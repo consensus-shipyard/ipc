@@ -6,7 +6,7 @@
 use fvm_shared::econ::TokenAmount;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use std::{collections::BTreeMap, fmt::Display, path::PathBuf};
+use std::collections::BTreeMap;
 use tendermint_rpc::Url;
 
 use fendermint_vm_encoding::IsHumanReadable;

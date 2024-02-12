@@ -24,7 +24,7 @@ use quickcheck::{Arbitrary, Gen};
 use crate::{
     manifest::{
         Account, Balance, BalanceMap, CollateralMap, IpcDeployment, Manifest, Node, NodeMap,
-        NodeMode, Relayer, Rootnet, Subnet, SubnetMap,
+        NodeMode, ParentNode, Relayer, Rootnet, Subnet, SubnetMap,
     },
     AccountId, NodeId, RelayerId, ResourceId, SubnetId,
 };
@@ -161,7 +161,7 @@ fn gen_manifest(
         }
     };
 
-    // Pick some node IDs targeted by relayers on the rootnet.
+    // Collect the parent nodes on the rootnet that subnets can target.
     let parent_nodes: Vec<ParentNode> = match &rootnet {
         Rootnet::External { urls, .. } => urls.iter().cloned().map(ParentNode::External).collect(),
         Rootnet::New { ref nodes, .. } => nodes.keys().cloned().map(ParentNode::Internal).collect(),

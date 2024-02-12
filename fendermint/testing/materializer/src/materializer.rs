@@ -1,8 +1,10 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use async_trait::async_trait;
-use fvm_shared::{address::Address, econ::TokenAmount};
+use ethers::types::H160;
+use fvm_shared::econ::TokenAmount;
 use std::collections::BTreeMap;
+use tendermint_rpc::Url;
 
 use fendermint_vm_genesis::Collateral;
 
@@ -80,6 +82,7 @@ pub trait Materializer {
         &mut self,
         subnet_name: &SubnetName,
         deployer: &Self::Account,
+        urls: Vec<Url>,
     ) -> anyhow::Result<Self::Deployment>;
 
     /// Set the IPC contracts onto the rootnet.
@@ -90,8 +93,8 @@ pub trait Materializer {
     fn existing_deployment(
         &mut self,
         subnet_name: &SubnetName,
-        gateway: Address,
-        registry: Address,
+        gateway: H160,
+        registry: H160,
     ) -> Self::Deployment;
 
     /// Return the well-known IPC contract deployments.
@@ -202,10 +205,10 @@ where
     pub genesis: &'a M::Genesis,
     /// The validator keys if this is a validator node; none if just a full node.
     pub validator: Option<&'a M::Account>,
-    /// The node for the top-down syncer to follow; none if this is a root node, or if the parent is an external address.
+    /// The node for the top-down syncer to follow; none if this is a root node.
     ///
     /// This can potentially also be used to configure the IPLD Resolver seeds, to connect across subnets.
-    pub parent_node: Option<&'a M::Node>,
+    pub parent_node: Option<TargetConfig<'a, M>>,
     /// Run the Ethereum API facade or not.
     pub ethapi: bool,
 }
@@ -223,13 +226,21 @@ where
     pub min_validators: usize,
 }
 
-/// Options for how to submit transactions to the parent subnet.
+/// Options for how to submit transactions to a subnet.
 pub struct SubmitConfig<'a, M>
 where
     M: Materializer + ?Sized,
 {
     /// The nodes to which we can send transactions or queries.
-    pub nodes: Vec<&'a M::Node>,
+    pub nodes: Vec<TargetConfig<'a, M>>,
     /// The location of the IPC contracts on the (generally parent) subnet.
     pub deployment: &'a M::Deployment,
+}
+
+pub enum TargetConfig<'a, M>
+where
+    M: Materializer + ?Sized,
+{
+    External(Url),
+    Internal(&'a M::Node),
 }

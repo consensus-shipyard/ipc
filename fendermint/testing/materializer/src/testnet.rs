@@ -7,12 +7,14 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Display,
 };
+use tendermint_rpc::Url;
 
 use crate::{
     manifest::{
-        BalanceMap, CollateralMap, IpcDeployment, Manifest, Node, NodeMode, Rootnet, Subnet,
+        BalanceMap, CollateralMap, IpcDeployment, Manifest, Node, NodeMode, ParentNode, Rootnet,
+        Subnet,
     },
-    materializer::{Materializer, NodeConfig, SubmitConfig, SubnetConfig},
+    materializer::{Materializer, NodeConfig, SubmitConfig, SubnetConfig, TargetConfig},
     AccountId, NodeId, NodeName, RelayerName, ResourceHash, SubnetId, SubnetName, TestnetId,
     TestnetName,
 };
@@ -33,6 +35,7 @@ use crate::{
 pub struct Testnet<M: Materializer> {
     name: TestnetName,
     network: M::Network,
+    externals: Vec<Url>,
     accounts: BTreeMap<AccountId, M::Account>,
     deployments: BTreeMap<SubnetName, M::Deployment>,
     genesis: BTreeMap<SubnetName, M::Genesis>,
@@ -55,6 +58,7 @@ where
         Ok(Self {
             name,
             network,
+            externals: Default::default(),
             accounts: Default::default(),
             deployments: Default::default(),
             genesis: Default::default(),
@@ -152,10 +156,20 @@ where
             .collect()
     }
 
-    /// Where can se send transactions and queries on a subnet.
+    /// Where can we send transactions and queries on a subnet.
     pub fn submit_config(&self, subnet_name: &SubnetName) -> anyhow::Result<SubmitConfig<M>> {
         let deployment = self.deployment(subnet_name)?;
-        let nodes = self.nodes_by_subnet(subnet_name);
+
+        let mut nodes = self
+            .nodes_by_subnet(subnet_name)
+            .into_iter()
+            .map(TargetConfig::Internal)
+            .collect::<Vec<_>>();
+
+        if subnet_name.is_root() {
+            nodes.extend(self.externals.iter().cloned().map(TargetConfig::External));
+        }
+
         Ok(SubmitConfig { deployment, nodes })
     }
 
@@ -237,28 +251,36 @@ where
         let network = self.network();
         let node_name = subnet_name.node(node_id);
 
+        let parent_node = match (subnet_name.parent(), &node.parent_node) {
+            (Some(ps), Some(ParentNode::Internal(id))) => Some(TargetConfig::<M>::Internal(
+                self.node(&ps.node(id))
+                    .with_context(|| format!("invalid parent node in {node_name:?}"))?,
+            )),
+            (Some(ps), Some(ParentNode::External(url))) if ps.is_root() => {
+                Some(TargetConfig::External(url.clone()))
+            }
+            (Some(_), Some(ParentNode::External(_))) => {
+                bail!("node {node_name:?} specifies external URL for parent, but it's on a non-root subnet")
+            }
+            (None, Some(_)) => {
+                bail!("node {node_name:?} specifies parent node, but there is no parent subnet")
+            }
+            _ => None,
+        };
+
         let node_config = NodeConfig {
             network,
             genesis,
             validator: match &node.mode {
                 NodeMode::Full => None,
-                NodeMode::Validator(id) => {
+                NodeMode::Validator { validator } => {
                     let validator = self
-                        .account(id)
+                        .account(validator)
                         .with_context(|| format!("invalid validator in {node_name:?}"))?;
                     Some(validator)
                 }
             },
-            parent_node: match (subnet_name.parent(), &node.parent_node) {
-                (Some(ps), Some(n)) => Some(
-                    self.node(&ps.node(n))
-                        .with_context(|| format!("invalid parent node in {node_name:?}"))?,
-                ),
-                (None, Some(_)) => {
-                    bail!("node {node_name:?} has parent node, but there is no parent subnet")
-                }
-                _ => None,
-            },
+            parent_node,
             ethapi: node.ethapi,
         };
 
@@ -307,12 +329,12 @@ where
         rootnet: Rootnet,
     ) -> anyhow::Result<()> {
         match rootnet {
-            Rootnet::External { deployment } => {
+            Rootnet::External { deployment, urls } => {
                 // Establish root contract locations.
                 let deployment = match deployment {
                     IpcDeployment::New { deployer } => {
                         let deployer = self.account(&deployer).context("invalid deployer")?;
-                        m.new_deployment(root_name, deployer)
+                        m.new_deployment(root_name, deployer, urls.clone())
                             .await
                             .context("failed to deploy IPC contracts")?
                     }
@@ -322,6 +344,7 @@ where
                 };
 
                 self.deployments.insert(root_name.clone(), deployment);
+                self.externals = urls;
 
                 // Establish balances.
                 for a in self.accounts.values() {
@@ -502,10 +525,10 @@ where
                     .context("invalid follow node")?;
 
                 let submit_node = match (subnet_name.parent(), &relayer.submit_node) {
-                    (Some(p), Some(s)) => Some(self.node(&p.node(s)).context("invalid submit node")?),
-                    (Some(p), None) if p.is_root() => None, // must be an external endpoint
-                    (Some(_), None)  => bail!(
-                        "invalid relayer {id} in {subnet_name:?}: parent is not root, but submit node is missing"
+                    (Some(p), ParentNode::Internal(s)) => TargetConfig::Internal(self.node(&p.node(s)).context("invalid submit node")?),
+                    (Some(p), ParentNode::External(url)) if p.is_root() => TargetConfig::External(url.clone()),
+                    (Some(_), ParentNode::External(_))  => bail!(
+                        "invalid relayer {id} in {subnet_name:?}: parent is not root, but submit node is external"
                     ),
                     (None, _) => bail!(
                         "invalid relayer {id} in {subnet_name:?}: there is no parent subnet to relay to"
@@ -516,7 +539,7 @@ where
                 let relayer = m
                     .create_relayer(
                         &SubmitConfig {
-                            nodes: submit_node.into_iter().collect(),
+                            nodes: vec![submit_node],
                             deployment: parent_submit_config.deployment,
                         },
                         &relayer_name,
