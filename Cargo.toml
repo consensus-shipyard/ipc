@@ -9,10 +9,10 @@ members = [
   "ipc/provider",
   "ipc/api",
   "ipc/types",
-  # Tests seem to be obsolete (using IPC agent):
-  # "ipc/ipc/testing/*",
+
   # ipld
   "ipld/resolver",
+
   # fendermint
   "fendermint/abci",
   "fendermint/app",
@@ -126,6 +126,7 @@ serde_bytes = "0.11"
 serde_json = { version = "1", features = ["raw_value"] }
 serde_tuple = "0.5"
 serde_with = "2.3"
+serial_test = "3.0"
 tempfile = "3.7"
 thiserror = "1"
 tokio = { version = "1", features = [
@@ -186,16 +187,12 @@ fvm_ipld_amt = "0.6.2"
 fil_actors_evm_shared = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v12.0.0" }
 fil_actors_runtime = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v12.0.0" }
 
-# Using 0.8 because of ref-fvm.
-# 0.9 would be better because of its updated quickcheck dependency.
-# 0.10 breaks some API.
 cid = { version = "0.10.1", default-features = false, features = [
   "serde-codec",
   "std",
 ] }
 
-# We need a version of frc42_dispatch that has been updated to use FVM 4.1
-frc42_dispatch = { git = "https://github.com/fridrik01/filecoin.git", branch = "update-fvm-4.1" }
+frc42_dispatch = "6.0.0"
 
 # Using the same tendermint-rs dependency as tower-abci. From both we are interested in v037 modules.
 tower-abci = { version = "0.7" }
@@ -210,7 +207,7 @@ tendermint-proto = { version = "0.31" }
 
 # Fluence
 fluence-actor-sdk = { version = "0.1.2" }
-fluence-fendermint-syscall = { version = "0.1.4" }
+fluence-fendermint-syscall = { version = "0.1.5" }
 
 [patch.crates-io]
 # Use stable-only features.

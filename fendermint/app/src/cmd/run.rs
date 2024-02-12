@@ -2,12 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::{anyhow, bail, Context};
+use async_stm::atomically_or_err;
 use fendermint_abci::ApplicationService;
-use fendermint_app::{App, AppConfig, AppParentFinalityQuery, AppStore, BitswapBlockstore};
+use fendermint_app::ipc::{AppParentFinalityQuery, AppVote};
+use fendermint_app::{App, AppConfig, AppStore, BitswapBlockstore};
 use fendermint_app_settings::AccountKind;
 use fendermint_crypto::SecretKey;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
 use fendermint_vm_actor_interface::eam::EthAddress;
+use fendermint_vm_interpreter::chain::ChainEnv;
 use fendermint_vm_interpreter::{
     bytes::{BytesMessageInterpreter, ProposalPrepareMode},
     chain::{ChainMessageInterpreter, CheckpointPool},
@@ -18,47 +21,35 @@ use fendermint_vm_resolver::ipld::IpldResolver;
 use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::proxy::IPCProviderProxy;
 use fendermint_vm_topdown::sync::launch_polling_syncer;
-use fendermint_vm_topdown::{CachedFinalityProvider, Toggle};
+use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
+use fendermint_vm_topdown::{CachedFinalityProvider, IPCParentFinality, Toggle};
 use fvm_shared::address::Address;
+use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
 use libp2p::identity::secp256k1;
 use libp2p::identity::Keypair;
 use std::sync::Arc;
+use tokio::sync::broadcast::error::RecvError;
 use tracing::info;
 
 use crate::cmd::key::read_secret_key;
 use crate::{cmd, options::run::RunArgs, settings::Settings};
 
-fn create_ipc_provider_proxy(settings: &Settings) -> anyhow::Result<IPCProviderProxy> {
-    let topdown_config = settings.ipc.topdown_config()?;
-    let subnet = ipc_provider::config::Subnet {
-        id: settings
-            .ipc
-            .subnet_id
-            .parent()
-            .ok_or_else(|| anyhow!("subnet has no parent"))?,
-        config: SubnetConfig::Fevm(EVMSubnet {
-            provider_http: topdown_config
-                .parent_http_endpoint
-                .to_string()
-                .parse()
-                .unwrap(),
-            auth_token: None,
-            registry_addr: topdown_config.parent_registry,
-            gateway_addr: topdown_config.parent_gateway,
-        }),
-    };
-    info!("init ipc provider with subnet: {}", subnet.id);
-
-    let ipc_provider = IpcProvider::new_with_subnet(None, subnet)?;
-    IPCProviderProxy::new(ipc_provider, settings.ipc.subnet_id.clone())
-}
-
 cmd! {
   RunArgs(self, settings) {
     run(settings).await
   }
+}
+
+// Database collection names.
+namespaces! {
+    Namespaces {
+        app,
+        state_hist,
+        state_store,
+        bit_store
+    }
 }
 
 /// Run the Fendermint ABCI Application.
@@ -90,9 +81,17 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         }
     };
 
+    let validator_keypair = validator.as_ref().map(|(sk, _)| {
+        let mut bz = sk.serialize();
+        let sk = libp2p::identity::secp256k1::SecretKey::try_from_bytes(&mut bz)
+            .expect("secp256k1 secret key");
+        let kp = libp2p::identity::secp256k1::Keypair::from(sk);
+        libp2p::identity::Keypair::from(kp)
+    });
+
     let validator_ctx = validator.map(|(sk, addr)| {
         // For now we are using the validator key for submitting transactions.
-        // This allows us to identify transactions coming from bonded validators, to give priority to protocol related transactions.
+        // This allows us to identify transactions coming from empowered validators, to give priority to protocol related transactions.
         let broadcaster = Broadcaster::new(
             tendermint_client.clone(),
             addr,
@@ -127,27 +126,60 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     let state_store =
         NamespaceBlockstore::new(db.clone(), ns.state_store).context("error creating state DB")?;
 
-    let resolve_pool = CheckpointPool::new();
+    let checkpoint_pool = CheckpointPool::new();
+    let parent_finality_votes = VoteTally::empty();
+
+    let topdown_enabled = settings.topdown_enabled();
 
     // If enabled, start a resolver that communicates with the application through the resolve pool.
-    if settings.resolver.enabled() {
+    if settings.resolver_enabled() {
         let service =
             make_resolver_service(&settings, db.clone(), state_store.clone(), ns.bit_store)?;
 
         let client = service.client();
 
-        let own_subnet_id = settings.resolver.subnet_id.clone();
+        let own_subnet_id = settings.ipc.subnet_id.clone();
 
         client
             .add_provided_subnet(own_subnet_id.clone())
             .context("error adding own provided subnet.")?;
 
         let resolver = IpldResolver::new(
-            client,
-            resolve_pool.queue(),
+            client.clone(),
+            checkpoint_pool.queue(),
             settings.resolver.retry_delay,
-            own_subnet_id,
+            own_subnet_id.clone(),
         );
+
+        if topdown_enabled {
+            if let Some(key) = validator_keypair {
+                let parent_finality_votes = parent_finality_votes.clone();
+
+                tracing::info!("starting the parent finality vote gossip loop...");
+                tokio::spawn(async move {
+                    publish_vote_loop(
+                        parent_finality_votes,
+                        settings.ipc.vote_interval,
+                        key,
+                        own_subnet_id,
+                        client,
+                        |height, block_hash| {
+                            AppVote::ParentFinality(IPCParentFinality { height, block_hash })
+                        },
+                    )
+                    .await
+                });
+            }
+        } else {
+            tracing::info!("parent finality vote gossip disabled");
+        }
+
+        tracing::info!("subscribing to gossip...");
+        let rx = service.subscribe();
+        let parent_finality_votes = parent_finality_votes.clone();
+        tokio::spawn(async move {
+            dispatch_resolver_events(rx, parent_finality_votes, topdown_enabled).await;
+        });
 
         tracing::info!("starting the IPLD Resolver Service...");
         tokio::spawn(async move {
@@ -162,7 +194,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         tracing::info!("IPLD Resolver disabled.")
     }
 
-    let (parent_finality_provider, ipc_tuple) = if settings.ipc.is_topdown_enabled() {
+    let (parent_finality_provider, ipc_tuple) = if topdown_enabled {
         info!("topdown finality enabled");
         let topdown_config = settings.ipc.topdown_config()?;
         let config = fendermint_vm_topdown::Config::new(
@@ -173,7 +205,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         )
         .with_proposal_delay(topdown_config.proposal_delay)
         .with_max_proposal_range(topdown_config.max_proposal_range);
-        let ipc_provider = Arc::new(create_ipc_provider_proxy(&settings)?);
+        let ipc_provider = Arc::new(make_ipc_provider_proxy(&settings)?);
         let finality_provider =
             CachedFinalityProvider::uninitialized(config.clone(), ipc_provider.clone()).await?;
         let p = Arc::new(Toggle::enabled(finality_provider));
@@ -220,8 +252,11 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         db,
         state_store,
         interpreter,
-        resolve_pool,
-        parent_finality_provider.clone(),
+        ChainEnv {
+            checkpoint_pool,
+            parent_finality_provider: parent_finality_provider.clone(),
+            parent_finality_votes: parent_finality_votes.clone(),
+        },
         snapshots,
     )?;
 
@@ -232,6 +267,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
                 app_parent_finality_query,
                 config,
                 parent_finality_provider,
+                parent_finality_votes,
                 agent_proxy,
                 tendermint_client,
             )
@@ -267,15 +303,6 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     Ok(())
 }
 
-namespaces! {
-    Namespaces {
-        app,
-        state_hist,
-        state_store,
-        bit_store
-    }
-}
-
 /// Open database with all
 fn open_db(settings: &Settings, ns: &Namespaces) -> anyhow::Result<RocksDb> {
     let path = settings.data_dir().join("rocksdb");
@@ -292,7 +319,7 @@ fn make_resolver_service(
     db: RocksDb,
     state_store: NamespaceBlockstore,
     bit_store_ns: String,
-) -> anyhow::Result<ipc_ipld_resolver::Service<libipld::DefaultParams>> {
+) -> anyhow::Result<ipc_ipld_resolver::Service<libipld::DefaultParams, AppVote>> {
     // Blockstore for Bitswap.
     let bit_store = NamespaceBlockstore::new(db, bit_store_ns).context("error creating bit DB")?;
 
@@ -305,6 +332,31 @@ fn make_resolver_service(
         .context("error creating IPLD Resolver Service")?;
 
     Ok(service)
+}
+
+fn make_ipc_provider_proxy(settings: &Settings) -> anyhow::Result<IPCProviderProxy> {
+    let topdown_config = settings.ipc.topdown_config()?;
+    let subnet = ipc_provider::config::Subnet {
+        id: settings
+            .ipc
+            .subnet_id
+            .parent()
+            .ok_or_else(|| anyhow!("subnet has no parent"))?,
+        config: SubnetConfig::Fevm(EVMSubnet {
+            provider_http: topdown_config
+                .parent_http_endpoint
+                .to_string()
+                .parse()
+                .unwrap(),
+            auth_token: None,
+            registry_addr: topdown_config.parent_registry,
+            gateway_addr: topdown_config.parent_gateway,
+        }),
+    };
+    info!("init ipc provider with subnet: {}", subnet.id);
+
+    let ipc_provider = IpcProvider::new_with_subnet(None, subnet)?;
+    IPCProviderProxy::new(ipc_provider, settings.ipc.subnet_id.clone())
 }
 
 fn to_resolver_config(settings: &Settings) -> anyhow::Result<ipc_ipld_resolver::Config> {
@@ -323,7 +375,7 @@ fn to_resolver_config(settings: &Settings) -> anyhow::Result<ipc_ipld_resolver::
 
     let network_name = format!(
         "ipld-resolver-{}-{}",
-        r.subnet_id.root_id(),
+        settings.ipc.subnet_id.root_id(),
         r.network.network_name
     );
 
@@ -365,5 +417,66 @@ fn to_address(sk: &SecretKey, kind: &AccountKind) -> anyhow::Result<Address> {
     match kind {
         AccountKind::Regular => Ok(Address::new_secp256k1(&pk)?),
         AccountKind::Ethereum => Ok(Address::from(EthAddress::new_secp256k1(&pk)?)),
+    }
+}
+
+async fn dispatch_resolver_events(
+    mut rx: tokio::sync::broadcast::Receiver<ResolverEvent<AppVote>>,
+    parent_finality_votes: VoteTally,
+    topdown_enabled: bool,
+) {
+    loop {
+        match rx.recv().await {
+            Ok(event) => match event {
+                ResolverEvent::ReceivedPreemptive(_, _) => {}
+                ResolverEvent::ReceivedVote(vote) => {
+                    dispatch_vote(*vote, &parent_finality_votes, topdown_enabled).await;
+                }
+            },
+            Err(RecvError::Lagged(n)) => {
+                tracing::warn!("the resolver service skipped {n} gossip events")
+            }
+            Err(RecvError::Closed) => {
+                tracing::error!("the resolver service stopped receiving gossip");
+                return;
+            }
+        }
+    }
+}
+
+async fn dispatch_vote(
+    vote: VoteRecord<AppVote>,
+    parent_finality_votes: &VoteTally,
+    topdown_enabled: bool,
+) {
+    match vote.content {
+        AppVote::ParentFinality(f) => {
+            if !topdown_enabled {
+                tracing::debug!("ignoring vote; topdown disabled");
+                return;
+            }
+            let res = atomically_or_err(|| {
+                parent_finality_votes.add_vote(
+                    vote.public_key.clone(),
+                    f.height,
+                    f.block_hash.clone(),
+                )
+            })
+            .await;
+
+            match res {
+                Ok(_) => {}
+                Err(e @ VoteError::Equivocation(_, _, _, _)) => {
+                    tracing::warn!(error = e.to_string(), "failed to handle vote");
+                }
+                Err(e @ (
+                      VoteError::Uninitialized // early vote, we're not ready yet
+                    | VoteError::UnpoweredValidator(_) // maybe arrived too early or too late, or spam
+                    | VoteError::UnexpectedBlock(_, _) // won't happen here
+                )) => {
+                    tracing::debug!(error = e.to_string(), "failed to handle vote")
+                }
+            }
+        }
     }
 }

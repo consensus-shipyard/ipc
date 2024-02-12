@@ -8,7 +8,7 @@ license-file.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.56"
+anyhow = { workspace = true }
 fil_actors_runtime = { workspace = true, optional = true }
 fnv = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }

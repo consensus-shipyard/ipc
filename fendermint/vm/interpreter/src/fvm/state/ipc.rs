@@ -4,34 +4,36 @@
 use anyhow::{anyhow, Context};
 use ethers::types as et;
 
-use fendermint_vm_message::conv::{from_eth, from_fvm};
 use fvm_ipld_blockstore::Blockstore;
+use fvm_shared::econ::TokenAmount;
 use fvm_shared::ActorID;
 
-use super::{
-    fevm::{ContractCaller, MockProvider, NoRevert},
-    FvmExecState,
-};
-use crate::fvm::FvmApplyRet;
-use fendermint_crypto::SecretKey;
+use fendermint_crypto::{PublicKey, SecretKey};
 use fendermint_vm_actor_interface::ipc;
 use fendermint_vm_actor_interface::{
     eam::EthAddress,
     init::builtin_actor_eth_addr,
     ipc::{AbiHash, ValidatorMerkleTree, GATEWAY_ACTOR_ID},
 };
-use fendermint_vm_genesis::{Power, Validator};
+use fendermint_vm_genesis::{Collateral, Power, PowerScale, Validator, ValidatorKey};
+use fendermint_vm_message::conv::{from_eth, from_fvm};
 use fendermint_vm_message::signed::sign_secp256k1;
 use fendermint_vm_topdown::IPCParentFinality;
-use fvm_shared::econ::TokenAmount;
+
 use ipc_actors_abis::checkpointing_facet::CheckpointingFacet;
 use ipc_actors_abis::gateway_getter_facet::GatewayGetterFacet;
-use ipc_actors_abis::gateway_getter_facet::{self as getter};
+use ipc_actors_abis::gateway_getter_facet::{self as getter, gateway_getter_facet};
 use ipc_actors_abis::top_down_finality_facet::TopDownFinalityFacet;
 use ipc_actors_abis::xnet_messaging_facet::XnetMessagingFacet;
 use ipc_actors_abis::{checkpointing_facet, top_down_finality_facet, xnet_messaging_facet};
 use ipc_api::cross::IpcEnvelope;
-use ipc_api::staking::StakingChangeRequest;
+use ipc_api::staking::{ConfigurationNumber, StakingChangeRequest};
+
+use super::{
+    fevm::{ContractCaller, MockProvider, NoRevert},
+    FvmExecState,
+};
+use crate::fvm::FvmApplyRet;
 
 #[derive(Clone)]
 pub struct GatewayCaller<DB> {
@@ -154,11 +156,25 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
     }
 
     /// Get the currently active validator set.
-    pub fn current_validator_set(
+    pub fn current_membership(
         &self,
         state: &mut FvmExecState<DB>,
     ) -> anyhow::Result<getter::Membership> {
         self.getter.call(state, |c| c.get_current_membership())
+    }
+
+    /// Get the current power table, which is the same as the membership but parsed into domain types.
+    pub fn current_power_table(
+        &self,
+        state: &mut FvmExecState<DB>,
+    ) -> anyhow::Result<(ConfigurationNumber, Vec<Validator<Power>>)> {
+        let membership = self
+            .current_membership(state)
+            .context("failed to get current membership")?;
+
+        let power_table = membership_to_power_table(&membership, state.power_scale());
+
+        Ok((membership.configuration_number, power_table))
     }
 
     /// Construct the input parameters for adding a signature to the checkpoint.
@@ -322,4 +338,25 @@ pub fn tokens_to_burn(msgs: &[checkpointing_facet::IpcEnvelope]) -> TokenAmount 
             total += from_eth::to_fvm_tokens(&msg.value);
             total
         })
+}
+
+/// Convert the collaterals and metadata in the membership to the public key and power expected by the system.
+fn membership_to_power_table(
+    m: &gateway_getter_facet::Membership,
+    power_scale: PowerScale,
+) -> Vec<Validator<Power>> {
+    let mut pt = Vec::new();
+
+    for v in m.validators.iter() {
+        // Ignoring any metadata that isn't a public key.
+        if let Ok(pk) = PublicKey::parse_slice(&v.metadata, None) {
+            let c = from_eth::to_fvm_tokens(&v.weight);
+            pt.push(Validator {
+                public_key: ValidatorKey(pk),
+                power: Collateral(c).into_power(power_scale),
+            })
+        }
+    }
+
+    pt
 }

@@ -11,12 +11,14 @@ use self::default::{
 };
 use self::export::{WalletExport, WalletExportArgs, WalletPublicKey, WalletPublicKeyArgs};
 use self::import::{WalletImport, WalletImportArgs};
+use self::list::{WalletList, WalletListArgs};
 use self::remove::{WalletRemove, WalletRemoveArgs};
 
 mod balances;
 mod default;
 mod export;
 mod import;
+mod list;
 mod new;
 mod remove;
 
@@ -39,6 +41,7 @@ impl WalletCommandsArgs {
             Commands::SetDefault(args) => WalletSetDefault::handle(global, args).await,
             Commands::GetDefault(args) => WalletGetDefault::handle(global, args).await,
             Commands::PubKey(args) => WalletPublicKey::handle(global, args).await,
+            Commands::List(args) => WalletList::handle(global, args).await,
         }
     }
 }
@@ -53,4 +56,5 @@ pub(crate) enum Commands {
     SetDefault(WalletSetDefaultArgs),
     GetDefault(WalletGetDefaultArgs),
     PubKey(WalletPublicKeyArgs),
+    List(WalletListArgs),
 }

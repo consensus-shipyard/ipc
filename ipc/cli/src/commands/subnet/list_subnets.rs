@@ -47,8 +47,8 @@ impl CommandLineHandler for ListSubnets {
     about = "List all child subnets registered in the gateway (i.e. that have provided enough collateral)"
 )]
 pub(crate) struct ListSubnetsArgs {
-    #[arg(long, short, help = "The gateway address to query subnets")]
+    #[arg(long, help = "The gateway address to query subnets")]
     pub gateway_address: Option<String>,
-    #[arg(long, short, help = "The subnet id to query child subnets")]
+    #[arg(long, help = "The subnet id to query child subnets")]
     pub subnet: String,
 }

@@ -22,6 +22,10 @@ sudo apt update && sudo apt install build-essential libssl-dev mesa-opencl-icd o
 ## Step 2: Initialise your config
 
 * Initialise the config
+```shell
+alias ipc-cli="cargo run -q -p ipc-cli --release --"
+```
+
 ```bash
 ipc-cli config init
 ```
@@ -58,14 +62,14 @@ You'll need to create a set of wallets to spawn and interact of the subnet. Plea
 
 * Create the three different wallets
 ```bash
-ipc-cli wallet new -w evm
-ipc-cli wallet new -w evm
-ipc-cli wallet new -w evm
+ipc-cli wallet new --wallet-type evm
+ipc-cli wallet new --wallet-type evm
+ipc-cli wallet new --wallet-type evm
 ```
 
 * You can optionally set one of the wallets as your default so you don't have to use the `--from` flag explicitly in some of the commands:
 ```bash
-ipc-cli wallet set-default --address <DEFAULT_ETH_ADDR> -w evm
+ipc-cli wallet set-default --address <DEFAULT_ETH_ADDR> --wallet-type evm
 ```
 
 <!-- * Convert the 0x addresses to f4 addresses for later usage (OWNER_1_F4, OWNER_2_F4, and OWNER_3_F4)  -->
@@ -77,7 +81,7 @@ ipc-cli wallet set-default --address <DEFAULT_ETH_ADDR> -w evm
 
 * Go to the [Calibration faucet](https://faucet.calibration.fildev.network/) and get some funds sent to each of your addresses
 
->💡 In case you'd like to import an EVM account into Metamask, you can use export the private key using `ipc-cli wallet export -w evm -a <ADDRESS>`. More information is available in the [EVM IPC agent support docs](./usage.md#key-management).
+>💡 In case you'd like to import an EVM account into Metamask, you can use export the private key using `ipc-cli wallet export --wallet-type evm --address <ADDRESS>`. More information is available in the [EVM IPC agent support docs](./usage.md#key-management).
 
 >💡 Note that you may hit faucet rate limits. In that case, wait a few minutes or continue with the guide and come back to this before step 9. Alternatively, you can send funds from your primary wallet to your owner wallets.
 
@@ -89,6 +93,8 @@ ipc-cli wallet set-default --address <DEFAULT_ETH_ADDR> -w evm
 ipc-cli subnet create --parent /r314159 --min-validators 3 --min-validator-stake 1 --bottomup-check-period 30
 ```
 
+This will output your subnet ID, which you will use below.
+
 * Make a note of the address of the subnet you created.
 
 ## Step 5: Join the subnet
@@ -97,9 +103,9 @@ Before we deploy the infrastructure for the subnet, we will have to bootstrap th
 
 * Get the public key for all of your wallets and note it down. This is the public key that each of your validators will use to sign blocks in the subnet.
 ```bash
-ipc-cli wallet pub-key -w evm --address <WALLET_ADDR1>
-ipc-cli wallet pub-key -w evm --address <WALLET_ADDR2>
-ipc-cli wallet pub-key -w evm --address <WALLET_ADDR3>
+ipc-cli wallet pub-key --wallet-type evm --address <WALLET_ADDR1>
+ipc-cli wallet pub-key --wallet-type evm --address <WALLET_ADDR2>
+ipc-cli wallet pub-key --wallet-type evm --address <WALLET_ADDR3>
 ```
 
 * Join the subnet with each validator
@@ -116,33 +122,50 @@ With the collateral and number of minimum validators fulfilled, the subnet is bo
 Before running our validators, at least one bootstrap needs to be deployed and advertised in the network. Bootstrap nodes allow validators discover other peers and validators in the network. In the current implementation of IPC, only validators are allowed to advertise bootstrap nodes.
 
 * We can deploy a new bootstrap node in the subnet by running:
+
 ```bash
 cargo make --makefile infra/fendermint/Makefile.toml \
-    -e PRIVATE_KEY_PATH=<VALIDATOR_PRIV_KEY> \
     -e SUBNET_ID=<SUBNET_ID> \
+    -e BOOTSTRAPS=<BOOTSTRAP_ENDPOINT> \  # optional if you have additional bootstraps and want to interconnect them
     -e CMT_P2P_HOST_PORT=<COMETBFT_P2P_PORT> \
     -e CMT_RPC_HOST_PORT=<COMETBFT_RPC_PORT> \
+    -e CMT_RPC_HOST_PORT=<COMETBFT_RPC_PORT> \
     -e ETHAPI_HOST_PORT=<ETH_RPC_PORT> \
-    -e BOOTSTRAPS=<BOOTSTRAP_ENDPOINT>
+    -e RESOLVER_HOST_PORT=<RESOLVER_HOST_PORT> \
+    -e RESOLVER_BOOTSTRAPS=<RESOLVER_BOOTSTRAPS> \
     -e PARENT_REGISTRY=<PARENT_REGISTRY_CONTRACT_ADDR> \
     -e PARENT_GATEWAY=<GATEWAY_REGISTRY_CONTRACT_ADDR> \
-    -e CMT_EXTERNAL_ADDR=<COMETBFT_EXTERNAL_ENDPOINT> \
     bootstrap
 ```
 
+> Customize the bootstrap's endpoints.
+> You may customize the bootstrap's endpoints by passing these env variables:
+> - `CMT_P2P_HOST_PORT` (optional): Specifies the listening port for the bootstrap's p2p interface for CometBFT.
+> - `CMT_RPC_HOST_PORT` (optional): Specifies the listening port in the localhost for CometBFT's RPC.
+> - `CMT_EXTERNAL_ADDR`: Address to advertise to peers for them to dial. If empty, will use the same as the default listening address from CometBFT (generally `0.0.0.0:<CMT_RPC_HOST_PORT>`).
+
 At the end of the output, this command should return the ID of your new bootstrap node:
+
 ```console
 
 [cargo-make] INFO - Running Task: cometbft-wait
 [cargo-make] INFO - Running Task: cometbft-node-id
 2b23b8298dff7711819172252f9df3c84531b1d9@172.26.0.2:26650
+[cargo-make] INFO - Running Task: bootstrap-peer-id
+QmYyQSo1c1Ym7orWxLYvCrM2EmxFTANf8wXmmE7DWjhx5N
 [cargo-make] INFO - Build Done in 13.38 seconds.
 ```
-Remember the address of your bootstrap for the next step. This address has the following format `id@ip:port`. Feel free to adjust the `ip` to use a reachable IP for your deployment so other nodes can contact it (in our case our localhost IP, `127.0.0.1`) and to use as `CMT_EXTERNAL_ADDR` a reachable IP by other peers, and the port configured in `CMT_EXTERNAL_ADDR`.
 
-* We can get the address of the deployed bootstrap node by running:
+This same external IP address can be used to circulate the libp2p multiaddress of the bootstrap node which is used for gossiping. The format will be like `/ip4/${CMT_EXTERNAL_ADDR}/tcp/${RESOLVER_HOST_PORT}/p2p/${BOOTSTRAP_PEER_ID}`. This will go in the `RESOLVER_BOOTSTRAPS` parameter of nodes connecting to our bootstrap.
+
+* We can get the CometBFT address of the deployed bootstrap node by running:
 ```bash
 cargo make --makefile infra/fendermint/Makefile.toml bootstrap-node-id
+```
+
+* We can get the libp2p peer ID of the deployed bootstrap node by running:
+```bash
+cargo make --makefile infra/fendermint/Makefile.toml bootstrap-peer-id
 ```
 
 * To shut down the bootstrap node run:
@@ -150,10 +173,14 @@ cargo make --makefile infra/fendermint/Makefile.toml bootstrap-node-id
 cargo make --makefile infra/fendermint/Makefile.toml bootstrap-down
 ```
 
+Remember the peer ID of your bootstrap for the next steps.
+
+You will now derive the node address. It has format: `id@ip:port`. For `ip`, you can use a loopback address if all your validators will run on the same host, or you can use the host's reachable IP address so other nodes can contact it.
+
 * To advertise the endpoint to the rest of nodes in the network we need to run:
 ```bash
 # Example of BOOTSTRAP_ENDPOINT = 2b23b8298dff7711819172252f9df3c84531b1d9@172.26.0.2:26650
-ipc-cli subnet add-bootstrap --subnet=<SUBNET_ID> --endpoint="<BOOTSRAP_ENDPOINT>"
+ipc-cli subnet add-bootstrap --subnet=<SUBNET_ID> --endpoint="<BOOTSTRAP_ENDPOINT>"
 ```
 
 * The bootstrap nodes currently deployed in the network can be queried through the following command:
@@ -164,11 +191,12 @@ ipc-cli subnet list-bootstraps --subnet=<SUBNET_ID>
 ### Deploying the validator infrastructure
 With the bootstrap node deployed and advertised to the network, we are now ready to deploy the validators that will run the subnet.
 
-* First we need to export the private keys of our validators from the addresses that we created with our `ipc-cli wallet` to a known path so they can be picked by Fendermint to sign blocks. We can use the default repo of IPC for this, `~/.ipc`.
+* First we need to export the private keys of our validators from the addresses that we created with our `ipc-cli wallet` to a known path so they can be picked by Fendermint to sign blocks. We can use the default repo of IPC for this, `~/.ipc`. We'll later refer to the private key paths as `<PATH_PRIV_KEY_VALIDATOR_n>`.
+
 ```bash
-ipc-cli wallet export -w evm -a <WALLET_ADDR1> --hex -o ~/.ipc/<PRIV_KEY_VALIDATOR_1>
-ipc-cli wallet export -w evm -a <WALLET_ADDR2> --hex -o ~/.ipc/<PRIV_KEY_VALIDATOR_2>
-ipc-cli wallet export -w evm -a <WALLET_ADDR3> --hex -o ~/.ipc/<PRIV_KEY_VALIDATOR_3>
+ipc-cli wallet export --wallet-type evm --address <WALLET_ADDR1> --hex > ~/.ipc/validator_1.sk
+ipc-cli wallet export --wallet-type evm --address <WALLET_ADDR2> --hex > ~/.ipc/validator_2.sk
+ipc-cli wallet export --wallet-type evm --address <WALLET_ADDR3> --hex > ~/.ipc/validator_3.sk
 ```
 
 * Now we have all that we need to deploy the three validators using the following command (configured for each of the validators, i.e. replace the arguments with `<..-n>` to fit that of the specific validator).
@@ -178,9 +206,11 @@ cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=validator-<n> \
     -e PRIVATE_KEY_PATH=<PATH_PRIV_KEY_VALIDATOR_n> \
     -e SUBNET_ID=<SUBNET_ID> \
-    -e CMT_P2P_HOST_PORT=<COMETBFT_P2P_PORT_n> -e CMT_RPC_HOST_PORT=<COMETBFT_RPC_PORT_n> \
+    -e CMT_P2P_HOST_PORT=<COMETBFT_P2P_PORT_n> \
+    -e CMT_RPC_HOST_PORT=<COMETBFT_RPC_PORT_n> \
     -e ETHAPI_HOST_PORT=<ETH_RPC_PORT_n> \
     -e BOOTSTRAPS=<BOOTSTRAP_ENDPOINT> \
+    -e RESOLVER_BOOTSTRAPS=<RESOLVER_BOOTSTRAPS> \
     -e PARENT_REGISTRY=<PARENT_REGISTRY_CONTRACT_ADDR> \
     -e PARENT_GATEWAY=<GATEWAY_REGISTRY_CONTRACT_ADDR> \
     -e CMT_EXTERNAL_ADDR=<COMETBFT_EXTERNAL_ENDPOINT> \
@@ -193,14 +223,16 @@ With this, we have everything in place, and our subnet should start automaticall
 ## Step 7: Configure your subnet in the IPC CLI
 
 * Edit the `ipc-cli` configuration `config.toml`
+
 ```bash
 nano ~/.ipc/config.toml
 ```
 
 * Append the new subnet to the configuration
+
 ```toml
 [[subnets]]
-id = "/r314159"
+id = <SUBNET_ID>    ## i.e. "/r314159/..."
 
 [subnets.config]
 network_type = "fevm"
@@ -211,7 +243,7 @@ registry_addr = "0x74539671a1d2f1c8f200826baba665179f53a1b7"
 
 With this you should be able to start interacting with your local subnet directly through your `ipc-cli`. You can try to fetch the balances of your wallets through the following command. The result should show the initial balance that you have included for your validators address in genesis:
 ```bash
-ipc-cli wallet balances -w evm --subnet=<SUBNET_ID>
+ipc-cli wallet balances --wallet-type evm --subnet=<SUBNET_ID>
 ```
 
 > The ETH addresses for `gateway_addr` and `registry_addr` used when they are deployed in genesis in a child subnet by Fendermint are `0x77aa40b105843728088c0132e43fc44348881da8` and `0x74539671a1d2f1c8f200826baba665179f53a1b7`, respectively.
@@ -221,6 +253,7 @@ ipc-cli wallet balances -w evm --subnet=<SUBNET_ID>
 For information about how to connect your Ethereum tooling with your subnet refer to the [following docs](./contracts.md).
 
 ## Step 9 (optional): Run a relayer
+
 IPC relies on the role of a specific type of peer on the network called the relayers that are responsible for submitting bottom-up checkpoints that have been finalized in a child subnet to its parent. This process is key for the commitment of child subnet checkpoints in the parent, and the execution of bottom-up cross-net messages. Without relayers, cross-net messages will only flow from top levels of the hierarchy to the bottom, but not the other way around.
 
 * *session* Run the relayer process for your subnet using your default address by calling:
@@ -238,6 +271,7 @@ ipc-cli subnet claim --subnet=<SUBNET_ID> --reward
 ```
 
 ## Step 10: What now?
+
 * Proceed to the [usage](usage.md) guide to learn how you can test your new subnet.
 * If something went wrong, please have a look at the [README](https://github.com/consensus-shipyard/ipc). If it doesn't help, please join us in #ipc-help. In either case, let us know your experience!
 * Please note that to repeat this guide or spawn a new subnet, you may need to change the parameters or reset your system.

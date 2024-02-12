@@ -20,7 +20,7 @@ mod arb;
 pub mod missing_blocks;
 
 pub use behaviour::{ContentConfig, DiscoveryConfig, MembershipConfig, NetworkConfig};
-pub use client::Client;
+pub use client::{Client, Resolver};
 pub use service::{Config, ConnectionConfig, Event, NoKnownPeers, Service};
 pub use timestamp::Timestamp;
-pub use vote_record::VoteRecord;
+pub use vote_record::{ValidatorKey, VoteRecord};

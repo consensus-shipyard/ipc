@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+set -eu
+set -o pipefail
 
 coverages=$(sed -n '/^.*headerCovTableEntryLo">/p' ./coverage_report/index.html | sed -En 's/[^0-9]*([0-9]{1,3})[^0-9]*/\1 /gp' | sed 's/ [0-9]//g')
 

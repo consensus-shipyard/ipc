@@ -52,15 +52,11 @@ impl CommandLineHandler for ListTopdownMsgs {
 #[derive(Debug, Args)]
 #[command(about = "List topdown cross messages for a specific epoch")]
 pub(crate) struct ListTopdownMsgsArgs {
-    #[arg(long, short, help = "The subnet id of the topdown subnet")]
+    #[arg(long, help = "The subnet id of the topdown subnet")]
     pub subnet: String,
-    #[arg(
-        long,
-        short,
-        help = "Include topdown messages starting from this epoch"
-    )]
+    #[arg(long, help = "Include topdown messages starting from this epoch")]
     pub from: ChainEpoch,
-    #[arg(long, short, help = "Include topdown messages to this epoch")]
+    #[arg(long, help = "Include topdown messages to this epoch")]
     pub to: ChainEpoch,
 }
 
@@ -84,6 +80,6 @@ impl CommandLineHandler for LatestParentFinality {
 #[derive(Debug, Args)]
 #[command(about = "Latest height of parent finality committed in child subnet")]
 pub(crate) struct LatestParentFinalityArgs {
-    #[arg(long, short, help = "The subnet id to check parent finality")]
+    #[arg(long, help = "The subnet id to check parent finality")]
     pub subnet: String,
 }

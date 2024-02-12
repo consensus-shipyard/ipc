@@ -52,17 +52,16 @@ impl CommandLineHandler for JoinSubnet {
 #[derive(Debug, Args)]
 #[command(name = "join", about = "Join a subnet")]
 pub struct JoinSubnetArgs {
-    #[arg(long, short, help = "The address that joins the subnet")]
+    #[arg(long, help = "The address that joins the subnet")]
     pub from: Option<String>,
-    #[arg(long, short, help = "The subnet to join")]
+    #[arg(long, help = "The subnet to join")]
     pub subnet: String,
     #[arg(
         long,
-        short,
         help = "The collateral to stake in the subnet (in whole FIL units)"
     )]
     pub collateral: f64,
-    #[arg(long, short, help = "The validator's metadata, hex encoded")]
+    #[arg(long, help = "The validator's metadata, hex encoded")]
     pub public_key: String,
     #[arg(
         long,
@@ -96,13 +95,12 @@ impl CommandLineHandler for StakeSubnet {
 #[derive(Debug, Args)]
 #[command(name = "stake", about = "Add collateral to an already joined subnet")]
 pub struct StakeSubnetArgs {
-    #[arg(long, short, help = "The address that stakes in the subnet")]
+    #[arg(long, help = "The address that stakes in the subnet")]
     pub from: Option<String>,
-    #[arg(long, short, help = "The subnet to add collateral to")]
+    #[arg(long, help = "The subnet to add collateral to")]
     pub subnet: String,
     #[arg(
         long,
-        short,
         help = "The collateral to stake in the subnet (in whole FIL units)"
     )]
     pub collateral: f64,
@@ -136,13 +134,12 @@ impl CommandLineHandler for UnstakeSubnet {
     about = "Remove collateral to an already joined subnet"
 )]
 pub struct UnstakeSubnetArgs {
-    #[arg(long, short, help = "The address that unstakes in the subnet")]
+    #[arg(long, help = "The address that unstakes in the subnet")]
     pub from: Option<String>,
-    #[arg(long, short, help = "The subnet to release collateral from")]
+    #[arg(long, help = "The subnet to release collateral from")]
     pub subnet: String,
     #[arg(
         long,
-        short,
         help = "The collateral to unstake from the subnet (in whole FIL units)"
     )]
     pub collateral: f64,

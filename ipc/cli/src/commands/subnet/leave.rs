@@ -32,9 +32,9 @@ impl CommandLineHandler for LeaveSubnet {
 #[derive(Debug, Args)]
 #[command(name = "leave", about = "Leaving a subnet")]
 pub struct LeaveSubnetArgs {
-    #[arg(long, short, help = "The address that leaves the subnet")]
+    #[arg(long, help = "The address that leaves the subnet")]
     pub from: Option<String>,
-    #[arg(long, short, help = "The subnet to leave")]
+    #[arg(long, help = "The subnet to leave")]
     pub subnet: String,
 }
 
@@ -64,13 +64,12 @@ impl CommandLineHandler for Claim {
     about = "Claim collateral or rewards available for validators and relayers, respectively"
 )]
 pub struct ClaimArgs {
-    #[arg(long, short, help = "The address that claims the collateral")]
+    #[arg(long, help = "The address that claims the collateral")]
     pub from: Option<String>,
-    #[arg(long, short, help = "The subnet to claim from")]
+    #[arg(long, help = "The subnet to claim from")]
     pub subnet: String,
     #[arg(
         long,
-        short,
         help = "Determine if we want to claim rewards instead of collateral"
     )]
     pub rewards: bool,
