@@ -1,83 +1,76 @@
-[accounts.ID72]
+[accounts.47B3BbT]
 
-[accounts.oyn]
+[accounts.iJ32]
 
-[accounts.x_52Lm]
+[accounts.jnqduIaQ]
 
 [rootnet]
-type = "External"
-
-[rootnet.deployment]
 type = "New"
-deployer = "ID72"
 
-[subnets.EQxjKGFA]
-creator = "ID72"
+[rootnet.validators]
+iJ32 = "2482914694179010604"
 
-[subnets.EQxjKGFA.validators]
-x_52Lm = "8209706277064916472"
+[rootnet.balances]
+47B3BbT = "100000000000000000000"
+iJ32 = "100000000000000000000"
+jnqduIaQ = "100000000000000000000"
 
-[subnets.EQxjKGFA.balances]
-oyn = "2305445625663596816"
+[rootnet.nodes.23W]
+ethapi = false
+seed_nodes = []
 
-[subnets.EQxjKGFA.nodes.HLT_z0G]
+[rootnet.nodes.23W.mode]
+type = "Validator"
+validator = "iJ32"
+
+[subnets.g8zHwBN]
+creator = "iJ32"
+
+[subnets.g8zHwBN.validators]
+jnqduIaQ = "5189884830813007041"
+
+[subnets.g8zHwBN.balances]
+47B3BbT = "9999999999999999999"
+
+[subnets.g8zHwBN.nodes.7eDxRM8E]
+ethapi = false
+seed_nodes = []
+parent_node = "23W"
+
+[subnets.g8zHwBN.nodes.7eDxRM8E.mode]
+type = "Validator"
+validator = "jnqduIaQ"
+
+[subnets.g8zHwBN.relayers.BonKZBB7]
+submitter = "jnqduIaQ"
+follow_node = "7eDxRM8E"
+submit_node = "23W"
+
+[subnets.g8zHwBN.relayers.tp_Y]
+submitter = "jnqduIaQ"
+follow_node = "7eDxRM8E"
+submit_node = "23W"
+
+[subnets.g8zHwBN.subnets.Zp-5etX]
+creator = "jnqduIaQ"
+
+[subnets.g8zHwBN.subnets.Zp-5etX.validators]
+47B3BbT = "3261699815520283256"
+
+[subnets.g8zHwBN.subnets.Zp-5etX.balances]
+
+[subnets.g8zHwBN.subnets.Zp-5etX.nodes.00IEmgAA]
 ethapi = true
 seed_nodes = []
+parent_node = "7eDxRM8E"
 
-[subnets.EQxjKGFA.nodes.HLT_z0G.mode]
+[subnets.g8zHwBN.subnets.Zp-5etX.nodes.00IEmgAA.mode]
 type = "Validator"
-validator = "x_52Lm"
+validator = "47B3BbT"
 
-[subnets.EQxjKGFA.relayers.E7xcJm]
-submitter = "oyn"
-follow_node = "HLT_z0G"
+[subnets.g8zHwBN.subnets.Zp-5etX.relayers.AsNlcZya]
+submitter = "jnqduIaQ"
+follow_node = "00IEmgAA"
+submit_node = "7eDxRM8E"
 
-[subnets.EQxjKGFA.relayers.x7_jB6]
-submitter = "x_52Lm"
-follow_node = "HLT_z0G"
-
-[subnets.EQxjKGFA.subnets.aWn]
-creator = "oyn"
-
-[subnets.EQxjKGFA.subnets.aWn.validators]
-ID72 = "3259809290142443537"
-oyn = "6012373228910588906"
-
-[subnets.EQxjKGFA.subnets.aWn.balances]
-oyn = "5080983028490214972"
-x_52Lm = "7333971111540430540"
-
-[subnets.EQxjKGFA.subnets.aWn.nodes._rtaW_H]
-ethapi = false
-seed_nodes = []
-parent_node = "HLT_z0G"
-
-[subnets.EQxjKGFA.subnets.aWn.nodes._rtaW_H.mode]
-type = "Validator"
-validator = "ID72"
-
-[subnets.EQxjKGFA.subnets.aWn.nodes.iHgPl_F]
-ethapi = false
-seed_nodes = ["_rtaW_H"]
-parent_node = "HLT_z0G"
-
-[subnets.EQxjKGFA.subnets.aWn.nodes.iHgPl_F.mode]
-type = "Validator"
-validator = "oyn"
-
-[subnets.EQxjKGFA.subnets.aWn.relayers.OF2iQ_]
-submitter = "ID72"
-follow_node = "_rtaW_H"
-submit_node = "HLT_z0G"
-
-[subnets.EQxjKGFA.subnets.aWn.relayers.hMUxqmPQ]
-submitter = "oyn"
-follow_node = "_rtaW_H"
-submit_node = "HLT_z0G"
-
-[subnets.EQxjKGFA.subnets.aWn.relayers.vR_1]
-submitter = "ID72"
-follow_node = "_rtaW_H"
-submit_node = "HLT_z0G"
-
-[subnets.EQxjKGFA.subnets.aWn.subnets]
+[subnets.g8zHwBN.subnets.Zp-5etX.subnets]

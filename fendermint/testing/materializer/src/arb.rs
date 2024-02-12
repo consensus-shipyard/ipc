@@ -1,7 +1,10 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use fendermint_testing::arb::ArbAddress;
+use ethers::{
+    core::rand::{rngs::StdRng, SeedableRng},
+    types::H160,
+};
 use lazy_static::lazy_static;
 use std::{
     cmp::min,
@@ -102,7 +105,7 @@ impl Arbitrary for Balance {
 
 impl Arbitrary for Manifest {
     fn arbitrary(g: &mut Gen) -> Self {
-        gen_manifest(g, 4, 3, DEFAULT_BALANCE.clone())
+        gen_manifest(g, 3, 3, DEFAULT_BALANCE.clone())
     }
 }
 
@@ -130,8 +133,8 @@ fn gen_manifest(
         Rootnet::External {
             deployment: if bool::arbitrary(g) {
                 IpcDeployment::Existing {
-                    gateway: ArbAddress::arbitrary(g).0,
-                    registry: ArbAddress::arbitrary(g).0,
+                    gateway: gen_address(g),
+                    registry: gen_address(g),
                 }
             } else {
                 IpcDeployment::New {
@@ -180,6 +183,12 @@ fn gen_manifest(
     }
 }
 
+/// Generate random ethereum address.
+fn gen_address(g: &mut Gen) -> H160 {
+    let mut rng = StdRng::seed_from_u64(u64::arbitrary(g));
+    H160::random_using(&mut rng)
+}
+
 /// Recursively generate some subnets.
 fn gen_subnets(
     g: &mut Gen,
@@ -201,7 +210,7 @@ fn gen_subnets(
     let num_children = if max_children <= min_children {
         min_children
     } else {
-        usize::arbitrary(g) % (max_children - min_children)
+        min_children + usize::arbitrary(g) % (max_children - min_children)
     };
 
     for _ in 0..num_children {

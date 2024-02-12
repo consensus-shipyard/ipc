@@ -3018,6 +3018,7 @@ name = "fendermint_testing_materializer"
 version = "0.1.0"
 dependencies = [
  "arbitrary",
+ "ethers",
  "fendermint_testing",
  "fendermint_testing_materializer",
  "fendermint_vm_encoding",

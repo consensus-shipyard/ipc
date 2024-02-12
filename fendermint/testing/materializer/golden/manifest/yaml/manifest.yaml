@@ -1,54 +1,203 @@
 accounts:
-  ByXyA: {}
-  GLR: {}
-  SUbs: {}
-  Xeo1IS: {}
-  Y2s7z_g: {}
+  I61qWC4: {}
+  NCgAA: {}
+  VcpXTO: {}
 rootnet:
-  type: New
-  validators:
-    Xeo1IS: '3980848373269038288'
-  balances:
-    ByXyA: '100000000000000000000'
-    GLR: '100000000000000000000'
-    SUbs: '100000000000000000000'
-    Xeo1IS: '100000000000000000000'
-    Y2s7z_g: '100000000000000000000'
-  nodes:
-    _zr9_:
-      mode:
-        type: Validator
-        validator: Xeo1IS
-      ethapi: false
-      seed_nodes: []
-      parent_node: null
+  type: External
+  deployment:
+    type: Existing
+    gateway: 0x50822b283dc42927e231fbc94022beb13ba3ff1a
+    registry: 0xb8489eb4586f3b91a7d24086992806c77ce6bd50
 subnets:
-  Bg3TJ9w:
-    creator: ByXyA
+  kSPhVX:
+    creator: NCgAA
     validators:
-      ByXyA: '146295359334072583'
-      Xeo1IS: '7788930049464346135'
+      I61qWC4: '4519651185555364056'
+      VcpXTO: '3156317461239747571'
     balances:
-      Xeo1IS: '8578574492639143987'
+      I61qWC4: '1941077231518181489'
+      NCgAA: '5238397055657365170'
     nodes:
-      dCIzpB5a:
+      2FJ:
         mode:
           type: Validator
-          validator: ByXyA
-        ethapi: false
+          validator: I61qWC4
+        ethapi: true
         seed_nodes: []
-        parent_node: _zr9_
-      eiGhs2:
+        parent_node: null
+      AJAt1A:
         mode:
           type: Validator
-          validator: Xeo1IS
+          validator: VcpXTO
         ethapi: false
         seed_nodes:
-        - dCIzpB5a
-        parent_node: _zr9_
+        - 2FJ
+        parent_node: null
     relayers:
-      NLlB:
-        submitter: Y2s7z_g
-        follow_node: dCIzpB5a
-        submit_node: _zr9_
-    subnets: {}
+      DEAt:
+        submitter: VcpXTO
+        follow_node: AJAt1A
+        submit_node: null
+      uC0THh:
+        submitter: VcpXTO
+        follow_node: 2FJ
+        submit_node: null
+      v2zh:
+        submitter: NCgAA
+        follow_node: 2FJ
+        submit_node: null
+    subnets:
+      IYTdW:
+        creator: NCgAA
+        validators:
+          NCgAA: '5265821310693556971'
+          VcpXTO: '3054268694356308807'
+        balances:
+          I61qWC4: '118803987423681723'
+          VcpXTO: '6294489244290471046'
+        nodes:
+          Wdfv:
+            mode:
+              type: Validator
+              validator: NCgAA
+            ethapi: false
+            seed_nodes: []
+            parent_node: AJAt1A
+          cLWI:
+            mode:
+              type: Validator
+              validator: VcpXTO
+            ethapi: true
+            seed_nodes:
+            - Wdfv
+            parent_node: 2FJ
+        relayers:
+          -J3-:
+            submitter: VcpXTO
+            follow_node: Wdfv
+            submit_node: AJAt1A
+          I2GUB:
+            submitter: NCgAA
+            follow_node: cLWI
+            submit_node: AJAt1A
+        subnets: {}
+      gd7:
+        creator: I61qWC4
+        validators:
+          I61qWC4: '1649626797163001199'
+          VcpXTO: '5300619603858024663'
+        balances: {}
+        nodes:
+          BN_:
+            mode:
+              type: Validator
+              validator: I61qWC4
+            ethapi: false
+            seed_nodes: []
+            parent_node: 2FJ
+          hvjhwW:
+            mode:
+              type: Validator
+              validator: VcpXTO
+            ethapi: false
+            seed_nodes:
+            - BN_
+            parent_node: AJAt1A
+        relayers:
+          Ot03GQ:
+            submitter: NCgAA
+            follow_node: BN_
+            submit_node: 2FJ
+        subnets: {}
+  new:
+    creator: I61qWC4
+    validators:
+      NCgAA: '1111472318230697820'
+    balances: {}
+    nodes:
+      51pqS:
+        mode:
+          type: Validator
+          validator: NCgAA
+        ethapi: true
+        seed_nodes: []
+        parent_node: null
+    relayers:
+      MBD7:
+        submitter: NCgAA
+        follow_node: 51pqS
+        submit_node: null
+      Nq8Y5:
+        submitter: I61qWC4
+        follow_node: 51pqS
+        submit_node: null
+    subnets:
+      ESAZZC:
+        creator: I61qWC4
+        validators:
+          VcpXTO: '1'
+        balances: {}
+        nodes:
+          WFB_UBP:
+            mode:
+              type: Validator
+              validator: VcpXTO
+            ethapi: false
+            seed_nodes: []
+            parent_node: 51pqS
+        relayers:
+          OH_P:
+            submitter: I61qWC4
+            follow_node: WFB_UBP
+            submit_node: 51pqS
+        subnets: {}
+      rxAbI-Wk:
+        creator: VcpXTO
+        validators:
+          I61qWC4: '6396207036609611554'
+          VcpXTO: '1'
+        balances:
+          NCgAA: '5809961165307502855'
+          VcpXTO: '4355800382985641001'
+        nodes:
+          3cX:
+            mode:
+              type: Validator
+              validator: I61qWC4
+            ethapi: false
+            seed_nodes: []
+            parent_node: 51pqS
+          GBJs:
+            mode:
+              type: Full
+            ethapi: true
+            seed_nodes:
+            - 3cX
+            parent_node: 51pqS
+        relayers:
+          fkKW_nF:
+            submitter: VcpXTO
+            follow_node: GBJs
+            submit_node: 51pqS
+        subnets: {}
+      v1Cpdz:
+        creator: I61qWC4
+        validators:
+          VcpXTO: '4308050305152735059'
+        balances:
+          NCgAA: '4870743883262242529'
+          VcpXTO: '568763699485655267'
+        nodes:
+          7A_I:
+            mode:
+              type: Validator
+              validator: VcpXTO
+            ethapi: false
+            seed_nodes: []
+            parent_node: 51pqS
+        relayers:
+          JAG_:
+            submitter: VcpXTO
+            follow_node: 7A_I
+            submit_node: 51pqS
+        subnets: {}

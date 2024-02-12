@@ -1,32 +1,176 @@
 {
   "accounts": {
-    "BjBg": {},
-    "Bt1Eds-r": {},
-    "HkJkB9": {},
-    "swuuBwY": {}
+    "PPS": {},
+    "SZ5": {},
+    "sW6O-u": {}
   },
   "rootnet": {
     "type": "New",
     "validators": {
-      "BjBg": "6303856855172616103"
+      "sW6O-u": "9899559205036071766"
     },
     "balances": {
-      "BjBg": "100000000000000000000",
-      "Bt1Eds-r": "100000000000000000000",
-      "HkJkB9": "100000000000000000000",
-      "swuuBwY": "100000000000000000000"
+      "PPS": "100000000000000000000",
+      "SZ5": "100000000000000000000",
+      "sW6O-u": "100000000000000000000"
     },
     "nodes": {
-      "_mtAn": {
+      "u1BpVQ": {
         "mode": {
           "type": "Validator",
-          "validator": "BjBg"
+          "validator": "sW6O-u"
         },
-        "ethapi": false,
+        "ethapi": true,
         "seed_nodes": [],
         "parent_node": null
       }
     }
   },
-  "subnets": {}
+  "subnets": {
+    "1Q5RaE": {
+      "creator": "PPS",
+      "validators": {
+        "sW6O-u": "3721646615506714962"
+      },
+      "balances": {},
+      "nodes": {
+        "mIEAl7O6": {
+          "mode": {
+            "type": "Validator",
+            "validator": "sW6O-u"
+          },
+          "ethapi": false,
+          "seed_nodes": [],
+          "parent_node": "u1BpVQ"
+        }
+      },
+      "relayers": {
+        "5yygQf": {
+          "submitter": "sW6O-u",
+          "follow_node": "mIEAl7O6",
+          "submit_node": "u1BpVQ"
+        },
+        "5z_Ru1b0": {
+          "submitter": "PPS",
+          "follow_node": "mIEAl7O6",
+          "submit_node": "u1BpVQ"
+        }
+      },
+      "subnets": {
+        "GWK2r": {
+          "creator": "PPS",
+          "validators": {
+            "PPS": "7842348883385469418",
+            "sW6O-u": "95975647236306899"
+          },
+          "balances": {},
+          "nodes": {
+            "88Adjq": {
+              "mode": {
+                "type": "Validator",
+                "validator": "PPS"
+              },
+              "ethapi": false,
+              "seed_nodes": [],
+              "parent_node": "mIEAl7O6"
+            },
+            "DBuBG7": {
+              "mode": {
+                "type": "Validator",
+                "validator": "sW6O-u"
+              },
+              "ethapi": false,
+              "seed_nodes": [
+                "88Adjq"
+              ],
+              "parent_node": "mIEAl7O6"
+            }
+          },
+          "relayers": {
+            "Xv1A": {
+              "submitter": "sW6O-u",
+              "follow_node": "88Adjq",
+              "submit_node": "mIEAl7O6"
+            },
+            "v4C36Bj": {
+              "submitter": "SZ5",
+              "follow_node": "DBuBG7",
+              "submit_node": "mIEAl7O6"
+            }
+          },
+          "subnets": {}
+        },
+        "QAhDsxj": {
+          "creator": "SZ5",
+          "validators": {
+            "SZ5": "179269309258396850"
+          },
+          "balances": {},
+          "nodes": {
+            "-fFmhBD": {
+              "mode": {
+                "type": "Validator",
+                "validator": "SZ5"
+              },
+              "ethapi": false,
+              "seed_nodes": [],
+              "parent_node": "mIEAl7O6"
+            }
+          },
+          "relayers": {
+            "L5ean3FL": {
+              "submitter": "sW6O-u",
+              "follow_node": "-fFmhBD",
+              "submit_node": "mIEAl7O6"
+            },
+            "atv4V7hg": {
+              "submitter": "SZ5",
+              "follow_node": "-fFmhBD",
+              "submit_node": "mIEAl7O6"
+            }
+          },
+          "subnets": {}
+        },
+        "j80": {
+          "creator": "SZ5",
+          "validators": {
+            "sW6O-u": "1635589545659224886"
+          },
+          "balances": {
+            "SZ5": "5820424334380753313",
+            "sW6O-u": "3922028849801147658"
+          },
+          "nodes": {
+            "nc_TZuiC": {
+              "mode": {
+                "type": "Validator",
+                "validator": "sW6O-u"
+              },
+              "ethapi": true,
+              "seed_nodes": [],
+              "parent_node": "mIEAl7O6"
+            }
+          },
+          "relayers": {
+            "GWcqoW1": {
+              "submitter": "sW6O-u",
+              "follow_node": "nc_TZuiC",
+              "submit_node": "mIEAl7O6"
+            },
+            "JwTXbz": {
+              "submitter": "SZ5",
+              "follow_node": "nc_TZuiC",
+              "submit_node": "mIEAl7O6"
+            },
+            "N-ISB7": {
+              "submitter": "SZ5",
+              "follow_node": "nc_TZuiC",
+              "submit_node": "mIEAl7O6"
+            }
+          },
+          "subnets": {}
+        }
+      }
+    }
+  }
 }

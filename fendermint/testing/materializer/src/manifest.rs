@@ -3,7 +3,7 @@
 
 // See https://github.com/cometbft/cometbft/blob/v0.38.5/test/e2e/pkg/manifest.go for inspiration.
 
-use fvm_shared::{address::Address, econ::TokenAmount};
+use fvm_shared::econ::TokenAmount;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::{collections::BTreeMap, path::PathBuf};
@@ -84,10 +84,8 @@ pub enum IpcDeployment {
     /// Use one of the existing deployments, given by the delegated address of
     /// the Gateway and Registry contracts.
     Existing {
-        #[serde_as(as = "IsHumanReadable")]
-        gateway: Address,
-        #[serde_as(as = "IsHumanReadable")]
-        registry: Address,
+        gateway: ethers::core::types::Address,
+        registry: ethers::core::types::Address,
     },
     /// Deploy a new IPC contract stack using one of the accounts.
     /// This can take a long time, but ensures we are testing with
