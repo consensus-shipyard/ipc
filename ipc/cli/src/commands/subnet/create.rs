@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 //! Create subnet cli command handler.
 
+use anyhow::Context;
 use async_trait::async_trait;
 use clap::Args;
 use fvm_shared::address::Address;
@@ -32,15 +33,20 @@ impl CreateSubnet {
             None => None,
         };
 
-        let permission_mode = PermissionMode::try_from(arguments.permission_mode.as_str())?;
+        let permission_mode = str::parse::<PermissionMode>(arguments.permission_mode.as_str())
+            .context("invalid permission mode")?;
         let token_address = if let Some(addr) = &arguments.supply_source_address {
             Some(Address::from_str(addr)?)
         } else {
             None
         };
-        let supply_source = SupplySource {
-            kind: SupplyKind::try_from(arguments.supply_source_kind.as_str())?,
-            token_address,
+        let supply_source = {
+            let kind = str::parse::<SupplyKind>(arguments.supply_source_kind.as_str())
+                .context("invalid supply source kind")?;
+            SupplySource {
+                kind,
+                token_address,
+            }
         };
         let addr = provider
             .create_subnet(
@@ -112,11 +118,15 @@ pub struct CreateSubnetArgs {
         long,
         help = "The permission mode for the subnet: collateral, federated and static"
     )]
+    // TODO figure out a way to use a newtype + ValueEnum, or reference PermissionMode::VARIANTS to
+    //  enumerate all variants
     pub permission_mode: String,
     #[arg(
         long,
         help = "The kind of supply source of a subnet on its parent subnet: native or erc20"
     )]
+    // TODO figure out a way to use a newtype + ValueEnum, or reference SupplySourceKind::VARIANTS to
+    //  enumerate all variants
     pub supply_source_kind: String,
     #[arg(
         long,
