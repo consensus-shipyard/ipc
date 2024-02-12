@@ -128,6 +128,38 @@ pub fn test_json_txt<T: Serialize + DeserializeOwned + Debug>(
     )
 }
 
+/// Same as [`test_json_txt`] but with YAML.
+pub fn test_yaml_txt<T: Serialize + DeserializeOwned + Debug>(
+    prefix: &str,
+    name: &str,
+    arb_data: fn(g: &mut quickcheck::Gen) -> T,
+) -> T {
+    test_txt(
+        prefix,
+        name,
+        arb_data,
+        "yaml",
+        |d| serde_yaml::to_string(d).expect("failed to serialize"),
+        |s| serde_yaml::from_str(s).map_err(|e| format!("failed to decode YAML: {e}")),
+    )
+}
+
+/// Same as [`test_json_txt`] but with TOML.
+pub fn test_toml_txt<T: Serialize + DeserializeOwned + Debug>(
+    prefix: &str,
+    name: &str,
+    arb_data: fn(g: &mut quickcheck::Gen) -> T,
+) -> T {
+    test_txt(
+        prefix,
+        name,
+        arb_data,
+        "toml",
+        |d| toml::to_string(d).expect("failed to serialize"),
+        |s| toml::from_str(s).map_err(|e| format!("failed to decode TOML: {e}")),
+    )
+}
+
 /// Test that the CID of something we deserialized from CBOR matches what we saved earlier,
 /// ie. that we produce the same CID, which is important if it's the basis of signing.
 pub fn test_cid<T: Debug>(prefix: &str, name: &str, data: T, cid: fn(&T) -> Cid) {
@@ -170,6 +202,42 @@ macro_rules! golden_json {
         fn $name() {
             let label = stringify!($name);
             $crate::golden::test_json_txt($prefix, &label, $gen);
+        }
+    };
+}
+
+/// Create a test which calls [`test_yaml_txt`].
+///
+/// # Example
+///
+/// ```ignore
+///        golden_yaml! { "genesis", genesis, Genesis::arbitrary}
+/// ```
+#[macro_export]
+macro_rules! golden_yaml {
+    ($prefix:literal, $name:ident, $gen:expr) => {
+        #[test]
+        fn $name() {
+            let label = stringify!($name);
+            $crate::golden::test_yaml_txt($prefix, &label, $gen);
+        }
+    };
+}
+
+/// Create a test which calls [`test_toml_txt`].
+///
+/// # Example
+///
+/// ```ignore
+///        golden_toml! { "genesis", genesis, Genesis::arbitrary}
+/// ```
+#[macro_export]
+macro_rules! golden_toml {
+    ($prefix:literal, $name:ident, $gen:expr) => {
+        #[test]
+        fn $name() {
+            let label = stringify!($name);
+            $crate::golden::test_toml_txt($prefix, &label, $gen);
         }
     };
 }
