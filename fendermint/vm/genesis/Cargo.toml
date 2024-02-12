@@ -19,6 +19,7 @@ rand = { workspace = true, optional = true }
 tendermint = { workspace = true }
 
 cid = { workspace = true, optional = true }
+multihash = { workspace = true, optional = true }
 fvm_shared = { workspace = true }
 ipc-api = { workspace = true }
 
@@ -48,4 +49,5 @@ arb = [
   "fendermint_testing/arb",
   "rand",
   "cid",
+  "multihash",
 ]
