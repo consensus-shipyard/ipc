@@ -150,33 +150,20 @@ contract IpcTokenController is IpcExchange {
         address receiver,
         uint256 amount
     ) internal returns (IpcEnvelope memory committed) {
+        // TODO: reject calls with non-zero msg.value
+        // TODO: coalesce error types to a single TransferRejected(string reason).
         if (destinationContract == address(0)) {
             revert ZeroAddress();
         }
         if (receiver == address(0)) {
             revert ZeroAddress();
         }
-        if (msg.value != DEFAULT_CROSS_MSG_FEE) {
-            revert NotEnoughFunds();
-        }
-
-        uint64 lastNonce = nonce;
-
-        emit TokenSent({
-            tokenContractAddress: tokenContractAddress,
-            sender: msg.sender,
-            destinationSubnet: destinationSubnet,
-            destinationContract: destinationContract,
-            receiver: receiver,
-            nonce: lastNonce,
-            value: amount
-        });
-        nonce++;
 
         uint256 startingBalance = IERC20(tokenContractAddress).balanceOf(address(this));
         IERC20(tokenContractAddress).safeTransferFrom({from: msg.sender, to: address(this), value: amount});
         uint256 endingBalance = IERC20(tokenContractAddress).balanceOf(address(this));
 
+        // TODO(raulk): won't safeTransferFrom revert if the amount could not be transferred? What does this protect against?
         if (endingBalance <= startingBalance) {
             revert NoTransfer();
         }
@@ -190,18 +177,33 @@ contract IpcTokenController is IpcExchange {
             rawAddress: FvmAddressHelper.from(destinationContract)
         });
 
-        committed = performIpcCall(destination, message, DEFAULT_CROSS_MSG_FEE);
+        committed = performIpcCall(destination, message, 0);
 
-        //add receipt to unconfirmedTransfers
+        // add entry to unconfirmedTransfers
         unconfirmedTransfers[committed.toHash()] = TransferDetails(msg.sender, amount);
+
+        emit TokenSent({
+            tokenContractAddress: tokenContractAddress,
+            sender: msg.sender,
+            destinationSubnet: destinationSubnet,
+            destinationContract: destinationContract,
+            receiver: receiver,
+            nonce: committed.nonce,
+            value: amount
+        });
     }
 
     function _handleIpcResult(
         IpcEnvelope storage original,
         IpcEnvelope memory result,
         ResultMsg memory resultMsg
-    ) internal override {}
+    ) internal override {
+        // TODO: remove from unconfirmedTransfers.
+    }
 
+    // TODO: method for the owner to manually drop an entry from unconfirmedTransfers.
+
+    // TODO: replace with abi.decode(data, (bytes4))?
     function toBytes4(bytes memory data) internal pure returns (bytes4 result) {
         if (data.length < 4) {
             revert InvalidMessageSignature();

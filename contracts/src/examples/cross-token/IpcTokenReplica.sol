@@ -64,7 +64,7 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
     }
 
     function burnAndTransfer(address receiver, uint256 amount) external payable returns (IpcEnvelope memory committed) {
-        // TODO: reject calls with value
+        // TODO: reject calls with non-zero msg.value
         // TODO: coalesce error types to a single TransferRejected(string reason).
         if (receiver == address(0)) {
             revert ZeroAddress();
@@ -139,6 +139,7 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
         }
     }
 
+    // TODO: replace with abi.decode(data, (bytes4))?
     function toBytes4(bytes memory data) internal pure returns (bytes4 result) {
         if (data.length < 4) {
             revert InvalidMessageSignature();
@@ -156,6 +157,8 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
         }
         _mint(recipient, value);
     }
+
+    // TODO: method for the owner to manually drop an entry from unconfirmedTransfers.
 
     function _handleIpcResult(
         IpcEnvelope storage original,
