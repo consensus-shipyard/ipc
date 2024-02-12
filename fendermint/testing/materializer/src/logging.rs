@@ -37,16 +37,13 @@ where
     M::Node: Debug,
     M::Relayer: Debug,
 {
-    async fn create_network<'s>(
-        &'s mut self,
-        testnet_name: &TestnetName,
-    ) -> anyhow::Result<M::Network> {
+    async fn create_network(&mut self, testnet_name: &TestnetName) -> anyhow::Result<M::Network> {
         eprintln!("create_network({testnet_name:?}");
         tracing::info!(self.tag, ?testnet_name, "create_network");
         self.inner.create_network(testnet_name).await
     }
 
-    fn create_account<'s>(&'s mut self, account_name: &AccountName) -> anyhow::Result<M::Account> {
+    fn create_account(&mut self, account_name: &AccountName) -> anyhow::Result<M::Account> {
         eprintln!("create_account({account_name:?})");
         tracing::info!(self.tag, ?account_name, "create_account");
         self.inner.create_account(account_name)
@@ -56,7 +53,10 @@ where
         &'s mut self,
         account: &'a M::Account,
         reference: Option<ResourceHash>,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<()>
+    where
+        's: 'a,
+    {
         eprintln!("fund_from_faucet({account:?})");
         tracing::info!(self.tag, ?account, "fund_from_faucet");
         self.inner.fund_from_faucet(account, reference).await
@@ -66,14 +66,17 @@ where
         &'s mut self,
         subnet_name: &SubnetName,
         deployer: &'a M::Account,
-    ) -> anyhow::Result<M::Deployment> {
+    ) -> anyhow::Result<M::Deployment>
+    where
+        's: 'a,
+    {
         eprintln!("new_deployment({subnet_name:?}, {deployer:?})");
         tracing::info!(self.tag, ?subnet_name, ?deployer, "new_deployment");
         self.inner.new_deployment(subnet_name, deployer).await
     }
 
-    fn existing_deployment<'s>(
-        &'s mut self,
+    fn existing_deployment(
+        &mut self,
         subnet_name: &SubnetName,
         gateway: Address,
         registry: Address,
@@ -84,17 +87,14 @@ where
             .existing_deployment(subnet_name, gateway, registry)
     }
 
-    fn default_deployment<'s, 'a>(
-        &'s mut self,
-        subnet_name: &SubnetName,
-    ) -> anyhow::Result<M::Deployment> {
+    fn default_deployment(&mut self, subnet_name: &SubnetName) -> anyhow::Result<M::Deployment> {
         eprintln!("default_deployment({subnet_name:?})");
         tracing::info!(self.tag, ?subnet_name, "default_deployment");
         self.inner.default_deployment(subnet_name)
     }
 
-    fn create_root_genesis<'s, 'a>(
-        &'s mut self,
+    fn create_root_genesis<'a>(
+        &mut self,
         subnet_name: &SubnetName,
         validators: BTreeMap<&'a M::Account, Collateral>,
         balances: BTreeMap<&'a M::Account, Balance>,
@@ -122,7 +122,10 @@ where
         &'s mut self,
         node: &'a M::Node,
         seed_nodes: &'a [&'a M::Node],
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<()>
+    where
+        's: 'a,
+    {
         eprintln!("start_node({node:?}");
         tracing::info!(self.tag, ?node, "start_node");
         self.inner.start_node(node, seed_nodes).await

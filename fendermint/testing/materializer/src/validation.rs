@@ -158,15 +158,12 @@ impl ValidatingMaterializer {
 
 #[async_trait]
 impl Materializer<ValidationMaterials> for ValidatingMaterializer {
-    async fn create_network<'s>(
-        &'s mut self,
-        testnet_name: &TestnetName,
-    ) -> anyhow::Result<VNetwork> {
+    async fn create_network(&mut self, testnet_name: &TestnetName) -> anyhow::Result<VNetwork> {
         self.network = Some(testnet_name.clone());
         Ok(testnet_name.clone())
     }
 
-    fn create_account<'s>(&'s mut self, account_name: &AccountName) -> anyhow::Result<VAccount> {
+    fn create_account(&mut self, account_name: &AccountName) -> anyhow::Result<VAccount> {
         self.ensure_contains(account_name)?;
         Ok(account_name.clone())
     }
@@ -175,7 +172,10 @@ impl Materializer<ValidationMaterials> for ValidatingMaterializer {
         &'s mut self,
         account: &'a VAccount,
         reference: Option<ResourceHash>,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<()>
+    where
+        's: 'a,
+    {
         let tn = self.network()?;
         self.ensure_unique(&tn.root(), reference)?;
         let balances = self.balances.entry(tn.root()).or_default();
@@ -193,14 +193,17 @@ impl Materializer<ValidationMaterials> for ValidatingMaterializer {
         subnet_name: &SubnetName,
         deployer: &'a VAccount,
         urls: Vec<Url>,
-    ) -> anyhow::Result<VDeployment> {
+    ) -> anyhow::Result<VDeployment>
+    where
+        's: 'a,
+    {
         self.ensure_contains(subnet_name)?;
         self.ensure_balance(subnet_name, deployer)?;
         Ok(subnet_name.clone())
     }
 
-    fn existing_deployment<'s>(
-        &'s mut self,
+    fn existing_deployment(
+        &mut self,
         subnet_name: &SubnetName,
         gateway: H160,
         registry: H160,
@@ -214,16 +217,13 @@ impl Materializer<ValidationMaterials> for ValidatingMaterializer {
         Ok(subnet_name.clone())
     }
 
-    fn default_deployment<'s, 'a>(
-        &mut self,
-        subnet_name: &SubnetName,
-    ) -> anyhow::Result<VDeployment> {
+    fn default_deployment(&mut self, subnet_name: &SubnetName) -> anyhow::Result<VDeployment> {
         self.ensure_contains(subnet_name)?;
         Ok(subnet_name.clone())
     }
 
-    fn create_root_genesis<'s, 'a>(
-        &'s mut self,
+    fn create_root_genesis<'a>(
+        &mut self,
         subnet_name: &SubnetName,
         validators: BTreeMap<&'a VAccount, Collateral>,
         balances: BTreeMap<&'a VAccount, Balance>,

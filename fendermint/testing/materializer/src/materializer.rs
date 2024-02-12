@@ -68,20 +68,19 @@ pub trait Materializer<M: Materials> {
     /// The return value should be able to able to represent settings that allow nodes
     /// to connect to each other, as well as perhaps to be labelled as a group
     /// (although for that we can use the common name prefixes as well).
-    async fn create_network<'s>(
-        &'s mut self,
-        testnet_name: &TestnetName,
-    ) -> anyhow::Result<M::Network>;
+    async fn create_network(&mut self, testnet_name: &TestnetName) -> anyhow::Result<M::Network>;
 
     /// Create a Secp256k1 keypair for signing transactions or creating blocks.
-    fn create_account<'s>(&'s mut self, account_name: &AccountName) -> anyhow::Result<M::Account>;
+    fn create_account(&mut self, account_name: &AccountName) -> anyhow::Result<M::Account>;
 
     /// Fund an account on the rootnet from the faucet.
     async fn fund_from_faucet<'s, 'a>(
         &'s mut self,
         account: &'a M::Account,
         reference: Option<ResourceHash>,
-    ) -> anyhow::Result<()>;
+    ) -> anyhow::Result<()>
+    where
+        's: 'a;
 
     /// Deploy the IPC contracts onto the rootnet.
     ///
@@ -95,33 +94,32 @@ pub trait Materializer<M: Materials> {
         subnet_name: &SubnetName,
         deployer: &'a M::Account,
         urls: Vec<Url>,
-    ) -> anyhow::Result<M::Deployment>;
+    ) -> anyhow::Result<M::Deployment>
+    where
+        's: 'a;
 
     /// Set the IPC contracts onto the rootnet.
     ///
     /// This is assumed to be used with external subnets, with the API address
     /// being known to the materializer, but not being part of the manifest,
     /// as there can be multiple endpoints to choose from, some better than others.
-    fn existing_deployment<'s>(
-        &'s mut self,
+    fn existing_deployment(
+        &mut self,
         subnet_name: &SubnetName,
         gateway: H160,
         registry: H160,
     ) -> anyhow::Result<M::Deployment>;
 
     /// Return the well-known IPC contract deployments.
-    fn default_deployment<'s>(
-        &'s mut self,
-        subnet_name: &SubnetName,
-    ) -> anyhow::Result<M::Deployment>;
+    fn default_deployment(&mut self, subnet_name: &SubnetName) -> anyhow::Result<M::Deployment>;
 
     /// Construct the genesis for the rootnet.
     ///
     /// The genesis time and the chain name (which should determine the chain ID and
     /// thus the subnet ID as well) can be chosen by the materializer, or we could make
     /// it part of the manifest.
-    fn create_root_genesis<'s, 'a>(
-        &'s mut self,
+    fn create_root_genesis<'a>(
+        &mut self,
         subnet_name: &SubnetName,
         validators: BTreeMap<&'a M::Account, Collateral>,
         balances: BTreeMap<&'a M::Account, Balance>,
@@ -149,7 +147,9 @@ pub trait Materializer<M: Materials> {
         &'s mut self,
         node: &'a M::Node,
         seed_nodes: &'a [&'a M::Node],
-    ) -> anyhow::Result<()>;
+    ) -> anyhow::Result<()>
+    where
+        's: 'a;
 
     /// Create a subnet on the parent subnet ledger.
     ///

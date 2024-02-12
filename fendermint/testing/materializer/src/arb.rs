@@ -173,6 +173,7 @@ fn gen_manifest(
         max_level,
         2,
         &account_ids,
+        &account_ids,
         &parent_node_ids,
         &mut balances,
     );
@@ -207,6 +208,7 @@ fn gen_urls(g: &mut Gen) -> Vec<Url> {
 }
 
 /// Recursively generate some subnets.
+#[allow(clippy::too_many_arguments)]
 fn gen_subnets(
     g: &mut Gen,
     max_children: usize,
@@ -349,7 +351,16 @@ fn gen_root_subnet(
     account_ids: &[AccountId],
     remaining_balances: &mut BalanceMap,
 ) -> Subnet {
-    let ss = gen_subnets(g, 1, 2, 2, account_ids, &[], remaining_balances);
+    let ss = gen_subnets(
+        g,
+        1,
+        2,
+        2,
+        account_ids,
+        account_ids,
+        &[],
+        remaining_balances,
+    );
     debug_assert_eq!(ss.len(), 1, "should have exactly 1 subnet");
     let mut s = ss.into_iter().next().unwrap().1;
     s.relayers.clear();
