@@ -745,8 +745,8 @@ where
         if let Some(data) = data {
             data.to_big_endian(&mut bz);
         }
-        // The client library expects hex encoded string.
-        Ok(hex::encode(bz))
+        // The client library expects hex encoded string. The JS client might want a prefix too.
+        Ok(format!("0x{}", hex::encode(bz)))
     };
 
     let height = data.query_height(block_id).await?;
