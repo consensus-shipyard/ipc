@@ -22,7 +22,7 @@ interface IpcHandler {
     function handleIpcMessage(IpcEnvelope calldata envelope) external payable returns (bytes memory ret);
 }
 
-abstract contract IpcExchange is IpcHandler, Ownable {
+abstract contract IpcExchange is IpcHandler, Ownable, ReentrancyGuard  {
     using CrossMsgHelper for IpcEnvelope;
 
     // The address of the gateway in the network.
@@ -76,7 +76,7 @@ abstract contract IpcExchange is IpcHandler, Ownable {
     function _handleIpcResult(IpcEnvelope storage original, IpcEnvelope memory result, ResultMsg memory resultMsg) internal virtual;
 
     /// @notice Method the implementation of this contract can invoke to perform an IPC call.
-    function performIpcCall(IPCAddress memory to, CallMsg memory callMsg, uint256 value) internal returns (IpcEnvelope memory envelope) {
+    function performIpcCall(IPCAddress memory to, CallMsg memory callMsg, uint256 value) internal nonReentrant returns (IpcEnvelope memory envelope) {
         // Queue the cross-net message for dispatch.
         envelope = IGateway(gatewayAddr).sendContractXnetMessage{value: value}(IpcEnvelope({
             kind: IpcMsgKind.Call,

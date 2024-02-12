@@ -196,7 +196,7 @@ contract GatewayGetterFacet {
 
         BottomUpCheckpoint[] memory checkpoints = new BottomUpCheckpoint[](size);
         for (uint64 i; i < size; ) {
-            checkpoints[i] = s.bottomUpCheckpoints[uint64(heights[i])];
+            checkpoints[i] = s.bottomUpCheckpoints[heights[i]];
             unchecked {
                 ++i;
             }

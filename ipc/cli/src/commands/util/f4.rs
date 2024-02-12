@@ -27,10 +27,6 @@ impl CommandLineHandler for EthToF4Addr {
 #[derive(Debug, Args)]
 #[command(about = "Get F4 for an Ethereum address")]
 pub(crate) struct EthToF4AddrArgs {
-    #[arg(
-        long,
-        short,
-        help = "Ethereum address to get the underlying f4 addr from"
-    )]
+    #[arg(long, help = "Ethereum address to get the underlying f4 addr from")]
     pub addr: String,
 }

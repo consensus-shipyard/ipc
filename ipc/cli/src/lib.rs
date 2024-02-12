@@ -33,14 +33,13 @@ pub trait CommandLineHandler {
 #[derive(Debug, Args, Clone, Default)]
 pub struct GlobalArguments {
     #[arg(
-        short,
         long,
         help = "The toml config file path for IPC Agent, default to ${HOME}/.ipc-agent/config.toml"
     )]
     config_path: Option<String>,
 
     /// Set the FVM Address Network. It's value affects whether `f` (main) or `t` (test) prefixed addresses are accepted.
-    #[arg(short, long, default_value = "testnet", env = "NETWORK", value_parser = parse_network)]
+    #[arg(long, default_value = "testnet", env = "NETWORK", value_parser = parse_network)]
     pub network: Network,
 }
 

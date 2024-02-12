@@ -2,7 +2,6 @@
 pragma solidity 0.8.19;
 
 import {SubnetID} from "../../structs/Subnet.sol";
-import {ReentrancyGuard} from "../../lib/LibReentrancyGuard.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {ERC20} from "openzeppelin-contracts/token/ERC20/ERC20.sol";
 import {IpcExchange} from "../../../sdk/IpcContract.sol";
@@ -24,7 +23,7 @@ error ZeroAddress();
 error InvalidMessageSignature();
 error InvalidMethod();
 
-contract IpcTokenReplica is IpcExchange, ERC20, ReentrancyGuard {
+contract IpcTokenReplica is IpcExchange, ERC20 {
     using FvmAddressHelper for FvmAddress;
     using CrossMsgHelper for IpcEnvelope;
     using SafeERC20 for IERC20;

@@ -3,7 +3,6 @@ pragma solidity 0.8.19;
 
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
-import {ReentrancyGuard} from "../../lib/LibReentrancyGuard.sol";
 import {FvmAddressHelper} from "../../lib/FvmAddressHelper.sol";
 import {FvmAddress} from "../../structs/FvmAddress.sol";
 import {GatewayMessengerFacet} from "../../gateway/GatewayMessengerFacet.sol";
@@ -25,7 +24,7 @@ error InvalidMethod();
  * @title IpcTokenController
  * @notice Contract to handle token transfer from L1, lock them and mint on L2.
  */
-contract IpcTokenController is IpcExchange, ReentrancyGuard {
+contract IpcTokenController is IpcExchange {
     using SafeERC20 for IERC20;
     using CrossMsgHelper for IpcEnvelope;
     using SubnetIDHelper for SubnetID;

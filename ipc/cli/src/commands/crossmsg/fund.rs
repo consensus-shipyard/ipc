@@ -4,7 +4,10 @@
 
 use async_trait::async_trait;
 use clap::Args;
+use fvm_shared::bigint::BigInt;
+use fvm_shared::econ::TokenAmount;
 use ipc_api::subnet_id::SubnetID;
+use num_traits::Num;
 use std::{fmt::Debug, str::FromStr};
 
 use crate::{
@@ -57,17 +60,16 @@ impl CommandLineHandler for Fund {
 #[derive(Debug, Args)]
 #[command(about = "Send funds from a parent to a child subnet")]
 pub(crate) struct FundArgs {
-    #[arg(long, short, help = "The gateway address of the subnet")]
+    #[arg(long, help = "The gateway address of the subnet")]
     pub gateway_address: Option<String>,
-    #[arg(long, short, help = "The address to send funds from")]
+    #[arg(long, help = "The address to send funds from")]
     pub from: Option<String>,
     #[arg(
         long,
-        short,
         help = "The address to send funds to (if not set, amount sent to from address)"
     )]
     pub to: Option<String>,
-    #[arg(long, short, help = "The subnet to fund")]
+    #[arg(long, help = "The subnet to fund")]
     pub subnet: String,
     #[arg(help = "The amount to fund in FIL, in whole FIL")]
     pub amount: f64,
@@ -107,9 +109,9 @@ impl CommandLineHandler for PreFund {
     about = "Add some funds in genesis to an address in a child-subnet"
 )]
 pub struct PreFundArgs {
-    #[arg(long, short, help = "The address funded in the subnet")]
+    #[arg(long, help = "The address funded in the subnet")]
     pub from: Option<String>,
-    #[arg(long, short, help = "The subnet to add balance to")]
+    #[arg(long, help = "The subnet to add balance to")]
     pub subnet: String,
     #[arg(help = "Add an initial balance for the address in genesis in the subnet")]
     pub initial_balance: f64,
@@ -136,11 +138,13 @@ impl CommandLineHandler for FundWithToken {
             None => None,
         };
 
+        let amount = BigInt::from_str_radix(arguments.amount.as_str(), 10)
+            .map_err(|e| anyhow::anyhow!("not a token amount: {e}"))
+            .map(TokenAmount::from_atto)?;
+
         println!(
             "fund with token performed in epoch: {:?}",
-            provider
-                .fund_with_token(subnet, from, to, f64_to_token_amount(arguments.amount)?,)
-                .await?,
+            provider.fund_with_token(subnet, from, to, amount).await?,
         );
 
         Ok(())
@@ -150,16 +154,15 @@ impl CommandLineHandler for FundWithToken {
 #[derive(Debug, Args)]
 #[command(about = "Send erc20 tokens from a parent to a child subnet")]
 pub(crate) struct FundWithTokenArgs {
-    #[arg(long, short, help = "The address to send funds from")]
+    #[arg(long, help = "The address to send funds from")]
     pub from: Option<String>,
     #[arg(
         long,
-        short,
         help = "The address to send funds to (if not set, amount sent to from address)"
     )]
     pub to: Option<String>,
-    #[arg(long, short, help = "The subnet to fund")]
+    #[arg(long, help = "The subnet to fund")]
     pub subnet: String,
-    #[arg(help = "The amount to fund in erc20, in ether, supports up to 9 decimal places")]
-    pub amount: f64,
+    #[arg(help = "The amount to fund in erc20, in the token's precision unit")]
+    pub amount: String,
 }

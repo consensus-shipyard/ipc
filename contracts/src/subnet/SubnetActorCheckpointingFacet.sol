@@ -103,11 +103,10 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
         console.log("block height:", checkpoint.blockHeight);
         console.log("s.bottomUpCheckPeriod:", s.bottomUpCheckPeriod);
         console.log("lastBottomUpCheckpointHeight:", lastBottomUpCheckpointHeight);
-        if (
-            checkpoint.blockHeight != lastBottomUpCheckpointHeight + s.bottomUpCheckPeriod &&
-            checkpoint.blockHeight != lastBottomUpCheckpointHeight
-        ) {
-            revert InvalidCheckpointEpoch();
+        if (checkpoint.blockHeight != lastBottomUpCheckpointHeight + s.bottomUpCheckPeriod) {
+            if (checkpoint.blockHeight != lastBottomUpCheckpointHeight) {
+                revert InvalidCheckpointEpoch();
+            }
         }
     }
 }

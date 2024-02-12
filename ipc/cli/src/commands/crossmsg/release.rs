@@ -57,17 +57,16 @@ impl CommandLineHandler for Release {
 #[derive(Debug, Args)]
 #[command(about = "Release operation in the gateway actor")]
 pub(crate) struct ReleaseArgs {
-    #[arg(long, short, help = "The gateway address of the subnet")]
+    #[arg(long, help = "The gateway address of the subnet")]
     pub gateway_address: Option<String>,
-    #[arg(long, short, help = "The address that releases funds")]
+    #[arg(long, help = "The address that releases funds")]
     pub from: Option<String>,
     #[arg(
         long,
-        short,
         help = "The address to release funds to (if not set, amount sent to from address)"
     )]
     pub to: Option<String>,
-    #[arg(long, short, help = "The subnet to release funds from")]
+    #[arg(long, help = "The subnet to release funds from")]
     pub subnet: String,
     #[arg(help = "The amount to release in FIL, in whole FIL")]
     pub amount: f64,
@@ -103,9 +102,9 @@ impl CommandLineHandler for PreRelease {
     about = "Release some funds from the genesis balance of the child subnet"
 )]
 pub struct PreReleaseArgs {
-    #[arg(long, short, help = "The address funded in the subnet")]
+    #[arg(long, help = "The address funded in the subnet")]
     pub from: Option<String>,
-    #[arg(long, short, help = "The subnet to release balance from")]
+    #[arg(long, help = "The subnet to release balance from")]
     pub subnet: String,
     #[arg(help = "Amount to release from the genesis balance of a child subnet")]
     pub amount: f64,

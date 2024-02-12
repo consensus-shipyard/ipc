@@ -41,8 +41,8 @@ impl CommandLineHandler for WalletRemove {
 #[derive(Debug, Args)]
 #[command(about = "Remove wallet from keystore")]
 pub(crate) struct WalletRemoveArgs {
-    #[arg(long, short, help = "Address of the key to remove")]
+    #[arg(long, help = "Address of the key to remove")]
     pub address: String,
-    #[arg(long, short, help = "The type of the wallet, i.e. fvm, evm")]
+    #[arg(long, help = "The type of the wallet, i.e. fvm, evm")]
     pub wallet_type: String,
 }
