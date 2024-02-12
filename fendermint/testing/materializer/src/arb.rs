@@ -145,12 +145,7 @@ fn gen_manifest(
     } else {
         let initial_balances = balances.clone();
         // Reuse the subnet generation logic for picking validators and nodes.
-        let subnet = gen_subnets(g, 0, 2, 2, &account_ids, &[], &mut balances);
-        let subnet = subnet
-            .into_iter()
-            .next()
-            .expect("should have exactly 1 subnet")
-            .1;
+        let subnet = gen_root_subnet(g, &account_ids, &mut balances);
 
         Rootnet::New {
             validators: subnet.validators,
@@ -307,6 +302,19 @@ fn gen_subnets(
     }
 
     subnets
+}
+
+/// Generate a random root-like subnet. The motivation for this is just to reuse the validator allocation for a new rootnet.
+fn gen_root_subnet(
+    g: &mut Gen,
+    account_ids: &[AccountId],
+    remaining_balances: &mut BalanceMap,
+) -> Subnet {
+    let ss = gen_subnets(g, 1, 2, 2, &account_ids, &[], remaining_balances);
+    debug_assert_eq!(ss.len(), 1, "should have exactly 1 subnet");
+    let mut s = ss.into_iter().next().unwrap().1;
+    s.relayers.clear();
+    s
 }
 
 /// Choose some balance, up to 10% of the remaining balance of the account, minimum 1 atto.
