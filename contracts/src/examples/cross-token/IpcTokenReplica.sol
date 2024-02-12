@@ -43,7 +43,6 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
     // Create the mapping of ipc envelope hash to TransferDetails
     mapping(bytes32 => TransferDetails) public unconfirmedTransfers;
 
-    uint256 public constant DEFAULT_CROSS_MSG_FEE = 10 gwei;
     uint64 public nonce = 0;
 
     event TokenSent(
@@ -67,11 +66,10 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
     }
 
     function burnAndTransfer(address receiver, uint256 amount) external payable returns (IpcEnvelope memory committed) {
+        // TODO: reject calls with value
+        // TODO: coalesce error types to a single TransferRejected(string reason).
         if (receiver == address(0)) {
             revert ZeroAddress();
-        }
-        if (msg.value != DEFAULT_CROSS_MSG_FEE) {
-            revert NotEnoughFunds();
         }
 
         uint64 lastNonce = nonce;
@@ -95,7 +93,7 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
             subnetId: controllerSubnet,
             rawAddress: FvmAddressHelper.from(controller)
         });
-        committed = performIpcCall(destination, message, DEFAULT_CROSS_MSG_FEE);
+        committed = performIpcCall(destination, message, 0);
         _burn(receiver, amount);
 
         //add receipt to unconfirmedTransfers
