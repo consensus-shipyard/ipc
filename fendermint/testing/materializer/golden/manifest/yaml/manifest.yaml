@@ -1,123 +1,54 @@
 accounts:
-  J_WmUD: {}
-  O0uRBWB: {}
-  gH_Ziu: {}
-  uK4gxA_: {}
-rootnet: !External
-  deployment: !Existing
-    gateway: f3acghldukzuracu6l6kvqsfmxy6uc7qpzq2gl3frxaaa76g6efxqt7zfsa4r4wldqel7qbbzzg72lww5onkvq
-    registry: f011904243251503077203
+  ByXyA: {}
+  GLR: {}
+  SUbs: {}
+  Xeo1IS: {}
+  Y2s7z_g: {}
+rootnet:
+  type: New
+  validators:
+    Xeo1IS: '3980848373269038288'
+  balances:
+    ByXyA: '100000000000000000000'
+    GLR: '100000000000000000000'
+    SUbs: '100000000000000000000'
+    Xeo1IS: '100000000000000000000'
+    Y2s7z_g: '100000000000000000000'
+  nodes:
+    _zr9_:
+      mode:
+        type: Validator
+        validator: Xeo1IS
+      ethapi: false
+      seed_nodes: []
+      parent_node: null
 subnets:
-  cJLRTI4:
-    creator: J_WmUD
+  Bg3TJ9w:
+    creator: ByXyA
     validators:
-      J_WmUD: '885727970195438721'
-      uK4gxA_: '1299574128368018545'
-    balances: {}
+      ByXyA: '146295359334072583'
+      Xeo1IS: '7788930049464346135'
+    balances:
+      Xeo1IS: '8578574492639143987'
     nodes:
-      oWY2dv:
-        mode: !Validator J_WmUD
+      dCIzpB5a:
+        mode:
+          type: Validator
+          validator: ByXyA
         ethapi: false
         seed_nodes: []
-        parent_node: null
-      pVHEecbw:
-        mode: !Validator uK4gxA_
-        ethapi: true
+        parent_node: _zr9_
+      eiGhs2:
+        mode:
+          type: Validator
+          validator: Xeo1IS
+        ethapi: false
         seed_nodes:
-        - oWY2dv
-        parent_node: null
+        - dCIzpB5a
+        parent_node: _zr9_
     relayers:
-      Atq_O:
-        submitter: gH_Ziu
-        follow_node: oWY2dv
-        submit_node: null
-      KN1y9:
-        submitter: O0uRBWB
-        follow_node: oWY2dv
-        submit_node: null
-    subnets:
-      AcrZLY:
-        creator: gH_Ziu
-        validators:
-          O0uRBWB: '3269965112664320401'
-        balances: {}
-        nodes:
-          Ntr_O6i:
-            mode: !Validator O0uRBWB
-            ethapi: false
-            seed_nodes: []
-            parent_node: pVHEecbw
-        relayers:
-          94ohaGC:
-            submitter: gH_Ziu
-            follow_node: Ntr_O6i
-            submit_node: pVHEecbw
-          MN_g:
-            submitter: uK4gxA_
-            follow_node: Ntr_O6i
-            submit_node: oWY2dv
-        subnets: {}
-      dgPt8:
-        creator: O0uRBWB
-        validators:
-          O0uRBWB: '8257100775081525155'
-          gH_Ziu: '4196706834963842439'
-          uK4gxA_: '2788714604261864978'
-        balances:
-          J_WmUD: '3875145680302025945'
-          gH_Ziu: '3591010432892743070'
-        nodes:
-          AwSB:
-            mode: !Validator O0uRBWB
-            ethapi: true
-            seed_nodes: []
-            parent_node: pVHEecbw
-          GBHFb3w:
-            mode: Full
-            ethapi: true
-            seed_nodes:
-            - _AAn
-            parent_node: oWY2dv
-          _AAn:
-            mode: !Validator gH_Ziu
-            ethapi: true
-            seed_nodes:
-            - AwSB
-            parent_node: oWY2dv
-        relayers:
-          1VuC:
-            submitter: gH_Ziu
-            follow_node: _AAn
-            submit_node: oWY2dv
-          Jr_s1UBy:
-            submitter: uK4gxA_
-            follow_node: AwSB
-            submit_node: oWY2dv
-        subnets: {}
-      ot5kR2:
-        creator: gH_Ziu
-        validators:
-          uK4gxA_: '3622325063118132095'
-        balances:
-          J_WmUD: '6760854123099346345'
-          uK4gxA_: '4769136887087469757'
-        nodes:
-          Xr2W:
-            mode: !Validator uK4gxA_
-            ethapi: true
-            seed_nodes: []
-            parent_node: pVHEecbw
-        relayers:
-          AK8tb:
-            submitter: O0uRBWB
-            follow_node: Xr2W
-            submit_node: pVHEecbw
-          E_x5:
-            submitter: gH_Ziu
-            follow_node: Xr2W
-            submit_node: oWY2dv
-          OM_Lt:
-            submitter: uK4gxA_
-            follow_node: Xr2W
-            submit_node: oWY2dv
-        subnets: {}
+      NLlB:
+        submitter: Y2s7z_g
+        follow_node: dCIzpB5a
+        submit_node: _zr9_
+    subnets: {}

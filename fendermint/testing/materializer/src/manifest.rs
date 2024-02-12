@@ -79,6 +79,7 @@ pub struct Balance(#[serde_as(as = "IsHumanReadable")] pub TokenAmount);
 /// and an address we learn after deployment.
 #[serde_as]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "type")]
 pub enum IpcDeployment {
     /// Use one of the existing deployments, given by the delegated address of
     /// the Gateway and Registry contracts.
@@ -98,6 +99,7 @@ pub enum IpcDeployment {
 /// if we are deploying to Calibration, or it might be a chain we provision
 /// with CometBFT and Fendermint.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "type")]
 pub enum Rootnet {
     /// Existing L1 running outside our control.
     ///
@@ -167,11 +169,13 @@ pub struct Node {
 
 /// The mode in which CometBFT is running.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "type")]
 pub enum NodeMode {
     /// A node able to create and sign blocks.
-    Validator(AccountId),
-    /// A node which runs consensus and executes blocks, but doesn't have a validator key.
+    Validator { validator: AccountId },
+    /// A node which executes blocks and checks their content, but doesn't have a validator key.
     Full,
+    // TODO: We can expand this to include seed nodes.
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]

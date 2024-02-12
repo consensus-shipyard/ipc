@@ -1,133 +1,83 @@
-[accounts.My2Bn2XY]
+[accounts.ID72]
 
-[accounts.OK5OS6]
+[accounts.oyn]
 
-[accounts.Z66]
+[accounts.x_52Lm]
 
-[accounts.wk8j]
+[rootnet]
+type = "External"
 
-[accounts.z_MP]
+[rootnet.deployment]
+type = "New"
+deployer = "ID72"
 
-[rootnet.External.deployment.Existing]
-gateway = "f2ox74e6yb35xeeap7vy7vkaiqq2etx2owhjqrq7i"
-registry = "f04763548530978817060"
+[subnets.EQxjKGFA]
+creator = "ID72"
 
-[subnets.IAYNV]
-creator = "wk8j"
+[subnets.EQxjKGFA.validators]
+x_52Lm = "8209706277064916472"
 
-[subnets.IAYNV.validators]
-My2Bn2XY = "2707702711287191077"
-OK5OS6 = "3852920720991473586"
+[subnets.EQxjKGFA.balances]
+oyn = "2305445625663596816"
 
-[subnets.IAYNV.balances]
-My2Bn2XY = "3493478323243188078"
-
-[subnets.IAYNV.nodes.1ah]
-ethapi = true
-seed_nodes = ["yB-S9cL"]
-
-[subnets.IAYNV.nodes.1ah.mode]
-Validator = "OK5OS6"
-
-[subnets.IAYNV.nodes.yB-S9cL]
+[subnets.EQxjKGFA.nodes.HLT_z0G]
 ethapi = true
 seed_nodes = []
 
-[subnets.IAYNV.nodes.yB-S9cL.mode]
-Validator = "My2Bn2XY"
+[subnets.EQxjKGFA.nodes.HLT_z0G.mode]
+type = "Validator"
+validator = "x_52Lm"
 
-[subnets.IAYNV.relayers.APf86S]
-submitter = "z_MP"
-follow_node = "yB-S9cL"
+[subnets.EQxjKGFA.relayers.E7xcJm]
+submitter = "oyn"
+follow_node = "HLT_z0G"
 
-[subnets.IAYNV.relayers.EZi]
-submitter = "Z66"
-follow_node = "yB-S9cL"
+[subnets.EQxjKGFA.relayers.x7_jB6]
+submitter = "x_52Lm"
+follow_node = "HLT_z0G"
 
-[subnets.IAYNV.relayers.xZ6e]
-submitter = "z_MP"
-follow_node = "yB-S9cL"
+[subnets.EQxjKGFA.subnets.aWn]
+creator = "oyn"
 
-[subnets.IAYNV.subnets.QWa]
-creator = "wk8j"
+[subnets.EQxjKGFA.subnets.aWn.validators]
+ID72 = "3259809290142443537"
+oyn = "6012373228910588906"
 
-[subnets.IAYNV.subnets.QWa.validators]
-Z66 = "4236981000069240434"
+[subnets.EQxjKGFA.subnets.aWn.balances]
+oyn = "5080983028490214972"
+x_52Lm = "7333971111540430540"
 
-[subnets.IAYNV.subnets.QWa.balances]
-My2Bn2XY = "1202162200411464376"
-Z66 = "9546683962838727507"
-wk8j = "9375844996493256003"
-z_MP = "9268892939970378289"
-
-[subnets.IAYNV.subnets.QWa.nodes.apy]
-ethapi = true
-seed_nodes = []
-parent_node = "1ah"
-
-[subnets.IAYNV.subnets.QWa.nodes.apy.mode]
-Validator = "Z66"
-
-[subnets.IAYNV.subnets.QWa.relayers.4l34xA]
-submitter = "My2Bn2XY"
-follow_node = "apy"
-submit_node = "1ah"
-
-[subnets.IAYNV.subnets.QWa.relayers.Axj_H]
-submitter = "Z66"
-follow_node = "apy"
-submit_node = "yB-S9cL"
-
-[subnets.IAYNV.subnets.QWa.subnets]
-
-[subnets.IAYNV.subnets.m9A]
-creator = "Z66"
-
-[subnets.IAYNV.subnets.m9A.validators]
-My2Bn2XY = "5082134360188716126"
-OK5OS6 = "3189320645764665839"
-z_MP = "7566325354090729327"
-
-[subnets.IAYNV.subnets.m9A.balances]
-My2Bn2XY = "8221003037829503961"
-
-[subnets.IAYNV.subnets.m9A.nodes.BLX1O_]
-ethapi = true
-seed_nodes = ["rod2q"]
-parent_node = "yB-S9cL"
-
-[subnets.IAYNV.subnets.m9A.nodes.BLX1O_.mode]
-Validator = "z_MP"
-
-[subnets.IAYNV.subnets.m9A.nodes.n1ZztNeA]
+[subnets.EQxjKGFA.subnets.aWn.nodes._rtaW_H]
 ethapi = false
-seed_nodes = ["rod2q"]
-parent_node = "yB-S9cL"
-
-[subnets.IAYNV.subnets.m9A.nodes.n1ZztNeA.mode]
-Validator = "OK5OS6"
-
-[subnets.IAYNV.subnets.m9A.nodes.rod2q]
-ethapi = true
 seed_nodes = []
-parent_node = "1ah"
+parent_node = "HLT_z0G"
 
-[subnets.IAYNV.subnets.m9A.nodes.rod2q.mode]
-Validator = "My2Bn2XY"
+[subnets.EQxjKGFA.subnets.aWn.nodes._rtaW_H.mode]
+type = "Validator"
+validator = "ID72"
 
-[subnets.IAYNV.subnets.m9A.relayers.2kr]
-submitter = "z_MP"
-follow_node = "rod2q"
-submit_node = "yB-S9cL"
+[subnets.EQxjKGFA.subnets.aWn.nodes.iHgPl_F]
+ethapi = false
+seed_nodes = ["_rtaW_H"]
+parent_node = "HLT_z0G"
 
-[subnets.IAYNV.subnets.m9A.relayers.S4sA_BU2]
-submitter = "Z66"
-follow_node = "rod2q"
-submit_node = "1ah"
+[subnets.EQxjKGFA.subnets.aWn.nodes.iHgPl_F.mode]
+type = "Validator"
+validator = "oyn"
 
-[subnets.IAYNV.subnets.m9A.relayers.qPXEeOW]
-submitter = "z_MP"
-follow_node = "BLX1O_"
-submit_node = "yB-S9cL"
+[subnets.EQxjKGFA.subnets.aWn.relayers.OF2iQ_]
+submitter = "ID72"
+follow_node = "_rtaW_H"
+submit_node = "HLT_z0G"
 
-[subnets.IAYNV.subnets.m9A.subnets]
+[subnets.EQxjKGFA.subnets.aWn.relayers.hMUxqmPQ]
+submitter = "oyn"
+follow_node = "_rtaW_H"
+submit_node = "HLT_z0G"
+
+[subnets.EQxjKGFA.subnets.aWn.relayers.vR_1]
+submitter = "ID72"
+follow_node = "_rtaW_H"
+submit_node = "HLT_z0G"
+
+[subnets.EQxjKGFA.subnets.aWn.subnets]
