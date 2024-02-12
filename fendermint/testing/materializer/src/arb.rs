@@ -50,7 +50,7 @@ fn choose_at_least<T: Clone>(g: &mut Gen, min_size: usize, xs: &[T]) -> Vec<T> {
     //
     // So we roll the dice and with 30% probability we include the 1st item in the list.
     //
-    // Then we have two cases to consider:
+    // Then we have total_weighto cases to consider:
     // 1. We included the 1st item, so now we have 2 slots and remaining 9 items to choose from.
     //    P_incl(2nd | incl(1st)) = 1 - 8/9 * 7/8 = 1 - 7/9 = 2/9
     // 2. We excluded the 1st item, so we still have 3 slots to fill and remaining 9 items to choose from.
@@ -188,7 +188,7 @@ fn gen_subnets(
     level: usize,
     account_ids: &[AccountId],
     parent_node_ids: &[NodeId],
-    balances: &mut BalanceMap,
+    remaining_balances: &mut BalanceMap,
 ) -> SubnetMap {
     let mut subnets = SubnetMap::default();
 
@@ -207,13 +207,13 @@ fn gen_subnets(
     for _ in 0..num_children {
         // We can pick any creator; we'll make sure this one also gets some
         // funds to pay for the creation of the subnet.
-        let c = choose_one(g, account_ids);
+        let creator = choose_one(g, account_ids);
 
         // Every subnet needs validators, so at least 1 needs to be chosen.
-        let vs: CollateralMap = choose_at_least(g, 1, account_ids)
+        let validators: CollateralMap = choose_at_least(g, 1, account_ids)
             .into_iter()
             .map(|a| {
-                let c = gen_collateral(g, &a, balances);
+                let c = gen_collateral(g, &a, remaining_balances);
                 (a, c)
             })
             .collect();
@@ -221,31 +221,33 @@ fn gen_subnets(
         // It's not necessary to have accounts in a subnet; only declaring
         // some that we want to end up with some balance, but others might
         // funded to support similar ones further down the hierarchy.
-        let bs: BalanceMap = choose_at_least(g, 0, account_ids)
+        let balances: BalanceMap = choose_at_least(g, 0, account_ids)
             .into_iter()
             .map(|a| {
-                let b: Balance = gen_balance(g, &a, balances);
+                let b: Balance = gen_balance(g, &a, remaining_balances);
                 (a, b)
             })
             .collect();
 
         // Run at least a quroum of validators.
-        let tw: TokenAmount = vs.values().map(|c| c.0.clone()).sum();
-        let qw = tw.mul(2).div_floor(3);
-        let mut ss = Vec::new();
-        let mut ns = NodeMap::default();
-        let mut sw = TokenAmount::zero();
+        let total_weight: TokenAmount = validators.values().map(|c| c.0.clone()).sum();
+        let quorum_weight = total_weight.mul(2).div_floor(3);
+        let mut node_ids = Vec::new();
+        let mut nodes = NodeMap::default();
+        let mut running_weight = TokenAmount::zero();
 
-        for (v, w) in vs.iter() {
-            let mode = if sw <= qw || bool::arbitrary(g) {
-                NodeMode::Validator(v.clone())
+        for (v, w) in validators.iter() {
+            let mode = if running_weight <= quorum_weight || bool::arbitrary(g) {
+                NodeMode::Validator {
+                    validator: v.clone(),
+                }
             } else {
                 NodeMode::Full
             };
-            let seed_nodes = if ss.is_empty() {
+            let seed_nodes = if node_ids.is_empty() {
                 vec![]
             } else {
-                choose_at_least(g, 1, &ss)
+                choose_at_least(g, 1, &node_ids)
             };
             let node = Node {
                 mode,
@@ -254,16 +256,16 @@ fn gen_subnets(
                 parent_node: g.choose(parent_node_ids).cloned(),
             };
             let id = NodeId::arbitrary(g);
-            ss.push(id.clone());
-            ns.insert(id, node);
-            sw += w.0.clone();
+            node_ids.push(id.clone());
+            nodes.insert(id, node);
+            running_weight += w.0.clone();
         }
 
-        let rs = (0..1 + usize::arbitrary(g) % 3)
+        let relayers = (0..1 + usize::arbitrary(g) % 3)
             .map(|_| {
                 let r = Relayer {
                     submitter: choose_one(g, account_ids),
-                    follow_node: choose_one(g, &ss),
+                    follow_node: choose_one(g, &node_ids),
                     submit_node: g.choose(parent_node_ids).cloned(),
                 };
                 let id = RelayerId::arbitrary(g);
@@ -271,28 +273,28 @@ fn gen_subnets(
             })
             .collect();
 
-        let ss = gen_subnets(
+        let child_subnets = gen_subnets(
             g,
             max_children,
             max_level,
             level + 1,
             account_ids,
-            &ss,
-            balances,
+            &node_ids,
+            remaining_balances,
         );
 
-        let s = Subnet {
-            creator: c,
-            validators: vs,
-            balances: bs,
-            nodes: ns,
-            relayers: rs,
-            subnets: ss,
+        let subnet = Subnet {
+            creator,
+            validators,
+            balances,
+            nodes,
+            relayers,
+            subnets: child_subnets,
         };
 
         let sid = SubnetId::arbitrary(g);
 
-        subnets.insert(sid, s);
+        subnets.insert(sid, subnet);
     }
 
     subnets
