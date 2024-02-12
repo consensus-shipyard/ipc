@@ -43,8 +43,6 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
     // Create the mapping of ipc envelope hash to TransferDetails
     mapping(bytes32 => TransferDetails) public unconfirmedTransfers;
 
-    uint64 public nonce = 0;
-
     event TokenSent(
         address sourceContract,
         address sender,
@@ -72,19 +70,6 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
             revert ZeroAddress();
         }
 
-        uint64 lastNonce = nonce;
-
-        emit TokenSent({
-            sourceContract: address(this),
-            sender: msg.sender,
-            destinationSubnet: controllerSubnet,
-            destinationContract: controller,
-            receiver: receiver,
-            nonce: lastNonce,
-            value: amount
-        });
-        nonce++;
-
         CallMsg memory message = CallMsg({
             method: abi.encodePacked(bytes4(keccak256("receiveAndUnlock(address,uint256)"))),
             params: abi.encode(receiver, amount)
@@ -96,8 +81,18 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
         committed = performIpcCall(destination, message, 0);
         _burn(receiver, amount);
 
-        //add receipt to unconfirmedTransfers
+        // add tracking entry to unconfirmedTransfers
         unconfirmedTransfers[committed.toHash()] = TransferDetails(msg.sender, amount);
+
+        emit TokenSent({
+            sourceContract: address(this),
+            sender: msg.sender,
+            destinationSubnet: controllerSubnet,
+            destinationContract: controller,
+            receiver: receiver,
+            nonce: committed.nonce,
+            value: amount
+        });
     }
 
     function getUnconfirmedTransfer(bytes32 hash) public view returns (address, uint256) {
