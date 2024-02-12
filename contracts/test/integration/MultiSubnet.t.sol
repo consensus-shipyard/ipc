@@ -70,7 +70,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
     IpcTokenController rootTokenController;
 
     function setUp() public override {
-        token = new ERC20PresetFixedSupply("TestToken", "TEST", 1_000_000, address(this));
+        token = new ERC20PresetFixedSupply("TestToken", "TEST", 1 ether, address(this));
 
         rootSubnetName = SubnetID({root: ROOTNET_CHAINID, route: new address[](0)});
         require(rootSubnetName.isRoot(), "not root");
