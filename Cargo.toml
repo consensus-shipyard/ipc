@@ -65,6 +65,7 @@ futures-core = "0.3"
 futures-util = "0.3"
 gcra = "0.4"
 hex = "0.4"
+hex-literal = "0.4.1"
 im = "15.1.0"
 integer-encoding = { version = "3.0.3", default-features = false }
 jsonrpc-v2 = { version = "0.11", default-features = false, features = [
@@ -183,6 +184,7 @@ fvm_ipld_amt = "0.6.2"
 # and this copy-paste is clunky, so at least for those that have it, we should use it.
 # Keep the version here in sync with the Makefile!
 fil_actors_evm_shared = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v12.0.0" }
+fil_actor_eam = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v12.0.0" }
 fil_actors_runtime = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v12.0.0" }
 
 cid = { version = "0.10.1", default-features = false, features = [
