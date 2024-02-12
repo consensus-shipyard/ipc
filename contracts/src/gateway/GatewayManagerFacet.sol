@@ -33,9 +33,9 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     function register(uint256 genesisCircSupply) external payable {
         // If L2+ support is not enabled, only allow the registration of new
         // subnets in the root
-        // if (s.networkName.route.length + 1 >= s.maxTreeDepth) {
-        //     revert MethodNotAllowed(ERR_CHILD_SUBNET_NOT_ALLOWED);
-        // }
+        if (s.networkName.route.length + 1 >= s.maxTreeDepth) {
+            revert MethodNotAllowed(ERR_CHILD_SUBNET_NOT_ALLOWED);
+        }
 
         if (msg.value < genesisCircSupply) {
             revert NotEnoughFunds();
@@ -44,7 +44,6 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         SubnetID memory subnetId = s.networkName.createSubnetId(msg.sender);
 
         (bool registered, Subnet storage subnet) = LibGateway.getSubnet(subnetId);
-
         if (registered) {
             revert AlreadyRegisteredSubnet();
         }
@@ -55,7 +54,6 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         subnet.circSupply = genesisCircSupply;
 
         s.subnetKeys.add(subnetId.toHash());
-
         s.totalSubnets += 1;
     }
 
@@ -114,6 +112,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
 
         s.totalSubnets -= 1;
         delete s.subnets[id];
+
         s.subnetKeys.remove(id);
 
         payable(msg.sender).sendValue(stake);

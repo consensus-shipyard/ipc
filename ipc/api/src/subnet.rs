@@ -78,6 +78,19 @@ impl TryFrom<u8> for PermissionMode {
     }
 }
 
+impl TryFrom<&str> for PermissionMode {
+    type Error = anyhow::Error;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        Ok(match s {
+            "collateral" => PermissionMode::Collateral,
+            "federated" => PermissionMode::Federated,
+            "static" => PermissionMode::Static,
+            _ => return Err(anyhow!("invalid permission mode: {}", s)),
+        })
+    }
+}
+
 impl TryFrom<u8> for SupplyKind {
     type Error = anyhow::Error;
 
@@ -86,6 +99,18 @@ impl TryFrom<u8> for SupplyKind {
             0 => SupplyKind::Native,
             1 => SupplyKind::ERC20,
             _ => return Err(anyhow!("unknown supply kind {value}")),
+        })
+    }
+}
+
+impl TryFrom<&str> for SupplyKind {
+    type Error = anyhow::Error;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        Ok(match s {
+            "native" => Self::Native,
+            "erc20" => Self::ERC20,
+            _ => return Err(anyhow!("invalid supply kind type: {}", s)),
         })
     }
 }

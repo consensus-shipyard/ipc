@@ -32,14 +32,14 @@ impl CreateSubnet {
             None => None,
         };
 
-        let permission_mode = PermissionMode::try_from(arguments.permission_mode)?;
+        let permission_mode = PermissionMode::try_from(arguments.permission_mode.as_str())?;
         let token_address = if let Some(addr) = &arguments.supply_source_address {
             Some(Address::from_str(addr)?)
         } else {
             None
         };
         let supply_source = SupplySource {
-            kind: SupplyKind::try_from(arguments.supply_source_kind)?,
+            kind: SupplyKind::try_from(arguments.supply_source_kind.as_str())?,
             token_address,
         };
         let addr = provider
@@ -110,14 +110,14 @@ pub struct CreateSubnetArgs {
     pub min_cross_msg_fee: f64,
     #[arg(
         long,
-        help = "The permission mode for the subnet, collateral(0), federated(1) and static(2)"
+        help = "The permission mode for the subnet: collateral, federated and static"
     )]
-    pub permission_mode: u8,
+    pub permission_mode: String,
     #[arg(
         long,
-        help = "The kind of supply source of a subnet on its parent subnet, native(0), erc20(1)"
+        help = "The kind of supply source of a subnet on its parent subnet: native or erc20"
     )]
-    pub supply_source_kind: u8,
+    pub supply_source_kind: String,
     #[arg(
         long,
         help = "The address of supply source of a subnet on its parent subnet. None if kind is native"
