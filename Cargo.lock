@@ -3031,6 +3031,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "serde_yaml",
+ "tendermint-rpc",
  "toml 0.8.8",
 ]
 

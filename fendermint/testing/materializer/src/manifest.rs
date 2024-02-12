@@ -7,6 +7,7 @@ use fvm_shared::econ::TokenAmount;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::{collections::BTreeMap, path::PathBuf};
+use tendermint_rpc::Url;
 
 use fendermint_vm_encoding::IsHumanReadable;
 use fendermint_vm_genesis::Collateral;
@@ -105,6 +106,8 @@ pub enum Rootnet {
     External {
         /// Indicate whether we have to (re)deploy the IPC contract or we can use an existing one.
         deployment: IpcDeployment,
+        /// Addresses of JSON-RPC endpoints on the external L1.
+        urls: Vec<Url>,
     },
 
     /// Provision a new chain to run the L1.
@@ -161,8 +164,8 @@ pub struct Node {
     /// The nodes from which CometBFT should bootstrap itself.
     pub seed_nodes: Vec<NodeId>,
     /// The parent node that the top-down syncer follows;
-    /// or leave it empty if the parent is CalibrationNet.
-    pub parent_node: Option<NodeId>,
+    /// or leave it empty if node is on the rootnet.
+    pub parent_node: Option<ParentNode>,
 }
 
 /// The mode in which CometBFT is running.
@@ -176,6 +179,16 @@ pub enum NodeMode {
     // TODO: We can expand this to include seed nodes.
 }
 
+/// A node on the parent subnet.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum ParentNode {
+    /// An external node such as one on Calibnet, given by its JSON-RPC URL.
+    External(Url),
+    /// A node defined in the manifest.
+    Internal(NodeId),
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Relayer {
     /// The account which will pay for the submission on the parent subnet.
@@ -184,7 +197,7 @@ pub struct Relayer {
     pub follow_node: NodeId,
     /// The node where the relayer submits the checkpoints;
     /// or leave it empty if the parent is CalibrationNet.
-    pub submit_node: Option<NodeId>,
+    pub submit_node: ParentNode,
 }
 
 #[cfg(test)]

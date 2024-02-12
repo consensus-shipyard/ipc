@@ -1,171 +1,99 @@
 {
   "accounts": {
-    "PPS": {},
-    "SZ5": {},
-    "sW6O-u": {}
+    "AJxB": {},
+    "Aj0I_t": {},
+    "TeBcA": {},
+    "ccXUc3": {}
   },
   "rootnet": {
-    "type": "New",
-    "validators": {
-      "sW6O-u": "9899559205036071766"
+    "type": "External",
+    "deployment": {
+      "type": "New",
+      "deployer": "Aj0I_t"
     },
-    "balances": {
-      "PPS": "100000000000000000000",
-      "SZ5": "100000000000000000000",
-      "sW6O-u": "100000000000000000000"
-    },
-    "nodes": {
-      "u1BpVQ": {
-        "mode": {
-          "type": "Validator",
-          "validator": "sW6O-u"
-        },
-        "ethapi": true,
-        "seed_nodes": [],
-        "parent_node": null
-      }
-    }
+    "urls": [
+      "https://e4gapevf.api.calibration.node.glif.io/rpc/v1",
+      "https://ypa.api.calibration.node.glif.io/rpc/v1",
+      "https://m4662lst.api.calibration.node.glif.io/rpc/v1"
+    ]
   },
   "subnets": {
-    "1Q5RaE": {
-      "creator": "PPS",
+    "Nq_6aQol": {
+      "creator": "Aj0I_t",
       "validators": {
-        "sW6O-u": "3721646615506714962"
+        "ccXUc3": "7172262545587084591"
       },
-      "balances": {},
+      "balances": {
+        "Aj0I_t": "9162460209480324624",
+        "ccXUc3": "5066607307630419796"
+      },
       "nodes": {
-        "mIEAl7O6": {
+        "66ACmYnr": {
           "mode": {
             "type": "Validator",
-            "validator": "sW6O-u"
+            "validator": "ccXUc3"
           },
-          "ethapi": false,
+          "ethapi": true,
           "seed_nodes": [],
-          "parent_node": "u1BpVQ"
+          "parent_node": "https://ypa.api.calibration.node.glif.io/rpc/v1"
         }
       },
       "relayers": {
-        "5yygQf": {
-          "submitter": "sW6O-u",
-          "follow_node": "mIEAl7O6",
-          "submit_node": "u1BpVQ"
-        },
-        "5z_Ru1b0": {
-          "submitter": "PPS",
-          "follow_node": "mIEAl7O6",
-          "submit_node": "u1BpVQ"
+        "_SfPAK_v": {
+          "submitter": "AJxB",
+          "follow_node": "66ACmYnr",
+          "submit_node": "https://ypa.api.calibration.node.glif.io/rpc/v1"
         }
       },
       "subnets": {
-        "GWK2r": {
-          "creator": "PPS",
+        "EhBMgOE": {
+          "creator": "AJxB",
           "validators": {
-            "PPS": "7842348883385469418",
-            "sW6O-u": "95975647236306899"
+            "Aj0I_t": "367423321636535243",
+            "TeBcA": "1",
+            "ccXUc3": "4622750394160732161"
           },
-          "balances": {},
+          "balances": {
+            "ccXUc3": "2093091713664174605"
+          },
           "nodes": {
-            "88Adjq": {
+            "BiA": {
               "mode": {
                 "type": "Validator",
-                "validator": "PPS"
+                "validator": "ccXUc3"
+              },
+              "ethapi": true,
+              "seed_nodes": [
+                "HekgqX"
+              ],
+              "parent_node": "66ACmYnr"
+            },
+            "HekgqX": {
+              "mode": {
+                "type": "Validator",
+                "validator": "Aj0I_t"
               },
               "ethapi": false,
               "seed_nodes": [],
-              "parent_node": "mIEAl7O6"
+              "parent_node": "66ACmYnr"
             },
-            "DBuBG7": {
+            "j_hfAR": {
               "mode": {
                 "type": "Validator",
-                "validator": "sW6O-u"
+                "validator": "TeBcA"
               },
               "ethapi": false,
               "seed_nodes": [
-                "88Adjq"
+                "HekgqX"
               ],
-              "parent_node": "mIEAl7O6"
+              "parent_node": "66ACmYnr"
             }
           },
           "relayers": {
-            "Xv1A": {
-              "submitter": "sW6O-u",
-              "follow_node": "88Adjq",
-              "submit_node": "mIEAl7O6"
-            },
-            "v4C36Bj": {
-              "submitter": "SZ5",
-              "follow_node": "DBuBG7",
-              "submit_node": "mIEAl7O6"
-            }
-          },
-          "subnets": {}
-        },
-        "QAhDsxj": {
-          "creator": "SZ5",
-          "validators": {
-            "SZ5": "179269309258396850"
-          },
-          "balances": {},
-          "nodes": {
-            "-fFmhBD": {
-              "mode": {
-                "type": "Validator",
-                "validator": "SZ5"
-              },
-              "ethapi": false,
-              "seed_nodes": [],
-              "parent_node": "mIEAl7O6"
-            }
-          },
-          "relayers": {
-            "L5ean3FL": {
-              "submitter": "sW6O-u",
-              "follow_node": "-fFmhBD",
-              "submit_node": "mIEAl7O6"
-            },
-            "atv4V7hg": {
-              "submitter": "SZ5",
-              "follow_node": "-fFmhBD",
-              "submit_node": "mIEAl7O6"
-            }
-          },
-          "subnets": {}
-        },
-        "j80": {
-          "creator": "SZ5",
-          "validators": {
-            "sW6O-u": "1635589545659224886"
-          },
-          "balances": {
-            "SZ5": "5820424334380753313",
-            "sW6O-u": "3922028849801147658"
-          },
-          "nodes": {
-            "nc_TZuiC": {
-              "mode": {
-                "type": "Validator",
-                "validator": "sW6O-u"
-              },
-              "ethapi": true,
-              "seed_nodes": [],
-              "parent_node": "mIEAl7O6"
-            }
-          },
-          "relayers": {
-            "GWcqoW1": {
-              "submitter": "sW6O-u",
-              "follow_node": "nc_TZuiC",
-              "submit_node": "mIEAl7O6"
-            },
-            "JwTXbz": {
-              "submitter": "SZ5",
-              "follow_node": "nc_TZuiC",
-              "submit_node": "mIEAl7O6"
-            },
-            "N-ISB7": {
-              "submitter": "SZ5",
-              "follow_node": "nc_TZuiC",
-              "submit_node": "mIEAl7O6"
+            "meX": {
+              "submitter": "AJxB",
+              "follow_node": "BiA",
+              "submit_node": "66ACmYnr"
             }
           },
           "subnets": {}

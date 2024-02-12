@@ -8,8 +8,11 @@ use ethers::{
 use lazy_static::lazy_static;
 use std::{
     cmp::min,
+    collections::BTreeMap,
     ops::{Mul, SubAssign},
+    str::FromStr,
 };
+use tendermint_rpc::Url;
 
 use fendermint_vm_genesis::Collateral;
 use fvm_shared::{
@@ -20,7 +23,8 @@ use quickcheck::{Arbitrary, Gen};
 
 use crate::manifest::{
     Account, AccountId, Balance, BalanceMap, CollateralMap, IpcDeployment, Manifest, Node, NodeId,
-    NodeMap, NodeMode, Relayer, RelayerId, ResourceId, Rootnet, Subnet, SubnetId, SubnetMap,
+    NodeMap, NodeMode, ParentNode, Relayer, RelayerId, ResourceId, Rootnet, Subnet, SubnetId,
+    SubnetMap,
 };
 
 const RESOURCE_ID_CHARSET: &[u8] =
@@ -79,7 +83,7 @@ fn choose_at_least<T: Clone>(g: &mut Gen, min_size: usize, xs: &[T]) -> Vec<T> {
 }
 
 fn choose_one<T: Clone>(g: &mut Gen, xs: &[T]) -> T {
-    g.choose(xs).expect("empty sequence to choose from").clone()
+    g.choose(xs).expect("empty slice to choose from").clone()
 }
 
 impl Arbitrary for ResourceId {
@@ -141,6 +145,7 @@ fn gen_manifest(
                     deployer: choose_one(g, &account_ids),
                 }
             },
+            urls: gen_urls(g),
         }
     } else {
         let initial_balances = balances.clone();
@@ -155,9 +160,19 @@ fn gen_manifest(
     };
 
     // Pick some node IDs targeted by relayers on the rootnet.
-    let parent_node_ids = match rootnet {
-        Rootnet::External { .. } => Vec::new(), // No specific target, it will be a JSON-RPC endpoint.
-        Rootnet::New { ref nodes, .. } => nodes.keys().cloned().collect(),
+    let parent_nodes: Vec<ParentNode> = match &rootnet {
+        Rootnet::External { urls, .. } => urls
+            .into_iter()
+            .cloned()
+            .map(ParentNode::External)
+            .collect(),
+
+        Rootnet::New { ref nodes, .. } => nodes
+            .keys()
+            .into_iter()
+            .cloned()
+            .map(ParentNode::Internal)
+            .collect(),
     };
 
     // The rootnet is L1, immediate subnets are L2.
@@ -167,7 +182,7 @@ fn gen_manifest(
         max_level,
         2,
         &account_ids,
-        &parent_node_ids,
+        &parent_nodes,
         &mut balances,
     );
 
@@ -184,6 +199,22 @@ fn gen_address(g: &mut Gen) -> H160 {
     H160::random_using(&mut rng)
 }
 
+/// Generate something that looks like it could be a JSON-RPC endpoint of an L1.
+///
+/// Return more, as if we had a list of nodes to choose from.
+fn gen_urls(g: &mut Gen) -> Vec<Url> {
+    let mut urls = Vec::new();
+    for _ in 0..1 + usize::arbitrary(g) % 3 {
+        let id = ResourceId::arbitrary(g);
+        // The glif.io addresses are load balanced, but let's pretend we can target a specific node.
+        // alternatively we could vary the ports or whatever.
+        let url = format!("https://{}.api.calibration.node.glif.io/rpc/v1", id.0);
+        let url = Url::from_str(&url).expect("URL should parse");
+        urls.push(url);
+    }
+    urls
+}
+
 /// Recursively generate some subnets.
 fn gen_subnets(
     g: &mut Gen,
@@ -191,7 +222,7 @@ fn gen_subnets(
     max_level: usize,
     level: usize,
     account_ids: &[AccountId],
-    parent_node_ids: &[NodeId],
+    parent_nodes: &[ParentNode],
     remaining_balances: &mut BalanceMap,
 ) -> SubnetMap {
     let mut subnets = SubnetMap::default();
@@ -257,7 +288,11 @@ fn gen_subnets(
                 mode,
                 ethapi: bool::arbitrary(g),
                 seed_nodes,
-                parent_node: g.choose(parent_node_ids).cloned(),
+                parent_node: if parent_nodes.is_empty() {
+                    None
+                } else {
+                    Some(choose_one(g, parent_nodes))
+                },
             };
             let id = NodeId::arbitrary(g);
             node_ids.push(id.clone());
@@ -265,17 +300,26 @@ fn gen_subnets(
             running_weight += w.0.clone();
         }
 
-        let relayers = (0..1 + usize::arbitrary(g) % 3)
-            .map(|_| {
-                let r = Relayer {
-                    submitter: choose_one(g, account_ids),
-                    follow_node: choose_one(g, &node_ids),
-                    submit_node: g.choose(parent_node_ids).cloned(),
-                };
-                let id = RelayerId::arbitrary(g);
-                (id, r)
-            })
-            .collect();
+        let relayers = if parent_nodes.is_empty() {
+            BTreeMap::default()
+        } else {
+            (0..1 + usize::arbitrary(g) % 3)
+                .map(|_| {
+                    let r = Relayer {
+                        submitter: choose_one(g, account_ids),
+                        follow_node: choose_one(g, &node_ids),
+                        submit_node: choose_one(g, parent_nodes),
+                    };
+                    let id = RelayerId::arbitrary(g);
+                    (id, r)
+                })
+                .collect()
+        };
+
+        let parent_nodes = node_ids
+            .into_iter()
+            .map(ParentNode::Internal)
+            .collect::<Vec<_>>();
 
         let child_subnets = gen_subnets(
             g,
@@ -283,7 +327,7 @@ fn gen_subnets(
             max_level,
             level + 1,
             account_ids,
-            &node_ids,
+            &parent_nodes,
             remaining_balances,
         );
 
