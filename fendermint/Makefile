@@ -25,6 +25,8 @@ BUILDX_STORE ?= --load
 BUILDX_FLAGS ?=
 # Set to the `<repo>/<image>:<tag>` label the image.
 BUILDX_TAG   ?= fendermint:latest
+# On CI we can push the builder image itself to cache it.
+BUILDX_BUILDER_TAG ?= fendermint-builder:latest
 
 all: test build diagrams
 
@@ -79,6 +81,11 @@ docker-deps: $(BUILTIN_ACTORS_BUNDLE) $(CUSTOM_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 # it can handle for anyone with `DOCKER_BUILDKIT=1`.
 docker-build: docker-deps $(FENDERMINT_CODE)
 	if [ "$(PROFILE)" = "ci" ]; then \
+		docker buildx build \
+			$(BUILDX_STORE) \
+			$(BUILDX_FLAGS) \
+			-f docker/builder.ci.Dockerfile \
+			-t $(BUILDX_BUILDER_TAG) $(PWD)/..; \
 		cat docker/builder.ci.Dockerfile docker/runner.Dockerfile > docker/Dockerfile ; \
 		docker buildx build \
 			$(BUILDX_STORE) \

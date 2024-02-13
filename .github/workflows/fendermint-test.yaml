@@ -90,9 +90,13 @@ jobs:
           path: ./contracts/out
           key: contracts-abi-${{ hashFiles('./contracts/src/**/*.sol') }}
 
-      # Pull the latest docker image. Its layers might be reused during the build.
+      - name: Docker Login
+        shell: bash
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
+
+      # Pull the latest docker builder image. Its layers might be reused during the build.
       - name: Docker Pull
-        run: docker pull ghcr.io/consensus-shipyard/fendermint:latest
+        run: docker pull ghcr.io/${{ github.repository_owner }}/fendermint-builder:latest || echo "builder image not found"
 
       - name: ${{ matrix.make.name }}
         run: cd fendermint && make ${{ matrix.make.task }}
