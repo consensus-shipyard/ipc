@@ -94,6 +94,18 @@ jobs:
         shell: bash
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
 
+      # https://github.com/marketplace/actions/free-disk-space-ubuntu
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
       # Pull the latest docker builder image. Its layers might be reused during the build.
       - name: Docker Pull
         run: docker pull ghcr.io/${{ github.repository_owner }}/fendermint-builder:latest || echo "builder image not found"
