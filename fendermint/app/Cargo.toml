@@ -9,7 +9,6 @@ license.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
-base64 = { workspace = true }
 bytes = { workspace = true }
 cid = { workspace = true }
 hex = { workspace = true }

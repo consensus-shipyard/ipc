@@ -2816,7 +2816,6 @@ dependencies = [
  "anyhow",
  "async-stm",
  "async-trait",
- "base64 0.21.7",
  "bytes",
  "cid",
  "fendermint_abci",
@@ -2943,6 +2942,8 @@ dependencies = [
 name = "fendermint_crypto"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "base64 0.21.7",
  "libsecp256k1",
  "rand",
  "zeroize",
