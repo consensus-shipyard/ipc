@@ -20,15 +20,6 @@ contract L1GatewayActorDiamond is IntegrationTestBase {
     function setUp() public virtual override {
         GatewayDiamond.ConstructorParams memory gwConstructorParams = defaultGatewayParams();
         gatewayDiamond = createGatewayDiamond(gwConstructorParams);
-
-        gwGetter = gatewayDiamond.getter();
-        gwManager = gatewayDiamond.manager();
-        gwCheckpointingFacet = gatewayDiamond.checkpointer();
-        gwXnetMessagingFacet = gatewayDiamond.xnetMessenger();
-        gwTopDownFinalityFacet = gatewayDiamond.topDownFinalizer();
-        gwMessenger = gatewayDiamond.messenger();
-        gwLouper = gatewayDiamond.diamondLouper();
-        gwCutter = gatewayDiamond.diamondCutter();
     }
 
     function defaultGatewayParams() internal pure override returns (GatewayDiamond.ConstructorParams memory) {
@@ -54,15 +45,6 @@ contract L2GatewayActorDiamond is IntegrationTestBase {
     function setUp() public virtual override {
         GatewayDiamond.ConstructorParams memory gwConstructorParams = defaultGatewayParams();
         gatewayDiamond = createGatewayDiamond(gwConstructorParams);
-
-        gwGetter = gatewayDiamond.getter();
-        gwManager = gatewayDiamond.manager();
-        gwCheckpointingFacet = gatewayDiamond.checkpointer();
-        gwXnetMessagingFacet = gatewayDiamond.xnetMessenger();
-        gwTopDownFinalityFacet = gatewayDiamond.topDownFinalizer();
-        gwMessenger = gatewayDiamond.messenger();
-        gwLouper = gatewayDiamond.diamondLouper();
-        gwCutter = gatewayDiamond.diamondCutter();
     }
 
     function defaultGatewayParams() internal pure override returns (GatewayDiamond.ConstructorParams memory) {
@@ -91,15 +73,6 @@ contract L3GatewayActorDiamond is IntegrationTestBase {
     function setUp() public virtual override {
         GatewayDiamond.ConstructorParams memory gwConstructorParams = defaultGatewayParams();
         gatewayDiamond = createGatewayDiamond(gwConstructorParams);
-
-        gwGetter = gatewayDiamond.getter();
-        gwManager = gatewayDiamond.manager();
-        gwCheckpointingFacet = gatewayDiamond.checkpointer();
-        gwXnetMessagingFacet = gatewayDiamond.xnetMessenger();
-        gwTopDownFinalityFacet = gatewayDiamond.topDownFinalizer();
-        gwMessenger = gatewayDiamond.messenger();
-        gwLouper = gatewayDiamond.diamondLouper();
-        gwCutter = gatewayDiamond.diamondCutter();
     }
 
     function defaultGatewayParams() internal pure override returns (GatewayDiamond.ConstructorParams memory) {

@@ -7,6 +7,7 @@ import {SubnetID, Subnet} from "../../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
 import {GatewayDiamond} from "../../src/GatewayDiamond.sol";
 import {SubnetActorDiamond} from "../../src/SubnetActorDiamond.sol";
+import {GatewayDiamond} from "../../src/GatewayDiamond.sol";
 import {GatewayGetterFacet} from "../../src/gateway/GatewayGetterFacet.sol";
 import {GatewayMessengerFacet} from "../../src/gateway/GatewayMessengerFacet.sol";
 import {GatewayManagerFacet} from "../../src/gateway/GatewayManagerFacet.sol";
@@ -17,6 +18,7 @@ import {IntegrationTestBase} from "../IntegrationTestBase.sol";
 import {SupplySourceHelper} from "../../src/lib/SupplySourceHelper.sol";
 import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 import {SubnetActorFacetsHelper} from "../helpers/SubnetActorFacetsHelper.sol";
+import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 
 contract SubnetActorInvariants is StdInvariant, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
@@ -32,9 +34,6 @@ contract SubnetActorInvariants is StdInvariant, IntegrationTestBase {
 
         gatewayDiamond = createGatewayDiamond(gwConstructorParams);
 
-        gwGetter = gatewayDiamond.getter();
-        gwManager = gatewayDiamond.manager();
-        gwMessenger = gatewayDiamond.messenger();
         gatewayAddress = address(gatewayDiamond);
 
         saDiamond = createMockedSubnetActorWithGateway(gatewayAddress);
@@ -89,8 +88,8 @@ contract SubnetActorInvariants is StdInvariant, IntegrationTestBase {
         );
 
         if (saDiamond.getter().bootstrapped()) {
-            SubnetID memory subnetId = gwGetter.getNetworkName().createSubnetId(address(saDiamond));
-            Subnet memory subnet = gwGetter.subnets(subnetId.toHash());
+            SubnetID memory subnetId = gatewayDiamond.getter().getNetworkName().createSubnetId(address(saDiamond));
+            Subnet memory subnet = gatewayDiamond.getter().subnets(subnetId.toHash());
 
             assertEq(
                 subnetActorHandler.ghost_stakedSum() - subnetActorHandler.ghost_unstakedSum(),

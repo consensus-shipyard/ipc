@@ -8,6 +8,8 @@ import {TopDownFinalityFacet} from "../../src/gateway/router/TopDownFinalityFace
 import {CheckpointingFacet} from "../../src/gateway/router/CheckpointingFacet.sol";
 import {XnetMessagingFacet} from "../../src/gateway/router/XnetMessagingFacet.sol";
 import {GatewayDiamond} from "../../src/GatewayDiamond.sol";
+import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
+import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 
 library GatewayFacetsHelper {
     function getter(address gw) internal pure returns (GatewayGetterFacet) {
@@ -69,6 +71,18 @@ library GatewayFacetsHelper {
 
     function xnetMessenger(GatewayDiamond gw) internal pure returns (XnetMessagingFacet) {
         XnetMessagingFacet facet = XnetMessagingFacet(address(gw));
+        return facet;
+    }
+
+    //
+
+    function diamondLouper(GatewayDiamond a) internal pure returns (DiamondLoupeFacet) {
+        DiamondLoupeFacet facet = DiamondLoupeFacet(address(a));
+        return facet;
+    }
+
+    function diamondCutter(GatewayDiamond a) internal pure returns (DiamondCutFacet) {
+        DiamondCutFacet facet = DiamondCutFacet(address(a));
         return facet;
     }
 }

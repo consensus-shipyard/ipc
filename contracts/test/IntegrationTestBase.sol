@@ -116,14 +116,6 @@ contract TestGatewayActor is Test, TestParams {
     bytes4[] gwLoupeSelectors;
 
     GatewayDiamond gatewayDiamond;
-    GatewayManagerFacet gwManager;
-    GatewayGetterFacet gwGetter;
-    CheckpointingFacet gwCheckpointingFacet;
-    XnetMessagingFacet gwXnetMessagingFacet;
-    TopDownFinalityFacet gwTopDownFinalityFacet;
-    GatewayMessengerFacet gwMessenger;
-    DiamondCutFacet gwCutter;
-    DiamondLoupeFacet gwLouper;
 
     constructor() {
         gwCheckpointingFacetSelectors = SelectorLibrary.resolveSelectors("CheckpointingFacet");
@@ -150,9 +142,6 @@ contract TestSubnetActor is Test, TestParams {
 
     SubnetActorDiamond saDiamond;
     SubnetActorMock saMock;
-
-    DiamondCutFacet saCutter;
-    DiamondLoupeFacet saLouper;
 
     constructor() {
         saGetterSelectors = SelectorLibrary.resolveSelectors("SubnetActorGetterFacet");
@@ -251,15 +240,6 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         // create the root gateway actor.
         GatewayDiamond.ConstructorParams memory gwConstructorParams = defaultGatewayParams();
         gatewayDiamond = createGatewayDiamond(gwConstructorParams);
-
-        gwGetter = gatewayDiamond.getter();
-        gwManager = gatewayDiamond.manager();
-        gwCheckpointingFacet = gatewayDiamond.checkpointer();
-        gwXnetMessagingFacet = gatewayDiamond.xnetMessenger();
-        gwTopDownFinalityFacet = gatewayDiamond.topDownFinalizer();
-        gwMessenger = gatewayDiamond.messenger();
-        gwLouper = gatewayDiamond.diamondLouper();
-        gwCutter = gatewayDiamond.diamondCutter();
 
         // create a subnet actor in the root network.
         SubnetActorDiamond.ConstructorParams memory saConstructorParams = defaultSubnetActorParamsWith(
@@ -653,7 +633,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
 
         vm.prank(FilAddress.SYSTEM_ACTOR);
-        gwTopDownFinalityFacet.commitParentFinality(finality);
+        gatewayDiamond.topDownFinalizer().commitParentFinality(finality);
     }
 
     function setupWhiteListMethod(address caller, address src) public returns (bytes32) {
@@ -662,11 +642,11 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         IpcEnvelope memory crossMsg = IpcEnvelope({
             kind: IpcMsgKind.Transfer,
             from: IPCAddress({
-                subnetId: gwGetter.getNetworkName().createSubnetId(caller),
+                subnetId: gatewayDiamond.getter().getNetworkName().createSubnetId(caller),
                 rawAddress: FvmAddressHelper.from(caller)
             }),
             to: IPCAddress({
-                subnetId: gwGetter.getNetworkName().createSubnetId(src),
+                subnetId: gatewayDiamond.getter().getNetworkName().createSubnetId(src),
                 rawAddress: FvmAddressHelper.from(src)
             }),
             value: DEFAULT_CROSS_MSG_FEE + 1,
@@ -681,7 +661,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         // addValidator(caller, 1000);
 
         vm.prank(FilAddress.SYSTEM_ACTOR);
-        gwXnetMessagingFacet.applyCrossMessages(msgs);
+        gatewayDiamond.xnetMessenger().applyCrossMessages(msgs);
 
         return crossMsg.toHash();
     }
@@ -698,10 +678,10 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
 
         vm.deal(validator, 1);
         ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
-        // uint64 n = gwGetter.getLastConfigurationNumber() + 1;
+        // uint64 n = gatewayDiamond.getter().getLastConfigurationNumber() + 1;
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        gwTopDownFinalityFacet.commitParentFinality(finality);
+        gatewayDiamond.topDownFinalizer().commitParentFinality(finality);
         vm.stopPrank();
     }
 
@@ -717,19 +697,22 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         // funding subnets is free, we do not need cross msg fee
         (SubnetID memory subnetId, , uint256 nonceBefore, , uint256 circSupplyBefore) = getSubnet(address(saDiamond));
 
-        uint256 expectedTopDownMsgsLength = gwGetter.getSubnetTopDownMsgsLength(subnetId) + 1;
+        uint256 expectedTopDownMsgsLength = gatewayDiamond.getter().getSubnetTopDownMsgsLength(subnetId) + 1;
         uint256 expectedNonce = nonceBefore + 1;
         uint256 expectedCircSupply = circSupplyBefore + fundAmount;
 
         if (mode == SupplyKind.Native) {
-            gwManager.fund{value: fundAmount}(subnetId, FvmAddressHelper.from(funderAddress));
+            gatewayDiamond.manager().fund{value: fundAmount}(subnetId, FvmAddressHelper.from(funderAddress));
         } else if (mode == SupplyKind.ERC20) {
-            gwManager.fundWithToken(subnetId, FvmAddressHelper.from(funderAddress), fundAmount);
+            gatewayDiamond.manager().fundWithToken(subnetId, FvmAddressHelper.from(funderAddress), fundAmount);
         }
 
         (, , uint256 nonce, , uint256 circSupply) = getSubnet(address(saDiamond));
 
-        require(gwGetter.getSubnetTopDownMsgsLength(subnetId) == expectedTopDownMsgsLength, "unexpected lengths");
+        require(
+            gatewayDiamond.getter().getSubnetTopDownMsgsLength(subnetId) == expectedTopDownMsgsLength,
+            "unexpected lengths"
+        );
 
         require(nonce == expectedNonce, "unexpected nonce");
         require(circSupply == expectedCircSupply, "unexpected circSupply");
@@ -817,9 +800,9 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     }
 
     function release(uint256 releaseAmount) public {
-        uint256 expectedNonce = gwGetter.bottomUpNonce() + 1;
-        gwManager.release{value: releaseAmount}(FvmAddressHelper.from(msg.sender));
-        require(gwGetter.bottomUpNonce() == expectedNonce, "gwGetter.bottomUpNonce() == expectedNonce");
+        uint256 expectedNonce = gatewayDiamond.getter().bottomUpNonce() + 1;
+        gatewayDiamond.manager().release{value: releaseAmount}(FvmAddressHelper.from(msg.sender));
+        require(gatewayDiamond.getter().bottomUpNonce() == expectedNonce, "unexpected nonce");
     }
 
     function addStake(uint256 stakeAmount, address subnetAddress) public {
@@ -827,7 +810,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
 
         (, uint256 stakedBefore, , , ) = getSubnet(subnetAddress);
 
-        gwManager.addStake{value: stakeAmount}();
+        gatewayDiamond.manager().addStake{value: stakeAmount}();
 
         uint256 balanceAfter = subnetAddress.balance;
         (, uint256 stakedAfter, , , ) = getSubnet(subnetAddress);
@@ -875,7 +858,9 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         return (subnet.id, subnet.stake, subnet.topDownNonce, subnet.appliedBottomUpNonce, subnet.circSupply);
     }
 
-    function getSubnet(address subnetAddress) public returns (SubnetID memory, uint256, uint256, uint256, uint256) {
+    function getSubnet(
+        address subnetAddress
+    ) public view returns (SubnetID memory, uint256, uint256, uint256, uint256) {
         return getSubnetGW(subnetAddress, gatewayDiamond);
     }
 }

@@ -21,6 +21,7 @@ import {IDiamondLoupe} from "../../src/interfaces/IDiamondLoupe.sol";
 import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
 import {MultisignatureChecker} from "../../src/lib/LibMultisignatureChecker.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
+import {GatewayDiamond} from "../../src/GatewayDiamond.sol";
 import {SubnetActorDiamond, FunctionNotFound} from "../../src/SubnetActorDiamond.sol";
 import {SubnetActorManagerFacet} from "../../src/subnet/SubnetActorManagerFacet.sol";
 import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
@@ -37,12 +38,14 @@ import {SupplySourceHelper} from "../../src/lib/SupplySourceHelper.sol";
 import {IntegrationTestBase} from "../IntegrationTestBase.sol";
 
 import {SubnetActorFacetsHelper} from "../helpers/SubnetActorFacetsHelper.sol";
+import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 
 contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
     using FilAddress for address;
     using FvmAddressHelper for FvmAddress;
     using SubnetActorFacetsHelper for SubnetActorDiamond;
+    using GatewayFacetsHelper for GatewayDiamond;
 
     address gatewayAddress;
 
@@ -691,7 +694,9 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         vm.deal(address(saDiamond), 100 ether);
         vm.prank(address(saDiamond));
-        gwManager.register{value: DEFAULT_MIN_VALIDATOR_STAKE + 3 * DEFAULT_CROSS_MSG_FEE}(3 * DEFAULT_CROSS_MSG_FEE);
+        gatewayDiamond.manager().register{value: DEFAULT_MIN_VALIDATOR_STAKE + 3 * DEFAULT_CROSS_MSG_FEE}(
+            3 * DEFAULT_CROSS_MSG_FEE
+        );
 
         bytes32 hash = keccak256(abi.encode(checkpoint));
 
@@ -774,7 +779,9 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         vm.deal(address(saDiamond), 100 ether);
         vm.prank(address(saDiamond));
-        gwManager.register{value: DEFAULT_MIN_VALIDATOR_STAKE + 6 * DEFAULT_CROSS_MSG_FEE}(6 * DEFAULT_CROSS_MSG_FEE);
+        gatewayDiamond.manager().register{value: DEFAULT_MIN_VALIDATOR_STAKE + 6 * DEFAULT_CROSS_MSG_FEE}(
+            6 * DEFAULT_CROSS_MSG_FEE
+        );
 
         bytes32 hash = keccak256(abi.encode(checkpoint));
 

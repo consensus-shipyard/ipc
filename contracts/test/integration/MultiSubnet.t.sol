@@ -691,7 +691,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         console.log("native subnet gateway(): %s", nativeSubnet.gatewayAddr);
     }
 
-    function printEnvelope(IpcEnvelope memory envelope) internal {
+    function printEnvelope(IpcEnvelope memory envelope) internal view {
         console.log("from %s:", envelope.from.subnetId.toString());
         console.log("to %s:", envelope.to.subnetId.toString());
     }
