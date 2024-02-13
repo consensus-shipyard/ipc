@@ -280,3 +280,34 @@ pkill -f "relayer" || true
 # Start relayer
 echo "$DASHES Start relayer process (in the background)"
 nohup $IPC_CLI checkpoint relayer --subnet $subnet_id > nohup.out 2> nohup.err < /dev/null &
+
+# Step 11: Print a summary of the deployment
+# Remove leading '/' and change middle '/' into '-'
+subnet_folder=$IPC_CONFIG_FOLDER/$(echo $subnet_id | sed 's|^/||;s|/|-|g')
+
+cat << EOF
+############################
+#                          #
+# IPC deployment ready! 🚀 #
+#                          #
+############################
+Subnet ID:
+$subnet_id
+
+Accounts:
+$(jq -r '.accounts[] | "\(.meta.Account.owner): \(.balance) coin units"' ${subnet_folder}/validator-0/genesis.json)
+
+Private keys (hex ready to import in MetaMask):
+$(cat ${IPC_CONFIG_FOLDER}/validator_0.sk | base64 -d | xxd -p -c 1000000)
+$(cat ${IPC_CONFIG_FOLDER}/validator_1.sk | base64 -d | xxd -p -c 1000000)
+$(cat ${IPC_CONFIG_FOLDER}/validator_2.sk | base64 -d | xxd -p -c 1000000)
+
+Chain ID:
+$(curl -s --location --request POST 'http://localhost:8645/' --header 'Content-Type: application/json' --data-raw '{ "jsonrpc":"2.0", "method":"eth_chainId", "params":[], "id":1 }' | jq -r '.result' | xargs printf "%d")
+
+Fendermint API:
+http://localhost:26658
+
+CometBFT API:
+http://0.0.0.0:26657
+EOF

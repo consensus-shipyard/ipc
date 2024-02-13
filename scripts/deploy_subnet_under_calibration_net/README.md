@@ -15,5 +15,7 @@ To run this script locally, you need to first manually prepare the environment a
 Please also notice that
 1. The automated dependency installation isn't guarantee to work 100% time. If you encountered any dependency installation issue, please refer to the script and retry. Usually you can resolve the issues by creating a new terminal, sourcing `~/.bash.rc`, etc.
 2. Depends on the RPC endpoint's quality of service for the calibration net, your command may or may not succeed when interacting with the RPC endpoint. Sometimes you will get rate limited, or other weird errors. In that case, you can choose a different calibration provider URL (TODO: Add link) to replace the value of `RPC_URL` variable in the script, then retry it.
+3. You need to manually install nodejs and npm. The reason is that we need to use very recent version of nodejs and it's usually not included with the Linux distribution. It's recommended that you use nvm (Node version manager) to manage your nodejs installation.
 
-## What does deploy.sh do?
+## What's the difference between running locally and running in Github workflow?
+Github workflow deploys IPC in a dedicated host, whose IP and username are kept using Github secret. Also, the wallet is prepared and the content of `evm_keystore.json` is stored as Github secret. All of these Github secret will be converted into files then will be scp-ed into the dedicated host before running the script.

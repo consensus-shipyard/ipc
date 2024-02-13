@@ -2,6 +2,7 @@ name: Deploy to calibration net on a dedicated server
 
 on:
   workflow_dispatch:
+  pull_request:
 
 concurrency:
   # Only allow one run at a time for this workflow
