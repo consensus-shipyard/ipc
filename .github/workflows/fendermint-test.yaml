@@ -64,6 +64,19 @@ jobs:
       RUSTFLAGS: -Dwarnings
 
     steps:
+      # https://github.com/marketplace/actions/free-disk-space-ubuntu
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        if: ${{ matrix.make.task }} == 'e2e'
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
       - name: Check out the project
         uses: actions/checkout@v3
         with:
@@ -93,18 +106,6 @@ jobs:
       - name: Docker Login
         shell: bash
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
-
-      # https://github.com/marketplace/actions/free-disk-space-ubuntu
-      - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
 
       # Pull the latest docker builder image. Its layers might be reused during the build.
       - name: Docker Pull
