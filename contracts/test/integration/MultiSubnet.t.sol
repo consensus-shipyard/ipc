@@ -25,7 +25,7 @@ import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 import {GatewayMessengerFacet} from "../../src/gateway/GatewayMessengerFacet.sol";
 import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
-import {IntegrationTestBase} from "../IntegrationTestBase.sol";
+import {IntegrationTestBase, RootSubnetDefinition, TestSubnetDefinition} from "../IntegrationTestBase.sol";
 import {L2GatewayActorDiamond, L1GatewayActorDiamond} from "../IntegrationTestPresets.sol";
 import {TestUtils, MockIpcContract, MockIpcContractPayable, MockIpcContractFallback} from "../helpers/TestUtils.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
@@ -45,21 +45,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
     using CrossMsgHelper for IpcEnvelope;
     using GatewayFacetsHelper for GatewayDiamond;
     using SubnetActorFacetsHelper for SubnetActorDiamond;
-
-    struct TestSubnetDefinition {
-        GatewayDiamond gateway;
-        address gatewayAddr;
-        SubnetActorDiamond subnetActor;
-        address subnetActorAddr;
-        SubnetID id;
-        address[] path;
-    }
-
-    struct RootSubnetDefinition {
-        GatewayDiamond gateway;
-        address gatewayAddr;
-        SubnetID id;
-    }
 
     RootSubnetDefinition public rootSubnet;
     TestSubnetDefinition public nativeSubnet;

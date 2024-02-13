@@ -51,7 +51,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         address caller = vm.addr(1);
         vm.deal(caller, 100);
 
-        (SubnetID memory subnetId, , , , ) = getSubnet(address(saManager));
+        (SubnetID memory subnetId, , , , ) = getSubnet(address(saDiamond));
 
         vm.prank(caller);
         vm.expectRevert(SupplySourceHelper.UnexpectedSupplySource.selector);
@@ -244,10 +244,6 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
 
         // Override the state variables with the new subnet.
         saDiamond = createSubnetActor(saConstructorParams);
-        saManager = SubnetActorManagerFacet(address(saDiamond));
-        saGetter = SubnetActorGetterFacet(address(saDiamond));
-        saLouper = DiamondLoupeFacet(address(saDiamond));
-        saCutter = DiamondCutFacet(address(saDiamond));
 
         // increment the block number by 5 (could be other number as well) so that commit
         // parent finality called down stream will work we need this because in setUp,

@@ -44,6 +44,21 @@ import {GatewayFacetsHelper} from "./helpers/GatewayFacetsHelper.sol";
 import {SubnetActorFacetsHelper} from "./helpers/SubnetActorFacetsHelper.sol";
 import {DiamondFacetsHelper} from "./helpers/DiamondFacetsHelper.sol";
 
+struct TestSubnetDefinition {
+    GatewayDiamond gateway;
+    address gatewayAddr;
+    SubnetActorDiamond subnetActor;
+    address subnetActorAddr;
+    SubnetID id;
+    address[] path;
+}
+
+struct RootSubnetDefinition {
+    GatewayDiamond gateway;
+    address gatewayAddr;
+    SubnetID id;
+}
+
 contract TestParams {
     uint64 constant MAX_NONCE = type(uint64).max;
     address constant BLS_ACCOUNT_ADDREESS = address(0xfF000000000000000000000000000000bEefbEEf);
@@ -134,12 +149,7 @@ contract TestSubnetActor is Test, TestParams {
     bytes4[] saLouperSelectors;
 
     SubnetActorDiamond saDiamond;
-    SubnetActorManagerFacet saManager;
     SubnetActorMock saMock;
-    SubnetActorGetterFacet saGetter;
-    SubnetActorRewardFacet saRewarder;
-    SubnetActorPauseFacet saPauser;
-    SubnetActorCheckpointingFacet saCheckpointer;
 
     DiamondCutFacet saCutter;
     DiamondLoupeFacet saLouper;
@@ -257,13 +267,6 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         );
 
         saDiamond = createSubnetActor(saConstructorParams);
-        saManager = saDiamond.manager();
-        saGetter = saDiamond.getter();
-        saPauser = saDiamond.pauser();
-        saRewarder = saDiamond.rewarder();
-        saCheckpointer = saDiamond.checkpointer();
-        saLouper = saDiamond.diamondLouper();
-        saCutter = saDiamond.diamondCutter();
 
         addValidator(TOPDOWN_VALIDATOR_1, 100);
     }
@@ -529,96 +532,20 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     ) public {
         SubnetID memory _parentId = SubnetID(ROOTNET_CHAINID, new address[](0));
 
-        saManager = new SubnetActorManagerFacet();
-        saGetter = new SubnetActorGetterFacet();
-        saPauser = new SubnetActorPauseFacet();
-        saCheckpointer = new SubnetActorCheckpointingFacet();
-        saRewarder = new SubnetActorRewardFacet();
-        saCutter = new DiamondCutFacet();
-        saLouper = new DiamondLoupeFacet();
-
-        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](7);
-
-        diamondCut[0] = (
-            IDiamond.FacetCut({
-                facetAddress: address(saManager),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: saManagerSelectors
-            })
-        );
-
-        diamondCut[1] = (
-            IDiamond.FacetCut({
-                facetAddress: address(saGetter),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: saGetterSelectors
-            })
-        );
-
-        diamondCut[2] = (
-            IDiamond.FacetCut({
-                facetAddress: address(saPauser),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: saPauserSelectors
-            })
-        );
-
-        diamondCut[3] = (
-            IDiamond.FacetCut({
-                facetAddress: address(saRewarder),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: saRewarderSelectors
-            })
-        );
-
-        diamondCut[4] = (
-            IDiamond.FacetCut({
-                facetAddress: address(saCheckpointer),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: saCheckpointerSelectors
-            })
-        );
-
-        diamondCut[5] = (
-            IDiamond.FacetCut({
-                facetAddress: address(saCutter),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: saCutterSelectors
-            })
-        );
-
-        diamondCut[6] = (
-            IDiamond.FacetCut({
-                facetAddress: address(saLouper),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: saLouperSelectors
-            })
-        );
-
-        saDiamond = new SubnetActorDiamond(
-            diamondCut,
-            SubnetActorDiamond.ConstructorParams({
-                parentId: _parentId,
-                ipcGatewayAddr: _ipcGatewayAddr,
-                consensus: _consensus,
-                minActivationCollateral: _minActivationCollateral,
-                minValidators: _minValidators,
-                bottomUpCheckPeriod: _checkPeriod,
-                majorityPercentage: _majorityPercentage,
-                activeValidatorsLimit: _activeValidatorsLimit,
-                powerScale: 12,
-                permissionMode: _permissionMode,
-                supplySource: SupplySourceHelper.native()
-            })
-        );
-
-        saManager = saDiamond.manager();
-        saPauser = saDiamond.pauser();
-        saRewarder = saDiamond.rewarder();
-        saCheckpointer = saDiamond.checkpointer();
-        saGetter = saDiamond.getter();
-        saCutter = saDiamond.diamondCutter();
-        saLouper = saDiamond.diamondLouper();
+        SubnetActorDiamond.ConstructorParams memory params = SubnetActorDiamond.ConstructorParams({
+            parentId: _parentId,
+            ipcGatewayAddr: _ipcGatewayAddr,
+            consensus: _consensus,
+            minActivationCollateral: _minActivationCollateral,
+            minValidators: _minValidators,
+            bottomUpCheckPeriod: _checkPeriod,
+            majorityPercentage: _majorityPercentage,
+            activeValidatorsLimit: _activeValidatorsLimit,
+            powerScale: 12,
+            permissionMode: _permissionMode,
+            supplySource: SupplySourceHelper.native()
+        });
+        saDiamond = createSubnetActor(params);
     }
 
     function createMockedSubnetActorWithGateway(address gw) public returns (SubnetActorDiamond) {
@@ -788,7 +715,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
 
     function fund(address funderAddress, uint256 fundAmount, SupplyKind mode) public {
         // funding subnets is free, we do not need cross msg fee
-        (SubnetID memory subnetId, , uint256 nonceBefore, , uint256 circSupplyBefore) = getSubnet(address(saManager));
+        (SubnetID memory subnetId, , uint256 nonceBefore, , uint256 circSupplyBefore) = getSubnet(address(saDiamond));
 
         uint256 expectedTopDownMsgsLength = gwGetter.getSubnetTopDownMsgsLength(subnetId) + 1;
         uint256 expectedNonce = nonceBefore + 1;
@@ -800,7 +727,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             gwManager.fundWithToken(subnetId, FvmAddressHelper.from(funderAddress), fundAmount);
         }
 
-        (, , uint256 nonce, , uint256 circSupply) = getSubnet(address(saManager));
+        (, , uint256 nonce, , uint256 circSupply) = getSubnet(address(saDiamond));
 
         require(gwGetter.getSubnetTopDownMsgsLength(subnetId) == expectedTopDownMsgsLength, "unexpected lengths");
 
@@ -811,7 +738,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     function join(address validatorAddress, bytes memory pubkey) public {
         vm.prank(validatorAddress);
         vm.deal(validatorAddress, DEFAULT_COLLATERAL_AMOUNT + 1);
-        saManager.join{value: DEFAULT_COLLATERAL_AMOUNT}(pubkey);
+        saDiamond.manager().join{value: DEFAULT_COLLATERAL_AMOUNT}(pubkey);
     }
 
     function confirmChange(address validator, uint256 privKey) internal {
@@ -862,12 +789,12 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
 
         bytes[] memory signatures = new bytes[](n);
 
-        (uint64 nextConfigNum, ) = saGetter.getConfigurationNumbers();
+        (uint64 nextConfigNum, ) = saDiamond.getter().getConfigurationNumbers();
 
-        uint256 h = saGetter.lastBottomUpCheckpointHeight() + saGetter.bottomUpCheckPeriod();
+        uint256 h = saDiamond.getter().lastBottomUpCheckpointHeight() + saDiamond.getter().bottomUpCheckPeriod();
 
         BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
-            subnetID: saGetter.getParent().createSubnetId(address(saDiamond)),
+            subnetID: saDiamond.getter().getParent().createSubnetId(address(saDiamond)),
             blockHeight: h,
             blockHash: keccak256(abi.encode(h)),
             nextConfigurationNumber: nextConfigNum - 1,
@@ -885,7 +812,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
 
         for (uint256 i = 0; i < n; i++) {
             vm.prank(validators[i]);
-            saCheckpointer.submitCheckpoint(checkpoint, validators, signatures);
+            saDiamond.checkpointer().submitCheckpoint(checkpoint, validators, signatures);
         }
     }
 

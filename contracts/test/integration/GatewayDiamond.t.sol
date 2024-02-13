@@ -36,11 +36,15 @@ import {IntegrationTestBase} from "../IntegrationTestBase.sol";
 import {SelectorLibrary} from "../helpers/SelectorLibrary.sol";
 import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 
+import {SubnetActorDiamond} from "../../src/SubnetActorDiamond.sol";
+import {SubnetActorFacetsHelper} from "../helpers/SubnetActorFacetsHelper.sol";
+
 contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for IpcEnvelope;
     using FvmAddressHelper for FvmAddress;
     using GatewayFacetsHelper for GatewayDiamond;
+    using SubnetActorFacetsHelper for SubnetActorDiamond;
 
     function setUp() public override {
         super.setUp();
@@ -567,7 +571,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         fund(funderAddress, fundAmount);
         vm.stopPrank();
 
-        vm.startPrank(address(saManager));
+        vm.startPrank(address(saDiamond));
         vm.expectRevert(NotEmptySubnetCircSupply.selector);
         gwManager.kill();
     }
@@ -578,7 +582,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         address funderAddress = address(101);
 
-        (SubnetID memory subnetId, , , , ) = getSubnet(address(saManager));
+        (SubnetID memory subnetId, , , , ) = getSubnet(address(saDiamond));
 
         vm.expectRevert(abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Value));
         gwManager.fund{value: 0}(subnetId, FvmAddressHelper.from(funderAddress));
@@ -613,9 +617,9 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         vm.deal(funderAddress, amount);
 
-        (SubnetID memory subnetId, , , , ) = getSubnet(address(saManager));
+        (SubnetID memory subnetId, , , , ) = getSubnet(address(saDiamond));
         vm.prank(funderAddress);
-        gwManager.fund{value: amount}(subnetId, FvmAddressHelper.from(msg.sender));
+        gatewayDiamond.manager().fund{value: amount}(subnetId, FvmAddressHelper.from(msg.sender));
     }
 
     function testGatewayDiamond_Fund_Fails_NotRegistered() public {
@@ -664,7 +668,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         join(validatorAddress, publicKey);
 
         vm.prank(validatorAddress);
-        saManager.leave();
+        saDiamond.manager().leave();
 
         join(validatorAddress, publicKey);
 

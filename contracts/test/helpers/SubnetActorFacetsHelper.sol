@@ -7,6 +7,8 @@ import {SubnetActorCheckpointingFacet} from "../../src/subnet/SubnetActorCheckpo
 import {SubnetActorRewardFacet} from "../../src/subnet/SubnetActorRewardFacet.sol";
 import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
 import {SubnetActorDiamond} from "../../src/SubnetActorDiamond.sol";
+import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
+import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 
 library SubnetActorFacetsHelper {
     function manager(address sa) internal pure returns (SubnetActorManagerFacet) {
@@ -31,6 +33,16 @@ library SubnetActorFacetsHelper {
 
     function getter(address sa) internal pure returns (SubnetActorGetterFacet) {
         SubnetActorGetterFacet facet = SubnetActorGetterFacet(sa);
+        return facet;
+    }
+
+    function diamondLouper(SubnetActorDiamond a) internal pure returns (DiamondLoupeFacet) {
+        DiamondLoupeFacet facet = DiamondLoupeFacet(address(a));
+        return facet;
+    }
+
+    function diamondCutter(SubnetActorDiamond a) internal pure returns (DiamondCutFacet) {
+        DiamondCutFacet facet = DiamondCutFacet(address(a));
         return facet;
     }
 

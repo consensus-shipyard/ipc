@@ -40,7 +40,6 @@ contract SubnetActorInvariants is StdInvariant, IntegrationTestBase {
         saDiamond = createMockedSubnetActorWithGateway(gatewayAddress);
 
         saMock = SubnetActorMock(address(saDiamond));
-        saGetter = saDiamond.getter();
         subnetActorHandler = new SubnetActorHandler(saDiamond);
 
         bytes4[] memory fuzzSelectors = new bytes4[](4);
@@ -57,7 +56,7 @@ contract SubnetActorInvariants is StdInvariant, IntegrationTestBase {
     /// if confirmations are executed immediately.
     function invariant_SA_01_total_validators_number_is_correct() public {
         assertEq(
-            saGetter.getTotalValidatorsNumber(),
+            saDiamond.getter().getTotalValidatorsNumber(),
             subnetActorHandler.joinedValidatorsNumber(),
             "unexpected total validators number"
         );
@@ -77,19 +76,19 @@ contract SubnetActorInvariants is StdInvariant, IntegrationTestBase {
         assertEq(
             ETH_SUPPLY,
             address(subnetActorHandler).balance +
-                saGetter.getTotalCollateral() +
+                saDiamond.getter().getTotalCollateral() +
                 subnetActorHandler.ghost_unstakedSum(),
             "subnet actor: unexpected stake"
         );
         assertEq(
             ETH_SUPPLY,
             address(subnetActorHandler).balance +
-                saGetter.getTotalConfirmedCollateral() +
+                saDiamond.getter().getTotalConfirmedCollateral() +
                 subnetActorHandler.ghost_unstakedSum(),
             "subnet actor: unexpected stake"
         );
 
-        if (saGetter.bootstrapped()) {
+        if (saDiamond.getter().bootstrapped()) {
             SubnetID memory subnetId = gwGetter.getNetworkName().createSubnetId(address(saDiamond));
             Subnet memory subnet = gwGetter.subnets(subnetId.toHash());
 
@@ -104,7 +103,7 @@ contract SubnetActorInvariants is StdInvariant, IntegrationTestBase {
     /// @notice The value resulting from all stake and unstake operations is equal to the total confirmed collateral.
     function invariant_SA_03_sum_of_stake_equals_collateral() public {
         assertEq(
-            saGetter.getTotalConfirmedCollateral(),
+            saDiamond.getter().getTotalConfirmedCollateral(),
             subnetActorHandler.ghost_stakedSum() - subnetActorHandler.ghost_unstakedSum()
         );
     }
@@ -117,7 +116,7 @@ contract SubnetActorInvariants is StdInvariant, IntegrationTestBase {
         if (validator == address(0)) {
             return;
         }
-        if (!saGetter.bootstrapped()) {
+        if (!saDiamond.getter().bootstrapped()) {
             return;
         }
 
@@ -140,10 +139,10 @@ contract SubnetActorInvariants is StdInvariant, IntegrationTestBase {
         address[] memory validators = subnetActorHandler.joinedValidators();
         uint256 n = validators.length;
         for (uint256 i; i < n; ++i) {
-            sumOfCollaterals += saGetter.getTotalValidatorCollateral(validators[i]);
+            sumOfCollaterals += saDiamond.getter().getTotalValidatorCollateral(validators[i]);
         }
 
-        uint256 totalCollateral = saGetter.getTotalConfirmedCollateral();
+        uint256 totalCollateral = saDiamond.getter().getTotalConfirmedCollateral();
 
         assertEq(sumOfCollaterals, totalCollateral, "unexpected sum of validators collateral");
     }
