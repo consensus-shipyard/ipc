@@ -23,11 +23,16 @@ ETHAPI_HOST_PORTS=(8545 8645 8745)
 RESOLVER_HOST_PORTS=(26655 26755 26855)
 
 if (($# != 1)); then
-  echo "Arguments: <commit hash to checkout in the repo>"
+  echo "Arguments: <Specify github remote branch name to use to deploy. Or use 'local' (without quote) to indicate using local repo instead."
   exit 1
 fi
 
-head_ref=$1
+if [ $1 = "local" ]; then
+  local_deploy=true
+else
+  local_deploy=false
+  head_ref=$1
+fi
 
 # Step 1: Prepare system for building and running IPC
 
@@ -100,16 +105,18 @@ source ${HOME}/.bashrc
 set -u
 
 # Step 2: Prepare code repo and build ipc-cli
-echo "$DASHES Preparing ipc repo..."
-cd $HOME
-if ! ls $IPC_FOLDER ; then
-  git clone https://github.com/consensus-shipyard/ipc.git
+if ! $local_deploy ; then
+  echo "$DASHES Preparing ipc repo..."
+  cd $HOME
+  if ! ls $IPC_FOLDER ; then
+    git clone https://github.com/consensus-shipyard/ipc.git
+  fi
+  cd ${IPC_FOLDER}/contracts
+  git fetch
+  git stash
+  git checkout $head_ref
+  git pull --rebase origin $head_ref
 fi
-cd ${IPC_FOLDER}/contracts
-git fetch
-git stash
-git checkout $head_ref
-git pull --rebase origin $head_ref
 
 echo "$DASHES Building ipc contracts..."
 cd ${IPC_FOLDER}/contracts
