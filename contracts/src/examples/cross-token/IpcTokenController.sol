@@ -80,6 +80,12 @@ contract IpcTokenController is IpcExchange, ReentrancyGuard {
         networkName = GatewayGetterFacet(address(_gateway)).getNetworkName();
     }
 
+    /* XXX TODO This function should be removed before deployed to production */
+    function receiveAndUnlockOnlyOwner(address recipient, uint256 value) external onlyOwner {
+        receiveAndUnlock(recipient, value);
+    }
+
+
     /**
      * @notice Transfers tokens from L1, locks them, and requests minting on L2.
      * @param receiver Address to receive the minted tokens on L2

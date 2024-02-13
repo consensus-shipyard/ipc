@@ -16,19 +16,21 @@ async function main() {
 
     // Deploy ERC20 token
     const ERC20 = await hre.ethers.getContractFactory('USDCTest')
-    const erc20Token = await ERC20.deploy('USDC', 'USDC')
+    const erc20Token = await ERC20.deploy();
     await erc20Token.deployed()
 
-    const subnetTokenBridge = await createSubnetTokenBridge(
+    const ipcTokenReplica = await createIpcTokenReplica(
         gateway,
         erc20Token.address,
         parentSubnet,
     )
     // Child SubnetID value
-    const subnetID = [parentSubnetChainId, [subnetTokenBridge.address]]
+    const subnetID = [parentSubnetChainId, [ipcTokenReplica.address]]
 
     // Mint tokens
     const mintAmount = hre.ethers.utils.parseUnits('1000', 18) // 1000 tokens
+    const transferAmount = hre.ethers.utils.parseUnits('100', 18) // Amount of tokens to transfer and mint
+
     await erc20Token.mint(mintAmount)
 
     console.log('ERC20 Token deployed to:', erc20Token.address)
@@ -36,105 +38,116 @@ async function main() {
         gateway,
         erc20Token,
         subnetID,
-        subnetTokenBridge,
+        ipcTokenReplica,
     )
 
+    //initialize the Token Replica with the Token Controller address.
+    await ipcTokenReplica.setController(ipcTokenController.address);
+
     const receiverAddress = accountAddress // choose to mint proxy tokens to some address on the subnet
-    const transferAmount = hre.ethers.utils.parseUnits('500', 18) // Amount of tokens to transfer and mint
 
     // Define the DEFAULT_CROSS_MSG_FEE
     const DEFAULT_CROSS_MSG_FEE = hre.ethers.utils.parseUnits('10', 'gwei')
 
     // Approve the IpcTokenController contract to spend tokens on behalf of the deployer
     await erc20Token.approve(ipcTokenController.address, transferAmount)
-    await ipcTokenController.transferAndMint(receiverAddress, transferAmount, {
+    await ipcTokenController.lockAndTransfer(receiverAddress, transferAmount, {
         value: DEFAULT_CROSS_MSG_FEE,
     })
+
+    //confirm balances
+
+    const userTokenBalance = await erc20Token.balanceOf(accountAddress)
+    console.log(`USDC Token balance of user on controller chain is: ${userTokenBalance}`);
+    const controllerTokenBalance = await erc20Token.balanceOf(ipcTokenController.address)
+    console.log(`USDC Token balance of controller chain is: ${controllerTokenBalance}`);
+
+    //assert values are correct
+    if (userTokenBalance != mintAmount-transferAmount) throw new Error(`User Token Balance incorrect`)
+    if (controllerTokenBalance != transferAmount-0) throw new Error(`Controller Token Balance incorrect`)
 
     console.log(
         `Transfer and mint request made for ${transferAmount} tokens to ${receiverAddress}`,
     )
 
-    console.log(`Simulate call to onXNetMessageReceived`)
-    await subnetTokenBridge.onXNetMessageReceived(
+    console.log(`Simulate call from Gateway to token replica contract`)
+    await ipcTokenReplica.mintOnlyOwner(
         accountAddress,
         transferAmount,
     )
 
-    const proxyTokenAddress = await subnetTokenBridge.getProxyTokenAddress()
-    const SubnetUSDCProxy = await ethers.getContractAt(
-        'SubnetUSDCProxy',
-        proxyTokenAddress,
-    )
-    const balance = await SubnetUSDCProxy.balanceOf(accountAddress)
-    console.log('balance is ', balance)
+    //confirm balances
 
-    //transfer up subnets
-    console.log(1)
+    let userReplicaTokenBalance = await ipcTokenReplica.balanceOf(accountAddress)
+    console.log(`USDC Replica Token balance of user on token replica chain is: ${userReplicaTokenBalance}`)
+    if (userReplicaTokenBalance != transferAmount-0) throw new Error(`User Replica Token Balance incorrect`)
 
-    //Approve subnet contract
-    await SubnetUSDCProxy.approve(subnetTokenBridge.address, transferAmount)
-    console.log(2)
 
-    //transfer
-    await subnetTokenBridge.depositTokens(accountAddress, transferAmount, {
+    //transfer back to controller
+    await ipcTokenReplica.burnAndTransfer(accountAddress, transferAmount, {
         value: DEFAULT_CROSS_MSG_FEE,
     })
-    console.log(3)
 
-    // todo
+
+    userReplicaTokenBalance = await ipcTokenReplica.balanceOf(accountAddress)
+    console.log(`USDC Replica Token balance of user on token replica chain is: ${userReplicaTokenBalance}`);
+    if (userReplicaTokenBalance != 0) throw new Error(`User Replica Token Balance incorrect`)
 
     // simulate xnetmessage on parent net to release original tokens back to the account
-    await ipcTokenController.onXNetMessageReceived(
+    await ipcTokenController.receiveAndUnlockOnlyOwner(
         accountAddress,
         transferAmount,
     )
 
     // verify that account currently has correct number of original tokens and 0 subnet tokens
 
-    const finalBalance = await erc20Token.balanceOf(accountAddress)
-    console.log('Final USDC Token balance on parent chain: ', finalBalance)
+    const userBalance = await erc20Token.balanceOf(accountAddress)
+    console.log(`Final User Token balance on parent chain: ${userBalance}`);
 
-    const subnetFinalBalance = await SubnetUSDCProxy.balanceOf(accountAddress)
+    const tokenControllerFinalBalance = await erc20Token.balanceOf(ipcTokenController.address)
     console.log(
-        'Final USDC Token balance on subnet chain: ',
-        subnetFinalBalance,
+        `Final USDC Token balance on subnet chain: ${tokenControllerFinalBalance}`
     )
+
+    if (tokenControllerFinalBalance != 0) throw new Error(`Token Controller Final Token Balance incorrect`)
+    if (userBalance - mintAmount != 0 ) throw new Error(`User Final Token Balance incorrect`)
 }
 
-async function createSubnetTokenBridge(
+async function createIpcTokenReplica(
     gateway,
     parentSubnetUSDC,
     parentSubnet,
 ) {
-    const SubnetTokenBridge = await ethers.getContractFactory(
-        'SubnetTokenBridge',
+    const IpcTokenReplica = await ethers.getContractFactory(
+        'IpcTokenReplica',
+        {"libraries" : {"SubnetIDHelper":"0x033b910e8a8f3365B69c84852009c637bA34eE83"}}
     )
-    const subnetTokenBridge = await SubnetTokenBridge.deploy(
+    const ipcTokenReplica = await IpcTokenReplica.deploy(
         gateway,
         parentSubnetUSDC,
         parentSubnet,
     )
-    console.log('SubnetTokenBridge deployed to:', subnetTokenBridge.address)
-    return subnetTokenBridge
+    console.log('IpcTokenReplica deployed to:', ipcTokenReplica.address)
+    return ipcTokenReplica
 }
 
 async function deployIpcTokenController(
     gateway,
     erc20Token,
     subnetID,
-    subnetTokenBridge,
+    ipcTokenReplica,
 ) {
     // Getting the contract factory for IpcTokenController
     const IpcTokenController = await hre.ethers.getContractFactory(
         'IpcTokenController',
+        {"libraries" : {"SubnetIDHelper":"0x033b910e8a8f3365B69c84852009c637bA34eE83"}}
     )
     // Deploying IpcTokenController with the new ERC20 token as sourceContract
     const ipcTokenController = await IpcTokenController.deploy(
         gateway,
         erc20Token.address,
         subnetID,
-        subnetTokenBridge.address,
+        ipcTokenReplica.address,
     )
 
     await ipcTokenController.deployed()
