@@ -8,6 +8,10 @@ import { IGateway } from "../src/interfaces/IGateway.sol";
 import { ReentrancyGuard } from "openzeppelin-contracts/security/ReentrancyGuard.sol";
 import { Ownable } from "openzeppelin-contracts/access/Ownable.sol";
 import { CrossMsgHelper } from "../src/lib/CrossMsgHelper.sol";
+import "../src/lib/SubnetIDHelper.sol";
+import "../src/lib/FvmAddressHelper.sol";
+
+import "forge-std/console.sol";
 
 // Interface that needs to be implemented by IPC-aware contracts.
 //
@@ -24,6 +28,8 @@ interface IpcHandler {
 
 abstract contract IpcExchange is IpcHandler, Ownable, ReentrancyGuard  {
     using CrossMsgHelper for IpcEnvelope;
+    using SubnetIDHelper for SubnetID;
+    using FvmAddressHelper for FvmAddress;
 
     // The address of the gateway in the network.
     address public immutable gatewayAddr;
@@ -33,6 +39,28 @@ abstract contract IpcExchange is IpcHandler, Ownable, ReentrancyGuard  {
 
     constructor(address gatewayAddr_) Ownable(msg.sender) {
         gatewayAddr = gatewayAddr_;
+    }
+    //
+    //prints any IpcEnvelope for debugging
+    function printCrossMsg(IpcEnvelope memory envelope) public {
+        console.log("\nPrintCrossMsg sdk/IpcContract.sol");
+        console.log("To Address:");
+        console.logBytes32(envelope.to.rawAddress.toHash());
+        console.log(envelope.to.subnetId.toString());
+        console.log("From Address:");
+        console.logBytes32(envelope.from.rawAddress.toHash());
+        console.log(envelope.from.subnetId.toString());
+        console.log("Nonce");
+        console.log(envelope.nonce);
+        console.log("Value");
+        console.log(envelope.value);
+        console.log("Message");
+        console.logBytes(envelope.message);
+        console.log("Hash");
+        console.logBytes32(envelope.toHash());
+        ResultMsg memory result = abi.decode(envelope.message, (ResultMsg));
+        console.log("Result id");
+        console.logBytes32(result.id);
     }
 
     /// @notice Entrypoint for IPC-enabled contracts. This function is always called by
@@ -44,15 +72,18 @@ abstract contract IpcExchange is IpcHandler, Ownable, ReentrancyGuard  {
             CallMsg memory call = abi.decode(envelope.message, (CallMsg));
             return _handleIpcCall(envelope, call);
         } else if (envelope.kind == IpcMsgKind.Result) {
+            console.log("handleIpcMessage Result");
             ResultMsg memory result = abi.decode(envelope.message, (ResultMsg));
+            printCrossMsg(envelope);
 
             // Recover the original message.
             // If we were not tracking it, or if some details don't match, refuse to handle the receipt.
-            IpcEnvelope storage orig = inflightMsgs[result.id];
+            IpcEnvelope storage orig = inflightMsgs[envelope.toHash()];
             if (
                 orig.message.length == 0 ||
                 keccak256(abi.encode(envelope.from)) != keccak256(abi.encode(orig.to))
             ) {
+                console.log("Unrecognized hash in handleIpcMessage");
                 revert IpcHandler.UnrecognizedResult();
             }
 
@@ -89,6 +120,8 @@ abstract contract IpcExchange is IpcHandler, Ownable, ReentrancyGuard  {
         // Add the message to the list of inflights
         bytes32 id = envelope.toHash();
         inflightMsgs[id] = envelope;
+        console.log("performIpcCall");
+        printCrossMsg(envelope);
     }
 
     function dropMessages(bytes32[] calldata ids) public onlyOwner {

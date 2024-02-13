@@ -2,6 +2,7 @@
 pragma solidity 0.8.19;
 
 import "forge-std/Test.sol";
+import "forge-std/console.sol";
 import "../../src/lib/CrossMsgHelper.sol";
 import "../../src/lib/SubnetIDHelper.sol";
 import "../../src/lib/FvmAddressHelper.sol";
@@ -353,6 +354,28 @@ contract CrossMsgHelperTest is Test {
 
         crossMsgs.push(crossMsg);
     }
+
+    function printCrossMsg(IpcEnvelope memory envelope) public {
+        console.log("\nPrintCrossMsg helper 1");
+        console.log("To Address:");
+        console.log("To Address subnet id:");
+        console.log(envelope.to.subnetId.toString());
+        console.log("To Address fvm address hash:");
+        console.logBytes32(envelope.to.rawAddress.toHash());
+        console.log("From Address:");
+        console.log("From Address subnet id:");
+        console.log(envelope.from.subnetId.toString());
+        console.log("From Address fvm address hash:");
+        console.logBytes32(envelope.from.rawAddress.toHash());
+        console.log("Nonce");
+        console.log(envelope.nonce);
+        console.log("Value");
+        console.log(envelope.value);
+        console.log("Message");
+        console.logBytes(envelope.message);
+    }
+
+    //prints any IpcEnvelope for debugging
 }
 
 library CallMsgTestHelper {

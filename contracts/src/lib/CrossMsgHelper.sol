@@ -13,6 +13,7 @@ import {Address} from "openzeppelin-contracts/utils/Address.sol";
 import {SupplySource} from "../structs/Subnet.sol";
 import {SupplySourceHelper} from "./SupplySourceHelper.sol";
 import {IpcHandler} from "../../sdk/IpcContract.sol";
+import "forge-std/console.sol";
 
 /// @title Helper library for manipulating IpcEnvelope-related structs
 library CrossMsgHelper {
@@ -65,7 +66,7 @@ library CrossMsgHelper {
         IpcEnvelope calldata crossMsg,
         OutcomeType outcome,
         bytes memory ret
-    ) public pure returns (IpcEnvelope memory) {
+    ) public view returns (IpcEnvelope memory) {
         ResultMsg memory message = ResultMsg({id: toHash(crossMsg), outcome: outcome, ret: ret});
         uint256 value = crossMsg.value;
         if (outcome == OutcomeType.Ok) {
@@ -73,6 +74,7 @@ library CrossMsgHelper {
             // in the subnet and there's no need to return it.
             value = 0;
         }
+        console.log("createResultMsg");
         return
             IpcEnvelope({
                 kind: IpcMsgKind.Result,
@@ -156,6 +158,7 @@ library CrossMsgHelper {
         IpcEnvelope calldata crossMsg,
         SupplySource memory supplySource
     ) public returns (bool success, bytes memory ret) {
+        console.log("HI");
         if (isEmpty(crossMsg)) {
             revert CannotExecuteEmptyEnvelope();
         }

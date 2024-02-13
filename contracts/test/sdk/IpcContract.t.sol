@@ -25,6 +25,8 @@ contract RecorderIpcExchange is IpcExchange {
     CallMsg private lastCallMsg;
     ResultMsg private lastResultMsg;
     bool private shouldRevert;
+    bool public handleIpcResultCalled = false;
+
 
     constructor(address gatewayAddr_) IpcExchange(gatewayAddr_) {}
 
@@ -44,11 +46,15 @@ contract RecorderIpcExchange is IpcExchange {
         IpcEnvelope memory result,
         ResultMsg memory resultMsg
     ) internal override {
+        console.log("handling ipc result");
         require(!shouldRevert, "revert requested");
         console.log("handling ipc result");
         require(keccak256(abi.encode(original)) == keccak256(abi.encode(lastEnvelope)));
         lastEnvelope = result;
         lastResultMsg = resultMsg;
+        //
+        //used to verify in the test that this method is called 
+        handleIpcResultCalled = true; // Mark as called
     }
 
     function flipRevert() public {
@@ -87,6 +93,8 @@ contract RecorderIpcExchange is IpcExchange {
 
 contract IpcExchangeTest is Test {
     using CrossMsgHelper for IpcEnvelope;
+    using FvmAddressHelper for FvmAddress;
+    using SubnetIDHelper for SubnetID;
 
     function test_IpcExchange() public {
         address gateway = vm.addr(1);
@@ -154,9 +162,38 @@ contract IpcExchangeTest is Test {
         // we store the correct envelope in the correlation map.
         IpcEnvelope memory correlated = exch.getInflight(envelope.toHash());
         require(correlated.toHash() == envelope.toHash());
+        console.log("Hash 1");
+        console.logBytes32(correlated.toHash());
+        console.log("Hash 2");
+        console.logBytes32(envelope.toHash());
+
+        printCrossMsg(envelope);
+        // After calling exch.handleIpcMessage(envelope) or similar
+        require(exch.handleIpcResultCalled(), "_handleIpcResult was not called");
 
         // TODO test receipt correlation
 
         // TODO test dropMessages
+    }
+    //prints any IpcEnvelope for debugging
+    function printCrossMsg(IpcEnvelope memory envelope) public {
+        console.log("\nPrintCrossMsg helper 3");
+        console.log("To Address:");
+        console.logBytes32(envelope.to.rawAddress.toHash());
+        console.log(envelope.to.subnetId.toString());
+        console.log("From Address:");
+        console.logBytes32(envelope.from.rawAddress.toHash());
+        console.log(envelope.from.subnetId.toString());
+        console.log("Nonce");
+        console.log(envelope.nonce);
+        console.log("Value");
+        console.log(envelope.value);
+        console.log("Message");
+        console.logBytes(envelope.message);
+        console.log("Hash");
+        console.logBytes32(envelope.toHash());
+        ResultMsg memory result = abi.decode(envelope.message, (ResultMsg));
+        console.log("Result id");
+        console.logBytes32(result.id);
     }
 }
