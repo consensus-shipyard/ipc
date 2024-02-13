@@ -1,8 +1,11 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use ethers::types::H160;
-use fendermint_crypto::{PublicKey, SecretKey};
+use std::path::Path;
+
+use anyhow::Context;
+use ethers::{core::rand::Rng, types::H160};
+use fendermint_crypto::{to_b64, PublicKey, SecretKey};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_genesis::Genesis;
 use fvm_shared::address::Address;
@@ -73,11 +76,70 @@ impl Ord for DefaultAccount {
 }
 
 impl DefaultAccount {
-    pub fn eth_address(&self) -> EthAddress {
+    pub fn eth_addr(&self) -> EthAddress {
         EthAddress::from(self.public_key)
     }
+
     /// We assume that all accounts that interact with IPC are ethereum accounts.
-    pub fn fvm_address(&self) -> Address {
-        self.eth_address().into()
+    pub fn fvm_addr(&self) -> Address {
+        self.eth_addr().into()
     }
+
+    pub fn get_or_create<R: Rng>(
+        rng: &mut R,
+        root: &Path,
+        name: &AccountName,
+    ) -> anyhow::Result<Self> {
+        let dir = root.join(name.path());
+        let sk = dir.join("secret.hex");
+
+        let (sk, pk, is_new) = if sk.exists() {
+            let sk = std::fs::read_to_string(sk).context("failed to read private key")?;
+            let sk = hex::decode(sk).context("cannot decode hex private key")?;
+            let sk = SecretKey::try_from(sk).context("failed to parse secret key")?;
+            let pk = sk.public_key();
+            (sk, pk, false)
+        } else {
+            let sk = SecretKey::random(rng);
+            let pk = sk.public_key();
+            (sk, pk, true)
+        };
+
+        let acc = Self {
+            name: name.clone(),
+            secret_key: sk,
+            public_key: pk,
+        };
+
+        if is_new {
+            let sk = acc.secret_key.serialize();
+            let pk = acc.public_key.serialize();
+
+            export(&dir, "secret", "b64", to_b64(sk.as_ref()))?;
+            export(&dir, "secret", "hex", hex::encode(pk))?;
+            export(&dir, "public", "b64", to_b64(sk.as_ref()))?;
+            export(&dir, "public", "hex", hex::encode(pk))?;
+            export(&dir, "eth-addr", "", acc.eth_addr().to_string())?;
+            export(&dir, "fvm-addr", "", acc.fvm_addr().to_string())?;
+        }
+
+        Ok(acc)
+    }
+}
+
+/// Write some content to a file.
+pub fn export(
+    output_dir: impl AsRef<Path>,
+    name: &str,
+    ext: &str,
+    contents: impl AsRef<str>,
+) -> anyhow::Result<()> {
+    let file_name = if ext.is_empty() {
+        name.into()
+    } else {
+        format!("{name}.{ext}")
+    };
+    let output_path = output_dir.as_ref().join(file_name);
+    std::fs::write(output_path, contents.as_ref())?;
+    Ok(())
 }

@@ -128,6 +128,12 @@ macro_rules! resource_name {
                 &self.0
             }
         }
+
+        impl $name {
+            pub fn path(&self) -> &Path {
+                &self.0 .0
+            }
+        }
     };
 }
 
@@ -224,10 +230,6 @@ impl SubnetName {
         }
 
         hops
-    }
-
-    fn path(&self) -> &Path {
-        &self.0 .0
     }
 }
 
