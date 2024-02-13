@@ -80,10 +80,6 @@ contract IpcTokenController is IpcExchange, ReentrancyGuard {
         networkName = GatewayGetterFacet(address(_gateway)).getNetworkName();
     }
 
-    /* XXX TODO This function should be removed before deployed to production */
-    function receiveAndUnlockOnlyOwner(address recipient, uint256 value) external onlyOwner {
-        receiveAndUnlock(recipient, value);
-    }
 
 
     /**

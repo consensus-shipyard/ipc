@@ -119,7 +119,7 @@ async function createIpcTokenReplica(
     parentSubnet,
 ) {
     const IpcTokenReplica = await ethers.getContractFactory(
-        'IpcTokenReplica',
+        'TestIpcTokenReplica',
         {"libraries" : {"SubnetIDHelper":"0x033b910e8a8f3365B69c84852009c637bA34eE83"}}
     )
     const ipcTokenReplica = await IpcTokenReplica.deploy(
@@ -139,7 +139,7 @@ async function deployIpcTokenController(
 ) {
     // Getting the contract factory for IpcTokenController
     const IpcTokenController = await hre.ethers.getContractFactory(
-        'IpcTokenController',
+        'TestIpcTokenController',
         {"libraries" : {"SubnetIDHelper":"0x033b910e8a8f3365B69c84852009c637bA34eE83"}}
     )
     // Deploying IpcTokenController with the new ERC20 token as sourceContract
