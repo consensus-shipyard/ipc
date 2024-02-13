@@ -359,6 +359,7 @@ library LibGateway {
     /// @param arrivingFrom - the immediate subnet from which this message is arriving
     /// @param crossMsg - the cross message to be executed
     function applyMsg(SubnetID memory arrivingFrom, IpcEnvelope memory crossMsg) internal {
+        console.log("applyMsg");
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
 
         if (crossMsg.to.subnetId.isEmpty()) {
@@ -448,12 +449,15 @@ library LibGateway {
         if (original.isEmpty()) {
             // This should not happen as previous validation should prevent empty messages arriving here.
             // If it does, we simply ignore.
+            // 
+            console.log("EMPTY");
             return;
         }
 
         // if we get a `Receipt` do nothing, no need to send receipts.
         // - And sending a `Receipt` to a `Receipt` could lead to amplification loops.
         if (original.kind == IpcMsgKind.Result) {
+            console.log("do nothing");
             return;
         }
 

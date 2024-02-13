@@ -44,6 +44,8 @@ abstract contract IpcExchange is IpcHandler, Ownable, ReentrancyGuard  {
     //prints any IpcEnvelope for debugging
     function printCrossMsg(IpcEnvelope memory envelope) public {
         console.log("\nPrintCrossMsg sdk/IpcContract.sol");
+        console.log("Kind:");
+        console.log(uint256(envelope.kind));
         console.log("To Address:");
         console.logBytes32(envelope.to.rawAddress.toHash());
         console.log(envelope.to.subnetId.toString());
@@ -69,6 +71,8 @@ abstract contract IpcExchange is IpcHandler, Ownable, ReentrancyGuard  {
     function handleIpcMessage(IpcEnvelope calldata envelope) external payable onlyGateway returns (bytes memory) {
         // internal dispatch of the cross-net message to the right method.
         if (envelope.kind == IpcMsgKind.Call) {
+            console.log("handleIpcMessage Result");
+            //printCrossMsg(envelope);
             CallMsg memory call = abi.decode(envelope.message, (CallMsg));
             return _handleIpcCall(envelope, call);
         } else if (envelope.kind == IpcMsgKind.Result) {
@@ -78,7 +82,7 @@ abstract contract IpcExchange is IpcHandler, Ownable, ReentrancyGuard  {
 
             // Recover the original message.
             // If we were not tracking it, or if some details don't match, refuse to handle the receipt.
-            IpcEnvelope storage orig = inflightMsgs[envelope.toHash()];
+            ipcenvelope storage orig = inflightmsgs[result.id];
             if (
                 orig.message.length == 0 ||
                 keccak256(abi.encode(envelope.from)) != keccak256(abi.encode(orig.to))
