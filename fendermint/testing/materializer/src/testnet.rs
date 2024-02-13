@@ -14,7 +14,8 @@ use crate::{
         BalanceMap, CollateralMap, IpcDeployment, Manifest, Node, NodeMode, ParentNode, Rootnet,
         Subnet,
     },
-    materializer::{Materializer, Materials, NodeConfig, SubmitConfig, SubnetConfig, TargetConfig},
+    materializer::{Materializer, NodeConfig, SubmitConfig, SubnetConfig, TargetConfig},
+    materials::Materials,
     AccountId, NodeId, NodeName, RelayerName, ResourceHash, SubnetId, SubnetName, TestnetId,
     TestnetName,
 };

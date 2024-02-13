@@ -27,6 +27,10 @@ lazy_static = { workspace = true, optional = true }
 arbitrary = { workspace = true, optional = true }
 quickcheck = { workspace = true, optional = true }
 
+ipc-api = { path = "../../../ipc/api" }
+
+fendermint_crypto = { path = "../../crypto" }
+fendermint_vm_actor_interface = { path = "../../vm/actor_interface" }
 fendermint_vm_genesis = { path = "../../vm/genesis" }
 fendermint_vm_encoding = { path = "../../vm/encoding" }
 fendermint_testing = { path = "..", optional = true }

@@ -10,7 +10,8 @@ use tendermint_rpc::Url;
 
 use crate::{
     manifest::Balance,
-    materializer::{Materializer, Materials, NodeConfig, SubmitConfig, SubnetConfig},
+    materializer::{Materializer, NodeConfig, SubmitConfig, SubnetConfig},
+    materials::Materials,
     AccountName, NodeName, RelayerName, ResourceHash, SubnetName, TestnetName,
 };
 

@@ -15,7 +15,8 @@ use tendermint_rpc::Url;
 use crate::{
     logging::LoggingMaterializer,
     manifest::{Balance, Manifest},
-    materializer::{Materializer, Materials, NodeConfig, SubmitConfig, SubnetConfig},
+    materializer::{Materializer, NodeConfig, SubmitConfig, SubnetConfig},
+    materials::Materials,
     testnet::Testnet,
     AccountName, NodeName, RelayerName, ResourceHash, ResourceName, SubnetName, TestnetId,
     TestnetName,

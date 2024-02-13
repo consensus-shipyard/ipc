@@ -7,9 +7,12 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[allow(unused_variables, dead_code)] // TODO: Remove once implemented
+pub mod docker;
 pub mod logging;
 pub mod manifest;
 pub mod materializer;
+pub mod materials;
 pub mod testnet;
 pub mod validation;
 
