@@ -294,6 +294,11 @@ cat << EOF
 Subnet ID:
 $subnet_id
 
+ETH API:
+http://localhost:${ETHAPI_HOST_PORT[0]}
+http://localhost:${ETHAPI_HOST_PORT[1]}
+http://localhost:${ETHAPI_HOST_PORT[2]}
+
 Accounts:
 $(jq -r '.accounts[] | "\(.meta.Account.owner): \(.balance) coin units"' ${subnet_folder}/validator-0/genesis.json)
 
@@ -309,5 +314,5 @@ Fendermint API:
 http://localhost:26658
 
 CometBFT API:
-http://0.0.0.0:26657
+http://localhost:${CMT_RPC_HOST_PORTS[0]}
 EOF
