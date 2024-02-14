@@ -2,15 +2,16 @@
 // SPDX-License-Identifier: MIT
 //! Create subnet cli command handler.
 
-use anyhow::Context;
+use std::fmt::Debug;
+use std::str::FromStr;
+
 use async_trait::async_trait;
 use clap::Args;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
+
 use ipc_api::subnet::{PermissionMode, SupplyKind, SupplySource};
 use ipc_api::subnet_id::SubnetID;
-use std::fmt::Debug;
-use std::str::FromStr;
 
 use crate::commands::get_ipc_provider;
 use crate::{f64_to_token_amount, require_fil_addr_from_str, CommandLineHandler, GlobalArguments};
@@ -33,20 +34,14 @@ impl CreateSubnet {
             None => None,
         };
 
-        let permission_mode = str::parse::<PermissionMode>(arguments.permission_mode.as_str())
-            .context("invalid permission mode")?;
         let token_address = if let Some(addr) = &arguments.supply_source_address {
             Some(Address::from_str(addr)?)
         } else {
             None
         };
-        let supply_source = {
-            let kind = str::parse::<SupplyKind>(arguments.supply_source_kind.as_str())
-                .context("invalid supply source kind")?;
-            SupplySource {
-                kind,
-                token_address,
-            }
+        let supply_source = SupplySource {
+            kind: arguments.supply_source_kind,
+            token_address,
         };
         let addr = provider
             .create_subnet(
@@ -59,7 +54,7 @@ impl CreateSubnet {
                     .active_validators_limit
                     .unwrap_or(DEFAULT_ACTIVE_VALIDATORS),
                 f64_to_token_amount(arguments.min_cross_msg_fee)?,
-                permission_mode,
+                arguments.permission_mode,
                 supply_source,
             )
             .await?;
@@ -116,18 +111,20 @@ pub struct CreateSubnetArgs {
     pub min_cross_msg_fee: f64,
     #[arg(
         long,
-        help = "The permission mode for the subnet: collateral, federated and static"
+        help = "The permission mode for the subnet: collateral, federated and static",
+        value_parser = PermissionMode::from_str,
     )]
     // TODO figure out a way to use a newtype + ValueEnum, or reference PermissionMode::VARIANTS to
     //  enumerate all variants
-    pub permission_mode: String,
+    pub permission_mode: PermissionMode,
     #[arg(
         long,
-        help = "The kind of supply source of a subnet on its parent subnet: native or erc20"
+        help = "The kind of supply source of a subnet on its parent subnet: native or erc20",
+        value_parser = SupplyKind::from_str,
     )]
     // TODO figure out a way to use a newtype + ValueEnum, or reference SupplySourceKind::VARIANTS to
     //  enumerate all variants
-    pub supply_source_kind: String,
+    pub supply_source_kind: SupplyKind,
     #[arg(
         long,
         help = "The address of supply source of a subnet on its parent subnet. None if kind is native"

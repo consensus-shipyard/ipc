@@ -17,6 +17,7 @@ pub const MANIFEST_ID: &str = "ipc_subnet_actor";
 /// Determines the permission mode for validators.
 #[repr(u8)]
 #[derive(
+    Copy,
     Debug,
     Clone,
     Serialize_repr,
@@ -48,6 +49,7 @@ pub struct SupplySource {
 /// Determines the type of supply used by the subnet.
 #[repr(u8)]
 #[derive(
+    Copy,
     Debug,
     Clone,
     Serialize_repr,
