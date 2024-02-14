@@ -1,7 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use multihash::MultihashDigest;
-use paste::paste;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Debug, Display},
@@ -121,42 +120,45 @@ impl Debug for ResourceName {
 
 macro_rules! resource_name {
     ($name:ident) => {
-        paste! {
-                #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-                pub struct [< $name Name >](ResourceName);
+        #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+        pub struct $name(ResourceName);
 
-                impl [< $name Name >] {
-                    pub fn path(&self) -> &Path {
-                        &self.0 .0
-                    }
-                }
+        impl $name {
+            pub fn path(&self) -> &Path {
+                &self.0 .0
+            }
+        }
 
-                impl AsRef<ResourceName> for [< $name Name >] {
-                    fn as_ref(&self) -> &ResourceName {
-                        &self.0
-                    }
-                }
+        impl AsRef<ResourceName> for $name {
+            fn as_ref(&self) -> &ResourceName {
+                &self.0
+            }
+        }
 
-                impl AsRef<Path> for [< $name Name >] {
-                    fn as_ref(&self) -> &Path {
-                        self.path()
-                    }
-                }
+        impl AsRef<Path> for $name {
+            fn as_ref(&self) -> &Path {
+                self.path()
+            }
+        }
 
-                impl Display for [< $name Name >] {
-                    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                        write!(f, "{}({})", stringify!($name), self.0)
-                    }
-                }
+        impl Display for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(
+                    f,
+                    "{}({})",
+                    stringify!($name).trim_end_matches("Name"),
+                    self.0
+                )
+            }
         }
     };
 }
 
-resource_name!(Testnet);
-resource_name!(Account);
-resource_name!(Subnet);
-resource_name!(Node);
-resource_name!(Relayer);
+resource_name!(TestnetName);
+resource_name!(AccountName);
+resource_name!(SubnetName);
+resource_name!(NodeName);
+resource_name!(RelayerName);
 
 impl TestnetName {
     pub fn new<T: Into<TestnetId>>(id: T) -> Self {

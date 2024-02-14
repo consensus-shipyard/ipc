@@ -1,7 +1,9 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use anyhow::Context;
 use async_trait::async_trait;
+use bollard::Docker;
 use ethers::{
     core::rand::{rngs::StdRng, SeedableRng},
     types::H160,
@@ -45,16 +47,21 @@ impl Materials for DockerMaterials {
 pub struct DockerMaterializer {
     dir: PathBuf,
     rng: StdRng,
+    docker: bollard::Docker,
 }
 
 impl DockerMaterializer {
     /// Create a materializer with a directory where all the
     /// testnets can live next to each other.
-    pub fn new(dir: &Path, seed: u64) -> Self {
-        Self {
+    pub fn new(dir: &Path, seed: u64) -> anyhow::Result<Self> {
+        let docker =
+            Docker::connect_with_local_defaults().context("failed to connect to Docker")?;
+
+        Ok(Self {
             dir: dir.into(),
             rng: StdRng::seed_from_u64(seed),
-        }
+            docker,
+        })
     }
 
     /// Path to a directory based on a resource name.
@@ -70,7 +77,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         &mut self,
         testnet_name: &TestnetName,
     ) -> anyhow::Result<<DockerMaterials as Materials>::Network> {
-        todo!("docker create network")
+        DockerNetwork::get_or_create(self.docker.clone(), testnet_name.clone()).await
     }
 
     /// Create a new key-value pair, or return an existing one.
