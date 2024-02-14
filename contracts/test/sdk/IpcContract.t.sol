@@ -258,5 +258,4 @@ contract IpcExchangeTest is Test {
         exch.handleIpcMessage(resultEnvelope);
         require(exch.getLastResultMsg().id != bytes32(""), "_handleIpcResult was not called");
     }
-
 }
