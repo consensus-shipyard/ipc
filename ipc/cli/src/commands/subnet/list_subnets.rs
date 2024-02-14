@@ -21,7 +21,7 @@ impl CommandLineHandler for ListSubnets {
         log::debug!("list subnets with args: {:?}", arguments);
 
         let provider = get_ipc_provider(global)?;
-        let subnet = SubnetID::from_str(&arguments.network)?;
+        let subnet = SubnetID::from_str(&arguments.parent)?;
 
         let gateway_addr = match &arguments.gateway_address {
             Some(address) => Some(require_fil_addr_from_str(address)?),
@@ -50,5 +50,5 @@ pub(crate) struct ListSubnetsArgs {
     #[arg(long, help = "The gateway address to query subnets")]
     pub gateway_address: Option<String>,
     #[arg(long, help = "The network id to query child subnets")]
-    pub network: String,
+    pub parent: String,
 }
