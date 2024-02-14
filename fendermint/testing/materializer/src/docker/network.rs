@@ -76,5 +76,76 @@ impl DockerNetwork {
     }
 }
 
-// TODO: Drop
-// TODO: Test
+impl Drop for DockerNetwork {
+    fn drop(&mut self) {
+        if !self.external {
+            let network_name = self.network_name.clone();
+            let docker = self.docker.clone();
+            // TODO: Handle this in a more linearlised way, e.g. it could happen that we are still stopping and
+            // removing containers when we try to remove the network, which will thus fail. Maybe the materializer
+            // should have a background worker listening to these events and execute commands one after the other.
+            // Or maybe it should have a single threaded tokio runtime that we can use with `block_on`. If that
+            // runtime isn't the one that is being used to run all the regular tasks, perhaps it can block here.
+            tokio::runtime::Handle::current().spawn(async move {
+                if let Err(e) = docker.remove_network(&network_name).await {
+                    tracing::error!(
+                        error = e.to_string(),
+                        network_name,
+                        "failed to remove docker network"
+                    );
+                }
+            });
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use bollard::Docker;
+
+    use super::DockerNetwork;
+    use crate::TestnetName;
+
+    #[tokio::test]
+    async fn test_network() {
+        let tn = TestnetName::new("test-network");
+
+        let docker = Docker::connect_with_local_defaults().expect("failed to connect to docker");
+
+        let n1 = DockerNetwork::get_or_create(docker.clone(), tn.clone())
+            .await
+            .expect("failed to create network");
+
+        let n2 = DockerNetwork::get_or_create(docker.clone(), tn.clone())
+            .await
+            .expect("failed to get network");
+
+        assert_eq!(
+            n1.external, false,
+            "when created, the network should not be external"
+        );
+        assert_eq!(
+            n2.external, true,
+            "when already exists, the network should be external"
+        );
+        assert_eq!(n1.id, n2.id);
+        assert_eq!(n1.network_name, n2.network_name);
+        assert_eq!(n1.network_name, "testnets/test-network");
+
+        let id = n1.id.clone();
+
+        let exists = || async {
+            let ns = docker.list_networks::<String>(None).await.unwrap();
+            ns.iter().find(|n| n.id == Some(id.clone())).is_some()
+        };
+
+        drop(n2);
+        assert!(exists().await, "network still exists after n2 dropped");
+
+        drop(n1);
+        assert!(
+            !exists().await,
+            "network should be removed when n1 is dropped"
+        );
+    }
+}
