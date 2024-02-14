@@ -34,6 +34,7 @@ jobs:
       - name: Deploy IPC contracts to calibration net
         run: |
           cd contracts
+          npm install --save hardhat
           make deploy-ipc NETWORK=calibrationnet
 #      - name: Copy deployment script files to the host
 #        uses: appleboy/scp-action@v0.1.7
