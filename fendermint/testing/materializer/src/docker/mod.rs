@@ -44,10 +44,36 @@ impl Materials for DockerMaterials {
     type Relayer = DockerRelayer;
 }
 
+#[derive(Clone)]
+pub struct DockerWithDropHandle {
+    /// Docker client.
+    pub docker: Docker,
+    /// Handle to a single threaded runtime to perform drop tasks.
+    pub drop_handle: tokio::runtime::Handle,
+}
+
+impl DockerWithDropHandle {
+    /// Create with the handle of a given runtime.
+    pub fn from_runtime(docker: Docker, runtime: &tokio::runtime::Runtime) -> Self {
+        Self {
+            docker,
+            drop_handle: runtime.handle().clone(),
+        }
+    }
+    /// Create with the handle of the current runtime, for testing purposes.
+    pub fn from_current(docker: Docker) -> Self {
+        Self {
+            docker,
+            drop_handle: tokio::runtime::Handle::current(),
+        }
+    }
+}
+
 pub struct DockerMaterializer {
     dir: PathBuf,
     rng: StdRng,
     docker: bollard::Docker,
+    drop_runtime: tokio::runtime::Runtime,
 }
 
 impl DockerMaterializer {
@@ -57,11 +83,22 @@ impl DockerMaterializer {
         let docker =
             Docker::connect_with_local_defaults().context("failed to connect to Docker")?;
 
+        // Create a runtime for the execution of drop tasks.
+        let drop_runtime = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .build()
+            .context("failed to create tokio Runtime")?;
+
         Ok(Self {
             dir: dir.into(),
             rng: StdRng::seed_from_u64(seed),
             docker,
+            drop_runtime,
         })
+    }
+
+    fn docker_with_drop_handle(&self) -> DockerWithDropHandle {
+        DockerWithDropHandle::from_runtime(self.docker.clone(), &self.drop_runtime)
     }
 
     /// Path to a directory based on a resource name.
@@ -77,7 +114,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         &mut self,
         testnet_name: &TestnetName,
     ) -> anyhow::Result<<DockerMaterials as Materials>::Network> {
-        DockerNetwork::get_or_create(self.docker.clone(), testnet_name.clone()).await
+        DockerNetwork::get_or_create(self.docker_with_drop_handle(), testnet_name.clone()).await
     }
 
     /// Create a new key-value pair, or return an existing one.
