@@ -21,9 +21,26 @@ use crate::{
     NodeName, RelayerName, ResourceHash, ResourceName, SubnetName, TestnetName,
 };
 
-mod materials;
+mod network;
+mod node;
+mod relayer;
 
-pub use materials::*;
+pub use network::DockerNetwork;
+pub use node::DockerNode;
+pub use relayer::DockerRelayer;
+
+pub struct DockerMaterials;
+
+impl Materials for DockerMaterials {
+    type Deployment = DefaultDeployment;
+    type Account = DefaultAccount;
+    type Genesis = DefaultGenesis;
+    type Subnet = DefaultSubnet;
+
+    type Network = DockerNetwork;
+    type Node = DockerNode;
+    type Relayer = DockerRelayer;
+}
 
 pub struct DockerMaterializer {
     dir: PathBuf,

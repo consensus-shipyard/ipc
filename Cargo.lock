@@ -1000,6 +1000,46 @@ dependencies = [
 ]
 
 [[package]]
+name = "bollard"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f03db470b3c0213c47e978da93200259a1eb4dae2e5512cba9955e2b540a6fc6"
+dependencies = [
+ "base64 0.21.7",
+ "bollard-stubs",
+ "bytes",
+ "futures-core",
+ "futures-util",
+ "hex",
+ "http",
+ "hyper",
+ "hyperlocal",
+ "log",
+ "pin-project-lite",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "serde_repr",
+ "serde_urlencoded",
+ "thiserror",
+ "tokio",
+ "tokio-util 0.7.10",
+ "url",
+ "winapi",
+]
+
+[[package]]
+name = "bollard-stubs"
+version = "1.43.0-rc.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b58071e8fd9ec1e930efd28e3a90c1251015872a2ce49f81f36421b86466932e"
+dependencies = [
+ "serde",
+ "serde_repr",
+ "serde_with 3.6.1",
+]
+
+[[package]]
 name = "bs58"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2859,7 +2899,7 @@ dependencies = [
  "rand_chacha",
  "serde",
  "serde_json",
- "serde_with",
+ "serde_with 2.3.3",
  "tempfile",
  "tendermint 0.31.1",
  "tendermint-config 0.33.2",
@@ -2907,7 +2947,7 @@ dependencies = [
  "ipc-provider",
  "multiaddr",
  "serde",
- "serde_with",
+ "serde_with 2.3.3",
  "serial_test",
  "tendermint-rpc",
 ]
@@ -3097,6 +3137,7 @@ dependencies = [
  "arbitrary",
  "async-recursion",
  "async-trait",
+ "bollard",
  "env_logger 0.10.2",
  "ethers",
  "fendermint_crypto",
@@ -3117,7 +3158,7 @@ dependencies = [
  "quickcheck_macros",
  "serde",
  "serde_json",
- "serde_with",
+ "serde_with 2.3.3",
  "serde_yaml",
  "tempfile",
  "tendermint-rpc",
@@ -3181,7 +3222,7 @@ dependencies = [
  "ipc-api",
  "num-traits",
  "serde",
- "serde_with",
+ "serde_with 2.3.3",
 ]
 
 [[package]]
@@ -3215,7 +3256,7 @@ dependencies = [
  "rand",
  "serde",
  "serde_json",
- "serde_with",
+ "serde_with 2.3.3",
  "tendermint 0.31.1",
 ]
 
@@ -3259,7 +3300,7 @@ dependencies = [
  "quickcheck_macros",
  "serde",
  "serde_json",
- "serde_with",
+ "serde_with 2.3.3",
  "tempfile",
  "tendermint 0.31.1",
  "tendermint-rpc",
@@ -3296,7 +3337,7 @@ dependencies = [
  "rand",
  "serde",
  "serde_tuple",
- "serde_with",
+ "serde_with 2.3.3",
  "thiserror",
 ]
 
@@ -4639,6 +4680,19 @@ dependencies = [
  "native-tls",
  "tokio",
  "tokio-native-tls",
+]
+
+[[package]]
+name = "hyperlocal"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0fafdf7b2b2de7c9784f76e02c0935e65a8117ec3b768644379983ab333ac98c"
+dependencies = [
+ "futures-util",
+ "hex",
+ "hyper",
+ "pin-project",
+ "tokio",
 ]
 
 [[package]]
@@ -8355,6 +8409,23 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with_macros",
+ "time",
+]
+
+[[package]]
+name = "serde_with"
+version = "3.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15d167997bd841ec232f5b2b8e0e26606df2e7caa4c31b95ea9ca52b200bd270"
+dependencies = [
+ "base64 0.21.7",
+ "chrono",
+ "hex",
+ "indexmap 1.9.3",
+ "indexmap 2.2.3",
+ "serde",
+ "serde_derive",
+ "serde_json",
  "time",
 ]
 

@@ -12,6 +12,7 @@ license.workspace = true
 anyhow = { workspace = true }
 async-recursion = { workspace = true }
 async-trait = { workspace = true }
+bollard = { workspace = true }
 ethers = { workspace = true }
 fvm_shared = { workspace = true }
 hex = { workspace = true }
