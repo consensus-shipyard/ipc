@@ -132,7 +132,7 @@ To run all repo tests run
 forge test -vvv --ffi
 ```
 
-And to generate coverage report run
+And to generate coverage report run:
 
 ```bash
 forge coverage
