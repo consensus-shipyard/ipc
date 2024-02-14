@@ -23,15 +23,16 @@ ETHAPI_HOST_PORTS=(8545 8645 8745)
 RESOLVER_HOST_PORTS=(26655 26755 26855)
 
 if (($# != 1)); then
-  echo "Arguments: <Specify github remote branch name to use to deploy. Or use 'local' (without quote) to indicate using local repo instead."
-  exit 1
-fi
-
-if [ $1 = "local" ]; then
-  local_deploy=true
-else
+  echo "Arguments: <Specify github remote branch name to use to deploy. Or use 'local' (without quote) to indicate using local repo instead. If not provided, will default to main branch"
+  head_ref=main
   local_deploy=false
-  head_ref=$1
+else
+  if [ $1 = "local" ]; then
+    local_deploy=true
+  else
+    local_deploy=false
+    head_ref=$1
+  fi
 fi
 
 # Step 1: Prepare system for building and running IPC
