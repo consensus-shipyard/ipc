@@ -16,8 +16,6 @@ import {IpcHandler, IpcExchange} from "../../sdk/IpcContract.sol";
 import {IGateway} from "../../src/interfaces/IGateway.sol";
 import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
 
-import {IntegrationTestBase, TestRegistry} from "../IntegrationTestBase.sol";
-
 interface Foo {
     function foo(string calldata) external returns (string memory);
 }
@@ -86,7 +84,7 @@ contract RecorderIpcExchange is IpcExchange {
     }
 }
 
-contract IpcExchangeTest is Test, IntegrationTestBase {
+contract IpcExchangeTest is Test {
     using CrossMsgHelper for IpcEnvelope;
     address gateway = vm.addr(1);
     SubnetID subnetA;
@@ -100,7 +98,7 @@ contract IpcExchangeTest is Test, IntegrationTestBase {
     IPCAddress ipcAddressA;
     IPCAddress ipcAddressB;
 
-    function setUp() public override {
+    function setUp() public {
         address[] memory pathA = new address[](1);
         pathA[0] = vm.addr(2000);
         address[] memory pathB = new address[](1);
@@ -184,7 +182,7 @@ contract IpcExchangeTest is Test, IntegrationTestBase {
         vm.expectRevert(IpcHandler.UnrecognizedResult.selector);
         exch.handleIpcMessage(callEnvelope);
     }
-    
+
     function test_IpcExchange_successfulCorrelation() public {
         // Perform an outgoing IPC call from within the contract.
         vm.mockCall(
