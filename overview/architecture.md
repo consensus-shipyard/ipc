@@ -2,13 +2,13 @@
 description: Architectural components in the IPC framework.
 ---
 
-# Architecture
+# 🟡 Architecture
 
 <figure><img src="../.gitbook/assets/image.png" alt=""><figcaption><p>IPC Architecture</p></figcaption></figure>
 
 ## Validator nodes
 
-Operators of a subnet run a full validator node for both the parent and the child subnet. Requiring the nodes of child subnets to run the nodes of parents is a security parameter to ensure [checkpointed](broken-reference) states of the subnet are appropriately stored, at the right time in the parent.&#x20;
+Operators of a subnet run a full validator node for both the parent and the child subnet. Requiring the nodes of child subnets to run the nodes of parents is a security parameter to ensure [checkpointed](../key-concepts/broken-reference/) states of the subnet are appropriately stored, at the right time in the parent.
 
 The following components make up a node:
 
@@ -18,13 +18,13 @@ The following components make up a node:
 
 ### ABCI++
 
-The [ABCI++](https://members.delphidigital.io/learn/abci) interface is implemented in order to handle the IPC ledger logic and transaction handling, using the [Filecoin Virtual Machine](https://docs.filecoin.io/smart-contracts/fundamentals/the-fvm) (or Ethereum-compatible FVM). The ABCI can pass [checkpointed](broken-reference) headers to the parent and use the ledger to gather relevant signatures.&#x20;
+The [ABCI++](https://members.delphidigital.io/learn/abci) interface is implemented in order to handle the IPC ledger logic and transaction handling, using the [Filecoin Virtual Machine](https://docs.filecoin.io/smart-contracts/fundamentals/the-fvm) (or Ethereum-compatible FVM). The ABCI can pass [checkpointed](../key-concepts/broken-reference/) headers to the parent and use the ledger to gather relevant signatures.
 
-An ABCI++ application can contact the [IPLD](https://docs.filecoin.io/basics/project-and-community/related-projects#ipld) [resolver & store](../reference/ipld-resolver.md) to read and write data so that it is IPLD addressable.&#x20;
+An ABCI++ application can contact the [IPLD](https://docs.filecoin.io/basics/project-and-community/related-projects#ipld) [resolver & store](broken-reference) to read and write data so that it is IPLD addressable.
 
 ### Filecoin Virtual Machine (FVM)
 
-The [FVM](https://docs.filecoin.io/smart-contracts/fundamentals/the-fvm) enables on-chain programmability and is built as a polyglot VM. It is currently compatible with Filecoin and Ethereum and has plans to support more chains in its [roadmap](https://fvm.filecoin.io/).&#x20;
+The [FVM](https://docs.filecoin.io/smart-contracts/fundamentals/the-fvm) enables on-chain programmability and is built as a polyglot VM. It is currently compatible with Filecoin and Ethereum and has plans to support more chains in its [roadmap](https://fvm.filecoin.io/).
 
 FVM is included as a transaction execution later in the subnet, allowing use cases enabled by smart contracts to be built on top of subnets.
 
@@ -46,7 +46,4 @@ The role of relayers is to pass messages between parent and child subnets. They 
 
 ### Lotus rootnet
 
-[Lotus](https://lotus.filecoin.io/lotus/get-started/what-is-lotus/) currently serves as the rootnet for IPC subnets. It is the reference implementation for Filecoin nodes.&#x20;
-
-
-
+[Lotus](https://lotus.filecoin.io/lotus/get-started/what-is-lotus/) currently serves as the rootnet for IPC subnets. It is the reference implementation for Filecoin nodes.

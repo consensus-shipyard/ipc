@@ -1,83 +1,4 @@
-# Deploy smart contract to Mycelium testnet
-
-Before delving into this tutorial, you should have a [basic understanding of IPC](../) and [subnets](../key-concepts/subnets.md). You may want to familiarize yourself with the fundamentals of setting up an IPC subnet, in the [previous quickstart](deploy-a-subnet.md).
-
-In this tutorial, we will guide you through the simple process of connecting to the Mycelium Calibration testnet and deploying smart contracts on it. We will use the ERC20 contract as an example to illustrate the steps, including:
-
-* Connect to the Mycelium Calibration
-* Fund your address on the Mycelium Calibration
-* Deploy an ERC20 contract on the Mycelium Calibration
-
-## Prerequisites
-
-* [VS Code](https://code.visualstudio.com/download)
-* [MetaMask](https://metamask.io/download/)
-* [NodeJS](https://nodejs.org/en/download)
-
-## Connect to the Mycelium Calibration
-
-The Filecoin Calibration testnet will be the IPC rootnet to host multiple IPC subnets for testing, each offering distinct features and capacities. Builders have the flexibility to select a subnet that suits their specific requirements for deploying smart contracts. Alternatively, if builders have unique needs, they can set up their own subnet. If you are interested in learning more about IPC rootnet and subnets, you can read more [here](../key-concepts/subnets.md).
-
-In this quickstart guide, we will utilize the **public subnet** - **the Mycelium Calibration**, connected to Filecoin Calibration testnet, to deploy and interact with smart contracts.
-
-To begin, the first step is to establish a connection to the Mycelium Calibration, enabling you to seamlessly request tFIL and interact with it.
-
-### Add the subnet to your MetaMask wallet (manually)
-
-Since IPC subnets are EVM-compatible, you can leverage various tools from the Ethereum ecosystem to build and interact with your decentralized applications (dApps).
-
-In this step, we will guide you through the process of manually configuring MetaMask to connect to our subnet. By doing so, we can manage tokens and interact with dApps deployed on this specific subnet using MetaMask.
-
-#### **1. Getting RPC URL & Chain ID**
-
-To connect MetaMak to Mycelium Calibration, we need to have its RPC URL and `chainID` which you can find on [Reference/Networks](../reference/networks.md#mycelium-calibration-network) page.
-
-```bash
-# Mycelium Calibration Info
-rpc url: "https://api.mycelium.calibration.node.glif.io/"
-chainID: "2120099022966061"
-```
-
-With the gathered information, you now have all the necessary details to manually add your subnet network to MetaMask.
-
-<figure><img src="../.gitbook/assets/MM-network.png" alt=""><figcaption><p>Add Canopy network to the MetaMask.</p></figcaption></figure>
-
-## Fund your address on the Mycelium Calibration
-
-Since any IPC subnet operates as a layer2 network on top of Filecoin, it is necessary to transfer some tFIL tokens from the Filecoin Calibration testnet (rootnet) to our wallet within the Mycelium Calibration. This ensures that we have an adequate token balance for performing actions on the subnet.
-
-To facilitate this transfer, we will directly request some tFIL on [public faucet](https://faucet.mycelium.calibration.node.glif.io/) for Mycelium Calibration. Use your wallet address on MetaMask to request tFIL on the faucet, it will send you 30 tFIL which was funded from Calibration.
-
-Once the tFIL is confirmed and transferred to the wallet address on Mycelium, we can transfer tokens within that Mycelium very quickly.
-
-There are a couple of ways to check the token balance in the IPC subnet.
-
-*   **On MetaMask**
-
-    <div align="left">
-
-    <img src="../.gitbook/assets/metamask (6).png" alt="Wallet Balance on MetaMask" width="371">
-
-    </div>
-*   **ETH API**
-
-    We can also send RPC API request to the Mycelium Calibration node to query the wallet balance of a certain wallet address.
-
-    {% code overflow="wrap" %}
-    ```sh
-    // Request wallet balance
-    curl -X POST -H 'Content-Type: application/json' --data '{"jsonrpc":"2.0","method":"eth_getBalance","params":["<WALLET ADDRESS", "latest"],"id":1}' <https://api.mycelium.calibration.node.glif.io/>
-    ```
-    {% endcode %}
-*   **`ipc-cli` command**
-
-    Use the `subnet-id` for the Mycelium Calibration.
-
-    ```sh
-    ipc-cli wallet balances --subnet /r314159/t410fx23amesh6qvzfzl744uzdr76vlsysb6nnp3us4q --wallet-type evm
-    ```
-
-After acquiring some test tokens in the MetaMask wallet, we can begin working on the smart contract for the IPC subnet.
+# 🟢 Transacting in a subnet
 
 ## Deploy ERC20 contract on the Mycelium Calibration
 
@@ -91,7 +12,7 @@ We will use Remix & MetaMask for this step. So ensure your MetaMask connects to 
 
 Let's go to the [Remix](https://remix.ethereum.org) website and create a new workspace. We will use the ERC20 template from [OpenZeppelin](https://docs.openzeppelin.com/contracts/5.x/erc20) and add a mintable feature to customize the contract.
 
-<figure><img src="../.gitbook/assets/create_workspace (1).png" alt=""><figcaption><p>Create a new workspace</p></figcaption></figure>
+<figure><img src="../../.gitbook/assets/create_workspace (1).png" alt=""><figcaption><p>Create a new workspace</p></figcaption></figure>
 
 Remix will generate a standard Solidity project structure, including an ERC20 token contract template and the necessary libraries from OpenZeppelin.
 
@@ -99,7 +20,7 @@ Remix will generate a standard Solidity project structure, including an ERC20 to
 
 On the left file explorer section on Remix, open `contracts/MyToken.sol` and modify the name and symbol for the ERC20 token.
 
-<figure><img src="../.gitbook/assets/token (1).png" alt=""><figcaption><p>Customize the token details</p></figcaption></figure>
+<figure><img src="../../.gitbook/assets/token (1).png" alt=""><figcaption><p>Customize the token details</p></figcaption></figure>
 
 **3. Compile your token contract**
 
@@ -109,11 +30,11 @@ Set the Solidity compiler version to 0.8.20 on the Solidity Compiler page. This 
 
 In this step, we will utilize MetaMask to sign and send deployment transactions to the Mycelium subnet. Ensure that MetaMask is connected to the Mycelium subnet, and selected `Injected Provider - MetaMask` as the deployment environment in Remix.
 
-<figure><img src="../.gitbook/assets/InjectMM (1).png" alt=""><figcaption><p>Use MetaMask to sign the transaction</p></figcaption></figure>
+<figure><img src="../../.gitbook/assets/InjectMM (1).png" alt=""><figcaption><p>Use MetaMask to sign the transaction</p></figcaption></figure>
 
 Set your wallet address (copy from MetaMask) as the initial owner of this ERC20 token when deploying it. Review and confirm the deployment transaction on the MetaMask pop-up window after clicking the **Deploy** button. Once confirmed, the ERC20 token contract will be deployed on the Mycelium Calibration.
 
-<figure><img src="../.gitbook/assets/deployed.png" alt=""><figcaption><p>Deploy the smart contract</p></figcaption></figure>
+<figure><img src="../../.gitbook/assets/deployed.png" alt=""><figcaption><p>Deploy the smart contract</p></figcaption></figure>
 
 **5. Invoke smart contract on Remix**
 
@@ -122,7 +43,7 @@ After successfully deploying your contract to the Mycelium Calibration, you will
 * **to**: the address to receive the minted ERC20 token
 * **amount**: the amount of tokens to be minted.
 
-<figure><img src="../.gitbook/assets/invoke (1).png" alt=""><figcaption><p>Invoke smart contract</p></figcaption></figure>
+<figure><img src="../../.gitbook/assets/invoke (1).png" alt=""><figcaption><p>Invoke smart contract</p></figcaption></figure>
 
 After the transaction is confirmed on the Mycelium Calibration, we will be able to call `balanceOf` to check if the tokens have been successfully minted to our wallet address.
 {% endtab %}
@@ -165,7 +86,7 @@ Considering the security of your project, we will use the `.evn` file to store s
 PRIVATE_KEY=<your-wallet-private-key>
 ```
 
-Open `hardhat.config.js` with VsCode, we will add IPC network configuration in this file. Make sure you have installed the `dotenv` package in your project by running `npm install dotenv`. Next, let's retrieve the ChainId and URL for the Mycelium Calibration from the [previous step](deploy-smart-contract-to-mycelium-testnet.md#1.-getting-rpc-url-and-chain-id). We will use them to configure the IPC network.
+Open `hardhat.config.js` with VsCode, we will add IPC network configuration in this file. Make sure you have installed the `dotenv` package in your project by running `npm install dotenv`. Next, let's retrieve the ChainId and URL for the Mycelium Calibration from the [previous step](transacting-in-a-subnet.md#1.-getting-rpc-url-and-chain-id). We will use them to configure the IPC network.
 
 In the `hardhat.config.js` file, add the following code.
 

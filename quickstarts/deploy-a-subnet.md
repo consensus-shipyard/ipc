@@ -1,8 +1,8 @@
-# Deploy a subnet
+# 🟡 Deploy a subnet
 
-Before delving into this tutorial, you should have a [basic understanding of IPC](../).
+Before delving into this tutorial, you should have a [basic understanding of IPC](broken-reference).
 
-Please note that you do not need to deploy your own subnet, in order to build on one. For deploying smart contracts to an existing subnet, check out [the next quickstart](deploy-smart-contract-to-mycelium-testnet.md).
+Please note that you do not need to deploy your own subnet, in order to build on one. For deploying smart contracts to an existing subnet, check out [the next quickstart](broken-reference).
 
 In this tutorial, we will guide you through the process of spinning up your own IPC subnet validator node locally. We will use a repository with a pre-built docker image to simplify deployment of the IPC tooling.&#x20;
 

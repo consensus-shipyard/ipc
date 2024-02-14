@@ -2,15 +2,15 @@
 description: This page lists all the ipc-cli commands to interact with IPC subnets.
 ---
 
-# ipc-cli Usage
+# 🟡 IPC CLI
 
 
 
 {% hint style="info" %}
-For background and setup information, make sure to start with the [README](https://github.com/consensus-shipyard/ipc/blob/main/README.md) of IPC on GitHub.&#x20;
+For background and setup information, make sure to start with the [README](https://github.com/consensus-shipyard/ipc/blob/main/README.md) of IPC on GitHub.
 {% endhint %}
 
-If you have IPC installed on your machine, you should be able to run `ipc-cli --help` to check all the available commands.&#x20;
+If you have IPC installed on your machine, you should be able to run `ipc-cli --help` to check all the available commands.
 
 ```sh
 ipc-cli --help
@@ -38,7 +38,7 @@ Commands:
 ipc-cli config init
 ```
 
-This command will initialize a new empty config file under `~/.ipc` with all parameters required to connect to the IPC rootnet network.&#x20;
+This command will initialize a new empty config file under `~/.ipc` with all parameters required to connect to the IPC rootnet network.
 
 ### Subnet Management
 
@@ -48,7 +48,7 @@ This command will initialize a new empty config file under `~/.ipc` with all par
 ipc-cli subnet list --subnet=<PARENT_SUBBNET_ID>
 ```
 
-You can check all the active child subnets on a specific parent subnet.&#x20;
+You can check all the active child subnets on a specific parent subnet.
 
 This command only shows subnets that have been registered to the gateway, i.e. that have provided enough collateral to participate in the IPC protocol and haven't been killed. It is not an exhaustive list of all of the subnet actors deployed over the network.
 
@@ -120,7 +120,7 @@ Leaving a subnet will release the collateral for the validator and remove all th
 ipc-cli subnet stake --subnet <subnet-id> --collateral <collateral_amount>
 ```
 
-After initially joining a subnet with specified collateral, a validator can stake more collaterals to the subnet.&#x20;
+After initially joining a subnet with specified collateral, a validator can stake more collaterals to the subnet.
 
 ```sh
 # Example execution
@@ -151,7 +151,7 @@ $ ipc-cli subnet claim --subnet=/r314159/t410fh4ywg4wvxcjzz4vsja3uh4f53johc2lf5b
 ```
 
 {% hint style="info" %}
-Changes in collateral and the power table are not reflected immediately in the parent. They need to be confirmed in the execution of the next bottom-up checkpoint, so until this happens, even if there has been a change in collateral, you may not be the change immediately when running `ipc-cli subnet list`. This impacts any change to the collateral of validators, i.e. `stake`, `unstake` and `leave` commands.&#x20;
+Changes in collateral and the power table are not reflected immediately in the parent. They need to be confirmed in the execution of the next bottom-up checkpoint, so until this happens, even if there has been a change in collateral, you may not be the change immediately when running `ipc-cli subnet list`. This impacts any change to the collateral of validators, i.e. `stake`, `unstake` and `leave` commands.
 
 To inspect the changes to the power table that have been performed between two epochs you can use the following command:
 
@@ -189,7 +189,7 @@ The `ipc-cli` has an EVM-compatible wallet that it uses to sign transactions and
 ipc-cli wallet new -w <wallet-type>
 ```
 
-This command will create a wallet,  and store the key information in `~/.ipc/evm_keystore.json`. You can create an EVM-compatible wallet which can also used with FVM (Filecoin Virtual Machine).
+This command will create a wallet, and store the key information in `~/.ipc/evm_keystore.json`. You can create an EVM-compatible wallet which can also used with FVM (Filecoin Virtual Machine).
 
 ```sh
 # Sample execution
@@ -216,7 +216,7 @@ You can check the token balance in your wallet addresses for any active subnet c
 ipc-cli wallet set-default --wallet-type <wallet-type> --address <EVM-ADDRESS>
 ```
 
-You can set a default address for your wallet so it is always the one used when the `--from` flag is not explicitly set.&#x20;
+You can set a default address for your wallet so it is always the one used when the `--from` flag is not explicitly set.
 
 ```sh
 # Sample execution
@@ -239,7 +239,7 @@ $ ipc-cli wallet set-default --wallet-type evm
 ipc-cli wallet export --wallet-type <wallet-type> --address <EVM-ADDRESS> > <OUTPUT_FILE>
 ```
 
-This command will exporte a wallet private key which is stored in the `ipc-cli` keystore `~/.ipc/evm_keystore.json`.&#x20;
+This command will exporte a wallet private key which is stored in the `ipc-cli` keystore `~/.ipc/evm_keystore.json`.
 
 ```sh
 # Sample execution
@@ -258,13 +258,13 @@ exported new wallet with address 0x406a7a1d002b71ece175cc7e067620ae5b58e9ec in f
     ipc-cli wallet export --wallet-type evm --address <EVM-ADDRESS> --hex > <OUTPUT_FILE>
     ```
 
-#### Import a wallet&#x20;
+#### Import a wallet
 
 ```
 ipc-cli wallet import --wallet-type evm --path <INPUT_FILE_WITH_KEY> --private-key <PRIVATE_KEY>
 ```
 
-This command will import a wallet from an EVM key file with this format `{“address”:,“private_key”:<PRIVATE_KEY>}`.&#x20;
+This command will import a wallet from an EVM key file with this format `{“address”:,“private_key”:<PRIVATE_KEY>}`.
 
 ```sh
 # Sample execution
@@ -322,7 +322,7 @@ ipc-cli cross-msg pre-fund
     she<amount>
 ```
 
-To fund your address in a child subnet genesis before it is bootstrapped, and include some funds on your address in the subnet in genesis, you can use the `pre-fund` command. This command can only be used before the subnet is bootstrapped and started.&#x20;
+To fund your address in a child subnet genesis before it is bootstrapped, and include some funds on your address in the subnet in genesis, you can use the `pre-fund` command. This command can only be used before the subnet is bootstrapped and started.
 
 ```sh
 # Example execution
@@ -412,7 +412,7 @@ ipc-cli checkpoint list-bottomup
     --subnet <subnet-id>
 ```
 
-Subnets are periodically committing checkpoints to their parent every `bottomup-check-period` (parameter defined when creating the subnet). You can use this command to inspect the information of a range of bottom-up checkpoints committed in the parent for a subnet.&#x20;
+Subnets are periodically committing checkpoints to their parent every `bottomup-check-period` (parameter defined when creating the subnet). You can use this command to inspect the information of a range of bottom-up checkpoints committed in the parent for a subnet.
 
 ```sh
 # Example execution
@@ -447,7 +447,7 @@ $ ipc-cli checkpoint quorum-reached-events --from-epoch 600 --to-epoch 680 --sub
     --submitter &#x3C;RELAYER_ADDR>
 </code></pre>
 
-This command can be used to check the state of the checkpoints submitted from a subnet relayer.    Once subnet validators have agreed on the bottom-up checkpoint to be submitted in the parent for a specific epoch, relayers need to pick up the checkpoint and submit it in the parent.
+This command can be used to check the state of the checkpoints submitted from a subnet relayer. Once subnet validators have agreed on the bottom-up checkpoint to be submitted in the parent for a specific epoch, relayers need to pick up the checkpoint and submit it in the parent.
 
 ```sh
 # Sample execution
@@ -495,4 +495,3 @@ Relayers are rewarded through cross-net message fees for the timely submission o
 # Example execution
 $ ipc-cli subnet claim --subnet=/r31415926/t4xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq --reward
 ```
-
