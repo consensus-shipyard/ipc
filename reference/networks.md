@@ -2,7 +2,7 @@
 description: Test networks are available for deployment of IPC subnets.
 ---
 
-# 🟡 Test Networks
+# Networks
 
 ### Mycelium Calibration Network
 

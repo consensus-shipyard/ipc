@@ -2,9 +2,7 @@
 description: This page lists all the ipc-cli commands to interact with IPC subnets.
 ---
 
-# 🟡 IPC CLI
-
-
+# ipc-cli Usage
 
 {% hint style="info" %}
 For background and setup information, make sure to start with the [README](https://github.com/consensus-shipyard/ipc/blob/main/README.md) of IPC on GitHub.
