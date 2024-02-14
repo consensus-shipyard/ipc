@@ -287,7 +287,7 @@ mod tests {
         let root = PathBuf::from("/tmp/foo");
         let net = TestnetName::new("bar");
         let acc = net.account("spam");
-        let dir = root.join(&acc);
+        let dir = root.join(acc);
         assert_eq!(dir, PathBuf::from("/tmp/foo/testnets/bar/accounts/spam"));
     }
 

@@ -6,6 +6,7 @@ use ethers::{
     core::rand::{rngs::StdRng, SeedableRng},
     types::H160,
 };
+use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_genesis::Collateral;
 use std::{
     collections::BTreeMap,
@@ -52,7 +53,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         &mut self,
         testnet_name: &TestnetName,
     ) -> anyhow::Result<<DockerMaterials as Materials>::Network> {
-        todo!()
+        todo!("docker create network")
     }
 
     /// Create a new key-value pair, or return an existing one.
@@ -71,7 +72,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
-        todo!()
+        todo!("use curl or something to trigger the faucet")
     }
 
     async fn new_deployment<'s, 'a>(
@@ -83,7 +84,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
-        todo!()
+        todo!("use the deploy scripts to create a new IPC stack on L1")
     }
 
     fn existing_deployment(
@@ -92,14 +93,18 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         gateway: H160,
         registry: H160,
     ) -> anyhow::Result<DefaultDeployment> {
-        todo!()
+        Ok(DefaultDeployment {
+            name: subnet_name.clone(),
+            gateway: EthAddress::from(gateway),
+            registry: EthAddress::from(registry),
+        })
     }
 
     fn default_deployment(
         &mut self,
         subnet_name: &SubnetName,
     ) -> anyhow::Result<DefaultDeployment> {
-        todo!()
+        Ok(DefaultDeployment::builtin(subnet_name.clone()))
     }
 
     fn create_root_genesis<'a>(
@@ -108,7 +113,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         validators: BTreeMap<&'a DefaultAccount, Collateral>,
         balances: BTreeMap<&'a DefaultAccount, Balance>,
     ) -> anyhow::Result<DefaultGenesis> {
-        todo!()
+        todo!("construct an in-memory genesis file, optionally save it to file")
     }
 
     async fn create_node<'s, 'a>(
@@ -119,7 +124,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
-        todo!()
+        todo!("docker-compose template")
     }
 
     async fn start_node<'s, 'a>(
@@ -130,7 +135,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
-        todo!()
+        todo!("docker-compose up")
     }
 
     async fn create_subnet<'s, 'a>(
@@ -142,7 +147,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
-        todo!()
+        todo!("use the ipc-cli to create a new subnet on the parent")
     }
 
     async fn fund_subnet<'s, 'a>(
@@ -156,7 +161,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
-        todo!()
+        todo!("use the ipc-cli to fund an existing subnet on the parent")
     }
 
     async fn join_subnet<'s, 'a>(
@@ -171,7 +176,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
-        todo!()
+        todo!("use the ipc-cli to join an existing subnet on the parent")
     }
 
     async fn create_subnet_genesis<'s, 'a>(
@@ -182,7 +187,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
-        todo!()
+        todo!("use the fendermint CLI to fetch the genesis of a subnet from the parent")
     }
 
     async fn create_relayer<'s, 'a>(
@@ -196,6 +201,6 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
-        todo!()
+        todo!("docker run relayer unless it is already running")
     }
 }

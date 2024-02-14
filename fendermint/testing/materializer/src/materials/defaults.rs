@@ -4,9 +4,9 @@
 use std::{fmt::Debug, path::Path};
 
 use anyhow::Context;
-use ethers::{core::rand::Rng, types::H160};
+use ethers::core::rand::Rng;
 use fendermint_crypto::{to_b64, PublicKey, SecretKey};
-use fendermint_vm_actor_interface::eam::EthAddress;
+use fendermint_vm_actor_interface::{eam::EthAddress, init::builtin_actor_eth_addr, ipc};
 use fendermint_vm_genesis::Genesis;
 use fvm_shared::address::Address;
 use ipc_api::subnet_id::SubnetID;
@@ -16,8 +16,19 @@ use crate::{AccountName, SubnetName};
 
 pub struct DefaultDeployment {
     pub name: SubnetName,
-    pub gateway: H160,
-    pub registry: H160,
+    pub gateway: EthAddress,
+    pub registry: EthAddress,
+}
+
+impl DefaultDeployment {
+    /// Deployment with the addresses that the Fendermint Genesis allocates.
+    pub fn builtin(name: SubnetName) -> Self {
+        Self {
+            name,
+            gateway: builtin_actor_eth_addr(ipc::GATEWAY_ACTOR_ID),
+            registry: builtin_actor_eth_addr(ipc::SUBNETREGISTRY_ACTOR_ID),
+        }
+    }
 }
 
 pub struct DefaultGenesis {
