@@ -1,6 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use multihash::MultihashDigest;
+use paste::paste;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Debug, Display},
@@ -120,32 +121,47 @@ impl Debug for ResourceName {
 
 macro_rules! resource_name {
     ($name:ident) => {
-        #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-        pub struct $name(ResourceName);
+        paste! {
+                #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+                pub struct [< $name Name >](ResourceName);
 
-        impl AsRef<ResourceName> for $name {
-            fn as_ref(&self) -> &ResourceName {
-                &self.0
-            }
-        }
+                impl [< $name Name >] {
+                    pub fn path(&self) -> &Path {
+                        &self.0 .0
+                    }
+                }
 
-        impl $name {
-            pub fn path(&self) -> &Path {
-                &self.0 .0
-            }
+                impl AsRef<ResourceName> for [< $name Name >] {
+                    fn as_ref(&self) -> &ResourceName {
+                        &self.0
+                    }
+                }
+
+                impl AsRef<Path> for [< $name Name >] {
+                    fn as_ref(&self) -> &Path {
+                        self.path()
+                    }
+                }
+
+                impl Display for [< $name Name >] {
+                    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        write!(f, "{}({})", stringify!($name), self.0)
+                    }
+                }
         }
     };
 }
 
-resource_name!(TestnetName);
-resource_name!(AccountName);
-resource_name!(SubnetName);
-resource_name!(NodeName);
-resource_name!(RelayerName);
+resource_name!(Testnet);
+resource_name!(Account);
+resource_name!(Subnet);
+resource_name!(Node);
+resource_name!(Relayer);
 
 impl TestnetName {
     pub fn new<T: Into<TestnetId>>(id: T) -> Self {
-        Self(ResourceName::from("/testnets").join_id(&id.into()))
+        // Not including a leadign slash (ie. "/testnets") so that we can join with directory paths.
+        Self(ResourceName::from("testnets").join_id(&id.into()))
     }
 
     pub fn account<T: Into<AccountId>>(&self, id: T) -> AccountName {
@@ -181,8 +197,15 @@ impl SubnetName {
         RelayerName(self.0.join("relayers").join_id(&id.into()))
     }
 
+    /// Check if this is the root subnet, ie. it ends with `root` and it parent is a `testnet`
     pub fn is_root(&self) -> bool {
-        self.path().components().count() == 4 && self.path().ends_with("root")
+        self.path().ends_with("root")
+            && self
+                .path()
+                .parent()
+                .and_then(|p| p.parent())
+                .filter(|p| p.ends_with("testnets"))
+                .is_some()
     }
 
     pub fn parent(&self) -> Option<SubnetName> {
@@ -255,16 +278,26 @@ impl ToString for ResourceHash {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use crate::TestnetName;
+
+    #[test]
+    fn test_path_join() {
+        let root = PathBuf::from("/tmp/foo");
+        let net = TestnetName::new("bar");
+        let acc = net.account("spam");
+        let dir = root.join(&acc);
+        assert_eq!(dir, PathBuf::from("/tmp/foo/testnets/bar/accounts/spam"));
+    }
 
     #[test]
     fn test_subnet_parent() {
         let tn = TestnetName::new("example");
         let rn = tn.root();
-        assert_eq!(rn.parent(), None);
-
         let sn = rn.subnet("foo");
-        assert_eq!(sn.parent(), Some(rn));
+        assert_eq!(rn.parent(), None, "root shouldn't have a parent");
+        assert_eq!(sn.parent(), Some(rn), "parent should be the root");
     }
 
     #[test]

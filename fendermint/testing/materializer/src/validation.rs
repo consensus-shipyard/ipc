@@ -43,7 +43,7 @@ impl Materials for ValidationMaterials {
     type Network = TestnetName;
     type Deployment = SubnetName;
     type Account = AccountName;
-    type Genesis = ();
+    type Genesis = SubnetName;
     type Subnet = SubnetName;
     type Node = NodeName;
     type Relayer = RelayerName;
@@ -243,7 +243,7 @@ impl Materializer<ValidationMaterials> for ValidatingMaterializer {
             *balance = b.0;
         }
 
-        Ok(())
+        Ok(subnet_name.clone())
     }
 
     async fn create_node<'s, 'a>(
@@ -325,13 +325,13 @@ impl Materializer<ValidationMaterials> for ValidatingMaterializer {
     async fn create_subnet_genesis<'s, 'a>(
         &'s mut self,
         _parent_submit_config: &SubmitConfig<'a, ValidationMaterials>,
-        _subnet: &'a VSubnet,
+        subnet: &'a VSubnet,
     ) -> anyhow::Result<VGenesis>
     where
         's: 'a,
     {
         // We're supposed to fetch the data from the parent, there's nothing to check.
-        Ok(())
+        Ok(subnet.clone())
     }
 
     async fn create_relayer<'s, 'a>(

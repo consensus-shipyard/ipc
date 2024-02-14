@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::path::Path;
+use std::{fmt::Debug, path::Path};
 
 use anyhow::Context;
 use ethers::{core::rand::Rng, types::H160};
@@ -11,32 +11,8 @@ use fendermint_vm_genesis::Genesis;
 use fvm_shared::address::Address;
 use ipc_api::subnet_id::SubnetID;
 
+use super::export;
 use crate::{AccountName, SubnetName};
-
-/// Type family of all the things a [Materializer] can create.
-///
-/// Kept separate from the [Materializer] so that we can wrap one in another
-/// and pass the same types along.
-pub trait Materials {
-    /// Represents the entire hierarchy of a testnet, e.g. a common docker network
-    /// and directory on the file system. It has its own type so the materializer
-    /// doesn't have to remember what it created for a testnet, and different
-    /// testnets can be kept isolated from each other.
-    type Network: Send + Sync;
-    /// Capture where the IPC stack (the gateway and the registry) has been deployed on a subnet.
-    /// These are the details which normally go into the `ipc-cli` configuration files.
-    type Deployment: Sync + Send;
-    /// Represents an account identity, typically a key-value pair.
-    type Account: Ord + Sync + Send;
-    /// Represents the genesis.json file (can be a file location, or a model).
-    type Genesis: Sync + Send;
-    /// The address of a dynamically created subnet.
-    type Subnet: Sync + Send;
-    /// The handle to a node; could be a (set of) docker container(s) or remote addresses.
-    type Node: Sync + Send;
-    /// The handle to a relayer process.
-    type Relayer: Sync + Send;
-}
 
 pub struct DefaultDeployment {
     pub name: SubnetName,
@@ -75,6 +51,15 @@ impl Ord for DefaultAccount {
     }
 }
 
+impl Debug for DefaultAccount {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DefaultAccount")
+            .field("name", &self.name)
+            .field("public_key", &self.public_key)
+            .finish()
+    }
+}
+
 impl DefaultAccount {
     pub fn eth_addr(&self) -> EthAddress {
         EthAddress::from(self.public_key)
@@ -87,10 +72,10 @@ impl DefaultAccount {
 
     pub fn get_or_create<R: Rng>(
         rng: &mut R,
-        root: &Path,
+        root: impl AsRef<Path>,
         name: &AccountName,
     ) -> anyhow::Result<Self> {
-        let dir = root.join(name.path());
+        let dir = root.as_ref().join(name.path());
         let sk = dir.join("secret.hex");
 
         let (sk, pk, is_new) = if sk.exists() {
@@ -116,8 +101,8 @@ impl DefaultAccount {
             let pk = acc.public_key.serialize();
 
             export(&dir, "secret", "b64", to_b64(sk.as_ref()))?;
-            export(&dir, "secret", "hex", hex::encode(pk))?;
-            export(&dir, "public", "b64", to_b64(sk.as_ref()))?;
+            export(&dir, "secret", "hex", hex::encode(sk))?;
+            export(&dir, "public", "b64", to_b64(pk.as_ref()))?;
             export(&dir, "public", "hex", hex::encode(pk))?;
             export(&dir, "eth-addr", "", acc.eth_addr().to_string())?;
             export(&dir, "fvm-addr", "", acc.fvm_addr().to_string())?;
@@ -127,19 +112,33 @@ impl DefaultAccount {
     }
 }
 
-/// Write some content to a file.
-pub fn export(
-    output_dir: impl AsRef<Path>,
-    name: &str,
-    ext: &str,
-    contents: impl AsRef<str>,
-) -> anyhow::Result<()> {
-    let file_name = if ext.is_empty() {
-        name.into()
-    } else {
-        format!("{name}.{ext}")
-    };
-    let output_path = output_dir.as_ref().join(file_name);
-    std::fs::write(output_path, contents.as_ref())?;
-    Ok(())
+#[cfg(test)]
+mod tests {
+    use ethers::core::rand::{rngs::StdRng, SeedableRng};
+    use tempfile::TempDir;
+
+    use crate::TestnetName;
+
+    use super::DefaultAccount;
+
+    #[test]
+    fn test_account() {
+        let mut rng = StdRng::from_entropy();
+        let dir = TempDir::new().expect("temp dir created");
+        let tn = TestnetName::new("account-test");
+        let an1 = tn.account("account-1");
+        let an2 = tn.account("account-2");
+
+        let a1n = DefaultAccount::get_or_create(&mut rng, &dir, &an1)
+            .expect("failed to create account-1");
+
+        let a1e =
+            DefaultAccount::get_or_create(&mut rng, &dir, &an1).expect("failed to get account-1");
+
+        let a2n = DefaultAccount::get_or_create(&mut rng, &dir, &an2)
+            .expect("failed to create account-2");
+
+        assert_eq!(a1n, a1e, "should reload existing account");
+        assert!(a1n != a2n, "should create new account per name");
+    }
 }
