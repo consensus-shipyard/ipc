@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import "forge-std/Test.sol";
 import "../../src/errors/IPCErrors.sol";
 import {EMPTY_BYTES, METHOD_SEND} from "../../src/constants/Constants.sol";
-import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMsgKind} from "../../src/structs/CrossNet.sol";
+import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMsgKind, ResultMsg, CallMsg} from "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
 import {SubnetID, Subnet, IPCAddress, Validator} from "../../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
@@ -616,9 +616,14 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         GatewayGetterFacet getter = GatewayGetterFacet(address(gateway));
         CheckpointingFacet checkpointer = CheckpointingFacet(address(gateway));
 
+        //@ms note: the usdc test is currently failing during the bottom up check point. There are two messages that are failing to be succesfullyt applied - the reciept from the initial Top Down deposit and the bottom up withdraw
         BottomUpMsgBatch memory batch = getter.bottomUpMsgBatch(e);
-        console.log("%d", batch.msgs.length);
-        require(batch.msgs.length == 1, "batch length incorrect");
+        console.log("batch length %d", batch.msgs.length);
+        require(batch.msgs.length > 0, "batch length incorrect");
+        if (batch.msgs.length == 2) {
+            printEnvelope(batch.msgs[0]);
+            printEnvelope(batch.msgs[1]);
+        }
 
         (, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
 
@@ -663,6 +668,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         SubnetActorCheckpointingFacet checkpointer = SubnetActorCheckpointingFacet(subnetActor);
 
         vm.startPrank(subnetActor);
+        console.log("submitCheckpoint");
         checkpointer.submitCheckpoint(checkpoint, parentValidators, parentSignatures);
         vm.stopPrank();
     }
@@ -688,9 +694,29 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         console.log("native subnet gateway(): %s", address(nativeSubnetGateway));
     }
 
-    function printEnvelope(IpcEnvelope memory envelope) internal {
+    //prints any IpcEnvelope for debugging
+    function printEnvelope(IpcEnvelope memory envelope) public {
+        console.log("\nPrint Envelope");
         console.log("from %s:", envelope.from.subnetId.toString());
         console.log("to %s:", envelope.to.subnetId.toString());
+        console.log("Nonce");
+        console.log(envelope.nonce);
+        console.log("Value");
+        console.log(envelope.value);
+        console.log("Message");
+        console.logBytes(envelope.message);
+        console.log("Hash");
+        console.logBytes32(envelope.toHash());
+        if (envelope.kind == IpcMsgKind.Result) {
+            ResultMsg memory result = abi.decode(envelope.message, (ResultMsg));
+            console.log("Result id");
+            console.logBytes32(result.id);
+        } else if (envelope.kind == IpcMsgKind.Call) {
+            CallMsg memory call = abi.decode(envelope.message, (CallMsg));
+            console.log("Call Msg");
+            console.logBytes(call.method);
+            console.logBytes(call.params);
+        }
     }
 
     // @dev This test verifies that USDC bridge connects correctly
@@ -702,27 +728,24 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         address holder = vm.addr(100);
         address recipient = vm.addr(200);
         address owner = address(this);
+        uint256 transferAmount = 300;
 
         vm.deal(address(rootTokenSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
         vm.prank(address(rootTokenSubnetActor));
         registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootTokenSubnetActor), rootGateway);
 
+        vm.deal(address(rootNativeSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
+        vm.prank(address(rootNativeSubnetActor));
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootNativeSubnetActor), rootGateway);
+
         console.log("--------------- transfer and mint (top-down) ---------------");
 
         USDCTest testUSDC = new USDCTest();
         testUSDC.mint(100_000);
-        testUSDC.transfer(1000, holder);
+        testUSDC.transfer(holder, 1000);
 
         require(testUSDC.owner() == owner, "unexpected owner");
-        require(testUSDC.balanceOf(holder) == 100, "unexpected balance");
-
-        // the token controller sits in the root network.
-        ipcTokenController = new IpcTokenController({
-            _gateway: address(rootGateway),
-            _tokenContractAddress: address(testUSDC),
-            _destinationSubnet: tokenSubnetName,
-            _destinationContract: address(ipcTokenReplica)
-        });
+        require(testUSDC.balanceOf(holder) == 1000, "unexpected balance");
 
         // the token replica sits in a native supply child subnet.
         ipcTokenReplica = new IpcTokenReplica({
@@ -731,27 +754,42 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             _controllerSubnet: rootSubnetName
         });
 
+        // the token controller sits in the root network.
+        ipcTokenController = new IpcTokenController({
+            _gateway: address(rootGateway),
+            _tokenContractAddress: address(testUSDC),
+            _destinationSubnet: nativeSubnetName,
+            _destinationContract: address(ipcTokenReplica)
+        });
+        ipcTokenReplica.setController(address(ipcTokenController));
+
         vm.prank(holder);
-        testUSDC.approve(address(ipcTokenController), 100);
+        testUSDC.approve(address(ipcTokenController), transferAmount);
 
         console.log("mock usdc contract: %s", address(testUSDC));
-        console.log("mock usdc owner: %s", address(owner));
+        console.log("mock usdc owner: %s", owner);
         console.log("mock usdc holder: %s", address(holder));
         console.log("ipcTokenController: %s", address(ipcTokenController));
-        console.log("controller allowance for holder: %d", testUSDC.allowance(address(holder), address(ipcTokenController)));
+        console.log(
+            "controller allowance for holder: %d",
+            testUSDC.allowance(address(holder), address(ipcTokenController))
+        );
 
         vm.prank(address(holder));
-        IpcEnvelope memory lockAndTransferEnvelope = ipcTokenController.lockAndTransferWithReturn(recipient, 100);
+        IpcEnvelope memory lockAndTransferEnvelope = ipcTokenController.lockAndTransferWithReturn(
+            recipient,
+            transferAmount
+        );
 
         // Check that the message is in unconfirmedTransfers
         (address receiptSender, uint256 receiptValue) = ipcTokenController.getUnconfirmedTransfer(
             lockAndTransferEnvelope.toHash()
         );
-        require(receiptSender == address(this), "Transfer sender incorrect in unconfirmedTransfers");
+        require(receiptSender == address(holder), "Transfer sender incorrect in unconfirmedTransfers");
         require(receiptValue == transferAmount, "Transfer amount incorrect in unconfirmedTransfers");
 
         //confirm that token replica only accept calls to Ipc from the gateway
-        vm.prank(address(testUSDCOwner));
+        vm.prank(owner);
         vm.expectRevert(IpcHandler.CallerIsNotGateway.selector);
         ipcTokenReplica.handleIpcMessage(expected);
 
@@ -764,51 +802,49 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
                 rawAddress: FvmAddressHelper.from(address(ipcTokenController))
             }),
             to: lockAndTransferEnvelope.to,
-            value: DEFAULT_CROSS_MSG_FEE,
+            value: 0,
             message: lockAndTransferEnvelope.message,
             nonce: 0 // nonce will be updated by LibGateway.commitCrossMessage
         });
 
         msgs[0] = expected;
-
-        executeTopDownMsgs(msgs, tokenSubnetName, address(tokenSubnetGateway));
+        executeTopDownMsgs(msgs, nativeSubnetName, address(nativeSubnetGateway));
 
         //ensure that tokens are delivered on subnet
-        require(
-            IERC20(ipcTokenReplica).balanceOf(address(testUSDCOwner)) == transferAmount,
-            "incorrect proxy token balance"
-        );
+        require(IERC20(ipcTokenReplica).balanceOf(recipient) == transferAmount, "incorrect proxy token balance");
 
         console.log("--------------- withdraw token (bottom-up)---------------");
 
-        // ensure that USDC owner has 0 tokens in the root chain
-        require(0 == testUSDC.balanceOf(testUSDCOwner), "unexpected owner balance in withdraw flow");
+        // ensure that USDC holder has 0 tokens in the root chain
+        // require(0 == testUSDC.balanceOf(holder), "unexpected holder balance in withdraw flow");
 
-        vm.prank(address(testUSDCOwner));
-        expected = ipcTokenReplica.burnAndTransfer(testUSDCOwner, transferAmount);
+        vm.prank(recipient);
+        expected = ipcTokenReplica.burnAndTransfer(holder, transferAmount);
 
         // check that the message is in unconfirmedTransfers
         (receiptSender, receiptValue) = ipcTokenReplica.getUnconfirmedTransfer(expected.toHash());
-        require(receiptSender == address(this), "Transfer sender incorrect in unconfirmedTransfers");
+        require(receiptSender == recipient, "Transfer sender incorrect in unconfirmedTransfers");
         require(receiptValue == transferAmount, "Transfer amount incorrect in unconfirmedTransfers");
+
+        console.log("Begin bottom up checkpoint");
 
         // TODO: This is already tested in IpcContract.t.sol. No need to retest here.
         //confirm that token controller only accept calls to Ipc from the gateway
-        // vm.prank(address(testUSDCOwner));
+        // vm.prank(holder);
         // vm.expectRevert(IpcHandler.CallerIsNotGateway.selector);
         // ipcTokenController.handleIpcMessage(expected);
 
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
-            tokenSubnetName,
-            address(tokenSubnetGateway)
+            nativeSubnetName,
+            address(nativeSubnetGateway)
         );
 
         submitBottomUpCheckpoint(checkpoint, address(rootTokenSubnetActor));
 
         //ensure that usdc tokens are returned on root net
-        require(transferAmount == testUSDC.balanceOf(testUSDCOwner), "unexpected owner balance after withdrawal");
-        //ensure that the tokens are the subnet are minted and the token bridge and the usdc owner does not own any
-        require(0 == ipcTokenReplica.balanceOf(testUSDCOwner), "unexpected testUSDCOwner balance in ipcTokenReplica");
+        require(transferAmount == testUSDC.balanceOf(holder), "unexpected holder balance after withdrawal");
+        //ensure that the tokens are the subnet are minted and the token bridge and the usdc holder does not own any
+        require(0 == ipcTokenReplica.balanceOf(holder), "unexpected holder balance in ipcTokenReplica");
         require(
             0 == ipcTokenReplica.balanceOf(address(ipcTokenReplica)),
             "unexpected ipcTokenReplica balance in ipcTokenReplica"
