@@ -617,6 +617,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         CheckpointingFacet checkpointer = CheckpointingFacet(address(gateway));
 
         BottomUpMsgBatch memory batch = getter.bottomUpMsgBatch(e);
+        console.log("%d", batch.msgs.length);
         require(batch.msgs.length == 1, "batch length incorrect");
 
         (, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
@@ -715,12 +716,12 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             tokenSubnetName,
             caller,
             FvmAddressHelper.from(caller),
-            DEFAULT_CROSS_MSG_FEE
+            100
         );
 
-        token.transfer(caller, DEFAULT_CROSS_MSG_FEE);
+        token.transfer(caller, 100);
         vm.prank(caller);
-        token.approve(address(rootGatewayManager), DEFAULT_CROSS_MSG_FEE);
+        token.approve(address(rootGatewayManager), 100);
 
         vm.prank(caller);
         vm.expectEmit(true, true, true, true, address(rootGateway));
@@ -728,7 +729,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         rootGatewayManager.fundWithToken(
             tokenSubnetName,
             FvmAddressHelper.from(address(caller)),
-            DEFAULT_CROSS_MSG_FEE
+            100
         );
 
         console.log("--------------- transfer and mint (top-down) ---------------");
@@ -750,9 +751,13 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         ipcTokenReplica.setController(address(rootTokenController));
 
-        vm.deal(testUSDCOwner, DEFAULT_CROSS_MSG_FEE);
-        vm.deal(address(rootTokenController), 1 ether);
+        // TODO: review(raulk): why?
+        // vm.deal(testUSDCOwner, DEFAULT_CROSS_MSG_FEE);
 
+        // TODO: review(raulk): why does the root token controller need to have balance?
+        // vm.deal(address(rootTokenController), 1 ether);
+
+        // TODO: review(raulk): let's mint to another address (e.g. vm.address(100)).
         vm.prank(testUSDCOwner);
         testUSDC.approve(address(rootTokenController), transferAmount);
 
@@ -762,9 +767,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         console.log("allowance: %d", testUSDC.allowance(address(testUSDCOwner), address(rootTokenController)));
 
         vm.prank(address(testUSDCOwner));
-        IpcEnvelope memory lockAndTransferEnvelope = rootTokenController.lockAndTransferWithReturn{
-            value: DEFAULT_CROSS_MSG_FEE
-        }(testUSDCOwner, transferAmount);
+        IpcEnvelope memory lockAndTransferEnvelope = rootTokenController.lockAndTransferWithReturn(testUSDCOwner, transferAmount);
 
         //check that the message is in unconfirmedTransfers
         (address receiptSender, uint256 receiptValue) = rootTokenController.getUnconfirmedTransfer(
@@ -804,22 +807,22 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         console.log("--------------- withdraw token (bottom-up)---------------");
 
-        //ensure that USDC owner has 0 tokens
+        // ensure that USDC owner has 0 tokens in the root chain
         require(0 == testUSDC.balanceOf(testUSDCOwner), "unexpected owner balance in withdraw flow");
 
-        vm.deal(testUSDCOwner, DEFAULT_CROSS_MSG_FEE);
         vm.prank(address(testUSDCOwner));
-        expected = ipcTokenReplica.burnAndTransfer{value: DEFAULT_CROSS_MSG_FEE}(testUSDCOwner, transferAmount);
+        expected = ipcTokenReplica.burnAndTransfer(testUSDCOwner, transferAmount);
 
-        //check that the message is in unconfirmedTransfers
+        // check that the message is in unconfirmedTransfers
         (receiptSender, receiptValue) = ipcTokenReplica.getUnconfirmedTransfer(expected.toHash());
         require(receiptSender == address(this), "Transfer sender incorrect in unconfirmedTransfers");
         require(receiptValue == transferAmount, "Transfer amount incorrect in unconfirmedTransfers");
 
+        // TODO: This is already tested in IpcContract.t.sol. No need to retest here.
         //confirm that token controller only accept calls to Ipc from the gateway
-        vm.prank(address(testUSDCOwner));
-        vm.expectRevert(IpcHandler.CallerIsNotGateway.selector);
-        rootTokenController.handleIpcMessage(expected);
+        // vm.prank(address(testUSDCOwner));
+        // vm.expectRevert(IpcHandler.CallerIsNotGateway.selector);
+        // rootTokenController.handleIpcMessage(expected);
 
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
             tokenSubnetName,
