@@ -30,6 +30,7 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
+          cache-dependency-path: contracts/package-lock.json
       - name: Deploy IPC contracts to calibration net
         run: |
           cd contracts
