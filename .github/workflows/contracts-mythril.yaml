@@ -39,27 +39,27 @@ jobs:
       - name: Check GatewayManagerFacet
         run: |
           cd contracts
-          myth analyze --solc-json remappings.json ./src/gateway/GatewayManagerFacade.sol --solv 0.8.19
+          myth analyze --solc-json remappings.json ./src/gateway/GatewayManagerFacet.sol --solv 0.8.19
 
       - name: Check GatewayGetterFacet
         run: |
           cd contracts
-          myth analyze --solc-json remappings.json ./src/gateway/GatewayGetterFacade.sol --solv 0.8.19
+          myth analyze --solc-json remappings.json ./src/gateway/GatewayGetterFacet.sol --solv 0.8.19
 
       - name: Check GatewayMessengerFacet
         run: |
           cd contracts
-          myth analyze --solc-json remappings.json ./src/gateway/GatewayMessengerFacade.sol --solv 0.8.19
+          myth analyze --solc-json remappings.json ./src/gateway/GatewayMessengerFacet.sol --solv 0.8.19
 
       - name: Check CheckpointingFacet
         run: |
           cd contracts
-          myth analyze --solc-json remappings.json ./src/gateway/router/CheckpointingFacade.sol --solv 0.8.19
+          myth analyze --solc-json remappings.json ./src/gateway/router/CheckpointingFacet.sol --solv 0.8.19
 
       - name: Check TopDownFinalityFacade
         run: |
           cd contracts
-          myth analyze --solc-json remappings.json ./src/gateway/router/TopDownFinalityFacade.sol --solv 0.8.19
+          myth analyze --solc-json remappings.json ./src/gateway/router/TopDownFinalityFacet.sol --solv 0.8.19
 
       - name: Check XnetMessagingFacet
         run: |
