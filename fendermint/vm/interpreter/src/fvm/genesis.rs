@@ -241,7 +241,7 @@ where
             // fendermint_actor_eam::PermissionModeParams::AllowList(
             //  vec![...]
             // )
-            // see: https://github.com/consensus-shipyard/ipc/issues/706
+            // TODO: https://github.com/consensus-shipyard/ipc/issues/706
             fendermint_actor_eam::PermissionModeParams::Unrestricted,
         )?;
         state
