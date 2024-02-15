@@ -729,6 +729,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         address recipient = vm.addr(200);
         address owner = address(this);
         uint256 transferAmount = 300;
+        uint256 holderTotalAmount = 1000;
 
         vm.deal(address(rootTokenSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
         vm.prank(address(rootTokenSubnetActor));
@@ -741,11 +742,12 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         console.log("--------------- transfer and mint (top-down) ---------------");
 
         USDCTest testUSDC = new USDCTest();
+
         testUSDC.mint(100_000);
-        testUSDC.transfer(holder, 1000);
+        testUSDC.transfer(holder, holderTotalAmount);
 
         require(testUSDC.owner() == owner, "unexpected owner");
-        require(testUSDC.balanceOf(holder) == 1000, "unexpected balance");
+        require(testUSDC.balanceOf(holder) == holderTotalAmount, "unexpected balance");
 
         // the token replica sits in a native supply child subnet.
         ipcTokenReplica = new IpcTokenReplica({
@@ -838,11 +840,10 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             nativeSubnetName,
             address(nativeSubnetGateway)
         );
-
-        submitBottomUpCheckpoint(checkpoint, address(rootTokenSubnetActor));
+        submitBottomUpCheckpoint(checkpoint, address(rootNativeSubnetActor));
 
         //ensure that usdc tokens are returned on root net
-        require(transferAmount == testUSDC.balanceOf(holder), "unexpected holder balance after withdrawal");
+        require(holderTotalAmount == testUSDC.balanceOf(holder), "unexpected holder balance after withdrawal");
         //ensure that the tokens are the subnet are minted and the token bridge and the usdc holder does not own any
         require(0 == ipcTokenReplica.balanceOf(holder), "unexpected holder balance in ipcTokenReplica");
         require(
