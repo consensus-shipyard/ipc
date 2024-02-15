@@ -60,10 +60,10 @@ slither:
 	slither . --config-file ./slither.config.json
 
 check-gateway:
-	docker run --rm -v $(shell pwd):/app -w /app mythril/myth:latest -v4 analyze --solc-json remappings.json ./src/Gateway.sol --solv 0.8.19
+	docker run --rm -v $(shell pwd):/app -w /app mythril/myth:latest -v4 analyze --solc-json remappings.json ./test/invariants/handlers/GatewayActorFacade.sol --solv 0.8.19
 
 check-subnet:
-	docker run --rm -v $(shell pwd):/app -w /app mythril/myth:latest -v4 analyze --solc-json remappings.json ./src/SubnetActor.sol --solv 0.8.19
+	docker run --rm -v $(shell pwd):/app -w /app mythril/myth:latest -v4 analyze --solc-json remappings.json ./src/SubnetActorDiamond.sol --solv 0.8.19
 
 # ==============================================================================
 # Development support
