@@ -9,7 +9,13 @@ use ethers::{
     types::H160,
 };
 use fendermint_vm_actor_interface::eam::EthAddress;
-use fendermint_vm_genesis::Collateral;
+use fendermint_vm_core::{chainid, Timestamp};
+use fendermint_vm_genesis::{
+    ipc::{GatewayParams, IpcParams},
+    Account, Actor, ActorMeta, Collateral, Genesis, SignerAddr, Validator, ValidatorKey,
+};
+use fvm_shared::{bigint::Zero, econ::TokenAmount, version::NetworkVersion};
+use ipc_api::subnet_id::SubnetID;
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
@@ -174,7 +180,44 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         validators: BTreeMap<&'a DefaultAccount, Collateral>,
         balances: BTreeMap<&'a DefaultAccount, Balance>,
     ) -> anyhow::Result<DefaultGenesis> {
-        todo!("construct an in-memory genesis file, optionally save it to file")
+        let chain_name = subnet_name.path().to_string_lossy().to_string();
+        let chain_id = chainid::from_str_hashed(&chain_name)?;
+        // TODO: Some of these hardcoded values can go into the manifest.
+        let genesis = Genesis {
+            chain_name,
+            timestamp: Timestamp::current(),
+            network_version: NetworkVersion::MAX,
+            base_fee: TokenAmount::zero(),
+            power_scale: 3,
+            validators: validators
+                .into_iter()
+                .map(|(v, c)| Validator {
+                    public_key: ValidatorKey(v.public_key.into()),
+                    power: c,
+                })
+                .collect(),
+            accounts: balances
+                .into_iter()
+                .map(|(a, b)| Actor {
+                    meta: ActorMeta::Account(Account {
+                        owner: SignerAddr(a.fvm_addr()),
+                    }),
+                    balance: b.0,
+                })
+                .collect(),
+            ipc: Some(IpcParams {
+                gateway: GatewayParams {
+                    subnet_id: SubnetID::new_root(chain_id.into()),
+                    bottom_up_check_period: 0,
+                    majority_percentage: 67,
+                    active_validators_limit: 100,
+                },
+            }),
+        };
+        Ok(DefaultGenesis {
+            name: subnet_name.clone(),
+            genesis,
+        })
     }
 
     async fn create_node<'s, 'a>(
