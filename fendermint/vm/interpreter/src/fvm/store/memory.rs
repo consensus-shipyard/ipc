@@ -21,10 +21,6 @@ impl MemoryBlockstore {
     pub fn new() -> Self {
         Self::default()
     }
-
-    pub fn copy_to(&self, other: &impl Blockstore) -> Result<()> {
-        other.put_many_keyed(self.blocks.read().unwrap().iter().map(|(&k, v)| (k, v)))
-    }
 }
 
 impl Blockstore for MemoryBlockstore {
