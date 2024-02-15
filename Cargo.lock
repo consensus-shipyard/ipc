@@ -2828,6 +2828,7 @@ dependencies = [
  "cid",
  "clap 4.4.14",
  "fendermint_vm_actor_interface",
+ "fendermint_vm_genesis",
  "fvm_ipld_encoding",
  "fvm_shared",
  "hex",
