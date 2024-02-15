@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.19;
+pragma solidity ^0.8.20;
 
 import {SupplySource} from "../../src/structs/Subnet.sol";
 import {SupplySourceHelper} from "../../src/lib/SupplySourceHelper.sol";

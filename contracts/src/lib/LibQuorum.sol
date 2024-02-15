@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-pragma solidity 0.8.19;
+pragma solidity ^0.8.20;
 
 import {QuorumMap, QuorumInfo, QuorumObjKind} from "../structs/Quorum.sol";
 import {InvalidRetentionHeight, QuorumAlreadyProcessed, FailedAddSignatory, InvalidSignature, SignatureReplay, NotAuthorized, FailedRemoveIncompleteQuorum, ZeroMembershipWeight, FailedAddIncompleteQuorum} from "../errors/IPCErrors.sol";

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-pragma solidity 0.8.19;
+pragma solidity ^0.8.20;
 
 import {SubnetID, Subnet, IPCAddress, Validator} from "../src/structs/Subnet.sol";
 import {DiamondCutFacet} from "../src/diamond/DiamondCutFacet.sol";

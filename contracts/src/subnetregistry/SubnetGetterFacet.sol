@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-pragma solidity 0.8.19;
+pragma solidity ^0.8.20;
 import {SubnetRegistryActorStorage} from "../lib/LibSubnetRegistryStorage.sol";
 import {CannotFindSubnet, FacetCannotBeZero} from "../errors/IPCErrors.sol";
 import {LibDiamond} from "../lib/LibDiamond.sol";
