@@ -14,7 +14,6 @@ import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {SupplySourceHelper} from "../lib/SupplySourceHelper.sol";
 
-import "hardhat/console.sol";
 
 library LibGateway {
     using SubnetIDHelper for SubnetID;
@@ -252,7 +251,6 @@ library LibGateway {
     /// @notice Commits a new cross-net message to a message batch for execution
     /// @param crossMessage - the cross message to be committed
     function commitBottomUpMsg(IpcEnvelope memory crossMessage) internal {
-        console.log("--commitBottomUpMsg--");
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
         uint256 epoch = getNextEpoch(block.number, s.bottomUpCheckPeriod);
 
@@ -263,7 +261,6 @@ library LibGateway {
         // populate the batch for that epoch
         (bool exists, BottomUpMsgBatch storage batch) = LibGateway.getBottomUpMsgBatch(epoch);
         if (!exists) {
-            console.log("--commitBottomUpMsg--111");
             batch.subnetID = s.networkName;
             batch.blockHeight = epoch;
             // we need to use push here to initialize the array.
@@ -474,7 +471,6 @@ library LibGateway {
      *  @return shouldBurn A Boolean that indicates if the input amount should be burned.
      */
     function commitCrossMessage(IpcEnvelope memory crossMessage) internal returns (bool shouldBurn) {
-        console.log("--commitCrossMessage--");
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
         SubnetID memory to = crossMessage.to.subnetId;
         if (to.isEmpty()) {

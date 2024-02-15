@@ -13,7 +13,6 @@ import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.
 import {LibSubnetActor} from "../lib/LibSubnetActor.sol";
 import {Pausable} from "../lib/LibPausable.sol";
 
-import "hardhat/console.sol";
 
 contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard, Pausable {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -99,10 +98,6 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
 
         // the max batch size not reached, we only support checkpoint period submission.
         uint256 lastBottomUpCheckpointHeight = s.lastBottomUpCheckpointHeight;
-        console.log("ensureValidCheckpoint");
-        console.log("block height:", checkpoint.blockHeight);
-        console.log("s.bottomUpCheckPeriod:", s.bottomUpCheckPeriod);
-        console.log("lastBottomUpCheckpointHeight:", lastBottomUpCheckpointHeight);
         if (checkpoint.blockHeight != lastBottomUpCheckpointHeight + s.bottomUpCheckPeriod) {
             if (checkpoint.blockHeight != lastBottomUpCheckpointHeight) {
                 revert InvalidCheckpointEpoch();
