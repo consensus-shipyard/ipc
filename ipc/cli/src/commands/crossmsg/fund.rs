@@ -4,7 +4,10 @@
 
 use async_trait::async_trait;
 use clap::Args;
+use fvm_shared::bigint::BigInt;
+use fvm_shared::econ::TokenAmount;
 use ipc_api::subnet_id::SubnetID;
+use num_traits::Num;
 use std::{fmt::Debug, str::FromStr};
 
 use crate::{
@@ -135,11 +138,13 @@ impl CommandLineHandler for FundWithToken {
             None => None,
         };
 
+        let amount = BigInt::from_str_radix(arguments.amount.as_str(), 10)
+            .map_err(|e| anyhow::anyhow!("not a token amount: {e}"))
+            .map(TokenAmount::from_atto)?;
+
         println!(
             "fund with token performed in epoch: {:?}",
-            provider
-                .fund_with_token(subnet, from, to, f64_to_token_amount(arguments.amount)?,)
-                .await?,
+            provider.fund_with_token(subnet, from, to, amount).await?,
         );
 
         Ok(())
@@ -158,6 +163,6 @@ pub(crate) struct FundWithTokenArgs {
     pub to: Option<String>,
     #[arg(long, help = "The subnet to fund")]
     pub subnet: String,
-    #[arg(help = "The amount to fund in erc20, in ether, supports up to 9 decimal places")]
-    pub amount: f64,
+    #[arg(help = "The amount to fund in erc20, in the token's precision unit")]
+    pub amount: String,
 }

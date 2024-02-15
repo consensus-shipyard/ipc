@@ -23,11 +23,17 @@ ETHAPI_HOST_PORTS=(8545 8645 8745)
 RESOLVER_HOST_PORTS=(26655 26755 26855)
 
 if (($# != 1)); then
-  echo "Arguments: <commit hash to checkout in the repo>"
-  exit 1
+  echo "Arguments: <Specify github remote branch name to use to deploy. Or use 'local' (without quote) to indicate using local repo instead. If not provided, will default to main branch"
+  head_ref=main
+  local_deploy=false
+else
+  if [ $1 = "local" ]; then
+    local_deploy=true
+  else
+    local_deploy=false
+    head_ref=$1
+  fi
 fi
-
-head_ref=$1
 
 # Step 1: Prepare system for building and running IPC
 
@@ -100,16 +106,18 @@ source ${HOME}/.bashrc
 set -u
 
 # Step 2: Prepare code repo and build ipc-cli
-echo "$DASHES Preparing ipc repo..."
-cd $HOME
-if ! ls $IPC_FOLDER ; then
-  git clone https://github.com/consensus-shipyard/ipc.git
+if ! $local_deploy ; then
+  echo "$DASHES Preparing ipc repo..."
+  cd $HOME
+  if ! ls $IPC_FOLDER ; then
+    git clone https://github.com/consensus-shipyard/ipc.git
+  fi
+  cd ${IPC_FOLDER}/contracts
+  git fetch
+  git stash
+  git checkout $head_ref
+  git pull --rebase origin $head_ref
 fi
-cd ${IPC_FOLDER}/contracts
-git fetch
-git stash
-git checkout $head_ref
-git pull --rebase origin $head_ref
 
 echo "$DASHES Building ipc contracts..."
 cd ${IPC_FOLDER}/contracts
@@ -273,3 +281,39 @@ pkill -f "relayer" || true
 # Start relayer
 echo "$DASHES Start relayer process (in the background)"
 nohup $IPC_CLI checkpoint relayer --subnet $subnet_id > nohup.out 2> nohup.err < /dev/null &
+
+# Step 11: Print a summary of the deployment
+# Remove leading '/' and change middle '/' into '-'
+subnet_folder=$IPC_CONFIG_FOLDER/$(echo $subnet_id | sed 's|^/||;s|/|-|g')
+
+cat << EOF
+############################
+#                          #
+# IPC deployment ready! 🚀 #
+#                          #
+############################
+Subnet ID:
+$subnet_id
+
+ETH API:
+http://localhost:${ETHAPI_HOST_PORTS[0]}
+http://localhost:${ETHAPI_HOST_PORTS[1]}
+http://localhost:${ETHAPI_HOST_PORTS[2]}
+
+Accounts:
+$(jq -r '.accounts[] | "\(.meta.Account.owner): \(.balance) coin units"' ${subnet_folder}/validator-0/genesis.json)
+
+Private keys (hex ready to import in MetaMask):
+$(cat ${IPC_CONFIG_FOLDER}/validator_0.sk | base64 -d | xxd -p -c 1000000)
+$(cat ${IPC_CONFIG_FOLDER}/validator_1.sk | base64 -d | xxd -p -c 1000000)
+$(cat ${IPC_CONFIG_FOLDER}/validator_2.sk | base64 -d | xxd -p -c 1000000)
+
+Chain ID:
+$(curl -s --location --request POST 'http://localhost:8645/' --header 'Content-Type: application/json' --data-raw '{ "jsonrpc":"2.0", "method":"eth_chainId", "params":[], "id":1 }' | jq -r '.result' | xargs printf "%d")
+
+Fendermint API:
+http://localhost:26658
+
+CometBFT API:
+http://localhost:${CMT_RPC_HOST_PORTS[0]}
+EOF

@@ -39,16 +39,6 @@ provider_http = "https://api.calibration.node.glif.io/rpc/v1"
 gateway_addr = "0x1AEe8A878a22280fc2753b3C63571C8F895D2FE3"
 registry_addr = "0x0b4e239FF21b40120cDa817fba77bD1B366c1bcD"
 
-# Mycelium Calibration
-[[subnets]]
-id = "/r314159/t410fx23amesh6qvzfzl744uzdr76vlsysb6nnp3us4q"
-
-[subnets.config]
-network_type = "fevm"
-provider_http = "https://api.mycelium.calibration.node.glif.io/"
-gateway_addr = "0x77aa40b105843728088c0132e43fc44348881da8"
-registry_addr = "0x74539671a1d2f1c8f200826baba665179f53a1b7"
-
 # Subnet template - uncomment and adjust before using
 # [[subnets]]
 # id = "/r314159/<SUBNET_ID>"
