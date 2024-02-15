@@ -279,7 +279,7 @@ where
     }
 
     /// Creates an actor using code specified in the manifest.
-    pub(crate) fn create_actor_internal(
+    fn create_actor_internal(
         &mut self,
         code_cid: Cid,
         id: ActorID,

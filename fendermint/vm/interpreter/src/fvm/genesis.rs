@@ -13,9 +13,7 @@ use fendermint_eth_hardhat::{Hardhat, FQN};
 use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
-use fendermint_vm_actor_interface::{
-    account, burntfunds, chainmetadata, cron, eam, init, ipc, reward, system,
-};
+use fendermint_vm_actor_interface::{account, burntfunds, chainmetadata, cron, eam, EMPTY_ARR, init, ipc, reward, system};
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Genesis, Power, PowerScale, Validator};
 use fvm_ipld_blockstore::Blockstore;
@@ -24,6 +22,7 @@ use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
 use ipc_actors_abis::i_diamond::FacetCut;
 use num_traits::Zero;
+use fendermint_actor_eam::PermissionModeParams;
 
 use crate::GenesisInterpreter;
 
@@ -189,6 +188,17 @@ where
             )
             .context("failed to create cron actor")?;
 
+        // Ethereum Account Manager (EAM) actor
+        state
+            .create_builtin_actor(
+                eam::EAM_ACTOR_CODE_ID,
+                eam::EAM_ACTOR_ID,
+                &EMPTY_ARR,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create EAM actor")?;
+
         // Burnt funds actor (it's just an account).
         state
             .create_builtin_actor(
@@ -237,12 +247,7 @@ where
 
         let eam_state = fendermint_actor_eam::State::new(
             state.store(),
-            // or we can allow certain address only with:
-            // fendermint_actor_eam::PermissionModeParams::AllowList(
-            //  vec![...]
-            // )
-            // TODO: https://github.com/consensus-shipyard/ipc/issues/706
-            fendermint_actor_eam::PermissionModeParams::Unrestricted,
+            PermissionModeParams::from(genesis.eam_permission_mode),
         )?;
         state
             .replace_builtin_actor(

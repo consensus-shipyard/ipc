@@ -3121,6 +3121,7 @@ dependencies = [
  "anyhow",
  "arbitrary",
  "cid",
+ "fendermint_actor_eam",
  "fendermint_crypto",
  "fendermint_testing",
  "fendermint_vm_core",

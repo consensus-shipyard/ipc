@@ -9,9 +9,7 @@ use fendermint_testing::arb::{ArbSubnetAddress, ArbSubnetID, ArbTokenAmount};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::ipc::{GatewayParams, IpcParams};
-use fendermint_vm_genesis::{
-    Account, Actor, ActorMeta, Collateral, Genesis, SignerAddr, Validator, ValidatorKey,
-};
+use fendermint_vm_genesis::{Account, Actor, ActorMeta, Collateral, Genesis, PermissionMode, SignerAddr, Validator, ValidatorKey};
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::bigint::Integer;
@@ -583,6 +581,7 @@ impl arbitrary::Arbitrary<'_> for StakingState {
             power_scale: *u.choose(&[0, 3]).expect("non empty"),
             validators: parent_validators,
             accounts: parent_actors,
+            eam_permission_mode: PermissionMode::Unrestricted,
             ipc: Some(parent_ipc),
         };
 
@@ -603,6 +602,7 @@ impl arbitrary::Arbitrary<'_> for StakingState {
             power_scale: *u.choose(&[0, 3]).expect("non empty"),
             validators: current_configuration,
             accounts: Vec::new(),
+            eam_permission_mode: PermissionMode::Unrestricted,
             ipc: Some(child_ipc),
         };
 

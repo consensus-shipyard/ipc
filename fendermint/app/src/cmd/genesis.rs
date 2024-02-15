@@ -11,10 +11,7 @@ use std::path::PathBuf;
 
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_core::{chainid, Timestamp};
-use fendermint_vm_genesis::{
-    ipc, Account, Actor, ActorMeta, Collateral, Genesis, Multisig, SignerAddr, Validator,
-    ValidatorKey,
-};
+use fendermint_vm_genesis::{ipc, Account, Actor, ActorMeta, Collateral, Genesis, Multisig, SignerAddr, Validator, ValidatorKey, PermissionMode};
 
 use crate::cmd;
 use crate::options::genesis::*;
@@ -45,6 +42,7 @@ cmd! {
       power_scale: self.power_scale,
       validators: Vec::new(),
       accounts: Vec::new(),
+      eam_permission_mode: PermissionMode::Unrestricted,
       ipc: None
     };
 
@@ -299,6 +297,7 @@ async fn new_genesis_from_parent(
         power_scale: args.power_scale,
         validators: Vec::new(),
         accounts: Vec::new(),
+        eam_permission_mode: PermissionMode::Unrestricted,
         ipc: Some(ipc_params),
     };
 

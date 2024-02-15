@@ -46,6 +46,10 @@
       "power": "75758188350819344134361527670772146683"
     }
   ],
+  "eam_permission_mode": {
+    "mode": "allowlist",
+    "addresses": ["f1rai3wqribaieprywdv55jh5psggh2vmvoyg2a2a", "f14mqisvkx7rpkcwlwjidldtbp57c7zyp6ds2bkuq"]
+  },
   "accounts": [
     {
       "meta": {

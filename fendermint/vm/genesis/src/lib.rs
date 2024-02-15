@@ -10,6 +10,7 @@ use serde_with::serde_as;
 
 use fvm_shared::version::NetworkVersion;
 use fvm_shared::{address::Address, econ::TokenAmount};
+use fendermint_actor_eam::PermissionModeParams;
 
 use fendermint_crypto::{normalize_public_key, PublicKey};
 use fendermint_vm_core::Timestamp;
@@ -41,9 +42,20 @@ pub struct Genesis {
     /// where the parent subnet tracks collateral.
     pub validators: Vec<Validator<Collateral>>,
     pub accounts: Vec<Actor>,
+    /// The custom eam permission mode that controls who can deploy contracts
+    pub eam_permission_mode: PermissionMode,
     /// IPC related configuration, if enabled.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ipc: Option<ipc::IpcParams>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "mode", rename_all = "lowercase")]
+pub enum PermissionMode {
+    /// No restriction, everyone can deploy
+    Unrestricted,
+    /// Only whitelisted addresses can deploy
+    AllowList { addresses: Vec<SignerAddr> },
 }
 
 /// Wrapper around [`Address`] to provide human readable serialization in JSON format.
@@ -195,6 +207,21 @@ impl<A> Validator<A> {
         Validator {
             public_key: self.public_key,
             power: f(self.power),
+        }
+    }
+}
+
+impl From<PermissionMode> for PermissionModeParams {
+    fn from(value: PermissionMode) -> Self {
+        match value {
+            PermissionMode::Unrestricted => PermissionModeParams::Unrestricted,
+            PermissionMode::AllowList { addresses } => {
+                let addresses = addresses
+                    .into_iter()
+                    .map(|v| v.0)
+                    .collect::<Vec<_>>();
+                PermissionModeParams::AllowList(addresses)
+            }
         }
     }
 }
