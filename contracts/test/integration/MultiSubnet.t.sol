@@ -616,7 +616,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         GatewayGetterFacet getter = GatewayGetterFacet(address(gateway));
         CheckpointingFacet checkpointer = CheckpointingFacet(address(gateway));
 
-        //@ms note: the usdc test is currently failing during the bottom up check point. There are two messages that are failing to be succesfullyt applied - the reciept from the initial Top Down deposit and the bottom up withdraw
         BottomUpMsgBatch memory batch = getter.bottomUpMsgBatch(e);
         console.log("batch length %d", batch.msgs.length);
         require(batch.msgs.length > 0, "batch length incorrect");
