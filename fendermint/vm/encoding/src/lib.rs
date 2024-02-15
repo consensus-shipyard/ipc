@@ -77,6 +77,8 @@ where
 /// // Or in full form:
 /// human_readable_str!(Address: IsHumanReadable);
 ///
+/// #[serde_as]
+/// #[derive(Serialize, Deserialize)]
 /// struct MyStruct {
 ///   #[serde_as(as = "Option<IsHumanReadable>")]
 ///   pub delegated_address: Option<Address>,
@@ -121,6 +123,8 @@ macro_rules! human_readable_str {
 /// // Or in full form:
 /// human_readable_delegate!(Address: IsHumanReadable => fendermint_vm_encoding::IsHumanReadable);
 ///
+/// #[serde_as]
+/// #[derive(Serialize, Deserialize)]
 /// struct MyStruct {
 ///   #[serde_as(as = "Option<IsHumanReadable>")]
 ///   pub delegated_address: Option<Address>,

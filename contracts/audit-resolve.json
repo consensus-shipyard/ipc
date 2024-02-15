@@ -31,6 +31,10 @@
         "1094471|webpack": {
             "decision": "ignore",
             "madeAt": 1706192525741
+        },
+        "1096437|json5": {
+            "decision": "ignore",
+            "madeAt": 1707760560016
         }
     },
     "rules": {},

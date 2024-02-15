@@ -7,7 +7,6 @@
 /// However, we should either deprecate the native actors, or make
 /// them use the types from this sdk directly.
 use crate::subnet_id::SubnetID;
-use anyhow::anyhow;
 use fvm_ipld_encoding::repr::*;
 use fvm_shared::{address::Address, clock::ChainEpoch, econ::TokenAmount};
 use serde::{Deserialize, Serialize};
@@ -17,7 +16,18 @@ pub const MANIFEST_ID: &str = "ipc_subnet_actor";
 
 /// Determines the permission mode for validators.
 #[repr(u8)]
-#[derive(Debug, Clone, Serialize_repr, Deserialize_repr, PartialEq, Eq)]
+#[derive(
+    Copy,
+    Debug,
+    Clone,
+    Serialize_repr,
+    Deserialize_repr,
+    PartialEq,
+    Eq,
+    strum::EnumString,
+    strum::VariantNames,
+)]
+#[strum(serialize_all = "snake_case")]
 pub enum PermissionMode {
     /// Validator power is determined by the collateral staked
     Collateral,
@@ -38,7 +48,18 @@ pub struct SupplySource {
 
 /// Determines the type of supply used by the subnet.
 #[repr(u8)]
-#[derive(Debug, Clone, Serialize_repr, Deserialize_repr, PartialEq, Eq)]
+#[derive(
+    Copy,
+    Debug,
+    Clone,
+    Serialize_repr,
+    Deserialize_repr,
+    PartialEq,
+    Eq,
+    strum::EnumString,
+    strum::VariantNames,
+)]
+#[strum(serialize_all = "snake_case")]
 pub enum SupplyKind {
     Native,
     ERC20,
@@ -63,54 +84,4 @@ pub struct ConstructParams {
 #[repr(u64)]
 pub enum ConsensusType {
     Fendermint,
-}
-
-impl TryFrom<u8> for PermissionMode {
-    type Error = anyhow::Error;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        Ok(match value {
-            0 => PermissionMode::Collateral,
-            1 => PermissionMode::Federated,
-            2 => PermissionMode::Static,
-            _ => return Err(anyhow!("unknown permission mode {value}")),
-        })
-    }
-}
-
-impl TryFrom<&str> for PermissionMode {
-    type Error = anyhow::Error;
-
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
-        Ok(match s {
-            "collateral" => PermissionMode::Collateral,
-            "federated" => PermissionMode::Federated,
-            "static" => PermissionMode::Static,
-            _ => return Err(anyhow!("invalid permission mode: {}", s)),
-        })
-    }
-}
-
-impl TryFrom<u8> for SupplyKind {
-    type Error = anyhow::Error;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        Ok(match value {
-            0 => SupplyKind::Native,
-            1 => SupplyKind::ERC20,
-            _ => return Err(anyhow!("unknown supply kind {value}")),
-        })
-    }
-}
-
-impl TryFrom<&str> for SupplyKind {
-    type Error = anyhow::Error;
-
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
-        Ok(match s {
-            "native" => Self::Native,
-            "erc20" => Self::ERC20,
-            _ => return Err(anyhow!("invalid supply kind type: {}", s)),
-        })
-    }
 }
