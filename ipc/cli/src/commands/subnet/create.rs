@@ -2,14 +2,16 @@
 // SPDX-License-Identifier: MIT
 //! Create subnet cli command handler.
 
+use std::fmt::Debug;
+use std::str::FromStr;
+
 use async_trait::async_trait;
 use clap::Args;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
+
 use ipc_api::subnet::{PermissionMode, SupplyKind, SupplySource};
 use ipc_api::subnet_id::SubnetID;
-use std::fmt::Debug;
-use std::str::FromStr;
 
 use crate::commands::get_ipc_provider;
 use crate::{f64_to_token_amount, require_fil_addr_from_str, CommandLineHandler, GlobalArguments};
@@ -32,14 +34,13 @@ impl CreateSubnet {
             None => None,
         };
 
-        let permission_mode = PermissionMode::try_from(arguments.permission_mode)?;
         let token_address = if let Some(addr) = &arguments.supply_source_address {
             Some(Address::from_str(addr)?)
         } else {
             None
         };
         let supply_source = SupplySource {
-            kind: SupplyKind::try_from(arguments.supply_source_kind)?,
+            kind: arguments.supply_source_kind,
             token_address,
         };
         let addr = provider
@@ -53,7 +54,7 @@ impl CreateSubnet {
                     .active_validators_limit
                     .unwrap_or(DEFAULT_ACTIVE_VALIDATORS),
                 f64_to_token_amount(arguments.min_cross_msg_fee)?,
-                permission_mode,
+                arguments.permission_mode,
                 supply_source,
             )
             .await?;
@@ -110,14 +111,20 @@ pub struct CreateSubnetArgs {
     pub min_cross_msg_fee: f64,
     #[arg(
         long,
-        help = "The permission mode for the subnet, collateral(0), federated(1) and static(2)"
+        help = "The permission mode for the subnet: collateral, federated and static",
+        value_parser = PermissionMode::from_str,
     )]
-    pub permission_mode: u8,
+    // TODO figure out a way to use a newtype + ValueEnum, or reference PermissionMode::VARIANTS to
+    //  enumerate all variants
+    pub permission_mode: PermissionMode,
     #[arg(
         long,
-        help = "The kind of supply source of a subnet on its parent subnet, native(0), erc20(1)"
+        help = "The kind of supply source of a subnet on its parent subnet: native or erc20",
+        value_parser = SupplyKind::from_str,
     )]
-    pub supply_source_kind: u8,
+    // TODO figure out a way to use a newtype + ValueEnum, or reference SupplySourceKind::VARIANTS to
+    //  enumerate all variants
+    pub supply_source_kind: SupplyKind,
     #[arg(
         long,
         help = "The address of supply source of a subnet on its parent subnet. None if kind is native"

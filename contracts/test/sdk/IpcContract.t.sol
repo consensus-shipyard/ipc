@@ -40,13 +40,12 @@ contract RecorderIpcExchange is IpcExchange {
     }
 
     function _handleIpcResult(
-        IpcEnvelope storage original,
+        IpcEnvelope storage,
         IpcEnvelope memory result,
         ResultMsg memory resultMsg
     ) internal override {
         require(!shouldRevert, "revert requested");
         console.log("handling ipc result");
-        require(keccak256(abi.encode(original)) == keccak256(abi.encode(lastEnvelope)));
         lastEnvelope = result;
         lastResultMsg = resultMsg;
     }
@@ -87,76 +86,176 @@ contract RecorderIpcExchange is IpcExchange {
 
 contract IpcExchangeTest is Test {
     using CrossMsgHelper for IpcEnvelope;
+    address gateway = vm.addr(1);
+    SubnetID subnetA;
+    SubnetID subnetB;
+    CallMsg callMsg;
+    ResultMsg resultMsg;
+    IpcEnvelope callEnvelope;
+    IpcEnvelope resultEnvelope;
+    RecorderIpcExchange exch;
 
-    function test_IpcExchange() public {
-        address gateway = vm.addr(1);
+    IPCAddress ipcAddressA;
+    IPCAddress ipcAddressB;
 
+    function setUp() public {
         address[] memory pathA = new address[](1);
         pathA[0] = vm.addr(2000);
         address[] memory pathB = new address[](1);
         pathB[0] = vm.addr(3000);
 
         // these two subnets are siblings.
-        SubnetID memory subnetA = SubnetID({root: 123, route: pathA});
-        SubnetID memory subnetB = SubnetID({root: 123, route: pathB});
+        subnetA = SubnetID({root: 123, route: pathA});
+        subnetB = SubnetID({root: 123, route: pathB});
+        ipcAddressA = IPCAddress({subnetId: subnetA, rawAddress: FvmAddressHelper.from(address(100))});
+        ipcAddressB = IPCAddress({subnetId: subnetB, rawAddress: FvmAddressHelper.from(address(200))});
 
-        CallMsg memory callMsg = CallMsg({method: abi.encodePacked(Foo.foo.selector), params: bytes("1234")});
-        IpcEnvelope memory envelope = IpcEnvelope({
-            kind: IpcMsgKind.Transfer,
-            from: IPCAddress({subnetId: subnetA, rawAddress: FvmAddressHelper.from(address(100))}),
-            to: IPCAddress({subnetId: subnetB, rawAddress: FvmAddressHelper.from(address(200))}),
+        callMsg = CallMsg({method: abi.encodePacked(Foo.foo.selector), params: bytes("1234")});
+        callEnvelope = IpcEnvelope({
+            kind: IpcMsgKind.Call,
+            from: ipcAddressA,
+            to: ipcAddressB,
             value: 1000,
             message: abi.encode(callMsg),
             nonce: 0
         });
 
-        RecorderIpcExchange exch = new RecorderIpcExchange(gateway);
+        resultMsg = ResultMsg({outcome: OutcomeType.Ok, id: callEnvelope.toHash(), ret: bytes("")});
+
+        resultEnvelope = IpcEnvelope({
+            kind: IpcMsgKind.Result,
+            from: ipcAddressB,
+            to: ipcAddressA,
+            value: 1000,
+            message: abi.encode(resultMsg),
+            nonce: 0
+        });
+
+        exch = new RecorderIpcExchange(gateway);
+    }
+
+    function test_IpcExchange_testTransferFails() public {
+        callEnvelope.kind = IpcMsgKind.Transfer;
 
         // a transfer; fails because cannot handle.
         vm.expectRevert(IpcHandler.UnsupportedMsgKind.selector);
         vm.prank(gateway);
-        exch.handleIpcMessage(envelope);
+        exch.handleIpcMessage(callEnvelope);
+    }
 
+    function test_IpcExchange_testGatewayOnlyFails() public {
         // a call; fails when the caller is not the gateway.
-        envelope.kind = IpcMsgKind.Call;
         vm.expectRevert(IpcHandler.CallerIsNotGateway.selector);
-        exch.handleIpcMessage(envelope);
+        exch.handleIpcMessage(callEnvelope);
+    }
 
+    function test_IpcExchange_handleOk() public {
         vm.startPrank(gateway);
-        exch.handleIpcMessage(envelope);
+        exch.handleIpcMessage(callEnvelope);
 
         // succeeds.
         IpcEnvelope memory lastEnvelope = exch.getLastEnvelope();
         CallMsg memory lastCall = exch.getLastCallMsg();
-        require(keccak256(abi.encode(envelope)) == keccak256(abi.encode(lastEnvelope)), "unexpected envelope");
+        require(keccak256(abi.encode(callEnvelope)) == keccak256(abi.encode(lastEnvelope)), "unexpected callEnvelope");
         require(keccak256(abi.encode(callMsg)) == keccak256(abi.encode(lastCall)), "unexpected callmsg");
+    }
 
+    function test_IpcExchange_revertPropagated() public {
+        vm.startPrank(gateway);
         // a revert bubbles up.
         exch.flipRevert();
         vm.expectRevert("revert requested");
-        exch.handleIpcMessage(envelope);
+        exch.handleIpcMessage(callEnvelope);
+    }
+
+    function test_IpcExchange_unexpectedResult() public {
+        vm.startPrank(gateway);
 
         // an unrecognized result
-        envelope.kind = IpcMsgKind.Result;
-        envelope.message = abi.encode(ResultMsg({outcome: OutcomeType.Ok, id: keccak256("foo"), ret: bytes("")}));
+        callEnvelope.kind = IpcMsgKind.Result;
+        callEnvelope.message = abi.encode(ResultMsg({outcome: OutcomeType.Ok, id: keccak256("foo"), ret: bytes("")}));
 
-        IPCAddress memory from = envelope.from;
-        envelope.from = envelope.to;
-        envelope.to = from;
+        IPCAddress memory from = callEnvelope.from;
+        callEnvelope.from = callEnvelope.to;
+        callEnvelope.to = from;
 
         vm.expectRevert(IpcHandler.UnrecognizedResult.selector);
-        exch.handleIpcMessage(envelope);
+        exch.handleIpcMessage(callEnvelope);
+    }
 
-        vm.mockCall(gateway, abi.encodeWithSelector(IGateway.sendContractXnetMessage.selector), abi.encode(envelope));
+    function test_IpcExchange_successfulCorrelation() public {
+        // Perform an outgoing IPC call from within the contract.
+        vm.mockCall(
+            gateway,
+            abi.encodeWithSelector(IGateway.sendContractXnetMessage.selector),
+            abi.encode(callEnvelope)
+        );
         vm.deal(address(this), 1000);
-        exch.performIpcCall_(from, CallMsg({method: bytes("1234"), params: bytes("AABB")}), 1);
+        exch.performIpcCall_(ipcAddressA, callMsg, 1);
+        // assert that we stored the correct callEnvelope in the correlation map.
+        IpcEnvelope memory correlated = exch.getInflight(callEnvelope.toHash());
+        require(correlated.toHash() == callEnvelope.toHash());
 
-        // we store the correct envelope in the correlation map.
-        IpcEnvelope memory correlated = exch.getInflight(envelope.toHash());
-        require(correlated.toHash() == envelope.toHash());
+        vm.startPrank(gateway);
 
-        // TODO test receipt correlation
+        // Simulate an OK incoming result.
+        exch.handleIpcMessage(resultEnvelope);
+        require(exch.getLastResultMsg().id != bytes32(""), "_handleIpcResult was not called");
+    }
 
-        // TODO test dropMessages
+    function test_IpcExchange_dropMessages() public {
+        vm.deal(address(this), 1000);
+
+        // Send three messages from within the contract.
+        bytes32[] memory ids = new bytes32[](3);
+        for (uint64 i = 0; i < 3; i++) {
+            callEnvelope.nonce = i;
+            vm.mockCall(
+                gateway,
+                abi.encodeWithSelector(IGateway.sendContractXnetMessage.selector),
+                abi.encode(callEnvelope)
+            );
+            exch.performIpcCall_(ipcAddressA, callMsg, 1);
+
+            bytes32 id = callEnvelope.toHash();
+            require(exch.getInflight(id).value != 0, "envelope not found in correlation map");
+
+            ids[i] = id;
+        }
+
+        bytes32[] memory params = new bytes32[](2);
+        params[0] = ids[0];
+        params[1] = ids[1];
+
+        // drop a message: unauthorized
+        vm.prank(address(vm.addr(999)));
+        vm.expectRevert();
+        exch.dropMessages(params);
+
+        // drop a message: from the owner
+        vm.prank(address(this));
+        exch.dropMessages(params);
+
+        require(exch.getInflight(ids[0]).value == 0, "did not expect envelope in correlation map");
+        require(exch.getInflight(ids[1]).value == 0, "did not expect envelope in correlation map");
+        require(exch.getInflight(ids[2]).value != 0, "expected envelope in correlation map");
+
+        vm.startPrank(gateway);
+
+        // unrecognized correlation id
+        vm.expectRevert(IpcHandler.UnrecognizedResult.selector);
+        exch.handleIpcMessage(resultEnvelope);
+
+        // only remaining one
+        resultMsg.id = ids[2];
+        resultEnvelope.message = abi.encode(resultMsg);
+
+        // assert that we stored the correct callEnvelope in the correlation map.
+        IpcEnvelope memory correlated = exch.getInflight(callEnvelope.toHash());
+        require(correlated.toHash() == callEnvelope.toHash());
+
+        // Simulate an OK incoming result.
+        exch.handleIpcMessage(resultEnvelope);
+        require(exch.getLastResultMsg().id != bytes32(""), "_handleIpcResult was not called");
     }
 }

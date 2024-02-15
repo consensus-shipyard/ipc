@@ -14,7 +14,7 @@ use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
 use fendermint_vm_actor_interface::{
-    account, burntfunds, chainmetadata, cron, init, ipc, reward, system,
+    account, burntfunds, chainmetadata, cron, eam, init, ipc, reward, system,
 };
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Genesis, Power, PowerScale, Validator};
@@ -241,17 +241,19 @@ where
             // fendermint_actor_eam::PermissionModeParams::AllowList(
             //  vec![...]
             // )
+            // see: https://github.com/consensus-shipyard/ipc/issues/706
             fendermint_actor_eam::PermissionModeParams::Unrestricted,
         )?;
         state
-            .create_custom_actor(
+            .replace_builtin_actor(
+                eam::EAM_ACTOR_NAME,
+                eam::EAM_ACTOR_ID,
                 fendermint_actor_eam::IPC_EAM_ACTOR_NAME,
-                fendermint_actor_eam::IPC_EAM_ACTOR_ID,
                 &eam_state,
                 TokenAmount::zero(),
                 None,
             )
-            .context("failed to create chainmetadata actor")?;
+            .context("failed to replace built in eam actor")?;
 
         // STAGE 2: Create non-builtin accounts which do not have a fixed ID.
 

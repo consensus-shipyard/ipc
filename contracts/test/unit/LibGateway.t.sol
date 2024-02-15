@@ -23,11 +23,15 @@ contract GatewayDummyContract {
 contract LibGatewayTest is Test {
     using CrossMsgHelper for IpcEnvelope;
 
-    function test_applyMsg_toSubnetEmpty() public {
+    function test_applyMsg_receiptFailure() public {
         LibGatewayMock t = new LibGatewayMock();
 
         SubnetID memory subnetId = SubnetID({root: 0, route: new address[](0)});
+        t.setSubnet(subnetId, 1);
 
+        // This message carries an empty subnet, which will make the gateway want to return an error
+        // result. However, the message payload is empty and will fail the isEmpty() check, so we'll also
+        // skip sending a receipt.
         IpcEnvelope memory envelope = IpcEnvelope({
             kind: IpcMsgKind.Call,
             from: IPCAddress({subnetId: subnetId, rawAddress: FvmAddressHelper.from(address(1))}),
@@ -37,8 +41,13 @@ contract LibGatewayTest is Test {
             nonce: 0
         });
 
-        vm.expectRevert(LibGateway.CannotCreateIpcReceipt.selector);
+        vm.recordLogs();
+
         t.applyMsg(subnetId, envelope);
+
+        // no bottom up nor top down interactions; caveat: not checking the postbox.
+        require(vm.getRecordedLogs().length == 0, "did not expect events");
+        require(t.getNextBottomUpMsgBatch().msgs.length == 0, "did not expect bottup up messages");
     }
 
     function test_applyMsg_transferNoOpt() public {

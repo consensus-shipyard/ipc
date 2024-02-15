@@ -3,7 +3,6 @@
 
 use std::sync::Arc;
 
-use crate::fvm::store::memory::MemoryBlockstore;
 use anyhow::{anyhow, bail, Context};
 use cid::{multihash::Code, Cid};
 use ethers::{abi::Tokenize, core::abi::Abi};
@@ -24,9 +23,9 @@ use fvm::{
     machine::Manifest,
     state_tree::{ActorState, StateTree},
 };
-use fvm_ipld_blockstore::{Block, Blockstore};
+use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_car::load_car_unchecked;
-use fvm_ipld_encoding::{BytesDe, CborStore, RawBytes, DAG_CBOR};
+use fvm_ipld_encoding::{BytesDe, CborStore, RawBytes};
 use fvm_shared::{
     address::{Address, Payload},
     clock::ChainEpoch,
@@ -37,7 +36,7 @@ use fvm_shared::{
     ActorID, BLOCK_GAS_LIMIT, METHOD_CONSTRUCTOR,
 };
 use num_traits::Zero;
-use serde::Serialize;
+use serde::{de, Serialize};
 
 use super::{exec::MachineBlockstore, FvmExecState, FvmStateParams};
 
@@ -100,35 +99,25 @@ where
     pub async fn new(
         store: DB,
         multi_engine: Arc<MultiEngine>,
-        builtin_actor_bundle: &[u8],
+        bundle: &[u8],
         custom_actor_bundle: &[u8],
     ) -> anyhow::Result<Self> {
+        // Load the builtin actor bundle.
+        let (manifest_version, manifest_data_cid): (u32, Cid) =
+            parse_bundle(&store, bundle).await?;
+        let manifest = Manifest::load(&store, &manifest_data_cid, manifest_version)?;
+
         // Load the custom actor bundle.
         let (custom_manifest_version, custom_manifest_data_cid): (u32, Cid) =
             parse_bundle(&store, custom_actor_bundle).await?;
         let custom_actor_manifest =
             CustomActorManifest::load(&store, &custom_manifest_data_cid, custom_manifest_version)?;
 
-        let mut intermediate_builtin = load_builtin(builtin_actor_bundle).await?;
-
-        replace_built_in_actor(
-            fendermint_actor_eam::IPC_EAM_ACTOR_NAME,
-            &custom_actor_manifest,
-            &mut intermediate_builtin,
-        )?;
-
-        // copy builtin actors from memory to store
-        intermediate_builtin.mem_store.copy_to(&store)?;
-
         let state_tree = empty_state_tree(store.clone())?;
 
         let state = Self {
-            manifest_data_cid: intermediate_builtin.root_cid,
-            manifest: Manifest::load(
-                &store,
-                &intermediate_builtin.root_cid,
-                intermediate_builtin.version,
-            )?,
+            manifest_data_cid,
+            manifest,
             custom_actor_manifest,
             store,
             multi_engine,
@@ -185,6 +174,74 @@ where
                 (cid, _, _) => Ok(cid),
             },
         }
+    }
+
+    /// Replaces the built in actor with custom actor. This assumes the system actor is already
+    /// created, else it would throw an error.
+    pub fn replace_builtin_actor(
+        &mut self,
+        built_in_actor_name: &str,
+        built_in_actor_id: ActorID,
+        custom_actor_name: &str,
+        state: &impl Serialize,
+        balance: TokenAmount,
+        delegated_address: Option<Address>,
+    ) -> anyhow::Result<()> {
+        let code_cid = self
+            .update_system_actor_manifest(built_in_actor_name, custom_actor_name)
+            .context("failed to replace system actor manifest")?;
+
+        self.create_actor_internal(
+            code_cid,
+            built_in_actor_id,
+            state,
+            balance,
+            delegated_address,
+        )
+    }
+
+    /// Update the manifest id of the system actor, returns the code cid of the replacing
+    /// custom actor.
+    fn update_system_actor_manifest(
+        &mut self,
+        built_in_actor_name: &str,
+        custom_actor_name: &str,
+    ) -> anyhow::Result<Cid> {
+        let code = *self
+            .custom_actor_manifest
+            .code_by_name(custom_actor_name)
+            .ok_or_else(|| anyhow!("replacement {custom_actor_name} actor not found"))?;
+
+        let manifest_cid = self
+            .get_actor_state::<system::State>(system::SYSTEM_ACTOR_ID)?
+            .builtin_actors;
+
+        let mut built_in_actors: Vec<(String, Cid)> = self
+            .store()
+            .get_cbor(&manifest_cid)
+            .context("could not load built in actors")?
+            .ok_or_else(|| anyhow!("cannot find manifest cid {}", manifest_cid))?;
+
+        for (_, code_cid) in built_in_actors
+            .iter_mut()
+            .filter(|(n, _)| n == built_in_actor_name)
+        {
+            *code_cid = code
+        }
+
+        let builtin_actors = self.put_state(built_in_actors)?;
+        let new_cid = self.put_state(system::State { builtin_actors })?;
+        let mutate = |actor_state: &mut ActorState| {
+            actor_state.state = new_cid;
+            Ok(())
+        };
+
+        self.with_state_tree(
+            |s| s.mutate_actor(system::SYSTEM_ACTOR_ID, mutate),
+            |s| s.mutate_actor(system::SYSTEM_ACTOR_ID, mutate),
+        )?;
+
+        Ok(code)
     }
 
     pub fn create_builtin_actor(
@@ -438,7 +495,7 @@ where
         Ok(EthAddress(addr))
     }
 
-    pub fn store(&mut self) -> &DB {
+    pub fn store(&self) -> &DB {
         &self.store
     }
 
@@ -475,71 +532,19 @@ where
             Stage::Exec(ref mut exec_state) => g(exec_state.state_tree_mut()),
         }
     }
-}
 
-type CodeByName = (String, Cid);
-struct IntermediateBuiltInActorState {
-    mem_store: MemoryBlockstore,
-    code_names: Vec<CodeByName>,
-    root_cid: Cid,
-    version: u32,
-}
-
-/// Load the built-in actor bundle but replace the certain actors with custom actor implementation.
-fn replace_built_in_actor(
-    name: &str,
-    custom_actor_manifest: &CustomActorManifest,
-    intermediate_builtin: &mut IntermediateBuiltInActorState,
-) -> anyhow::Result<()> {
-    let code = custom_actor_manifest
-        .code_by_name(name)
-        .ok_or_else(|| anyhow!("replacement actor not found"))?;
-
-    for (_, code_cid) in intermediate_builtin
-        .code_names
-        .iter_mut()
-        .filter(|(n, _)| n == name)
-    {
-        *code_cid = *code
-    }
-
-    let data = fvm_ipld_encoding::to_vec(&intermediate_builtin.code_names)?;
-    let new_root_cid = intermediate_builtin.mem_store.put(
-        Code::Blake2b256,
-        &Block {
-            codec: DAG_CBOR,
-            data,
-        },
-    )?;
-
-    intermediate_builtin.root_cid = new_root_cid;
-
-    Ok(())
-}
-
-async fn load_builtin(
-    builtin_actor_bundle: &[u8],
-) -> anyhow::Result<IntermediateBuiltInActorState> {
-    let mem_store = MemoryBlockstore::new();
-
-    // Load the builtin actor bundle.
-    let (ver, root_cid): (u32, Cid) = parse_bundle(&mem_store, builtin_actor_bundle).await?;
-
-    if ver != 1 {
-        return Err(anyhow!("unsupported manifest version {}", ver));
-    }
-
-    let vec: Vec<CodeByName> = match mem_store.get_cbor(&root_cid)? {
-        Some(vec) => vec,
-        None => {
-            return Err(anyhow!("cannot find manifest root cid {}", root_cid));
+    /// Query the actor state from the state tree under the two different stages.
+    fn get_actor_state<T: de::DeserializeOwned>(&self, actor: ActorID) -> anyhow::Result<T> {
+        let actor_state_cid = match &self.stage {
+            Stage::Tree(s) => s.get_actor(actor)?,
+            Stage::Exec(s) => s.state_tree().get_actor(actor)?,
         }
-    };
+        .ok_or_else(|| anyhow!("actor state {actor} not found, is it deployed?"))?
+        .state;
 
-    Ok(IntermediateBuiltInActorState {
-        mem_store,
-        code_names: vec,
-        root_cid,
-        version: ver,
-    })
+        self.store()
+            .get_cbor(&actor_state_cid)
+            .context("failed to get actor state by state cid")?
+            .ok_or_else(|| anyhow!("actor state by {actor_state_cid} not found"))
+    }
 }

@@ -44,7 +44,6 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         SubnetID memory subnetId = s.networkName.createSubnetId(msg.sender);
 
         (bool registered, Subnet storage subnet) = LibGateway.getSubnet(subnetId);
-
         if (registered) {
             revert AlreadyRegisteredSubnet();
         }
@@ -55,7 +54,6 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         subnet.circSupply = genesisCircSupply;
 
         s.subnetKeys.add(subnetId.toHash());
-
         s.totalSubnets += 1;
     }
 
@@ -114,6 +112,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
 
         s.totalSubnets -= 1;
         delete s.subnets[id];
+
         s.subnetKeys.remove(id);
 
         payable(msg.sender).sendValue(stake);
@@ -160,6 +159,11 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     /// @param to The funded address.
     /// @param amount The amount of ERC20 tokens to be sent.
     function fundWithToken(SubnetID calldata subnetId, FvmAddress calldata to, uint256 amount) external nonReentrant {
+        if (amount == 0) {
+            // prevent spamming if there's no value to fund.
+            revert InvalidXnetMessage(InvalidXnetMessageReason.Value);
+        }
+
         // Check that the supply strategy is ERC20.
         // There is no need to check whether the subnet exists. If it doesn't exist, the call to getter will revert.
         // LibGateway.commitTopDownMsg will also revert if the subnet doesn't exist.

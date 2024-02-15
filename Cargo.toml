@@ -24,6 +24,7 @@ members = [
   "fendermint/rpc",
   "fendermint/storage",
   "fendermint/testing",
+  "fendermint/testing/materializer",
   "fendermint/testing/*-test",
   "fendermint/vm/*",
   "fendermint/actors",
@@ -123,9 +124,11 @@ sha2 = "0.10"
 serde = { version = "1", features = ["derive"] }
 serde_bytes = "0.11"
 serde_json = { version = "1", features = ["raw_value"] }
+serde_yaml = { version = "0.9" }
 serde_tuple = "0.5"
 serde_with = "2.3"
 serial_test = "3.0"
+strum = { version = "0.26.1", features = ["derive"] }
 tempfile = "3.7"
 thiserror = "1"
 tokio = { version = "1", features = [
@@ -139,7 +142,7 @@ tokio = { version = "1", features = [
 tokio-stream = "0.1.14"
 tokio-util = { version = "0.7.8", features = ["compat"] }
 tokio-tungstenite = { version = "0.18.0", features = ["native-tls"] }
-toml = "0.7"
+toml = "0.8"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 trace4rs = "0.5.1"
