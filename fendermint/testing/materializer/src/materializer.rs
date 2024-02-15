@@ -25,8 +25,8 @@ use crate::{
 /// the materializer. We can use this for dry-runs as well.
 ///
 /// A live materializer should persist its logs, so that it can be resumed.
-/// For example we can create an run a testnet externally, then parse the manifest
-/// and the materializer logs inside a test to talk to one of the nodew, and the
+/// For example we can create and run a testnet externally, then parse the manifest
+/// and the materializer logs inside a test to talk to one of the nodes, and the
 /// materializer should be able to return to the test correct JSON-RPC endpoints.
 ///
 /// Some of the operations of the materializer should be idempotent, e.g. the

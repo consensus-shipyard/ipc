@@ -18,6 +18,7 @@ mod arb;
 #[derive(Clone, Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ResourceId(String);
 
+/// Implementing a deserializer which has the logic to sanitise URL-unfriendly characters.
 impl<'de> Deserialize<'de> for ResourceId {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -39,6 +40,7 @@ impl From<&str> for ResourceId {
     }
 }
 
+/// Replace the path separator with a different character when reading strings.
 impl From<String> for ResourceId {
     fn from(value: String) -> Self {
         Self(value.replace('/', "_"))
