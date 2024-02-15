@@ -8,9 +8,9 @@ use fvm_shared::bigint::{BigInt, Integer};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
+use fendermint_actor_eam::PermissionModeParams;
 use fvm_shared::version::NetworkVersion;
 use fvm_shared::{address::Address, econ::TokenAmount};
-use fendermint_actor_eam::PermissionModeParams;
 
 use fendermint_crypto::{normalize_public_key, PublicKey};
 use fendermint_vm_core::Timestamp;
@@ -216,10 +216,7 @@ impl From<PermissionMode> for PermissionModeParams {
         match value {
             PermissionMode::Unrestricted => PermissionModeParams::Unrestricted,
             PermissionMode::AllowList { addresses } => {
-                let addresses = addresses
-                    .into_iter()
-                    .map(|v| v.0)
-                    .collect::<Vec<_>>();
+                let addresses = addresses.into_iter().map(|v| v.0).collect::<Vec<_>>();
                 PermissionModeParams::AllowList(addresses)
             }
         }

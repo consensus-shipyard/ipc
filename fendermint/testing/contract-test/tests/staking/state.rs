@@ -9,7 +9,10 @@ use fendermint_testing::arb::{ArbSubnetAddress, ArbSubnetID, ArbTokenAmount};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::ipc::{GatewayParams, IpcParams};
-use fendermint_vm_genesis::{Account, Actor, ActorMeta, Collateral, Genesis, PermissionMode, SignerAddr, Validator, ValidatorKey};
+use fendermint_vm_genesis::{
+    Account, Actor, ActorMeta, Collateral, Genesis, PermissionMode, SignerAddr, Validator,
+    ValidatorKey,
+};
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::bigint::Integer;

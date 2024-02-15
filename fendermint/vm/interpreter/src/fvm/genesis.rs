@@ -9,11 +9,14 @@ use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use ethers::abi::Tokenize;
 use ethers::core::types as et;
+use fendermint_actor_eam::PermissionModeParams;
 use fendermint_eth_hardhat::{Hardhat, FQN};
 use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
-use fendermint_vm_actor_interface::{account, burntfunds, chainmetadata, cron, eam, EMPTY_ARR, init, ipc, reward, system};
+use fendermint_vm_actor_interface::{
+    account, burntfunds, chainmetadata, cron, eam, init, ipc, reward, system, EMPTY_ARR,
+};
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Genesis, Power, PowerScale, Validator};
 use fvm_ipld_blockstore::Blockstore;
@@ -22,7 +25,6 @@ use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
 use ipc_actors_abis::i_diamond::FacetCut;
 use num_traits::Zero;
-use fendermint_actor_eam::PermissionModeParams;
 
 use crate::GenesisInterpreter;
 

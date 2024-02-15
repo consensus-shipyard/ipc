@@ -11,7 +11,10 @@ use std::path::PathBuf;
 
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_core::{chainid, Timestamp};
-use fendermint_vm_genesis::{ipc, Account, Actor, ActorMeta, Collateral, Genesis, Multisig, SignerAddr, Validator, ValidatorKey, PermissionMode};
+use fendermint_vm_genesis::{
+    ipc, Account, Actor, ActorMeta, Collateral, Genesis, Multisig, PermissionMode, SignerAddr,
+    Validator, ValidatorKey,
+};
 
 use crate::cmd;
 use crate::options::genesis::*;
