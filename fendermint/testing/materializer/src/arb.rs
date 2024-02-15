@@ -21,10 +21,12 @@ use fvm_shared::{
 };
 use quickcheck::{Arbitrary, Gen};
 
-use crate::manifest::{
-    Account, AccountId, Balance, BalanceMap, CollateralMap, IpcDeployment, Manifest, Node, NodeId,
-    NodeMap, NodeMode, ParentNode, Relayer, RelayerId, ResourceId, Rootnet, Subnet, SubnetId,
-    SubnetMap,
+use crate::{
+    manifest::{
+        Account, Balance, BalanceMap, CollateralMap, IpcDeployment, Manifest, Node, NodeMap,
+        NodeMode, ParentNode, Relayer, Rootnet, Subnet, SubnetMap,
+    },
+    AccountId, NodeId, RelayerId, ResourceId, SubnetId,
 };
 
 const RESOURCE_ID_CHARSET: &[u8] =
@@ -159,7 +161,7 @@ fn gen_manifest(
         }
     };
 
-    // Pick some node IDs targeted by relayers on the rootnet.
+    // Collect the parent nodes on the rootnet that subnets can target.
     let parent_nodes: Vec<ParentNode> = match &rootnet {
         Rootnet::External { urls, .. } => urls.iter().cloned().map(ParentNode::External).collect(),
         Rootnet::New { ref nodes, .. } => nodes.keys().cloned().map(ParentNode::Internal).collect(),
@@ -197,7 +199,7 @@ fn gen_urls(g: &mut Gen) -> Vec<Url> {
     for _ in 0..1 + usize::arbitrary(g) % 3 {
         let id = ResourceId::arbitrary(g);
         // The glif.io addresses are load balanced, but let's pretend we can target a specific node.
-        // alternatively we could vary the ports or whatever.
+        // Alternatively we could vary the ports or whatever.
         let url = format!("https://{}.api.calibration.node.glif.io/rpc/v1", id.0);
         let url = Url::from_str(&url).expect("URL should parse");
         urls.push(url);
