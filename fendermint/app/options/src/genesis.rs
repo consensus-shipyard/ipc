@@ -7,8 +7,8 @@ use clap::{Args, Subcommand, ValueEnum};
 use ipc_api::subnet_id::SubnetID;
 
 use super::parse::{
-    parse_comma_separated_addrs, parse_eth_address, parse_full_fil, parse_network_version,
-    parse_percentage, parse_token_amount,
+    parse_eth_address, parse_full_fil, parse_network_version,
+    parse_percentage, parse_token_amount, parse_signer_addr
 };
 use fendermint_vm_genesis::SignerAddr;
 use fvm_shared::{address::Address, econ::TokenAmount, version::NetworkVersion};
@@ -53,11 +53,11 @@ pub struct GenesisSetEAMPermissionsArgs {
     #[arg(
         long,
         short,
-        default_value = "",
-        value_parser = parse_comma_separated_addrs,
+        value_delimiter = ',',
+        value_parser = parse_signer_addr,
         help = "List of addresses that can deploy contract. Field is ignored if mode is unrestricted"
     )]
-    pub addresses: ::std::vec::Vec<SignerAddr>,
+    pub addresses: Vec<SignerAddr>,
 }
 
 #[derive(Args, Debug)]

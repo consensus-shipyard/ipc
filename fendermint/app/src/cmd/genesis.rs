@@ -202,7 +202,7 @@ fn set_eam_permissions(
         genesis.eam_permission_mode = match args.mode.to_lowercase().as_str() {
             "unrestricted" => PermissionMode::Unrestricted,
             "allowlist" => {
-                let addresses = args.addresses.iter().map(|a| a.clone()).collect();
+                let addresses = args.addresses.clone();
                 PermissionMode::AllowList { addresses }
             }
             _ => return Err(anyhow!("unknown eam permisison mode")),

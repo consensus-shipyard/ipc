@@ -58,14 +58,8 @@ pub fn parse_address(s: &str) -> Result<Address, String> {
     Address::from_str(s).map_err(|e| format!("error parsing address: {e}"))
 }
 
-pub fn parse_comma_separated_addrs(s: &str) -> Result<Vec<SignerAddr>, String> {
-    if s.is_empty() {
-        return Ok(vec![]);
-    }
-
-    s.split(',')
-        .map(|s| Address::from_str(s).map(|a| SignerAddr(a)))
-        .collect::<Result<Vec<_>, _>>()
+pub fn parse_signer_addr(s: &str) -> Result<SignerAddr, String> {
+    Address::from_str(s).map(SignerAddr)
         .map_err(|e| format!("error parsing addresses: {e}"))
 }
 
