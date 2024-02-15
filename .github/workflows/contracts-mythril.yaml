@@ -17,6 +17,9 @@ jobs:
         with:
           node-version: '18' # Adjust this as needed for your project
 
+      - name: Install dependencies
+        run: cd contracts && npm install
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
