@@ -35,6 +35,18 @@
         "1096437|json5": {
             "decision": "ignore",
             "madeAt": 1707760560016
+        },
+        "1096482|@microsoft/api-extractor>@microsoft/api-extractor-model>@rushstack/node-core-library>semver": {
+            "decision": "ignore",
+            "madeAt": 1708002967617
+        },
+        "1096482|@microsoft/api-extractor-model>@rushstack/node-core-library>semver": {
+            "decision": "ignore",
+            "madeAt": 1708002967617
+        },
+        "1096485|mocha>minimatch": {
+            "decision": "ignore",
+            "madeAt": 1708002979356
         }
     },
     "rules": {},
