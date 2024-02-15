@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.19;
 
-import "forge-std/StdUtils.sol";
-import "forge-std/StdCheats.sol";
 import {CommonBase} from "forge-std/Base.sol";
 import {FvmAddress} from "../../../src/structs/FvmAddress.sol";
 import {SubnetID} from "../../../src/structs/Subnet.sol";
@@ -12,7 +10,7 @@ import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.
 
 uint256 constant ETH_SUPPLY = 129_590_000 ether;
 
-contract GatewayActorFacade is CommonBase, StdCheats, StdUtils {
+contract GatewayActorFacade is CommonBase {
     GatewayManagerFacet managerFacet;
 
     uint256 private constant DEFAULT_MIN_VALIDATOR_STAKE = 10 ether;
