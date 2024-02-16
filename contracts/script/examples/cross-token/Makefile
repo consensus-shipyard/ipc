@@ -1,0 +1,59 @@
+# Makefile for USDC Token Bridge on Calibration Network
+
+# Include environment variables from .env file
+include .env
+export
+
+.PHONY: help deploy-usdctest mint-usdc check-balance deploy-replica deploy-bridge update-replica deposit-usdc withdraw-usdc
+
+help:
+	@echo "Available targets:"
+	@echo "  deploy-usdctest  - Deploy the USDCTest contract on the Calibration Network."
+	@echo "  mint-usdc        - Mint 1000 USDCTest tokens to the wallet specified in the .env file."
+	@echo "  check-balance    - Check the balance of USDCTest tokens in the wallet."
+	@echo "  deploy-replica   - Deploy the token replica contract on the subnet."
+	@echo "  deploy-bridge    - Deploy the token bridge contract on the Calibration Network."
+	@echo "  update-replica   - Update the replica with the token bridge controller's address."
+	@echo "  deposit-usdc     - Deposit USDC to the subnet."
+	@echo "  withdraw-usdc    - Withdraw USDC from the subnet."
+	@echo ""
+	@echo "Usage:"
+	@echo "  make <target>    - Run a specific target."
+	@echo "  make help        - Display this help message."
+
+deploy-usdctest:
+	@echo "Deploying USDCTest contract..."
+	forge script DeployUSDCTest.s.sol --broadcast --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --skip-simulation
+
+mint-usdc:
+	@echo "Minting 1000 USDCTest tokens..."
+	cast send $$USDC "$$(cast calldata "mint(uint256)" 1000)" --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY
+
+check-balance:
+	@echo "Checking wallet balance..."
+	cast call $$USDC "$$(cast calldata 'balanceOf(address)' $$PUBLIC_ADDRESS)" --rpc-url $$CALIBNET_RPC_URL
+
+deploy-replica:
+	@echo "Deploying token replica contract on subnet..."
+	forge script DeployIpcTokenReplica.s.sol:DeployIpcTokenReplica --rpc-url $$SUBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "run(address,address,uint64,address[])" -- $$GATEWAY 0x0000000000000000000000000000000000000000 $$CALIBNET_CHAIN_ID '[]'
+
+deploy-bridge:
+	@echo "Deploying token bridge contract on Calibnet..."
+	forge script DeployIpcTokenController.s.sol:DeployIpcTokenController --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "run(address,address,uint64,address[],address)" -- $$GATEWAY $$USDC $$CALIBNET_CHAIN_ID "[$$GATEWAY]" $$IpcTokenReplica
+
+update-replica:
+	@echo "Updating replica with controller's address..."
+	cast send $$IpcTokenReplica "setController(address)" $$IpcTokenController --rpc-url $$RPC_URL --private-key $$PRIVATE_KEY
+
+deposit-usdc:
+	@echo "Depositing USDC to subnet..."
+	# To deposit 1,000 USDCTest tokens
+	AMOUNT=1000
+	cast send $$USDC "approve(address,uint256)" --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY -- $$IpcTokenController $$AMOUNT
+	forge script CallLockAndTransfer.s.sol:CallLockAndTransfer --rpc-url $$RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "run(address,address,uint256)" -- $$IpcTokenController $$PUBLIC_ADDRESS $$AMOUNT
+
+withdraw-usdc:
+	@echo "Withdrawing USDC from subnet..."
+	# To withdraw 1,000 USDCTest tokens
+	forge script CallLockAndTransfer.s.sol:CallLockAndTransfer --rpc-url $$RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "run(address,address,uint256)" -- $$IpcTokenController $$PUBLIC_ADDRESS $$AMOUNT
+
