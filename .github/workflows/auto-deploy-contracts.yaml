@@ -66,9 +66,22 @@ jobs:
         run: |
           echo "gateway_address: $gateway_address"
           echo "registry_address: $registry_address"
-      - name: Write deployed address to file
+      - name: Write deployed address to output file
         run: |
           mkdir -p deployments
           json_str='{"commit":"${{ github.sha }}","gateway_addr":"'$gateway_address'","registry_addr":"'$registry_address'"}'
           jq -n "$json_str" > deployments/r314159.json
           cat deployments/r314159.json
+      - name: Commit output file and push it to repo
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: Update contract address
+          branch: cd/contracts
+          file_pattern: deployments/r314159.json
+          commit_user_name: Contract Auto Deployer
+          commit_user_email: dummy@dummy.org
+          push_options: '--force'
+          skip_dirty_check: true
+          create_branch: true
+
+
