@@ -25,7 +25,7 @@ jobs:
       - name: Checkout code repo
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref }}
+          ref: ${{ github.ref_name }}
           submodules: recursive
       - name: Setup node and npm
         uses: actions/setup-node@v4
@@ -35,14 +35,17 @@ jobs:
           cache-dependency-path: contracts/package-lock.json
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
-#      - name: Deploy IPC contracts to calibration net
-#        run: |
-#          cd contracts
-#          npm install --save hardhat
-#          make deploy-ipc NETWORK=calibrationnet
+      - name: Deploy IPC contracts to calibration net
+        id: deploy_contracts
+        run: |
+          cd contracts
+          npm install --save hardhat
+          echo "deploy_output=$(make deploy-ipc NETWORK=calibrationnet)" >> $GITHUB_OUTPUT
       - name: Test create output
         id: gen_output
         run: |
           echo "key=$(date)" >> $GITHUB_OUTPUT
       - name: test use output
         run: echo ${{ steps.gen_output.outputs.key }}
+      - name: Test view deploy_output
+        run: echo ${{ steps.deploy_contracts.outputs.deploy_output }}
