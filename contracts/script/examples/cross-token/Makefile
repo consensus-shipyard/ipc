@@ -4,7 +4,7 @@
 include .env
 export
 
-.PHONY: help deploy-usdctest mint-usdc check-balance deploy-replica deploy-bridge update-replica deposit-usdc withdraw-usdc
+.PHONY: help deploy-usdctest mint-usdc check-balance deploy-replica deploy-controller update-replica deposit-usdc withdraw-usdc
 
 help:
 	@echo "Available targets:"
@@ -12,8 +12,8 @@ help:
 	@echo "  mint-usdc        - Mint 1000 USDCTest tokens to the wallet specified in the .env file."
 	@echo "  check-balance    - Check the balance of USDCTest tokens in the wallet."
 	@echo "  deploy-replica   - Deploy the token replica contract on the subnet."
-	@echo "  deploy-bridge    - Deploy the token bridge contract on the Calibration Network."
-	@echo "  update-replica   - Update the replica with the token bridge controller's address."
+	@echo "  deploy-controller    - Deploy the token controller contract on the Calibration Network."
+	@echo "  update-replica   - Update the replica with the token controller controller's address."
 	@echo "  deposit-usdc     - Deposit USDC to the subnet."
 	@echo "  withdraw-usdc    - Withdraw USDC from the subnet."
 	@echo ""
@@ -37,8 +37,8 @@ deploy-replica:
 	@echo "Deploying token replica contract on subnet..."
 	forge script DeployIpcTokenReplica.s.sol:DeployIpcTokenReplica --rpc-url $$SUBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "run(address,address,uint64,address[])" -- $$GATEWAY 0x0000000000000000000000000000000000000000 $$CALIBNET_CHAIN_ID '[]'
 
-deploy-bridge:
-	@echo "Deploying token bridge contract on Calibnet..."
+deploy-controller:
+	@echo "Deploying token controller contract on Calibnet..."
 	forge script DeployIpcTokenController.s.sol:DeployIpcTokenController --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "run(address,address,uint64,address[],address)" -- $$GATEWAY $$USDC $$CALIBNET_CHAIN_ID "[$$GATEWAY]" $$IpcTokenReplica
 
 update-replica:
