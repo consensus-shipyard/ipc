@@ -58,9 +58,9 @@ dirs = "5.0"
 dircpy = "0.3"
 env_logger = "0.10"
 erased-serde = "0.3"
-ethers = { version = "2.0", features = ["abigen", "ws"] }
-ethers-core = { version = "2.0" }
-ethers-contract = "2.0.8"
+ethers = { version = "2.0.13", features = ["abigen", "ws"] }
+ethers-core = { version = "2.0.13" }
+ethers-contract = "2.0.13"
 fnv = "1.0"
 futures = "0.3"
 futures-core = "0.3"
