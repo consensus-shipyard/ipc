@@ -35,8 +35,14 @@ jobs:
           cache-dependency-path: contracts/package-lock.json
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
-      - name: Deploy IPC contracts to calibration net
+#      - name: Deploy IPC contracts to calibration net
+#        run: |
+#          cd contracts
+#          npm install --save hardhat
+#          make deploy-ipc NETWORK=calibrationnet
+      - name: Test create output
+        id: gen_output
         run: |
-          cd contracts
-          npm install --save hardhat
-          make deploy-ipc NETWORK=calibrationnet
+          echo "key=$(date)" >> $GITHUB_OUTPUT
+      - name: test use output
+        run: echo ${{ steps.gen_output.outputs.key }}
