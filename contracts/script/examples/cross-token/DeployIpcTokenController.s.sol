@@ -10,8 +10,13 @@ contract DeployIpcTokenController is Script {
         // Example for setting up the SubnetID, adjust according to your actual setup
         SubnetID memory destinationSubnet = SubnetID({root: _rootNetChainId, route: _route});
 
+        vm.startBroadcast();
+
         // Deploy the IpcTokenController contract
         IpcTokenController controller = new IpcTokenController(_gateway, _tokenContractAddress, destinationSubnet, _destinationContract);
+
+        vm.stopBroadcast();
+
 
         // Log the address of the deployed contract
         console.log("IpcTokenController deployed at:", address(controller));

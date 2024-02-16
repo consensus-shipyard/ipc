@@ -10,8 +10,12 @@ contract DeployIpcTokenReplica is Script {
         // Assuming SubnetID is a struct and can be instantiated like this
         SubnetID memory controllerSubnet = SubnetID({root: _rootNetChainId , route: _route});
 
+        vm.startBroadcast();
+
         // Deploy the IpcTokenReplica contract
         IpcTokenReplica replica = new IpcTokenReplica(_gateway, _controller, controllerSubnet);
+
+        vm.stopBroadcast();
 
         // Log the address of the deployed contract
         console.log("IpcTokenReplica deployed at:", address(replica));
