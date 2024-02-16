@@ -31,6 +31,7 @@ use fendermint_vm_interpreter::{
 };
 use fendermint_vm_message::query::FvmQueryHeight;
 use fendermint_vm_snapshot::{SnapshotClient, SnapshotError};
+use fendermint_vm_upgrade_scheduler::upgrade_scheduler::UpgradeScheduler;
 use fvm::engine::MultiEngine;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::chainid::ChainID;
@@ -43,6 +44,7 @@ use tendermint::abci::request::CheckTxKind;
 use tendermint::abci::{request, response};
 use tracing::instrument;
 
+use crate::upgrades::load_upgrade_scheduler;
 use crate::{tmconv::*, VERSION};
 use crate::{BlockHeight, APP_VERSION};
 
@@ -162,6 +164,8 @@ where
     ///
     /// Zero means unlimited.
     state_hist_size: u64,
+    /// Upgrade scheduler stores all the upgrades to be executed at given heights.
+    upgrade_scheduler: UpgradeScheduler<SS>,
 }
 
 impl<DB, SS, S, I> App<DB, SS, S, I>
@@ -182,6 +186,8 @@ where
         chain_env: ChainEnv,
         snapshots: Option<SnapshotClient>,
     ) -> Result<Self> {
+        let upgrade_scheduler = load_upgrade_scheduler::<SS>().expect("Invalid upgrade schedule");
+
         let app = Self {
             db: Arc::new(db),
             state_store: Arc::new(state_store),
@@ -196,6 +202,7 @@ where
             snapshots,
             exec_state: Arc::new(tokio::sync::Mutex::new(None)),
             check_state: Arc::new(tokio::sync::Mutex::new(None)),
+            upgrade_scheduler,
         };
         app.init_committed_state()?;
         Ok(app)
@@ -760,7 +767,26 @@ where
 
         // TODO: Return events from epoch transitions.
         let ret = self
-            .modify_exec_state(|s| self.interpreter.end(s))
+            .modify_exec_state(|s| async {
+                // check for upgrades in the upgrade_scheduler
+                if let Some(upgrade) = self
+                    .upgrade_scheduler
+                    .get_upgrade(request.height.try_into()?)
+                {
+                    // there is an upgrade scheduled for this height, lets run the migration
+                    let res = (upgrade.migration)(&s.1);
+
+                    tracing::info!(
+                        "upgrade at height {} with migration result {:?}",
+                        request.height,
+                        res
+                    );
+                }
+
+                let ret = self.interpreter.end(s).await?;
+
+                Ok(ret)
+            })
             .await
             .context("end failed")?;
 

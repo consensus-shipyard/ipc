@@ -50,11 +50,14 @@ fendermint_vm_core = { path = "../vm/core" }
 fendermint_vm_encoding = { path = "../vm/encoding" }
 fendermint_vm_event = { path = "../vm/event" }
 fendermint_vm_genesis = { path = "../vm/genesis" }
-fendermint_vm_interpreter = { path = "../vm/interpreter", features = ["bundle"] }
+fendermint_vm_interpreter = { path = "../vm/interpreter", features = [
+    "bundle",
+] }
 fendermint_vm_message = { path = "../vm/message" }
 fendermint_vm_resolver = { path = "../vm/resolver" }
 fendermint_vm_snapshot = { path = "../vm/snapshot" }
 fendermint_vm_topdown = { path = "../vm/topdown" }
+fendermint_vm_upgrade_scheduler = { path = "../vm/upgrade_scheduler" }
 
 fvm = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }

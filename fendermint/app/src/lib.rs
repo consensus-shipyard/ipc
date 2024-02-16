@@ -4,6 +4,7 @@ mod app;
 pub mod ipc;
 mod store;
 mod tmconv;
+mod upgrades;
 
 pub use app::{App, AppConfig};
 pub use store::{AppStore, BitswapBlockstore};

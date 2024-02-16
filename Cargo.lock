@@ -2865,6 +2865,7 @@ dependencies = [
  "fendermint_vm_resolver",
  "fendermint_vm_snapshot",
  "fendermint_vm_topdown",
+ "fendermint_vm_upgrade_scheduler",
  "fvm",
  "fvm_ipld_blockstore",
  "fvm_ipld_car",
@@ -3425,6 +3426,15 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "fendermint_vm_upgrade_scheduler"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fendermint_vm_interpreter",
+ "fvm_ipld_blockstore",
 ]
 
 [[package]]
