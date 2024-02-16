@@ -1,8 +1,8 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use crate::{
-    ipc, Account, Actor, ActorMeta, Collateral, Genesis, Multisig, Power, SignerAddr, Validator,
-    ValidatorKey,
+    ipc, Account, Actor, ActorMeta, Collateral, Genesis, Multisig, PermissionMode, Power,
+    SignerAddr, Validator, ValidatorKey,
 };
 use cid::multihash::MultihashDigest;
 use fendermint_crypto::SecretKey;
@@ -108,6 +108,7 @@ impl Arbitrary for Genesis {
             power_scale: *g.choose(&[-1, 0, 3]).unwrap(),
             validators: (0..nv).map(|_| Arbitrary::arbitrary(g)).collect(),
             accounts: (0..na).map(|_| Arbitrary::arbitrary(g)).collect(),
+            eam_permission_mode: PermissionMode::Unrestricted,
             ipc: if bool::arbitrary(g) {
                 Some(ipc::IpcParams::arbitrary(g))
             } else {
