@@ -29,14 +29,14 @@ jobs:
           #ref: ${{ github.ref_name }}
           ref: ${{ github.head_ref }}
           submodules: recursive
-      - name: Setup node and npm
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-          cache-dependency-path: contracts/package-lock.json
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+#      - name: Setup node and npm
+#        uses: actions/setup-node@v4
+#        with:
+#          node-version: 20
+#          cache: 'npm'
+#          cache-dependency-path: contracts/package-lock.json
+#      - name: Install Foundry
+#        uses: foundry-rs/foundry-toolchain@v1
 #      - name: Deploy IPC contracts to calibration net
 #        id: deploy_contracts
 #        run: |
@@ -60,8 +60,8 @@ jobs:
           deploy_output=$(cat scripts/deploy_subnet_under_calibration_net/deploy_output.txt)
           deployed_gateway_address=$(echo "$deploy_output" | grep '"Gateway"' | awk -F'"' '{print $4}')
           deployed_registry_address=$(echo "$deploy_output" | grep '"SubnetRegistry"' | awk -F'"' '{print $4}')
-          echo "gateway_address=$deploy_gateway_address" >> $GITHUB_ENV
-          echo "registry_address=$deploy_registry_address" >> $GITHUB_ENV
+          echo "gateway_address=$deployed_gateway_address" >> $GITHUB_ENV
+          echo "registry_address=$deployed_registry_address" >> $GITHUB_ENV
       - name: Read deployed addresses
         run: |
           echo "gateway_address: $gateway_address"
