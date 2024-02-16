@@ -24,8 +24,6 @@ library LibDiamond {
     error CannotRemoveFunctionThatDoesNotExist(bytes4 _selector);
     error CannotRemoveImmutableFunction(bytes4 _selector);
 
-    event DiamondCut(IDiamondCut.FacetCut[] _diamondCut, address _init, bytes _calldata);
-
     struct FacetAddressAndSelectorPosition {
         address facetAddress;
         uint16 selectorPosition;
@@ -91,7 +89,7 @@ library LibDiamond {
                 ++facetIndex;
             }
         }
-        emit DiamondCut({_diamondCut: _diamondCut, _init: _init, _calldata: _calldata});
+        emit IDiamond.DiamondCut({_diamondCut: _diamondCut, _init: _init, _calldata: _calldata});
         initializeDiamondCut(_init, _calldata);
     }
 
