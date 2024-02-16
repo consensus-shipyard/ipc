@@ -37,15 +37,15 @@ jobs:
           cache-dependency-path: contracts/package-lock.json
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
-      - name: Deploy IPC contracts to calibration net
-        id: deploy_contracts
-        run: |
-          cd contracts
-          npm install --save hardhat
-          output=$(make deploy-ipc NETWORK=calibrationnet)
-          echo "deploy_output<<EOF" >> $GITHUB_OUTPUT
-          echo "$output" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+#      - name: Deploy IPC contracts to calibration net
+#        id: deploy_contracts
+#        run: |
+#          cd contracts
+#          npm install --save hardhat
+#          output=$(make deploy-ipc NETWORK=calibrationnet)
+#          echo "deploy_output<<EOF" >> $GITHUB_OUTPUT
+#          echo "$output" >> $GITHUB_OUTPUT
+#          echo "EOF" >> $GITHUB_OUTPUT
 #      - name: Test create output
 #        id: gen_output
 #        run: |
