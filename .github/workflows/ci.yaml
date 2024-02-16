@@ -98,6 +98,7 @@ jobs:
 
   fendermint-test:
     uses: ./.github/workflows/fendermint-test.yaml
+    secrets: inherit
     needs: [changes, license]
     if: >-
       needs.changes.outputs.workspace == 'true' ||

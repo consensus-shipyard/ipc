@@ -1,117 +1,80 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::{anyhow, Context};
-use std::path::PathBuf;
-use std::str::FromStr;
-use std::sync::Arc;
-use trace4rs::config::{AppenderId, Policy, Target};
-use trace4rs::{
-    config::{self, Config, Format},
-    Handle,
-};
-
 pub use fendermint_app_options as options;
 pub use fendermint_app_settings as settings;
-use fendermint_app_settings::expand_tilde;
-
+use tracing_appender::{
+    non_blocking::WorkerGuard,
+    rolling::{RollingFileAppender, Rotation},
+};
+use tracing_subscriber::{
+    fmt::{self, writer::MakeWriterExt},
+    layer::SubscriberExt,
+};
 mod cmd;
 
+fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
+    let mut guard = None;
+
+    let Some(log_level) = opts.tracing_level() else {
+        return guard;
+    };
+
+    let registry = tracing_subscriber::registry();
+
+    // add a file layer if log_dir is set
+    let registry = registry.with(if let Some(log_dir) = &opts.log_dir {
+        let filename = match &opts.log_file_prefix {
+            Some(prefix) => format!("{}-{}", prefix, "fendermint"),
+            None => "fendermint".to_string(),
+        };
+
+        let appender = RollingFileAppender::builder()
+            .filename_prefix(filename)
+            .filename_suffix("log")
+            .rotation(Rotation::DAILY)
+            .max_log_files(5)
+            .build(log_dir)
+            .expect("failed to initialize rolling file appender");
+
+        let (non_blocking, g) = tracing_appender::non_blocking(appender);
+        guard = Some(g);
+
+        Some(
+            fmt::Layer::new()
+                .json()
+                .with_writer(non_blocking.with_max_level(log_level))
+                .with_target(false)
+                .with_file(true)
+                .with_line_number(true),
+        )
+    } else {
+        None
+    });
+
+    // we also log all traces with level INFO or higher to stdout
+    let registry = registry.with(
+        tracing_subscriber::fmt::layer()
+            .with_writer(std::io::stdout.with_max_level(tracing::Level::INFO))
+            .with_target(false)
+            .with_file(true)
+            .with_line_number(true),
+    );
+
+    tracing::subscriber::set_global_default(registry).expect("Unable to set a global collector");
+
+    guard
+}
 #[tokio::main]
 async fn main() {
     let opts = options::parse();
 
-    if let Some(level) = opts.tracing_level() {
-        create_log(level, opts.log_dir.as_ref()).expect("cannot create logging");
-    }
+    let _guard = init_tracing(&opts);
 
     if let Err(e) = cmd::exec(&opts).await {
         tracing::error!("failed to execute {:?}: {e:?}", opts);
         std::process::exit(1);
     }
-}
-
-fn create_log(level: tracing::Level, log_dir: Option<&PathBuf>) -> anyhow::Result<()> {
-    let console_appender = config::Appender::Console;
-
-    // default logging output info log to console
-    let default = config::Logger {
-        level: config::LevelFilter::from_str(level.as_str())?,
-        appenders: literally::hset! { AppenderId::from("console") },
-        format: Format::default(),
-    };
-
-    let mut config = Config {
-        default: default.clone(),
-        loggers: literally::hmap! {},
-        appenders: literally::hmap! {AppenderId::from("console") => console_appender},
-    };
-
-    if let Some(log_dir) = log_dir {
-        let log_folder = expand_tilde(log_dir)
-            .to_str()
-            .ok_or_else(|| anyhow!("cannot parse log folder"))?
-            .to_string();
-        std::fs::create_dir_all(&log_folder).context("cannot create log folder")?;
-
-        let topdown_appender = config::Appender::RollingFile {
-            path: format!("{log_folder}/topdown.log"),
-            policy: Policy {
-                maximum_file_size: "10mb".to_string(),
-                // we keep the last 5 log files, older files will be deleted
-                max_size_roll_backups: 5,
-                pattern: None,
-            },
-        };
-        let debug_appender = config::Appender::RollingFile {
-            path: format!("{log_folder}/debug.log"),
-            policy: Policy {
-                maximum_file_size: "10mb".to_string(),
-                // we keep the last 5 log files, older files will be deleted
-                max_size_roll_backups: 5,
-                pattern: None,
-            },
-        };
-
-        let topdown_logger = config::Logger {
-            level: config::LevelFilter::DEBUG,
-            appenders: literally::hset! { AppenderId::from("topdown") },
-            format: Format::default(),
-        };
-        let debug_logger = config::Logger {
-            level: config::LevelFilter::DEBUG,
-            appenders: literally::hset! { AppenderId::from("debug") },
-            format: Format::default(),
-        };
-
-        config.loggers.insert(
-            Target::from("fendermint_vm_topdown"),
-            topdown_logger.clone(),
-        );
-        config.loggers.insert(
-            Target::from("fendermint_vm_interpreter::chain"),
-            topdown_logger,
-        );
-        config
-            .appenders
-            .insert(AppenderId::from("topdown"), topdown_appender);
-
-        // maybe there are better ways to handle this, but * does not seem to be supported
-        config
-            .loggers
-            .insert(Target::from("fendermint"), debug_logger);
-        config.loggers.insert(Target::from("fendermint"), default);
-        config
-            .appenders
-            .insert(AppenderId::from("debug"), debug_appender);
-    }
-
-    let handle = Arc::new(Handle::try_from(config)?);
-
-    tracing::subscriber::set_global_default(handle.subscriber())
-        .context("setting default subscriber failed")?;
-
-    Ok(())
 }
 
 #[cfg(test)]
