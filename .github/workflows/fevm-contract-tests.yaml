@@ -76,6 +76,8 @@ jobs:
       - name: Run a testnode
         id: testnode
         working-directory: ipc/
+        env:
+          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
         run: |
           export BALANCE=10000000000
           { out=$(cargo make --makefile ./infra/fendermint/Makefile.toml testnode | tee /dev/fd/3); } 3>&1
