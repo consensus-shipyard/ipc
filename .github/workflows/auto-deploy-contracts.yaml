@@ -66,3 +66,8 @@ jobs:
         run: |
           echo "gateway_address: $gateway_address"
           echo "registry_address: $registry_address"
+      - name: Write deployed address to file
+        run: |
+          mkdir -p deployments
+          jq -n '{ "commit": $GITHUB_SHA, "gateway_addr": $gateway_address, "registry_addr": $registry_address }' > deployments/r314159.json
+          cat deployments/r314159.json
