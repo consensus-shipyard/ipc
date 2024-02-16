@@ -46,11 +46,23 @@ jobs:
           echo "deploy_output<<EOF" >> $GITHUB_OUTPUT
           echo "$output" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-      - name: Test create output
-        id: gen_output
+#      - name: Test create output
+#        id: gen_output
+#        run: |
+#          echo "key=$(date)" >> $GITHUB_OUTPUT
+#      - name: test use output
+#        run: echo ${{ steps.gen_output.outputs.key }}
+#      - name: Test view deploy_output
+#        run: echo "${{ steps.deploy_contracts.outputs.deploy_output }}"
+      - name: Parse deploy output
         run: |
-          echo "key=$(date)" >> $GITHUB_OUTPUT
-      - name: test use output
-        run: echo ${{ steps.gen_output.outputs.key }}
-      - name: Test view deploy_output
-        run: echo ${{ steps.deploy_contracts.outputs.deploy_output }}
+#          deploy_output="${{ steps.deploy_contracts.outputs.deploy_output }}"
+          deploy_output=$(cat scripts/deploy_subnet_under_calibration_net/deploy_output.txt)
+          deployed_gateway_address=$(echo "$deploy_output" | grep '"Gateway"' | awk -F'"' '{print $4}')
+          deployed_registry_address=$(echo "$deploy_output" | grep '"SubnetRegistry"' | awk -F'"' '{print $4}')
+          echo "gateway_address=$deploy_gateway_address" >> $GITHUB_ENV
+          echo "registry_address=$deploy_registry_address" >> $GITHUB_ENV
+      - name: Read deployed addresses
+        run: |
+          echo "gateway_address: $gateway_address"
+          echo "registry_address: $registry_address"
