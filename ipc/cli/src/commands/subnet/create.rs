@@ -7,7 +7,6 @@ use std::str::FromStr;
 
 use async_trait::async_trait;
 use clap::Args;
-use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 
 use ipc_api::subnet::{PermissionMode, SupplyKind, SupplySource};
@@ -35,7 +34,7 @@ impl CreateSubnet {
         };
 
         let token_address = if let Some(addr) = &arguments.supply_source_address {
-            Some(Address::from_str(addr)?)
+            Some(require_fil_addr_from_str(addr)?)
         } else {
             None
         };
