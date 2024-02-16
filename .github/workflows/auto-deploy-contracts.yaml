@@ -25,48 +25,47 @@ jobs:
       - name: Checkout code repo
         uses: actions/checkout@v4
         with:
-          # TODO(jie): After switch to workflow_dispatch only, uncomment this
-          #ref: ${{ github.ref_name }}
+          # TODO(jie): After switch to workflow_dispatch only, we should use ref_name.
+          # head_ref only works for workflow triggered by pull requests.
+          # ref: ${{ github.ref_name }}
           ref: ${{ github.head_ref }}
           submodules: recursive
-#      - name: Setup node and npm
-#        uses: actions/setup-node@v4
-#        with:
-#          node-version: 20
-#          cache: 'npm'
-#          cache-dependency-path: contracts/package-lock.json
-#      - name: Install Foundry
-#        uses: foundry-rs/foundry-toolchain@v1
-#      - name: Deploy IPC contracts to calibration net
-#        id: deploy_contracts
-#        run: |
-#          cd contracts
-#          npm install --save hardhat
-#          output=$(make deploy-ipc NETWORK=calibrationnet)
-#          echo "deploy_output<<EOF" >> $GITHUB_OUTPUT
-#          echo "$output" >> $GITHUB_OUTPUT
-#          echo "EOF" >> $GITHUB_OUTPUT
+      - name: Setup node and npm
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: contracts/package-lock.json
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+      - name: Deploy IPC contracts to calibration net
+        id: deploy_contracts
+        run: |
+          cd contracts
+          npm install --save hardhat
+          output=$(make deploy-ipc NETWORK=calibrationnet)
+          echo "deploy_output<<EOF" >> $GITHUB_OUTPUT
+          echo "$output" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
       - name: Parse deploy output
         # deploy_output=$(cat scripts/deploy_subnet_under_calibration_net/deploy_output.txt)
         # deploy_output='${{ steps.deploy_contracts.outputs.deploy_output }}'
         run: |
-          deploy_output=$(cat scripts/deploy_subnet_under_calibration_net/deploy_output.txt)
+          deploy_output='${{ steps.deploy_contracts.outputs.deploy_output }}'
           echo "$deploy_output"
           deployed_gateway_address=$(echo "$deploy_output" | grep '"Gateway"' | awk -F'"' '{print $4}')
           deployed_registry_address=$(echo "$deploy_output" | grep '"SubnetRegistry"' | awk -F'"' '{print $4}')
           echo "gateway_address=$deployed_gateway_address" >> $GITHUB_ENV
           echo "registry_address=$deployed_registry_address" >> $GITHUB_ENV
           echo "commit_hash=$(git rev-parse HEAD)" >> $GITHUB_ENV
-      - name: Read deployed addresses
+      - name: Review deployed addresses
         run: |
           echo "commit_hash: $commit_hash"
           echo "gateway_address: $gateway_address"
           echo "registry_address: $registry_address"
-      - name: Checkout code repo
+      - name: Switch code repo to cd/contract branch
         uses: actions/checkout@v4
         with:
-          # TODO(jie): After switch to workflow_dispatch only, uncomment this
-          #ref: ${{ github.ref_name }}
           ref: cd/contracts
           submodules: recursive
       - name: Write deployed address to output file
@@ -75,14 +74,14 @@ jobs:
           json_str='{"commit":"'$commit_hash'","gateway_addr":"'$gateway_address'","registry_addr":"'$registry_address'"}'
           jq -n "$json_str" > deployments/r314159.json
           cat deployments/r314159.json
-      - name: Commit output file and push it to repo
+      - name: Commit output file and push it to remote repo
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: Update contract address
           branch: cd/contracts
           file_pattern: deployments/r314159.json
           commit_user_name: Contract Auto Deployer
-          commit_user_email: dummy@dummy.org
+          commit_user_email: dummy@dummy.dummy
           push_options: '--force'
           skip_dirty_check: true
           create_branch: true
