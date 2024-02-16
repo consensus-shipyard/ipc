@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.23;
 
 import {NotEnoughBalance} from "../errors/IPCErrors.sol";
 import {SupplySource, SupplyKind} from "../structs/Subnet.sol";

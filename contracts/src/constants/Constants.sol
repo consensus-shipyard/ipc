@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.23;
 
 address constant BURNT_FUNDS_ACTOR = address(99);
 bytes32 constant EMPTY_HASH = bytes32("");

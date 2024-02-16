@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.23;
 
 import {IDiamondCut} from "../interfaces/IDiamondCut.sol";
 import {IDiamond} from "../interfaces/IDiamond.sol";

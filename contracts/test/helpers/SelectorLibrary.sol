@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.23;
 
 library SelectorLibrary {
     function resolveSelectors(string memory facetName) public pure returns (bytes4[] memory facetSelectors) {
