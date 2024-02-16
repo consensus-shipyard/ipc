@@ -1,0 +1,34 @@
+name: Examples
+
+on:
+  workflow_call:
+
+env:
+  FOUNDRY_PROFILE: ci
+
+jobs:
+  examples-axelar-token:
+    name: "Examples: Axelar token"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+    defaults:
+      run:
+        working-directory: ./examples/axelar-token
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+      - name: Run Forge build
+        id: build
+        run: |
+          forge --version
+          forge build --sizes
+      - name: Run Forge tests
+        id: test
+        run: |
+          forge test -vvvv

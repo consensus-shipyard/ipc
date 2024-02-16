@@ -79,6 +79,10 @@ jobs:
     uses: ./.github/workflows/contracts-sast.yaml
     needs: [contracts-prettier]
 
+  examples:
+    uses: ./.github/workflows/examples.yaml
+    needs: [contracts-prettier]
+
   ipc:
     uses: ./.github/workflows/ipc.yaml
     needs: [changes, license]
@@ -119,7 +123,6 @@ jobs:
       needs.changes.outputs.ipld-resolver == 'true' ||
       needs.changes.outputs.fendermint == 'true' ||
       github.ref == 'refs/heads/main'
-
 
   fendermint-publish:
     uses: ./.github/workflows/fendermint-publish.yaml
