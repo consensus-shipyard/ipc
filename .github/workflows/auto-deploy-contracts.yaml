@@ -56,8 +56,10 @@ jobs:
           deployed_registry_address=$(echo "$deploy_output" | grep '"SubnetRegistry"' | awk -F'"' '{print $4}')
           echo "gateway_address=$deployed_gateway_address" >> $GITHUB_ENV
           echo "registry_address=$deployed_registry_address" >> $GITHUB_ENV
+          echo "commit_hash=$(git rev-parse HEAD)" >> $GITHUB_ENV
       - name: Read deployed addresses
         run: |
+          echo "commit_hash: $commit_hash"
           echo "gateway_address: $gateway_address"
           echo "registry_address: $registry_address"
       - name: Checkout code repo
@@ -70,7 +72,7 @@ jobs:
       - name: Write deployed address to output file
         run: |
           mkdir -p deployments
-          json_str='{"commit":"${{ github.sha }}","gateway_addr":"'$gateway_address'","registry_addr":"'$registry_address'"}'
+          json_str='{"commit":"'$commit_hash'","gateway_addr":"'$gateway_address'","registry_addr":"'$registry_address'"}'
           jq -n "$json_str" > deployments/r314159.json
           cat deployments/r314159.json
       - name: Commit output file and push it to repo
