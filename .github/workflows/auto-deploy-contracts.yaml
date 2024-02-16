@@ -50,6 +50,7 @@ jobs:
         # deploy_output="${{ steps.deploy_contracts.outputs.deploy_output }}"
         # deploy_output=$(cat scripts/deploy_subnet_under_calibration_net/deploy_output.txt)
         run: |
+          echo "$deploy_output"
           deploy_output="${{ steps.deploy_contracts.outputs.deploy_output }}"
           deployed_gateway_address=$(echo "$deploy_output" | grep '"Gateway"' | awk -F'"' '{print $4}')
           deployed_registry_address=$(echo "$deploy_output" | grep '"SubnetRegistry"' | awk -F'"' '{print $4}')
