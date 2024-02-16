@@ -48,8 +48,6 @@ jobs:
           echo "$output" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
       - name: Parse deploy output
-        # deploy_output=$(cat scripts/deploy_subnet_under_calibration_net/deploy_output.txt)
-        # deploy_output='${{ steps.deploy_contracts.outputs.deploy_output }}'
         run: |
           deploy_output='${{ steps.deploy_contracts.outputs.deploy_output }}'
           echo "$deploy_output"
