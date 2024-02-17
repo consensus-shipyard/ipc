@@ -14,7 +14,6 @@ import {IPCAddress, SubnetID} from "../../structs/Subnet.sol";
 import {CrossMsgHelper} from "../../../src/lib/CrossMsgHelper.sol";
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
 import {InvalidOriginContract, InvalidOriginSubnet} from "./IpcCrossTokenErrors.sol";
-import "forge-std/console.sol";
 
 error NoTransfer();
 error ZeroAddress();
@@ -200,7 +199,6 @@ contract IpcTokenController is IpcExchange {
         ResultMsg memory resultMsg
     ) internal override {
         // TODO: remove from unconfirmedTransfers.
-        console.log("IpcTokenController _handleIpcResult");
     }
 
     // TODO: method for the owner to manually drop an entry from unconfirmedTransfers.
