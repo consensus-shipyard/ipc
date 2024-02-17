@@ -86,9 +86,9 @@ contract IpcTokenReplicaTest is Test, IntegrationTestBase {
         });
 
         vm.expectRevert(InvalidOriginContract.selector);
-        replica.verifyIpcEnvelope(invalidContract);
+        replica.verifyIpcEnvelopeLogic(invalidContract);
 
         vm.expectRevert(InvalidOriginSubnet.selector);
-        replica.verifyIpcEnvelope(invalidSubnet);
+        replica.verifyIpcEnvelopeLogic(invalidSubnet);
     }
 }

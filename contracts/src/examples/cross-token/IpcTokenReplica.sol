@@ -117,7 +117,7 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
         return controllerSubnet;
     }
 
-    modifier verifyIpcEnvelope(IpcEnvelope memory envelope) {
+    function verifyIpcEnvelopeLogic(IpcEnvelope memory envelope) public view {
         SubnetID memory subnetId = envelope.from.subnetId;
         FvmAddress memory rawAddress = envelope.from.rawAddress;
         if (!subnetId.equals(controllerSubnet)) {
@@ -126,6 +126,10 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
         if (!rawAddress.equal(FvmAddressHelper.from(controller))) {
             revert InvalidOriginContract();
         }
+    }
+
+    modifier verifyIpcEnvelope(IpcEnvelope memory envelope) {
+        verifyIpcEnvelopeLogic(envelope); // Call the function
         _; // Continue execution of the modified function
     }
 
