@@ -12,8 +12,8 @@ use std::path::PathBuf;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{
-    ipc, Account, Actor, ActorMeta, Collateral, Genesis, Multisig, SignerAddr, Validator,
-    ValidatorKey,
+    ipc, Account, Actor, ActorMeta, Collateral, Genesis, Multisig, PermissionMode, SignerAddr,
+    Validator, ValidatorKey,
 };
 
 use crate::cmd;
@@ -30,6 +30,7 @@ cmd! {
         GenesisCommands::AddMultisig(args) => args.exec(genesis_file).await,
         GenesisCommands::AddValidator(args) => args.exec(genesis_file).await,
         GenesisCommands::IntoTendermint(args) => args.exec(genesis_file).await,
+        GenesisCommands::SetEamPermissions(args) => args.exec(genesis_file).await,
         GenesisCommands::Ipc { command } => command.exec(genesis_file).await,
     }
   }
@@ -45,6 +46,7 @@ cmd! {
       power_scale: self.power_scale,
       validators: Vec::new(),
       accounts: Vec::new(),
+      eam_permission_mode: PermissionMode::Unrestricted,
       ipc: None
     };
 
@@ -76,6 +78,12 @@ cmd! {
 cmd! {
   GenesisIntoTendermintArgs(self, genesis_file: PathBuf) {
     into_tendermint(&genesis_file, self)
+  }
+}
+
+cmd! {
+  GenesisSetEAMPermissionsArgs(self, genesis_file: PathBuf) {
+    set_eam_permissions(&genesis_file, self)
   }
 }
 
@@ -184,6 +192,23 @@ where
     let json = serde_json::to_string_pretty(&genesis)?;
     std::fs::write(genesis_file, json)?;
     Ok(())
+}
+
+fn set_eam_permissions(
+    genesis_file: &PathBuf,
+    args: &GenesisSetEAMPermissionsArgs,
+) -> anyhow::Result<()> {
+    update_genesis(genesis_file, |mut genesis| {
+        genesis.eam_permission_mode = match args.mode.to_lowercase().as_str() {
+            "unrestricted" => PermissionMode::Unrestricted,
+            "allowlist" => {
+                let addresses = args.addresses.clone();
+                PermissionMode::AllowList { addresses }
+            }
+            _ => return Err(anyhow!("unknown eam permisison mode")),
+        };
+        Ok(genesis)
+    })
 }
 
 fn into_tendermint(genesis_file: &PathBuf, args: &GenesisIntoTendermintArgs) -> anyhow::Result<()> {
@@ -299,6 +324,7 @@ async fn new_genesis_from_parent(
         power_scale: args.power_scale,
         validators: Vec::new(),
         accounts: Vec::new(),
+        eam_permission_mode: PermissionMode::Unrestricted,
         ipc: Some(ipc_params),
     };
 

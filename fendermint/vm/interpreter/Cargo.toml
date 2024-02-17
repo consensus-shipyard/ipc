@@ -21,7 +21,7 @@ fendermint_eth_hardhat = { path = "../../eth/hardhat" }
 fendermint_rpc = { path = "../../rpc" }
 fendermint_actors = { path = "../../actors" }
 fendermint_actor_chainmetadata = { path = "../../actors/chainmetadata" }
-fendermint_actor_eam = { path = "../../actors/eam" }
+fendermint_actor_eam = { workspace = true }
 ipc_actors_abis = { workspace = true }
 
 ipc-api = { workspace = true }
