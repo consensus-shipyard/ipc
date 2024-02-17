@@ -17,7 +17,6 @@ import {IPCAddress, SubnetID} from "../../structs/Subnet.sol";
 import {CrossMsgHelper} from "../../../src/lib/CrossMsgHelper.sol";
 import {InvalidOriginContract, InvalidOriginSubnet} from "./IpcCrossTokenErrors.sol";
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
-import "forge-std/console.sol";
 
 error NoTransfer();
 error ZeroAddress();
@@ -115,7 +114,6 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
         IpcEnvelope memory envelope,
         CallMsg memory callMsg
     ) internal override returns (bytes memory) {
-        console.log("IpcTokenReplica ipc call");
         // only accept messages from replica contract
         // TODO: try to turn this into a modifier.
         verifyIpcEnvelope(envelope);
@@ -168,7 +166,6 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
         IpcEnvelope memory result,
         ResultMsg memory resultMsg
     ) internal override {
-        console.log("IpcTokenReplica _handleIpcResult");
         // TODO: remove correlation from unconfirmedTransfers
     }
 }
