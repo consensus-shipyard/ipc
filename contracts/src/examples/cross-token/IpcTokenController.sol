@@ -15,11 +15,14 @@ import {CrossMsgHelper} from "../../../src/lib/CrossMsgHelper.sol";
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
 import {InvalidOriginContract, InvalidOriginSubnet} from "./IpcCrossTokenErrors.sol";
 
-error NoTransfer();
 error ZeroAddress();
 error InvalidMessageSignature();
 error InvalidMethod();
-error ValueMustBeZero();
+error TransferRejected(string reason);
+
+string constant ERR_ZERO_ADDRESS = "Zero address is not allowed";
+string constant ERR_VALUE_MUST_BE_ZERO = "Value must be zero";
+
 
 /**
  * @title IpcTokenController
@@ -151,17 +154,14 @@ contract IpcTokenController is IpcExchange {
         address receiver,
         uint256 amount
     ) internal returns (IpcEnvelope memory committed) {
-        // Ensure msg.value is zero, revert with ValueMustBeZero error otherwise
         if (msg.value != 0) {
-            revert ValueMustBeZero();
+            revert TransferRejected(ERR_VALUE_MUST_BE_ZERO);
         }
-
-        // TODO: coalesce error types to a single TransferRejected(string reason).
         if (destinationContract == address(0)) {
-            revert ZeroAddress();
+            revert TransferRejected(ERR_ZERO_ADDRESS);
         }
         if (receiver == address(0)) {
-            revert ZeroAddress();
+            revert TransferRejected(ERR_ZERO_ADDRESS);
         }
 
         IERC20(tokenContractAddress).safeTransferFrom({from: msg.sender, to: address(this), value: amount});
