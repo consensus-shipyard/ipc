@@ -117,14 +117,22 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
         return controllerSubnet;
     }
 
+    modifier verifyIpcEnvelope(IpcEnvelope memory envelope) {
+        SubnetID memory subnetId = envelope.from.subnetId;
+        FvmAddress memory rawAddress = envelope.from.rawAddress;
+        if (!subnetId.equals(controllerSubnet)) {
+            revert InvalidOriginSubnet();
+        }
+        if (!rawAddress.equal(FvmAddressHelper.from(controller))) {
+            revert InvalidOriginContract();
+        }
+        _; // Continue execution of the modified function
+    }
+
     function _handleIpcCall(
         IpcEnvelope memory envelope,
         CallMsg memory callMsg
-    ) internal override returns (bytes memory) {
-        // only accept messages from replica contract
-        // TODO: try to turn this into a modifier.
-        verifyIpcEnvelope(envelope);
-
+    ) internal override verifyIpcEnvelope(envelope) returns (bytes memory) {
         bytes4 methodSignature = toBytes4(callMsg.method);
         // Note: cannot use receiveAndMint.selector because the method is private.
         if (methodSignature != bytes4(keccak256("receiveAndMint(address,uint256)"))) {
@@ -134,17 +142,6 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
         (address receiver, uint256 amount) = abi.decode(callMsg.params, (address, uint256));
         receiveAndMint(receiver, amount);
         return bytes("");
-    }
-
-    function verifyIpcEnvelope(IpcEnvelope memory envelope) public {
-        SubnetID memory subnetId = envelope.from.subnetId;
-        FvmAddress memory rawAddress = envelope.from.rawAddress;
-        if (!subnetId.equals(controllerSubnet)) {
-            revert InvalidOriginSubnet();
-        }
-        if (!rawAddress.equal(FvmAddressHelper.from(controller))) {
-            revert InvalidOriginContract();
-        }
     }
 
     // TODO: replace with abi.decode(data, (bytes4))?
