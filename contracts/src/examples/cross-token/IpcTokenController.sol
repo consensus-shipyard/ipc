@@ -19,6 +19,7 @@ error NoTransfer();
 error ZeroAddress();
 error InvalidMessageSignature();
 error InvalidMethod();
+error ValueMustBeZero();
 
 /**
  * @title IpcTokenController
@@ -150,7 +151,11 @@ contract IpcTokenController is IpcExchange {
         address receiver,
         uint256 amount
     ) internal returns (IpcEnvelope memory committed) {
-        // TODO: reject calls with non-zero msg.value
+        // Ensure msg.value is zero, revert with ValueMustBeZero error otherwise
+        if (msg.value != 0) {
+            revert ValueMustBeZero();
+        }
+
         // TODO: coalesce error types to a single TransferRejected(string reason).
         if (destinationContract == address(0)) {
             revert ZeroAddress();
