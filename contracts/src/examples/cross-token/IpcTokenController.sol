@@ -164,14 +164,7 @@ contract IpcTokenController is IpcExchange {
             revert ZeroAddress();
         }
 
-        uint256 startingBalance = IERC20(tokenContractAddress).balanceOf(address(this));
         IERC20(tokenContractAddress).safeTransferFrom({from: msg.sender, to: address(this), value: amount});
-        uint256 endingBalance = IERC20(tokenContractAddress).balanceOf(address(this));
-
-        // TODO(raulk): won't safeTransferFrom revert if the amount could not be transferred? What does this protect against?
-        if (endingBalance <= startingBalance) {
-            revert NoTransfer();
-        }
 
         CallMsg memory message = CallMsg({
             method: abi.encodePacked(bytes4(keccak256("receiveAndMint(address,uint256)"))),
