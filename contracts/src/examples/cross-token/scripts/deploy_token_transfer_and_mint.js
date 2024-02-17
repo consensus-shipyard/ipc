@@ -42,14 +42,9 @@ async function main() {
     const receiverAddress = accountAddress // choose to mint proxy tokens to some address on the subnet
     const transferAmount = hre.ethers.utils.parseUnits('500', 18) // Amount of tokens to transfer and mint
 
-    // Define the DEFAULT_CROSS_MSG_FEE
-    const DEFAULT_CROSS_MSG_FEE = hre.ethers.utils.parseUnits('10', 'gwei')
-
     // Approve the IpcTokenController contract to spend tokens on behalf of the deployer
     await erc20Token.approve(ipcTokenController.address, transferAmount)
-    await ipcTokenController.transferAndMint(receiverAddress, transferAmount, {
-        value: DEFAULT_CROSS_MSG_FEE,
-    })
+    await ipcTokenController.transferAndMint(receiverAddress, transferAmount)
 
     console.log(
         `Transfer and mint request made for ${transferAmount} tokens to ${receiverAddress}`,
@@ -77,9 +72,7 @@ async function main() {
     console.log(2)
 
     //transfer
-    await subnetTokenBridge.depositTokens(accountAddress, transferAmount, {
-        value: DEFAULT_CROSS_MSG_FEE,
-    })
+    await subnetTokenBridge.depositTokens(accountAddress, transferAmount)
     console.log(3)
 
     // todo
