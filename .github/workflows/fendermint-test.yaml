@@ -84,7 +84,7 @@ jobs:
           cache-prefix: fendermint-${{ matrix.make.name }}-${{ matrix.os }}-${{ matrix.rust }}-${{ hashFiles('rust-toolchain', 'rust-toolchain.toml') }}
           cache-suffix: ${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Cache Solidity ABI arfiacts
+      - name: Cache Solidity ABI artifacts
         uses: actions/cache@v2
         with:
           path: ./contracts/out
@@ -95,4 +95,6 @@ jobs:
         run: docker pull ghcr.io/consensus-shipyard/fendermint:latest
 
       - name: ${{ matrix.make.name }}
+        env:
+          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
         run: cd fendermint && make ${{ matrix.make.task }}

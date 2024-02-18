@@ -5,6 +5,7 @@ extend = [
   { path = "scripts/ethapi.toml" },
   { path = "scripts/genesis.toml" },
   { path = "scripts/node.toml" },
+  { path = "scripts/promtail.toml" },
   { path = "scripts/testnet.toml" },
   { path = "scripts/testnode.toml" },
   { path = "scripts/subnet.toml" },
@@ -84,11 +85,14 @@ COMETBFT_SUBDIR = "cometbft"
 CMT_CONTAINER_NAME = "${NODE_NAME}-cometbft"
 FM_CONTAINER_NAME = "${NODE_NAME}-fendermint"
 ETHAPI_CONTAINER_NAME = "${NODE_NAME}-ethapi"
+PROMTAIL_CONTAINER_NAME="${NODE_NAME}-promtail"
+
 
 CMT_DOCKER_IMAGE = "cometbft/cometbft:v0.37.x"
 FM_DOCKER_TAG = "latest"
 FM_DOCKER_IMAGE = "fendermint:${FM_DOCKER_TAG}"
 FM_REMOTE_DOCKER_IMAGE = "ghcr.io/consensus-shipyard/fendermint:${FM_DOCKER_TAG}"
+PROMTAIL_DOCKER_IMAGE = "grafana/promtail:latest"
 # If this wasn't present, any wait task is skipped.
 CARGO_MAKE_WAIT_MILLISECONDS = 5000
 # This wait time seems to work locally.

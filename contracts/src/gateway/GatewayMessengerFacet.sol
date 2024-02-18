@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-pragma solidity 0.8.19;
+pragma solidity ^0.8.23;
 
 import {GatewayActorModifiers} from "../lib/LibGatewayActorStorage.sol";
 import {IpcEnvelope, CallMsg, IpcMsgKind} from "../structs/CrossNet.sol";

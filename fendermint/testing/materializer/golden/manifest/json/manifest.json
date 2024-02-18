@@ -1,0 +1,104 @@
+{
+  "accounts": {
+    "AJxB": {},
+    "Aj0I_t": {},
+    "TeBcA": {},
+    "ccXUc3": {}
+  },
+  "rootnet": {
+    "type": "External",
+    "deployment": {
+      "type": "New",
+      "deployer": "Aj0I_t"
+    },
+    "urls": [
+      "https://e4gapevf.api.calibration.node.glif.io/rpc/v1",
+      "https://ypa.api.calibration.node.glif.io/rpc/v1",
+      "https://m4662lst.api.calibration.node.glif.io/rpc/v1"
+    ]
+  },
+  "subnets": {
+    "Nq_6aQol": {
+      "creator": "Aj0I_t",
+      "validators": {
+        "ccXUc3": "7172262545587084591"
+      },
+      "balances": {
+        "Aj0I_t": "9162460209480324624",
+        "ccXUc3": "5066607307630419796"
+      },
+      "nodes": {
+        "66ACmYnr": {
+          "mode": {
+            "type": "Validator",
+            "validator": "ccXUc3"
+          },
+          "ethapi": true,
+          "seed_nodes": [],
+          "parent_node": "https://ypa.api.calibration.node.glif.io/rpc/v1"
+        }
+      },
+      "relayers": {
+        "_SfPAK_v": {
+          "submitter": "AJxB",
+          "follow_node": "66ACmYnr",
+          "submit_node": "https://ypa.api.calibration.node.glif.io/rpc/v1"
+        }
+      },
+      "subnets": {
+        "EhBMgOE": {
+          "creator": "AJxB",
+          "validators": {
+            "Aj0I_t": "367423321636535243",
+            "TeBcA": "1",
+            "ccXUc3": "4622750394160732161"
+          },
+          "balances": {
+            "ccXUc3": "2093091713664174605"
+          },
+          "nodes": {
+            "BiA": {
+              "mode": {
+                "type": "Validator",
+                "validator": "ccXUc3"
+              },
+              "ethapi": true,
+              "seed_nodes": [
+                "HekgqX"
+              ],
+              "parent_node": "66ACmYnr"
+            },
+            "HekgqX": {
+              "mode": {
+                "type": "Validator",
+                "validator": "Aj0I_t"
+              },
+              "ethapi": false,
+              "seed_nodes": [],
+              "parent_node": "66ACmYnr"
+            },
+            "j_hfAR": {
+              "mode": {
+                "type": "Validator",
+                "validator": "TeBcA"
+              },
+              "ethapi": false,
+              "seed_nodes": [
+                "HekgqX"
+              ],
+              "parent_node": "66ACmYnr"
+            }
+          },
+          "relayers": {
+            "meX": {
+              "submitter": "AJxB",
+              "follow_node": "BiA",
+              "submit_node": "66ACmYnr"
+            }
+          },
+          "subnets": {}
+        }
+      }
+    }
+  }
+}
