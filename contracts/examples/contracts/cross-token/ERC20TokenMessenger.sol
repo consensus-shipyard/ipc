@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-pragma solidity 0.8.19;
+pragma solidity 0.8.23;
 
 import {IpcEnvelope, CallMsg, IpcMsgKind} from "../../../src/structs/CrossNet.sol";
 import {IPCAddress, SubnetID} from "../../../src/structs/Subnet.sol";
