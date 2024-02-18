@@ -48,8 +48,10 @@ jobs:
           echo "$output" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
       - name: Parse deploy output
+          # deploy_output='${{ steps.deploy_contracts.outputs.deploy_output }}'
+          # deploy_output=$(cat scripts/deploy_subnet_under_calibration_net/deploy_output.txt)
         run: |
-          deploy_output='${{ steps.deploy_contracts.outputs.deploy_output }}'
+          deploy_output=$(cat scripts/deploy_subnet_under_calibration_net/deploy_output.txt)
           echo "$deploy_output"
           deployed_gateway_address=$(echo "$deploy_output" | grep '"Gateway"' | awk -F'"' '{print $4}')
           deployed_registry_address=$(echo "$deploy_output" | grep '"SubnetRegistry"' | awk -F'"' '{print $4}')
@@ -66,6 +68,8 @@ jobs:
         with:
           ref: cd/contracts
           submodules: recursive
+      - name: Merge from the branch that triggered the workflow run
+        run: git merge ${{ github.head_ref }}
       - name: Write deployed address to output file
         run: |
           mkdir -p deployments
