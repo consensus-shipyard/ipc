@@ -25,10 +25,13 @@ use tendermint_rpc::Url;
 use crate::{
     manifest::Balance,
     materializer::{Materializer, NodeConfig, SubmitConfig, SubnetConfig},
-    materials::{DefaultAccount, DefaultDeployment, DefaultGenesis, DefaultSubnet, Materials},
+    materials::{
+        export, DefaultAccount, DefaultDeployment, DefaultGenesis, DefaultSubnet, Materials,
+    },
     NodeName, RelayerName, ResourceHash, ResourceName, SubnetName, TestnetName,
 };
 
+mod container;
 mod network;
 mod node;
 mod relayer;
@@ -48,6 +51,17 @@ impl Materials for DockerMaterials {
     type Network = DockerNetwork;
     type Node = DockerNode;
     type Relayer = DockerRelayer;
+}
+
+/// A thing constructed by docker.
+pub struct DockerConstruct {
+    /// Unique ID of the thing.
+    pub id: String,
+    /// The name of the thing that we can use in docker commands.
+    pub name: String,
+    /// Indicate whether the thing was created outside the test,
+    /// or it can be destroyed when it goes out of scope.
+    pub external: bool,
 }
 
 #[derive(Clone)]
@@ -112,6 +126,38 @@ impl DockerMaterializer {
         let name: &ResourceName = name.as_ref();
         self.dir.join(&name.0)
     }
+
+    /// Return an existing genesis by parsing it from the `genesis.json` of the subnet,
+    /// or create a new one and export it.
+    fn get_or_create_genesis<F>(
+        &self,
+        subnet_name: &SubnetName,
+        make_genesis: F,
+    ) -> anyhow::Result<DefaultGenesis>
+    where
+        F: FnOnce() -> anyhow::Result<Genesis>,
+    {
+        let subnet_path = self.path(subnet_name);
+        let genesis_path = subnet_path.join("genesis.json");
+
+        let genesis = if genesis_path.exists() {
+            let json = std::fs::read_to_string(&genesis_path)
+                .with_context(|| format!("failed to read {}", genesis_path.to_string_lossy()))?;
+            serde_json::from_str::<Genesis>(&json)
+                .with_context(|| format!("failed to parse {}", genesis_path.to_string_lossy()))?
+        } else {
+            let genesis = make_genesis().context("failed to make genesis")?;
+            let json =
+                serde_json::to_string_pretty(&genesis).context("failed to serialize genesis")?;
+            export(&subnet_path, "genesis", "json", json)?;
+            genesis
+        };
+
+        Ok(DefaultGenesis {
+            name: subnet_name.clone(),
+            genesis,
+        })
+    }
 }
 
 #[async_trait]
@@ -174,49 +220,50 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         Ok(DefaultDeployment::builtin(subnet_name.clone()))
     }
 
+    /// Check if a genesis file already exists. If so, parse it, otherwise
+    /// create an in-memory representation of a genesis file and export it.
     fn create_root_genesis<'a>(
         &mut self,
         subnet_name: &SubnetName,
         validators: BTreeMap<&'a DefaultAccount, Collateral>,
         balances: BTreeMap<&'a DefaultAccount, Balance>,
     ) -> anyhow::Result<DefaultGenesis> {
-        let chain_name = subnet_name.path().to_string_lossy().to_string();
-        let chain_id = chainid::from_str_hashed(&chain_name)?;
-        // TODO: Some of these hardcoded values can go into the manifest.
-        let genesis = Genesis {
-            chain_name,
-            timestamp: Timestamp::current(),
-            network_version: NetworkVersion::MAX,
-            base_fee: TokenAmount::zero(),
-            power_scale: 3,
-            validators: validators
-                .into_iter()
-                .map(|(v, c)| Validator {
-                    public_key: ValidatorKey(v.public_key.into()),
-                    power: c,
-                })
-                .collect(),
-            accounts: balances
-                .into_iter()
-                .map(|(a, b)| Actor {
-                    meta: ActorMeta::Account(Account {
-                        owner: SignerAddr(a.fvm_addr()),
-                    }),
-                    balance: b.0,
-                })
-                .collect(),
-            ipc: Some(IpcParams {
-                gateway: GatewayParams {
-                    subnet_id: SubnetID::new_root(chain_id.into()),
-                    bottom_up_check_period: 0,
-                    majority_percentage: 67,
-                    active_validators_limit: 100,
-                },
-            }),
-        };
-        Ok(DefaultGenesis {
-            name: subnet_name.clone(),
-            genesis,
+        self.get_or_create_genesis(subnet_name, || {
+            let chain_name = subnet_name.path().to_string_lossy().to_string();
+            let chain_id = chainid::from_str_hashed(&chain_name)?;
+            // TODO: Some of these hardcoded values can go into the manifest.
+            let genesis = Genesis {
+                chain_name,
+                timestamp: Timestamp::current(),
+                network_version: NetworkVersion::MAX,
+                base_fee: TokenAmount::zero(),
+                power_scale: 3,
+                validators: validators
+                    .into_iter()
+                    .map(|(v, c)| Validator {
+                        public_key: ValidatorKey(v.public_key.into()),
+                        power: c,
+                    })
+                    .collect(),
+                accounts: balances
+                    .into_iter()
+                    .map(|(a, b)| Actor {
+                        meta: ActorMeta::Account(Account {
+                            owner: SignerAddr(a.fvm_addr()),
+                        }),
+                        balance: b.0,
+                    })
+                    .collect(),
+                ipc: Some(IpcParams {
+                    gateway: GatewayParams {
+                        subnet_id: SubnetID::new_root(chain_id.into()),
+                        bottom_up_check_period: 0,
+                        majority_percentage: 67,
+                        active_validators_limit: 100,
+                    },
+                }),
+            };
+            Ok(genesis)
         })
     }
 
@@ -228,7 +275,11 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
-        todo!("docker-compose template")
+        // We could write a (shared) docker-compose.yaml file and .env file per node,
+        // however the `bollard` library doesn't support docker-compose, so different
+        // techniques would need to be used. Alternatively we can just use `Docker`
+        // and run three different containers.
+        DockerNode::get_or_create(self.docker_with_drop_handle(), node_name, node_config).await
     }
 
     async fn start_node<'s, 'a>(
