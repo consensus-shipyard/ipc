@@ -44,7 +44,7 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
     }
 
     // Create the mapping of ipc envelope hash to TransferDetails
-    mapping(bytes32 => TransferDetails) public unconfirmedTransfers;
+    mapping(bytes32 => TransferDetails) private _unconfirmedTransfers;
 
     event TokenSent(
         address sourceContract,
@@ -89,8 +89,8 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
         committed = performIpcCall(destination, message, 0);
         _burn(msg.sender, amount);
 
-        // add tracking entry to unconfirmedTransfers
-        unconfirmedTransfers[committed.toHash()] = TransferDetails(msg.sender, amount);
+        addUnconfirmedTransfer(committed.toHash(), msg.sender, amount);
+
 
         emit TokenSent({
             sourceContract: address(this),
@@ -104,13 +104,18 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
     }
 
     function getUnconfirmedTransfer(bytes32 hash) public view returns (address, uint256) {
-        TransferDetails storage details = unconfirmedTransfers[hash];
+        TransferDetails storage details = _unconfirmedTransfers[hash];
         return (details.sender, details.value);
     }
 
     // Setter function to update the address of controller
     function setController(address _newAddress) external onlyOwner {
         controller = _newAddress;
+    }
+
+    // Method for the contract owner to manually drop an entry from unconfirmedTransfers
+    function manualRemoveUnconfirmedTransfer(bytes32 hash) external onlyOwner {
+        removeUnconfirmedTransfer(hash);
     }
 
     function getControllerSubnet() external view returns (SubnetID memory) {
@@ -127,6 +132,15 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
             revert InvalidOriginContract();
         }
     }
+
+    function addUnconfirmedTransfer(bytes32 hash, address sender, uint256 value) internal {
+        _unconfirmedTransfers[hash] = TransferDetails(sender, value);
+    }
+
+    function removeUnconfirmedTransfer(bytes32 hash) internal {
+        delete _unconfirmedTransfers[hash];
+    }
+
 
     modifier verifyIpcEnvelope(IpcEnvelope memory envelope) {
         verifyIpcEnvelopeLogic(envelope); // Call the function
@@ -166,8 +180,6 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
         }
         _mint(recipient, value);
     }
-
-    // TODO: method for the owner to manually drop an entry from unconfirmedTransfers.
 
     function _handleIpcResult(
         IpcEnvelope storage original,
