@@ -9,7 +9,7 @@ import {GatewayMessengerFacet} from "../../gateway/GatewayMessengerFacet.sol";
 import {GatewayGetterFacet} from "../../gateway/GatewayGetterFacet.sol";
 import {GatewayCannotBeZero, NotEnoughFunds} from "../../errors/IPCErrors.sol";
 import {IpcExchange} from "../../../sdk/IpcContract.sol";
-import {IpcEnvelope, ResultMsg, CallMsg, IpcMsgKind} from "../../structs/CrossNet.sol";
+import {IpcEnvelope, ResultMsg, CallMsg, OutcomeType, IpcMsgKind} from "../../structs/CrossNet.sol";
 import {IPCAddress, SubnetID} from "../../structs/Subnet.sol";
 import {CrossMsgHelper} from "../../../src/lib/CrossMsgHelper.sol";
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
@@ -46,7 +46,7 @@ contract IpcTokenController is IpcExchange {
     }
 
     // Create the mapping of ipc envelope hash to TransferDetails
-    mapping(bytes32 => TransferDetails) public unconfirmedTransfers;
+    mapping(bytes32 => TransferDetails) public _unconfirmedTransfers;
 
     uint64 public nonce = 0;
 
@@ -101,8 +101,21 @@ contract IpcTokenController is IpcExchange {
     }
 
     function getUnconfirmedTransfer(bytes32 hash) public view returns (address, uint256) {
-        TransferDetails storage details = unconfirmedTransfers[hash];
+        TransferDetails storage details = _unconfirmedTransfers[hash];
         return (details.sender, details.value);
+    }
+
+    // Method for the contract owner to manually drop an entry from unconfirmedTransfers
+    function manualRemoveUnconfirmedTransfer(bytes32 hash) external onlyOwner {
+        removeUnconfirmedTransfer(hash);
+    }
+
+    function addUnconfirmedTransfer(bytes32 hash, address sender, uint256 value) internal {
+        _unconfirmedTransfers[hash] = TransferDetails(sender, value);
+    }
+
+    function removeUnconfirmedTransfer(bytes32 hash) internal {
+        delete _unconfirmedTransfers[hash];
     }
 
     function _handleIpcCall(
@@ -176,8 +189,7 @@ contract IpcTokenController is IpcExchange {
 
         committed = performIpcCall(destination, message, 0);
 
-        // add entry to unconfirmedTransfers
-        unconfirmedTransfers[committed.toHash()] = TransferDetails(msg.sender, amount);
+        addUnconfirmedTransfer(committed.toHash(), msg.sender, amount);
 
         emit TokenSent({
             tokenContractAddress: tokenContractAddress,
@@ -195,10 +207,18 @@ contract IpcTokenController is IpcExchange {
         IpcEnvelope memory result,
         ResultMsg memory resultMsg
     ) internal override {
-        // TODO: remove from unconfirmedTransfers.
-    }
 
-    // TODO: method for the owner to manually drop an entry from unconfirmedTransfers.
+        bytes32 id = resultMsg.id;
+        OutcomeType outcome = resultMsg.outcome;
+        if(outcome == OutcomeType.Ok){
+            removeUnconfirmedTransfer(id);
+        }else{
+            if( outcome == OutcomeType.SystemErr || outcome == OutcomeType.ActorErr ){
+                // TODO: refund
+                removeUnconfirmedTransfer(id);
+            }
+        }
+    }
 
     // TODO: replace with abi.decode(data, (bytes4))?
     function toBytes4(bytes memory data) internal pure returns (bytes4 result) {
