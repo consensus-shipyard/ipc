@@ -12,7 +12,7 @@ import {GatewayMessengerFacet} from "../../gateway/GatewayMessengerFacet.sol";
 import {GatewayGetterFacet} from "../../gateway/GatewayGetterFacet.sol";
 import {GatewayCannotBeZero, NotEnoughFunds} from "../../errors/IPCErrors.sol";
 import {IpcExchange} from "../../../sdk/IpcContract.sol";
-import {IpcEnvelope, ResultMsg, CallMsg, IpcMsgKind} from "../../structs/CrossNet.sol";
+import {IpcEnvelope, ResultMsg, CallMsg, OutcomeType, IpcMsgKind} from "../../structs/CrossNet.sol";
 import {IPCAddress, SubnetID} from "../../structs/Subnet.sol";
 import {CrossMsgHelper} from "../../../src/lib/CrossMsgHelper.sol";
 import {InvalidOriginContract, InvalidOriginSubnet} from "./IpcCrossTokenErrors.sol";
@@ -186,6 +186,15 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
         IpcEnvelope memory result,
         ResultMsg memory resultMsg
     ) internal override {
-        // TODO: remove correlation from unconfirmedTransfers
+        bytes32 id = resultMsg.id;
+        OutcomeType outcome = resultMsg.outcome;
+        if(outcome == OutcomeType.Ok){
+            removeUnconfirmedTransfer(id);
+        }else{
+            if( outcome == OutcomeType.SystemErr || outcome == OutcomeType.ActorErr ){
+                // TODO: refund
+                removeUnconfirmedTransfer(id);
+            }
+        }
     }
 }
