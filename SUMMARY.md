@@ -1,15 +1,24 @@
 # Table of contents
 
-* [Overview](README.md)
-* [Quickstarts](quickstarts/README.md)
-  * [Deploy a subnet](quickstarts/deploy-a-subnet.md)
-  * [Deploy smart contract to Mycelium testnet](quickstarts/deploy-smart-contract-to-mycelium-testnet.md)
-* [Key Concepts](key-concepts/README.md)
-  * [Architecture](key-concepts/architecture.md)
-  * [Subnets](key-concepts/subnets.md)
-  * [Fees](key-concepts/fees.md)
-* [Reference](reference/README.md)
-  * [Networks](reference/networks.md)
-  * [ipc-cli Usage](reference/ipc-cli-usage.md)
-  * [IPLD Resolver](reference/ipld-resolver.md)
-* [Contact Us](contact-us.md)
+## Overview
+
+* [Introduction](README.md)
+* [Use cases](overview/use-cases.md)
+* [How IPC compares](overview/how-ipc-compares.md)
+* [Architecture](overview/architecture.md)
+
+## Quickstarts
+
+* [Deploy a subnet](quickstarts/deploy-a-subnet.md)
+
+## Concepts
+
+* [Subnets](concepts/subnets/README.md)
+  * [Parent-child interactions](concepts/subnets/parent-child-interactions.md)
+* [Circulating supply](concepts/circulating-supply.md)
+
+## Reference
+
+* [Networks](reference/networks.md)
+* [IPC CLI](reference/ipc-cli-usage.md)
+* [Troubleshooting](reference/troubleshooting.md)

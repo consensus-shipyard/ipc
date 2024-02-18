@@ -2,7 +2,7 @@
 description: Architectural components in the IPC framework.
 ---
 
-# 🟡 Architecture
+# Architecture
 
 <figure><img src="../.gitbook/assets/image.png" alt=""><figcaption><p>IPC Architecture</p></figcaption></figure>
 
