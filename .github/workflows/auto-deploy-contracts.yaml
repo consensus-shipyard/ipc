@@ -69,7 +69,7 @@ jobs:
           ref: cd/contracts
           submodules: recursive
       - name: Merge from the branch that triggered the workflow run
-        run: git merge origin/${{ github.head_ref }}
+        run: git pull origin ${{ github.head_ref }} --allow-unrelated-histories
       - name: Write deployed address to output file
         run: |
           mkdir -p deployments
