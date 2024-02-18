@@ -18,13 +18,13 @@ import {CrossMsgHelper} from "../../../src/lib/CrossMsgHelper.sol";
 import {InvalidOriginContract, InvalidOriginSubnet} from "./IpcCrossTokenErrors.sol";
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
 
-error ZeroAddress();
 error InvalidMessageSignature();
 error InvalidMethod();
 error TransferRejected(string reason);
 
 string constant ERR_ZERO_ADDRESS = "Zero address is not allowed";
 string constant ERR_VALUE_MUST_BE_ZERO = "Value must be zero";
+string constant ERR_VALUE_CANNOT_BE_ZERO = "Value cannot be zero";
 
 contract IpcTokenReplica is IpcExchange, ERC20 {
     using FvmAddressHelper for FvmAddress;
@@ -174,9 +174,20 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
         }
     }
 
+    function _refund(bytes32 id) private {
+        (address sender, uint256 value ) = getUnconfirmedTransfer(id);
+        if (sender == address(0)) {
+            revert TransferRejected(ERR_ZERO_ADDRESS);
+        }
+        if( value == 0){
+            revert TransferRejected(ERR_VALUE_CANNOT_BE_ZERO);
+        }
+        _mint(sender, value);
+    }
+
     function receiveAndMint(address recipient, uint256 value) private {
         if (recipient == address(0)) {
-            revert ZeroAddress();
+            revert TransferRejected(ERR_ZERO_ADDRESS);
         }
         _mint(recipient, value);
     }
@@ -185,14 +196,14 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
         IpcEnvelope storage original,
         IpcEnvelope memory result,
         ResultMsg memory resultMsg
-    ) internal override {
+    ) internal override verifyIpcEnvelope(original) {
         bytes32 id = resultMsg.id;
         OutcomeType outcome = resultMsg.outcome;
         if(outcome == OutcomeType.Ok){
             removeUnconfirmedTransfer(id);
         }else{
             if( outcome == OutcomeType.SystemErr || outcome == OutcomeType.ActorErr ){
-                // TODO: refund
+                _refund(id);
                 removeUnconfirmedTransfer(id);
             }
         }

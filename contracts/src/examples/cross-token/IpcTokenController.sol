@@ -15,13 +15,13 @@ import {CrossMsgHelper} from "../../../src/lib/CrossMsgHelper.sol";
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
 import {InvalidOriginContract, InvalidOriginSubnet} from "./IpcCrossTokenErrors.sol";
 
-error ZeroAddress();
 error InvalidMessageSignature();
 error InvalidMethod();
 error TransferRejected(string reason);
 
 string constant ERR_ZERO_ADDRESS = "Zero address is not allowed";
 string constant ERR_VALUE_MUST_BE_ZERO = "Value must be zero";
+string constant ERR_VALUE_CANNOT_BE_ZERO = "Value cannot be zero";
 
 
 /**
@@ -121,9 +121,7 @@ contract IpcTokenController is IpcExchange {
     function _handleIpcCall(
         IpcEnvelope memory envelope,
         CallMsg memory callMsg
-    ) internal override returns (bytes memory) {
-        //only accept messages from replica contract
-        verifyIpcEnvelope(envelope);
+    ) internal override verifyIpcEnvelope(envelope) returns (bytes memory) {
 
         bytes4 methodSignature = toBytes4(callMsg.method);
         if (methodSignature != bytes4(keccak256("receiveAndUnlock(address,uint256)"))) {
@@ -136,7 +134,13 @@ contract IpcTokenController is IpcExchange {
         return bytes("");
     }
 
-    function verifyIpcEnvelope(IpcEnvelope memory envelope) public {
+    modifier verifyIpcEnvelope(IpcEnvelope memory envelope) {
+        verifyIpcEnvelopeLogic(envelope); // Call the function
+        _; // Continue execution of the modified function
+    }
+
+    //only accept messages from replica contract
+    function verifyIpcEnvelopeLogic(IpcEnvelope memory envelope) public {
         SubnetID memory subnetId = envelope.from.subnetId;
         FvmAddress memory rawAddress = envelope.from.rawAddress;
         if (!subnetId.equals(destinationSubnet)) {
@@ -149,7 +153,7 @@ contract IpcTokenController is IpcExchange {
 
     function receiveAndUnlock(address receiver, uint256 amount) private {
         if (receiver == address(0)) {
-            revert ZeroAddress();
+            revert TransferRejected(ERR_ZERO_ADDRESS);
         }
 
         // Transfer the specified amount of tokens to the receiver
@@ -202,11 +206,24 @@ contract IpcTokenController is IpcExchange {
         });
     }
 
+    function _refund(bytes32 id) private {
+        (address sender, uint256 value) = getUnconfirmedTransfer(id);
+        if (sender == address(0)) {
+            revert TransferRejected(ERR_ZERO_ADDRESS);
+        }
+        if( value == 0){
+            revert TransferRejected(ERR_VALUE_CANNOT_BE_ZERO);
+        }
+
+        IERC20(tokenContractAddress).safeTransfer(sender, value);
+    }
+
+
     function _handleIpcResult(
         IpcEnvelope storage original,
         IpcEnvelope memory result,
         ResultMsg memory resultMsg
-    ) internal override {
+    ) internal override verifyIpcEnvelope(original) {
 
         bytes32 id = resultMsg.id;
         OutcomeType outcome = resultMsg.outcome;
@@ -214,7 +231,7 @@ contract IpcTokenController is IpcExchange {
             removeUnconfirmedTransfer(id);
         }else{
             if( outcome == OutcomeType.SystemErr || outcome == OutcomeType.ActorErr ){
-                // TODO: refund
+                _refund(id);
                 removeUnconfirmedTransfer(id);
             }
         }
