@@ -20,7 +20,10 @@ async function main() {
         parentSubnet,
     )
 
-    console.log('Subnet Token Bridge Token deployed to:', subnetTokenBridge.address)
+    console.log(
+        'Subnet Token Bridge Token deployed to:',
+        subnetTokenBridge.address,
+    )
 }
 
 async function createSubnetTokenBridge(

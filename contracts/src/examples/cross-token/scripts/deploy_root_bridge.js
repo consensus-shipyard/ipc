@@ -8,7 +8,12 @@ async function main() {
     const accountAddress = await getAccountAddress()
 
     // Validate environment variables
-    if (!gateway || !USDCaddress || !subnetTokenBridgeAddress || !subnetAddress) {
+    if (
+        !gateway ||
+        !USDCaddress ||
+        !subnetTokenBridgeAddress ||
+        !subnetAddress
+    ) {
         throw new Error('All required environment variables must be provided')
     }
 
@@ -35,16 +40,13 @@ async function main() {
 
     // Approve the RootnetTokenBridge contract to spend tokens on behalf of the deployer
     await erc20Token.approve(rootnetTokenBridge.address, transferAmount)
-    await rootnetTokenBridge.depositToken(
-        receiverAddress,
-        transferAmount,
-        { value: DEFAULT_CROSS_MSG_FEE },
-    )
+    await rootnetTokenBridge.depositToken(receiverAddress, transferAmount, {
+        value: DEFAULT_CROSS_MSG_FEE,
+    })
 
     console.log(
         `Transfer and mint request made for ${transferAmount} tokens to ${receiverAddress}`,
     )
-
 }
 
 async function createSubnetTokenBridge(
@@ -79,15 +81,12 @@ async function deployRootnetTokenBridge(
         gateway,
         erc20Token,
         subnetID,
-        subnetTokenBridge
+        subnetTokenBridge,
     )
 
     await rootnetTokenBridge.deployed()
 
-    console.log(
-        'RootnetTokenBridge deployed to:',
-        rootnetTokenBridge.address,
-    )
+    console.log('RootnetTokenBridge deployed to:', rootnetTokenBridge.address)
     return rootnetTokenBridge
 }
 
@@ -109,4 +108,3 @@ main()
         console.error(error)
         process.exit(1)
     })
-

@@ -8,10 +8,7 @@ async function main() {
     const rootTokenBridge = process.env.RootTokenBridge
     const accountAddress = await getAccountAddress()
 
-    const usdcToken = await ethers.getContractAt(
-        'USDCMock',
-        USDCaddress,
-    )
+    const usdcToken = await ethers.getContractAt('USDCMock', USDCaddress)
 
     const RootTokenBridge = await ethers.getContractAt(
         'RootnetTokenBridge',
@@ -26,17 +23,11 @@ async function main() {
 
     // Approve the RootnetTokenBridge contract to spend tokens on behalf of the deployer
     await usdcToken.approve(rootTokenBridge, transferAmount)
-    await RootTokenBridge.depositToken(
-        receiverAddress,
-        transferAmount,
-        { value: DEFAULT_CROSS_MSG_FEE },
-    )
+    await RootTokenBridge.depositToken(receiverAddress, transferAmount, {
+        value: DEFAULT_CROSS_MSG_FEE,
+    })
 
-    console.log(
-        `${transferAmount} USDC tokens deposited to bridge contract`
-    )
-
-
+    console.log(`${transferAmount} USDC tokens deposited to bridge contract`)
 }
 
 async function getAccountAddress() {
@@ -51,11 +42,9 @@ async function getAccountAddress() {
     return publicAddress
 }
 
-
 main()
     .then(() => process.exit(0))
     .catch((error) => {
         console.error(error)
         process.exit(1)
     })
-

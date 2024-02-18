@@ -8,17 +8,15 @@ async function main() {
     const rootTokenBridge = process.env.RootTokenBridge
     const accountAddress = await getAccountAddress()
 
-    const usdcToken = await ethers.getContractAt(
-        'USDCMock',
-        USDCaddress,
-    )
+    const usdcToken = await ethers.getContractAt('USDCMock', USDCaddress)
 
     const subnetTokenBridge = await ethers.getContractAt(
         'SubnetTokenBridge',
         subnetTokenBridgeAddress,
     )
 
-    const subnetUDSCTokenAddress = await subnetTokenBridge.getProxyTokenAddress()
+    const subnetUDSCTokenAddress =
+        await subnetTokenBridge.getProxyTokenAddress()
 
     const subnetUSDCToken = await ethers.getContractAt(
         'SubnetUSDCProxy',
@@ -27,7 +25,6 @@ async function main() {
 
     const balance = await subnetUSDCToken.balanceOf(accountAddress)
     console.log('balance is ', balance)
-
 }
 
 async function getAccountAddress() {
@@ -41,8 +38,6 @@ async function getAccountAddress() {
     const publicAddress = currentAccount.address
     return publicAddress
 }
-
-
 
 main()
     .then(() => process.exit(0))

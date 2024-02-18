@@ -23,7 +23,6 @@ string constant ERR_ZERO_ADDRESS = "Zero address is not allowed";
 string constant ERR_VALUE_MUST_BE_ZERO = "Value must be zero";
 string constant ERR_VALUE_CANNOT_BE_ZERO = "Value cannot be zero";
 
-
 /**
  * @title IpcTokenController
  * @notice Contract to handle token transfer from L1, lock them and mint on L2.
@@ -122,7 +121,6 @@ contract IpcTokenController is IpcExchange {
         IpcEnvelope memory envelope,
         CallMsg memory callMsg
     ) internal override verifyIpcEnvelope(envelope) returns (bytes memory) {
-
         bytes4 methodSignature = toBytes4(callMsg.method);
         if (methodSignature != bytes4(keccak256("receiveAndUnlock(address,uint256)"))) {
             revert InvalidMethod();
@@ -211,26 +209,24 @@ contract IpcTokenController is IpcExchange {
         if (sender == address(0)) {
             revert TransferRejected(ERR_ZERO_ADDRESS);
         }
-        if( value == 0){
+        if (value == 0) {
             revert TransferRejected(ERR_VALUE_CANNOT_BE_ZERO);
         }
 
         IERC20(tokenContractAddress).safeTransfer(sender, value);
     }
 
-
     function _handleIpcResult(
         IpcEnvelope storage original,
         IpcEnvelope memory result,
         ResultMsg memory resultMsg
     ) internal override verifyIpcEnvelope(original) {
-
         bytes32 id = resultMsg.id;
         OutcomeType outcome = resultMsg.outcome;
-        if(outcome == OutcomeType.Ok){
+        if (outcome == OutcomeType.Ok) {
             removeUnconfirmedTransfer(id);
-        }else{
-            if( outcome == OutcomeType.SystemErr || outcome == OutcomeType.ActorErr ){
+        } else {
+            if (outcome == OutcomeType.SystemErr || outcome == OutcomeType.ActorErr) {
                 _refund(id);
                 removeUnconfirmedTransfer(id);
             }

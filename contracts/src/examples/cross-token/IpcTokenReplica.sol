@@ -91,7 +91,6 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
 
         addUnconfirmedTransfer(committed.toHash(), msg.sender, amount);
 
-
         emit TokenSent({
             sourceContract: address(this),
             sender: msg.sender,
@@ -141,7 +140,6 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
         delete _unconfirmedTransfers[hash];
     }
 
-
     modifier verifyIpcEnvelope(IpcEnvelope memory envelope) {
         verifyIpcEnvelopeLogic(envelope); // Call the function
         _; // Continue execution of the modified function
@@ -175,11 +173,11 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
     }
 
     function _refund(bytes32 id) private {
-        (address sender, uint256 value ) = getUnconfirmedTransfer(id);
+        (address sender, uint256 value) = getUnconfirmedTransfer(id);
         if (sender == address(0)) {
             revert TransferRejected(ERR_ZERO_ADDRESS);
         }
-        if( value == 0){
+        if (value == 0) {
             revert TransferRejected(ERR_VALUE_CANNOT_BE_ZERO);
         }
         _mint(sender, value);
@@ -199,10 +197,10 @@ contract IpcTokenReplica is IpcExchange, ERC20 {
     ) internal override verifyIpcEnvelope(original) {
         bytes32 id = resultMsg.id;
         OutcomeType outcome = resultMsg.outcome;
-        if(outcome == OutcomeType.Ok){
+        if (outcome == OutcomeType.Ok) {
             removeUnconfirmedTransfer(id);
-        }else{
-            if( outcome == OutcomeType.SystemErr || outcome == OutcomeType.ActorErr ){
+        } else {
+            if (outcome == OutcomeType.SystemErr || outcome == OutcomeType.ActorErr) {
                 _refund(id);
                 removeUnconfirmedTransfer(id);
             }
