@@ -107,17 +107,13 @@ pub enum RpcDataRepoCommands {
         #[arg(long, short)]
         key: String,
         #[arg(long, short)]
-        content: Vec<Cid>,
-        #[arg(long, short)]
-        file: String,
+        content: Cid,
     },
     Append {
         #[arg(long, short)]
         key: String,
         #[arg(long, short)]
-        content: Vec<Cid>,
-        #[arg(long, short)]
-        file: String,
+        content: Cid,
     },
     Delete {
         #[arg(long, short)]

@@ -629,7 +629,7 @@ where
             time = request.time.to_string(),
             "prepare proposal"
         );
-        let txs = request.txs.into_iter().map(|tx| tx.to_vec()).collect();
+        let txs: Vec<Vec<u8>> = request.txs.into_iter().map(|tx| tx.to_vec()).collect();
 
         let txs = self
             .interpreter

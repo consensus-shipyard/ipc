@@ -112,3 +112,31 @@ where
         Ok(res)
     }
 }
+
+/// Trait to limit the capabilities to resolving CIDs from IPFS.
+#[async_trait]
+pub trait IpfsResolver {
+    /// Send a CID for resolution from a local IPFS node, await its completion,
+    /// then return the result, to be inspected by the caller.
+    ///
+    /// Upon success, the data should be pinned in the local IPFS node.
+    async fn resolve_ipfs(&self, cid: Cid) -> anyhow::Result<ResolveResult>;
+}
+
+#[async_trait]
+impl<V> IpfsResolver for Client<V>
+where
+    V: Sync + Send + 'static,
+{
+    /// Send a CID for resolution from a local IPFS node, await its completion,
+    /// then return the result, to be inspected by the caller.
+    ///
+    /// Upon success, the data should be pinned in the local IPFS node.
+    async fn resolve_ipfs(&self, cid: Cid) -> anyhow::Result<ResolveResult> {
+        let (tx, rx) = oneshot::channel();
+        let req = Request::ResolveIpfs(cid, tx);
+        self.send_request(req)?;
+        let res = rx.await?;
+        Ok(res)
+    }
+}

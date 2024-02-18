@@ -23,7 +23,7 @@ pub struct State {
 
 impl State {
     pub fn new<BS: Blockstore>(store: &BS) -> anyhow::Result<Self> {
-        let root = match Hamt::<_, Vec<Cid>>::new_with_bit_width(store, BIT_WIDTH).flush() {
+        let root = match Hamt::<_, Vec<u8>>::new_with_bit_width(store, BIT_WIDTH).flush() {
             Ok(cid) => cid,
             Err(e) => {
                 return Err(anyhow::anyhow!(
@@ -40,9 +40,9 @@ impl State {
         &mut self,
         store: &BS,
         key: BytesKey,
-        content: Vec<Cid>,
+        content: Vec<u8>,
     ) -> anyhow::Result<Cid> {
-        let mut hamt = Hamt::<_, Vec<Cid>>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
+        let mut hamt = Hamt::<_, Vec<u8>>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
 
         // TODO:(carsonfarmer) We could use set_if_absent here to avoid overwriting existing objects.
         hamt.set(key, content)?;
@@ -54,10 +54,9 @@ impl State {
         &mut self,
         store: &BS,
         key: BytesKey,
-        content: Vec<Cid>,
+        content: Vec<u8>,
     ) -> anyhow::Result<Cid> {
-        let mut hamt = Hamt::<_, Vec<Cid>>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
-
+        let mut hamt = Hamt::<_, Vec<u8>>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
         let new_content = match hamt.get(&key)? {
             Some(existing) => {
                 let mut new_content = existing.clone();
@@ -66,17 +65,19 @@ impl State {
             }
             None => content,
         };
-
         hamt.set(key, new_content)?;
         self.root = hamt.flush()?;
         Ok(self.root)
     }
 
     pub fn delete<BS: Blockstore>(&mut self, store: &BS, key: &BytesKey) -> anyhow::Result<Cid> {
-        let mut hamt = Hamt::<_, Vec<Cid>>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
-        hamt.delete(key)?;
-        self.root = hamt.flush()?;
-        Ok(self.root)
+        let mut hamt = Hamt::<_, Vec<u8>>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
+        if hamt.contains_key(key)? {
+            hamt.delete(key)?;
+            self.root = hamt.flush()?;
+            return Ok(self.root);
+        }
+        return Err(anyhow::anyhow!("key not found"));
     }
 
     pub fn get<BS: Blockstore>(
@@ -84,30 +85,13 @@ impl State {
         store: &BS,
         key: &BytesKey,
     ) -> anyhow::Result<Option<Vec<u8>>> {
-        let hamt = Hamt::<_, Vec<Cid>>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
+        let hamt = Hamt::<_, Vec<u8>>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
         let value = hamt.get(key).map(|v| v.map(|inner| inner.to_owned()))?;
-        let res = match value {
-            Some(cids) => {
-                let mut data: Vec<u8> = vec![];
-                for cid in cids {
-                    if let Some(d) = store.get(&cid)? {
-                        data.extend(d);
-                    } else {
-                        return Err(anyhow::anyhow!(
-                            "objectstore: cid {} not reachable",
-                            cid.to_string()
-                        ));
-                    };
-                }
-                Some(data)
-            }
-            None => None,
-        };
-        Ok(res)
+        Ok(value)
     }
 
     pub fn list<BS: Blockstore>(&self, store: &BS) -> anyhow::Result<Vec<Vec<u8>>> {
-        let hamt = Hamt::<_, Vec<Cid>>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
+        let hamt = Hamt::<_, Vec<u8>>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
         let mut keys = Vec::new();
         hamt.for_each(|k, _| {
             keys.push(k.0.to_owned());
@@ -123,8 +107,8 @@ pub const OBJECTSTORE_ACTOR_NAME: &str = "objectstore";
 pub struct ObjectParams {
     #[serde(with = "strict_bytes")]
     pub key: Vec<u8>,
-    pub content: Vec<Cid>,
-    pub file: String,
+    pub content: Vec<u8>,
+    // pub file: String,
 }
 
 #[derive(FromPrimitive)]

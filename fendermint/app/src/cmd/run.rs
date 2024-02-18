@@ -13,10 +13,11 @@ use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::chain::ChainEnv;
 use fendermint_vm_interpreter::{
     bytes::{BytesMessageInterpreter, ProposalPrepareMode},
-    chain::{ChainMessageInterpreter, CheckpointPool},
+    chain::{ChainMessageInterpreter, CheckpointPool, IpfsPinPool},
     fvm::{Broadcaster, FvmMessageInterpreter, ValidatorContext},
     signed::SignedMessageInterpreter,
 };
+use fendermint_vm_ipfs_resolver::ipfs::IpfsResolver;
 use fendermint_vm_resolver::ipld::IpldResolver;
 use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::proxy::IPCProviderProxy;
@@ -117,7 +118,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     let interpreter = SignedMessageInterpreter::new(interpreter);
     let interpreter = ChainMessageInterpreter::<_, NamespaceBlockstore>::new(interpreter);
     let interpreter =
-        BytesMessageInterpreter::new(interpreter, ProposalPrepareMode::AppendOnly, false);
+        BytesMessageInterpreter::new(interpreter, ProposalPrepareMode::PassThrough, false);
 
     let ns = Namespaces::default();
     let db = open_db(&settings, &ns).context("error opening DB")?;
@@ -127,6 +128,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         NamespaceBlockstore::new(db.clone(), ns.state_store).context("error creating state DB")?;
 
     let checkpoint_pool = CheckpointPool::new();
+    let ipfs_pin_pool = IpfsPinPool::new();
     let parent_finality_votes = VoteTally::empty();
 
     let topdown_enabled = settings.topdown_enabled();
@@ -151,11 +153,18 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             own_subnet_id.clone(),
         );
 
+        let ipfs_resolver = IpfsResolver::new(
+            client.clone(),
+            ipfs_pin_pool.queue(),
+            settings.resolver.retry_delay,
+        );
+
         if topdown_enabled {
             if let Some(key) = validator_keypair {
                 let parent_finality_votes = parent_finality_votes.clone();
 
                 tracing::info!("starting the parent finality vote gossip loop...");
+                let client = client.clone();
                 tokio::spawn(async move {
                     publish_vote_loop(
                         parent_finality_votes,
@@ -190,6 +199,19 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
 
         tracing::info!("starting the IPLD Resolver...");
         tokio::spawn(async move { resolver.run().await });
+
+        tracing::info!("starting the IPFS Resolver...");
+        tokio::spawn(async move { ipfs_resolver.run().await });
+
+        // let foo = client
+        //     .resolve_ipfs(
+        //         Cid::try_from("bafkreiedpxbbdhdd3psulzkrlsnjzns4kxp2ealw5cfacn2rrn27xoe75y")
+        //             .unwrap(),
+        //     )
+        //     .await?;
+        // if foo.is_ok() {
+        //     println!("got it!!!!!");
+        // }
     } else {
         tracing::info!("IPLD Resolver disabled.")
     }
@@ -256,6 +278,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             checkpoint_pool,
             parent_finality_provider: parent_finality_provider.clone(),
             parent_finality_votes: parent_finality_votes.clone(),
+            ipfs_pin_pool,
         },
         snapshots,
     )?;

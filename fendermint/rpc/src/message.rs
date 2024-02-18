@@ -103,7 +103,36 @@ impl MessageFactory {
             gas_premium: gas_params.gas_premium,
         };
         self.sequence += 1;
-        let signed = SignedMessage::new_secp256k1(message, &self.sk, &self.chain_id)?;
+        let signed = SignedMessage::new_secp256k1(message, &self.sk, &self.chain_id, None)?;
+        let chain = ChainMessage::Signed(signed);
+        Ok(chain)
+    }
+
+    /// Send a message to an actor.
+    pub fn transaction_with_resolve(
+        &mut self,
+        to: Address,
+        method_num: MethodNum,
+        params: RawBytes,
+        value: TokenAmount,
+        gas_params: GasParams,
+        resolve_cid: Cid,
+    ) -> anyhow::Result<ChainMessage> {
+        let message = Message {
+            version: Default::default(), // TODO: What does this do?
+            from: self.addr,
+            to,
+            sequence: self.sequence,
+            value,
+            method_num,
+            params,
+            gas_limit: gas_params.gas_limit,
+            gas_fee_cap: gas_params.gas_fee_cap,
+            gas_premium: gas_params.gas_premium,
+        };
+        self.sequence += 1;
+        let signed =
+            SignedMessage::new_secp256k1(message, &self.sk, &self.chain_id, Some(resolve_cid))?;
         let chain = ChainMessage::Signed(signed);
         Ok(chain)
     }
@@ -112,23 +141,22 @@ impl MessageFactory {
     pub fn datarepo_put(
         &mut self,
         key: String,
-        content: Vec<Cid>,
-        file_name: String,
+        content: Cid,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
         let input = fendermint_actor_objectstore::ObjectParams {
             key: key.into_bytes(),
-            content,
-            file: file_name,
+            content: content.to_bytes(),
         };
         let params = RawBytes::serialize(&input)?;
-        let message = self.transaction(
+        let message = self.transaction_with_resolve(
             objectstore::OBJECTSTORE_ACTOR_ADDR,
             fendermint_actor_objectstore::Method::PutObject as u64,
             params,
             value,
             gas_params,
+            content,
         )?;
         Ok(message)
     }
@@ -137,23 +165,22 @@ impl MessageFactory {
     pub fn datarepo_append(
         &mut self,
         key: String,
-        content: Vec<Cid>,
-        file_name: String,
+        content: Cid,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
         let input = fendermint_actor_objectstore::ObjectParams {
             key: key.into_bytes(),
-            content,
-            file: file_name,
+            content: content.to_bytes(),
         };
         let params = RawBytes::serialize(&input)?;
-        let message = self.transaction(
+        let message = self.transaction_with_resolve(
             objectstore::OBJECTSTORE_ACTOR_ADDR,
             fendermint_actor_objectstore::Method::AppendObject as u64,
             params,
             value,
             gas_params,
+            content,
         )?;
         Ok(message)
     }

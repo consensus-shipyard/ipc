@@ -168,7 +168,7 @@ max_provider_age = 300
 [resolver.connection]
 # The address where we will listen to incoming connections.
 # Leaving it empty disables the IPLD Resolver.
-listen_addr = ""
+listen_addr = "/ip4/127.0.0.1/tcp/3001"
 
 # Maximum number of incoming connections.
 max_incoming = 30
@@ -194,7 +194,7 @@ rate_limit_period = 0
 # IPC related configuration parameters
 [ipc]
 # Default subnet ID, which basically means IPC is disabled.
-subnet_id = "/r0"
+subnet_id = "/r31415926"
 # Voting interval about things such as the top-down finality, in seconds.
 # It's limited to avoid GossipSub throttling or banning the node for over production.
 # The minimum is 1 seconds which is about the minimum target block time as well;

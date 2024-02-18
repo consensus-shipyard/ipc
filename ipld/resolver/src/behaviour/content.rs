@@ -22,12 +22,11 @@ use libp2p_bitswap::{Bitswap, BitswapConfig, BitswapEvent, BitswapResponse, Bits
 use log::debug;
 use prometheus::Registry;
 
+use crate::service::QueryId;
 use crate::{
     limiter::{RateLimit, RateLimiter},
     stats,
 };
-
-pub type QueryId = libp2p_bitswap::QueryId;
 
 // Not much to do here, just hiding the `Progress` event as I don't think we'll need it.
 // We can't really turn it into anything more meaningful; the outer Service, which drives
@@ -142,7 +141,13 @@ impl<P: StoreParams> Behaviour<P> {
         debug!("resolving {cid} from {peers:?}");
         stats::CONTENT_RESOLVE_RUNNING.inc();
         // Not passing any missing items, which will result in a call to `BitswapStore::missing_blocks`.
-        self.inner.sync(cid, peers, [].into_iter())
+        QueryId(
+            self.inner
+                .sync(cid, peers, [].into_iter())
+                .to_string()
+                .parse()
+                .unwrap(),
+        )
     }
 
     /// Check whether the peer has already exhaused their rate limit.
@@ -335,7 +340,7 @@ impl<P: StoreParams> NetworkBehaviour for Behaviour<P> {
                     BitswapEvent::Progress(_, _) => {}
                     BitswapEvent::Complete(id, result) => {
                         stats::CONTENT_RESOLVE_RUNNING.dec();
-                        let out = Event::Complete(id, result);
+                        let out = Event::Complete(QueryId(id.to_string().parse().unwrap()), result);
                         return Poll::Ready(ToSwarm::GenerateEvent(out));
                     }
                 },

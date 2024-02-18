@@ -6,6 +6,7 @@ use std::time::Duration;
 use anyhow::anyhow;
 use bloom::{BloomFilter, ASMS};
 use ipc_api::subnet_id::SubnetID;
+use ipfs_api_backend_hyper::{IpfsApi, IpfsClient};
 use libipld::store::StoreParams;
 use libipld::Cid;
 use libp2p::futures::StreamExt;
@@ -51,8 +52,17 @@ struct Query {
     response_channel: ResponseChannel,
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct QueryId(pub u64);
+
+impl std::fmt::Display for QueryId {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 /// Keeps track of where to send query responses to.
-type QueryMap = HashMap<content::QueryId, Query>;
+type QueryMap = HashMap<QueryId, Query>;
 
 /// Error returned when we tried to get a CID from a subnet for
 /// which we currently have no peers to contact
@@ -94,6 +104,7 @@ pub(crate) enum Request<V> {
     PinSubnet(SubnetID),
     UnpinSubnet(SubnetID),
     Resolve(Cid, SubnetID, ResponseChannel),
+    ResolveIpfs(Cid, ResponseChannel),
     RateLimitUsed(PeerId, usize),
     UpdateRateLimit(u32),
 }
@@ -457,6 +468,9 @@ where
             Request::Resolve(cid, subnet_id, response_channel) => {
                 self.start_query(cid, subnet_id, response_channel)
             }
+            Request::ResolveIpfs(cid, response_channel) => {
+                self.start_ipfs_query(cid, response_channel)
+            }
             Request::RateLimitUsed(peer_id, bytes) => {
                 self.content_mut().rate_limit_used(peer_id, bytes)
             }
@@ -498,6 +512,20 @@ where
 
             self.queries.insert(query_id, query);
         }
+    }
+
+    /// Start a CID resolution using local IPFS.
+    fn start_ipfs_query(&mut self, cid: Cid, response_channel: ResponseChannel) {
+        tokio::spawn(async move {
+            let client = IpfsClient::default();
+            let res = client
+                .pin_add(cid.to_string().as_str(), true)
+                .await
+                .unwrap();
+            println!("pins: {:#?}", res.pins);
+
+            send_resolve_result(response_channel, Ok(()))
+        });
     }
 
     /// Handle the results from a resolve attempt. If it succeeded, notify the

@@ -1,6 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::signed::SignedMessage;
 use cid::Cid;
 use fvm_shared::{
     address::Address, clock::ChainEpoch, crypto::signature::Signature, econ::TokenAmount,
@@ -28,6 +29,9 @@ pub enum IpcMessage {
     /// A top-down checkpoint parent finality proposal. This proposal should contain the latest parent
     /// state that to be checked and voted by validators.
     TopDownExec(ParentFinality),
+
+    IpfsResolve(SignedMessage),
+    IpfsExec(SignedMessage),
 }
 
 /// A message relayed by a user on the current subnet.

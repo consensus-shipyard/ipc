@@ -58,14 +58,23 @@ pub enum DomainHash {
 pub struct SignedMessage {
     pub message: Message,
     pub signature: Signature,
+    pub resolve_cid: Option<Cid>,
 }
 
 impl SignedMessage {
     /// Generate a new signed message from fields.
     ///
     /// The signature will not be verified.
-    pub fn new_unchecked(message: Message, signature: Signature) -> SignedMessage {
-        SignedMessage { message, signature }
+    pub fn new_unchecked(
+        message: Message,
+        signature: Signature,
+        resolve_cid: Option<Cid>,
+    ) -> SignedMessage {
+        SignedMessage {
+            message,
+            signature,
+            resolve_cid,
+        }
     }
 
     /// Create a signed message.
@@ -73,12 +82,17 @@ impl SignedMessage {
         message: Message,
         sk: &SecretKey,
         chain_id: &ChainID,
+        resolve_cid: Option<Cid>,
     ) -> Result<Self, SignedMessageError> {
         let signature = match Self::signable(&message, chain_id)? {
             Signable::Ethereum((hash, _)) => sign_eth(sk, hash),
             Signable::Regular(data) => sign_regular(sk, &data),
         };
-        Ok(Self { message, signature })
+        Ok(Self {
+            message,
+            signature,
+            resolve_cid,
+        })
     }
 
     /// Calculate the CID of an FVM message.
@@ -296,6 +310,7 @@ mod arb {
             Self {
                 message: ArbMessage::arbitrary(g).0,
                 signature: Signature::arbitrary(g),
+                resolve_cid: None,
             }
         }
     }
@@ -326,7 +341,7 @@ mod tests {
         msg.from = Address::new_secp256k1(&pk.serialize())
             .map_err(|e| format!("failed to conver to address: {e}"))?;
 
-        let signed = SignedMessage::new_secp256k1(msg, &sk, &chain_id0)
+        let signed = SignedMessage::new_secp256k1(msg, &sk, &chain_id0, None)
             .map_err(|e| format!("signing failed: {e}"))?;
 
         signed
@@ -350,7 +365,7 @@ mod tests {
         msg.from = Address::from(ea);
 
         let signed =
-            SignedMessage::new_secp256k1(msg, &sk, &chain_id).map_err(|e| e.to_string())?;
+            SignedMessage::new_secp256k1(msg, &sk, &chain_id, None).map_err(|e| e.to_string())?;
 
         signed.verify(&chain_id).map_err(|e| e.to_string())
     }

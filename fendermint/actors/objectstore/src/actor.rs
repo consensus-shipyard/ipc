@@ -14,7 +14,7 @@ use fvm_shared::error::ExitCode;
 
 use crate::{Method, ObjectParams, State, OBJECTSTORE_ACTOR_NAME};
 
-const SYSCALL_FAILED_EXIT_CODE: u32 = 0x31337;
+// const SYSCALL_FAILED_EXIT_CODE: u32 = 0x31337;
 
 fil_actors_runtime::wasm_trampoline!(Actor);
 
@@ -40,10 +40,10 @@ impl Actor {
         // FIXME:(carsonfarmer) We'll want to validate the caller is the owner of the repo.
         rt.validate_immediate_caller_accept_any()?;
 
-        objectstore_actor_sdk::load_car(params.file).map_err(|en| {
-            let msg = format!("load_car syscall failed with {en}");
-            ActorError::checked(ExitCode::new(SYSCALL_FAILED_EXIT_CODE), msg, None)
-        })?;
+        // objectstore_actor_sdk::load_car(params.file).map_err(|en| {
+        //     let msg = format!("load_car syscall failed with {en}");
+        //     ActorError::checked(ExitCode::new(SYSCALL_FAILED_EXIT_CODE), msg, None)
+        // })?;
 
         let root = rt.transaction(|st: &mut State, rt| {
             st.put(rt.store(), BytesKey(params.key), params.content)
@@ -59,10 +59,10 @@ impl Actor {
         // FIXME:(carsonfarmer) We'll want to validate the caller is the owner of the repo.
         rt.validate_immediate_caller_accept_any()?;
 
-        objectstore_actor_sdk::load_car(params.file).map_err(|en| {
-            let msg = format!("load_car syscall failed with {en}");
-            ActorError::checked(ExitCode::new(SYSCALL_FAILED_EXIT_CODE), msg, None)
-        })?;
+        // objectstore_actor_sdk::load_car(params.file).map_err(|en| {
+        //     let msg = format!("load_car syscall failed with {en}");
+        //     ActorError::checked(ExitCode::new(SYSCALL_FAILED_EXIT_CODE), msg, None)
+        // })?;
 
         let root = rt.transaction(|st: &mut State, rt| {
             st.append(rt.store(), BytesKey(params.key), params.content)

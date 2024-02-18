@@ -12,7 +12,11 @@ use anyhow::{bail, Context};
 use async_stm::atomically;
 use async_trait::async_trait;
 use fendermint_vm_actor_interface::ipc;
+use fendermint_vm_ipfs_resolver::pool::{
+    ResolveKey as IpfsResolveKey, ResolvePool as IpfsResolvePool,
+};
 use fendermint_vm_message::ipc::ParentFinality;
+use fendermint_vm_message::signed::SignedMessage;
 use fendermint_vm_message::{
     chain::ChainMessage,
     ipc::{BottomUpCheckpoint, CertifiedMessage, IpcMessage, SignedRelayedMessage},
@@ -33,6 +37,7 @@ use std::sync::Arc;
 /// A resolution pool for bottom-up and top-down checkpoints.
 pub type CheckpointPool = ResolvePool<CheckpointPoolItem>;
 pub type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProviderProxy>>>;
+pub type IpfsPinPool = IpfsResolvePool<IpfsPinPoolItem>;
 
 /// These are the extra state items that the chain interpreter needs,
 /// a sort of "environment" supporting IPC.
@@ -43,6 +48,8 @@ pub struct ChainEnv {
     /// The parent finality provider for top down checkpoint
     pub parent_finality_provider: TopDownFinalityProvider,
     pub parent_finality_votes: VoteTally,
+    /// IPFS pin resolution pool.
+    pub ipfs_pin_pool: IpfsPinPool,
 }
 
 #[derive(Clone, Hash, PartialEq, Eq)]
@@ -61,6 +68,17 @@ impl From<&CheckpointPoolItem> for ResolveKey {
                 (cp.message.subnet_id.clone(), cp.message.bottom_up_messages)
             }
         }
+    }
+}
+
+#[derive(Clone, Hash, PartialEq, Eq)]
+pub struct IpfsPinPoolItem {
+    msg: SignedMessage,
+}
+
+impl From<&IpfsPinPoolItem> for IpfsResolveKey {
+    fn from(value: &IpfsPinPoolItem) -> Self {
+        value.msg.resolve_cid.unwrap()
     }
 }
 
@@ -112,6 +130,19 @@ where
         state: Self::State,
         mut msgs: Vec<Self::Message>,
     ) -> anyhow::Result<Vec<Self::Message>> {
+        for i in 0..msgs.len() {
+            match &msgs[i] {
+                ChainMessage::Signed(msg) => {
+                    if let Some(_) = msg.resolve_cid {
+                        println!("PREPARE: IpfsResolve (nonce = {})", msg.message.sequence);
+                        let msg = ChainMessage::Ipc(IpcMessage::IpfsResolve(msg.clone()));
+                        msgs[i] = msg;
+                    }
+                }
+                _ => {}
+            }
+        }
+
         // Collect resolved CIDs ready to be proposed from the pool.
         let ckpts = atomically(|| state.checkpoint_pool.collect_resolved()).await;
 
@@ -119,6 +150,11 @@ where
         let ckpts = ckpts.into_iter().map(|ckpt| match ckpt {
             CheckpointPoolItem::BottomUp(ckpt) => ChainMessage::Ipc(IpcMessage::BottomUpExec(ckpt)),
         });
+
+        let pins = atomically(|| state.ipfs_pin_pool.collect_resolved()).await;
+        let pins = pins
+            .into_iter()
+            .map(|pin| ChainMessage::Ipc(IpcMessage::IpfsExec(pin.msg)));
 
         // Prepare top down proposals.
         // Before we try to find a quorum, pause incoming votes. This is optional but if there are lots of votes coming in it might hold up proposals.
@@ -154,6 +190,7 @@ where
 
         // Append at the end - if we run out of block space, these are going to be reproposed in the next block.
         msgs.extend(ckpts);
+        msgs.extend(pins);
         Ok(msgs)
     }
 
@@ -194,6 +231,28 @@ where
                         return Ok(false);
                     }
                 }
+                ChainMessage::Ipc(IpcMessage::IpfsExec(msg)) => {
+                    if let Some(_) = msg.resolve_cid {
+                        println!("PROCESS: IpfsExec (nonce = {})", msg.message.sequence);
+                        let item = IpfsPinPoolItem { msg };
+
+                        // We can just look in memory because when we start the application, we should retrieve any
+                        // pending checkpoints (relayed but not executed) from the ledger, so they should be there.
+                        // We don't have to validate the checkpoint here, because
+                        // 1) we validated it when it was relayed, and
+                        // 2) if a validator proposes something invalid, we can make them pay during execution.
+                        let is_resolved =
+                            atomically(|| match env.ipfs_pin_pool.get_status(&item)? {
+                                None => Ok(false),
+                                Some(status) => status.is_resolved(),
+                            })
+                            .await;
+
+                        if !is_resolved {
+                            return Ok(false);
+                        }
+                    }
+                }
                 _ => {}
             };
         }
@@ -229,6 +288,7 @@ where
     ) -> anyhow::Result<(Self::State, Self::DeliverOutput)> {
         match msg {
             ChainMessage::Signed(msg) => {
+                println!("DELIVER: SignedMessage (nonce = {})", msg.message.sequence);
                 let (state, ret) = self
                     .inner
                     .deliver(state, VerifiableMessage::Signed(msg))
@@ -363,6 +423,35 @@ where
 
                     Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
                 }
+                IpcMessage::IpfsResolve(msg) => {
+                    println!("DELIVER: IpfsResolve (nonce = {})", msg.message.sequence);
+                    // let (state, ret) = self
+                    //     .inner
+                    //     .deliver(state, VerifiableMessage::Signed(msg.clone()))
+                    //     .await?;
+
+                    // if ret.is_ok() {
+                    atomically(|| env.ipfs_pin_pool.add(IpfsPinPoolItem { msg: msg.clone() }))
+                        .await;
+                    // }
+
+                    // Need to return something here...
+                    // Ok(((env, state), ChainMessageApplyRet::Signed(ret)))
+                }
+                IpcMessage::IpfsExec(mut msg) => {
+                    println!("DELIVER: IpfsExec (nonce = {})", msg.message.sequence);
+
+                    let orig = msg.message.clone();
+                    msg.message.sequence += 1;
+                    let smsg = SyntheticMessage::new(msg.message, &orig, msg.signature)
+                        .context("failed to create syntetic message")?;
+
+                    let (state, ret) = self
+                        .inner
+                        .deliver(state, VerifiableMessage::Synthetic(smsg))
+                        .await?;
+                    Ok(((env, state), ChainMessageApplyRet::Signed(ret)))
+                }
             },
         }
     }
@@ -422,6 +511,7 @@ where
     ) -> anyhow::Result<(Self::State, Self::Output)> {
         match msg {
             ChainMessage::Signed(msg) => {
+                println!("CHECK: SignedMessage (nonce = {})", msg.message.sequence);
                 let (state, ret) = self
                     .inner
                     .check(state, VerifiableMessage::Signed(msg), is_recheck)
@@ -443,9 +533,19 @@ where
 
                         Ok((state, Ok(ret)))
                     }
-                    IpcMessage::TopDownExec(_) | IpcMessage::BottomUpExec(_) => {
+                    IpcMessage::TopDownExec(_)
+                    | IpcMessage::BottomUpExec(_)
+                    | IpcMessage::IpfsExec(_) => {
                         // Users cannot send these messages, only validators can propose them in blocks.
                         Ok((state, Err(IllegalMessage)))
+                    }
+                    IpcMessage::IpfsResolve(msg) => {
+                        println!("CHECK: IpfsResolve (nonce = {})", msg.message.sequence);
+                        let (state, ret) = self
+                            .inner
+                            .check(state, VerifiableMessage::Signed(msg), is_recheck)
+                            .await?;
+                        Ok((state, Ok(ret)))
                     }
                 }
             }

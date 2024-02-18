@@ -77,13 +77,12 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
     async fn datarepo_put(
         &mut self,
         key: String,
-        content: Vec<Cid>,
-        file_name: String,
+        content: Cid,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<M::Response<Cid>> {
         let mf = self.message_factory_mut();
-        let msg = mf.datarepo_put(key, content, file_name, value, gas_params)?;
+        let msg = mf.datarepo_put(key, content, value, gas_params)?;
         let fut = self.perform(msg, decode_cid);
         let res = fut.await?;
         Ok(res)
@@ -93,13 +92,12 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
     async fn datarepo_append(
         &mut self,
         key: String,
-        content: Vec<Cid>,
-        file_name: String,
+        content: Cid,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<M::Response<Cid>> {
         let mf = self.message_factory_mut();
-        let msg = mf.datarepo_append(key, content, file_name, value, gas_params)?;
+        let msg = mf.datarepo_append(key, content, value, gas_params)?;
         let fut = self.perform(msg, decode_cid);
         let res = fut.await?;
         Ok(res)
