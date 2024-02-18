@@ -816,8 +816,8 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         console.log("--------------- withdraw token (bottom-up)---------------");
 
-        // ensure that USDC holder has 0 tokens in the root chain
-        // require(0 == testUSDC.balanceOf(holder), "unexpected holder balance in withdraw flow");
+        // ensure that USDC holder has initial balance minus tokens previously sent amount of tokens in the root chain
+        require(holderTotalAmount - transferAmount == testUSDC.balanceOf(holder), "unexpected holder balance in withdraw flow");
 
         vm.prank(recipient);
         expected = ipcTokenReplica.burnAndTransfer(holder, transferAmount);
