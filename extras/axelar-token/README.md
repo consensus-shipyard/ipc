@@ -2,6 +2,10 @@
 
 > Cross L1 chain atomic deposit of ERC20 tokens into token-supply subnets, via the Axelar network.
 
+**⚠️ Disclaimer: These contracts and implementation herein have not been security-reviewed or audited, and are considered bleeding-edge in terms of development.
+IPC developers do not make any guarantees.
+USE AT YOUR OWN RISK.**
+
 ## Motivation
 
 Imagine an ERC20 token residing on the Ethereum L1.
