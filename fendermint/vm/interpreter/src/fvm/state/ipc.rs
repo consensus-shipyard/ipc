@@ -29,6 +29,8 @@ use ipc_actors_abis::{checkpointing_facet, top_down_finality_facet, xnet_messagi
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::{ConfigurationNumber, StakingChangeRequest};
 
+use tracing::instrument;
+
 use super::{
     fevm::{ContractCaller, MockProvider, NoRevert},
     FvmExecState,
@@ -122,6 +124,7 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
     }
 
     /// Insert a new checkpoint at the period boundary.
+    #[instrument(skip(self, state))]
     pub fn create_bottom_up_checkpoint(
         &self,
         state: &mut FvmExecState<DB>,
@@ -151,6 +154,7 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
     }
 
     /// Apply all pending validator changes, returning the newly adopted configuration number, or 0 if there were no changes.
+    #[instrument(skip(self, state))]
     pub fn apply_validator_changes(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<u64> {
         self.topdown.call(state, |c| c.apply_finality_changes())
     }
@@ -225,6 +229,7 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
 
     /// Commit the parent finality to the gateway and returns the previously committed finality.
     /// None implies there is no previously committed finality.
+    #[instrument(skip(self, state))]
     pub fn commit_parent_finality(
         &self,
         state: &mut FvmExecState<DB>,
@@ -262,6 +267,7 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
     }
 
     /// Call this function to mint some FIL to the gateway contract
+    #[instrument(name = "increase_circulation", skip(self, state))]
     pub fn mint_to_gateway(
         &self,
         state: &mut FvmExecState<DB>,

@@ -12,6 +12,7 @@ use async_stm::{Stm, StmResult};
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
 use std::sync::Arc;
+use tracing::instrument;
 
 /// The finality provider that performs io to the parent if not found in cache
 #[derive(Clone)]
@@ -119,6 +120,7 @@ impl<T: ParentQueryProxy + Send + Sync + 'static> ParentFinalityProvider
         self.inner.check_proposal(proposal)
     }
 
+    #[instrument(skip(self))]
     fn set_new_finality(
         &self,
         finality: IPCParentFinality,

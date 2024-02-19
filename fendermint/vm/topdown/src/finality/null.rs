@@ -9,6 +9,7 @@ use async_stm::{abort, atomically, Stm, StmResult, TVar};
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
 use std::cmp::min;
+use tracing::instrument;
 
 /// Finality provider that can handle null blocks
 #[derive(Clone)]
@@ -66,6 +67,7 @@ impl FinalityWithNull {
         self.last_committed_finality.write(Some(finality))
     }
 
+    #[instrument(skip(self))]
     pub fn new_parent_view(
         &self,
         height: BlockHeight,

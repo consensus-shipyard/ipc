@@ -40,6 +40,7 @@ use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 use tendermint::abci::request::CheckTxKind;
 use tendermint::abci::{request, response};
+use tracing::instrument;
 
 use crate::{tmconv::*, VERSION};
 use crate::{BlockHeight, APP_VERSION};
@@ -743,6 +744,7 @@ where
     }
 
     /// Signals the end of a block.
+    #[instrument(skip(self))]
     async fn end_block(&self, request: request::EndBlock) -> AbciResult<response::EndBlock> {
         tracing::debug!(height = request.height, "end block");
 
