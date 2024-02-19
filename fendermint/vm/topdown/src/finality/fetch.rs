@@ -120,7 +120,7 @@ impl<T: ParentQueryProxy + Send + Sync + 'static> ParentFinalityProvider
         self.inner.check_proposal(proposal)
     }
 
-    #[instrument(skip(self))]
+    #[instrument(name = "new-topdown-finality", skip(self))]
     fn set_new_finality(
         &self,
         finality: IPCParentFinality,

@@ -67,7 +67,7 @@ impl FinalityWithNull {
         self.last_committed_finality.write(Some(finality))
     }
 
-    #[instrument(skip(self))]
+    #[instrument(name = "new-parent-view", skip(self))]
     pub fn new_parent_view(
         &self,
         height: BlockHeight,

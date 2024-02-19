@@ -744,7 +744,7 @@ where
     }
 
     /// Signals the end of a block.
-    #[instrument(skip(self))]
+    #[instrument(name = "new-block", skip(self))]
     async fn end_block(&self, request: request::EndBlock) -> AbciResult<response::EndBlock> {
         tracing::debug!(height = request.height, "end block");
 
