@@ -7,11 +7,11 @@ use tracing_appender::{
     non_blocking::WorkerGuard,
     rolling::{RollingFileAppender, Rotation},
 };
+use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::{
     fmt::{self, writer::MakeWriterExt},
     layer::SubscriberExt,
 };
-use tracing_subscriber::fmt::format::FmtSpan;
 
 mod cmd;
 
