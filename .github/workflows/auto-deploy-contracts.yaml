@@ -77,6 +77,8 @@ jobs:
       - name: Pull rebase from origin main branch
         run: |
           git rev-parse --abbrev-ref HEAD
+          git config --global user.name 'Contract Auto Deployer'
+          git config --global user.email 'dummy@dummy.dummy'
           git pull --rebase origin main
       - name: Commit output file and push it to remote repo
         uses: stefanzweifel/git-auto-commit-action@v5
