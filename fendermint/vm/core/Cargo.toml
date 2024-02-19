@@ -1,6 +1,6 @@
 [package]
 name = "fendermint_vm_core"
-description = "Core data structures shared between genesis and messages"
+description = "Core data structures shared between the vm"
 version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
@@ -14,7 +14,7 @@ serde = { workspace = true }
 thiserror = { workspace = true }
 arbitrary = { workspace = true, optional = true }
 quickcheck = { workspace = true, optional = true }
-
+strum_macros = { worspace = true }
 cid = { workspace = true }
 fvm_shared = { workspace = true }
 

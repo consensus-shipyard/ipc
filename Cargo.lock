@@ -3157,6 +3157,7 @@ dependencies = [
  "quickcheck_macros",
  "regex",
  "serde",
+ "strum_macros 0.25.3",
  "thiserror",
 ]
 
@@ -3343,6 +3344,7 @@ dependencies = [
  "ethers",
  "fendermint_crypto",
  "fendermint_testing",
+ "fendermint_vm_core",
  "fendermint_vm_genesis",
  "fvm_ipld_encoding",
  "fvm_shared",

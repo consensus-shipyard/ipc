@@ -29,6 +29,9 @@ use super::{
     ValidatorContext,
 };
 
+use fendermint_vm_core::emit;
+use fendermint_vm_core::event::VMEvent;
+
 /// Validator voting power snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PowerTable(pub Vec<Validator<Power>>);
@@ -89,6 +92,8 @@ where
         *circ_supply -= burnt_tokens;
     });
 
+    let num_msgs = msgs.len();
+
     // Construct checkpoint.
     let checkpoint = BottomUpCheckpoint {
         subnet_id,
@@ -115,6 +120,14 @@ where
 
         power_diff(curr_power_table, next_power_table)
     };
+
+    emit!(
+        VMEvent::NewBottomUpCheckpoint,
+        height = height.value(),
+        block_hash = hex::encode(block_hash),
+        msgs = num_msgs,
+        next_configuration_number,
+    );
 
     Ok(Some((checkpoint, power_updates)))
 }
