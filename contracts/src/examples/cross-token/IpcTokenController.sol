@@ -33,26 +33,27 @@ contract IpcTokenController is IpcExchange {
     using SubnetIDHelper for SubnetID;
     using FvmAddressHelper for FvmAddress;
 
-    address private _tokenAddr;
-    SubnetID private _destinationSubnet;
-    address private _destinationContract;
-    SubnetID public _subnetId;
+    address public immutable _tokenAddr;
+    SubnetID public immutable _destinationSubnet;
+    address public immutable _destinationContract;
+    SubnetID public immutable _subnetId;
 
     // Define a struct to hold the sender address and the value of unconfirmed transfers
-    struct TransferDetails {
+    struct UnconfirmedTransferDetails {
         address sender;
         uint256 value;
     }
 
     // Create the mapping of ipc envelope hash to TransferDetails
-    mapping(bytes32 => TransferDetails) public _unconfirmedTransfers;
+    mapping(bytes32 => UnconfirmedTransferDetails) public _unconfirmedTransfers;
 
-    event TokenSent(
+    event TokensSent(
         address tokenAddr,
         address sender,
         SubnetID destinationSubnet,
         address destinationContract,
         address receiver,
+        uint64 nonce,
         uint256 value
     );
 
@@ -96,7 +97,7 @@ contract IpcTokenController is IpcExchange {
     }
 
     function getUnconfirmedTransfer(bytes32 hash) public view returns (address, uint256) {
-        TransferDetails storage details = _unconfirmedTransfers[hash];
+        UnconfirmedTransferDetails storage details = _unconfirmedTransfers[hash];
         return (details.sender, details.value);
     }
 
@@ -106,7 +107,7 @@ contract IpcTokenController is IpcExchange {
     }
 
     function _addUnconfirmedTransfer(bytes32 hash, address sender, uint256 value) internal {
-        _unconfirmedTransfers[hash] = TransferDetails(sender, value);
+        _unconfirmedTransfers[hash] = UnconfirmedTransferDetails(sender, value);
     }
 
     function _removeUnconfirmedTransfer(bytes32 hash) internal {
@@ -129,7 +130,8 @@ contract IpcTokenController is IpcExchange {
     }
 
     //only accept messages from replica contract
-    function verifyIpcEnvelopeLogic(IpcEnvelope memory envelope) public {
+    // TODO make internal
+    function validateEnvelope(IpcEnvelope memory envelope) public {
         SubnetID memory subnetId = envelope.from.subnetId;
         FvmAddress memory rawAddress = envelope.from.rawAddress;
         if (!_subnetId.equals(_destinationSubnet)) {
@@ -184,7 +186,7 @@ contract IpcTokenController is IpcExchange {
 
         _addUnconfirmedTransfer(committed.toHash(), msg.sender, amount);
 
-        emit TokenSent({
+        emit TokensSent({
             tokenContractAddress: _tokenAddr,
             sender: msg.sender,
             destinationSubnet: _destinationSubnet,
@@ -237,7 +239,7 @@ contract IpcTokenController is IpcExchange {
     }
 
     modifier validateOrigin(IpcEnvelope memory envelope) {
-        verifyIpcEnvelopeLogic(envelope); // Call the function
+        validateEnvelope(envelope);
         _; // Continue execution of the modified function
     }
 }

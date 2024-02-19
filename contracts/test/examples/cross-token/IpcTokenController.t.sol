@@ -95,10 +95,10 @@ contract IpcTokenControllerTest is Test, IntegrationTestBase {
         });
 
         vm.expectRevert(InvalidOriginContract.selector);
-        controller.verifyIpcEnvelopeLogic(invalidContract);
+        controller.validateEnvelope(invalidContract);
 
         vm.expectRevert(InvalidOriginSubnet.selector);
-        controller.verifyIpcEnvelopeLogic(invalidSubnet);
+        controller.validateEnvelope(invalidSubnet);
     }
 
     function testParentSubnetUSDCAddress() public {
