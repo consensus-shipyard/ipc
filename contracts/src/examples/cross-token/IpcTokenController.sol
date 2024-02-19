@@ -211,7 +211,7 @@ contract IpcTokenController is IpcExchange {
         IpcEnvelope storage original,
         IpcEnvelope memory result,
         ResultMsg memory resultMsg
-    ) internal override validateOrigin(original) {
+    ) internal override validateOrigin(result) {
         bytes32 id = resultMsg.id;
         OutcomeType outcome = resultMsg.outcome;
         if (outcome == OutcomeType.Ok) {
