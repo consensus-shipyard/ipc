@@ -2,12 +2,11 @@
 pragma solidity ^0.8.23;
 
 import "forge-std/Script.sol";
-import "../../../src/examples/cross-token/IpcTokenController.sol";
-import "../../../src/structs/Subnet.sol";
+import "../src/LinkedTokenController.sol";
 
 contract CallLockAndTransfer is Script {
     function run(address contractAddress, address recipient, uint256 amount) public {
-        IpcLinkedTokenController controller = IpcLinkedTokenController(contractAddress);
+        LinkedTokenController controller = LinkedTokenController(contractAddress);
         vm.startBroadcast();
         controller.lockAndTransfer(recipient, amount);
         vm.stopBroadcast();

@@ -2,8 +2,8 @@
 pragma solidity ^0.8.23;
 
 import "forge-std/Script.sol";
-import "../../../src/examples/cross-token/IpcTokenReplica.sol";
-import "../../../src/structs/Subnet.sol";
+import "../src/LinkedTokenReplica.sol";
+import "@ipc/src/structs/Subnet.sol";
 
 contract DeployIpcTokenReplica is Script {
     function run(address _gateway, address _controller, uint64 _rootNetChainId, address[] memory _route) external {
@@ -11,10 +11,7 @@ contract DeployIpcTokenReplica is Script {
         SubnetID memory controllerSubnet = SubnetID({root: _rootNetChainId , route: _route});
 
         vm.startBroadcast();
-
-        // Deploy the IpcTokenReplica contract
-        IpcTokenReplica replica = new IpcTokenReplica(_gateway, _controller, controllerSubnet);
-
+        LinkedTokenReplica replica = new LinkedTokenReplica(_gateway, _controller, controllerSubnet);
         vm.stopBroadcast();
 
         // Log the address of the deployed contract

@@ -3,13 +3,13 @@ pragma solidity 0.8.23;
 
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
-import {FvmAddressHelper} from "../../lib/FvmAddressHelper.sol";
-import {FvmAddress} from "../../structs/FvmAddress.sol";
-import {IpcExchange} from "../../../sdk/IpcContract.sol";
-import {IpcEnvelope, ResultMsg, CallMsg, OutcomeType, IpcMsgKind} from "../../structs/CrossNet.sol";
-import {IPCAddress, SubnetID} from "../../structs/Subnet.sol";
-import {CrossMsgHelper} from "../../../src/lib/CrossMsgHelper.sol";
-import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
+import {FvmAddressHelper} from "@ipc/src/lib/FvmAddressHelper.sol";
+import {FvmAddress} from "@ipc/src/structs/FvmAddress.sol";
+import {IpcExchange} from "@ipc/sdk/IpcContract.sol";
+import {IpcEnvelope, ResultMsg, CallMsg, OutcomeType, IpcMsgKind} from "@ipc/src/structs/CrossNet.sol";
+import {IPCAddress, SubnetID} from "@ipc/src/structs/Subnet.sol";
+import {CrossMsgHelper} from "@ipc/src/lib/CrossMsgHelper.sol";
+import {SubnetIDHelper} from "@ipc/src/lib/SubnetIDHelper.sol";
 
 /**
  * @title LinkedToken
@@ -21,8 +21,8 @@ abstract contract LinkedToken is IpcExchange {
     using FvmAddressHelper for FvmAddress;
 
     IERC20 public immutable _underlying;
-    address public immutable _destinationContract;
-    SubnetID public _destinationSubnet;
+    address public _linkedContract;
+    SubnetID public _linkedSubnet;
 
     mapping(bytes32 => UnconfirmedTransfer) public _unconfirmedTransfers;
 
@@ -38,10 +38,10 @@ abstract contract LinkedToken is IpcExchange {
         uint256 value;
     }
 
-    event LinkedTokenDeployed(
+    event LinkedTokenInitialized(
         address indexed underlying,
-        SubnetID indexed destinationSubnet,
-        address indexed destinationContract
+        SubnetID indexed linkedSubnet,
+        address indexed linkedContract
     );
 
     event LinkedTokensSent(
@@ -59,24 +59,16 @@ abstract contract LinkedToken is IpcExchange {
      * @dev Constructor for IpcTokenController
      * @param _gateway Address of the gateway for cross-network communication
      * @param _tokenContractAddress Address of the source ERC20 token contract
-     * @param _destinationSubnet SubnetID of the destination network
-     * @param _destinationContract Address of the destination contract for minting
+     * @param _linkedSubnet SubnetID of the destination network
+     * @param _linkedContract Address of the destination contract for minting
      */
     constructor(
         address gateway,
         address underlyingToken,
-        SubnetID memory destinationSubnet,
-        address destinationContract
+        SubnetID memory linkedSubnet
     ) IpcExchange(gateway) {
         _underlying = underlyingToken;
-        _destinationSubnet = destinationSubnet;
-        _destinationContract = destinationContract;
-
-        emit LinkedTokenDeployed({
-            underlying: _underlying,
-            destinationSubnet: _destinationSubnet,
-            destinationContract: _destinationContract
-        });
+        _linkedSubnet = linkedSubnet;
     }
 
     function _captureTokens(address holder, uint256 amount) internal virtual;
@@ -96,6 +88,8 @@ abstract contract LinkedToken is IpcExchange {
         address recipient,
         uint256 amount
     ) internal returns (IpcEnvelope memory committed) {
+        _validateInitialized();
+
         // Validate that the transfer parameters are acceptable.
         _validateTransfer(recipient, amount);
 
@@ -108,8 +102,8 @@ abstract contract LinkedToken is IpcExchange {
             params: abi.encode(recipient, amount)
         });
         IPCAddress memory destination = IPCAddress({
-            subnetId: _destinationSubnet,
-            rawAddress: FvmAddressHelper.from(_destinationContract)
+            subnetId: _linkedSubnet,
+            rawAddress: FvmAddressHelper.from(_linkedContract)
         });
 
         // Route through GMP.
@@ -131,9 +125,26 @@ abstract contract LinkedToken is IpcExchange {
     function lockAndTransferWithReturn(
         address receiver,
         uint256 amount
-    ) external payable returns (IpcEnvelope memory envelope) {
+    ) external returns (IpcEnvelope memory envelope) {
         // Transfer and lock tokens on L1 using the inherited sendToken function
         return _linkedTransfer(receiver, amount);
+    }
+
+    // ----------------------------
+    // Linked contract management.
+    // ----------------------------
+
+    function initialize(address linkedContract) external onlyOwner {
+        // Note: for now, this allows changing the linked contract for upgradeability purposes.
+        // Consider disallowing this if we anyway switch to something like https://docs.openzeppelin.com/upgrades.
+
+        _linkedContract = linkedContract;
+
+        emit LinkedTokenInitialized({
+            underlying: _underlying,
+            linkedSubnet: _linkedSubnet,
+            linkedContract: _linkedContract
+        });
     }
 
     // ----------------------------
@@ -144,8 +155,10 @@ abstract contract LinkedToken is IpcExchange {
         IpcEnvelope memory envelope,
         CallMsg memory callMsg
     ) internal override returns (bytes memory) {
+        _validateInitialized();
         _validateEnvelope(envelope);
         _requireSelector(callMsg.method, "receiveLinked(address,uint256)");
+
         (address receiver, uint256 amount) = abi.decode(callMsg.params, (address, uint256));
 
         _receiveLinked(receiver, amount);
@@ -156,16 +169,14 @@ abstract contract LinkedToken is IpcExchange {
         IpcEnvelope storage original,
         IpcEnvelope memory result,
         ResultMsg memory resultMsg
-    ) internal override validateEnvelope(result) {
-        bytes32 id = resultMsg.id;
+    ) internal override {
+        _validateInitialized();
+        _validateEnvelope(result);
+
         OutcomeType outcome = resultMsg.outcome;
-        if (outcome == OutcomeType.Ok) {
-            _removeUnconfirmedTransfer(id);
-            return;
-        }
-        if (outcome == OutcomeType.SystemErr || outcome == OutcomeType.ActorErr) {
-            _refundAndRemoveUnconfirmed(id);
-        }
+        bool refund = outcome == OutcomeType.SystemErr || outcome == OutcomeType.ActorErr;
+
+        _removeUnconfirmedTransfer({ id: resultMsg.id, refund: refund });
     }
 
     function _receiveLinked(address recipient, uint256 amount) private {
@@ -182,15 +193,19 @@ abstract contract LinkedToken is IpcExchange {
     // Validation helpers.
     // ----------------------------
 
+    function _validateInitialized() internal {
+        require(_linkedContract != address(0), "linked token not initialized");
+    }
+
     // Only accept messages from our linked token contract.
     function _validateEnvelope(IpcEnvelope memory envelope) internal {
         SubnetID memory subnetId = envelope.from.subnetId;
-        if (!_subnetId.equals(_destinationSubnet)) {
+        if (!_subnetId.equals(_linkedSubnet)) {
             revert InvalidOriginSubnet();
         }
 
         FvmAddress memory rawAddress = envelope.from.rawAddress;
-        if (!rawAddress.equal(FvmAddressHelper.from(_destinationContract))) {
+        if (!rawAddress.equal(FvmAddressHelper.from(_linkedContract))) {
             revert InvalidOriginContract();
         }
     }
@@ -228,23 +243,21 @@ abstract contract LinkedToken is IpcExchange {
 
     // Method for the contract owner to manually drop an entry from unconfirmedTransfers
     function removeUnconfirmedTransfer(bytes32 id) external onlyOwner {
-        _removeUnconfirmedTransfer(id);
-    }
-
-    function _refundAndRemoveUnconfirmed(bytes32 id) private {
-        (address sender, uint256 value) = getUnconfirmedTransfer(id);
-        require(sender != address(0), "internal error: no unconfirmed transfer to refund");
-
-        _removeUnconfirmedTransfer(id);
-        _releaseTokens(sender, value);
+        _removeUnconfirmedTransfer(id, false);
     }
 
     function _addUnconfirmedTransfer(bytes32 hash, address sender, uint256 value) internal {
         _unconfirmedTransfers[hash] = UnconfirmedTransferDetails(sender, value);
     }
 
-    function _removeUnconfirmedTransfer(bytes32 id) internal {
+    function _removeUnconfirmedTransfer(bytes32 id, bool refund) internal {
+        (address sender, uint256 value) = getUnconfirmedTransfer(id);
         delete _unconfirmedTransfers[id];
+
+        if (refund) {
+            require(sender != address(0), "internal error: no such unconfirmed transfer");
+            _releaseTokens(sender, value);
+        }
     }
 
 }

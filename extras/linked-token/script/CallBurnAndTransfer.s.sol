@@ -2,12 +2,11 @@
 pragma solidity ^0.8.23;
 
 import "forge-std/Script.sol";
-import "../../../src/examples/cross-token/IpcTokenReplica.sol";
-import "../../../src/structs/Subnet.sol";
+import "../src/LinkedTokenReplica.sol";
 
 contract CallBurnAndTransfer is Script {
     function run(address contractAddress, address recipient, uint256 amount) public {
-        IpcTokenReplica replica = IpcTokenReplica(contractAddress);
+        LinkedTokenReplica replica = LinkedTokenReplica(contractAddress);
         vm.startBroadcast();
         replica.burnAndTransfer(recipient, amount);
         vm.stopBroadcast();
