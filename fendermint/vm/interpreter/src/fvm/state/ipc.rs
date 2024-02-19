@@ -52,11 +52,7 @@ pub struct GatewayCaller<DB> {
         TopDownFinalityFacet<MockProvider>,
         top_down_finality_facet::TopDownFinalityFacetErrors,
     >,
-    xnet: ContractCaller<
-        DB,
-        XnetMessagingFacet<MockProvider>,
-        NoErrors,
-    >,
+    xnet: ContractCaller<DB, XnetMessagingFacet<MockProvider>, NoErrors>,
 }
 
 impl<DB> Default for GatewayCaller<DB> {
