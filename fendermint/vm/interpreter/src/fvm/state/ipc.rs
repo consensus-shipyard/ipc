@@ -2,9 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::{anyhow, Context};
-use ethers::abi::{AbiDecode, AbiEncode, AbiError};
-use ethers::contract::ContractRevert;
-use ethers::prelude::Selector;
 use ethers::types as et;
 
 use fvm_ipld_blockstore::Blockstore;
@@ -52,7 +49,7 @@ pub struct GatewayCaller<DB> {
         TopDownFinalityFacet<MockProvider>,
         top_down_finality_facet::TopDownFinalityFacetErrors,
     >,
-    xnet: ContractCaller<DB, XnetMessagingFacet<MockProvider>, NoErrors>,
+    xnet: ContractCaller<DB, XnetMessagingFacet<MockProvider>, NoRevert>,
 }
 
 impl<DB> Default for GatewayCaller<DB> {
@@ -358,25 +355,4 @@ fn membership_to_power_table(
     }
 
     pt
-}
-
-#[derive(Clone, ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
-pub struct NoErrors {}
-
-impl ContractRevert for NoErrors {
-    fn valid_selector(_selector: Selector) -> bool {
-        unreachable!("valid_selector should not have been called")
-    }
-}
-
-impl AbiDecode for NoErrors {
-    fn decode(_bytes: impl AsRef<[u8]>) -> Result<Self, AbiError> {
-        unreachable!("decode should not have been called")
-    }
-}
-
-impl AbiEncode for NoErrors {
-    fn encode(self) -> Vec<u8> {
-        unreachable!("encode should not have been called")
-    }
 }
