@@ -27,7 +27,7 @@ import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 
 import {IpcTokenReplica} from "../../src/examples/cross-token/IpcTokenReplica.sol";
-import {IpcTokenController} from "../../src/examples/cross-token/IpcTokenController.sol";
+import {IpcLinkedTokenController} from "../../src/examples/cross-token/IpcTokenController.sol";
 import {USDCTest} from "../../src/examples/cross-token/USDCTest.sol";
 import {IpcHandler, IpcExchange} from "../../sdk/IpcContract.sol";
 
@@ -67,7 +67,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
     IERC20 public token;
 
     IpcTokenReplica ipcTokenReplica;
-    IpcTokenController ipcTokenController;
+    IpcLinkedTokenController ipcTokenController;
 
     function setUp() public override {
         token = new ERC20PresetFixedSupply("TestToken", "TEST", 1 ether, address(this));

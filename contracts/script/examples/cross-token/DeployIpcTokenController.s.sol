@@ -13,7 +13,7 @@ contract DeployIpcTokenController is Script {
         vm.startBroadcast();
 
         // Deploy the IpcTokenController contract
-        IpcTokenController controller = new IpcTokenController(_gateway, _tokenContractAddress, destinationSubnet, _destinationContract);
+        IpcLinkedTokenController controller = new IpcTokenController(_gateway, _tokenContractAddress, destinationSubnet, _destinationContract);
 
         vm.stopBroadcast();
 

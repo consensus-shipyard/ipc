@@ -8,14 +8,14 @@ import {GatewayDiamond} from "../../../src/GatewayDiamond.sol";
 import {SubnetIDHelper} from "../../../src/lib/SubnetIDHelper.sol";
 
 import {SubnetActorDiamond} from "../../../src/SubnetActorDiamond.sol";
-import {IpcTokenController} from "../../../src/examples/cross-token/IpcTokenController.sol";
+import {IpcLinkedTokenController} from "../../../src/examples/cross-token/IpcTokenController.sol";
 import {InvalidOriginContract, InvalidOriginSubnet} from "../../../src/examples/cross-token/IpcCrossTokenErrors.sol";
 import {USDCTest} from "../../../src/examples/cross-token/USDCTest.sol";
 
 contract IpcTokenReplicaTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
 
-    IpcTokenController controller;
+    IpcLinkedTokenController controller;
     IpcTokenReplica replica;
     address controllerSubnetUSDC;
     SubnetID controllerSubnet;

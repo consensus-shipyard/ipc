@@ -7,7 +7,7 @@ import "../../../src/structs/Subnet.sol";
 
 contract CallLockAndTransfer is Script {
     function run(address contractAddress, address recipient, uint256 amount) public {
-        IpcTokenController controller = IpcTokenController(contractAddress);
+        IpcLinkedTokenController controller = IpcLinkedTokenController(contractAddress);
         vm.startBroadcast();
         controller.lockAndTransfer(recipient, amount);
         vm.stopBroadcast();
