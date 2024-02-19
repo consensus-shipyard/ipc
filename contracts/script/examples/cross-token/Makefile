@@ -23,7 +23,6 @@ help:
 	@echo "  make <target>          - Run a specific target."
 	@echo "  make help              - Display this help message."
 
-
 deploy-usdctest:
 	@echo "Deploying USDCTest contract..."
 	forge script DeployUSDCTest.s.sol --broadcast --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --skip-simulation
@@ -34,7 +33,9 @@ mint-usdc:
 
 check-balance:
 	@echo "Checking wallet balance..."
-	cast call $$CALIBNET_USDC "$$(cast calldata 'balanceOf(address)' $$PUBLIC_ADDRESS)" --rpc-url $$CALIBNET_RPC_URL
+	@WALLET_ADDRESS=$$(cast wallet address --private-key $$PRIVATE_KEY); \
+	cast call $$CALIBNET_USDC "$$(cast calldata 'balanceOf(address)' $$WALLET_ADDRESS)" --rpc-url $$CALIBNET_RPC_URL
+
 
 deploy-replica:
 	@echo "Deploying token replica contract on subnet..."
@@ -54,14 +55,16 @@ approve-usdc:
 
 deposit-usdc:
 	@echo "Depositing USDC to subnet..."
-	forge script CallLockAndTransfer.s.sol:CallLockAndTransfer --skip-simulation --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "run(address,address,uint256)" -- $$IPC_TOKEN_CONTROLLER $$PUBLIC_ADDRESS $$AMOUNT
+	@WALLET_ADDRESS=$$(cast wallet address --private-key $$PRIVATE_KEY); \
+	forge script CallLockAndTransfer.s.sol:CallLockAndTransfer --skip-simulation --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "run(address,address,uint256)" -- $$IPC_TOKEN_CONTROLLER $$WALLET_ADDRESS $$AMOUNT
 
 check-replica-balance:
 	@echo "Checking Replica Token balance..."
-	cast call $$IPC_TOKEN_REPLICA "$$(cast calldata 'balanceOf(address)' $$PUBLIC_ADDRESS)" --rpc-url $$SUBNET_RPC_URL
+	@WALLET_ADDRESS=$$(cast wallet address --private-key $$PRIVATE_KEY); \
+	cast call $$IPC_TOKEN_REPLICA "$$(cast calldata 'balanceOf(address)' $$WALLET_ADDRESS)" --rpc-url $$SUBNET_RPC_URL
 
 withdraw-usdc:
 	@echo "Withdrawing USDC from subnet..."
-	# To withdraw 1,000 USDCTest tokens
-	forge script CallBurnAndTransfer.s.sol:CallBurnAndTransfer --skip-simulation --rpc-url $$SUBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "run(address,address,uint256)" -- $$IPC_TOKEN_REPLICA $$PUBLIC_ADDRESS $$AMOUNT
+	@WALLET_ADDRESS=$$(cast wallet address --private-key $$PRIVATE_KEY); \
+	forge script CallBurnAndTransfer.s.sol:CallBurnAndTransfer --skip-simulation --rpc-url $$SUBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "run(address,address,uint256)" -- $$IPC_TOKEN_REPLICA $$WALLET_ADDRESS $$AMOUNT
 
