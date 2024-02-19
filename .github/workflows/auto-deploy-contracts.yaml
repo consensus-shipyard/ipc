@@ -80,6 +80,7 @@ jobs:
           git config --global user.name 'Contract Auto Deployer'
           git config --global user.email 'dummy@dummy.dummy'
           git pull --rebase origin main
+          git push -f origin cd/contracts
       - name: Commit output file and push it to remote repo
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
