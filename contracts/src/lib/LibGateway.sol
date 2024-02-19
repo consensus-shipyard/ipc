@@ -23,6 +23,8 @@ library LibGateway {
     using SupplySourceHelper for SupplySource;
 
     event MembershipUpdated(Membership);
+    /// @dev event emiited when committing the result message failed.
+    event FailedToCommitResultMsg(bytes ret);
     /// @dev subnet refers to the next "down" subnet that the `envelope.message.to` should be forwarded to.
     event NewTopDownMessage(address indexed subnet, IpcEnvelope message);
     /// @dev event emitted when there is a new bottom-up message batch to be signed.
@@ -454,8 +456,13 @@ library LibGateway {
         }
 
         // commmit the receipt for propagation
-        // slither-disable-next-line unused-return
-        commitCrossMessage(original.createResultMsg(outcomeType, ret));
+        (bool success, bytes memory result) = address(LibGateway).delegatecall(   // solhint-disable-line avoid-low-level-calls
+            abi.encodeWithSelector(LibGateway.commitCrossMessage.selector, original.createResultMsg(outcomeType, ret))
+        );
+
+        if (!success) {
+            emit FailedToCommitResultMsg(result);
+        }
     }
 
     /**
@@ -469,7 +476,7 @@ library LibGateway {
      *  @param crossMessage The cross-network message to commit.
      *  @return shouldBurn A Boolean that indicates if the input amount should be burned.
      */
-    function commitCrossMessage(IpcEnvelope memory crossMessage) internal returns (bool shouldBurn) {
+    function commitCrossMessage(IpcEnvelope memory crossMessage) public returns (bool shouldBurn) {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
         SubnetID memory to = crossMessage.to.subnetId;
         if (to.isEmpty()) {
