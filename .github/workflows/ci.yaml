@@ -79,8 +79,8 @@ jobs:
     uses: ./.github/workflows/contracts-sast.yaml
     needs: [contracts-prettier]
 
-  examples:
-    uses: ./.github/workflows/examples.yaml
+  extras:
+    uses: ./.github/workflows/extras.yaml
     needs: [contracts-prettier]
 
   ipc:
