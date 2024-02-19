@@ -77,7 +77,6 @@ jobs:
       - name: Pull rebase from origin main branch
         run: |
           git rev-parse --abbrev-ref HEAD
-          git show HEAD
           git pull --rebase origin main
       - name: Commit output file and push it to remote repo
         uses: stefanzweifel/git-auto-commit-action@v5
