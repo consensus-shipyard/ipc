@@ -74,7 +74,7 @@
 [*] Registry script in /home/runner/work/ipc/ipc/contracts/scripts/deploy-registry.ts
 Deploying contracts with account: 0xF161ba5E71EA64b34E95A860F3b093425c7Ca9AF and balance: 232197673117076586236
 {
-  "SubnetRegistry": "0x827b8D93bB9734DE1bfd9A10dE13b5f6453E54Cc",
+  "SubnetRegistry": "0x727b8D93bB9734DE1bfd9A10dE13b5f6453E54Cc",
   "Facets": [
     {
       "name": "RegisterSubnetFacet",
