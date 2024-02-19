@@ -38,7 +38,7 @@ contract IpcTokenSender {
         token.transferFrom(msg.sender, address(this), amount);
         token.approve(address(_axelarIts), amount);
 
-        // Tell the IpcTokenHandler on the IPC L1 rootnet to credit these funds to the specified beneficiariy
+        // Tell the IpcTokenHandler on the IPC L1 rootnet to credit these funds to the specified beneficiary
         // in the designated subnet.
         bytes memory payload = abi.encode(subnet, recipient);
         _axelarIts.callContractWithInterchainToken{ value: msg.value }(
