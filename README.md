@@ -16,6 +16,16 @@ On Linux (links and instructions for Ubuntu):
 - Install Docker. See [instructions](https://docs.docker.com/engine/install/ubuntu/).
 - Install Foundry. See [instructions](https://book.getfoundry.sh/getting-started/installation).
 
+On MacOS:
+- Install Xcode from App Store or terminal: xcode-select --install
+- Install Homebrew: https://brew.sh/
+- Install dependencies: brew install jq
+- Install Rust: https://www.rust-lang.org/tools/install (if you have homebrew installed rust, you may need to uninstall that if you get errors in the build)
+- Install Cargo make: cargo install --force cargo-make
+- Install docker: https://docs.docker.com/desktop/install/mac-install/
+- Install foundry: https://book.getfoundry.sh/getting-started/installation
+  
+
 ## Building
 
 ```
@@ -27,7 +37,9 @@ sudo usermod -aG docker $USER && newgrp docker
 
 # clone this repo and build
 git clone https://github.com/consensus-shipyard/ipc.git
-cd ipc
+cd ipc/contracts
+make gen
+cd ..
 cargo build --release
 
 # building will generate the following binaries
