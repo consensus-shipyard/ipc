@@ -4,24 +4,25 @@
 include .env
 export
 
-.PHONY: help deploy-usdctest mint-usdc check-balance deploy-replica deploy-controller update-replica deposit-usdc withdraw-usdc
+.PHONY: help deploy-usdctest mint-usdc check-balance deploy-replica deploy-controller update-replica deposit-usdc withdraw-usdc check-replica-balance
 
 help:
 	@echo "Available targets:"
-	@echo "  deploy-usdctest  - Deploy the USDCTest contract on the Calibration Network."
-	@echo "  mint-usdc        - Mint 1000 USDCTest tokens to the wallet specified in the .env file."
-	@echo "  check-balance    - Check the balance of USDCTest tokens in the wallet."
-	@echo "  deploy-replica   - Deploy the token replica contract on the subnet."
-	@echo "  deploy-controller    - Deploy the token controller contract on the Calibration Network."
-	@echo "  update-replica   - Update the replica with the token controller controller's address."
-	@echo "  approve-usdc     - Approve USDC to allow for transfer to the subnet."
-	@echo "  deposit-usdc     - Deposit USDC to the subnet."
-	@echo "  check-replica-balance     - Check Replica Token balance."
-	@echo "  withdraw-usdc    - Withdraw USDC from the subnet."
+	@echo "  deploy-usdctest        - Deploy the USDCTest contract on the Calibration Network."
+	@echo "  mint-usdc              - Mint 1000 USDCTest tokens to the wallet specified in the .env file."
+	@echo "  check-balance          - Check the balance of USDCTest tokens in the wallet."
+	@echo "  deploy-replica         - Deploy the token replica contract on the subnet."
+	@echo "  deploy-controller      - Deploy the token controller contract on the Calibration Network."
+	@echo "  update-replica         - Update the replica with the token controller's address."
+	@echo "  approve-usdc           - Approve USDC to allow for transfer to the subnet."
+	@echo "  deposit-usdc           - Deposit USDC to the subnet."
+	@echo "  check-replica-balance  - Check Replica Token balance."
+	@echo "  withdraw-usdc          - Withdraw USDC from the subnet."
 	@echo ""
 	@echo "Usage:"
-	@echo "  make <target>    - Run a specific target."
-	@echo "  make help        - Display this help message."
+	@echo "  make <target>          - Run a specific target."
+	@echo "  make help              - Display this help message."
+
 
 deploy-usdctest:
 	@echo "Deploying USDCTest contract..."
