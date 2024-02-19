@@ -33,10 +33,10 @@ contract IpcTokenController is IpcExchange {
     using SubnetIDHelper for SubnetID;
     using FvmAddressHelper for FvmAddress;
 
-    address private tokenContractAddress;
-    SubnetID private destinationSubnet;
-    address private destinationContract;
-    SubnetID public networkName;
+    address private _tokenAddr;
+    SubnetID private _destinationSubnet;
+    address private _destinationContract;
+    SubnetID public _subnetId;
 
     // Define a struct to hold the sender address and the value of unconfirmed transfers
     struct TransferDetails {
@@ -47,15 +47,12 @@ contract IpcTokenController is IpcExchange {
     // Create the mapping of ipc envelope hash to TransferDetails
     mapping(bytes32 => TransferDetails) public _unconfirmedTransfers;
 
-    uint64 public nonce = 0;
-
     event TokenSent(
-        address tokenContractAddress,
+        address tokenAddr,
         address sender,
         SubnetID destinationSubnet,
         address destinationContract,
         address receiver,
-        uint64 nonce,
         uint256 value
     );
 
@@ -69,16 +66,15 @@ contract IpcTokenController is IpcExchange {
      * @param _destinationContract Address of the destination contract for minting
      */
     constructor(
-        address _gateway,
-        address _tokenContractAddress,
-        SubnetID memory _destinationSubnet,
-        address _destinationContract
-    ) IpcExchange(_gateway) {
-        tokenContractAddress = _tokenContractAddress;
-        destinationSubnet = _destinationSubnet;
-        destinationContract = _destinationContract;
-
-        networkName = GatewayGetterFacet(address(_gateway)).getNetworkName();
+        address gateway,
+        address tokenAddr,
+        SubnetID memory destinationSubnet,
+        address destinationContract
+    ) IpcExchange(gateway) {
+        _tokenAddr = _tokenAddr;
+        _destinationSubnet = _destinationSubnet;
+        _destinationContract = _destinationContract;
+        _subnetId = GatewayGetterFacet(address(gateway)).getNetworkName();
     }
 
     /**
@@ -88,7 +84,7 @@ contract IpcTokenController is IpcExchange {
      */
     function lockAndTransfer(address receiver, uint256 amount) external payable {
         // Transfer and lock tokens on L1 using the inherited sendToken function
-        _sendToken(tokenContractAddress, destinationSubnet, destinationContract, receiver, amount);
+        _sendToken(_tokenAddr, _destinationSubnet, _destinationContract, receiver, amount);
     }
 
     function lockAndTransferWithReturn(
@@ -96,7 +92,7 @@ contract IpcTokenController is IpcExchange {
         uint256 amount
     ) external payable returns (IpcEnvelope memory envelope) {
         // Transfer and lock tokens on L1 using the inherited sendToken function
-        return _sendToken(tokenContractAddress, destinationSubnet, destinationContract, receiver, amount);
+        return _sendToken(_tokenAddr, _destinationSubnet, _destinationContract, receiver, amount);
     }
 
     function getUnconfirmedTransfer(bytes32 hash) public view returns (address, uint256) {
@@ -105,22 +101,22 @@ contract IpcTokenController is IpcExchange {
     }
 
     // Method for the contract owner to manually drop an entry from unconfirmedTransfers
-    function manualRemoveUnconfirmedTransfer(bytes32 hash) external onlyOwner {
-        removeUnconfirmedTransfer(hash);
+    function removeUnconfirmedTransfer(bytes32 hash) external onlyOwner {
+        _removeUnconfirmedTransfer(hash);
     }
 
-    function addUnconfirmedTransfer(bytes32 hash, address sender, uint256 value) internal {
+    function _addUnconfirmedTransfer(bytes32 hash, address sender, uint256 value) internal {
         _unconfirmedTransfers[hash] = TransferDetails(sender, value);
     }
 
-    function removeUnconfirmedTransfer(bytes32 hash) internal {
+    function _removeUnconfirmedTransfer(bytes32 hash) internal {
         delete _unconfirmedTransfers[hash];
     }
 
     function _handleIpcCall(
         IpcEnvelope memory envelope,
         CallMsg memory callMsg
-    ) internal override verifyIpcEnvelope(envelope) returns (bytes memory) {
+    ) internal override validateOrigin(envelope) returns (bytes memory) {
         bytes4 methodSignature = toBytes4(callMsg.method);
         if (methodSignature != bytes4(keccak256("receiveAndUnlock(address,uint256)"))) {
             revert InvalidMethod();
@@ -132,19 +128,14 @@ contract IpcTokenController is IpcExchange {
         return bytes("");
     }
 
-    modifier verifyIpcEnvelope(IpcEnvelope memory envelope) {
-        verifyIpcEnvelopeLogic(envelope); // Call the function
-        _; // Continue execution of the modified function
-    }
-
     //only accept messages from replica contract
     function verifyIpcEnvelopeLogic(IpcEnvelope memory envelope) public {
         SubnetID memory subnetId = envelope.from.subnetId;
         FvmAddress memory rawAddress = envelope.from.rawAddress;
-        if (!subnetId.equals(destinationSubnet)) {
+        if (!_subnetId.equals(_destinationSubnet)) {
             revert InvalidOriginSubnet();
         }
-        if (!rawAddress.equal(FvmAddressHelper.from(destinationContract))) {
+        if (!rawAddress.equal(FvmAddressHelper.from(_destinationContract))) {
             revert InvalidOriginContract();
         }
     }
@@ -155,7 +146,7 @@ contract IpcTokenController is IpcExchange {
         }
 
         // Transfer the specified amount of tokens to the receiver
-        IERC20(tokenContractAddress).safeTransfer(receiver, amount);
+        IERC20(_tokenAddr).safeTransfer(receiver, amount);
 
         // Emit an event for the token unlock and transfer
         emit TokensUnlocked(receiver, amount);
@@ -171,33 +162,33 @@ contract IpcTokenController is IpcExchange {
         if (msg.value != 0) {
             revert TransferRejected(ERR_VALUE_MUST_BE_ZERO);
         }
-        if (destinationContract == address(0)) {
+        if (_destinationContract == address(0)) {
             revert TransferRejected(ERR_ZERO_ADDRESS);
         }
         if (receiver == address(0)) {
             revert TransferRejected(ERR_ZERO_ADDRESS);
         }
 
-        IERC20(tokenContractAddress).safeTransferFrom({from: msg.sender, to: address(this), value: amount});
+        IERC20(_tokenAddr).safeTransferFrom({from: msg.sender, to: address(this), value: amount});
 
         CallMsg memory message = CallMsg({
             method: abi.encodePacked(bytes4(keccak256("receiveAndMint(address,uint256)"))),
             params: abi.encode(receiver, amount)
         });
         IPCAddress memory destination = IPCAddress({
-            subnetId: destinationSubnet,
-            rawAddress: FvmAddressHelper.from(destinationContract)
+            subnetId: _destinationSubnet,
+            rawAddress: FvmAddressHelper.from(_destinationContract)
         });
 
         committed = performIpcCall(destination, message, 0);
 
-        addUnconfirmedTransfer(committed.toHash(), msg.sender, amount);
+        _addUnconfirmedTransfer(committed.toHash(), msg.sender, amount);
 
         emit TokenSent({
-            tokenContractAddress: tokenContractAddress,
+            tokenContractAddress: _tokenAddr,
             sender: msg.sender,
-            destinationSubnet: destinationSubnet,
-            destinationContract: destinationContract,
+            destinationSubnet: _destinationSubnet,
+            destinationContract: _destinationContract,
             receiver: receiver,
             nonce: committed.nonce,
             value: amount
@@ -213,23 +204,23 @@ contract IpcTokenController is IpcExchange {
             revert TransferRejected(ERR_VALUE_CANNOT_BE_ZERO);
         }
 
-        IERC20(tokenContractAddress).safeTransfer(sender, value);
+        IERC20(_tokenAddr).safeTransfer(sender, value);
     }
 
     function _handleIpcResult(
         IpcEnvelope storage original,
         IpcEnvelope memory result,
         ResultMsg memory resultMsg
-    ) internal override verifyIpcEnvelope(original) {
+    ) internal override validateOrigin(original) {
         bytes32 id = resultMsg.id;
         OutcomeType outcome = resultMsg.outcome;
         if (outcome == OutcomeType.Ok) {
-            removeUnconfirmedTransfer(id);
-        } else {
-            if (outcome == OutcomeType.SystemErr || outcome == OutcomeType.ActorErr) {
-                _refund(id);
-                removeUnconfirmedTransfer(id);
-            }
+            _removeUnconfirmedTransfer(id);
+            return;
+        }
+        if (outcome == OutcomeType.SystemErr || outcome == OutcomeType.ActorErr) {
+            _refund(id);
+            _removeUnconfirmedTransfer(id);
         }
     }
 
@@ -243,5 +234,10 @@ contract IpcTokenController is IpcExchange {
         assembly {
             result := mload(add(data, 32))
         }
+    }
+
+    modifier validateOrigin(IpcEnvelope memory envelope) {
+        verifyIpcEnvelopeLogic(envelope); // Call the function
+        _; // Continue execution of the modified function
     }
 }
