@@ -22,6 +22,15 @@ jobs:
       RPC_URL: https://calibration.filfox.info/rpc/v1
       PRIVATE_KEY: ${{ secrets.CONTRACTS_DEPLOYER_PRIVATE_KEY }}
     steps:
+      - name: Checkout code repo
+        uses: actions/checkout@v4
+        with:
+          # TODO(jie): After switch to workflow_dispatch only, we should use ref_name.
+          # head_ref only works for workflow triggered by pull requests.
+          # ref: ${{ github.ref_name }}
+          ref: ${{ github.head_ref }}
+          submodules: recursive
+
       - name: Setup node and npm
         uses: actions/setup-node@v4
         with:
@@ -31,15 +40,6 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
-
-      - name: Checkout code repo
-        uses: actions/checkout@v4
-        with:
-          # TODO(jie): After switch to workflow_dispatch only, we should use ref_name.
-          # head_ref only works for workflow triggered by pull requests.
-          # ref: ${{ github.ref_name }}
-          ref: ${{ github.head_ref }}
-          submodules: recursive
 
       - name: Deploy IPC contracts to calibration net
         id: deploy_contracts
