@@ -58,7 +58,6 @@ fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
     // we also log all traces with level INFO or higher to stdout
     let registry = registry.with(
         tracing_subscriber::fmt::layer()
-            .with_span_events(FmtSpan::CLOSE)
             .with_writer(std::io::stdout.with_max_level(tracing::Level::INFO))
             .with_target(false)
             .with_file(true)
