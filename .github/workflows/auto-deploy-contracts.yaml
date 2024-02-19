@@ -22,6 +22,16 @@ jobs:
       RPC_URL: https://calibration.filfox.info/rpc/v1
       PRIVATE_KEY: ${{ secrets.CONTRACTS_DEPLOYER_PRIVATE_KEY }}
     steps:
+      - name: Setup node and npm
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: contracts/package-lock.json
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
       - name: Checkout code repo
         uses: actions/checkout@v4
         with:
@@ -31,31 +41,19 @@ jobs:
           ref: ${{ github.head_ref }}
           submodules: recursive
 
-#      - name: Setup node and npm
-#        uses: actions/setup-node@v4
-#        with:
-#          node-version: 20
-#          cache: 'npm'
-#          cache-dependency-path: contracts/package-lock.json
-
-#      - name: Install Foundry
-#        uses: foundry-rs/foundry-toolchain@v1
-
-#      - name: Deploy IPC contracts to calibration net
-#        id: deploy_contracts
-#        run: |
-#          cd contracts
-#          npm install --save hardhat
-#          output=$(make deploy-ipc NETWORK=calibrationnet)
-#          echo "deploy_output<<EOF" >> $GITHUB_OUTPUT
-#          echo "$output" >> $GITHUB_OUTPUT
-#          echo "EOF" >> $GITHUB_OUTPUT
+      - name: Deploy IPC contracts to calibration net
+        id: deploy_contracts
+        run: |
+          cd contracts
+          npm install --save hardhat
+          output=$(make deploy-ipc NETWORK=calibrationnet)
+          echo "deploy_output<<EOF" >> $GITHUB_OUTPUT
+          echo "$output" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Parse deploy output
-          # deploy_output='${{ steps.deploy_contracts.outputs.deploy_output }}'
-          # deploy_output=$(cat scripts/deploy_subnet_under_calibration_net/deploy_output.txt)
         run: |
-          deploy_output=$(cat scripts/deploy_subnet_under_calibration_net/deploy_output.txt)
+          deploy_output='${{ steps.deploy_contracts.outputs.deploy_output }}'
           echo "$deploy_output"
           deployed_gateway_address=$(echo "$deploy_output" | grep '"Gateway"' | awk -F'"' '{print $4}')
           deployed_registry_address=$(echo "$deploy_output" | grep '"SubnetRegistry"' | awk -F'"' '{print $4}')
@@ -77,7 +75,6 @@ jobs:
 
       - name: Pull rebase from main branch and update cd/contracts branch
         run: |
-          git rev-parse --abbrev-ref HEAD
           git config --global user.name 'Contract Auto Deployer'
           git config --global user.email 'dummy@dummy.dummy'
           git pull --rebase origin main
