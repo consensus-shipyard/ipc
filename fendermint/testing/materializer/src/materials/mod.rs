@@ -7,6 +7,7 @@ mod defaults;
 
 use anyhow::Context;
 pub use defaults::*;
+use serde::{de::DeserializeOwned, Serialize};
 
 /// Type family of all the things a [Materializer] can create.
 ///
@@ -61,4 +62,41 @@ pub fn export(
         .with_context(|| format!("failed to write to {}", file_path.to_string_lossy()))?;
 
     Ok(())
+}
+
+pub fn export_json(file_path: impl AsRef<Path>, value: impl Serialize) -> anyhow::Result<()> {
+    let json = serde_json::to_string_pretty(&value).context("failed to serialize to JSON")?;
+
+    if let Some(dir_path) = file_path.as_ref().parent() {
+        if !dir_path.exists() {
+            std::fs::create_dir_all(dir_path).with_context(|| {
+                format!("failed to create directory {}", dir_path.to_string_lossy())
+            })?;
+        }
+    }
+
+    std::fs::write(&file_path, &json).with_context(|| {
+        format!(
+            "failed to write to {}",
+            file_path.as_ref().to_string_lossy()
+        )
+    })?;
+
+    Ok(())
+}
+
+/// Read a JSON file, if it exists.
+pub fn import_json<T: DeserializeOwned>(file_path: impl AsRef<Path>) -> anyhow::Result<Option<T>> {
+    let file_path = file_path.as_ref();
+    if file_path.exists() {
+        let json = std::fs::read_to_string(file_path)
+            .with_context(|| format!("failed to read {}", file_path.to_string_lossy()))?;
+
+        let value = serde_json::from_str::<T>(&json)
+            .with_context(|| format!("failed to parse {}", file_path.to_string_lossy()))?;
+
+        Ok(Some(value))
+    } else {
+        Ok(None)
+    }
 }

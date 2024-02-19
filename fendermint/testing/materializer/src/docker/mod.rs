@@ -16,6 +16,7 @@ use fendermint_vm_genesis::{
 };
 use fvm_shared::{bigint::Zero, econ::TokenAmount, version::NetworkVersion};
 use ipc_api::subnet_id::SubnetID;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
@@ -26,7 +27,8 @@ use crate::{
     manifest::Balance,
     materializer::{Materializer, NodeConfig, SubmitConfig, SubnetConfig},
     materials::{
-        export, DefaultAccount, DefaultDeployment, DefaultGenesis, DefaultSubnet, Materials,
+        export_json, import_json, DefaultAccount, DefaultDeployment, DefaultGenesis, DefaultSubnet,
+        Materials,
     },
     NodeName, RelayerName, ResourceHash, ResourceName, SubnetName, TestnetName,
 };
@@ -39,6 +41,10 @@ mod relayer;
 pub use network::DockerNetwork;
 pub use node::DockerNode;
 pub use relayer::DockerRelayer;
+
+const STATE_JSON_FILE_NAME: &str = "materializer-state.json";
+const PORT_RANGE_START: u32 = 30000;
+const PORT_RANGE_SIZE: u32 = 100;
 
 pub struct DockerMaterials;
 
@@ -89,11 +95,26 @@ impl DockerWithDropHandle {
     }
 }
 
+/// Allocated (inclusive) range we can use to expose containers' ports on the host.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DockerPortRange {
+    pub from: u32,
+    pub to: u32,
+}
+
+/// State of the materializer that it persists, so that it can resume operations.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DockerMaterializerState {
+    /// Port ranges ever allocated by this materializer.
+    port_ranges: BTreeMap<NodeName, DockerPortRange>,
+}
+
 pub struct DockerMaterializer {
     dir: PathBuf,
     rng: StdRng,
     docker: bollard::Docker,
     drop_runtime: tokio::runtime::Runtime,
+    state: DockerMaterializerState,
 }
 
 impl DockerMaterializer {
@@ -109,12 +130,22 @@ impl DockerMaterializer {
             .build()
             .context("failed to create tokio Runtime")?;
 
-        Ok(Self {
+        // Read in the state if it exists, otherwise create a default one.
+        let state = import_json(dir.join(STATE_JSON_FILE_NAME))
+            .context("failed to read state")?
+            .unwrap_or_default();
+
+        let m = Self {
             dir: dir.into(),
             rng: StdRng::seed_from_u64(seed),
             docker,
             drop_runtime,
-        })
+            state,
+        };
+
+        m.save_state()?;
+
+        Ok(m)
     }
 
     fn docker_with_drop_handle(&self) -> DockerWithDropHandle {
@@ -125,6 +156,26 @@ impl DockerMaterializer {
     fn path<T: AsRef<ResourceName>>(&self, name: T) -> PathBuf {
         let name: &ResourceName = name.as_ref();
         self.dir.join(&name.0)
+    }
+
+    /// Path where the state of the materializer is saved.
+    fn state_path(&self) -> PathBuf {
+        self.dir.join(STATE_JSON_FILE_NAME)
+    }
+
+    /// Update the state, save it to JSON, then return whatever value the update returns.
+    fn update_state<F, T>(&mut self, f: F) -> anyhow::Result<T>
+    where
+        F: FnOnce(&mut DockerMaterializerState) -> T,
+    {
+        let value = f(&mut self.state);
+        self.save_state()?;
+        Ok(value)
+    }
+
+    /// Write the state to a JSON file.
+    fn save_state(&self) -> anyhow::Result<()> {
+        export_json(self.state_path(), &self.state).context("failed to export state")
     }
 
     /// Return an existing genesis by parsing it from the `genesis.json` of the subnet,
@@ -140,23 +191,36 @@ impl DockerMaterializer {
         let subnet_path = self.path(subnet_name);
         let genesis_path = subnet_path.join("genesis.json");
 
-        let genesis = if genesis_path.exists() {
-            let json = std::fs::read_to_string(&genesis_path)
-                .with_context(|| format!("failed to read {}", genesis_path.to_string_lossy()))?;
-            serde_json::from_str::<Genesis>(&json)
-                .with_context(|| format!("failed to parse {}", genesis_path.to_string_lossy()))?
-        } else {
-            let genesis = make_genesis().context("failed to make genesis")?;
-            let json =
-                serde_json::to_string_pretty(&genesis).context("failed to serialize genesis")?;
-            export(&subnet_path, "genesis", "json", json)?;
-            genesis
+        let genesis = match import_json(&genesis_path).context("failed to read genesis")? {
+            Some(genesis) => genesis,
+            None => {
+                let genesis = make_genesis().context("failed to make genesis")?;
+                export_json(&genesis_path, &genesis).context("failed to export genesis")?;
+                genesis
+            }
         };
 
         Ok(DefaultGenesis {
             name: subnet_name.clone(),
             genesis,
         })
+    }
+
+    /// Pick a range for a container. Remember the choice so that we can recreate
+    /// this materializer in a test and allocate more if needed without clashes.
+    fn port_range(&mut self, node_name: &NodeName) -> anyhow::Result<DockerPortRange> {
+        if let Some(range) = self.state.port_ranges.get(node_name) {
+            return Ok(range.clone());
+        }
+        // Currently the range allocations are not dropped from the materializer,
+        // so the length can be used to derive the next available port. Otherwise
+        // we could loop through to find an unused slot.
+        let node_count = self.state.port_ranges.len();
+        let from = PORT_RANGE_START * node_count as u32;
+        let to = from + PORT_RANGE_SIZE;
+        let range = DockerPortRange { from, to };
+        self.update_state(|s| s.port_ranges.insert(node_name.clone(), range.clone()))?;
+        Ok(range)
     }
 }
 
@@ -267,6 +331,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         })
     }
 
+    /// Get or create all docker containers that constitute to a Node.
     async fn create_node<'s, 'a>(
         &'s mut self,
         node_name: &NodeName,
@@ -275,11 +340,23 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
+        // Pick a port range.
+        let port_range = self
+            .port_range(node_name)
+            .context("failed to pick port range")?;
+
         // We could write a (shared) docker-compose.yaml file and .env file per node,
         // however the `bollard` library doesn't support docker-compose, so different
         // techniques would need to be used. Alternatively we can just use `Docker`
         // and run three different containers.
-        DockerNode::get_or_create(self.docker_with_drop_handle(), node_name, node_config).await
+        DockerNode::get_or_create(
+            self.docker_with_drop_handle(),
+            node_name,
+            node_config,
+            port_range,
+        )
+        .await
+        .context("failed to create node")
     }
 
     async fn start_node<'s, 'a>(

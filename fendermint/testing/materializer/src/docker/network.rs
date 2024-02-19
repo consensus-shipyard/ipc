@@ -11,18 +11,22 @@ use bollard::{
 
 use crate::TestnetName;
 
-use super::DockerWithDropHandle;
+use super::{DockerConstruct, DockerWithDropHandle};
 
 pub struct DockerNetwork {
     dh: DockerWithDropHandle,
+    /// There is a single docker network created for the entire testnet.
     testnet_name: TestnetName,
-    network_name: String,
-    /// Indicate whether this resource is managed outside the test.
-    external: bool,
-    id: String,
+    network: DockerConstruct,
 }
 
 impl DockerNetwork {
+    pub fn testnet_name(&self) -> &TestnetName {
+        &self.testnet_name
+    }
+
+    /// Check if an externally managed network already exists;
+    /// if not, create a new docker network for the testnet.
     pub async fn get_or_create(
         dh: DockerWithDropHandle,
         testnet_name: TestnetName,
@@ -38,10 +42,10 @@ impl DockerNetwork {
             .await
             .context("failed to list docker networks")?;
 
-        let networks = networks
-            .into_iter()
-            .filter(|n| n.name.as_ref() == Some(&network_name))
-            .collect::<Vec<_>>();
+        // let networks = networks
+        //     .into_iter()
+        //     .filter(|n| n.name.as_ref() == Some(&network_name))
+        //     .collect::<Vec<_>>();
 
         let (id, external) = match networks.len() {
             0 => {
@@ -75,23 +79,20 @@ impl DockerNetwork {
         Ok(Self {
             dh,
             testnet_name,
-            network_name,
-            external,
-            id,
+            network: DockerConstruct {
+                id,
+                name: network_name,
+                external,
+            },
         })
     }
 }
 
 impl Drop for DockerNetwork {
     fn drop(&mut self) {
-        if !self.external {
-            let network_name = self.network_name.clone();
+        if !self.network.external {
+            let network_name = self.network.name.clone();
             let docker = self.dh.docker.clone();
-            // TODO: Handle this in a more linearlised way, e.g. it could happen that we are still stopping and
-            // removing containers when we try to remove the network, which will thus fail. Maybe the materializer
-            // should have a background worker listening to these events and execute commands one after the other.
-            // Or maybe it should have a single threaded tokio runtime that we can use with `block_on`. If that
-            // runtime isn't the one that is being used to run all the regular tasks, perhaps it can block here.
             self.dh.drop_handle.spawn(async move {
                 if let Err(e) = docker.remove_network(&network_name).await {
                     tracing::error!(
@@ -129,18 +130,18 @@ mod tests {
             .expect("failed to get network");
 
         assert!(
-            !n1.external,
+            !n1.network.external,
             "when created, the network should not be external"
         );
         assert!(
-            n2.external,
+            n2.network.external,
             "when already exists, the network should be external"
         );
-        assert_eq!(n1.id, n2.id);
-        assert_eq!(n1.network_name, n2.network_name);
-        assert_eq!(n1.network_name, "testnets/test-network");
+        assert_eq!(n1.network.id, n2.network.id);
+        assert_eq!(n1.network.name, n2.network.name);
+        assert_eq!(n1.network.name, "testnets/test-network");
 
-        let id = n1.id.clone();
+        let id = n1.network.id.clone();
 
         let exists = || async {
             tokio::time::sleep(Duration::from_millis(250)).await;
