@@ -45,7 +45,7 @@ fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
         Some(
             fmt::Layer::new()
                 .json()
-                .with_span_events(FmtSpan::CLOSE)
+                .with_span_events(FmtSpan::FULL)
                 .with_writer(non_blocking.with_max_level(log_level))
                 .with_target(false)
                 .with_file(true)
