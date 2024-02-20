@@ -65,9 +65,11 @@ alias ipc-cli="cargo run -q -p ipc-cli --release --"
 ipc-cli config init
 ```
 
-This should have populated a default config file with all the parameters required to connect to calibration at `~/.ipc/config.toml`. Feel free to update this configuration to fit your needs. You may need to replace the content of the config to reflect the address of the up-to-date contracts in Calibration.
+This should have populated a default config file with all the parameters required to connect to calibration at `~/.ipc/config.toml`. Feel free to update this configuration to fit your needs.&#x20;
 
-* You can run `nano ~/.ipc/config.toml` to double-check that the config file has been populated with the following content:
+The IPC stack is changing rapidly. In order to make sure you use the latest contracts deployed on Filecoin Calibration:
+
+* Run `nano ~/.ipc/config.toml` to see your configuration
 
 ```
 keystore_path = "~/.ipc"
@@ -93,7 +95,7 @@ registry_addr = "0x7308C4A503a12521215718cbCa98F951E9aAB9B5"
 # registry_addr = "0x74539671a1d2f1c8f200826baba665179f53a1b7"
 ```
 
-The Gateway and Registry addresses under Filecoin Calibration section are that of already deployed IPC contracts.
+* Follow [this link](https://github.com/consensus-shipyard/ipc/blob/cd/contracts/deployments/r314159.json) to get the  up-to-date addresses of (`gateway_addr` and `registry_addr)` and replace them with addresses under `# Filecoin Calibration`
 
 ### Step 3: Set up your wallets
 
