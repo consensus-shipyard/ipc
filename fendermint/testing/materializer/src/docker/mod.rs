@@ -318,6 +318,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
                         balance: b.0,
                     })
                     .collect(),
+                eam_permission_mode: fendermint_vm_genesis::PermissionMode::Unrestricted,
                 ipc: Some(IpcParams {
                     gateway: GatewayParams {
                         subnet_id: SubnetID::new_root(chain_id.into()),
@@ -350,6 +351,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         // techniques would need to be used. Alternatively we can just use `Docker`
         // and run three different containers.
         DockerNode::get_or_create(
+            &self.dir,
             self.docker_with_drop_handle(),
             node_name,
             node_config,
