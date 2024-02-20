@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-pragma solidity 0.8.19;
+pragma solidity ^0.8.23;
 
 import {LibDiamond} from "../lib/LibDiamond.sol";
 import {Pausable} from "../lib/LibPausable.sol";

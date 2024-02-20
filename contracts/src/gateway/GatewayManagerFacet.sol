@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-pragma solidity 0.8.19;
+pragma solidity ^0.8.23;
 
 import {GatewayActorModifiers} from "../lib/LibGatewayActorStorage.sol";
 import {SubnetActorGetterFacet} from "../subnet/SubnetActorGetterFacet.sol";
@@ -159,6 +159,11 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     /// @param to The funded address.
     /// @param amount The amount of ERC20 tokens to be sent.
     function fundWithToken(SubnetID calldata subnetId, FvmAddress calldata to, uint256 amount) external nonReentrant {
+        if (amount == 0) {
+            // prevent spamming if there's no value to fund.
+            revert InvalidXnetMessage(InvalidXnetMessageReason.Value);
+        }
+
         // Check that the supply strategy is ERC20.
         // There is no need to check whether the subnet exists. If it doesn't exist, the call to getter will revert.
         // LibGateway.commitTopDownMsg will also revert if the subnet doesn't exist.

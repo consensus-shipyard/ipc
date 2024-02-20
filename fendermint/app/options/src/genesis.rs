@@ -7,8 +7,10 @@ use clap::{Args, Subcommand, ValueEnum};
 use ipc_api::subnet_id::SubnetID;
 
 use super::parse::{
-    parse_eth_address, parse_full_fil, parse_network_version, parse_percentage, parse_token_amount,
+    parse_eth_address, parse_full_fil, parse_network_version, parse_percentage, parse_signer_addr,
+    parse_token_amount,
 };
+use fendermint_vm_genesis::SignerAddr;
 use fvm_shared::{address::Address, econ::TokenAmount, version::NetworkVersion};
 
 #[derive(Debug, Clone, ValueEnum)]
@@ -27,6 +29,8 @@ pub enum GenesisCommands {
     AddMultisig(GenesisAddMultisigArgs),
     /// Add a validator to the genesis file.
     AddValidator(GenesisAddValidatorArgs),
+    /// Set the EAM actor permission mode.
+    SetEamPermissions(GenesisSetEAMPermissionsArgs),
     /// IPC commands.
     Ipc {
         #[command(subcommand)]
@@ -34,6 +38,26 @@ pub enum GenesisCommands {
     },
     /// Convert the genesis file into the format expected by Tendermint.
     IntoTendermint(GenesisIntoTendermintArgs),
+}
+
+#[derive(Args, Debug)]
+pub struct GenesisSetEAMPermissionsArgs {
+    #[arg(
+        long,
+        short,
+        default_value = "unrestricted",
+        help = "Permission mode (unrestricted/allowlist) that controls who can deploy contracts in the subnet"
+    )]
+    pub mode: String,
+
+    #[arg(
+        long,
+        short,
+        value_delimiter = ',',
+        value_parser = parse_signer_addr,
+        help = "List of addresses that can deploy contract. Field is ignored if mode is unrestricted"
+    )]
+    pub addresses: Vec<SignerAddr>,
 }
 
 #[derive(Args, Debug)]

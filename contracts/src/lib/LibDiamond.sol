@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-pragma solidity 0.8.19;
+pragma solidity ^0.8.23;
 
 import {IDiamondCut} from "../interfaces/IDiamondCut.sol";
 import {IDiamond} from "../interfaces/IDiamond.sol";
@@ -23,8 +23,6 @@ library LibDiamond {
     error RemoveFacetAddressMustBeZeroAddress(address _facetAddress);
     error CannotRemoveFunctionThatDoesNotExist(bytes4 _selector);
     error CannotRemoveImmutableFunction(bytes4 _selector);
-
-    event DiamondCut(IDiamondCut.FacetCut[] _diamondCut, address _init, bytes _calldata);
 
     struct FacetAddressAndSelectorPosition {
         address facetAddress;
@@ -91,7 +89,7 @@ library LibDiamond {
                 ++facetIndex;
             }
         }
-        emit DiamondCut({_diamondCut: _diamondCut, _init: _init, _calldata: _calldata});
+        emit IDiamond.DiamondCut({_diamondCut: _diamondCut, _init: _init, _calldata: _calldata});
         initializeDiamondCut(_init, _calldata);
     }
 

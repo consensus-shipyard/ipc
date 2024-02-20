@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-pragma solidity 0.8.19;
+pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 import "../src/errors/IPCErrors.sol";
@@ -946,7 +946,9 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         return (subnet.id, subnet.stake, subnet.topDownNonce, subnet.appliedBottomUpNonce, subnet.circSupply);
     }
 
-    function getSubnet(address subnetAddress) public returns (SubnetID memory, uint256, uint256, uint256, uint256) {
+    function getSubnet(
+        address subnetAddress
+    ) public view returns (SubnetID memory, uint256, uint256, uint256, uint256) {
         return getSubnetGW(subnetAddress, gatewayDiamond);
     }
 }

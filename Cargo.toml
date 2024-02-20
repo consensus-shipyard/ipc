@@ -24,6 +24,7 @@ members = [
   "fendermint/rpc",
   "fendermint/storage",
   "fendermint/testing",
+  "fendermint/testing/materializer",
   "fendermint/testing/*-test",
   "fendermint/vm/*",
   "fendermint/actors",
@@ -44,6 +45,7 @@ anyhow = "1"
 ambassador = "0.3.5"
 arbitrary = { version = "1", features = ["derive"] }
 arbtest = "0.2"
+async-recursion = "1"
 async-stm = "0.4"
 async-trait = "0.1"
 async-channel = "1.8.0"
@@ -58,15 +60,16 @@ dirs = "5.0"
 dircpy = "0.3"
 env_logger = "0.10"
 erased-serde = "0.3"
-ethers = { version = "2.0", features = ["abigen", "ws"] }
-ethers-core = { version = "2.0" }
-ethers-contract = "2.0.8"
+ethers = { version = "2.0.13", features = ["abigen", "ws"] }
+ethers-core = { version = "2.0.13" }
+ethers-contract = "2.0.13"
 fnv = "1.0"
 futures = "0.3"
 futures-core = "0.3"
 futures-util = "0.3"
 gcra = "0.4"
 hex = "0.4"
+hex-literal = "0.4.1"
 im = "15.1.0"
 integer-encoding = { version = "3.0.3", default-features = false }
 jsonrpc-v2 = { version = "0.11", default-features = false, features = [
@@ -115,6 +118,7 @@ pin-project = "1.1.2"
 prometheus = "0.13"
 prost = { version = "0.11" }
 quickcheck = "1"
+quickcheck_async = "0.1"
 quickcheck_macros = "1"
 rand = "0.8"
 rand_chacha = "0.3"
@@ -124,9 +128,11 @@ sha2 = "0.10"
 serde = { version = "1", features = ["derive"] }
 serde_bytes = "0.11"
 serde_json = { version = "1", features = ["raw_value"] }
+serde_yaml = { version = "0.9" }
 serde_tuple = "0.5"
 serde_with = "2.3"
 serial_test = "3.0"
+strum = { version = "0.26.1", features = ["derive"] }
 tempfile = "3.7"
 thiserror = "1"
 tokio = { version = "1", features = [
@@ -140,10 +146,10 @@ tokio = { version = "1", features = [
 tokio-stream = "0.1.14"
 tokio-util = { version = "0.7.8", features = ["compat"] }
 tokio-tungstenite = { version = "0.18.0", features = ["native-tls"] }
-toml = "0.7"
+toml = "0.8"
 tracing = "0.1"
-tracing-subscriber = "0.3"
-trace4rs = "0.5.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-appender = "0.2.3"
 url = { version = "2.4.1", features = ["serde"] }
 zeroize = "1.6"
 
@@ -185,7 +191,10 @@ fvm_ipld_amt = "0.6.2"
 # and this copy-paste is clunky, so at least for those that have it, we should use it.
 # Keep the version here in sync with the Makefile!
 fil_actors_evm_shared = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v12.0.0" }
+fil_actor_eam = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v12.0.0" }
 fil_actors_runtime = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v12.0.0" }
+
+fendermint_actor_eam = { path = "./fendermint/actors/eam" }
 
 cid = { version = "0.10.1", default-features = false, features = [
   "serde-codec",

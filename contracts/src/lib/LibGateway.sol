@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-pragma solidity 0.8.19;
+pragma solidity ^0.8.23;
 
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {GatewayActorStorage, LibGatewayActorStorage} from "../lib/LibGatewayActorStorage.sol";
@@ -27,8 +27,6 @@ library LibGateway {
     event NewTopDownMessage(address indexed subnet, IpcEnvelope message);
     /// @dev event emitted when there is a new bottom-up message batch to be signed.
     event NewBottomUpMsgBatch(uint256 indexed epoch, BottomUpMsgBatch batch);
-
-    error CannotCreateIpcReceipt();
 
     /// @notice returns the current bottom-up checkpoint
     /// @return exists - whether the checkpoint exists
@@ -442,20 +440,22 @@ library LibGateway {
     /// failing network.
     /// (we could optionally trigger a receipt from `Transfer`s to, but without
     /// multi-level execution it would be adding unnecessary overhead).
-    function sendReceipt(IpcEnvelope memory crossMsg, OutcomeType outcomeType, bytes memory ret) internal {
-        if (crossMsg.isEmpty()) {
-            revert CannotCreateIpcReceipt();
+    function sendReceipt(IpcEnvelope memory original, OutcomeType outcomeType, bytes memory ret) internal {
+        if (original.isEmpty()) {
+            // This should not happen as previous validation should prevent empty messages arriving here.
+            // If it does, we simply ignore.
+            return;
         }
 
         // if we get a `Receipt` do nothing, no need to send receipts.
         // - And sending a `Receipt` to a `Receipt` could lead to amplification loops.
-        if (crossMsg.kind == IpcMsgKind.Result) {
+        if (original.kind == IpcMsgKind.Result) {
             return;
         }
 
         // commmit the receipt for propagation
         // slither-disable-next-line unused-return
-        commitCrossMessage(crossMsg.createResultMsg(outcomeType, ret));
+        commitCrossMessage(original.createResultMsg(outcomeType, ret));
     }
 
     /**

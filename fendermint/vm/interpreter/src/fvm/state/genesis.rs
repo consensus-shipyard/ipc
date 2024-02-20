@@ -36,7 +36,7 @@ use fvm_shared::{
     ActorID, BLOCK_GAS_LIMIT, METHOD_CONSTRUCTOR,
 };
 use num_traits::Zero;
-use serde::Serialize;
+use serde::{de, Serialize};
 
 use super::{exec::MachineBlockstore, FvmExecState, FvmStateParams};
 
@@ -174,6 +174,74 @@ where
                 (cid, _, _) => Ok(cid),
             },
         }
+    }
+
+    /// Replaces the built in actor with custom actor. This assumes the system actor is already
+    /// created, else it would throw an error.
+    pub fn replace_builtin_actor(
+        &mut self,
+        built_in_actor_name: &str,
+        built_in_actor_id: ActorID,
+        custom_actor_name: &str,
+        state: &impl Serialize,
+        balance: TokenAmount,
+        delegated_address: Option<Address>,
+    ) -> anyhow::Result<()> {
+        let code_cid = self
+            .update_system_actor_manifest(built_in_actor_name, custom_actor_name)
+            .context("failed to replace system actor manifest")?;
+
+        self.create_actor_internal(
+            code_cid,
+            built_in_actor_id,
+            state,
+            balance,
+            delegated_address,
+        )
+    }
+
+    /// Update the manifest id of the system actor, returns the code cid of the replacing
+    /// custom actor.
+    fn update_system_actor_manifest(
+        &mut self,
+        built_in_actor_name: &str,
+        custom_actor_name: &str,
+    ) -> anyhow::Result<Cid> {
+        let code = *self
+            .custom_actor_manifest
+            .code_by_name(custom_actor_name)
+            .ok_or_else(|| anyhow!("replacement {custom_actor_name} actor not found"))?;
+
+        let manifest_cid = self
+            .get_actor_state::<system::State>(system::SYSTEM_ACTOR_ID)?
+            .builtin_actors;
+
+        let mut built_in_actors: Vec<(String, Cid)> = self
+            .store()
+            .get_cbor(&manifest_cid)
+            .context("could not load built in actors")?
+            .ok_or_else(|| anyhow!("cannot find manifest cid {}", manifest_cid))?;
+
+        for (_, code_cid) in built_in_actors
+            .iter_mut()
+            .filter(|(n, _)| n == built_in_actor_name)
+        {
+            *code_cid = code
+        }
+
+        let builtin_actors = self.put_state(built_in_actors)?;
+        let new_cid = self.put_state(system::State { builtin_actors })?;
+        let mutate = |actor_state: &mut ActorState| {
+            actor_state.state = new_cid;
+            Ok(())
+        };
+
+        self.with_state_tree(
+            |s| s.mutate_actor(system::SYSTEM_ACTOR_ID, mutate),
+            |s| s.mutate_actor(system::SYSTEM_ACTOR_ID, mutate),
+        )?;
+
+        Ok(code)
     }
 
     pub fn create_builtin_actor(
@@ -427,7 +495,7 @@ where
         Ok(EthAddress(addr))
     }
 
-    pub fn store(&mut self) -> &DB {
+    pub fn store(&self) -> &DB {
         &self.store
     }
 
@@ -463,5 +531,20 @@ where
             Stage::Tree(ref mut state_tree) => f(state_tree),
             Stage::Exec(ref mut exec_state) => g(exec_state.state_tree_mut()),
         }
+    }
+
+    /// Query the actor state from the state tree under the two different stages.
+    fn get_actor_state<T: de::DeserializeOwned>(&self, actor: ActorID) -> anyhow::Result<T> {
+        let actor_state_cid = match &self.stage {
+            Stage::Tree(s) => s.get_actor(actor)?,
+            Stage::Exec(s) => s.state_tree().get_actor(actor)?,
+        }
+        .ok_or_else(|| anyhow!("actor state {actor} not found, is it deployed?"))?
+        .state;
+
+        self.store()
+            .get_cbor(&actor_state_cid)
+            .context("failed to get actor state by state cid")?
+            .ok_or_else(|| anyhow!("actor state by {actor_state_cid} not found"))
     }
 }

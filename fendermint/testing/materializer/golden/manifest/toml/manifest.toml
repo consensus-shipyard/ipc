@@ -1,0 +1,61 @@
+[accounts.7tQxM]
+
+[accounts._BveKc_O]
+
+[accounts.maOV_H]
+
+[accounts.ogrE]
+
+[rootnet]
+type = "External"
+urls = ["https://td_bn6ha.api.calibration.node.glif.io/rpc/v1"]
+
+[rootnet.deployment]
+type = "New"
+deployer = "maOV_H"
+
+[subnets.Dj72]
+creator = "ogrE"
+
+[subnets.Dj72.validators]
+7tQxM = "6191444572336960256"
+_BveKc_O = "1"
+ogrE = "7588374658330027519"
+
+[subnets.Dj72.balances]
+7tQxM = "5221160371199856067"
+ogrE = "8976986692201503093"
+
+[subnets.Dj72.nodes.3eGbMB]
+ethapi = true
+seed_nodes = ["StU"]
+parent_node = "https://td_bn6ha.api.calibration.node.glif.io/rpc/v1"
+
+[subnets.Dj72.nodes.3eGbMB.mode]
+type = "Validator"
+validator = "ogrE"
+
+[subnets.Dj72.nodes.StU]
+ethapi = false
+seed_nodes = ["eOpV_M7"]
+parent_node = "https://td_bn6ha.api.calibration.node.glif.io/rpc/v1"
+
+[subnets.Dj72.nodes.StU.mode]
+type = "Validator"
+validator = "_BveKc_O"
+
+[subnets.Dj72.nodes.eOpV_M7]
+ethapi = false
+seed_nodes = []
+parent_node = "https://td_bn6ha.api.calibration.node.glif.io/rpc/v1"
+
+[subnets.Dj72.nodes.eOpV_M7.mode]
+type = "Validator"
+validator = "7tQxM"
+
+[subnets.Dj72.relayers.p0_Z]
+submitter = "_BveKc_O"
+follow_node = "eOpV_M7"
+submit_node = "https://td_bn6ha.api.calibration.node.glif.io/rpc/v1"
+
+[subnets.Dj72.subnets]
