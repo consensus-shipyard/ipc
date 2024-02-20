@@ -95,7 +95,7 @@ registry_addr = "0x7308C4A503a12521215718cbCa98F951E9aAB9B5"
 # registry_addr = "0x74539671a1d2f1c8f200826baba665179f53a1b7"
 ```
 
-* Follow [this link](https://github.com/consensus-shipyard/ipc/blob/cd/contracts/deployments/r314159.json) to get the  up-to-date addresses of (`gateway_addr` and `registry_addr)` and replace them with addresses under `# Filecoin Calibration`
+* Follow [this link](https://github.com/consensus-shipyard/ipc/blob/cd/contracts/deployments/r314159.json) to get the up-to-date addresses of `gateway_addr` and `registry_addr` to use them under  `# Filecoin Calibration` part of the configuration.
 
 ### Step 3: Set up your wallets
 
