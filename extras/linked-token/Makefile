@@ -39,11 +39,11 @@ check-balance:
 
 deploy-replica:
 	@echo "Deploying token replica contract on subnet..."
-	forge script DeployIpcTokenReplica.s.sol:DeployIpcTokenReplica --skip-simulation --rpc-url $$SUBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "run(address,address,uint64,address[])" -- $$SUBNET_GATEWAY 0x0000000000000000000000000000000000000000 $$CALIBNET_CHAIN_ID '[]'
+	forge script script/DeployIpcTokenReplica.s.sol:DeployIpcTokenReplica --skip-simulation --rpc-url $$SUBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "run(address,address,uint64,address[])" -- $$SUBNET_GATEWAY 0x0000000000000000000000000000000000000000 $$CALIBNET_CHAIN_ID '[]'
 
 deploy-controller:
 	@echo "Deploying token controller contract on Calibnet..."
-	forge script DeployIpcTokenController.s.sol:DeployIpcTokenController --skip-simulation --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "run(address,address,uint64,address[],address)" -- $$CALIBNET_GATEWAY $$CALIBNET_USDC $$CALIBNET_CHAIN_ID "[$$SUBNET_ROUTE_IN_ETH_FORMAT]" $$IPC_TOKEN_REPLICA
+	forge script script/DeployIpcTokenController.s.sol:DeployIpcTokenController --skip-simulation --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "run(address,address,uint64,address[],address)" -- $$CALIBNET_GATEWAY $$CALIBNET_USDC $$CALIBNET_CHAIN_ID "[$$SUBNET_ROUTE_IN_ETH_FORMAT]" $$IPC_TOKEN_REPLICA
 
 update-replica:
 	@echo "Updating replica with controller's address..."
@@ -56,7 +56,7 @@ approve-usdc:
 deposit-usdc:
 	@echo "Depositing USDC to subnet..."
 	@WALLET_ADDRESS=$$(cast wallet address --private-key $$PRIVATE_KEY); \
-	forge script CallLockAndTransfer.s.sol:CallLockAndTransfer --skip-simulation --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "run(address,address,uint256)" -- $$IPC_TOKEN_CONTROLLER $$WALLET_ADDRESS $$AMOUNT
+	forge script script/CallLockAndTransfer.s.sol:CallLockAndTransfer --skip-simulation --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "run(address,address,uint256)" -- $$IPC_TOKEN_CONTROLLER $$WALLET_ADDRESS $$AMOUNT
 
 check-replica-balance:
 	@echo "Checking Replica Token balance..."
@@ -66,5 +66,5 @@ check-replica-balance:
 withdraw-usdc:
 	@echo "Withdrawing USDC from subnet..."
 	@WALLET_ADDRESS=$$(cast wallet address --private-key $$PRIVATE_KEY); \
-	forge script CallBurnAndTransfer.s.sol:CallBurnAndTransfer --skip-simulation --rpc-url $$SUBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "run(address,address,uint256)" -- $$IPC_TOKEN_REPLICA $$WALLET_ADDRESS $$AMOUNT
+	forge script script/CallBurnAndTransfer.s.sol:CallBurnAndTransfer --skip-simulation --rpc-url $$SUBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "run(address,address,uint256)" -- $$IPC_TOKEN_REPLICA $$WALLET_ADDRESS $$AMOUNT
 
