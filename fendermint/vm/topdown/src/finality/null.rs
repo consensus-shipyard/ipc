@@ -6,8 +6,7 @@ use crate::finality::{
 };
 use crate::{BlockHash, BlockHeight, Config, Error, IPCParentFinality, SequentialKeyCache};
 use async_stm::{abort, atomically, Stm, StmResult, TVar};
-use fendermint_vm_core::emit;
-use fendermint_vm_core::event::VMEvent;
+use fendermint_vm_event::{emit, VMEvent};
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
 use std::cmp::min;
@@ -75,13 +74,14 @@ impl FinalityWithNull {
     ) -> StmResult<(), Error> {
         if let Some((block_hash, validator_changes, top_down_msgs)) = maybe_payload {
             emit!(
-                VMEvent::NewParentNonNullRound,
+                VMEvent::NewParentView,
+                is_null = false,
                 height,
                 block_hash = hex::encode(&block_hash)
             );
             self.parent_block_filled(height, block_hash, validator_changes, top_down_msgs)
         } else {
-            emit!(VMEvent::NewParentNullRound, height);
+            emit!(VMEvent::NewParentView, is_null = true, height);
             self.parent_null_round(height)
         }
     }

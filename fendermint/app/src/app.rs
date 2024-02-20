@@ -13,8 +13,8 @@ use fendermint_abci::{AbciResult, Application};
 use fendermint_storage::{
     Codec, Encode, KVCollection, KVRead, KVReadable, KVStore, KVWritable, KVWrite,
 };
-use fendermint_vm_core::event::VMEvent;
-use fendermint_vm_core::{emit, Timestamp};
+use fendermint_vm_core::Timestamp;
+use fendermint_vm_event::{emit, VMEvent};
 use fendermint_vm_interpreter::bytes::{
     BytesMessageApplyRes, BytesMessageCheckRes, BytesMessageQuery, BytesMessageQueryRes,
 };

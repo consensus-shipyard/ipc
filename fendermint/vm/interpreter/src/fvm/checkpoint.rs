@@ -29,8 +29,7 @@ use super::{
     ValidatorContext,
 };
 
-use fendermint_vm_core::emit;
-use fendermint_vm_core::event::VMEvent;
+use fendermint_vm_event::{emit, VMEvent};
 
 /// Validator voting power snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -2830,6 +2830,7 @@ dependencies = [
  "fendermint_vm_actor_interface",
  "fendermint_vm_core",
  "fendermint_vm_encoding",
+ "fendermint_vm_event",
  "fendermint_vm_genesis",
  "fendermint_vm_interpreter",
  "fendermint_vm_message",
@@ -3157,7 +3158,6 @@ dependencies = [
  "quickcheck_macros",
  "regex",
  "serde",
- "strum_macros 0.25.3",
  "thiserror",
 ]
 
@@ -3171,6 +3171,13 @@ dependencies = [
  "num-traits",
  "serde",
  "serde_with",
+]
+
+[[package]]
+name = "fendermint_vm_event"
+version = "0.1.0"
+dependencies = [
+ "strum 0.25.0",
 ]
 
 [[package]]
@@ -3219,6 +3226,7 @@ dependencies = [
  "fendermint_vm_actor_interface",
  "fendermint_vm_core",
  "fendermint_vm_encoding",
+ "fendermint_vm_event",
  "fendermint_vm_genesis",
  "fendermint_vm_message",
  "fendermint_vm_resolver",
@@ -3345,6 +3353,7 @@ dependencies = [
  "fendermint_crypto",
  "fendermint_testing",
  "fendermint_vm_core",
+ "fendermint_vm_event",
  "fendermint_vm_genesis",
  "fvm_ipld_encoding",
  "fvm_shared",

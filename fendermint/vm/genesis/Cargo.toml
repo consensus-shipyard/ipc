@@ -26,7 +26,7 @@ fendermint_actor_eam = { workspace = true }
 
 fendermint_crypto = { path = "../../crypto" }
 fendermint_testing = { path = "../../testing", optional = true }
-fendermint_vm_core = { workspace = true }
+fendermint_vm_core = { path = "../core" }
 fendermint_vm_encoding = { path = "../encoding" }
 
 [dev-dependencies]

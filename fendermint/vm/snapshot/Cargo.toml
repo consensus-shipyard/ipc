@@ -37,7 +37,7 @@ fvm_ipld_encoding = { workspace = true }
 fvm_shared = { workspace = true, optional = true, features = ["arb"] }
 
 fendermint_vm_interpreter = { path = "../interpreter" }
-fendermint_vm_core = { workspace = true, optional = true }
+fendermint_vm_core = { path = "../core", optional = true }
 fendermint_testing = { path = "../../testing", features = ["arb"], optional = true }
 
 [dev-dependencies]

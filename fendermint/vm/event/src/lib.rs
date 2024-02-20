@@ -1,10 +1,9 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-#[derive(strum_macros::Display)]
+#[derive(strum::Display)]
 pub enum VMEvent {
-    NewParentNullRound,
-    NewParentNonNullRound,
+    NewParentView,
     ParentFinalityCommitted,
     NewBottomUpCheckpoint,
     /// A new block is produced in fendermint
