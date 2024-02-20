@@ -600,7 +600,7 @@ where
     let receipt = request(
         "eth_sendRawTransaction",
         send_transaction(&mw, coin_send.tx, "coin_send").await,
-        |receipt| !receipt.logs.is_empty(),
+        |receipt| !receipt.logs.is_empty() && receipt.logs.iter().all(|l| l.log_type.is_none()),
     )?;
 
     tracing::info!(tx_hash = ?receipt.transaction_hash, "coin sent");
