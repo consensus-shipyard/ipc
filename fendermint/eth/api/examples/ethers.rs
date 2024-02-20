@@ -621,6 +621,14 @@ where
         |logs| *logs == receipt.logs,
     )?;
 
+    // Check that requesting logs with higher-than-highest height does not fail.
+    request(
+        "eth_getLogs /w too high",
+        mw.get_logs(&Filter::new().to_block(BlockNumber::Number(U64::from(u32::MAX))))
+            .await,
+        |logs: &Vec<Log>| logs.is_empty(), // There will be nothing from latest-to-latest by now.
+    )?;
+
     // See what kind of events were logged.
 
     if let Some(blocks_filter_id) = blocks_filter_id {
