@@ -227,8 +227,8 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e FM_PULL_SKIP=1 \
     child-validator 2>&1)
 echo "$bootstrap_output"
-bootstrap_node_id=$(echo "$bootstrap_output" | sed -n '/CometBFT node ID:/ {n;p}' | tr -d "[:blank:]")
-bootstrap_peer_id=$(echo "$bootstrap_output" | sed -n '/IPLD Resolver Multiaddress:/ {n;p}' | tr -d "[:blank:]" | sed 's/.*\/p2p\///')
+bootstrap_node_id=$(echo "$bootstrap_output" | sed -n '/CometBFT node ID:/ {n;p;}' | tr -d "[:blank:]")
+bootstrap_peer_id=$(echo "$bootstrap_output" | sed -n '/IPLD Resolver Multiaddress:/ {n;p;}' | tr -d "[:blank:]" | sed 's/.*\/p2p\///')
 echo "Bootstrap node started. Node id ${bootstrap_node_id}, peer id ${bootstrap_peer_id}"
 
 bootstrap_node_endpoint=${bootstrap_node_id}@validator-0-cometbft:${CMT_P2P_HOST_PORTS[0]}
