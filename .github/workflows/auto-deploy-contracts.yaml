@@ -87,6 +87,7 @@ jobs:
         with:
           ref: cd/contracts
           submodules: recursive
+          fetch-depth: 0
 
       - name: Merge from main branch and update cd/contracts branch
         run: |
