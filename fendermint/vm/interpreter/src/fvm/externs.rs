@@ -41,11 +41,11 @@ where
     DB: Blockstore + 'static,
 {
     fn get_chain_randomness(&self, _round: ChainEpoch) -> anyhow::Result<[u8; 32]> {
-        todo!("might need randomness")
+        Err(anyhow!("randomness not implemented"))
     }
 
     fn get_beacon_randomness(&self, _round: ChainEpoch) -> anyhow::Result<[u8; 32]> {
-        unimplemented!("not expecting to use the beacon")
+        Err(anyhow!("beacon not implemented"))
     }
 }
 
