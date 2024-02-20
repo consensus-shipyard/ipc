@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::{collections::BTreeMap, path::Path};
+use std::{collections::BTreeMap, os::unix::fs::MetadataExt, path::Path};
 
 use anyhow::Context;
 use bollard::{
@@ -41,10 +41,10 @@ impl DockerNode {
 
         // Directory for the node's data volumes
         let node_dir = root.as_ref().join(node_name);
-        std::fs::create_dir_all(node_dir).context("failed to create node dir")?;
+        std::fs::create_dir_all(&node_dir).context("failed to create node dir")?;
 
-        // Get the current user ID to use with docker containers
-        let user = todo!();
+        // Get the current user ID to use with docker containers.
+        let user = node_dir.metadata()?.uid();
 
         // Create a directory for cometbft
         let cometbft_dir = node_dir.join("cometbft");
