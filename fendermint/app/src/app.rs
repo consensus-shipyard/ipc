@@ -14,7 +14,7 @@ use fendermint_storage::{
     Codec, Encode, KVCollection, KVRead, KVReadable, KVStore, KVWritable, KVWrite,
 };
 use fendermint_vm_core::Timestamp;
-use fendermint_vm_event::{emit, VMEvent};
+use fendermint_vm_event::{emit, EventType};
 use fendermint_vm_interpreter::bytes::{
     BytesMessageApplyRes, BytesMessageCheckRes, BytesMessageQuery, BytesMessageQueryRes,
 };
@@ -755,7 +755,7 @@ where
 
         let r = to_end_block(ret)?;
 
-        emit!(VMEvent::NewBlock, height = request.height);
+        emit!(EventType::NewBlock, height = request.height);
 
         Ok(r)
     }

@@ -29,7 +29,7 @@ use super::{
     ValidatorContext,
 };
 
-use fendermint_vm_event::{emit, VMEvent};
+use fendermint_vm_event::{emit, EventType};
 
 /// Validator voting power snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -121,7 +121,7 @@ where
     };
 
     emit!(
-        VMEvent::NewBottomUpCheckpoint,
+        EventType::NewBottomUpCheckpoint,
         height = height.value(),
         block_hash = hex::encode(block_hash),
         msgs = num_msgs,

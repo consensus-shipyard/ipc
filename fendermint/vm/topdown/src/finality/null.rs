@@ -6,7 +6,7 @@ use crate::finality::{
 };
 use crate::{BlockHash, BlockHeight, Config, Error, IPCParentFinality, SequentialKeyCache};
 use async_stm::{abort, atomically, Stm, StmResult, TVar};
-use fendermint_vm_event::{emit, VMEvent};
+use fendermint_vm_event::{emit, EventType};
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
 use std::cmp::min;
@@ -74,14 +74,14 @@ impl FinalityWithNull {
     ) -> StmResult<(), Error> {
         if let Some((block_hash, validator_changes, top_down_msgs)) = maybe_payload {
             emit!(
-                VMEvent::NewParentView,
+                EventType::NewParentView,
                 is_null = false,
                 height,
                 block_hash = hex::encode(&block_hash)
             );
             self.parent_block_filled(height, block_hash, validator_changes, top_down_msgs)
         } else {
-            emit!(VMEvent::NewParentView, is_null = true, height);
+            emit!(EventType::NewParentView, is_null = true, height);
             self.parent_null_round(height)
         }
     }
@@ -129,7 +129,11 @@ impl FinalityWithNull {
         self.last_committed_finality.write(Some(finality))?;
 
         // emit event only after successful write
-        emit!(VMEvent::ParentFinalityCommitted, height, block_hash = hash);
+        emit!(
+            EventType::ParentFinalityCommitted,
+            height,
+            block_hash = hash
+        );
 
         Ok(())
     }

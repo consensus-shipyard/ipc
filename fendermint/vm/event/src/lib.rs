@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 #[derive(strum::Display)]
-pub enum VMEvent {
+pub enum EventType {
     NewParentView,
     ParentFinalityCommitted,
     NewBottomUpCheckpoint,

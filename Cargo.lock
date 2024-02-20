@@ -3352,7 +3352,6 @@ dependencies = [
  "ethers",
  "fendermint_crypto",
  "fendermint_testing",
- "fendermint_vm_core",
  "fendermint_vm_event",
  "fendermint_vm_genesis",
  "fvm_ipld_encoding",
