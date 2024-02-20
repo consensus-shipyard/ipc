@@ -10,6 +10,10 @@ on:
     paths:
       - contracts/**
 
+env:
+  GIT_USERNAME: github-actions[bot]
+  GIT_EMAIL: ipc+github-actions[bot]@users.noreply.github.com
+
 concurrency:
   # Only allow one run at a time for this workflow
   group: auto-deploy-contracts
@@ -32,10 +36,12 @@ jobs:
       - name: (Dry run) Try merge from main branch to see if there's any conflicts that can't be resolved itself
         run: |
           git show HEAD
-          git config --global user.name 'Contract Auto Deployer'
-          git config --global user.email 'dummy@dummy.dummy'
-          git config pull.rebase false
-          git pull origin main --no-edit --allow-unrelated-histories
+          git config --global user.name "$GIT_USERNAME"
+          git config --global user.email "$GIT_EMAIL"
+          git checkout main
+          git pull --rebase origin main
+          git checkout cd/contracts
+          git merge main --no-edit --allow-unrelated-histories
 
       - name: Checkout the branch that triggered this run
         uses: actions/checkout@v4
@@ -91,10 +97,12 @@ jobs:
 
       - name: Merge from main branch and update cd/contracts branch
         run: |
-          git config --global user.name 'Contract Auto Deployer'
-          git config --global user.email 'dummy@dummy.dummy'
-          git config pull.rebase false
-          git pull origin main --no-edit --allow-unrelated-histories
+          git config --global user.name "$GIT_USERNAME"
+          git config --global user.email "$GIT_EMAIL"
+          git checkout main
+          git pull --rebase origin main
+          git checkout cd/contracts
+          git merge main --no-edit --allow-unrelated-histories
           git push -f origin cd/contracts
 
       - name: Write deployed address to output file
@@ -110,8 +118,8 @@ jobs:
           commit_message: Update contract address
           branch: cd/contracts
           file_pattern: deployments/r314159.json
-          commit_user_name: Contract Auto Deployer
-          commit_user_email: dummy@dummy.dummy
+          commit_user_name: ${{env.GIT_USERNAME}}
+          commit_user_email: ${{env.GIT_EMAIL}}
           push_options: '--force'
           skip_dirty_check: true
           create_branch: true
