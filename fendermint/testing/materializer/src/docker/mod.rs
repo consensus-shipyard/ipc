@@ -367,6 +367,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
+        // Overwrite the env file which has seed addresses.
         todo!("docker-compose up")
     }
 
