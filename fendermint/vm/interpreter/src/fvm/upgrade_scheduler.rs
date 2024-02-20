@@ -3,12 +3,15 @@
 
 use std::collections::BTreeMap;
 
-use fendermint_vm_interpreter::fvm::state::{snapshot::BlockHeight, FvmExecState};
 use fvm_ipld_blockstore::Blockstore;
+
+use super::state::{snapshot::BlockHeight, FvmExecState};
 
 /// a function type for migration
 // TODO: Add missing parameters
-pub type MigrationFunc<DB> = fn(state: &FvmExecState<DB>) -> anyhow::Result<()>;
+pub type MigrationFunc<DB> = fn(state: &mut FvmExecState<DB>) -> anyhow::Result<()>;
+
+pub type ChainID = u64;
 
 /// Upgrade represents a single upgrade to be executed at a given height
 #[derive(Clone)]
@@ -16,6 +19,8 @@ pub struct Upgrade<DB>
 where
     DB: Blockstore + 'static + Clone,
 {
+    /// the chain id on which the upgrade should be executed
+    pub chain_id: ChainID,
     /// the block height at which the upgrade should be executed
     pub block_height: BlockHeight,
     /// the migration function to be executed
@@ -30,7 +35,7 @@ pub struct UpgradeScheduler<DB>
 where
     DB: Blockstore + 'static + Clone,
 {
-    pub upgrades: BTreeMap<BlockHeight, Upgrade<DB>>,
+    pub upgrades: BTreeMap<(ChainID, BlockHeight), Upgrade<DB>>,
 }
 
 impl<DB> Default for UpgradeScheduler<DB>
@@ -50,20 +55,24 @@ where
 {
     // add a new upgrade to the schedule
     pub fn add_upgrade(&mut self, upgrade: Upgrade<DB>) -> anyhow::Result<()> {
-        if self.upgrades.contains_key(&upgrade.block_height) {
+        if self
+            .upgrades
+            .contains_key(&(upgrade.chain_id, upgrade.block_height))
+        {
             return Err(anyhow::anyhow!(
                 "Upgrade already exists at block height {}",
                 upgrade.block_height
             ));
         }
 
-        self.upgrades.insert(upgrade.block_height, upgrade);
+        self.upgrades
+            .insert((upgrade.chain_id, upgrade.block_height), upgrade);
 
         Ok(())
     }
 
-    pub fn get_upgrade(&self, block_height: BlockHeight) -> Option<&Upgrade<DB>> {
-        self.upgrades.get(&block_height)
+    pub fn get_upgrade(&self, chain_id: ChainID, height: BlockHeight) -> Option<&Upgrade<DB>> {
+        self.upgrades.get(&(chain_id, height))
     }
 }
 
@@ -73,12 +82,14 @@ fn test_validate_upgrade_schedule() {
         UpgradeScheduler::default();
 
     let upgrade = Upgrade {
+        chain_id: 1,
         block_height: 10,
         migration: |_state| Ok(()),
     };
     us.add_upgrade(upgrade).unwrap();
 
     let upgrade = Upgrade {
+        chain_id: 1,
         block_height: 20,
         migration: |_state| Ok(()),
     };
@@ -86,12 +97,13 @@ fn test_validate_upgrade_schedule() {
 
     // adding an upgrade at the same height should fail
     let upgrade = Upgrade {
+        chain_id: 1,
         block_height: 20,
         migration: |_state| Ok(()),
     };
     let res = us.add_upgrade(upgrade);
     assert!(res.is_err());
 
-    assert!(us.get_upgrade(9).is_none());
-    assert!(us.get_upgrade(10).is_some());
+    assert!(us.get_upgrade(1, 9).is_none());
+    assert!(us.get_upgrade(1, 10).is_some());
 }

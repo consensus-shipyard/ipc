@@ -11,6 +11,8 @@ mod genesis;
 mod query;
 pub mod state;
 pub mod store;
+mod upgrade_scheduler;
+mod upgrades;
 
 #[cfg(any(test, feature = "bundle"))]
 pub mod bundle;
@@ -25,9 +27,10 @@ pub use fendermint_vm_message::query::FvmQuery;
 pub use genesis::FvmGenesisOutput;
 pub use query::FvmQueryRet;
 use tendermint_rpc::Client;
+use upgrades::load_upgrade_scheduler;
 
 pub use self::broadcast::Broadcaster;
-use self::state::ipc::GatewayCaller;
+use self::{state::ipc::GatewayCaller, upgrade_scheduler::UpgradeScheduler};
 
 pub type FvmMessage = fvm_shared::message::Message;
 
@@ -56,7 +59,10 @@ impl<C> ValidatorContext<C> {
 
 /// Interpreter working on already verified unsigned messages.
 #[derive(Clone)]
-pub struct FvmMessageInterpreter<DB, C> {
+pub struct FvmMessageInterpreter<DB, C>
+where
+    DB: fvm_ipld_blockstore::Blockstore + 'static + Clone,
+{
     contracts: Hardhat,
     /// Tendermint client for querying the RPC.
     client: C,
@@ -72,9 +78,14 @@ pub struct FvmMessageInterpreter<DB, C> {
     /// when they are added to the mempool, or just the most basic ones are performed.
     exec_in_check: bool,
     gateway: GatewayCaller<DB>,
+    /// Upgrade scheduler stores all the upgrades to be executed at given heights.
+    upgrade_scheduler: UpgradeScheduler<DB>,
 }
 
-impl<DB, C> FvmMessageInterpreter<DB, C> {
+impl<DB, C> FvmMessageInterpreter<DB, C>
+where
+    DB: fvm_ipld_blockstore::Blockstore + 'static + Clone,
+{
     pub fn new(
         client: C,
         validator_ctx: Option<ValidatorContext<C>>,
@@ -83,6 +94,8 @@ impl<DB, C> FvmMessageInterpreter<DB, C> {
         gas_search_step: f64,
         exec_in_check: bool,
     ) -> Self {
+        let upgrade_scheduler = load_upgrade_scheduler::<DB>().expect("Invalid upgrade schedule");
+
         Self {
             client,
             validator_ctx,
@@ -91,12 +104,14 @@ impl<DB, C> FvmMessageInterpreter<DB, C> {
             gas_search_step,
             exec_in_check,
             gateway: GatewayCaller::default(),
+            upgrade_scheduler,
         }
     }
 }
 
 impl<DB, C> FvmMessageInterpreter<DB, C>
 where
+    DB: fvm_ipld_blockstore::Blockstore + 'static + Clone,
     C: Client + Sync,
 {
     /// Indicate that the node is syncing with the rest of the network and hasn't caught up with the tip yet.
