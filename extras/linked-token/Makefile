@@ -25,7 +25,7 @@ help:
 
 deploy-usdctest:
 	@echo "Deploying USDCTest contract..."
-	forge script DeployUSDCTest.s.sol --broadcast --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --skip-simulation
+	forge script script/DeployUSDCTest.s.sol:DeployUSDCTest --broadcast --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --skip-simulation
 
 mint-usdc:
 	@echo "Minting 1000 USDCTest tokens..."

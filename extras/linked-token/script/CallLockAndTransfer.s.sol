@@ -8,7 +8,7 @@ contract CallLockAndTransfer is Script {
     function run(address contractAddress, address recipient, uint256 amount) public {
         LinkedTokenController controller = LinkedTokenController(contractAddress);
         vm.startBroadcast();
-        controller.lockAndTransfer(recipient, amount);
+        controller.linkedTransfer(recipient, amount);
         vm.stopBroadcast();
         // Log the address of the deployed contract
         console.log("done");

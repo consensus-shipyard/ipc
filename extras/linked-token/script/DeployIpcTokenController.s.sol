@@ -11,7 +11,7 @@ contract DeployIpcTokenController is Script {
         SubnetID memory destinationSubnet = SubnetID({root: _rootNetChainId, route: _route});
 
         vm.startBroadcast();
-        LinkedTokenController controller = new LinkedTokenController(_gateway, _tokenContractAddress, destinationSubnet, _destinationContract);
+        LinkedTokenController controller = new LinkedTokenController(_gateway, _tokenContractAddress, destinationSubnet);
         vm.stopBroadcast();
 
         // Log the address of the deployed contract

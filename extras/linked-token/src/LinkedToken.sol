@@ -10,12 +10,16 @@ import {IpcEnvelope, ResultMsg, CallMsg, OutcomeType, IpcMsgKind} from "@ipc/src
 import {IPCAddress, SubnetID} from "@ipc/src/structs/Subnet.sol";
 import {CrossMsgHelper} from "@ipc/src/lib/CrossMsgHelper.sol";
 import {SubnetIDHelper} from "@ipc/src/lib/SubnetIDHelper.sol";
+error InvalidOriginContract();
+error InvalidOriginSubnet();
+
 
 /**
  * @title LinkedToken
  * @notice Contract to handle token transfer from L1, lock them and mint on L2.
  */
 abstract contract LinkedToken is IpcExchange {
+    using SafeERC20 for IERC20;
     using CrossMsgHelper for IpcEnvelope;
     using SubnetIDHelper for SubnetID;
     using FvmAddressHelper for FvmAddress;
@@ -32,7 +36,6 @@ abstract contract LinkedToken is IpcExchange {
 
     error InvalidEnvelope(string reason);
     error TransferRejected(string reason);
-
     struct UnconfirmedTransfer {
         address sender;
         uint256 value;
@@ -53,23 +56,27 @@ abstract contract LinkedToken is IpcExchange {
         uint256 value
     );
 
-    event LinkedTokenReceived(address indexed recipient, uint256 amount, bytes32 id);
+    event LinkedTokenReceived(address indexed recipient, uint256 amount);
 
     /**
      * @dev Constructor for IpcTokenController
-     * @param _gateway Address of the gateway for cross-network communication
-     * @param _tokenContractAddress Address of the source ERC20 token contract
-     * @param _linkedSubnet SubnetID of the destination network
-     * @param _linkedContract Address of the destination contract for minting
+     * @param gateway Address of the gateway for cross-network communication
+     * @param underlyingToken Address of the destination contract for minting
+     * @param linkedSubnet SubnetID of the destination network
      */
     constructor(
         address gateway,
         address underlyingToken,
         SubnetID memory linkedSubnet
     ) IpcExchange(gateway) {
-        _underlying = underlyingToken;
+        _underlying = IERC20(underlyingToken);
         _linkedSubnet = linkedSubnet;
     }
+
+    function getLinkedSubnet() public view returns (SubnetID memory) {
+        return _linkedSubnet;
+    }
+
 
     function _captureTokens(address holder, uint256 amount) internal virtual;
 
@@ -113,9 +120,10 @@ abstract contract LinkedToken is IpcExchange {
         _addUnconfirmedTransfer(committed.toHash(), msg.sender, amount);
 
         emit LinkedTokensSent({
-            underlying: _underlying,
+            underlying: address(_underlying),
             sender: msg.sender,
             recipient: recipient,
+            id: committed.toHash(),
             nonce: committed.nonce,
             value: amount
         });
@@ -141,7 +149,7 @@ abstract contract LinkedToken is IpcExchange {
         _linkedContract = linkedContract;
 
         emit LinkedTokenInitialized({
-            underlying: _underlying,
+            underlying: address(_underlying),
             linkedSubnet: _linkedSubnet,
             linkedContract: _linkedContract
         });
@@ -198,9 +206,10 @@ abstract contract LinkedToken is IpcExchange {
     }
 
     // Only accept messages from our linked token contract.
-    function _validateEnvelope(IpcEnvelope memory envelope) internal {
+    // Made public for testing
+    function _validateEnvelope(IpcEnvelope memory envelope) public {
         SubnetID memory subnetId = envelope.from.subnetId;
-        if (!_subnetId.equals(_linkedSubnet)) {
+        if (!subnetId.equals(_linkedSubnet)) {
             revert InvalidOriginSubnet();
         }
 
@@ -210,13 +219,13 @@ abstract contract LinkedToken is IpcExchange {
         }
     }
 
-    function _requireSelector(bytes memory method, string memory signature) internal {
+    function _requireSelector(bytes memory method, bytes memory signature) internal {
         if (method.length < 4) {
             revert InvalidEnvelope("short selector");
         }
         bytes4 coerced;
         assembly {
-            coerced := mload(add(data, 32))
+            coerced := mload(add(method, 32))
         }
         if (coerced != bytes4(keccak256(signature))) {
             revert InvalidEnvelope("invalid selector");
@@ -236,7 +245,7 @@ abstract contract LinkedToken is IpcExchange {
     // Unconfirmed transfers
     // ----------------------------
 
-    function unconfirmedTransfer(bytes32 id) public view returns (address, uint256) {
+    function getUnconfirmedTransfer(bytes32 id) public view returns (address, uint256) {
         UnconfirmedTransfer storage details = _unconfirmedTransfers[id];
         return (details.sender, details.value);
     }
@@ -247,7 +256,7 @@ abstract contract LinkedToken is IpcExchange {
     }
 
     function _addUnconfirmedTransfer(bytes32 hash, address sender, uint256 value) internal {
-        _unconfirmedTransfers[hash] = UnconfirmedTransferDetails(sender, value);
+        _unconfirmedTransfers[hash] = UnconfirmedTransfer(sender, value);
     }
 
     function _removeUnconfirmedTransfer(bytes32 id, bool refund) internal {

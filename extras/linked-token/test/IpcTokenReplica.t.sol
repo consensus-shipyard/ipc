@@ -2,21 +2,27 @@
 pragma solidity 0.8.23;
 
 import "forge-std/Test.sol";
-import "../../../src/examples/cross-token/IpcTokenReplica.sol";
-import {IntegrationTestBase} from "../../IntegrationTestBase.sol";
-import {GatewayDiamond} from "../../../src/GatewayDiamond.sol";
-import {SubnetIDHelper} from "../../../src/lib/SubnetIDHelper.sol";
+import "../src/LinkedTokenReplica.sol";
+import {IntegrationTestBase} from "@ipc/test/IntegrationTestBase.sol";
+import {GatewayDiamond} from "@ipc/src/GatewayDiamond.sol";
+import {SubnetIDHelper} from "@ipc/src/lib/SubnetIDHelper.sol";
+import {SubnetID, IPCAddress} from "@ipc/src/structs/Subnet.sol";
+import {FvmAddressHelper} from "@ipc/src/lib/FvmAddressHelper.sol";
+import {FvmAddress} from "@ipc/src/structs/FvmAddress.sol";
 
-import {SubnetActorDiamond} from "../../../src/SubnetActorDiamond.sol";
-import {IpcLinkedTokenController} from "../../../src/examples/cross-token/IpcTokenController.sol";
-import {InvalidOriginContract, InvalidOriginSubnet} from "../../../src/examples/cross-token/IpcCrossTokenErrors.sol";
-import {USDCTest} from "../../../src/examples/cross-token/USDCTest.sol";
+import {IpcEnvelope, CallMsg,  IpcMsgKind} from "@ipc/src/structs/CrossNet.sol";
+
+import {SubnetActorDiamond} from "@ipc/src/SubnetActorDiamond.sol";
+import {LinkedTokenController} from "../src/LinkedTokenController.sol";
+//import {InvalidOriginContract, InvalidOriginSubnet} from "@ipc/src/examples/cross-token/IpcCrossTokenErrors.sol";
+import {USDCTest} from "../src/USDCTest.sol";
+import {InvalidOriginContract, InvalidOriginSubnet} from "../src/LinkedToken.sol";
 
 contract IpcTokenReplicaTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
 
-    IpcLinkedTokenController controller;
-    IpcTokenReplica replica;
+    LinkedTokenController controller;
+    LinkedTokenReplica replica;
     address controllerSubnetUSDC;
     SubnetID controllerSubnet;
     SubnetID replicaSubnetName;
@@ -38,7 +44,7 @@ contract IpcTokenReplicaTest is Test, IntegrationTestBase {
         require(controllerSubnet.isRoot(), "not root");
         rootGateway = createGatewayDiamond(gatewayParams(controllerSubnet));
         gateway = address(rootGateway);
-        replica = new IpcTokenReplica(gateway, controllerSubnetUSDC, controllerSubnet);
+        replica = new LinkedTokenReplica(gateway, controllerSubnetUSDC, controllerSubnet);
         rootNativeSubnetActor = createSubnetActor(subnetActorWithParams(address(rootGateway), controllerSubnet));
         nativeSubnetPath = new address[](1);
         nativeSubnetPath[0] = address(rootNativeSubnetActor);
@@ -48,8 +54,9 @@ contract IpcTokenReplicaTest is Test, IntegrationTestBase {
         vm.prank(address(rootNativeSubnetActor));
         registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootNativeSubnetActor), rootGateway);
 
-        controller = new IpcTokenController(gateway, controllerSubnetUSDC, replicaSubnetName, address(replica));
-        replica.setController(address(controller));
+        controller = new LinkedTokenController(gateway, controllerSubnetUSDC, replicaSubnetName);
+        replica.initialize(address(controller));
+        controller.initialize(address(replica));
     }
 
     function testHandleIpcMessageOrigin() public {
@@ -86,9 +93,9 @@ contract IpcTokenReplicaTest is Test, IntegrationTestBase {
         });
 
         vm.expectRevert(InvalidOriginContract.selector);
-        replica.verifyIpcEnvelopeLogic(invalidContract);
+        replica._validateEnvelope(invalidContract);
 
         vm.expectRevert(InvalidOriginSubnet.selector);
-        replica.verifyIpcEnvelopeLogic(invalidSubnet);
+        replica._validateEnvelope(invalidSubnet);
     }
 }
