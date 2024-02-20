@@ -22,6 +22,13 @@ jobs:
       RPC_URL: https://calibration.filfox.info/rpc/v1
       PRIVATE_KEY: ${{ secrets.CONTRACTS_DEPLOYER_PRIVATE_KEY }}
     steps:
+      - name: (Dry run) Try merge from main branch and update cd/contracts branch
+        run: |
+          git config --global user.name 'Contract Auto Deployer'
+          git config --global user.email 'dummy@dummy.dummy'
+          git config pull.rebase false
+          git pull origin main --no-edit --allow-unrelated-histories
+
       - name: Checkout code repo
         uses: actions/checkout@v4
         with:
