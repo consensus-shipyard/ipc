@@ -9,8 +9,8 @@
 use std::collections::HashSet;
 
 use anyhow::Context;
-use ethers_core::types as et;
 use ethers_core::types::transaction::eip2718::TypedTransaction;
+use ethers_core::types::{self as et, BlockNumber};
 use ethers_core::utils::rlp;
 use fendermint_rpc::message::MessageFactory;
 use fendermint_rpc::query::QueryClient;
@@ -63,8 +63,7 @@ pub async fn block_number<C>(data: JsonRpcData<C>) -> JsonRpcResult<et::U64>
 where
     C: Client + Sync + Send,
 {
-    let res: block::Response = data.tm().latest_block().await?;
-    let height = res.block.header.height;
+    let height = data.latest_height().await?;
     Ok(et::U64::from(height.value()))
 }
 
@@ -869,15 +868,43 @@ where
             from_block,
             to_block,
         } => {
+            // Turn block number into a height.
+            async fn resolve_height<C: Client + Send + Sync>(
+                data: &JsonRpcData<C>,
+                bn: BlockNumber,
+            ) -> JsonRpcResult<Height> {
+                match bn {
+                    BlockNumber::Number(n) => {
+                        Ok(Height::try_from(n.as_u64()).context("invalid height")?)
+                    }
+                    other => {
+                        let h = data.header_by_height(other).await?;
+                        Ok(h.height)
+                    }
+                }
+            }
+
             let from_block = from_block.unwrap_or_default();
-            let to_block = to_block.unwrap_or_default();
-            let to_header = data.header_by_height(to_block).await?;
-            let from_header = if from_block == to_block {
-                to_header.clone()
+            let mut to_block = to_block.unwrap_or_default();
+
+            // Automatically restrict the end to the highest available block to allow queries by fixed ranges.
+            // This is only applied ot the end, not the start, so if `from > to` then we return nothing.
+            if let BlockNumber::Number(n) = to_block {
+                let latest_height = data.latest_height().await?;
+                if n.as_u64() > latest_height.value() {
+                    to_block = BlockNumber::Number(et::U64::from(latest_height.value()));
+                }
+            }
+
+            // Resolve named heights to a number.
+            let to_height = resolve_height(&data, to_block).await?;
+            let from_height = if from_block == to_block {
+                to_height
             } else {
-                data.header_by_height(from_block).await?
+                resolve_height(&data, from_block).await?
             };
-            (from_header.height, to_header.height)
+
+            (from_height, to_height)
         }
         et::FilterBlockOption::AtBlockHash(block_hash) => {
             let header = data.header_by_hash(block_hash).await?;

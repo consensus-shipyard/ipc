@@ -65,7 +65,7 @@ make test
 
 ## Documentation and Guides
 
-**We've prepared a [quick start guide](./docs/ipc/quickstart-calibration.md) that will have you running and validating on your own subnet quickly, at the cost of detailed explanations.**
+**We've prepared a [quick start guide](https://docs.ipc.space/quickstarts/deploy-a-subnet) that will have you running and validating on your own subnet quickly, at the cost of detailed explanations.**
 
 For further documentation, see:
 - [docs/contracts.md](./docs/ipc/contracts.md) for instructions on how to deploy FEVM actors on subnets.

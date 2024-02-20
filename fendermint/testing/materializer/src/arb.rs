@@ -138,10 +138,8 @@ fn gen_manifest(
     let rootnet = if bool::arbitrary(g) {
         Rootnet::External {
             deployment: if bool::arbitrary(g) {
-                IpcDeployment::Existing {
-                    gateway: gen_address(g),
-                    registry: gen_address(g),
-                }
+                let [gateway, registry] = gen_addresses::<2>(g);
+                IpcDeployment::Existing { gateway, registry }
             } else {
                 IpcDeployment::New {
                     deployer: choose_one(g, &account_ids),
@@ -151,7 +149,6 @@ fn gen_manifest(
         }
     } else {
         let initial_balances = balances.clone();
-        // Reuse the subnet generation logic for picking validators and nodes.
         let subnet = gen_root_subnet(g, &account_ids, &mut balances);
 
         Rootnet::New {
@@ -174,6 +171,7 @@ fn gen_manifest(
         max_level,
         2,
         &account_ids,
+        &account_ids,
         &parent_nodes,
         &mut balances,
     );
@@ -186,9 +184,9 @@ fn gen_manifest(
 }
 
 /// Generate random ethereum address.
-fn gen_address(g: &mut Gen) -> H160 {
+fn gen_addresses<const N: usize>(g: &mut Gen) -> [H160; N] {
     let mut rng = StdRng::seed_from_u64(u64::arbitrary(g));
-    H160::random_using(&mut rng)
+    std::array::from_fn(|_| H160::random_using(&mut rng))
 }
 
 /// Generate something that looks like it could be a JSON-RPC endpoint of an L1.
@@ -208,12 +206,14 @@ fn gen_urls(g: &mut Gen) -> Vec<Url> {
 }
 
 /// Recursively generate some subnets.
+#[allow(clippy::too_many_arguments)]
 fn gen_subnets(
     g: &mut Gen,
     max_children: usize,
     max_level: usize,
     level: usize,
     account_ids: &[AccountId],
+    parent_account_ids: &[AccountId],
     parent_nodes: &[ParentNode],
     remaining_balances: &mut BalanceMap,
 ) -> SubnetMap {
@@ -232,9 +232,9 @@ fn gen_subnets(
     };
 
     for _ in 0..num_children {
-        // We can pick any creator; we'll make sure this one also gets some
-        // funds to pay for the creation of the subnet.
-        let creator = choose_one(g, account_ids);
+        // Pick one of the accounts on the parent subnet as creator.
+        // This way they should have some non-zero balance to pay for the fees.
+        let creator = choose_one(g, parent_account_ids);
 
         // Every subnet needs validators, so at least 1 needs to be chosen.
         let validators: CollateralMap = choose_at_least(g, 1, account_ids)
@@ -245,10 +245,10 @@ fn gen_subnets(
             })
             .collect();
 
-        // It's not necessary to have accounts in a subnet; only declaring
-        // some that we want to end up with some balance, but others might
-        // funded to support similar ones further down the hierarchy.
-        let balances: BalanceMap = choose_at_least(g, 0, account_ids)
+        // It's not necessary to have accounts in a subnet; but let's pick at least one
+        // so that we have someone to use on this subnet to pick as a creator or relayer
+        // on child subnets.
+        let balances: BalanceMap = choose_at_least(g, 1, account_ids)
             .into_iter()
             .map(|a| {
                 let b: Balance = gen_balance(g, &a, remaining_balances);
@@ -298,7 +298,7 @@ fn gen_subnets(
             (0..1 + usize::arbitrary(g) % 3)
                 .map(|_| {
                     let r = Relayer {
-                        submitter: choose_one(g, account_ids),
+                        submitter: choose_one(g, parent_account_ids),
                         follow_node: choose_one(g, &node_ids),
                         submit_node: choose_one(g, parent_nodes),
                     };
@@ -313,12 +313,15 @@ fn gen_subnets(
             .map(ParentNode::Internal)
             .collect::<Vec<_>>();
 
+        let parent_account_ids = balances.keys().cloned().collect::<Vec<_>>();
+
         let child_subnets = gen_subnets(
             g,
             max_children,
             max_level,
             level + 1,
             account_ids,
+            &parent_account_ids,
             &parent_nodes,
             remaining_balances,
         );
@@ -346,7 +349,16 @@ fn gen_root_subnet(
     account_ids: &[AccountId],
     remaining_balances: &mut BalanceMap,
 ) -> Subnet {
-    let ss = gen_subnets(g, 1, 2, 2, account_ids, &[], remaining_balances);
+    let ss = gen_subnets(
+        g,
+        1,
+        2,
+        2,
+        account_ids,
+        account_ids,
+        &[],
+        remaining_balances,
+    );
     debug_assert_eq!(ss.len(), 1, "should have exactly 1 subnet");
     let mut s = ss.into_iter().next().unwrap().1;
     s.relayers.clear();

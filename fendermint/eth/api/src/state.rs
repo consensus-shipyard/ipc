@@ -134,6 +134,12 @@ impl<C> JsonRpcState<C>
 where
     C: Client + Sync + Send,
 {
+    /// Get the height of the latest commit.
+    pub async fn latest_height(&self) -> JsonRpcResult<tendermint::block::Height> {
+        let res: commit::Response = self.tm().latest_commit().await?;
+        Ok(res.signed_header.header.height)
+    }
+
     /// Get the Tendermint block at a specific height.
     pub async fn block_by_height(
         &self,
