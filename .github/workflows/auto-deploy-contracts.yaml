@@ -28,7 +28,7 @@ jobs:
           ref: cd/contracts
           submodules: recursive
 
-      - name: (Dry run) Try merge from main branch and update cd/contracts branch
+      - name: (Dry run) Try merge from main branch to see if there's any conflicts that can't be resolved itself
         run: |
           git config --global user.name 'Contract Auto Deployer'
           git config --global user.email 'dummy@dummy.dummy'
