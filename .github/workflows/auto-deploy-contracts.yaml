@@ -32,7 +32,7 @@ jobs:
         run: |
           git config --global user.name 'Contract Auto Deployer'
           git config --global user.email 'dummy@dummy.dummy'
-          git config pull.rebase false
+          git config pull.rebase true
           git pull origin main --no-edit --allow-unrelated-histories
 
       - name: Checkout the branch that triggered this run
