@@ -27,10 +27,11 @@ jobs:
         with:
           ref: cd/contracts
           submodules: recursive
+          fetch-depth: 0
 
       - name: (Dry run) Try merge from main branch to see if there's any conflicts that can't be resolved itself
         run: |
-          git log --graph --abbrev-commit --decorate --date=relative --format=format:'%C(bold blue)%h%C(reset) - %C(bold green)(%ar)%C(reset) %C(white)%s%C(reset) %C(dim white)- %an%C(reset)%C(bold yellow)%d%C(reset)' --all
+          git show HEAD
           git config --global user.name 'Contract Auto Deployer'
           git config --global user.email 'dummy@dummy.dummy'
           git config pull.rebase false
