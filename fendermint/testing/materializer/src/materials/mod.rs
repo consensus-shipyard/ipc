@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::path::Path;
+use std::{os::unix::fs::PermissionsExt, path::Path};
 
 mod defaults;
 
@@ -52,21 +52,10 @@ pub fn export(
     let dir_path = output_dir.as_ref();
     let file_path = dir_path.join(file_name);
 
-    if !dir_path.exists() {
-        std::fs::create_dir_all(dir_path).with_context(|| {
-            format!("failed to create directory {}", dir_path.to_string_lossy())
-        })?;
-    }
-
-    std::fs::write(&file_path, contents.as_ref())
-        .with_context(|| format!("failed to write to {}", file_path.to_string_lossy()))?;
-
-    Ok(())
+    export_file(file_path, contents)
 }
-
-pub fn export_json(file_path: impl AsRef<Path>, value: impl Serialize) -> anyhow::Result<()> {
-    let json = serde_json::to_string_pretty(&value).context("failed to serialize to JSON")?;
-
+/// Export text to a file.
+pub fn export_file(file_path: impl AsRef<Path>, contents: impl AsRef<str>) -> anyhow::Result<()> {
     if let Some(dir_path) = file_path.as_ref().parent() {
         if !dir_path.exists() {
             std::fs::create_dir_all(dir_path).with_context(|| {
@@ -75,7 +64,7 @@ pub fn export_json(file_path: impl AsRef<Path>, value: impl Serialize) -> anyhow
         }
     }
 
-    std::fs::write(&file_path, &json).with_context(|| {
+    std::fs::write(&file_path, contents.as_ref()).with_context(|| {
         format!(
             "failed to write to {}",
             file_path.as_ref().to_string_lossy()
@@ -83,6 +72,23 @@ pub fn export_json(file_path: impl AsRef<Path>, value: impl Serialize) -> anyhow
     })?;
 
     Ok(())
+}
+
+/// Export executable shell script.
+pub fn export_script(file_path: impl AsRef<Path>, contents: impl AsRef<str>) -> anyhow::Result<()> {
+    export_file(&file_path, contents)?;
+
+    std::fs::set_permissions(&file_path, std::fs::Permissions::from_mode(0o774))
+        .context("failed to set file permissions")?;
+
+    Ok(())
+}
+
+/// Export an object as JSON.
+pub fn export_json(file_path: impl AsRef<Path>, value: impl Serialize) -> anyhow::Result<()> {
+    let json = serde_json::to_string_pretty(&value).context("failed to serialize to JSON")?;
+
+    export_file(file_path, json)
 }
 
 /// Read a JSON file, if it exists.

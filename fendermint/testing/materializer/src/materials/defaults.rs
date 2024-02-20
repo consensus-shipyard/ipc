@@ -1,7 +1,10 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::{fmt::Debug, path::Path};
+use std::{
+    fmt::Debug,
+    path::{Path, PathBuf},
+};
 
 use anyhow::Context;
 use ethers::core::rand::Rng;
@@ -35,6 +38,8 @@ pub struct DefaultGenesis {
     pub name: SubnetName,
     /// In-memory representation of the `genesis.json` file.
     pub genesis: Genesis,
+    /// Path to the `genesis.json` file.
+    pub path: PathBuf,
 }
 
 pub struct DefaultSubnet {
@@ -48,6 +53,8 @@ pub struct DefaultAccount {
     pub name: AccountName,
     pub secret_key: SecretKey,
     pub public_key: PublicKey,
+    /// Path to the directory where the keys are exported.
+    pub path: PathBuf,
 }
 
 impl PartialOrd for DefaultAccount {
@@ -105,21 +112,26 @@ impl DefaultAccount {
             name: name.clone(),
             secret_key: sk,
             public_key: pk,
+            path: dir,
         };
 
         if is_new {
             let sk = acc.secret_key.serialize();
             let pk = acc.public_key.serialize();
 
-            export(&dir, "secret", "b64", to_b64(sk.as_ref()))?;
-            export(&dir, "secret", "hex", hex::encode(sk))?;
-            export(&dir, "public", "b64", to_b64(pk.as_ref()))?;
-            export(&dir, "public", "hex", hex::encode(pk))?;
-            export(&dir, "eth-addr", "", acc.eth_addr().to_string())?;
-            export(&dir, "fvm-addr", "", acc.fvm_addr().to_string())?;
+            export(&acc.path, "secret", "b64", to_b64(sk.as_ref()))?;
+            export(&acc.path, "secret", "hex", hex::encode(sk))?;
+            export(&acc.path, "public", "b64", to_b64(pk.as_ref()))?;
+            export(&acc.path, "public", "hex", hex::encode(pk))?;
+            export(&acc.path, "eth-addr", "", acc.eth_addr().to_string())?;
+            export(&acc.path, "fvm-addr", "", acc.fvm_addr().to_string())?;
         }
 
         Ok(acc)
+    }
+
+    pub fn secret_key_path(&self) -> PathBuf {
+        self.path.join("secret.b64")
     }
 }
 

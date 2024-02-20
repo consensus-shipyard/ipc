@@ -27,8 +27,8 @@ use crate::{
     manifest::Balance,
     materializer::{Materializer, NodeConfig, SubmitConfig, SubnetConfig},
     materials::{
-        export_json, import_json, DefaultAccount, DefaultDeployment, DefaultGenesis, DefaultSubnet,
-        Materials,
+        export_json, export_script, import_json, DefaultAccount, DefaultDeployment, DefaultGenesis,
+        DefaultSubnet, Materials,
     },
     NodeName, RelayerName, ResourceHash, ResourceName, SubnetName, TestnetName,
 };
@@ -43,6 +43,8 @@ pub use node::DockerNode;
 pub use relayer::DockerRelayer;
 
 const STATE_JSON_FILE_NAME: &str = "materializer-state.json";
+const DOCKER_ENTRY: &str = include_str!("../../scripts/docker-entry.sh");
+const FENDERMINT_INIT: &str = include_str!("../../scripts/fendermint-init.sh");
 const PORT_RANGE_START: u32 = 30000;
 const PORT_RANGE_SIZE: u32 = 100;
 
@@ -143,7 +145,8 @@ impl DockerMaterializer {
             state,
         };
 
-        m.save_state()?;
+        m.save_state().context("failed to save state")?;
+        m.export_scripts().context("failed to export scripts")?;
 
         Ok(m)
     }
@@ -161,6 +164,19 @@ impl DockerMaterializer {
     /// Path where the state of the materializer is saved.
     fn state_path(&self) -> PathBuf {
         self.dir.join(STATE_JSON_FILE_NAME)
+    }
+
+    /// Directory where scripts are exported, to be mounted into containers.
+    fn scripts_dir(&self) -> PathBuf {
+        self.dir.join("scripts")
+    }
+
+    /// Export scripts that need to be mounted.
+    fn export_scripts(&self) -> anyhow::Result<()> {
+        let scripts_dir = self.scripts_dir();
+        export_script(scripts_dir.join("docker-entry.sh"), DOCKER_ENTRY)?;
+        export_script(scripts_dir.join("fendermint-init.sh"), FENDERMINT_INIT)?;
+        Ok(())
     }
 
     /// Update the state, save it to JSON, then return whatever value the update returns.
@@ -203,6 +219,7 @@ impl DockerMaterializer {
         Ok(DefaultGenesis {
             name: subnet_name.clone(),
             genesis,
+            path: genesis_path,
         })
     }
 

@@ -1,11 +1,11 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::{collections::BTreeMap, os::unix::fs::MetadataExt, path::Path};
+use std::{os::unix::fs::MetadataExt, path::Path};
 
 use anyhow::Context;
 use bollard::{
-    container::{Config, CreateContainerOptions, RemoveContainerOptions},
+    container::{Config, RemoveContainerOptions},
     service::HostConfig,
     Docker,
 };
@@ -13,7 +13,8 @@ use bollard::{
 use super::{container::DockerContainer, DockerMaterials, DockerPortRange, DockerWithDropHandle};
 use crate::{materializer::NodeConfig, NodeName};
 
-const DOCKER_ENTRY: &str = include_str!("../../scripts/docker-entry.sh");
+const COMETBFT_IMAGE: &str = "cometbft/cometbft:v0.37.x";
+const FENDERMINT_IMAGE: &str = "fendermint:latest";
 
 /// A Node consists of multiple docker containers.
 pub struct DockerNode {
@@ -47,27 +48,85 @@ impl DockerNode {
         // Get the current user ID to use with docker containers.
         let user = node_dir.metadata()?.uid();
 
+        // Use the subnet genesis file.
+
+        // Create a directory for keys
+        let keys_dir = node_dir.join("keys");
+        if !keys_dir.exists() {
+            std::fs::create_dir(&keys_dir)?;
+
+            // Make the validator key available for the init script.
+            if let Some(v) = node_config.validator {
+                let validator_key_path = v.secret_key_path();
+                std::fs::copy(validator_key_path, keys_dir.join("validator_key.sk"))
+                    .context("failed to copy validator key")?;
+            }
+        }
+
         // Create a directory for cometbft
         let cometbft_dir = node_dir.join("cometbft");
         if !cometbft_dir.exists() {
             std::fs::create_dir(&cometbft_dir)?;
+
             // Init cometbft to establish the network key.
-            todo!()
+            let config = Config {
+                image: Some(COMETBFT_IMAGE.to_string()),
+                user: Some(user.to_string()),
+                host_config: Some(HostConfig {
+                    // Volumes
+                    binds: Some(vec![format!(
+                        "{}:/cometbft",
+                        cometbft_dir.to_string_lossy()
+                    )]),
+                    ..Default::default()
+                }),
+                cmd: Some(vec!["init".to_string()]),
+                ..Default::default()
+            };
+
+            docker_run(&dh.docker, config)
+                .await
+                .context("cannot init cometbft")?;
+
+            // Convert fendermint genesis to cometbft.
+            // Convert validator private key to cometbft.
+            // Create a network key for the resolver.
+            let config = Config {
+                image: Some(FENDERMINT_IMAGE.to_string()),
+                user: Some(user.to_string()),
+                host_config: Some(HostConfig {
+                    // Volumes for fendermint-init.sh
+                    binds: Some(vec![
+                        format!(
+                            "{}:/scripts/fendermint-init.sh",
+                            root.as_ref()
+                                .join("scripts")
+                                .join("fendermint-init.sh")
+                                .to_string_lossy()
+                        ),
+                        format!("{}:/data/keys", keys_dir.to_string_lossy()),
+                        format!("{}:/data/cometbft", cometbft_dir.to_string_lossy()),
+                        format!(
+                            "{}:/data/genesis.json",
+                            node_config.genesis.path.to_string_lossy()
+                        ),
+                    ]),
+                    ..Default::default()
+                }),
+                entrypoint: Some(vec!["/scripts/fendermint-init.sh".to_string()]),
+                ..Default::default()
+            };
+
+            docker_run(&dh.docker, config)
+                .await
+                .context("cannot init fendermint")?;
         }
 
         // Create a directory for fendermint
         let fendermint_dir = node_dir.join("fendermint");
         if !fendermint_dir.exists() {
             std::fs::create_dir(&fendermint_dir)?;
-            // Export fendermint genesis file.
-            // Convert fendermint genesis to cometbft.
-            // Convert validator private key to cometbft.
-            // Create a network key for the resolver.
-            todo!()
         }
-
-        // Export the docker entry point to an executable script.
-        todo!();
 
         // If there is no static env var file, create one with all the common variables.
         todo!();
@@ -137,7 +196,14 @@ fn container_name(node_name: &NodeName, container: &str) -> String {
 }
 
 /// Run a short lived container.
-async fn docker_run(docker: &Docker, create_config: Config<&str>) -> anyhow::Result<()> {
+async fn docker_run(docker: &Docker, mut create_config: Config<String>) -> anyhow::Result<()> {
+    create_config.attach_stderr = Some(true);
+    create_config.attach_stdout = Some(true);
+    if let Some(ref mut host_config) = create_config.host_config {
+        host_config.auto_remove = Some(true);
+        host_config.init = Some(true);
+    }
+
     let id = docker
         .create_container::<&str, _>(None, create_config)
         .await
