@@ -5,8 +5,9 @@ use std::{collections::BTreeMap, os::unix::fs::MetadataExt, path::Path};
 
 use anyhow::Context;
 use bollard::{
-    container::{Config, CreateContainerOptions},
+    container::{Config, CreateContainerOptions, RemoveContainerOptions},
     service::HostConfig,
+    Docker,
 };
 
 use super::{container::DockerContainer, DockerMaterials, DockerPortRange, DockerWithDropHandle};
@@ -133,4 +134,32 @@ fn container_name(node_name: &NodeName, container: &str) -> String {
         .to_string();
 
     name.replace("/", "__")
+}
+
+/// Run a short lived container.
+async fn docker_run(docker: &Docker, create_config: Config<&str>) -> anyhow::Result<()> {
+    let id = docker
+        .create_container::<&str, _>(None, create_config)
+        .await
+        .context("failed to create container")?
+        .id;
+
+    docker
+        .start_container::<&str>(&id, None)
+        .await
+        .context("failed to start container")?;
+
+    // TODO: Output?
+
+    docker
+        .remove_container(
+            &id,
+            Some(RemoveContainerOptions {
+                force: true,
+                ..Default::default()
+            }),
+        )
+        .await?;
+
+    Ok(())
 }
