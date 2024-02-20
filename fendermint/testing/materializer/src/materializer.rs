@@ -210,7 +210,7 @@ pub struct NodeConfig<'a, M: Materials> {
     /// The node for the top-down syncer to follow; none if this is a root node.
     ///
     /// This can potentially also be used to configure the IPLD Resolver seeds, to connect across subnets.
-    pub parent_node: Option<TargetConfig<'a, M>>,
+    pub parent_node: Option<ParentConfig<'a, M>>,
     /// Run the Ethereum API facade or not.
     pub ethapi: bool,
 }
@@ -230,6 +230,14 @@ pub struct SubmitConfig<'a, M: Materials> {
     /// The nodes to which we can send transactions or queries.
     pub nodes: Vec<TargetConfig<'a, M>>,
     /// The location of the IPC contracts on the (generally parent) subnet.
+    pub deployment: &'a M::Deployment,
+}
+
+/// Options for how to follow the parent consensus and sync IPC changes.
+pub struct ParentConfig<'a, M: Materials> {
+    /// The trusted parent node to follow.
+    pub node: TargetConfig<'a, M>,
+    /// The location of the IPC contracts on the parent subnet.
     pub deployment: &'a M::Deployment,
 }
 

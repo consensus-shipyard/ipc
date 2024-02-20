@@ -23,7 +23,6 @@ fendermint \
   genesis --genesis-file $GENESIS_FILE \
   into-tendermint --out $CMT_DIR/config/genesis.json
 
-
 # Create a network key for the fendermint IPLD resolver
 fendermint \
   key gen --out-dir $KEYS_DIR --name $NETWORK_KEY_NAME
