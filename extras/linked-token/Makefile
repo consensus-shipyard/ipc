@@ -60,10 +60,10 @@ initialize-controller:
 	@echo "Updating controller with replica's address..."
 	@CONTROLLER_ADDR=$$(cat config/config.json | jq -r '.LinkedToken.LinkedTokenController'); \
 	REPLICA_ADDR=$$(cat config/config.json | jq -r '.LinkedToken.LinkedTokenReplica'); \
-	cast send $$CONTROLLER_ADDR "initialize(address)" $$REPLICA_ADDR --rpc-url $$SUBNET_RPC_URL --private-key $$PRIVATE_KEY
+	cast send $$CONTROLLER_ADDR "initialize(address)" $$REPLICA_ADDR --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY
 
 approve-usdc:
-	@echo "Depositing USDC to Controller Contract..."
+	@echo "Approving USDC for Controller Contract..."
 	@CONTROLLER_ADDR=$$(cat config/config.json | jq -r '.LinkedToken.LinkedTokenController'); \
 	USDCTEST_ADDR=$$(cat config/config.json | jq -r '.LinkedToken.USDCTest'); \
 	cast send $$USDCTEST_ADDR "approve(address,uint256)" --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY -- $$CONTROLLER_ADDR $$AMOUNT
