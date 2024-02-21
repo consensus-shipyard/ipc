@@ -17,11 +17,14 @@ use ethers::types::H160;
 use super::{container::DockerContainer, DockerMaterials, DockerPortRange, DockerWithDropHandle};
 use crate::{
     materializer::{NodeConfig, TargetConfig},
+    materials::export_file,
     NodeName, ResourceHash,
 };
 
 const COMETBFT_IMAGE: &str = "cometbft/cometbft:v0.37.x";
 const FENDERMINT_IMAGE: &str = "fendermint:latest";
+const STATIC_ENV: &str = "static.env";
+const DYANMIC_ENV: &str = "dynamic.env";
 const RESOLVER_PORT: u32 = 26655;
 
 type EnvVars = Vec<(&'static str, String)>;
@@ -141,7 +144,7 @@ impl DockerNode {
         }
 
         // If there is no static env var file, create one with all the common variables.
-        let static_env = node_dir.join("static.env");
+        let static_env = node_dir.join(STATIC_ENV);
         if !static_env.exists() {
             let genesis = &node_config.genesis.genesis;
             let ipc = genesis
@@ -215,16 +218,19 @@ impl DockerNode {
                 "CMT_RPC_MAX_SUBSCRIPTIONS_PER_CLIENT" => 1000,
             ];
 
-            let env = vec![basic, topdown, cmt].concat();
-
             // Export the env to a file.
-            todo!()
+            export_env(&static_env, vec![basic, topdown, cmt].concat())
+                .context("failed to export env")?;
         }
 
-        // If there is no dynamic env var file, create an empty one.
-        // --env FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES=${RESOLVER_BOOTSTRAPS} \
-        // --env CMT_P2P_SEEDS
-        todo!();
+        // If there is no dynamic env var file, create an empty one so it can be mounted.
+        let dynamic_env = node_dir.join(DYANMIC_ENV);
+        if !dynamic_env.exists() {
+            // The values will be assigned when the node is started.
+            // --env FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES=${RESOLVER_BOOTSTRAPS}
+            // --env CMT_P2P_SEEDS
+            export_env(&dynamic_env, vec![])?;
+        }
 
         if fendermint.is_none() {
             // Create a fendermint container mounting:
@@ -356,4 +362,12 @@ impl<'a> DockerRunner<'a> {
 
         Ok(())
     }
+}
+
+fn export_env(file_path: impl AsRef<Path>, env: EnvVars) -> anyhow::Result<()> {
+    let env = env
+        .into_iter()
+        .map(|(k, v)| format!("{k}={v}"))
+        .collect::<Vec<_>>();
+    export_file(file_path, env.join("\n"))
 }
