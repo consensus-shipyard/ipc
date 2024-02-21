@@ -190,8 +190,7 @@ abstract contract LinkedToken is IpcExchange {
     function _receiveLinked(address recipient, uint256 amount) private {
         _validateTransfer(recipient, amount);
 
-        // Transfer the specified amount of tokens to the recipient
-        _underlying.safeTransfer(recipient, amount);
+        _releaseTokens(recipient, amount);
 
         // Emit an event for the token unlock and transfer
         emit LinkedTokenReceived(recipient, amount);
