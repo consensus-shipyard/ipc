@@ -1,214 +1,61 @@
-[accounts.76hEB3]
+[accounts.7tQxM]
 
-[accounts.UhcTkp]
+[accounts._BveKc_O]
 
-[accounts.bxJNf8pA]
+[accounts.maOV_H]
 
-[accounts.tBVm]
+[accounts.ogrE]
 
 [rootnet]
+type = "External"
+urls = ["https://td_bn6ha.api.calibration.node.glif.io/rpc/v1"]
+
+[rootnet.deployment]
 type = "New"
+deployer = "maOV_H"
 
-[rootnet.validators]
-tBVm = "127444647959580162"
+[subnets.Dj72]
+creator = "ogrE"
 
-[rootnet.balances]
-76hEB3 = "100000000000000000000"
-UhcTkp = "100000000000000000000"
-bxJNf8pA = "100000000000000000000"
-tBVm = "100000000000000000000"
+[subnets.Dj72.validators]
+7tQxM = "6191444572336960256"
+_BveKc_O = "1"
+ogrE = "7588374658330027519"
 
-[rootnet.nodes.pBiEDY]
+[subnets.Dj72.balances]
+7tQxM = "5221160371199856067"
+ogrE = "8976986692201503093"
+
+[subnets.Dj72.nodes.3eGbMB]
 ethapi = true
-seed_nodes = []
+seed_nodes = ["StU"]
+parent_node = "https://td_bn6ha.api.calibration.node.glif.io/rpc/v1"
 
-[rootnet.nodes.pBiEDY.mode]
+[subnets.Dj72.nodes.3eGbMB.mode]
 type = "Validator"
-validator = "tBVm"
+validator = "ogrE"
 
-[subnets.2T_]
-creator = "bxJNf8pA"
-
-[subnets.2T_.validators]
-76hEB3 = "7354531027421743211"
-UhcTkp = "6802062520748498447"
-tBVm = "6673760720012822995"
-
-[subnets.2T_.balances]
-76hEB3 = "5890643492178552655"
-
-[subnets.2T_.nodes.68UwJR5]
+[subnets.Dj72.nodes.StU]
 ethapi = false
-seed_nodes = ["ARK"]
-parent_node = "pBiEDY"
+seed_nodes = ["eOpV_M7"]
+parent_node = "https://td_bn6ha.api.calibration.node.glif.io/rpc/v1"
 
-[subnets.2T_.nodes.68UwJR5.mode]
+[subnets.Dj72.nodes.StU.mode]
 type = "Validator"
-validator = "UhcTkp"
+validator = "_BveKc_O"
 
-[subnets.2T_.nodes.6oBzmlmG]
-ethapi = true
-seed_nodes = ["ARK"]
-parent_node = "pBiEDY"
-
-[subnets.2T_.nodes.6oBzmlmG.mode]
-type = "Full"
-
-[subnets.2T_.nodes.ARK]
+[subnets.Dj72.nodes.eOpV_M7]
 ethapi = false
 seed_nodes = []
-parent_node = "pBiEDY"
+parent_node = "https://td_bn6ha.api.calibration.node.glif.io/rpc/v1"
 
-[subnets.2T_.nodes.ARK.mode]
+[subnets.Dj72.nodes.eOpV_M7.mode]
 type = "Validator"
-validator = "76hEB3"
+validator = "7tQxM"
 
-[subnets.2T_.relayers.7Vh]
-submitter = "76hEB3"
-follow_node = "ARK"
-submit_node = "pBiEDY"
+[subnets.Dj72.relayers.p0_Z]
+submitter = "_BveKc_O"
+follow_node = "eOpV_M7"
+submit_node = "https://td_bn6ha.api.calibration.node.glif.io/rpc/v1"
 
-[subnets.2T_.relayers.b23VBVdY]
-submitter = "bxJNf8pA"
-follow_node = "6oBzmlmG"
-submit_node = "pBiEDY"
-
-[subnets.2T_.subnets]
-
-[subnets.g5622]
-creator = "UhcTkp"
-
-[subnets.g5622.validators]
-76hEB3 = "6982047635411859550"
-bxJNf8pA = "4370247248808734149"
-tBVm = "8764589166643781876"
-
-[subnets.g5622.balances]
-
-[subnets.g5622.nodes.GQ1Y]
-ethapi = false
-seed_nodes = ["_AUQA"]
-parent_node = "pBiEDY"
-
-[subnets.g5622.nodes.GQ1Y.mode]
-type = "Validator"
-validator = "tBVm"
-
-[subnets.g5622.nodes.INFjd]
-ethapi = false
-seed_nodes = []
-parent_node = "pBiEDY"
-
-[subnets.g5622.nodes.INFjd.mode]
-type = "Validator"
-validator = "76hEB3"
-
-[subnets.g5622.nodes._AUQA]
-ethapi = true
-seed_nodes = ["INFjd"]
-parent_node = "pBiEDY"
-
-[subnets.g5622.nodes._AUQA.mode]
-type = "Validator"
-validator = "bxJNf8pA"
-
-[subnets.g5622.relayers.F7CX__]
-submitter = "76hEB3"
-follow_node = "GQ1Y"
-submit_node = "pBiEDY"
-
-[subnets.g5622.subnets.m29V]
-creator = "tBVm"
-
-[subnets.g5622.subnets.m29V.validators]
-UhcTkp = "2144481152200301908"
-tBVm = "1"
-
-[subnets.g5622.subnets.m29V.balances]
-76hEB3 = "3222683124664893388"
-UhcTkp = "385073529741899579"
-
-[subnets.g5622.subnets.m29V.nodes.4B1B]
-ethapi = false
-seed_nodes = []
-parent_node = "_AUQA"
-
-[subnets.g5622.subnets.m29V.nodes.4B1B.mode]
-type = "Validator"
-validator = "UhcTkp"
-
-[subnets.g5622.subnets.m29V.nodes.h1bYXA]
-ethapi = true
-seed_nodes = ["4B1B"]
-parent_node = "INFjd"
-
-[subnets.g5622.subnets.m29V.nodes.h1bYXA.mode]
-type = "Validator"
-validator = "tBVm"
-
-[subnets.g5622.subnets.m29V.relayers.LGso]
-submitter = "76hEB3"
-follow_node = "4B1B"
-submit_node = "GQ1Y"
-
-[subnets.g5622.subnets.m29V.relayers.yRo]
-submitter = "UhcTkp"
-follow_node = "4B1B"
-submit_node = "GQ1Y"
-
-[subnets.g5622.subnets.m29V.subnets]
-
-[subnets.g5622.subnets.tdJ_gR]
-creator = "tBVm"
-
-[subnets.g5622.subnets.tdJ_gR.validators]
-76hEB3 = "1"
-bxJNf8pA = "4109379184506113130"
-tBVm = "5199030646289053047"
-
-[subnets.g5622.subnets.tdJ_gR.balances]
-bxJNf8pA = "2412305611157281668"
-
-[subnets.g5622.subnets.tdJ_gR.nodes.Bd5]
-ethapi = true
-seed_nodes = ["WA4-C"]
-parent_node = "_AUQA"
-
-[subnets.g5622.subnets.tdJ_gR.nodes.Bd5.mode]
-type = "Validator"
-validator = "bxJNf8pA"
-
-[subnets.g5622.subnets.tdJ_gR.nodes.KP8ne_pY]
-ethapi = false
-seed_nodes = ["Bd5"]
-parent_node = "GQ1Y"
-
-[subnets.g5622.subnets.tdJ_gR.nodes.KP8ne_pY.mode]
-type = "Validator"
-validator = "tBVm"
-
-[subnets.g5622.subnets.tdJ_gR.nodes.WA4-C]
-ethapi = false
-seed_nodes = []
-parent_node = "_AUQA"
-
-[subnets.g5622.subnets.tdJ_gR.nodes.WA4-C.mode]
-type = "Validator"
-validator = "76hEB3"
-
-[subnets.g5622.subnets.tdJ_gR.relayers.VI889-]
-submitter = "76hEB3"
-follow_node = "Bd5"
-submit_node = "_AUQA"
-
-[subnets.g5622.subnets.tdJ_gR.relayers.kABB2_T]
-submitter = "bxJNf8pA"
-follow_node = "WA4-C"
-submit_node = "INFjd"
-
-[subnets.g5622.subnets.tdJ_gR.relayers.wDLFE4]
-submitter = "UhcTkp"
-follow_node = "WA4-C"
-submit_node = "GQ1Y"
-
-[subnets.g5622.subnets.tdJ_gR.subnets]
+[subnets.Dj72.subnets]
