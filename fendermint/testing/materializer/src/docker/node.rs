@@ -28,6 +28,7 @@ use crate::{
 
 const COMETBFT_IMAGE: &str = "cometbft/cometbft:v0.37.x";
 const FENDERMINT_IMAGE: &str = "fendermint:latest";
+
 const STATIC_ENV: &str = "static.env";
 const DYNAMIC_ENV: &str = "dynamic.env";
 
@@ -38,9 +39,9 @@ const FENDERMINT_ABCI_PORT: u32 = 26658;
 const ETHAPI_RPC_PORT: u32 = 8445;
 
 lazy_static! {
-    static ref STATIC_ENV_PATH: String = format!("/fendermint/config/{STATIC_ENV}");
-    static ref DYNAMIC_ENV_PATH: String = format!("/fendermint/config/{DYNAMIC_ENV}");
-    static ref DOCKER_ENTRY_PATH: String = format!("/fendermint/{DOCKER_ENTRY_FILE_NAME}");
+    static ref STATIC_ENV_PATH: String = format!("/opt/docker/{STATIC_ENV}");
+    static ref DYNAMIC_ENV_PATH: String = format!("/opt/docker/{DYNAMIC_ENV}");
+    static ref DOCKER_ENTRY_PATH: String = format!("/opt/docker/{DOCKER_ENTRY_FILE_NAME}");
 }
 
 type EnvVars = Vec<(&'static str, String)>;
@@ -60,6 +61,7 @@ pub struct DockerNode {
     cometbft: DockerContainer,
     ethapi: Option<DockerContainer>,
     port_range: DockerPortRange,
+    path: PathBuf,
 }
 
 impl DockerNode {
@@ -181,6 +183,7 @@ impl DockerNode {
             let basic: EnvVars = env_vars![
                 "LOG_LEVEL"        => "info",
                 "RUST_BACKTRACE"   => 1,
+                "FM_NETWORK "      => "testnet",
                 "FM_DATA_DIR"      => "/fendermint/data",
                 "FM_LOG_DIR"       => "/fendermint/logs",
                 "FM_SNAPSHOTS_DIR" => "/fendermint/snapshots",
@@ -258,66 +261,109 @@ impl DockerNode {
             export_env(&dynamic_env, vec![])?;
         }
 
+        // All containers will be started with the docker entry and all env files.
+        let volumes = |vs: Volumes| {
+            let common: Volumes = vec![
+                (static_env.clone(), STATIC_ENV_PATH.as_str()),
+                (dynamic_env.clone(), DYNAMIC_ENV_PATH.as_str()),
+                (
+                    root.as_ref().join("scripts").join(DOCKER_ENTRY_FILE_NAME),
+                    DOCKER_ENTRY_PATH.as_str(),
+                ),
+            ];
+            vec![common, vs].concat()
+        };
+
+        let entrypoint = |ep: &str| {
+            format!(
+                "{} '{ep}' {} {}",
+                *DOCKER_ENTRY_PATH, *STATIC_ENV_PATH, *DYNAMIC_ENV_PATH
+            )
+        };
+
+        // Create a fendermint container mounting:
         let fendermint = match fendermint {
             Some(c) => c,
             None => {
-                // Create a fendermint container mounting:
-                // - the fendermint directory
-                // - the docker-entry
-                // - the env var files
-                let fendermint_creator = DockerRunner::new(
+                let creator = DockerRunner::new(
                     &dh,
                     FENDERMINT_IMAGE,
                     user,
-                    vec![
+                    volumes(vec![
                         (keys_dir.clone(), "/fendermint/keys"),
                         (fendermint_dir.join("data"), "/fendermint/data"),
                         (fendermint_dir.join("logs"), "/fendermint/logs"),
                         (fendermint_dir.join("snapshots"), "/fendermint/snapshots"),
-                        (static_env.clone(), &STATIC_ENV_PATH),
-                        (dynamic_env.clone(), &DYNAMIC_ENV_PATH),
-                        (
-                            root.as_ref().join("scripts").join(DOCKER_ENTRY_FILE_NAME),
-                            &DOCKER_ENTRY_PATH,
-                        ),
-                    ],
+                    ]),
                 );
 
-                fendermint_creator
+                creator
                     .create(
                         fendermint_name,
                         node_config.network,
-                        vec![
-                            (port_range.resolver_p2p_host_port(), RESOLVER_P2P_PORT),
-                            (port_range.cometbft_p2p_host_port(), COMETBFT_P2P_PORT),
-                            (port_range.cometbft_rpc_host_port(), COMETBFT_RPC_PORT),
-                            (port_range.ethapi_rpc_host_port(), ETHAPI_RPC_PORT),
-                        ],
-                        format!(
-                            "{} {} {}",
-                            *DOCKER_ENTRY_PATH, *STATIC_ENV_PATH, *DYNAMIC_ENV_PATH
-                        ),
+                        vec![(port_range.resolver_p2p_host_port(), RESOLVER_P2P_PORT)],
+                        entrypoint("fendermint run"),
                     )
                     .await
                     .context("failed to create fendermint")?
             }
         };
 
-        if cometbft.is_none() {
-            // Create a CometBFT container mounting:
-            // - the cometbft directory
-            // - the docker-entry
-            // - the env var files
-        }
+        // Create a CometBFT container
+        let cometbft = match cometbft {
+            Some(c) => c,
+            None => {
+                let creator = DockerRunner::new(
+                    &dh,
+                    COMETBFT_IMAGE,
+                    user,
+                    volumes(vec![(cometbft_dir.clone(), "/cometbft")]),
+                );
 
-        if node_config.ethapi && ethapi.is_none() {
-            // Create a ethapi container mounting:
-            // - the docker-entry
-            // - the env var files
-        }
+                creator
+                    .create(
+                        cometbft_name,
+                        node_config.network,
+                        vec![
+                            (port_range.cometbft_p2p_host_port(), COMETBFT_P2P_PORT),
+                            (port_range.cometbft_rpc_host_port(), COMETBFT_RPC_PORT),
+                        ],
+                        entrypoint("cometbft start"),
+                    )
+                    .await
+                    .context("failed to create fendermint")?
+            }
+        };
+
+        // Create a ethapi container
+        let ethapi = match ethapi {
+            None if node_config.ethapi => {
+                let creator = DockerRunner::new(&dh, FENDERMINT_IMAGE, user, volumes(vec![]));
+
+                let c = creator
+                    .create(
+                        ethapi_name,
+                        node_config.network,
+                        vec![(port_range.ethapi_rpc_host_port(), ETHAPI_RPC_PORT)],
+                        entrypoint("fendermint eth run"),
+                    )
+                    .await
+                    .context("failed to create ethapi")?;
+
+                Some(c)
+            }
+            other => other,
+        };
 
         // Construct the DockerNode
-        todo!()
+        Ok(DockerNode {
+            node_name: node_name.clone(),
+            fendermint,
+            cometbft,
+            ethapi,
+            port_range,
+            path: node_dir,
+        })
     }
 }
 
