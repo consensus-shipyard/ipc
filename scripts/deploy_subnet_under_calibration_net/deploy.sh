@@ -117,6 +117,7 @@ if ! $local_deploy ; then
   git stash
   git checkout $head_ref
   git pull --rebase origin $head_ref
+  git submodule sync
   git submodule update --init --recursive
 fi
 
