@@ -109,7 +109,7 @@ contract IpcTokenHandler is InterchainTokenExecutable, IpcHandler {
     }
 
     // @notice Queries the claim of a beneficiary over a particular token.
-    function claimFor(address beneficiary, address token) external view returns (uint256) {
+    function getClaimFor(address beneficiary, address token) external view returns (uint256) {
         return _claims[beneficiary][token];
     }
 }

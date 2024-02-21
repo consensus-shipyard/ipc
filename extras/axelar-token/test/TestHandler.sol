@@ -38,6 +38,8 @@ contract TestHandler is Test {
         handler.executeWithInterchainToken(bytes32(""), "", "", params, bytes32(""), address(token), 1);
     }
 
-    // TODO test_handler_err_withdrawal
+    // TODO test_handler_err_withdrawal (also test getClaims)
+
+    // TODO test_handler_err_deposit (e.g. sending to a non-ERC20 subnet)
 
 }
