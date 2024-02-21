@@ -2,8 +2,6 @@ name: Auto deploy IPC contracts when changed
 
 on:
   workflow_dispatch:
-  # TODO: Test only. Remove before PR merge
-  pull_request:
   push:
     branches:
       - main
