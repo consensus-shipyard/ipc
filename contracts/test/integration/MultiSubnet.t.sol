@@ -19,8 +19,7 @@ import {SubnetID, Subnet, IPCAddress, Validator} from "../../src/structs/Subnet.
 
 import "forge-std/console.sol";
 
-contract MultiSubnetTest is  MultiSubnetTestBase {
-
+contract MultiSubnetTest is MultiSubnetTestBase {
     //--------------------
     // Fund flow tests.
     //---------------------
@@ -489,5 +488,4 @@ contract MultiSubnetTest is  MultiSubnetTestBase {
 
         assertEq(address(recipient).balance, amount);
     }
-
 }

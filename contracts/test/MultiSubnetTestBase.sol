@@ -30,7 +30,6 @@ import {MerkleTreeHelper} from "./helpers/MerkleTreeHelper.sol";
 import "forge-std/console.sol";
 
 abstract contract MultiSubnetTestBase is IntegrationTestBase {
-
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for IpcEnvelope;
 
@@ -232,6 +231,4 @@ abstract contract MultiSubnetTestBase is IntegrationTestBase {
             console.logBytes(call.params);
         }
     }
-
-
 }
