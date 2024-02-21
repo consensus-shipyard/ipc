@@ -25,6 +25,10 @@ impl DockerNetwork {
         &self.testnet_name
     }
 
+    pub fn network(&self) -> &DockerConstruct {
+        &self.network
+    }
+
     /// Check if an externally managed network already exists;
     /// if not, create a new docker network for the testnet.
     pub async fn get_or_create(

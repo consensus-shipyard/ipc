@@ -8,14 +8,19 @@ use std::{
 
 use anyhow::{anyhow, Context};
 use bollard::{
-    container::{Config, RemoveContainerOptions},
-    service::HostConfig,
+    container::{Config, CreateContainerOptions, RemoveContainerOptions},
+    service::{HostConfig, PortBinding},
     Docker,
 };
 use ethers::types::H160;
+use lazy_static::lazy_static;
 
-use super::{container::DockerContainer, DockerMaterials, DockerPortRange, DockerWithDropHandle};
+use super::{
+    container::DockerContainer, DockerConstruct, DockerMaterials, DockerNetwork, DockerPortRange,
+    DockerWithDropHandle,
+};
 use crate::{
+    docker::DOCKER_ENTRY_FILE_NAME,
     materializer::{NodeConfig, TargetConfig},
     materials::export_file,
     NodeName, ResourceHash,
@@ -24,8 +29,19 @@ use crate::{
 const COMETBFT_IMAGE: &str = "cometbft/cometbft:v0.37.x";
 const FENDERMINT_IMAGE: &str = "fendermint:latest";
 const STATIC_ENV: &str = "static.env";
-const DYANMIC_ENV: &str = "dynamic.env";
-const RESOLVER_PORT: u32 = 26655;
+const DYNAMIC_ENV: &str = "dynamic.env";
+
+const RESOLVER_P2P_PORT: u32 = 26655;
+const COMETBFT_P2P_PORT: u32 = 26656;
+const COMETBFT_RPC_PORT: u32 = 26657;
+const FENDERMINT_ABCI_PORT: u32 = 26658;
+const ETHAPI_RPC_PORT: u32 = 8445;
+
+lazy_static! {
+    static ref STATIC_ENV_PATH: String = format!("/fendermint/config/{STATIC_ENV}");
+    static ref DYNAMIC_ENV_PATH: String = format!("/fendermint/config/{DYNAMIC_ENV}");
+    static ref DOCKER_ENTRY_PATH: String = format!("/fendermint/{DOCKER_ENTRY_FILE_NAME}");
+}
 
 type EnvVars = Vec<(&'static str, String)>;
 type Volumes = Vec<(PathBuf, &'static str)>;
@@ -43,6 +59,7 @@ pub struct DockerNode {
     fendermint: DockerContainer,
     cometbft: DockerContainer,
     ethapi: Option<DockerContainer>,
+    port_range: DockerPortRange,
 }
 
 impl DockerNode {
@@ -79,11 +96,29 @@ impl DockerNode {
         if !cometbft_dir.exists() {
             std::fs::create_dir(&cometbft_dir)?;
 
+            // We'll need to run some cometbft and fendermint commands.
+            // NOTE: Currently the Fendermint CLI commands live in the
+            // `app` crate in a way that they can't be imported. We
+            // could move them to the `lib.rs` from `main.rs` and
+            // then we wouldn't need docker for some of these steps.
+            // However, at least this way they are tested.
+
             let cometbft_runner = DockerRunner::new(
-                &dh.docker,
+                &dh,
                 COMETBFT_IMAGE,
                 user,
                 vec![(cometbft_dir.clone(), "/cometbft")],
+            );
+
+            let fendermint_runner = DockerRunner::new(
+                &dh,
+                FENDERMINT_IMAGE,
+                user,
+                vec![
+                    (keys_dir.clone(), "/fendermint/keys"),
+                    (cometbft_dir.clone(), "/cometbft"),
+                    (node_config.genesis.path.clone(), "/fendermint/genesis.json"),
+                ],
             );
 
             // Init cometbft to establish the network key.
@@ -92,22 +127,11 @@ impl DockerNode {
                 .await
                 .context("cannot init cometbft")?;
 
-            let fendermint_runner = DockerRunner::new(
-                &dh.docker,
-                FENDERMINT_IMAGE,
-                user,
-                vec![
-                    (keys_dir.clone(), "/data/keys"),
-                    (cometbft_dir.clone(), "/data/cometbft"),
-                    (node_config.genesis.path.clone(), "/data/genesis.json"),
-                ],
-            );
-
             // Convert fendermint genesis to cometbft.
             fendermint_runner
                 .run_cmd(
-                    "genesis --genesis-file /data/genesis.json \
-                    into-tendermint --out /data/cometbft/config/genesis.json",
+                    "genesis --genesis-file /fendermint/genesis.json \
+                    into-tendermint --out /cometbft/config/genesis.json",
                 )
                 .await
                 .context("failed to convert genesis")?;
@@ -120,8 +144,8 @@ impl DockerNode {
 
                 fendermint_runner
                     .run_cmd(
-                        "key into-tendermint --secret-key /data/keys/validator_key.sk \
-                        --out /data/cometbft/config/priv_validator_key.json",
+                        "key into-tendermint --secret-key /fendermint/keys/validator_key.sk \
+                        --out cometbft/config/priv_validator_key.json",
                     )
                     .await
                     .context("failed to convert validator key")?;
@@ -129,7 +153,7 @@ impl DockerNode {
 
             // Create a network key for the resolver.
             fendermint_runner
-                .run_cmd("key gen --out-dir /data/keys --name network_key")
+                .run_cmd("key gen --out-dir /fendermint/keys --name network_key")
                 .await
                 .context("failed to create network key")?;
         }
@@ -162,11 +186,13 @@ impl DockerNode {
                 "FM_SNAPSHOTS_DIR" => "/fendermint/snapshots",
                 "FM_CHAIN_NAME"    => genesis.chain_name.clone(),
                 "FM_IPC_SUBNET_ID" => ipc.gateway.subnet_id,
-                "FM_RESOLVER__NETWORK__LOCAL_KEY"          => "/data/keys/network_key.sk",
-                "FM_RESOLVER__CONNECTION__LISTEN_ADDR"     => format!("/ip4/0.0.0.0/tcp/${RESOLVER_PORT}"),
-                "FM_TENDERMINT_RPC_URL" => format!("http://${cometbft_name}:26657"),
-                "TENDERMINT_RPC_URL"    => format!("http://${cometbft_name}:26657"),
-                "TENDERMINT_WS_URL"     => format!("ws://${cometbft_name}:26657/websocket"),
+                "FM_RESOLVER__NETWORK__LOCAL_KEY"          => "/fendermint/keys/network_key.sk",
+                "FM_RESOLVER__CONNECTION__LISTEN_ADDR"     => format!("/ip4/0.0.0.0/tcp/${RESOLVER_P2P_PORT}"),
+                "FM_TENDERMINT_RPC_URL" => format!("http://${cometbft_name}:{COMETBFT_RPC_PORT}"),
+                "TENDERMINT_RPC_URL"    => format!("http://${cometbft_name}:{COMETBFT_RPC_PORT}"),
+                "TENDERMINT_WS_URL"     => format!("ws://${cometbft_name}:{COMETBFT_RPC_PORT}/websocket"),
+                "FM_ABCI__LISTEN__PORT" => FENDERMINT_ABCI_PORT,
+                "FM_ETH__LISTEN__PORT"  => ETHAPI_RPC_PORT,
             ];
 
             let topdown: EnvVars = match node_config.parent_node {
@@ -196,7 +222,7 @@ impl DockerNode {
                             })?;
                             env_vars![
                                 "FM_IPC__TOPDOWN__CHAIN_HEAD_DELAY"        => 1,
-                                "FM_IPC__TOPDOWN__PARENT_HTTP_ENDPOINT"    => format!("http://{}:8445", parent_ethapi.container.name),
+                                "FM_IPC__TOPDOWN__PARENT_HTTP_ENDPOINT"    => format!("http://{}:{ETHAPI_RPC_PORT}", parent_ethapi.container.name),
                                 "FM_IPC__TOPDOWN__PARENT_REGISTRY"         => registry,
                                 "FM_IPC__TOPDOWN__PARENT_GATEWAY"          => gateway,
                                 "FM_IPC__TOPDOWN__EXPONENTIAL_BACK_OFF"    => 5,
@@ -212,7 +238,7 @@ impl DockerNode {
             };
 
             let cmt = env_vars![
-                "CMT_PROXY_APP" => format!("tcp://{fendermint_name}:26658"),
+                "CMT_PROXY_APP" => format!("tcp://{fendermint_name}:{FENDERMINT_ABCI_PORT}"),
                 "CMT_P2P_PEX"   => true,
                 "CMT_RPC_MAX_SUBSCRIPTION_CLIENTS"     => 10,
                 "CMT_RPC_MAX_SUBSCRIPTIONS_PER_CLIENT" => 1000,
@@ -224,7 +250,7 @@ impl DockerNode {
         }
 
         // If there is no dynamic env var file, create an empty one so it can be mounted.
-        let dynamic_env = node_dir.join(DYANMIC_ENV);
+        let dynamic_env = node_dir.join(DYNAMIC_ENV);
         if !dynamic_env.exists() {
             // The values will be assigned when the node is started.
             // --env FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES=${RESOLVER_BOOTSTRAPS}
@@ -232,33 +258,50 @@ impl DockerNode {
             export_env(&dynamic_env, vec![])?;
         }
 
-        if fendermint.is_none() {
-            // Create a fendermint container mounting:
-            // - the fendermint directory
-            // - the docker-entry
-            // - the env var files
+        let fendermint = match fendermint {
+            Some(c) => c,
+            None => {
+                // Create a fendermint container mounting:
+                // - the fendermint directory
+                // - the docker-entry
+                // - the env var files
+                let fendermint_creator = DockerRunner::new(
+                    &dh,
+                    FENDERMINT_IMAGE,
+                    user,
+                    vec![
+                        (keys_dir.clone(), "/fendermint/keys"),
+                        (fendermint_dir.join("data"), "/fendermint/data"),
+                        (fendermint_dir.join("logs"), "/fendermint/logs"),
+                        (fendermint_dir.join("snapshots"), "/fendermint/snapshots"),
+                        (static_env.clone(), &STATIC_ENV_PATH),
+                        (dynamic_env.clone(), &DYNAMIC_ENV_PATH),
+                        (
+                            root.as_ref().join("scripts").join(DOCKER_ENTRY_FILE_NAME),
+                            &DOCKER_ENTRY_PATH,
+                        ),
+                    ],
+                );
 
-            //         let fendermint = match fendermint {
-            //             Some(container) => container,
-            //             None => dh
-            //                 .docker
-            //                 .create_container(Some(CreateContainerOptions {
-            //                     name: fendermint_name.clone(),
-            //                     ..Default::default()
-            //                 }), Config {
-            //                     hostname: Some(fendermint_name.clone()),
-            // user,
-            // host_config: Some(HostConfig {
-            //     init: Some(true ),
-            //     binds: ,
-            //     port_bindings: ,
-            // })
-            //                 })
-            //                 .await
-            //                 .context("failed to create fendermint container")?,
-            //         };
-            todo!();
-        }
+                fendermint_creator
+                    .create(
+                        fendermint_name,
+                        node_config.network,
+                        vec![
+                            (port_range.resolver_p2p_host_port(), RESOLVER_P2P_PORT),
+                            (port_range.cometbft_p2p_host_port(), COMETBFT_P2P_PORT),
+                            (port_range.cometbft_rpc_host_port(), COMETBFT_RPC_PORT),
+                            (port_range.ethapi_rpc_host_port(), ETHAPI_RPC_PORT),
+                        ],
+                        format!(
+                            "{} {} {}",
+                            *DOCKER_ENTRY_PATH, *STATIC_ENV_PATH, *DYNAMIC_ENV_PATH
+                        ),
+                    )
+                    .await
+                    .context("failed to create fendermint")?
+            }
+        };
 
         if cometbft.is_none() {
             // Create a CometBFT container mounting:
@@ -296,22 +339,25 @@ fn container_name(node_name: &NodeName, container: &str) -> String {
     format!("{node_id}-{container}-{}", hash)
 }
 
-/// Helper for short-lived `docker run` commands.
 struct DockerRunner<'a> {
-    docker: &'a Docker,
+    dh: &'a DockerWithDropHandle,
     image: String,
     user: u32,
     volumes: Volumes,
 }
 
 impl<'a> DockerRunner<'a> {
-    pub fn new(docker: &'a Docker, image: &str, user: u32, volumes: Volumes) -> Self {
+    pub fn new(dh: &'a DockerWithDropHandle, image: &str, user: u32, volumes: Volumes) -> Self {
         Self {
-            docker,
+            dh,
             image: image.to_string(),
             user,
             volumes,
         }
+    }
+
+    fn docker(&self) -> &Docker {
+        &self.dh.docker
     }
 
     /// Run a short lived container.
@@ -337,20 +383,20 @@ impl<'a> DockerRunner<'a> {
         };
 
         let id = self
-            .docker
+            .docker()
             .create_container::<&str, _>(None, config)
             .await
             .context("failed to create container")?
             .id;
 
-        self.docker
+        self.docker()
             .start_container::<&str>(&id, None)
             .await
             .context("failed to start container")?;
 
         // TODO: Output?
 
-        self.docker
+        self.docker()
             .remove_container(
                 &id,
                 Some(RemoveContainerOptions {
@@ -361,6 +407,74 @@ impl<'a> DockerRunner<'a> {
             .await?;
 
         Ok(())
+    }
+
+    /// Create a container to be started later.
+    pub async fn create(
+        &self,
+        name: String,
+        network: &DockerNetwork,
+        // Host <-> Container port mappings
+        ports: Vec<(u32, u32)>,
+        entrypoint: String,
+    ) -> anyhow::Result<DockerContainer> {
+        let config = Config {
+            hostname: Some(name.clone()),
+            image: Some(self.image.clone()),
+            user: Some(self.user.to_string()),
+            entrypoint: Some(vec![entrypoint]),
+            cmd: None,
+            host_config: Some(HostConfig {
+                init: Some(true),
+                binds: Some(
+                    self.volumes
+                        .iter()
+                        .map(|(h, c)| format!("{}:{c}", h.to_string_lossy()))
+                        .collect(),
+                ),
+                port_bindings: Some(
+                    ports
+                        .into_iter()
+                        .flat_map(|(h, c)| {
+                            let binding = PortBinding {
+                                host_ip: None,
+                                host_port: Some(h.to_string()),
+                            };
+                            // Emitting both TCP and UDP, just in case.
+                            vec![
+                                (format!("{c}/tcp"), Some(vec![binding.clone()])),
+                                (format!("{c}/udp"), Some(vec![binding])),
+                            ]
+                        })
+                        .collect(),
+                ),
+                network_mode: Some(network.network().name.clone()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let id = self
+            .docker()
+            .create_container::<String, _>(
+                Some(CreateContainerOptions {
+                    name: name.clone(),
+                    ..Default::default()
+                }),
+                config,
+            )
+            .await
+            .context("failed to create container")?
+            .id;
+
+        Ok(DockerContainer {
+            dh: self.dh.clone(),
+            container: DockerConstruct {
+                id,
+                name,
+                external: false,
+            },
+        })
     }
 }
 

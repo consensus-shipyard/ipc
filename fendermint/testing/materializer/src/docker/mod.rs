@@ -43,7 +43,10 @@ pub use node::DockerNode;
 pub use relayer::DockerRelayer;
 
 const STATE_JSON_FILE_NAME: &str = "materializer-state.json";
-const DOCKER_ENTRY: &str = include_str!("../../scripts/docker-entry.sh");
+
+const DOCKER_ENTRY_SCRIPT: &str = include_str!("../../scripts/docker-entry.sh");
+const DOCKER_ENTRY_FILE_NAME: &str = "docker-entry.sh";
+
 const PORT_RANGE_START: u32 = 30000;
 const PORT_RANGE_SIZE: u32 = 100;
 
@@ -101,6 +104,29 @@ impl DockerWithDropHandle {
 pub struct DockerPortRange {
     pub from: u32,
     pub to: u32,
+}
+
+/// Mapping ports assuming a 100 size ranges.
+impl DockerPortRange {
+    /// Mapping 26655 to the host.
+    pub fn resolver_p2p_host_port(&self) -> u32 {
+        self.from + 55
+    }
+
+    /// Mapping 26656 to the host.
+    pub fn cometbft_p2p_host_port(&self) -> u32 {
+        self.from + 56
+    }
+
+    /// Mapping 26657 to the host.
+    pub fn cometbft_rpc_host_port(&self) -> u32 {
+        self.from + 57
+    }
+
+    /// Mapping 8445 to the host.
+    pub fn ethapi_rpc_host_port(&self) -> u32 {
+        self.from + 45
+    }
 }
 
 /// State of the materializer that it persists, so that it can resume operations.
@@ -173,7 +199,7 @@ impl DockerMaterializer {
     /// Export scripts that need to be mounted.
     fn export_scripts(&self) -> anyhow::Result<()> {
         let scripts_dir = self.scripts_dir();
-        export_script(scripts_dir.join("docker-entry.sh"), DOCKER_ENTRY)?;
+        export_script(scripts_dir.join("docker-entry.sh"), DOCKER_ENTRY_SCRIPT)?;
         Ok(())
     }
 
