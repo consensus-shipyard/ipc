@@ -110,13 +110,14 @@ if ! $local_deploy ; then
   echo "$DASHES Preparing ipc repo..."
   cd $HOME
   if ! ls $IPC_FOLDER ; then
-    git clone https://github.com/consensus-shipyard/ipc.git
+    git clone --recurse-submodules -j8 https://github.com/consensus-shipyard/ipc.git
   fi
   cd ${IPC_FOLDER}/contracts
   git fetch
   git stash
   git checkout $head_ref
   git pull --rebase origin $head_ref
+  git submodule update --init --recursive
 fi
 
 echo "$DASHES Building ipc contracts..."
