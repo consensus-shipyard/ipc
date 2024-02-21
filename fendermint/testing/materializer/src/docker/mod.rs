@@ -44,7 +44,6 @@ pub use relayer::DockerRelayer;
 
 const STATE_JSON_FILE_NAME: &str = "materializer-state.json";
 const DOCKER_ENTRY: &str = include_str!("../../scripts/docker-entry.sh");
-const FENDERMINT_INIT: &str = include_str!("../../scripts/fendermint-init.sh");
 const PORT_RANGE_START: u32 = 30000;
 const PORT_RANGE_SIZE: u32 = 100;
 
@@ -175,7 +174,6 @@ impl DockerMaterializer {
     fn export_scripts(&self) -> anyhow::Result<()> {
         let scripts_dir = self.scripts_dir();
         export_script(scripts_dir.join("docker-entry.sh"), DOCKER_ENTRY)?;
-        export_script(scripts_dir.join("fendermint-init.sh"), FENDERMINT_INIT)?;
         Ok(())
     }
 

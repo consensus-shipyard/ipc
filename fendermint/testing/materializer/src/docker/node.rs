@@ -1,7 +1,10 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::{os::unix::fs::MetadataExt, path::Path};
+use std::{
+    os::unix::fs::MetadataExt,
+    path::{Path, PathBuf},
+};
 
 use anyhow::{anyhow, Context};
 use bollard::{
@@ -22,6 +25,7 @@ const FENDERMINT_IMAGE: &str = "fendermint:latest";
 const RESOLVER_PORT: u32 = 26655;
 
 type EnvVars = Vec<(&'static str, String)>;
+type Volumes = Vec<(PathBuf, &'static str)>;
 
 macro_rules! env_vars {
     ( $($key:literal => $value:expr),* $(,)? ) => {
@@ -65,13 +69,6 @@ impl DockerNode {
         let keys_dir = node_dir.join("keys");
         if !keys_dir.exists() {
             std::fs::create_dir(&keys_dir)?;
-
-            // Make the validator key available for the init script.
-            if let Some(v) = node_config.validator {
-                let validator_key_path = v.secret_key_path();
-                std::fs::copy(validator_key_path, keys_dir.join("validator_key.sk"))
-                    .context("failed to copy validator key")?;
-            }
         }
 
         // Create a directory for cometbft
@@ -79,58 +76,59 @@ impl DockerNode {
         if !cometbft_dir.exists() {
             std::fs::create_dir(&cometbft_dir)?;
 
-            // Init cometbft to establish the network key.
-            let config = Config {
-                image: Some(COMETBFT_IMAGE.to_string()),
-                user: Some(user.to_string()),
-                host_config: Some(HostConfig {
-                    // Volumes
-                    binds: Some(vec![format!(
-                        "{}:/cometbft",
-                        cometbft_dir.to_string_lossy()
-                    )]),
-                    ..Default::default()
-                }),
-                cmd: Some(vec!["init".to_string()]),
-                ..Default::default()
-            };
+            let cometbft_runner = DockerRunner::new(
+                &dh.docker,
+                COMETBFT_IMAGE,
+                user,
+                vec![(cometbft_dir.clone(), "/cometbft")],
+            );
 
-            docker_run(&dh.docker, config)
+            // Init cometbft to establish the network key.
+            cometbft_runner
+                .run_cmd("init")
                 .await
                 .context("cannot init cometbft")?;
 
-            // Convert fendermint genesis to cometbft.
-            // Convert validator private key to cometbft.
-            // Create a network key for the resolver.
-            let config = Config {
-                image: Some(FENDERMINT_IMAGE.to_string()),
-                user: Some(user.to_string()),
-                host_config: Some(HostConfig {
-                    // Volumes for fendermint-init.sh
-                    binds: Some(vec![
-                        format!(
-                            "{}:/scripts/fendermint-init.sh",
-                            root.as_ref()
-                                .join("scripts")
-                                .join("fendermint-init.sh")
-                                .to_string_lossy()
-                        ),
-                        format!("{}:/data/keys", keys_dir.to_string_lossy()),
-                        format!("{}:/data/cometbft", cometbft_dir.to_string_lossy()),
-                        format!(
-                            "{}:/data/genesis.json",
-                            node_config.genesis.path.to_string_lossy()
-                        ),
-                    ]),
-                    ..Default::default()
-                }),
-                entrypoint: Some(vec!["/scripts/fendermint-init.sh".to_string()]),
-                ..Default::default()
-            };
+            let fendermint_runner = DockerRunner::new(
+                &dh.docker,
+                FENDERMINT_IMAGE,
+                user,
+                vec![
+                    (keys_dir.clone(), "/data/keys"),
+                    (cometbft_dir.clone(), "/data/cometbft"),
+                    (node_config.genesis.path.clone(), "/data/genesis.json"),
+                ],
+            );
 
-            docker_run(&dh.docker, config)
+            // Convert fendermint genesis to cometbft.
+            fendermint_runner
+                .run_cmd(
+                    "genesis --genesis-file /data/genesis.json \
+                    into-tendermint --out /data/cometbft/config/genesis.json",
+                )
                 .await
-                .context("cannot init fendermint")?;
+                .context("failed to convert genesis")?;
+
+            // Convert validator private key to cometbft.
+            if let Some(v) = node_config.validator {
+                let validator_key_path = v.secret_key_path();
+                std::fs::copy(validator_key_path, keys_dir.join("validator_key.sk"))
+                    .context("failed to copy validator key")?;
+
+                fendermint_runner
+                    .run_cmd(
+                        "key into-tendermint --secret-key /data/keys/validator_key.sk \
+                        --out /data/cometbft/config/priv_validator_key.json",
+                    )
+                    .await
+                    .context("failed to convert validator key")?;
+            }
+
+            // Create a network key for the resolver.
+            fendermint_runner
+                .run_cmd("key gen --out-dir /data/keys --name network_key")
+                .await
+                .context("failed to create network key")?;
         }
 
         // Create a directory for fendermint
@@ -292,37 +290,70 @@ fn container_name(node_name: &NodeName, container: &str) -> String {
     format!("{node_id}-{container}-{}", hash)
 }
 
-/// Run a short lived container.
-async fn docker_run(docker: &Docker, mut create_config: Config<String>) -> anyhow::Result<()> {
-    create_config.attach_stderr = Some(true);
-    create_config.attach_stdout = Some(true);
-    if let Some(ref mut host_config) = create_config.host_config {
-        host_config.auto_remove = Some(true);
-        host_config.init = Some(true);
+/// Helper for short-lived `docker run` commands.
+struct DockerRunner<'a> {
+    docker: &'a Docker,
+    image: String,
+    user: u32,
+    volumes: Volumes,
+}
+
+impl<'a> DockerRunner<'a> {
+    pub fn new(docker: &'a Docker, image: &str, user: u32, volumes: Volumes) -> Self {
+        Self {
+            docker,
+            image: image.to_string(),
+            user,
+            volumes,
+        }
     }
 
-    let id = docker
-        .create_container::<&str, _>(None, create_config)
-        .await
-        .context("failed to create container")?
-        .id;
-
-    docker
-        .start_container::<&str>(&id, None)
-        .await
-        .context("failed to start container")?;
-
-    // TODO: Output?
-
-    docker
-        .remove_container(
-            &id,
-            Some(RemoveContainerOptions {
-                force: true,
+    /// Run a short lived container.
+    pub async fn run_cmd(&self, cmd: &str) -> anyhow::Result<()> {
+        let config = Config {
+            image: Some(self.image.clone()),
+            user: Some(self.user.to_string()),
+            cmd: Some(vec![cmd.to_string()]),
+            attach_stderr: Some(true),
+            attach_stdout: Some(true),
+            host_config: Some(HostConfig {
+                auto_remove: Some(true),
+                init: Some(true),
+                binds: Some(
+                    self.volumes
+                        .iter()
+                        .map(|(h, c)| format!("{}:{c}", h.to_string_lossy()))
+                        .collect(),
+                ),
                 ..Default::default()
             }),
-        )
-        .await?;
+            ..Default::default()
+        };
 
-    Ok(())
+        let id = self
+            .docker
+            .create_container::<&str, _>(None, config)
+            .await
+            .context("failed to create container")?
+            .id;
+
+        self.docker
+            .start_container::<&str>(&id, None)
+            .await
+            .context("failed to start container")?;
+
+        // TODO: Output?
+
+        self.docker
+            .remove_container(
+                &id,
+                Some(RemoveContainerOptions {
+                    force: true,
+                    ..Default::default()
+                }),
+            )
+            .await?;
+
+        Ok(())
+    }
 }
