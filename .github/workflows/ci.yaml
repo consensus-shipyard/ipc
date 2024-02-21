@@ -57,7 +57,8 @@ jobs:
     needs: [changes]
     if: >-
       needs.changes.outputs.contracts == 'true' ||
-      github.ref == 'refs/heads/main'
+      github.ref == 'refs/heads/main' ||
+      github.ref_type == 'tag'
 
   contracts-deployment-test:
     uses: ./.github/workflows/contracts-deployment-test.yaml
@@ -90,7 +91,8 @@ jobs:
       needs.changes.outputs.workspace == 'true' ||
       needs.changes.outputs.contracts == 'true' ||
       needs.changes.outputs.ipc == 'true' ||
-      github.ref == 'refs/heads/main'
+      github.ref == 'refs/heads/main' ||
+      github.ref_type == 'tag'
 
   ipld-resolver:
     uses: ./.github/workflows/ipld-resolver.yaml
@@ -98,7 +100,8 @@ jobs:
     if: >-
       needs.changes.outputs.workspace == 'true' ||
       needs.changes.outputs.ipld-resolver == 'true' ||
-      github.ref == 'refs/heads/main'
+      github.ref == 'refs/heads/main' ||
+      github.ref_type == 'tag'
 
   fendermint-test:
     uses: ./.github/workflows/fendermint-test.yaml
@@ -110,7 +113,8 @@ jobs:
       needs.changes.outputs.ipc == 'true' ||
       needs.changes.outputs.ipld-resolver == 'true' ||
       needs.changes.outputs.fendermint == 'true' ||
-      github.ref == 'refs/heads/main'
+      github.ref == 'refs/heads/main' ||
+      github.ref_type == 'tag'
 
   fevm-contract-tests:
     uses: ./.github/workflows/fevm-contract-tests.yaml
@@ -122,7 +126,8 @@ jobs:
       needs.changes.outputs.ipc == 'true' ||
       needs.changes.outputs.ipld-resolver == 'true' ||
       needs.changes.outputs.fendermint == 'true' ||
-      github.ref == 'refs/heads/main'
+      github.ref == 'refs/heads/main' ||
+      github.ref_type == 'tag'
 
   fendermint-publish:
     uses: ./.github/workflows/fendermint-publish.yaml
@@ -131,7 +136,9 @@ jobs:
     # It is because of these needs that all the filters are allowed to run on `main` too, otherwise this would be disabled.
     # It could be done in a more granular approach inside the workflows to allow the job to pass but opt-out of testing,
     # but I guess it doesn't hurt to run a final round of unconditional tests, even though it takes longer to publish.
-    if: github.ref == 'refs/heads/main'
+    if: >-
+      github.ref == 'refs/heads/main' ||
+      github.ref_type == 'tag'
     needs:
       - contracts-test # generates the ABI artifacts (although fendermint can do on its own too)
       - ipc
