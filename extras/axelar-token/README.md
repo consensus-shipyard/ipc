@@ -9,20 +9,26 @@ USE AT YOUR OWN RISK.**
 
 ## Motivation
 
-Imagine an ERC20 token residing on the Ethereum L1.
+The IPC stack enables you to convert an ERC20 residing on the parent network to native supply of a child subnet.
+This promotes the token to a "native coin" status, and it's then used for transfers within the subnet, as well as for gas payments.
+
+But what if the token resides on an L1 other than the root of the subnet?
+Imagine an ERC20 token residing on the Ethereum L1 or Polygon _(foreign L1)_.
 We'll call this the _canonical token_, with symbol `TOK`.
+Then there is an IPC L2 subnet anchored on the Filecoin L1 _(root L1)_ wishing to adopt `TOK` as its supply source.
 
-Then there is an IPC L2 subnet anchored on Filecoin mainnet (L1) wishing to adopt `TOK` as its supply source.
-
-We can leverage the [Axelar Interchain Token Service (ITS)](https://interchain.axelar.dev/) to replicate the canonical token across L1s: from Ethereum to Filecoin.
+We can leverage the [Axelar Interchain Token Service (ITS)](https://interchain.axelar.dev/) to replicate the canonical token across L1s: from Ethereum/Polygon to Filecoin.
 Doing so creates a remote token on Filecoin managed by the Axelar bridge.
 We'll call it `filTOK`.
 
-Using Axelar, users can move `TOK` freely between Ethereum <> Filecoin (the L1s).
+Using Axelar, users can move `TOK` freely between Ethereum/Polygon <> Filecoin (the L1s).
 Every bridge transaction takes a few minutes to settle (depending on finality, approval, execution).
 But once `TOK` arrives to Filecoin in the form of `filTOK`, users would have to sign yet another transaction (this time on Filecoin) to deposit the newly arrived tokens into the IPC L2 subnet.
 
-Sign a tx, wait, switch network, sign another tx. What if we could get rid of this extra step, and perform the transfer and the deposit in one go (atomically)?
+In summary: sign a tx on the foreign L1, wait, switch network to the root L1, sign another tx.
+This is too much work for users.
+
+This repo facilitates atomic cross L1 transfers and deposits of tokens from a foreign L1, straight into IPC L2 subnets.
 
 ## Solution
 
@@ -31,6 +37,7 @@ Sign a tx, wait, switch network, sign another tx. What if we could get rid of th
 ## Contents
 
 This example contains a duo of contracts leveraging Axelar's General Message Passing (GMP) via the ITS to conduct an atomic transfer and subnet deposit.
+It assumes Polygon as its _foreign L1_, but this can easily be changed through parameters.
 
 **`IpcTokenSender`:** This contract is deployed on the source L1. The user transacts with this contract by calling `fundSubnet()`, passing in the Axelar token ID, the subnet ID, the receipient address within the subnet, and the amount. This transfers the tokens to the destination L1 via the Axelar ITS, addressed to `IpcTokenHandler`, sending the subnet/recipient routing along for the `IpcTokenHandler` to use.
 
