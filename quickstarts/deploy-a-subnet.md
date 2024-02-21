@@ -38,7 +38,7 @@ sudo apt update && sudo apt install build-essential libssl-dev mesa-opencl-icd o
 # make sure that rust has the wasm32 target
 rustup target add wasm32-unknown-unknown
 
-# add your user to the docker group
+# LINUX ONLY: add your user to the docker group
 sudo usermod -aG docker $USER && newgrp docker
 
 # clone this repo and build
@@ -95,7 +95,11 @@ registry_addr = "0x7308C4A503a12521215718cbCa98F951E9aAB9B5"
 # registry_addr = "0x74539671a1d2f1c8f200826baba665179f53a1b7"
 ```
 
-* Follow [this link](https://github.com/consensus-shipyard/ipc/blob/cd/contracts/deployments/r314159.json) to get the up-to-date addresses of `gateway_addr` and `registry_addr` to use them under  `# Filecoin Calibration` part of the configuration.
+* **Replace** the `gateway_addr` and `registry_addr` with the following values. Copy and paste them from [this link](https://github.com/consensus-shipyard/ipc/blob/cd/contracts/deployments/r314159.json).
+
+![Gateway Address](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fconsensus-shipyard%2Fipc%2Fcd%2Fcontracts%2Fdeployments%2Fr314159.json\&query=%24.gateway\_addr\&label=Gateway%20Address\&link=https%3A%2F%2Fgithub.com%2Fconsensus-shipyard%2Fipc%2Fblob%2Fcd%2Fcontracts%2Fdeployments%2Fr314159.json)
+
+![Registry Address](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fconsensus-shipyard%2Fipc%2Fcd%2Fcontracts%2Fdeployments%2Fr314159.json\&query=%24.registry\_addr\&label=Registry%20Address\&link=https%3A%2F%2Fgithub.com%2Fconsensus-shipyard%2Fipc%2Fblob%2Fcd%2Fcontracts%2Fdeployments%2Fr314159.json)
 
 ### Step 3: Set up your wallets
 
