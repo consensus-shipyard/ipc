@@ -1,12 +1,16 @@
 include .env
 export
 
+.PHONY: install
+install:
+	forge install # installs existing dependencies
+
 .PHONY: deps
 deps:
 	forge install --no-commit \
-		axelarnetwork/axelar-gmp-sdk-solidity \
-		axelarnetwork/interchain-token-service \
-		openzeppelin/openzeppelin-contracts
+		axelarnetwork/axelar-gmp-sdk-solidity@v5.6.4 \
+		axelarnetwork/interchain-token-service@v1.2.1 \
+		openzeppelin/openzeppelin-contracts@v5.0.1
 
 .PHONY: help
 help:
