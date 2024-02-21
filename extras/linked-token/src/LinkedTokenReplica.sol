@@ -3,7 +3,9 @@ pragma solidity 0.8.23;
 
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {ERC20} from "openzeppelin-contracts/token/ERC20/ERC20.sol";
-import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
+import {
+    SafeERC20
+} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {LinkedToken} from "./LinkedToken.sol";
 import {SubnetID} from "@ipc/src/structs/Subnet.sol";
 
@@ -18,14 +20,19 @@ contract LinkedTokenReplica is LinkedToken, ERC20 {
         address gateway,
         address underlyingToken,
         SubnetID memory linkedSubnet
-    ) LinkedToken(gateway, underlyingToken, linkedSubnet) ERC20("USDCTestReplica", "USDCtR") {
-    }
+    )
+        LinkedToken(gateway, underlyingToken, linkedSubnet)
+        ERC20("USDCTestReplica", "USDCtR")
+    {}
 
     function _captureTokens(address holder, uint256 amount) internal override {
         _burn(holder, amount);
     }
 
-    function _releaseTokens(address beneficiary, uint256 amount) internal override {
+    function _releaseTokens(address beneficiary, uint256 amount)
+        internal
+        override
+    {
         _mint(beneficiary, amount);
     }
 }
