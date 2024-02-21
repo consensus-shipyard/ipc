@@ -87,8 +87,8 @@ abstract contract LinkedToken is IpcExchange {
      * @param receiver Address to receive the minted tokens on L2
      * @param amount Amount of tokens to be transferred and minted
      */
-    function linkedTransfer(address receiver, uint256 amount) external {
-        _linkedTransfer(receiver, amount);
+    function linkedTransfer(address receiver, uint256 amount) external returns (IpcEnvelope memory committed) {
+        return _linkedTransfer(receiver, amount);
     }
 
     function _linkedTransfer(
