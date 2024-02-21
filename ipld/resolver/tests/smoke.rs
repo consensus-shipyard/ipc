@@ -137,7 +137,7 @@ impl ClusterBuilder {
     }
 }
 
-/// Run the tests with `RUST_LOG=debug` for example to see the logs, for example:
+/// Run the tests with `RUST_LOG=debug` to see the logs, for example:
 ///
 /// ```text
 /// RUST_LOG=debug cargo test -p ipc_ipld_resolver --test smoke resolve

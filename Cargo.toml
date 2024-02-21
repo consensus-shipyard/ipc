@@ -39,6 +39,8 @@ license-file = "LICENSE-APACHE"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+## dummy trigger ci
+
 [workspace.dependencies]
 anyhow = "1"
 arbitrary = { version = "1", features = ["derive"] }
@@ -116,6 +118,7 @@ pin-project = "1.1.2"
 prometheus = "0.13"
 prost = { version = "0.11" }
 quickcheck = "1"
+quickcheck_async = "0.1"
 quickcheck_macros = "1"
 rand = "0.8"
 rand_chacha = "0.3"

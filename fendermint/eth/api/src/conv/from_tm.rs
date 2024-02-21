@@ -493,6 +493,9 @@ pub fn to_logs(
         let (topics, data) =
             to_topics_and_data(&event.attributes).context("failed to collect topics and data")?;
 
+        // Blockscout doesn't recognise the `logType` field since https://github.com/blockscout/blockscout/pull/9007
+        let log_type = None; // Some(event.kind.clone()),
+
         let log = et::Log {
             address,
             topics,
@@ -503,7 +506,7 @@ pub fn to_logs(
             transaction_index: Some(transaction_index),
             log_index: Some(et::U256::from(idx + log_index_start)),
             transaction_log_index: Some(et::U256::from(idx)),
-            log_type: Some(event.kind.clone()),
+            log_type,
             removed: Some(false),
         };
 

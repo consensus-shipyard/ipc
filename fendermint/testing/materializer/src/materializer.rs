@@ -12,6 +12,31 @@ use crate::{
     manifest::Balance, AccountName, NodeName, RelayerName, ResourceHash, SubnetName, TestnetName,
 };
 
+/// Type family of all the things a [Materializer] can create.
+///
+/// Kept separate from the [Materializer] so that we can wrap one in another
+/// and pass the same types along.
+pub trait Materials {
+    /// Represents the entire hierarchy of a testnet, e.g. a common docker network
+    /// and directory on the file system. It has its own type so the materializer
+    /// doesn't have to remember what it created for a testnet, and different
+    /// testnets can be kept isolated from each other.
+    type Network: Send + Sync;
+    /// Capture where the IPC stack (the gateway and the registry) has been deployed on a subnet.
+    /// These are the details which normally go into the `ipc-cli` configuration files.
+    type Deployment: Sync + Send;
+    /// Represents an account identity, typically a key-value pair.
+    type Account: Ord + Sync + Send;
+    /// Represents the genesis.json file (can be a file location, or a model).
+    type Genesis: Sync + Send;
+    /// The address of a dynamically created subnet.
+    type Subnet: Sync + Send;
+    /// The handle to a node; could be a (set of) docker container(s) or remote addresses.
+    type Node: Sync + Send;
+    /// The handle to a relayer process.
+    type Relayer: Sync + Send;
+}
+
 /// The materializer is a component to provision resources of a testnet, and
 /// to carry out subsequent commands on them, e.g. to restart nodes.
 ///
@@ -37,39 +62,25 @@ use crate::{
 /// one, e.g. a testnet set up before tests are run, which the materializer should
 /// know.
 #[async_trait]
-pub trait Materializer {
-    /// Represents the entire hierarchy of a testnet, e.g. a common docker network
-    /// and directory on the file system. It has its own type so the materializer
-    /// doesn't have to remember what it created for a testnet, and different
-    /// testnets can be kept isolated from each other.
-    type Network: Send + Sync;
-    /// Capture where the IPC stack (the gateway and the registry) has been deployed on a subnet.
-    /// These are the details which normally go into the `ipc-cli` configuration files.
-    type Deployment: Sync + Send;
-    /// Represents an account identity, typically a key-value pair.
-    type Account: Ord + Sync + Send;
-    /// Represents the genesis.json file (can be a file location, or a model).
-    type Genesis: Sync + Send;
-    /// The address of a dynamically created subnet.
-    type Subnet: Sync + Send;
-    /// The handle to a node; could be a (set of) docker container(s) or remote addresses.
-    type Node: Sync + Send;
-    /// The handle to a relayer process.
-    type Relayer: Sync + Send;
-
+pub trait Materializer<M: Materials> {
     /// Create the physical network group.
     ///
     /// The return value should be able to able to represent settings that allow nodes
     /// to connect to each other, as well as perhaps to be labelled as a group
     /// (although for that we can use the common name prefixes as well).
-    async fn create_network(&mut self, testnet_name: &TestnetName)
-        -> anyhow::Result<Self::Network>;
+    async fn create_network(&mut self, testnet_name: &TestnetName) -> anyhow::Result<M::Network>;
 
     /// Create a Secp256k1 keypair for signing transactions or creating blocks.
-    fn create_account(&mut self, account_name: &AccountName) -> Self::Account;
+    fn create_account(&mut self, account_name: &AccountName) -> anyhow::Result<M::Account>;
 
     /// Fund an account on the rootnet from the faucet.
-    async fn fund_from_faucet(&mut self, account: &Self::Account) -> anyhow::Result<()>;
+    async fn fund_from_faucet<'s, 'a>(
+        &'s mut self,
+        account: &'a M::Account,
+        reference: Option<ResourceHash>,
+    ) -> anyhow::Result<()>
+    where
+        's: 'a;
 
     /// Deploy the IPC contracts onto the rootnet.
     ///
@@ -78,12 +89,14 @@ pub trait Materializer {
     /// as there can be multiple endpoints to choose from, some better than others.
     ///
     /// The return value should contain at the addresses of the contracts.
-    async fn new_deployment(
-        &mut self,
+    async fn new_deployment<'s, 'a>(
+        &'s mut self,
         subnet_name: &SubnetName,
-        deployer: &Self::Account,
+        deployer: &'a M::Account,
         urls: Vec<Url>,
-    ) -> anyhow::Result<Self::Deployment>;
+    ) -> anyhow::Result<M::Deployment>
+    where
+        's: 'a;
 
     /// Set the IPC contracts onto the rootnet.
     ///
@@ -95,22 +108,22 @@ pub trait Materializer {
         subnet_name: &SubnetName,
         gateway: H160,
         registry: H160,
-    ) -> Self::Deployment;
+    ) -> anyhow::Result<M::Deployment>;
 
     /// Return the well-known IPC contract deployments.
-    fn default_deployment(&mut self, subnet_name: &SubnetName) -> Self::Deployment;
+    fn default_deployment(&mut self, subnet_name: &SubnetName) -> anyhow::Result<M::Deployment>;
 
     /// Construct the genesis for the rootnet.
     ///
     /// The genesis time and the chain name (which should determine the chain ID and
     /// thus the subnet ID as well) can be chosen by the materializer, or we could make
     /// it part of the manifest.
-    fn create_root_genesis(
+    fn create_root_genesis<'a>(
         &mut self,
-        subnet_name: SubnetName,
-        validators: BTreeMap<&Self::Account, Collateral>,
-        balances: BTreeMap<&Self::Account, Balance>,
-    ) -> anyhow::Result<Self::Genesis>;
+        subnet_name: &SubnetName,
+        validators: BTreeMap<&'a M::Account, Collateral>,
+        balances: BTreeMap<&'a M::Account, Balance>,
+    ) -> anyhow::Result<M::Genesis>;
 
     /// Construct the configuration for a node.
     ///
@@ -119,20 +132,24 @@ pub trait Materializer {
     /// such as their network identities which are a function of their keys.
     ///
     /// The method is async in case we have to provision some resources remotely.
-    async fn create_node(
-        &mut self,
+    async fn create_node<'s, 'a>(
+        &'s mut self,
         node_name: &NodeName,
-        node_config: NodeConfig<Self>,
-    ) -> anyhow::Result<Self::Node>;
+        node_config: NodeConfig<'a, M>,
+    ) -> anyhow::Result<M::Node>
+    where
+        's: 'a;
 
     /// Start a node.
     ///
     /// At this point the identities of any dependency nodes should be known.
-    async fn start_node(
-        &mut self,
-        node: &Self::Node,
-        seed_nodes: &[&Self::Node],
-    ) -> anyhow::Result<()>;
+    async fn start_node<'s, 'a>(
+        &'s mut self,
+        node: &'a M::Node,
+        seed_nodes: &'a [&'a M::Node],
+    ) -> anyhow::Result<()>
+    where
+        's: 'a;
 
     /// Create a subnet on the parent subnet ledger.
     ///
@@ -140,65 +157,74 @@ pub trait Materializer {
     /// can be sent, or it can be empty if it's an external rootnet.
     ///
     /// The result should contain the address of the subnet.
-    async fn create_subnet(
-        &mut self,
-        parent_submit_config: &SubmitConfig<Self>,
+    async fn create_subnet<'s, 'a>(
+        &'s mut self,
+        parent_submit_config: &SubmitConfig<'a, M>,
         subnet_name: &SubnetName,
-        subnet_config: SubnetConfig<Self>,
-    ) -> anyhow::Result<Self::Subnet>;
+        subnet_config: SubnetConfig<'a, M>,
+    ) -> anyhow::Result<M::Subnet>
+    where
+        's: 'a;
 
     /// Fund an account on a target subnet by transferring tokens from the source subnet.
     ///
     /// Only works if the target subnet has been bootstrapped.
     ///
     /// The `reference` can be used to deduplicate repeated transfer attempts.
-    async fn fund_subnet(
-        &mut self,
-        parent_submit_config: &SubmitConfig<Self>,
-        account: &Self::Account,
-        subnet: &Self::Subnet,
+    async fn fund_subnet<'s, 'a>(
+        &'s mut self,
+        parent_submit_config: &SubmitConfig<'a, M>,
+        account: &'a M::Account,
+        subnet: &'a M::Subnet,
         amount: TokenAmount,
         reference: Option<ResourceHash>,
-    ) -> anyhow::Result<()>;
+    ) -> anyhow::Result<()>
+    where
+        's: 'a;
 
     /// Join a target subnet as a validator.
     ///
     /// The `reference` can be used to deduplicate repeated transfer attempts.
-    async fn join_subnet(
-        &mut self,
-        parent_submit_config: &SubmitConfig<Self>,
-        account: &Self::Account,
-        subnet: &Self::Subnet,
+    async fn join_subnet<'s, 'a>(
+        &'s mut self,
+        parent_submit_config: &SubmitConfig<'a, M>,
+        account: &'a M::Account,
+        subnet: &'a M::Subnet,
         collateral: Collateral,
         balance: Balance,
         reference: Option<ResourceHash>,
-    ) -> anyhow::Result<()>;
+    ) -> anyhow::Result<()>
+    where
+        's: 'a;
 
     /// Construct the genesis for a subnet, which involves fetching details from the parent.
-    fn create_subnet_genesis(
-        &mut self,
-        parent_submit_config: &SubmitConfig<Self>,
-        subnet: &Self::Subnet,
-    ) -> anyhow::Result<Self::Genesis>;
+    ///
+    /// The method is async to allow for network operations.
+    async fn create_subnet_genesis<'s, 'a>(
+        &'s mut self,
+        parent_submit_config: &SubmitConfig<'a, M>,
+        subnet: &'a M::Subnet,
+    ) -> anyhow::Result<M::Genesis>
+    where
+        's: 'a;
 
     /// Create and start a relayer.
     ///
     /// It should follow the given node. If the submit node is empty, it should submit to an external rootnet.
-    async fn create_relayer(
-        &mut self,
-        parent_submit_config: &SubmitConfig<Self>,
+    async fn create_relayer<'s, 'a>(
+        &'s mut self,
+        parent_submit_config: &SubmitConfig<'a, M>,
         relayer_name: &RelayerName,
-        subnet: &Self::Subnet,
-        submitter: &Self::Account,
-        follow_node: &Self::Node,
-    ) -> anyhow::Result<Self::Relayer>;
+        subnet: &'a M::Subnet,
+        submitter: &'a M::Account,
+        follow_node: &'a M::Node,
+    ) -> anyhow::Result<M::Relayer>
+    where
+        's: 'a;
 }
 
 /// Options regarding node configuration, e.g. which services to start.
-pub struct NodeConfig<'a, M>
-where
-    M: Materializer + ?Sized,
-{
+pub struct NodeConfig<'a, M: Materials> {
     /// The physical network to join.
     pub network: &'a M::Network,
     /// The genesis of this subnet; it should indicate whether this is a rootnet or a deeper level.
@@ -214,10 +240,7 @@ where
 }
 
 /// Options regarding subnet configuration, e.g. how many validators are required.
-pub struct SubnetConfig<'a, M>
-where
-    M: Materializer + ?Sized,
-{
+pub struct SubnetConfig<'a, M: Materials> {
     /// Which account to use on the parent to create the subnet.
     ///
     /// This account has to have the necessary balance on the parent.
@@ -226,21 +249,16 @@ where
     pub min_validators: usize,
 }
 
-/// Options for how to submit transactions to a subnet.
-pub struct SubmitConfig<'a, M>
-where
-    M: Materializer + ?Sized,
-{
+/// Options for how to submit IPC transactions to a subnet.
+pub struct SubmitConfig<'a, M: Materials> {
     /// The nodes to which we can send transactions or queries.
     pub nodes: Vec<TargetConfig<'a, M>>,
     /// The location of the IPC contracts on the (generally parent) subnet.
     pub deployment: &'a M::Deployment,
 }
 
-pub enum TargetConfig<'a, M>
-where
-    M: Materializer + ?Sized,
-{
+/// Where to submit a transaction or a query.
+pub enum TargetConfig<'a, M: Materials> {
     External(Url),
     Internal(&'a M::Node),
 }

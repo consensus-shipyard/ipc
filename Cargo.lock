@@ -2830,6 +2830,7 @@ dependencies = [
  "fendermint_vm_actor_interface",
  "fendermint_vm_core",
  "fendermint_vm_encoding",
+ "fendermint_vm_event",
  "fendermint_vm_genesis",
  "fendermint_vm_interpreter",
  "fendermint_vm_message",
@@ -3095,23 +3096,28 @@ dependencies = [
  "arbitrary",
  "async-recursion",
  "async-trait",
+ "env_logger 0.10.2",
  "ethers",
  "fendermint_testing",
  "fendermint_testing_materializer",
  "fendermint_vm_encoding",
  "fendermint_vm_genesis",
+ "futures",
  "fvm_shared",
  "hex",
  "lazy_static",
  "multihash 0.18.1",
  "quickcheck",
+ "quickcheck_async",
  "quickcheck_macros",
  "serde",
  "serde_json",
  "serde_with",
  "serde_yaml",
  "tendermint-rpc",
+ "tokio",
  "toml 0.8.10",
+ "tracing",
 ]
 
 [[package]]
@@ -3173,6 +3179,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_vm_event"
+version = "0.1.0"
+dependencies = [
+ "strum 0.25.0",
+]
+
+[[package]]
 name = "fendermint_vm_genesis"
 version = "0.1.0"
 dependencies = [
@@ -3218,6 +3231,7 @@ dependencies = [
  "fendermint_vm_actor_interface",
  "fendermint_vm_core",
  "fendermint_vm_encoding",
+ "fendermint_vm_event",
  "fendermint_vm_genesis",
  "fendermint_vm_message",
  "fendermint_vm_resolver",
@@ -3343,6 +3357,7 @@ dependencies = [
  "ethers",
  "fendermint_crypto",
  "fendermint_testing",
+ "fendermint_vm_event",
  "fendermint_vm_genesis",
  "fvm_ipld_encoding",
  "fvm_shared",
@@ -7423,6 +7438,16 @@ dependencies = [
  "env_logger 0.8.4",
  "log",
  "rand",
+]
+
+[[package]]
+name = "quickcheck_async"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "247df671941313a4e255a5015772917368f1b21bfedfbd89d68fbb27e802b2fa"
+dependencies = [
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]
