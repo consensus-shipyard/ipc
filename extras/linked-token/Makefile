@@ -47,7 +47,8 @@ deploy-replica:
 
 deploy-controller:
 	@echo "Deploying token controller contract on Calibnet..."
-	forge script script/DeployIpcTokenController.s.sol:DeployIpcTokenController --skip-simulation --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "run(address,address,uint64,address[])" -- $$CALIBNET_GATEWAY $$CALIBNET_USDC $$CALIBNET_CHAIN_ID "[$$SUBNET_ROUTE_IN_ETH_FORMAT]"
+	@USDCTEST_ADDR=$$(cat config/config.json | jq -r '.LinkedToken.USDCTest'); \
+	forge script script/DeployIpcTokenController.s.sol:DeployIpcTokenController --skip-simulation --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "run(address,address,uint64,address[])" -- $$CALIBNET_GATEWAY $$USDCTEST_ADDR $$CALIBNET_CHAIN_ID "[$$SUBNET_ROUTE_IN_ETH_FORMAT]"
 
 initialize-replica:
 	@echo "Updating replica with controller's address..."
@@ -64,7 +65,8 @@ initialize-controller:
 approve-usdc:
 	@echo "Depositing USDC to Controller Contract..."
 	@CONTROLLER_ADDR=$$(cat config/config.json | jq -r '.LinkedToken.LinkedTokenController'); \
-	cast send $$CALIBNET_USDC "approve(address,uint256)" --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY -- $$CONTROLLER_ADDR $$AMOUNT
+	USDCTEST_ADDR=$$(cat config/config.json | jq -r '.LinkedToken.USDCTest'); \
+	cast send $$USDCTEST_ADDR "approve(address,uint256)" --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY -- $$CONTROLLER_ADDR $$AMOUNT
 
 deposit-usdc:
 	@echo "Depositing USDC to subnet..."
