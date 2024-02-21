@@ -22,3 +22,5 @@ fail_on_revert = true   # Fail the test if the contract reverts
 
 [profile.allow_revert.invariant]
 fail_on_revert = false   # Fail the test if the contract reverts
+
+## dummy trigger ci
