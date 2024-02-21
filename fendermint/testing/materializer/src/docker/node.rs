@@ -26,6 +26,7 @@ use crate::{
     NodeName, ResourceHash,
 };
 
+// TODO: Add these to the materializer.
 const COMETBFT_IMAGE: &str = "cometbft/cometbft:v0.37.x";
 const FENDERMINT_IMAGE: &str = "fendermint:latest";
 
@@ -164,9 +165,9 @@ impl DockerNode {
         let fendermint_dir = node_dir.join("fendermint");
         if !fendermint_dir.exists() {
             std::fs::create_dir(&fendermint_dir)?;
-            std::fs::create_dir(&fendermint_dir.join("data"))?;
-            std::fs::create_dir(&fendermint_dir.join("logs"))?;
-            std::fs::create_dir(&fendermint_dir.join("snapshots"))?;
+            std::fs::create_dir(fendermint_dir.join("data"))?;
+            std::fs::create_dir(fendermint_dir.join("logs"))?;
+            std::fs::create_dir(fendermint_dir.join("snapshots"))?;
         }
 
         // If there is no static env var file, create one with all the common variables.
@@ -248,7 +249,7 @@ impl DockerNode {
             ];
 
             // Export the env to a file.
-            export_env(&static_env, vec![basic, topdown, cmt].concat())
+            export_env(&static_env, [basic, topdown, cmt].concat())
                 .context("failed to export env")?;
         }
 
@@ -271,9 +272,10 @@ impl DockerNode {
                     DOCKER_ENTRY_PATH.as_str(),
                 ),
             ];
-            vec![common, vs].concat()
+            [common, vs].concat()
         };
 
+        // Wrap an entry point with the docker entry script.
         let entrypoint = |ep: &str| {
             format!(
                 "{} '{ep}' {} {}",

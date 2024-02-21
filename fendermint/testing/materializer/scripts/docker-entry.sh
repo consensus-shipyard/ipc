@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# A docker entry point that allows us to source multipl env-var files and kick off a command.
+# A docker entry point that allows us to source multiple env-var files and kick off a command.
 
 # Example:
 # echo 'a=1' > test1.env
@@ -22,4 +22,5 @@ while [ ! -z $1 ]; do
   shift
 done
 
+# Execute the real command, transfering the PID so it receives signals.
 exec $COMMAND
