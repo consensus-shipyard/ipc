@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use std::{
+    collections::BTreeMap,
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
 };
@@ -45,12 +46,12 @@ lazy_static! {
     static ref DOCKER_ENTRY_PATH: String = format!("/opt/docker/{DOCKER_ENTRY_FILE_NAME}");
 }
 
-type EnvVars = Vec<(&'static str, String)>;
+type EnvVars = BTreeMap<&'static str, String>;
 type Volumes = Vec<(PathBuf, &'static str)>;
 
 macro_rules! env_vars {
     ( $($key:literal => $value:expr),* $(,)? ) => {
-        vec![ $( ($key, $value.to_string()) ),* ]
+        BTreeMap::from([ $( ($key, $value.to_string()) ),* ])
     };
 }
 
@@ -181,7 +182,7 @@ impl DockerNode {
 
             let resolver_host_port: u32 = port_range.from;
 
-            let basic: EnvVars = env_vars![
+            let mut env: EnvVars = env_vars![
                 "LOG_LEVEL"        => "info",
                 "RUST_BACKTRACE"   => 1,
                 "FM_NETWORK "      => "testnet",
@@ -190,8 +191,8 @@ impl DockerNode {
                 "FM_SNAPSHOTS_DIR" => "/fendermint/snapshots",
                 "FM_CHAIN_NAME"    => genesis.chain_name.clone(),
                 "FM_IPC_SUBNET_ID" => ipc.gateway.subnet_id,
-                "FM_RESOLVER__NETWORK__LOCAL_KEY"          => "/fendermint/keys/network_key.sk",
-                "FM_RESOLVER__CONNECTION__LISTEN_ADDR"     => format!("/ip4/0.0.0.0/tcp/${RESOLVER_P2P_PORT}"),
+                "FM_RESOLVER__NETWORK__LOCAL_KEY"      => "/fendermint/keys/network_key.sk",
+                "FM_RESOLVER__CONNECTION__LISTEN_ADDR" => format!("/ip4/0.0.0.0/tcp/${RESOLVER_P2P_PORT}"),
                 "FM_TENDERMINT_RPC_URL" => format!("http://${cometbft_name}:{COMETBFT_RPC_PORT}"),
                 "TENDERMINT_RPC_URL"    => format!("http://${cometbft_name}:{COMETBFT_RPC_PORT}"),
                 "TENDERMINT_WS_URL"     => format!("ws://${cometbft_name}:{COMETBFT_RPC_PORT}/websocket"),
@@ -199,58 +200,62 @@ impl DockerNode {
                 "FM_ETH__LISTEN__PORT"  => ETHAPI_RPC_PORT,
             ];
 
-            let topdown: EnvVars = match node_config.parent_node {
-                Some(pc) => {
-                    let gateway: H160 = pc.deployment.gateway.into();
-                    let registry: H160 = pc.deployment.registry.into();
-                    match pc.node {
-                        // Assume Lotus
-                        TargetConfig::External(url) => env_vars![
-                            "FM_IPC__TOPDOWN__CHAIN_HEAD_DELAY"        => 20,
-                            "FM_IPC__TOPDOWN__PARENT_HTTP_ENDPOINT"    => url,
+            if node_config.validator.is_some() {
+                env.extend(env_vars![
+                    "FM_VALIDATOR_KEY__KIND" => "ethereum",
+                    "FM_VALIDATOR_KEY__PATH" => "/fendermint/keys/validator_key.sk",
+                ]);
+            }
+
+            if let Some(pc) = node_config.parent_node {
+                let gateway: H160 = pc.deployment.gateway.into();
+                let registry: H160 = pc.deployment.registry.into();
+                let topdown = match pc.node {
+                    // Assume Lotus
+                    TargetConfig::External(url) => env_vars![
+                        "FM_IPC__TOPDOWN__CHAIN_HEAD_DELAY"        => 20,
+                        "FM_IPC__TOPDOWN__PARENT_HTTP_ENDPOINT"    => url,
+                        "FM_IPC__TOPDOWN__PARENT_REGISTRY"         => registry,
+                        "FM_IPC__TOPDOWN__PARENT_GATEWAY"          => gateway,
+                        "FM_IPC__TOPDOWN__EXPONENTIAL_BACK_OFF"    => 5,
+                        "FM_IPC__TOPDOWN__EXPONENTIAL_RETRY_LIMIT" => 5                ,
+                        "FM_IPC__TOPDOWN__POLLING_INTERVAL"        => 10,
+                        "FM_IPC__TOPDOWN__PROPOSAL_DELAY"          => 2,
+                        "FM_IPC__TOPDOWN__MAX_PROPOSAL_RANGE"      => 100,
+                    ],
+                    // Assume Fendermint
+                    TargetConfig::Internal(node) => {
+                        let parent_ethapi = node.ethapi.as_ref().ok_or_else(|| {
+                            anyhow!(
+                                "{node_name} cannot follow {}; ethapi is not running",
+                                node.node_name
+                            )
+                        })?;
+                        env_vars![
+                            "FM_IPC__TOPDOWN__CHAIN_HEAD_DELAY"        => 1,
+                            "FM_IPC__TOPDOWN__PARENT_HTTP_ENDPOINT"    => format!("http://{}:{ETHAPI_RPC_PORT}", parent_ethapi.container.name),
                             "FM_IPC__TOPDOWN__PARENT_REGISTRY"         => registry,
                             "FM_IPC__TOPDOWN__PARENT_GATEWAY"          => gateway,
                             "FM_IPC__TOPDOWN__EXPONENTIAL_BACK_OFF"    => 5,
                             "FM_IPC__TOPDOWN__EXPONENTIAL_RETRY_LIMIT" => 5                ,
-                            "FM_IPC__TOPDOWN__POLLING_INTERVAL"        => 10,
-                            "FM_IPC__TOPDOWN__PROPOSAL_DELAY"          => 2,
-                            "FM_IPC__TOPDOWN__MAX_PROPOSAL_RANGE"      => 100,
-                        ],
-                        // Assume Fendermint
-                        TargetConfig::Internal(node) => {
-                            let parent_ethapi = node.ethapi.as_ref().ok_or_else(|| {
-                                anyhow!(
-                                    "{node_name} cannot follow {}; ethapi is not running",
-                                    node.node_name
-                                )
-                            })?;
-                            env_vars![
-                                "FM_IPC__TOPDOWN__CHAIN_HEAD_DELAY"        => 1,
-                                "FM_IPC__TOPDOWN__PARENT_HTTP_ENDPOINT"    => format!("http://{}:{ETHAPI_RPC_PORT}", parent_ethapi.container.name),
-                                "FM_IPC__TOPDOWN__PARENT_REGISTRY"         => registry,
-                                "FM_IPC__TOPDOWN__PARENT_GATEWAY"          => gateway,
-                                "FM_IPC__TOPDOWN__EXPONENTIAL_BACK_OFF"    => 5,
-                                "FM_IPC__TOPDOWN__EXPONENTIAL_RETRY_LIMIT" => 5                ,
-                                "FM_IPC__TOPDOWN__POLLING_INTERVAL"        => 1,
-                                "FM_IPC__TOPDOWN__PROPOSAL_DELAY"          => 0,
-                                "FM_IPC__TOPDOWN__MAX_PROPOSAL_RANGE"      => 10,
-                            ]
-                        }
+                            "FM_IPC__TOPDOWN__POLLING_INTERVAL"        => 1,
+                            "FM_IPC__TOPDOWN__PROPOSAL_DELAY"          => 0,
+                            "FM_IPC__TOPDOWN__MAX_PROPOSAL_RANGE"      => 10,
+                        ]
                     }
-                }
-                None => env_vars!(),
-            };
+                };
+                env.extend(topdown);
+            }
 
-            let cmt = env_vars![
+            env.extend(env_vars![
                 "CMT_PROXY_APP" => format!("tcp://{fendermint_name}:{FENDERMINT_ABCI_PORT}"),
                 "CMT_P2P_PEX"   => true,
                 "CMT_RPC_MAX_SUBSCRIPTION_CLIENTS"     => 10,
                 "CMT_RPC_MAX_SUBSCRIPTIONS_PER_CLIENT" => 1000,
-            ];
+            ]);
 
             // Export the env to a file.
-            export_env(&static_env, [basic, topdown, cmt].concat())
-                .context("failed to export env")?;
+            export_env(&static_env, &env).context("failed to export env")?;
         }
 
         // If there is no dynamic env var file, create an empty one so it can be mounted.
@@ -259,7 +264,7 @@ impl DockerNode {
             // The values will be assigned when the node is started.
             // --env FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES=${RESOLVER_BOOTSTRAPS}
             // --env CMT_P2P_SEEDS
-            export_env(&dynamic_env, vec![])?;
+            export_env(&dynamic_env, &Default::default())?;
         }
 
         // All containers will be started with the docker entry and all env files.
@@ -526,10 +531,11 @@ impl<'a> DockerRunner<'a> {
     }
 }
 
-fn export_env(file_path: impl AsRef<Path>, env: EnvVars) -> anyhow::Result<()> {
+fn export_env(file_path: impl AsRef<Path>, env: &EnvVars) -> anyhow::Result<()> {
     let env = env
-        .into_iter()
+        .iter()
         .map(|(k, v)| format!("{k}={v}"))
         .collect::<Vec<_>>();
+
     export_file(file_path, env.join("\n"))
 }
