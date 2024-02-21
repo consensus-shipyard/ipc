@@ -3,19 +3,21 @@
 use multihash::MultihashDigest;
 use serde::{Deserialize, Serialize};
 use std::{
-    fmt::Display,
+    fmt::{Debug, Display},
     path::{Path, PathBuf},
 };
 
+pub mod logging;
 pub mod manifest;
 pub mod materializer;
 pub mod testnet;
+pub mod validation;
 
 #[cfg(feature = "arb")]
 mod arb;
 
 /// An ID identifying a resource within its parent.
-#[derive(Clone, Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ResourceId(String);
 
 /// Implementing a deserializer which has the logic to sanitise URL-unfriendly characters.
@@ -31,6 +33,12 @@ impl<'de> Deserialize<'de> for ResourceId {
 impl Display for ResourceId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "'{}'", self.0)
+    }
+}
+
+impl Debug for ResourceId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
     }
 }
 
@@ -72,7 +80,7 @@ pub type RelayerId = ResourceId;
 /// concatenated into a URL-like path.
 ///
 /// See <https://cloud.google.com/apis/design/resource_names>
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ResourceName(PathBuf);
 
 impl ResourceName {
@@ -101,20 +109,30 @@ impl Display for ResourceName {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub struct TestnetName(ResourceName);
+impl Debug for ResourceName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
+    }
+}
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub struct AccountName(ResourceName);
+macro_rules! resource_name {
+    ($name:ident) => {
+        #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+        pub struct $name(ResourceName);
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub struct SubnetName(ResourceName);
+        impl AsRef<ResourceName> for $name {
+            fn as_ref(&self) -> &ResourceName {
+                &self.0
+            }
+        }
+    };
+}
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub struct NodeName(ResourceName);
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub struct RelayerName(ResourceName);
+resource_name!(TestnetName);
+resource_name!(AccountName);
+resource_name!(SubnetName);
+resource_name!(NodeName);
+resource_name!(RelayerName);
 
 impl TestnetName {
     pub fn new<T: Into<TestnetId>>(id: T) -> Self {
@@ -127,6 +145,11 @@ impl TestnetName {
 
     pub fn root(&self) -> SubnetName {
         SubnetName(self.0.join("root"))
+    }
+
+    /// Check that the testnet contains a certain resource name, ie. it's a prefix of it.
+    pub fn contains<T: AsRef<ResourceName>>(&self, name: T) -> bool {
+        self.0.is_prefix_of(name.as_ref())
     }
 }
 
@@ -180,8 +203,8 @@ impl SubnetName {
         ss
     }
 
-    /// parent->child hop pairs from the root to the subnet.
-    pub fn ancestor_hops(&self) -> Vec<(SubnetName, SubnetName)> {
+    /// parent->child hop pairs from the root to the current subnet.
+    pub fn ancestor_hops(&self, include_self: bool) -> Vec<(SubnetName, SubnetName)> {
         let ss0 = self.ancestors();
 
         let ss1 = ss0
@@ -191,7 +214,13 @@ impl SubnetName {
             .cloned()
             .collect::<Vec<_>>();
 
-        ss0.into_iter().zip(ss1).collect()
+        let mut hops = ss0.into_iter().zip(ss1).collect::<Vec<_>>();
+
+        if !include_self {
+            hops.pop();
+        }
+
+        hops
     }
 
     fn path(&self) -> &Path {
@@ -200,6 +229,7 @@ impl SubnetName {
 }
 
 /// Unique identifier for certain things that we want to keep unique.
+#[derive(Clone, Debug, Hash, PartialEq, PartialOrd, Eq, Ord)]
 pub struct ResourceHash([u8; 32]);
 
 impl ResourceHash {
@@ -245,7 +275,13 @@ mod tests {
         let rn = tn.root();
         let foo = rn.subnet("foo");
         let bar = foo.subnet("bar");
-        assert_eq!(bar.ancestor_hops(), vec![(rn, foo.clone()), (foo, bar)]);
+
+        let hops0 = bar.ancestor_hops(false);
+        let hops1 = bar.ancestor_hops(true);
+        let hops = vec![(rn, foo.clone()), (foo, bar)];
+
+        assert_eq!(hops0[..], hops[..1]);
+        assert_eq!(hops1[..], hops[..]);
     }
 
     #[test]
