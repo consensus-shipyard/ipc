@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
 };
@@ -109,6 +109,7 @@ impl DockerNode {
 
             let cometbft_runner = DockerRunner::new(
                 &dh,
+                node_name,
                 COMETBFT_IMAGE,
                 user,
                 vec![(cometbft_dir.clone(), "/cometbft")],
@@ -116,6 +117,7 @@ impl DockerNode {
 
             let fendermint_runner = DockerRunner::new(
                 &dh,
+                node_name,
                 FENDERMINT_IMAGE,
                 user,
                 vec![
@@ -294,6 +296,7 @@ impl DockerNode {
             None => {
                 let creator = DockerRunner::new(
                     &dh,
+                    node_name,
                     FENDERMINT_IMAGE,
                     user,
                     volumes(vec![
@@ -322,6 +325,7 @@ impl DockerNode {
             None => {
                 let creator = DockerRunner::new(
                     &dh,
+                    node_name,
                     COMETBFT_IMAGE,
                     user,
                     volumes(vec![(cometbft_dir.clone(), "/cometbft")]),
@@ -345,7 +349,8 @@ impl DockerNode {
         // Create a ethapi container
         let ethapi = match ethapi {
             None if node_config.ethapi => {
-                let creator = DockerRunner::new(&dh, FENDERMINT_IMAGE, user, volumes(vec![]));
+                let creator =
+                    DockerRunner::new(&dh, node_name, FENDERMINT_IMAGE, user, volumes(vec![]));
 
                 let c = creator
                     .create(
@@ -394,15 +399,23 @@ fn container_name(node_name: &NodeName, container: &str) -> String {
 
 struct DockerRunner<'a> {
     dh: &'a DockerWithDropHandle,
+    node_name: NodeName,
     image: String,
     user: u32,
     volumes: Volumes,
 }
 
 impl<'a> DockerRunner<'a> {
-    pub fn new(dh: &'a DockerWithDropHandle, image: &str, user: u32, volumes: Volumes) -> Self {
+    pub fn new(
+        dh: &'a DockerWithDropHandle,
+        node_name: &NodeName,
+        image: &str,
+        user: u32,
+        volumes: Volumes,
+    ) -> Self {
         Self {
             dh,
+            node_name: node_name.clone(),
             image: image.to_string(),
             user,
             volumes,
@@ -413,6 +426,17 @@ impl<'a> DockerRunner<'a> {
         &self.dh.docker
     }
 
+    // Tag containers with resource names.
+    fn labels(&self) -> HashMap<String, String> {
+        [
+            ("testnet", self.node_name.testnet().path()),
+            ("node", self.node_name.path()),
+        ]
+        .into_iter()
+        .map(|(n, p)| (n.to_string(), p.to_string_lossy().to_string()))
+        .collect()
+    }
+
     /// Run a short lived container.
     pub async fn run_cmd(&self, cmd: &str) -> anyhow::Result<()> {
         let config = Config {
@@ -421,6 +445,7 @@ impl<'a> DockerRunner<'a> {
             cmd: Some(vec![cmd.to_string()]),
             attach_stderr: Some(true),
             attach_stdout: Some(true),
+            labels: Some(self.labels()),
             host_config: Some(HostConfig {
                 auto_remove: Some(true),
                 init: Some(true),

@@ -178,11 +178,25 @@ impl TestnetName {
     pub fn contains<T: AsRef<ResourceName>>(&self, name: T) -> bool {
         self.0.is_prefix_of(name.as_ref())
     }
+
+    /// Assuming correct contstruction of resources, get the testnet prefix.
+    fn from_prefix(name: &ResourceName) -> Self {
+        name.0
+            .components()
+            .nth(1)
+            .map(|c| c.as_os_str().to_string_lossy().to_string())
+            .map(Self::new)
+            .unwrap_or_else(|| Self(name.clone()))
+    }
 }
 
 impl NodeName {
     pub fn is_in_subnet(&self, subnet_name: &SubnetName) -> bool {
         subnet_name.0.is_prefix_of(&self.0)
+    }
+
+    pub fn testnet(&self) -> TestnetName {
+        TestnetName::from_prefix(&self.0)
     }
 }
 
@@ -256,6 +270,10 @@ impl SubnetName {
 
         hops
     }
+
+    pub fn testnet(&self) -> TestnetName {
+        TestnetName::from_prefix(&self.0)
+    }
 }
 
 /// Unique identifier for certain things that we want to keep unique.
@@ -300,6 +318,7 @@ mod tests {
         let sn = rn.subnet("foo");
         assert_eq!(rn.parent(), None, "root shouldn't have a parent");
         assert_eq!(sn.parent(), Some(rn), "parent should be the root");
+        assert_eq!(sn.testnet(), tn, "testnet is the prefix");
     }
 
     #[test]
@@ -331,5 +350,6 @@ mod tests {
         let node = sn.node("node-1");
 
         assert!(node.is_in_subnet(&sn));
+        assert_eq!(node.testnet(), tn, "testnet is the prefix");
     }
 }
