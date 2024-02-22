@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 // Note(sander): See this thread about choosing the ids https://filecoinproject.slack.com/archives/C04JR5R1UL8/p1706638112395409
-define_singleton!(OBJECTSTORE {
-    id: 91,
-    code_id: 91
+define_singleton!(CONTENTRESOLVER {
+    id: 90,
+    code_id: 90
 });

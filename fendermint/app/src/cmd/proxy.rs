@@ -6,6 +6,7 @@ use crate::options::{
 };
 use anyhow::anyhow;
 use cid::Cid;
+use fendermint_actor_objectstore::Object;
 use fendermint_rpc::client::FendermintClient;
 use fendermint_rpc::message::GasParams;
 use fendermint_rpc::tx::{CallClient, TxClient};
@@ -14,6 +15,7 @@ use fvm_shared::econ::TokenAmount;
 use fvm_shared::BLOCK_GAS_LIMIT;
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -169,7 +171,16 @@ async fn handle_get(
         })?;
 
     match res {
-        Some(obj) => Ok(obj),
+        Some(obj) => {
+            let value = Cid::try_from(obj.value).map_err(|e| {
+                Rejection::from(BadRequest {
+                    message: format!("failed to decode value: {}", e),
+                })
+            })?;
+            Ok(warp::reply::json(
+                &json!({"value": value.to_string(), "resolved": obj.resolved}),
+            ))
+        }
         None => Err(Rejection::from(NotFound)),
     }
 }
@@ -326,22 +337,6 @@ async fn datarepo_put(
     .await
 }
 
-async fn datarepo_append(
-    client: FendermintClient,
-    args: TransArgs,
-    key: String,
-    content: Cid,
-) -> anyhow::Result<Txn> {
-    broadcast(client, args, |mut client, value, gas_params| {
-        Box::pin(async move {
-            client
-                .datarepo_append(key, content, value, gas_params)
-                .await
-        })
-    })
-    .await
-}
-
 async fn datarepo_delete(
     client: FendermintClient,
     args: TransArgs,
@@ -358,7 +353,7 @@ async fn datarepo_get(
     args: TransArgs,
     key: String,
     height: u64,
-) -> anyhow::Result<Option<Vec<u8>>> {
+) -> anyhow::Result<Option<Object>> {
     let mut client = TransClient::new(client, &args)?;
     let gas_params = gas_params(&args);
     let h = FvmQueryHeight::from(height);

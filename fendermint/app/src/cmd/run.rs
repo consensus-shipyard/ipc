@@ -13,7 +13,7 @@ use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::chain::ChainEnv;
 use fendermint_vm_interpreter::{
     bytes::{BytesMessageInterpreter, ProposalPrepareMode},
-    chain::{ChainMessageInterpreter, CheckpointPool, IpfsPinPool},
+    chain::{ChainMessageInterpreter, CheckpointPool, ObjectPool},
     fvm::{Broadcaster, FvmMessageInterpreter, ValidatorContext},
     signed::SignedMessageInterpreter,
 };
@@ -128,7 +128,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         NamespaceBlockstore::new(db.clone(), ns.state_store).context("error creating state DB")?;
 
     let checkpoint_pool = CheckpointPool::new();
-    let ipfs_pin_pool = IpfsPinPool::new();
+    let ipfs_pin_pool = ObjectPool::new();
     let parent_finality_votes = VoteTally::empty();
 
     let topdown_enabled = settings.topdown_enabled();
@@ -278,7 +278,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             checkpoint_pool,
             parent_finality_provider: parent_finality_provider.clone(),
             parent_finality_votes: parent_finality_votes.clone(),
-            ipfs_pin_pool,
+            object_pool: ipfs_pin_pool,
         },
         snapshots,
     )?;
@@ -493,9 +493,9 @@ async fn dispatch_vote(
                     tracing::warn!(error = e.to_string(), "failed to handle vote");
                 }
                 Err(e @ (
-                      VoteError::Uninitialized // early vote, we're not ready yet
-                    | VoteError::UnpoweredValidator(_) // maybe arrived too early or too late, or spam
-                    | VoteError::UnexpectedBlock(_, _) // won't happen here
+                VoteError::Uninitialized // early vote, we're not ready yet
+                | VoteError::UnpoweredValidator(_) // maybe arrived too early or too late, or spam
+                | VoteError::UnexpectedBlock(_, _) // won't happen here
                 )) => {
                     tracing::debug!(error = e.to_string(), "failed to handle vote")
                 }

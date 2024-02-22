@@ -109,12 +109,6 @@ pub enum RpcDataRepoCommands {
         #[arg(long, short)]
         content: Cid,
     },
-    Append {
-        #[arg(long, short)]
-        key: String,
-        #[arg(long, short)]
-        content: Cid,
-    },
     Delete {
         #[arg(long, short)]
         key: String,

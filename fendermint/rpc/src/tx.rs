@@ -11,6 +11,7 @@ use fendermint_vm_message::query::{FvmQueryHeight, GasEstimate};
 use tendermint::abci::response::DeliverTx;
 use tendermint_rpc::endpoint::broadcast::{tx_async, tx_commit, tx_sync};
 
+use fendermint_actor_objectstore::Object;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
@@ -67,7 +68,7 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
         gas_params: GasParams,
     ) -> anyhow::Result<M::Response<RawBytes>> {
         let mf = self.message_factory_mut();
-        let msg = mf.transaction(to, method_num, params, value, gas_params)?;
+        let msg = mf.transaction(to, method_num, params, value, gas_params, None)?;
         let fut = self.perform(msg, decode_bytes);
         let res = fut.await?;
         Ok(res)
@@ -83,21 +84,6 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
     ) -> anyhow::Result<M::Response<Cid>> {
         let mf = self.message_factory_mut();
         let msg = mf.datarepo_put(key, content, value, gas_params)?;
-        let fut = self.perform(msg, decode_cid);
-        let res = fut.await?;
-        Ok(res)
-    }
-
-    /// Append to an object in a data repo.
-    async fn datarepo_append(
-        &mut self,
-        key: String,
-        content: Cid,
-        value: TokenAmount,
-        gas_params: GasParams,
-    ) -> anyhow::Result<M::Response<Cid>> {
-        let mf = self.message_factory_mut();
-        let msg = mf.datarepo_append(key, content, value, gas_params)?;
         let fut = self.perform(msg, decode_cid);
         let res = fut.await?;
         Ok(res)
@@ -163,7 +149,7 @@ pub trait CallClient: QueryClient + BoundClient {
         value: TokenAmount,
         gas_params: GasParams,
         height: FvmQueryHeight,
-    ) -> anyhow::Result<CallResponse<Vec<u8>>> {
+    ) -> anyhow::Result<CallResponse<Object>> {
         let msg = self
             .message_factory_mut()
             .datarepo_get(key, value, gas_params)?;
@@ -262,8 +248,10 @@ impl<C> CallClient for C where C: QueryClient + BoundClient + Send + Sync {}
 
 /// Return immediately after the transaction is broadcasted without waiting for check results.
 pub struct TxAsync;
+
 /// Wait for the check results before returning from broadcast.
 pub struct TxSync;
+
 /// Wait for the delivery results before returning from broadcast.
 pub struct TxCommit;
 

@@ -47,6 +47,21 @@ pub enum DomainHash {
     Eth([u8; 32]),
 }
 
+/// Represents a resolvable key/value object that can accompany a [`SignedMessage`].
+///
+/// The object's value will be queued for resolution.
+#[derive(PartialEq, Clone, Debug, Serialize_tuple, Deserialize_tuple, Hash, Eq)]
+pub struct Object {
+    pub key: Vec<u8>,
+    pub value: Cid,
+}
+
+impl Object {
+    pub fn new(key: Vec<u8>, value: Cid) -> Self {
+        Object { key, value }
+    }
+}
+
 /// Represents a wrapped message with signature bytes.
 ///
 /// This is the message that the client needs to send, but only the `message`
@@ -58,7 +73,7 @@ pub enum DomainHash {
 pub struct SignedMessage {
     pub message: Message,
     pub signature: Signature,
-    pub resolve_cid: Option<Cid>,
+    pub object: Option<Object>,
 }
 
 impl SignedMessage {
@@ -68,12 +83,12 @@ impl SignedMessage {
     pub fn new_unchecked(
         message: Message,
         signature: Signature,
-        resolve_cid: Option<Cid>,
+        object: Option<Object>,
     ) -> SignedMessage {
         SignedMessage {
             message,
             signature,
-            resolve_cid,
+            object,
         }
     }
 
@@ -82,16 +97,16 @@ impl SignedMessage {
         message: Message,
         sk: &SecretKey,
         chain_id: &ChainID,
-        resolve_cid: Option<Cid>,
+        object: Option<Object>,
     ) -> Result<Self, SignedMessageError> {
-        let signature = match Self::signable(&message, chain_id)? {
+        let signature = match Self::signable(&message, chain_id, &object)? {
             Signable::Ethereum((hash, _)) => sign_eth(sk, hash),
             Signable::Regular(data) => sign_regular(sk, &data),
         };
         Ok(Self {
             message,
             signature,
-            resolve_cid,
+            object,
         })
     }
 
@@ -104,7 +119,11 @@ impl SignedMessage {
     ///
     /// The [`ChainID`] is used as a replay attack protection, a variation of
     /// https://github.com/filecoin-project/FIPs/blob/master/FIPS/fip-0039.md
-    fn signable(message: &Message, chain_id: &ChainID) -> Result<Signable, SignedMessageError> {
+    fn signable(
+        message: &Message,
+        chain_id: &ChainID,
+        object: &Option<Object>,
+    ) -> Result<Signable, SignedMessageError> {
         // Here we look at the sender to decide what scheme to use for hashing.
         //
         // This is in contrast to https://github.com/filecoin-project/FIPs/blob/master/FIPS/fip-0055.md#delegated-signature-type
@@ -119,6 +138,7 @@ impl SignedMessage {
         // been signed according to the Ethereum scheme, and it could not have been signed by an `f1` address, it doesn't
         // work with regular accounts.
         match maybe_eth_address(&message.from) {
+            // FIXME(sander): Figure out how to include the object in the eth style signature.
             Some(addr) => {
                 let tx: TypedTransaction = from_fvm::to_eth_transaction_request(message, chain_id)
                     .map_err(SignedMessageError::Ethereum)?
@@ -129,6 +149,9 @@ impl SignedMessage {
             None => {
                 let mut data = Self::cid(message)?.to_bytes();
                 data.extend(chain_id_bytes(chain_id).iter());
+                if let Some(obj) = object {
+                    data.extend(crate::cid(obj)?.to_bytes());
+                }
                 Ok(Signable::Regular(data))
             }
         }
@@ -139,8 +162,9 @@ impl SignedMessage {
         message: &Message,
         signature: &Signature,
         chain_id: &ChainID,
+        object: &Option<Object>,
     ) -> Result<(), SignedMessageError> {
-        match Self::signable(message, chain_id)? {
+        match Self::signable(message, chain_id, object)? {
             Signable::Ethereum((hash, from)) => {
                 // If the sender is ethereum, recover the public key from the signature (which verifies it),
                 // then turn it into an `EthAddress` and verify it matches the `from` of the message.
@@ -193,8 +217,12 @@ impl SignedMessage {
     }
 
     /// Verifies that the from address of the message generated the signature.
-    pub fn verify(&self, chain_id: &ChainID) -> Result<(), SignedMessageError> {
-        Self::verify_signature(&self.message, &self.signature, chain_id)
+    pub fn verify(
+        &self,
+        chain_id: &ChainID,
+        object: &Option<Object>,
+    ) -> Result<(), SignedMessageError> {
+        Self::verify_signature(&self.message, &self.signature, chain_id, object)
     }
 
     /// Returns reference to the unsigned message.
@@ -310,7 +338,7 @@ mod arb {
             Self {
                 message: ArbMessage::arbitrary(g).0,
                 signature: Signature::arbitrary(g),
-                resolve_cid: None,
+                object: None,
             }
         }
     }
@@ -345,10 +373,10 @@ mod tests {
             .map_err(|e| format!("signing failed: {e}"))?;
 
         signed
-            .verify(&chain_id0)
+            .verify(&chain_id0, &None)
             .map_err(|e| format!("verifying failed: {e}"))?;
 
-        if signed.verify(&chain_id1).is_ok() {
+        if signed.verify(&chain_id1, &None).is_ok() {
             return Err("verifying with a different chain ID should fail".into());
         }
         Ok(())
@@ -367,6 +395,6 @@ mod tests {
         let signed =
             SignedMessage::new_secp256k1(msg, &sk, &chain_id, None).map_err(|e| e.to_string())?;
 
-        signed.verify(&chain_id).map_err(|e| e.to_string())
+        signed.verify(&chain_id, &None).map_err(|e| e.to_string())
     }
 }

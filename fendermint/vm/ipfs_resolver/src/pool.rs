@@ -155,6 +155,15 @@ where
         Ok(resolved)
     }
 
+    /// Return the status of an item. It can be queried for completion.
+    pub fn remove(&self, item: &T) -> Stm<Option<ResolveStatus<T>>> {
+        let key = ResolveKey::from(item);
+        let mut items = self.items.read_clone()?;
+        let removed = items.remove(&key);
+        self.items.write(items)?;
+        Ok(removed)
+    }
+
     /// Await the next item to be resolved.
     pub fn next(&self) -> Stm<ResolveTask> {
         self.queue.read()
@@ -167,7 +176,6 @@ where
 mod tests {
     use async_stm::{atomically, queues::TQueueLike};
     use cid::Cid;
-    use ipc_api::subnet_id::SubnetID;
 
     #[derive(Clone, Hash, Eq, PartialEq, Debug)]
     struct TestItem {
@@ -175,7 +183,7 @@ mod tests {
     }
 
     impl TestItem {
-        pub fn dummy(root_id: u64) -> Self {
+        pub fn dummy() -> Self {
             Self {
                 cid: Cid::default(),
             }
@@ -193,7 +201,7 @@ mod tests {
     #[tokio::test]
     async fn add_new_item() {
         let pool = ResolvePool::new();
-        let item = TestItem::dummy(0);
+        let item = TestItem::dummy();
 
         atomically(|| pool.add(item.clone())).await;
         atomically(|| {
@@ -208,7 +216,7 @@ mod tests {
     #[tokio::test]
     async fn add_existing_item() {
         let pool = ResolvePool::new();
-        let item = TestItem::dummy(0);
+        let item = TestItem::dummy();
 
         // Add once.
         atomically(|| pool.add(item.clone())).await;
@@ -237,7 +245,7 @@ mod tests {
     #[tokio::test]
     async fn get_status() {
         let pool = ResolvePool::new();
-        let item = TestItem::dummy(0);
+        let item = TestItem::dummy();
 
         let status1 = atomically(|| pool.add(item.clone())).await;
         let status2 = atomically(|| pool.get_status(&item))
@@ -265,7 +273,7 @@ mod tests {
     #[tokio::test]
     async fn collect_resolved() {
         let pool = ResolvePool::new();
-        let item = TestItem::dummy(0);
+        let item = TestItem::dummy();
 
         atomically(|| {
             let status = pool.add(item.clone())?;

@@ -12,7 +12,7 @@ use fil_actors_runtime::ActorError;
 use fvm_ipld_hamt::BytesKey;
 use fvm_shared::error::ExitCode;
 
-use crate::{Method, ObjectParams, State, OBJECTSTORE_ACTOR_NAME};
+use crate::{Method, Object, ObjectParams, State, OBJECTSTORE_ACTOR_NAME};
 
 // const SYSCALL_FAILED_EXIT_CODE: u32 = 0x31337;
 
@@ -46,7 +46,7 @@ impl Actor {
         // })?;
 
         let root = rt.transaction(|st: &mut State, rt| {
-            st.put(rt.store(), BytesKey(params.key), params.content)
+            st.put(rt.store(), BytesKey(params.key), params.content, true)
                 .map_err(|e| {
                     e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to put object")
                 })
@@ -55,20 +55,13 @@ impl Actor {
         Ok(root)
     }
 
-    fn append_object(rt: &impl Runtime, params: ObjectParams) -> Result<Cid, ActorError> {
-        // FIXME:(carsonfarmer) We'll want to validate the caller is the owner of the repo.
-        rt.validate_immediate_caller_accept_any()?;
-
-        // objectstore_actor_sdk::load_car(params.file).map_err(|en| {
-        //     let msg = format!("load_car syscall failed with {en}");
-        //     ActorError::checked(ExitCode::new(SYSCALL_FAILED_EXIT_CODE), msg, None)
-        // })?;
+    fn resolve_object(rt: &impl Runtime, key: Vec<u8>) -> Result<Cid, ActorError> {
+        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
         let root = rt.transaction(|st: &mut State, rt| {
-            st.append(rt.store(), BytesKey(params.key), params.content)
-                .map_err(|e| {
-                    e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to append to object")
-                })
+            st.resolve(rt.store(), &BytesKey(key)).map_err(|e| {
+                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to resolve object")
+            })
         })?;
 
         Ok(root)
@@ -80,14 +73,14 @@ impl Actor {
 
         let root = rt.transaction(|st: &mut State, rt| {
             st.delete(rt.store(), &BytesKey(key)).map_err(|e| {
-                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to delete to object")
+                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to delete object")
             })
         })?;
 
         Ok(root)
     }
 
-    fn get_object(rt: &impl Runtime, key: Vec<u8>) -> Result<Option<Vec<u8>>, ActorError> {
+    fn get_object(rt: &impl Runtime, key: Vec<u8>) -> Result<Option<Object>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
         let st: State = rt.state()?;
@@ -116,7 +109,7 @@ impl ActorCode for Actor {
     actor_dispatch! {
         Constructor => constructor,
         PutObject => put_object,
-        AppendObject => append_object,
+        ResolveObject => resolve_object,
         DeleteObject => delete_object,
         GetObject => get_object,
         ListObjects => list_objects,

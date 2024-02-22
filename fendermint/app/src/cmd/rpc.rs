@@ -62,9 +62,6 @@ cmd! {
                 RpcDataRepoCommands::Put { key, content } => {
                     datarepo_put(client, args, key, content).await
                 }
-                RpcDataRepoCommands::Append { key, content} => {
-                    datarepo_append(client, args, key, content).await
-                }
                 RpcDataRepoCommands::Delete { key } => {
                     datarepo_delete(client, args, key).await
                 }
@@ -112,7 +109,7 @@ async fn query(
         RpcQueryCommands::ActorState { address } => {
             match client.actor_state(&address, height).await?.value {
                 Some((id, state)) => {
-                    let out = json! ({
+                    let out = json!({
                       "id": id,
                       "state": state,
                     });
@@ -211,32 +208,7 @@ async fn datarepo_put(
         client,
         args,
         |mut client, value, gas_params| {
-            Box::pin(async move {
-                client
-                    .datarepo_put(key, content, value, gas_params)
-                    .await
-            })
-        },
-        cid_to_json,
-    )
-    .await
-}
-
-async fn datarepo_append(
-    client: FendermintClient,
-    args: TransArgs,
-    key: String,
-    content: Cid,
-) -> anyhow::Result<()> {
-    broadcast_and_print(
-        client,
-        args,
-        |mut client, value, gas_params| {
-            Box::pin(async move {
-                client
-                    .datarepo_append(key, content, value, gas_params)
-                    .await
-            })
+            Box::pin(async move { client.datarepo_put(key, content, value, gas_params).await })
         },
         cid_to_json,
     )
