@@ -114,22 +114,22 @@ impl MessageFactory {
     pub fn datarepo_put(
         &mut self,
         key: String,
-        content: Cid,
-        value: TokenAmount,
+        value: Cid,
+        token_value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
         let input = fendermint_actor_objectstore::ObjectParams {
             key: key.clone().into_bytes(),
-            value: content.to_bytes(),
+            value,
         };
         let params = RawBytes::serialize(&input)?;
         let message = self.transaction(
             objectstore::OBJECTSTORE_ACTOR_ADDR,
             fendermint_actor_objectstore::Method::PutObject as u64,
             params,
-            value,
+            token_value,
             gas_params,
-            Some(Object::new(key.into_bytes(), content)),
+            Some(Object::new(key.into_bytes(), value)),
         )?;
         Ok(message)
     }

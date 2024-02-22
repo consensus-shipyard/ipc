@@ -13,7 +13,6 @@ fvm = { workspace = true }
 fvm_shared = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }
 num-traits = { workspace = true }
-fvm_ipld_car = { workspace = true }
-multihash = { workspace = true }
-rand = "0.8.5"
-async-std = "1.12.0"
+tokio = { workspace = true }
+log = { workspace = true }
+ipfs-api-backend-hyper = { version = "0.6.0", features = ["with-send-sync"] }

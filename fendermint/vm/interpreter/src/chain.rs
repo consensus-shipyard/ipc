@@ -223,7 +223,6 @@ where
                     }
                 }
                 ChainMessage::Ipc(IpcMessage::ObjectResolved(obj)) => {
-                    println!("PROCESS: ObjectResolved");
                     let item = ObjectPoolItem { obj };
 
                     let is_resolved = atomically(|| match env.object_pool.get_status(&item)? {
@@ -416,19 +415,22 @@ where
                     Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
                 }
                 IpcMessage::ObjectResolved(obj) => {
-                    println!("DELIVER: ObjectResolved");
-
                     let from = system::SYSTEM_ACTOR_ADDR;
                     let to = objectstore::OBJECTSTORE_ACTOR_ADDR;
                     let method_num = fendermint_actor_objectstore::Method::PutObject as u64;
                     let gas_limit = 10_000_000_000;
 
-                    let params = RawBytes::serialize(obj.key)?;
+                    // TODO(sander): Clean up with From.
+                    let input = fendermint_actor_objectstore::ObjectParams {
+                        key: obj.key,
+                        value: obj.value,
+                    };
+                    let params = RawBytes::serialize(&input)?;
                     let msg = Message {
                         version: Default::default(),
                         from,
                         to,
-                        sequence: 0, // TODO(sander): This works but is it right?
+                        sequence: 0, // TODO(sander): This works but is it okay?
                         value: TokenAmount::zero(),
                         method_num: fendermint_actor_objectstore::Method::ResolveObject as u64,
                         params,
@@ -509,7 +511,6 @@ where
     ) -> anyhow::Result<(Self::State, Self::Output)> {
         match msg {
             ChainMessage::Signed(msg) => {
-                println!("CHECK: SignedMessage (nonce = {})", msg.message.sequence);
                 let (state, ret) = self
                     .inner
                     .check(state, VerifiableMessage::Signed(msg), is_recheck)

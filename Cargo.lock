@@ -6625,7 +6625,6 @@ dependencies = [
 name = "objectstore_actor_sdk"
 version = "0.1.0"
 dependencies = [
- "cid",
  "fvm_sdk",
  "fvm_shared",
  "num-traits",
@@ -6637,15 +6636,14 @@ version = "0.1.0"
 dependencies = [
  "ambassador",
  "anyhow",
- "async-std",
  "cid",
  "fvm",
  "fvm_ipld_blockstore",
- "fvm_ipld_car",
  "fvm_shared",
- "multihash 0.18.1",
+ "ipfs-api-backend-hyper",
+ "log",
  "num-traits",
- "rand",
+ "tokio",
 ]
 
 [[package]]

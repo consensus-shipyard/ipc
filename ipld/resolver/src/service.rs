@@ -518,13 +518,17 @@ where
     fn start_ipfs_query(&mut self, cid: Cid, response_channel: ResponseChannel) {
         tokio::spawn(async move {
             let client = IpfsClient::default();
-            let res = client
-                .pin_add(cid.to_string().as_str(), true)
-                .await
-                .unwrap();
-            println!("pins: {:#?}", res.pins);
-
-            send_resolve_result(response_channel, Ok(()))
+            let res = client.pin_add(&cid.to_string(), true).await;
+            match res {
+                Ok(_) => {
+                    info!("resolved {} from IPFS", cid);
+                    send_resolve_result(response_channel, Ok(()))
+                }
+                Err(e) => {
+                    info!("resolving {} from IPFS failed with {}", cid, e);
+                    send_resolve_result(response_channel, Err(anyhow!(e)))
+                }
+            }
         });
     }
 

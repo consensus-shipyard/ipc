@@ -19,8 +19,8 @@ use fvm_shared::{address::Address, econ::TokenAmount, ActorID, MethodNum};
 
 #[derive(Delegate)]
 #[delegate(ActorOps, where = "C: CallManager")]
-#[delegate(SendOps<K>, generics = "K", where = "K: Kernel")]
-#[delegate(UpgradeOps<K>, generics = "K", where = "K: Kernel")]
+#[delegate(SendOps < K >, generics = "K", where = "K: Kernel")]
+#[delegate(UpgradeOps < K >, generics = "K", where = "K: Kernel")]
 #[delegate(IpldBlockOps, where = "C: CallManager")]
 #[delegate(CryptoOps, where = "C: CallManager")]
 #[delegate(DebugOps, where = "C: CallManager")]
@@ -41,9 +41,6 @@ where
 {
     /// Directly add a block, skipping gas and reachability checks.
     fn block_add(&mut self, cid: Cid, data: &[u8]) -> Result<()> {
-        // self.0
-        //     .blocks
-        //     .put_reachable(Block::new(cid.codec(), data, vec![]))?;
         self.0
             .call_manager
             .blockstore()
@@ -71,10 +68,12 @@ where
         + ObjectStoreOps,
 {
     fn link_syscalls(linker: &mut Linker<K>) -> anyhow::Result<()> {
-        use crate::{SYSCALL_FUNCTION_NAME, SYSCALL_MODULE_NAME};
-
         DefaultKernel::<K::CallManager>::link_syscalls(linker)?;
-        linker.link_syscall(SYSCALL_MODULE_NAME, SYSCALL_FUNCTION_NAME, crate::load_car)?;
+        linker.link_syscall(
+            crate::SYSCALL_MODULE_NAME,
+            crate::CIDRM_SYSCALL_FUNCTION_NAME,
+            crate::cid_rm,
+        )?;
 
         Ok(())
     }

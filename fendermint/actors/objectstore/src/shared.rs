@@ -4,8 +4,7 @@
 
 use cid::Cid;
 use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding::strict_bytes;
-use fvm_ipld_encoding::tuple::*;
+use fvm_ipld_encoding::{strict_bytes, tuple::*};
 use fvm_ipld_hamt::{BytesKey, Hamt};
 use fvm_shared::METHOD_CONSTRUCTOR;
 use num_derive::FromPrimitive;
@@ -16,8 +15,7 @@ pub const OBJECTSTORE_ACTOR_NAME: &str = "objectstore";
 pub struct ObjectParams {
     #[serde(with = "strict_bytes")]
     pub key: Vec<u8>,
-    #[serde(with = "strict_bytes")]
-    pub value: Vec<u8>,
+    pub value: Cid,
 }
 
 #[derive(FromPrimitive)]
@@ -44,15 +42,18 @@ pub struct State {
 #[derive(Clone, Debug, PartialEq, Serialize_tuple, Deserialize_tuple)]
 pub struct Object {
     /// Cid in bytes representation
+    ///
+    /// We can't use Cid type because FVM will reject it as unreachable.
     #[serde(with = "strict_bytes")]
     pub value: Vec<u8>,
+    /// Whether the object has been resolved.
     pub resolved: bool,
 }
 
 impl Object {
-    fn new(value: Vec<u8>) -> Self {
+    fn new(value: Cid) -> Self {
         Object {
-            value,
+            value: value.to_bytes(),
             resolved: false,
         }
     }
@@ -77,7 +78,7 @@ impl State {
         &mut self,
         store: &BS,
         key: BytesKey,
-        value: Vec<u8>,
+        value: Cid,
         overwrite: bool,
     ) -> anyhow::Result<Cid> {
         let mut hamt = Hamt::<_, Object>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
@@ -91,25 +92,38 @@ impl State {
         Ok(self.root)
     }
 
-    pub fn resolve<BS: Blockstore>(&mut self, store: &BS, key: &BytesKey) -> anyhow::Result<Cid> {
+    pub fn resolve<BS: Blockstore>(
+        &mut self,
+        store: &BS,
+        key: BytesKey,
+        value: Cid,
+    ) -> anyhow::Result<Cid> {
         let mut hamt = Hamt::<_, Object>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
-        match hamt.get(key).map(|v| v.map(|inner| inner.clone()))? {
+        match hamt.get(&key).map(|v| v.map(|inner| inner.clone()))? {
             Some(mut obj) => {
-                obj.resolved = true;
-                hamt.set(key.clone(), obj)?;
-                self.root = hamt.flush()?;
+                // Ignore if value changed before it was resolved.
+                if obj.value == value.to_bytes() {
+                    obj.resolved = true;
+                    hamt.set(key, obj)?;
+                    self.root = hamt.flush()?;
+                }
                 Ok(self.root)
             }
-            None => Err(anyhow::anyhow!("key not found")),
+            // Don't error here in case key was deleted before value was resolved.
+            None => Ok(self.root),
         }
     }
 
-    pub fn delete<BS: Blockstore>(&mut self, store: &BS, key: &BytesKey) -> anyhow::Result<Cid> {
+    pub fn delete<BS: Blockstore>(
+        &mut self,
+        store: &BS,
+        key: &BytesKey,
+    ) -> anyhow::Result<(Option<Object>, Cid)> {
         let mut hamt = Hamt::<_, Object>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
         if hamt.contains_key(key)? {
-            hamt.delete(key)?;
+            let value = hamt.delete(key)?.map(|o| o.1);
             self.root = hamt.flush()?;
-            return Ok(self.root);
+            return Ok((value, self.root));
         }
         return Err(anyhow::anyhow!("key not found"));
     }
@@ -157,12 +171,12 @@ mod tests {
         let store = fvm_ipld_blockstore::MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         assert!(state
-            .put(&store, BytesKey(vec![1, 2, 3]), vec![4, 5, 6], true)
+            .put(&store, BytesKey(vec![1, 2, 3]), Cid::default(), true)
             .is_ok());
 
         assert_eq!(
             state.root,
-            Cid::from_str("bafy2bzaceaftc6vvulkujsfbntlcxkaywbz2l7u6x7vcanyztgxiv6rfjiick")
+            Cid::from_str("bafy2bzaced7xmsrlxozd2kac6vfmp6gw3ynz666vfdgsde2uh2iumbk3hgxcg")
                 .unwrap()
         );
     }
@@ -172,18 +186,17 @@ mod tests {
         let store = fvm_ipld_blockstore::MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let key = BytesKey(vec![1, 2, 3]);
-        let content = vec![4, 5, 6];
         state
-            .put(&store, key.clone(), content.clone(), true)
+            .put(&store, key.clone(), Cid::default(), true)
             .unwrap();
-        assert!(state.resolve(&store, &key).is_ok());
+        assert!(state.resolve(&store, key.clone(), Cid::default()).is_ok());
 
         let result = state.get(&store, &key);
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
             Some(Object {
-                value: content,
+                value: Cid::default().to_bytes(),
                 resolved: true,
             })
         );
@@ -194,7 +207,9 @@ mod tests {
         let store = fvm_ipld_blockstore::MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let key = BytesKey(vec![1, 2, 3]);
-        state.put(&store, key.clone(), vec![4, 5, 6], true).unwrap();
+        state
+            .put(&store, key.clone(), Cid::default(), true)
+            .unwrap();
         assert!(state.delete(&store, &key).is_ok());
 
         let result = state.get(&store, &key);
@@ -207,9 +222,8 @@ mod tests {
         let store = fvm_ipld_blockstore::MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let key = BytesKey(vec![1, 2, 3]);
-        let content = vec![4, 5, 6];
         state
-            .put(&store, key.clone(), content.clone(), true)
+            .put(&store, key.clone(), Cid::default(), true)
             .unwrap();
         let result = state.get(&store, &key);
 
@@ -217,7 +231,7 @@ mod tests {
         assert_eq!(
             result.unwrap(),
             Some(Object {
-                value: content,
+                value: Cid::default().to_bytes(),
                 resolved: false,
             })
         );
@@ -228,10 +242,14 @@ mod tests {
         let store = fvm_ipld_blockstore::MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let key = BytesKey(vec![1, 2, 3]);
-        state.put(&store, key.clone(), vec![4, 5, 6], true).unwrap();
+        state
+            .put(&store, key.clone(), Cid::default(), true)
+            .unwrap();
         let result = state.list(&store);
 
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), vec![key.0]);
+        let result = result.unwrap();
+        assert_eq!(result[0].0, key.0);
+        assert_eq!(result[0].1.value, Cid::default().to_bytes());
     }
 }

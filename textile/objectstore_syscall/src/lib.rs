@@ -1,42 +1,43 @@
 pub mod objectstore_kernel;
 
 use crate::objectstore_kernel::ObjectStoreOps;
-use async_std::task;
-use fvm::kernel::{IpldBlockOps, Result};
+use cid::Cid;
+use fvm::kernel::{ExecutionError, Result, SyscallError};
 use fvm::syscalls::Context;
-use fvm_ipld_car::CarReader;
-// use multihash::Code;
+use fvm_shared::error::ErrorNumber;
+use ipfs_api_backend_hyper::{IpfsApi, IpfsClient};
+use log::info;
+use num_traits::FromPrimitive;
+use std::fmt::Display;
 
 pub const SYSCALL_MODULE_NAME: &str = "objectstore";
-pub const SYSCALL_FUNCTION_NAME: &str = "load_car";
+pub const CIDRM_SYSCALL_FUNCTION_NAME: &str = "cid_rm";
 
-pub fn load_car(
-    context: Context<'_, impl IpldBlockOps + ObjectStoreOps>,
-    file_off: u32,
-    file_len: u32,
-) -> Result<()> {
-    let data = context.memory.try_slice(file_off, file_len)?;
-    let name = std::str::from_utf8(data).expect("failed to parse file name");
+const CIDRM_SYSCALL_ERROR_CODE: u32 = 101; // TODO(sander): Is the okay?
 
-    // Create and link blocks
-    task::block_on(async move {
-        let file = async_std::fs::File::open(format!("/tmp/{}", name))
+fn syscall_error<D: Display>(error_number: u32) -> impl FnOnce(D) -> ExecutionError {
+    move |e| {
+        ExecutionError::Syscall(SyscallError::new(
+            ErrorNumber::from_u32(error_number).unwrap(),
+            e,
+        ))
+    }
+}
+
+pub fn cid_rm(context: Context<'_, impl ObjectStoreOps>, cid_off: u32, cid_len: u32) -> Result<()> {
+    let cid = context.memory.try_slice(cid_off, cid_len)?;
+    let cid = Cid::try_from(cid).map_err(syscall_error(CIDRM_SYSCALL_ERROR_CODE))?;
+
+    // Don't block the chain with this.
+    tokio::spawn(async move {
+        let client = IpfsClient::default();
+        let foo = client
+            .pin_rm(&cid.to_string(), true)
             .await
-            .unwrap();
-        let mut reader = CarReader::new(file).await.unwrap();
-        while let Some(block) = reader.next_block().await.unwrap() {
-            // let bid = context
-            //     .kernel
-            //     .block_create(block.cid.codec(), &block.data)
-            //     .expect("failed to create block");
-            // context
-            //     .kernel
-            //     .block_link(bid, Code::Blake2b256.into(), 32)
-            //     .expect("failed to link block");
-            context
-                .kernel
-                .block_add(block.cid, &block.data)
-                .expect("failed to add block");
+            .map_err(syscall_error(CIDRM_SYSCALL_ERROR_CODE));
+        match foo {
+            Ok(_) => info!("unresolved {} from IPFS", cid),
+            Err(e) => info!("unresolving {} from IPFS failed with {}", cid, e),
         }
     });
 
