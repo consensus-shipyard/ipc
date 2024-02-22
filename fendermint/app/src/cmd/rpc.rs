@@ -73,6 +73,13 @@ cmd! {
                     let height = Height::try_from(height)?;
                     datarepo_list_call(client, args, height).await
                 }
+                RpcDataRepoCommands::Push { content } => {
+                    datarepo_push(client, args, content).await
+                }
+                RpcDataRepoCommands::Root { height } => {
+                    let height = Height::try_from(height)?;
+                    datarepo_root_call(client, args, height).await
+                }
             },
             RpcCommands::Fevm { args, command } => match command {
                 RpcFevmCommands::Create { contract, constructor_args } => {
@@ -265,6 +272,42 @@ async fn datarepo_list_call(
     let res = client
         .inner
         .datarepo_list_call(value, gas_params, height)
+        .await?;
+
+    let json = json!({"response": res.response, "return_data": res.return_data});
+
+    print_json(&json)
+}
+
+async fn datarepo_push(
+    client: FendermintClient,
+    args: TransArgs,
+    event: Bytes,
+) -> anyhow::Result<()> {
+    broadcast_and_print(
+        client,
+        args,
+        |mut client, value, gas_params| {
+            Box::pin(async move { client.datarepo_push(event, value, gas_params).await })
+        },
+        cid_to_json,
+    )
+    .await
+}
+
+async fn datarepo_root_call(
+    client: FendermintClient,
+    args: TransArgs,
+    height: Height,
+) -> anyhow::Result<()> {
+    let mut client = TransClient::new(client, &args)?;
+    let gas_params = gas_params(&args);
+    let value = args.value;
+    let height = FvmQueryHeight::from(height.value());
+
+    let res = client
+        .inner
+        .datarepo_root_call(value, gas_params, height)
         .await?;
 
     let json = json!({"response": res.response, "return_data": res.return_data});

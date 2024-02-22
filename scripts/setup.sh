@@ -28,7 +28,7 @@ fendermint genesis --genesis-file test-network/genesis.json ipc gateway --subnet
 
 # Configure Tendermint
 rm -rf ~/.cometbft
-/home/sander/go/bin/cometbft init
+~/go/bin/cometbft init
 
 ## Convert the Genesis file
 mv ~/.cometbft/config/genesis.json ~/.cometbft/config/genesis.json.orig

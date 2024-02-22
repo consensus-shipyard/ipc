@@ -8,7 +8,7 @@ use base64::Engine;
 use bytes::Bytes;
 use cid::Cid;
 use fendermint_crypto::SecretKey;
-use fendermint_vm_actor_interface::{eam, evm, objectstore};
+use fendermint_vm_actor_interface::{accumulator, eam, evm, objectstore};
 use fendermint_vm_message::signed::Object;
 use fendermint_vm_message::{chain::ChainMessage, signed::SignedMessage};
 use fvm_ipld_encoding::{BytesSer, RawBytes};
@@ -114,22 +114,22 @@ impl MessageFactory {
     pub fn datarepo_put(
         &mut self,
         key: String,
-        value: Cid,
-        token_value: TokenAmount,
+        object_value: Cid,
+        value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
         let input = fendermint_actor_objectstore::ObjectParams {
             key: key.clone().into_bytes(),
-            value,
+            value: object_value,
         };
         let params = RawBytes::serialize(&input)?;
         let message = self.transaction(
             objectstore::OBJECTSTORE_ACTOR_ADDR,
             fendermint_actor_objectstore::Method::PutObject as u64,
             params,
-            token_value,
+            value,
             gas_params,
-            Some(Object::new(key.into_bytes(), value)),
+            Some(Object::new(key.into_bytes(), object_value)),
         )?;
         Ok(message)
     }
@@ -191,6 +191,52 @@ impl MessageFactory {
         let message = self.transaction(
             objectstore::OBJECTSTORE_ACTOR_ADDR,
             fendermint_actor_objectstore::Method::ListObjects as u64,
+            RawBytes::default(),
+            value,
+            gas_params,
+            None,
+        )?;
+
+        let message = if let ChainMessage::Signed(signed) = message {
+            signed.into_message()
+        } else {
+            panic!("unexpected message type: {message:?}");
+        };
+
+        // Roll back the sequence, we don't really want to invoke anything.
+        self.set_sequence(message.sequence);
+
+        Ok(message)
+    }
+
+    /// Push to the accumulator of a data repo.
+    pub fn datarepo_push(
+        &mut self,
+        event: Bytes,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<ChainMessage> {
+        let params = RawBytes::serialize(event.to_vec())?;
+        let message = self.transaction(
+            accumulator::ACCUMULATOR_ACTOR_ADDR,
+            fendermint_actor_accumulator::Method::Push as u64,
+            params,
+            value,
+            gas_params,
+            None,
+        )?;
+        Ok(message)
+    }
+
+    /// Get the root accumulator commitment. This will not create a transaction.
+    pub fn datarepo_root(
+        &mut self,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<Message> {
+        let message = self.transaction(
+            accumulator::ACCUMULATOR_ACTOR_ADDR,
+            fendermint_actor_accumulator::Method::Root as u64,
             RawBytes::default(),
             value,
             gas_params,

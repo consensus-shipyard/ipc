@@ -103,6 +103,20 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
         Ok(res)
     }
 
+    /// Push to the accumulator in a data repo.
+    async fn datarepo_push(
+        &mut self,
+        event: Bytes,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<M::Response<Cid>> {
+        let mf = self.message_factory_mut();
+        let msg = mf.datarepo_push(event, value, gas_params)?;
+        let fut = self.perform(msg, decode_cid);
+        let res = fut.await?;
+        Ok(res)
+    }
+
     /// Deploy a FEVM contract.
     async fn fevm_create(
         &mut self,
@@ -190,6 +204,32 @@ pub trait CallClient: QueryClient + BoundClient {
         let response = CallResponse {
             response,
             return_data,
+        };
+
+        Ok(response)
+    }
+
+    /// Get root accumulator commitment for a data repo without including a transaction on the blockchain.
+    async fn datarepo_root_call(
+        &mut self,
+        value: TokenAmount,
+        gas_params: GasParams,
+        height: FvmQueryHeight,
+    ) -> anyhow::Result<CallResponse<Cid>> {
+        let msg = self
+            .message_factory_mut()
+            .datarepo_root(value, gas_params)?;
+
+        let response = self.call(msg, height).await?;
+        if response.value.code.is_err() {
+            return Err(anyhow!("{}", response.value.info));
+        }
+        let root =
+            decode_cid(&response.value).context("error decoding data from deliver_tx in call")?;
+
+        let response = CallResponse {
+            response,
+            return_data: Some(root),
         };
 
         Ok(response)

@@ -101,18 +101,24 @@ pub enum RpcQueryCommands {
     StateParams,
 }
 
+// FIXME:(carsonfarmer) For now, just adding all commands to the data repo enum.
+
 #[derive(Subcommand, Debug, Clone)]
 pub enum RpcDataRepoCommands {
+    // Object Store operations
+    /// Put a new key-value pair into the data repo.
     Put {
         #[arg(long, short)]
         key: String,
         #[arg(long, short)]
         content: Cid,
     },
+    /// Delete the value at a key from the data repo.
     Delete {
         #[arg(long, short)]
         key: String,
     },
+    /// Get the value of a key from the data repo.
     Get {
         #[arg(long, short)]
         key: String,
@@ -120,7 +126,21 @@ pub enum RpcDataRepoCommands {
         #[arg(long, short = 'b', default_value_t = 0)]
         height: u64,
     },
+    /// List all keys in the data repo.
     List {
+        /// Block height to query; 0 means latest.
+        #[arg(long, short = 'b', default_value_t = 0)]
+        height: u64,
+    },
+    // Accumulator operations
+    /// Push a new value into the data repo's accumulator.
+    Push {
+        /// Content to push into the data repo for tracking.
+        #[arg(long, short)]
+        event: Bytes,
+    },
+    /// Get the root commitment of the data repo's accumulator.
+    Root {
         /// Block height to query; 0 means latest.
         #[arg(long, short = 'b', default_value_t = 0)]
         height: u64,
