@@ -172,15 +172,12 @@ impl FinalityWithNull {
         };
         Ok(Some(h))
     }
-}
 
-/// All the private functions
-impl FinalityWithNull {
-    /// Get the first non-null block in the range [start, end].
-    fn first_non_null_block_before(&self, height: BlockHeight) -> Stm<Option<BlockHeight>> {
+    /// Get the first non-null block in the range of earliest cache block till the height specified, inclusive.
+    pub(crate) fn first_non_null_block(&self, height: BlockHeight) -> Stm<Option<BlockHeight>> {
         let cache = self.cached_data.read()?;
         Ok(cache.lower_bound().and_then(|lower_bound| {
-            for h in (lower_bound..height).rev() {
+            for h in (lower_bound..=height).rev() {
                 if let Some(Some(_)) = cache.get_value(h) {
                     return Some(h);
                 }
@@ -188,7 +185,10 @@ impl FinalityWithNull {
             None
         }))
     }
+}
 
+/// All the private functions
+impl FinalityWithNull {
     fn propose_next_height(&self) -> Stm<Option<BlockHeight>> {
         let latest_height = if let Some(h) = self.latest_height_in_cache()? {
             h
@@ -207,18 +207,17 @@ impl FinalityWithNull {
         let candidate_height = min(max_proposal_height, latest_height);
         tracing::debug!(max_proposal_height, candidate_height, "propose heights");
 
-        let first_non_null_height =
-            if let Some(h) = self.first_non_null_block_before(candidate_height)? {
-                h
-            } else {
-                tracing::debug!(height = candidate_height, "no non-null block found before");
-                return Ok(None);
-            };
+        let first_non_null_height = if let Some(h) = self.first_non_null_block(candidate_height)? {
+            h
+        } else {
+            tracing::debug!(height = candidate_height, "no non-null block found before");
+            return Ok(None);
+        };
 
         tracing::debug!(first_non_null_height, candidate_height);
         // an extra layer of delay
         let maybe_proposal_height =
-            self.first_non_null_block_before(first_non_null_height - self.config.proposal_delay())?;
+            self.first_non_null_block(first_non_null_height - self.config.proposal_delay())?;
         tracing::debug!(
             delayed_height = maybe_proposal_height,
             delay = self.config.proposal_delay()
