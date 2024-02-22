@@ -175,6 +175,8 @@ library TestUtils {
 contract MockIpcContract is IpcHandler {
     /* solhint-disable-next-line unused-vars */
     function handleIpcMessage(IpcEnvelope calldata) external payable returns (bytes memory ret) {
+        console.log("msg value in mocked ipc contract");
+        console.log(msg.value);
         return EMPTY_BYTES;
     }
 }

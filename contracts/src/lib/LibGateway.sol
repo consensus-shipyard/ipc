@@ -14,6 +14,8 @@ import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {SupplySourceHelper} from "../lib/SupplySourceHelper.sol";
 
+import "forge-std/Test.sol";
+
 library LibGateway {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for IpcEnvelope;
@@ -411,6 +413,7 @@ library LibGateway {
 
         // execute the message and get the receipt.
         (bool success, bytes memory ret) = executeCrossMsg(crossMsg, supplySource);
+        console.log(success);
         if (success) {
             sendReceipt(crossMsg, OutcomeType.Ok, ret);
         } else {
