@@ -10,17 +10,11 @@ Several steps in this guide involve running long-lived processes. In each of the
 
 #### **For Linux:**
 
-* Install system packages: `sudo apt install build-essential clang cmake pkg-config libssl-dev protobuf-compiler git curl`.
+* Install system packages: `sudo apt update && sudo apt install build-essential clang cmake pkg-config libssl-dev protobuf-compiler git curl mesa-opencl-icd ocl-icd-opencl-dev gcc bzr jq hwloc libhwloc-dev wget ca-certificates gnupg -y`.
 * Install Rust. See [instructions](https://www.rust-lang.org/tools/install).
 * Install cargo-make: `cargo install --force cargo-make`.
 * Install Docker. See [instructions](https://docs.docker.com/engine/install/ubuntu/).
 * Install Foundry. See [instructions](https://book.getfoundry.sh/getting-started/installation).
-
-Also install the following dependencies ([details](https://lotus.filecoin.io/lotus/install/prerequisites/#supported-platforms))
-
-```
-sudo apt update && sudo apt install build-essential libssl-dev mesa-opencl-icd ocl-icd-opencl-dev gcc git bzr jq pkg-config curl clang hwloc libhwloc-dev wget ca-certificates gnupg -y
-```
 
 #### For MacOS:
 
