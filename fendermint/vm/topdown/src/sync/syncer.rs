@@ -26,6 +26,14 @@ pub(crate) struct LotusParentSyncer<T, P> {
 
     /// The pointers that indicate which height to poll parent next
     sync_pointers: SyncPointers,
+
+    /// For testing purposes, we can sync one block at a time.
+    /// Not part of `Config` as it's a very niche setting;
+    /// if enabled it would slow down catching up with parent
+    /// history to a crawl, or one would have to increase
+    /// the polling frequence to where it's impractical after
+    /// we have caught up.
+    sync_many: bool,
 }
 
 impl<T, P> LotusParentSyncer<T, P>
@@ -51,9 +59,12 @@ where
             vote_tally,
             query,
             sync_pointers: SyncPointers::new(last_committed_finality.height),
+            sync_many: true,
         })
     }
 
+    /// Sync as many blocks as we can.
+    ///
     /// There are 2 pointers, each refers to a block height, when syncing with parent. As Lotus has
     /// delayed execution and null round, we need to ensure the topdown messages and validator
     /// changes polled are indeed finalized and executed. The following three pointers are introduced:
@@ -102,12 +113,21 @@ where
             return Ok(());
         }
 
-        if self.exceed_cache_size_limit().await {
-            tracing::debug!("exceeded cache size limit");
-            return Ok(());
-        }
+        loop {
+            if self.exceed_cache_size_limit().await {
+                tracing::debug!("exceeded cache size limit");
+                break;
+            }
 
-        self.poll_next().await?;
+            let synced_height = self.poll_next().await?;
+
+            if synced_height == chain_head {
+                tracing::debug!("reached the tip of the chain");
+                break;
+            } else if !self.sync_many {
+                break;
+            }
+        }
 
         Ok(())
     }
@@ -123,8 +143,13 @@ where
         atomically(|| self.provider.cached_blocks()).await > max_cache_blocks
     }
 
-    /// Poll the next block height. Returns finalized and executed block data.
-    async fn poll_next(&mut self) -> Result<(), Error> {
+    /// Poll the next block height. Adds the finalized and executed block data to the caches.
+    ///
+    /// Returns the height which was polled.
+    ///
+    /// This method is only expected to be called after the caller has checked that the chain
+    /// is supposed to have data at the next height.
+    async fn poll_next(&mut self) -> Result<BlockHeight, Error> {
         let height = self.sync_pointers.head() + 1;
         let parent_block_hash = self.non_null_parent_hash().await;
 
@@ -143,7 +168,7 @@ where
 
                     self.sync_pointers.advance_head();
 
-                    return Ok(());
+                    return Ok(height);
                 }
                 return Err(Error::CannotQueryParent(err, height));
             }
@@ -202,7 +227,7 @@ where
             .set_tail(height, block_hash_res.block_hash);
         self.sync_pointers.advance_head();
 
-        Ok(())
+        Ok(height)
     }
 
     async fn fetch_data(
@@ -409,6 +434,7 @@ mod tests {
 
     async fn new_syncer(
         blocks: SequentialKeyCache<BlockHeight, Option<BlockHash>>,
+        sync_many: bool,
     ) -> LotusParentSyncer<TestParentFinalityStateQuery, TestParentProxy> {
         let config = Config {
             chain_head_delay: 2,
@@ -441,7 +467,7 @@ mod tests {
             ),
         );
 
-        LotusParentSyncer::new(
+        let mut syncer = LotusParentSyncer::new(
             config,
             proxy,
             Arc::new(Toggle::enabled(provider)),
@@ -451,7 +477,12 @@ mod tests {
             }),
         )
         .await
-        .unwrap()
+        .unwrap();
+
+        // Some tests expect to sync one block at a time.
+        syncer.sync_many = sync_many;
+
+        syncer
     }
 
     /// Creates a mock of a new parent blockchain view. The key is the height and the value is the
@@ -478,14 +509,13 @@ mod tests {
             105 => Some(vec![5; 32])    // chain head
         );
 
-        let mut syncer = new_syncer(parent_blocks).await;
+        let mut syncer = new_syncer(parent_blocks, false).await;
 
         assert_eq!(syncer.sync_pointers.head(), 100);
         assert_eq!(syncer.sync_pointers.tail(), None);
 
         // sync block 101, which is a non-null block
-        let r = syncer.sync().await;
-        assert!(r.is_ok());
+        syncer.sync().await.unwrap();
         assert_eq!(syncer.sync_pointers.head(), 101);
         assert_eq!(syncer.sync_pointers.tail(), Some((101, vec![1; 32])));
         // latest height is None as we are yet to confirm block 101, so latest height should equal
@@ -496,8 +526,7 @@ mod tests {
         );
 
         // sync block 101, which is a non-null block
-        let r = syncer.sync().await;
-        assert!(r.is_ok());
+        syncer.sync().await.unwrap();
         assert_eq!(syncer.sync_pointers.head(), 102);
         assert_eq!(syncer.sync_pointers.tail(), Some((102, vec![2; 32])));
         assert_eq!(
@@ -523,15 +552,14 @@ mod tests {
             111 => None
         );
 
-        let mut syncer = new_syncer(parent_blocks).await;
+        let mut syncer = new_syncer(parent_blocks, false).await;
 
         assert_eq!(syncer.sync_pointers.head(), 100);
         assert_eq!(syncer.sync_pointers.tail(), None);
 
         // sync block 101 to 103, which are null blocks
         for h in 101..=103 {
-            let r = syncer.sync().await;
-            assert!(r.is_ok());
+            syncer.sync().await.unwrap();
             assert_eq!(syncer.sync_pointers.head(), h);
             assert_eq!(syncer.sync_pointers.tail(), None);
         }
@@ -549,8 +577,7 @@ mod tests {
 
         // sync block 105 to 107, which are null blocks
         for h in 105..=107 {
-            let r = syncer.sync().await;
-            assert!(r.is_ok());
+            syncer.sync().await.unwrap();
             assert_eq!(syncer.sync_pointers.head(), h);
             assert_eq!(syncer.sync_pointers.tail(), Some((104, vec![4; 32])));
         }
@@ -559,6 +586,44 @@ mod tests {
         syncer.sync().await.unwrap();
         assert_eq!(syncer.sync_pointers.head(), 108);
         assert_eq!(syncer.sync_pointers.tail(), Some((108, vec![5; 32])));
+        // latest height is None as we are yet to confirm block 108, so latest height should equal
+        // to the previous confirmed block, which is 104
+        assert_eq!(
+            atomically(|| syncer.provider.latest_height()).await,
+            Some(104)
+        );
+    }
+
+    #[tokio::test]
+    async fn with_non_null_block_many() {
+        let parent_blocks = new_parent_blocks!(
+            100 => Some(vec![0; 32]),   // genesis block
+            101 => None,
+            102 => None,
+            103 => None,
+            104 => Some(vec![4; 32]),
+            105 => None,
+            106 => None,
+            107 => None,
+            108 => Some(vec![5; 32]),
+            109 => None,
+            110 => None,
+            111 => None
+        );
+
+        let mut syncer = new_syncer(parent_blocks, true).await;
+
+        assert_eq!(syncer.sync_pointers.head(), 100);
+        assert_eq!(syncer.sync_pointers.tail(), None);
+
+        // Sync all the way to the head of the chain.
+        syncer.sync().await.unwrap();
+
+        // The end height should be the finalized height, top - delay.
+        // NOTE: The syncer doesn't care that the height isn't buried in `delay` number of null or non-null blocks.
+        assert_eq!(syncer.sync_pointers.head(), 111 - 2);
+        assert_eq!(syncer.sync_pointers.tail(), Some((108, vec![5; 32])));
+
         // latest height is None as we are yet to confirm block 108, so latest height should equal
         // to the previous confirmed block, which is 104
         assert_eq!(
