@@ -27,7 +27,7 @@ import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 import {IntegrationTestBase} from "../IntegrationTestBase.sol";
 import {L2GatewayActorDiamond, L1GatewayActorDiamond} from "../IntegrationTestPresets.sol";
-import {TestUtils, MockIpcContract, MockIpcContractPayable, MockIpcContractFallback} from "../helpers/TestUtils.sol";
+import {TestUtils, MockIpcContract, MockIpcContractPayable, MockIpcContractRevert, MockIpcContractFallback} from "../helpers/TestUtils.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
 
@@ -844,6 +844,59 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
     // Call flow tests.
     //---------------------
 
+    function testMultiSubnet_Native_CallResultRevertsFromChildToParent() public {
+        address caller = address(new MockIpcContractRevert());
+        address recipient = address(new MockIpcContractRevert());
+        uint256 amount = 3;
+
+        uint256 initialBalance = 1 ether;
+
+        vm.deal(address(rootNativeSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
+        vm.deal(caller, initialBalance);
+
+        vm.prank(address(rootNativeSubnetActor));
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootNativeSubnetActor), rootGateway);
+
+        require(address(rootGatewayManager).balance == initialBalance, "initial balance not correct");
+
+        uint256 fundToSend = 100000;
+
+        vm.prank(caller);
+        rootGatewayManager.fund{value: fundToSend}(nativeSubnetName, FvmAddressHelper.from(address(caller)));
+
+        require(address(rootGatewayManager).balance == initialBalance + fundToSend, "fund not locked in gateway");
+
+        // a cross network message from parent caller to child recipient
+        IpcEnvelope memory crossMsg = TestUtils.newXnetCallMsg(
+            IPCAddress({subnetId: rootSubnetName, rawAddress: FvmAddressHelper.from(caller)}),
+            IPCAddress({subnetId: nativeSubnetName, rawAddress: FvmAddressHelper.from(recipient)}),
+            amount,
+            0
+        );
+        // result in child is ActorErr, resultMsg should be a bottom up message
+        // from child recipient to the parent caller
+        IpcEnvelope memory resultMsg = CrossMsgHelper.createResultMsg(crossMsg, OutcomeType.ActorErr, new bytes(0));
+        IpcEnvelope[] memory crossMsgs = new IpcEnvelope[](1);
+        crossMsgs[0] = resultMsg;
+
+        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+            nativeSubnetName,
+            address(nativeSubnetGateway),
+            crossMsgs
+        );
+
+        // execution should be in the root native subnet, in the parent
+        // note that the result msg is sent to the caller in the parent,
+        // but the caller is MockIpcContractRevert, which reverts whatever
+        // call made to `handleIpcMessage`, we should make sure:
+        // 1. The submission of checkpoint is never blocked
+        // 2. The fund is locked in the gateway as execution is rejected
+        submitBottomUpCheckpoint(checkpoint, address(rootNativeSubnetActor));
+
+        require(address(rootGatewayManager).balance == initialBalance + fundToSend, "fund should still be locked in gateway");
+        require(caller.balance == initialBalance - fundToSend, "fund should still be locked in gateway");
+    }
+
     function testMultiSubnet_Native_SendCrossMessageFromChildToParent() public {
         address caller = address(new MockIpcContract());
         address recipient = address(new MockIpcContract());
@@ -922,6 +975,63 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         executeTopDownMsgs(msgs, nativeSubnetName, address(nativeSubnetGateway));
 
         assertEq(address(recipient).balance, amount);
+    }
+
+    function testMultiSubnet_Token_CallResultRevertsFromChildToParent() public {
+        address caller = address(new MockIpcContractRevert());
+        address recipient = address(new MockIpcContractRevert());
+        uint256 amount = 3;
+
+        vm.deal(address(rootTokenSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
+        vm.deal(caller, 1 ether);
+
+        uint256 balance = 100;
+
+        // Fund an account in the subnet.
+        token.transfer(caller, balance);
+        vm.prank(caller);
+        token.approve(address(rootGateway), balance);
+
+        vm.prank(address(rootTokenSubnetActor));
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootTokenSubnetActor), rootGateway);
+
+        uint256 fundToSend = 10;
+
+        vm.prank(caller);
+        rootGatewayManager.fundWithToken(tokenSubnetName, FvmAddressHelper.from(address(caller)), fundToSend);
+
+        require(token.balanceOf(address(rootGatewayManager)) == fundToSend, "initial balance not correct");
+
+        // a cross network message from parent caller to child recipient
+        IpcEnvelope memory crossMsg = TestUtils.newXnetCallMsg(
+            IPCAddress({subnetId: rootSubnetName, rawAddress: FvmAddressHelper.from(caller)}),
+            IPCAddress({subnetId: tokenSubnetName, rawAddress: FvmAddressHelper.from(recipient)}),
+            amount,
+            0
+        );
+
+        // result in child is ActorErr, resultMsg should be a bottom up message
+        // from child recipient to the parent caller
+        IpcEnvelope memory resultMsg = CrossMsgHelper.createResultMsg(crossMsg, OutcomeType.ActorErr, new bytes(0));
+        IpcEnvelope[] memory crossMsgs = new IpcEnvelope[](1);
+        crossMsgs[0] = resultMsg;
+
+        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+            tokenSubnetName,
+            address(tokenSubnetGateway),
+            crossMsgs
+        );
+
+        // execution should be in the root native subnet, in the parent
+        // note that the result msg is sent to the caller in the parent,
+        // but the caller is MockIpcContractRevert, which reverts whatever
+        // call made to `handleIpcMessage`, we should make sure:
+        // 1. The submission of checkpoint is never blocked
+        // 2. The fund is locked in the gateway as execution is rejected
+        submitBottomUpCheckpoint(checkpoint, address(rootTokenSubnetActor));
+
+        require(token.balanceOf(address(rootGatewayManager)) == fundToSend, "fund should still be locked in gateway");
+        require(token.balanceOf(caller) == balance - fundToSend, "fund should still be locked in gateway");
     }
 
     function testMultiSubnet_Token_CallFromChildToParent() public {
