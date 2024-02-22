@@ -14,6 +14,7 @@ async-recursion = { workspace = true }
 async-trait = { workspace = true }
 bollard = { workspace = true }
 ethers = { workspace = true }
+futures = { workspace = true }
 fvm_shared = { workspace = true }
 hex = { workspace = true }
 multihash = { workspace = true }

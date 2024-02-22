@@ -413,8 +413,8 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
-        // Overwrite the env file which has seed addresses.
-        todo!("docker-compose up")
+        // Overwrite the env file which has seed addresses, then start the node (unless it's already running).
+        node.start(seed_nodes).await
     }
 
     async fn create_subnet<'s, 'a>(

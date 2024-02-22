@@ -9,11 +9,15 @@ use std::{
 
 use anyhow::{anyhow, Context};
 use bollard::{
-    container::{Config, CreateContainerOptions, RemoveContainerOptions},
+    container::{
+        AttachContainerOptions, AttachContainerResults, Config, CreateContainerOptions,
+        RemoveContainerOptions,
+    },
     service::{HostConfig, PortBinding},
     Docker,
 };
 use ethers::types::H160;
+use futures::StreamExt;
 use lazy_static::lazy_static;
 
 use super::{
@@ -142,6 +146,12 @@ impl DockerNode {
                 .run_cmd("init")
                 .await
                 .context("cannot init cometbft")?;
+
+            // Capture the cometbft node identity.
+            let cometbft_node_id = cometbft_runner
+                .run_cmd("show-node-id")
+                .await
+                .context("cannot show node ID")?;
 
             // Convert fendermint genesis to cometbft.
             fendermint_runner
@@ -387,6 +397,12 @@ impl DockerNode {
             path: node_dir,
         })
     }
+
+    pub async fn start(&self, seed_nodes: &[&Self]) -> anyhow::Result<()> {
+        // TODO: Export the identity when we create the node.
+        //let cometbft_seeds = seed_nodes.iter().map(|n| n.cometbft.container.name);
+        todo!()
+    }
 }
 
 /// Create a container name from a node name and a logical container name, e.g. "cometbft"
@@ -448,7 +464,7 @@ impl<'a> DockerRunner<'a> {
     }
 
     /// Run a short lived container.
-    pub async fn run_cmd(&self, cmd: &str) -> anyhow::Result<()> {
+    pub async fn run_cmd(&self, cmd: &str) -> anyhow::Result<Vec<String>> {
         let config = Config {
             image: Some(self.image.clone()),
             user: Some(self.user.to_string()),
@@ -477,12 +493,33 @@ impl<'a> DockerRunner<'a> {
             .context("failed to create container")?
             .id;
 
+        eprintln!("ID = {id}");
+
+        let AttachContainerResults { mut output, .. } = self
+            .docker()
+            .attach_container::<String>(
+                &id,
+                Some(AttachContainerOptions {
+                    stdout: Some(true),
+                    stderr: Some(true),
+                    ..Default::default()
+                }),
+            )
+            .await
+            .context("failed to attach to container")?;
+
         self.docker()
             .start_container::<&str>(&id, None)
             .await
             .context("failed to start container")?;
 
-        // TODO: Output?
+        tokio::time::sleep(std::time::Duration::from_secs(120)).await;
+
+        // pipe docker attach output into stdout
+        let mut out = Vec::new();
+        while let Some(Ok(output)) = output.next().await {
+            out.push(output.to_string());
+        }
 
         self.docker()
             .remove_container(
@@ -494,7 +531,7 @@ impl<'a> DockerRunner<'a> {
             )
             .await?;
 
-        Ok(())
+        Ok(out)
     }
 
     /// Create a container to be started later.
@@ -573,4 +610,30 @@ fn export_env(file_path: impl AsRef<Path>, env: &EnvVars) -> anyhow::Result<()> 
         .collect::<Vec<_>>();
 
     export_file(file_path, env.join("\n"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{DockerRunner, COMETBFT_IMAGE};
+    use crate::{docker::DockerWithDropHandle, TestnetName};
+    use bollard::Docker;
+
+    #[tokio::test]
+    async fn test_docker_run_output() {
+        let nn = TestnetName::new("test-network").root().node("test-node");
+        let docker = Docker::connect_with_local_defaults().expect("failed to connect to docker");
+        let dh = DockerWithDropHandle::from_current(docker.clone());
+
+        let runner = DockerRunner::new(&dh, &nn, &COMETBFT_IMAGE, 0, Vec::new());
+
+        // Based on my manual testing, this will initialise the config and then show the ID.
+        let logs = runner
+            .run_cmd("show-node-id")
+            .await
+            .expect("failed to show ID");
+
+        eprintln!("{}", logs.join("\n"));
+
+        assert!(logs.len() > 0);
+    }
 }
