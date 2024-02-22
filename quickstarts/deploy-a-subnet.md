@@ -59,7 +59,7 @@ alias ipc-cli="cargo run -q -p ipc-cli --release --"
 ipc-cli config init
 ```
 
-This should have populated a default config file with all the parameters required to connect to calibration at `~/.ipc/config.toml`. Feel free to update this configuration to fit your needs.&#x20;
+This should have populated a default config file with all the parameters required to connect to calibration at `~/.ipc/config.toml`. Feel free to update this configuration to fit your needs.
 
 The IPC stack is changing rapidly. In order to make sure you use the latest contracts deployed on Filecoin Calibration:
 
@@ -89,11 +89,11 @@ registry_addr = "0x7308C4A503a12521215718cbCa98F951E9aAB9B5"
 # registry_addr = "0x74539671a1d2f1c8f200826baba665179f53a1b7"
 ```
 
-* **Replace** the `gateway_addr` and `registry_addr` with the following values. Click on the badges below to take you to the source to copy and paste them or go to [this link](https://github.com/consensus-shipyard/ipc/blob/cd/contracts/deployments/r314159.json).
+*   **Replace** the `gateway_addr` and `registry_addr` with the following values. Click on the badges below to take you to the source to copy and paste them or go to [this link](https://github.com/consensus-shipyard/ipc/blob/cd/contracts/deployments/r314159.json).
 
-  [![Gateway Address](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fconsensus-shipyard%2Fipc%2Fcd%2Fcontracts%2Fdeployments%2Fr314159.json&query=%24.gateway_addr&label=Gateway%20Address)](https://github.com/consensus-shipyard/ipc/blob/cd/contracts/deployments/r314159.json)
+    [![Gateway Address](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fconsensus-shipyard%2Fipc%2Fcd%2Fcontracts%2Fdeployments%2Fr314159.json\&query=%24.gateway\_addr\&label=Gateway%20Address)](https://github.com/consensus-shipyard/ipc/blob/cd/contracts/deployments/r314159.json)
 
-  [![Registry Address](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fconsensus-shipyard%2Fipc%2Fcd%2Fcontracts%2Fdeployments%2Fr314159.json&query=%24.registry_addr&label=Registry%20Address)](https://github.com/consensus-shipyard/ipc/blob/cd/contracts/deployments/r314159.json)
+    [![Registry Address](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fconsensus-shipyard%2Fipc%2Fcd%2Fcontracts%2Fdeployments%2Fr314159.json\&query=%24.registry\_addr\&label=Registry%20Address)](https://github.com/consensus-shipyard/ipc/blob/cd/contracts/deployments/r314159.json)
 
 ### Step 3: Set up your wallets
 
@@ -183,7 +183,7 @@ Note:
 * Use full path to PRIVATE\_KEY\_PATH, don't path with "\~"
 * Do not change values of any port unless you have to
 
-We'll need the _IPLD Resolver Multiaddress_ for the next nodes we'll start.&#x20;
+We'll need the _IPLD Resolver Multiaddress_ for the next nodes we'll start.
 
 Let's start the second validator:
 
@@ -241,11 +241,7 @@ ipc-cli wallet balances --wallet-type evm --subnet=<SUBNET_ID>
 
 > The ETH addresses for `gateway_addr` and `registry_addr` used when they are deployed in genesis in a child subnet by Fendermint are `0x77aa40b105843728088c0132e43fc44348881da8` and `0x74539671a1d2f1c8f200826baba665179f53a1b7`, respectively.
 
-### Step 8: Interact with your the ETH RPC
-
-For information about how to connect your Ethereum tooling with your subnet refer to the [following docs](https://github.com/consensus-shipyard/ipc/blob/main/docs/ipc/contracts.md).
-
-### Step 9 (optional): Run a relayer
+### Step 8 (optional): Run a relayer
 
 IPC relies on the role of a specific type of peer on the network called the relayers that are responsible for submitting bottom-up checkpoints that have been finalized in a child subnet to its parent. This process is key for the commitment of child subnet checkpoints in the parent, and the execution of bottom-up cross-net messages. Without relayers, cross-net messages will only flow from top levels of the hierarchy to the bottom, but not the other way around.
 
