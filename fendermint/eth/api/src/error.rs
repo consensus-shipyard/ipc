@@ -1,7 +1,8 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use ethers_contract::EthError;
+use ethers_contract::{ContractRevert, EthError};
+use fendermint_vm_actor_interface::ipc::subnet::SubnetActorErrors;
 use fvm_shared::error::ExitCode;
 use serde::Serialize;
 
@@ -79,15 +80,22 @@ pub fn error_with_revert<T>(
     msg: impl ToString,
     data: Option<impl AsRef<[u8]>>,
 ) -> Result<T, JsonRpcError> {
+    let msg = msg.to_string();
     let (msg, data) = match data {
-        None => (msg.to_string(), None),
+        None => (msg, None),
         Some(data) => {
-            let mut msg = msg.to_string();
-            if let Some(revert) = String::decode_with_selector(data.as_ref()) {
-                msg.push('\n');
-                msg.push_str(&revert);
-            }
-            (msg, Some(hex::encode(data)))
+            // Try the simplest case of just a string, even though it's covered by the `SubnetActorErrors` as well.
+            // Then see if it's an error that one of our known IPC actor facets are producing.
+            let revert = if let Some(revert) = String::decode_with_selector(data.as_ref()) {
+                Some(revert)
+            } else {
+                SubnetActorErrors::decode_with_selector(data.as_ref()).map(|e| e.to_string())
+            };
+
+            (
+                revert.map(|rev| format!("{msg}\n{rev}")).unwrap_or(msg),
+                Some(hex::encode(data)),
+            )
         }
     };
     error_with_data(exit_code, msg, data)
