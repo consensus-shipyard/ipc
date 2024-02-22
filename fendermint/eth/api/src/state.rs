@@ -137,7 +137,10 @@ where
     /// Get the height of the latest commit.
     pub async fn latest_height(&self) -> JsonRpcResult<tendermint::block::Height> {
         let res: commit::Response = self.tm().latest_commit().await?;
-        Ok(res.signed_header.header.height)
+        // Return -1 so we don't risk having no data to serve.
+        let h = res.signed_header.header.height.value();
+        let h = h.saturating_sub(1);
+        Ok(Height::try_from(h).context("decrementing should be fine")?)
     }
 
     /// Get the Tendermint block at a specific height.
@@ -221,10 +224,13 @@ where
 
     /// Return the height of a block which we should send with a query,
     /// or None if it's the latest, to let the node figure it out.
+    ///
+    /// Adjusts the height of the query to +1 so the effects of the block is visible.
     pub async fn query_height(&self, block_id: et::BlockId) -> JsonRpcResult<FvmQueryHeight> {
         match block_id {
             et::BlockId::Number(bn) => match bn {
-                et::BlockNumber::Number(height) => Ok(FvmQueryHeight::from(height.as_u64())),
+                // The client might be asking by height of a block, expecting to see the results.
+                et::BlockNumber::Number(height) => Ok(FvmQueryHeight::from(height.as_u64() + 1)),
                 et::BlockNumber::Finalized | et::BlockNumber::Latest | et::BlockNumber::Safe => {
                     Ok(FvmQueryHeight::Committed)
                 }
@@ -232,8 +238,9 @@ where
                 et::BlockNumber::Earliest => Ok(FvmQueryHeight::Height(1)),
             },
             et::BlockId::Hash(h) => {
+                // The effects of this block are saved at the next height.
                 let header = self.header_by_hash(h).await?;
-                Ok(FvmQueryHeight::Height(header.height.value()))
+                Ok(FvmQueryHeight::Height(header.height.value() + 1))
             }
         }
     }
