@@ -36,6 +36,8 @@ These instructions describe the steps required to create a new kernel which impl
            fn my_custom_syscall(&self) -> Result<u64>;
        }
        ```
+       [fendermint/vm/interpreter/src/fvm/examples/mycustomkernel.rs#L23](https://github.com/consensus-shipyard/ipc/blob/98497363a10e08236325e6d5c52755b9fcd52958/fendermint/vm/interpreter/src/fvm/examples/mycustomkernel.rs#L23)
+
    3.  Define a struct `CustomKernelImpl` which extends `DefaultKernel` . We use the `ambassador` crate to automatically delegate calls which reduces the boilerplate code we need to write. Here we simply delegate all calls to existing syscall to the `DefaultKernel`.
 
        ```rust
@@ -53,6 +55,9 @@ These instructions describe the steps required to create a new kernel which impl
        #[delegate(UpgradeOps<K>, generics = "K", where = "K: CustomKernel")]
        pub struct CustomKernelImpl<C>(pub DefaultKernel<C>);
        ```
+       [fendermint/vm/interpreter/src/fvm/examples/mycustomkernel.rs#L27](https://github.com/consensus-shipyard/ipc/blob/98497363a10e08236325e6d5c52755b9fcd52958/fendermint/vm/interpreter/src/fvm/examples/mycustomkernel.rs#L27)
+
+       
 2. **Implementing all necessary functions for the syscall**
    1.  Implement `my_custom_syscall`
 
@@ -78,6 +83,9 @@ These instructions describe the steps required to create a new kernel which impl
            }
        }
        ```
+       [fendermint/vm/interpreter/src/fvm/examples/mycustomkernel.rs#L42](https://github.com/consensus-shipyard/ipc/blob/98497363a10e08236325e6d5c52755b9fcd52958/fendermint/vm/interpreter/src/fvm/examples/mycustomkernel.rs#L42)
+
+       
    2.  Next we need to implement the `Kernel` trait for the new `CustomKernelImpl`. You can treat this as boilerplate code and you can just copy it as is:
 
        ```rust
@@ -132,6 +140,8 @@ These instructions describe the steps required to create a new kernel which impl
            }
        }
        ```
+       [fendermint/vm/interpreter/src/fvm/examples/mycustomkernel.rs#L61](https://github.com/consensus-shipyard/ipc/blob/98497363a10e08236325e6d5c52755b9fcd52958/fendermint/vm/interpreter/src/fvm/examples/mycustomkernel.rs#L61)
+       
 3.  Next we need to implement the `SyscallHandler` trait for the `CustomKernelImpl` and link all the syscalls to that kernel. We need to explicitly list each of the syscall traits (ActorOps, SendOps, etc) manually here in addition to the `CustomKernel` trait. Then inside the `link_syscalls` method we plug in (link) the actor invocation to the kernel function that should process that syscall. We can link all the existing syscalls using the `link_syscalls` on the `DefaultKernel` and then link our custom syscall.
 
     ```rust
@@ -159,6 +169,8 @@ These instructions describe the steps required to create a new kernel which impl
         }
     }
     ```
+    [fendermint/vm/interpreter/src/fvm/examples/mycustomkernel.rs#L112](https://github.com/consensus-shipyard/ipc/blob/98497363a10e08236325e6d5c52755b9fcd52958/fendermint/vm/interpreter/src/fvm/examples/mycustomkernel.rs#L112)
+    
 4.  Once all the implementation is finished, we can expose the customized syscall.
 
     Once this function is linked to a syscall and exposed publicly, we can use this syscall by calling `my_custom_kernel.my_custom_syscall`.
@@ -170,6 +182,9 @@ These instructions describe the steps required to create a new kernel which impl
         context.kernel.my_custom_syscall()
     } 
     ```
+    [fendermint/vm/interpreter/src/fvm/examples/mycustomkernel.rs#L136](https://github.com/consensus-shipyard/ipc/blob/98497363a10e08236325e6d5c52755b9fcd52958/fendermint/vm/interpreter/src/fvm/examples/mycustomkernel.rs#L136)
+
+    
 5.  **Replace existing IPC kernel with new custom kernel**
 
     Since the customized syscall is implemented in a `CustomKernelImpl` which extends and implements all the behaviors for `DefaultKernel`, we can plug it into IPC instead of `DefaultKernel`.
@@ -182,6 +197,8 @@ These instructions describe the steps required to create a new kernel which impl
 
     executor: DefaultExecutor<CustomKernelImpl<DefaultCallManager<DefaultMachine<DB, FendermintExterns>>>,
     ```
+    [fendermint/vm/interpreter/src/fvm/state/exec.rs#L86](https://github.com/consensus-shipyard/ipc/blob/98497363a10e08236325e6d5c52755b9fcd52958/fendermint/vm/interpreter/src/fvm/state/exec.rs#L86)
+    
 6.  **Use syscall in your IPC subnet**
 
     1.  Now, we are all set to use the custom syscall in the IPC subnet.
@@ -220,6 +237,7 @@ These instructions describe the steps required to create a new kernel which impl
         }
     }
     ```
+    [fendermint/actors/customsyscall/src/actor.rs#L14](https://github.com/consensus-shipyard/ipc/blob/98497363a10e08236325e6d5c52755b9fcd52958/fendermint/actors/customsyscall/src/actor.rs#L14)
 
     Even though this is Rust code, IPC will compile it as a Wasm target and then run the compiled Wasm code inside FVM as an actor. However, we want to share some of the code between Wasm and IPC, such as the actor name `CUSTOMSYSCALL_ACTOR_NAME` and the `Invoke` method enum. We will define these in a separate file called [`shared.rs`](http://shared.rs) as follows:
 
@@ -234,6 +252,8 @@ These instructions describe the steps required to create a new kernel which impl
         Invoke = frc42_dispatch::method_hash!("Invoke"),
     }
     ```
+    [fendermint/actors/customsyscall/src/shared.rs](https://github.com/consensus-shipyard/ipc/blob/98497363a10e08236325e6d5c52755b9fcd52958/fendermint/actors/customsyscall/src/shared.rs#L1)
+
 
     We next need to write a [`lib.rs`](http://lib.rs) file which exports the shared code and only compiles `actor.rs` if we are building the Wasm actor.
 
@@ -244,6 +264,7 @@ These instructions describe the steps required to create a new kernel which impl
 
     pub use shared::*;
     ```
+    [fendermint/actors/customsyscall/src/lib.rs](https://github.com/consensus-shipyard/ipc/blob/98497363a10e08236325e6d5c52755b9fcd52958/fendermint/actors/customsyscall/src/lib.rs#L1)
 
     There are several other files you need to change in compile this actor and package it with the other actors that IPC uses. Please refer to the Pull Request for the following other files you need to change:
 
@@ -269,6 +290,7 @@ These instructions describe the steps required to create a new kernel which impl
         )
         .context("failed to create customsyscall actor")?;
     ```
+    [fendermint/vm/interpreter/src/fvm/genesis.rs#L251](https://github.com/consensus-shipyard/ipc/blob/98497363a10e08236325e6d5c52755b9fcd52958/fendermint/vm/interpreter/src/fvm/genesis.rs#L251)
 
     Your actor has now been deployed and we should be able to send it messages!
 
@@ -299,6 +321,7 @@ These instructions describe the steps required to create a new kernel which impl
     let val: u64 = apply_ret.msg_receipt.return_data.deserialize().unwrap();
     println!("customsyscall actor returned: {}", val);
     ```
+    [fendermint/vm/interpreter/src/fvm/exec.rs#L115](https://github.com/consensus-shipyard/ipc/blob/98497363a10e08236325e6d5c52755b9fcd52958/fendermint/vm/interpreter/src/fvm/exec.rs#L115)
 
     This code sends a message to the customsyscall actor and parses it output after it has been executed. We print out the return value from the actor, which will be the return value of our custom syscall.
 
