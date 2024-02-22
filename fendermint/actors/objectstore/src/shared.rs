@@ -10,6 +10,7 @@ use fvm_shared::METHOD_CONSTRUCTOR;
 use num_derive::FromPrimitive;
 
 pub const OBJECTSTORE_ACTOR_NAME: &str = "objectstore";
+pub const BIT_WIDTH: u32 = 8;
 
 #[derive(Default, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ObjectParams {
@@ -28,8 +29,6 @@ pub enum Method {
     GetObject = frc42_dispatch::method_hash!("GetObject"),
     ListObjects = frc42_dispatch::method_hash!("ListObjects"),
 }
-
-pub const BIT_WIDTH: u32 = 8;
 
 /// The state represents an object store backed by a Hamt
 #[derive(Serialize_tuple, Deserialize_tuple)]

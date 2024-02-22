@@ -110,8 +110,8 @@ impl MessageFactory {
         Ok(chain)
     }
 
-    /// Put an object into a data repo.
-    pub fn datarepo_put(
+    /// Put an object into an object store.
+    pub fn os_put(
         &mut self,
         key: String,
         object_value: Cid,
@@ -134,8 +134,8 @@ impl MessageFactory {
         Ok(message)
     }
 
-    /// Delete an object from a data repo.
-    pub fn datarepo_delete(
+    /// Delete an object from an object store.
+    pub fn os_delete(
         &mut self,
         key: String,
         value: TokenAmount,
@@ -153,8 +153,8 @@ impl MessageFactory {
         Ok(message)
     }
 
-    /// Get an object from a data repo. This will not create a transaction.
-    pub fn datarepo_get(
+    /// Get an object from an object store. This will not create a transaction.
+    pub fn os_get(
         &mut self,
         key: String,
         value: TokenAmount,
@@ -182,8 +182,8 @@ impl MessageFactory {
         Ok(message)
     }
 
-    /// List objects in a data repo. This will not create a transaction.
-    pub fn datarepo_list(
+    /// List objects in an object store. This will not create a transaction.
+    pub fn os_list(
         &mut self,
         value: TokenAmount,
         gas_params: GasParams,
@@ -209,8 +209,8 @@ impl MessageFactory {
         Ok(message)
     }
 
-    /// Push to the accumulator of a data repo.
-    pub fn datarepo_push(
+    /// Push an event to an accumulator.
+    pub fn acc_push(
         &mut self,
         event: Bytes,
         value: TokenAmount,
@@ -228,8 +228,8 @@ impl MessageFactory {
         Ok(message)
     }
 
-    /// Get the root accumulator commitment. This will not create a transaction.
-    pub fn datarepo_root(
+    /// Get the root commitment in an accumulator. This will not create a transaction.
+    pub fn acc_root(
         &mut self,
         value: TokenAmount,
         gas_params: GasParams,
