@@ -6,7 +6,7 @@ import {Script} from "forge-std/Script.sol";
 
 contract ConfigManager is Script {
 
-    string private configPath = "config/config.json"; // Path to your JSON config file
+    string private configPath = "config.json"; // Path to your JSON config file
 
     // Reads a value from the JSON config
     function readConfig(string memory key) internal returns (bytes memory value) {

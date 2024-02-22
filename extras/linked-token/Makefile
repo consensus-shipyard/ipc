@@ -30,58 +30,58 @@ deploy-usdctest:
 
 mint-usdc:
 	@echo "Minting 1000 USDCTest tokens..."
-	@USDCTEST_ADDR=$$(cat config/config.json | jq -r '.LinkedToken.USDCTest'); \
+	@USDCTEST_ADDR=$$(cat config.json | jq -r '.LinkedToken.USDCTest'); \
     cast send $$USDCTEST_ADDR "$$(cast calldata "mint(uint256)" $$AMOUNT)" --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY
 
 
 check-balance:
 	@echo "Checking wallet balance..."
 	@WALLET_ADDRESS=$$(cast wallet address --private-key $$PRIVATE_KEY); \
-	USDCTEST_ADDR=$$(cat config/config.json | jq -r '.LinkedToken.USDCTest'); \
+	USDCTEST_ADDR=$$(cat config.json | jq -r '.LinkedToken.USDCTest'); \
 	cast call $$USDCTEST_ADDR "$$(cast calldata 'balanceOf(address)' $$WALLET_ADDRESS)" --rpc-url $$CALIBNET_RPC_URL
 
 deploy-replica:
 	@echo "Deploying token replica contract on subnet..."
-	@USDCTEST_ADDR=$$(cat config/config.json | jq -r '.LinkedToken.USDCTest'); \
+	@USDCTEST_ADDR=$$(cat config.json | jq -r '.LinkedToken.USDCTest'); \
 	forge script script/DeployIpcTokenReplica.s.sol:DeployIpcTokenReplica --skip-simulation --rpc-url $$SUBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "run(address,address,uint64,address[])" -- $$SUBNET_GATEWAY $$USDCTEST_ADDR $$CALIBNET_CHAIN_ID '[]'
 
 deploy-controller:
 	@echo "Deploying token controller contract on Calibnet..."
-	@USDCTEST_ADDR=$$(cat config/config.json | jq -r '.LinkedToken.USDCTest'); \
+	@USDCTEST_ADDR=$$(cat config.json | jq -r '.LinkedToken.USDCTest'); \
 	forge script script/DeployIpcTokenController.s.sol:DeployIpcTokenController --skip-simulation --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "run(address,address,uint64,address[])" -- $$CALIBNET_GATEWAY $$USDCTEST_ADDR $$CALIBNET_CHAIN_ID "[$$SUBNET_ROUTE_IN_ETH_FORMAT]"
 
 initialize-replica:
 	@echo "Updating replica with controller's address..."
-	@REPLICA_ADDR=$$(cat config/config.json | jq -r '.LinkedToken.LinkedTokenReplica'); \
-	CONTROLLER_ADDR=$$(cat config/config.json | jq -r '.LinkedToken.LinkedTokenController'); \
+	@REPLICA_ADDR=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenReplica'); \
+	CONTROLLER_ADDR=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenController'); \
 	cast send $$REPLICA_ADDR "initialize(address)" $$CONTROLLER_ADDR --rpc-url $$SUBNET_RPC_URL --private-key $$PRIVATE_KEY
 
 initialize-controller:
 	@echo "Updating controller with replica's address..."
-	@CONTROLLER_ADDR=$$(cat config/config.json | jq -r '.LinkedToken.LinkedTokenController'); \
-	REPLICA_ADDR=$$(cat config/config.json | jq -r '.LinkedToken.LinkedTokenReplica'); \
+	@CONTROLLER_ADDR=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenController'); \
+	REPLICA_ADDR=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenReplica'); \
 	cast send $$CONTROLLER_ADDR "initialize(address)" $$REPLICA_ADDR --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY
 
 approve-usdc:
 	@echo "Approving USDC for Controller Contract..."
-	@CONTROLLER_ADDR=$$(cat config/config.json | jq -r '.LinkedToken.LinkedTokenController'); \
-	USDCTEST_ADDR=$$(cat config/config.json | jq -r '.LinkedToken.USDCTest'); \
+	@CONTROLLER_ADDR=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenController'); \
+	USDCTEST_ADDR=$$(cat config.json | jq -r '.LinkedToken.USDCTest'); \
 	cast send $$USDCTEST_ADDR "approve(address,uint256)" --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY -- $$CONTROLLER_ADDR $$AMOUNT
 
 deposit-usdc:
 	@echo "Depositing USDC to subnet..."
 	@WALLET_ADDRESS=$$(cast wallet address --private-key $$PRIVATE_KEY); \
-	CONTROLLER_ADDR=$$(cat config/config.json | jq -r '.LinkedToken.LinkedTokenController'); \
+	CONTROLLER_ADDR=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenController'); \
 	cast send $$CONTROLLER_ADDR "linkedTransfer(address,uint256)" $$WALLET_ADDRESS $$AMOUNT --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY
 
 check-replica-balance:
 	@echo "Checking Replica Token balance..."
 	@WALLET_ADDRESS=$$(cast wallet address --private-key $$PRIVATE_KEY); \
-	REPLICA_ADDR=$$(cat config/config.json | jq -r '.LinkedToken.LinkedTokenReplica'); \
+	REPLICA_ADDR=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenReplica'); \
 	cast call $$REPLICA_ADDR "$$(cast calldata 'balanceOf(address)' $$WALLET_ADDRESS)" --rpc-url $$SUBNET_RPC_URL
 
 withdraw-usdc:
 	@echo "Withdrawing USDC from subnet..."
 	@WALLET_ADDRESS=$$(cast wallet address --private-key $$PRIVATE_KEY); \
-	REPLICA_ADDR=$$(cat config/config.json | jq -r '.LinkedToken.LinkedTokenReplica'); \
+	REPLICA_ADDR=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenReplica'); \
 	cast send $$REPLICA_ADDR "linkedTransfer(address,uint256)" $$WALLET_ADDRESS $$AMOUNT --rpc-url $$SUBNET_RPC_URL --private-key $$PRIVATE_KEY

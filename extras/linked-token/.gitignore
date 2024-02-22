@@ -13,4 +13,4 @@ docs/
 # Dotenv file
 .env
 
-config/config.json
+config.json
