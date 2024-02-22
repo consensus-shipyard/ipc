@@ -11,6 +11,7 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 axum = { workspace = true }
 ethers-core = { workspace = true }
+ethers-contract = { workspace = true }
 erased-serde = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }

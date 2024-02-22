@@ -40,7 +40,7 @@ use fil_actors_evm_shared::uints;
 
 use crate::conv::from_eth::to_fvm_message;
 use crate::conv::from_tm::{self, msg_hash, to_chain_message, to_cumulative, to_eth_block_zero};
-use crate::error::error_with_data;
+use crate::error::error_with_revert;
 use crate::filters::{matches_topics, FilterId, FilterKind, FilterRecords};
 use crate::{
     conv::{
@@ -637,13 +637,13 @@ where
     } else {
         // Try to decode any errors returned in the data.
         let data = RawBytes::from(res.data.to_vec());
-        // TODO: Might have to first call `decode_fevm_data` here in case CometBFT
+        // Might have to first call `decode_fevm_data` here in case CometBFT
         // wraps the data into Base64 encoding like it does for `DeliverTx`.
         let data = decode_fevm_return_data(data)
             .or_else(|_| decode_data(&res.data).and_then(decode_fevm_return_data))
-            .unwrap_or_default();
+            .ok();
 
-        error_with_data(ExitCode::new(res.code.value()), res.log, hex::encode(data))
+        error_with_revert(ExitCode::new(res.code.value()), res.log, data)
     }
 }
 
@@ -664,14 +664,14 @@ where
     // Based on Lotus, we should return the data from the receipt.
     if deliver_tx.code.is_err() {
         // There might be some revert data encoded as ABI in the response.
-        let (msg, data) = match decode_fevm_invoke(&deliver_tx).map(hex::encode) {
-            Ok(h) => (deliver_tx.info, h),
+        let (msg, data) = match decode_fevm_invoke(&deliver_tx) {
+            Ok(h) => (deliver_tx.info, Some(h)),
             Err(e) => (
                 format!("{}\nfailed to decode return data: {:#}", deliver_tx.info, e),
-                "".to_string(),
+                None,
             ),
         };
-        error_with_data(ExitCode::new(deliver_tx.code.value()), msg, data)
+        error_with_revert(ExitCode::new(deliver_tx.code.value()), msg, data)
     } else if is_create {
         // It's not clear why some tools like Remix call this with deployment transaction, but they do.
         // We could parse the deployed contract address, but it would be of very limited use;
@@ -722,12 +722,11 @@ where
     if !estimate.exit_code.is_success() {
         // There might be some revert data encoded as ABI in the response.
         let msg = format!("failed to estimate gas: {}", estimate.info);
-        let (msg, data) = match decode_fevm_return_data(estimate.return_data).map(hex::encode) {
-            Ok(h) => (msg, h),
-            Err(e) => (format!("{msg}\n{e:#}"), "".to_string()),
+        let (msg, data) = match decode_fevm_return_data(estimate.return_data) {
+            Ok(h) => (msg, Some(h)),
+            Err(e) => (format!("{msg}\n{e:#}"), None),
         };
-
-        error_with_data(estimate.exit_code, msg, data)
+        error_with_revert(estimate.exit_code, msg, data)
     } else {
         Ok(estimate.gas_limit.into())
     }

@@ -13,3 +13,15 @@
 [submodule "contracts/lib/forge-std"]
 	path = contracts/lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
+[submodule "extras/axelar-token/lib/axelar-gmp-sdk-solidity"]
+	path = extras/axelar-token/lib/axelar-gmp-sdk-solidity
+	url = https://github.com/axelarnetwork/axelar-gmp-sdk-solidity
+[submodule "extras/axelar-token/lib/interchain-token-service"]
+	path = extras/axelar-token/lib/interchain-token-service
+	url = https://github.com/axelarnetwork/interchain-token-service
+[submodule "extras/axelar-token/lib/openzeppelin-contracts"]
+	path = extras/axelar-token/lib/openzeppelin-contracts
+	url = https://github.com/openzeppelin/openzeppelin-contracts
+[submodule "extras/axelar-token/lib/forge-std"]
+	path = extras/axelar-token/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
