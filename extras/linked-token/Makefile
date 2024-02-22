@@ -72,7 +72,7 @@ deposit-usdc:
 	@echo "Depositing USDC to subnet..."
 	@WALLET_ADDRESS=$$(cast wallet address --private-key $$PRIVATE_KEY); \
 	CONTROLLER_ADDR=$$(cat config/config.json | jq -r '.LinkedToken.LinkedTokenController'); \
-	forge script script/CallLockAndTransfer.s.sol:CallLockAndTransfer --skip-simulation --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "run(address,address,uint256)" -- $$CONTROLLER_ADDR $$WALLET_ADDRESS $$AMOUNT
+	cast send $$CONTROLLER_ADDR "linkedTransfer(address,uint256)" $$WALLET_ADDRESS $$AMOUNT --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY
 
 check-replica-balance:
 	@echo "Checking Replica Token balance..."
@@ -84,5 +84,4 @@ withdraw-usdc:
 	@echo "Withdrawing USDC from subnet..."
 	@WALLET_ADDRESS=$$(cast wallet address --private-key $$PRIVATE_KEY); \
 	REPLICA_ADDR=$$(cat config/config.json | jq -r '.LinkedToken.LinkedTokenReplica'); \
-	forge script script/CallBurnAndTransfer.s.sol:CallBurnAndTransfer --skip-simulation --rpc-url $$SUBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "run(address,address,uint256)" -- $$REPLICA_ADDR $$WALLET_ADDRESS $$AMOUNT
-
+	cast send $$REPLICA_ADDR "linkedTransfer(address,uint256)" $$WALLET_ADDRESS $$AMOUNT --rpc-url $$SUBNET_RPC_URL --private-key $$PRIVATE_KEY
