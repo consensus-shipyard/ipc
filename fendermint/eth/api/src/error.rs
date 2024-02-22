@@ -1,6 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use ethers_contract::EthError;
 use fvm_shared::error::ExitCode;
 use serde::Serialize;
 
@@ -66,6 +67,25 @@ pub fn error_with_data<T, E: Serialize>(
         message: msg.to_string(),
         data: Some(data),
     })
+}
+
+/// Try to parse the data returned from the EVM as a revert string and append it to the message,
+/// so we have a bit more human readable feedback than just hexadecimal strings with the selector
+/// we can see in for example [here](https://github.com/gakonst/ethers-rs/commit/860100535812cbfe5e3cc417872392a6d76a159c).
+///
+/// The goal is that if Solidity has something like `require(x > 0, "X must be positive")` then we see the message in the JSON-RPC response.
+pub fn error_with_revert<T>(
+    exit_code: ExitCode,
+    msg: impl ToString,
+    data: impl AsRef<[u8]>,
+) -> Result<T, JsonRpcError> {
+    let mut msg = msg.to_string();
+    if let Some(revert) = String::decode_with_selector(data.as_ref()) {
+        msg.push('\n');
+        msg.push_str(&revert);
+    }
+    let data = hex::encode(data);
+    error_with_data(exit_code, msg, data)
 }
 
 impl std::fmt::Display for JsonRpcError {
