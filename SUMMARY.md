@@ -17,6 +17,10 @@
   * [Parent-child interactions](concepts/subnets/parent-child-interactions.md)
 * [Circulating supply](concepts/circulating-supply.md)
 
+## Development Guides
+
+* [Pluggable Syscall Tutorial](development-guides/pluggable-syscall-tutorial.md)
+
 ## Reference
 
 * [Networks](reference/networks.md)
