@@ -16,9 +16,6 @@ WORKDIR $FM_HOME_DIR
 
 EXPOSE 26658
 
-ENTRYPOINT ["fendermint"]
-CMD ["run"]
-
 STOPSIGNAL SIGTERM
 
 ENV FM_ABCI__LISTEN__HOST=0.0.0.0
@@ -32,3 +29,4 @@ COPY fendermint/docker/.artifacts/custom_actors_bundle.car $FM_HOME_DIR/custom_a
 COPY fendermint/docker/.artifacts/contracts $FM_HOME_DIR/contracts
 COPY --from=builder /app/fendermint/app/config $FM_HOME_DIR/config
 COPY --from=builder /app/output/bin/fendermint /usr/local/bin/fendermint
+COPY --from=builder /app/output/bin/ipc-cli /usr/local/bin/ipc-cli
