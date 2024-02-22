@@ -178,8 +178,8 @@ cargo make --makefile infra/fendermint/Makefile.toml \
     -e CMT_RPC_HOST_PORT=26657 \
     -e ETHAPI_HOST_PORT=8545 \
     -e RESOLVER_HOST_PORT=26655 \
-    -e PARENT_REGISTRY=0x7308C4A503a12521215718cbCa98F951E9aAB9B5 \
-    -e PARENT_GATEWAY=0x5cF14D2Af9BBd5456Ea532639f1DB355B9BaCBf8 \
+    -e PARENT_GATEWAY=<PLEASE PUT GATEWAY_ADDR> \
+    -e PARENT_REGISTRY=<PLEASE PUT REGISTRY_ADD> \
     -e FM_PULL_SKIP=1 \
     child-validator
 ```
@@ -204,8 +204,8 @@ cargo make --makefile infra/fendermint/Makefile.toml \
     -e RESOLVER_HOST_PORT=26755 \
     -e BOOTSTRAPS=092a95385ccc6fcebe1fad0e77ee8105ef6bf965@validator-1-cometbft:26656 \
     -e RESOLVER_BOOTSTRAPS=/dns/validator-1-fendermint/tcp/26655/p2p/16Uiu2HAmGa3jAm2yPrCGbi3Y95B9b1Mv6KAx7f7VjXT6Srem2bjC \
-    -e PARENT_REGISTRY=0x7308C4A503a12521215718cbCa98F951E9aAB9B5 \
-    -e PARENT_GATEWAY=0x5cF14D2Af9BBd5456Ea532639f1DB355B9BaCBf8 \
+    -e PARENT_GATEWAY=<PLEASE PUT GATEWAY_ADDR> \
+    -e PARENT_REGISTRY=<PLEASE PUT REGISTRY_ADD> \
     child-validator
 ```
 
@@ -227,8 +227,8 @@ cargo make --makefile infra/fendermint/Makefile.toml \
     -e RESOLVER_HOST_PORT=26855 \
     -e BOOTSTRAPS=092a95385ccc6fcebe1fad0e77ee8105ef6bf965@validator-1-cometbft:26656 \
     -e RESOLVER_BOOTSTRAPS=/dns/validator-1-fendermint/tcp/26655/p2p/16Uiu2HAmGa3jAm2yPrCGbi3Y95B9b1Mv6KAx7f7VjXT6Srem2bjC \
-    -e PARENT_REGISTRY=0x7308C4A503a12521215718cbCa98F951E9aAB9B5 \
-    -e PARENT_GATEWAY=0x5cF14D2Af9BBd5456Ea532639f1DB355B9BaCBf8 \
+    -e PARENT_GATEWAY=<PLEASE PUT GATEWAY_ADDR> \
+    -e PARENT_REGISTRY=<PLEASE PUT REGISTRY_ADD> \
     child-validator
 ```
 
