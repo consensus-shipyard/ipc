@@ -14,7 +14,7 @@ use ethers_core::types::{self as et, BlockNumber};
 use ethers_core::utils::rlp;
 use fendermint_rpc::message::MessageFactory;
 use fendermint_rpc::query::QueryClient;
-use fendermint_rpc::response::{decode_fevm_invoke, decode_fevm_return_data};
+use fendermint_rpc::response::{decode_data, decode_fevm_invoke, decode_fevm_return_data};
 use fendermint_vm_actor_interface::eam::{EthAddress, EAM_ACTOR_ADDR};
 use fendermint_vm_actor_interface::evm;
 use fendermint_vm_message::chain::ChainMessage;
@@ -635,11 +635,15 @@ where
         // Ok(et::TxHash::from_slice(res.hash.as_bytes()))
         Ok(msghash)
     } else {
-        error_with_revert(
-            ExitCode::new(res.code.value()),
-            res.log,
-            Some(res.data.to_vec()),
-        )
+        // Try to decode any errors returned in the data.
+        let data = RawBytes::from(res.data.to_vec());
+        // Might have to first call `decode_fevm_data` here in case CometBFT
+        // wraps the data into Base64 encoding like it does for `DeliverTx`.
+        let data = decode_fevm_return_data(data)
+            .or_else(|_| decode_data(&res.data).and_then(decode_fevm_return_data))
+            .ok();
+
+        error_with_revert(ExitCode::new(res.code.value()), res.log, data)
     }
 }
 
