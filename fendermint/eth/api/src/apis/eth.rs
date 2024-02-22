@@ -635,7 +635,11 @@ where
         // Ok(et::TxHash::from_slice(res.hash.as_bytes()))
         Ok(msghash)
     } else {
-        error_with_revert(ExitCode::new(res.code.value()), res.log, res.data.to_vec())
+        error_with_revert(
+            ExitCode::new(res.code.value()),
+            res.log,
+            Some(res.data.to_vec()),
+        )
     }
 }
 
@@ -657,10 +661,10 @@ where
     if deliver_tx.code.is_err() {
         // There might be some revert data encoded as ABI in the response.
         let (msg, data) = match decode_fevm_invoke(&deliver_tx) {
-            Ok(h) => (deliver_tx.info, h),
+            Ok(h) => (deliver_tx.info, Some(h)),
             Err(e) => (
                 format!("{}\nfailed to decode return data: {:#}", deliver_tx.info, e),
-                Vec::new(),
+                None,
             ),
         };
         error_with_revert(ExitCode::new(deliver_tx.code.value()), msg, data)
@@ -715,8 +719,8 @@ where
         // There might be some revert data encoded as ABI in the response.
         let msg = format!("failed to estimate gas: {}", estimate.info);
         let (msg, data) = match decode_fevm_return_data(estimate.return_data) {
-            Ok(h) => (msg, h),
-            Err(e) => (format!("{msg}\n{e:#}"), Vec::new()),
+            Ok(h) => (msg, Some(h)),
+            Err(e) => (format!("{msg}\n{e:#}"), None),
         };
         error_with_revert(estimate.exit_code, msg, data)
     } else {

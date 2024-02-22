@@ -56,16 +56,16 @@ pub fn error<T>(exit_code: ExitCode, msg: impl ToString) -> Result<T, JsonRpcErr
 pub fn error_with_data<T, E: Serialize>(
     exit_code: ExitCode,
     msg: impl ToString,
-    data: E,
+    data: Option<E>,
 ) -> Result<T, JsonRpcError> {
-    let data = match serde_json::to_value(data) {
+    let data = data.map(|data| match serde_json::to_value(data) {
         Ok(v) => v,
         Err(e) => serde_json::Value::String(format!("failed to serialize error data: {e}")),
-    };
+    });
     Err(JsonRpcError {
         code: exit_code.value().into(),
         message: msg.to_string(),
-        data: Some(data),
+        data,
     })
 }
 
@@ -77,14 +77,19 @@ pub fn error_with_data<T, E: Serialize>(
 pub fn error_with_revert<T>(
     exit_code: ExitCode,
     msg: impl ToString,
-    data: impl AsRef<[u8]>,
+    data: Option<impl AsRef<[u8]>>,
 ) -> Result<T, JsonRpcError> {
-    let mut msg = msg.to_string();
-    if let Some(revert) = String::decode_with_selector(data.as_ref()) {
-        msg.push('\n');
-        msg.push_str(&revert);
-    }
-    let data = hex::encode(data);
+    let (msg, data) = match data {
+        None => (msg.to_string(), None),
+        Some(data) => {
+            let mut msg = msg.to_string();
+            if let Some(revert) = String::decode_with_selector(data.as_ref()) {
+                msg.push('\n');
+                msg.push_str(&revert);
+            }
+            (msg, Some(hex::encode(data)))
+        }
+    };
     error_with_data(exit_code, msg, data)
 }
 
