@@ -12,7 +12,7 @@ The params to connect to Filecoin Calibration are:
 
 * subnet\_id : `/r314159`
 * provider\_http : `https://api.calibration.node.glif.io/rpc/v1`
-* gateway\_addr : `0x1AEe8A878a22280fc2753b3C63571C8F895D2FE3`
-* registry\_addr : `0x0b4e239FF21b40120cDa817fba77bD1B366c1bcD`
+* gateway\_addr :  [![Gateway Address](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fconsensus-shipyard%2Fipc%2Fcd%2Fcontracts%2Fdeployments%2Fr314159.json&query=%24.gateway_addr&label=Gateway%20Address)](https://github.com/consensus-shipyard/ipc/blob/cd/contracts/deployments/r314159.json)
+* registry\_addr : [![Registry Address](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fconsensus-shipyard%2Fipc%2Fcd%2Fcontracts%2Fdeployments%2Fr314159.json&query=%24.registry_addr&label=Registry%20Address)](https://github.com/consensus-shipyard/ipc/blob/cd/contracts/deployments/r314159.json)
 
 The Chain ID for Filecoin Calibration is `314159`. A [faucet](https://faucet.calibration.fildev.network/) and [explorer](https://calibration.filfox.info/en) are available.
