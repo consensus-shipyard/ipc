@@ -365,6 +365,9 @@ mod tests {
     use ipc_provider::manager::{GetBlockHashResult, TopDownQueryPayload};
     use std::sync::Arc;
 
+    /// How far behind the tip of the chain do we consider blocks final in the tests.
+    const FINALITY_DELAY: u64 = 2;
+
     struct TestParentFinalityStateQuery {
         latest_finality: IPCParentFinality,
     }
@@ -437,7 +440,7 @@ mod tests {
         sync_many: bool,
     ) -> LotusParentSyncer<TestParentFinalityStateQuery, TestParentProxy> {
         let config = Config {
-            chain_head_delay: 2,
+            chain_head_delay: FINALITY_DELAY,
             polling_interval: Default::default(),
             exponential_back_off: Default::default(),
             exponential_retry_limit: 0,
@@ -619,13 +622,12 @@ mod tests {
         // Sync all the way to the head of the chain.
         syncer.sync().await.unwrap();
 
-        // The end height should be the finalized height, top - delay.
-        // NOTE: The syncer doesn't care that the height isn't buried in `delay` number of null or non-null blocks.
-        assert_eq!(syncer.sync_pointers.head(), 111 - 2);
+        // The end height should be the finalized height: `top - delay``.
+        // NOTE: The syncer doesn't care that the height isn't buried in `delay` number of non-null blocks, null blocks finalize as well.
+        assert_eq!(syncer.sync_pointers.head(), 111 - FINALITY_DELAY);
         assert_eq!(syncer.sync_pointers.tail(), Some((108, vec![5; 32])));
 
-        // latest height is None as we are yet to confirm block 108, so latest height should equal
-        // to the previous confirmed block, which is 104
+        // latest height is None as we are yet to confirm block 108 by a non-null block.
         assert_eq!(
             atomically(|| syncer.provider.latest_height()).await,
             Some(104)
