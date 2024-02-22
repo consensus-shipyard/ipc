@@ -456,8 +456,15 @@ mod tests {
                 .await
                 .expect("failed to create state");
 
-        let interpreter =
-            FvmMessageInterpreter::new(mock_client(), None, contracts_path(), 1.05, 1.05, false);
+        let interpreter = FvmMessageInterpreter::new(
+            mock_client(),
+            None,
+            contracts_path(),
+            1.05,
+            1.05,
+            false,
+            None,
+        );
 
         let (state, out) = interpreter
             .init(state, genesis)

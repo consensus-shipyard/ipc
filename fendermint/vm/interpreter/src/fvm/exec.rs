@@ -213,23 +213,30 @@ where
         };
 
         // check for upgrades in the upgrade_scheduler
-        let chain_id: u64 = state.chain_id().into();
-        let block_height: u64 = state.block_height().try_into().unwrap();
+        match &self.upgrade_scheduler {
+            Some(upgrade_scheduler) => {
+                let chain_id: u64 = state.chain_id().into();
+                let block_height: u64 = state.block_height().try_into().unwrap();
 
-        if let Some(upgrade) = self.upgrade_scheduler.get_upgrade(chain_id, block_height) {
-            tracing::info!(
-                chain_id = chain_id,
-                height = block_height,
-                "Running migration",
-            );
+                if let Some(upgrade) = upgrade_scheduler.get(chain_id, block_height) {
+                    tracing::info!(
+                        chain_id = chain_id,
+                        height = block_height,
+                        "Running migration",
+                    );
 
-            // there is an upgrade scheduled for this height, lets run the migration
-            let res = (upgrade.migration)(&mut state);
+                    // there is an upgrade scheduled for this height, lets run the migration
+                    let res = (upgrade.migration)(&mut state);
 
-            tracing::info!(
-                result =? res,
-                "upgrade finished ",
-            );
+                    tracing::info!(
+                        chain_id = chain_id,
+                        height = block_height,
+                        result =? res,
+                        "Running migration done",
+                    );
+                }
+            }
+            None => {}
         }
 
         Ok((state, updates))

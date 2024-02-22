@@ -11,8 +11,7 @@ mod genesis;
 mod query;
 pub mod state;
 pub mod store;
-mod upgrade_scheduler;
-mod upgrades;
+pub mod upgrade_scheduler;
 
 #[cfg(any(test, feature = "bundle"))]
 pub mod bundle;
@@ -27,7 +26,6 @@ pub use fendermint_vm_message::query::FvmQuery;
 pub use genesis::FvmGenesisOutput;
 pub use query::FvmQueryRet;
 use tendermint_rpc::Client;
-use upgrades::load_upgrade_scheduler;
 
 pub use self::broadcast::Broadcaster;
 use self::{state::ipc::GatewayCaller, upgrade_scheduler::UpgradeScheduler};
@@ -79,7 +77,7 @@ where
     exec_in_check: bool,
     gateway: GatewayCaller<DB>,
     /// Upgrade scheduler stores all the upgrades to be executed at given heights.
-    upgrade_scheduler: UpgradeScheduler<DB>,
+    upgrade_scheduler: Option<UpgradeScheduler<DB>>,
 }
 
 impl<DB, C> FvmMessageInterpreter<DB, C>
@@ -93,9 +91,8 @@ where
         gas_overestimation_rate: f64,
         gas_search_step: f64,
         exec_in_check: bool,
+        upgrade_scheduler: Option<UpgradeScheduler<DB>>,
     ) -> Self {
-        let upgrade_scheduler = load_upgrade_scheduler::<DB>().expect("Invalid upgrade schedule");
-
         Self {
             client,
             validator_ctx,

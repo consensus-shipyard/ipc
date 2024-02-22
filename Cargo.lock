@@ -2954,6 +2954,7 @@ dependencies = [
  "anyhow",
  "arbitrary",
  "arbtest",
+ "cid",
  "ethers",
  "fendermint_crypto",
  "fendermint_testing",

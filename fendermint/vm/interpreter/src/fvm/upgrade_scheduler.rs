@@ -54,7 +54,7 @@ where
     DB: Blockstore + 'static + Clone,
 {
     // add a new upgrade to the schedule
-    pub fn add_upgrade(&mut self, upgrade: Upgrade<DB>) -> anyhow::Result<()> {
+    pub fn add(&mut self, upgrade: Upgrade<DB>) -> anyhow::Result<()> {
         if self
             .upgrades
             .contains_key(&(upgrade.chain_id, upgrade.block_height))
@@ -71,7 +71,8 @@ where
         Ok(())
     }
 
-    pub fn get_upgrade(&self, chain_id: ChainID, height: BlockHeight) -> Option<&Upgrade<DB>> {
+    // check if there is an upgrade scheduled for the given chain_id at a given height
+    pub fn get(&self, chain_id: ChainID, height: BlockHeight) -> Option<&Upgrade<DB>> {
         self.upgrades.get(&(chain_id, height))
     }
 }
@@ -86,14 +87,14 @@ fn test_validate_upgrade_schedule() {
         block_height: 10,
         migration: |_state| Ok(()),
     };
-    us.add_upgrade(upgrade).unwrap();
+    us.add(upgrade).unwrap();
 
     let upgrade = Upgrade {
         chain_id: 1,
         block_height: 20,
         migration: |_state| Ok(()),
     };
-    us.add_upgrade(upgrade).unwrap();
+    us.add(upgrade).unwrap();
 
     // adding an upgrade at the same height should fail
     let upgrade = Upgrade {
@@ -101,9 +102,9 @@ fn test_validate_upgrade_schedule() {
         block_height: 20,
         migration: |_state| Ok(()),
     };
-    let res = us.add_upgrade(upgrade);
+    let res = us.add(upgrade);
     assert!(res.is_err());
 
-    assert!(us.get_upgrade(1, 9).is_none());
-    assert!(us.get_upgrade(1, 10).is_some());
+    assert!(us.get(1, 9).is_none());
+    assert!(us.get(1, 10).is_some());
 }

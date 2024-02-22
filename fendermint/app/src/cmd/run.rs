@@ -113,6 +113,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         settings.fvm.gas_overestimation_rate,
         settings.fvm.gas_search_step,
         settings.fvm.exec_in_check,
+        None,
     );
     let interpreter = SignedMessageInterpreter::new(interpreter);
     let interpreter = ChainMessageInterpreter::<_, NamespaceBlockstore>::new(interpreter);
