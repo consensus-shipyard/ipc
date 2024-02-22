@@ -72,8 +72,8 @@ impl Object {
 #[derive(PartialEq, Clone, Debug, Serialize_tuple, Deserialize_tuple, Hash, Eq)]
 pub struct SignedMessage {
     pub message: Message,
-    pub signature: Signature,
     pub object: Option<Object>,
+    pub signature: Signature,
 }
 
 impl SignedMessage {
@@ -82,8 +82,8 @@ impl SignedMessage {
     /// The signature will not be verified.
     pub fn new_unchecked(
         message: Message,
-        signature: Signature,
         object: Option<Object>,
+        signature: Signature,
     ) -> SignedMessage {
         SignedMessage {
             message,
@@ -95,18 +95,18 @@ impl SignedMessage {
     /// Create a signed message.
     pub fn new_secp256k1(
         message: Message,
+        object: Option<Object>,
         sk: &SecretKey,
         chain_id: &ChainID,
-        object: Option<Object>,
     ) -> Result<Self, SignedMessageError> {
-        let signature = match Self::signable(&message, chain_id, &object)? {
+        let signature = match Self::signable(&message, &object, chain_id)? {
             Signable::Ethereum((hash, _)) => sign_eth(sk, hash),
             Signable::Regular(data) => sign_regular(sk, &data),
         };
         Ok(Self {
             message,
-            signature,
             object,
+            signature,
         })
     }
 
@@ -121,8 +121,8 @@ impl SignedMessage {
     /// https://github.com/filecoin-project/FIPs/blob/master/FIPS/fip-0039.md
     fn signable(
         message: &Message,
-        chain_id: &ChainID,
         object: &Option<Object>,
+        chain_id: &ChainID,
     ) -> Result<Signable, SignedMessageError> {
         // Here we look at the sender to decide what scheme to use for hashing.
         //
@@ -160,11 +160,11 @@ impl SignedMessage {
     /// Verify that the message CID was signed by the `from` address.
     pub fn verify_signature(
         message: &Message,
+        object: &Option<Object>,
         signature: &Signature,
         chain_id: &ChainID,
-        object: &Option<Object>,
     ) -> Result<(), SignedMessageError> {
-        match Self::signable(message, chain_id, object)? {
+        match Self::signable(message, object, chain_id)? {
             Signable::Ethereum((hash, from)) => {
                 // If the sender is ethereum, recover the public key from the signature (which verifies it),
                 // then turn it into an `EthAddress` and verify it matches the `from` of the message.
@@ -217,12 +217,8 @@ impl SignedMessage {
     }
 
     /// Verifies that the from address of the message generated the signature.
-    pub fn verify(
-        &self,
-        chain_id: &ChainID,
-        object: &Option<Object>,
-    ) -> Result<(), SignedMessageError> {
-        Self::verify_signature(&self.message, &self.signature, chain_id, object)
+    pub fn verify(&self, chain_id: &ChainID) -> Result<(), SignedMessageError> {
+        Self::verify_signature(&self.message, &self.object, &self.signature, chain_id)
     }
 
     /// Returns reference to the unsigned message.
@@ -369,14 +365,14 @@ mod tests {
         msg.from = Address::new_secp256k1(&pk.serialize())
             .map_err(|e| format!("failed to conver to address: {e}"))?;
 
-        let signed = SignedMessage::new_secp256k1(msg, &sk, &chain_id0, None)
+        let signed = SignedMessage::new_secp256k1(msg, None, &sk, &chain_id0)
             .map_err(|e| format!("signing failed: {e}"))?;
 
         signed
-            .verify(&chain_id0, &None)
+            .verify(&chain_id0)
             .map_err(|e| format!("verifying failed: {e}"))?;
 
-        if signed.verify(&chain_id1, &None).is_ok() {
+        if signed.verify(&chain_id1).is_ok() {
             return Err("verifying with a different chain ID should fail".into());
         }
         Ok(())
@@ -393,8 +389,8 @@ mod tests {
         msg.from = Address::from(ea);
 
         let signed =
-            SignedMessage::new_secp256k1(msg, &sk, &chain_id, None).map_err(|e| e.to_string())?;
+            SignedMessage::new_secp256k1(msg, None, &sk, &chain_id).map_err(|e| e.to_string())?;
 
-        signed.verify(&chain_id, &None).map_err(|e| e.to_string())
+        signed.verify(&chain_id).map_err(|e| e.to_string())
     }
 }

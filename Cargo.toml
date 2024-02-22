@@ -29,7 +29,6 @@ members = [
     "fendermint/actors",
     "fendermint/actors/chainmetadata",
     "fendermint/actors/objectstore",
-    "fendermint/actors/contentresolver",
     # textile
     "textile/objectstore_actor_sdk",
     "textile/objectstore_syscall",

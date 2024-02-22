@@ -105,7 +105,7 @@ impl MessageFactory {
             gas_premium: gas_params.gas_premium,
         };
         self.sequence += 1;
-        let signed = SignedMessage::new_secp256k1(message, &self.sk, &self.chain_id, object)?;
+        let signed = SignedMessage::new_secp256k1(message, object, &self.sk, &self.chain_id)?;
         let chain = ChainMessage::Signed(signed);
         Ok(chain)
     }
@@ -120,7 +120,7 @@ impl MessageFactory {
     ) -> anyhow::Result<ChainMessage> {
         let input = fendermint_actor_objectstore::ObjectParams {
             key: key.clone().into_bytes(),
-            content: content.to_bytes(),
+            value: content.to_bytes(),
         };
         let params = RawBytes::serialize(&input)?;
         let message = self.transaction(

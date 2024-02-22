@@ -280,7 +280,8 @@ where
 
                 if ret.is_ok() {
                     if let Some(obj) = msg.object {
-                        atomically(|| env.object_pool.add(ObjectPoolItem { obj })).await;
+                        atomically(|| env.object_pool.add(ObjectPoolItem { obj: obj.clone() }))
+                            .await;
                     }
                 }
 

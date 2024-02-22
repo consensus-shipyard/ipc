@@ -14,8 +14,8 @@ use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
 use fendermint_vm_actor_interface::{
-    account, burntfunds, chainmetadata, contentresolver, cron, eam, init, ipc, objectstore, reward,
-    system, EMPTY_ARR,
+    account, burntfunds, chainmetadata, cron, eam, init, ipc, objectstore, reward, system,
+    EMPTY_ARR,
 };
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Genesis, Power, PowerScale, Validator};
@@ -247,18 +247,6 @@ where
                 None,
             )
             .context("failed to create chainmetadata actor")?;
-
-        // Initialize the content resolver actor.
-        let contentresolver_state = fendermint_actor_contentresolver::State::new(&state.store())?;
-        state
-            .create_custom_actor(
-                fendermint_actor_contentresolver::CONTENTRESOLVER_ACTOR_NAME,
-                contentresolver::CONTENTRESOLVER_ACTOR_ID,
-                &contentresolver_state,
-                TokenAmount::zero(),
-                None,
-            )
-            .context("failed to create contentresolver actor")?;
 
         // Initialize the object store actor.
         let objectstore_state = fendermint_actor_objectstore::State::new(&state.store())?;

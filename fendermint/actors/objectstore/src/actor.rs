@@ -46,7 +46,7 @@ impl Actor {
         // })?;
 
         let root = rt.transaction(|st: &mut State, rt| {
-            st.put(rt.store(), BytesKey(params.key), params.content, true)
+            st.put(rt.store(), BytesKey(params.key), params.value, true)
                 .map_err(|e| {
                     e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to put object")
                 })
@@ -88,7 +88,7 @@ impl Actor {
             .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get object"))
     }
 
-    fn list_objects(rt: &impl Runtime) -> Result<Option<Vec<Vec<u8>>>, ActorError> {
+    fn list_objects(rt: &impl Runtime) -> Result<Option<Vec<(Vec<u8>, Object)>>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
         let st: State = rt.state()?;

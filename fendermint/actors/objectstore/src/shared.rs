@@ -17,7 +17,7 @@ pub struct ObjectParams {
     #[serde(with = "strict_bytes")]
     pub key: Vec<u8>,
     #[serde(with = "strict_bytes")]
-    pub content: Vec<u8>,
+    pub value: Vec<u8>,
 }
 
 #[derive(FromPrimitive)]
@@ -124,11 +124,11 @@ impl State {
         Ok(value)
     }
 
-    pub fn list<BS: Blockstore>(&self, store: &BS) -> anyhow::Result<Vec<Vec<u8>>> {
+    pub fn list<BS: Blockstore>(&self, store: &BS) -> anyhow::Result<Vec<(Vec<u8>, Object)>> {
         let hamt = Hamt::<_, Object>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
         let mut keys = Vec::new();
-        hamt.for_each(|k, _| {
-            keys.push(k.0.to_owned());
+        hamt.for_each(|k, v| {
+            keys.push((k.0.to_owned(), v.clone()));
             Ok(())
         })?;
         Ok(keys)

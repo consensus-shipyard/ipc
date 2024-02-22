@@ -15,7 +15,7 @@ use fvm_shared::econ::TokenAmount;
 use fvm_shared::BLOCK_GAS_LIMIT;
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{json, Value};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -198,11 +198,19 @@ async fn handle_list(
             })
         })?;
 
-    let list: Vec<String> = res
+    let list = res
         .unwrap_or_default()
         .iter()
-        .map(|v| core::str::from_utf8(v).unwrap_or_default().to_string())
-        .collect();
+        .map(|v| -> Result<Value, Rejection> {
+            let key = core::str::from_utf8(&v.0).unwrap_or_default().to_string();
+            let value = Cid::try_from(v.1.value.clone()).map_err(|e| {
+                Rejection::from(BadRequest {
+                    message: format!("failed to decode value: {}", e),
+                })
+            })?;
+            Ok(json!({"key": key, "value": value.to_string(), "resolved": v.1.resolved}))
+        })
+        .collect::<Result<Vec<Value>, Rejection>>()?;
 
     Ok(warp::reply::json(&list))
 }
@@ -370,7 +378,7 @@ async fn datarepo_list(
     client: FendermintClient,
     args: TransArgs,
     height: u64,
-) -> anyhow::Result<Option<Vec<Vec<u8>>>> {
+) -> anyhow::Result<Option<Vec<(Vec<u8>, Object)>>> {
     let mut client = TransClient::new(client, &args)?;
     let gas_params = gas_params(&args);
     let h = FvmQueryHeight::from(height);

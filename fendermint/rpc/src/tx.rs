@@ -175,7 +175,7 @@ pub trait CallClient: QueryClient + BoundClient {
         value: TokenAmount,
         gas_params: GasParams,
         height: FvmQueryHeight,
-    ) -> anyhow::Result<CallResponse<Vec<Vec<u8>>>> {
+    ) -> anyhow::Result<CallResponse<Vec<(Vec<u8>, Object)>>> {
         let msg = self
             .message_factory_mut()
             .datarepo_list(value, gas_params)?;
