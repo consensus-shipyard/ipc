@@ -226,6 +226,15 @@ where
     /// or None if it's the latest, to let the node figure it out.
     ///
     /// Adjusts the height of the query to +1 so the effects of the block is visible.
+    /// The node stores the results at height+1 to be consistent with how CometBFT works,
+    /// ie. the way it publishes the state hash in the *next* block.
+    ///
+    /// The assumption here is that the client got the height from one of two sources:
+    /// * by calling the `latest_height` method above, which adjusts it down,
+    ///   so that the returned height is one which is surely executed
+    /// * by getting a block (e.g. from a subscription) which was already executed
+    ///
+    /// In both cases we know that there should be state stored at height + 1.
     pub async fn query_height(&self, block_id: et::BlockId) -> JsonRpcResult<FvmQueryHeight> {
         match block_id {
             et::BlockId::Number(bn) => match bn {
