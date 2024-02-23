@@ -4,9 +4,6 @@ use crate::commands::checkpoint::bottomup_bundles::{GetBottomUpBundles, GetBotto
 use crate::commands::checkpoint::bottomup_height::{
     LastBottomUpCheckpointHeight, LastBottomUpCheckpointHeightArgs,
 };
-use crate::commands::checkpoint::list_checkpoints::{
-    ListBottomUpCheckpoints, ListBottomUpCheckpointsArgs,
-};
 use crate::commands::checkpoint::list_validator_changes::{
     ListValidatorChanges, ListValidatorChangesArgs,
 };
@@ -19,7 +16,6 @@ use clap::{Args, Subcommand};
 
 mod bottomup_bundles;
 mod bottomup_height;
-mod list_checkpoints;
 mod list_validator_changes;
 mod quorum_reached;
 mod relayer;
@@ -35,7 +31,9 @@ pub(crate) struct CheckpointCommandsArgs {
 impl CheckpointCommandsArgs {
     pub async fn handle(&self, global: &GlobalArguments) -> anyhow::Result<()> {
         match &self.command {
-            Commands::ListBottomup(args) => ListBottomUpCheckpoints::handle(global, args).await,
+            Commands::ListBottomup(args) => {
+                LastBottomUpCheckpointHeight::handle(global, args).await
+            }
             Commands::Relayer(args) => BottomUpRelayer::handle(global, args).await,
             Commands::ListValidatorChanges(args) => {
                 ListValidatorChanges::handle(global, args).await
@@ -53,7 +51,7 @@ impl CheckpointCommandsArgs {
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum Commands {
-    ListBottomup(ListBottomUpCheckpointsArgs),
+    ListBottomup(LastBottomUpCheckpointHeightArgs),
     Relayer(BottomUpRelayerArgs),
     ListValidatorChanges(ListValidatorChangesArgs),
     ListBottomupBundle(GetBottomUpBundlesArgs),

@@ -28,11 +28,10 @@ impl CommandLineHandler for GetBottomUpBundles {
 
         for h in arguments.from_epoch..=arguments.to_epoch {
             let bundle = provider.get_bottom_up_bundle(&subnet, h).await?;
-            println!(
-                "checkpoint: {:?}, signatures: {:?}, signatories: {:?}",
-                bundle.checkpoint, bundle.signatures, bundle.signatories,
-            );
-            println!("{bundle:?}");
+            println!("bottom up checkpoint bundle at height: {}", h);
+            println!("checkpoint: {:?}", bundle.checkpoint);
+            println!("signatures: {:?}", bundle.signatures);
+            println!("signatories: {:?}", bundle.signatories);
         }
 
         Ok(())
