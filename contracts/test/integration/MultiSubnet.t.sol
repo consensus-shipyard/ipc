@@ -893,7 +893,10 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         // 2. The fund is locked in the gateway as execution is rejected
         submitBottomUpCheckpoint(checkpoint, address(rootNativeSubnetActor));
 
-        require(address(rootGatewayManager).balance == initialBalance + fundToSend, "fund should still be locked in gateway");
+        require(
+            address(rootGatewayManager).balance == initialBalance + fundToSend,
+            "fund should still be locked in gateway"
+        );
         require(caller.balance == initialBalance - fundToSend, "fund should still be locked in gateway");
     }
 
