@@ -682,7 +682,7 @@ impl IpcProvider {
         &self,
         subnet: &SubnetID,
         height: ChainEpoch,
-    ) -> anyhow::Result<BottomUpCheckpointBundle> {
+    ) -> anyhow::Result<Option<BottomUpCheckpointBundle>> {
         let conn = match self.connection(subnet) {
             None => return Err(anyhow!("target subnet not found")),
             Some(conn) => conn,

@@ -27,7 +27,10 @@ impl CommandLineHandler for GetBottomUpBundles {
         let subnet = SubnetID::from_str(&arguments.subnet)?;
 
         for h in arguments.from_epoch..=arguments.to_epoch {
-            let bundle = provider.get_bottom_up_bundle(&subnet, h).await?;
+            let Some(bundle) = provider.get_bottom_up_bundle(&subnet, h).await? else {
+                continue;
+            };
+
             println!("bottom up checkpoint bundle at height: {}", h);
             println!("{}", bundle);
         }
