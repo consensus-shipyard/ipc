@@ -54,6 +54,24 @@ impl DockerContainer {
             }
         }
     }
+
+    /// Start the container, unless it's already running.
+    pub async fn start(&self) -> anyhow::Result<()> {
+        // TODO: Check if the container is running.
+
+        self.dh
+            .docker
+            .start_container::<&str>(&self.container.id, None)
+            .await
+            .with_context(|| {
+                format!(
+                    "failed to start container: {} ({})",
+                    self.container.name, self.container.id
+                )
+            })?;
+
+        Ok(())
+    }
 }
 
 impl Drop for DockerContainer {

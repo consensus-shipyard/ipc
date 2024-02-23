@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, bail, Context};
 use bollard::{
     container::{
         AttachContainerOptions, AttachContainerResults, Config, CreateContainerOptions,
@@ -159,11 +159,11 @@ impl DockerNode {
                 .last()
                 .ok_or_else(|| anyhow!("empty cometbft node ID"))?;
 
-            if hex::decode(cometbft_node_id).is_err() {
+            if hex::decode(&cometbft_node_id).is_err() {
                 bail!("invalid cometbft node ID: {cometbft_node_id}");
             }
 
-            export_file(keys_dir.join(*COMETBFT_NODE_ID), cometbft_node_id)?;
+            export_file(keys_dir.join(COMETBFT_NODE_ID), cometbft_node_id)?;
 
             // Convert fendermint genesis to cometbft.
             fendermint_runner
@@ -202,9 +202,9 @@ impl DockerNode {
                 .context("cannot show peer ID")?
                 .into_iter()
                 .last()
-                .ok_or_else(|| anyhow!("empty fendermint peer ID"));
+                .ok_or_else(|| anyhow!("empty fendermint peer ID"))?;
 
-            export_file(keys_dir.join(*FENDERMINT_PEER_ID), fendermint_peer_id)?;
+            export_file(keys_dir.join(FENDERMINT_PEER_ID), fendermint_peer_id)?;
         }
 
         // Create a directory for fendermint
@@ -420,27 +420,17 @@ impl DockerNode {
     }
 
     pub async fn start(&self, seed_nodes: &[&Self]) -> anyhow::Result<()> {
-        let cometbft_seeds = seed_nodes
-            .iter()
-            .map(|n| {
-                let c = n.cometbft.container.name;
-                let id = n.cometbft_node_id()?;
-                Ok(format!("{id}@{name}:{COMETBFT_P2P_PORT}"))
-            })
-            .collect::<Result<Vec<_>, _>>()
-            .context("failed to collect cometbft seeds")?
-            .join(",");
+        let cometbft_seeds = collect_seeds(seed_nodes, |n| {
+            let host = &n.cometbft.container.name;
+            let id = n.cometbft_node_id()?;
+            Ok(format!("{id}@{host}:{COMETBFT_P2P_PORT}"))
+        })?;
 
-        let resolver_seeds = seed_nodes
-            .iter()
-            .map(|n| {
-                let c = n.fendermint.container.name;
-                let id = n.fendermint_peer_id()?;
-                Ok(format!("/dns/{c}/tcp/{RESOLVER_P2P_PORT}/p2p/{id}"))
-            })
-            .collect::<Result<Vec<_>, _>>()
-            .context("failed to collect resolver seeds")?
-            .join(",");
+        let resolver_seeds = collect_seeds(seed_nodes, |n| {
+            let host = &n.fendermint.container.name;
+            let id = n.fendermint_peer_id()?;
+            Ok(format!("/dns/{host}/tcp/{RESOLVER_P2P_PORT}/p2p/{id}"))
+        })?;
 
         let env = env_vars! [
             "CMT_P2P_SEEDS" => cometbft_seeds,
@@ -450,15 +440,21 @@ impl DockerNode {
         export_env(self.path.join(DYNAMIC_ENV), &env)?;
 
         // Start all three containers.
-        todo!();
+        self.fendermint.start().await?;
+        self.cometbft.start().await?;
+        if let Some(ref ethapi) = self.ethapi {
+            ethapi.start().await?;
+        }
 
         Ok(())
     }
 
+    /// Read the CometBFT node ID from the file we persisted during creation.
     pub fn cometbft_node_id(&self) -> anyhow::Result<String> {
         read_file(self.path.join("keys").join(COMETBFT_NODE_ID))
     }
 
+    /// Read the libp2p peer ID from the file we persisted during creation.
     pub fn fendermint_peer_id(&self) -> anyhow::Result<String> {
         read_file(self.path.join("keys").join(FENDERMINT_PEER_ID))
     }
@@ -480,6 +476,20 @@ fn container_name(node_name: &NodeName, container: &str) -> String {
     let hash = hash.to_string();
     let hash = &hash.as_str()[..6];
     format!("{node_id}-{container}-{}", hash)
+}
+
+/// Collect comma separated values from seeds nodes.
+fn collect_seeds<F>(seed_nodes: &[&DockerNode], f: F) -> anyhow::Result<String>
+where
+    F: Fn(&DockerNode) -> anyhow::Result<String>,
+{
+    let ss = seed_nodes
+        .iter()
+        .map(|n| f(*n))
+        .collect::<anyhow::Result<Vec<_>>>()
+        .context("failed to collect seeds")?;
+
+    Ok(ss.join(","))
 }
 
 struct DockerRunner<'a> {
@@ -671,7 +681,7 @@ fn export_env(file_path: impl AsRef<Path>, env: &EnvVars) -> anyhow::Result<()> 
 }
 
 fn read_file(file_path: impl AsRef<Path>) -> anyhow::Result<String> {
-    std::fs::read_to_string(file_path)
+    std::fs::read_to_string(&file_path)
         .with_context(|| format!("failed to read {}", file_path.as_ref().to_string_lossy()))
 }
 
