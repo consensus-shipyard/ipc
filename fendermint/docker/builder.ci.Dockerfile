@@ -70,7 +70,8 @@ RUN set -eux; \
   *) echo >&2 "unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
   esac; \
   rustup show ; \
-  cargo build --release -p fendermint_app --target ${ARCH}-unknown-linux-gnu
+  cargo build --release -p fendermint_app --target ${ARCH}-unknown-linux-gnu &&\
+  cargo build --release -p ipc-cli --target ${ARCH}-unknown-linux-gnu
 
 # Now copy the full source.
 COPY . .
@@ -84,4 +85,5 @@ RUN set -eux; \
   amd64) ARCH='x86_64'  ;; \
   arm64) ARCH='aarch64' ;; \
   esac; \
-  cargo install --locked --root output --path fendermint/app --target ${ARCH}-unknown-linux-gnu
+  cargo install --locked --root output --path fendermint/app --target ${ARCH}-unknown-linux-gnu &&\
+  cargo install --locked --root output --path ipc/cli --target ${ARCH}-unknown-linux-gnu
