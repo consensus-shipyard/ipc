@@ -1,0 +1,8 @@
+{
+  "port_ranges": {
+    "testnets/test-root-only/root/nodes/node-1": {
+      "from": 0,
+      "to": 100
+    }
+  }
+}

@@ -53,7 +53,7 @@ where
     M: Materials,
     R: Materializer<M> + Sync + Send,
 {
-    pub async fn new(m: &mut R, id: &TestnetId) -> anyhow::Result<Self> {
+    pub async fn new(m: &mut R, id: impl Into<TestnetId>) -> anyhow::Result<Self> {
         let name = TestnetName::new(id);
         let network = m
             .create_network(&name)
@@ -82,7 +82,11 @@ where
     ///
     /// To validate a manifest, we can first create a testnet with a [Materializer]
     /// that only creates symbolic resources.
-    pub async fn setup(m: &mut R, id: &TestnetId, manifest: &Manifest) -> anyhow::Result<Self> {
+    pub async fn setup(
+        m: &mut R,
+        id: impl Into<TestnetId>,
+        manifest: &Manifest,
+    ) -> anyhow::Result<Self> {
         let mut t = Self::new(m, id).await?;
         let root_name = t.root();
 
