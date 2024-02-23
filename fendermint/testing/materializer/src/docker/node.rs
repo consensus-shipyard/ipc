@@ -46,6 +46,9 @@ const STATIC_ENV: &str = "static.env";
 /// These go into a separate file just so it's easy to recreate them.
 const DYNAMIC_ENV: &str = "dynamic.env";
 
+const COMETBFT_NODE_ID: &str = "cometbft-node-id";
+const FENDERMINT_PEER_ID: &str = "fendermint-peer-id";
+
 const RESOLVER_P2P_PORT: u32 = 26655;
 const COMETBFT_P2P_PORT: u32 = 26656;
 const COMETBFT_RPC_PORT: u32 = 26657;
@@ -151,7 +154,16 @@ impl DockerNode {
             let cometbft_node_id = cometbft_runner
                 .run_cmd("show-node-id")
                 .await
-                .context("cannot show node ID")?;
+                .context("cannot show node ID")?
+                .into_iter()
+                .last()
+                .ok_or_else(|| anyhow!("empty cometbft node ID"))?;
+
+            if hex::decode(cometbft_node_id).is_err() {
+                bail!("invalid cometbft node ID: {cometbft_node_id}");
+            }
+
+            export_file(keys_dir.join(*COMETBFT_NODE_ID), cometbft_node_id)?;
 
             // Convert fendermint genesis to cometbft.
             fendermint_runner
@@ -182,6 +194,17 @@ impl DockerNode {
                 .run_cmd("key gen --out-dir /fendermint/keys --name network_key")
                 .await
                 .context("failed to create network key")?;
+
+            // Capture the fendermint node identity.
+            let fendermint_peer_id = fendermint_runner
+                .run_cmd("key show-node-id --public-key /fendermint/keys/network_key.pk")
+                .await
+                .context("cannot show peer ID")?
+                .into_iter()
+                .last()
+                .ok_or_else(|| anyhow!("empty fendermint peer ID"));
+
+            export_file(keys_dir.join(*FENDERMINT_PEER_ID), fendermint_peer_id)?;
         }
 
         // Create a directory for fendermint
@@ -284,8 +307,6 @@ impl DockerNode {
         let dynamic_env = node_dir.join(DYNAMIC_ENV);
         if !dynamic_env.exists() {
             // The values will be assigned when the node is started.
-            // --env FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES=${RESOLVER_BOOTSTRAPS}
-            // --env CMT_P2P_SEEDS
             export_env(&dynamic_env, &Default::default())?;
         }
 
@@ -399,9 +420,47 @@ impl DockerNode {
     }
 
     pub async fn start(&self, seed_nodes: &[&Self]) -> anyhow::Result<()> {
-        // TODO: Export the identity when we create the node.
-        //let cometbft_seeds = seed_nodes.iter().map(|n| n.cometbft.container.name);
-        todo!()
+        let cometbft_seeds = seed_nodes
+            .iter()
+            .map(|n| {
+                let c = n.cometbft.container.name;
+                let id = n.cometbft_node_id()?;
+                Ok(format!("{id}@{name}:{COMETBFT_P2P_PORT}"))
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .context("failed to collect cometbft seeds")?
+            .join(",");
+
+        let resolver_seeds = seed_nodes
+            .iter()
+            .map(|n| {
+                let c = n.fendermint.container.name;
+                let id = n.fendermint_peer_id()?;
+                Ok(format!("/dns/{c}/tcp/{RESOLVER_P2P_PORT}/p2p/{id}"))
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .context("failed to collect resolver seeds")?
+            .join(",");
+
+        let env = env_vars! [
+            "CMT_P2P_SEEDS" => cometbft_seeds,
+            "FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES" => resolver_seeds,
+        ];
+
+        export_env(self.path.join(DYNAMIC_ENV), &env)?;
+
+        // Start all three containers.
+        todo!();
+
+        Ok(())
+    }
+
+    pub fn cometbft_node_id(&self) -> anyhow::Result<String> {
+        read_file(self.path.join("keys").join(COMETBFT_NODE_ID))
+    }
+
+    pub fn fendermint_peer_id(&self) -> anyhow::Result<String> {
+        read_file(self.path.join("keys").join(FENDERMINT_PEER_ID))
     }
 }
 
@@ -471,9 +530,11 @@ impl<'a> DockerRunner<'a> {
             cmd: Some(vec![cmd.to_string()]),
             attach_stderr: Some(true),
             attach_stdout: Some(true),
+            tty: Some(true),
             labels: Some(self.labels()),
             host_config: Some(HostConfig {
-                auto_remove: Some(true),
+                // We'll remove it explicitly at the end after collecting the output.
+                auto_remove: Some(false),
                 init: Some(true),
                 binds: Some(
                     self.volumes
@@ -493,8 +554,6 @@ impl<'a> DockerRunner<'a> {
             .context("failed to create container")?
             .id;
 
-        eprintln!("ID = {id}");
-
         let AttachContainerResults { mut output, .. } = self
             .docker()
             .attach_container::<String>(
@@ -502,6 +561,7 @@ impl<'a> DockerRunner<'a> {
                 Some(AttachContainerOptions {
                     stdout: Some(true),
                     stderr: Some(true),
+                    stream: Some(true),
                     ..Default::default()
                 }),
             )
@@ -513,9 +573,7 @@ impl<'a> DockerRunner<'a> {
             .await
             .context("failed to start container")?;
 
-        tokio::time::sleep(std::time::Duration::from_secs(120)).await;
-
-        // pipe docker attach output into stdout
+        // Collect docker attach output
         let mut out = Vec::new();
         while let Some(Ok(output)) = output.next().await {
             out.push(output.to_string());
@@ -612,6 +670,11 @@ fn export_env(file_path: impl AsRef<Path>, env: &EnvVars) -> anyhow::Result<()> 
     export_file(file_path, env.join("\n"))
 }
 
+fn read_file(file_path: impl AsRef<Path>) -> anyhow::Result<String> {
+    std::fs::read_to_string(file_path)
+        .with_context(|| format!("failed to read {}", file_path.as_ref().to_string_lossy()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::{DockerRunner, COMETBFT_IMAGE};
@@ -626,13 +689,12 @@ mod tests {
 
         let runner = DockerRunner::new(&dh, &nn, &COMETBFT_IMAGE, 0, Vec::new());
 
-        // Based on my manual testing, this will initialise the config and then show the ID.
+        // Based on my manual testing, this will initialise the config and then show the ID:
+        // `docker run cometbft/cometbft:v0.37.x show-node-id`
         let logs = runner
             .run_cmd("show-node-id")
             .await
             .expect("failed to show ID");
-
-        eprintln!("{}", logs.join("\n"));
 
         assert!(logs.len() > 0);
     }
