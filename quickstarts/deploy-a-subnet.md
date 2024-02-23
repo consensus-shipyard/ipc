@@ -233,60 +233,35 @@ Notes:
 
 ### Step 7: Interact with your subnet using the IPC CLI
 
-You can try to fetch the balances of your wallets through the following command. The result should show the initial balance that you have included for your validators address in genesis:
+* Make sure `~/.ipc/config.toml` contains the configuration of your subnet in the "Subnet template" section. Uncomment the section and populate the corresponding fields
 
 ```
-ipc-cli wallet balances --wallet-type evm --subnet=<SUBNET_ID>
-```
-
-> The ETH addresses for `gateway_addr` and `registry_addr` used when they are deployed in genesis in a child subnet by Fendermint are `0x77aa40b105843728088c0132e43fc44348881da8` and `0x74539671a1d2f1c8f200826baba665179f53a1b7`, respectively.
-
-### Step 8 (optional): Run a relayer
-
-IPC relies on the role of a specific type of peer on the network called the relayers that are responsible for submitting bottom-up checkpoints that have been finalized in a child subnet to its parent. This process is key for the commitment of child subnet checkpoints in the parent, and the execution of bottom-up cross-net messages. Without relayers, cross-net messages will only flow from top levels of the hierarchy to the bottom, but not the other way around.
-
-* Make sure `~/.ipc/config.toml` contains the configuration of your subnet in "Subnet template" section.
-
-```
-keystore_path = "~/.ipc"
-
-# Filecoin Calibration
-[[subnets]]
-id = "/r314159"
-
-[subnets.config]
-network_type = "fevm"
-provider_http = "https://api.calibration.node.glif.io/rpc/v1"
-gateway_addr = "0x5cF14D2Af9BBd5456Ea532639f1DB355B9BaCBf8"
-registry_addr = "0x7308C4A503a12521215718cbCa98F951E9aAB9B5"
-
 # Subnet template - uncomment and adjust before using
 [[subnets]]
 id = <PUT YOUR SUBNET ID>
 
 [subnets.config]
 network_type = "fevm"
-provider_http = "https://<RPC_ADDR>/"
+provider_http = "http://localhost:8545/"
 gateway_addr = "0x77aa40b105843728088c0132e43fc44348881da8"
 registry_addr = "0x74539671a1d2f1c8f200826baba665179f53a1b7"
 ```
 
-Note: the `gateway_addr` and `registry_addr` in the subnet section should be exactly the same as above. Fendermint always uses sets up the same addresses.
+> 💡 The ETH addresses for `gateway_addr` and `registry_addr` used when they are deployed in genesis in a child subnet by Fendermint are `0x77aa40b105843728088c0132e43fc44348881da8` and `0x74539671a1d2f1c8f200826baba665179f53a1b7`, respectively, so no need to change them.
 
-* Run the relayer process for your subnet using your default address by calling:
+* Fetch the balances of your wallets using  the following command. The result should show the initial balance that you have included for your validators address in genesis:
 
 ```
-ipc-cli checkpoint relayer --subnet <SUBNET_ID>
+ipc-cli wallet balances --wallet-type evm --subnet=<SUBNET_ID>
 ```
 
-* In order to run the relayer from a different address you can use the `--submitted` flag:
+### Step 8: Run a relayer
+
+IPC relies on the role of a specific type of peer on the network called the relayers that are responsible for submitting bottom-up checkpoints that have been finalized in a child subnet to its parent. This process is key for the commitment of child subnet checkpoints in the parent, and the execution of bottom-up cross-net messages. Without relayers, cross-net messages will only flow from top levels of the hierarchy to the bottom, but not the other way around.
+
+
+* Run the relayer process passing the 0x address of the submitter account:
 
 ```
 ipc-cli checkpoint relayer --subnet <SUBNET_ID> --submitter <RELAYER_ADDR>
-```
-
-Relayers are rewarded through cross-net messages fees for the timely submission of bottom-up checkpoints to the parent. In order to claim the checkpointing rewards collected for a subnet, the following command need to be run from the relayer address:
-
-```
-ipc-cli subnet claim --subnet=<SUBNET_ID> --reward
 ```
