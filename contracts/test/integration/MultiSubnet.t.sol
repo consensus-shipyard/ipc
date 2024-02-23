@@ -136,8 +136,8 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         uint256 amount = 3;
 
         vm.deal(address(rootNativeSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
-        vm.deal(caller, amount);
-        vm.deal(recipient, amount);
+        vm.deal(caller, 0);
+        vm.deal(recipient, 0);
 
         vm.prank(address(rootNativeSubnetActor));
         registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootNativeSubnetActor), rootGateway);
@@ -158,8 +158,8 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         executeTopDownMsgs(msgs, nativeSubnetName, address(nativeSubnetGateway));
 
         // works with no state changes
-        assertEq(recipient.balance, amount);
-        assertEq(caller.balance, amount);
+        assertEq(recipient.balance, 0);
+        assertEq(caller.balance, 0);
     }
 
     // A bottom up receipt sending from parent to child. The original message is a
@@ -171,8 +171,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         uint256 amount = 3;
 
         vm.deal(address(rootNativeSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
-        vm.deal(caller, amount);
-        vm.deal(recipient, amount);
 
         vm.prank(address(rootNativeSubnetActor));
         registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootNativeSubnetActor), rootGateway);
@@ -191,7 +189,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         executeTopDownMsgs(msgs, nativeSubnetName, address(nativeSubnetGateway));
 
-        require(caller.balance == amount + amount, "refund not happening");
+        require(caller.balance == amount, "refund not happening");
     }
 
     // A bottom up receipt sending from parent to child. The original message is a
@@ -203,8 +201,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         uint256 amount = 3;
 
         vm.deal(address(rootNativeSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
-        vm.deal(caller, amount);
-        vm.deal(recipient, amount);
 
         vm.prank(address(rootNativeSubnetActor));
         registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootNativeSubnetActor), rootGateway);
@@ -223,7 +219,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         executeTopDownMsgs(msgs, nativeSubnetName, address(nativeSubnetGateway));
 
-        require(caller.balance == amount + amount, "refund not happening");
+        require(caller.balance == amount, "refund not happening");
     }
 
     function testMultiSubnet_Native_NonPayable_FundingFromParentToChildFails() public {
@@ -337,7 +333,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         token.approve(address(rootGateway), 100);
 
         vm.deal(address(rootTokenSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
-        vm.deal(caller, amount);
+        vm.deal(caller, 0);
 
         vm.prank(address(rootTokenSubnetActor));
         registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootTokenSubnetActor), rootGateway);
@@ -354,7 +350,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         msgs[0] = resultMsg;
 
         executeTopDownMsgs(msgs, tokenSubnetName, address(tokenSubnetGateway));
-        require(caller.balance == amount + amount, "refund should have happened");
+        require(caller.balance == amount, "refund should have happened");
     }
 
     function testMultiSubnet_Erc20_ReleaseSystemErrFromParentToChild() public {
@@ -367,7 +363,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         token.approve(address(rootGateway), 100);
 
         vm.deal(address(rootTokenSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
-        vm.deal(caller, amount);
+        vm.deal(caller, 0);
 
         vm.prank(address(rootTokenSubnetActor));
         registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootTokenSubnetActor), rootGateway);
@@ -384,7 +380,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         msgs[0] = resultMsg;
 
         executeTopDownMsgs(msgs, tokenSubnetName, address(tokenSubnetGateway));
-        require(caller.balance == amount + amount, "refund should have happened");
+        require(caller.balance == amount, "refund should have happened");
     }
 
     function testMultiSubnet_Erc20_NonPayable_FundingFromParentToChildFails() public {
