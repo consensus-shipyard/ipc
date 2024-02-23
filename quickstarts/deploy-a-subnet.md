@@ -181,9 +181,9 @@ cargo make --makefile infra/fendermint/Makefile.toml \
 Note:
 
 * Use full path to PRIVATE\_KEY\_PATH, don't path with "\~"
-* Do not change values of any port unless you have to
+* Do not change values of any port from the ones provided unless you have to
 
-We'll need the _IPLD Resolver Multiaddress_ for the next nodes we'll start.
+You'll need the final component of the `IPLD Resolver Multiaddress` (the `peer ID`) and the `CometBFT node ID` for the next nodes we'll start.
 
 Let's start the second validator:
 
@@ -196,8 +196,8 @@ cargo make --makefile infra/fendermint/Makefile.toml \
     -e CMT_RPC_HOST_PORT=26757 \
     -e ETHAPI_HOST_PORT=8645 \
     -e RESOLVER_HOST_PORT=26755 \
-    -e BOOTSTRAPS=092a95385ccc6fcebe1fad0e77ee8105ef6bf965@validator-1-cometbft:26656 \
-    -e RESOLVER_BOOTSTRAPS=/dns/validator-1-fendermint/tcp/26655/p2p/16Uiu2HAmGa3jAm2yPrCGbi3Y95B9b1Mv6KAx7f7VjXT6Srem2bjC \
+    -e BOOTSTRAPS=<PLEASE PUT COMETBFT NODE ID of VALIDATOR-1>@validator-1-cometbft:26656 \
+    -e RESOLVER_BOOTSTRAPS=/dns/validator-1-fendermint/tcp/26655/p2p/<PLEASE PUT PEER_ID of VALIDATOR-1> \
     -e PARENT_GATEWAY=<PLEASE PUT GATEWAY_ADDR> \
     -e PARENT_REGISTRY=<PLEASE PUT REGISTRY_ADD> \
     child-validator
@@ -206,7 +206,6 @@ cargo make --makefile infra/fendermint/Makefile.toml \
 Notes:
 
 * Do not change values of any port from the ones provided unless you have to
-* Do not change values of BOOTSTRAPS and RESOLVER\_BOOTSTRAPS from the ones provided
 
 And the third:
 
@@ -219,8 +218,8 @@ cargo make --makefile infra/fendermint/Makefile.toml \
     -e CMT_RPC_HOST_PORT=26857 \
     -e ETHAPI_HOST_PORT=8745 \
     -e RESOLVER_HOST_PORT=26855 \
-    -e BOOTSTRAPS=092a95385ccc6fcebe1fad0e77ee8105ef6bf965@validator-1-cometbft:26656 \
-    -e RESOLVER_BOOTSTRAPS=/dns/validator-1-fendermint/tcp/26655/p2p/16Uiu2HAmGa3jAm2yPrCGbi3Y95B9b1Mv6KAx7f7VjXT6Srem2bjC \
+    -e BOOTSTRAPS=<PLEASE PUT COMETBFT NODE ID of VALIDATOR-1>@validator-1-cometbft:26656 \
+    -e RESOLVER_BOOTSTRAPS=/dns/validator-1-fendermint/tcp/26655/p2p/<PLEASE PUT PEER_ID of VALIDATOR-1> \
     -e PARENT_GATEWAY=<PLEASE PUT GATEWAY_ADDR> \
     -e PARENT_REGISTRY=<PLEASE PUT REGISTRY_ADD> \
     child-validator
@@ -229,7 +228,6 @@ cargo make --makefile infra/fendermint/Makefile.toml \
 Notes:
 
 * Do not change values of any port from the ones provided unless you have to
-* Do not change values of BOOTSTRAPS and RESOLVER\_BOOTSTRAPS from the ones provided
 
 ### Step 7: Interact with your subnet using the IPC CLI
 
