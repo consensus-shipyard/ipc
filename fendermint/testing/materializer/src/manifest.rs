@@ -39,6 +39,7 @@ pub struct Manifest {
     pub rootnet: Rootnet,
 
     /// Subnets created on the rootnet.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub subnets: SubnetMap,
 }
 
@@ -131,6 +132,7 @@ pub struct Subnet {
     /// Child subnets under this parent.
     ///
     /// The subnet ID exists so we can find the outcome of existing deployments in the log.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub subnets: SubnetMap,
 }
 
@@ -141,9 +143,11 @@ pub struct Node {
     /// Indicate whether to run the Ethereum API.
     pub ethapi: bool,
     /// The nodes from which CometBFT should bootstrap itself.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub seed_nodes: Vec<NodeId>,
     /// The parent node that the top-down syncer follows;
     /// or leave it empty if node is on the rootnet.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_node: Option<ParentNode>,
 }
 
