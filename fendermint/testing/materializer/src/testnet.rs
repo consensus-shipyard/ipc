@@ -18,8 +18,7 @@ use crate::{
         Materializer, NodeConfig, ParentConfig, SubmitConfig, SubnetConfig, TargetConfig,
     },
     materials::Materials,
-    AccountId, NodeId, NodeName, RelayerName, ResourceHash, SubnetId, SubnetName, TestnetId,
-    TestnetName,
+    AccountId, NodeId, NodeName, RelayerName, ResourceHash, SubnetId, SubnetName, TestnetName,
 };
 
 /// The `Testnet` parses a [Manifest] and is able to derive the steps
@@ -53,15 +52,14 @@ where
     M: Materials,
     R: Materializer<M> + Sync + Send,
 {
-    pub async fn new(m: &mut R, id: impl Into<TestnetId>) -> anyhow::Result<Self> {
-        let name = TestnetName::new(id);
+    pub async fn new(m: &mut R, name: &TestnetName) -> anyhow::Result<Self> {
         let network = m
-            .create_network(&name)
+            .create_network(name)
             .await
             .context("failed to create the network")?;
 
         Ok(Self {
-            name,
+            name: name.clone(),
             network,
             externals: Default::default(),
             accounts: Default::default(),
@@ -74,6 +72,10 @@ where
         })
     }
 
+    pub fn name(&self) -> &TestnetName {
+        &self.name
+    }
+
     pub fn root(&self) -> SubnetName {
         self.name.root()
     }
@@ -82,12 +84,8 @@ where
     ///
     /// To validate a manifest, we can first create a testnet with a [Materializer]
     /// that only creates symbolic resources.
-    pub async fn setup(
-        m: &mut R,
-        id: impl Into<TestnetId>,
-        manifest: &Manifest,
-    ) -> anyhow::Result<Self> {
-        let mut t = Self::new(m, id).await?;
+    pub async fn setup(m: &mut R, name: &TestnetName, manifest: &Manifest) -> anyhow::Result<Self> {
+        let mut t = Self::new(m, name).await?;
         let root_name = t.root();
 
         // Create keys for accounts.

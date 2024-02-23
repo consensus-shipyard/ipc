@@ -3,7 +3,11 @@
 
 use anyhow::Context;
 use async_trait::async_trait;
-use bollard::Docker;
+use bollard::{
+    container::{ListContainersOptions, RemoveContainerOptions},
+    secret::ContainerSummary,
+    Docker,
+};
 use ethers::{
     core::rand::{rngs::StdRng, SeedableRng},
     types::H160,
@@ -18,7 +22,7 @@ use fvm_shared::{bigint::Zero, econ::TokenAmount, version::NetworkVersion};
 use ipc_api::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     path::{Path, PathBuf},
 };
 use tendermint_rpc::Url;
@@ -177,6 +181,47 @@ impl DockerMaterializer {
         m.export_scripts().context("failed to export scripts")?;
 
         Ok(m)
+    }
+
+    /// Remove all traces of a testnet.
+    pub async fn remove(&mut self, testnet: &TestnetName) -> anyhow::Result<()> {
+        let mut filters = HashMap::new();
+        filters.insert(
+            "testnet".to_string(),
+            vec![testnet.path().to_string_lossy().to_string()],
+        );
+
+        let containers: Vec<ContainerSummary> = self
+            .docker
+            .list_containers(Some(ListContainersOptions {
+                all: true,
+                filters,
+                ..Default::default()
+            }))
+            .await
+            .context("failed to list docker containers")?;
+
+        let ids = containers.into_iter().filter_map(|c| c.id);
+
+        for id in ids {
+            self.docker
+                .remove_container(
+                    &id,
+                    Some(RemoveContainerOptions {
+                        force: true,
+                        ..Default::default()
+                    }),
+                )
+                .await?;
+        }
+
+        self.docker
+            .remove_network(&testnet.path().to_string_lossy().to_string())
+            .await?;
+
+        std::fs::remove_dir_all(self.dir.join(testnet.path()))?;
+
+        Ok(())
     }
 
     fn docker_with_drop_handle(&self) -> DockerWithDropHandle {

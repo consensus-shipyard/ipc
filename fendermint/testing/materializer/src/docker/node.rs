@@ -700,7 +700,7 @@ mod tests {
         let runner = DockerRunner::new(&dh, &nn, &COMETBFT_IMAGE, 0, Vec::new());
 
         // Based on my manual testing, this will initialise the config and then show the ID:
-        // `docker run cometbft/cometbft:v0.37.x show-node-id`
+        // `docker run --rm cometbft/cometbft:v0.37.x show-node-id`
         let logs = runner
             .run_cmd("show-node-id")
             .await
