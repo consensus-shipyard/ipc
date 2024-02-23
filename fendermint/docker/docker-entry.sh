@@ -8,7 +8,7 @@ if [[ $CMD == 'ipc-cli' ]]; then
   exec ipc-cli "${@:2}"
 else
   if (( $# == 0)); then
-    exec fendermint run
+    exec fendermint
   else
     exec fendermint "$@"
   fi
