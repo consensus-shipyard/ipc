@@ -78,6 +78,7 @@ pub fn to_deliver_tx(
     let gas_wanted: i64 = ret.gas_limit.try_into().unwrap_or(i64::MAX);
     let gas_used: i64 = receipt.gas_used.try_into().unwrap_or(i64::MAX);
 
+    // This should return the `RawBytes` as-is, which is IPLD encoded content.
     let data: bytes::Bytes = receipt.return_data.to_vec().into();
     let mut events = to_events("event", ret.apply_ret.events, ret.emitters);
 
@@ -131,10 +132,16 @@ pub fn to_check_tx(ret: FvmCheckRet) -> response::CheckTx {
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| to_error_msg(ret.exit_code).to_owned());
 
+    // Potential error messages that arise in checking if contract execution is enabled are returned in the data.
+    // See https://github.com/gakonst/ethers-rs/commit/860100535812cbfe5e3cc417872392a6d76a159c for examples.
+    // Do this the same way as `to_deliver_tx`, serializing to IPLD.
+    let data: bytes::Bytes = ret.return_data.unwrap_or_default().to_vec().into();
+
     response::CheckTx {
         code: to_code(ret.exit_code),
         log: message.clone(),
         info: Default::default(),
+        data,
         gas_wanted: ret.gas_limit.try_into().unwrap_or(i64::MAX),
         sender: ret.sender.to_string(),
         ..Default::default()
