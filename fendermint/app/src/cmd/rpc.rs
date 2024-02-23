@@ -60,27 +60,27 @@ cmd! {
             },
             RpcCommands::Os { args, command } => match command {
                 RpcObjectStoreCommands::Put { key, value } => {
-                    datarepo_put(client, args, key, value).await
+                    os_put(client, args, key, value).await
                 }
                 RpcObjectStoreCommands::Delete { key } => {
-                    datarepo_delete(client, args, key).await
+                    os_delete(client, args, key).await
                 }
                 RpcObjectStoreCommands::Get { key, height } => {
                     let height = Height::try_from(height)?;
-                    datarepo_get_call(client, args, key, height).await
+                    os_get_call(client, args, key, height).await
                 }
                 RpcObjectStoreCommands::List { height } => {
                     let height = Height::try_from(height)?;
-                    datarepo_list_call(client, args, height).await
+                    os_list_call(client, args, height).await
                 }
             },
             RpcCommands::Acc { args, command } => match command {
                 RpcAccumulatorCommands::Push { event } => {
-                    datarepo_push(client, args, event).await
+                    os_push(client, args, event).await
                 }
                 RpcAccumulatorCommands::Root { height } => {
                     let height = Height::try_from(height)?;
-                    datarepo_root_call(client, args, height).await
+                    os_root_call(client, args, height).await
                 }
             },
             RpcCommands::Fevm { args, command } => match command {
@@ -207,7 +207,7 @@ async fn transaction(
     .await
 }
 
-async fn datarepo_put(
+async fn os_put(
     client: FendermintClient,
     args: TransArgs,
     key: String,
@@ -224,11 +224,7 @@ async fn datarepo_put(
     .await
 }
 
-async fn datarepo_delete(
-    client: FendermintClient,
-    args: TransArgs,
-    key: String,
-) -> anyhow::Result<()> {
+async fn os_delete(client: FendermintClient, args: TransArgs, key: String) -> anyhow::Result<()> {
     broadcast_and_print(
         client,
         args,
@@ -240,7 +236,7 @@ async fn datarepo_delete(
     .await
 }
 
-async fn datarepo_get_call(
+async fn os_get_call(
     client: FendermintClient,
     args: TransArgs,
     key: String,
@@ -261,7 +257,7 @@ async fn datarepo_get_call(
     print_json(&json)
 }
 
-async fn datarepo_list_call(
+async fn os_list_call(
     client: FendermintClient,
     args: TransArgs,
     height: Height,
@@ -278,11 +274,7 @@ async fn datarepo_list_call(
     print_json(&json)
 }
 
-async fn datarepo_push(
-    client: FendermintClient,
-    args: TransArgs,
-    event: Bytes,
-) -> anyhow::Result<()> {
+async fn os_push(client: FendermintClient, args: TransArgs, event: Bytes) -> anyhow::Result<()> {
     broadcast_and_print(
         client,
         args,
@@ -294,7 +286,7 @@ async fn datarepo_push(
     .await
 }
 
-async fn datarepo_root_call(
+async fn os_root_call(
     client: FendermintClient,
     args: TransArgs,
     height: Height,

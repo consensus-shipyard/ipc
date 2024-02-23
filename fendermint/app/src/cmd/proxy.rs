@@ -334,7 +334,7 @@ struct Txn {
     #[serde(skip_serializing_if = "i64::is_zero")]
     pub gas_used: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub repo_root: Option<String>,
+    pub state: Option<String>,
 }
 
 impl Txn {
@@ -344,17 +344,17 @@ impl Txn {
             hash,
             height: None,
             gas_used: 0,
-            repo_root: None,
+            state: None,
         }
     }
 
-    fn committed(hash: Hash, height: Height, gas_used: i64, repo_root: Cid) -> Self {
+    fn committed(hash: Hash, height: Height, gas_used: i64, state: Cid) -> Self {
         Txn {
             status: TxnStatus::Committed,
             hash,
             height: Some(height),
             gas_used,
-            repo_root: Some(repo_root.to_string()),
+            state: Some(state.to_string()),
         }
     }
 }
