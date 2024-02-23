@@ -146,7 +146,7 @@ ipc-cli wallet pub-key --wallet-type evm --address <PLEASE PUT ADDRESS 3>
 * Join the subnet with each validator
 
 ```
-ipc-cli subnet join --from=<PLEASE PUT ADDRESS 1> --subnet=<PLEASE PUT SUBNET ID> --collateral=10 --public-key=<PLEASE PUT PUBLIC KEY RELATED TO ADDRESS 1>  --initial-balance 1
+ipc-cli subnet join --from=<PLEASE PUT ADDRESS 1> --subnet=<PLEASE PUT SUBNET ID> --collateral=10 --public-key=<PLEASE PUT PUBLIC KEY RELATED TO ADDRESS 1> --initial-balance 1
 ipc-cli subnet join --from=<PLEASE PUT ADDRESS 2> --subnet=<PLEASE PUT SUBNET ID> --collateral=10 --public-key=<PLEASE PUT PUBLIC KEY RELATED TO ADDRESS 2> --initial-balance 1
 ipc-cli subnet join --from=<PLEASE PUT ADDRESS 3> --subnet=<PLEASE PUT SUBNET ID> --collateral=10 --public-key=<PLEASE PUT PUBLIC KEY RELATED TO ADDRESS 3> --initial-balance 1
 ```
