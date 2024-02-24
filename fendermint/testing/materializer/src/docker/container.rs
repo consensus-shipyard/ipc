@@ -95,7 +95,7 @@ impl Drop for DockerContainer {
         if !self.container.external {
             if self
                 .dropper
-                .send(DropCommand::DropContainer(self.container.id.clone()))
+                .send(DropCommand::DropContainer(self.container.name.clone()))
                 .is_err()
             {
                 tracing::error!(

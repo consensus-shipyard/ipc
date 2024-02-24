@@ -54,7 +54,7 @@ pub fn start(docker: Docker) -> DropHandle {
                             Some(RemoveContainerOptions {
                                 force: true,
                                 v: true,
-                                link: true,
+                                ..Default::default()
                             }),
                         )
                         .await

@@ -184,6 +184,7 @@ impl DockerMaterializer {
                     &id,
                     Some(RemoveContainerOptions {
                         force: true,
+                        v: true,
                         ..Default::default()
                     }),
                 )
