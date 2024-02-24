@@ -120,7 +120,7 @@ impl Debug for ResourceName {
 
 macro_rules! resource_name {
     ($name:ident) => {
-        #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+        #[derive(Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
         pub struct $name(ResourceName);
 
         impl $name {
@@ -149,6 +149,12 @@ macro_rules! resource_name {
                     stringify!($name).trim_end_matches("Name"),
                     self.0
                 )
+            }
+        }
+
+        impl Debug for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                Display::fmt(&self, f)
             }
         }
     };
@@ -351,5 +357,12 @@ mod tests {
 
         assert!(node.is_in_subnet(&sn));
         assert_eq!(node.testnet(), tn, "testnet is the prefix");
+    }
+
+    #[test]
+    fn test_resource_name_display() {
+        let tn = TestnetName::new("display-test");
+        assert_eq!(format!("{tn}"), "Testnet('testnets/display-test')");
+        assert_eq!(format!("{tn:?}"), "Testnet('testnets/display-test')");
     }
 }

@@ -70,6 +70,7 @@ impl Materials for DockerMaterials {
 }
 
 /// A thing constructed by docker.
+#[derive(Debug, Clone)]
 pub struct DockerConstruct {
     /// Unique ID of the thing.
     pub id: String,
@@ -177,6 +178,7 @@ impl DockerMaterializer {
         let ids = containers.into_iter().filter_map(|c| c.id);
 
         for id in ids {
+            eprintln!("removing docker container {id}");
             self.docker
                 .remove_container(
                     &id,
@@ -201,6 +203,7 @@ impl DockerMaterializer {
         let ids = networks.into_iter().filter_map(|n| n.id);
 
         for id in ids {
+            eprintln!("removing docker network {id}");
             self.docker
                 .remove_network(&id)
                 .await

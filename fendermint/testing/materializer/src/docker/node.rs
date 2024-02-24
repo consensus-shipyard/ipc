@@ -163,19 +163,15 @@ impl DockerNode {
                 .context("cannot show node ID")?
                 .into_iter()
                 .last()
-                .ok_or_else(|| anyhow!("empty cometbft node ID"))?;
-
-            if hex::decode(&cometbft_node_id).is_err() {
-                bail!("invalid cometbft node ID: {cometbft_node_id}");
-            }
+                .ok_or_else(|| anyhow!("empty cometbft node ID"))
+                .and_then(parse_cometbft_node_id)?;
 
             export_file(keys_dir.join(COMETBFT_NODE_ID), cometbft_node_id)?;
 
             // Convert fendermint genesis to cometbft.
             fendermint_runner
                 .run_cmd(
-                    "genesis --genesis-file /fendermint/genesis.json \
-                    into-tendermint --out /cometbft/config/genesis.json",
+                    "genesis --genesis-file /fendermint/genesis.json into-tendermint --out /cometbft/config/genesis.json",
                 )
                 .await
                 .context("failed to convert genesis")?;
@@ -188,8 +184,7 @@ impl DockerNode {
 
                 fendermint_runner
                     .run_cmd(
-                        "key into-tendermint --secret-key /fendermint/keys/validator_key.sk \
-                        --out cometbft/config/priv_validator_key.json",
+                        "key into-tendermint --secret-key /fendermint/keys/validator_key.sk --out /cometbft/config/priv_validator_key.json",
                     )
                     .await
                     .context("failed to convert validator key")?;
@@ -203,12 +198,13 @@ impl DockerNode {
 
             // Capture the fendermint node identity.
             let fendermint_peer_id = fendermint_runner
-                .run_cmd("key show-node-id --public-key /fendermint/keys/network_key.pk")
+                .run_cmd("key show-peer-id --public-key /fendermint/keys/network_key.pk")
                 .await
                 .context("cannot show peer ID")?
                 .into_iter()
                 .last()
-                .ok_or_else(|| anyhow!("empty fendermint peer ID"))?;
+                .ok_or_else(|| anyhow!("empty fendermint peer ID"))
+                .and_then(parse_fendermint_peer_id)?;
 
             export_file(keys_dir.join(FENDERMINT_PEER_ID), fendermint_peer_id)?;
         }
@@ -236,17 +232,17 @@ impl DockerNode {
             let mut env: EnvVars = env_vars![
                 "LOG_LEVEL"        => "info",
                 "RUST_BACKTRACE"   => 1,
-                "FM_NETWORK "      => "testnet",
+                "FM_NETWORK"       => "testnet",
                 "FM_DATA_DIR"      => "/fendermint/data",
                 "FM_LOG_DIR"       => "/fendermint/logs",
                 "FM_SNAPSHOTS_DIR" => "/fendermint/snapshots",
                 "FM_CHAIN_NAME"    => genesis.chain_name.clone(),
                 "FM_IPC_SUBNET_ID" => ipc.gateway.subnet_id,
                 "FM_RESOLVER__NETWORK__LOCAL_KEY"      => "/fendermint/keys/network_key.sk",
-                "FM_RESOLVER__CONNECTION__LISTEN_ADDR" => format!("/ip4/0.0.0.0/tcp/${RESOLVER_P2P_PORT}"),
-                "FM_TENDERMINT_RPC_URL" => format!("http://${cometbft_name}:{COMETBFT_RPC_PORT}"),
-                "TENDERMINT_RPC_URL"    => format!("http://${cometbft_name}:{COMETBFT_RPC_PORT}"),
-                "TENDERMINT_WS_URL"     => format!("ws://${cometbft_name}:{COMETBFT_RPC_PORT}/websocket"),
+                "FM_RESOLVER__CONNECTION__LISTEN_ADDR" => format!("/ip4/0.0.0.0/tcp/{RESOLVER_P2P_PORT}"),
+                "FM_TENDERMINT_RPC_URL" => format!("http://{cometbft_name}:{COMETBFT_RPC_PORT}"),
+                "TENDERMINT_RPC_URL"    => format!("http://{cometbft_name}:{COMETBFT_RPC_PORT}"),
+                "TENDERMINT_WS_URL"     => format!("ws://{cometbft_name}:{COMETBFT_RPC_PORT}/websocket"),
                 "FM_ABCI__LISTEN__PORT" => FENDERMINT_ABCI_PORT,
                 "FM_ETH__LISTEN__PORT"  => ETHAPI_RPC_PORT,
             ];
@@ -331,10 +327,12 @@ impl DockerNode {
 
         // Wrap an entry point with the docker entry script.
         let entrypoint = |ep: &str| {
-            format!(
-                "{} '{ep}' {} {}",
-                *DOCKER_ENTRY_PATH, *STATIC_ENV_PATH, *DYNAMIC_ENV_PATH
-            )
+            vec![
+                DOCKER_ENTRY_PATH.to_string(),
+                format!("'{ep}'"),
+                STATIC_ENV_PATH.to_string(),
+                DYNAMIC_ENV_PATH.to_string(),
+            ]
         };
 
         // Create a fendermint container mounting:
@@ -547,10 +545,11 @@ impl<'a> DockerRunner<'a> {
 
     /// Run a short lived container.
     pub async fn run_cmd(&self, cmd: &str) -> anyhow::Result<Vec<String>> {
+        let cmdv = cmd.split(" ").into_iter().map(|s| s.to_string()).collect();
         let config = Config {
             image: Some(self.image.clone()),
             user: Some(self.user.to_string()),
-            cmd: Some(vec![cmd.to_string()]),
+            cmd: Some(cmdv),
             attach_stderr: Some(true),
             attach_stdout: Some(true),
             tty: Some(true),
@@ -602,6 +601,13 @@ impl<'a> DockerRunner<'a> {
             out.push(output.to_string());
         }
 
+        eprintln!("NODE: {}", self.node_name);
+        eprintln!("CMD: {cmd}");
+        for o in out.iter() {
+            eprint!("OUT: {o}");
+        }
+        eprintln!("---");
+
         self.docker
             .remove_container(
                 &id,
@@ -622,13 +628,14 @@ impl<'a> DockerRunner<'a> {
         network: &DockerNetwork,
         // Host <-> Container port mappings
         ports: Vec<(u32, u32)>,
-        entrypoint: String,
+        entrypoint: Vec<String>,
     ) -> anyhow::Result<DockerContainer> {
         let config = Config {
             hostname: Some(name.clone()),
             image: Some(self.image.clone()),
             user: Some(self.user.to_string()),
-            entrypoint: Some(vec![entrypoint]),
+            entrypoint: Some(entrypoint),
+            labels: Some(self.labels()),
             cmd: None,
             host_config: Some(HostConfig {
                 init: Some(true),
@@ -654,7 +661,7 @@ impl<'a> DockerRunner<'a> {
                         })
                         .collect(),
                 ),
-                network_mode: Some(network.network().name.clone()),
+                network_mode: Some(network.network().id.clone()),
                 ..Default::default()
             }),
             ..Default::default()
@@ -699,10 +706,31 @@ fn read_file(file_path: impl AsRef<Path>) -> anyhow::Result<String> {
         .with_context(|| format!("failed to read {}", file_path.as_ref().to_string_lossy()))
 }
 
+fn parse_cometbft_node_id(value: impl AsRef<str>) -> anyhow::Result<String> {
+    let value = value.as_ref().trim().to_string();
+    if hex::decode(&value).is_err() {
+        bail!("failed to parse CometBFT node ID: {value}");
+    }
+    Ok(value)
+}
+
+/// libp2p peer ID is base58 encoded.
+fn parse_fendermint_peer_id(value: impl AsRef<str>) -> anyhow::Result<String> {
+    let value = value.as_ref().trim().to_string();
+    // We could match the regex
+    if value.len() != 53 {
+        bail!("failed to parse Fendermint peer ID: {value}");
+    }
+    Ok(value)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{DockerRunner, COMETBFT_IMAGE};
-    use crate::{docker::dropper, TestnetName};
+    use crate::{
+        docker::{dropper, node::parse_cometbft_node_id},
+        TestnetName,
+    };
     use bollard::Docker;
 
     #[tokio::test]
@@ -721,5 +749,14 @@ mod tests {
             .expect("failed to show ID");
 
         assert!(logs.len() > 0);
+    }
+
+    #[test]
+    fn test_valid_cometbft_id() {
+        assert!(
+            parse_cometbft_node_id("eb9470dd3bfa7311f1de3f3d3d69a628531adcfe").is_ok(),
+            "sample ID is valid"
+        );
+        assert!(parse_cometbft_node_id("I[2024-02-23|14:20:21.724] Generated genesis file                       module=main path=/cometbft/config/genesis.json").is_err(), "logs aren't valid");
     }
 }

@@ -24,7 +24,9 @@ pub fn start(docker: Docker) -> DropHandle {
         while let Some(cmd) = rx.recv().await {
             match cmd {
                 DropCommand::DropNetwork(id) => {
+                    eprintln!("dropping docker network {id}");
                     if let Err(e) = docker.remove_network(&id).await {
+                        eprintln!("failed to remove docker network: {e}");
                         tracing::error!(
                             error = e.to_string(),
                             id,
@@ -33,6 +35,8 @@ pub fn start(docker: Docker) -> DropHandle {
                     }
                 }
                 DropCommand::DropContainer(id) => {
+                    eprintln!("dropping docker container {id}");
+
                     if let Err(e) = docker
                         .stop_container(&id, Some(StopContainerOptions { t: 5 }))
                         .await
@@ -43,6 +47,7 @@ pub fn start(docker: Docker) -> DropHandle {
                             "failed to stop docker container"
                         );
                     }
+
                     if let Err(e) = docker
                         .remove_container(
                             &id,
@@ -54,6 +59,8 @@ pub fn start(docker: Docker) -> DropHandle {
                         )
                         .await
                     {
+                        eprintln!("failed to remove container: {e}");
+
                         tracing::error!(
                             error = e.to_string(),
                             id,

@@ -41,27 +41,19 @@ where
 
     let mut materializer = DockerMaterializer::new(&root, 0).unwrap();
 
-    eprintln!("remove previous");
-
     materializer
         .remove(&testnet_name)
         .await
         .context("failed to remove testnet")?;
 
-    eprintln!("setting up the testnet");
-
     let testnet = Testnet::setup(&mut materializer, &testnet_name, &manifest)
         .await
         .context("failed to set up testnet")?;
 
-    eprintln!("testing up the testnet");
-
     let res = f(&mut materializer, testnet, manifest).await;
 
-    eprintln!("res: {res:?}");
-    // Allow some time for resources to be freed.
-    // TODO: Remove the runtime handle becuase as it goes out of scope it causes panics.
-    tokio::time::sleep(Duration::from_secs(1)).await;
+    // Allow some time for containers to be dropped.
+    tokio::time::sleep(Duration::from_secs(5)).await;
 
     res
 }

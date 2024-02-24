@@ -1,1 +1,3 @@
 tests/testnets
+tests/scripts
+tests/materializer-state.json
