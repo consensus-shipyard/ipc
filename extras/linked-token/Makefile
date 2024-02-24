@@ -8,6 +8,7 @@ export
 
 help:
 	@echo "Available targets:"
+	@echo "  install                - Install dependencies."
 	@echo "  deploy-usdctest        - Deploy the USDCTest contract on the Calibration Network."
 	@echo "  mint-usdc              - Mint 1000 USDCTest tokens to the wallet specified in the .env file."
 	@echo "  check-balance          - Check the balance of USDCTest tokens in the wallet."
@@ -24,6 +25,10 @@ help:
 	@echo "  make <target>          - Run a specific target."
 	@echo "  make help              - Display this help message."
 
+install:
+	@echo "Installing dependencies..."
+	forge install
+
 deploy-usdctest:
 	@echo "Deploying USDCTest contract..."
 	forge script script/DeployUSDCTest.s.sol:DeployUSDCTest --broadcast --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --skip-simulation -vvv
@@ -32,7 +37,6 @@ mint-usdc:
 	@echo "Minting 1000 USDCTest tokens..."
 	@USDCTEST_ADDR=$$(cat config.json | jq -r '.LinkedToken.USDCTest'); \
     cast send $$USDCTEST_ADDR "$$(cast calldata "mint(uint256)" $$AMOUNT)" --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY
-
 
 check-balance:
 	@echo "Checking wallet balance..."
