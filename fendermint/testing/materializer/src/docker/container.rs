@@ -4,29 +4,45 @@
 use anyhow::{anyhow, Context};
 use std::collections::HashMap;
 
-use bollard::{
-    container::{ListContainersOptions, RemoveContainerOptions, StopContainerOptions},
-    service::ContainerSummary,
-};
+use bollard::{container::ListContainersOptions, service::ContainerSummary, Docker};
 
-use super::{DockerConstruct, DockerWithDropHandle};
+use super::{
+    dropper::{DropCommand, DropHandle},
+    DockerConstruct,
+};
 
 /// Time to wait before killing the container if it doesn't want to stop.
 const KILL_TIMEOUT_SECS: i64 = 5;
 
 pub struct DockerContainer {
-    pub dh: DockerWithDropHandle,
-    pub container: DockerConstruct,
+    docker: Docker,
+    dropper: DropHandle,
+    container: DockerConstruct,
 }
 
 impl DockerContainer {
+    pub fn new(docker: Docker, dropper: DropHandle, container: DockerConstruct) -> Self {
+        Self {
+            docker,
+            dropper,
+            container,
+        }
+    }
+
+    pub fn hostname(&self) -> &str {
+        &self.container.name
+    }
+
     /// Get a container by name, if it exists.
-    pub async fn get(dh: &DockerWithDropHandle, name: String) -> anyhow::Result<Option<Self>> {
+    pub async fn get(
+        docker: Docker,
+        dropper: DropHandle,
+        name: String,
+    ) -> anyhow::Result<Option<Self>> {
         let mut filters = HashMap::new();
         filters.insert("name".to_string(), vec![name.clone()]);
 
-        let containers: Vec<ContainerSummary> = dh
-            .docker
+        let containers: Vec<ContainerSummary> = docker
             .list_containers(Some(ListContainersOptions {
                 all: true,
                 filters,
@@ -44,7 +60,8 @@ impl DockerContainer {
                     .ok_or_else(|| anyhow!("docker container {name} has no id"))?;
 
                 Ok(Some(Self {
-                    dh: dh.clone(),
+                    docker,
+                    dropper,
                     container: DockerConstruct {
                         id,
                         name,
@@ -59,8 +76,7 @@ impl DockerContainer {
     pub async fn start(&self) -> anyhow::Result<()> {
         // TODO: Check if the container is running.
 
-        self.dh
-            .docker
+        self.docker
             .start_container::<&str>(&self.container.id, None)
             .await
             .with_context(|| {
@@ -78,41 +94,13 @@ impl Drop for DockerContainer {
     fn drop(&mut self) {
         if !self.container.external {
             let container_name = self.container.name.clone();
-            let docker = self.dh.docker.clone();
-            self.dh.drop_handle.spawn(async move {
-                if let Err(e) = docker
-                    .stop_container(
-                        &container_name,
-                        Some(StopContainerOptions {
-                            t: KILL_TIMEOUT_SECS,
-                        }),
-                    )
-                    .await
-                {
-                    tracing::error!(
-                        error = e.to_string(),
-                        container_name,
-                        "failed to stop docker container"
-                    );
-                }
-                if let Err(e) = docker
-                    .remove_container(
-                        &container_name,
-                        Some(RemoveContainerOptions {
-                            force: true,
-                            v: true,
-                            link: true,
-                        }),
-                    )
-                    .await
-                {
-                    tracing::error!(
-                        error = e.to_string(),
-                        container_name,
-                        "failed to remove docker container"
-                    );
-                }
-            });
+            if self
+                .dropper
+                .send(DropCommand::DropContainer(container_name.clone()))
+                .is_err()
+            {
+                tracing::error!(container_name, "dropper no longer listening");
+            }
         }
     }
 }

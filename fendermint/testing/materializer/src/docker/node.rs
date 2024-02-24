@@ -21,8 +21,8 @@ use futures::StreamExt;
 use lazy_static::lazy_static;
 
 use super::{
-    container::DockerContainer, DockerConstruct, DockerMaterials, DockerNetwork, DockerPortRange,
-    DockerWithDropHandle,
+    container::DockerContainer, dropper::DropHandle, DockerConstruct, DockerMaterials,
+    DockerNetwork, DockerPortRange,
 };
 use crate::{
     docker::DOCKER_ENTRY_FILE_NAME,
@@ -86,7 +86,8 @@ pub struct DockerNode {
 impl DockerNode {
     pub async fn get_or_create<'a>(
         root: impl AsRef<Path>,
-        dh: DockerWithDropHandle,
+        docker: Docker,
+        dropper: DropHandle,
         node_name: &NodeName,
         node_config: NodeConfig<'a, DockerMaterials>,
         port_range: DockerPortRange,
@@ -95,9 +96,12 @@ impl DockerNode {
         let cometbft_name = container_name(node_name, "cometbft");
         let ethapi_name = container_name(node_name, "ethapi");
 
-        let fendermint = DockerContainer::get(&dh, fendermint_name.clone()).await?;
-        let cometbft = DockerContainer::get(&dh, cometbft_name.clone()).await?;
-        let ethapi = DockerContainer::get(&dh, ethapi_name.clone()).await?;
+        let fendermint =
+            DockerContainer::get(docker.clone(), dropper.clone(), fendermint_name.clone()).await?;
+        let cometbft =
+            DockerContainer::get(docker.clone(), dropper.clone(), cometbft_name.clone()).await?;
+        let ethapi =
+            DockerContainer::get(docker.clone(), dropper.clone(), ethapi_name.clone()).await?;
 
         // Directory for the node's data volumes
         let node_dir = root.as_ref().join(node_name);
@@ -125,7 +129,8 @@ impl DockerNode {
             // However, at least this way they are tested.
 
             let cometbft_runner = DockerRunner::new(
-                &dh,
+                &docker,
+                &dropper,
                 node_name,
                 COMETBFT_IMAGE,
                 user,
@@ -133,7 +138,8 @@ impl DockerNode {
             );
 
             let fendermint_runner = DockerRunner::new(
-                &dh,
+                &docker,
+                &dropper,
                 node_name,
                 FENDERMINT_IMAGE,
                 user,
@@ -278,7 +284,7 @@ impl DockerNode {
                         })?;
                         env_vars![
                             "FM_IPC__TOPDOWN__CHAIN_HEAD_DELAY"        => 1,
-                            "FM_IPC__TOPDOWN__PARENT_HTTP_ENDPOINT"    => format!("http://{}:{ETHAPI_RPC_PORT}", parent_ethapi.container.name),
+                            "FM_IPC__TOPDOWN__PARENT_HTTP_ENDPOINT"    => format!("http://{}:{ETHAPI_RPC_PORT}", parent_ethapi.hostname()),
                             "FM_IPC__TOPDOWN__PARENT_REGISTRY"         => registry,
                             "FM_IPC__TOPDOWN__PARENT_GATEWAY"          => gateway,
                             "FM_IPC__TOPDOWN__EXPONENTIAL_BACK_OFF"    => 5,
@@ -336,7 +342,8 @@ impl DockerNode {
             Some(c) => c,
             None => {
                 let creator = DockerRunner::new(
-                    &dh,
+                    &docker,
+                    &dropper,
                     node_name,
                     FENDERMINT_IMAGE,
                     user,
@@ -365,7 +372,8 @@ impl DockerNode {
             Some(c) => c,
             None => {
                 let creator = DockerRunner::new(
-                    &dh,
+                    &docker,
+                    &dropper,
                     node_name,
                     COMETBFT_IMAGE,
                     user,
@@ -390,8 +398,14 @@ impl DockerNode {
         // Create a ethapi container
         let ethapi = match ethapi {
             None if node_config.ethapi => {
-                let creator =
-                    DockerRunner::new(&dh, node_name, FENDERMINT_IMAGE, user, volumes(vec![]));
+                let creator = DockerRunner::new(
+                    &docker,
+                    &dropper,
+                    node_name,
+                    FENDERMINT_IMAGE,
+                    user,
+                    volumes(vec![]),
+                );
 
                 let c = creator
                     .create(
@@ -421,13 +435,13 @@ impl DockerNode {
 
     pub async fn start(&self, seed_nodes: &[&Self]) -> anyhow::Result<()> {
         let cometbft_seeds = collect_seeds(seed_nodes, |n| {
-            let host = &n.cometbft.container.name;
+            let host = &n.cometbft.hostname();
             let id = n.cometbft_node_id()?;
             Ok(format!("{id}@{host}:{COMETBFT_P2P_PORT}"))
         })?;
 
         let resolver_seeds = collect_seeds(seed_nodes, |n| {
-            let host = &n.fendermint.container.name;
+            let host = &n.fendermint.hostname();
             let id = n.fendermint_peer_id()?;
             Ok(format!("/dns/{host}/tcp/{RESOLVER_P2P_PORT}/p2p/{id}"))
         })?;
@@ -493,7 +507,8 @@ where
 }
 
 struct DockerRunner<'a> {
-    dh: &'a DockerWithDropHandle,
+    docker: &'a Docker,
+    dropper: &'a DropHandle,
     node_name: NodeName,
     image: String,
     user: u32,
@@ -502,23 +517,21 @@ struct DockerRunner<'a> {
 
 impl<'a> DockerRunner<'a> {
     pub fn new(
-        dh: &'a DockerWithDropHandle,
+        docker: &'a Docker,
+        dropper: &'a DropHandle,
         node_name: &NodeName,
         image: &str,
         user: u32,
         volumes: Volumes,
     ) -> Self {
         Self {
-            dh,
+            docker,
+            dropper,
             node_name: node_name.clone(),
             image: image.to_string(),
             user,
             volumes,
         }
-    }
-
-    fn docker(&self) -> &Docker {
-        &self.dh.docker
     }
 
     // Tag containers with resource names.
@@ -558,14 +571,14 @@ impl<'a> DockerRunner<'a> {
         };
 
         let id = self
-            .docker()
+            .docker
             .create_container::<&str, _>(None, config)
             .await
             .context("failed to create container")?
             .id;
 
         let AttachContainerResults { mut output, .. } = self
-            .docker()
+            .docker
             .attach_container::<String>(
                 &id,
                 Some(AttachContainerOptions {
@@ -578,7 +591,7 @@ impl<'a> DockerRunner<'a> {
             .await
             .context("failed to attach to container")?;
 
-        self.docker()
+        self.docker
             .start_container::<&str>(&id, None)
             .await
             .context("failed to start container")?;
@@ -589,7 +602,7 @@ impl<'a> DockerRunner<'a> {
             out.push(output.to_string());
         }
 
-        self.docker()
+        self.docker
             .remove_container(
                 &id,
                 Some(RemoveContainerOptions {
@@ -648,7 +661,7 @@ impl<'a> DockerRunner<'a> {
         };
 
         let id = self
-            .docker()
+            .docker
             .create_container::<String, _>(
                 Some(CreateContainerOptions {
                     name: name.clone(),
@@ -660,14 +673,15 @@ impl<'a> DockerRunner<'a> {
             .context("failed to create container")?
             .id;
 
-        Ok(DockerContainer {
-            dh: self.dh.clone(),
-            container: DockerConstruct {
+        Ok(DockerContainer::new(
+            self.docker.clone(),
+            self.dropper.clone(),
+            DockerConstruct {
                 id,
                 name,
                 external: false,
             },
-        })
+        ))
     }
 }
 
@@ -688,16 +702,16 @@ fn read_file(file_path: impl AsRef<Path>) -> anyhow::Result<String> {
 #[cfg(test)]
 mod tests {
     use super::{DockerRunner, COMETBFT_IMAGE};
-    use crate::{docker::DockerWithDropHandle, TestnetName};
+    use crate::{docker::dropper, TestnetName};
     use bollard::Docker;
 
     #[tokio::test]
     async fn test_docker_run_output() {
         let nn = TestnetName::new("test-network").root().node("test-node");
         let docker = Docker::connect_with_local_defaults().expect("failed to connect to docker");
-        let dh = DockerWithDropHandle::from_current(docker.clone());
+        let dropper = dropper::start(docker.clone());
 
-        let runner = DockerRunner::new(&dh, &nn, &COMETBFT_IMAGE, 0, Vec::new());
+        let runner = DockerRunner::new(&docker, &dropper, &nn, &COMETBFT_IMAGE, 0, Vec::new());
 
         // Based on my manual testing, this will initialise the config and then show the ID:
         // `docker run --rm cometbft/cometbft:v0.37.x show-node-id`

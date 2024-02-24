@@ -7,14 +7,19 @@ use anyhow::{anyhow, Context};
 use bollard::{
     network::{CreateNetworkOptions, ListNetworksOptions},
     service::{Network, NetworkCreateResponse},
+    Docker,
 };
 
 use crate::TestnetName;
 
-use super::{DockerConstruct, DockerWithDropHandle};
+use super::{
+    dropper::{DropCommand, DropHandle},
+    DockerConstruct,
+};
 
 pub struct DockerNetwork {
-    dh: DockerWithDropHandle,
+    docker: Docker,
+    dropper: DropHandle,
     /// There is a single docker network created for the entire testnet.
     testnet_name: TestnetName,
     network: DockerConstruct,
@@ -32,7 +37,8 @@ impl DockerNetwork {
     /// Check if an externally managed network already exists;
     /// if not, create a new docker network for the testnet.
     pub async fn get_or_create(
-        dh: DockerWithDropHandle,
+        docker: Docker,
+        dropper: DropHandle,
         testnet_name: TestnetName,
     ) -> anyhow::Result<Self> {
         let network_name = testnet_name.path().to_string_lossy().to_string();
@@ -40,16 +46,14 @@ impl DockerNetwork {
         let mut filters = HashMap::new();
         filters.insert("name".to_string(), vec![network_name.clone()]);
 
-        let networks: Vec<Network> = dh
-            .docker
+        let networks: Vec<Network> = docker
             .list_networks(Some(ListNetworksOptions { filters }))
             .await
             .context("failed to list docker networks")?;
 
         let (id, external) = match networks.first() {
             None => {
-                let network: NetworkCreateResponse = dh
-                    .docker
+                let network: NetworkCreateResponse = docker
                     .create_network(CreateNetworkOptions {
                         name: network_name.clone(),
                         ..Default::default()
@@ -75,7 +79,8 @@ impl DockerNetwork {
         };
 
         Ok(Self {
-            dh,
+            docker,
+            dropper,
             testnet_name,
             network: DockerConstruct {
                 id,
@@ -90,16 +95,13 @@ impl Drop for DockerNetwork {
     fn drop(&mut self) {
         if !self.network.external {
             let network_name = self.network.name.clone();
-            let docker = self.dh.docker.clone();
-            self.dh.drop_handle.spawn(async move {
-                if let Err(e) = docker.remove_network(&network_name).await {
-                    tracing::error!(
-                        error = e.to_string(),
-                        network_name,
-                        "failed to remove docker network"
-                    );
-                }
-            });
+            if self
+                .dropper
+                .send(DropCommand::DropNetwork(network_name.clone()))
+                .is_err()
+            {
+                tracing::error!(network_name, "dropper no longer listening");
+            }
         }
     }
 }
@@ -110,20 +112,20 @@ mod tests {
     use std::time::Duration;
 
     use super::DockerNetwork;
-    use crate::{docker::DockerWithDropHandle, TestnetName};
+    use crate::{docker::dropper, TestnetName};
 
     #[tokio::test]
     async fn test_network() {
         let tn = TestnetName::new("test-network");
 
         let docker = Docker::connect_with_local_defaults().expect("failed to connect to docker");
-        let dh = DockerWithDropHandle::from_current(docker.clone());
+        let dropper = dropper::start(docker.clone());
 
-        let n1 = DockerNetwork::get_or_create(dh.clone(), tn.clone())
+        let n1 = DockerNetwork::get_or_create(docker.clone(), dropper.clone(), tn.clone())
             .await
             .expect("failed to create network");
 
-        let n2 = DockerNetwork::get_or_create(dh.clone(), tn.clone())
+        let n2 = DockerNetwork::get_or_create(docker.clone(), dropper.clone(), tn.clone())
             .await
             .expect("failed to get network");
 

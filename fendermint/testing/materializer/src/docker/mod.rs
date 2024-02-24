@@ -38,6 +38,7 @@ use crate::{
 };
 
 mod container;
+mod dropper;
 mod network;
 mod node;
 mod relayer;
@@ -76,31 +77,6 @@ pub struct DockerConstruct {
     /// Indicate whether the thing was created outside the test,
     /// or it can be destroyed when it goes out of scope.
     pub external: bool,
-}
-
-#[derive(Clone)]
-pub struct DockerWithDropHandle {
-    /// Docker client.
-    pub docker: Docker,
-    /// Handle to a single threaded runtime to perform drop tasks.
-    pub drop_handle: tokio::runtime::Handle,
-}
-
-impl DockerWithDropHandle {
-    /// Create with the handle of a given runtime.
-    pub fn from_runtime(docker: Docker, runtime: &tokio::runtime::Runtime) -> Self {
-        Self {
-            docker,
-            drop_handle: runtime.handle().clone(),
-        }
-    }
-    /// Create with the handle of the current runtime, for testing purposes.
-    pub fn from_current(docker: Docker) -> Self {
-        Self {
-            docker,
-            drop_handle: tokio::runtime::Handle::current(),
-        }
-    }
 }
 
 /// Allocated (inclusive) range we can use to expose containers' ports on the host.
@@ -147,7 +123,7 @@ pub struct DockerMaterializer {
     dir: PathBuf,
     rng: StdRng,
     docker: bollard::Docker,
-    drop_runtime: tokio::runtime::Runtime,
+    dropper: dropper::DropHandle,
     state: DockerMaterializerState,
 }
 
@@ -159,10 +135,7 @@ impl DockerMaterializer {
             Docker::connect_with_local_defaults().context("failed to connect to Docker")?;
 
         // Create a runtime for the execution of drop tasks.
-        let drop_runtime = tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(1)
-            .build()
-            .context("failed to create tokio Runtime")?;
+        let dropper = dropper::start(docker.clone());
 
         // Read in the state if it exists, otherwise create a default one.
         let state = import_json(dir.join(STATE_JSON_FILE_NAME))
@@ -173,7 +146,7 @@ impl DockerMaterializer {
             dir: dir.into(),
             rng: StdRng::seed_from_u64(seed),
             docker,
-            drop_runtime,
+            dropper,
             state,
         };
 
@@ -222,10 +195,6 @@ impl DockerMaterializer {
         std::fs::remove_dir_all(self.dir.join(testnet.path()))?;
 
         Ok(())
-    }
-
-    fn docker_with_drop_handle(&self) -> DockerWithDropHandle {
-        DockerWithDropHandle::from_runtime(self.docker.clone(), &self.drop_runtime)
     }
 
     /// Path to a directory based on a resource name.
@@ -319,7 +288,12 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         &mut self,
         testnet_name: &TestnetName,
     ) -> anyhow::Result<<DockerMaterials as Materials>::Network> {
-        DockerNetwork::get_or_create(self.docker_with_drop_handle(), testnet_name.clone()).await
+        DockerNetwork::get_or_create(
+            self.docker.clone(),
+            self.dropper.clone(),
+            testnet_name.clone(),
+        )
+        .await
     }
 
     /// Create a new key-value pair, or return an existing one.
@@ -441,7 +415,8 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         // and run three different containers.
         DockerNode::get_or_create(
             &self.dir,
-            self.docker_with_drop_handle(),
+            self.docker.clone(),
+            self.dropper.clone(),
             node_name,
             node_config,
             port_range,

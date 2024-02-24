@@ -234,13 +234,13 @@ where
         for (node_id, node) in node_ids.iter() {
             self.create_node(m, subnet_name, node_id, node)
                 .await
-                .with_context(|| "failed to create node {node_id} in {subnet_name:?}")?;
+                .with_context(|| format!("failed to create node {node_id} in {subnet_name:?}"))?;
         }
 
         for (node_id, node) in node_ids.iter() {
             self.start_node(m, subnet_name, node_id, node)
                 .await
-                .with_context(|| "failed to start node {node_id} in {subnet_name:?}")?;
+                .with_context(|| format!("failed to start node {node_id} in {subnet_name:?}"))?;
         }
 
         Ok(())
