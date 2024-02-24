@@ -93,13 +93,15 @@ impl DockerContainer {
 impl Drop for DockerContainer {
     fn drop(&mut self) {
         if !self.container.external {
-            let container_name = self.container.name.clone();
             if self
                 .dropper
-                .send(DropCommand::DropContainer(container_name.clone()))
+                .send(DropCommand::DropContainer(self.container.id.clone()))
                 .is_err()
             {
-                tracing::error!(container_name, "dropper no longer listening");
+                tracing::error!(
+                    container_name = self.container.name,
+                    "dropper no longer listening"
+                );
             }
         }
     }
