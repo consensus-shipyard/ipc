@@ -54,6 +54,9 @@ where
     let res = f(&mut materializer, testnet, manifest).await;
 
     // Allow some time for containers to be dropped.
+    // This only happens if the testnet setup succeeded,
+    // otherwise the system shuts down too quick, but
+    // at least we can inspect the containers.
     tokio::time::sleep(Duration::from_secs(5)).await;
 
     res

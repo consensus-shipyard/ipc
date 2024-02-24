@@ -30,8 +30,8 @@ impl DockerNetwork {
         &self.testnet_name
     }
 
-    pub fn network(&self) -> &DockerConstruct {
-        &self.network
+    pub fn network_name(&self) -> &str {
+        &self.network.name
     }
 
     /// Check if an externally managed network already exists;

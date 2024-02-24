@@ -13,6 +13,7 @@ use bollard::{
         AttachContainerOptions, AttachContainerResults, Config, CreateContainerOptions,
         RemoveContainerOptions,
     },
+    network::ConnectNetworkOptions,
     service::{HostConfig, PortBinding},
     Docker,
 };
@@ -661,7 +662,6 @@ impl<'a> DockerRunner<'a> {
                         })
                         .collect(),
                 ),
-                network_mode: Some(network.network().id.clone()),
                 ..Default::default()
             }),
             ..Default::default()
@@ -679,6 +679,18 @@ impl<'a> DockerRunner<'a> {
             .await
             .context("failed to create container")?
             .id;
+
+        // host_config.network_mode should work as well.
+        self.docker
+            .connect_network(
+                &network.network_name(),
+                ConnectNetworkOptions {
+                    container: id.clone(),
+                    ..Default::default()
+                },
+            )
+            .await
+            .context("failed to connect container to network")?;
 
         Ok(DockerContainer::new(
             self.docker.clone(),
