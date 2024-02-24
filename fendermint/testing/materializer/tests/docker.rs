@@ -11,6 +11,7 @@ use fendermint_testing_materializer::{
     TestnetName,
 };
 use futures::Future;
+use serial_test::serial;
 
 /// Want to keep the testnet artifacts in the `tests/testnets` directory.
 fn tests_dir() -> PathBuf {
@@ -58,15 +59,21 @@ where
     res
 }
 
-#[tokio::test]
-async fn test_root_only() {
-    with_testnet("root-only", |_materializer, testnet, _manifest| {
-        Box::pin(async move {
-            let node1 = testnet.root().node("node-1");
-            let _dnode1 = testnet.node(&node1)?;
-            Ok(())
+// Run these tests serially because they share a common `materializer-state.json` file with the port mappings.
+#[serial]
+mod materializer_tests {
+    use super::with_testnet;
+
+    #[tokio::test]
+    async fn test_root_only() {
+        with_testnet("root-only", |_materializer, testnet, _manifest| {
+            Box::pin(async move {
+                let node1 = testnet.root().node("node-1");
+                let _dnode1 = testnet.node(&node1)?;
+                Ok(())
+            })
         })
-    })
-    .await
-    .unwrap()
+        .await
+        .unwrap()
+    }
 }

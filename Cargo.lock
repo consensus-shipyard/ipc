@@ -3149,6 +3149,7 @@ dependencies = [
  "serde_json",
  "serde_with 2.3.3",
  "serde_yaml",
+ "serial_test",
  "tempfile",
  "tendermint-rpc",
  "tokio",
