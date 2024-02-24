@@ -13,13 +13,13 @@ use fendermint_testing_materializer::{
 use futures::Future;
 
 /// Want to keep the testnet artifacts in the `tests/testnets` directory.
-fn materializer_dir() -> PathBuf {
+fn tests_dir() -> PathBuf {
     let dir = current_dir().unwrap();
     debug_assert!(
         dir.ends_with("materializer"),
         "expected the current directory to be the crate"
     );
-    dir
+    dir.join("tests")
 }
 
 /// Parse a manifest file in the `manifests` directory, clean up any corresponding
@@ -32,7 +32,7 @@ where
         Manifest,
     ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>>>>,
 {
-    let root = materializer_dir();
+    let root = tests_dir();
     let manifest = root.join("manifests").join(format!("{manifest_name}.yaml"));
     let manifest = std::fs::read_to_string(manifest).context("failed to read manifest")?;
     let manifest = serde_yaml::from_str(&manifest).context("failed to parse manifest")?;

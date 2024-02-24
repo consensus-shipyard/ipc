@@ -1,11 +1,12 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::Context;
+use anyhow::{bail, Context};
 use async_trait::async_trait;
 use bollard::{
     container::{ListContainersOptions, RemoveContainerOptions},
-    secret::ContainerSummary,
+    network::ListNetworksOptions,
+    secret::{ContainerSummary, Network},
     Docker,
 };
 use ethers::{
@@ -157,12 +158,11 @@ impl DockerMaterializer {
     }
 
     /// Remove all traces of a testnet.
-    pub async fn remove(&mut self, testnet: &TestnetName) -> anyhow::Result<()> {
+    pub async fn remove(&mut self, testnet_name: &TestnetName) -> anyhow::Result<()> {
+        let testnet = testnet_name.path().to_string_lossy().to_string();
+
         let mut filters = HashMap::new();
-        filters.insert(
-            "testnet".to_string(),
-            vec![testnet.path().to_string_lossy().to_string()],
-        );
+        filters.insert("label".to_string(), vec![format!("testnet={}", testnet)]);
 
         let containers: Vec<ContainerSummary> = self
             .docker
@@ -185,14 +185,37 @@ impl DockerMaterializer {
                         ..Default::default()
                     }),
                 )
-                .await?;
+                .await
+                .with_context(|| format!("failed to remove container {id}"))?;
         }
 
-        self.docker
-            .remove_network(&testnet.path().to_string_lossy().to_string())
-            .await?;
+        let mut filters = HashMap::new();
+        filters.insert("name".to_string(), vec![testnet]);
 
-        std::fs::remove_dir_all(self.dir.join(testnet.path()))?;
+        let networks: Vec<Network> = self
+            .docker
+            .list_networks(Some(ListNetworksOptions { filters }))
+            .await
+            .context("failed to list networks")?;
+
+        let ids = networks.into_iter().filter_map(|n| n.id);
+
+        for id in ids {
+            self.docker
+                .remove_network(&id)
+                .await
+                .context("failed to remove network")?;
+        }
+
+        let dir = self.dir.join(testnet_name.path());
+        if let Err(e) = std::fs::remove_dir_all(&dir) {
+            if !e.to_string().contains("No such file") {
+                bail!(
+                    "failed to remove testnet directory {}: {e:?}",
+                    dir.to_string_lossy()
+                );
+            }
+        };
 
         Ok(())
     }
