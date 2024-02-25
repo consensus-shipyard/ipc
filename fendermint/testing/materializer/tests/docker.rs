@@ -80,14 +80,34 @@ where
 // Run these tests serially because they share a common `materializer-state.json` file with the port mappings.
 #[serial]
 mod materializer_tests {
+    use std::time::Duration;
+
+    use anyhow::{anyhow, bail};
+    use ethers::{providers::Middleware, types::U64};
+    use fendermint_testing_materializer::HasEthApi;
+
     use super::with_testnet;
 
     #[tokio::test]
     async fn test_root_only() {
         with_testnet("root-only.yaml", |_materializer, testnet, _manifest| {
             Box::pin(async move {
-                let node1 = testnet.root().node("node-1");
-                let _dnode1 = testnet.node(&node1)?;
+                // Check that node2 is following node1.
+                let node2 = testnet.root().node("node-2");
+                let dnode2 = testnet.node(&node2)?;
+
+                let provider = dnode2
+                    .ethapi_http_provider()?
+                    .ok_or_else(|| anyhow!("node-2 has ethapi enabled"))?;
+
+                tokio::time::sleep(Duration::from_secs(3)).await;
+
+                let bn = provider.get_block_number().await?;
+
+                if bn <= U64::one() {
+                    bail!("expected positive block number");
+                }
+
                 Ok(())
             })
         })

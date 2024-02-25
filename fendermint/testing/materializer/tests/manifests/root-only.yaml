@@ -15,11 +15,11 @@ rootnet:
       mode:
         type: Validator
         validator: alice
-      ethapi: true
+      ethapi: false
 
     node-2:
       mode:
         type: Full
-      ethapi: false
+      ethapi: true
       seed_nodes:
         - node-1

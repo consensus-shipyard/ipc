@@ -21,7 +21,7 @@ use crate::{
     env_vars,
     materializer::{NodeConfig, TargetConfig},
     materials::export_file,
-    NodeName, ResourceHash,
+    HasEthApi, NodeName, ResourceHash,
 };
 
 // TODO: Add these to the materializer.
@@ -439,6 +439,17 @@ impl DockerNode {
     /// Read the libp2p peer ID from the file we persisted during creation.
     pub fn fendermint_peer_id(&self) -> anyhow::Result<String> {
         read_file(self.path.join("keys").join(FENDERMINT_PEER_ID))
+    }
+}
+
+impl HasEthApi for DockerNode {
+    fn ethapi_http_endpoint(&self) -> Option<String> {
+        self.ethapi.as_ref().map(|_| {
+            format!(
+                "http://localhost:{}",
+                self.port_range.ethapi_rpc_host_port()
+            )
+        })
     }
 }
 

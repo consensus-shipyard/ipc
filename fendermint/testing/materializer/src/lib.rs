@@ -1,3 +1,4 @@
+use ethers::providers::{Http, Provider};
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use multihash::MultihashDigest;
@@ -299,6 +300,18 @@ impl ResourceHash {
 impl ToString for ResourceHash {
     fn to_string(&self) -> String {
         hex::encode(self.0)
+    }
+}
+
+pub trait HasEthApi {
+    /// URL of the HTTP endpoint, if it's enabled.
+    fn ethapi_http_endpoint(&self) -> Option<String>;
+
+    fn ethapi_http_provider(&self) -> anyhow::Result<Option<Provider<Http>>> {
+        match self.ethapi_http_endpoint() {
+            Some(url) => Ok(Some(Provider::<Http>::try_from(url)?)),
+            None => Ok(None),
+        }
     }
 }
 
