@@ -4,7 +4,12 @@
 use anyhow::{anyhow, Context};
 use std::collections::HashMap;
 
-use bollard::{container::ListContainersOptions, service::ContainerSummary, Docker};
+use bollard::{
+    container::ListContainersOptions,
+    secret::{ContainerInspectResponse, ContainerStateStatusEnum},
+    service::ContainerSummary,
+    Docker,
+};
 
 use super::{
     dropper::{DropCommand, DropHandle},
@@ -74,7 +79,21 @@ impl DockerContainer {
 
     /// Start the container, unless it's already running.
     pub async fn start(&self) -> anyhow::Result<()> {
-        // TODO: Check if the container is running.
+        let inspect: ContainerInspectResponse = self
+            .docker
+            .inspect_container(&self.container.id, None)
+            .await
+            .with_context(|| {
+                format!(
+                    "failed to inspect container: {} ({})",
+                    self.container.name, self.container.id,
+                )
+            })?;
+
+        // Idempotency; we could be re-running the materializer after it failed somewhere along testnet creation.
+        if let Some(ContainerStateStatusEnum::RUNNING) = inspect.state.and_then(|s| s.status) {
+            return Ok(());
+        }
 
         self.docker
             .start_container::<&str>(&self.container.id, None)
