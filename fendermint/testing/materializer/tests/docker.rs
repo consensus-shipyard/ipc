@@ -102,6 +102,8 @@ mod materializer_tests {
 
                 tokio::time::sleep(Duration::from_secs(3)).await;
 
+                eprintln!("sleep before querying the block number");
+                tokio::time::sleep(Duration::from_secs(30)).await;
                 let bn = provider.get_block_number().await?;
 
                 if bn <= U64::one() {

@@ -95,6 +95,11 @@ impl DockerContainer {
             return Ok(());
         }
 
+        eprintln!(
+            "STARTING CONTAINER: {} ({})",
+            self.container.name, self.container.id
+        );
+
         self.docker
             .start_container::<&str>(&self.container.id, None)
             .await

@@ -212,6 +212,10 @@ impl DockerRunner {
             .context("failed to create container")?
             .id;
 
+        eprintln!("NODE: {}", self.node_name);
+        eprintln!("CREATED CONTAINER: {} ({})", name, id);
+        eprintln!("---");
+
         // host_config.network_mode should work as well.
         self.docker
             .connect_network(

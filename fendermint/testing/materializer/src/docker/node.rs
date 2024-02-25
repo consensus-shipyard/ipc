@@ -213,11 +213,15 @@ impl DockerNode {
                 .ok_or_else(|| anyhow!("ipc config missing"))?;
 
             let resolver_host_port: u32 = port_range.from;
+            let network = match fvm_shared::address::current_network() {
+                fvm_shared::address::Network::Mainnet => "mainnet",
+                fvm_shared::address::Network::Testnet => "testnet",
+            };
 
             let mut env: EnvVars = env_vars![
                 "LOG_LEVEL"        => "info",
                 "RUST_BACKTRACE"   => 1,
-                "FM_NETWORK"       => "testnet",
+                "FM_NETWORK"       => network,
                 "FM_DATA_DIR"      => "/fendermint/data",
                 "FM_LOG_DIR"       => "/fendermint/logs",
                 "FM_SNAPSHOTS_DIR" => "/fendermint/snapshots",
@@ -314,7 +318,7 @@ impl DockerNode {
         let entrypoint = |ep: &str| {
             vec![
                 DOCKER_ENTRY_PATH.to_string(),
-                format!("'{ep}'"),
+                ep.to_string(),
                 STATIC_ENV_PATH.to_string(),
                 DYNAMIC_ENV_PATH.to_string(),
             ]
@@ -446,7 +450,7 @@ impl HasEthApi for DockerNode {
     fn ethapi_http_endpoint(&self) -> Option<String> {
         self.ethapi.as_ref().map(|_| {
             format!(
-                "http://localhost:{}",
+                "http://127.0.0.1:{}",
                 self.port_range.ethapi_rpc_host_port()
             )
         })
