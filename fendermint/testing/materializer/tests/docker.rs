@@ -23,9 +23,22 @@ fn tests_dir() -> PathBuf {
     dir.join("tests")
 }
 
+/// Parse a manifest from the `tests/manifests` directory.
+fn read_manifest(file_name: &str) -> anyhow::Result<Manifest> {
+    let manifest = tests_dir().join("manifests").join(file_name);
+    let manifest = std::fs::read_to_string(&manifest).with_context(|| {
+        format!(
+            "failed to read manifest from {}",
+            manifest.to_string_lossy()
+        )
+    })?;
+    let manifest = serde_yaml::from_str(&manifest).context("failed to parse manifest")?;
+    Ok(manifest)
+}
+
 /// Parse a manifest file in the `manifests` directory, clean up any corresponding
 /// testnet resources, then materialize a testnet and run some tests.
-async fn with_testnet<F>(manifest_name: &str, f: F) -> anyhow::Result<()>
+async fn with_testnet<F>(manifest_file_name: &str, f: F) -> anyhow::Result<()>
 where
     F: FnOnce(
         &mut DockerMaterializer,
@@ -33,14 +46,16 @@ where
         Manifest,
     ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>>>>,
 {
-    let root = tests_dir();
-    let manifest = root.join("manifests").join(format!("{manifest_name}.yaml"));
-    let manifest = std::fs::read_to_string(manifest).context("failed to read manifest")?;
-    let manifest = serde_yaml::from_str(&manifest).context("failed to parse manifest")?;
+    let testnet_name = TestnetName::new(
+        PathBuf::from(manifest_file_name)
+            .file_stem()
+            .expect("there is a file step")
+            .to_string_lossy()
+            .to_string(),
+    );
+    let manifest = read_manifest(manifest_file_name)?;
 
-    let testnet_name = TestnetName::new(manifest_name);
-
-    let mut materializer = DockerMaterializer::new(&root, 0).unwrap();
+    let mut materializer = DockerMaterializer::new(&tests_dir().join("docker-materializer"), 0)?;
 
     materializer
         .remove(&testnet_name)
@@ -57,7 +72,7 @@ where
     // This only happens if the testnet setup succeeded,
     // otherwise the system shuts down too quick, but
     // at least we can inspect the containers.
-    tokio::time::sleep(Duration::from_secs(5)).await;
+    tokio::time::sleep(Duration::from_secs(2)).await;
 
     res
 }
@@ -69,7 +84,7 @@ mod materializer_tests {
 
     #[tokio::test]
     async fn test_root_only() {
-        with_testnet("root-only", |_materializer, testnet, _manifest| {
+        with_testnet("root-only.yaml", |_materializer, testnet, _manifest| {
             Box::pin(async move {
                 let node1 = testnet.root().node("node-1");
                 let _dnode1 = testnet.node(&node1)?;

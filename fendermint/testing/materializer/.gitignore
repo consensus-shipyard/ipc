@@ -1,3 +1,1 @@
-tests/testnets
-tests/scripts
-tests/materializer-state.json
+tests/docker-materializer
