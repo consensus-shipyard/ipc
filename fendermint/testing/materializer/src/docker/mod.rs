@@ -400,7 +400,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             let genesis = Genesis {
                 chain_name,
                 timestamp: Timestamp::current(),
-                network_version: NetworkVersion::MAX,
+                network_version: NetworkVersion::V21,
                 base_fee: TokenAmount::zero(),
                 power_scale: 3,
                 validators: validators
