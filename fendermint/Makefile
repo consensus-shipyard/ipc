@@ -38,16 +38,19 @@ install: $(IPC_ACTORS_GEN)
 	cargo install --locked --path app
 
 # Using --release for testing because wasm can otherwise be slow.
+# Excluding the materializer tests because they rely on docker; we could test with --lib
 test: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 	FM_BUILTIN_ACTORS_BUNDLE=$(BUILTIN_ACTORS_BUNDLE) \
 	FM_CUSTOM_ACTORS_BUNDLE=$(CUSTOM_ACTORS_BUNDLE) \
 	FM_CONTRACTS_DIR=$(IPC_ACTORS_OUT) \
-	cargo test --release $(PACKAGE)
+	cargo test --release $(shell echo $(PACKAGE) | sed 's/--package fendermint_testing_materializer//g')
 
+# Not using --release beause the build has been done in docker and the wasm code runs inside the container.
 e2e: docker-build | cargo-make
 	cd testing/smoke-test    && cargo make --profile $(PROFILE)
 	cd testing/snapshot-test && cargo make --profile $(PROFILE)
 	cd testing/graph-test    && cargo make --profile $(PROFILE)
+	cargo test --package fendermint_testing_materializer
 
 clean:
 	cargo clean
