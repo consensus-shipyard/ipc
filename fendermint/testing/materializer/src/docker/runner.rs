@@ -3,14 +3,14 @@
 
 use std::collections::HashMap;
 
-use anyhow::Context;
+use anyhow::{bail, Context};
 use bollard::{
     container::{
         AttachContainerOptions, AttachContainerResults, Config, CreateContainerOptions,
         RemoveContainerOptions,
     },
     network::ConnectNetworkOptions,
-    secret::{HostConfig, PortBinding},
+    secret::{ContainerInspectResponse, HostConfig, PortBinding},
     Docker,
 };
 use futures::StreamExt;
@@ -125,6 +125,12 @@ impl DockerRunner {
         }
         eprintln!("---");
 
+        let inspect: ContainerInspectResponse = self
+            .docker
+            .inspect_container(&id, None)
+            .await
+            .context("failed to inspect container")?;
+
         self.docker
             .remove_container(
                 &id,
@@ -134,6 +140,16 @@ impl DockerRunner {
                 }),
             )
             .await?;
+
+        if let Some(state) = inspect.state {
+            let exit_code = state.exit_code.unwrap_or_default();
+            if exit_code != 0 {
+                bail!(
+                    "ctonainer exited with code {exit_code}: {}",
+                    state.error.unwrap_or_default()
+                );
+            }
+        }
 
         Ok(out)
     }
