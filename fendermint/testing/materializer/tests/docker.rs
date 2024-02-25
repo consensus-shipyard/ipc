@@ -40,11 +40,15 @@ fn read_manifest(file_name: &str) -> anyhow::Result<Manifest> {
 /// testnet resources, then materialize a testnet and run some tests.
 async fn with_testnet<F>(manifest_file_name: &str, f: F) -> anyhow::Result<()>
 where
+    // TODO: How could we pass only a reference to the testnet to the async test?
+    // NOTE: Asking for the testnet to be returned to make sure it's not dropped prematurely.
     F: FnOnce(
         &mut DockerMaterializer,
+        &Manifest,
         Testnet<DockerMaterials, DockerMaterializer>,
-        Manifest,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>>>>,
+    ) -> Pin<
+        Box<dyn Future<Output = anyhow::Result<Testnet<DockerMaterials, DockerMaterializer>>>>,
+    >,
 {
     let testnet_name = TestnetName::new(
         PathBuf::from(manifest_file_name)
@@ -66,13 +70,20 @@ where
         .await
         .context("failed to set up testnet")?;
 
-    let res = f(&mut materializer, testnet, manifest).await;
+    // Allow time for things to consolidate and blocks to be created.
+    tokio::time::sleep(Duration::from_secs(10)).await;
+
+    // TODO: Print all logs on failure. Would be nice if the testnet could be passed as a reference,
+    // so that we can loop through the nodes in it, because currently it gets lost on error.
+    let res = f(&mut materializer, &manifest, testnet).await.map(|tn| {
+        drop(tn);
+    });
 
     // Allow some time for containers to be dropped.
     // This only happens if the testnet setup succeeded,
     // otherwise the system shuts down too quick, but
     // at least we can inspect the containers.
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_secs(5)).await;
 
     res
 }
@@ -80,7 +91,6 @@ where
 // Run these tests serially because they share a common `materializer-state.json` file with the port mappings.
 #[serial]
 mod materializer_tests {
-    use std::time::Duration;
 
     use anyhow::{anyhow, bail};
     use ethers::{providers::Middleware, types::U64};
@@ -90,7 +100,7 @@ mod materializer_tests {
 
     #[tokio::test]
     async fn test_root_only() {
-        with_testnet("root-only.yaml", |_materializer, testnet, _manifest| {
+        with_testnet("root-only.yaml", |_materializer, _manifest, testnet| {
             Box::pin(async move {
                 // Check that node2 is following node1.
                 let node2 = testnet.root().node("node-2");
@@ -100,17 +110,13 @@ mod materializer_tests {
                     .ethapi_http_provider()?
                     .ok_or_else(|| anyhow!("node-2 has ethapi enabled"))?;
 
-                tokio::time::sleep(Duration::from_secs(3)).await;
-
-                eprintln!("sleep before querying the block number");
-                tokio::time::sleep(Duration::from_secs(30)).await;
                 let bn = provider.get_block_number().await?;
 
                 if bn <= U64::one() {
                     bail!("expected positive block number");
                 }
 
-                Ok(())
+                Ok(testnet)
             })
         })
         .await
