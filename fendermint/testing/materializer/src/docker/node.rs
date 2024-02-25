@@ -2,31 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
 };
 
 use anyhow::{anyhow, bail, Context};
-use bollard::{
-    container::{
-        AttachContainerOptions, AttachContainerResults, Config, CreateContainerOptions,
-        RemoveContainerOptions,
-    },
-    network::ConnectNetworkOptions,
-    service::{HostConfig, PortBinding},
-    Docker,
-};
+use bollard::Docker;
 use ethers::types::H160;
-use futures::StreamExt;
 use lazy_static::lazy_static;
 
 use super::{
-    container::DockerContainer, dropper::DropHandle, DockerConstruct, DockerMaterials,
-    DockerNetwork, DockerPortRange,
+    container::DockerContainer, dropper::DropHandle, runner::DockerRunner, DockerMaterials,
+    DockerPortRange, EnvVars, Volumes,
 };
 use crate::{
     docker::DOCKER_ENTRY_FILE_NAME,
+    env_vars,
     materializer::{NodeConfig, TargetConfig},
     materials::export_file,
     NodeName, ResourceHash,
@@ -60,15 +52,6 @@ lazy_static! {
     static ref STATIC_ENV_PATH: String = format!("/opt/docker/{STATIC_ENV}");
     static ref DYNAMIC_ENV_PATH: String = format!("/opt/docker/{DYNAMIC_ENV}");
     static ref DOCKER_ENTRY_PATH: String = format!("/opt/docker/{DOCKER_ENTRY_FILE_NAME}");
-}
-
-type EnvVars = BTreeMap<&'static str, String>;
-type Volumes = Vec<(PathBuf, &'static str)>;
-
-macro_rules! env_vars {
-    ( $($key:literal => $value:expr),* $(,)? ) => {
-        BTreeMap::from([ $( ($key, $value.to_string()) ),* ])
-    };
 }
 
 /// A Node consists of multiple docker containers.
@@ -111,6 +94,17 @@ impl DockerNode {
         // Get the current user ID to use with docker containers.
         let user = node_dir.metadata()?.uid();
 
+        let make_runner = |image, volumes| {
+            DockerRunner::new(
+                docker.clone(),
+                dropper.clone(),
+                node_name.clone(),
+                user,
+                image,
+                volumes,
+            )
+        };
+
         // Create a directory for keys
         let keys_dir = node_dir.join("keys");
         if !keys_dir.exists() {
@@ -129,21 +123,11 @@ impl DockerNode {
             // then we wouldn't need docker for some of these steps.
             // However, at least this way they are tested.
 
-            let cometbft_runner = DockerRunner::new(
-                &docker,
-                &dropper,
-                node_name,
-                COMETBFT_IMAGE,
-                user,
-                vec![(cometbft_dir.clone(), "/cometbft")],
-            );
+            let cometbft_runner =
+                make_runner(COMETBFT_IMAGE, vec![(cometbft_dir.clone(), "/cometbft")]);
 
-            let fendermint_runner = DockerRunner::new(
-                &docker,
-                &dropper,
-                node_name,
+            let fendermint_runner = make_runner(
                 FENDERMINT_IMAGE,
-                user,
                 vec![
                     (keys_dir.clone(), "/fendermint/keys"),
                     (cometbft_dir.clone(), "/cometbft"),
@@ -340,12 +324,8 @@ impl DockerNode {
         let fendermint = match fendermint {
             Some(c) => c,
             None => {
-                let creator = DockerRunner::new(
-                    &docker,
-                    &dropper,
-                    node_name,
+                let creator = make_runner(
                     FENDERMINT_IMAGE,
-                    user,
                     volumes(vec![
                         (keys_dir.clone(), "/fendermint/keys"),
                         (fendermint_dir.join("data"), "/fendermint/data"),
@@ -370,12 +350,8 @@ impl DockerNode {
         let cometbft = match cometbft {
             Some(c) => c,
             None => {
-                let creator = DockerRunner::new(
-                    &docker,
-                    &dropper,
-                    node_name,
+                let creator = make_runner(
                     COMETBFT_IMAGE,
-                    user,
                     volumes(vec![(cometbft_dir.clone(), "/cometbft")]),
                 );
 
@@ -397,14 +373,7 @@ impl DockerNode {
         // Create a ethapi container
         let ethapi = match ethapi {
             None if node_config.ethapi => {
-                let creator = DockerRunner::new(
-                    &docker,
-                    &dropper,
-                    node_name,
-                    FENDERMINT_IMAGE,
-                    user,
-                    volumes(vec![]),
-                );
+                let creator = make_runner(FENDERMINT_IMAGE, volumes(vec![]));
 
                 let c = creator
                     .create(
@@ -505,205 +474,6 @@ where
     Ok(ss.join(","))
 }
 
-struct DockerRunner<'a> {
-    docker: &'a Docker,
-    dropper: &'a DropHandle,
-    node_name: NodeName,
-    image: String,
-    user: u32,
-    volumes: Volumes,
-}
-
-impl<'a> DockerRunner<'a> {
-    pub fn new(
-        docker: &'a Docker,
-        dropper: &'a DropHandle,
-        node_name: &NodeName,
-        image: &str,
-        user: u32,
-        volumes: Volumes,
-    ) -> Self {
-        Self {
-            docker,
-            dropper,
-            node_name: node_name.clone(),
-            image: image.to_string(),
-            user,
-            volumes,
-        }
-    }
-
-    // Tag containers with resource names.
-    fn labels(&self) -> HashMap<String, String> {
-        [
-            ("testnet", self.node_name.testnet().path()),
-            ("node", self.node_name.path()),
-        ]
-        .into_iter()
-        .map(|(n, p)| (n.to_string(), p.to_string_lossy().to_string()))
-        .collect()
-    }
-
-    /// Run a short lived container.
-    pub async fn run_cmd(&self, cmd: &str) -> anyhow::Result<Vec<String>> {
-        let cmdv = cmd.split(" ").into_iter().map(|s| s.to_string()).collect();
-        let config = Config {
-            image: Some(self.image.clone()),
-            user: Some(self.user.to_string()),
-            cmd: Some(cmdv),
-            attach_stderr: Some(true),
-            attach_stdout: Some(true),
-            tty: Some(true),
-            labels: Some(self.labels()),
-            host_config: Some(HostConfig {
-                // We'll remove it explicitly at the end after collecting the output.
-                auto_remove: Some(false),
-                init: Some(true),
-                binds: Some(
-                    self.volumes
-                        .iter()
-                        .map(|(h, c)| format!("{}:{c}", h.to_string_lossy()))
-                        .collect(),
-                ),
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-
-        let id = self
-            .docker
-            .create_container::<&str, _>(None, config)
-            .await
-            .context("failed to create container")?
-            .id;
-
-        let AttachContainerResults { mut output, .. } = self
-            .docker
-            .attach_container::<String>(
-                &id,
-                Some(AttachContainerOptions {
-                    stdout: Some(true),
-                    stderr: Some(true),
-                    stream: Some(true),
-                    ..Default::default()
-                }),
-            )
-            .await
-            .context("failed to attach to container")?;
-
-        self.docker
-            .start_container::<&str>(&id, None)
-            .await
-            .context("failed to start container")?;
-
-        // Collect docker attach output
-        let mut out = Vec::new();
-        while let Some(Ok(output)) = output.next().await {
-            out.push(output.to_string());
-        }
-
-        eprintln!("NODE: {}", self.node_name);
-        eprintln!("CMD: {cmd}");
-        for o in out.iter() {
-            eprint!("OUT: {o}");
-        }
-        eprintln!("---");
-
-        self.docker
-            .remove_container(
-                &id,
-                Some(RemoveContainerOptions {
-                    force: true,
-                    ..Default::default()
-                }),
-            )
-            .await?;
-
-        Ok(out)
-    }
-
-    /// Create a container to be started later.
-    pub async fn create(
-        &self,
-        name: String,
-        network: &DockerNetwork,
-        // Host <-> Container port mappings
-        ports: Vec<(u32, u32)>,
-        entrypoint: Vec<String>,
-    ) -> anyhow::Result<DockerContainer> {
-        let config = Config {
-            hostname: Some(name.clone()),
-            image: Some(self.image.clone()),
-            user: Some(self.user.to_string()),
-            entrypoint: Some(entrypoint),
-            labels: Some(self.labels()),
-            cmd: None,
-            host_config: Some(HostConfig {
-                init: Some(true),
-                binds: Some(
-                    self.volumes
-                        .iter()
-                        .map(|(h, c)| format!("{}:{c}", h.to_string_lossy()))
-                        .collect(),
-                ),
-                port_bindings: Some(
-                    ports
-                        .into_iter()
-                        .flat_map(|(h, c)| {
-                            let binding = PortBinding {
-                                host_ip: None,
-                                host_port: Some(h.to_string()),
-                            };
-                            // Emitting both TCP and UDP, just in case.
-                            vec![
-                                (format!("{c}/tcp"), Some(vec![binding.clone()])),
-                                (format!("{c}/udp"), Some(vec![binding])),
-                            ]
-                        })
-                        .collect(),
-                ),
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-
-        let id = self
-            .docker
-            .create_container::<String, _>(
-                Some(CreateContainerOptions {
-                    name: name.clone(),
-                    ..Default::default()
-                }),
-                config,
-            )
-            .await
-            .context("failed to create container")?
-            .id;
-
-        // host_config.network_mode should work as well.
-        self.docker
-            .connect_network(
-                &network.network_name(),
-                ConnectNetworkOptions {
-                    container: id.clone(),
-                    ..Default::default()
-                },
-            )
-            .await
-            .context("failed to connect container to network")?;
-
-        Ok(DockerContainer::new(
-            self.docker.clone(),
-            self.dropper.clone(),
-            DockerConstruct {
-                id,
-                name,
-                external: false,
-            },
-        ))
-    }
-}
-
 fn export_env(file_path: impl AsRef<Path>, env: &EnvVars) -> anyhow::Result<()> {
     let env = env
         .iter()
@@ -745,14 +515,16 @@ mod tests {
     };
     use bollard::Docker;
 
-    #[tokio::test]
-    async fn test_docker_run_output() {
+    fn make_runner() -> DockerRunner {
         let nn = TestnetName::new("test-network").root().node("test-node");
         let docker = Docker::connect_with_local_defaults().expect("failed to connect to docker");
         let dropper = dropper::start(docker.clone());
+        DockerRunner::new(docker, dropper, nn, 0, COMETBFT_IMAGE, Vec::new())
+    }
 
-        let runner = DockerRunner::new(&docker, &dropper, &nn, &COMETBFT_IMAGE, 0, Vec::new());
-
+    #[tokio::test]
+    async fn test_docker_run_output() {
+        let runner = make_runner();
         // Based on my manual testing, this will initialise the config and then show the ID:
         // `docker run --rm cometbft/cometbft:v0.37.x show-node-id`
         let logs = runner
@@ -761,6 +533,21 @@ mod tests {
             .expect("failed to show ID");
 
         assert!(logs.len() > 0);
+
+        assert!(
+            parse_cometbft_node_id(logs.last().unwrap()).is_ok(),
+            "last line is a node ID"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_docker_run_error() {
+        let runner = make_runner();
+
+        let _err = runner
+            .run_cmd("show-peer-id")
+            .await
+            .expect_err("wrong command should fail");
     }
 
     #[test]
