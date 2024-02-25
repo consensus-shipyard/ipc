@@ -423,7 +423,8 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
                 ipc: Some(IpcParams {
                     gateway: GatewayParams {
                         subnet_id: SubnetID::new_root(chain_id.into()),
-                        bottom_up_check_period: 0,
+                        // TODO: The gateway constructor doesn't allow 0 bottom-up-checkpoint-period even on the rootnet!
+                        bottom_up_check_period: 1,
                         majority_percentage: 67,
                         active_validators_limit: 100,
                     },
