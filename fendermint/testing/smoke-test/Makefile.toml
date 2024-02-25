@@ -35,10 +35,9 @@ dependencies = [
 ]
 
 [tasks.simplecoin-example]
-# Using --release in the hope that it can reuse artifacts compiled earlier for the docker build.
 script = """
 cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint
-cargo run -p fendermint_rpc --release --example simplecoin -- \
+cargo run -p fendermint_rpc --example simplecoin -- \
   --secret-key testing/smoke-test/test-data/keys/alice.sk \
   ${VERBOSITY}
 """
@@ -47,7 +46,7 @@ cargo run -p fendermint_rpc --release --example simplecoin -- \
 [tasks.ethers-example]
 script = """
 cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint
-cargo run -p fendermint_eth_api --release --example ethers -- \
+cargo run -p fendermint_eth_api --example ethers -- \
   --secret-key-from testing/smoke-test/test-data/keys/emily.sk \
   --secret-key-to   testing/smoke-test/test-data/keys/eric.sk
 """
@@ -55,7 +54,7 @@ cargo run -p fendermint_eth_api --release --example ethers -- \
 [tasks.query-blockhash-example]
 script = """
 cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint
-cargo run -p fendermint_eth_api --release --example query_blockhash -- \
+cargo run -p fendermint_eth_api --example query_blockhash -- \
    --secret-key testing/smoke-test/test-data/keys/emily.sk \
   ${VERBOSITY}
 """
