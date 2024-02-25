@@ -47,6 +47,14 @@ pub struct Testnet<M: Materials, R> {
     _phantom_materializer: PhantomData<R>,
 }
 
+impl<M: Materials, R> Drop for Testnet<M, R> {
+    fn drop(&mut self) {
+        // Make sure anything that can use a common network is dropped first.
+        drop(std::mem::take(&mut self.relayers));
+        drop(std::mem::take(&mut self.nodes));
+    }
+}
+
 impl<M, R> Testnet<M, R>
 where
     M: Materials,
