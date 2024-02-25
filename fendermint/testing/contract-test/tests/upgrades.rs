@@ -5,19 +5,27 @@ mod staking;
 
 use anyhow::{Context, Result};
 use cid::Cid;
+use ethers::types::{H160, U256};
+use rand::rngs::StdRng;
+use rand::SeedableRng;
 use std::future::Future;
+use std::str::FromStr;
 use std::sync::Arc;
-use tendermint_rpc::HttpClient;
 
+use ethers::contract::abigen;
 use fvm::engine::MultiEngine;
+use fvm_shared::address::Address;
 use fvm_shared::bigint::Zero;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
+use tendermint_rpc::HttpClient;
 
-use fendermint_vm_actor_interface::system;
+use fendermint_crypto::SecretKey;
+use fendermint_vm_actor_interface::eam;
+use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_core::Timestamp;
-use fendermint_vm_genesis::{Genesis, PermissionMode};
+use fendermint_vm_genesis::{Account, Actor, ActorMeta, Genesis, PermissionMode, SignerAddr};
 use fendermint_vm_interpreter::fvm::bundle::{bundle_path, custom_actors_bundle_path};
 use fendermint_vm_interpreter::fvm::state::{
     FvmExecState, FvmGenesisState, FvmStateParams, FvmUpdatableParams,
@@ -30,6 +38,7 @@ use fendermint_vm_interpreter::{
     fvm::{bundle::contracts_path, upgrade_scheduler::Upgrade, FvmMessageInterpreter},
     ExecInterpreter,
 };
+use fendermint_vm_message::chain::ChainMessage;
 
 #[derive(Clone)]
 struct Tester<I> {
@@ -77,7 +86,7 @@ where
         }
     }
 
-    async fn init_genesis(&mut self) -> anyhow::Result<()> {
+    async fn init(&mut self, genesis: Genesis) -> anyhow::Result<()> {
         let bundle_path = bundle_path();
         let bundle = std::fs::read(&bundle_path)
             .with_context(|| format!("failed to read bundle: {}", bundle_path.to_string_lossy()))?;
@@ -99,18 +108,6 @@ where
         )
         .await
         .context("failed to create genesis state")?;
-
-        let genesis = Genesis {
-            chain_name: "test".to_string(),
-            timestamp: Timestamp(0),
-            network_version: NetworkVersion::V21,
-            base_fee: TokenAmount::zero(),
-            power_scale: 0,
-            validators: Vec::new(),
-            accounts: Vec::new(),
-            eam_permission_mode: PermissionMode::Unrestricted,
-            ipc: None,
-        };
 
         let (state, out) = self
             .interpreter
@@ -163,7 +160,7 @@ where
     }
 
     async fn begin_block(&self, block_height: ChainEpoch) -> Result<()> {
-        // generate a random block hash
+        // TODO: generate block hash based on input
         let block_hash: [u8; 32] = [0; 32];
 
         let db = self.state_store.as_ref().clone();
@@ -214,68 +211,184 @@ where
     }
 }
 
-#[test]
-fn testest() {
-    let rt: tokio::runtime::Runtime =
-        tokio::runtime::Runtime::new().expect("create tokio runtime for init");
+const CONTRACT_HEX: &str = include_str!("../../contracts/SimpleCoin.bin");
+abigen!(SimpleCoin, "../contracts/SimpleCoin.abi");
 
-    let mut us = UpgradeScheduler::default();
+fn eth_addr_to_h160(eth_addr: &EthAddress) -> H160 {
+    ethers::core::types::Address::from_slice(&eth_addr.0)
+}
 
-    let chain_id = 1942764459484029;
+// returns a seeded secret key which is guaranteed to be the same every time
+fn my_secret_key() -> SecretKey {
+    SecretKey::random(&mut StdRng::seed_from_u64(123))
+}
 
-    us.add(Upgrade {
-        chain_id,
-        block_height: 1,
-        migration: |state| {
-            println!(
-                "Migration at height {} just prints out chainmetadata actor",
-                state.block_height()
-            );
+#[tokio::test]
+async fn testest() {
+    use bytes::Bytes;
+    use fendermint_rpc::message::{GasParams, MessageFactory};
+    use lazy_static::lazy_static;
 
-            let actor = state
-                .state_tree_mut()
-                .get_actor(system::SYSTEM_ACTOR_ID)
+    lazy_static! {
+        /// Default gas params based on the testkit.
+        static ref GAS_PARAMS: GasParams = GasParams {
+            gas_limit: 10_000_000_000,
+            gas_fee_cap: TokenAmount::default(),
+            gas_premium: TokenAmount::default(),
+        };
+    }
+
+    let mut upgrade_scheduler = UpgradeScheduler::new();
+    upgrade_scheduler
+        .add(
+            Upgrade::new("mychain".to_string(), 1, |state| {
+                println!(
+                    "!!! Running migration at height {}: Deploy simple contract",
+                    state.block_height()
+                );
+
+                // create a message for deploying the contract
+                let mut mf = MessageFactory::new_secp256k1(my_secret_key(), 1, state.chain_id());
+                let message = match mf
+                    .fevm_create(
+                        Bytes::from(
+                            hex::decode(CONTRACT_HEX)
+                                .context("error parsing contract")
+                                .unwrap(),
+                        ),
+                        Bytes::default(),
+                        TokenAmount::default(),
+                        GAS_PARAMS.clone(),
+                    )
+                    .unwrap()
+                {
+                    ChainMessage::Signed(signed) => signed.into_message(),
+                    _ => panic!("unexpected message type"),
+                };
+
+                // execute the message
+                let (apply_ret, _) = state.execute_implicit(message).unwrap();
+                println!("Execute message returned: {:?}", apply_ret);
+                if let Some(err) = apply_ret.failure_info {
+                    anyhow::bail!("failed to deploy contract: {}", err);
+                }
+
+                // parse the return value
+                let res = fvm_ipld_encoding::from_slice::<eam::CreateReturn>(
+                    &apply_ret.msg_receipt.return_data,
+                )
+                .map_err(|e| panic!("error parsing as CreateReturn: {e}"))
                 .unwrap();
-            print!("chainmetadata actor: {:?}", actor);
-            Ok(())
-        },
-    })
-    .unwrap();
 
-    us.add(Upgrade {
-        chain_id,
-        block_height: 2,
-        migration: |state| {
-            println!(
-                "Migration at height {} deletes chainmetadata actor",
-                state.block_height()
-            );
+                let contract_delegated_addr = res.delegated_address();
+                println!("Contract delegated_address: {}", contract_delegated_addr);
+                let contract_robus_addr = res.delegated_address();
+                println!("Contract robust_address: {}", contract_robus_addr);
 
-            state.state_tree_mut().delete_actor(system::SYSTEM_ACTOR_ID);
+                Ok(())
+            })
+            .unwrap(),
+        )
+        .unwrap();
 
-            Ok(())
-        },
-    })
-    .unwrap();
+    upgrade_scheduler
+        .add(
+            Upgrade::new("mychain".to_string(), 2, |state| {
+                println!(
+                    "!!! Running migration at height {}: Sends a balance",
+                    state.block_height()
+                );
 
-    us.add(Upgrade {
-        chain_id,
-        block_height: 3,
-        migration: |state| {
-            println!(
-                "Migration at height {} confirms the chainmetadata actor is deleted",
-                state.block_height()
-            );
+                let contract_delegated_address =
+                    Address::from_str("f410fnz5jdky3zzcj6pejqkomkggw72pcuvkpihz2rwa").unwrap();
 
-            let actor = state
-                .state_tree_mut()
-                .get_actor(system::SYSTEM_ACTOR_ID)
-                .unwrap();
-            print!("chainmetadata actor after delete: {:?}", actor);
-            Ok(())
-        },
-    })
-    .unwrap();
+                // build the calldata for the send_coin function
+                let (client, _mock) = ethers::providers::Provider::mocked();
+                let calldata = SimpleCoin::new(EthAddress::from_id(101), client.into())
+                    .send_coin(
+                        // the address we are sending the balance to (which is us in this case)
+                        eth_addr_to_h160(&EthAddress::from(my_secret_key().public_key())),
+                        // the amount we are sending
+                        U256::from(1000),
+                    )
+                    .calldata()
+                    .expect("calldata should contain function and parameters");
+
+                // create a message for sending the balance
+                let mut mf = MessageFactory::new_secp256k1(my_secret_key(), 1, state.chain_id());
+                let message = match mf
+                    .fevm_invoke(
+                        contract_delegated_address,
+                        calldata.0,
+                        TokenAmount::default(),
+                        GAS_PARAMS.clone(),
+                    )
+                    .unwrap()
+                {
+                    ChainMessage::Signed(signed) => signed.into_message(),
+                    _ => panic!("unexpected message type"),
+                };
+
+                // execute the message
+                let (apply_ret, _) = state.execute_implicit(message).unwrap();
+                println!("Ret apply_ret : {:?}", apply_ret);
+
+                if let Some(err) = apply_ret.failure_info {
+                    anyhow::bail!("failed to send balance: {}", err);
+                }
+
+                Ok(())
+            })
+            .unwrap(),
+        )
+        .unwrap();
+
+    upgrade_scheduler
+        .add(
+            Upgrade::new("mychain".to_string(), 3, |state| {
+                println!(
+                    "!!! Running migration at height {}: Returns a balance",
+                    state.block_height()
+                );
+
+                let contract_delegated_address =
+                    Address::from_str("f410fnz5jdky3zzcj6pejqkomkggw72pcuvkpihz2rwa").unwrap();
+
+                // build the calldata for the get_balance function
+                let (client, _mock) = ethers::providers::Provider::mocked();
+                let calldata = SimpleCoin::new(EthAddress::from_id(0), client.into())
+                    .get_balance(eth_addr_to_h160(&EthAddress::from(
+                        my_secret_key().public_key(),
+                    )))
+                    .calldata()
+                    .expect("calldata should contain function and parameters");
+
+                let mut mf = MessageFactory::new_secp256k1(my_secret_key(), 1, state.chain_id());
+                let message = match mf
+                    .fevm_invoke(
+                        contract_delegated_address,
+                        calldata.0,
+                        TokenAmount::default(),
+                        GAS_PARAMS.clone(),
+                    )
+                    .unwrap()
+                {
+                    ChainMessage::Signed(signed) => signed.into_message(),
+                    _ => panic!("unexpected message type"),
+                };
+
+                let (apply_ret, _) = state.execute_implicit(message).unwrap();
+                println!("Ret apply_ret : {:?}", apply_ret);
+
+                if let Some(err) = apply_ret.failure_info {
+                    anyhow::bail!("failed to get balance: {}", err);
+                }
+
+                Ok(())
+            })
+            .unwrap(),
+        )
+        .unwrap();
 
     let interpreter: FvmMessageInterpreter<MemoryBlockstore, HttpClient> =
         FvmMessageInterpreter::new(
@@ -285,16 +398,39 @@ fn testest() {
             1.05,
             1.05,
             false,
-            Some(us),
+            upgrade_scheduler,
         );
 
     let mut tester = Tester::new(interpreter, MemoryBlockstore::new());
-    rt.block_on(tester.init_genesis()).unwrap();
 
-    // iterate over 3 blocks
+    // include test actor with some balance
+    let actor = Actor {
+        meta: ActorMeta::Account(Account {
+            owner: SignerAddr(
+                Address::new_secp256k1(&my_secret_key().public_key().serialize()).unwrap(),
+            ),
+        }),
+        balance: TokenAmount::from_atto(1000),
+    };
+
+    let genesis = Genesis {
+        chain_name: "mychain".to_string(),
+        timestamp: Timestamp(0),
+        network_version: NetworkVersion::V21,
+        base_fee: TokenAmount::zero(),
+        power_scale: 0,
+        validators: Vec::new(),
+        accounts: vec![actor],
+        eam_permission_mode: PermissionMode::Unrestricted,
+        ipc: None,
+    };
+
+    tester.init(genesis).await.unwrap();
+
+    // iterate over all the upgrades
     for block_height in 1..=3 {
-        rt.block_on(tester.begin_block(block_height)).unwrap();
-        rt.block_on(tester.end_block(block_height)).unwrap();
-        rt.block_on(tester.commit()).unwrap();
+        tester.begin_block(block_height).await.unwrap();
+        tester.end_block(block_height).await.unwrap();
+        tester.commit().await.unwrap();
     }
 }

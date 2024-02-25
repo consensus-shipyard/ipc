@@ -318,6 +318,7 @@ mod tests {
             bundle::{bundle_path, contracts_path, custom_actors_bundle_path},
             state::{snapshot::Snapshot, FvmGenesisState, FvmStateParams},
             store::memory::MemoryBlockstore,
+            upgrade_scheduler::UpgradeScheduler,
             FvmMessageInterpreter,
         },
         GenesisInterpreter,
@@ -463,7 +464,7 @@ mod tests {
             1.05,
             1.05,
             false,
-            None,
+            UpgradeScheduler::new(),
         );
 
         let (state, out) = interpreter

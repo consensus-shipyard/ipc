@@ -1,17 +1,16 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::BTreeMap;
-
+use anyhow::bail;
+use fendermint_vm_core::chainid;
 use fvm_ipld_blockstore::Blockstore;
+use fvm_shared::chainid::ChainID;
 
 use super::state::{snapshot::BlockHeight, FvmExecState};
 
 /// a function type for migration
 // TODO: Add missing parameters
 pub type MigrationFunc<DB> = fn(state: &mut FvmExecState<DB>) -> anyhow::Result<()>;
-
-pub type ChainID = u64;
 
 /// Upgrade represents a single upgrade to be executed at a given height
 #[derive(Clone)]
@@ -20,11 +19,40 @@ where
     DB: Blockstore + 'static + Clone,
 {
     /// the chain id on which the upgrade should be executed
-    pub chain_id: ChainID,
+    chain_id: ChainID,
     /// the block height at which the upgrade should be executed
-    pub block_height: BlockHeight,
+    block_height: BlockHeight,
     /// the migration function to be executed
-    pub migration: MigrationFunc<DB>,
+    migration: MigrationFunc<DB>,
+
+    /// the chain name is never read after initialization
+    _chain_name: String,
+}
+
+impl<DB> Upgrade<DB>
+where
+    DB: Blockstore + 'static + Clone,
+{
+    pub fn new(
+        chain_name: String,
+        block_height: BlockHeight,
+        migration: MigrationFunc<DB>,
+    ) -> anyhow::Result<Self> {
+        let chain_id = chainid::from_str_hashed(&chain_name)?;
+
+        let me = Self {
+            _chain_name: chain_name,
+            chain_id,
+            block_height,
+            migration,
+        };
+
+        Ok(me)
+    }
+
+    pub fn execute(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<()> {
+        (self.migration)(state)
+    }
 }
 
 /// UpgradeScheduler represents a list of upgrades to be executed at given heights
@@ -35,7 +63,8 @@ pub struct UpgradeScheduler<DB>
 where
     DB: Blockstore + 'static + Clone,
 {
-    pub upgrades: BTreeMap<(ChainID, BlockHeight), Upgrade<DB>>,
+    // TODO: Consider using Set
+    pub upgrades: Vec<Upgrade<DB>>,
 }
 
 impl<DB> Default for UpgradeScheduler<DB>
@@ -43,8 +72,17 @@ where
     DB: Blockstore + 'static + Clone,
 {
     fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<DB> UpgradeScheduler<DB>
+where
+    DB: Blockstore + 'static + Clone,
+{
+    pub fn new() -> Self {
         Self {
-            upgrades: BTreeMap::new(),
+            upgrades: Vec::new(),
         }
     }
 }
@@ -57,54 +95,49 @@ where
     pub fn add(&mut self, upgrade: Upgrade<DB>) -> anyhow::Result<()> {
         if self
             .upgrades
-            .contains_key(&(upgrade.chain_id, upgrade.block_height))
+            .iter()
+            .any(|u| u.chain_id == upgrade.chain_id && u.block_height == upgrade.block_height)
         {
-            return Err(anyhow::anyhow!(
+            bail!(
                 "Upgrade already exists at block height {}",
                 upgrade.block_height
-            ));
+            );
         }
 
-        self.upgrades
-            .insert((upgrade.chain_id, upgrade.block_height), upgrade);
+        self.upgrades.push(upgrade);
 
         Ok(())
     }
 
     // check if there is an upgrade scheduled for the given chain_id at a given height
     pub fn get(&self, chain_id: ChainID, height: BlockHeight) -> Option<&Upgrade<DB>> {
-        self.upgrades.get(&(chain_id, height))
+        self.upgrades
+            .iter()
+            .find(|u| u.chain_id == chain_id && u.block_height == height)
     }
 }
 
 #[test]
 fn test_validate_upgrade_schedule() {
-    let mut us: UpgradeScheduler<fvm_ipld_blockstore::MemoryBlockstore> =
-        UpgradeScheduler::default();
+    use crate::fvm::store::memory::MemoryBlockstore;
 
-    let upgrade = Upgrade {
-        chain_id: 1,
-        block_height: 10,
-        migration: |_state| Ok(()),
-    };
-    us.add(upgrade).unwrap();
+    let mut upgrade_scheduler: UpgradeScheduler<MemoryBlockstore> = UpgradeScheduler::new();
 
-    let upgrade = Upgrade {
-        chain_id: 1,
-        block_height: 20,
-        migration: |_state| Ok(()),
-    };
-    us.add(upgrade).unwrap();
+    let upgrade = Upgrade::new("mychain".to_string(), 10, |_state| Ok(())).unwrap();
+    upgrade_scheduler.add(upgrade).unwrap();
 
-    // adding an upgrade at the same height should fail
-    let upgrade = Upgrade {
-        chain_id: 1,
-        block_height: 20,
-        migration: |_state| Ok(()),
-    };
-    let res = us.add(upgrade);
+    let upgrade = Upgrade::new("mychain".to_string(), 20, |_state| Ok(())).unwrap();
+    upgrade_scheduler.add(upgrade).unwrap();
+
+    // adding an upgrade with the same chain_id and height should fail
+    let upgrade = Upgrade::new("mychain".to_string(), 20, |_state| Ok(())).unwrap();
+    let res = upgrade_scheduler.add(upgrade);
     assert!(res.is_err());
 
-    assert!(us.get(1, 9).is_none());
-    assert!(us.get(1, 10).is_some());
+    let mychain_id = chainid::from_str_hashed("mychain").unwrap();
+    let otherhain_id = chainid::from_str_hashed("otherchain").unwrap();
+
+    assert!(upgrade_scheduler.get(mychain_id, 9).is_none());
+    assert!(upgrade_scheduler.get(mychain_id, 10).is_some());
+    assert!(upgrade_scheduler.get(otherhain_id, 10).is_none());
 }

@@ -77,7 +77,7 @@ where
     exec_in_check: bool,
     gateway: GatewayCaller<DB>,
     /// Upgrade scheduler stores all the upgrades to be executed at given heights.
-    upgrade_scheduler: Option<UpgradeScheduler<DB>>,
+    upgrade_scheduler: UpgradeScheduler<DB>,
 }
 
 impl<DB, C> FvmMessageInterpreter<DB, C>
@@ -91,7 +91,7 @@ where
         gas_overestimation_rate: f64,
         gas_search_step: f64,
         exec_in_check: bool,
-        upgrade_scheduler: Option<UpgradeScheduler<DB>>,
+        upgrade_scheduler: UpgradeScheduler<DB>,
     ) -> Self {
         Self {
             client,

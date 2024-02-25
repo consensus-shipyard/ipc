@@ -37,3 +37,8 @@ arbtest = { workspace = true }
 rand = { workspace = true }
 tokio = { workspace = true }
 cid = { workspace = true }
+fendermint_rpc = { path = "../../rpc" }
+lazy_static = { workspace = true }
+bytes = { workspace = true }
+fvm_ipld_encoding = { workspace = true }
+multihash = { workspace = true }
