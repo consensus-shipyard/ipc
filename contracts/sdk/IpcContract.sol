@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import { IpcEnvelope, ResultMsg, CallMsg, IpcMsgKind } from "../src/structs/CrossNet.sol";
-import { IPCAddress } from "../src/structs/Subnet.sol";
-import { EMPTY_BYTES } from "../src/constants/Constants.sol";
-import { IGateway } from "../src/interfaces/IGateway.sol";
-import { ReentrancyGuard } from "openzeppelin-contracts/utils/ReentrancyGuard.sol";
-import { Ownable } from "openzeppelin-contracts/access/Ownable.sol";
-import { CrossMsgHelper } from "../src/lib/CrossMsgHelper.sol";
+import {IpcEnvelope, ResultMsg, CallMsg, IpcMsgKind} from "../src/structs/CrossNet.sol";
+import {IPCAddress} from "../src/structs/Subnet.sol";
+import {EMPTY_BYTES} from "../src/constants/Constants.sol";
+import {IGateway} from "../src/interfaces/IGateway.sol";
+import {ReentrancyGuard} from "openzeppelin-contracts/utils/ReentrancyGuard.sol";
+import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
+import {CrossMsgHelper} from "../src/lib/CrossMsgHelper.sol";
 
 // Interface that needs to be implemented by IPC-aware contracts.
 //
@@ -22,7 +22,7 @@ interface IpcHandler {
     function handleIpcMessage(IpcEnvelope calldata envelope) external payable returns (bytes memory ret);
 }
 
-abstract contract IpcExchange is IpcHandler, Ownable, ReentrancyGuard  {
+abstract contract IpcExchange is IpcHandler, Ownable, ReentrancyGuard {
     using CrossMsgHelper for IpcEnvelope;
 
     // The address of the gateway in the network.
@@ -49,10 +49,7 @@ abstract contract IpcExchange is IpcHandler, Ownable, ReentrancyGuard  {
             // Recover the original message.
             // If we were not tracking it, or if some details don't match, refuse to handle the receipt.
             IpcEnvelope storage orig = inflightMsgs[result.id];
-            if (
-                orig.message.length == 0 ||
-                keccak256(abi.encode(envelope.from)) != keccak256(abi.encode(orig.to))
-            ) {
+            if (orig.message.length == 0 || keccak256(abi.encode(envelope.from)) != keccak256(abi.encode(orig.to))) {
                 revert IpcHandler.UnrecognizedResult();
             }
 
@@ -67,25 +64,38 @@ abstract contract IpcExchange is IpcHandler, Ownable, ReentrancyGuard  {
     /// @notice Function to be overridden by the child contract to handle incoming IPC calls.
     ///
     /// NOTE: It's fine for this method to revert. If that happens, IPC will carry the error to the caller.
-    function _handleIpcCall(IpcEnvelope memory envelope, CallMsg memory callMsg) internal virtual returns (bytes memory);
+    function _handleIpcCall(
+        IpcEnvelope memory envelope,
+        CallMsg memory callMsg
+    ) internal virtual returns (bytes memory);
 
     /// @notice Function to be overridden by the child contract to handle results from previously performed IPC calls.
     ///
     /// NOTE: This must not revert as doing so will leave the correlation map in an inconsistent state.
     /// (IPC will consider the result delivery attempted, and will not repeat it again).
-    function _handleIpcResult(IpcEnvelope storage original, IpcEnvelope memory result, ResultMsg memory resultMsg) internal virtual;
+    function _handleIpcResult(
+        IpcEnvelope storage original,
+        IpcEnvelope memory result,
+        ResultMsg memory resultMsg
+    ) internal virtual;
 
     /// @notice Method the implementation of this contract can invoke to perform an IPC call.
-    function performIpcCall(IPCAddress calldata to, CallMsg calldata callMsg, uint256 value) internal nonReentrant {
+    function performIpcCall(
+        IPCAddress memory to,
+        CallMsg memory callMsg,
+        uint256 value
+    ) internal nonReentrant returns (IpcEnvelope memory envelope) {
         // Queue the cross-net message for dispatch.
-        IpcEnvelope memory envelope = IGateway(gatewayAddr).sendContractXnetMessage{value: value}(IpcEnvelope({
-            kind: IpcMsgKind.Call,
-            from: to, // TODO: will anyway be replaced by sendContractXnetMessage.
-            to: to,
-            nonce: 0, // TODO: will be replaced.
-            value: value,
-            message: abi.encode(callMsg)
-        }));
+        envelope = IGateway(gatewayAddr).sendContractXnetMessage{value: value}(
+            IpcEnvelope({
+                kind: IpcMsgKind.Call,
+                from: to, // TODO: will anyway be replaced by sendContractXnetMessage.
+                to: to,
+                nonce: 0, // TODO: will be replaced.
+                value: value,
+                message: abi.encode(callMsg)
+            })
+        );
         // Add the message to the list of inflights
         bytes32 id = envelope.toHash();
         inflightMsgs[id] = envelope;
