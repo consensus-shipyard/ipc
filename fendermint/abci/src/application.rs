@@ -201,7 +201,7 @@ where
 
 fn log_error<T>(res: AbciResult<T>) -> AbciResult<T> {
     if let Err(ref e) = res {
-        tracing::error!("failed execute ABCI request: {e:#}");
+        tracing::error!("failed to execute ABCI request: {e:#}");
     }
     res
 }
