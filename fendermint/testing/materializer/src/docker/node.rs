@@ -115,83 +115,6 @@ impl DockerNode {
         let cometbft_dir = node_dir.join("cometbft");
         if !cometbft_dir.exists() {
             std::fs::create_dir(&cometbft_dir)?;
-
-            // We'll need to run some cometbft and fendermint commands.
-            // NOTE: Currently the Fendermint CLI commands live in the
-            // `app` crate in a way that they can't be imported. We
-            // could move them to the `lib.rs` from `main.rs` and
-            // then we wouldn't need docker for some of these steps.
-            // However, at least this way they are tested.
-
-            let cometbft_runner =
-                make_runner(COMETBFT_IMAGE, vec![(cometbft_dir.clone(), "/cometbft")]);
-
-            let fendermint_runner = make_runner(
-                FENDERMINT_IMAGE,
-                vec![
-                    (keys_dir.clone(), "/fendermint/keys"),
-                    (cometbft_dir.clone(), "/cometbft"),
-                    (node_config.genesis.path.clone(), "/fendermint/genesis.json"),
-                ],
-            );
-
-            // Init cometbft to establish the network key.
-            cometbft_runner
-                .run_cmd("init")
-                .await
-                .context("cannot init cometbft")?;
-
-            // Capture the cometbft node identity.
-            let cometbft_node_id = cometbft_runner
-                .run_cmd("show-node-id")
-                .await
-                .context("cannot show node ID")?
-                .into_iter()
-                .last()
-                .ok_or_else(|| anyhow!("empty cometbft node ID"))
-                .and_then(parse_cometbft_node_id)?;
-
-            export_file(keys_dir.join(COMETBFT_NODE_ID), cometbft_node_id)?;
-
-            // Convert fendermint genesis to cometbft.
-            fendermint_runner
-                .run_cmd(
-                    "genesis --genesis-file /fendermint/genesis.json into-tendermint --out /cometbft/config/genesis.json",
-                )
-                .await
-                .context("failed to convert genesis")?;
-
-            // Convert validator private key to cometbft.
-            if let Some(v) = node_config.validator {
-                let validator_key_path = v.secret_key_path();
-                std::fs::copy(validator_key_path, keys_dir.join("validator_key.sk"))
-                    .context("failed to copy validator key")?;
-
-                fendermint_runner
-                    .run_cmd(
-                        "key into-tendermint --secret-key /fendermint/keys/validator_key.sk --out /cometbft/config/priv_validator_key.json",
-                    )
-                    .await
-                    .context("failed to convert validator key")?;
-            }
-
-            // Create a network key for the resolver.
-            fendermint_runner
-                .run_cmd("key gen --out-dir /fendermint/keys --name network_key")
-                .await
-                .context("failed to create network key")?;
-
-            // Capture the fendermint node identity.
-            let fendermint_peer_id = fendermint_runner
-                .run_cmd("key show-peer-id --public-key /fendermint/keys/network_key.pk")
-                .await
-                .context("cannot show peer ID")?
-                .into_iter()
-                .last()
-                .ok_or_else(|| anyhow!("empty fendermint peer ID"))
-                .and_then(parse_fendermint_peer_id)?;
-
-            export_file(keys_dir.join(FENDERMINT_PEER_ID), fendermint_peer_id)?;
         }
 
         // Create a directory for fendermint
@@ -202,6 +125,86 @@ impl DockerNode {
             std::fs::create_dir(fendermint_dir.join("logs"))?;
             std::fs::create_dir(fendermint_dir.join("snapshots"))?;
         }
+
+        // We'll need to run some cometbft and fendermint commands.
+        // NOTE: Currently the Fendermint CLI commands live in the
+        // `app` crate in a way that they can't be imported. We
+        // could move them to the `lib.rs` from `main.rs` and
+        // then we wouldn't need docker for some of these steps.
+        // However, at least this way they are tested.
+
+        let cometbft_runner =
+            make_runner(COMETBFT_IMAGE, vec![(cometbft_dir.clone(), "/cometbft")]);
+
+        let fendermint_runner = make_runner(
+            FENDERMINT_IMAGE,
+            vec![
+                (keys_dir.clone(), "/fendermint/keys"),
+                (cometbft_dir.clone(), "/cometbft"),
+                (node_config.genesis.path.clone(), "/fendermint/genesis.json"),
+            ],
+        );
+
+        // Only run init once, just in case it would overwrite previous values.
+        if !cometbft_dir.join("config").exists() {
+            // Init cometbft to establish the network key.
+            cometbft_runner
+                .run_cmd("init")
+                .await
+                .context("cannot init cometbft")?;
+        }
+
+        // Capture the cometbft node identity.
+        let cometbft_node_id = cometbft_runner
+            .run_cmd("show-node-id")
+            .await
+            .context("cannot show node ID")?
+            .into_iter()
+            .last()
+            .ok_or_else(|| anyhow!("empty cometbft node ID"))
+            .and_then(parse_cometbft_node_id)?;
+
+        export_file(keys_dir.join(COMETBFT_NODE_ID), cometbft_node_id)?;
+
+        // Convert fendermint genesis to cometbft.
+        fendermint_runner
+                .run_cmd(
+                    "genesis --genesis-file /fendermint/genesis.json into-tendermint --out /cometbft/config/genesis.json",
+                )
+                .await
+                .context("failed to convert genesis")?;
+
+        // Convert validator private key to cometbft.
+        if let Some(v) = node_config.validator {
+            let validator_key_path = v.secret_key_path();
+            std::fs::copy(validator_key_path, keys_dir.join("validator_key.sk"))
+                .context("failed to copy validator key")?;
+
+            fendermint_runner
+                    .run_cmd(
+                        "key into-tendermint --secret-key /fendermint/keys/validator_key.sk --out /cometbft/config/priv_validator_key.json",
+                    )
+                    .await
+                    .context("failed to convert validator key")?;
+        }
+
+        // Create a network key for the resolver.
+        fendermint_runner
+            .run_cmd("key gen --out-dir /fendermint/keys --name network_key")
+            .await
+            .context("failed to create network key")?;
+
+        // Capture the fendermint node identity.
+        let fendermint_peer_id = fendermint_runner
+            .run_cmd("key show-peer-id --public-key /fendermint/keys/network_key.pk")
+            .await
+            .context("cannot show peer ID")?
+            .into_iter()
+            .last()
+            .ok_or_else(|| anyhow!("empty fendermint peer ID"))
+            .and_then(parse_fendermint_peer_id)?;
+
+        export_file(keys_dir.join(FENDERMINT_PEER_ID), fendermint_peer_id)?;
 
         // If there is no static env var file, create one with all the common variables.
         let static_env = node_dir.join(STATIC_ENV);
