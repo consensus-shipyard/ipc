@@ -1,5 +1,10 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
+//! Utility methods and entry point for tests using the docker materializer.
+//!
+//! # Example
+//!
+//! `cargo test -p fendermint_testing_materializer --test docker -- --nocapture`
 
 use std::{env::current_dir, path::PathBuf, pin::Pin, time::Duration};
 
@@ -12,7 +17,6 @@ use fendermint_testing_materializer::{
 };
 use futures::Future;
 use lazy_static::lazy_static;
-use serial_test::serial;
 
 lazy_static! {
     static ref CI_PROFILE: bool = std::env::var("PROFILE").unwrap_or_default() == "ci";
@@ -46,7 +50,7 @@ fn read_manifest(file_name: &str) -> anyhow::Result<Manifest> {
 
 /// Parse a manifest file in the `manifests` directory, clean up any corresponding
 /// testnet resources, then materialize a testnet and run some tests.
-async fn with_testnet<F>(manifest_file_name: &str, f: F) -> anyhow::Result<()>
+pub async fn with_testnet<F>(manifest_file_name: &str, f: F) -> anyhow::Result<()>
 where
     // https://users.rust-lang.org/t/function-that-takes-a-closure-with-mutable-reference-that-returns-a-future/54324
     F: for<'a> FnOnce(
@@ -112,40 +116,5 @@ where
 }
 
 // Run these tests serially because they share a common `materializer-state.json` file with the port mappings.
-#[serial]
-mod materializer_tests {
-
-    use anyhow::{anyhow, bail};
-    use ethers::{providers::Middleware, types::U64};
-    use fendermint_testing_materializer::HasEthApi;
-    use futures::FutureExt;
-
-    use super::with_testnet;
-
-    #[tokio::test]
-    async fn test_root_only() {
-        with_testnet("root-only.yaml", |_materializer, _manifest, testnet| {
-            let test = async {
-                // Check that node2 is following node1.
-                let node2 = testnet.root().node("node-2");
-                let dnode2 = testnet.node(&node2)?;
-
-                let provider = dnode2
-                    .ethapi_http_provider()?
-                    .ok_or_else(|| anyhow!("node-2 has ethapi enabled"))?;
-
-                let bn = provider.get_block_number().await?;
-
-                if bn <= U64::one() {
-                    bail!("expected positive block number");
-                }
-
-                Ok(())
-            };
-
-            test.boxed_local()
-        })
-        .await
-        .unwrap()
-    }
-}
+// Unfortunately the `#[serial]` macro can only be applied to module blocks, not this.
+mod docker_tests;
