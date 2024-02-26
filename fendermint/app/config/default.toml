@@ -200,3 +200,8 @@ subnet_id = "/r0"
 # The minimum is 1 seconds which is about the minimum target block time as well;
 # ideally one round of gossip per block should be as frequent as we would go.
 vote_interval = 1
+# Voting timeout about top-down finality, in seconds. After this time, if there is
+# no new height to vote on, the previous vote is re-published. This is to avoid
+# potential stalling because peers missed an important vote and the cache is full,
+# pausing the syncer, preventing new events to trigger votes.
+vote_timeout = 60

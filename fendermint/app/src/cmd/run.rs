@@ -160,6 +160,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
                     publish_vote_loop(
                         parent_finality_votes,
                         settings.ipc.vote_interval,
+                        settings.ipc.vote_timeout,
                         key,
                         own_subnet_id,
                         client,
