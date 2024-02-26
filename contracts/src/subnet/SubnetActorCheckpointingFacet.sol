@@ -40,21 +40,22 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
         // agree on submission, it's accepted. This is also needed when a bottom up msg bundle
         // becomes full, a bottom up checkpoint will be created before the checkpoint period
         // is reached.
+        if (checkpoint.blockHeight <= s.lastBottomUpCheckpointHeight + s.bottomUpCheckPeriod) {
+            // validate signatures and quorum threshold, revert if validation fails
+            validateActiveQuorumSignatures({signatories: signatories, hash: checkpointHash, signatures: signatures});
 
-        // validate signatures and quorum threshold, revert if validation fails
-        validateActiveQuorumSignatures({signatories: signatories, hash: checkpointHash, signatures: signatures});
+            // If the checkpoint height is the next expected height then this is a new checkpoint which must be executed
+            // in the Gateway Actor, the checkpoint and the relayer must be stored, last bottom-up checkpoint updated.
+            s.committedCheckpoints[checkpoint.blockHeight] = checkpoint;
 
-        // If the checkpoint height is the next expected height then this is a new checkpoint which must be executed
-        // in the Gateway Actor, the checkpoint and the relayer must be stored, last bottom-up checkpoint updated.
-        s.committedCheckpoints[checkpoint.blockHeight] = checkpoint;
+            s.lastBottomUpCheckpointHeight = checkpoint.blockHeight;
 
-        s.lastBottomUpCheckpointHeight = checkpoint.blockHeight;
+            // Commit in gateway to distribute rewards
+            IGateway(s.ipcGatewayAddr).commitCheckpoint(checkpoint);
 
-        // Commit in gateway to distribute rewards
-        IGateway(s.ipcGatewayAddr).commitCheckpoint(checkpoint);
-
-        // confirming the changes in membership in the child
-        LibStaking.confirmChange(checkpoint.nextConfigurationNumber);
+            // confirming the changes in membership in the child
+            LibStaking.confirmChange(checkpoint.nextConfigurationNumber);
+        }
     }
 
     /// @notice Checks whether the signatures are valid for the provided signatories and hash within the current validator set.
