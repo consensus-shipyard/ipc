@@ -259,8 +259,8 @@ impl DockerMaterializer {
         // Currently the range allocations are not dropped from the materializer,
         // so the length can be used to derive the next available port. Otherwise
         // we could loop through to find an unused slot.
-        let node_count = self.state.port_ranges.len();
-        let from = PORT_RANGE_START * node_count as u32;
+        let node_count = self.state.port_ranges.len() as u32;
+        let from = PORT_RANGE_START + PORT_RANGE_SIZE * node_count;
         let to = from + PORT_RANGE_SIZE;
         let range = DockerPortRange { from, to };
         self.update_state(|s| s.port_ranges.insert(node_name.clone(), range.clone()))?;
