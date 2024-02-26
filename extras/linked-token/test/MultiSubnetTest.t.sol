@@ -190,12 +190,6 @@ contract MultiSubnetTest is MultiSubnetTestBase {
 
         console.log("Begin bottom up checkpoint");
 
-        // TODO: This is already tested in IpcContract.t.sol. No need to retest here.
-        //confirm that token controller only accept calls to Ipc from the gateway
-        // vm.prank(holder);
-        // vm.expectRevert(IpcHandler.CallerIsNotGateway.selector);
-        // ipcTokenController.handleIpcMessage(expected);
-
         BottomUpCheckpoint memory checkpoint =
             callCreateBottomUpCheckpointFromChildSubnet(
                 nativeSubnetName,
