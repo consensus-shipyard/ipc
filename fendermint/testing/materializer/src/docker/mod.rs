@@ -107,23 +107,26 @@ pub struct DockerPortRange {
 }
 
 /// Mapping ports assuming a 100 size ranges.
+///
+/// The ports on the host are assigned so that they end with the same number as the internal one,
+/// which is hopefully a little bit intuitive for anyone who is familiar with the default values.
 impl DockerPortRange {
-    /// Mapping 26655 to the host.
+    /// Mapping the internal 26655 port to the host.
     pub fn resolver_p2p_host_port(&self) -> u32 {
         self.from + 55
     }
 
-    /// Mapping 26656 to the host.
+    /// Mapping the internal 26656 port to the host.
     pub fn cometbft_p2p_host_port(&self) -> u32 {
         self.from + 56
     }
 
-    /// Mapping 26657 to the host.
+    /// Mapping the internal 26657 port to the host.
     pub fn cometbft_rpc_host_port(&self) -> u32 {
         self.from + 57
     }
 
-    /// Mapping 8445 to the host.
+    /// Mapping the internal 8445 port to the host.
     pub fn ethapi_rpc_host_port(&self) -> u32 {
         self.from + 45
     }
