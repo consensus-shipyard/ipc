@@ -34,12 +34,12 @@ use fendermint_rpc::{client::FendermintClient, query::QueryClient};
 use fendermint_vm_actor_interface::eam::{self, CreateReturn, EthAddress};
 
 use crate::cmd;
-use crate::options::rpc::{
-    BroadcastMode, FevmArgs, RpcDataRepoCommands, RpcFevmCommands, TransArgs,
-};
 use crate::{
     cmd::to_b64,
-    options::rpc::{RpcArgs, RpcCommands, RpcQueryCommands},
+    options::rpc::{
+        BroadcastMode, FevmArgs, RpcAccumulatorCommands, RpcArgs, RpcCommands, RpcFevmCommands,
+        RpcObjectStoreCommands, RpcQueryCommands, TransArgs,
+    },
 };
 
 use super::key::read_secret_key;
@@ -58,30 +58,29 @@ cmd! {
             RpcCommands::Transaction { args, to, method_number, params } => {
                 transaction(client, args, to, method_number, params.clone()).await
             },
-            RpcCommands::DataRepo { args, command } => match command {
-                RpcDataRepoCommands::Put { key, content } => {
-                    datarepo_put(client, args, key, content).await
+            RpcCommands::Os { args, command } => match command {
+                RpcObjectStoreCommands::Put { key, value } => {
+                    os_put(client, args, key, value).await
                 }
-                RpcDataRepoCommands::Append { key, content } => {
-                    datarepo_append(client, args, key, content).await
+                RpcObjectStoreCommands::Delete { key } => {
+                    os_delete(client, args, key).await
                 }
-                RpcDataRepoCommands::Delete { key } => {
-                    datarepo_delete(client, args, key).await
-                }
-                RpcDataRepoCommands::Get { key, height } => {
+                RpcObjectStoreCommands::Get { key, height } => {
                     let height = Height::try_from(height)?;
-                    datarepo_get_call(client, args, key, height).await
+                    os_get_call(client, args, key, height).await
                 }
-                RpcDataRepoCommands::List { height } => {
+                RpcObjectStoreCommands::List { height } => {
                     let height = Height::try_from(height)?;
-                    datarepo_list_call(client, args, height).await
+                    os_list_call(client, args, height).await
                 }
-                RpcDataRepoCommands::Push { content } => {
-                    datarepo_push(client, args, content).await
+            },
+            RpcCommands::Acc { args, command } => match command {
+                RpcAccumulatorCommands::Push { event } => {
+                    os_push(client, args, event).await
                 }
-                RpcDataRepoCommands::Root { height } => {
+                RpcAccumulatorCommands::Root { height } => {
                     let height = Height::try_from(height)?;
-                    datarepo_root_call(client, args, height).await
+                    os_root_call(client, args, height).await
                 }
             },
             RpcCommands::Fevm { args, command } => match command {
@@ -119,7 +118,7 @@ async fn query(
         RpcQueryCommands::ActorState { address } => {
             match client.actor_state(&address, height).await?.value {
                 Some((id, state)) => {
-                    let out = json! ({
+                    let out = json!({
                       "id": id,
                       "state": state,
                     });
@@ -208,61 +207,36 @@ async fn transaction(
     .await
 }
 
-async fn datarepo_put(
+async fn os_put(
     client: FendermintClient,
     args: TransArgs,
     key: String,
-    content: Bytes,
+    content: Cid,
 ) -> anyhow::Result<()> {
     broadcast_and_print(
         client,
         args,
         |mut client, value, gas_params| {
-            Box::pin(async move { client.datarepo_put(key, content, value, gas_params).await })
+            Box::pin(async move { client.os_put(key, content, value, gas_params).await })
         },
         cid_to_json,
     )
     .await
 }
 
-async fn datarepo_append(
-    client: FendermintClient,
-    args: TransArgs,
-    key: String,
-    content: Bytes,
-) -> anyhow::Result<()> {
+async fn os_delete(client: FendermintClient, args: TransArgs, key: String) -> anyhow::Result<()> {
     broadcast_and_print(
         client,
         args,
         |mut client, value, gas_params| {
-            Box::pin(async move {
-                client
-                    .datarepo_append(key, content, value, gas_params)
-                    .await
-            })
+            Box::pin(async move { client.os_delete(key, value, gas_params).await })
         },
         cid_to_json,
     )
     .await
 }
 
-async fn datarepo_delete(
-    client: FendermintClient,
-    args: TransArgs,
-    key: String,
-) -> anyhow::Result<()> {
-    broadcast_and_print(
-        client,
-        args,
-        |mut client, value, gas_params| {
-            Box::pin(async move { client.datarepo_delete(key, value, gas_params).await })
-        },
-        cid_to_json,
-    )
-    .await
-}
-
-async fn datarepo_get_call(
+async fn os_get_call(
     client: FendermintClient,
     args: TransArgs,
     key: String,
@@ -275,7 +249,7 @@ async fn datarepo_get_call(
 
     let res = client
         .inner
-        .datarepo_get_call(key, value, gas_params, height)
+        .os_get_call(key, value, gas_params, height)
         .await?;
 
     let json = json!({"response": res.response, "return_data": res.return_data});
@@ -283,7 +257,7 @@ async fn datarepo_get_call(
     print_json(&json)
 }
 
-async fn datarepo_list_call(
+async fn os_list_call(
     client: FendermintClient,
     args: TransArgs,
     height: Height,
@@ -293,33 +267,26 @@ async fn datarepo_list_call(
     let value = args.value;
     let height = FvmQueryHeight::from(height.value());
 
-    let res = client
-        .inner
-        .datarepo_list_call(value, gas_params, height)
-        .await?;
+    let res = client.inner.os_list_call(value, gas_params, height).await?;
 
     let json = json!({"response": res.response, "return_data": res.return_data});
 
     print_json(&json)
 }
 
-async fn datarepo_push(
-    client: FendermintClient,
-    args: TransArgs,
-    content: Bytes,
-) -> anyhow::Result<()> {
+async fn os_push(client: FendermintClient, args: TransArgs, event: Bytes) -> anyhow::Result<()> {
     broadcast_and_print(
         client,
         args,
         |mut client, value, gas_params| {
-            Box::pin(async move { client.datarepo_push(content, value, gas_params).await })
+            Box::pin(async move { client.acc_push(event, value, gas_params).await })
         },
         cid_to_json,
     )
     .await
 }
 
-async fn datarepo_root_call(
+async fn os_root_call(
     client: FendermintClient,
     args: TransArgs,
     height: Height,
@@ -331,7 +298,7 @@ async fn datarepo_root_call(
 
     let res = client
         .inner
-        .datarepo_root_call(value, gas_params, height)
+        .acc_root_call(value, gas_params, height)
         .await?;
 
     let json = json!({"response": res.response, "return_data": res.return_data});

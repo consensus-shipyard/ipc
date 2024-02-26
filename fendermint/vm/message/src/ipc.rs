@@ -1,6 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::signed::Object;
 use cid::Cid;
 use fvm_shared::{
     address::Address, clock::ChainEpoch, crypto::signature::Signature, econ::TokenAmount,
@@ -28,6 +29,9 @@ pub enum IpcMessage {
     /// A top-down checkpoint parent finality proposal. This proposal should contain the latest parent
     /// state that to be checked and voted by validators.
     TopDownExec(ParentFinality),
+
+    /// Proposed by validators when an object accompanying a message has been resolved and is ready to be executed.
+    ObjectResolved(Object),
 }
 
 /// A message relayed by a user on the current subnet.
@@ -105,7 +109,6 @@ pub struct ParentFinality {
 
 #[cfg(feature = "arb")]
 mod arb {
-
     use crate::ipc::ParentFinality;
     use fendermint_testing::arb::{ArbAddress, ArbCid, ArbSubnetID, ArbTokenAmount};
     use fvm_shared::crypto::signature::Signature;

@@ -3,18 +3,18 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use cid::Cid;
-use fil_actors_runtime::actor_dispatch;
-use fil_actors_runtime::actor_error;
-use fil_actors_runtime::builtin::singletons::SYSTEM_ACTOR_ADDR;
-use fil_actors_runtime::runtime::{ActorCode, Runtime};
-use fil_actors_runtime::ActorDowncast;
-use fil_actors_runtime::ActorError;
-// use fvm_ipld_encoding::de::DeserializeOwned;
-// use fvm_ipld_encoding::ser::Serialize;
-use fvm_shared::error::ExitCode;
+use fil_actors_runtime::{
+    actor_dispatch, actor_error,
+    builtin::singletons::SYSTEM_ACTOR_ADDR,
+    runtime::{ActorCode, Runtime},
+    ActorDowncast, ActorError, FIRST_EXPORTED_METHOD_NUMBER,
+};
+use fvm_ipld_encoding::ipld_block::IpldBlock;
+use fvm_shared::{error::ExitCode, MethodNum};
 
 use crate::{Method, State, ACCUMULATOR_ACTOR_NAME};
 
+#[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
 
 pub struct Actor;
@@ -64,6 +64,20 @@ impl Actor {
         let st: State = rt.state()?;
         Ok(st.leaf_count)
     }
+
+    /// Fallback method for unimplemented method numbers.
+    pub fn fallback(
+        rt: &impl Runtime,
+        method: MethodNum,
+        _: Option<IpldBlock>,
+    ) -> Result<Option<IpldBlock>, ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+        if method >= FIRST_EXPORTED_METHOD_NUMBER {
+            Ok(None)
+        } else {
+            Err(actor_error!(unhandled_message; "invalid method: {}", method))
+        }
+    }
 }
 
 impl ActorCode for Actor {
@@ -79,5 +93,6 @@ impl ActorCode for Actor {
         Root => get_root,
         Peaks => get_peaks,
         Count => get_count,
+        _ => fallback,
     }
 }

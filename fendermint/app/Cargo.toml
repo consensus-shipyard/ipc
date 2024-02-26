@@ -52,6 +52,7 @@ fendermint_vm_genesis = { path = "../vm/genesis" }
 fendermint_vm_interpreter = { path = "../vm/interpreter", features = ["bundle"] }
 fendermint_vm_message = { path = "../vm/message" }
 fendermint_vm_resolver = { path = "../vm/resolver" }
+fendermint_vm_ipfs_resolver = { path = "../vm/ipfs_resolver" }
 fendermint_vm_topdown = { path = "../vm/topdown" }
 fendermint_vm_snapshot = { path = "../vm/snapshot" }
 
@@ -66,6 +67,10 @@ ipc_ipld_resolver = { workspace = true }
 
 warp = "0.3.6"
 futures-util = "0.3.30"
+unsigned-varint = "0.7.2"
+thiserror = "1.0.56"
+async-tempfile = "0.5.0"
+fendermint_actor_objectstore = { path = "../actors/objectstore" }
 
 [dev-dependencies]
 tempfile = { workspace = true }

@@ -6,8 +6,10 @@ use std::path::Path;
 use anyhow::Context;
 use base64::Engine;
 use bytes::Bytes;
+use cid::Cid;
 use fendermint_crypto::SecretKey;
 use fendermint_vm_actor_interface::{accumulator, eam, evm, objectstore};
+use fendermint_vm_message::signed::Object;
 use fendermint_vm_message::{chain::ChainMessage, signed::SignedMessage};
 use fvm_ipld_encoding::{BytesSer, RawBytes};
 use fvm_shared::{
@@ -77,7 +79,7 @@ impl MessageFactory {
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
-        self.transaction(to, METHOD_SEND, Default::default(), value, gas_params)
+        self.transaction(to, METHOD_SEND, Default::default(), value, gas_params, None)
     }
 
     /// Send a message to an actor.
@@ -88,6 +90,7 @@ impl MessageFactory {
         params: RawBytes,
         value: TokenAmount,
         gas_params: GasParams,
+        object: Option<Object>,
     ) -> anyhow::Result<ChainMessage> {
         let message = Message {
             version: Default::default(), // TODO: What does this do?
@@ -102,22 +105,22 @@ impl MessageFactory {
             gas_premium: gas_params.gas_premium,
         };
         self.sequence += 1;
-        let signed = SignedMessage::new_secp256k1(message, &self.sk, &self.chain_id)?;
+        let signed = SignedMessage::new_secp256k1(message, object, &self.sk, &self.chain_id)?;
         let chain = ChainMessage::Signed(signed);
         Ok(chain)
     }
 
-    /// Put an object into a data repo.
-    pub fn datarepo_put(
+    /// Put an object into an object store.
+    pub fn os_put(
         &mut self,
         key: String,
-        content: Bytes,
+        object_value: Cid,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
         let input = fendermint_actor_objectstore::ObjectParams {
-            key: key.into_bytes(),
-            content: content.to_vec(),
+            key: key.clone().into_bytes(),
+            value: object_value,
         };
         let params = RawBytes::serialize(&input)?;
         let message = self.transaction(
@@ -126,35 +129,13 @@ impl MessageFactory {
             params,
             value,
             gas_params,
+            Some(Object::new(key.into_bytes(), object_value)),
         )?;
         Ok(message)
     }
 
-    /// Append to an object in a data repo.
-    pub fn datarepo_append(
-        &mut self,
-        key: String,
-        content: Bytes,
-        value: TokenAmount,
-        gas_params: GasParams,
-    ) -> anyhow::Result<ChainMessage> {
-        let input = fendermint_actor_objectstore::ObjectParams {
-            key: key.into_bytes(),
-            content: content.to_vec(),
-        };
-        let params = RawBytes::serialize(&input)?;
-        let message = self.transaction(
-            objectstore::OBJECTSTORE_ACTOR_ADDR,
-            fendermint_actor_objectstore::Method::AppendObject as u64,
-            params,
-            value,
-            gas_params,
-        )?;
-        Ok(message)
-    }
-
-    /// Delete an object from a data repo.
-    pub fn datarepo_delete(
+    /// Delete an object from an object store.
+    pub fn os_delete(
         &mut self,
         key: String,
         value: TokenAmount,
@@ -167,12 +148,13 @@ impl MessageFactory {
             params,
             value,
             gas_params,
+            None,
         )?;
         Ok(message)
     }
 
-    /// Get an object from a data repo. This will not create a transaction.
-    pub fn datarepo_get(
+    /// Get an object from an object store. This will not create a transaction.
+    pub fn os_get(
         &mut self,
         key: String,
         value: TokenAmount,
@@ -185,6 +167,7 @@ impl MessageFactory {
             params,
             value,
             gas_params,
+            None,
         )?;
 
         let message = if let ChainMessage::Signed(signed) = message {
@@ -199,8 +182,8 @@ impl MessageFactory {
         Ok(message)
     }
 
-    /// List objects in a data repo. This will not create a transaction.
-    pub fn datarepo_list(
+    /// List objects in an object store. This will not create a transaction.
+    pub fn os_list(
         &mut self,
         value: TokenAmount,
         gas_params: GasParams,
@@ -211,6 +194,7 @@ impl MessageFactory {
             RawBytes::default(),
             value,
             gas_params,
+            None,
         )?;
 
         let message = if let ChainMessage::Signed(signed) = message {
@@ -225,26 +209,27 @@ impl MessageFactory {
         Ok(message)
     }
 
-    /// Push to the accumulator of a data repo.
-    pub fn datarepo_push(
+    /// Push an event to an accumulator.
+    pub fn acc_push(
         &mut self,
-        content: Bytes,
+        event: Bytes,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
-        let params = RawBytes::serialize(content.to_vec())?;
+        let params = RawBytes::serialize(event.to_vec())?;
         let message = self.transaction(
             accumulator::ACCUMULATOR_ACTOR_ADDR,
             fendermint_actor_accumulator::Method::Push as u64,
             params,
             value,
             gas_params,
+            None,
         )?;
         Ok(message)
     }
 
-    /// Get the root accumulator commitment. This will not create a transaction.
-    pub fn datarepo_root(
+    /// Get the root commitment in an accumulator. This will not create a transaction.
+    pub fn acc_root(
         &mut self,
         value: TokenAmount,
         gas_params: GasParams,
@@ -255,6 +240,7 @@ impl MessageFactory {
             RawBytes::default(),
             value,
             gas_params,
+            None,
         )?;
 
         let message = if let ChainMessage::Signed(signed) = message {
@@ -285,6 +271,7 @@ impl MessageFactory {
             initcode,
             value,
             gas_params,
+            None,
         )?;
         Ok(message)
     }
@@ -304,6 +291,7 @@ impl MessageFactory {
             calldata,
             value,
             gas_params,
+            None,
         )?;
         Ok(message)
     }

@@ -1,35 +1,38 @@
 [workspace]
 resolver = "2"
 members = [
-  # contracts
-  "contracts/binding",
-  # ipc
-  "ipc/cli",
-  "ipc/wallet",
-  "ipc/provider",
-  "ipc/api",
-  "ipc/types",
-  # Tests seem to be obsolete (using IPC agent):
-  # "ipc/ipc/testing/*",
-  # ipld
-  "ipld/resolver",
-  # fendermint
-  "fendermint/abci",
-  "fendermint/app",
-  "fendermint/app/options",
-  "fendermint/crypto",
-  "fendermint/app/settings",
-  "fendermint/eth/*",
-  "fendermint/rocksdb",
-  "fendermint/rpc",
-  "fendermint/storage",
-  "fendermint/testing",
-  "fendermint/testing/*-test",
-  "fendermint/vm/*",
-  "fendermint/actors",
-  "fendermint/actors/chainmetadata",
-  "fendermint/actors/objectstore",
-  "fendermint/actors/accumulator",
+    # contracts
+    "contracts/binding",
+    # ipc
+    "ipc/cli",
+    "ipc/wallet",
+    "ipc/provider",
+    "ipc/api",
+    "ipc/types",
+    # Tests seem to be obsolete (using IPC agent):
+    # "ipc/ipc/testing/*",
+    # ipld
+    "ipld/resolver",
+    # fendermint
+    "fendermint/abci",
+    "fendermint/app",
+    "fendermint/app/options",
+    "fendermint/crypto",
+    "fendermint/app/settings",
+    "fendermint/eth/*",
+    "fendermint/rocksdb",
+    "fendermint/rpc",
+    "fendermint/storage",
+    "fendermint/testing",
+    "fendermint/testing/*-test",
+    "fendermint/vm/*",
+    "fendermint/actors",
+    "fendermint/actors/chainmetadata",
+    "fendermint/actors/objectstore",
+    "fendermint/actors/accumulator",
+    # textile
+    "textile/objectstore_actor_sdk",
+    "textile/objectstore_syscall",
 ]
 
 [workspace.package]
@@ -41,6 +44,7 @@ license-file = "LICENSE-APACHE"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [workspace.dependencies]
+ambassador = "0.3.5"
 anyhow = "1"
 arbitrary = { version = "1", features = ["derive"] }
 arbtest = "0.2"
@@ -70,29 +74,29 @@ hex = "0.4"
 im = "15.1.0"
 integer-encoding = { version = "3.0.3", default-features = false }
 jsonrpc-v2 = { version = "0.11", default-features = false, features = [
-  "bytes-v10",
+    "bytes-v10",
 ] }
 k256 = "0.11" # Same as tendermint-rs
 lazy_static = "1.4"
 libipld = { version = "0.16", default-features = false, features = [
-  "dag-cbor",
+    "dag-cbor",
 ] }
 libp2p = { version = "0.53", default-features = false, features = [
-  "gossipsub",
-  "kad",
-  "identify",
-  "ping",
-  "noise",
-  "yamux",
-  "tcp",
-  "dns",
-  "request-response",
-  "metrics",
-  "tokio",
-  "macros",
-  "serde",
-  "secp256k1",
-  "plaintext",
+    "gossipsub",
+    "kad",
+    "identify",
+    "ping",
+    "noise",
+    "yamux",
+    "tcp",
+    "dns",
+    "request-response",
+    "metrics",
+    "tokio",
+    "macros",
+    "serde",
+    "secp256k1",
+    "plaintext",
 ] }
 libp2p-mplex = { version = "0.41" }
 # libp2p-bitswap = "0.25.1"
@@ -104,8 +108,8 @@ lru_time_cache = "0.11"
 merkle-tree-rs = "0.1.0"
 multiaddr = "0.18"
 multihash = { version = "0.18.1", default-features = false, features = [
-  "sha2",
-  "sha3",
+    "sha2",
+    "sha3",
 ] }
 num-bigint = "0.4"
 num-derive = "0.3"
@@ -130,12 +134,12 @@ serial_test = "3.0"
 tempfile = "3.7"
 thiserror = "1"
 tokio = { version = "1", features = [
-  "rt-multi-thread",
-  "macros",
-  "fs",
-  "io-util",
-  "io-std",
-  "sync",
+    "rt-multi-thread",
+    "macros",
+    "fs",
+    "io-util",
+    "io-std",
+    "sync",
 ] }
 tokio-stream = "0.1.14"
 tokio-util = { version = "0.7.8", features = ["compat"] }
@@ -189,8 +193,8 @@ fil_actors_evm_shared = { git = "https://github.com/filecoin-project/builtin-act
 fil_actors_runtime = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v12.0.0" }
 
 cid = { version = "0.10.1", default-features = false, features = [
-  "serde-codec",
-  "std",
+    "serde-codec",
+    "std",
 ] }
 
 frc42_dispatch = "6.0.0"
@@ -200,9 +204,9 @@ tower-abci = { version = "0.7" }
 tendermint = { version = "0.31", features = ["secp256k1"] }
 tendermint-config = "0.33.0"
 tendermint-rpc = { version = "0.31", features = [
-  "secp256k1",
-  "http-client",
-  "websocket-client",
+    "secp256k1",
+    "http-client",
+    "websocket-client",
 ] }
 tendermint-proto = { version = "0.31" }
 

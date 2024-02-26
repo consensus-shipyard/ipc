@@ -2,20 +2,32 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use cid::multihash::Code;
-use cid::multihash::MultihashDigest;
+use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
 use fvm_ipld_amt::Amt;
 use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding::de::DeserializeOwned;
-use fvm_ipld_encoding::ser::Serialize;
-use fvm_ipld_encoding::tuple::{Deserialize_tuple, Serialize_tuple};
-use fvm_ipld_encoding::CborStore;
-use fvm_ipld_encoding::{to_vec, DAG_CBOR};
+use fvm_ipld_encoding::{
+    de::DeserializeOwned,
+    ser::Serialize,
+    to_vec,
+    tuple::{Deserialize_tuple, Serialize_tuple},
+    CborStore, DAG_CBOR,
+};
 use fvm_shared::METHOD_CONSTRUCTOR;
 use num_derive::FromPrimitive;
 
+pub const ACCUMULATOR_ACTOR_NAME: &str = "accumulator";
 const BIT_WIDTH: u32 = 3;
+
+#[derive(FromPrimitive)]
+#[repr(u64)]
+pub enum Method {
+    Constructor = METHOD_CONSTRUCTOR,
+    Push = frc42_dispatch::method_hash!("Push"),
+    Root = frc42_dispatch::method_hash!("Root"),
+    Peaks = frc42_dispatch::method_hash!("Peaks"),
+    Count = frc42_dispatch::method_hash!("Count"),
+}
 
 /// Compute the hash of a pair of CIDs.
 /// The hash is the CID of a new block containing the concatenation of the two CIDs.
@@ -88,7 +100,7 @@ impl State {
                 return Err(anyhow::anyhow!(
                     "accumulator actor failed to create empty Amt: {}",
                     e
-                ))
+                ));
             }
         };
         Ok(Self {
@@ -124,18 +136,6 @@ impl State {
         })?;
         Ok(peaks)
     }
-}
-
-pub const ACCUMULATOR_ACTOR_NAME: &str = "accumulator";
-
-#[derive(FromPrimitive)]
-#[repr(u64)]
-pub enum Method {
-    Constructor = METHOD_CONSTRUCTOR,
-    Push = frc42_dispatch::method_hash!("Push"),
-    Root = frc42_dispatch::method_hash!("Root"),
-    Peaks = frc42_dispatch::method_hash!("Peaks"),
-    Count = frc42_dispatch::method_hash!("Count"),
 }
 
 #[cfg(test)]

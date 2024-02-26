@@ -11,8 +11,12 @@ use crate::{
 use anyhow::{bail, Context};
 use async_stm::atomically;
 use async_trait::async_trait;
-use fendermint_vm_actor_interface::ipc;
+use fendermint_vm_actor_interface::{ipc, objectstore, system};
+use fendermint_vm_ipfs_resolver::pool::{
+    ResolveKey as IpfsResolveKey, ResolvePool as IpfsResolvePool,
+};
 use fendermint_vm_message::ipc::ParentFinality;
+use fendermint_vm_message::signed::Object;
 use fendermint_vm_message::{
     chain::ChainMessage,
     ipc::{BottomUpCheckpoint, CertifiedMessage, IpcMessage, SignedRelayedMessage},
@@ -27,12 +31,14 @@ use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
+use fvm_shared::message::Message;
 use num_traits::Zero;
 use std::sync::Arc;
 
 /// A resolution pool for bottom-up and top-down checkpoints.
 pub type CheckpointPool = ResolvePool<CheckpointPoolItem>;
 pub type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProviderProxy>>>;
+pub type ObjectPool = IpfsResolvePool<ObjectPoolItem>;
 
 /// These are the extra state items that the chain interpreter needs,
 /// a sort of "environment" supporting IPC.
@@ -43,6 +49,8 @@ pub struct ChainEnv {
     /// The parent finality provider for top down checkpoint
     pub parent_finality_provider: TopDownFinalityProvider,
     pub parent_finality_votes: VoteTally,
+    /// IPFS pin resolution pool.
+    pub object_pool: ObjectPool,
 }
 
 #[derive(Clone, Hash, PartialEq, Eq)]
@@ -61,6 +69,17 @@ impl From<&CheckpointPoolItem> for ResolveKey {
                 (cp.message.subnet_id.clone(), cp.message.bottom_up_messages)
             }
         }
+    }
+}
+
+#[derive(Clone, Hash, PartialEq, Eq)]
+pub struct ObjectPoolItem {
+    obj: Object,
+}
+
+impl From<&ObjectPoolItem> for IpfsResolveKey {
+    fn from(value: &ObjectPoolItem) -> Self {
+        value.obj.value
     }
 }
 
@@ -120,6 +139,14 @@ where
             CheckpointPoolItem::BottomUp(ckpt) => ChainMessage::Ipc(IpcMessage::BottomUpExec(ckpt)),
         });
 
+        // Collect resolved objects ready to be proposed from the pool.
+        let objects = atomically(|| state.object_pool.collect_resolved()).await;
+
+        // Create transactions ready to be included on the chain.
+        let objects = objects
+            .into_iter()
+            .map(|item| ChainMessage::Ipc(IpcMessage::ObjectResolved(item.obj)));
+
         // Prepare top down proposals.
         // Before we try to find a quorum, pause incoming votes. This is optional but if there are lots of votes coming in it might hold up proposals.
         atomically(|| state.parent_finality_votes.pause_votes_until_find_quorum()).await;
@@ -154,6 +181,7 @@ where
 
         // Append at the end - if we run out of block space, these are going to be reproposed in the next block.
         msgs.extend(ckpts);
+        msgs.extend(objects);
         Ok(msgs)
     }
 
@@ -194,6 +222,21 @@ where
                         return Ok(false);
                     }
                 }
+                ChainMessage::Ipc(IpcMessage::ObjectResolved(obj)) => {
+                    let item = ObjectPoolItem { obj };
+
+                    let is_resolved = atomically(|| match env.object_pool.get_status(&item)? {
+                        None => Ok(false),
+                        Some(status) => status.is_resolved(),
+                    })
+                    .await;
+
+                    if !is_resolved {
+                        return Ok(false);
+                    }
+
+                    atomically(|| env.object_pool.remove(&item)).await;
+                }
                 _ => {}
             };
         }
@@ -231,8 +274,16 @@ where
             ChainMessage::Signed(msg) => {
                 let (state, ret) = self
                     .inner
-                    .deliver(state, VerifiableMessage::Signed(msg))
+                    .deliver(state, VerifiableMessage::Signed(msg.clone()))
                     .await?;
+
+                if ret.is_ok() {
+                    if let Some(obj) = msg.object {
+                        atomically(|| env.object_pool.add(ObjectPoolItem { obj: obj.clone() }))
+                            .await;
+                    }
+                }
+
                 Ok(((env, state), ChainMessageApplyRet::Signed(ret)))
             }
             ChainMessage::Ipc(msg) => match msg {
@@ -363,6 +414,44 @@ where
 
                     Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
                 }
+                IpcMessage::ObjectResolved(obj) => {
+                    let from = system::SYSTEM_ACTOR_ADDR;
+                    let to = objectstore::OBJECTSTORE_ACTOR_ADDR;
+                    let method_num = fendermint_actor_objectstore::Method::PutObject as u64;
+                    let gas_limit = 10_000_000_000;
+
+                    // TODO(sander): Clean up with From.
+                    let input = fendermint_actor_objectstore::ObjectParams {
+                        key: obj.key,
+                        value: obj.value,
+                    };
+                    let params = RawBytes::serialize(&input)?;
+                    let msg = Message {
+                        version: Default::default(),
+                        from,
+                        to,
+                        sequence: 0, // TODO(sander): This works but is it okay?
+                        value: TokenAmount::zero(),
+                        method_num: fendermint_actor_objectstore::Method::ResolveObject as u64,
+                        params,
+                        gas_limit,
+                        gas_fee_cap: TokenAmount::zero(),
+                        gas_premium: TokenAmount::zero(),
+                    };
+
+                    let (apply_ret, emitters) = state.execute_implicit(msg)?;
+
+                    let ret = FvmApplyRet {
+                        apply_ret,
+                        from: system::SYSTEM_ACTOR_ADDR,
+                        to,
+                        method_num,
+                        gas_limit,
+                        emitters,
+                    };
+
+                    Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
+                }
             },
         }
     }
@@ -443,7 +532,9 @@ where
 
                         Ok((state, Ok(ret)))
                     }
-                    IpcMessage::TopDownExec(_) | IpcMessage::BottomUpExec(_) => {
+                    IpcMessage::TopDownExec(_)
+                    | IpcMessage::BottomUpExec(_)
+                    | IpcMessage::ObjectResolved(_) => {
                         // Users cannot send these messages, only validators can propose them in blocks.
                         Ok((state, Err(IllegalMessage)))
                     }

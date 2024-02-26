@@ -4,7 +4,7 @@ use tendermint_rpc::Url;
 #[derive(Args, Debug)]
 pub struct ProxyArgs {
     /// The URL to bind to.
-    #[arg(long, short, default_value = "127.0.0.1:8080")]
+    #[arg(long, short, default_value = "127.0.0.1:8888")]
     pub bind: String,
 
     /// The URL of the Tendermint node's RPC endpoint.

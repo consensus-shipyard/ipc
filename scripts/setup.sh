@@ -23,6 +23,9 @@ fendermint genesis --genesis-file test-network/genesis.json add-multisig --publi
 # Add validators to the Genesis file
 fendermint genesis --genesis-file test-network/genesis.json add-validator --public-key test-network/keys/bob.pk --power 1
 
+# Add ipc to the Genesis file
+fendermint genesis --genesis-file test-network/genesis.json ipc gateway --subnet-id /r31415926 --bottom-up-check-period 10 --msg-fee 1 --majority-percentage 65
+
 # Configure Tendermint
 rm -rf ~/.cometbft
 ~/go/bin/cometbft init
@@ -38,6 +41,14 @@ fendermint key into-tendermint --secret-key test-network/keys/bob.sk --out ~/.co
 rm -rf ~/.fendermint
 mkdir -p ~/.fendermint/data
 cp -r ./fendermint/app/config ~/.fendermint/config
+
+## Generate a network key for the IPLD resolver
+mkdir -p ~/.fendermint/keys
+fendermint key gen --out-dir ~/.fendermint/keys --name network
+
+## Copy IPC contracts
+mkdir -p ~/.fendermint/contracts
+cp -r ./contracts/out/* ~/.fendermint/contracts
 
 # Build actors
 (cd fendermint && make actor-bundle)
