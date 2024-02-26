@@ -11,6 +11,9 @@ use bollard::{
 
 use super::{DockerConstruct, DockerWithDropHandle};
 
+/// Time to wait before killing the container if it doesn't want to stop.
+const KILL_TIMEOUT_SECS: i64 = 5;
+
 pub struct DockerContainer {
     pub dh: DockerWithDropHandle,
     pub container: DockerConstruct,
@@ -61,7 +64,12 @@ impl Drop for DockerContainer {
             let docker = self.dh.docker.clone();
             self.dh.drop_handle.spawn(async move {
                 if let Err(e) = docker
-                    .stop_container(&container_name, Some(StopContainerOptions { t: 5 }))
+                    .stop_container(
+                        &container_name,
+                        Some(StopContainerOptions {
+                            t: KILL_TIMEOUT_SECS,
+                        }),
+                    )
                     .await
                 {
                     tracing::error!(
