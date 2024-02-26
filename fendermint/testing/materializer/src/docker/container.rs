@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::{anyhow, bail, Context};
+use anyhow::{anyhow, Context};
 use std::collections::HashMap;
 
 use bollard::{
@@ -35,10 +35,10 @@ impl DockerContainer {
             .await
             .context("failed to list docker containers")?;
 
-        match containers.len() {
-            0 => Ok(None),
-            1 => {
-                let id = containers[0]
+        match containers.first() {
+            None => Ok(None),
+            Some(container) => {
+                let id = container
                     .id
                     .clone()
                     .ok_or_else(|| anyhow!("docker container {name} has no id"))?;
@@ -52,7 +52,6 @@ impl DockerContainer {
                     },
                 }))
             }
-            n => bail!("there are multiple docker container with the same name: {name}"),
         }
     }
 }
