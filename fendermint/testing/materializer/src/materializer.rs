@@ -9,33 +9,9 @@ use tendermint_rpc::Url;
 use fendermint_vm_genesis::Collateral;
 
 use crate::{
-    manifest::Balance, AccountName, NodeName, RelayerName, ResourceHash, SubnetName, TestnetName,
+    manifest::Balance, materials::Materials, AccountName, NodeName, RelayerName, ResourceHash,
+    SubnetName, TestnetName,
 };
-
-/// Type family of all the things a [Materializer] can create.
-///
-/// Kept separate from the [Materializer] so that we can wrap one in another
-/// and pass the same types along.
-pub trait Materials {
-    /// Represents the entire hierarchy of a testnet, e.g. a common docker network
-    /// and directory on the file system. It has its own type so the materializer
-    /// doesn't have to remember what it created for a testnet, and different
-    /// testnets can be kept isolated from each other.
-    type Network: Send + Sync;
-    /// Capture where the IPC stack (the gateway and the registry) has been deployed on a subnet.
-    /// These are the details which normally go into the `ipc-cli` configuration files.
-    type Deployment: Sync + Send;
-    /// Represents an account identity, typically a key-value pair.
-    type Account: Ord + Sync + Send;
-    /// Represents the genesis.json file (can be a file location, or a model).
-    type Genesis: Sync + Send;
-    /// The address of a dynamically created subnet.
-    type Subnet: Sync + Send;
-    /// The handle to a node; could be a (set of) docker container(s) or remote addresses.
-    type Node: Sync + Send;
-    /// The handle to a relayer process.
-    type Relayer: Sync + Send;
-}
 
 /// The materializer is a component to provision resources of a testnet, and
 /// to carry out subsequent commands on them, e.g. to restart nodes.
@@ -234,7 +210,7 @@ pub struct NodeConfig<'a, M: Materials> {
     /// The node for the top-down syncer to follow; none if this is a root node.
     ///
     /// This can potentially also be used to configure the IPLD Resolver seeds, to connect across subnets.
-    pub parent_node: Option<TargetConfig<'a, M>>,
+    pub parent_node: Option<ParentConfig<'a, M>>,
     /// Run the Ethereum API facade or not.
     pub ethapi: bool,
 }
@@ -254,6 +230,14 @@ pub struct SubmitConfig<'a, M: Materials> {
     /// The nodes to which we can send transactions or queries.
     pub nodes: Vec<TargetConfig<'a, M>>,
     /// The location of the IPC contracts on the (generally parent) subnet.
+    pub deployment: &'a M::Deployment,
+}
+
+/// Options for how to follow the parent consensus and sync IPC changes.
+pub struct ParentConfig<'a, M: Materials> {
+    /// The trusted parent node to follow.
+    pub node: TargetConfig<'a, M>,
+    /// The location of the IPC contracts on the parent subnet.
     pub deployment: &'a M::Deployment,
 }
 
