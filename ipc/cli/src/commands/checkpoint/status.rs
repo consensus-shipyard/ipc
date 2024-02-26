@@ -29,9 +29,11 @@ impl CommandLineHandler for Status {
         let checkpoint = provider.get_bottom_up_bundle(&subnet, height).await?;
         let chain_head = provider.get_chain_head_height(&subnet).await?;
 
+        let maybe_height = provider.max_quorum_reached_height(&subnet, height + 1, chain_head).await?;
+
         println!(
-            "last checkpoint height: {}, chain head {}",
-            height, chain_head
+            "last checkpoint height: {}, chain head {}, max quorum reached height {:?}",
+            height, chain_head, maybe_height
         );
         println!("last submitted checkpoint: {:?}", checkpoint);
 

@@ -719,6 +719,20 @@ impl IpcProvider {
         conn.manager().quorum_reached_events(height).await
     }
 
+    pub async fn max_quorum_reached_height(
+        &self,
+        subnet: &SubnetID,
+        from: ChainEpoch,
+        to: ChainEpoch,
+    ) -> anyhow::Result<Option<ChainEpoch>> {
+        let conn = match self.connection(subnet) {
+            None => return Err(anyhow!("target subnet not found")),
+            Some(conn) => conn,
+        };
+
+        conn.manager().max_quorum_reached_height(subnet, from, to).await
+    }
+
     /// Advertises the endpoint of a bootstrap node for the subnet.
     pub async fn add_bootstrap(
         &mut self,
