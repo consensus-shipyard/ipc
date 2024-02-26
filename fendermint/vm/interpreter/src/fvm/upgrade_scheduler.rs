@@ -41,10 +41,10 @@ where
         let chain_id = chainid::from_str_hashed(&chain_name)?;
 
         let me = Self {
-            _chain_name: chain_name,
             chain_id,
             block_height,
             migration,
+            _chain_name: chain_name,
         };
 
         Ok(me)

@@ -10,6 +10,7 @@ license.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
+cid = { workspace = true }
 ethers = { workspace = true }
 fvm = { workspace = true }
 fvm_shared = { workspace = true }
@@ -17,6 +18,7 @@ fvm_ipld_blockstore = { workspace = true }
 hex = { workspace = true }
 rand = { workspace = true }
 tendermint-rpc = { workspace = true }
+tokio = { workspace = true }
 
 ipc-api = { workspace = true }
 ipc_actors_abis = { workspace = true }
@@ -35,8 +37,6 @@ fendermint_vm_interpreter = { path = "../../vm/interpreter", features = [
 arbitrary = { workspace = true }
 arbtest = { workspace = true }
 rand = { workspace = true }
-tokio = { workspace = true }
-cid = { workspace = true }
 fendermint_rpc = { path = "../../rpc" }
 lazy_static = { workspace = true }
 bytes = { workspace = true }
