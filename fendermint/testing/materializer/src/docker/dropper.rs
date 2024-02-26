@@ -6,6 +6,9 @@ use bollard::{
     Docker,
 };
 
+/// Timemout before we kill the container if it doesn't want to stop.
+const KILL_TIMEOUT_SECS: i64 = 5;
+
 /// Commands to destroy docker constructs when they go out of scope.
 pub enum DropCommand {
     DropNetwork(String),
@@ -38,7 +41,12 @@ pub fn start(docker: Docker) -> DropHandle {
                     eprintln!("dropping docker container {id}");
 
                     if let Err(e) = docker
-                        .stop_container(&id, Some(StopContainerOptions { t: 5 }))
+                        .stop_container(
+                            &id,
+                            Some(StopContainerOptions {
+                                t: KILL_TIMEOUT_SECS,
+                            }),
+                        )
                         .await
                     {
                         tracing::error!(
