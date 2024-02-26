@@ -17,6 +17,7 @@ use serial_test::serial;
 lazy_static! {
     static ref CI_PROFILE: bool = std::env::var("PROFILE").unwrap_or_default() == "ci";
     static ref STARTUP_WAIT_SECS: u64 = if *CI_PROFILE { 20 } else { 10 };
+    static ref PRINT_LOGS_ON_ERROR: bool = *CI_PROFILE;
 }
 
 /// Want to keep the testnet artifacts in the `tests/testnets` directory.
@@ -46,15 +47,12 @@ fn read_manifest(file_name: &str) -> anyhow::Result<Manifest> {
 /// testnet resources, then materialize a testnet and run some tests.
 async fn with_testnet<F>(manifest_file_name: &str, f: F) -> anyhow::Result<()>
 where
-    // TODO: How could we pass only a reference to the testnet to the async test?
-    // NOTE: Asking for the testnet to be returned to make sure it's not dropped prematurely.
-    F: FnOnce(
-        &mut DockerMaterializer,
+    // https://users.rust-lang.org/t/function-that-takes-a-closure-with-mutable-reference-that-returns-a-future/54324
+    F: for<'a> FnOnce(
         &Manifest,
-        Testnet<DockerMaterials, DockerMaterializer>,
-    ) -> Pin<
-        Box<dyn Future<Output = anyhow::Result<Testnet<DockerMaterials, DockerMaterializer>>>>,
-    >,
+        &mut DockerMaterializer,
+        &'a mut Testnet<DockerMaterials, DockerMaterializer>,
+    ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + 'a>>,
 {
     let testnet_name = TestnetName::new(
         PathBuf::from(manifest_file_name)
@@ -72,7 +70,7 @@ where
         .await
         .context("failed to remove testnet")?;
 
-    let testnet = Testnet::setup(&mut materializer, &testnet_name, &manifest)
+    let mut testnet = Testnet::setup(&mut materializer, &testnet_name, &manifest)
         .await
         .context("failed to set up testnet")?;
 
@@ -81,9 +79,9 @@ where
 
     // TODO: Print all logs on failure. Would be nice if the testnet could be passed as a reference,
     // so that we can loop through the nodes in it, because currently it gets lost on error.
-    let res = f(&mut materializer, &manifest, testnet).await.map(|tn| {
-        drop(tn);
-    });
+    let res = f(&manifest, &mut materializer, &mut testnet).await;
+
+    drop(testnet);
 
     // Allow some time for containers to be dropped.
     // This only happens if the testnet setup succeeded,
@@ -101,13 +99,14 @@ mod materializer_tests {
     use anyhow::{anyhow, bail};
     use ethers::{providers::Middleware, types::U64};
     use fendermint_testing_materializer::HasEthApi;
+    use futures::FutureExt;
 
     use super::with_testnet;
 
     #[tokio::test]
     async fn test_root_only() {
         with_testnet("root-only.yaml", |_materializer, _manifest, testnet| {
-            Box::pin(async move {
+            let test = async {
                 // Check that node2 is following node1.
                 let node2 = testnet.root().node("node-2");
                 let dnode2 = testnet.node(&node2)?;
@@ -122,8 +121,10 @@ mod materializer_tests {
                     bail!("expected positive block number");
                 }
 
-                Ok(testnet)
-            })
+                Ok(())
+            };
+
+            test.boxed_local()
         })
         .await
         .unwrap()
