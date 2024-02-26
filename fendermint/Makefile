@@ -50,7 +50,7 @@ e2e: docker-build | cargo-make
 	cd testing/smoke-test    && cargo make --profile $(PROFILE)
 	cd testing/snapshot-test && cargo make --profile $(PROFILE)
 	cd testing/graph-test    && cargo make --profile $(PROFILE)
-	cargo test --package fendermint_testing_materializer
+	PROFILE=$(PROFILE) cargo test --package fendermint_testing_materializer
 
 clean:
 	cargo clean

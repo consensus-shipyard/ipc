@@ -11,7 +11,13 @@ use fendermint_testing_materializer::{
     TestnetName,
 };
 use futures::Future;
+use lazy_static::lazy_static;
 use serial_test::serial;
+
+lazy_static! {
+    static ref CI_PROFILE: bool = std::env::var("PROFILE").unwrap_or_default() == "ci";
+    static ref STARTUP_WAIT_SECS: u64 = if *CI_PROFILE { 20 } else { 10 };
+}
 
 /// Want to keep the testnet artifacts in the `tests/testnets` directory.
 fn tests_dir() -> PathBuf {
@@ -71,7 +77,7 @@ where
         .context("failed to set up testnet")?;
 
     // Allow time for things to consolidate and blocks to be created.
-    tokio::time::sleep(Duration::from_secs(10)).await;
+    tokio::time::sleep(Duration::from_secs(*STARTUP_WAIT_SECS)).await;
 
     // TODO: Print all logs on failure. Would be nice if the testnet could be passed as a reference,
     // so that we can loop through the nodes in it, because currently it gets lost on error.
