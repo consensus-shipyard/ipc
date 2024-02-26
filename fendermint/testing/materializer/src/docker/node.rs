@@ -31,7 +31,15 @@ use crate::{
 const COMETBFT_IMAGE: &str = "cometbft/cometbft:v0.37.x";
 const FENDERMINT_IMAGE: &str = "fendermint:latest";
 
+/// The static environment variables are the ones we can assign during node creation,
+/// ie. they don't depend on other nodes' values which get determined during their creation.
 const STATIC_ENV: &str = "static.env";
+/// The dynamic environment variables are ones we can only during the start of the node,
+/// by which time all other nodes will have been created. Examples of this are network
+/// identities which depend on network keys being created; in order to create a fully
+/// connected network, we first need all network keys to be created, then we can look
+/// all of them up during the start of each node.
+/// These go into a separate file just so it's easy to recreate them.
 const DYNAMIC_ENV: &str = "dynamic.env";
 
 const RESOLVER_P2P_PORT: u32 = 26655;
@@ -63,6 +71,8 @@ pub struct DockerNode {
     cometbft: DockerContainer,
     ethapi: Option<DockerContainer>,
     port_range: DockerPortRange,
+    /// This is the file system directory were all the artifacts
+    /// regarding this node are stored, such as docker volumes and keys.
     path: PathBuf,
 }
 
