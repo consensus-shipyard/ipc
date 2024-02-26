@@ -162,6 +162,9 @@ ipc-types = { path = "ipc/types" }
 ipc_actors_abis = { path = "contracts/binding" }
 
 # Vendored for cross-compilation, see https://github.com/cross-rs/cross/wiki/Recipes#openssl
+# Make sure every top level build target actually imports this dependency, and don't end up
+# depending on the same _without_ the "vendored" feature, because then the Docker build for
+# for ARM64 on AMD64 will fail, it won't find the OpenSSL installation.
 openssl = { version = "0.10", features = ["vendored"] }
 
 # NOTE: When upgrading the FVM it may cause our fendermint/actors/build.rs to fail as it can
