@@ -208,7 +208,7 @@ contract MultiSubnetTest is MultiSubnetTestBase {
             holderTotalAmount == testUSDC.balanceOf(holder),
             "unexpected holder balance after withdrawal"
         );
-        //ensure that the tokens are the subnet are minted and the token bridge and the usdc holder does not own any
+        //ensure that the tokens in the subnet are minted and the token bridge and the usdc holder does not own any
         require(
             0 == ipcTokenReplica.balanceOf(holder),
             "unexpected holder balance in ipcTokenReplica"
