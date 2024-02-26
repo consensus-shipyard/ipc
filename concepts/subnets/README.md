@@ -2,7 +2,7 @@
 
 ## Definition
 
-A subnet is a new subsystem that a user can spawn from a parent subnet in a permissionless and on-demand way, depending on scalability requirements. Subnets have separate consensus algorithms and cryptoeconomic rules from their parent subnet. Subnets are firewalled from the parent network&#x20;
+A subnet is a new subsystem that a user can spawn from a parent subnet in a permissionless and on-demand way, depending on scalability requirements. Subnets have separate consensus algorithms and cryptoeconomic rules from their parent subnet. Subnets are firewalled from the parent network.
 
 ## Hierarchy trees
 

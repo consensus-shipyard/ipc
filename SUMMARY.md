@@ -15,11 +15,11 @@
 
 * [Subnets](concepts/subnets/README.md)
   * [Parent-child interactions](concepts/subnets/parent-child-interactions.md)
-  * [Performing Transactions from a Wallet in a Subnet](concepts/subnets/performing-transactions-from-a-wallet-in-a-subnet.md)
 * [Circulating supply](concepts/circulating-supply.md)
 
 ## Development Guides
 
+* [Performing transactions in a subnet](development-guides/performing-transactions-in-a-subnet.md)
 * [Advanced subnet customization](development-guides/pluggable-syscall-tutorial.md)
 
 ## Reference
