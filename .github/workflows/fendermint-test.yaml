@@ -64,6 +64,18 @@ jobs:
       RUSTFLAGS: -Dwarnings
 
     steps:
+      # https://github.com/marketplace/actions/free-disk-space-ubuntu
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          large-packages: false
+          swap-storage: false
+          docker-images: false
+          android: true
+          dotnet: true
+          haskell: true
+
       - name: Check out the project
         uses: actions/checkout@v3
         with:
@@ -89,10 +101,6 @@ jobs:
         with:
           path: ./contracts/out
           key: contracts-abi-${{ hashFiles('./contracts/src/**/*.sol') }}
-
-      # Pull the latest docker image. Its layers might be reused during the build.
-      - name: Docker Pull
-        run: docker pull ghcr.io/consensus-shipyard/fendermint:latest
 
       - name: ${{ matrix.make.name }}
         env:
