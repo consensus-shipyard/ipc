@@ -13,6 +13,7 @@ use fendermint_testing_materializer::{
     docker::{DockerMaterializer, DockerMaterials},
     manifest::Manifest,
     testnet::Testnet,
+    validation::validate_manifest,
     TestnetName,
 };
 use futures::Future;
@@ -33,6 +34,11 @@ fn tests_dir() -> PathBuf {
         "expected the current directory to be the crate"
     );
     dir.join("tests")
+}
+
+/// Directory where we keep the docker-materializer related data files.
+fn test_data_dir() -> PathBuf {
+    tests_dir().join("docker-materializer-data")
 }
 
 /// Parse a manifest from the `tests/manifests` directory.
@@ -66,9 +72,15 @@ where
             .to_string_lossy()
             .to_string(),
     );
+
     let manifest = read_manifest(manifest_file_name)?;
 
-    let mut materializer = DockerMaterializer::new(&tests_dir().join("docker-materializer"), 0)?;
+    // First make sure it's a sound manifest.
+    validate_manifest(&testnet_name, &manifest)
+        .await
+        .context("failed to validate manifest")?;
+
+    let mut materializer = DockerMaterializer::new(&test_data_dir(), 0)?;
 
     materializer
         .remove(&testnet_name)

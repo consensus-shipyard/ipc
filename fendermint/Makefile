@@ -56,6 +56,7 @@ clean:
 	cargo clean
 	rm $(BUILTIN_ACTORS_BUNDLE)
 	rm $(CUSTOM_ACTORS_BUNDLE)
+	rm -rf testing/materializer/tests/docker-materializer
 
 lint: \
 	check-fmt \
