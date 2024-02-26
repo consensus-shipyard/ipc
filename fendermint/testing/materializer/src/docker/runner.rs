@@ -62,7 +62,7 @@ impl DockerRunner {
 
     /// Run a short lived container.
     pub async fn run_cmd(&self, cmd: &str) -> anyhow::Result<Vec<String>> {
-        let cmdv = cmd.split(" ").into_iter().map(|s| s.to_string()).collect();
+        let cmdv = cmd.split(' ').map(|s| s.to_string()).collect();
         let config = Config {
             image: Some(self.image.clone()),
             user: Some(self.user.to_string()),
@@ -219,7 +219,7 @@ impl DockerRunner {
         // host_config.network_mode should work as well.
         self.docker
             .connect_network(
-                &network.network_name(),
+                network.network_name(),
                 ConnectNetworkOptions {
                     container: id.clone(),
                     ..Default::default()

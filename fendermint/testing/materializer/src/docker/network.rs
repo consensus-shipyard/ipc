@@ -93,17 +93,18 @@ impl DockerNetwork {
 
 impl Drop for DockerNetwork {
     fn drop(&mut self) {
-        if !self.network.external {
-            if self
-                .dropper
-                .send(DropCommand::DropNetwork(self.network.name.clone()))
-                .is_err()
-            {
-                tracing::error!(
-                    network_name = self.network.name,
-                    "dropper no longer listening"
-                );
-            }
+        if self.network.external {
+            return;
+        }
+        if self
+            .dropper
+            .send(DropCommand::DropNetwork(self.network.name.clone()))
+            .is_err()
+        {
+            tracing::error!(
+                network_name = self.network.name,
+                "dropper no longer listening"
+            );
         }
     }
 }

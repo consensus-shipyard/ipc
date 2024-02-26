@@ -482,7 +482,7 @@ where
 {
     let ss = seed_nodes
         .iter()
-        .map(|n| f(*n))
+        .map(|n| f(n))
         .collect::<anyhow::Result<Vec<_>>>()
         .context("failed to collect seeds")?;
 
@@ -547,7 +547,7 @@ mod tests {
             .await
             .expect("failed to show ID");
 
-        assert!(logs.len() > 0);
+        assert!(!logs.is_empty());
 
         assert!(
             parse_cometbft_node_id(logs.last().unwrap()).is_ok(),
