@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use anyhow::{anyhow, bail, Context};
+use anyhow::{anyhow, Context};
 use bollard::{
     network::{CreateNetworkOptions, ListNetworksOptions},
     service::{Network, NetworkCreateResponse},
@@ -46,13 +46,8 @@ impl DockerNetwork {
             .await
             .context("failed to list docker networks")?;
 
-        // let networks = networks
-        //     .into_iter()
-        //     .filter(|n| n.name.as_ref() == Some(&network_name))
-        //     .collect::<Vec<_>>();
-
-        let (id, external) = match networks.len() {
-            0 => {
+        let (id, external) = match networks.first() {
+            None => {
                 let network: NetworkCreateResponse = dh
                     .docker
                     .create_network(CreateNetworkOptions {
@@ -69,15 +64,14 @@ impl DockerNetwork {
 
                 (id, false)
             }
-            1 => {
-                let id = networks[0]
+            Some(network) => {
+                let id = network
                     .id
                     .clone()
                     .ok_or_else(|| anyhow!("docker network {network_name} has no id"))?;
 
                 (id, true)
             }
-            n => bail!("there are multiple docker networks with the same name: {network_name}"),
         };
 
         Ok(Self {
