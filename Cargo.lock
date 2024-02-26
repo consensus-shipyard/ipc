@@ -3000,6 +3000,7 @@ dependencies = [
  "clap 4.5.1",
  "erased-serde",
  "ethers",
+ "ethers-contract",
  "ethers-core",
  "fendermint_crypto",
  "fendermint_rpc",
@@ -3229,7 +3230,7 @@ dependencies = [
 name = "fendermint_vm_event"
 version = "0.1.0"
 dependencies = [
- "strum 0.25.0",
+ "strum 0.26.1",
 ]
 
 [[package]]
