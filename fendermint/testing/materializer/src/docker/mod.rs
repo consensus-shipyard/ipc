@@ -171,7 +171,7 @@ impl DockerMaterializer {
 
     /// Remove all traces of a testnet.
     pub async fn remove(&mut self, testnet_name: &TestnetName) -> anyhow::Result<()> {
-        let testnet = testnet_name.path().to_string_lossy().to_string();
+        let testnet = testnet_name.path_string();
 
         let mut filters = HashMap::new();
         filters.insert("label".to_string(), vec![format!("testnet={}", testnet)]);
@@ -394,7 +394,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         balances: BTreeMap<&'a DefaultAccount, Balance>,
     ) -> anyhow::Result<DefaultGenesis> {
         self.get_or_create_genesis(subnet_name, || {
-            let chain_name = subnet_name.path().to_string_lossy().to_string();
+            let chain_name = subnet_name.path_string();
             let chain_id = chainid::from_str_hashed(&chain_name)?;
             // TODO: Some of these hardcoded values can go into the manifest.
             let genesis = Genesis {

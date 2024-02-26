@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::{anyhow, Context};
+use futures::StreamExt;
 use std::collections::HashMap;
 
 use bollard::{
-    container::ListContainersOptions,
+    container::{ListContainersOptions, LogsOptions},
     secret::{ContainerInspectResponse, ContainerStateStatusEnum},
     service::ContainerSummary,
     Docker,
@@ -111,6 +112,26 @@ impl DockerContainer {
             })?;
 
         Ok(())
+    }
+
+    /// Simplistic way of collecting logs of containers used in the test,
+    /// mostly to debug build failures on CI.
+    pub async fn logs(&self) -> Vec<String> {
+        let mut log_stream = self.docker.logs::<&str>(
+            &self.container.name,
+            Some(LogsOptions {
+                stdout: true,
+                stderr: true,
+                follow: false,
+                ..Default::default()
+            }),
+        );
+
+        let mut out = Vec::new();
+        while let Some(Ok(log)) = log_stream.next().await {
+            out.push(log.to_string().trim().to_string());
+        }
+        out
     }
 }
 

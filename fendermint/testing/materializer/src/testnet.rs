@@ -173,6 +173,11 @@ where
             .collect()
     }
 
+    /// Iterate all the nodes in the testnet.
+    pub fn nodes(&self) -> impl Iterator<Item = (&NodeName, &M::Node)> {
+        self.nodes.iter()
+    }
+
     /// Where can we send transactions and queries on a subnet.
     pub fn submit_config(&self, subnet_name: &SubnetName) -> anyhow::Result<SubmitConfig<M>> {
         let deployment = self.deployment(subnet_name)?;

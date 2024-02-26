@@ -447,6 +447,21 @@ impl DockerNode {
     pub fn fendermint_peer_id(&self) -> anyhow::Result<String> {
         read_file(self.path.join("keys").join(FENDERMINT_PEER_ID))
     }
+
+    pub async fn fendermint_logs(&self) -> Vec<String> {
+        self.fendermint.logs().await
+    }
+
+    pub async fn cometbft_logs(&self) -> Vec<String> {
+        self.cometbft.logs().await
+    }
+
+    pub async fn ethapi_logs(&self) -> Vec<String> {
+        match self.ethapi {
+            None => Vec::new(),
+            Some(ref c) => c.logs().await,
+        }
+    }
 }
 
 impl HasEthApi for DockerNode {
@@ -472,7 +487,7 @@ fn container_name(node_name: &NodeName, container: &str) -> String {
         .unwrap_or_default()
         .to_string_lossy()
         .to_string();
-    let hash = ResourceHash::digest(node_name.path().to_string_lossy().to_string());
+    let hash = ResourceHash::digest(node_name.path_string());
     let hash = hash.to_string();
     let hash = &hash.as_str()[..6];
     format!("{node_id}-{container}-{}", hash)

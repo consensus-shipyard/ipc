@@ -99,6 +99,10 @@ impl ResourceName {
     pub fn is_prefix_of(&self, other: &ResourceName) -> bool {
         other.0.starts_with(&self.0)
     }
+
+    pub fn path_string(&self) -> String {
+        self.0.to_string_lossy().to_string()
+    }
 }
 
 impl From<&str> for ResourceName {
@@ -127,6 +131,10 @@ macro_rules! resource_name {
         impl $name {
             pub fn path(&self) -> &Path {
                 &self.0 .0
+            }
+
+            pub fn path_string(&self) -> String {
+                self.0.path_string()
             }
         }
 

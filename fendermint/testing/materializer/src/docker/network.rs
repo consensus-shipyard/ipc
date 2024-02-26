@@ -41,7 +41,7 @@ impl DockerNetwork {
         dropper: DropHandle,
         testnet_name: TestnetName,
     ) -> anyhow::Result<Self> {
-        let network_name = testnet_name.path().to_string_lossy().to_string();
+        let network_name = testnet_name.path_string();
 
         let mut filters = HashMap::new();
         filters.insert("name".to_string(), vec![network_name.clone()]);
