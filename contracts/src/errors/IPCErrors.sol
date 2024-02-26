@@ -9,6 +9,7 @@ error CannotReleaseZero();
 error CannotSendCrossMsgToItself();
 error CheckpointAlreadyExists();
 error BatchAlreadyExists();
+error BottomUpCheckpointAlreadySubmitted();
 error MaxMsgsPerBatchExceeded();
 error QuorumAlreadyProcessed();
 error CheckpointNotCreated();
