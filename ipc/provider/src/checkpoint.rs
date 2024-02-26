@@ -106,18 +106,28 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         log::info!("launching {self} for {submitter}");
 
         loop {
-            if let Err(e) = self.submit_checkpoint(&submitter).await {
-                log::error!("cannot submit checkpoint for submitter: {submitter} due to {e}");
-            }
-
+            self.submit_checkpoint(&submitter).await;
             tokio::time::sleep(submission_interval).await;
         }
     }
 
     /// Submit the checkpoint from the target submitter address
-    pub async fn submit_checkpoint(&self, submitter: &Address) -> Result<()> {
-        self.submit_last_epoch(submitter).await?;
-        self.submit_next_epoch(submitter).await
+    pub async fn submit_checkpoint(&self, submitter: &Address) {
+        let next_submission_height = if let Ok(h) = self.next_submission_height().await {
+            h
+        } else {
+            log::error!("cannot fetch next submission height for submitter {submitter}");
+            return;
+        };
+
+        if let Err(e) = self.submit_epoch(next_submission_height, submitter).await {
+            log::error!(
+                "cannot submit at bottom up checkpoint for height: {} and submitter {} due to {}",
+                next_submission_height,
+                submitter,
+                e
+            )
+        }
     }
 
     /// Derive the next submission checkpoint height
@@ -132,45 +142,12 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         Ok(last_checkpoint_epoch + self.checkpoint_period())
     }
 
-    /// Checks if the relayer has already submitted at the `last_checkpoint_height`, if not it submits it.
-    async fn submit_last_epoch(&self, submitter: &Address) -> Result<()> {
-        let subnet = &self.metadata.child.id;
-
-        let height = self
-            .parent_handler
-            .last_bottom_up_checkpoint_height(subnet)
-            .await?;
-
-        if height == 0 {
-            log::debug!("no previous checkpoint yet");
-            return Ok(());
-        }
-
-        let bundle = self.child_handler.checkpoint_bundle_at(height).await?;
-        log::debug!("bottom up bundle: {bundle:?}");
-
-        let epoch = self
-            .parent_handler
-            .submit_checkpoint(
-                submitter,
-                bundle.checkpoint,
-                bundle.signatures,
-                bundle.signatories,
-            )
-            .await
-            .map_err(|e| anyhow!("cannot submit bottom up checkpoint due to: {e:}"))?;
-        log::info!(
-            "submitted bottom up checkpoint({}) in parent at height {}",
-            height,
-            epoch
-        );
-
-        Ok(())
-    }
-
     /// Checks if the relayer has already submitted at the next submission epoch, if not it submits it.
-    async fn submit_next_epoch(&self, submitter: &Address) -> Result<()> {
-        let next_submission_height = self.next_submission_height().await?;
+    async fn submit_epoch(
+        &self,
+        next_submission_height: ChainEpoch,
+        submitter: &Address,
+    ) -> Result<()> {
         let current_height = self.child_handler.current_epoch().await?;
         let finalized_height = max(1, current_height - self.finalization_blocks);
 
