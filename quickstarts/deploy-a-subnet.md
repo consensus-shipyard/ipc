@@ -12,8 +12,6 @@ Several steps in this guide involve running long-lived processes. In each of the
 
 ### Install the basic requirements for IPC:
 
-#### **For Linux:**
-
 {% tabs %}
 {% tab title="Linux" %}
 * Install system packages: `sudo apt install build-essential clang cmake pkg-config libssl-dev protobuf-compiler git curl`.
@@ -99,7 +97,7 @@ cargo build --release
 * Initialise the config&#x20;
 
 {% tabs %}
-{% tab title="Linus/MacOS" %}
+{% tab title="Linux/MacOS" %}
 ```
 alias ipc-cli="cargo run -q -p ipc-cli --release --"
 ipc-cli config init
