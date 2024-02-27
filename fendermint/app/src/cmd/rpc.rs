@@ -9,7 +9,7 @@ use anyhow::Context;
 use async_trait::async_trait;
 use bytes::Bytes;
 use fendermint_app_options::genesis::AccountKind;
-use fendermint_crypto::SecretKey;
+use fendermint_crypto::{to_b64, SecretKey};
 use fendermint_rpc::client::BoundFendermintClient;
 use fendermint_rpc::tx::{
     AsyncResponse, BoundClient, CallClient, CommitResponse, SyncResponse, TxAsync, TxClient,
@@ -34,10 +34,7 @@ use fendermint_vm_actor_interface::eam::{self, CreateReturn, EthAddress};
 
 use crate::cmd;
 use crate::options::rpc::{BroadcastMode, FevmArgs, RpcFevmCommands, TransArgs};
-use crate::{
-    cmd::to_b64,
-    options::rpc::{RpcArgs, RpcCommands, RpcQueryCommands},
-};
+use crate::options::rpc::{RpcArgs, RpcCommands, RpcQueryCommands};
 
 use super::key::read_secret_key;
 

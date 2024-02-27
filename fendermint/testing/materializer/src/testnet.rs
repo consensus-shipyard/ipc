@@ -14,7 +14,10 @@ use crate::{
         BalanceMap, CollateralMap, IpcDeployment, Manifest, Node, NodeMode, ParentNode, Rootnet,
         Subnet,
     },
-    materializer::{Materializer, Materials, NodeConfig, SubmitConfig, SubnetConfig, TargetConfig},
+    materializer::{
+        Materializer, NodeConfig, ParentConfig, SubmitConfig, SubnetConfig, TargetConfig,
+    },
+    materials::Materials,
     AccountId, NodeId, NodeName, RelayerName, ResourceHash, SubnetId, SubnetName, TestnetId,
     TestnetName,
 };
@@ -256,12 +259,24 @@ where
         let node_name = subnet_name.node(node_id);
 
         let parent_node = match (subnet_name.parent(), &node.parent_node) {
-            (Some(ps), Some(ParentNode::Internal(id))) => Some(TargetConfig::<M>::Internal(
-                self.node(&ps.node(id))
-                    .with_context(|| format!("invalid parent node in {node_name:?}"))?,
-            )),
+            (Some(ps), Some(ParentNode::Internal(id))) => {
+                let tc = TargetConfig::<M>::Internal(
+                    self.node(&ps.node(id))
+                        .with_context(|| format!("invalid parent node in {node_name:?}"))?,
+                );
+                let deployment = self.deployment(&ps)?;
+                Some(ParentConfig {
+                    node: tc,
+                    deployment,
+                })
+            }
             (Some(ps), Some(ParentNode::External(url))) if ps.is_root() => {
-                Some(TargetConfig::External(url.clone()))
+                let tc = TargetConfig::External(url.clone());
+                let deployment = self.deployment(&ps)?;
+                Some(ParentConfig {
+                    node: tc,
+                    deployment,
+                })
             }
             (Some(_), Some(ParentNode::External(_))) => {
                 bail!("node {node_name:?} specifies external URL for parent, but it's on a non-root subnet")

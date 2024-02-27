@@ -47,6 +47,14 @@
         "1096485|mocha>minimatch": {
             "decision": "ignore",
             "madeAt": 1708002979356
+        },
+        "1096525|hardhat-deploy>axios": {
+            "decision": "ignore",
+            "madeAt": 1708963069648
+        },
+        "1096544|json5": {
+            "decision": "ignore",
+            "madeAt": 1708963077846
         }
     },
     "rules": {},
