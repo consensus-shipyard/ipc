@@ -17,6 +17,7 @@ ethers = { workspace = true }
 futures = { workspace = true }
 fvm_shared = { workspace = true }
 hex = { workspace = true }
+lazy_static = { workspace = true }
 multihash = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
@@ -26,7 +27,6 @@ tendermint-rpc = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 
-lazy_static = { workspace = true, optional = true }
 arbitrary = { workspace = true, optional = true }
 quickcheck = { workspace = true, optional = true }
 
@@ -62,7 +62,6 @@ default = []
 arb = [
   "arbitrary",
   "quickcheck",
-  "lazy_static",
   "fvm_shared/arb",
   "fendermint_testing/arb",
   "fendermint_vm_genesis/arb",
