@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {InvalidBatchEpoch, MaxMsgsPerBatchExceeded, InvalidSignatureErr, InvalidCheckpointEpoch, BottomUpCheckpointAlreadySubmitted} from "../errors/IPCErrors.sol";
+import {InvalidBatchEpoch, MaxMsgsPerBatchExceeded, InvalidSignatureErr, InvalidCheckpointEpoch} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {BottomUpCheckpoint, BottomUpMsgBatch, BottomUpMsgBatchInfo} from "../structs/CrossNet.sol";
 import {Validator, ValidatorSet} from "../structs/Subnet.sol";
@@ -32,29 +32,22 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
 
         bytes32 checkpointHash = keccak256(abi.encode(checkpoint));
 
-        if (s.committedCheckpoints[checkpoint.blockHeight].blockHeight != 0) {
-            revert BottomUpCheckpointAlreadySubmitted();
+        if (checkpoint.blockHeight == s.lastBottomUpCheckpointHeight + s.bottomUpCheckPeriod) {
+            // validate signatures and quorum threshold, revert if validation fails
+            validateActiveQuorumSignatures({signatories: signatories, hash: checkpointHash, signatures: signatures});
+
+            // If the checkpoint height is the next expected height then this is a new checkpoint which must be executed
+            // in the Gateway Actor, the checkpoint and the relayer must be stored, last bottom-up checkpoint updated.
+            s.committedCheckpoints[checkpoint.blockHeight] = checkpoint;
+
+            s.lastBottomUpCheckpointHeight = checkpoint.blockHeight;
+
+            // Commit in gateway to distribute rewards
+            IGateway(s.ipcGatewayAddr).commitCheckpoint(checkpoint);
+
+            // confirming the changes in membership in the child
+            LibStaking.confirmChange(checkpoint.nextConfigurationNumber);
         }
-
-        // there is no check against the checkpoint period. Whatever the child validators
-        // agree on submission, it's accepted. This is also needed when a bottom up msg bundle
-        // becomes full, a bottom up checkpoint will be created before the checkpoint period
-        // is reached.
-
-        // validate signatures and quorum threshold, revert if validation fails
-        validateActiveQuorumSignatures({signatories: signatories, hash: checkpointHash, signatures: signatures});
-
-        // If the checkpoint height is the next expected height then this is a new checkpoint which must be executed
-        // in the Gateway Actor, the checkpoint and the relayer must be stored, last bottom-up checkpoint updated.
-        s.committedCheckpoints[checkpoint.blockHeight] = checkpoint;
-
-        s.lastBottomUpCheckpointHeight = checkpoint.blockHeight;
-
-        // Commit in gateway to distribute rewards
-        IGateway(s.ipcGatewayAddr).commitCheckpoint(checkpoint);
-
-        // confirming the changes in membership in the child
-        LibStaking.confirmChange(checkpoint.nextConfigurationNumber);
     }
 
     /// @notice Checks whether the signatures are valid for the provided signatories and hash within the current validator set.
