@@ -86,9 +86,12 @@ cargo build --release
 
 {% tab title="Docker" %}
 * Run docker desktop
-* `docker pull` [`ghcr.io/consensus-shipyard/fendermint:latest`](http://ghcr.io/consensus-shipyard/fendermint:latest)
-* `alias ipc-cli='docker run` [`ghcr.io/consensus-shipyard/fendermint`](http://ghcr.io/consensus-shipyard/fendermint) `ipc-cli'`
-*
+
+```
+docker pull  ghcr.io/consensus-shipyard/fendermint:latest
+
+alias ipc-cli='docker run  ghcr.io/consensus-shipyard/fendermint  ipc-cli'
+```
 {% endtab %}
 {% endtabs %}
 
