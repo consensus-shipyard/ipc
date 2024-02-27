@@ -4,6 +4,7 @@
 mod staking;
 
 use anyhow::Context;
+use async_trait::async_trait;
 use ethers::types::{H160, U256};
 use fendermint_contract_test::Tester;
 use fendermint_rpc::response::decode_fevm_return_data;
@@ -16,7 +17,7 @@ use fvm_shared::address::Address;
 use fvm_shared::bigint::Zero;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
-use tendermint_rpc::HttpClient;
+use tendermint_rpc::Client;
 
 use fendermint_crypto::SecretKey;
 use fendermint_vm_actor_interface::eam;
@@ -211,16 +212,15 @@ async fn test_applying_upgrades() {
         )
         .unwrap();
 
-    let interpreter: FvmMessageInterpreter<MemoryBlockstore, HttpClient> =
-        FvmMessageInterpreter::new(
-            tendermint_rpc::HttpClient::new("http://127.0.0.1:26657").unwrap(),
-            None,
-            contracts_path(),
-            1.05,
-            1.05,
-            false,
-            upgrade_scheduler,
-        );
+    let interpreter: FvmMessageInterpreter<MemoryBlockstore, _> = FvmMessageInterpreter::new(
+        NeverCallClient,
+        None,
+        contracts_path(),
+        1.05,
+        1.05,
+        false,
+        upgrade_scheduler,
+    );
 
     let mut tester = Tester::new(interpreter, MemoryBlockstore::new());
 
@@ -253,5 +253,18 @@ async fn test_applying_upgrades() {
         tester.begin_block(block_height).await.unwrap();
         tester.end_block(block_height).await.unwrap();
         tester.commit().await.unwrap();
+    }
+}
+
+#[derive(Clone)]
+struct NeverCallClient;
+
+#[async_trait]
+impl Client for NeverCallClient {
+    async fn perform<R>(&self, _request: R) -> Result<R::Output, tendermint_rpc::Error>
+    where
+        R: tendermint_rpc::SimpleRequest,
+    {
+        todo!()
     }
 }

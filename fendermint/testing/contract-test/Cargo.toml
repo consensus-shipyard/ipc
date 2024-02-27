@@ -36,6 +36,7 @@ fendermint_vm_interpreter = { path = "../../vm/interpreter", features = [
 [dev-dependencies]
 arbitrary = { workspace = true }
 arbtest = { workspace = true }
+async-trait = { workspace = true }
 rand = { workspace = true }
 fendermint_rpc = { path = "../../rpc" }
 lazy_static = { workspace = true }
