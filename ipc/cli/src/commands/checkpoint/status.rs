@@ -7,10 +7,13 @@ use std::str::FromStr;
 
 use async_trait::async_trait;
 use clap::Args;
+use fvm_shared::clock::ChainEpoch;
 use ipc_api::subnet_id::SubnetID;
 
 use crate::commands::get_ipc_provider;
 use crate::{CommandLineHandler, GlobalArguments};
+
+const DEFAULT_MAX_PENDING: usize = 10;
 
 /// The command to list bottom up checkpoint status.
 pub(crate) struct Status;
@@ -29,13 +32,19 @@ impl CommandLineHandler for Status {
         let checkpoint = provider.get_bottom_up_bundle(&subnet, height).await?;
         let chain_head = provider.get_chain_head_height(&subnet).await?;
 
-        let maybe_height = provider.max_quorum_reached_height(&subnet, height + 1, chain_head).await?;
-
         println!(
-            "last checkpoint height: {}, chain head {}, max quorum reached height {:?}",
-            height, chain_head, maybe_height
+            "last checkpoint height: {}, chain head {}",
+            height, chain_head
         );
         println!("last submitted checkpoint: {:?}", checkpoint);
+
+        let max_pending = arguments.max_pending.unwrap_or(DEFAULT_MAX_PENDING);
+        for h in height + 1..max_pending as ChainEpoch {
+            let c = provider.get_bottom_up_bundle(&subnet, h).await?;
+            if c.checkpoint.block_height != 0 {
+                println!("pending checkpoint bundle at height: {} \n {:?}", h, c);
+            }
+        }
 
         Ok(())
     }
@@ -46,4 +55,9 @@ impl CommandLineHandler for Status {
 pub(crate) struct StatusArgs {
     #[arg(long, help = "The target subnet to check status")]
     pub subnet: String,
+    #[arg(
+        long,
+        help = "The max number of pending checkpoint to print, default 10"
+    )]
+    pub max_pending: Option<usize>,
 }

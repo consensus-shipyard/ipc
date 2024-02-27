@@ -730,7 +730,9 @@ impl IpcProvider {
             Some(conn) => conn,
         };
 
-        conn.manager().max_quorum_reached_height(subnet, from, to).await
+        conn.manager()
+            .max_quorum_reached_height(subnet, from, to)
+            .await
     }
 
     /// Advertises the endpoint of a bootstrap node for the subnet.
