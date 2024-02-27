@@ -39,6 +39,8 @@ license-file = "LICENSE-APACHE"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+## dummy trigger ci
+
 [workspace.dependencies]
 anyhow = "1"
 arbitrary = { version = "1", features = ["derive"] }
@@ -49,6 +51,7 @@ async-trait = "0.1"
 async-channel = "1.8.0"
 axum = { version = "0.6", features = ["ws"] }
 base64 = "0.21"
+bollard = "0.15"
 blake2b_simd = "1.0"
 bloom = "0.3"
 bytes = "1.4"
@@ -58,9 +61,9 @@ dirs = "5.0"
 dircpy = "0.3"
 env_logger = "0.10"
 erased-serde = "0.3"
-ethers = { version = "2.0", features = ["abigen", "ws"] }
-ethers-core = { version = "2.0" }
-ethers-contract = "2.0.8"
+ethers = { version = "2.0.13", features = ["abigen", "ws"] }
+ethers-core = { version = "2.0.13" }
+ethers-contract = "2.0.13"
 fnv = "1.0"
 futures = "0.3"
 futures-core = "0.3"
@@ -116,6 +119,7 @@ pin-project = "1.1.2"
 prometheus = "0.13"
 prost = { version = "0.11" }
 quickcheck = "1"
+quickcheck_async = "0.1"
 quickcheck_macros = "1"
 rand = "0.8"
 rand_chacha = "0.3"
@@ -159,6 +163,9 @@ ipc-types = { path = "ipc/types" }
 ipc_actors_abis = { path = "contracts/binding" }
 
 # Vendored for cross-compilation, see https://github.com/cross-rs/cross/wiki/Recipes#openssl
+# Make sure every top level build target actually imports this dependency, and don't end up
+# depending on the same _without_ the "vendored" feature, because then the Docker build for
+# for ARM64 on AMD64 will fail, it won't find the OpenSSL installation.
 openssl = { version = "0.10", features = ["vendored"] }
 
 # NOTE: When upgrading the FVM it may cause our fendermint/actors/build.rs to fail as it can
@@ -190,6 +197,8 @@ fvm_ipld_amt = "0.6.2"
 fil_actors_evm_shared = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v12.0.0" }
 fil_actor_eam = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v12.0.0" }
 fil_actors_runtime = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v12.0.0" }
+
+fendermint_actor_eam = { path = "./fendermint/actors/eam" }
 
 cid = { version = "0.10.1", default-features = false, features = [
   "serde-codec",

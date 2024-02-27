@@ -1,137 +1,190 @@
 accounts:
-  -ADtE: {}
-  1__AewWZ: {}
-  2_8_dKA_: {}
-  BzCCPd4: {}
-  ri88A0E: {}
+  2Ak5RIDi: {}
+  2lev1nx: {}
+  BxF: {}
 rootnet:
-  type: External
-  deployment:
-    type: Existing
-    gateway: 0xc14fe096e50ac9339ea63691b22feb09a927340e
-    registry: 0x30d429efcb2ff38bca6fedb038265c3b30c5e907
-  urls:
-  - https://shhd.api.calibration.node.glif.io/rpc/v1
-  - https://xouk.api.calibration.node.glif.io/rpc/v1
+  type: New
+  validators:
+    2lev1nx: '1311343059170131720'
+    BxF: '5989245444587736169'
+  balances:
+    2Ak5RIDi: '100000000000000000000'
+    2lev1nx: '100000000000000000000'
+    BxF: '100000000000000000000'
+  nodes:
+    HsPA:
+      mode:
+        type: Validator
+        validator: BxF
+      ethapi: true
+      seed_nodes:
+      - PSW1
+      parent_node: null
+    PSW1:
+      mode:
+        type: Validator
+        validator: 2lev1nx
+      ethapi: false
+      seed_nodes: []
+      parent_node: null
 subnets:
-  zS7lxtb:
-    creator: 2_8_dKA_
+  _LdLB:
+    creator: 2lev1nx
     validators:
-      -ADtE: '8126022878002554493'
-      1__AewWZ: '4720181718236265378'
-      2_8_dKA_: '3381379608852078264'
+      2Ak5RIDi: '7981310479508636141'
     balances:
-      1__AewWZ: '1289758629437437188'
-      ri88A0E: '5378886159656006786'
+      2Ak5RIDi: '7153043716686363498'
     nodes:
-      __HG7pi:
+      oeOB8:
         mode:
           type: Validator
-          validator: -ADtE
-        ethapi: true
-        seed_nodes: []
-        parent_node: https://shhd.api.calibration.node.glif.io/rpc/v1
-      e8HRXaD:
-        mode:
-          type: Validator
-          validator: 2_8_dKA_
-        ethapi: true
-        seed_nodes:
-        - __HG7pi
-        parent_node: https://xouk.api.calibration.node.glif.io/rpc/v1
-      yAOMA:
-        mode:
-          type: Validator
-          validator: 1__AewWZ
+          validator: 2Ak5RIDi
         ethapi: false
-        seed_nodes:
-        - __HG7pi
-        parent_node: https://xouk.api.calibration.node.glif.io/rpc/v1
+        seed_nodes: []
+        parent_node: PSW1
     relayers:
-      Ccw9IU:
-        submitter: BzCCPd4
-        follow_node: __HG7pi
-        submit_node: https://shhd.api.calibration.node.glif.io/rpc/v1
-      QOFg7A:
-        submitter: BzCCPd4
-        follow_node: yAOMA
-        submit_node: https://xouk.api.calibration.node.glif.io/rpc/v1
+      vAzA:
+        submitter: 2Ak5RIDi
+        follow_node: oeOB8
+        submit_node: PSW1
     subnets:
-      Oml:
-        creator: 2_8_dKA_
+      aPOAxmh:
+        creator: 2Ak5RIDi
         validators:
-          -ADtE: '995525741287275685'
-          ri88A0E: '1555753531667157108'
-        balances: {}
+          2Ak5RIDi: '3569488325570546967'
+        balances:
+          2Ak5RIDi: '1'
         nodes:
-          t0Tu:
+          2OTVaiDn:
             mode:
               type: Validator
-              validator: ri88A0E
+              validator: 2Ak5RIDi
             ethapi: false
-            seed_nodes:
-            - wggHAT
-            parent_node: __HG7pi
-          wggHAT:
+            seed_nodes: []
+            parent_node: oeOB8
+        relayers:
+          OzO:
+            submitter: 2Ak5RIDi
+            follow_node: 2OTVaiDn
+            submit_node: oeOB8
+          yAzPW4E:
+            submitter: 2Ak5RIDi
+            follow_node: 2OTVaiDn
+            submit_node: oeOB8
+        subnets: {}
+      wA_sTO:
+        creator: 2Ak5RIDi
+        validators:
+          2Ak5RIDi: '5425090782793795444'
+          2lev1nx: '7294094662943369157'
+        balances:
+          2Ak5RIDi: '2319626882661946130'
+          BxF: '4331796456198798470'
+        nodes:
+          -TcBwENk:
             mode:
               type: Validator
-              validator: -ADtE
+              validator: 2Ak5RIDi
             ethapi: true
             seed_nodes: []
-            parent_node: yAOMA
-        relayers:
-          9G3C:
-            submitter: 1__AewWZ
-            follow_node: t0Tu
-            submit_node: yAOMA
-          yA_cU8:
-            submitter: 1__AewWZ
-            follow_node: t0Tu
-            submit_node: yAOMA
-        subnets: {}
-      PhkZpSZ:
-        creator: ri88A0E
-        validators:
-          1__AewWZ: '4473141922156769997'
-          2_8_dKA_: '7395746039000362948'
-          BzCCPd4: '9475029707515561200'
-          ri88A0E: '159807005328574964'
-        balances:
-          -ADtE: '8288247619104377003'
-        nodes:
-          0MY:
+            parent_node: oeOB8
+          mAGp:
             mode:
               type: Validator
-              validator: 2_8_dKA_
-            ethapi: false
+              validator: 2lev1nx
+            ethapi: true
             seed_nodes:
-            - KS3
-            parent_node: yAOMA
-          KS3:
+            - -TcBwENk
+            parent_node: oeOB8
+        relayers:
+          MzY:
+            submitter: 2Ak5RIDi
+            follow_node: -TcBwENk
+            submit_node: oeOB8
+        subnets: {}
+  wABdB:
+    creator: 2lev1nx
+    validators:
+      2Ak5RIDi: '1860320313236845636'
+    balances:
+      2lev1nx: '5071526246180730733'
+    nodes:
+      EK2_S09e:
+        mode:
+          type: Validator
+          validator: 2Ak5RIDi
+        ethapi: true
+        seed_nodes: []
+        parent_node: HsPA
+    relayers:
+      X35qcc:
+        submitter: 2Ak5RIDi
+        follow_node: EK2_S09e
+        submit_node: PSW1
+      iUZnP:
+        submitter: BxF
+        follow_node: EK2_S09e
+        submit_node: HsPA
+    subnets:
+      H_3gy:
+        creator: 2lev1nx
+        validators:
+          2lev1nx: '6235377311449574725'
+          BxF: '6411644753916219113'
+        balances:
+          2lev1nx: '7868447936831718130'
+        nodes:
+          adyP:
             mode:
               type: Validator
-              validator: 1__AewWZ
+              validator: 2lev1nx
             ethapi: false
             seed_nodes: []
-            parent_node: e8HRXaD
-          VX3C-N:
-            mode:
-              type: Full
-            ethapi: false
-            seed_nodes:
-            - KS3
-            parent_node: yAOMA
-          jGA2:
+            parent_node: EK2_S09e
+          xqZ8Qj:
             mode:
               type: Validator
-              validator: BzCCPd4
-            ethapi: false
+              validator: BxF
+            ethapi: true
             seed_nodes:
-            - KS3
-            parent_node: __HG7pi
+            - adyP
+            parent_node: EK2_S09e
         relayers:
-          MWx55:
-            submitter: -ADtE
-            follow_node: jGA2
-            submit_node: e8HRXaD
+          9BrZf:
+            submitter: 2lev1nx
+            follow_node: adyP
+            submit_node: EK2_S09e
+          i3_C:
+            submitter: 2lev1nx
+            follow_node: adyP
+            submit_node: EK2_S09e
+        subnets: {}
+      aV6:
+        creator: 2lev1nx
+        validators:
+          2lev1nx: '807708124336674951'
+          BxF: '8306922559634087661'
+        balances:
+          BxF: '5616869653981856804'
+        nodes:
+          cvY0:
+            mode:
+              type: Validator
+              validator: BxF
+            ethapi: true
+            seed_nodes:
+            - dSASzQA_
+            parent_node: EK2_S09e
+          dSASzQA_:
+            mode:
+              type: Validator
+              validator: 2lev1nx
+            ethapi: true
+            seed_nodes: []
+            parent_node: EK2_S09e
+        relayers:
+          BS6BTW:
+            submitter: 2lev1nx
+            follow_node: cvY0
+            submit_node: EK2_S09e
         subnets: {}

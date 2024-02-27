@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-pragma solidity 0.8.19;
+pragma solidity ^0.8.23;
 
 import {LibGateway} from "../../src/lib/LibGateway.sol";
 import {IpcEnvelope, BottomUpMsgBatch} from "../../src/structs/CrossNet.sol";

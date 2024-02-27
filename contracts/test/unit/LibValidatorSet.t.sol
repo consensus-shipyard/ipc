@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-pragma solidity 0.8.19;
+pragma solidity ^0.8.23;
 
 import {Test} from "forge-std/Test.sol";
 import {MaxPQ, LibMaxPQ} from "../../src/lib/priority/LibMaxPQ.sol";

@@ -26,6 +26,8 @@ where
         }
     }
 
+    /// Sync with the parent, unless CometBFT is still catching up with the network,
+    /// in which case we'll get the changes from the subnet peers in the blocks.
     pub async fn sync(&mut self) -> anyhow::Result<()> {
         if self.is_syncing_peer().await? {
             tracing::debug!("syncing with peer, skip parent finality syncing this round");

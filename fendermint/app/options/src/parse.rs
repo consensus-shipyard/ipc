@@ -7,6 +7,7 @@ use bytes::Bytes;
 use cid::Cid;
 use num_traits::{FromPrimitive, Num};
 
+use fendermint_vm_genesis::SignerAddr;
 use fvm_shared::{
     address::{set_current_network, Address, Network},
     bigint::BigInt,
@@ -55,6 +56,12 @@ pub fn parse_address(s: &str) -> Result<Address, String> {
         _ => (),
     }
     Address::from_str(s).map_err(|e| format!("error parsing address: {e}"))
+}
+
+pub fn parse_signer_addr(s: &str) -> Result<SignerAddr, String> {
+    Address::from_str(s)
+        .map(SignerAddr)
+        .map_err(|e| format!("error parsing addresses: {e}"))
 }
 
 pub fn parse_bytes(s: &str) -> Result<Bytes, String> {

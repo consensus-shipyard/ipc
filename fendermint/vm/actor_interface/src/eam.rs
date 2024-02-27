@@ -19,6 +19,8 @@ define_singleton!(EAM {
     code_id: 15
 });
 
+pub const EAM_ACTOR_NAME: &str = "eam";
+
 /// Ethereum Address Manager actor methods available.
 #[repr(u64)]
 pub enum Method {

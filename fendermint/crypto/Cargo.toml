@@ -10,5 +10,7 @@ license.workspace = true
 # Defined here so no other crate keeps a direct reference to it.
 libsecp256k1 = "0.7"
 
+anyhow = { workspace = true }
+base64 = { workspace = true }
 rand = { workspace = true }
 zeroize = { workspace = true }

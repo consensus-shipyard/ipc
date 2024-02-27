@@ -9,7 +9,6 @@ license.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
-base64 = { workspace = true }
 bytes = { workspace = true }
 cid = { workspace = true }
 hex = { workspace = true }
@@ -47,6 +46,7 @@ fendermint_rpc = { path = "../rpc" }
 fendermint_eth_api = { path = "../eth/api" }
 fendermint_vm_actor_interface = { path = "../vm/actor_interface" }
 fendermint_vm_core = { path = "../vm/core" }
+fendermint_vm_event = { path = "../vm/event" }
 fendermint_vm_encoding = { path = "../vm/encoding" }
 fendermint_vm_genesis = { path = "../vm/genesis" }
 fendermint_vm_interpreter = { path = "../vm/interpreter", features = ["bundle"] }
