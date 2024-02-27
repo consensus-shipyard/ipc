@@ -2,4 +2,4 @@
 set -eu
 
 cometbft unsafe-reset-all
-cometbft start --consensus.create_empty_blocks=false
+cometbft start

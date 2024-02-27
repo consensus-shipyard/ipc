@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-#cargo install --path fendermint/app
+export FM_NETWORK=test
 
 # Create a new Genesis file
 rm -rf test-network
