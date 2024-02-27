@@ -1,13 +1,12 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use fil_actor_bundler::Bundler;
 use std::error::Error;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::thread;
-
-use fil_actor_bundler::Bundler;
 
 const ACTORS: &[&str] = &["chainmetadata", "eam", "objectstore", "accumulator"];
 

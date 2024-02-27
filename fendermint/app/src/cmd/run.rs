@@ -202,16 +202,6 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
 
         tracing::info!("starting the IPFS Resolver...");
         tokio::spawn(async move { ipfs_resolver.run().await });
-
-        // let foo = client
-        //     .resolve_ipfs(
-        //         Cid::try_from("bafkreiedpxbbdhdd3psulzkrlsnjzns4kxp2ealw5cfacn2rrn27xoe75y")
-        //             .unwrap(),
-        //     )
-        //     .await?;
-        // if foo.is_ok() {
-        //     println!("got it!!!!!");
-        // }
     } else {
         tracing::info!("IPLD Resolver disabled.")
     }
