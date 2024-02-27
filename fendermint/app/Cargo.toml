@@ -65,12 +65,14 @@ ipc-api = { workspace = true }
 ipc-provider = { workspace = true }
 ipc_ipld_resolver = { workspace = true }
 
-warp = "0.3.6"
-futures-util = "0.3.30"
-unsigned-varint = "0.7.2"
-thiserror = "1.0.56"
-async-tempfile = "0.5.0"
 fendermint_actor_objectstore = { path = "../actors/objectstore" }
+
+warp = "0.3.6"
+futures-util = { workspace = true }
+tokio-util = { workspace = true }
+async-tempfile = "0.5.0"
+ipfs-api-backend-hyper = { version = "0.6.0", features = ["with-send-sync"] }
+thiserror = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

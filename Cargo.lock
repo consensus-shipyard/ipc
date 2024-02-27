@@ -2861,6 +2861,7 @@ dependencies = [
  "ipc-api",
  "ipc-provider",
  "ipc_ipld_resolver",
+ "ipfs-api-backend-hyper",
  "k256 0.11.6",
  "libipld",
  "libp2p",
@@ -2883,11 +2884,11 @@ dependencies = [
  "tendermint-rpc",
  "thiserror",
  "tokio",
+ "tokio-util 0.7.10",
  "tower-abci",
  "trace4rs",
  "tracing",
  "tracing-subscriber",
- "unsigned-varint 0.7.2",
  "warp",
 ]
 

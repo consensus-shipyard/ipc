@@ -1,30 +1,43 @@
-use super::rpc::{gas_params, BroadcastResponse, TransClient};
-use crate::cmd;
-use crate::options::{
-    proxy::{ProxyArgs, ProxyCommands},
-    rpc::TransArgs,
-};
+use std::{convert::Infallible, net::SocketAddr};
+use std::future::Future;
+use std::num::ParseIntError;
+use std::pin::Pin;
+use std::sync::Arc;
+
 use anyhow::anyhow;
-use bytes::Bytes;
+use async_tempfile::TempFile;
+use bytes::{Buf, Bytes};
 use cid::Cid;
+use futures_util::{Stream, StreamExt};
+use fvm_shared::BLOCK_GAS_LIMIT;
+use fvm_shared::econ::TokenAmount;
+use ipfs_api_backend_hyper::{IpfsApi, IpfsClient};
+use num_traits::Zero;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use tendermint::block::Height;
+use tendermint::Hash;
+use thiserror::Error;
+use tokio::io::{AsyncSeekExt, AsyncWriteExt};
+use tokio::sync::Mutex;
+use tokio_util::compat::TokioAsyncReadCompatExt;
+use warp::{Filter, http::StatusCode, Rejection, Reply};
+use warp::http::{HeaderMap, HeaderValue};
+
 use fendermint_actor_objectstore::Object;
 use fendermint_rpc::client::FendermintClient;
 use fendermint_rpc::message::GasParams;
 use fendermint_rpc::tx::{CallClient, TxClient};
 use fendermint_vm_message::query::FvmQueryHeight;
-use fvm_shared::econ::TokenAmount;
-use fvm_shared::BLOCK_GAS_LIMIT;
-use num_traits::Zero;
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::Arc;
-use std::{convert::Infallible, net::SocketAddr};
-use tendermint::block::Height;
-use tendermint::Hash;
-use tokio::sync::Mutex;
-use warp::{http::StatusCode, Filter, Rejection, Reply};
+
+use crate::cmd;
+use crate::cmd::proxy::ProxyError::RangeHeaderInvalid;
+use crate::options::{
+    proxy::{ProxyArgs, ProxyCommands},
+    rpc::TransArgs,
+};
+
+use super::rpc::{BroadcastResponse, gas_params, TransClient};
 
 const MAX_EVENT_LENGTH: u64 = 1024 * 500; // Limit to 500KiB for now
 
@@ -41,6 +54,14 @@ cmd! {
                     .and(warp::get()).and_then(health);
 
                 // Object Store routes
+                let upload_route = warp::path!("v1" / "os" / String)
+                    .and(warp::put())
+                    .and(with_client(client.clone()))
+                    .and(with_args(args.clone()))
+                    .and(with_nonce(nonce.clone()))
+                    .and(warp::header::optional::<u64>("X-DataRepo-GasLimit"))
+                    .and(warp::body::stream())
+                    .and_then(handle_os_upload);
                 let add_route = warp::path!("v1" / "os" / String / Cid)
                     .and(warp::put())
                     .and(with_client(client.clone()))
@@ -60,6 +81,7 @@ cmd! {
                     .and(with_client(client.clone()))
                     .and(with_args(args.clone()))
                     .and(warp::query::<HeightQuery>())
+                    .and(warp::header::optional::<String>("Range"))
                     .and_then(handle_os_get);
                 let list_route = warp::path!("v1" / "os")
                     .and(warp::get())
@@ -86,6 +108,7 @@ cmd! {
                     .and_then(handle_acc_root);
 
                 let router = health_route
+                    .or(upload_route)
                     .or(add_route)
                     .or(delete_route)
                     .or(get_route)
@@ -130,10 +153,79 @@ async fn health() -> Result<impl Reply, Rejection> {
     Ok(warp::reply::reply())
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-pub struct CarHeader {
-    pub roots: Vec<Cid>,
-    pub version: u64,
+async fn handle_os_upload(
+    key: String,
+    client: FendermintClient,
+    mut args: TransArgs,
+    nonce: Arc<Mutex<u64>>,
+    gas_limit: Option<u64>,
+    mut body: impl Stream<Item = Result<impl Buf, warp::Error>> + Unpin + Send + Sync,
+) -> Result<impl Reply, Rejection> {
+    let mut nonce_lck = nonce.lock().await;
+    args.sequence = *nonce_lck;
+    args.gas_limit = gas_limit.unwrap_or_else(|| BLOCK_GAS_LIMIT);
+
+    let mut tmp = TempFile::new().await.map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("failed to create tmp file: {}", e),
+        })
+    })?;
+    while let Some(buf) = body.next().await {
+        let mut buf = buf.unwrap();
+        while buf.remaining() > 0 {
+            let chunk = buf.chunk().to_owned();
+            let chunk_len = chunk.len();
+            tmp.write_all(&chunk).await.map_err(|e| {
+                Rejection::from(BadRequest {
+                    message: format!("failed to write chunk: {}", e),
+                })
+            })?;
+            tmp.flush().await.map_err(|e| {
+                Rejection::from(BadRequest {
+                    message: format!("failed to flush chunk: {}", e),
+                })
+            })?;
+            buf.advance(chunk_len);
+        }
+    }
+    tmp.rewind().await.map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("failed to rewind: {}", e),
+        })
+    })?;
+
+    let ipfs = IpfsClient::default();
+    let add = ipfs_api_backend_hyper::request::Add {
+        chunker: Some("size-1048576"),
+        pin: Some(false),
+        raw_leaves: Some(true),
+        cid_version: Some(1),
+        hash: Some("blake2b-256"),
+        ..Default::default()
+    };
+
+    let res = ipfs
+        .add_async_with_options(tmp.compat(), add)
+        .await
+        .map_err(|e| {
+            Rejection::from(BadRequest {
+                message: format!("failed to add file: {}", e),
+            })
+        })?;
+    let cid = Cid::try_from(res.hash).map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("failed to parse cid: {}", e),
+        })
+    })?;
+
+    let res = os_put(client, args, key, cid).await.map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("put error: {}", e),
+        })
+    })?;
+
+    *nonce_lck += 1;
+    Ok(warp::reply::json(&res))
 }
 
 async fn handle_os_add(
@@ -179,11 +271,54 @@ async fn handle_os_delete(
     Ok(warp::reply::json(&res))
 }
 
+fn get_range_params(range: String, size: u64) -> Result<(u64, u64), ProxyError> {
+    let range: Vec<String> = range
+        .replace("bytes=", "")
+        .split("-")
+        .filter_map(|n| {
+            if n.len() > 0 {
+                Some(n.to_string())
+            } else {
+                None
+            }
+        })
+        .collect();
+    let start = if range.len() > 0 {
+        range[0].parse::<u64>()?
+    } else {
+        0
+    };
+    let end = if range.len() > 1 {
+        range[1].parse::<u64>()?
+    } else {
+        size - 1
+    };
+    if start > end || end >= size {
+        return Err(RangeHeaderInvalid);
+    }
+    Ok((start, end))
+}
+
+#[derive(Debug, Error)]
+enum ProxyError {
+    #[error("error parsing range header: `{0}`")]
+    RangeHeaderParseError(ParseIntError),
+    #[error("invalid range header")]
+    RangeHeaderInvalid,
+}
+
+impl From<ParseIntError> for ProxyError {
+    fn from(err: ParseIntError) -> Self {
+        ProxyError::RangeHeaderParseError(err)
+    }
+}
+
 async fn handle_os_get(
     key: String,
     client: FendermintClient,
     args: TransArgs,
     hq: HeightQuery,
+    range: Option<String>,
 ) -> Result<impl Reply, Rejection> {
     let res = os_get(client, args, key, hq.height.unwrap_or_else(|| 0))
         .await
@@ -200,9 +335,56 @@ async fn handle_os_get(
                     message: format!("failed to decode value: {}", e),
                 })
             })?;
-            Ok(warp::reply::json(
-                &json!({"value": value.to_string(), "resolved": obj.resolved}),
-            ))
+            if !obj.resolved {
+                return Err(Rejection::from(BadRequest {
+                    message: "object is not resolved".to_string(),
+                }));
+            }
+            let val = value.to_string();
+
+            let ipfs = IpfsClient::default();
+            let stat = ipfs.object_stat(&val).await.map_err(|e| {
+                Rejection::from(BadRequest {
+                    message: format!("failed to stat object: {}", e),
+                })
+            })?;
+
+            let (stream, start, end, len) = match range {
+                Some(range) => {
+                    let (start, end) = get_range_params(range, stat.data_size).map_err(|e| {
+                        Rejection::from(BadRequest {
+                            message: format!("failed to get range params: {}", e),
+                        })
+                    })?;
+                    let len = end - start + 1;
+                    (
+                        ipfs.cat_range(&val, start as usize, len as usize),
+                        start,
+                        end,
+                        len,
+                    )
+                }
+                None => (ipfs.cat(&val), 0, stat.data_size - 1, stat.data_size),
+            };
+            let body = warp::hyper::Body::wrap_stream(stream);
+            let mut response = warp::reply::Response::new(body);
+
+            if len < stat.data_size {
+                *response.status_mut() = StatusCode::PARTIAL_CONTENT;
+            }
+
+            let mut header_map = HeaderMap::new();
+            header_map.insert("Accept-Ranges", HeaderValue::from_str("bytes").unwrap());
+            header_map.insert(
+                "Content-Range",
+                HeaderValue::from_str(&format!("bytes {}-{}/{}", start, end, len)).unwrap(),
+            );
+            header_map.insert("Content-Length", HeaderValue::from(len));
+
+            let headers = response.headers_mut();
+            headers.extend(header_map);
+
+            Ok(response)
         }
         None => Err(Rejection::from(NotFound)),
     }
