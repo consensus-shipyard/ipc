@@ -85,19 +85,36 @@ cargo build --release
 ./target/release/fendermint --version
 ```
 {% endtab %}
+
+{% tab title="Docker" %}
+* Run docker desktop
+* `docker pull` [`ghcr.io/consensus-shipyard/fendermint:latest`](http://ghcr.io/consensus-shipyard/fendermint:latest)
+* `alias ipc-cli='docker run` [`ghcr.io/consensus-shipyard/fendermint`](http://ghcr.io/consensus-shipyard/fendermint) `ipc-cli'`
+*
+{% endtab %}
 {% endtabs %}
 
 ### Step 2: Initialise your config
 
-* Initialise the config
+* Initialise the config&#x20;
 
+{% tabs %}
+{% tab title="Linus/MacOS" %}
 ```
 alias ipc-cli="cargo run -q -p ipc-cli --release --"
-```
-
-```
 ipc-cli config init
 ```
+{% endtab %}
+
+{% tab title="Docker" %}
+```
+alias ipc-cli='docker run  ghcr.io/consensus-shipyard/fendermint  ipc-cli'
+ipc-cli config init
+
+alias ipc-cli="docker run -it --rm -u $(id -u) -v $HOME/.ipc:/fendermint/.ipc ghcr.io/consensus-shipyard/fendermint ipc-cli"
+```
+{% endtab %}
+{% endtabs %}
 
 This should have populated a default config file with all the parameters required to connect to calibration at `~/.ipc/config.toml`. Feel free to update this configuration to fit your needs.
 
