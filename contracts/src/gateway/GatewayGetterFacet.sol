@@ -20,6 +20,12 @@ contract GatewayGetterFacet {
     using EnumerableSet for EnumerableSet.AddressSet;
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
+    /// @notice jiejie
+    function getCommitSha() external view returns (uint64) {
+        uint64 ret = 123;
+        return ret;
+    }
+
     /// @notice Returns the current nonce for bottom-up message processing.
     function bottomUpNonce() external view returns (uint64) {
         return s.bottomUpNonce;

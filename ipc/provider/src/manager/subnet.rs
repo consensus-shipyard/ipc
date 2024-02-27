@@ -7,6 +7,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
+use ipc_actors_abis::gateway_getter_facet::Subnet;
 use ipc_api::checkpoint::{
     BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent, Signature,
 };
@@ -133,6 +134,9 @@ pub trait SubnetManager: Send + Sync + TopDownFinalityQuery + BottomUpCheckpoint
     /// Returning as a `String` because the maximum value for an EVM
     /// networks is a `U256` that wouldn't fit in an integer type.
     async fn get_chain_id(&self) -> Result<String>;
+
+    /// Get commit sha
+    async fn get_commit_sha(&self) -> Result<u64>;
 
     /// Gets the genesis information required to bootstrap a child subnet
     async fn get_genesis_info(&self, subnet: &SubnetID) -> Result<SubnetGenesisInfo>;
