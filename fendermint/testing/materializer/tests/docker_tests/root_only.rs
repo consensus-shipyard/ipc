@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 use anyhow::{anyhow, bail};
 use ethers::{providers::Middleware, types::U64};
-use fendermint_testing_materializer::HasEthApi;
+use fendermint_materializer::HasEthApi;
 use futures::FutureExt;
 
 use crate::with_testnet;

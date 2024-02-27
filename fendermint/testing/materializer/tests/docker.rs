@@ -4,12 +4,12 @@
 //!
 //! # Example
 //!
-//! `cargo test -p fendermint_testing_materializer --test docker -- --nocapture`
+//! `cargo test -p fendermint_materializer --test docker -- --nocapture`
 
 use std::{env::current_dir, path::PathBuf, pin::Pin, time::Duration};
 
 use anyhow::Context;
-use fendermint_testing_materializer::{
+use fendermint_materializer::{
     docker::{DockerMaterializer, DockerMaterials},
     manifest::Manifest,
     testnet::Testnet,
