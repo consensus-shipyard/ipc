@@ -46,8 +46,13 @@ jobs:
         make:
           - name: Clippy
             task: check-clippy
-          - name: Test
-            task: test
+          # Technically it's not necessary to build, testing would be fine on its own.
+          # However, tests bring in dev-dependencies, and without them something might not compile,
+          # which we want to catch as it would mean the `cargo build` in the docs would fail.
+          # Doing it a one step so build artifacts can be reused by the tests, minimising the overhead.
+          - name: Build and Test
+            task: build test
+          # Tests that involve docker.
           - name: End-to-End
             task: e2e
         exclude:
