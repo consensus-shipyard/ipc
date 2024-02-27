@@ -230,13 +230,6 @@ pub trait BottomUpCheckpointRelayer: Send + Sync {
     async fn checkpoint_bundle_at(&self, height: ChainEpoch) -> Result<BottomUpCheckpointBundle>;
     /// Queries the signature quorum reached events at target height.
     async fn quorum_reached_events(&self, height: ChainEpoch) -> Result<Vec<QuorumReachedEvent>>;
-    /// Returns the highest quorum reached chain epoch within the specified range
-    async fn max_quorum_reached_height(
-        &self,
-        subnet_id: &SubnetID,
-        from: ChainEpoch,
-        to: ChainEpoch,
-    ) -> Result<Option<ChainEpoch>>;
     /// Get the current epoch in the current subnet
     async fn current_epoch(&self) -> Result<ChainEpoch>;
 }

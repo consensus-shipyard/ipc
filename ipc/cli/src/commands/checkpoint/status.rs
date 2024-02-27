@@ -30,6 +30,7 @@ impl CommandLineHandler for Status {
 
         let height = provider.last_bottom_up_checkpoint_height(&subnet).await?;
         let checkpoint = provider.get_bottom_up_bundle(&subnet, height).await?;
+        let period = provider.checkpoint_period(&subnet).await?;
         let chain_head = provider.get_chain_head_height(&subnet).await?;
 
         println!(
@@ -39,12 +40,20 @@ impl CommandLineHandler for Status {
         println!("last submitted checkpoint: {:?}", checkpoint);
 
         let max_pending = arguments.max_pending.unwrap_or(DEFAULT_MAX_PENDING);
-        for h in height + 1..max_pending as ChainEpoch {
+
+        let start = height + 1;
+        let ending = max_pending as ChainEpoch * period + start;
+        let mut checkpoints_ahead = 0;
+        for h in start..=ending {
             let c = provider.get_bottom_up_bundle(&subnet, h).await?;
             if c.checkpoint.block_height != 0 {
-                println!("pending checkpoint bundle at height: {} \n {:?}", h, c);
+                checkpoints_ahead += 1;
             }
         }
+        println!(
+            "there are at least {} number of check ahead",
+            checkpoints_ahead
+        );
 
         Ok(())
     }

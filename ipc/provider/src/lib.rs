@@ -678,6 +678,15 @@ impl IpcProvider {
         conn.manager().chain_head_height().await
     }
 
+    pub async fn checkpoint_period(&self, subnet: &SubnetID) -> anyhow::Result<ChainEpoch> {
+        let conn = match self.connection(subnet) {
+            None => return Err(anyhow!("target subnet not found")),
+            Some(conn) => conn,
+        };
+
+        conn.manager().checkpoint_period(subnet).await
+    }
+
     pub async fn get_bottom_up_bundle(
         &self,
         subnet: &SubnetID,
@@ -717,22 +726,6 @@ impl IpcProvider {
         };
 
         conn.manager().quorum_reached_events(height).await
-    }
-
-    pub async fn max_quorum_reached_height(
-        &self,
-        subnet: &SubnetID,
-        from: ChainEpoch,
-        to: ChainEpoch,
-    ) -> anyhow::Result<Option<ChainEpoch>> {
-        let conn = match self.connection(subnet) {
-            None => return Err(anyhow!("target subnet not found")),
-            Some(conn) => conn,
-        };
-
-        conn.manager()
-            .max_quorum_reached_height(subnet, from, to)
-            .await
     }
 
     /// Advertises the endpoint of a bootstrap node for the subnet.

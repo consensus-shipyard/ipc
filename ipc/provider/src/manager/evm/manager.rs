@@ -1077,36 +1077,6 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
         Ok(events)
     }
 
-    async fn max_quorum_reached_height(
-        &self,
-        subnet_id: &SubnetID,
-        from: ChainEpoch,
-        to: ChainEpoch,
-    ) -> Result<Option<ChainEpoch>> {
-        let mut maybe_height = None;
-
-        let period = self.checkpoint_period(subnet_id).await?;
-
-        let mut l = from;
-        let mut r = to;
-
-        while l < r {
-            let mid = (l + r) / 2;
-
-            // locate the epoch where checkpoints should have been created
-            let mid = mid / period * period;
-
-            if self.quorum_reached_events(mid).await?.is_empty() {
-                r = mid - 1;
-            } else {
-                maybe_height = Some(mid);
-                l = mid + 1;
-            }
-        }
-
-        Ok(maybe_height)
-    }
-
     async fn current_epoch(&self) -> Result<ChainEpoch> {
         let epoch = self
             .ipc_contract_info
