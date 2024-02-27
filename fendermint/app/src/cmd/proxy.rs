@@ -275,23 +275,23 @@ fn get_range_params(range: String, size: u64) -> Result<(u64, u64), ProxyError> 
     let range: Vec<String> = range
         .replace("bytes=", "")
         .split("-")
-        .filter_map(|n| {
-            if n.len() > 0 {
-                Some(n.to_string())
-            } else {
-                None
-            }
-        })
+        .map(|n| n.to_string())
         .collect();
-    let start = if range.len() > 0 {
-        range[0].parse::<u64>()?
-    } else {
-        0
-    };
-    let end = if range.len() > 1 {
-        range[1].parse::<u64>()?
-    } else {
-        size - 1
+    if range.len() != 2 {
+        return Err(RangeHeaderInvalid);
+    }
+    let (start, end): (u64, u64) = match (range[0].len() > 0, range[1].len() > 0) {
+        (true, true) => (range[0].parse::<u64>()?, range[1].parse::<u64>()?),
+        (true, false) => (range[0].parse::<u64>()?, size - 1),
+        (false, true) => {
+            let last = range[1].parse::<u64>()?;
+            if last > size {
+                (0, size - 1)
+            } else {
+                (size - last, size - 1)
+            }
+        }
+        (false, false) => (0, size - 1),
     };
     if start > end || end >= size {
         return Err(RangeHeaderInvalid);
