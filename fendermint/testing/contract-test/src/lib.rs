@@ -69,7 +69,6 @@ pub async fn init_exec_state(
     Ok((state, out))
 }
 
-#[derive(Clone)]
 pub struct Tester<I> {
     interpreter: Arc<I>,
     state_store: Arc<MemoryBlockstore>,
