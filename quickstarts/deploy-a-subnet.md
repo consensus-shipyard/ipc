@@ -132,7 +132,7 @@ You'll need to create a set of wallets to spawn and interact of the subnet.&#x20
 TIP: Note down wallet and subnet addresses and keys as you go along
 {% endhint %}
 
-* Create the three different wallets
+* Create the four different wallets (we recommend a minimum of 4 for BFT security)
 
 ```
 ipc-cli wallet new --wallet-type evm
@@ -228,7 +228,7 @@ NOTE:
 
 You'll need the final component of the `IPLD Resolver Multiaddress` (the `peer ID`) and the `CometBFT node ID` for the next nodes we'll start.
 
-Repeat for validators 2, 3 and 4.
+* Repeat for validators 2, 3 and 4.
 
 {% hint style="info" %}
 NOTE: Do not change values of any port from the ones provided unless you have to
