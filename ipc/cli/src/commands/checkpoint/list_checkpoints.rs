@@ -26,10 +26,10 @@ impl CommandLineHandler for ListBottomUpCheckpoints {
 #[derive(Debug, Args)]
 #[command(about = "List bottom-up checkpoints")]
 pub(crate) struct ListBottomUpCheckpointsArgs {
-    #[arg(long, short, help = "The subnet id of the checkpointing subnet")]
+    #[arg(long, help = "The subnet id of the checkpointing subnet")]
     pub subnet: String,
-    #[arg(long, short, help = "Include checkpoints from this epoch")]
+    #[arg(long, help = "Include checkpoints from this epoch")]
     pub from_epoch: ChainEpoch,
-    #[arg(long, short, help = "Include checkpoints up to this epoch")]
+    #[arg(long, help = "Include checkpoints up to this epoch")]
     pub to_epoch: ChainEpoch,
 }

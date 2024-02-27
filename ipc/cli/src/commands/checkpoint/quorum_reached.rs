@@ -40,10 +40,10 @@ impl CommandLineHandler for GetQuorumReacehdEvents {
 #[derive(Debug, Args)]
 #[command(about = "List quorum reached events for a child subnet")]
 pub(crate) struct GetQuorumReachedEventsArgs {
-    #[arg(long, short, help = "The target subnet to perform query")]
+    #[arg(long, help = "The target subnet to perform query")]
     pub subnet: String,
-    #[arg(long, short, help = "Include events from this epoch")]
+    #[arg(long, help = "Include events from this epoch")]
     pub from_epoch: ChainEpoch,
-    #[arg(long, short, help = "Include events up to this epoch")]
+    #[arg(long, help = "Include events up to this epoch")]
     pub to_epoch: ChainEpoch,
 }

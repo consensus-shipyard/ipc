@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-pragma solidity 0.8.19;
+pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 import "../src/errors/IPCErrors.sol";
@@ -152,6 +152,50 @@ contract TestSubnetActor is Test, TestParams {
         saLouperSelectors = SelectorLibrary.resolveSelectors("DiamondLoupeFacet");
     }
 
+    function subnetActorWithParams(
+        address gw,
+        SubnetID memory parentID
+    ) internal pure returns (SubnetActorDiamond.ConstructorParams memory) {
+        SupplySource memory native = SupplySourceHelper.native();
+        SubnetActorDiamond.ConstructorParams memory params = SubnetActorDiamond.ConstructorParams({
+            parentId: parentID,
+            ipcGatewayAddr: gw,
+            consensus: ConsensusType.Fendermint,
+            minActivationCollateral: DEFAULT_COLLATERAL_AMOUNT,
+            minValidators: DEFAULT_MIN_VALIDATORS,
+            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
+            activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
+            powerScale: DEFAULT_POWER_SCALE,
+            permissionMode: PermissionMode.Collateral,
+            supplySource: native
+        });
+
+        return params;
+    }
+
+    function subnetActorWithParams(
+        address gw,
+        SubnetID memory parentID,
+        address tokenAddress
+    ) internal pure returns (SubnetActorDiamond.ConstructorParams memory) {
+        SubnetActorDiamond.ConstructorParams memory params = SubnetActorDiamond.ConstructorParams({
+            parentId: parentID,
+            ipcGatewayAddr: gw,
+            consensus: ConsensusType.Fendermint,
+            minActivationCollateral: DEFAULT_COLLATERAL_AMOUNT,
+            minValidators: DEFAULT_MIN_VALIDATORS,
+            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
+            activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
+            powerScale: DEFAULT_POWER_SCALE,
+            permissionMode: PermissionMode.Collateral,
+            supplySource: SupplySource({kind: SupplyKind.ERC20, tokenAddress: tokenAddress})
+        });
+
+        return params;
+    }
+
     function defaultSubnetActorParamsWithGateway(
         address gw
     ) internal pure virtual returns (SubnetActorDiamond.ConstructorParams memory) {
@@ -221,6 +265,18 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     function defaultGatewayParams() internal pure virtual returns (GatewayDiamond.ConstructorParams memory) {
         GatewayDiamond.ConstructorParams memory params = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
+            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
+            genesisValidators: new Validator[](0),
+            activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT
+        });
+
+        return params;
+    }
+
+    function gatewayParams(SubnetID memory id) internal pure returns (GatewayDiamond.ConstructorParams memory) {
+        GatewayDiamond.ConstructorParams memory params = GatewayDiamond.ConstructorParams({
+            networkName: id,
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
@@ -853,6 +909,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
 
     function registerSubnetGW(uint256 collateral, address subnetAddress, GatewayDiamond gw) public {
         GatewayManagerFacet manager = GatewayManagerFacet(address(gw));
+        GatewayGetterFacet getter = GatewayGetterFacet(address(gw));
 
         manager.register{value: collateral}(0);
 
@@ -861,7 +918,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             gw
         );
 
-        SubnetID memory parentNetwork = gwGetter.getNetworkName();
+        SubnetID memory parentNetwork = getter.getNetworkName();
 
         require(
             id.toHash() == parentNetwork.createSubnetId(subnetAddress).toHash(),
@@ -879,18 +936,19 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     function getSubnetGW(
         address subnetAddress,
         GatewayDiamond gw
-    ) public returns (SubnetID memory, uint256, uint256, uint256, uint256) {
-        gwManager = GatewayManagerFacet(address(gw));
-        gwGetter = GatewayGetterFacet(address(gw));
+    ) public view returns (SubnetID memory, uint256, uint256, uint256, uint256) {
+        GatewayGetterFacet getter = GatewayGetterFacet(address(gw));
 
-        SubnetID memory subnetId = gwGetter.getNetworkName().createSubnetId(subnetAddress);
+        SubnetID memory subnetId = getter.getNetworkName().createSubnetId(subnetAddress);
 
-        Subnet memory subnet = gwGetter.subnets(subnetId.toHash());
+        Subnet memory subnet = getter.subnets(subnetId.toHash());
 
         return (subnet.id, subnet.stake, subnet.topDownNonce, subnet.appliedBottomUpNonce, subnet.circSupply);
     }
 
-    function getSubnet(address subnetAddress) public returns (SubnetID memory, uint256, uint256, uint256, uint256) {
+    function getSubnet(
+        address subnetAddress
+    ) public view returns (SubnetID memory, uint256, uint256, uint256, uint256) {
         return getSubnetGW(subnetAddress, gatewayDiamond);
     }
 }

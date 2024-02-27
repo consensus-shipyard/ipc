@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-pragma solidity 0.8.19;
+pragma solidity ^0.8.23;
 
 import {GatewayActorModifiers} from "../lib/LibGatewayActorStorage.sol";
 import {IpcEnvelope, CallMsg, IpcMsgKind} from "../structs/CrossNet.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {SubnetID, SupplyKind, IPCAddress} from "../structs/Subnet.sol";
-import {InvalidCrossMsgSender, InvalidCrossMsgDstSubnet, InvalidCrossMsgKind, CannotSendCrossMsgToItself, InvalidCrossMsgValue, MethodNotAllowed} from "../errors/IPCErrors.sol";
+import {InvalidXnetMessage, InvalidXnetMessageReason, CannotSendCrossMsgToItself, MethodNotAllowed} from "../errors/IPCErrors.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
@@ -37,19 +37,17 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
             revert MethodNotAllowed(ERR_GENERAL_CROSS_MSG_DISABLED);
         }
 
-        // TODO: consolidate all these error types into an error InvalidXnetMsg(string reason).
-        //
         // We prevent the sender from being an EoA.
         if (!(msg.sender.code.length > 0)) {
-            revert InvalidCrossMsgSender();
+            revert InvalidXnetMessage(InvalidXnetMessageReason.Sender);
         }
 
         if (envelope.value != msg.value) {
-            revert InvalidCrossMsgValue();
+            revert InvalidXnetMessage(InvalidXnetMessageReason.Value);
         }
 
         if (envelope.kind != IpcMsgKind.Call) {
-            revert InvalidCrossMsgKind();
+            revert InvalidXnetMessage(InvalidXnetMessageReason.Kind);
         }
 
         // Will revert if the message won't deserialize into a CallMsg.

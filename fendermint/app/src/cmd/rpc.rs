@@ -9,16 +9,6 @@ use anyhow::Context;
 use async_trait::async_trait;
 use bytes::Bytes;
 use cid::Cid;
-use fendermint_app_options::genesis::AccountKind;
-use fendermint_crypto::SecretKey;
-use fendermint_rpc::client::BoundFendermintClient;
-use fendermint_rpc::tx::{
-    AsyncResponse, BoundClient, CallClient, CommitResponse, SyncResponse, TxAsync, TxClient,
-    TxCommit, TxSync,
-};
-use fendermint_vm_core::chainid;
-use fendermint_vm_message::chain::ChainMessage;
-use fendermint_vm_message::query::FvmQueryHeight;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
@@ -29,17 +19,24 @@ use tendermint::abci::response::DeliverTx;
 use tendermint::block::Height;
 use tendermint_rpc::HttpClient;
 
-use fendermint_rpc::message::{GasParams, MessageFactory};
+use fendermint_app_options::genesis::AccountKind;
+use fendermint_crypto::{SecretKey, to_b64};
 use fendermint_rpc::{client::FendermintClient, query::QueryClient};
+use fendermint_rpc::client::BoundFendermintClient;
+use fendermint_rpc::message::{GasParams, MessageFactory};
+use fendermint_rpc::tx::{
+    AsyncResponse, BoundClient, CallClient, CommitResponse, SyncResponse, TxAsync, TxClient,
+    TxCommit, TxSync,
+};
 use fendermint_vm_actor_interface::eam::{self, CreateReturn, EthAddress};
+use fendermint_vm_core::chainid;
+use fendermint_vm_message::chain::ChainMessage;
+use fendermint_vm_message::query::FvmQueryHeight;
 
 use crate::cmd;
-use crate::{
-    cmd::to_b64,
-    options::rpc::{
-        BroadcastMode, FevmArgs, RpcAccumulatorCommands, RpcArgs, RpcCommands, RpcFevmCommands,
-        RpcObjectStoreCommands, RpcQueryCommands, TransArgs,
-    },
+use crate::options::rpc::{BroadcastMode, FevmArgs, RpcFevmCommands, TransArgs};
+use crate::options::rpc::{
+    RpcAccumulatorCommands, RpcArgs, RpcCommands, RpcObjectStoreCommands, RpcQueryCommands,
 };
 
 use super::key::read_secret_key;

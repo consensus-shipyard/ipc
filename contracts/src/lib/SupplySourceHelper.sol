@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.19;
+pragma solidity ^0.8.23;
 
+import {NotEnoughBalance} from "../errors/IPCErrors.sol";
 import {SupplySource, SupplyKind} from "../structs/Subnet.sol";
 import {EMPTY_BYTES} from "../constants/Constants.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
@@ -72,7 +73,7 @@ library SupplySourceHelper {
     /// This function the `safeTransfer` function used before.
     function ierc20Transfer(
         SupplySource memory supplySource,
-        address payable recipient,
+        address recipient,
         uint256 value
     ) internal returns (bool success, bytes memory ret) {
         return
@@ -101,14 +102,38 @@ library SupplySourceHelper {
             // Use the optimized path to send value along with the call.
             (success, ret) = functionCallWithValue({target: target, data: data, value: value});
         } else if (supplySource.kind == SupplyKind.ERC20) {
-            // Transfer the tokens first, _then_ perform the call.
-            (success, ret) = ierc20Transfer(supplySource, target, value);
-            if (success) {
-                // Perform the call only if the ERC20 was successful.
-                (success, ret) = functionCallWithValue(target, data, 0);
-            } else {
-                return (success, ret);
+            (success, ret) = functionCallWithERC20Value({supplySource: supplySource, target: target, data: data, value: value});
+        }
+        return (success, ret);
+    }
+
+    /// @dev Performs the function call with ERC20 value atomically
+    function functionCallWithERC20Value(
+        SupplySource memory supplySource,
+        address target,
+        bytes memory data,
+        uint256 value
+    ) internal returns (bool success, bytes memory ret) {
+        // Transfer the tokens first, _then_ perform the call.
+        (success, ret) = ierc20Transfer(supplySource, target, value);
+
+        if (success) {
+            // Perform the call only if the ERC20 was successful.
+            (success, ret) = functionCallWithValue(target, data, 0);
+        }
+
+        if (!success) {
+            // following the implementation of `openzeppelin-contracts/utils/Address.sol`
+            if (ret.length > 0) {
+                assembly {
+                    let returndata_size := mload(ret)
+                    // see https://ethereum.stackexchange.com/questions/133748/trying-to-understand-solidity-assemblys-revert-function
+                    revert(add(32, ret), returndata_size)
+                }
             }
+            // disable solhint as the failing call does not have return data as well.
+            /* solhint-disable reason-string */
+            revert();
         }
         return (success, ret);
     }
@@ -120,7 +145,9 @@ library SupplySourceHelper {
         bytes memory data,
         uint256 value
     ) internal returns (bool success, bytes memory) {
-        require(address(this).balance >= value, "insufficient balance for call");
+        if (address(this).balance < value) {
+            revert NotEnoughBalance();
+        }
 
         return target.call{value: value}(data);
     }
@@ -128,9 +155,9 @@ library SupplySourceHelper {
     /**
      *
      * @dev Adaptation from implementation `openzeppelin-contracts/utils/Address.sol`
-     * so it doesn't revert immediately and bubbles up the succeess of the call
+     * so it doesn't revert immediately and bubbles up the success of the call
      *
-     * Replacement for Solidity's `transfer`: sends `amount` wei to
+     * Replacement for Solidity's `transfer`: sends `value` wei to
      * `recipient`, forwarding all available gas and reverting on errors.
      *
      * https://eips.ethereum.org/EIPS/eip-1884[EIP1884] increases the gas cost
@@ -145,10 +172,11 @@ library SupplySourceHelper {
      * {ReentrancyGuard} or the
      * https://solidity.readthedocs.io/en/v0.5.11/security-considerations.html#use-the-checks-effects-interactions-pattern[checks-effects-interactions pattern].
      */
-    function sendValue(address payable recipient, uint256 amount) internal returns (bool) {
-        require(address(this).balance >= amount, "insufficient balance");
-
-        (bool success, ) = recipient.call{value: amount}("");
+    function sendValue(address payable recipient, uint256 value) internal returns (bool) {
+        if (address(this).balance < value) {
+            revert NotEnoughBalance();
+        }
+        (bool success, ) = recipient.call{value: value}("");
         return success;
     }
 

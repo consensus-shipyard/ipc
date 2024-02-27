@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-pragma solidity 0.8.19;
+pragma solidity ^0.8.23;
 
 import {InvalidBatchEpoch, MaxMsgsPerBatchExceeded, InvalidSignatureErr, InvalidCheckpointEpoch} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
@@ -97,11 +97,10 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
 
         // the max batch size not reached, we only support checkpoint period submission.
         uint256 lastBottomUpCheckpointHeight = s.lastBottomUpCheckpointHeight;
-        if (
-            checkpoint.blockHeight != lastBottomUpCheckpointHeight + s.bottomUpCheckPeriod &&
-            checkpoint.blockHeight != lastBottomUpCheckpointHeight
-        ) {
-            revert InvalidCheckpointEpoch();
+        if (checkpoint.blockHeight != lastBottomUpCheckpointHeight + s.bottomUpCheckPeriod) {
+            if (checkpoint.blockHeight != lastBottomUpCheckpointHeight) {
+                revert InvalidCheckpointEpoch();
+            }
         }
     }
 }

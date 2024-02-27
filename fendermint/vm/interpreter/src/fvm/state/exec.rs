@@ -213,6 +213,11 @@ where
         self.executor.state_tree_mut()
     }
 
+    /// Get a reference to the underlying [StateTree].
+    pub fn state_tree(&self) -> &StateTree<MachineBlockstore<DB>> {
+        self.executor.state_tree()
+    }
+
     /// Built-in actor manifest to inspect code CIDs.
     pub fn builtin_actors(&self) -> &Manifest {
         self.executor.builtin_actors()

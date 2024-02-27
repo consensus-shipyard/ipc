@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-pragma solidity 0.8.19;
+pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 import "elliptic-curve-solidity/contracts/EllipticCurve.sol";
@@ -177,4 +177,42 @@ contract MockIpcContract is IpcHandler {
     function handleIpcMessage(IpcEnvelope calldata) external payable returns (bytes memory ret) {
         return EMPTY_BYTES;
     }
+}
+
+contract MockIpcContractFallback is IpcHandler {
+    /* solhint-disable-next-line unused-vars */
+    function handleIpcMessage(IpcEnvelope calldata) external payable returns (bytes memory ret) {
+        return EMPTY_BYTES;
+    }
+
+    fallback() external {
+        revert();
+    }
+}
+
+contract MockIpcContractRevert is IpcHandler {
+    bool public reverted = true;
+
+    /* solhint-disable-next-line unused-vars */
+    function handleIpcMessage(IpcEnvelope calldata) external payable returns (bytes memory ret) {
+        // success execution of this methid will set reverted to false, by default it's true
+        reverted = false;
+
+        // since this reverts, `reverted` should always be true
+        revert();
+    }
+
+    fallback() external {
+        console.log("here2");
+        revert();
+    }
+}
+
+contract MockIpcContractPayable is IpcHandler {
+    /* solhint-disable-next-line unused-vars */
+    function handleIpcMessage(IpcEnvelope calldata) external payable returns (bytes memory ret) {
+        return EMPTY_BYTES;
+    }
+
+    receive() external payable {}
 }

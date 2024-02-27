@@ -9,12 +9,12 @@
 use std::collections::HashSet;
 
 use anyhow::Context;
-use ethers_core::types as et;
 use ethers_core::types::transaction::eip2718::TypedTransaction;
+use ethers_core::types::{self as et, BlockNumber};
 use ethers_core::utils::rlp;
 use fendermint_rpc::message::MessageFactory;
 use fendermint_rpc::query::QueryClient;
-use fendermint_rpc::response::{decode_fevm_invoke, decode_fevm_return_data};
+use fendermint_rpc::response::{decode_data, decode_fevm_invoke, decode_fevm_return_data};
 use fendermint_vm_actor_interface::eam::{EthAddress, EAM_ACTOR_ADDR};
 use fendermint_vm_actor_interface::evm;
 use fendermint_vm_message::chain::ChainMessage;
@@ -40,7 +40,7 @@ use fil_actors_evm_shared::uints;
 
 use crate::conv::from_eth::to_fvm_message;
 use crate::conv::from_tm::{self, msg_hash, to_chain_message, to_cumulative, to_eth_block_zero};
-use crate::error::error_with_data;
+use crate::error::error_with_revert;
 use crate::filters::{matches_topics, FilterId, FilterKind, FilterRecords};
 use crate::{
     conv::{
@@ -63,8 +63,7 @@ pub async fn block_number<C>(data: JsonRpcData<C>) -> JsonRpcResult<et::U64>
 where
     C: Client + Sync + Send,
 {
-    let res: block::Response = data.tm().latest_block().await?;
-    let height = res.block.header.height;
+    let height = data.latest_height().await?;
     Ok(et::U64::from(height.value()))
 }
 
@@ -637,11 +636,15 @@ where
         // Ok(et::TxHash::from_slice(res.hash.as_bytes()))
         Ok(msghash)
     } else {
-        error_with_data(
-            ExitCode::new(res.code.value()),
-            res.log,
-            hex::encode(res.data.as_ref()), // TODO: What is the content?
-        )
+        // Try to decode any errors returned in the data.
+        let data = RawBytes::from(res.data.to_vec());
+        // Might have to first call `decode_fevm_data` here in case CometBFT
+        // wraps the data into Base64 encoding like it does for `DeliverTx`.
+        let data = decode_fevm_return_data(data)
+            .or_else(|_| decode_data(&res.data).and_then(decode_fevm_return_data))
+            .ok();
+
+        error_with_revert(ExitCode::new(res.code.value()), res.log, data)
     }
 }
 
@@ -662,14 +665,14 @@ where
     // Based on Lotus, we should return the data from the receipt.
     if deliver_tx.code.is_err() {
         // There might be some revert data encoded as ABI in the response.
-        let (msg, data) = match decode_fevm_invoke(&deliver_tx).map(hex::encode) {
-            Ok(h) => (deliver_tx.info, h),
+        let (msg, data) = match decode_fevm_invoke(&deliver_tx) {
+            Ok(h) => (deliver_tx.info, Some(h)),
             Err(e) => (
                 format!("{}\nfailed to decode return data: {:#}", deliver_tx.info, e),
-                "".to_string(),
+                None,
             ),
         };
-        error_with_data(ExitCode::new(deliver_tx.code.value()), msg, data)
+        error_with_revert(ExitCode::new(deliver_tx.code.value()), msg, data)
     } else if is_create {
         // It's not clear why some tools like Remix call this with deployment transaction, but they do.
         // We could parse the deployed contract address, but it would be of very limited use;
@@ -720,12 +723,11 @@ where
     if !estimate.exit_code.is_success() {
         // There might be some revert data encoded as ABI in the response.
         let msg = format!("failed to estimate gas: {}", estimate.info);
-        let (msg, data) = match decode_fevm_return_data(estimate.return_data).map(hex::encode) {
-            Ok(h) => (msg, h),
-            Err(e) => (format!("{msg}\n{e:#}"), "".to_string()),
+        let (msg, data) = match decode_fevm_return_data(estimate.return_data) {
+            Ok(h) => (msg, Some(h)),
+            Err(e) => (format!("{msg}\n{e:#}"), None),
         };
-
-        error_with_data(estimate.exit_code, msg, data)
+        error_with_revert(estimate.exit_code, msg, data)
     } else {
         Ok(estimate.gas_limit.into())
     }
@@ -746,8 +748,8 @@ where
         if let Some(data) = data {
             data.to_big_endian(&mut bz);
         }
-        // The client library expects hex encoded string.
-        Ok(hex::encode(bz))
+        // The client library expects hex encoded string. The JS client might want a prefix too.
+        Ok(format!("0x{}", hex::encode(bz)))
     };
 
     let height = data.query_height(block_id).await?;
@@ -870,15 +872,43 @@ where
             from_block,
             to_block,
         } => {
+            // Turn block number into a height.
+            async fn resolve_height<C: Client + Send + Sync>(
+                data: &JsonRpcData<C>,
+                bn: BlockNumber,
+            ) -> JsonRpcResult<Height> {
+                match bn {
+                    BlockNumber::Number(n) => {
+                        Ok(Height::try_from(n.as_u64()).context("invalid height")?)
+                    }
+                    other => {
+                        let h = data.header_by_height(other).await?;
+                        Ok(h.height)
+                    }
+                }
+            }
+
             let from_block = from_block.unwrap_or_default();
-            let to_block = to_block.unwrap_or_default();
-            let to_header = data.header_by_height(to_block).await?;
-            let from_header = if from_block == to_block {
-                to_header.clone()
+            let mut to_block = to_block.unwrap_or_default();
+
+            // Automatically restrict the end to the highest available block to allow queries by fixed ranges.
+            // This is only applied ot the end, not the start, so if `from > to` then we return nothing.
+            if let BlockNumber::Number(n) = to_block {
+                let latest_height = data.latest_height().await?;
+                if n.as_u64() > latest_height.value() {
+                    to_block = BlockNumber::Number(et::U64::from(latest_height.value()));
+                }
+            }
+
+            // Resolve named heights to a number.
+            let to_height = resolve_height(&data, to_block).await?;
+            let from_height = if from_block == to_block {
+                to_height
             } else {
-                data.header_by_height(from_block).await?
+                resolve_height(&data, from_block).await?
             };
-            (from_header.height, to_header.height)
+
+            (from_height, to_height)
         }
         et::FilterBlockOption::AtBlockHash(block_hash) => {
             let header = data.header_by_hash(block_hash).await?;

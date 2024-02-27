@@ -84,7 +84,7 @@ lazy_static! {
                             abi: ia::subnet_actor_manager_facet::SUBNETACTORMANAGERFACET_ABI
                                 .to_owned(),
                         },
-EthFacet {
+                        EthFacet {
                             name: "SubnetActorRewardFacet",
                             abi: ia::subnet_actor_reward_facet::SUBNETACTORREWARDFACET_ABI.to_owned(),
                         },

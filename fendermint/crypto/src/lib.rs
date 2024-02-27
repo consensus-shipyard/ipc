@@ -1,10 +1,32 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use base64::engine::GeneralPurpose;
+use base64::engine::{DecodePaddingMode, GeneralPurposeConfig};
+use base64::{alphabet, Engine};
 use rand::Rng;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 pub use libsecp256k1::{PublicKey, RecoveryId, Signature};
+
+/// A [`GeneralPurpose`] engine using the [`alphabet::STANDARD`] base64 alphabet
+/// padding bytes when writing but requireing no padding when reading.
+const B64_ENGINE: GeneralPurpose = GeneralPurpose::new(
+    &alphabet::STANDARD,
+    GeneralPurposeConfig::new()
+        .with_encode_padding(true)
+        .with_decode_padding_mode(DecodePaddingMode::Indifferent),
+);
+
+/// Encode bytes in a format that the Genesis deserializer can handle.
+pub fn to_b64(bz: &[u8]) -> String {
+    B64_ENGINE.encode(bz)
+}
+
+/// Decode bytes from Base64
+pub fn from_b64(b64: &str) -> anyhow::Result<Vec<u8>> {
+    Ok(B64_ENGINE.decode(b64)?)
+}
 
 /// Create a new key and make sure the wrapped public key is normalized,
 /// which is to ensure the results look the same after a serialization roundtrip.

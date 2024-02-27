@@ -16,6 +16,16 @@ On Linux (links and instructions for Ubuntu):
 - Install Docker. See [instructions](https://docs.docker.com/engine/install/ubuntu/).
 - Install Foundry. See [instructions](https://book.getfoundry.sh/getting-started/installation).
 
+On MacOS:
+- Install Xcode from App Store or terminal: xcode-select --install
+- Install Homebrew: https://brew.sh/
+- Install dependencies: brew install jq
+- Install Rust: https://www.rust-lang.org/tools/install (if you have homebrew installed rust, you may need to uninstall that if you get errors in the build)
+- Install Cargo make: cargo install --force cargo-make
+- Install docker: https://docs.docker.com/desktop/install/mac-install/
+- Install foundry: https://book.getfoundry.sh/getting-started/installation
+  
+
 ## Building
 
 ```
@@ -26,8 +36,10 @@ rustup target add wasm32-unknown-unknown
 sudo usermod -aG docker $USER && newgrp docker
 
 # clone this repo and build
-git clone https://github.com/consensus-shipyard/ipc-monorepo.git
-cd ipc-monorepo
+git clone https://github.com/consensus-shipyard/ipc.git
+cd ipc/contracts
+make gen
+cd ..
 cargo build --release
 
 # building will generate the following binaries
@@ -53,7 +65,7 @@ make test
 
 ## Documentation and Guides
 
-**We've prepared a [quick start guide](./docs/ipc/quickstart-calibration.md) that will have you running and validating on your own subnet quickly, at the cost of detailed explanations.**
+**We've prepared a [quick start guide](https://docs.ipc.space/quickstarts/deploy-a-subnet) that will have you running and validating on your own subnet quickly, at the cost of detailed explanations.**
 
 For further documentation, see:
 - [docs/contracts.md](./docs/ipc/contracts.md) for instructions on how to deploy FEVM actors on subnets.
@@ -88,16 +100,6 @@ network_type = "fevm"
 provider_http = "https://api.calibration.node.glif.io/rpc/v1"
 gateway_addr = "0x1AEe8A878a22280fc2753b3C63571C8F895D2FE3"
 registry_addr = "0x0b4e239FF21b40120cDa817fba77bD1B366c1bcD"
-
-# Mycelium Calibration
-[[subnets]]
-id = "/r314159/t410fx23amesh6qvzfzl744uzdr76vlsysb6nnp3us4q"
-
-[subnets.config]
-network_type = "fevm"
-provider_http = "https://api.mycelium.calibration.node.glif.io/"
-gateway_addr = "0x77aa40b105843728088c0132e43fc44348881da8"
-registry_addr = "0x74539671a1d2f1c8f200826baba665179f53a1b7"
 ```
 
 To be able to interact with Calibration and run new subnets, some FIL should be provided to, at least, the wallet that will be used by the `ipc-cli` to interact with IPC. You can request some tFIL for your address through the [Calibration Faucet](https://faucet.calibration.fildev.network/funds.html).

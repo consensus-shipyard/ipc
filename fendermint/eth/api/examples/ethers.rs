@@ -600,7 +600,7 @@ where
     let receipt = request(
         "eth_sendRawTransaction",
         send_transaction(&mw, coin_send.tx, "coin_send").await,
-        |receipt| !receipt.logs.is_empty(),
+        |receipt| !receipt.logs.is_empty() && receipt.logs.iter().all(|l| l.log_type.is_none()),
     )?;
 
     tracing::info!(tx_hash = ?receipt.transaction_hash, "coin sent");
@@ -619,6 +619,14 @@ where
         mw.get_logs(&Filter::new().at_block_hash(receipt.block_hash.unwrap()))
             .await,
         |logs| *logs == receipt.logs,
+    )?;
+
+    // Check that requesting logs with higher-than-highest height does not fail.
+    request(
+        "eth_getLogs /w too high 'to' height",
+        mw.get_logs(&Filter::new().to_block(BlockNumber::Number(U64::from(u32::MAX))))
+            .await,
+        |logs: &Vec<Log>| logs.is_empty(), // There will be nothing from latest-to-latest by now.
     )?;
 
     // See what kind of events were logged.

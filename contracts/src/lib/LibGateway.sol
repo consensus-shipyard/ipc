@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-pragma solidity 0.8.19;
+pragma solidity ^0.8.23;
 
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {GatewayActorStorage, LibGatewayActorStorage} from "../lib/LibGatewayActorStorage.sol";
@@ -8,7 +8,7 @@ import {SubnetID, Subnet, SupplyKind, SupplySource} from "../structs/Subnet.sol"
 import {SubnetActorGetterFacet} from "../subnet/SubnetActorGetterFacet.sol";
 import {CallMsg, IpcMsgKind, IpcEnvelope, OutcomeType, BottomUpMsgBatch, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../structs/CrossNet.sol";
 import {Membership} from "../structs/Subnet.sol";
-import {CannotSendCrossMsgToItself, MethodNotAllowed, MaxMsgsPerBatchExceeded, InvalidCrossMsgNonce, InvalidCrossMsgDstSubnet, OldConfigurationNumber, NotRegisteredSubnet, InvalidActorAddress, ParentFinalityAlreadyCommitted} from "../errors/IPCErrors.sol";
+import {CannotSendCrossMsgToItself, MethodNotAllowed, MaxMsgsPerBatchExceeded, InvalidXnetMessage ,OldConfigurationNumber, NotRegisteredSubnet, InvalidActorAddress, ParentFinalityAlreadyCommitted, InvalidXnetMessageReason} from "../errors/IPCErrors.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
@@ -27,8 +27,6 @@ library LibGateway {
     event NewTopDownMessage(address indexed subnet, IpcEnvelope message);
     /// @dev event emitted when there is a new bottom-up message batch to be signed.
     event NewBottomUpMsgBatch(uint256 indexed epoch, BottomUpMsgBatch batch);
-
-    error CannotCreateIpcReceipt();
 
     /// @notice returns the current bottom-up checkpoint
     /// @return exists - whether the checkpoint exists
@@ -360,7 +358,7 @@ library LibGateway {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
 
         if (crossMsg.to.subnetId.isEmpty()) {
-            sendReceipt(crossMsg, OutcomeType.SystemErr, abi.encodeWithSelector(InvalidCrossMsgDstSubnet.selector));
+            sendReceipt(crossMsg, OutcomeType.SystemErr, abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.DstSubnet));
             return;
         }
 
@@ -379,7 +377,7 @@ library LibGateway {
                 return;
             }
             if (subnet.appliedBottomUpNonce != crossMsg.nonce) {
-                sendReceipt(crossMsg, OutcomeType.SystemErr, abi.encodeWithSelector(InvalidCrossMsgNonce.selector));
+                sendReceipt(crossMsg, OutcomeType.SystemErr, abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Nonce));
                 return;
             }
             subnet.appliedBottomUpNonce += 1;
@@ -390,7 +388,7 @@ library LibGateway {
         } else if (applyType == IPCMsgType.TopDown) {
             // Note: there is no need to load the subnet, as a top-down application means that _we_ are the subnet.
             if (s.appliedTopDownNonce != crossMsg.nonce) {
-                sendReceipt(crossMsg, OutcomeType.SystemErr, abi.encodeWithSelector(InvalidCrossMsgNonce.selector));
+                sendReceipt(crossMsg, OutcomeType.SystemErr, abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Nonce));
                 return;
             }
             s.appliedTopDownNonce += 1;
@@ -442,20 +440,22 @@ library LibGateway {
     /// failing network.
     /// (we could optionally trigger a receipt from `Transfer`s to, but without
     /// multi-level execution it would be adding unnecessary overhead).
-    function sendReceipt(IpcEnvelope memory crossMsg, OutcomeType outcomeType, bytes memory ret) internal {
-        if (crossMsg.isEmpty()) {
-            revert CannotCreateIpcReceipt();
+    function sendReceipt(IpcEnvelope memory original, OutcomeType outcomeType, bytes memory ret) internal {
+        if (original.isEmpty()) {
+            // This should not happen as previous validation should prevent empty messages arriving here.
+            // If it does, we simply ignore.
+            return;
         }
 
         // if we get a `Receipt` do nothing, no need to send receipts.
         // - And sending a `Receipt` to a `Receipt` could lead to amplification loops.
-        if (crossMsg.kind == IpcMsgKind.Result) {
+        if (original.kind == IpcMsgKind.Result) {
             return;
         }
 
         // commmit the receipt for propagation
         // slither-disable-next-line unused-return
-        commitCrossMessage(crossMsg.createResultMsg(outcomeType, ret));
+        commitCrossMessage(original.createResultMsg(outcomeType, ret));
     }
 
     /**
@@ -473,7 +473,7 @@ library LibGateway {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
         SubnetID memory to = crossMessage.to.subnetId;
         if (to.isEmpty()) {
-            revert InvalidCrossMsgDstSubnet();
+            revert InvalidXnetMessage(InvalidXnetMessageReason.DstSubnet);
         }
         // destination is the current network, you are better off with a good old message, no cross needed
         if (to.equals(s.networkName)) {
@@ -505,8 +505,10 @@ library LibGateway {
             // Check the next subnet (which can may be the destination subnet).
             reject = to.down(s.networkName).getActor().hasSupplyOfKind(SupplyKind.ERC20);
         }
-        if (reject && crossMessage.kind == IpcMsgKind.Transfer) {
-            revert MethodNotAllowed("propagation of `Transfer` messages not suppported for subnets with ERC20 supply");
+        if (reject) {
+            if (crossMessage.kind == IpcMsgKind.Transfer) {
+                revert MethodNotAllowed("propagation of `Transfer` messages not suppported for subnets with ERC20 supply");
+            }
         }
 
         // If the directionality is top-down, or if we're inverting the direction

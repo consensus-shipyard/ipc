@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-pragma solidity 0.8.19;
+pragma solidity ^0.8.23;
 
 import {GatewayActorModifiers} from "../../lib/LibGatewayActorStorage.sol";
 import {IpcEnvelope, SubnetID} from "../../structs/CrossNet.sol";
@@ -14,7 +14,7 @@ import {CrossMsgHelper} from "../../lib/CrossMsgHelper.sol";
 import {SupplySourceHelper} from "../../lib/SupplySourceHelper.sol";
 import {SupplySource} from "../../structs/Subnet.sol";
 
-import {InvalidCrossMsgNonce, InvalidCrossMsgNonce, NotRegisteredSubnet} from "../../errors/IPCErrors.sol";
+import {NotRegisteredSubnet} from "../../errors/IPCErrors.sol";
 
 contract XnetMessagingFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;

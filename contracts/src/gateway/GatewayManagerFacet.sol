@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-pragma solidity 0.8.19;
+pragma solidity ^0.8.23;
 
 import {GatewayActorModifiers} from "../lib/LibGatewayActorStorage.sol";
 import {SubnetActorGetterFacet} from "../subnet/SubnetActorGetterFacet.sol";
@@ -8,7 +8,7 @@ import {IpcEnvelope} from "../structs/CrossNet.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {SubnetID, Subnet, SupplySource} from "../structs/Subnet.sol";
 import {Membership, SupplyKind} from "../structs/Subnet.sol";
-import {AlreadyRegisteredSubnet, CannotReleaseZero, MethodNotAllowed, NotEnoughFunds, NotEnoughFundsToRelease, NotEnoughCollateral, NotEmptySubnetCircSupply, NotRegisteredSubnet, InvalidCrossMsgValue} from "../errors/IPCErrors.sol";
+import {AlreadyRegisteredSubnet, CannotReleaseZero, MethodNotAllowed, NotEnoughFunds, NotEnoughFundsToRelease, NotEnoughCollateral, NotEmptySubnetCircSupply, NotRegisteredSubnet, InvalidXnetMessage, InvalidXnetMessageReason} from "../errors/IPCErrors.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
@@ -33,9 +33,9 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     function register(uint256 genesisCircSupply) external payable {
         // If L2+ support is not enabled, only allow the registration of new
         // subnets in the root
-        // if (s.networkName.route.length + 1 >= s.maxTreeDepth) {
-        //     revert MethodNotAllowed(ERR_CHILD_SUBNET_NOT_ALLOWED);
-        // }
+        if (s.networkName.route.length + 1 >= s.maxTreeDepth) {
+            revert MethodNotAllowed(ERR_CHILD_SUBNET_NOT_ALLOWED);
+        }
 
         if (msg.value < genesisCircSupply) {
             revert NotEnoughFunds();
@@ -44,7 +44,6 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         SubnetID memory subnetId = s.networkName.createSubnetId(msg.sender);
 
         (bool registered, Subnet storage subnet) = LibGateway.getSubnet(subnetId);
-
         if (registered) {
             revert AlreadyRegisteredSubnet();
         }
@@ -55,7 +54,6 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         subnet.circSupply = genesisCircSupply;
 
         s.subnetKeys.add(subnetId.toHash());
-
         s.totalSubnets += 1;
     }
 
@@ -114,6 +112,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
 
         s.totalSubnets -= 1;
         delete s.subnets[id];
+
         s.subnetKeys.remove(id);
 
         payable(msg.sender).sendValue(stake);
@@ -129,7 +128,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     function fund(SubnetID calldata subnetId, FvmAddress calldata to) external payable {
         if (msg.value == 0) {
             // prevent spamming if there's no value to fund.
-            revert InvalidCrossMsgValue();
+            revert InvalidXnetMessage(InvalidXnetMessageReason.Value);
         }
         // slither-disable-next-line unused-return
         (bool registered, ) = LibGateway.getSubnet(subnetId);
@@ -160,6 +159,11 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     /// @param to The funded address.
     /// @param amount The amount of ERC20 tokens to be sent.
     function fundWithToken(SubnetID calldata subnetId, FvmAddress calldata to, uint256 amount) external nonReentrant {
+        if (amount == 0) {
+            // prevent spamming if there's no value to fund.
+            revert InvalidXnetMessage(InvalidXnetMessageReason.Value);
+        }
+
         // Check that the supply strategy is ERC20.
         // There is no need to check whether the subnet exists. If it doesn't exist, the call to getter will revert.
         // LibGateway.commitTopDownMsg will also revert if the subnet doesn't exist.
@@ -188,7 +192,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     function release(FvmAddress calldata to) external payable {
         if (msg.value == 0) {
             // prevent spamming if there's no value to release.
-            revert InvalidCrossMsgValue();
+            revert InvalidXnetMessage(InvalidXnetMessageReason.Value);
         }
         IpcEnvelope memory crossMsg = CrossMsgHelper.createReleaseMsg({
             subnet: s.networkName,

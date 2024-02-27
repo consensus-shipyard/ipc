@@ -9,6 +9,7 @@ use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use ethers::abi::Tokenize;
 use ethers::core::types as et;
+use fendermint_actor_eam::PermissionModeParams;
 use fendermint_eth_hardhat::{Hardhat, FQN};
 use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
@@ -230,7 +231,6 @@ where
             .context("failed to create reward actor")?;
 
         // STAGE 1b: Then we initialize the in-repo custom actors.
-        //
 
         // Initialize the chain metadata actor which handles saving metadata about the chain
         // (e.g. block hashes) which we can query.
@@ -247,6 +247,21 @@ where
                 None,
             )
             .context("failed to create chainmetadata actor")?;
+
+        let eam_state = fendermint_actor_eam::State::new(
+            state.store(),
+            PermissionModeParams::from(genesis.eam_permission_mode),
+        )?;
+        state
+            .replace_builtin_actor(
+                eam::EAM_ACTOR_NAME,
+                eam::EAM_ACTOR_ID,
+                fendermint_actor_eam::IPC_EAM_ACTOR_NAME,
+                &eam_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to replace built in eam actor")?;
 
         // Initialize the object store actor.
         let objectstore_state = fendermint_actor_objectstore::State::new(&state.store())?;

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-pragma solidity 0.8.19;
+pragma solidity ^0.8.23;
 
 import { IpcEnvelope, ResultMsg, CallMsg, IpcMsgKind } from "../src/structs/CrossNet.sol";
 import { IPCAddress } from "../src/structs/Subnet.sol";
 import { EMPTY_BYTES } from "../src/constants/Constants.sol";
 import { IGateway } from "../src/interfaces/IGateway.sol";
-import { ReentrancyGuard } from "openzeppelin-contracts/security/ReentrancyGuard.sol";
+import { ReentrancyGuard } from "openzeppelin-contracts/utils/ReentrancyGuard.sol";
 import { Ownable } from "openzeppelin-contracts/access/Ownable.sol";
 import { CrossMsgHelper } from "../src/lib/CrossMsgHelper.sol";
 
@@ -22,7 +22,7 @@ interface IpcHandler {
     function handleIpcMessage(IpcEnvelope calldata envelope) external payable returns (bytes memory ret);
 }
 
-abstract contract IpcExchange is IpcHandler, Ownable {
+abstract contract IpcExchange is IpcHandler, Ownable, ReentrancyGuard  {
     using CrossMsgHelper for IpcEnvelope;
 
     // The address of the gateway in the network.
@@ -76,7 +76,7 @@ abstract contract IpcExchange is IpcHandler, Ownable {
     function _handleIpcResult(IpcEnvelope storage original, IpcEnvelope memory result, ResultMsg memory resultMsg) internal virtual;
 
     /// @notice Method the implementation of this contract can invoke to perform an IPC call.
-    function performIpcCall(IPCAddress calldata to, CallMsg calldata callMsg, uint256 value) internal {
+    function performIpcCall(IPCAddress calldata to, CallMsg calldata callMsg, uint256 value) internal nonReentrant {
         // Queue the cross-net message for dispatch.
         IpcEnvelope memory envelope = IGateway(gatewayAddr).sendContractXnetMessage{value: value}(IpcEnvelope({
             kind: IpcMsgKind.Call,

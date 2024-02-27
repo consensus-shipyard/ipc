@@ -82,6 +82,10 @@ pub struct Options {
     #[arg(long, env = "FM_LOG_DIR")]
     pub log_dir: Option<PathBuf>,
 
+    /// Set a custom prefix for ipc log files.
+    #[arg(long, env = "FM_LOG_FILE_PREFIX")]
+    pub log_file_prefix: Option<String>,
+
     /// Optionally override the default configuration.
     #[arg(short, long, default_value = "dev")]
     pub mode: String,

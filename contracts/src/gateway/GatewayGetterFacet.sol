@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-pragma solidity 0.8.19;
+pragma solidity ^0.8.23;
 
 import {BottomUpCheckpoint, BottomUpMsgBatch, IpcEnvelope, ParentFinality} from "../structs/CrossNet.sol";
 import {QuorumInfo} from "../structs/Quorum.sol";
@@ -196,7 +196,7 @@ contract GatewayGetterFacet {
 
         BottomUpCheckpoint[] memory checkpoints = new BottomUpCheckpoint[](size);
         for (uint64 i; i < size; ) {
-            checkpoints[i] = s.bottomUpCheckpoints[uint64(heights[i])];
+            checkpoints[i] = s.bottomUpCheckpoints[heights[i]];
             unchecked {
                 ++i;
             }

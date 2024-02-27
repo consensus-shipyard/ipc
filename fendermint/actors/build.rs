@@ -1,16 +1,17 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use fil_actor_bundler::Bundler;
 use std::error::Error;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::thread;
 
-const ACTORS: &[&str] = &["chainmetadata", "objectstore", "accumulator"];
+use fil_actor_bundler::Bundler;
 
-const FILES_TO_WATCH: &[&str] = &["Cargo.toml", "src", "actors"];
+const ACTORS: &[&str] = &["chainmetadata", "eam", "objectstore", "accumulator"];
+
+const FILES_TO_WATCH: &[&str] = &["Cargo.toml", "src"];
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Cargo executable location.
@@ -27,7 +28,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR unset"))
             .join("Cargo.toml");
 
-    for file in FILES_TO_WATCH {
+    for file in [FILES_TO_WATCH, ACTORS].concat() {
         println!("cargo:rerun-if-changed={}", file);
     }
 

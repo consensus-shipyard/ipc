@@ -1,17 +1,21 @@
+use std::collections::HashMap;
+
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use anyhow::{anyhow, Context};
 use cid::Cid;
-use fendermint_actor_accumulator::ACCUMULATOR_ACTOR_NAME;
-use fendermint_actor_chainmetadata::CHAINMETADATA_ACTOR_NAME;
-use fendermint_actor_objectstore::OBJECTSTORE_ACTOR_NAME;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::CborStore;
-use std::collections::HashMap;
+
+use fendermint_actor_accumulator::ACCUMULATOR_ACTOR_NAME;
+use fendermint_actor_chainmetadata::CHAINMETADATA_ACTOR_NAME;
+use fendermint_actor_eam::IPC_EAM_ACTOR_NAME;
+use fendermint_actor_objectstore::OBJECTSTORE_ACTOR_NAME;
 
 // array of required actors
 pub const REQUIRED_ACTORS: &[&str] = &[
     CHAINMETADATA_ACTOR_NAME,
+    IPC_EAM_ACTOR_NAME,
     OBJECTSTORE_ACTOR_NAME,
     ACCUMULATOR_ACTOR_NAME,
 ];

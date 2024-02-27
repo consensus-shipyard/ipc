@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-pragma solidity 0.8.19;
+pragma solidity ^0.8.23;
 
 /// @title Reentrancy Guard
 /// @notice Abstract contract to provide protection against reentrancy
