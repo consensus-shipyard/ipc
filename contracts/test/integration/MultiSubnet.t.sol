@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 import "forge-std/Test.sol";
 import "../../src/errors/IPCErrors.sol";
 import {EMPTY_BYTES, METHOD_SEND} from "../../src/constants/Constants.sol";
-import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMsgKind} from "../../src/structs/CrossNet.sol";
+import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMsgKind, OutcomeType} from "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
 import {SubnetID, Subnet, IPCAddress, Validator} from "../../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
@@ -27,7 +27,7 @@ import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 import {IntegrationTestBase} from "../IntegrationTestBase.sol";
 import {L2GatewayActorDiamond, L1GatewayActorDiamond} from "../IntegrationTestPresets.sol";
-import {TestUtils, MockIpcContract, MockIpcContractPayable, MockIpcContractFallback} from "../helpers/TestUtils.sol";
+import {TestUtils, MockIpcContract, MockIpcContractPayable, MockIpcContractRevert, MockIpcContractFallback} from "../helpers/TestUtils.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
 
@@ -127,6 +127,101 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         assertEq(recipient.balance, amount);
     }
 
+    // A bottom up receipt sending from parent to child. The original message is a
+    // bottom up release message, but the execution worked in the parent, creating
+    // a topdown result message from parent to child
+    function testMultiSubnet_Native_OkResultFromParentToChild() public {
+        address caller = address(new MockIpcContract());
+        address recipient = address(new MockIpcContractPayable());
+        uint256 amount = 3;
+
+        vm.deal(address(rootNativeSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
+        vm.deal(caller, 0);
+        vm.deal(recipient, 0);
+
+        vm.prank(address(rootNativeSubnetActor));
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootNativeSubnetActor), rootGateway);
+
+        IpcEnvelope memory crossMsg = CrossMsgHelper.createReleaseMsg(
+            nativeSubnetName,
+            recipient,
+            FvmAddressHelper.from(caller),
+            amount
+        );
+
+        IpcEnvelope memory resultMsg = CrossMsgHelper.createResultMsg(crossMsg, OutcomeType.Ok, new bytes(0));
+        require(resultMsg.value == 0, "ok receipt should have 0 value");
+
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
+        msgs[0] = resultMsg;
+
+        executeTopDownMsgs(msgs, nativeSubnetName, address(nativeSubnetGateway));
+
+        // works with no state changes
+        assertEq(recipient.balance, 0);
+        assertEq(caller.balance, 0);
+    }
+
+    // A bottom up receipt sending from parent to child. The original message is a
+    // bottom up release message, but the execution encounters system error in the parent,
+    // creating a topdown result message from parent to child
+    function testMultiSubnet_Native_SystemErrResultFromParentToChild() public {
+        address caller = address(new MockIpcContract());
+        address recipient = address(new MockIpcContractPayable());
+        uint256 amount = 3;
+
+        vm.deal(address(rootNativeSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
+
+        vm.prank(address(rootNativeSubnetActor));
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootNativeSubnetActor), rootGateway);
+
+        IpcEnvelope memory crossMsg = CrossMsgHelper.createReleaseMsg(
+            nativeSubnetName,
+            caller,
+            FvmAddressHelper.from(recipient),
+            amount
+        );
+
+        IpcEnvelope memory resultMsg = CrossMsgHelper.createResultMsg(crossMsg, OutcomeType.SystemErr, new bytes(0));
+
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
+        msgs[0] = resultMsg;
+
+        executeTopDownMsgs(msgs, nativeSubnetName, address(nativeSubnetGateway));
+
+        require(caller.balance == amount, "refund not happening");
+    }
+
+    // A bottom up receipt sending from parent to child. The original message is a
+    // bottom up release message, but the execution encounters system error in the parent,
+    // creating a topdown result message from parent to child
+    function testMultiSubnet_Native_ActorErrResultFromParentToChild() public {
+        address caller = address(new MockIpcContract());
+        address recipient = address(new MockIpcContractPayable());
+        uint256 amount = 3;
+
+        vm.deal(address(rootNativeSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
+
+        vm.prank(address(rootNativeSubnetActor));
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootNativeSubnetActor), rootGateway);
+
+        IpcEnvelope memory crossMsg = CrossMsgHelper.createReleaseMsg(
+            nativeSubnetName,
+            caller,
+            FvmAddressHelper.from(recipient),
+            amount
+        );
+
+        IpcEnvelope memory resultMsg = CrossMsgHelper.createResultMsg(crossMsg, OutcomeType.ActorErr, new bytes(0));
+
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
+        msgs[0] = resultMsg;
+
+        executeTopDownMsgs(msgs, nativeSubnetName, address(nativeSubnetGateway));
+
+        require(caller.balance == amount, "refund not happening");
+    }
+
     function testMultiSubnet_Native_NonPayable_FundingFromParentToChildFails() public {
         address caller = address(new MockIpcContract());
         address recipient = address(new MockIpcContractFallback());
@@ -197,6 +292,97 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         assertEq(recipient.balance, amount);
     }
 
+    function testMultiSubnet_Erc20_ReleaseResultOkFromParentToChild() public {
+        address caller = address(new MockIpcContract());
+        address recipient = address(new MockIpcContractPayable());
+        uint256 amount = 3;
+
+        token.transfer(caller, 100);
+        vm.prank(caller);
+        token.approve(address(rootGateway), 100);
+
+        vm.deal(address(rootTokenSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
+        vm.deal(caller, amount);
+
+        vm.prank(address(rootTokenSubnetActor));
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootTokenSubnetActor), rootGateway);
+
+        IpcEnvelope memory crossMsg = CrossMsgHelper.createReleaseMsg(
+            tokenSubnetName,
+            caller,
+            FvmAddressHelper.from(recipient),
+            amount
+        );
+        IpcEnvelope memory resultMsg = CrossMsgHelper.createResultMsg(crossMsg, OutcomeType.Ok, new bytes(0));
+
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
+        msgs[0] = resultMsg;
+
+        executeTopDownMsgs(msgs, tokenSubnetName, address(tokenSubnetGateway));
+
+        assertEq(caller.balance, amount);
+    }
+
+    function testMultiSubnet_Erc20_ReleaseActorErrFromParentToChild() public {
+        address caller = address(new MockIpcContract());
+        address recipient = address(new MockIpcContractPayable());
+        uint256 amount = 3;
+
+        token.transfer(caller, 100);
+        vm.prank(caller);
+        token.approve(address(rootGateway), 100);
+
+        vm.deal(address(rootTokenSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
+        vm.deal(caller, 0);
+
+        vm.prank(address(rootTokenSubnetActor));
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootTokenSubnetActor), rootGateway);
+
+        IpcEnvelope memory crossMsg = CrossMsgHelper.createReleaseMsg(
+            tokenSubnetName,
+            caller,
+            FvmAddressHelper.from(recipient),
+            amount
+        );
+        IpcEnvelope memory resultMsg = CrossMsgHelper.createResultMsg(crossMsg, OutcomeType.ActorErr, new bytes(0));
+
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
+        msgs[0] = resultMsg;
+
+        executeTopDownMsgs(msgs, tokenSubnetName, address(tokenSubnetGateway));
+        require(caller.balance == amount, "refund should have happened");
+    }
+
+    function testMultiSubnet_Erc20_ReleaseSystemErrFromParentToChild() public {
+        address caller = address(new MockIpcContract());
+        address recipient = address(new MockIpcContractPayable());
+        uint256 amount = 3;
+
+        token.transfer(caller, 100);
+        vm.prank(caller);
+        token.approve(address(rootGateway), 100);
+
+        vm.deal(address(rootTokenSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
+        vm.deal(caller, 0);
+
+        vm.prank(address(rootTokenSubnetActor));
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootTokenSubnetActor), rootGateway);
+
+        IpcEnvelope memory crossMsg = CrossMsgHelper.createReleaseMsg(
+            tokenSubnetName,
+            caller,
+            FvmAddressHelper.from(recipient),
+            amount
+        );
+        IpcEnvelope memory resultMsg = CrossMsgHelper.createResultMsg(crossMsg, OutcomeType.SystemErr, new bytes(0));
+
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
+        msgs[0] = resultMsg;
+
+        executeTopDownMsgs(msgs, tokenSubnetName, address(tokenSubnetGateway));
+        require(caller.balance == amount, "refund should have happened");
+    }
+
     function testMultiSubnet_Erc20_NonPayable_FundingFromParentToChildFails() public {
         address caller = address(new MockIpcContract());
         address recipient = address(new MockIpcContractFallback());
@@ -265,6 +451,134 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         assertEq(recipient.balance, amount);
     }
 
+    // The result message from the parent sending a fund message to the child.
+    // The result message would be a bottom up cross message from the child to
+    // the parent.
+    function testMultiSubnet_Native_FundOkResultFromChildToParent() public {
+        address caller = address(new MockIpcContract());
+        address recipient = address(new MockIpcContractPayable());
+        uint256 amount = 3;
+
+        vm.deal(address(rootNativeSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
+        vm.deal(caller, 1 ether);
+
+        vm.prank(address(rootNativeSubnetActor));
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootNativeSubnetActor), rootGateway);
+
+        IpcEnvelope memory crossMsg = CrossMsgHelper.createFundMsg(
+            nativeSubnetName,
+            caller,
+            FvmAddressHelper.from(recipient),
+            amount
+        );
+        IpcEnvelope memory resultMsg = CrossMsgHelper.createResultMsg(crossMsg, OutcomeType.Ok, new bytes(0));
+        IpcEnvelope[] memory crossMsgs = new IpcEnvelope[](1);
+        crossMsgs[0] = resultMsg;
+
+        GatewayManagerFacet manager = GatewayManagerFacet(address(nativeSubnetGateway));
+
+        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+            nativeSubnetName,
+            address(nativeSubnetGateway),
+            crossMsgs
+        );
+
+        submitBottomUpCheckpoint(checkpoint, address(rootNativeSubnetActor));
+
+        // no change to caller's balance
+        assertEq(caller.balance, 1 ether);
+    }
+
+    // The result message from the parent sending a fund message to the child.
+    // The result message would be a bottom up cross message from the child to
+    // the parent.
+    function testMultiSubnet_Native_FundActorErrResultFromChildToParent() public {
+        address caller = address(new MockIpcContract());
+        address recipient = address(new MockIpcContractPayable());
+        uint256 amount = 3;
+
+        vm.deal(address(rootNativeSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
+        vm.deal(caller, 1 ether);
+
+        vm.prank(address(rootNativeSubnetActor));
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootNativeSubnetActor), rootGateway);
+
+        // fund first to provide circulation
+        vm.prank(caller);
+        rootGatewayManager.fund{value: amount}(nativeSubnetName, FvmAddressHelper.from(address(caller)));
+        assertEq(caller.balance, 1 ether - amount);
+
+        IpcEnvelope memory crossMsg = CrossMsgHelper.createFundMsg(
+            nativeSubnetName,
+            caller,
+            FvmAddressHelper.from(recipient),
+            amount
+        );
+        IpcEnvelope memory resultMsg = CrossMsgHelper.createResultMsg(crossMsg, OutcomeType.ActorErr, new bytes(0));
+        IpcEnvelope[] memory crossMsgs = new IpcEnvelope[](1);
+        crossMsgs[0] = resultMsg;
+
+        GatewayManagerFacet manager = GatewayManagerFacet(address(nativeSubnetGateway));
+
+        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+            nativeSubnetName,
+            address(nativeSubnetGateway),
+            crossMsgs
+        );
+
+        submitBottomUpCheckpoint(checkpoint, address(rootNativeSubnetActor));
+
+        // caller's balance should receive the refund
+        assertEq(caller.balance, 1 ether);
+    }
+
+    // The result message from the parent sending a fund message to the child.
+    // The result message would be a bottom up cross message from the child to
+    // the parent.
+    function testMultiSubnet_Native_FundSystemErrResultFromChildToParent() public {
+        address caller = address(new MockIpcContract());
+        address recipient = address(new MockIpcContractPayable());
+        uint256 amount = 3;
+
+        vm.deal(address(rootNativeSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
+        vm.deal(caller, 1 ether);
+
+        vm.prank(address(rootNativeSubnetActor));
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootNativeSubnetActor), rootGateway);
+
+        // fund first to provide circulation
+        vm.prank(caller);
+        rootGatewayManager.fund{value: amount}(nativeSubnetName, FvmAddressHelper.from(address(caller)));
+        assertEq(caller.balance, 1 ether - amount);
+
+        // now the fund propagated to the child and execution is Ok
+        // assuming the Result message is created in the child message batch
+        // and relayer pushed to the parent
+
+        IpcEnvelope memory crossMsg = CrossMsgHelper.createFundMsg(
+            nativeSubnetName,
+            caller,
+            FvmAddressHelper.from(recipient),
+            amount
+        );
+        IpcEnvelope memory resultMsg = CrossMsgHelper.createResultMsg(crossMsg, OutcomeType.SystemErr, new bytes(0));
+        IpcEnvelope[] memory crossMsgs = new IpcEnvelope[](1);
+        crossMsgs[0] = resultMsg;
+
+        GatewayManagerFacet manager = GatewayManagerFacet(address(nativeSubnetGateway));
+
+        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+            nativeSubnetName,
+            address(nativeSubnetGateway),
+            crossMsgs
+        );
+
+        submitBottomUpCheckpoint(checkpoint, address(rootNativeSubnetActor));
+
+        // caller's balance should receive the refund
+        assertEq(caller.balance, 1 ether);
+    }
+
     function testMultiSubnet_Native_NonPayable_ReleaseFromChildToParentFails() public {
         address caller = address(new MockIpcContract());
         address recipient = address(new MockIpcContractFallback());
@@ -318,6 +632,144 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         submitBottomUpCheckpoint(checkpoint, address(rootNativeSubnetActor));
 
         assertEq(recipient.balance, amount);
+    }
+
+    function testMultiSubnet_Erc20_FundResultOkFromChildToParent() public {
+        address caller = address(new MockIpcContract());
+        address recipient = address(new MockIpcContractPayable());
+        uint256 amount = 3;
+
+        token.transfer(caller, amount);
+        vm.prank(caller);
+        token.approve(address(rootGateway), amount);
+
+        vm.deal(address(rootTokenSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
+        vm.deal(caller, 1 ether);
+
+        vm.prank(address(rootTokenSubnetActor));
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootTokenSubnetActor), rootGateway);
+
+        vm.prank(caller);
+        rootGatewayManager.fundWithToken(tokenSubnetName, FvmAddressHelper.from(address(caller)), amount);
+        assertEq(token.balanceOf(caller), 0);
+
+        // now the fund propagated to the child and execution is Ok
+        // assuming the Result message is created in the child message batch
+        // and relayer pushed to the parent
+
+        // simulating the checkpoint pushed from relayer
+        IpcEnvelope memory crossMsg = CrossMsgHelper.createFundMsg(
+            tokenSubnetName,
+            caller,
+            FvmAddressHelper.from(caller),
+            amount
+        );
+        IpcEnvelope memory resultMsg = CrossMsgHelper.createResultMsg(crossMsg, OutcomeType.Ok, new bytes(0));
+        IpcEnvelope[] memory crossMsgs = new IpcEnvelope[](1);
+        crossMsgs[0] = resultMsg;
+
+        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+            tokenSubnetName,
+            address(tokenSubnetGateway),
+            crossMsgs
+        );
+
+        submitBottomUpCheckpoint(checkpoint, address(rootTokenSubnetActor));
+
+        // fund works, so fund is still locked, balance is 0
+        assertEq(token.balanceOf(caller), 0);
+    }
+
+    function testMultiSubnet_Erc20_FundResultSystemErrFromChildToParent() public {
+        address caller = address(new MockIpcContract());
+        address recipient = address(new MockIpcContractPayable());
+        uint256 amount = 3;
+
+        token.transfer(caller, amount);
+        vm.prank(caller);
+        token.approve(address(rootGateway), amount);
+
+        vm.deal(address(rootTokenSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
+        vm.deal(caller, 1 ether);
+
+        vm.prank(address(rootTokenSubnetActor));
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootTokenSubnetActor), rootGateway);
+
+        vm.prank(caller);
+        rootGatewayManager.fundWithToken(tokenSubnetName, FvmAddressHelper.from(address(caller)), amount);
+        assertEq(token.balanceOf(caller), 0);
+
+        // now the fund propagated to the child and execution is Ok
+        // assuming the Result message is created in the child message batch
+        // and relayer pushed to the parent
+
+        // simulating the checkpoint pushed from relayer
+        IpcEnvelope memory crossMsg = CrossMsgHelper.createFundMsg(
+            tokenSubnetName,
+            caller,
+            FvmAddressHelper.from(caller),
+            amount
+        );
+        IpcEnvelope memory resultMsg = CrossMsgHelper.createResultMsg(crossMsg, OutcomeType.SystemErr, new bytes(0));
+        IpcEnvelope[] memory crossMsgs = new IpcEnvelope[](1);
+        crossMsgs[0] = resultMsg;
+
+        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+            tokenSubnetName,
+            address(tokenSubnetGateway),
+            crossMsgs
+        );
+
+        submitBottomUpCheckpoint(checkpoint, address(rootTokenSubnetActor));
+
+        // fund rejected, so fund should be unlocked
+        assertEq(token.balanceOf(caller), amount);
+    }
+
+    function testMultiSubnet_Erc20_FundResultActorErrFromChildToParent() public {
+        address caller = address(new MockIpcContract());
+        address recipient = address(new MockIpcContractPayable());
+        uint256 amount = 3;
+
+        token.transfer(caller, amount);
+        vm.prank(caller);
+        token.approve(address(rootGateway), amount);
+
+        vm.deal(address(rootTokenSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
+        vm.deal(caller, 1 ether);
+
+        vm.prank(address(rootTokenSubnetActor));
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootTokenSubnetActor), rootGateway);
+
+        vm.prank(caller);
+        rootGatewayManager.fundWithToken(tokenSubnetName, FvmAddressHelper.from(address(caller)), amount);
+        assertEq(token.balanceOf(caller), 0);
+
+        // now the fund propagated to the child and execution is Ok
+        // assuming the Result message is created in the child message batch
+        // and relayer pushed to the parent
+
+        // simulating the checkpoint pushed from relayer
+        IpcEnvelope memory crossMsg = CrossMsgHelper.createFundMsg(
+            tokenSubnetName,
+            caller,
+            FvmAddressHelper.from(caller),
+            amount
+        );
+        IpcEnvelope memory resultMsg = CrossMsgHelper.createResultMsg(crossMsg, OutcomeType.ActorErr, new bytes(0));
+        IpcEnvelope[] memory crossMsgs = new IpcEnvelope[](1);
+        crossMsgs[0] = resultMsg;
+
+        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+            tokenSubnetName,
+            address(tokenSubnetGateway),
+            crossMsgs
+        );
+
+        submitBottomUpCheckpoint(checkpoint, address(rootTokenSubnetActor));
+
+        // fund rejected, so fund should be unlocked
+        assertEq(token.balanceOf(caller), amount);
     }
 
     function testMultiSubnet_Erc20_ReleaseFromChildToParent() public {
@@ -387,6 +839,62 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
     //--------------------
     // Call flow tests.
     //---------------------
+
+    function testMultiSubnet_Native_CallResultRevertsFromChildToParent() public {
+        address caller = address(new MockIpcContractRevert());
+        address recipient = address(new MockIpcContractRevert());
+        uint256 amount = 3;
+
+        uint256 initialBalance = 1 ether;
+
+        vm.deal(address(rootNativeSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
+        vm.deal(caller, initialBalance);
+
+        vm.prank(address(rootNativeSubnetActor));
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootNativeSubnetActor), rootGateway);
+
+        require(address(rootGatewayManager).balance == initialBalance, "initial balance not correct");
+
+        uint256 fundToSend = 100000;
+
+        vm.prank(caller);
+        rootGatewayManager.fund{value: fundToSend}(nativeSubnetName, FvmAddressHelper.from(address(caller)));
+
+        require(address(rootGatewayManager).balance == initialBalance + fundToSend, "fund not locked in gateway");
+
+        // a cross network message from parent caller to child recipient
+        IpcEnvelope memory crossMsg = TestUtils.newXnetCallMsg(
+            IPCAddress({subnetId: rootSubnetName, rawAddress: FvmAddressHelper.from(caller)}),
+            IPCAddress({subnetId: nativeSubnetName, rawAddress: FvmAddressHelper.from(recipient)}),
+            amount,
+            0
+        );
+        // result in child is ActorErr, resultMsg should be a bottom up message
+        // from child recipient to the parent caller
+        IpcEnvelope memory resultMsg = CrossMsgHelper.createResultMsg(crossMsg, OutcomeType.ActorErr, new bytes(0));
+        IpcEnvelope[] memory crossMsgs = new IpcEnvelope[](1);
+        crossMsgs[0] = resultMsg;
+
+        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+            nativeSubnetName,
+            address(nativeSubnetGateway),
+            crossMsgs
+        );
+
+        // execution should be in the root native subnet, in the parent
+        // note that the result msg is sent to the caller in the parent,
+        // but the caller is MockIpcContractRevert, which reverts whatever
+        // call made to `handleIpcMessage`, we should make sure:
+        // 1. The submission of checkpoint is never blocked
+        // 2. The fund is locked in the gateway as execution is rejected
+        submitBottomUpCheckpoint(checkpoint, address(rootNativeSubnetActor));
+
+        require(
+            address(rootGatewayManager).balance == initialBalance + fundToSend,
+            "fund should still be locked in gateway"
+        );
+        require(caller.balance == initialBalance - fundToSend, "fund should still be locked in gateway");
+    }
 
     function testMultiSubnet_Native_SendCrossMessageFromChildToParent() public {
         address caller = address(new MockIpcContract());
@@ -466,6 +974,63 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         executeTopDownMsgs(msgs, nativeSubnetName, address(nativeSubnetGateway));
 
         assertEq(address(recipient).balance, amount);
+    }
+
+    function testMultiSubnet_Token_CallResultRevertsFromChildToParent() public {
+        address caller = address(new MockIpcContractRevert());
+        address recipient = address(new MockIpcContractRevert());
+        uint256 amount = 3;
+
+        vm.deal(address(rootTokenSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
+        vm.deal(caller, 1 ether);
+
+        uint256 balance = 100;
+
+        // Fund an account in the subnet.
+        token.transfer(caller, balance);
+        vm.prank(caller);
+        token.approve(address(rootGateway), balance);
+
+        vm.prank(address(rootTokenSubnetActor));
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootTokenSubnetActor), rootGateway);
+
+        uint256 fundToSend = 10;
+
+        vm.prank(caller);
+        rootGatewayManager.fundWithToken(tokenSubnetName, FvmAddressHelper.from(address(caller)), fundToSend);
+
+        require(token.balanceOf(address(rootGatewayManager)) == fundToSend, "initial balance not correct");
+
+        // a cross network message from parent caller to child recipient
+        IpcEnvelope memory crossMsg = TestUtils.newXnetCallMsg(
+            IPCAddress({subnetId: rootSubnetName, rawAddress: FvmAddressHelper.from(caller)}),
+            IPCAddress({subnetId: tokenSubnetName, rawAddress: FvmAddressHelper.from(recipient)}),
+            amount,
+            0
+        );
+
+        // result in child is ActorErr, resultMsg should be a bottom up message
+        // from child recipient to the parent caller
+        IpcEnvelope memory resultMsg = CrossMsgHelper.createResultMsg(crossMsg, OutcomeType.ActorErr, new bytes(0));
+        IpcEnvelope[] memory crossMsgs = new IpcEnvelope[](1);
+        crossMsgs[0] = resultMsg;
+
+        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+            tokenSubnetName,
+            address(tokenSubnetGateway),
+            crossMsgs
+        );
+
+        // execution should be in the root native subnet, in the parent
+        // note that the result msg is sent to the caller in the parent,
+        // but the caller is MockIpcContractRevert, which reverts whatever
+        // call made to `handleIpcMessage`, we should make sure:
+        // 1. The submission of checkpoint is never blocked
+        // 2. The fund is locked in the gateway as execution is rejected
+        submitBottomUpCheckpoint(checkpoint, address(rootTokenSubnetActor));
+
+        require(token.balanceOf(address(rootGatewayManager)) == fundToSend, "fund should still be locked in gateway");
+        require(token.balanceOf(caller) == balance - fundToSend, "fund should still be locked in gateway");
     }
 
     function testMultiSubnet_Token_CallFromChildToParent() public {
@@ -619,6 +1184,35 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: batch.msgs
+        });
+
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        checkpointer.createBottomUpCheckpoint(checkpoint, membershipRoot, weights[0] + weights[1] + weights[2]);
+        vm.stopPrank();
+
+        return checkpoint;
+    }
+
+    function callCreateBottomUpCheckpointFromChildSubnet(
+        SubnetID memory subnet,
+        address gateway,
+        IpcEnvelope[] memory msgs
+    ) internal returns (BottomUpCheckpoint memory checkpoint) {
+        uint256 e = getNextEpoch(block.number, DEFAULT_CHECKPOINT_PERIOD);
+
+        GatewayGetterFacet getter = GatewayGetterFacet(address(gateway));
+        CheckpointingFacet checkpointer = CheckpointingFacet(address(gateway));
+
+        (, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
+
+        (bytes32 membershipRoot, ) = MerkleTreeHelper.createMerkleProofsForValidators(addrs, weights);
+
+        checkpoint = BottomUpCheckpoint({
+            subnetID: subnet,
+            blockHeight: e,
+            blockHash: keccak256("block1"),
+            nextConfigurationNumber: 0,
+            msgs: msgs
         });
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
