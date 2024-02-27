@@ -876,7 +876,10 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         vm.prank(caller);
         rootSubnet.gateway.manager().fund{value: fundToSend}(nativeSubnet.id, FvmAddressHelper.from(address(caller)));
 
-        require(address(rootSubnet.gateway.manager()).balance == initialBalance + fundToSend, "fund not locked in gateway");
+        require(
+            address(rootSubnet.gateway.manager()).balance == initialBalance + fundToSend,
+            "fund not locked in gateway"
+        );
 
         // a cross network message from parent caller to child recipient
         IpcEnvelope memory crossMsg = TestUtils.newXnetCallMsg(
@@ -1044,7 +1047,10 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         // 2. The fund is locked in the gateway as execution is rejected
         submitBottomUpCheckpoint(checkpoint, tokenSubnet.subnetActor);
 
-        require(token.balanceOf(address(rootSubnet.gateway.manager())) == fundToSend, "fund should still be locked in gateway");
+        require(
+            token.balanceOf(address(rootSubnet.gateway.manager())) == fundToSend,
+            "fund should still be locked in gateway"
+        );
         require(token.balanceOf(caller) == balance - fundToSend, "fund should still be locked in gateway");
     }
 
