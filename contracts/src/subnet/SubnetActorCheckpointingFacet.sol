@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {InvalidBatchEpoch, MaxMsgsPerBatchExceeded, InvalidSignatureErr, InvalidCheckpointEpoch, BottomUpCheckpointAlreadySubmitted} from "../errors/IPCErrors.sol";
+import {InvalidBatchEpoch, MaxMsgsPerBatchExceeded, InvalidSignatureErr, InvalidCheckpointEpoch} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {BottomUpCheckpoint, BottomUpMsgBatch, BottomUpMsgBatchInfo} from "../structs/CrossNet.sol";
 import {Validator, ValidatorSet} from "../structs/Subnet.sol";
@@ -31,10 +31,6 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
         ensureValidCheckpoint(checkpoint);
 
         bytes32 checkpointHash = keccak256(abi.encode(checkpoint));
-
-        if (s.committedCheckpoints[checkpoint.blockHeight].blockHeight != 0) {
-            revert BottomUpCheckpointAlreadySubmitted();
-        }
 
         // there is no check against the checkpoint period. Whatever the child validators
         // agree on submission, it's accepted. This is also needed when a bottom up msg bundle
