@@ -1,16 +1,16 @@
-use std::{convert::Infallible, net::SocketAddr};
 use std::future::Future;
 use std::num::ParseIntError;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::{convert::Infallible, net::SocketAddr};
 
 use anyhow::anyhow;
 use async_tempfile::TempFile;
 use bytes::{Buf, Bytes};
 use cid::Cid;
 use futures_util::{Stream, StreamExt};
-use fvm_shared::BLOCK_GAS_LIMIT;
 use fvm_shared::econ::TokenAmount;
+use fvm_shared::BLOCK_GAS_LIMIT;
 use ipfs_api_backend_hyper::{IpfsApi, IpfsClient};
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
@@ -21,8 +21,8 @@ use thiserror::Error;
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 use tokio::sync::Mutex;
 use tokio_util::compat::TokioAsyncReadCompatExt;
-use warp::{Filter, http::StatusCode, Rejection, Reply};
 use warp::http::{HeaderMap, HeaderValue};
+use warp::{http::StatusCode, Filter, Rejection, Reply};
 
 use fendermint_actor_objectstore::Object;
 use fendermint_rpc::client::FendermintClient;
@@ -37,7 +37,7 @@ use crate::options::{
     rpc::TransArgs,
 };
 
-use super::rpc::{BroadcastResponse, gas_params, TransClient};
+use super::rpc::{gas_params, BroadcastResponse, TransClient};
 
 const MAX_EVENT_LENGTH: u64 = 1024 * 500; // Limit to 500KiB for now
 
@@ -343,15 +343,16 @@ async fn handle_os_get(
             let val = value.to_string();
 
             let ipfs = IpfsClient::default();
-            let stat = ipfs.object_stat(&val).await.map_err(|e| {
+            let stat = ipfs.object_links(&val).await.map_err(|e| {
                 Rejection::from(BadRequest {
                     message: format!("failed to stat object: {}", e),
                 })
             })?;
+            let size = stat.links.iter().fold(0, |sum, i| sum + (i.size));
 
             let (stream, start, end, len) = match range {
                 Some(range) => {
-                    let (start, end) = get_range_params(range, stat.data_size).map_err(|e| {
+                    let (start, end) = get_range_params(range, size).map_err(|e| {
                         Rejection::from(BadRequest {
                             message: format!("failed to get range params: {}", e),
                         })
@@ -364,12 +365,12 @@ async fn handle_os_get(
                         len,
                     )
                 }
-                None => (ipfs.cat(&val), 0, stat.data_size - 1, stat.data_size),
+                None => (ipfs.cat(&val), 0, size - 1, size),
             };
             let body = warp::hyper::Body::wrap_stream(stream);
             let mut response = warp::reply::Response::new(body);
 
-            if len < stat.data_size {
+            if len < size {
                 *response.status_mut() = StatusCode::PARTIAL_CONTENT;
             }
 
