@@ -13,7 +13,9 @@ use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use lazy_static::lazy_static;
-use serde::{Deserialize, Serialize};
+use serde::de::Error;
+use serde::ser::SerializeSeq;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::serde_as;
 use std::fmt::{Display, Formatter};
 
@@ -54,6 +56,8 @@ impl Display for QuorumReachedEvent {
 pub struct BottomUpCheckpointBundle {
     pub checkpoint: BottomUpCheckpoint,
     /// The list of signatures that have signed the checkpoint hash
+    #[serde(deserialize_with = "deserialize_vec_bytes_from_vec_hex")]
+    #[serde(serialize_with = "serialize_vec_bytes_to_hex")]
     pub signatures: Vec<Signature>,
     /// The list of addresses that have signed the checkpoint hash
     pub signatories: Vec<Address>,
@@ -88,4 +92,60 @@ pub struct BottomUpCheckpoint {
     pub next_configuration_number: u64,
     /// The list of messages for execution
     pub msgs: Vec<IpcEnvelope>,
+}
+
+fn deserialize_vec_bytes_from_vec_hex<'de, D>(
+    deserializer: D,
+) -> anyhow::Result<Vec<Vec<u8>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let data = <Vec<String>>::deserialize(deserializer)?;
+
+    let mut ret = Vec::new();
+    for s in data {
+        let s =
+            hex::decode(&s).map_err(|_| D::Error::custom(format!("cannot decode hex: {}", s)))?;
+        ret.push(s);
+    }
+    Ok(ret)
+}
+
+pub fn serialize_vec_bytes_to_hex<T: AsRef<[u8]>, S>(data: &[T], s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let values = data.iter().map(hex::encode).collect::<Vec<_>>();
+
+    let mut seq = s.serialize_seq(Some(values.len()))?;
+    for element in values {
+        seq.serialize_element(&element)?;
+    }
+    seq.end()
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::checkpoint::{
+        deserialize_vec_bytes_from_vec_hex, serialize_vec_bytes_to_hex, Signature,
+    };
+    use serde::{Deserialize, Serialize};
+
+    #[test]
+    fn test_serialization_vec_vec_u8() {
+        #[derive(Debug, Serialize, Deserialize, PartialEq)]
+        struct T {
+            #[serde(deserialize_with = "deserialize_vec_bytes_from_vec_hex")]
+            #[serde(serialize_with = "serialize_vec_bytes_to_hex")]
+            d: Vec<Signature>,
+        }
+
+        let t = T {
+            d: vec![vec![1; 30], vec![2; 30]],
+        };
+        let s = serde_json::to_string(&t).unwrap();
+        let r: T = serde_json::from_str(&s).unwrap();
+
+        assert_eq!(r, t);
+    }
 }
