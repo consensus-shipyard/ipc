@@ -4,6 +4,7 @@
 
 use crate::cross::IpcEnvelope;
 use crate::subnet_id::SubnetID;
+use crate::HumanReadable;
 use cid::multihash::Code;
 use cid::multihash::MultihashDigest;
 use cid::Cid;
@@ -64,9 +65,11 @@ pub struct BottomUpCheckpointBundle {
 }
 
 /// The collection of items for the bottom up checkpoint submission
+#[serde_as]
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
 pub struct BottomUpMsgBatch {
     /// Child subnet ID, for replay protection from other subnets where the exact same validators operate
+    #[serde_as(as = "HumanReadable")]
     pub subnet_id: SubnetID,
     /// The height of the child subnet at which the batch was cut
     pub block_height: ChainEpoch,
@@ -126,24 +129,46 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::address::IPCAddress;
     use crate::checkpoint::{
         deserialize_vec_bytes_from_vec_hex, serialize_vec_bytes_to_hex, Signature,
     };
+    use crate::subnet_id::SubnetID;
+    use crate::HumanReadable;
+    use fvm_shared::address::Address;
     use serde::{Deserialize, Serialize};
+    use serde_with::serde_as;
+    use std::str::FromStr;
 
     #[test]
     fn test_serialization_vec_vec_u8() {
+        #[serde_as]
         #[derive(Debug, Serialize, Deserialize, PartialEq)]
         struct T {
             #[serde(deserialize_with = "deserialize_vec_bytes_from_vec_hex")]
             #[serde(serialize_with = "serialize_vec_bytes_to_hex")]
             d: Vec<Signature>,
+            #[serde_as(as = "HumanReadable")]
+            subnet_id: SubnetID,
+            #[serde_as(as = "HumanReadable")]
+            ipc_address: IPCAddress,
         }
+
+        let subnet_id =
+            SubnetID::from_str("/r31415926/f2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq").unwrap();
+        let ipc_address = IPCAddress::new(&subnet_id, &Address::new_id(101)).unwrap();
 
         let t = T {
             d: vec![vec![1; 30], vec![2; 30]],
+            subnet_id,
+            ipc_address,
         };
         let s = serde_json::to_string(&t).unwrap();
+        assert_eq!(
+            s,
+            r#"{"d":["010101010101010101010101010101010101010101010101010101010101","020202020202020202020202020202020202020202020202020202020202"],"subnet_id":"/r31415926/f2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq","ipc_address":"/r31415926/f2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq:f0101"}"#
+        );
+
         let r: T = serde_json::from_str(&s).unwrap();
 
         assert_eq!(r, t);

@@ -3,12 +3,12 @@
 use crate::error::Error;
 use crate::subnet_id::SubnetID;
 use fvm_shared::address::{Address, Protocol};
-use serde::{Deserialize, Serialize};
+use serde_tuple::{Deserialize_tuple, Serialize_tuple};
 use std::{fmt, str::FromStr};
 
 const IPC_SEPARATOR_ADDR: &str = ":";
 
-#[derive(Clone, PartialEq, Eq, Debug, Hash, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash, Serialize_tuple, Deserialize_tuple)]
 pub struct IPCAddress {
     subnet_id: SubnetID,
     raw_address: Address,

@@ -4,6 +4,7 @@
 
 use crate::address::IPCAddress;
 use crate::subnet_id::SubnetID;
+use crate::HumanReadable;
 use anyhow::anyhow;
 use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
@@ -20,10 +21,12 @@ pub struct IpcEnvelope {
     /// It makes sense to extract from the encoded message
     /// all shared fields required by all message, so they
     /// can be inspected without having to decode the message.
+    #[serde_as(as = "HumanReadable")]
     pub to: IPCAddress,
     /// Value included in the envelope
     pub value: TokenAmount,
     /// address sending the message
+    #[serde_as(as = "HumanReadable")]
     pub from: IPCAddress,
     /// abi.encoded message
     #[serde_as(as = "serde_with::hex::Hex")]
