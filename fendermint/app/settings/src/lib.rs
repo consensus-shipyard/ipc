@@ -231,11 +231,15 @@ impl Settings {
     /// then overrides from the local environment.
     pub fn new(config_dir: &Path, home_dir: &Path, run_mode: &str) -> Result<Self, ConfigError> {
         let c = Config::builder()
-            .add_source(File::from(config_dir.join("default")))
+            .add_source(EnvInterpol(File::from(config_dir.join("default"))))
             // Optional mode specific overrides, checked into git.
-            .add_source(File::from(config_dir.join(run_mode)).required(false))
+            .add_source(EnvInterpol(
+                File::from(config_dir.join(run_mode)).required(false),
+            ))
             // Optional local overrides, not checked into git.
-            .add_source(File::from(config_dir.join("local")).required(false))
+            .add_source(EnvInterpol(
+                File::from(config_dir.join("local")).required(false),
+            ))
             // Add in settings from the environment (with a prefix of FM)
             // e.g. `FM_DB__DATA_DIR=./foo/bar ./target/app` would set the database location.
             .add_source(EnvInterpol(
