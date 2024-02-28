@@ -3,6 +3,8 @@
 
 use std::path::{Path, PathBuf};
 
+use config::{ConfigError, Environment, Source, Value, ValueKind};
+
 #[macro_export]
 macro_rules! home_relative {
     // Using this inside something that has a `.home_dir()` function.
@@ -60,6 +62,33 @@ pub fn expand_tilde<P: AsRef<Path>>(path: P) -> PathBuf {
             }
         })
         .unwrap_or(p)
+}
+
+#[derive(Clone, Debug)]
+pub struct EnvInterpol(Environment);
+
+impl Source for EnvInterpol {
+    fn clone_into_box(&self) -> Box<dyn Source + Send + Sync> {
+        Box::new(self.clone())
+    }
+
+    fn collect(&self) -> Result<config::Map<String, config::Value>, ConfigError> {
+        let mut values = self.0.collect()?;
+
+        for value in values.values_mut() {
+            match value.kind {
+                ValueKind::String(ref s) => todo!(),
+                _ => {}
+            }
+        }
+
+        Ok(values)
+    }
+}
+
+/// Find values in the string that can be interpolated, e.g. "${NOMAD_HOST_ADDRESS_cometbft_p2p}"
+fn find_vars(value: &str) -> Vec<String> {
+    todo!()
 }
 
 #[cfg(test)]
