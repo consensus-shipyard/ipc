@@ -690,8 +690,14 @@ impl SubnetManager for EthSubnetManager {
             self.ipc_contract_info.gateway_addr,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
-        log::debug!("gateway_contract address : {:?}", self.ipc_contract_info.gateway_addr);
-        log::debug!("gateway_contract_getter_facet address : {:?}", gateway_contract.address());
+        log::debug!(
+            "gateway_contract address : {:?}",
+            self.ipc_contract_info.gateway_addr
+        );
+        log::debug!(
+            "gateway_contract_getter_facet address : {:?}",
+            gateway_contract.address()
+        );
 
         let commit_sha = gateway_contract
             .get_commit_sha()

@@ -5,8 +5,8 @@ use async_trait::async_trait;
 use clap::Args;
 use ipc_api::subnet_id::SubnetID;
 use std::fmt::Debug;
-use std::str::FromStr;
 use std::str::from_utf8;
+use std::str::FromStr;
 
 use crate::{get_ipc_provider, CommandLineHandler, GlobalArguments};
 
@@ -25,7 +25,10 @@ impl CommandLineHandler for ShowGatewayContractCommitSha {
         let commit_sha = provider.get_commit_sha(&subnet).await?;
         let commit_sha_str = from_utf8(&commit_sha).unwrap();
 
-        println!("Using commit SHA {} for contracts in subnet {}", commit_sha_str, subnet);
+        println!(
+            "Using commit SHA {} for contracts in subnet {}",
+            commit_sha_str, subnet
+        );
 
         Ok(())
     }
