@@ -9,7 +9,8 @@ const { getSelectors, FacetCutAction } = require('./js/diamond.js')
 function getGitCommitSha(): string {
     const commitSha = require('child_process')
         .execSync('git rev-parse --short HEAD')
-        .toString().trim()
+        .toString()
+        .trim()
     return commitSha
 }
 export async function deploy(libs: { [key in string]: string }) {
