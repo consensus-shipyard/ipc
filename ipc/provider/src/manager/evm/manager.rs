@@ -684,7 +684,6 @@ impl SubnetManager for EthSubnetManager {
             .to_string())
     }
 
-
     async fn get_commit_sha(&self) -> Result<[u8; 32]> {
         let gateway_contract = gateway_getter_facet::GatewayGetterFacet::new(
             self.ipc_contract_info.gateway_addr,
