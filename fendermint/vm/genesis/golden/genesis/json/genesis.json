@@ -2,6 +2,7 @@
   "chain_name": "l",
   "timestamp": 13118654904661894111,
   "network_version": 21,
+  "app_version": 0,
   "base_fee": "295189338358586741336982727392336216534",
   "power_scale": 3,
   "validators": [
