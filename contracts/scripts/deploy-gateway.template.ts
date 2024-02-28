@@ -123,9 +123,6 @@ export async function deploy(libs: { [key in string]: string }) {
         commitSha: ethers.utils.formatBytes32String(getGitCommitSha()),
     }
 
-    // console.log(`${JSON.stringify(gatewayConstructorParams)}`)
-    // console.log(`${ethers.utils.parseBytes32String(gatewayConstructorParams.commitSha)}`)
-
     const diamondLibs: Libraries = {}
     // deploy Diamond
     const { address: gatewayAddress } = await deployContractWithDeployer(

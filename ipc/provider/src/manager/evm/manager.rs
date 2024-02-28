@@ -697,7 +697,7 @@ impl SubnetManager for EthSubnetManager {
             .get_commit_sha()
             .call()
             .await
-            .map_err(|e| anyhow!("cannot get applied top down nonce due to: {e:}"))?;
+            .map_err(|e| anyhow!("cannot get commit sha due to: {e:}"))?;
 
         Ok(commit_sha)
     }

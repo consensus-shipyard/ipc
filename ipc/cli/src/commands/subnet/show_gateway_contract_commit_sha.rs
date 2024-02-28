@@ -1,6 +1,5 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
-//! List subnets cli command
 
 use async_trait::async_trait;
 use clap::Args;
@@ -11,7 +10,6 @@ use std::str::from_utf8;
 
 use crate::{get_ipc_provider, CommandLineHandler, GlobalArguments};
 
-/// The command to create a new subnet actor.
 pub(crate) struct ShowGatewayContractCommitSha;
 
 #[async_trait]
@@ -35,8 +33,8 @@ impl CommandLineHandler for ShowGatewayContractCommitSha {
 
 #[derive(Debug, Args)]
 #[command(
-    name = "list",
-    about = "List all child subnets registered in the gateway (i.e. that have provided enough collateral)"
+    name = "show-gateway-contract-commit-sha",
+    about = "Show code commit SHA for contracts deployed in this network"
 )]
 pub(crate) struct ShowGatewayContractCommitShaArgs {
     #[arg(long, help = "The network id to query child subnets")]
