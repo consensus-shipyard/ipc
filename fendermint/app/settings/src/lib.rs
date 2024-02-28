@@ -318,6 +318,8 @@ mod tests {
     // Run these tests serially because they modify the environment.
     #[serial]
     mod env {
+        use multiaddr::multiaddr;
+
         use crate::tests::try_parse_config;
         use crate::utils::tests::with_env_vars;
 
@@ -345,6 +347,31 @@ mod tests {
 
             assert_eq!(settings.resolver.discovery.static_addresses.len(), 0);
             assert_eq!(settings.resolver.membership.static_subnets.len(), 0);
+        }
+
+        #[test]
+        fn parse_with_interpolation() {
+            let settings = with_env_vars(
+                vec![
+                    ("FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES", "/dns4/${SEED_1_HOST}/tcp/${SEED_1_PORT},/dns4/${SEED_2_HOST}/tcp/${SEED_2_PORT}"),
+                    ("SEED_1_HOST", "foo.io"),
+                    ("SEED_1_PORT", "1234"),
+                    ("SEED_2_HOST", "bar.ai"),
+                    ("SEED_2_PORT", "5678"),
+                ],
+                || try_parse_config(""),
+            )
+            .unwrap();
+
+            assert_eq!(settings.resolver.discovery.static_addresses.len(), 2);
+            assert_eq!(
+                settings.resolver.discovery.static_addresses[0],
+                multiaddr!(Dns4("foo.io"), Tcp(1234u16))
+            );
+            assert_eq!(
+                settings.resolver.discovery.static_addresses[1],
+                multiaddr!(Dns4("bar.ai"), Tcp(5678u16))
+            );
         }
     }
 }
