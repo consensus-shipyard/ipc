@@ -25,6 +25,8 @@ serde_tuple = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
 ethers = { workspace = true }
+tracing = { workspace = true }
+serde_with = { workspace = true, features = ["hex"] }
 
 ipc_actors_abis = { workspace = true }
 ipc-types = { workspace = true }

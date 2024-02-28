@@ -152,7 +152,7 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
             ));
         };
 
-        log::debug!("bottom up bundle: {bundle}");
+        log::debug!("bottom up bundle: {}", serde_json::to_string(&bundle)?);
 
         let epoch = self
             .parent_handler
@@ -209,7 +209,7 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                     ));
                 };
 
-                log::debug!("bottom up bundle: {bundle}");
+                log::debug!("bottom up bundle: {}", serde_json::to_string(&bundle)?);
 
                 let epoch = self
                     .parent_handler

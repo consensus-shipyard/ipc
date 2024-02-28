@@ -3,7 +3,8 @@
 use fnv::FnvHasher;
 use fvm_shared::address::Address;
 use lazy_static::lazy_static;
-use serde_tuple::{Deserialize_tuple, Serialize_tuple};
+use serde::de::Error as SerdeError;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 use std::fmt::Write;
 use std::hash::{Hash, Hasher};
@@ -20,7 +21,7 @@ pub const MAX_CHAIN_ID: u64 = 4503599627370476;
 /// It is composed of the chainID of the root network, and the address of
 /// all the subnet actors from the root to the corresponding level in the
 /// hierarchy where the subnet is spawned.
-#[derive(PartialEq, Eq, Hash, Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct SubnetID {
     root: u64,
     children: Vec<Address>,
@@ -240,11 +241,42 @@ impl FromStr for SubnetID {
     }
 }
 
+impl Serialize for SubnetID {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // default to human readable form for all use cases
+        self.to_string().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for SubnetID {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        SubnetID::from_str(&s)
+            .map_err(|_| D::Error::custom(format!("cannot parse subnet id {}", s)))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::subnet_id::SubnetID;
     use fvm_shared::address::Address;
     use std::str::FromStr;
+
+    #[test]
+    fn test_human_readable_serialization() {
+        let id = "/r31415926/f2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq";
+        let subnet_id = SubnetID::from_str(id).unwrap();
+
+        let s = serde_json::to_string(&subnet_id).unwrap();
+        let recovered: SubnetID = serde_json::from_str(&s).unwrap();
+        assert_eq!(recovered, subnet_id);
+    }
 
     #[test]
     fn test_parse_root_net() {

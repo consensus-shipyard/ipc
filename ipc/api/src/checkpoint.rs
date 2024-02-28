@@ -14,6 +14,7 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use std::fmt::{Display, Formatter};
 
 lazy_static! {
@@ -69,6 +70,7 @@ pub struct BottomUpMsgBatch {
     pub msgs: Vec<IpcEnvelope>,
 }
 
+#[serde_as]
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
 pub struct BottomUpCheckpoint {
     /// Child subnet ID, for replay protection from other subnets where the exact same validators operate.
@@ -78,6 +80,7 @@ pub struct BottomUpCheckpoint {
     /// Has to follow the previous checkpoint by checkpoint period.
     pub block_height: ChainEpoch,
     /// The hash of the block.
+    #[serde_as(as = "serde_with::hex::Hex")]
     pub block_hash: Vec<u8>,
     /// The number of the membership (validator set) which is going to sign the next checkpoint.
     /// This one expected to be signed by the validators from the membership reported in the previous checkpoint.
@@ -85,44 +88,4 @@ pub struct BottomUpCheckpoint {
     pub next_configuration_number: u64,
     /// The list of messages for execution
     pub msgs: Vec<IpcEnvelope>,
-}
-
-impl Display for BottomUpCheckpoint {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "BottomUpCheckpoint(subnet_id = {}, height = {}, hash = {}, next_config_number = {}, msgs = {})",
-            self.subnet_id,
-            self.block_height,
-            hex::encode(&self.block_hash),
-            self.next_configuration_number,
-            join_to_string(self.msgs.as_slice()),
-        )
-    }
-}
-
-impl Display for BottomUpCheckpointBundle {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "BottomUpCheckpointBundle (checkpoint = {}, signatures = {}, signatories = {}",
-            self.checkpoint,
-            join_to_string(
-                self.signatures
-                    .iter()
-                    .map(hex::encode)
-                    .collect::<Vec<_>>()
-                    .as_slice()
-            ),
-            join_to_string(self.signatories.as_slice()),
-        )
-    }
-}
-
-fn join_to_string<T: Display>(items: &[T]) -> String {
-    items
-        .iter()
-        .map(|v| v.to_string())
-        .collect::<Vec<_>>()
-        .join(",")
 }

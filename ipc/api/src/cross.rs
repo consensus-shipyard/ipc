@@ -5,13 +5,13 @@
 use crate::address::IPCAddress;
 use crate::subnet_id::SubnetID;
 use anyhow::anyhow;
-use ethers::utils::hex;
 use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
 use serde::{Deserialize, Serialize};
 use serde_tuple::{Deserialize_tuple, Serialize_tuple};
-use std::fmt::{Display, Formatter};
+use serde_with::serde_as;
 
+#[serde_as]
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
 pub struct IpcEnvelope {
     /// Type of message being propagated.
@@ -26,6 +26,7 @@ pub struct IpcEnvelope {
     /// address sending the message
     pub from: IPCAddress,
     /// abi.encoded message
+    #[serde_as(as = "serde_with::hex::Hex")]
     pub message: Vec<u8>,
     /// outgoing nonce for the envelope.
     /// This nonce is set by the gateway when committing the message for propagation
@@ -189,21 +190,6 @@ impl IpcEnvelope {
             Some(b) => b.data.into(), // FIXME: this assumes cbor serialization. We should maybe return serialized IpldBlock
             None => RawBytes::default(),
         })
-    }
-}
-
-impl Display for IpcEnvelope {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "IpcEnvelope(kind = {}, from = {}, to = {}, value = {}, message = {}, nonce = {})",
-            self.kind,
-            self.from,
-            self.to,
-            self.value,
-            hex::encode(&self.message),
-            self.nonce,
-        )
     }
 }
 

@@ -32,7 +32,7 @@ impl CommandLineHandler for GetBottomUpBundles {
             };
 
             println!("bottom up checkpoint bundle at height: {}", h);
-            println!("{}", bundle);
+            println!("{}", serde_json::to_string(&bundle)?);
         }
 
         Ok(())
