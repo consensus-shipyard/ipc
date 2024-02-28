@@ -64,7 +64,7 @@ impl SubnetCommandsArgs {
             Commands::GetValidator(args) => ValidatorInfo::handle(global, args).await,
             Commands::ShowGatewayContractCommitSha(args) => {
                 ShowGatewayContractCommitSha::handle(global, args).await
-            },
+            }
         }
     }
 }
