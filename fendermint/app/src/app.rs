@@ -665,21 +665,17 @@ where
             .await
             .context("failed to process proposal")?;
 
+        emit!(
+            EventType::ProposalProcessed,
+            is_accepted = accept,
+            height = request.height.value(),
+            size = num_txs,
+            hash = request.hash.to_string(),
+            proposer = request.proposer_address.to_string()
+        );
         if accept {
-            emit!(
-                EventType::ProposalAccepted,
-                height = request.height.value(),
-                size = num_txs
-            );
             Ok(response::ProcessProposal::Accept)
         } else {
-            emit!(
-                EventType::ProposalRejected,
-                height = request.height.value(),
-                size = num_txs,
-                hash = request.hash.to_string(),
-                proposer = request.proposer_address.to_string()
-            );
             Ok(response::ProcessProposal::Reject)
         }
     }
