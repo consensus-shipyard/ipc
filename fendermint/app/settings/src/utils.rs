@@ -1,9 +1,10 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use config::{ConfigError, Source, Value, ValueKind};
+use lazy_static::lazy_static;
+use regex::Regex;
 use std::path::{Path, PathBuf};
-
-use config::{ConfigError, Environment, Source, Value, ValueKind};
 
 #[macro_export]
 macro_rules! home_relative {
@@ -65,9 +66,9 @@ pub fn expand_tilde<P: AsRef<Path>>(path: P) -> PathBuf {
 }
 
 #[derive(Clone, Debug)]
-pub struct EnvInterpol(Environment);
+pub struct EnvInterpol<T>(pub T);
 
-impl Source for EnvInterpol {
+impl<T: Source + Clone + Send + Sync + 'static> Source for EnvInterpol<T> {
     fn clone_into_box(&self) -> Box<dyn Source + Send + Sync> {
         Box::new(self.clone())
     }
@@ -77,7 +78,9 @@ impl Source for EnvInterpol {
 
         for value in values.values_mut() {
             match value.kind {
-                ValueKind::String(ref s) => todo!(),
+                ValueKind::String(ref s) => {
+                    let s = interpolate_vars(s);
+                }
                 _ => {}
             }
         }
@@ -87,13 +90,52 @@ impl Source for EnvInterpol {
 }
 
 /// Find values in the string that can be interpolated, e.g. "${NOMAD_HOST_ADDRESS_cometbft_p2p}"
-fn find_vars(value: &str) -> Vec<String> {
-    todo!()
+fn find_vars(value: &str) -> Vec<&str> {
+    lazy_static! {
+        /// Capture env variables like `${VARIABLE_NAME}`
+        static ref ENV_VAR_RE: Regex = Regex::new(r"\$\{([^}]+)\}").expect("env var regex parses");
+    }
+    ENV_VAR_RE
+        .captures_iter(value)
+        .map(|c| c.extract())
+        .map(|(_, [n])| n)
+        .collect()
+}
+
+/// Find variables and replace them from the environment.
+fn interpolate_vars(value: &str) -> String {
+    let keys = find_vars(value);
+    let mut value = value.to_string();
+    for k in keys {
+        if let Ok(v) = std::env::var(k) {
+            value = value.replace(&format!("${{{k}}}"), &v);
+        }
+    }
+    value
 }
 
 #[cfg(test)]
-mod tests {
-    use super::expand_tilde;
+pub(crate) mod tests {
+    use std::path::PathBuf;
+
+    use crate::utils::find_vars;
+
+    use super::{expand_tilde, interpolate_vars};
+
+    /// Set some env vars, run a fallible piece of code, then unset the variables otherwise they would affect the next test.
+    pub fn with_env_vars<F, T, E>(vars: Vec<(&str, &str)>, f: F) -> Result<T, E>
+    where
+        F: FnOnce() -> Result<T, E>,
+    {
+        for (k, v) in vars.iter() {
+            std::env::set_var(k, v);
+        }
+        let result = f();
+        for (k, _) in vars {
+            std::env::remove_var(k);
+        }
+        result
+    }
 
     #[test]
     fn tilde_expands_to_home() {
@@ -102,5 +144,23 @@ mod tests {
         assert_eq!(expand_tilde("~/.project"), home_project);
         assert_eq!(expand_tilde("/foo/bar"), PathBuf::from("/foo/bar"));
         assert_eq!(expand_tilde("~foo/bar"), PathBuf::from("~foo/bar"));
+    }
+
+    #[test]
+    fn test_find_vars() {
+        assert_eq!(
+            find_vars("FOO_${NAME}_${NUMBER}_BAR"),
+            vec!["NAME", "NUMBER"]
+        );
+        assert!(find_vars("FOO_${NAME").is_empty());
+        assert!(find_vars("FOO_$NAME").is_empty());
+    }
+
+    #[test]
+    fn test_interpolate_vars() {
+        let s = "FOO_${NAME}_${NUMBER}_BAR";
+        let i =
+            with_env_vars::<_, _, ()>(vec![("NAME", "spam")], || Ok(interpolate_vars(s))).unwrap();
+        assert_eq!(i, "FOO_spam_${NUMBER}_BAR");
     }
 }

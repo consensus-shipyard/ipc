@@ -318,21 +318,7 @@ mod tests {
     #[serial]
     mod env {
         use crate::tests::try_parse_config;
-
-        /// Set some env vars, run a fallible piece of code, then unset the variables otherwise they would affect the next test.
-        fn with_env_vars<F, T, E>(vars: Vec<(&str, &str)>, f: F) -> Result<T, E>
-        where
-            F: FnOnce() -> Result<T, E>,
-        {
-            for (k, v) in vars.iter() {
-                std::env::set_var(k, v);
-            }
-            let result = f();
-            for (k, _) in vars {
-                std::env::remove_var(k);
-            }
-            result
-        }
+        use crate::utils::tests::with_env_vars;
 
         #[test]
         fn parse_comma_separated() {
