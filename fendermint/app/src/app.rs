@@ -19,12 +19,13 @@ use fendermint_vm_interpreter::bytes::{
     BytesMessageApplyRes, BytesMessageCheckRes, BytesMessageQuery, BytesMessageQueryRes,
 };
 use fendermint_vm_interpreter::chain::{ChainEnv, ChainMessageApplyRet, IllegalMessage};
+use fendermint_vm_interpreter::fvm::state::FvmEndOutput;
 use fendermint_vm_interpreter::fvm::state::{
     empty_state_tree, CheckStateRef, FvmExecState, FvmGenesisState, FvmQueryState, FvmStateParams,
     FvmUpdatableParams,
 };
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
-use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmGenesisOutput, PowerUpdates};
+use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmGenesisOutput};
 use fendermint_vm_interpreter::signed::InvalidSignature;
 use fendermint_vm_interpreter::{
     CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
@@ -235,6 +236,7 @@ where
                     circ_supply: TokenAmount::zero(),
                     chain_id: 0,
                     power_scale: 0,
+                    app_version: 0,
                 },
             };
             self.set_committed_state(state)?;
@@ -408,7 +410,7 @@ where
         Message = Vec<u8>,
         BeginOutput = FvmApplyRet,
         DeliverOutput = BytesMessageApplyRes,
-        EndOutput = PowerUpdates,
+        EndOutput = FvmEndOutput,
     >,
     I: CheckInterpreter<
         State = FvmExecState<ReadOnlyBlockstore<SS>>,
@@ -502,6 +504,7 @@ where
                 circ_supply: out.circ_supply,
                 chain_id: out.chain_id.into(),
                 power_scale: out.power_scale,
+                app_version: out.app_version,
             },
         };
 
@@ -760,7 +763,16 @@ where
 
         // TODO: Return events from epoch transitions.
         let ret = self
-            .modify_exec_state(|s| self.interpreter.end(s))
+            .modify_exec_state(|state| async {
+                let ((env, mut state), res) = self.interpreter.end(state).await?;
+
+                // update the app_version in case there was an upgrade defined at this height which upgraded it
+                state.update_app_version(|app_version| {
+                    *app_version = res.app_version;
+                });
+
+                Ok(((env, state), res.power_updates))
+            })
             .await
             .context("end failed")?;
 
@@ -785,6 +797,7 @@ where
             FvmUpdatableParams {
                 power_scale,
                 circ_supply,
+                app_version,
             },
             _,
         ) = exec_state.commit().context("failed to commit FVM")?;
@@ -792,6 +805,7 @@ where
         state.state_params.state_root = state_root;
         state.state_params.power_scale = power_scale;
         state.state_params.circ_supply = circ_supply;
+        state.state_params.app_version = app_version;
 
         let app_hash = state.app_hash();
         let block_height = state.block_height;

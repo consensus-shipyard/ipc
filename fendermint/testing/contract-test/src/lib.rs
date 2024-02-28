@@ -8,13 +8,14 @@ use fvm_shared::{bigint::Zero, clock::ChainEpoch, econ::TokenAmount, version::Ne
 use std::{future::Future, sync::Arc};
 
 use fendermint_vm_genesis::Genesis;
+use fendermint_vm_interpreter::fvm::state::FvmEndOutput;
 use fendermint_vm_interpreter::{
     fvm::{
         bundle::{bundle_path, contracts_path, custom_actors_bundle_path},
         state::{FvmExecState, FvmGenesisState, FvmStateParams, FvmUpdatableParams},
         store::memory::MemoryBlockstore,
         upgrade_scheduler::UpgradeScheduler,
-        FvmApplyRet, FvmGenesisOutput, FvmMessage, FvmMessageInterpreter, PowerUpdates,
+        FvmApplyRet, FvmGenesisOutput, FvmMessage, FvmMessageInterpreter,
     },
     ExecInterpreter, GenesisInterpreter,
 };
@@ -89,7 +90,7 @@ where
         Message = FvmMessage,
         BeginOutput = FvmApplyRet,
         DeliverOutput = FvmApplyRet,
-        EndOutput = PowerUpdates,
+        EndOutput = FvmEndOutput,
     >,
 {
     fn state_store_clone(&self) -> MemoryBlockstore {
@@ -110,6 +111,7 @@ where
                 circ_supply: TokenAmount::zero(),
                 chain_id: 0,
                 power_scale: 0,
+                app_version: 0,
             },
         }
     }
@@ -153,6 +155,7 @@ where
             circ_supply: out.circ_supply,
             chain_id: out.chain_id.into(),
             power_scale: out.power_scale,
+            app_version: out.app_version,
         };
 
         Ok(())
@@ -211,7 +214,17 @@ where
 
     pub async fn end_block(&self, _block_height: ChainEpoch) -> Result<()> {
         let _ret = self
-            .modify_exec_state(|s| self.interpreter.end(s))
+            .modify_exec_state(|state| async {
+                //let ((env, mut state), res) = self.interpreter.end(state).await?;
+                let (mut state, res) = self.interpreter.end(state).await?;
+
+                // update the app_version in case there was an upgrade defined at this height which upgraded it
+                state.update_app_version(|app_version| {
+                    *app_version = res.app_version;
+                });
+
+                Ok((state, res.power_updates))
+            })
             .await
             .context("end failed")?;
 
@@ -226,6 +239,7 @@ where
             FvmUpdatableParams {
                 power_scale,
                 circ_supply,
+                app_version,
             },
             _,
         ) = exec_state.commit().context("failed to commit FVM")?;
@@ -233,7 +247,14 @@ where
         self.state_params.state_root = state_root;
         self.state_params.power_scale = power_scale;
         self.state_params.circ_supply = circ_supply;
+        self.state_params.app_version = app_version;
+
+        println!("self.state_params: {:?}", self.state_params);
 
         Ok(())
+    }
+
+    pub fn state_params(&self) -> FvmStateParams {
+        self.state_params.clone()
     }
 }

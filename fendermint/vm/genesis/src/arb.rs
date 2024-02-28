@@ -114,6 +114,7 @@ impl Arbitrary for Genesis {
             } else {
                 None
             },
+            app_version: 0,
         }
     }
 }

@@ -111,7 +111,10 @@ async fn test_applying_upgrades() {
                     Address::from_str(CONTRACT_ADDRESS).unwrap()
                 );
 
-                Ok(())
+                // lets upgrade the app version as well
+                let app_version = 1;
+
+                Ok(app_version)
             })
             .unwrap(),
         )
@@ -158,7 +161,8 @@ async fn test_applying_upgrades() {
                     res.failure_info
                 );
 
-                Ok(())
+                // this upgrade didn't affect our app version, so return 0
+                Ok(0)
             })
             .unwrap(),
         )
@@ -206,7 +210,8 @@ async fn test_applying_upgrades() {
                 let balance = U256::from_big_endian(&bytes);
                 assert_eq!(balance, U256::from(SEND_BALANCE_AMOUNT));
 
-                Ok(())
+                // this upgrade didn't affect our app version, so return 0
+                Ok(0)
             })
             .unwrap(),
         )
@@ -244,15 +249,22 @@ async fn test_applying_upgrades() {
         accounts: vec![actor],
         eam_permission_mode: PermissionMode::Unrestricted,
         ipc: None,
+        app_version: 0,
     };
 
     tester.init(genesis).await.unwrap();
+
+    // check that the app version is 0
+    assert_eq!(tester.state_params().app_version, 0);
 
     // iterate over all the upgrades
     for block_height in 1..=3 {
         tester.begin_block(block_height).await.unwrap();
         tester.end_block(block_height).await.unwrap();
         tester.commit().await.unwrap();
+
+        // check that the app_version was upgraded to 1
+        assert_eq!(tester.state_params().app_version, 1);
     }
 }
 

@@ -23,7 +23,7 @@ use fvm_shared::{
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
-use crate::fvm::externs::FendermintExterns;
+use crate::fvm::{externs::FendermintExterns, PowerUpdates};
 use fendermint_vm_core::{chainid::HasChainID, Timestamp};
 use fendermint_vm_encoding::IsHumanReadable;
 
@@ -59,6 +59,8 @@ pub struct FvmStateParams {
     pub chain_id: u64,
     /// Conversion from collateral to voting power.
     pub power_scale: PowerScale,
+    /// The application protocol version.
+    pub app_version: u64,
 }
 
 /// Parts of the state which can be updated by message execution, apart from the actor state.
@@ -75,6 +77,14 @@ pub struct FvmUpdatableParams {
     /// Doesn't change at the moment but in theory it could,
     /// and it doesn't have a place within the FVM.
     pub power_scale: PowerScale,
+    /// The application protocol version.
+    pub app_version: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct FvmEndOutput {
+    pub power_updates: PowerUpdates,
+    pub app_version: u64,
 }
 
 pub type MachineBlockstore<DB> = <DefaultMachine<DB, FendermintExterns<DB>> as Machine>::Blockstore;
@@ -141,6 +151,7 @@ where
             params: FvmUpdatableParams {
                 circ_supply: params.circ_supply,
                 power_scale: params.power_scale,
+                app_version: params.app_version,
             },
             params_dirty: false,
         })
@@ -206,6 +217,10 @@ where
         self.params.power_scale
     }
 
+    pub fn app_version(&self) -> u64 {
+        self.params.app_version
+    }
+
     /// Get a mutable reference to the underlying [StateTree].
     pub fn state_tree_mut(&mut self) -> &mut StateTree<MachineBlockstore<DB>> {
         self.executor.state_tree_mut()
@@ -253,6 +268,13 @@ where
         F: FnOnce(&mut TokenAmount),
     {
         self.update_params(|p| f(&mut p.circ_supply))
+    }
+
+    pub fn update_app_version<F>(&mut self, f: F)
+    where
+        F: FnOnce(&mut u64),
+    {
+        self.update_params(|p| f(&mut p.app_version))
     }
 
     /// Update the parameters and mark them as dirty.

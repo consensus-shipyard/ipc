@@ -1,7 +1,8 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use crate::fvm::state::ipc::GatewayCaller;
-use crate::fvm::{topdown, FvmApplyRet, PowerUpdates};
+use crate::fvm::state::FvmEndOutput;
+use crate::fvm::{topdown, FvmApplyRet};
 use crate::{
     fvm::state::FvmExecState,
     fvm::FvmMessage,
@@ -209,7 +210,7 @@ where
         Message = VerifiableMessage,
         DeliverOutput = SignedMessageApplyRes,
         State = FvmExecState<DB>,
-        EndOutput = PowerUpdates,
+        EndOutput = FvmEndOutput,
     >,
 {
     // The state consists of the resolver pool, which this interpreter needs, and the rest of the
@@ -382,8 +383,9 @@ where
         let (state, out) = self.inner.end(state).await?;
 
         // Update any component that needs to know about changes in the power table.
-        if !out.0.is_empty() {
+        if !out.power_updates.0.is_empty() {
             let power_updates = out
+                .power_updates
                 .0
                 .iter()
                 .map(|v| {

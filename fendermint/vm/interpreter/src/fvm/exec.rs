@@ -15,7 +15,7 @@ use crate::ExecInterpreter;
 
 use super::{
     checkpoint::{self, PowerUpdates},
-    state::FvmExecState,
+    state::{FvmEndOutput, FvmExecState},
     FvmMessage, FvmMessageInterpreter,
 };
 
@@ -46,7 +46,7 @@ where
     /// Return validator power updates.
     /// Currently ignoring events as there aren't any emitted by the smart contract,
     /// but keep in mind that if there were, those would have to be propagated.
-    type EndOutput = PowerUpdates;
+    type EndOutput = FvmEndOutput;
 
     async fn begin(
         &self,
@@ -212,41 +212,39 @@ where
             PowerUpdates::default()
         };
 
+        let mut app_version = state.app_version();
+
         // check for upgrades in the upgrade_scheduler
         let chain_id = state.chain_id();
         let block_height: u64 = state.block_height().try_into().unwrap();
         if let Some(upgrade) = self.upgrade_scheduler.get(chain_id, block_height) {
-            tracing::info!(
-                chain_id = ?chain_id,
-                height = block_height,
-                "Running migration",
-            );
+            tracing::info!(?chain_id, height = block_height, "Executing an upgrade");
 
             // there is an upgrade scheduled for this height, lets run the migration
             let res = upgrade.execute(&mut state);
 
             match res {
-                Ok(_) => {
-                    tracing::info!(
-                        chain_id = ?chain_id,
-                        height = block_height,
-                        result =? res,
-                        "Running migration done",
-                    );
-                }
-                Err(e) => {
-                    tracing::error!(
-                        chain_id = ?chain_id,
-                        height = block_height,
-                        error =? e,
-                        "Running migration failed",
-                    );
+                Ok(new_app_version) => {
+                    tracing::info!(result =? res, "upgrade done");
 
-                    return Err(e);
+                    // TODO: consider using an explicit tracing enum for upgrades
+                    if new_app_version != 0 {
+                        app_version = new_app_version;
+                        tracing::info!(app_version, "upgraded app version");
+                    }
+                }
+                Err(err) => {
+                    tracing::error!(?err, "Upgrade failed");
+                    return Err(err);
                 }
             }
         }
 
-        Ok((state, updates))
+        let output = FvmEndOutput {
+            power_updates: updates,
+            app_version,
+        };
+
+        Ok((state, output))
     }
 }

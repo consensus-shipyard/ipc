@@ -482,6 +482,7 @@ mod tests {
             circ_supply: out.circ_supply,
             chain_id: out.chain_id.into(),
             power_scale: out.power_scale,
+            app_version: 0,
         };
 
         (state_params, store)
