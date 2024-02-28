@@ -12,7 +12,7 @@ macro_rules! home_relative {
     ($($name:ident),+) => {
         $(
         pub fn $name(&self) -> std::path::PathBuf {
-            crate::utils::expand_path(&self.home_dir(), &self.$name)
+            $crate::utils::expand_path(&self.home_dir(), &self.$name)
         }
         )+
     };
