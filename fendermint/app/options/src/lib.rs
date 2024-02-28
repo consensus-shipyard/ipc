@@ -11,6 +11,7 @@ use self::{eth::EthArgs, genesis::GenesisArgs, key::KeyArgs, rpc::RpcArgs, run::
 pub mod eth;
 pub mod genesis;
 pub mod key;
+pub mod materializer;
 pub mod rpc;
 pub mod run;
 
