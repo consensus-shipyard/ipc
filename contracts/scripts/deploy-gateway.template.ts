@@ -124,7 +124,7 @@ export async function deploy(libs: { [key in string]: string }) {
     }
 
     // console.log(`${JSON.stringify(gatewayConstructorParams)}`)
-    console.log(`${ethers.utils.parseBytes32String(gatewayConstructorParams.commitSha)}`)
+    // console.log(`${ethers.utils.parseBytes32String(gatewayConstructorParams.commitSha)}`)
 
     const diamondLibs: Libraries = {}
     // deploy Diamond

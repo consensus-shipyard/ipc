@@ -136,7 +136,7 @@ pub trait SubnetManager: Send + Sync + TopDownFinalityQuery + BottomUpCheckpoint
     async fn get_chain_id(&self) -> Result<String>;
 
     /// Get commit sha
-    async fn get_commit_sha(&self) -> Result<u64>;
+    async fn get_commit_sha(&self) -> Result<[u8; 32]>;
 
     /// Gets the genesis information required to bootstrap a child subnet
     async fn get_genesis_info(&self, subnet: &SubnetID) -> Result<SubnetGenesisInfo>;

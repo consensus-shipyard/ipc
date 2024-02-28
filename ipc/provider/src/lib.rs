@@ -669,7 +669,7 @@ impl IpcProvider {
         conn.manager().get_chain_id().await
     }
 
-    pub async fn get_commit_sha(&self, subnet: &SubnetID) -> anyhow::Result<u64> {
+    pub async fn get_commit_sha(&self, subnet: &SubnetID) -> anyhow::Result<[u8; 32]> {
         let conn = match self.connection(subnet) {
             None => return Err(anyhow!("target subnet not found")),
             Some(conn) => conn,
