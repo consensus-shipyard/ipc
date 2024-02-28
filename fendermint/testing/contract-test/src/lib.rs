@@ -155,7 +155,7 @@ where
             circ_supply: out.circ_supply,
             chain_id: out.chain_id.into(),
             power_scale: out.power_scale,
-            app_version: out.app_version,
+            app_version: 0,
         };
 
         Ok(())

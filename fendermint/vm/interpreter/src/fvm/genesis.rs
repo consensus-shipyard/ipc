@@ -40,7 +40,6 @@ pub struct FvmGenesisOutput {
     pub power_scale: PowerScale,
     pub circ_supply: TokenAmount,
     pub validators: Vec<Validator<Power>>,
-    pub app_version: u64,
 }
 
 #[async_trait]
@@ -108,7 +107,6 @@ where
             base_fee: genesis.base_fee,
             power_scale: genesis.power_scale,
             validators,
-            app_version: genesis.app_version,
         };
 
         // STAGE 0: Declare the built-in EVM contracts we'll have to deploy.

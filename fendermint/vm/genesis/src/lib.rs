@@ -47,8 +47,6 @@ pub struct Genesis {
     /// IPC related configuration, if enabled.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ipc: Option<ipc::IpcParams>,
-    /// The application protocol version.
-    pub app_version: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

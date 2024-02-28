@@ -249,7 +249,6 @@ async fn test_applying_upgrades() {
         accounts: vec![actor],
         eam_permission_mode: PermissionMode::Unrestricted,
         ipc: None,
-        app_version: 0,
     };
 
     tester.init(genesis).await.unwrap();
