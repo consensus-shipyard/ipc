@@ -6,6 +6,12 @@ import { ethers } from 'hardhat'
 
 const { getSelectors, FacetCutAction } = require('./js/diamond.js')
 
+function getGitCommitSha(): string {
+    const commitSha = require('child_process')
+        .execSync('git rev-parse --short HEAD')
+        .toString().trim()
+    return commitSha
+}
 export async function deploy(libs: { [key in string]: string }) {
     if (!libs || Object.keys(libs).length === 0)
         throw new Error(`Libraries are missing`)
@@ -114,7 +120,11 @@ export async function deploy(libs: { [key in string]: string }) {
             route: [],
         },
         genesisValidators: [],
+        commitSha: ethers.utils.formatBytes32String(getGitCommitSha()),
     }
+
+    // console.log(`${JSON.stringify(gatewayConstructorParams)}`)
+    console.log(`${ethers.utils.parseBytes32String(gatewayConstructorParams.commitSha)}`)
 
     const diamondLibs: Libraries = {}
     // deploy Diamond
