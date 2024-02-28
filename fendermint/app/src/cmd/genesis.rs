@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::{anyhow, Context};
-use fendermint_app::APP_VERSION;
 use fendermint_crypto::PublicKey;
 use fvm_shared::address::Address;
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
@@ -242,7 +241,7 @@ fn into_tendermint(genesis_file: &PathBuf, args: &GenesisIntoTendermintArgs) -> 
             validator: tendermint::consensus::params::ValidatorParams {
                 pub_key_types: vec![tendermint::public_key::Algorithm::Secp256k1],
             },
-            version: Some(tendermint::consensus::params::VersionParams { app: APP_VERSION }),
+            version: Some(tendermint::consensus::params::VersionParams { app: 0 }),
         },
         // Validators will be returnd from `init_chain`.
         validators: Vec::new(),

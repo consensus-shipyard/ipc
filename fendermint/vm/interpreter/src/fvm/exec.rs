@@ -15,7 +15,7 @@ use crate::ExecInterpreter;
 
 use super::{
     checkpoint::{self, PowerUpdates},
-    state::{FvmEndOutput, FvmExecState},
+    state::FvmExecState,
     FvmMessage, FvmMessageInterpreter,
 };
 
@@ -46,7 +46,7 @@ where
     /// Return validator power updates.
     /// Currently ignoring events as there aren't any emitted by the smart contract,
     /// but keep in mind that if there were, those would have to be propagated.
-    type EndOutput = FvmEndOutput;
+    type EndOutput = PowerUpdates;
 
     async fn begin(
         &self,
@@ -212,12 +212,11 @@ where
             PowerUpdates::default()
         };
 
-        let mut app_version = state.app_version();
-
         // check for upgrades in the upgrade_scheduler
         let chain_id = state.chain_id();
         let block_height: u64 = state.block_height().try_into().unwrap();
         if let Some(upgrade) = self.upgrade_scheduler.get(chain_id, block_height) {
+            // TODO: consider using an explicit tracing enum for upgrades
             tracing::info!(?chain_id, height = block_height, "Executing an upgrade");
 
             // there is an upgrade scheduled for this height, lets run the migration
@@ -227,10 +226,13 @@ where
                 Ok(new_app_version) => {
                     tracing::info!(result =? res, "upgrade done");
 
-                    // TODO: consider using an explicit tracing enum for upgrades
+                    // update the app_version in case there was an upgrade defined at this height which upgraded it
                     if new_app_version != 0 {
-                        app_version = new_app_version;
-                        tracing::info!(app_version, "upgraded app version");
+                        state.update_app_version(|app_version| {
+                            *app_version = new_app_version;
+                        });
+
+                        tracing::info!(app_version = state.app_version(), "upgraded app version");
                     }
                 }
                 Err(err) => {
@@ -240,11 +242,6 @@ where
             }
         }
 
-        let output = FvmEndOutput {
-            power_updates: updates,
-            app_version,
-        };
-
-        Ok((state, output))
+        Ok((state, updates))
     }
 }

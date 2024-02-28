@@ -4,11 +4,11 @@
 use anyhow::{anyhow, Context, Result};
 use cid::Cid;
 use fendermint_vm_core::Timestamp;
+use fendermint_vm_interpreter::fvm::PowerUpdates;
 use fvm_shared::{bigint::Zero, clock::ChainEpoch, econ::TokenAmount, version::NetworkVersion};
 use std::{future::Future, sync::Arc};
 
 use fendermint_vm_genesis::Genesis;
-use fendermint_vm_interpreter::fvm::state::FvmEndOutput;
 use fendermint_vm_interpreter::{
     fvm::{
         bundle::{bundle_path, contracts_path, custom_actors_bundle_path},
@@ -90,7 +90,7 @@ where
         Message = FvmMessage,
         BeginOutput = FvmApplyRet,
         DeliverOutput = FvmApplyRet,
-        EndOutput = FvmEndOutput,
+        EndOutput = PowerUpdates,
     >,
 {
     fn state_store_clone(&self) -> MemoryBlockstore {
@@ -214,17 +214,7 @@ where
 
     pub async fn end_block(&self, _block_height: ChainEpoch) -> Result<()> {
         let _ret = self
-            .modify_exec_state(|state| async {
-                //let ((env, mut state), res) = self.interpreter.end(state).await?;
-                let (mut state, res) = self.interpreter.end(state).await?;
-
-                // update the app_version in case there was an upgrade defined at this height which upgraded it
-                state.update_app_version(|app_version| {
-                    *app_version = res.app_version;
-                });
-
-                Ok((state, res.power_updates))
-            })
+            .modify_exec_state(|s| self.interpreter.end(s))
             .await
             .context("end failed")?;
 

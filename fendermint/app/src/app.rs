@@ -19,13 +19,12 @@ use fendermint_vm_interpreter::bytes::{
     BytesMessageApplyRes, BytesMessageCheckRes, BytesMessageQuery, BytesMessageQueryRes,
 };
 use fendermint_vm_interpreter::chain::{ChainEnv, ChainMessageApplyRet, IllegalMessage};
-use fendermint_vm_interpreter::fvm::state::FvmEndOutput;
 use fendermint_vm_interpreter::fvm::state::{
     empty_state_tree, CheckStateRef, FvmExecState, FvmGenesisState, FvmQueryState, FvmStateParams,
     FvmUpdatableParams,
 };
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
-use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmGenesisOutput};
+use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmGenesisOutput, PowerUpdates};
 use fendermint_vm_interpreter::signed::InvalidSignature;
 use fendermint_vm_interpreter::{
     CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
@@ -44,8 +43,8 @@ use tendermint::abci::request::CheckTxKind;
 use tendermint::abci::{request, response};
 use tracing::instrument;
 
+use crate::BlockHeight;
 use crate::{tmconv::*, VERSION};
-use crate::{BlockHeight, APP_VERSION};
 
 #[derive(Serialize)]
 #[repr(u8)]
@@ -410,7 +409,7 @@ where
         Message = Vec<u8>,
         BeginOutput = FvmApplyRet,
         DeliverOutput = BytesMessageApplyRes,
-        EndOutput = FvmEndOutput,
+        EndOutput = PowerUpdates,
     >,
     I: CheckInterpreter<
         State = FvmExecState<ReadOnlyBlockstore<SS>>,
@@ -432,7 +431,7 @@ where
         let info = response::Info {
             data: "fendermint".to_string(),
             version: VERSION.to_owned(),
-            app_version: APP_VERSION,
+            app_version: state.state_params.app_version,
             last_block_height: height,
             last_block_app_hash: state.app_hash(),
         };
@@ -763,16 +762,7 @@ where
 
         // TODO: Return events from epoch transitions.
         let ret = self
-            .modify_exec_state(|state| async {
-                let ((env, mut state), res) = self.interpreter.end(state).await?;
-
-                // update the app_version in case there was an upgrade defined at this height which upgraded it
-                state.update_app_version(|app_version| {
-                    *app_version = res.app_version;
-                });
-
-                Ok(((env, state), res.power_updates))
-            })
+            .modify_exec_state(|s| self.interpreter.end(s))
             .await
             .context("end failed")?;
 

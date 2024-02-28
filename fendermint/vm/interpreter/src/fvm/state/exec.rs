@@ -23,7 +23,7 @@ use fvm_shared::{
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
-use crate::fvm::{externs::FendermintExterns, PowerUpdates};
+use crate::fvm::externs::FendermintExterns;
 use fendermint_vm_core::{chainid::HasChainID, Timestamp};
 use fendermint_vm_encoding::IsHumanReadable;
 
@@ -78,12 +78,6 @@ pub struct FvmUpdatableParams {
     /// and it doesn't have a place within the FVM.
     pub power_scale: PowerScale,
     /// The application protocol version.
-    pub app_version: u64,
-}
-
-#[derive(Debug, Clone)]
-pub struct FvmEndOutput {
-    pub power_updates: PowerUpdates,
     pub app_version: u64,
 }
 
