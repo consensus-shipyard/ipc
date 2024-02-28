@@ -11,6 +11,7 @@ use serde_with::{serde_as, DurationSeconds};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tendermint_rpc::Url;
+use utils::EnvInterpol;
 
 use fendermint_vm_encoding::{human_readable_delegate, human_readable_str};
 use fendermint_vm_topdown::BlockHeight;
@@ -237,7 +238,7 @@ impl Settings {
             .add_source(File::from(config_dir.join("local")).required(false))
             // Add in settings from the environment (with a prefix of FM)
             // e.g. `FM_DB__DATA_DIR=./foo/bar ./target/app` would set the database location.
-            .add_source(
+            .add_source(EnvInterpol(
                 Environment::with_prefix("fm")
                     .prefix_separator("_")
                     .separator("__")
@@ -246,7 +247,7 @@ impl Settings {
                     .list_separator(",") // need to list keys explicitly below otherwise it can't pase simple `String` type
                     .with_list_parse_key("resolver.discovery.static_addresses")
                     .with_list_parse_key("resolver.membership.static_subnets"),
-            )
+            ))
             // Set the home directory based on what was passed to the CLI,
             // so everything in the config can be relative to it.
             // The `home_dir` key is not added to `default.toml` so there is no confusion

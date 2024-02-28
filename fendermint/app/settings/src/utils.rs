@@ -75,16 +75,9 @@ impl<T: Source + Clone + Send + Sync + 'static> Source for EnvInterpol<T> {
 
     fn collect(&self) -> Result<config::Map<String, config::Value>, ConfigError> {
         let mut values = self.0.collect()?;
-
         for value in values.values_mut() {
-            match value.kind {
-                ValueKind::String(ref s) => {
-                    let s = interpolate_vars(s);
-                }
-                _ => {}
-            }
+            interpolate_values(value);
         }
-
         Ok(values)
     }
 }
@@ -103,15 +96,46 @@ fn find_vars(value: &str) -> Vec<&str> {
 }
 
 /// Find variables and replace them from the environment.
-fn interpolate_vars(value: &str) -> String {
+///
+/// Returns `None` if there are no env vars in the value.
+fn interpolate_vars(value: &str) -> Option<String> {
     let keys = find_vars(value);
+    if keys.is_empty() {
+        return None;
+    }
     let mut value = value.to_string();
     for k in keys {
         if let Ok(v) = std::env::var(k) {
             value = value.replace(&format!("${{{k}}}"), &v);
         }
     }
-    value
+    Some(value)
+}
+
+/// Find strings which have env vars in them and do the interpolation.
+///
+/// It does not change the kind of the values, ie. it doesn't try to parse
+/// into primitives or arrays *after* the interpolation. It does recurse
+/// into arrays, though, so if there are variables within array items,
+/// they get replaced.
+fn interpolate_values(value: &mut Value) {
+    match value.kind {
+        ValueKind::String(ref mut s) => {
+            if let Some(i) = interpolate_vars(s) {
+                // TODO: We could try to parse into primitive values,
+                // but the only reason we do it with `Environment` is to support list separators,
+                // otherwise it was fine with just strings, so I think we can skip this for now.
+                *s = i;
+            }
+        }
+        ValueKind::Array(ref mut vs) => {
+            for v in vs.iter_mut() {
+                interpolate_values(v);
+            }
+        }
+        // Leave anything else as it is.
+        _ => {}
+    }
 }
 
 #[cfg(test)]
@@ -159,8 +183,9 @@ pub(crate) mod tests {
     #[test]
     fn test_interpolate_vars() {
         let s = "FOO_${NAME}_${NUMBER}_BAR";
-        let i =
-            with_env_vars::<_, _, ()>(vec![("NAME", "spam")], || Ok(interpolate_vars(s))).unwrap();
+        let i = with_env_vars::<_, _, ()>(vec![("NAME", "spam")], || Ok(interpolate_vars(s)))
+            .unwrap()
+            .expect("non empty vars");
         assert_eq!(i, "FOO_spam_${NUMBER}_BAR");
     }
 }
