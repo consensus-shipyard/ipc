@@ -18,6 +18,10 @@ import {SubnetActorCheckpointingFacet} from "../../src/subnet/SubnetActorCheckpo
 import {GatewayGetterFacet} from "../../src/gateway/GatewayGetterFacet.sol";
 import {GatewayManagerFacet} from "../../src/gateway/GatewayManagerFacet.sol";
 import {LibGateway} from "../../src/lib/LibGateway.sol";
+import {TopDownFinalityFacet} from "../../src/gateway/router/TopDownFinalityFacet.sol";
+import {CheckpointingFacet} from "../../src/gateway/router/CheckpointingFacet.sol";
+import {XnetMessagingFacet} from "../../src/gateway/router/XnetMessagingFacet.sol";
+import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 import {GatewayMessengerFacet} from "../../src/gateway/GatewayMessengerFacet.sol";
 import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
@@ -25,7 +29,6 @@ import {IntegrationTestBase, RootSubnetDefinition, TestSubnetDefinition} from ".
 import {L2GatewayActorDiamond, L1GatewayActorDiamond} from "../IntegrationTestPresets.sol";
 import {TestUtils, MockIpcContract, MockIpcContractPayable, MockIpcContractRevert, MockIpcContractFallback} from "../helpers/TestUtils.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
-import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
 import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
 
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
