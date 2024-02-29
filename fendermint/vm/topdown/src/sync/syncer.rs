@@ -64,7 +64,7 @@ where
         };
 
         let (mut latest_height_fetched, mut first_non_null_parent_hash) =
-            self.latest_data_from_cache().await;
+            self.latest_cached_data().await;
         tracing::debug!(chain_head, latest_height_fetched, "syncing heights");
 
         if latest_height_fetched > chain_head {
@@ -91,7 +91,7 @@ where
                 break;
             }
 
-            let synced_height = match self
+            first_non_null_parent_hash = match self
                 .poll_next(latest_height_fetched + 1, first_non_null_parent_hash)
                 .await
             {
@@ -104,14 +104,14 @@ where
                 Err(e) => return Err(anyhow!(e)),
             };
 
-            if synced_height == chain_head {
+            latest_height_fetched += 1;
+
+            if latest_height_fetched == chain_head {
                 tracing::debug!("reached the tip of the chain");
                 break;
             } else if !self.sync_many {
                 break;
             }
-
-            (latest_height_fetched, first_non_null_parent_hash) = self.latest_data_from_cache().await;
         }
 
         Ok(())
@@ -129,7 +129,7 @@ where
     }
 
     /// Get the latest data stored in the cache to pull the next block
-    async fn latest_data_from_cache(&self) -> (BlockHeight, BlockHash) {
+    async fn latest_cached_data(&self) -> (BlockHeight, BlockHash) {
         // we are getting the latest height fetched in cache along with the first non null block
         // that is stored in cache.
         // we are doing two fetches in one `atomically` as if we get the data in two `atomically`,
@@ -175,7 +175,7 @@ where
         &mut self,
         height: BlockHeight,
         parent_block_hash: BlockHash,
-    ) -> Result<BlockHeight, Error> {
+    ) -> Result<BlockHash, Error> {
         tracing::debug!(
             height,
             parent_block_hash = hex::encode(&parent_block_hash),
@@ -203,7 +203,9 @@ where
 
                     emit!(EventType::NewParentView, is_null = true, height);
 
-                    return Ok(height);
+                    // Null block received, no block hash for the current height being polled.
+                    // Return the previous parent hash as the non-null block hash.
+                    return Ok(parent_block_hash);
                 }
                 return Err(Error::CannotQueryParent(err, height));
             }
@@ -220,7 +222,18 @@ where
         }
 
         let data = self.fetch_data(height, block_hash_res.block_hash).await?;
+
+        tracing::debug!(
+            height,
+            staking_requests = data.1.len(),
+            cross_messages = data.2.len(),
+            "fetched data"
+        );
+
         atomically_or_err::<_, Error, _>(|| {
+            // This is here so we see if there is abnormal amount of retries for some reason.
+            tracing::debug!(height, "adding data to the cache");
+
             self.provider.new_parent_view(height, Some(data.clone()))?;
             self.vote_tally
                 .add_block(height, Some(data.0.clone()))
@@ -238,7 +251,7 @@ where
             num_topdown_messages = data.2.len(),
             num_validator_changes = data.1.len(),
         );
-        Ok(height)
+        Ok(data.0)
     }
 
     async fn fetch_data(
@@ -320,7 +333,7 @@ fn map_voting_err(e: StmError<voting::Error>) -> StmError<Error> {
 mod tests {
     use crate::proxy::ParentQueryProxy;
     use crate::sync::syncer::LotusParentSyncer;
-    use crate::sync::{syncer, ParentFinalityStateQuery};
+    use crate::sync::ParentFinalityStateQuery;
     use crate::voting::VoteTally;
     use crate::{
         BlockHash, BlockHeight, CachedFinalityProvider, Config, IPCParentFinality,
