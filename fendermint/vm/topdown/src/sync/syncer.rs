@@ -466,7 +466,7 @@ mod tests {
         // Some tests expect to sync one block at a time.
         syncer.sync_many = sync_many;
 
-        return syncer;
+        syncer
     }
 
     /// Creates a mock of a new parent blockchain view. The key is the height and the value is the
