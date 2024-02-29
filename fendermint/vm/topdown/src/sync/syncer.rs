@@ -71,7 +71,7 @@ where
             tracing::warn!(
                 chain_head,
                 latest_height_fetched,
-                "chain head went backwards, potential detected from height"
+                "chain head went backwards, potential reorg detected from height"
             );
             return self.reset().await;
         }
@@ -138,7 +138,7 @@ where
             let latest_height = if let Some(h) = self.provider.latest_height()? {
                 h
             } else {
-                unreachable!("guaranteed to have last committed finality, report bug please")
+                unreachable!("guaranteed to have latest height, report bug please")
             };
 
             // first try to get the first non null block before latest_height + 1, i.e. from cache
