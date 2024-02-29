@@ -165,6 +165,10 @@ else
 fi
 """
 
+[tasks.fendermint-stop]
+env = { "CONTAINER_NAME" = "${FM_CONTAINER_NAME}" }
+run_task = "docker-stop"
+
 [tasks.fendermint-destroy]
 env = { "CONTAINER_NAME" = "${FM_CONTAINER_NAME}" }
 run_task = "docker-destroy"
