@@ -952,6 +952,10 @@ impl EthSubnetManager {
             client = client.default_headers(headers);
         }
 
+        if let Some(timeout) = subnet.rpc_timeout() {
+            client = client.timeout(timeout);
+        }
+
         let client = client.build()?;
 
         let provider = Http::new_with_client(url, client);

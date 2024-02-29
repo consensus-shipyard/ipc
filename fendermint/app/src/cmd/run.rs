@@ -348,6 +348,7 @@ fn make_ipc_provider_proxy(settings: &Settings) -> anyhow::Result<IPCProviderPro
                 .to_string()
                 .parse()
                 .unwrap(),
+            provider_timeout: topdown_config.parent_http_timeout,
             auth_token: None,
             registry_addr: topdown_config.parent_registry,
             gateway_addr: topdown_config.parent_gateway,
