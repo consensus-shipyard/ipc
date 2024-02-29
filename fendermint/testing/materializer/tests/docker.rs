@@ -82,6 +82,7 @@ where
 
     let mut materializer = DockerMaterializer::new(&test_data_dir(), 0)?;
 
+    // make sure we start with clean slate by removing any previous files
     materializer
         .remove(&testnet_name)
         .await
