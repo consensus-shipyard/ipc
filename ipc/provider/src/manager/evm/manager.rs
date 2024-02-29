@@ -67,7 +67,7 @@ const ETH_PROVIDER_POLLING_TIME: Duration = Duration::from_secs(1);
 const TRANSACTION_RECEIPT_RETRIES: usize = 200;
 
 /// The majority vote percentage for checkpoint submission when creating a subnet.
-const SUBNET_MAJORITY_PERCENTAGE: u8 = 60;
+const SUBNET_MAJORITY_PERCENTAGE: u8 = 67;
 
 pub struct EthSubnetManager {
     keystore: Option<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>>,
