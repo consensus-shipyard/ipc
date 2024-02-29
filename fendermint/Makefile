@@ -26,7 +26,7 @@ BUILDX_FLAGS ?=
 # Set to the `<repo>/<image>:<tag>` label the image.
 BUILDX_TAG   ?= fendermint:latest
 
-all: test build diagrams
+all: lint build test diagrams docker-build
 
 diagrams:
 	make -C  ../docs/fendermint/diagrams diagrams

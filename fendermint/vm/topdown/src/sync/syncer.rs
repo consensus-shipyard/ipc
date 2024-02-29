@@ -193,7 +193,17 @@ where
 
             let data = self.fetch_data(to_confirm_height, to_confirm_hash).await?;
 
+            tracing::debug!(
+                height,
+                staking_requests = data.1.len(),
+                cross_messages = data.2.len(),
+                "fetched data"
+            );
+
             atomically_or_err::<_, Error, _>(|| {
+                // This is here so we see if there is abnormal amount of retries for some reason.
+                tracing::debug!(height, "adding data to the cache");
+
                 // we only push the null block in cache when we confirmed a block so that in cache
                 // the latest height is always a confirmed non null block.
                 let latest_height = self
