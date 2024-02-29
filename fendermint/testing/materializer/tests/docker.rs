@@ -6,23 +6,33 @@
 //!
 //! `cargo test -p fendermint_materializer --test docker -- --nocapture`
 
-use std::{env::current_dir, path::PathBuf, pin::Pin, time::Duration};
+use std::{
+    collections::BTreeSet,
+    env::current_dir,
+    path::PathBuf,
+    pin::Pin,
+    time::{Duration, Instant},
+};
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
+use ethers::providers::Middleware;
 use fendermint_materializer::{
     docker::{DockerMaterializer, DockerMaterials},
     manifest::Manifest,
     testnet::Testnet,
     validation::validate_manifest,
-    TestnetName,
+    HasCometBftApi, HasEthApi, TestnetName,
 };
 use futures::Future;
 use lazy_static::lazy_static;
+use tendermint_rpc::Client;
+
+pub type DockerTestnet = Testnet<DockerMaterials, DockerMaterializer>;
 
 lazy_static! {
     static ref CI_PROFILE: bool = std::env::var("PROFILE").unwrap_or_default() == "ci";
-    static ref STARTUP_WAIT_SECS: u64 = if *CI_PROFILE { 20 } else { 15 };
-    static ref TEARDOWN_WAIT_SECS: u64 = 5;
+    static ref STARTUP_TIMEOUT: Duration = Duration::from_secs(60);
+    static ref TEARDOWN_TIMEOUT: Duration = Duration::from_secs(5);
     static ref PRINT_LOGS_ON_ERROR: bool = *CI_PROFILE;
 }
 
@@ -62,7 +72,7 @@ where
     F: for<'a> FnOnce(
         &Manifest,
         &mut DockerMaterializer,
-        &'a mut Testnet<DockerMaterials, DockerMaterializer>,
+        &'a mut DockerTestnet,
     ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + 'a>>,
 {
     let testnet_name = TestnetName::new(
@@ -92,10 +102,13 @@ where
         .await
         .context("failed to set up testnet")?;
 
-    // Allow time for things to consolidate and blocks to be created.
-    tokio::time::sleep(Duration::from_secs(*STARTUP_WAIT_SECS)).await;
+    let started = wait_for_startup(&testnet).await?;
 
-    let res = f(&manifest, &mut materializer, &mut testnet).await;
+    let res = if started {
+        f(&manifest, &mut materializer, &mut testnet).await
+    } else {
+        Err(anyhow!("the startup sequence timed out"))
+    };
 
     // Print all logs on failure.
     // Some might be available in logs in the files which are left behind,
@@ -123,9 +136,48 @@ where
     // otherwise the system shuts down too quick, but
     // at least we can inspect the containers.
     // If they don't all get dropped, `docker system prune` helps.
-    tokio::time::sleep(Duration::from_secs(*TEARDOWN_WAIT_SECS)).await;
+    tokio::time::sleep(*TEARDOWN_TIMEOUT).await;
 
     res
+}
+
+/// Allow time for things to consolidate and APIs to start.
+async fn wait_for_startup(testnet: &DockerTestnet) -> anyhow::Result<bool> {
+    let start = Instant::now();
+    let mut started = BTreeSet::new();
+
+    'startup: loop {
+        if start.elapsed() > *STARTUP_TIMEOUT {
+            return Ok(false);
+        }
+        tokio::time::sleep(Duration::from_secs(5)).await;
+
+        for (name, dnode) in testnet.nodes() {
+            if started.contains(name) {
+                continue;
+            }
+
+            let client = dnode.cometbft_http_provider()?;
+
+            if let Err(e) = client.abci_info().await {
+                eprintln!("CometBFT on {name} still fails: {e}");
+                continue 'startup;
+            }
+
+            if let Some(client) = dnode.ethapi_http_provider()? {
+                if let Err(e) = client.get_chainid().await {
+                    eprintln!("EthAPI on {name} still fails: {e}");
+                    continue 'startup;
+                }
+            }
+
+            eprintln!("APIs on {name} started");
+            started.insert(name.clone());
+        }
+
+        // All of them succeeded.
+        return Ok(true);
+    }
 }
 
 // Run these tests serially because they share a common `materializer-state.json` file with the port mappings.

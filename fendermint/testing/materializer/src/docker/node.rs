@@ -5,6 +5,7 @@ use std::{
     collections::BTreeMap,
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
+    str::FromStr,
 };
 
 use anyhow::{anyhow, bail, Context};
@@ -21,7 +22,7 @@ use crate::{
     env_vars,
     materializer::{NodeConfig, TargetConfig},
     materials::export_file,
-    HasEthApi, NodeName, ResourceHash,
+    HasCometBftApi, HasEthApi, NodeName, ResourceHash,
 };
 
 // TODO: Add these to the materializer.
@@ -472,6 +473,16 @@ impl HasEthApi for DockerNode {
                 self.port_range.ethapi_rpc_host_port()
             )
         })
+    }
+}
+
+impl HasCometBftApi for DockerNode {
+    fn cometbft_http_endpoint(&self) -> tendermint_rpc::Url {
+        tendermint_rpc::Url::from_str(&format!(
+            "http://127.0.0.1:{}",
+            self.port_range.cometbft_rpc_host_port()
+        ))
+        .unwrap()
     }
 }
 

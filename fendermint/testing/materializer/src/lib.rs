@@ -323,6 +323,17 @@ pub trait HasEthApi {
     }
 }
 
+pub trait HasCometBftApi {
+    /// URL of the HTTP endpoint.
+    fn cometbft_http_endpoint(&self) -> tendermint_rpc::Url;
+
+    fn cometbft_http_provider(&self) -> anyhow::Result<tendermint_rpc::HttpClient> {
+        Ok(tendermint_rpc::HttpClient::new(
+            self.cometbft_http_endpoint(),
+        )?)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
