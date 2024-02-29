@@ -71,7 +71,7 @@ where
             tracing::warn!(
                 chain_head,
                 latest_height_fetched,
-                "chain head went backwards, potential detected from height"
+                "chain head went backwards, potential reorg detected from height"
             );
             return self.reset().await;
         }
