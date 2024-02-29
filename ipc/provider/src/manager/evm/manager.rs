@@ -15,6 +15,8 @@ use ipc_actors_abis::{
 };
 use ipc_api::evm::{fil_to_eth_amount, payload_to_evm_address, subnet_id_to_evm_addresses};
 use ipc_api::validator::from_contract_validators;
+use reqwest::header::HeaderValue;
+use reqwest::Client;
 use std::net::{IpAddr, SocketAddr};
 
 use ipc_api::subnet::{PermissionMode, SupplyKind, SupplySource};
@@ -937,11 +939,22 @@ impl EthSubnetManager {
 
         let SubnetConfig::Fevm(config) = &subnet.config;
 
-        let provider = if auth_token.is_some() {
-            Http::new_with_auth(url, Authorization::Bearer(auth_token.unwrap()))?
-        } else {
-            Http::new(url)
-        };
+        let mut client = Client::builder();
+
+        if let Some(auth_token) = auth_token {
+            let auth = Authorization::Bearer(auth_token);
+            let mut auth_value = HeaderValue::from_str(&auth.to_string())?;
+            auth_value.set_sensitive(true);
+
+            let mut headers = reqwest::header::HeaderMap::new();
+            headers.insert(reqwest::header::AUTHORIZATION, auth_value);
+
+            client = client.default_headers(headers);
+        }
+
+        let client = client.build()?;
+
+        let provider = Http::new_with_client(url, client);
 
         let mut provider = Provider::new(provider);
         // set polling interval for provider to fit fast child subnets block times.
