@@ -68,7 +68,7 @@ where
     let testnet_name = TestnetName::new(
         PathBuf::from(manifest_file_name)
             .file_stem()
-            .expect("there is a file step")
+            .expect("filename missing")
             .to_string_lossy()
             .to_string(),
     );
