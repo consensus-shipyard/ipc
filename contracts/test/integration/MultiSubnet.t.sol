@@ -27,9 +27,10 @@ import {TestUtils, MockIpcContract, MockIpcContractPayable, MockIpcContractRever
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
 import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
-import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMsgKind, ResultMsg, CallMsg} from "../../src/structs/CrossNet.sol";
-import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
-import {SubnetID, Subnet, IPCAddress, Validator} from "../../src/structs/Subnet.sol";
+
+import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
+import {ERC20PresetFixedSupply} from "../helpers/ERC20PresetFixedSupply.sol";
+import {IERC20Errors} from "openzeppelin-contracts/interfaces/draft-IERC6093.sol";
 
 import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 import {SubnetActorFacetsHelper} from "../helpers/SubnetActorFacetsHelper.sol";
