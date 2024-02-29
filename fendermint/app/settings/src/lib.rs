@@ -128,6 +128,9 @@ pub struct TopDownSettings {
     pub exponential_retry_limit: usize,
     /// The parent rpc http endpoint
     pub parent_http_endpoint: Url,
+    /// Timeout for calls to the parent Ethereum API.
+    #[serde_as(as = "Option<DurationSeconds<u64>>")]
+    pub parent_http_timeout: Option<Duration>,
     /// The parent registry address
     #[serde(deserialize_with = "deserialize_eth_address_from_str")]
     pub parent_registry: Address,
