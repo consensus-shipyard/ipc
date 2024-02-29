@@ -8,7 +8,9 @@ use tracing_subscriber::EnvFilter;
 
 /// Standard log levels, or something we can pass to <https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html>
 ///
-/// To be fair we could pass of everything except "off" as a filter.
+/// To be fair all of these could be handled by the `EnvFilter`, even `off`,
+/// however I also wanted to leave it here as an example of implementing `ValueEnum` manually,
+/// and perhaps we have simpler usecases where we only want to simply match levels.
 #[derive(Debug, Clone)]
 pub enum LogLevel {
     Off,
@@ -21,21 +23,28 @@ pub enum LogLevel {
 }
 
 impl LogLevel {
-    pub fn to_filter(&self) -> anyhow::Result<Option<EnvFilter>> {
-        let filter = match self {
-            LogLevel::Off => return Ok(None),
-            LogLevel::Filter(s) => s,
+    pub fn as_str(&self) -> &str {
+        match self {
+            LogLevel::Off => "off",
             LogLevel::Error => "error",
             LogLevel::Warn => "warn",
             LogLevel::Info => "info",
             LogLevel::Debug => "debug",
             LogLevel::Trace => "trace",
-        };
+            LogLevel::Filter(s) => s.as_str(),
+        }
+    }
+
+    pub fn to_filter(&self) -> anyhow::Result<Option<EnvFilter>> {
+        if let LogLevel::Off = self {
+            // NOTE: We could just pass "off" to `EnvFilter` and return non-optional.
+            return Ok(None);
+        }
 
         // At this point the filter should have been parsed before,
         // but if we created a log level directly, it can fail.
         // We fail if it doesn't parse because presumably we _want_ to see those things.
-        let filter = EnvFilter::try_new(filter)?;
+        let filter = EnvFilter::try_new(self.as_str())?;
 
         Ok(Some(filter))
     }
@@ -58,15 +67,10 @@ impl ValueEnum for LogLevel {
     }
 
     fn to_possible_value(&self) -> Option<PossibleValue> {
-        let pv = |name: &str| Some(PossibleValue::new(name.to_lowercase()));
-        match self {
-            LogLevel::Off => pv("Off"),
-            LogLevel::Error => pv("Error"),
-            LogLevel::Warn => pv("Warn"),
-            LogLevel::Info => pv("Info"),
-            LogLevel::Debug => pv("Debug"),
-            LogLevel::Trace => pv("Trace"),
-            LogLevel::Filter(_) => None,
+        if let LogLevel::Filter(_) = self {
+            None
+        } else {
+            Some(PossibleValue::new(self.as_str().to_string()))
         }
     }
 }
