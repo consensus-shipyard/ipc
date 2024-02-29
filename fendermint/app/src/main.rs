@@ -65,11 +65,37 @@ fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
 
     guard
 }
+
+/// Install a panic handler that prints stuff to the logs, otherwise it only shows up in the console.
+fn init_panic_handler() {
+    let default_hook = std::panic::take_hook();
+
+    std::panic::set_hook(Box::new(move |info| {
+        // Do the default first, just in case logging fails too.
+        default_hook(info);
+
+        // let stacktrace = std::backtrace::Backtrace::capture();
+        let stacktrace = std::backtrace::Backtrace::force_capture();
+
+        tracing::error!(
+            stacktrace = stacktrace.to_string(),
+            info = info.to_string(),
+            "panicking"
+        );
+
+        // We could exit the application if any of the background tokio tasks panic.
+        // However, they are not necessarily critical processes, the chain might still make progress.
+        // std::process::abort();
+    }))
+}
+
 #[tokio::main]
 async fn main() {
     let opts = options::parse();
 
     let _guard = init_tracing(&opts);
+
+    init_panic_handler();
 
     if let Err(e) = cmd::exec(&opts).await {
         tracing::error!("failed to execute {:?}: {e:?}", opts);
