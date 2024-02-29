@@ -8,63 +8,64 @@ use tracing_appender::{
     rolling::{RollingFileAppender, Rotation},
 };
 use tracing_subscriber::fmt::format::FmtSpan;
-use tracing_subscriber::{
-    fmt::{self, writer::MakeWriterExt},
-    layer::SubscriberExt,
-    Layer,
-};
+use tracing_subscriber::{fmt, layer::SubscriberExt, Layer};
 
 mod cmd;
 
 fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
     let mut guard = None;
 
-    let Some(tracing_filter) = opts.tracing_filter().expect("failed to create filter") else {
+    let console_filter = opts.log_console_filter().expect("invalid filter");
+    let file_filter = opts.log_file_filter().expect("invalid filter");
+
+    if console_filter.is_none() && file_filter.is_none() {
         return guard;
-    };
+    }
 
     let registry = tracing_subscriber::registry();
 
     // add a file layer if log_dir is set
-    let registry = registry.with(if let Some(log_dir) = &opts.log_dir {
-        let filename = match &opts.log_file_prefix {
-            Some(prefix) => format!("{}-{}", prefix, "fendermint"),
-            None => "fendermint".to_string(),
-        };
+    let registry = registry.with(match (&opts.log_dir, file_filter) {
+        (Some(log_dir), Some(filter)) => {
+            let filename = match &opts.log_file_prefix {
+                Some(prefix) => format!("{}-{}", prefix, "fendermint"),
+                None => "fendermint".to_string(),
+            };
 
-        let appender = RollingFileAppender::builder()
-            .filename_prefix(filename)
-            .filename_suffix("log")
-            .rotation(Rotation::DAILY)
-            .max_log_files(5)
-            .build(log_dir)
-            .expect("failed to initialize rolling file appender");
+            let appender = RollingFileAppender::builder()
+                .filename_prefix(filename)
+                .filename_suffix("log")
+                .rotation(Rotation::DAILY)
+                .max_log_files(7)
+                .build(log_dir)
+                .expect("failed to initialize rolling file appender");
 
-        let (non_blocking, g) = tracing_appender::non_blocking(appender);
-        guard = Some(g);
+            let (non_blocking, g) = tracing_appender::non_blocking(appender);
+            guard = Some(g);
 
-        let file_layer = fmt::Layer::new()
-            .json()
-            .with_writer(non_blocking)
-            .with_span_events(FmtSpan::CLOSE)
+            let file_layer = fmt::Layer::new()
+                .json()
+                .with_writer(non_blocking)
+                .with_span_events(FmtSpan::CLOSE)
+                .with_target(false)
+                .with_file(true)
+                .with_line_number(true)
+                .with_filter(filter);
+
+            Some(file_layer)
+        }
+        _ => None,
+    });
+
+    // we also log all traces to stdout
+    let registry = registry.with(console_filter.map(|filter| {
+        tracing_subscriber::fmt::layer()
+            .with_writer(std::io::stdout)
             .with_target(false)
             .with_file(true)
             .with_line_number(true)
-            .with_filter(tracing_filter);
-
-        Some(file_layer)
-    } else {
-        None
-    });
-
-    // we also log all traces with level INFO or higher to stdout
-    let registry = registry.with(
-        tracing_subscriber::fmt::layer()
-            .with_writer(std::io::stdout.with_max_level(tracing::Level::INFO))
-            .with_target(false)
-            .with_file(true)
-            .with_line_number(true),
-    );
+            .with_filter(filter)
+    }));
 
     tracing::subscriber::set_global_default(registry).expect("Unable to set a global collector");
 

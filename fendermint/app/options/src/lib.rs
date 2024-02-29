@@ -84,7 +84,7 @@ pub struct Options {
     #[arg(short, long, default_value = "dev")]
     pub mode: String,
 
-    /// Set the logging level.
+    /// Set the logging level of the console.
     #[arg(
         short = 'l',
         long,
@@ -100,6 +100,15 @@ pub struct Options {
     #[arg(hide = true, value_enum, env = "LOG_LEVEL", value_parser = parse_log_level,)]
     _log_level: Option<LogLevel>,
 
+    /// Set the logging level of the log file. If missing, it defaults to the same level as the console.
+    #[arg(
+        long,
+        value_enum,
+        env = "FM_LOG_FILE_LEVEL",
+        value_parser = parse_log_level,
+    )]
+    log_file_level: Option<LogLevel>,
+
     /// Global options repeated here for discoverability, so they show up in `--help` among the others.
     #[command(flatten)]
     pub global: GlobalArgs,
@@ -109,16 +118,25 @@ pub struct Options {
 }
 
 impl Options {
-    /// Tracing filter, unless it's turned off.
+    /// Tracing filter for the console, unless it's turned off.
     ///
     /// Coalescing everything into a filter instead of either a level or a filter
     /// because the `tracing_subscriber` setup methods like `with_filter` and `with_level`
     /// produce different static types and it's not obvious how to use them as alternatives.
-    pub fn tracing_filter(&self) -> anyhow::Result<Option<EnvFilter>> {
+    pub fn log_console_filter(&self) -> anyhow::Result<Option<EnvFilter>> {
         self._log_level
             .as_ref()
             .unwrap_or(&self.log_level)
             .to_filter()
+    }
+
+    /// Tracing filter for the log file.
+    pub fn log_file_filter(&self) -> anyhow::Result<Option<EnvFilter>> {
+        if let Some(ref level) = self.log_file_level {
+            level.to_filter()
+        } else {
+            self.log_console_filter()
+        }
     }
 
     pub fn config_dir(&self) -> PathBuf {
@@ -181,7 +199,7 @@ mod tests {
     fn parse_log_level() {
         let parse_filter = |cmd: &str| {
             let opts: Options = Options::parse_from(cmd.split_ascii_whitespace());
-            opts.tracing_filter().expect("filter should parse")
+            opts.log_console_filter().expect("filter should parse")
         };
 
         assert!(
