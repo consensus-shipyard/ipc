@@ -6,7 +6,7 @@ use bollard::{
     Docker,
 };
 
-/// Timemout before we kill the container if it doesn't want to stop.
+/// Timeout before we kill the container if it doesn't want to stop.
 const KILL_TIMEOUT_SECS: i64 = 5;
 
 /// Commands to destroy docker constructs when they go out of scope.
