@@ -57,10 +57,10 @@ fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
         _ => None,
     });
 
-    // we also log all traces to stdout
+    // we also log all traces to stderr (reserving stdout for any actual output such as from the CLI commands)
     let registry = registry.with(console_filter.map(|filter| {
         tracing_subscriber::fmt::layer()
-            .with_writer(std::io::stdout)
+            .with_writer(std::io::stderr)
             .with_target(false)
             .with_file(true)
             .with_line_number(true)
