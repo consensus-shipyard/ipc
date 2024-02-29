@@ -2905,6 +2905,7 @@ dependencies = [
 name = "fendermint_app_options"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "bytes",
  "cid",
  "clap 4.5.1",

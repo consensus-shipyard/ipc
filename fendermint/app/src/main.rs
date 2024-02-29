@@ -19,7 +19,7 @@ mod cmd;
 fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
     let mut guard = None;
 
-    let Some(tracing_filter) = opts.tracing_filter() else {
+    let Some(tracing_filter) = opts.tracing_filter().expect("failed to create filter") else {
         return guard;
     };
 

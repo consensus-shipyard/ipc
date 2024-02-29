@@ -110,7 +110,11 @@ pub struct Options {
 
 impl Options {
     /// Tracing filter, unless it's turned off.
-    pub fn tracing_filter(&self) -> Option<EnvFilter> {
+    ///
+    /// Coalescing everything into a filter instead of either a level or a filter
+    /// because the `tracing_subscriber` setup methods like `with_filter` and `with_level`
+    /// produce different static types and it's not obvious how to use them as alternatives.
+    pub fn tracing_filter(&self) -> anyhow::Result<Option<EnvFilter>> {
         self._log_level
             .as_ref()
             .unwrap_or(&self.log_level)
@@ -145,6 +149,7 @@ mod tests {
     use crate::*;
     use clap::Parser;
     use fvm_shared::address::Network;
+    use tracing::level_filters::LevelFilter;
 
     #[test]
     fn parse_global() {
@@ -170,5 +175,36 @@ mod tests {
             .expect_err("--help is not Options");
 
         assert!(e.to_string().contains("Usage:"), "unexpected help: {e}");
+    }
+
+    #[test]
+    fn parse_log_level() {
+        let parse_filter = |cmd: &str| {
+            let opts: Options = Options::parse_from(cmd.split_ascii_whitespace());
+            opts.tracing_filter().expect("filter should parse")
+        };
+
+        assert!(
+            parse_filter("fendermint --log-level debug run").is_some(),
+            "standard log level"
+        );
+        assert!(
+            parse_filter("fendermint --log-level off run").is_none(),
+            "no logging"
+        );
+        assert!(
+            parse_filter("fendermint --log-level libp2p=warn,debug run").is_some(),
+            "complex filter"
+        );
+
+        let filter = parse_filter("fendermint --log-level info run").unwrap();
+        assert_eq!(filter.max_level_hint(), Some(LevelFilter::INFO));
+    }
+
+    #[test]
+    fn parse_invalid_log_level() {
+        // NOTE: `nonsense` in itself is interpreted as a target. Maybe we should mandate at least `=` in it?
+        let cmd = "fendermint --log-level nonsense/123 run";
+        Options::try_parse_from(cmd.split_ascii_whitespace()).expect_err("should not parse");
     }
 }

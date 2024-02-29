@@ -21,9 +21,9 @@ pub enum LogLevel {
 }
 
 impl LogLevel {
-    pub fn to_filter(&self) -> Option<EnvFilter> {
+    pub fn to_filter(&self) -> anyhow::Result<Option<EnvFilter>> {
         let filter = match self {
-            LogLevel::Off => return None,
+            LogLevel::Off => return Ok(None),
             LogLevel::Filter(s) => s,
             LogLevel::Error => "error",
             LogLevel::Warn => "warn",
@@ -31,7 +31,13 @@ impl LogLevel {
             LogLevel::Debug => "debug",
             LogLevel::Trace => "trace",
         };
-        Some(EnvFilter::new(filter))
+
+        // At this point the filter should have been parsed before,
+        // but if we created a log level directly, it can fail.
+        // We fail if it doesn't parse because presumably we _want_ to see those things.
+        let filter = EnvFilter::try_new(filter)?;
+
+        Ok(Some(filter))
     }
 }
 
