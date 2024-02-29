@@ -12,6 +12,7 @@ use crate::{
 use anyhow::anyhow;
 use async_stm::{atomically, atomically_or_err, StmError};
 use ethers::utils::hex;
+use fendermint_vm_event::{emit, EventType};
 use std::sync::Arc;
 
 /// Parent syncer that constantly poll parent. This struct handles lotus null blocks and deferred
@@ -193,6 +194,7 @@ where
 
                     atomically_or_err::<_, Error, _>(|| {
                         self.provider.new_parent_view(height, None)?;
+                        emit!(EventType::NewParentView, is_null = true, height);
                         self.vote_tally
                             .add_block(height, None)
                             .map_err(map_voting_err)?;
@@ -219,6 +221,14 @@ where
         let data = self.fetch_data(height, block_hash_res.block_hash).await?;
         atomically_or_err::<_, Error, _>(|| {
             self.provider.new_parent_view(height, Some(data.clone()))?;
+            emit!(
+                EventType::NewParentView,
+                is_null = false,
+                height,
+                block_hash = hex::encode(&data.0),
+                num_topdown_messages = data.2.len(),
+                num_validator_changes = data.1.len(),
+            );
             self.vote_tally
                 .add_block(height, Some(data.0.clone()))
                 .map_err(map_voting_err)?;

@@ -73,15 +73,8 @@ impl FinalityWithNull {
         maybe_payload: Option<ParentViewPayload>,
     ) -> StmResult<(), Error> {
         if let Some((block_hash, validator_changes, top_down_msgs)) = maybe_payload {
-            emit!(
-                EventType::NewParentView,
-                is_null = false,
-                height,
-                block_hash = hex::encode(&block_hash)
-            );
             self.parent_block_filled(height, block_hash, validator_changes, top_down_msgs)
         } else {
-            emit!(EventType::NewParentView, is_null = true, height);
             self.parent_null_round(height)
         }
     }
