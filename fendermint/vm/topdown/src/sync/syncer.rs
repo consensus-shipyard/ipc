@@ -64,7 +64,7 @@ where
         };
 
         let (mut latest_height_fetched, mut first_non_null_parent_hash) =
-            self.get_from_cache().await;
+            self.latest_data_from_cache().await;
         tracing::debug!(chain_head, latest_height_fetched, "syncing heights");
 
         if latest_height_fetched > chain_head {
@@ -111,7 +111,7 @@ where
                 break;
             }
 
-            (latest_height_fetched, first_non_null_parent_hash) = self.get_from_cache().await;
+            (latest_height_fetched, first_non_null_parent_hash) = self.latest_data_from_cache().await;
         }
 
         Ok(())
@@ -128,8 +128,8 @@ where
         atomically(|| self.provider.cached_blocks()).await > max_cache_blocks
     }
 
-    /// Get the data needed to pull the next block
-    async fn get_from_cache(&self) -> (BlockHeight, BlockHash) {
+    /// Get the latest data stored in the cache to pull the next block
+    async fn latest_data_from_cache(&self) -> (BlockHeight, BlockHash) {
         // we are getting the latest height fetched in cache along with the first non null block
         // that is stored in cache.
         // we are doing two fetches in one `atomically` as if we get the data in two `atomically`,
@@ -194,13 +194,14 @@ where
 
                     atomically_or_err::<_, Error, _>(|| {
                         self.provider.new_parent_view(height, None)?;
-                        emit!(EventType::NewParentView, is_null = true, height);
                         self.vote_tally
                             .add_block(height, None)
                             .map_err(map_voting_err)?;
                         Ok(())
                     })
                     .await?;
+
+                    emit!(EventType::NewParentView, is_null = true, height);
 
                     return Ok(height);
                 }
@@ -221,14 +222,6 @@ where
         let data = self.fetch_data(height, block_hash_res.block_hash).await?;
         atomically_or_err::<_, Error, _>(|| {
             self.provider.new_parent_view(height, Some(data.clone()))?;
-            emit!(
-                EventType::NewParentView,
-                is_null = false,
-                height,
-                block_hash = hex::encode(&data.0),
-                num_topdown_messages = data.2.len(),
-                num_validator_changes = data.1.len(),
-            );
             self.vote_tally
                 .add_block(height, Some(data.0.clone()))
                 .map_err(map_voting_err)?;
@@ -237,6 +230,14 @@ where
         })
         .await?;
 
+        emit!(
+            EventType::NewParentView,
+            is_null = false,
+            height,
+            block_hash = hex::encode(&data.0),
+            num_topdown_messages = data.2.len(),
+            num_validator_changes = data.1.len(),
+        );
         Ok(height)
     }
 
