@@ -7,10 +7,12 @@ use tracing_appender::{
     non_blocking::WorkerGuard,
     rolling::{RollingFileAppender, Rotation},
 };
+use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::{
     fmt::{self, writer::MakeWriterExt},
     layer::SubscriberExt,
 };
+
 mod cmd;
 
 fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
@@ -44,6 +46,7 @@ fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
             fmt::Layer::new()
                 .json()
                 .with_writer(non_blocking.with_max_level(log_level))
+                .with_span_events(FmtSpan::CLOSE)
                 .with_target(false)
                 .with_file(true)
                 .with_line_number(true),
