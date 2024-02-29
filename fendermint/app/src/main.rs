@@ -11,6 +11,7 @@ use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::{
     fmt::{self, writer::MakeWriterExt},
     layer::SubscriberExt,
+    Layer,
 };
 
 mod cmd;
@@ -18,7 +19,7 @@ mod cmd;
 fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
     let mut guard = None;
 
-    let Some(log_level) = opts.tracing_level() else {
+    let Some(tracing_filter) = opts.tracing_filter() else {
         return guard;
     };
 
@@ -42,15 +43,16 @@ fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
         let (non_blocking, g) = tracing_appender::non_blocking(appender);
         guard = Some(g);
 
-        Some(
-            fmt::Layer::new()
-                .json()
-                .with_writer(non_blocking.with_max_level(log_level))
-                .with_span_events(FmtSpan::CLOSE)
-                .with_target(false)
-                .with_file(true)
-                .with_line_number(true),
-        )
+        let file_layer = fmt::Layer::new()
+            .json()
+            .with_writer(non_blocking)
+            .with_span_events(FmtSpan::CLOSE)
+            .with_target(false)
+            .with_file(true)
+            .with_line_number(true)
+            .with_filter(tracing_filter);
+
+        Some(file_layer)
     } else {
         None
     });

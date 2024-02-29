@@ -3,11 +3,14 @@
 
 use std::path::PathBuf;
 
-use clap::{Args, Parser, Subcommand, ValueEnum};
+use clap::{Args, Parser, Subcommand};
 use fvm_shared::address::Network;
-use materializer::MaterializerArgs;
+use tracing_subscriber::EnvFilter;
 
-use self::{eth::EthArgs, genesis::GenesisArgs, key::KeyArgs, rpc::RpcArgs, run::RunArgs};
+use self::{
+    eth::EthArgs, genesis::GenesisArgs, key::KeyArgs, materializer::MaterializerArgs, rpc::RpcArgs,
+    run::RunArgs,
+};
 
 pub mod eth;
 pub mod genesis;
@@ -16,8 +19,10 @@ pub mod materializer;
 pub mod rpc;
 pub mod run;
 
+mod log;
 mod parse;
 
+use log::{parse_log_level, LogLevel};
 use parse::parse_network;
 
 /// Parse the main arguments by:
@@ -29,16 +34,6 @@ pub fn parse() -> Options {
     fvm_shared::address::set_current_network(opts.global.network);
     let opts: Options = Options::parse();
     opts
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
-pub enum LogLevel {
-    Off,
-    Error,
-    Warn,
-    Info,
-    Debug,
-    Trace,
 }
 
 #[derive(Args, Debug)]
@@ -95,9 +90,15 @@ pub struct Options {
         long,
         default_value = "info",
         value_enum,
-        env = "LOG_LEVEL"
+        env = "FM_LOG_LEVEL",
+        help = "Standard log levels, or a comma separated list of filters, e.g. 'debug,tower_abci=warn,libp2p::gossipsub=info'",
+        value_parser = parse_log_level,
     )]
-    pub log_level: LogLevel,
+    log_level: LogLevel,
+
+    /// Fallback for the `log_level` with a legacy env var name.
+    #[arg(hide = true, value_enum, env = "LOG_LEVEL", value_parser = parse_log_level,)]
+    _log_level: Option<LogLevel>,
 
     /// Global options repeated here for discoverability, so they show up in `--help` among the others.
     #[command(flatten)]
@@ -108,16 +109,12 @@ pub struct Options {
 }
 
 impl Options {
-    /// Tracing level, unless it's turned off.
-    pub fn tracing_level(&self) -> Option<tracing::Level> {
-        match self.log_level {
-            LogLevel::Off => None,
-            LogLevel::Error => Some(tracing::Level::ERROR),
-            LogLevel::Warn => Some(tracing::Level::WARN),
-            LogLevel::Info => Some(tracing::Level::INFO),
-            LogLevel::Debug => Some(tracing::Level::DEBUG),
-            LogLevel::Trace => Some(tracing::Level::TRACE),
-        }
+    /// Tracing filter, unless it's turned off.
+    pub fn tracing_filter(&self) -> Option<EnvFilter> {
+        self._log_level
+            .as_ref()
+            .unwrap_or(&self.log_level)
+            .to_filter()
     }
 
     pub fn config_dir(&self) -> PathBuf {

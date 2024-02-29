@@ -2916,9 +2916,11 @@ dependencies = [
  "hex",
  "ipc-api",
  "ipc-types",
+ "lazy_static",
  "num-traits",
  "tendermint-rpc",
  "tracing",
+ "tracing-subscriber",
  "url",
 ]
 
