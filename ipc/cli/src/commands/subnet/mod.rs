@@ -15,6 +15,7 @@ use crate::commands::subnet::show_gateway_contract_commit_sha::{
 use crate::commands::subnet::validator::{ValidatorInfo, ValidatorInfoArgs};
 use crate::{CommandLineHandler, GlobalArguments};
 use clap::{Args, Subcommand};
+use crate::commands::subnet::set_federated_power::{SetFederatedPower, SetFederatedPowerArgs};
 
 use self::bootstrap::{AddBootstrap, AddBootstrapArgs, ListBootstraps, ListBootstrapsArgs};
 use self::join::{StakeSubnet, StakeSubnetArgs, UnstakeSubnet, UnstakeSubnetArgs};
@@ -32,6 +33,7 @@ pub mod rpc;
 pub mod send_value;
 pub mod show_gateway_contract_commit_sha;
 mod validator;
+mod set_federated_power;
 
 #[derive(Debug, Args)]
 #[command(
@@ -65,6 +67,7 @@ impl SubnetCommandsArgs {
             Commands::ShowGatewayContractCommitSha(args) => {
                 ShowGatewayContractCommitSha::handle(global, args).await
             }
+            Commands::SetFederatedPower(args) => SetFederatedPower::handle(global, args).await,
         }
     }
 }
@@ -86,5 +89,9 @@ pub(crate) enum Commands {
     ListBootstraps(ListBootstrapsArgs),
     GenesisEpoch(GenesisEpochArgs),
     GetValidator(ValidatorInfoArgs),
+<<<<<<< HEAD
     ShowGatewayContractCommitSha(ShowGatewayContractCommitShaArgs),
+=======
+    SetFederatedPower(SetFederatedPowerArgs),
+>>>>>>> b762e9f0 (Rough work)
 }

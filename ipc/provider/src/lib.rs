@@ -769,6 +769,21 @@ impl IpcProvider {
 
         conn.manager().latest_parent_finality().await
     }
+
+
+    pub async fn set_federated_power(
+        &self,
+        subnet: &SubnetID,
+        validators: &Vec<Address>,
+        public_keys: &Vec<Vec<u8>>,
+        federated_power: &Vec<u128>) -> anyhow::Result<()> {
+        let conn = match self.connection(subnet) {
+            None => return Err(anyhow!("target subnet not found")),
+            Some(conn) => conn,
+        };
+
+        conn.manager().set_federated_power(subnet, validators, public_keys, federated_power).await
+    }
 }
 
 /// Lotus JSON keytype format

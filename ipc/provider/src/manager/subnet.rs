@@ -157,6 +157,14 @@ pub trait SubnetManager: Send + Sync + TopDownFinalityQuery + BottomUpCheckpoint
         subnet: &SubnetID,
         validator: &Address,
     ) -> Result<ValidatorInfo>;
+
+    async fn set_federated_power(
+        &self,
+        subnet: &SubnetID,
+        validators: &Vec<Address>,
+        public_keys: &Vec<Vec<u8>>,
+        federated_power: &Vec<u128>,
+    ) -> Result<()>;
 }
 
 #[derive(Debug)]

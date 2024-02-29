@@ -798,6 +798,53 @@ impl SubnetManager for EthSubnetManager {
             is_waiting,
         })
     }
+
+    async fn set_federated_power(
+        &self,
+        subnet: &SubnetID,
+        validators: &Vec<Address>,
+        public_keys: &Vec<Vec<u8>>,
+        federated_power: &Vec<u128>,
+    ) -> Result<()> {
+        let address = contract_address_from_subnet(&subnet)?;
+        log::info!(
+            "interacting with evm subnet contract: {address:}"
+        );
+
+        let contract = subnet_actor_manager_facet::SubnetActorManagerFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+
+        // let mut addresses: Vec<ethers::core::types::Address> = Vec::new();
+        // for address in validators {
+        //     addresses.push(payload_to_evm_address(address.payload())?)
+        // }
+        let addresses: Vec<ethers::core::types::Address> = validators.iter().map(
+            |validator_address| payload_to_evm_address(validator_address.payload()).unwrap()
+        ).collect();
+        log::info!("converted addresses {:?}:", addresses);
+
+        // let mut pubkeys: Vec<ethers::core::types::Bytes> = Vec::new();
+        // for key in public_keys {
+        //     pubkeys.push(ethers::core::types::Bytes::from(key.clone()))
+        // }
+        let pubkeys: Vec<ethers::core::types::Bytes> = public_keys.iter().map(
+            |key| ethers::core::types::Bytes::from(key.clone())
+        ).collect();
+        log::info!("converted pubkeys {:?}:", pubkeys);
+
+        // let mut power_u256: Vec<ethers::core::types::U256> = Vec::new();
+        // for power in federated_power {
+        //     power_u256.push(ethers::core::types::U256::from(*power))
+        // }
+        let power_u256: Vec<ethers::core::types::U256> = federated_power.iter().map(
+            |power| ethers::core::types::U256::from(*power)
+        ).collect();
+        log::info!("converted power {:?}:", power_u256);
+
+        Ok(contract.set_federated_power(addresses, pubkeys, power_u256).call().await?)
+    }
 }
 
 #[async_trait]
