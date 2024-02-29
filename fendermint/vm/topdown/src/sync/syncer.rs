@@ -62,7 +62,8 @@ where
             return Ok(());
         };
 
-        let (mut latest_height_fetched, mut first_non_null_parent_hash) = self.get_from_cache().await;
+        let (mut latest_height_fetched, mut first_non_null_parent_hash) =
+            self.get_from_cache().await;
         tracing::debug!(chain_head, latest_height_fetched, "syncing heights");
 
         if latest_height_fetched > chain_head {
@@ -308,7 +309,7 @@ fn map_voting_err(e: StmError<voting::Error>) -> StmError<Error> {
 mod tests {
     use crate::proxy::ParentQueryProxy;
     use crate::sync::syncer::LotusParentSyncer;
-    use crate::sync::{ParentFinalityStateQuery, syncer};
+    use crate::sync::{syncer, ParentFinalityStateQuery};
     use crate::voting::VoteTally;
     use crate::{
         BlockHash, BlockHeight, CachedFinalityProvider, Config, IPCParentFinality,
@@ -318,10 +319,10 @@ mod tests {
     use async_stm::atomically;
     use async_trait::async_trait;
     use fendermint_vm_genesis::{Power, Validator};
-    use ipc_provider::manager::{GetBlockHashResult, TopDownQueryPayload};
-    use std::sync::Arc;
     use ipc_api::cross::IpcEnvelope;
     use ipc_api::staking::StakingChangeRequest;
+    use ipc_provider::manager::{GetBlockHashResult, TopDownQueryPayload};
+    use std::sync::Arc;
 
     /// How far behind the tip of the chain do we consider blocks final in the tests.
     const FINALITY_DELAY: u64 = 2;
