@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
-import {MultiSubnetTestBase} from "@ipc/test/MultiSubnetTestBase.sol";
+import {IntegrationTestBase, RootSubnetDefinition, TestSubnetDefinition} from "@ipc/test/IntegrationTestBase.sol";
+import {ERC20PresetFixedSupply} from "@ipc/test/helpers/ERC20PresetFixedSupply.sol";
+import {TestUtils} from "@ipc/test/helpers/TestUtils.sol";
+import {MerkleTreeHelper} from "@ipc/test/helpers/MerkleTreeHelper.sol";
+import {GatewayFacetsHelper} from "@ipc/test/helpers/GatewayFacetsHelper.sol";
+import {SubnetActorFacetsHelper} from "@ipc/test/helpers/SubnetActorFacetsHelper.sol";
 import {LinkedTokenController} from "../src/LinkedTokenController.sol";
 import {LinkedTokenReplica} from "../src/LinkedTokenReplica.sol";
 import {USDCTest} from "../src/USDCTest.sol";
@@ -12,6 +17,14 @@ import {
     IPCAddress,
     Validator
 } from "@ipc/src/structs/Subnet.sol";
+import {SubnetActorDiamond} from "@ipc/src/SubnetActorDiamond.sol";
+import {GatewayDiamond} from "@ipc/src/GatewayDiamond.sol";
+import {TopDownFinalityFacet} from "@ipc/src/gateway/router/TopDownFinalityFacet.sol";
+import {XnetMessagingFacet} from "@ipc/src/gateway/router/XnetMessagingFacet.sol";
+import {SubnetActorManagerFacet} from "@ipc/src/subnet/SubnetActorManagerFacet.sol";
+import {GatewayGetterFacet} from "@ipc/src/gateway/GatewayGetterFacet.sol";
+import {SubnetActorCheckpointingFacet} from "@ipc/src/subnet/SubnetActorCheckpointingFacet.sol";
+import {CheckpointingFacet} from "@ipc/src/gateway/router/CheckpointingFacet.sol";
 import {FvmAddressHelper} from "@ipc/src/lib/FvmAddressHelper.sol";
 import {
     IpcEnvelope,
@@ -22,19 +35,87 @@ import {
     ResultMsg,
     CallMsg
 } from "@ipc/src/structs/CrossNet.sol";
+import {SubnetIDHelper} from "@ipc/src/lib/SubnetIDHelper.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {CrossMsgHelper} from "@ipc/src/lib/CrossMsgHelper.sol";
 import {IpcHandler} from "@ipc/sdk/IpcContract.sol";
-
+import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import "forge-std/console.sol";
 
-contract MultiSubnetTest is MultiSubnetTestBase {
+contract MultiSubnetTest is IntegrationTestBase {
+    using SubnetIDHelper for SubnetID;
+    using GatewayFacetsHelper for GatewayDiamond;
+    using SubnetActorFacetsHelper for SubnetActorDiamond;
     // @dev This test verifies that USDC bridge connects correctly
     // a contract from native subnet with a contract in token subnet through the rootnet.
     using CrossMsgHelper for IpcEnvelope;
 
     LinkedTokenReplica ipcTokenReplica;
     LinkedTokenController ipcTokenController;
+
+    RootSubnetDefinition public rootSubnet;
+    TestSubnetDefinition public nativeSubnet;
+    TestSubnetDefinition public tokenSubnet;
+
+    SubnetActorDiamond rootTokenSubnetActor;
+    SubnetActorDiamond rootNativeSubnetActor;
+    GatewayDiamond rootGateway;
+    GatewayDiamond nativeSubnetGateway;
+    SubnetID rootSubnetName;
+    SubnetID nativeSubnetName;
+
+    IERC20 public token;
+
+    function setUp() public override {
+        token = new ERC20PresetFixedSupply("TestToken", "TEST", 1_000_000, address(this));
+
+        rootSubnetName = SubnetID({root: ROOTNET_CHAINID, route: new address[](0)});
+        require(rootSubnetName.isRoot(), "not root");
+
+        rootGateway = createGatewayDiamond(gatewayParams(rootSubnetName));
+
+        rootNativeSubnetActor = createSubnetActor(
+            defaultSubnetActorParamsWith(address(rootGateway), rootSubnetName)
+        );
+
+        rootTokenSubnetActor = createSubnetActor(
+            defaultSubnetActorParamsWith(address(rootGateway), rootSubnetName, address(token))
+        );
+
+        address[] memory tokenSubnetPath = new address[](1);
+        tokenSubnetPath[0] = address(rootTokenSubnetActor);
+        SubnetID memory tokenSubnetName = SubnetID({root: ROOTNET_CHAINID, route: tokenSubnetPath});
+        GatewayDiamond tokenSubnetGateway = createGatewayDiamond(gatewayParams(tokenSubnetName));
+
+        address[] memory nativeSubnetPath = new address[](1);
+        nativeSubnetPath[0] = address(rootNativeSubnetActor);
+        nativeSubnetName = SubnetID({root: ROOTNET_CHAINID, route: nativeSubnetPath});
+        nativeSubnetGateway = createGatewayDiamond(gatewayParams(nativeSubnetName));
+
+        rootSubnet = RootSubnetDefinition({
+            gateway: rootGateway,
+            gatewayAddr: address(rootGateway),
+            id: rootSubnetName
+        });
+
+        nativeSubnet = TestSubnetDefinition({
+            gateway: nativeSubnetGateway,
+            gatewayAddr: address(nativeSubnetGateway),
+            id: nativeSubnetName,
+            subnetActor: rootNativeSubnetActor,
+            subnetActorAddr: address(rootNativeSubnetActor),
+            path: nativeSubnetPath
+        });
+
+        tokenSubnet = TestSubnetDefinition({
+            gateway: tokenSubnetGateway,
+            gatewayAddr: address(tokenSubnetGateway),
+            id: tokenSubnetName,
+            subnetActor: rootTokenSubnetActor,
+            subnetActorAddr: address(rootTokenSubnetActor),
+            path: tokenSubnetPath
+        });
+    }
 
     function testMultiSubnet_Native_FundFromParentToChild_USDCBridge() public {
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
@@ -149,7 +230,7 @@ contract MultiSubnetTest is MultiSubnetTestBase {
         executeTopDownMsgs(
             msgs,
             nativeSubnetName,
-            address(nativeSubnetGateway)
+            nativeSubnetGateway
         );
 
         console.log("fail:");
@@ -193,9 +274,9 @@ contract MultiSubnetTest is MultiSubnetTestBase {
         BottomUpCheckpoint memory checkpoint =
             callCreateBottomUpCheckpointFromChildSubnet(
                 nativeSubnetName,
-                address(nativeSubnetGateway)
+                nativeSubnetGateway
             );
-        submitBottomUpCheckpoint(checkpoint, address(rootNativeSubnetActor));
+        submitBottomUpCheckpoint(checkpoint, rootNativeSubnetActor);
 
         //ensure that usdc tokens are returned on root net
         require(
@@ -211,5 +292,157 @@ contract MultiSubnetTest is MultiSubnetTestBase {
             0 == ipcTokenReplica.balanceOf(address(ipcTokenReplica)),
             "unexpected ipcTokenReplica balance in ipcTokenReplica"
         );
+    }
+
+    function commitParentFinality(address gateway) internal {
+        vm.roll(10);
+        ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
+
+        TopDownFinalityFacet gwTopDownFinalityFacet = TopDownFinalityFacet(address(gateway));
+
+        vm.prank(FilAddress.SYSTEM_ACTOR);
+        gwTopDownFinalityFacet.commitParentFinality(finality);
+    }
+
+    function executeTopDownMsgs(IpcEnvelope[] memory msgs, SubnetID memory _subnet, GatewayDiamond gw) internal {
+        XnetMessagingFacet messenger = gw.xnetMessenger();
+
+        uint256 minted_tokens;
+
+        for (uint256 i; i < msgs.length; ) {
+            minted_tokens += msgs[i].value;
+            unchecked {
+                ++i;
+            }
+        }
+        console.log("minted tokens in executed top-downs: %d", minted_tokens);
+
+        // The implementation of the function in fendermint is in
+        // https://github.com/consensus-shipyard/ipc/blob/main/fendermint/vm/interpreter/src/fvm/topdown.rs#L43
+
+        // This emulates minting tokens.
+        vm.deal(address(gw), minted_tokens);
+
+        // TODO: how to emulate increase of circulation supply?
+
+        vm.prank(FilAddress.SYSTEM_ACTOR);
+        messenger.applyCrossMessages(msgs);
+    }
+
+    function executeTopDownMsgsRevert(IpcEnvelope[] memory msgs, SubnetID memory subnet, GatewayDiamond gw) internal {
+        vm.expectRevert();
+        executeTopDownMsgs(msgs, subnet, gw);
+    }
+
+    function callCreateBottomUpCheckpointFromChildSubnet(
+        SubnetID memory subnet,
+        GatewayDiamond gw
+    ) internal returns (BottomUpCheckpoint memory checkpoint) {
+        uint256 e = getNextEpoch(block.number, DEFAULT_CHECKPOINT_PERIOD);
+
+        GatewayGetterFacet getter = gw.getter();
+        CheckpointingFacet checkpointer = gw.checkpointer();
+
+        BottomUpMsgBatch memory batch = getter.bottomUpMsgBatch(e);
+
+        (, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
+
+        (bytes32 membershipRoot, ) = MerkleTreeHelper.createMerkleProofsForValidators(addrs, weights);
+
+        checkpoint = BottomUpCheckpoint({
+            subnetID: subnet,
+            blockHeight: batch.blockHeight,
+            blockHash: keccak256("block1"),
+            nextConfigurationNumber: 0,
+            msgs: batch.msgs
+        });
+
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        checkpointer.createBottomUpCheckpoint(checkpoint, membershipRoot, weights[0] + weights[1] + weights[2]);
+        vm.stopPrank();
+
+        return checkpoint;
+    }
+
+    function callCreateBottomUpCheckpointFromChildSubnet(
+        SubnetID memory subnet,
+        GatewayDiamond gw,
+        IpcEnvelope[] memory msgs
+    ) internal returns (BottomUpCheckpoint memory checkpoint) {
+        uint256 e = getNextEpoch(block.number, DEFAULT_CHECKPOINT_PERIOD);
+
+        CheckpointingFacet checkpointer = gw.checkpointer();
+
+        (, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
+
+        (bytes32 membershipRoot, ) = MerkleTreeHelper.createMerkleProofsForValidators(addrs, weights);
+
+        checkpoint = BottomUpCheckpoint({
+            subnetID: subnet,
+            blockHeight: e,
+            blockHash: keccak256("block1"),
+            nextConfigurationNumber: 0,
+            msgs: msgs
+        });
+
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        checkpointer.createBottomUpCheckpoint(checkpoint, membershipRoot, weights[0] + weights[1] + weights[2]);
+        vm.stopPrank();
+
+        return checkpoint;
+    }
+
+    function submitBottomUpCheckpoint(BottomUpCheckpoint memory checkpoint, SubnetActorDiamond sa) internal {
+        (uint256[] memory parentKeys, address[] memory parentValidators, ) = TestUtils.getThreeValidators(vm);
+        bytes[] memory parentPubKeys = new bytes[](3);
+        bytes[] memory parentSignatures = new bytes[](3);
+
+        SubnetActorManagerFacet manager = sa.manager();
+
+        for (uint256 i = 0; i < 3; i++) {
+            vm.deal(parentValidators[i], 10 gwei);
+            parentPubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(parentKeys[i]);
+            vm.prank(parentValidators[i]);
+            manager.join{value: 10}(parentPubKeys[i]);
+        }
+
+        bytes32 hash = keccak256(abi.encode(checkpoint));
+
+        for (uint256 i = 0; i < 3; i++) {
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(parentKeys[i], hash);
+            parentSignatures[i] = abi.encodePacked(r, s, v);
+        }
+
+        SubnetActorCheckpointingFacet checkpointer = sa.checkpointer();
+
+        vm.startPrank(address(sa));
+        checkpointer.submitCheckpoint(checkpoint, parentValidators, parentSignatures);
+        vm.stopPrank();
+    }
+
+    function submitBottomUpCheckpointRevert(BottomUpCheckpoint memory checkpoint, SubnetActorDiamond sa) internal {
+        vm.expectRevert();
+        submitBottomUpCheckpoint(checkpoint, sa);
+    }
+
+    function getNextEpoch(uint256 blockNumber, uint256 checkPeriod) internal pure returns (uint256) {
+        return ((uint64(blockNumber) / checkPeriod) + 1) * checkPeriod;
+    }
+
+    function printActors() internal view {
+        console.log("root gateway: %s", rootSubnet.gatewayAddr);
+        console.log("root actor: %s", rootSubnet.id.getActor());
+        console.log("root native subnet actor: %s", (nativeSubnet.subnetActorAddr));
+        console.log("root token subnet actor: %s", (tokenSubnet.subnetActorAddr));
+        console.log("root name: %s", rootSubnet.id.toString());
+        console.log("native subnet name: %s", nativeSubnet.id.toString());
+        console.log("token subnet name: %s", tokenSubnet.id.toString());
+        console.log("native subnet getActor(): %s", address(nativeSubnet.id.getActor()));
+        console.log("native subnet gateway(): %s", nativeSubnet.gatewayAddr);
+    }
+
+    function printEnvelope(IpcEnvelope memory envelope) internal view {
+        console.log("from %s:", envelope.from.subnetId.toString());
+        console.log("to %s:", envelope.to.subnetId.toString());
     }
 }
