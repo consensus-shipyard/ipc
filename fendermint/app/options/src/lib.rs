@@ -5,14 +5,14 @@ use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use fvm_shared::address::Network;
-use mat::MaterializerArgs;
+use materializer::MaterializerArgs;
 
 use self::{eth::EthArgs, genesis::GenesisArgs, key::KeyArgs, rpc::RpcArgs, run::RunArgs};
 
 pub mod eth;
 pub mod genesis;
 pub mod key;
-pub mod mat;
+pub mod materializer;
 pub mod rpc;
 pub mod run;
 
@@ -139,7 +139,8 @@ pub enum Commands {
     /// Subcommands related to the Ethereum API facade.
     Eth(EthArgs),
     /// Subcommands related to the Testnet Materializer.
-    Mat(MaterializerArgs),
+    #[clap(aliases  = &["mat", "matr", "mate"])]
+    Materializer(MaterializerArgs),
 }
 
 #[cfg(test)]

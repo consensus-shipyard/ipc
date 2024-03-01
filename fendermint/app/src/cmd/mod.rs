@@ -13,7 +13,7 @@ use async_trait::async_trait;
 pub mod eth;
 pub mod genesis;
 pub mod key;
-pub mod mat;
+pub mod materializer;
 pub mod rpc;
 pub mod run;
 
@@ -65,7 +65,7 @@ pub async fn exec(opts: &Options) -> anyhow::Result<()> {
         Commands::Genesis(args) => args.exec(()).await,
         Commands::Rpc(args) => args.exec(()).await,
         Commands::Eth(args) => args.exec(settings(opts)?.eth).await,
-        Commands::Mat(args) => args.exec(()).await,
+        Commands::Materializer(args) => args.exec(()).await,
     }
 }
 

@@ -4,7 +4,7 @@
 use std::path::Path;
 
 use anyhow::anyhow;
-use fendermint_app_options::mat::*;
+use fendermint_app_options::materializer::*;
 use fendermint_materializer::{
     docker::DockerMaterializer, manifest::Manifest, testnet::Testnet, TestnetId, TestnetName,
 };
@@ -40,17 +40,19 @@ cmd! {
   }
 }
 
+/// Validate a manifest.
 async fn validate(manifest_file: &Path) -> anyhow::Result<()> {
-    let (name, manifest) = read_manifest(&manifest_file)?;
+    let (name, manifest) = read_manifest(manifest_file)?;
     manifest.validate(&name).await
 }
 
+/// Setup a testnet.
 async fn setup(
     mut m: DockerMaterializer,
     manifest_file: &Path,
     validate: bool,
 ) -> anyhow::Result<()> {
-    let (name, manifest) = read_manifest(&manifest_file)?;
+    let (name, manifest) = read_manifest(manifest_file)?;
 
     if validate {
         manifest.validate(&name).await?;
@@ -61,6 +63,7 @@ async fn setup(
     Ok(())
 }
 
+/// Remove a testnet.
 async fn remove(mut m: DockerMaterializer, id: TestnetId) -> anyhow::Result<()> {
     m.remove(&TestnetName::new(id)).await
 }
@@ -75,7 +78,7 @@ fn read_manifest(manifest_file: &Path) -> anyhow::Result<(TestnetName, Manifest)
 
     let name = TestnetName::new(testnet_id);
 
-    let manifest = Manifest::from_file(&manifest_file)?;
+    let manifest = Manifest::from_file(manifest_file)?;
 
     Ok((name, manifest))
 }
