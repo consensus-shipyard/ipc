@@ -62,6 +62,7 @@ dependencies = [
     "cometbft-start",
     "cometbft-wait",
     "ethapi-start",
+    "proxy-start",
     "node-report",
 ]
 
@@ -70,10 +71,12 @@ run_task = { name = [
     "cometbft-stop",
     "fendermint-stop",
     "ethapi-stop",
+    "proxy-stop",
     "fendermint-start-validator",
     "cometbft-start",
     "cometbft-wait",
     "ethapi-start",
+    "proxy-start",
 ] }
 
 [tasks.child-fullnode-down]
@@ -96,6 +99,7 @@ dependencies = [
     "cometbft-start",
     "cometbft-wait",
     "ethapi-start",
+    "proxy-start",
     "node-report",
 ]
 
@@ -104,6 +108,7 @@ dependencies = [
     "subnet-fetch-genesis",
     "genesis-write",
     "fendermint-new-network-key",
+    "fendermint-new-proxy-key",
 ]
 
 [tasks.validator-config]
@@ -132,6 +137,9 @@ script = """cat << EOF
 
 Subnet ID:
 \t${SUBNET_ID}
+
+Proxy API:
+\thttp://0.0.0.0:${PROXY_HOST_PORT}
 
 Eth API:
 \thttp://0.0.0.0:${ETHAPI_HOST_PORT}

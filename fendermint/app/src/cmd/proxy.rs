@@ -1,8 +1,9 @@
+use std::convert::Infallible;
 use std::future::Future;
+use std::net::ToSocketAddrs;
 use std::num::ParseIntError;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::{convert::Infallible, net::SocketAddr};
 
 use anyhow::anyhow;
 use async_tempfile::TempFile;
@@ -25,6 +26,7 @@ use warp::http::{HeaderMap, HeaderValue};
 use warp::{http::StatusCode, Filter, Rejection, Reply};
 
 use fendermint_actor_objectstore::Object;
+use fendermint_app_settings::proxy::ProxySettings;
 use fendermint_rpc::client::FendermintClient;
 use fendermint_rpc::message::GasParams;
 use fendermint_rpc::tx::{CallClient, TxClient};
@@ -39,13 +41,15 @@ use crate::options::{
 
 use super::rpc::{gas_params, BroadcastResponse, TransClient};
 
+const MAX_OBJECT_LENGTH: u64 = 1024 * 1024 * 1024;
 const MAX_EVENT_LENGTH: u64 = 1024 * 500; // Limit to 500KiB for now
 
 cmd! {
-    ProxyArgs(self) {
-        let client = FendermintClient::new_http(self.url.clone(), self.proxy_url.clone())?;
+    ProxyArgs(self, settings: ProxySettings) {
         match self.command.clone() {
-            ProxyCommands::Start { args } => {
+            ProxyCommands::Run { http_url, args} => {
+                let client = FendermintClient::new_http(http_url, None)?;
+
                 let seq = args.sequence;
                 let nonce = Arc::new(Mutex::new(seq));
 
@@ -56,6 +60,7 @@ cmd! {
                 // Object Store routes
                 let upload_route = warp::path!("v1" / "os" / String)
                     .and(warp::put())
+                    .and(warp::body::content_length_limit(MAX_OBJECT_LENGTH))
                     .and(with_client(client.clone()))
                     .and(with_args(args.clone()))
                     .and(with_nonce(nonce.clone()))
@@ -120,9 +125,11 @@ cmd! {
                         .allow_methods(vec!["PUT", "DEL", "GET"]))
                     .recover(handle_rejection);
 
-                let saddr: SocketAddr = self.bind.parse().expect("Unable to parse server address");
-                println!("Server started at {} with nonce {}", self.bind, seq);
-                Ok(warp::serve(router).run(saddr).await)
+                if let Some(listen_addr) = settings.listen.to_socket_addrs()?.next() {
+                    Ok(warp::serve(router).run(listen_addr).await)
+                } else {
+                    Err(anyhow!("failed to convert to any socket address"))
+                }
             },
         }
     }

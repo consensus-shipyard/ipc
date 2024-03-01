@@ -213,13 +213,13 @@ pub struct TransArgs {
     #[arg(long, short, value_parser = parse_full_fil, default_value = "0")]
     pub value: TokenAmount,
     /// Path to the secret key of the sender to sign the transaction.
-    #[arg(long, short)]
+    #[arg(long, short, env = "FM_PROXY_SECRET_KEY")]
     pub secret_key: PathBuf,
     /// Indicate whether its a regular or ethereum account.
-    #[arg(long, short, default_value = "regular")]
+    #[arg(long, short, default_value = "regular", env = "FM_PROXY_ACCOUNT_KIND")]
     pub account_kind: AccountKind,
     /// Sender account nonce.
-    #[arg(long, short = 'n')]
+    #[arg(long, short = 'n', env = "FM_PROXY_SEQUENCE")]
     pub sequence: u64,
     /// Maximum amount of gas that can be charged.
     #[arg(long, default_value_t = 10_000_000_000)] // Default from ref-fvm testkit.

@@ -1,0 +1,33 @@
+[tasks.proxy-run]
+script = """
+docker run \
+  ${FLAGS} \
+  --name ${PROXY_CONTAINER_NAME} \
+  --init \
+  --user $(id -u) \
+  --network ${NETWORK_NAME} \
+  --publish ${PROXY_HOST_PORT}:8001 \
+  --env FM_CHAIN_NAME=${NETWORK_NAME} \
+  --env FM_PROXY_SECRET_KEY=/data/${NODE_NAME}/${PROXY_PRIV_KEY_PATH} \
+  --env FM_PROXY_ACCOUNT_KIND=ethereum \
+  --env FM_PROXY_BROADCAST_MODE=commit \
+  --env FM_PROXY_SEQUENCE=0 \
+  --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
+  --env LOG_LEVEL=${PROXY_LOG_LEVEL} \
+  --env RUST_BACKTRACE=1 \
+  ${FM_DOCKER_IMAGE} \
+  ${CMD}
+"""
+dependencies = ["docker-network-create"]
+
+[tasks.proxy-start]
+extend = "proxy-run"
+env = { "CMD" = "proxy run", "FLAGS" = "-d" }
+
+[tasks.proxy-destroy]
+env = { "CONTAINER_NAME" = "${PROXY_CONTAINER_NAME}" }
+run_task = "docker-destroy"
+
+[tasks.proxy-logs]
+extend = "docker-logs"
+env = { "CONTAINER_NAME" = "${PROXY_CONTAINER_NAME}" }

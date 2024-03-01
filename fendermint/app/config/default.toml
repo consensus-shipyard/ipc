@@ -113,6 +113,15 @@ host = "127.0.0.1"
 port = 8545
 
 
+# Proxy API facade
+[proxy]
+
+[proxy.listen]
+# Only accept local connections by default.
+host = "127.0.0.1"
+port = 8001
+
+
 # IPLD Resolver Configuration
 [resolver]
 # Time to wait between attempts to resolve a CID after an error.

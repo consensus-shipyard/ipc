@@ -65,7 +65,7 @@ pub async fn exec(opts: &Options) -> anyhow::Result<()> {
         Commands::Genesis(args) => args.exec(()).await,
         Commands::Rpc(args) => args.exec(()).await,
         Commands::Eth(args) => args.exec(settings(opts)?.eth).await,
-        Commands::Proxy(args) => args.exec(()).await,
+        Commands::Proxy(args) => args.exec(settings(opts)?.proxy).await,
     }
 }
 

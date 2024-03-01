@@ -17,11 +17,13 @@ use fendermint_vm_topdown::BlockHeight;
 
 use self::eth::EthSettings;
 use self::fvm::FvmSettings;
+use self::proxy::ProxySettings;
 use self::resolver::ResolverSettings;
 use ipc_provider::config::deserialize::deserialize_eth_address_from_str;
 
 pub mod eth;
 pub mod fvm;
+pub mod proxy;
 pub mod resolver;
 
 /// Marker to be used with the `#[serde_as(as = "IsHumanReadable")]` annotations.
@@ -213,6 +215,7 @@ pub struct Settings {
     pub resolver: ResolverSettings,
     pub broadcast: BroadcastSettings,
     pub ipc: IpcSettings,
+    pub proxy: ProxySettings,
 }
 
 #[macro_export]

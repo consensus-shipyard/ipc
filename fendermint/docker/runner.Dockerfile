@@ -23,6 +23,7 @@ STOPSIGNAL SIGTERM
 
 ENV FM_ABCI__LISTEN__HOST=0.0.0.0
 ENV FM_ETH__LISTEN__HOST=0.0.0.0
+ENV FM_PROXY__LISTEN__HOST=0.0.0.0
 
 RUN mkdir /fendermint/logs
 RUN chmod 777 /fendermint/logs

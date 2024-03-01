@@ -1,14 +1,15 @@
 extend = [
-  { path = "scripts/docker.toml" },
-  { path = "scripts/cometbft.toml" },
-  { path = "scripts/fendermint.toml" },
-  { path = "scripts/ethapi.toml" },
-  { path = "scripts/genesis.toml" },
-  { path = "scripts/node.toml" },
-  { path = "scripts/promtail.toml" },
-  { path = "scripts/testnet.toml" },
-  { path = "scripts/testnode.toml" },
-  { path = "scripts/subnet.toml" },
+    { path = "scripts/docker.toml" },
+    { path = "scripts/cometbft.toml" },
+    { path = "scripts/fendermint.toml" },
+    { path = "scripts/ethapi.toml" },
+    { path = "scripts/genesis.toml" },
+    { path = "scripts/node.toml" },
+    { path = "scripts/promtail.toml" },
+    { path = "scripts/proxy.toml" },
+    { path = "scripts/testnet.toml" },
+    { path = "scripts/testnode.toml" },
+    { path = "scripts/subnet.toml" },
 ]
 
 [config]
@@ -25,6 +26,7 @@ CMT_P2P_HOST_PORT = { value = "26656", condition = { env_not_set = ["CMT_P2P_HOS
 CMT_RPC_HOST_PORT = { value = "26657", condition = { env_not_set = ["CMT_RPC_HOST_PORT"] } }
 ETHAPI_HOST_PORT = { value = "8545", condition = { env_not_set = ["ETHAPI_HOST_PORT"] } }
 RESOLVER_HOST_PORT = { value = "26655", condition = { env_not_set = ["RESOLVER_HOST_PORT"] } }
+PROXY_HOST_PORT = { value = "8888", condition = { env_not_set = ["PROXY_HOST_PORT"] } }
 
 BALANCE = { value = "1000", condition = { env_not_set = ["BALANCE"] } }
 BASE_FEE = { value = "1000", condition = { env_not_set = ["BASE_FEE"] } }
@@ -35,21 +37,21 @@ POWER_SCALE = { value = "3", condition = { env_not_set = ["POWER_SCALE"] } }
 # Use calibration as default value
 NODE_NAME = { value = "ipc-node", condition = { env_not_set = ["NODE_NAME"] } }
 PARENT_ENDPOINT = { value = "https://api.calibration.node.glif.io/rpc/v1", condition = { env_not_set = [
-  "PARENT_ENDPOINT",
+    "PARENT_ENDPOINT",
 ] } }
 PARENT_GATEWAY = { value = "0x56948d2CFaa2EF355B8C08Ac925202db212146D1", condition = { env_not_set = [
-  "PARENT_GATEWAY",
+    "PARENT_GATEWAY",
 ] } }
 PARENT_REGISTRY = { value = "0x6A4884D2B6A597792dC68014D4B7C117cca5668e", condition = { env_not_set = [
-  "PARENT_REGISTRY",
+    "PARENT_REGISTRY",
 ] } }
 FM_NETWORK = { value = "test", condition = { env_not_set = ["FM_NETWORK"] } }
 TOPDOWN_CHAIN_HEAD_DELAY = { value = "10", condition = { env_not_set = [
-  "TOPDOWN_CHAIN_HEAD_DELAY",
+    "TOPDOWN_CHAIN_HEAD_DELAY",
 ] } }
 TOPDOWN_PROPOSAL_DELAY = { value = "2", condition = { env_not_set = ["TOPDOWN_PROPOSAL_DELAY"] } }
 TOPDOWN_MAX_PROPOSAL_RANGE = { value = "100", condition = { env_not_set = [
-  "TOPDOWN_MAX_PROPOSAL_RANGE",
+    "TOPDOWN_MAX_PROPOSAL_RANGE",
 ] } }
 # Comma-separated list of bootstrap nodes to be used by the CometBFT node.
 BOOTSTRAPS = { value = "", condition = { env_not_set = ["BOOTSTRAPS"] } }
@@ -80,13 +82,17 @@ NETWORK_KEY_NAME = "network_key"
 NETWORK_PUB_KEY_PATH = "${KEYS_SUBDIR}/${NETWORK_KEY_NAME}.pk"
 NETWORK_PRIV_KEY_PATH = "${KEYS_SUBDIR}/${NETWORK_KEY_NAME}.sk"
 
+PROXY_KEY_NAME = "proxy_key"
+PROXY_PUB_KEY_PATH = "${KEYS_SUBDIR}/${PROXY_KEY_NAME}.pk"
+PROXY_PRIV_KEY_PATH = "${KEYS_SUBDIR}/${PROXY_KEY_NAME}.sk"
+
 COMETBFT_SUBDIR = "cometbft"
 
 CMT_CONTAINER_NAME = "${NODE_NAME}-cometbft"
 FM_CONTAINER_NAME = "${NODE_NAME}-fendermint"
 ETHAPI_CONTAINER_NAME = "${NODE_NAME}-ethapi"
-PROMTAIL_CONTAINER_NAME="${NODE_NAME}-promtail"
-
+PROMTAIL_CONTAINER_NAME = "${NODE_NAME}-promtail"
+PROXY_CONTAINER_NAME = "${NODE_NAME}-proxy"
 
 CMT_DOCKER_IMAGE = "cometbft/cometbft:v0.37.x"
 FM_DOCKER_TAG = "latest"
@@ -103,6 +109,7 @@ VERBOSITY = ""
 LOG_LEVEL = "info"
 ETHAPI_LOG_LEVEL = { value = "${LOG_LEVEL}", condition = { env_not_set = ["ETHAPI_LOG_LEVEL"] } }
 FM_LOG_LEVEL = { value = "${LOG_LEVEL}", condition = { env_not_set = ["FM_LOG_LEVEL"] } }
+PROXY_LOG_LEVEL = { value = "${LOG_LEVEL}", condition = { env_not_set = ["PROXY_LOG_LEVEL"] } }
 
 [tasks.info]
 script = """
@@ -136,22 +143,22 @@ echo
 clear = true
 script_runner = "@duckscript"
 script = [
-  '''
-    echo
-    echo Main tasks:
-    echo - testnet: run 4-nodes testnet
-    echo - testnet-down: stop the testnet
-    echo - testnode: run a test node
-    echo - testnode-down: stop the test node
-    echo - info: Print the setup information
-    echo
-    echo Most tasks use these environment variables:
-    echo - SUBNET_ID (default '${SUBNET_ID}'): the target IPC subnet
-    echo
-    echo Run 'cargo make -e SUBNET_ID=chain -e BALANCE=100 -e BASE_FEE=200 ... COMMAND' to populate the variables from CLI or
-    echo Run 'cargo make --env-file=/PATH/.env COMMAND' to populate the variables from the file before running the command.
-    echo
-    echo Run 'cargo make --list-all-steps' for a complete list of available tasks.
-    echo
-''',
+    '''
+      echo
+      echo Main tasks:
+      echo - testnet: run 4-nodes testnet
+      echo - testnet-down: stop the testnet
+      echo - testnode: run a test node
+      echo - testnode-down: stop the test node
+      echo - info: Print the setup information
+      echo
+      echo Most tasks use these environment variables:
+      echo - SUBNET_ID (default '${SUBNET_ID}'): the target IPC subnet
+      echo
+      echo Run 'cargo make -e SUBNET_ID=chain -e BALANCE=100 -e BASE_FEE=200 ... COMMAND' to populate the variables from CLI or
+      echo Run 'cargo make --env-file=/PATH/.env COMMAND' to populate the variables from the file before running the command.
+      echo
+      echo Run 'cargo make --list-all-steps' for a complete list of available tasks.
+      echo
+  ''',
 ]

@@ -8,10 +8,10 @@
 # 2. You may need to rerun the script after docker installation for the first time
 # 2. You may need to manually install nodejs and npm on the host
 
-set -euxo pipefail
+set -euo pipefail
 
 DASHES='------'
-IPC_FOLDER=${HOME}/ipc
+IPC_FOLDER=${HOME}/github/textileio/ipc
 IPC_CLI=${IPC_FOLDER}/target/release/ipc-cli
 IPC_CONFIG_FOLDER=${HOME}/.ipc
 
@@ -21,6 +21,7 @@ CMT_P2P_HOST_PORTS=(26656 26756 26856)
 CMT_RPC_HOST_PORTS=(26657 26757 26857)
 ETHAPI_HOST_PORTS=(8545 8645 8745)
 RESOLVER_HOST_PORTS=(26655 26755 26855)
+PROXY_HOST_PORTS=(8001 8002 8003)
 
 if (($# != 1)); then
   echo "Arguments: <Specify github remote branch name to use to deploy. Or use 'local' (without quote) to indicate using local repo instead. If not provided, will default to main branch"
@@ -38,8 +39,8 @@ fi
 # Step 1: Prepare system for building and running IPC
 
 # Step 1.1: Install build dependencies
-echo "${DASHES} Installing build dependencies..."
-sudo apt update && sudo apt install build-essential libssl-dev mesa-opencl-icd ocl-icd-opencl-dev gcc git bzr jq pkg-config curl clang hwloc libhwloc-dev wget ca-certificates gnupg -y
+#echo "${DASHES} Installing build dependencies..."
+#sudo apt update && sudo apt install build-essential libssl-dev mesa-opencl-icd ocl-icd-opencl-dev gcc git bzr jq pkg-config curl clang hwloc libhwloc-dev wget ca-certificates gnupg -y
 
 # Step 1.2: Install rust + cargo
 echo "$DASHES Check rustc & cargo..."
@@ -202,8 +203,8 @@ done
 # Step 8: Start validators
 
 # Step 8.1 (optional): Rebuild fendermint docker
-# cd ${IPC_FOLDER}/fendermint
-# make docker-build
+cd ${IPC_FOLDER}/fendermint
+make docker-build
 
 # Step 8.2: Start the bootstrap validator node
 echo "$DASHES Start the first validator node as bootstrap"
@@ -215,6 +216,7 @@ echo "Finished waiting"
 cd ${IPC_FOLDER}
 cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=validator-0 \
+    -e FM_PULL_SKIP=1 \
     child-validator-down
 bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=validator-0 \
@@ -224,6 +226,7 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e CMT_RPC_HOST_PORT=${CMT_RPC_HOST_PORTS[0]} \
     -e ETHAPI_HOST_PORT=${ETHAPI_HOST_PORTS[0]} \
     -e RESOLVER_HOST_PORT=${RESOLVER_HOST_PORTS[0]} \
+    -e PROXY_HOST_PORT=${PROXY_HOST_PORTS[0]} \
     -e PARENT_REGISTRY=${parent_registry_address} \
     -e PARENT_GATEWAY=${parent_gateway_address} \
     -e FM_PULL_SKIP=1 \
@@ -255,6 +258,7 @@ do
       -e CMT_RPC_HOST_PORT=${CMT_RPC_HOST_PORTS[i]} \
       -e ETHAPI_HOST_PORT=${ETHAPI_HOST_PORTS[i]} \
       -e RESOLVER_HOST_PORT=${RESOLVER_HOST_PORTS[i]} \
+      -e PROXY_HOST_PORT=${PROXY_HOST_PORTS[i]} \
       -e RESOLVER_BOOTSTRAPS=${bootstrap_resolver_endpoint} \
       -e BOOTSTRAPS=${bootstrap_node_endpoint} \
       -e PARENT_REGISTRY=${parent_registry_address} \
@@ -263,7 +267,7 @@ do
       child-validator
 done
 
-# Step 9: Test ETH API endpoint
+# Step 9a: Test ETH API endpoint
 echo "$DASHES Test ETH API endpoints of validator nodes"
 for i in {0..2}
 do
@@ -275,6 +279,13 @@ do
     "params":[],
     "id":83
   }'
+done
+
+# Step 9b: Test proxy endpoint
+echo "$DASHES Test proxy endpoints of validator nodes"
+for i in {0..2}
+do
+  curl --location http://localhost:${PROXY_HOST_PORTS[i]}/health
 done
 
 # Step 10: Start a relayer process
@@ -296,6 +307,11 @@ cat << EOF
 ############################
 Subnet ID:
 $subnet_id
+
+Proxy API:
+http://localhost:${PROXY_HOST_PORTS[0]}
+http://localhost:${PROXY_HOST_PORTS[1]}
+http://localhost:${PROXY_HOST_PORTS[2]}
 
 ETH API:
 http://localhost:${ETHAPI_HOST_PORTS[0]}
