@@ -208,7 +208,10 @@ where
                     // Return the previous parent hash as the non-null block hash.
                     return Ok(parent_block_hash);
                 }
-                return Err(Error::CannotQueryParent(err, height));
+                return Err(Error::CannotQueryParent(
+                    format!("get_block_hash: {e}"),
+                    height,
+                ));
             }
         };
 
@@ -265,7 +268,7 @@ where
             .parent_proxy
             .get_validator_changes(height)
             .await
-            .map_err(|e| Error::CannotQueryParent(e.to_string(), height))?;
+            .map_err(|e| Error::CannotQueryParent(format!("get_validator_changes: {e}"), height))?;
 
         if changes_res.block_hash != block_hash {
             tracing::warn!(
@@ -281,7 +284,7 @@ where
             .parent_proxy
             .get_top_down_msgs(height)
             .await
-            .map_err(|e| Error::CannotQueryParent(e.to_string(), height))?;
+            .map_err(|e| Error::CannotQueryParent(format!("get_top_down_msgs: {e}"), height))?;
 
         if topdown_msgs_res.block_hash != block_hash {
             tracing::warn!(
