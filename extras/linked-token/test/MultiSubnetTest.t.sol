@@ -294,16 +294,6 @@ contract MultiSubnetTest is IntegrationTestBase {
         );
     }
 
-    function commitParentFinality(address gateway) internal {
-        vm.roll(10);
-        ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
-
-        TopDownFinalityFacet gwTopDownFinalityFacet = TopDownFinalityFacet(address(gateway));
-
-        vm.prank(FilAddress.SYSTEM_ACTOR);
-        gwTopDownFinalityFacet.commitParentFinality(finality);
-    }
-
     function executeTopDownMsgs(IpcEnvelope[] memory msgs, SubnetID memory _subnet, GatewayDiamond gw) internal {
         XnetMessagingFacet messenger = gw.xnetMessenger();
 
@@ -329,11 +319,6 @@ contract MultiSubnetTest is IntegrationTestBase {
         messenger.applyCrossMessages(msgs);
     }
 
-    function executeTopDownMsgsRevert(IpcEnvelope[] memory msgs, SubnetID memory subnet, GatewayDiamond gw) internal {
-        vm.expectRevert();
-        executeTopDownMsgs(msgs, subnet, gw);
-    }
-
     function callCreateBottomUpCheckpointFromChildSubnet(
         SubnetID memory subnet,
         GatewayDiamond gw
@@ -355,34 +340,6 @@ contract MultiSubnetTest is IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: batch.msgs
-        });
-
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        checkpointer.createBottomUpCheckpoint(checkpoint, membershipRoot, weights[0] + weights[1] + weights[2]);
-        vm.stopPrank();
-
-        return checkpoint;
-    }
-
-    function callCreateBottomUpCheckpointFromChildSubnet(
-        SubnetID memory subnet,
-        GatewayDiamond gw,
-        IpcEnvelope[] memory msgs
-    ) internal returns (BottomUpCheckpoint memory checkpoint) {
-        uint256 e = getNextEpoch(block.number, DEFAULT_CHECKPOINT_PERIOD);
-
-        CheckpointingFacet checkpointer = gw.checkpointer();
-
-        (, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
-
-        (bytes32 membershipRoot, ) = MerkleTreeHelper.createMerkleProofsForValidators(addrs, weights);
-
-        checkpoint = BottomUpCheckpoint({
-            subnetID: subnet,
-            blockHeight: e,
-            blockHash: keccak256("block1"),
-            nextConfigurationNumber: 0,
-            msgs: msgs
         });
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
@@ -420,29 +377,7 @@ contract MultiSubnetTest is IntegrationTestBase {
         vm.stopPrank();
     }
 
-    function submitBottomUpCheckpointRevert(BottomUpCheckpoint memory checkpoint, SubnetActorDiamond sa) internal {
-        vm.expectRevert();
-        submitBottomUpCheckpoint(checkpoint, sa);
-    }
-
     function getNextEpoch(uint256 blockNumber, uint256 checkPeriod) internal pure returns (uint256) {
         return ((uint64(blockNumber) / checkPeriod) + 1) * checkPeriod;
-    }
-
-    function printActors() internal view {
-        console.log("root gateway: %s", rootSubnet.gatewayAddr);
-        console.log("root actor: %s", rootSubnet.id.getActor());
-        console.log("root native subnet actor: %s", (nativeSubnet.subnetActorAddr));
-        console.log("root token subnet actor: %s", (tokenSubnet.subnetActorAddr));
-        console.log("root name: %s", rootSubnet.id.toString());
-        console.log("native subnet name: %s", nativeSubnet.id.toString());
-        console.log("token subnet name: %s", tokenSubnet.id.toString());
-        console.log("native subnet getActor(): %s", address(nativeSubnet.id.getActor()));
-        console.log("native subnet gateway(): %s", nativeSubnet.gatewayAddr);
-    }
-
-    function printEnvelope(IpcEnvelope memory envelope) internal view {
-        console.log("from %s:", envelope.from.subnetId.toString());
-        console.log("to %s:", envelope.to.subnetId.toString());
     }
 }
