@@ -51,10 +51,13 @@ pub struct MaterializerSetupArgs {
     /// Path to the manifest file.
     ///
     /// The format of the manifest (e.g. JSON or YAML) will be determined based on the file extension.
+    ///
+    /// The name of the manifest (without the extension) will act as the testnet ID.
     #[arg(long, short)]
     pub manifest_file: PathBuf,
 
-    #[arg(long, short)]
+    /// Run validation before attempting to set up the testnet.
+    #[arg(long, short, default_value = "false")]
     pub validate: bool,
 }
 
