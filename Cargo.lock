@@ -2851,6 +2851,7 @@ dependencies = [
  "fendermint_app_settings",
  "fendermint_crypto",
  "fendermint_eth_api",
+ "fendermint_materializer",
  "fendermint_rocksdb",
  "fendermint_rpc",
  "fendermint_storage",

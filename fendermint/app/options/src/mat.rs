@@ -19,6 +19,10 @@ pub struct MaterializerArgs {
     )]
     pub data_dir: PathBuf,
 
+    /// Seed for random values in the materialized testnet.
+    #[arg(long, short, env = "FM_MATERIALIZER__SEED", default_value = "0")]
+    pub seed: u64,
+
     #[command(subcommand)]
     pub command: MaterializerCommands,
 }

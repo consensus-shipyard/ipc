@@ -20,7 +20,6 @@ use fendermint_materializer::{
     docker::{DockerMaterializer, DockerMaterials},
     manifest::Manifest,
     testnet::Testnet,
-    validation::validate_manifest,
     HasCometBftApi, HasEthApi, TestnetName,
 };
 use futures::Future;
@@ -54,13 +53,7 @@ fn test_data_dir() -> PathBuf {
 /// Parse a manifest from the `tests/manifests` directory.
 fn read_manifest(file_name: &str) -> anyhow::Result<Manifest> {
     let manifest = tests_dir().join("manifests").join(file_name);
-    let manifest = std::fs::read_to_string(&manifest).with_context(|| {
-        format!(
-            "failed to read manifest from {}",
-            manifest.to_string_lossy()
-        )
-    })?;
-    let manifest = serde_yaml::from_str(&manifest).context("failed to parse manifest")?;
+    let manifest = Manifest::from_file(&manifest)?;
     Ok(manifest)
 }
 
@@ -86,7 +79,8 @@ where
     let manifest = read_manifest(manifest_file_name)?;
 
     // First make sure it's a sound manifest.
-    validate_manifest(&testnet_name, &manifest)
+    manifest
+        .validate(&testnet_name)
         .await
         .context("failed to validate manifest")?;
 
