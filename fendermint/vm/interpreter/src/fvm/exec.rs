@@ -220,8 +220,8 @@ where
             tracing::info!(?chain_id, height = block_height, "Executing an upgrade");
 
             // there is an upgrade scheduled for this height, lets run the migration
-            let new_app_version = upgrade.execute(&mut state).context("upgrade failed")?;
-            if new_app_version != 0 {
+            let res = upgrade.execute(&mut state).context("upgrade failed")?;
+            if let Some(new_app_version) = res {
                 state.update_app_version(|app_version| {
                     *app_version = new_app_version;
                 });

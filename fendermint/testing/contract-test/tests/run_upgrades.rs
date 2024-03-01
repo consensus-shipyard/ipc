@@ -3,7 +3,7 @@
 
 mod staking;
 
-use anyhow::Context;
+use anyhow::{Context, Ok};
 use async_trait::async_trait;
 use ethers::types::U256;
 use fendermint_contract_test::Tester;
@@ -108,7 +108,7 @@ async fn test_applying_upgrades() {
                 // lets upgrade the app version as well
                 let app_version = 1;
 
-                Ok(app_version)
+                Ok(Some(app_version))
             })
             .unwrap(),
         )
@@ -155,8 +155,8 @@ async fn test_applying_upgrades() {
                     res.failure_info
                 );
 
-                // this upgrade didn't affect our app version, so return 0
-                Ok(0)
+                // this upgrade didn't affect our app version, so return None
+                Ok(None)
             })
             .unwrap(),
         )
@@ -203,8 +203,8 @@ async fn test_applying_upgrades() {
                 let balance = U256::from_big_endian(&bytes);
                 assert_eq!(balance, U256::from(SEND_BALANCE_AMOUNT));
 
-                // this upgrade didn't affect our app version, so return 0
-                Ok(0)
+                // this upgrade didn't affect our app version, so return None
+                Ok(None)
             })
             .unwrap(),
         )

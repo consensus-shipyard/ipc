@@ -31,10 +31,10 @@ impl Ord for UpgradeKey {
     }
 }
 
-/// a function type for migration. It takes in a state and returns a new application version (or 0 if not affected)
+/// a function type for migration. It takes in a state and returns a new application version (or None if not affected)
 // TODO: Add missing parameters
 // TODO: Create a application version type
-pub type MigrationFunc<DB> = fn(state: &mut FvmExecState<DB>) -> anyhow::Result<u64>;
+pub type MigrationFunc<DB> = fn(state: &mut FvmExecState<DB>) -> anyhow::Result<Option<u64>>;
 
 /// Upgrade represents a single upgrade to be executed at a given height
 #[derive(Clone)]
@@ -74,7 +74,7 @@ where
         Ok(upgrade)
     }
 
-    pub fn execute(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<u64> {
+    pub fn execute(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<Option<u64>> {
         (self.migration)(state)
     }
 }
@@ -142,14 +142,14 @@ fn test_validate_upgrade_schedule() {
 
     let mut upgrade_scheduler: UpgradeScheduler<MemoryBlockstore> = UpgradeScheduler::new();
 
-    let upgrade = Upgrade::new("mychain", 10, |_state| Ok(0)).unwrap();
+    let upgrade = Upgrade::new("mychain", 10, |_state| Ok(None)).unwrap();
     upgrade_scheduler.add(upgrade).unwrap();
 
-    let upgrade = Upgrade::new("mychain", 20, |_state| Ok(0)).unwrap();
+    let upgrade = Upgrade::new("mychain", 20, |_state| Ok(None)).unwrap();
     upgrade_scheduler.add(upgrade).unwrap();
 
     // adding an upgrade with the same chain_id and height should fail
-    let upgrade = Upgrade::new("mychain", 20, |_state| Ok(0)).unwrap();
+    let upgrade = Upgrade::new("mychain", 20, |_state| Ok(None)).unwrap();
     let res = upgrade_scheduler.add(upgrade);
     assert!(res.is_err());
 
