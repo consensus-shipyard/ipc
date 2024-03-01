@@ -62,7 +62,7 @@ async fn test_applying_upgrades() {
     let mut upgrade_scheduler = UpgradeScheduler::new();
     upgrade_scheduler
         .add(
-            Upgrade::new("mychain", 1, |state| {
+            Upgrade::new("mychain", 1, Some(1), |state| {
                 println!(
                     "[Upgrade at height {}] Deploy simple contract",
                     state.block_height()
@@ -105,10 +105,7 @@ async fn test_applying_upgrades() {
                     Address::from_str(CONTRACT_ADDRESS).unwrap()
                 );
 
-                // lets upgrade the app version as well
-                let app_version = 1;
-
-                Ok(Some(app_version))
+                Ok(())
             })
             .unwrap(),
         )
@@ -116,7 +113,7 @@ async fn test_applying_upgrades() {
 
     upgrade_scheduler
         .add(
-            Upgrade::new("mychain", 2, |state| {
+            Upgrade::new("mychain", 2, None, |state| {
                 println!(
                     "[Upgrade at height {}] Sends a balance",
                     state.block_height()
@@ -155,8 +152,7 @@ async fn test_applying_upgrades() {
                     res.failure_info
                 );
 
-                // this upgrade didn't affect our app version, so return None
-                Ok(None)
+                Ok(())
             })
             .unwrap(),
         )
@@ -164,7 +160,7 @@ async fn test_applying_upgrades() {
 
     upgrade_scheduler
         .add(
-            Upgrade::new("mychain", 3, |state| {
+            Upgrade::new("mychain", 3, None, |state| {
                 println!(
                     "[Upgrade at height {}] Returns a balance",
                     state.block_height()
@@ -203,8 +199,7 @@ async fn test_applying_upgrades() {
                 let balance = U256::from_big_endian(&bytes);
                 assert_eq!(balance, U256::from(SEND_BALANCE_AMOUNT));
 
-                // this upgrade didn't affect our app version, so return None
-                Ok(None)
+                Ok(())
             })
             .unwrap(),
         )
