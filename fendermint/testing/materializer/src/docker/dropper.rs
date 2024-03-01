@@ -17,6 +17,52 @@ pub enum DropCommand {
 
 pub type DropHandle = tokio::sync::mpsc::UnboundedSender<DropCommand>;
 
+/// Decide whether to keep or discard constructs when they go out of scope.
+#[derive(Clone, Debug)]
+pub struct DropPolicy {
+    pub keep_existing: bool,
+    pub keep_created: bool,
+}
+
+impl DropPolicy {
+    /// A completely transient network that aims to drop even what exists,
+    /// assuming it only exists because it was created by it earlier, but
+    /// due to some error it failed to be removed.
+    pub const TRANSIENT: DropPolicy = DropPolicy {
+        keep_existing: false,
+        keep_created: false,
+    };
+
+    /// Keep everything around, which is good for CLI applications that
+    /// set up networks that should exist until explicitly removed.
+    pub const PERSISTENT: DropPolicy = DropPolicy {
+        keep_existing: true,
+        keep_created: true,
+    };
+
+    /// Policy which only tries to remove artifacts which were created
+    /// by this materializer, but leaves existing resources around.
+    pub const DROP_CREATED: DropPolicy = DropPolicy {
+        keep_created: false,
+        keep_existing: true,
+    };
+
+    /// Decide if something should be kept when it's out of scope.
+    pub fn keep(&self, is_new: bool) -> bool {
+        if is_new {
+            self.keep_created
+        } else {
+            self.keep_existing
+        }
+    }
+}
+
+impl Default for DropPolicy {
+    fn default() -> Self {
+        Self::DROP_CREATED
+    }
+}
+
 /// Start a background task to remove docker constructs.
 ///
 /// The loop will exit when all clones of the sender channel have been dropped.

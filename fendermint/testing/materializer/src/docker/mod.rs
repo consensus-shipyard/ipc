@@ -45,6 +45,7 @@ mod node;
 mod relayer;
 mod runner;
 
+pub use dropper::DropPolicy;
 pub use network::DockerNetwork;
 pub use node::DockerNode;
 pub use relayer::DockerRelayer;
@@ -89,7 +90,7 @@ pub struct DockerConstruct {
     pub name: String,
     /// Indicate whether the thing was created outside the test,
     /// or it can be destroyed when it goes out of scope.
-    pub external: bool,
+    pub keep: bool,
 }
 
 /// Allocated (inclusive) range we can use to expose containers' ports on the host.
@@ -137,6 +138,7 @@ pub struct DockerMaterializer {
     rng: StdRng,
     docker: bollard::Docker,
     dropper: dropper::DropHandle,
+    drop_policy: dropper::DropPolicy,
     state: DockerMaterializerState,
 }
 
@@ -161,12 +163,18 @@ impl DockerMaterializer {
             docker,
             dropper,
             state,
+            drop_policy: DropPolicy::default(),
         };
 
         m.save_state().context("failed to save state")?;
         m.export_scripts().context("failed to export scripts")?;
 
         Ok(m)
+    }
+
+    pub fn with_policy(mut self, policy: DropPolicy) -> Self {
+        self.drop_policy = policy;
+        self
     }
 
     /// Remove all traces of a testnet.
@@ -330,6 +338,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             self.docker.clone(),
             self.dropper.clone(),
             testnet_name.clone(),
+            &self.drop_policy,
         )
         .await
     }
@@ -456,6 +465,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             &self.dir,
             self.docker.clone(),
             self.dropper.clone(),
+            &self.drop_policy,
             node_name,
             node_config,
             port_range,

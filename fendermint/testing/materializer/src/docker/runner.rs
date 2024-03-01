@@ -18,12 +18,15 @@ use futures::StreamExt;
 use crate::NodeName;
 
 use super::{
-    container::DockerContainer, dropper::DropHandle, DockerConstruct, DockerNetwork, Volumes,
+    container::DockerContainer,
+    dropper::{DropHandle, DropPolicy},
+    DockerConstruct, DockerNetwork, Volumes,
 };
 
 pub struct DockerRunner {
     docker: Docker,
     dropper: DropHandle,
+    drop_policy: DropPolicy,
     node_name: NodeName,
     user: u32,
     image: String,
@@ -34,6 +37,7 @@ impl DockerRunner {
     pub fn new(
         docker: Docker,
         dropper: DropHandle,
+        drop_policy: DropPolicy,
         node_name: NodeName,
         user: u32,
         image: &str,
@@ -42,6 +46,7 @@ impl DockerRunner {
         Self {
             docker,
             dropper,
+            drop_policy,
             node_name,
             user,
             image: image.to_string(),
@@ -234,7 +239,7 @@ impl DockerRunner {
             DockerConstruct {
                 id,
                 name,
-                external: false,
+                keep: self.drop_policy.keep(true),
             },
         ))
     }

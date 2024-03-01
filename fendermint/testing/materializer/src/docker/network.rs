@@ -13,7 +13,7 @@ use bollard::{
 use crate::TestnetName;
 
 use super::{
-    dropper::{DropCommand, DropHandle},
+    dropper::{DropCommand, DropHandle, DropPolicy},
     DockerConstruct,
 };
 
@@ -40,6 +40,7 @@ impl DockerNetwork {
         docker: Docker,
         dropper: DropHandle,
         testnet_name: TestnetName,
+        drop_policy: &DropPolicy,
     ) -> anyhow::Result<Self> {
         let network_name = testnet_name.path_string();
 
@@ -51,7 +52,7 @@ impl DockerNetwork {
             .await
             .context("failed to list docker networks")?;
 
-        let (id, external) = match networks.first() {
+        let (id, is_new) = match networks.first() {
             None => {
                 let network: NetworkCreateResponse = docker
                     .create_network(CreateNetworkOptions {
@@ -66,7 +67,7 @@ impl DockerNetwork {
                     .clone()
                     .ok_or_else(|| anyhow!("created docker network has no id"))?;
 
-                (id, false)
+                (id, true)
             }
             Some(network) => {
                 let id = network
@@ -74,7 +75,7 @@ impl DockerNetwork {
                     .clone()
                     .ok_or_else(|| anyhow!("docker network {network_name} has no id"))?;
 
-                (id, true)
+                (id, false)
             }
         };
 
@@ -85,7 +86,7 @@ impl DockerNetwork {
             network: DockerConstruct {
                 id,
                 name: network_name,
-                external,
+                keep: drop_policy.keep(is_new),
             },
         })
     }
@@ -93,7 +94,7 @@ impl DockerNetwork {
 
 impl Drop for DockerNetwork {
     fn drop(&mut self) {
-        if self.network.external {
+        if self.network.keep {
             return;
         }
         if self
@@ -115,7 +116,10 @@ mod tests {
     use std::time::Duration;
 
     use super::DockerNetwork;
-    use crate::{docker::dropper, TestnetName};
+    use crate::{
+        docker::dropper::{self, DropPolicy},
+        TestnetName,
+    };
 
     #[tokio::test]
     async fn test_network() {
@@ -123,22 +127,25 @@ mod tests {
 
         let docker = Docker::connect_with_local_defaults().expect("failed to connect to docker");
         let dropper = dropper::start(docker.clone());
+        let drop_policy = DropPolicy::default();
 
-        let n1 = DockerNetwork::get_or_create(docker.clone(), dropper.clone(), tn.clone())
-            .await
-            .expect("failed to create network");
+        let n1 =
+            DockerNetwork::get_or_create(docker.clone(), dropper.clone(), tn.clone(), &drop_policy)
+                .await
+                .expect("failed to create network");
 
-        let n2 = DockerNetwork::get_or_create(docker.clone(), dropper.clone(), tn.clone())
-            .await
-            .expect("failed to get network");
+        let n2 =
+            DockerNetwork::get_or_create(docker.clone(), dropper.clone(), tn.clone(), &drop_policy)
+                .await
+                .expect("failed to get network");
 
         assert!(
-            !n1.network.external,
-            "when created, the network should not be external"
+            !n1.network.keep,
+            "when created, the network should not be marked to keep"
         );
         assert!(
-            n2.network.external,
-            "when already exists, the network should be external"
+            n2.network.keep,
+            "when already exists, the network should be kept"
         );
         assert_eq!(n1.network.id, n2.network.id);
         assert_eq!(n1.network.name, n2.network.name);

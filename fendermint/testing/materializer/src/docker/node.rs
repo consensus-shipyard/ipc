@@ -14,8 +14,10 @@ use ethers::types::H160;
 use lazy_static::lazy_static;
 
 use super::{
-    container::DockerContainer, dropper::DropHandle, runner::DockerRunner, DockerMaterials,
-    DockerPortRange, EnvVars, Volumes,
+    container::DockerContainer,
+    dropper::{DropHandle, DropPolicy},
+    runner::DockerRunner,
+    DockerMaterials, DockerPortRange, EnvVars, Volumes,
 };
 use crate::{
     docker::DOCKER_ENTRY_FILE_NAME,
@@ -73,6 +75,7 @@ impl DockerNode {
         root: impl AsRef<Path>,
         docker: Docker,
         dropper: DropHandle,
+        drop_policy: &DropPolicy,
         node_name: &NodeName,
         node_config: NodeConfig<'a, DockerMaterials>,
         port_range: DockerPortRange,
@@ -81,12 +84,29 @@ impl DockerNode {
         let cometbft_name = container_name(node_name, "cometbft");
         let ethapi_name = container_name(node_name, "ethapi");
 
-        let fendermint =
-            DockerContainer::get(docker.clone(), dropper.clone(), fendermint_name.clone()).await?;
-        let cometbft =
-            DockerContainer::get(docker.clone(), dropper.clone(), cometbft_name.clone()).await?;
-        let ethapi =
-            DockerContainer::get(docker.clone(), dropper.clone(), ethapi_name.clone()).await?;
+        let fendermint = DockerContainer::get(
+            docker.clone(),
+            dropper.clone(),
+            drop_policy,
+            fendermint_name.clone(),
+        )
+        .await?;
+
+        let cometbft = DockerContainer::get(
+            docker.clone(),
+            dropper.clone(),
+            drop_policy,
+            cometbft_name.clone(),
+        )
+        .await?;
+
+        let ethapi = DockerContainer::get(
+            docker.clone(),
+            dropper.clone(),
+            drop_policy,
+            ethapi_name.clone(),
+        )
+        .await?;
 
         // Directory for the node's data volumes
         let node_dir = root.as_ref().join(node_name);
@@ -99,6 +119,7 @@ impl DockerNode {
             DockerRunner::new(
                 docker.clone(),
                 dropper.clone(),
+                drop_policy.clone(),
                 node_name.clone(),
                 user,
                 image,
@@ -554,7 +575,10 @@ fn parse_fendermint_peer_id(value: impl AsRef<str>) -> anyhow::Result<String> {
 mod tests {
     use super::{DockerRunner, COMETBFT_IMAGE};
     use crate::{
-        docker::{dropper, node::parse_cometbft_node_id},
+        docker::{
+            dropper::{self, DropPolicy},
+            node::parse_cometbft_node_id,
+        },
         TestnetName,
     };
     use bollard::Docker;
@@ -563,7 +587,17 @@ mod tests {
         let nn = TestnetName::new("test-network").root().node("test-node");
         let docker = Docker::connect_with_local_defaults().expect("failed to connect to docker");
         let dropper = dropper::start(docker.clone());
-        DockerRunner::new(docker, dropper, nn, 0, COMETBFT_IMAGE, Vec::new())
+        let drop_policy = DropPolicy::TRANSIENT;
+
+        DockerRunner::new(
+            docker,
+            dropper,
+            drop_policy,
+            nn,
+            0,
+            COMETBFT_IMAGE,
+            Vec::new(),
+        )
     }
 
     #[tokio::test]

@@ -6,14 +6,17 @@ use std::path::Path;
 use anyhow::anyhow;
 use fendermint_app_options::materializer::*;
 use fendermint_materializer::{
-    docker::DockerMaterializer, manifest::Manifest, testnet::Testnet, TestnetId, TestnetName,
+    docker::{DockerMaterializer, DropPolicy},
+    manifest::Manifest,
+    testnet::Testnet,
+    TestnetId, TestnetName,
 };
 
 use crate::cmd;
 
 cmd! {
   MaterializerArgs(self) {
-    let m = || DockerMaterializer::new(&self.data_dir, self.seed);
+    let m = || DockerMaterializer::new(&self.data_dir, self.seed).map(|m| m.with_policy(DropPolicy::PERSISTENT));
     match &self.command {
         MaterializerCommands::Validate(args) => args.exec(()).await,
         MaterializerCommands::Setup(args) => args.exec(m()?).await,
