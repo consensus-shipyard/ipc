@@ -56,7 +56,7 @@ contract IpcTokenReplicaTest is Test, IntegrationTestBase {
             controllerSubnet
         );
         rootNativeSubnetActor = createSubnetActor(
-            subnetActorWithParams(address(rootGateway), controllerSubnet)
+            defaultSubnetActorParamsWith(address(rootGateway), controllerSubnet)
         );
         nativeSubnetPath = new address[](1);
         nativeSubnetPath[0] = address(rootNativeSubnetActor);
