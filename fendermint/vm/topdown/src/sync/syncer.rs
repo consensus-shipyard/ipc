@@ -14,6 +14,7 @@ use async_stm::{atomically, atomically_or_err, StmError};
 use ethers::utils::hex;
 use fendermint_vm_event::{emit, EventType};
 use std::sync::Arc;
+use tracing::instrument;
 
 /// Parent syncer that constantly poll parent. This struct handles lotus null blocks and deferred
 /// execution. For ETH based parent, it should work out of the box as well.
@@ -257,6 +258,7 @@ where
         Ok(data.0)
     }
 
+    #[instrument(skip(self))]
     async fn fetch_data(
         &self,
         height: BlockHeight,
