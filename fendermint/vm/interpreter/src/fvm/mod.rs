@@ -11,7 +11,7 @@ mod genesis;
 mod query;
 pub mod state;
 pub mod store;
-pub mod upgrade_scheduler;
+pub mod upgrades;
 
 #[cfg(any(test, feature = "bundle"))]
 pub mod bundle;
@@ -23,12 +23,13 @@ pub use exec::FvmApplyRet;
 use fendermint_crypto::{PublicKey, SecretKey};
 use fendermint_eth_hardhat::Hardhat;
 pub use fendermint_vm_message::query::FvmQuery;
+use fvm_ipld_blockstore::Blockstore;
 pub use genesis::FvmGenesisOutput;
 pub use query::FvmQueryRet;
 use tendermint_rpc::Client;
 
 pub use self::broadcast::Broadcaster;
-use self::{state::ipc::GatewayCaller, upgrade_scheduler::UpgradeScheduler};
+use self::{state::ipc::GatewayCaller, upgrades::UpgradeScheduler};
 
 pub type FvmMessage = fvm_shared::message::Message;
 
@@ -59,7 +60,7 @@ impl<C> ValidatorContext<C> {
 #[derive(Clone)]
 pub struct FvmMessageInterpreter<DB, C>
 where
-    DB: fvm_ipld_blockstore::Blockstore + 'static + Clone,
+    DB: Blockstore + 'static + Clone,
 {
     contracts: Hardhat,
     /// Tendermint client for querying the RPC.
@@ -82,7 +83,7 @@ where
 
 impl<DB, C> FvmMessageInterpreter<DB, C>
 where
-    DB: fvm_ipld_blockstore::Blockstore + 'static + Clone,
+    DB: Blockstore + 'static + Clone,
 {
     pub fn new(
         client: C,

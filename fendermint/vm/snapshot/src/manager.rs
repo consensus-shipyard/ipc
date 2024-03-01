@@ -318,7 +318,7 @@ mod tests {
             bundle::{bundle_path, contracts_path, custom_actors_bundle_path},
             state::{snapshot::Snapshot, FvmGenesisState, FvmStateParams},
             store::memory::MemoryBlockstore,
-            upgrade_scheduler::UpgradeScheduler,
+            upgrades::UpgradeScheduler,
             FvmMessageInterpreter,
         },
         GenesisInterpreter,

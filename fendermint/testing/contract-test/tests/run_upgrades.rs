@@ -5,7 +5,7 @@ mod staking;
 
 use anyhow::Context;
 use async_trait::async_trait;
-use ethers::types::{H160, U256};
+use ethers::types::U256;
 use fendermint_contract_test::Tester;
 use fendermint_rpc::response::decode_fevm_return_data;
 use rand::rngs::StdRng;
@@ -25,15 +25,9 @@ use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Account, Actor, ActorMeta, Genesis, PermissionMode, SignerAddr};
 use fendermint_vm_interpreter::fvm::store::memory::MemoryBlockstore;
-use fendermint_vm_interpreter::fvm::upgrade_scheduler::UpgradeScheduler;
-use fendermint_vm_interpreter::fvm::{
-    bundle::contracts_path, upgrade_scheduler::Upgrade, FvmMessageInterpreter,
-};
+use fendermint_vm_interpreter::fvm::upgrades::{Upgrade, UpgradeScheduler};
+use fendermint_vm_interpreter::fvm::{bundle::contracts_path, FvmMessageInterpreter};
 use fendermint_vm_message::chain::ChainMessage;
-
-fn eth_addr_to_h160(eth_addr: &EthAddress) -> H160 {
-    ethers::core::types::Address::from_slice(&eth_addr.0)
-}
 
 // returns a seeded secret key which is guaranteed to be the same every time
 fn my_secret_key() -> SecretKey {
@@ -68,7 +62,7 @@ async fn test_applying_upgrades() {
     let mut upgrade_scheduler = UpgradeScheduler::new();
     upgrade_scheduler
         .add(
-            Upgrade::new("mychain".to_string(), 1, |state| {
+            Upgrade::new("mychain", 1, |state| {
                 println!(
                     "[Upgrade at height {}] Deploy simple contract",
                     state.block_height()
@@ -122,7 +116,7 @@ async fn test_applying_upgrades() {
 
     upgrade_scheduler
         .add(
-            Upgrade::new("mychain".to_string(), 2, |state| {
+            Upgrade::new("mychain", 2, |state| {
                 println!(
                     "[Upgrade at height {}] Sends a balance",
                     state.block_height()
@@ -133,7 +127,7 @@ async fn test_applying_upgrades() {
                 let simple_coin = SimpleCoin::new(EthAddress::from_id(101), client.into());
                 let call = simple_coin.send_coin(
                     // the address we are sending the balance to (which is us in this case)
-                    eth_addr_to_h160(&EthAddress::from(my_secret_key().public_key())),
+                    EthAddress::from(my_secret_key().public_key()).into(),
                     // the amount we are sending
                     U256::from(SEND_BALANCE_AMOUNT),
                 );
@@ -170,7 +164,7 @@ async fn test_applying_upgrades() {
 
     upgrade_scheduler
         .add(
-            Upgrade::new("mychain".to_string(), 3, |state| {
+            Upgrade::new("mychain", 3, |state| {
                 println!(
                     "[Upgrade at height {}] Returns a balance",
                     state.block_height()
@@ -179,9 +173,8 @@ async fn test_applying_upgrades() {
                 // build the calldata for the get_balance function
                 let (client, _mock) = ethers::providers::Provider::mocked();
                 let simple_coin = SimpleCoin::new(EthAddress::from_id(0), client.into());
-                let call = simple_coin.get_balance(eth_addr_to_h160(&EthAddress::from(
-                    my_secret_key().public_key(),
-                )));
+                let call =
+                    simple_coin.get_balance(EthAddress::from(my_secret_key().public_key()).into());
 
                 let mut mf = MessageFactory::new_secp256k1(my_secret_key(), 1, state.chain_id());
                 let message = match mf

@@ -2955,6 +2955,7 @@ dependencies = [
  "arbitrary",
  "arbtest",
  "async-trait",
+ "byteorder",
  "bytes",
  "cid",
  "ethers",

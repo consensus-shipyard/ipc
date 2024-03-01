@@ -19,6 +19,7 @@ hex = { workspace = true }
 rand = { workspace = true }
 tendermint-rpc = { workspace = true }
 tokio = { workspace = true }
+byteorder = { workspace = true }
 
 ipc-api = { workspace = true }
 ipc_actors_abis = { workspace = true }

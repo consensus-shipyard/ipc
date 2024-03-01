@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::{anyhow, Context, Result};
+use byteorder::{BigEndian, WriteBytesExt};
 use cid::Cid;
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_interpreter::fvm::PowerUpdates;
@@ -14,7 +15,7 @@ use fendermint_vm_interpreter::{
         bundle::{bundle_path, contracts_path, custom_actors_bundle_path},
         state::{FvmExecState, FvmGenesisState, FvmStateParams, FvmUpdatableParams},
         store::memory::MemoryBlockstore,
-        upgrade_scheduler::UpgradeScheduler,
+        upgrades::UpgradeScheduler,
         FvmApplyRet, FvmGenesisOutput, FvmMessage, FvmMessageInterpreter,
     },
     ExecInterpreter, GenesisInterpreter,
@@ -191,8 +192,8 @@ where
     }
 
     pub async fn begin_block(&self, block_height: ChainEpoch) -> Result<()> {
-        // TODO: generate block hash based on input
-        let block_hash: [u8; 32] = [0; 32];
+        let mut block_hash: [u8; 32] = [0; 32];
+        let _ = block_hash.as_mut().write_i64::<BigEndian>(block_height);
 
         let db = self.state_store.as_ref().clone();
         let mut state_params = self.state_params.clone();
@@ -239,7 +240,7 @@ where
         self.state_params.circ_supply = circ_supply;
         self.state_params.app_version = app_version;
 
-        println!("self.state_params: {:?}", self.state_params);
+        eprintln!("self.state_params: {:?}", self.state_params);
 
         Ok(())
     }
