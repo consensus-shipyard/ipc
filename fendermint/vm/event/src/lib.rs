@@ -8,6 +8,8 @@ pub enum EventType {
     NewBottomUpCheckpoint,
     /// A new block is produced in fendermint
     NewBlock,
+    /// A proposal is processed
+    ProposalProcessed,
 }
 
 #[macro_export]
