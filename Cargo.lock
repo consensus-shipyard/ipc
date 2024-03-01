@@ -3031,6 +3031,49 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_graph_test"
+version = "0.1.0"
+
+[[package]]
+name = "fendermint_materializer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "async-recursion",
+ "async-trait",
+ "bollard",
+ "env_logger 0.10.2",
+ "ethers",
+ "fendermint_crypto",
+ "fendermint_materializer",
+ "fendermint_testing",
+ "fendermint_vm_actor_interface",
+ "fendermint_vm_core",
+ "fendermint_vm_encoding",
+ "fendermint_vm_genesis",
+ "futures",
+ "fvm_shared",
+ "hex",
+ "ipc-api",
+ "lazy_static",
+ "multihash 0.18.1",
+ "quickcheck",
+ "quickcheck_async",
+ "quickcheck_macros",
+ "serde",
+ "serde_json",
+ "serde_with 2.3.3",
+ "serde_yaml",
+ "serial_test",
+ "tempfile",
+ "tendermint-rpc",
+ "tokio",
+ "toml 0.8.10",
+ "tracing",
+]
+
+[[package]]
 name = "fendermint_rocksdb"
 version = "0.1.0"
 dependencies = [
@@ -3118,44 +3161,6 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "toml 0.8.10",
-]
-
-[[package]]
-name = "fendermint_testing_materializer"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arbitrary",
- "async-recursion",
- "async-trait",
- "bollard",
- "env_logger 0.10.2",
- "ethers",
- "fendermint_crypto",
- "fendermint_testing",
- "fendermint_testing_materializer",
- "fendermint_vm_actor_interface",
- "fendermint_vm_core",
- "fendermint_vm_encoding",
- "fendermint_vm_genesis",
- "futures",
- "fvm_shared",
- "hex",
- "ipc-api",
- "lazy_static",
- "multihash 0.18.1",
- "quickcheck",
- "quickcheck_async",
- "quickcheck_macros",
- "serde",
- "serde_json",
- "serde_with 2.3.3",
- "serde_yaml",
- "tempfile",
- "tendermint-rpc",
- "tokio",
- "toml 0.8.10",
- "tracing",
 ]
 
 [[package]]
@@ -4253,10 +4258,6 @@ dependencies = [
  "js-sys",
  "wasm-bindgen",
 ]
-
-[[package]]
-name = "graph-test"
-version = "0.1.0"
 
 [[package]]
 name = "group"

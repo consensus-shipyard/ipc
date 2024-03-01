@@ -80,10 +80,6 @@ jobs:
 
           echo "IMAGE_TAG=$IMAGE_ID:$VERSION" >> $GITHUB_OUTPUT
 
-      # Pull the latest docker image. Its layers might be reused during the build.
-      - name: Docker Pull
-        run: docker pull ghcr.io/consensus-shipyard/fendermint:latest
-
       - name: Docker Deps
         run: |
           cd fendermint && make docker-deps

@@ -1,9 +1,14 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::Context;
+use anyhow::{bail, Context};
 use async_trait::async_trait;
-use bollard::Docker;
+use bollard::{
+    container::{ListContainersOptions, RemoveContainerOptions},
+    network::ListNetworksOptions,
+    secret::{ContainerSummary, Network},
+    Docker,
+};
 use ethers::{
     core::rand::{rngs::StdRng, SeedableRng},
     types::H160,
@@ -18,7 +23,7 @@ use fvm_shared::{bigint::Zero, econ::TokenAmount, version::NetworkVersion};
 use ipc_api::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     path::{Path, PathBuf},
 };
 use tendermint_rpc::Url;
@@ -34,9 +39,11 @@ use crate::{
 };
 
 mod container;
+mod dropper;
 mod network;
 mod node;
 mod relayer;
+mod runner;
 
 pub use network::DockerNetwork;
 pub use node::DockerNode;
@@ -49,6 +56,16 @@ const DOCKER_ENTRY_FILE_NAME: &str = "docker-entry.sh";
 
 const PORT_RANGE_START: u32 = 30000;
 const PORT_RANGE_SIZE: u32 = 100;
+
+type Volumes = Vec<(PathBuf, &'static str)>;
+type EnvVars = BTreeMap<&'static str, String>;
+
+#[macro_export]
+macro_rules! env_vars {
+    ( $($key:literal => $value:expr),* $(,)? ) => {
+        BTreeMap::from([ $( ($key, $value.to_string()) ),* ])
+    };
+}
 
 pub struct DockerMaterials;
 
@@ -64,6 +81,7 @@ impl Materials for DockerMaterials {
 }
 
 /// A thing constructed by docker.
+#[derive(Debug, Clone)]
 pub struct DockerConstruct {
     /// Unique ID of the thing.
     pub id: String,
@@ -72,31 +90,6 @@ pub struct DockerConstruct {
     /// Indicate whether the thing was created outside the test,
     /// or it can be destroyed when it goes out of scope.
     pub external: bool,
-}
-
-#[derive(Clone)]
-pub struct DockerWithDropHandle {
-    /// Docker client.
-    pub docker: Docker,
-    /// Handle to a single threaded runtime to perform drop tasks.
-    pub drop_handle: tokio::runtime::Handle,
-}
-
-impl DockerWithDropHandle {
-    /// Create with the handle of a given runtime.
-    pub fn from_runtime(docker: Docker, runtime: &tokio::runtime::Runtime) -> Self {
-        Self {
-            docker,
-            drop_handle: runtime.handle().clone(),
-        }
-    }
-    /// Create with the handle of the current runtime, for testing purposes.
-    pub fn from_current(docker: Docker) -> Self {
-        Self {
-            docker,
-            drop_handle: tokio::runtime::Handle::current(),
-        }
-    }
 }
 
 /// Allocated (inclusive) range we can use to expose containers' ports on the host.
@@ -143,7 +136,7 @@ pub struct DockerMaterializer {
     dir: PathBuf,
     rng: StdRng,
     docker: bollard::Docker,
-    drop_runtime: tokio::runtime::Runtime,
+    dropper: dropper::DropHandle,
     state: DockerMaterializerState,
 }
 
@@ -155,10 +148,7 @@ impl DockerMaterializer {
             Docker::connect_with_local_defaults().context("failed to connect to Docker")?;
 
         // Create a runtime for the execution of drop tasks.
-        let drop_runtime = tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(1)
-            .build()
-            .context("failed to create tokio Runtime")?;
+        let dropper = dropper::start(docker.clone());
 
         // Read in the state if it exists, otherwise create a default one.
         let state = import_json(dir.join(STATE_JSON_FILE_NAME))
@@ -169,7 +159,7 @@ impl DockerMaterializer {
             dir: dir.into(),
             rng: StdRng::seed_from_u64(seed),
             docker,
-            drop_runtime,
+            dropper,
             state,
         };
 
@@ -179,8 +169,70 @@ impl DockerMaterializer {
         Ok(m)
     }
 
-    fn docker_with_drop_handle(&self) -> DockerWithDropHandle {
-        DockerWithDropHandle::from_runtime(self.docker.clone(), &self.drop_runtime)
+    /// Remove all traces of a testnet.
+    pub async fn remove(&mut self, testnet_name: &TestnetName) -> anyhow::Result<()> {
+        let testnet = testnet_name.path_string();
+
+        let mut filters = HashMap::new();
+        filters.insert("label".to_string(), vec![format!("testnet={}", testnet)]);
+
+        let containers: Vec<ContainerSummary> = self
+            .docker
+            .list_containers(Some(ListContainersOptions {
+                all: true,
+                filters,
+                ..Default::default()
+            }))
+            .await
+            .context("failed to list docker containers")?;
+
+        let ids = containers.into_iter().filter_map(|c| c.id);
+
+        for id in ids {
+            eprintln!("removing docker container {id}");
+            self.docker
+                .remove_container(
+                    &id,
+                    Some(RemoveContainerOptions {
+                        force: true,
+                        v: true,
+                        ..Default::default()
+                    }),
+                )
+                .await
+                .with_context(|| format!("failed to remove container {id}"))?;
+        }
+
+        let mut filters = HashMap::new();
+        filters.insert("name".to_string(), vec![testnet]);
+
+        let networks: Vec<Network> = self
+            .docker
+            .list_networks(Some(ListNetworksOptions { filters }))
+            .await
+            .context("failed to list networks")?;
+
+        let ids = networks.into_iter().filter_map(|n| n.id);
+
+        for id in ids {
+            eprintln!("removing docker network {id}");
+            self.docker
+                .remove_network(&id)
+                .await
+                .context("failed to remove network")?;
+        }
+
+        let dir = self.dir.join(testnet_name.path());
+        if let Err(e) = std::fs::remove_dir_all(&dir) {
+            if !e.to_string().contains("No such file") {
+                bail!(
+                    "failed to remove testnet directory {}: {e:?}",
+                    dir.to_string_lossy()
+                );
+            }
+        };
+
+        Ok(())
     }
 
     /// Path to a directory based on a resource name.
@@ -274,7 +326,12 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         &mut self,
         testnet_name: &TestnetName,
     ) -> anyhow::Result<<DockerMaterials as Materials>::Network> {
-        DockerNetwork::get_or_create(self.docker_with_drop_handle(), testnet_name.clone()).await
+        DockerNetwork::get_or_create(
+            self.docker.clone(),
+            self.dropper.clone(),
+            testnet_name.clone(),
+        )
+        .await
     }
 
     /// Create a new key-value pair, or return an existing one.
@@ -337,13 +394,13 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         balances: BTreeMap<&'a DefaultAccount, Balance>,
     ) -> anyhow::Result<DefaultGenesis> {
         self.get_or_create_genesis(subnet_name, || {
-            let chain_name = subnet_name.path().to_string_lossy().to_string();
+            let chain_name = subnet_name.path_string();
             let chain_id = chainid::from_str_hashed(&chain_name)?;
             // TODO: Some of these hardcoded values can go into the manifest.
             let genesis = Genesis {
                 chain_name,
                 timestamp: Timestamp::current(),
-                network_version: NetworkVersion::MAX,
+                network_version: NetworkVersion::V21,
                 base_fee: TokenAmount::zero(),
                 power_scale: 3,
                 validators: validators
@@ -366,7 +423,8 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
                 ipc: Some(IpcParams {
                     gateway: GatewayParams {
                         subnet_id: SubnetID::new_root(chain_id.into()),
-                        bottom_up_check_period: 0,
+                        // TODO: The gateway constructor doesn't allow 0 bottom-up-checkpoint-period even on the rootnet!
+                        bottom_up_check_period: 1,
                         majority_percentage: 67,
                         active_validators_limit: 100,
                     },
@@ -396,7 +454,8 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         // and run three different containers.
         DockerNode::get_or_create(
             &self.dir,
-            self.docker_with_drop_handle(),
+            self.docker.clone(),
+            self.dropper.clone(),
             node_name,
             node_config,
             port_range,
@@ -413,8 +472,8 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
-        // Overwrite the env file which has seed addresses.
-        todo!("docker-compose up")
+        // Overwrite the env file which has seed addresses, then start the node (unless it's already running).
+        node.start(seed_nodes).await
     }
 
     async fn create_subnet<'s, 'a>(
