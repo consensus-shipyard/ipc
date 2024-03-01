@@ -165,7 +165,7 @@ ipc-cli wallet new --wallet-type evm
 ipc-cli wallet set-default --address <DEFAULT_ETH_ADDR> --wallet-type evm
 ```
 
-* Go to the [Calibration faucet](https://faucet.calibration.fildev.network/) and get some funds sent to each of your addresses
+* Go to the [Calibration faucet](https://faucet.calibnet.chainsafe-fil.io/) and get some funds sent to each of your addresses
 
 {% hint style="info" %}
 NOTE: you may hit faucet rate limits. In that case, wait a few minutes or continue with the guide and come back to this before step 9. Alternatively, you can send funds from your primary wallet to your owner wallets.
@@ -237,20 +237,69 @@ cargo make --makefile infra/fendermint/Makefile.toml \
     child-validator
 ```
 
+Now, the 2nd validator:
+
+```
+cargo make --makefile infra/fendermint/Makefile.toml \
+    -e NODE_NAME=validator-2 \
+    -e PRIVATE_KEY_PATH=<PLEASE PUT FULL PATH TO validator_2.sk> \
+    -e SUBNET_ID=<PLEASE PUT SUBNET ID> \
+    -e CMT_P2P_HOST_PORT=26756 \
+    -e CMT_RPC_HOST_PORT=26757 \
+    -e ETHAPI_HOST_PORT=8645 \
+    -e RESOLVER_HOST_PORT=26755 \
+    -e BOOTSTRAPS=<PLEASE PUT COMETBFT NODE ID of VALIDATOR-1>@validator-1-cometbft:26656 \
+    -e RESOLVER_BOOTSTRAPS=/dns/validator-1-fendermint/tcp/26655/p2p/<PLEASE PUT PEER_ID of VALIDATOR-1> \
+    -e PARENT_GATEWAY=`curl -s https://raw.githubusercontent.com/consensus-shipyard/ipc/cd/contracts/deployments/r314159.json | jq -r '.gateway_addr'` \
+    -e PARENT_REGISTRY=`curl -s https://raw.githubusercontent.com/consensus-shipyard/ipc/cd/contracts/deployments/r314159.json | jq -r '.registry_addr'` \
+    child-validator
+```
+
+Now, the 3rd:
+
+```
+cargo make --makefile infra/fendermint/Makefile.toml \
+    -e NODE_NAME=validator-3 \
+    -e PRIVATE_KEY_PATH=<PLEASE PUT FULL PATH TO validator_3.sk> \
+    -e SUBNET_ID=<PLEASE PUT SUBNET ID> \
+    -e CMT_P2P_HOST_PORT=26856 \
+    -e CMT_RPC_HOST_PORT=26857 \
+    -e ETHAPI_HOST_PORT=8745 \
+    -e RESOLVER_HOST_PORT=26855 \
+    -e BOOTSTRAPS=<PLEASE PUT COMETBFT NODE ID of VALIDATOR-1>@validator-1-cometbft:26656 \
+    -e RESOLVER_BOOTSTRAPS=/dns/validator-1-fendermint/tcp/26655/p2p/<PLEASE PUT PEER_ID of VALIDATOR-1> \
+    -e PARENT_GATEWAY=`curl -s https://raw.githubusercontent.com/consensus-shipyard/ipc/cd/contracts/deployments/r314159.json | jq -r '.gateway_addr'` \
+    -e PARENT_REGISTRY=`curl -s https://raw.githubusercontent.com/consensus-shipyard/ipc/cd/contracts/deployments/r314159.json | jq -r '.registry_addr'` \
+    child-validator
+```
+
+And finally, the 4th:
+
+```
+cargo make --makefile infra/fendermint/Makefile.toml \
+    -e NODE_NAME=validator-4 \
+    -e PRIVATE_KEY_PATH=<PLEASE PUT FULL PATH TO validator_4.sk> \
+    -e SUBNET_ID=<PLEASE PUT SUBNET ID> \
+    -e CMT_P2P_HOST_PORT=26956 \
+    -e CMT_RPC_HOST_PORT=26957 \
+    -e ETHAPI_HOST_PORT=8845 \
+    -e RESOLVER_HOST_PORT=26955 \
+    -e BOOTSTRAPS=<PLEASE PUT COMETBFT NODE ID of VALIDATOR-1>@validator-1-cometbft:26656 \
+    -e RESOLVER_BOOTSTRAPS=/dns/validator-1-fendermint/tcp/26655/p2p/<PLEASE PUT PEER_ID of VALIDATOR-1> \
+    -e PARENT_GATEWAY=`curl -s https://raw.githubusercontent.com/consensus-shipyard/ipc/cd/contracts/deployments/r314159.json | jq -r '.gateway_addr'` \
+    -e PARENT_REGISTRY=`curl -s https://raw.githubusercontent.com/consensus-shipyard/ipc/cd/contracts/deployments/r314159.json | jq -r '.registry_addr'` \
+    child-validator
+```
+
 {% hint style="info" %}
 NOTE:
 
 * Use full path to PRIVATE\_KEY\_PATH, don't path with "\~"
 * Do not change values of any port from the ones provided unless you have to
+* If you are deploying all validators on a single server, ports will need to be different, as shown in above examples. If you are deploying them from different servers, the ports can be similar.
 {% endhint %}
 
-You'll need the final component of the `IPLD Resolver Multiaddress` (the `peer ID`) and the `CometBFT node ID` for the next nodes we'll start.
-
-* Repeat for validators 2, 3 and 4.
-
-{% hint style="info" %}
-NOTE: Do not change values of any port from the ones provided unless you have to
-{% endhint %}
+You'll need the final component of the `IPLD Resolver Multiaddress` (the `peer ID`) and the `CometBFT node ID` for the next nodes to start.
 
 ### Step 7: Interact with your subnet using the IPC CLI
 
