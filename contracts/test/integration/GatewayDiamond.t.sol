@@ -187,6 +187,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         SubnetID memory networkName = depGetter.getNetworkName();
 
+        require(depGetter.getCommitSha() == bytes32(DEFAULT_COMMIT_SHA), "unexpected commit sha");
         require(networkName.isRoot(), "unexpected networkName");
         require(depGetter.bottomUpCheckPeriod() == checkpointPeriod, "gw.bottomUpCheckPeriod() == checkpointPeriod");
         require(
