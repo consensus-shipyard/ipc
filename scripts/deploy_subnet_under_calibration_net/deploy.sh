@@ -11,7 +11,11 @@
 set -euo pipefail
 
 DASHES='------'
-IPC_FOLDER=${HOME}/github/textileio/ipc
+if [[ ! -v IPC_FOLDER ]]; then
+    IPC_FOLDER=${HOME}/ipc
+else
+    IPC_FOLDER=${IPC_FOLDER}
+fi
 IPC_CLI=${IPC_FOLDER}/target/release/ipc-cli
 IPC_CONFIG_FOLDER=${HOME}/.ipc
 
@@ -112,9 +116,8 @@ set -u
 # Step 2: Prepare code repo and build ipc-cli
 if ! $local_deploy ; then
   echo "$DASHES Preparing ipc repo..."
-  cd $HOME
   if ! ls $IPC_FOLDER ; then
-    git clone --recurse-submodules -j8 https://github.com/consensus-shipyard/ipc.git
+    git clone --recurse-submodules -j8 https://github.com/tablelandnetwork/ipc.git ${IPC_FOLDER}
   fi
   cd ${IPC_FOLDER}/contracts
   git fetch
@@ -336,6 +339,11 @@ Proxy API:
 http://localhost:${PROXY_HOST_PORTS[0]}
 http://localhost:${PROXY_HOST_PORTS[1]}
 http://localhost:${PROXY_HOST_PORTS[2]}
+
+IPFS API:
+http://localhost:${IPFS_RPC_HOST_PORTS[0]}
+http://localhost:${IPFS_RPC_HOST_PORTS[1]}
+http://localhost:${IPFS_RPC_HOST_PORTS[2]}
 
 ETH API:
 http://localhost:${ETHAPI_HOST_PORTS[0]}
