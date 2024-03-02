@@ -31,7 +31,8 @@ contract L1GatewayActorDiamond is IntegrationTestBase {
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
-            activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT
+            activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
+            commitSha: DEFAULT_COMMIT_SHA
         });
 
         return params;
@@ -57,7 +58,8 @@ contract L2GatewayActorDiamond is IntegrationTestBase {
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
-            activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT
+            activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
+            commitSha: DEFAULT_COMMIT_SHA
         });
 
         return params;
@@ -86,7 +88,8 @@ contract L3GatewayActorDiamond is IntegrationTestBase {
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
-            activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT
+            activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
+            commitSha: DEFAULT_COMMIT_SHA
         });
 
         return params;

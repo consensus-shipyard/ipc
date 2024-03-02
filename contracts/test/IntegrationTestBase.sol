@@ -81,6 +81,7 @@ contract TestParams {
     address constant ROOTNET_ADDRESS = address(1);
     address constant DEFAULT_IPC_GATEWAY_ADDR = address(1024);
     address constant TOPDOWN_VALIDATOR_1 = address(12);
+    bytes32 constant DEFAULT_COMMIT_SHA = "c7d8f53f";
 }
 
 contract TestRegistry is Test, TestParams {
@@ -257,7 +258,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
-            activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT
+            activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
+            commitSha: DEFAULT_COMMIT_SHA
         });
         return params;
     }
@@ -268,7 +270,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
-            activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT
+            activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
+            commitSha: DEFAULT_COMMIT_SHA
         });
         return params;
     }

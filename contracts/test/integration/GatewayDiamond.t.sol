@@ -178,7 +178,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             bottomUpCheckPeriod: checkpointPeriod,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
-            activeValidatorsLimit: 100
+            activeValidatorsLimit: 100,
+            commitSha: DEFAULT_COMMIT_SHA
         });
 
         GatewayDiamond dep = createGatewayDiamond(constructorParams);
@@ -186,6 +187,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         SubnetID memory networkName = depGetter.getNetworkName();
 
+        require(depGetter.getCommitSha() == bytes32(DEFAULT_COMMIT_SHA), "unexpected commit sha");
         require(networkName.isRoot(), "unexpected networkName");
         require(depGetter.bottomUpCheckPeriod() == checkpointPeriod, "gw.bottomUpCheckPeriod() == checkpointPeriod");
         require(
@@ -209,7 +211,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             bottomUpCheckPeriod: checkpointPeriod,
             majorityPercentage: 100,
             genesisValidators: new Validator[](0),
-            activeValidatorsLimit: 100
+            activeValidatorsLimit: 100,
+            commitSha: DEFAULT_COMMIT_SHA
         });
 
         IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](2);
@@ -712,7 +715,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
-            activeValidatorsLimit: 100
+            activeValidatorsLimit: 100,
+            commitSha: DEFAULT_COMMIT_SHA
         });
         gatewayDiamond = createGatewayDiamond(constructorParams);
 
@@ -739,7 +743,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
-            activeValidatorsLimit: 100
+            activeValidatorsLimit: 100,
+            commitSha: DEFAULT_COMMIT_SHA
         });
 
         gatewayDiamond = createGatewayDiamond(constructorParams);
@@ -765,7 +770,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
-            activeValidatorsLimit: 100
+            activeValidatorsLimit: 100,
+            commitSha: DEFAULT_COMMIT_SHA
         });
 
         gatewayDiamond = createGatewayDiamond(constructorParams);
@@ -792,7 +798,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
-            activeValidatorsLimit: 100
+            activeValidatorsLimit: 100,
+            commitSha: DEFAULT_COMMIT_SHA
         });
 
         gatewayDiamond = createGatewayDiamond(constructorParams);
@@ -1643,7 +1650,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
-            activeValidatorsLimit: 100
+            activeValidatorsLimit: 100,
+            commitSha: DEFAULT_COMMIT_SHA
         });
 
         gatewayDiamond = createGatewayDiamond(constructorParams);

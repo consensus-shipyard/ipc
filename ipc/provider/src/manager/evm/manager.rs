@@ -684,6 +684,29 @@ impl SubnetManager for EthSubnetManager {
             .to_string())
     }
 
+    async fn get_commit_sha(&self) -> Result<[u8; 32]> {
+        let gateway_contract = gateway_getter_facet::GatewayGetterFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+        log::debug!(
+            "gateway_contract address : {:?}",
+            self.ipc_contract_info.gateway_addr
+        );
+        log::debug!(
+            "gateway_contract_getter_facet address : {:?}",
+            gateway_contract.address()
+        );
+
+        let commit_sha = gateway_contract
+            .get_commit_sha()
+            .call()
+            .await
+            .map_err(|e| anyhow!("cannot get commit sha due to: {e:}"))?;
+
+        Ok(commit_sha)
+    }
+
     async fn get_genesis_info(&self, subnet: &SubnetID) -> Result<SubnetGenesisInfo> {
         let address = contract_address_from_subnet(subnet)?;
         let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
