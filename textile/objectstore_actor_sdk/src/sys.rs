@@ -1,3 +1,6 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: Apache-2.0, MIT
+
 use fvm_sdk::sys::fvm_syscalls;
 
 fvm_syscalls! {
