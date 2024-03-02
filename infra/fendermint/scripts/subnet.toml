@@ -63,6 +63,7 @@ dependencies = [
     "cometbft-wait",
     "ethapi-start",
     "proxy-start",
+    "ipfs-start",
     "node-report",
 ]
 
@@ -72,11 +73,13 @@ run_task = { name = [
     "fendermint-stop",
     "ethapi-stop",
     "proxy-stop",
+    "ipfs-stop",
     "fendermint-start-validator",
     "cometbft-start",
     "cometbft-wait",
     "ethapi-start",
     "proxy-start",
+    "ipfs-start",
 ] }
 
 [tasks.child-fullnode-down]
@@ -100,6 +103,7 @@ dependencies = [
     "cometbft-wait",
     "ethapi-start",
     "proxy-start",
+    "ipfs-start",
     "node-report",
 ]
 
@@ -140,6 +144,9 @@ Subnet ID:
 
 Proxy API:
 \thttp://0.0.0.0:${PROXY_HOST_PORT}
+
+IPFS API:
+\thttp://0.0.0.0:${IPFS_RPC_HOST_PORT}
 
 Eth API:
 \thttp://0.0.0.0:${ETHAPI_HOST_PORT}

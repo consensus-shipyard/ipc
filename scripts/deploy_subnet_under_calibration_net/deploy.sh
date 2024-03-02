@@ -22,6 +22,9 @@ CMT_RPC_HOST_PORTS=(26657 26757 26857)
 ETHAPI_HOST_PORTS=(8545 8645 8745)
 RESOLVER_HOST_PORTS=(26655 26755 26855)
 PROXY_HOST_PORTS=(8001 8002 8003)
+IPFS_SWARM_HOST_PORTS=(4001 4002 4003)
+IPFS_RPC_HOST_PORTS=(5001 5002 5003)
+IPFS_GATEWAY_HOST_PORTS=(8080 8081 8082)
 
 if (($# != 1)); then
   echo "Arguments: <Specify github remote branch name to use to deploy. Or use 'local' (without quote) to indicate using local repo instead. If not provided, will default to main branch"
@@ -203,8 +206,8 @@ done
 # Step 8: Start validators
 
 # Step 8.1 (optional): Rebuild fendermint docker
-cd ${IPC_FOLDER}/fendermint
-make docker-build
+#cd ${IPC_FOLDER}/fendermint
+#make docker-build
 
 # Step 8.2: Start the bootstrap validator node
 echo "$DASHES Start the first validator node as bootstrap"
@@ -227,6 +230,9 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e ETHAPI_HOST_PORT=${ETHAPI_HOST_PORTS[0]} \
     -e RESOLVER_HOST_PORT=${RESOLVER_HOST_PORTS[0]} \
     -e PROXY_HOST_PORT=${PROXY_HOST_PORTS[0]} \
+    -e IPFS_SWARM_HOST_PORT=${IPFS_SWARM_HOST_PORTS[0]} \
+    -e IPFS_RPC_HOST_PORT=${IPFS_RPC_HOST_PORTS[0]} \
+    -e IPFS_GATEWAY_HOST_PORT=${IPFS_GATEWAY_HOST_PORTS[0]} \
     -e PARENT_REGISTRY=${parent_registry_address} \
     -e PARENT_GATEWAY=${parent_gateway_address} \
     -e FM_PULL_SKIP=1 \
@@ -259,6 +265,9 @@ do
       -e ETHAPI_HOST_PORT=${ETHAPI_HOST_PORTS[i]} \
       -e RESOLVER_HOST_PORT=${RESOLVER_HOST_PORTS[i]} \
       -e PROXY_HOST_PORT=${PROXY_HOST_PORTS[i]} \
+      -e IPFS_SWARM_HOST_PORT=${IPFS_SWARM_HOST_PORTS[i]} \
+      -e IPFS_RPC_HOST_PORT=${IPFS_RPC_HOST_PORTS[i]} \
+      -e IPFS_GATEWAY_HOST_PORT=${IPFS_GATEWAY_HOST_PORTS[i]} \
       -e RESOLVER_BOOTSTRAPS=${bootstrap_resolver_endpoint} \
       -e BOOTSTRAPS=${bootstrap_node_endpoint} \
       -e PARENT_REGISTRY=${parent_registry_address} \
@@ -266,6 +275,21 @@ do
       -e FM_PULL_SKIP=1 \
       child-validator
 done
+
+# Tableland: Export pre-funded proxy wallet for validator-0
+mv ${IPC_CONFIG_FOLDER}/evm_keystore.json ${IPC_CONFIG_FOLDER}/evm_keystore_main.json
+mv ${IPC_CONFIG_FOLDER}/evm_keystore_proxy.json ${IPC_CONFIG_FOLDER}/evm_keystore.json
+proxy_address=$($IPC_CLI wallet get-default --wallet-type evm | tr -d '"')
+subnet_folder=$IPC_CONFIG_FOLDER/$(echo $subnet_id | sed 's|^/||;s|/|-|g')
+$IPC_CLI wallet export --wallet-type evm --address ${proxy_address} --fendermint > ${subnet_folder}/validator-0/validator-0/keys/proxy_key.sk
+chmod 600 ${subnet_folder}/validator-0/validator-0/keys/proxy_key.sk
+
+# Tableland: Fund proxy wallet for validator-0 in new subnet (default wallet is currently 'proxy_address'
+$IPC_CLI cross-msg fund --from ${proxy_address} --subnet ${subnet_id} 2
+
+# Tableland: Revert keystores
+mv ${IPC_CONFIG_FOLDER}/evm_keystore.json ${IPC_CONFIG_FOLDER}/evm_keystore_proxy.json
+mv ${IPC_CONFIG_FOLDER}/evm_keystore_main.json ${IPC_CONFIG_FOLDER}/evm_keystore.json
 
 # Step 9a: Test ETH API endpoint
 echo "$DASHES Test ETH API endpoints of validator nodes"

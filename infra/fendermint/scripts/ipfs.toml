@@ -1,0 +1,29 @@
+[tasks.ipfs-run]
+script = """
+docker run \
+  ${FLAGS} \
+  --name ${IPFS_CONTAINER_NAME} \
+  --init \
+  --user $(id -u) \
+  --network ${NETWORK_NAME} \
+  --volume ${IPFS_DIR}:/data/ipfs \
+  --publish ${IPFS_SWARM_HOST_PORT}:4001 \
+  --publish ${IPFS_SWARM_HOST_PORT}:4001/udp \
+  --publish 127.0.0.1:${IPFS_RPC_HOST_PORT}:5001 \
+  --publish 127.0.0.1:${IPFS_GATEWAY_HOST_PORT}:8080 \
+  --env IPFS_PROFILE=server \
+  ${IPFS_DOCKER_IMAGE}
+"""
+dependencies = ["docker-network-create"]
+
+[tasks.ipfs-start]
+extend = "ipfs-run"
+env = { "FLAGS" = "-d" }
+
+[tasks.ipfs-destroy]
+env = { "CONTAINER_NAME" = "${IPFS_CONTAINER_NAME}" }
+run_task = "docker-destroy"
+
+[tasks.ipfs-logs]
+extend = "docker-logs"
+env = { "CONTAINER_NAME" = "${IPFS_CONTAINER_NAME}" }

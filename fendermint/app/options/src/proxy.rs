@@ -13,11 +13,19 @@ pub enum ProxyCommands {
         /// The URL of the Tendermint node's RPC endpoint.
         #[arg(
             long,
-            short = 'u',
+            short,
             default_value = "http://127.0.0.1:26657",
             env = "TENDERMINT_RPC_URL"
         )]
-        http_url: Url,
+        tendermint_url: Url,
+
+        #[arg(
+            long,
+            short,
+            default_value = "/ip4/127.0.0.1/tcp/5001",
+            env = "IPFS_RPC_ADDR"
+        )]
+        ipfs_addr: String,
 
         #[command(flatten)]
         args: super::rpc::TransArgs,

@@ -39,7 +39,7 @@ use crate::{cmd, options::run::RunArgs, settings::Settings};
 
 cmd! {
   RunArgs(self, settings) {
-    run(settings).await
+    run(self.ipfs_addr.clone(), settings).await
   }
 }
 
@@ -56,7 +56,7 @@ namespaces! {
 /// Run the Fendermint ABCI Application.
 ///
 /// This method acts as our composition root.
-async fn run(settings: Settings) -> anyhow::Result<()> {
+async fn run(ipfs_addr: String, settings: Settings) -> anyhow::Result<()> {
     let tendermint_rpc_url = settings.tendermint_rpc_url()?;
     tracing::info!("Connecting to Tendermint at {tendermint_rpc_url}");
 
@@ -135,8 +135,13 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
 
     // If enabled, start a resolver that communicates with the application through the resolve pool.
     if settings.resolver_enabled() {
-        let service =
-            make_resolver_service(&settings, db.clone(), state_store.clone(), ns.bit_store)?;
+        let service = make_resolver_service(
+            &settings,
+            db.clone(),
+            state_store.clone(),
+            ns.bit_store,
+            ipfs_addr,
+        )?;
 
         let client = service.client();
 
@@ -332,6 +337,7 @@ fn make_resolver_service(
     db: RocksDb,
     state_store: NamespaceBlockstore,
     bit_store_ns: String,
+    ipfs_addr: String,
 ) -> anyhow::Result<ipc_ipld_resolver::Service<libipld::DefaultParams, AppVote>> {
     // Blockstore for Bitswap.
     let bit_store = NamespaceBlockstore::new(db, bit_store_ns).context("error creating bit DB")?;
@@ -339,7 +345,8 @@ fn make_resolver_service(
     // Blockstore for Bitswap with a fallback on the actor store for reads.
     let bitswap_store = BitswapBlockstore::new(state_store, bit_store);
 
-    let config = to_resolver_config(settings).context("error creating resolver config")?;
+    let config =
+        to_resolver_config(settings, ipfs_addr).context("error creating resolver config")?;
 
     let service = ipc_ipld_resolver::Service::new(config, bitswap_store)
         .context("error creating IPLD Resolver Service")?;
@@ -372,7 +379,10 @@ fn make_ipc_provider_proxy(settings: &Settings) -> anyhow::Result<IPCProviderPro
     IPCProviderProxy::new(ipc_provider, settings.ipc.subnet_id.clone())
 }
 
-fn to_resolver_config(settings: &Settings) -> anyhow::Result<ipc_ipld_resolver::Config> {
+fn to_resolver_config(
+    settings: &Settings,
+    ipfs_addr: String,
+) -> anyhow::Result<ipc_ipld_resolver::Config> {
     use ipc_ipld_resolver::{
         Config, ConnectionConfig, ContentConfig, DiscoveryConfig, MembershipConfig, NetworkConfig,
     };
@@ -420,6 +430,7 @@ fn to_resolver_config(settings: &Settings) -> anyhow::Result<ipc_ipld_resolver::
             rate_limit_bytes: r.content.rate_limit_bytes,
             rate_limit_period: r.content.rate_limit_period,
         },
+        ipfs_addr,
     };
 
     Ok(config)

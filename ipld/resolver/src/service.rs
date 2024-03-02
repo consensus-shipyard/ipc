@@ -6,7 +6,7 @@ use std::time::Duration;
 use anyhow::anyhow;
 use bloom::{BloomFilter, ASMS};
 use ipc_api::subnet_id::SubnetID;
-use ipfs_api_backend_hyper::{IpfsApi, IpfsClient};
+use ipfs_api_backend_hyper::{IpfsApi, IpfsClient, TryFromUri};
 use libipld::store::StoreParams;
 use libipld::Cid;
 use libp2p::futures::StreamExt;
@@ -92,6 +92,7 @@ pub struct Config {
     pub membership: MembershipConfig,
     pub connection: ConnectionConfig,
     pub content: ContentConfig,
+    pub ipfs_addr: String,
 }
 
 /// Internal requests to enqueue to the [`Service`]
@@ -140,6 +141,8 @@ where
     background_lookup_filter: BloomFilter,
     /// To limit the number of peers contacted in a Bitswap resolution attempt.
     max_peers_per_query: usize,
+    /// IPFS client
+    ipfs_client: IpfsClient,
 }
 
 impl<P, V> Service<P, V>
@@ -202,6 +205,9 @@ where
         let (request_tx, request_rx) = mpsc::unbounded_channel();
         let (event_tx, _) = broadcast::channel(config.connection.event_buffer_capacity as usize);
 
+        let ipfs_client = IpfsClient::from_multiaddr_str(&config.ipfs_addr)
+            .expect("failed to create IPFS client");
+
         let service = Self {
             peer_id,
             listen_addr: config.connection.listen_addr,
@@ -215,6 +221,7 @@ where
                 config.connection.expected_peer_count,
             ),
             max_peers_per_query: config.connection.max_peers_per_query as usize,
+            ipfs_client,
         };
 
         Ok(service)
@@ -516,9 +523,9 @@ where
 
     /// Start a CID resolution using local IPFS.
     fn start_ipfs_query(&mut self, cid: Cid, response_channel: ResponseChannel) {
+        let ipfs = self.ipfs_client.clone();
         tokio::spawn(async move {
-            let client = IpfsClient::default();
-            let res = client.pin_add(&cid.to_string(), true).await;
+            let res = ipfs.pin_add(&cid.to_string(), true).await;
             match res {
                 Ok(_) => {
                     info!("resolved {} from IPFS", cid);

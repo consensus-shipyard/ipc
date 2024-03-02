@@ -12,7 +12,7 @@ use cid::Cid;
 use futures_util::{Stream, StreamExt};
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::BLOCK_GAS_LIMIT;
-use ipfs_api_backend_hyper::{IpfsApi, IpfsClient};
+use ipfs_api_backend_hyper::{IpfsApi, IpfsClient, TryFromUri};
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -47,8 +47,9 @@ const MAX_EVENT_LENGTH: u64 = 1024 * 500; // Limit to 500KiB for now
 cmd! {
     ProxyArgs(self, settings: ProxySettings) {
         match self.command.clone() {
-            ProxyCommands::Run { http_url, args} => {
-                let client = FendermintClient::new_http(http_url, None)?;
+            ProxyCommands::Run { tendermint_url, ipfs_addr, args} => {
+                let client = FendermintClient::new_http(tendermint_url, None)?;
+                let ipfs = IpfsClient::from_multiaddr_str(&ipfs_addr)?;
 
                 let seq = args.sequence;
                 let nonce = Arc::new(Mutex::new(seq));
@@ -62,18 +63,12 @@ cmd! {
                     .and(warp::put())
                     .and(warp::body::content_length_limit(MAX_OBJECT_LENGTH))
                     .and(with_client(client.clone()))
+                    .and(with_ipfs(ipfs.clone()))
                     .and(with_args(args.clone()))
                     .and(with_nonce(nonce.clone()))
                     .and(warp::header::optional::<u64>("X-DataRepo-GasLimit"))
                     .and(warp::body::stream())
                     .and_then(handle_os_upload);
-                let add_route = warp::path!("v1" / "os" / String / Cid)
-                    .and(warp::put())
-                    .and(with_client(client.clone()))
-                    .and(with_args(args.clone()))
-                    .and(with_nonce(nonce.clone()))
-                    .and(warp::header::optional::<u64>("X-DataRepo-GasLimit"))
-                    .and_then(handle_os_add);
                 let delete_route = warp::path!("v1" / "os" / String)
                     .and(warp::delete())
                     .and(with_client(client.clone()))
@@ -84,6 +79,7 @@ cmd! {
                 let get_route = warp::path!("v1" / "os" / String)
                     .and(warp::get())
                     .and(with_client(client.clone()))
+                    .and(with_ipfs(ipfs.clone()))
                     .and(with_args(args.clone()))
                     .and(warp::query::<HeightQuery>())
                     .and(warp::header::optional::<String>("Range"))
@@ -114,7 +110,6 @@ cmd! {
 
                 let router = health_route
                     .or(upload_route)
-                    .or(add_route)
                     .or(delete_route)
                     .or(get_route)
                     .or(list_route)
@@ -141,6 +136,12 @@ fn with_client(
     warp::any().map(move || client.clone())
 }
 
+fn with_ipfs(
+    client: IpfsClient,
+) -> impl Filter<Extract = (IpfsClient,), Error = Infallible> + Clone {
+    warp::any().map(move || client.clone())
+}
+
 fn with_args(args: TransArgs) -> impl Filter<Extract = (TransArgs,), Error = Infallible> + Clone {
     warp::any().map(move || args.clone())
 }
@@ -163,6 +164,7 @@ async fn health() -> Result<impl Reply, Rejection> {
 async fn handle_os_upload(
     key: String,
     client: FendermintClient,
+    ipfs: IpfsClient,
     mut args: TransArgs,
     nonce: Arc<Mutex<u64>>,
     gas_limit: Option<u64>,
@@ -201,7 +203,6 @@ async fn handle_os_upload(
         })
     })?;
 
-    let ipfs = IpfsClient::default();
     let add = ipfs_api_backend_hyper::request::Add {
         chunker: Some("size-1048576"),
         pin: Some(false),
@@ -226,28 +227,6 @@ async fn handle_os_upload(
     })?;
 
     let res = os_put(client, args, key, cid).await.map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("put error: {}", e),
-        })
-    })?;
-
-    *nonce_lck += 1;
-    Ok(warp::reply::json(&res))
-}
-
-async fn handle_os_add(
-    key: String,
-    content: Cid,
-    client: FendermintClient,
-    mut args: TransArgs,
-    nonce: Arc<Mutex<u64>>,
-    gas_limit: Option<u64>,
-) -> Result<impl Reply, Rejection> {
-    let mut nonce_lck = nonce.lock().await;
-    args.sequence = *nonce_lck;
-    args.gas_limit = gas_limit.unwrap_or_else(|| BLOCK_GAS_LIMIT);
-
-    let res = os_put(client, args, key, content).await.map_err(|e| {
         Rejection::from(BadRequest {
             message: format!("put error: {}", e),
         })
@@ -323,6 +302,7 @@ impl From<ParseIntError> for ProxyError {
 async fn handle_os_get(
     key: String,
     client: FendermintClient,
+    ipfs: IpfsClient,
     args: TransArgs,
     hq: HeightQuery,
     range: Option<String>,
@@ -349,7 +329,6 @@ async fn handle_os_get(
             }
             let val = value.to_string();
 
-            let ipfs = IpfsClient::default();
             let stat = ipfs.object_links(&val).await.map_err(|e| {
                 Rejection::from(BadRequest {
                     message: format!("failed to stat object: {}", e),
