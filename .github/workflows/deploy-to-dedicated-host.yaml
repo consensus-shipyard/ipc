@@ -45,7 +45,6 @@ jobs:
           echo '${{ secrets.CI_TEST_PROXY_SECRET_KEY }}' | tr -d '\n' > proxy_key.sk
           echo '${{ secrets.CI_TEST_PROXY_PUBLIC_KEY }}' | tr -d '\n' > proxy_key.pk
           echo '${{ secrets.CI_TEST_PROXY_ADDRESS }}' | tr -d '\n' > proxy_address
-          chmod 600 proxy_key.sk proxy_key.pk proxy_address
       - name: Copy wallet file to the host
         uses: appleboy/scp-action@v0.1.7
         with:
