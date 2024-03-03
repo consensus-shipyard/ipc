@@ -10,6 +10,7 @@ docker run \
   --publish ${PROXY_HOST_PORT}:8001 \
   --env FM_CHAIN_NAME=${NETWORK_NAME} \
   --env FM_PROXY_SECRET_KEY=/data/${NODE_NAME}/${PROXY_PRIV_KEY_PATH} \
+  --env FM_PROXY_ACCOUNT_KIND=ethereum
   --env FM_PROXY_BROADCAST_MODE=commit \
   --env FM_PROXY_SEQUENCE=0 \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \

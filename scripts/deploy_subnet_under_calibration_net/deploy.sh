@@ -291,10 +291,12 @@ do
 done
 
 # Tableland: Fund proxy wallet in the subnet
+echo "$DASHES Fund proxy wallet in the subnet"
 $IPC_CLI wallet import --wallet-type evm --private-key $(cat ${IPC_CONFIG_FOLDER}/proxy_key.sk) --fendermint
 $IPC_CLI cross-msg fund --from $(cat ${IPC_CONFIG_FOLDER}/proxy_address) --subnet ${subnet_id} 2
 
 # Tableland: Give validator-0 the funded proxy key
+echo "$DASHES Give validator-0 the funded proxy key"
 subnet_folder=$IPC_CONFIG_FOLDER/$(echo $subnet_id | sed 's|^/||;s|/|-|g')
 cp ${IPC_CONFIG_FOLDER}/proxy_key.* ${subnet_folder}/validator-0/validator-0/keys
 
