@@ -66,4 +66,4 @@ jobs:
           username: textile
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
           script: bash -il /home/textile/scripts/deploy_subnet_under_calibration_net/deploy.sh ${{ github.ref_name }}
-          command_timeout: 50m
+          command_timeout: 90m

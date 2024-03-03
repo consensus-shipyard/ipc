@@ -86,7 +86,7 @@ else
   echo "$DASHES Need to install node"
   curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
   source "$HOME/.bashrc"
-  nvm install stable
+  nvm install --default lts/*
 fi
 
 # Step 1.4: Install docker
