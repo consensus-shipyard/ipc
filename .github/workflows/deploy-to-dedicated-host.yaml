@@ -45,7 +45,7 @@ jobs:
           echo '${{ secrets.CI_TEST_PROXY_SECRET_KEY }}' | tr -d '\n' > proxy_key.sk
           echo '${{ secrets.CI_TEST_PROXY_PUBLIC_KEY }}' | tr -d '\n' > proxy_key.pk
           echo '${{ secrets.CI_TEST_PROXY_ADDRESS }}' | tr -d '\n' > proxy_address
-          chmod 600 proxy_key.sk proxy_key.pk
+          chmod 600 proxy_key.sk proxy_key.pk proxy_address
       - name: Copy wallet file to the host
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -54,13 +54,29 @@ jobs:
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
           source: "evm_keystore.json"
           target: "/home/textile/.ipc"
-      - name: Copy proxy wallet file to the host
+      - name: Copy proxy secret key file to the host
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
           username: textile
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
-          source: "evm_keystore_proxy.json"
+          source: "proxy_key.sk"
+          target: "/home/textile/.ipc"
+      - name: Copy proxy public key file to the host
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
+          username: textile
+          key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
+          source: "proxy_key.pk"
+          target: "/home/textile/.ipc"
+      - name: Copy proxy address file to the host
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
+          username: textile
+          key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
+          source: "proxy_address"
           target: "/home/textile/.ipc"
       - name: Run deploy scripts on the host
         uses: appleboy/ssh-action@v1.0.3
