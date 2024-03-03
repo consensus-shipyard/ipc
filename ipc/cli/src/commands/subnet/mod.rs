@@ -89,9 +89,6 @@ pub(crate) enum Commands {
     ListBootstraps(ListBootstrapsArgs),
     GenesisEpoch(GenesisEpochArgs),
     GetValidator(ValidatorInfoArgs),
-<<<<<<< HEAD
     ShowGatewayContractCommitSha(ShowGatewayContractCommitShaArgs),
-=======
     SetFederatedPower(SetFederatedPowerArgs),
->>>>>>> b762e9f0 (Rough work)
 }

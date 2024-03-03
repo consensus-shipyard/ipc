@@ -777,11 +777,11 @@ impl IpcProvider {
         validators: &Vec<Address>,
         public_keys: &Vec<Vec<u8>>,
         federated_power: &Vec<u128>) -> anyhow::Result<()> {
-        let conn = match self.connection(subnet) {
-            None => return Err(anyhow!("target subnet not found")),
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("target parent subnet not found")),
             Some(conn) => conn,
         };
-
         conn.manager().set_federated_power(subnet, validators, public_keys, federated_power).await
     }
 }

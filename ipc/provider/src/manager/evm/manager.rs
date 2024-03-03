@@ -816,28 +816,16 @@ impl SubnetManager for EthSubnetManager {
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
 
-        // let mut addresses: Vec<ethers::core::types::Address> = Vec::new();
-        // for address in validators {
-        //     addresses.push(payload_to_evm_address(address.payload())?)
-        // }
         let addresses: Vec<ethers::core::types::Address> = validators.iter().map(
             |validator_address| payload_to_evm_address(validator_address.payload()).unwrap()
         ).collect();
         log::info!("converted addresses {:?}:", addresses);
 
-        // let mut pubkeys: Vec<ethers::core::types::Bytes> = Vec::new();
-        // for key in public_keys {
-        //     pubkeys.push(ethers::core::types::Bytes::from(key.clone()))
-        // }
         let pubkeys: Vec<ethers::core::types::Bytes> = public_keys.iter().map(
             |key| ethers::core::types::Bytes::from(key.clone())
         ).collect();
         log::info!("converted pubkeys {:?}:", pubkeys);
 
-        // let mut power_u256: Vec<ethers::core::types::U256> = Vec::new();
-        // for power in federated_power {
-        //     power_u256.push(ethers::core::types::U256::from(*power))
-        // }
         let power_u256: Vec<ethers::core::types::U256> = federated_power.iter().map(
             |power| ethers::core::types::U256::from(*power)
         ).collect();

@@ -19,10 +19,6 @@ impl CommandLineHandler for crate::commands::subnet::SetFederatedPower {
         let provider = get_ipc_provider(global)?;
         let subnet = SubnetID::from_str(&arguments.subnet)?;
 
-        // let from = match &arguments.from {
-        //     Some(address) => Some(require_fil_addr_from_str(address)?),
-        //     None => None,
-        // };
         let addresses: Vec<Address> = arguments.validator_addresses.iter().map(
             |address| require_fil_addr_from_str(address).unwrap()
         ).collect();
@@ -30,13 +26,6 @@ impl CommandLineHandler for crate::commands::subnet::SetFederatedPower {
         let public_keys: Vec<Vec<u8>> = arguments.validator_pubkeys.iter().map(
             |key| hex::decode(key).unwrap()
         ).collect();
-
-        // let federated_power:
-
-        // let to = match &arguments.to {
-        //     Some(address) => Some(require_fil_addr_from_str(address)?),
-        //     None => None,
-        // };
 
         provider.set_federated_power(&subnet, &addresses, &public_keys, &arguments.validator_power).await
     }
