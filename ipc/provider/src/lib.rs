@@ -831,21 +831,26 @@ impl IpcProvider {
     pub fn import_evm_key_from_privkey(
         &self,
         private_key: String,
+        hex_encoded: bool,
     ) -> anyhow::Result<EthKeyAddress> {
         let keystore = self.evm_wallet()?;
         let mut keystore = keystore.write().unwrap();
 
-        let private_key = if !private_key.starts_with("0x") {
-            hex::decode(&private_key)?
+        let private_key = if hex_encoded {
+            if !private_key.starts_with("0x") {
+                hex::decode(&private_key)?
+            } else {
+                hex::decode(&private_key.as_str()[2..])?
+            }
         } else {
-            hex::decode(&private_key.as_str()[2..])?
+            base64::engine::general_purpose::STANDARD.decode(&private_key)?
         };
         keystore.put(ipc_wallet::EvmKeyInfo::new(private_key))
     }
 
     pub fn import_evm_key_from_json(&self, keyinfo: String) -> anyhow::Result<EthKeyAddress> {
         let persisted: ipc_wallet::PersistentKeyInfo = serde_json::from_str(&keyinfo)?;
-        self.import_evm_key_from_privkey(persisted.private_key().parse()?)
+        self.import_evm_key_from_privkey(persisted.private_key().parse()?, true)
     }
 }
 

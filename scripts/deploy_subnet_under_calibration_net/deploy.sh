@@ -290,20 +290,13 @@ do
       child-validator
 done
 
-# Tableland: Export pre-funded proxy wallet for validator-0
-mv ${IPC_CONFIG_FOLDER}/evm_keystore.json ${IPC_CONFIG_FOLDER}/evm_keystore_main.json
-mv ${IPC_CONFIG_FOLDER}/evm_keystore_proxy.json ${IPC_CONFIG_FOLDER}/evm_keystore.json
-proxy_address=$($IPC_CLI wallet get-default --wallet-type evm | tr -d '"')
+# Tableland: Fund proxy wallet in the subnet
+$IPC_CLI wallet import --wallet-type evm --private-key $(cat ${IPC_CONFIG_FOLDER}/proxy_key.sk) --fendermint
+$IPC_CLI cross-msg fund --from $(cat ${IPC_CONFIG_FOLDER}/proxy_address) --subnet ${subnet_id} 2
+
+# Tableland: Give validator-0 the funded proxy key
 subnet_folder=$IPC_CONFIG_FOLDER/$(echo $subnet_id | sed 's|^/||;s|/|-|g')
-$IPC_CLI wallet export --wallet-type evm --address ${proxy_address} --fendermint > ${subnet_folder}/validator-0/validator-0/keys/proxy_key.sk
-chmod 600 ${subnet_folder}/validator-0/validator-0/keys/proxy_key.sk
-
-# Tableland: Fund proxy wallet for validator-0 in new subnet (default wallet is currently 'proxy_address'
-$IPC_CLI cross-msg fund --from ${proxy_address} --subnet ${subnet_id} 2
-
-# Tableland: Revert keystores
-mv ${IPC_CONFIG_FOLDER}/evm_keystore.json ${IPC_CONFIG_FOLDER}/evm_keystore_proxy.json
-mv ${IPC_CONFIG_FOLDER}/evm_keystore_main.json ${IPC_CONFIG_FOLDER}/evm_keystore.json
+cp ${IPC_CONFIG_FOLDER}/proxy_key.* ${subnet_folder}/validator-0/validator-0/keys
 
 # Step 9a: Test ETH API endpoint
 echo "$DASHES Test ETH API endpoints of validator nodes"
