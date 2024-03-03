@@ -78,6 +78,17 @@ else
   foundryup
 fi
 
+# Step 1.3.1: Install node
+echo "$DASHES Check node..."
+if which node ; then
+  echo "$DASHES node is already installed."
+else
+  echo "$DASHES Need to install node"
+  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
+  source "$HOME/.bashrc"
+  nvm install stable
+fi
+
 # Step 1.4: Install docker
 echo "$DASHES check docker"
 if which docker ; then
