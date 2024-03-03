@@ -46,8 +46,8 @@ fi
 # Step 1: Prepare system for building and running IPC
 
 # Step 1.1: Install build dependencies
-#echo "${DASHES} Installing build dependencies..."
-#sudo apt update && sudo apt install build-essential libssl-dev mesa-opencl-icd ocl-icd-opencl-dev gcc git bzr jq pkg-config curl clang hwloc libhwloc-dev wget ca-certificates gnupg -y
+echo "${DASHES} Installing build dependencies..."
+sudo apt update && sudo apt install build-essential libssl-dev mesa-opencl-icd ocl-icd-opencl-dev gcc git bzr jq pkg-config curl clang hwloc libhwloc-dev wget ca-certificates gnupg -y
 
 # Step 1.2: Install rust + cargo
 echo "$DASHES Check rustc & cargo..."
