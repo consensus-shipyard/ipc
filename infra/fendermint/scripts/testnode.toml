@@ -58,6 +58,8 @@ run_task = { name = [
     "cometbft-destroy",
     "fendermint-destroy",
     "ethapi-destroy",
+    "proxy-destroy",
+    "ipfs-destroy",
     "docker-network-rm",
     "destroy-log-volume",
 ] }

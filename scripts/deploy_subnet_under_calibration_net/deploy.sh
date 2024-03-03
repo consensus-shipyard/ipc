@@ -119,7 +119,7 @@ if ! $local_deploy ; then
   if ! ls $IPC_FOLDER ; then
     git clone --recurse-submodules -j8 https://github.com/tablelandnetwork/ipc.git ${IPC_FOLDER}
   fi
-  cd ${IPC_FOLDER}/contracts
+  cd ${IPC_FOLDER}
   git fetch
   git stash
   git checkout $head_ref
@@ -209,8 +209,8 @@ done
 # Step 8: Start validators
 
 # Step 8.1 (optional): Rebuild fendermint docker
-#cd ${IPC_FOLDER}/fendermint
-#make docker-build
+cd ${IPC_FOLDER}/fendermint
+make docker-build
 
 # Step 8.2: Start the bootstrap validator node
 echo "$DASHES Start the first validator node as bootstrap"
