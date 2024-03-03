@@ -801,11 +801,12 @@ impl SubnetManager for EthSubnetManager {
 
     async fn set_federated_power(
         &self,
+        from: &Address,
         subnet: &SubnetID,
         validators: &Vec<Address>,
         public_keys: &Vec<Vec<u8>>,
         federated_power: &Vec<u128>,
-    ) -> Result<()> {
+    ) -> Result<ChainEpoch> {
         let address = contract_address_from_subnet(&subnet)?;
         log::info!(
             "interacting with evm subnet contract: {address:}"
@@ -831,7 +832,14 @@ impl SubnetManager for EthSubnetManager {
         ).collect();
         log::info!("converted power {:?}:", power_u256);
 
-        Ok(contract.set_federated_power(addresses, pubkeys, power_u256).call().await?)
+        log::info!("from address {:?}:", from);
+
+        let signer = Arc::new(self.get_signer(from)?);
+        let call = contract.set_federated_power(addresses, pubkeys, power_u256);
+        let txn = call_with_premium_estimation(signer, call).await?;
+        let pending_tx = txn.send().await?;
+        let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
+        block_number_from_receipt(receipt)
     }
 }
 

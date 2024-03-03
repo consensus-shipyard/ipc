@@ -4,7 +4,7 @@ use clap::Args;
 use fvm_shared::address::Address;
 use ipc_api::subnet_id::SubnetID;
 use crate::{CommandLineHandler, GlobalArguments};
-use crate::commands::{f64_to_token_amount, get_ipc_provider, require_fil_addr_from_str};
+use crate::commands::{get_ipc_provider, require_fil_addr_from_str};
 
 /// The command to set federated power.
 pub struct SetFederatedPower;
@@ -27,13 +27,20 @@ impl CommandLineHandler for crate::commands::subnet::SetFederatedPower {
             |key| hex::decode(key).unwrap()
         ).collect();
 
-        provider.set_federated_power(&subnet, &addresses, &public_keys, &arguments.validator_power).await
+        let from_address = require_fil_addr_from_str(&arguments.from).unwrap();
+
+        let chain_epoch = provider.set_federated_power(&from_address, &subnet, &addresses, &public_keys, &arguments.validator_power).await?;
+        println!("New federated power is set at epoch {chain_epoch}");
+
+        Ok(())
     }
 }
 
 #[derive(Debug, Args)]
 #[command(name = "stake", about = "Set federated power for validators")]
 pub struct SetFederatedPowerArgs {
+    #[arg(long, help = "The address to sign and pay for this transaction.")]
+    pub from: String,
     #[arg(long, help = "The subnet to release collateral from")]
     pub subnet: String,
     #[arg(long, num_args = 1.., help = "Addresses of validators, separated by space")]
