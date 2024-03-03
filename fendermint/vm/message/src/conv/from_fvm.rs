@@ -113,7 +113,11 @@ pub fn to_eth_transaction_request(
         gas_premium,
     } = msg;
 
-    let data = fvm_ipld_encoding::from_slice::<BytesDe>(params).map(|bz| bz.0)?;
+    let data = if params.len() > 0 {
+        fvm_ipld_encoding::from_slice::<BytesDe>(params).map(|bz| bz.0)?
+    } else {
+        vec![]
+    };
 
     let mut tx = et::Eip1559TransactionRequest::new()
         .chain_id(chain_id)
