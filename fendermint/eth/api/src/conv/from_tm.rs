@@ -319,8 +319,8 @@ pub async fn to_eth_receipt(
         transaction_index,
         block_hash: Some(block_hash),
         block_number: Some(block_number),
-        from: to_eth_address(&msg.from).unwrap_or_default(),
-        to: to_eth_address(&msg.to),
+        from: to_eth_address(&msg.from).ok().flatten().unwrap_or_default(),
+        to: to_eth_address(&msg.to).ok().flatten(),
         cumulative_gas_used,
         gas_used: Some(et::U256::from(result.tx_result.gas_used)),
         contract_address,
@@ -486,7 +486,8 @@ pub fn to_logs(
             .ok_or_else(|| anyhow!("cannot find the 'emitter.id' key"))?;
 
         let address = addr
-            .and_then(|a| to_eth_address(&a))
+            .and_then(|a| to_eth_address(&a).ok())
+            .flatten()
             .unwrap_or_else(|| et::H160::from(EthAddress::from_id(actor_id).0));
 
         // https://github.com/filecoin-project/lotus/blob/6cc506f5cf751215be6badc94a960251c6453202/node/impl/full/eth.go#LL2240C9-L2240C15
