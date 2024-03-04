@@ -8,3 +8,4 @@ testing/materializer/tests/docker-materializer-data
 .idea
 .make
 .contracts-gen
+.vscode

@@ -2905,6 +2905,7 @@ dependencies = [
 name = "fendermint_app_options"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "bytes",
  "cid",
  "clap 4.5.1",
@@ -2916,9 +2917,11 @@ dependencies = [
  "hex",
  "ipc-api",
  "ipc-types",
+ "lazy_static",
  "num-traits",
  "tendermint-rpc",
  "tracing",
+ "tracing-subscriber",
  "url",
 ]
 
