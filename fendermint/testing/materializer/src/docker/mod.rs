@@ -52,6 +52,10 @@ pub use relayer::DockerRelayer;
 
 use self::dropper::DropHandle;
 
+// TODO: Add these to the materializer.
+const COMETBFT_IMAGE: &str = "cometbft/cometbft:v0.37.x";
+const FENDERMINT_IMAGE: &str = "fendermint:latest";
+
 const STATE_JSON_FILE_NAME: &str = "materializer-state.json";
 
 const DOCKER_ENTRY_SCRIPT: &str = include_str!("../../scripts/docker-entry.sh");

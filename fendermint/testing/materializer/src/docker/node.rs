@@ -17,7 +17,7 @@ use super::{
     container::DockerContainer,
     dropper::{DropChute, DropPolicy},
     runner::DockerRunner,
-    DockerMaterials, DockerPortRange, EnvVars, Volumes,
+    DockerMaterials, DockerPortRange, EnvVars, Volumes, COMETBFT_IMAGE, FENDERMINT_IMAGE,
 };
 use crate::{
     docker::DOCKER_ENTRY_FILE_NAME,
@@ -26,10 +26,6 @@ use crate::{
     materials::export_file,
     HasCometBftApi, HasEthApi, NodeName, ResourceHash,
 };
-
-// TODO: Add these to the materializer.
-const COMETBFT_IMAGE: &str = "cometbft/cometbft:v0.37.x";
-const FENDERMINT_IMAGE: &str = "fendermint:latest";
 
 /// The static environment variables are the ones we can assign during node creation,
 /// ie. they don't depend on other nodes' values which get determined during their creation.
