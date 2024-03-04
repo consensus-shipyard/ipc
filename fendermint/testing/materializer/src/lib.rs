@@ -65,6 +65,12 @@ impl From<&ResourceId> for ResourceId {
     }
 }
 
+impl AsRef<str> for ResourceId {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
 /// A human readable name for a testnet.
 pub type TestnetId = ResourceId;
 
@@ -102,6 +108,16 @@ impl ResourceName {
 
     pub fn path_string(&self) -> String {
         self.0.to_string_lossy().to_string()
+    }
+
+    pub fn id(&self) -> ResourceId {
+        ResourceId(
+            self.0
+                .file_name()
+                .expect("resource name has file segment")
+                .to_string_lossy()
+                .to_string(),
+        )
     }
 }
 

@@ -186,11 +186,14 @@ impl DockerNode {
 
         // Convert fendermint genesis to cometbft.
         fendermint_runner
-                .run_cmd(
-                    "genesis --genesis-file /fendermint/genesis.json into-tendermint --out /cometbft/config/genesis.json",
-                )
-                .await
-                .context("failed to convert genesis")?;
+            .run_cmd(
+                "genesis
+                    --genesis-file /fendermint/genesis.json
+                    into-tendermint
+                    --out /cometbft/config/genesis.json",
+            )
+            .await
+            .context("failed to convert genesis")?;
 
         // Convert validator private key to cometbft.
         if let Some(v) = node_config.validator {
@@ -199,11 +202,13 @@ impl DockerNode {
                 .context("failed to copy validator key")?;
 
             fendermint_runner
-                    .run_cmd(
-                        "key into-tendermint --secret-key /fendermint/keys/validator_key.sk --out /cometbft/config/priv_validator_key.json",
-                    )
-                    .await
-                    .context("failed to convert validator key")?;
+                .run_cmd(
+                    "key into-tendermint
+                        --secret-key /fendermint/keys/validator_key.sk
+                        --out /cometbft/config/priv_validator_key.json",
+                )
+                .await
+                .context("failed to convert validator key")?;
         }
 
         // Create a network key for the resolver.

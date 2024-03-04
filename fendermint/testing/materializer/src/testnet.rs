@@ -136,21 +136,21 @@ where
             .ok_or_else(|| anyhow!("account {id} does not exist"))
     }
 
-    /// Get an node by name.
+    /// Get a node by name.
     pub fn node(&self, name: &NodeName) -> anyhow::Result<&M::Node> {
         self.nodes
             .get(name)
             .ok_or_else(|| anyhow!("node {name:?} does not exist"))
     }
 
-    /// Get an subnet by name.
+    /// Get a subnet by name.
     pub fn subnet(&self, name: &SubnetName) -> anyhow::Result<&M::Subnet> {
         self.subnets
             .get(name)
             .ok_or_else(|| anyhow!("subnet {name:?} does not exist"))
     }
 
-    /// Get an genesis by subnet.
+    /// Get a genesis by subnet.
     pub fn genesis(&self, name: &SubnetName) -> anyhow::Result<&M::Genesis> {
         self.genesis
             .get(name)

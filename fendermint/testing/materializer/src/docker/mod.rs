@@ -24,6 +24,7 @@ use ipc_api::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
+    os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
 };
 use tendermint_rpc::Url;
@@ -50,7 +51,7 @@ pub use network::DockerNetwork;
 pub use node::DockerNode;
 pub use relayer::DockerRelayer;
 
-use self::dropper::DropHandle;
+use self::{dropper::DropHandle, runner::DockerRunner};
 
 // TODO: Add these to the materializer.
 const COMETBFT_IMAGE: &str = "cometbft/cometbft:v0.37.x";
@@ -344,6 +345,37 @@ impl DockerMaterializer {
         self.update_state(|s| s.port_ranges.insert(node_name.clone(), range.clone()))?;
         Ok(range)
     }
+
+    /// Create an instance of an `ipc-cli` command runner.
+    fn ipc_cli_runner(&self, testnet_name: &TestnetName) -> anyhow::Result<DockerRunner> {
+        // Create a directory to hold the wallet.
+        let ipc_dir = self.path(testnet_name).join(".ipc");
+        let accounts_dir = self.path(testnet_name).join("accounts");
+        // Create a `~/.ipc` directory, as expected by default by the `ipc-cli`.
+        std::fs::create_dir_all(&ipc_dir).context("failed to create .ipc dir")?;
+        // Use the owner of the directory for the container, so we don't get permission issues.
+        let user = ipc_dir.metadata()?.uid();
+        // Mount the `~/.ipc` directory and all the keys to be imported.
+        let volumes = vec![
+            (ipc_dir, "/fendermint/.ipc"),
+            (accounts_dir, "/fendermint/accounts"),
+        ];
+
+        // TODO: The runner wants a node name, which we technically don't have here.
+        let node_name = testnet_name.root().node("ipc-cli");
+
+        let runner = DockerRunner::new(
+            self.docker.clone(),
+            self.drop_chute.clone(),
+            self.drop_policy.clone(),
+            node_name,
+            user,
+            FENDERMINT_IMAGE,
+            volumes,
+        );
+
+        Ok(runner)
+    }
 }
 
 #[async_trait]
@@ -513,7 +545,53 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
-        todo!("use the ipc-cli to create a new subnet on the parent")
+        let runner = self.ipc_cli_runner(&subnet_name.testnet())?;
+
+        let account_id = subnet_config.creator.name.0.id();
+        let account_id = account_id.as_ref();
+        let eth_addr = format!("{:?}", subnet_config.creator.eth_addr());
+
+        let cmd = format!(
+            "ipc-cli wallet import
+                --wallet-type evm
+                --path /fendermint/accounts/{account_id}/secret.hex"
+        );
+
+        // TODO: It would be nice to skip if already imported, but not crucial.
+        runner
+            .run_cmd(&cmd)
+            .await
+            .context("failed to import wallet")?;
+
+        // TODO: Look up the subnet ID from the parent subnet deployment.
+        // TODO: Why don't we pass the parent subnet to `create_subnet`?
+        let parent_subnet_id: SubnetID = todo!();
+
+        // TODO: All the hardcoded values need to go into the config.
+        let cmd = format!(
+            "ipc-cli subnet create
+                --parent {}
+                --min-validators {}
+                --min-validator-stake 1
+                --bottom-up-check-period 1000
+                --permission-mode collateral
+                --supply-source-kind native
+                ",
+            parent_subnet_id.to_string(),
+            subnet_config.min_validators
+        );
+
+        // TODO: Create a config.toml file for the ipc-cli based
+        // on the deployment of the parent.
+
+        // TODO: Skip this if the subnet already exists.
+        runner
+            .run_cmd(&cmd)
+            .await
+            .context("failed to create subnet")?;
+
+        // TODO: Parse the subnet ID from the command output.
+        todo!()
     }
 
     async fn fund_subnet<'s, 'a>(
