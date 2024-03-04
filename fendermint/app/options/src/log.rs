@@ -35,18 +35,11 @@ impl LogLevel {
         }
     }
 
-    pub fn to_filter(&self) -> anyhow::Result<Option<EnvFilter>> {
-        if let LogLevel::Off = self {
-            // NOTE: We could just pass "off" to `EnvFilter` and return non-optional.
-            return Ok(None);
-        }
-
+    pub fn to_filter(&self) -> anyhow::Result<EnvFilter> {
         // At this point the filter should have been parsed before,
         // but if we created a log level directly, it can fail.
         // We fail if it doesn't parse because presumably we _want_ to see those things.
-        let filter = EnvFilter::try_new(self.as_str())?;
-
-        Ok(Some(filter))
+        Ok(EnvFilter::try_new(self.as_str())?)
     }
 }
 

@@ -118,12 +118,12 @@ pub struct Options {
 }
 
 impl Options {
-    /// Tracing filter for the console, unless it's turned off.
+    /// Tracing filter for the console.
     ///
     /// Coalescing everything into a filter instead of either a level or a filter
     /// because the `tracing_subscriber` setup methods like `with_filter` and `with_level`
     /// produce different static types and it's not obvious how to use them as alternatives.
-    pub fn log_console_filter(&self) -> anyhow::Result<Option<EnvFilter>> {
+    pub fn log_console_filter(&self) -> anyhow::Result<EnvFilter> {
         self._log_level
             .as_ref()
             .unwrap_or(&self.log_level)
@@ -131,7 +131,7 @@ impl Options {
     }
 
     /// Tracing filter for the log file.
-    pub fn log_file_filter(&self) -> anyhow::Result<Option<EnvFilter>> {
+    pub fn log_file_filter(&self) -> anyhow::Result<EnvFilter> {
         if let Some(ref level) = self.log_file_level {
             level.to_filter()
         } else {
@@ -202,21 +202,18 @@ mod tests {
             opts.log_console_filter().expect("filter should parse")
         };
 
-        assert!(
-            parse_filter("fendermint --log-level debug run").is_some(),
-            "standard log level"
-        );
-        assert!(
-            parse_filter("fendermint --log-level off run").is_none(),
-            "no logging"
-        );
-        assert!(
-            parse_filter("fendermint --log-level libp2p=warn,debug run").is_some(),
-            "complex filter"
-        );
+        let assert_level = |cmd: &str, level: LevelFilter| {
+            let filter = parse_filter(cmd);
+            assert_eq!(filter.max_level_hint(), Some(level))
+        };
 
-        let filter = parse_filter("fendermint --log-level info run").unwrap();
-        assert_eq!(filter.max_level_hint(), Some(LevelFilter::INFO));
+        assert_level("fendermint --log-level debug run", LevelFilter::DEBUG);
+        assert_level("fendermint --log-level off run", LevelFilter::OFF);
+        assert_level(
+            "fendermint --log-level libp2p=warn,error run",
+            LevelFilter::WARN,
+        );
+        assert_level("fendermint --log-level info run", LevelFilter::INFO);
     }
 
     #[test]

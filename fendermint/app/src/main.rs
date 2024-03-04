@@ -13,20 +13,20 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, Layer};
 mod cmd;
 
 fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
-    let mut guard = None;
-
     let console_filter = opts.log_console_filter().expect("invalid filter");
     let file_filter = opts.log_file_filter().expect("invalid filter");
 
-    if console_filter.is_none() && file_filter.is_none() {
-        return guard;
-    }
-
-    let registry = tracing_subscriber::registry();
+    // log all traces to stderr (reserving stdout for any actual output such as from the CLI commands)
+    let console_layer = tracing_subscriber::fmt::layer()
+        .with_writer(std::io::stderr)
+        .with_target(false)
+        .with_file(true)
+        .with_line_number(true)
+        .with_filter(console_filter);
 
     // add a file layer if log_dir is set
-    let registry = registry.with(match (&opts.log_dir, file_filter) {
-        (Some(log_dir), Some(filter)) => {
+    let (file_layer, file_guard) = match &opts.log_dir {
+        Some(log_dir) => {
             let filename = match &opts.log_file_prefix {
                 Some(prefix) => format!("{}-{}", prefix, "fendermint"),
                 None => "fendermint".to_string(),
@@ -40,8 +40,7 @@ fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
                 .build(log_dir)
                 .expect("failed to initialize rolling file appender");
 
-            let (non_blocking, g) = tracing_appender::non_blocking(appender);
-            guard = Some(g);
+            let (non_blocking, file_guard) = tracing_appender::non_blocking(appender);
 
             let file_layer = fmt::Layer::new()
                 .json()
@@ -50,26 +49,20 @@ fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
                 .with_target(false)
                 .with_file(true)
                 .with_line_number(true)
-                .with_filter(filter);
+                .with_filter(file_filter);
 
-            Some(file_layer)
+            (Some(file_layer), Some(file_guard))
         }
-        _ => None,
-    });
+        None => (None, None),
+    };
 
-    // we also log all traces to stderr (reserving stdout for any actual output such as from the CLI commands)
-    let registry = registry.with(console_filter.map(|filter| {
-        tracing_subscriber::fmt::layer()
-            .with_writer(std::io::stderr)
-            .with_target(false)
-            .with_file(true)
-            .with_line_number(true)
-            .with_filter(filter)
-    }));
+    let registry = tracing_subscriber::registry()
+        .with(console_layer)
+        .with(file_layer);
 
     tracing::subscriber::set_global_default(registry).expect("Unable to set a global collector");
 
-    guard
+    file_guard
 }
 
 /// Install a panic handler that prints stuff to the logs, otherwise it only shows up in the console.
