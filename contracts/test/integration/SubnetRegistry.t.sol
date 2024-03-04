@@ -26,10 +26,15 @@ import {SubnetGetterFacet} from "../../src/subnetregistry/SubnetGetterFacet.sol"
 import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 import {SupplySourceHelper} from "../../src/lib/SupplySourceHelper.sol";
+import {RegistryFacetsHelper} from "../helpers/RegistryFacetsHelper.sol";
+import {DiamondFacetsHelper} from "../helpers/DiamondFacetsHelper.sol";
 
 import {IntegrationTestBase, TestRegistry} from "../IntegrationTestBase.sol";
 
 contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
+    using RegistryFacetsHelper for SubnetRegistryDiamond;
+    using DiamondFacetsHelper for SubnetRegistryDiamond;
+
     bytes4[] empty;
 
     function setUp() public virtual override {
@@ -64,10 +69,10 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         params.subnetActorPauserSelectors = mockedSelectors5;
 
         registryDiamond = createSubnetRegistry(params);
-        registryLouper = DiamondLoupeFacet(address(registryDiamond));
-        registryCutter = DiamondCutFacet(address(registryDiamond));
-        registrySubnetFacet = RegisterSubnetFacet(address(registryDiamond));
-        registrySubnetGetterFacet = SubnetGetterFacet(address(registryDiamond));
+        registryLouper = registryDiamond.diamondLouper();
+        registryCutter = registryDiamond.diamondCutter();
+        registrySubnetFacet = registryDiamond.register();
+        registrySubnetGetterFacet = registryDiamond.getter();
     }
 
     function test_Registry_FacetFunctionSelectors() public view {
@@ -137,7 +142,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
     }
 
     function test_Registry_Deployment_DifferentGateway() public {
-        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWithGateway(address(1));
+        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(address(1));
         params.permissionMode = PermissionMode.Collateral;
 
         vm.expectRevert(WrongGateway.selector);
@@ -147,9 +152,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
     function test_Registry_LatestSubnetDeploy_Revert() public {
         vm.startPrank(DEFAULT_SENDER);
 
-        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWithGateway(
-            DEFAULT_IPC_GATEWAY_ADDR
-        );
+        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(DEFAULT_IPC_GATEWAY_ADDR);
         params.permissionMode = PermissionMode.Collateral;
 
         registrySubnetFacet.newSubnetActor(params);
@@ -160,9 +163,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
     function test_Registry_GetSubnetDeployedByNonce_Revert() public {
         vm.startPrank(DEFAULT_SENDER);
 
-        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWithGateway(
-            DEFAULT_IPC_GATEWAY_ADDR
-        );
+        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(DEFAULT_IPC_GATEWAY_ADDR);
         params.permissionMode = PermissionMode.Collateral;
 
         registrySubnetFacet.newSubnetActor(params);
@@ -173,9 +174,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
     function test_Registry_Deployment_Works() public {
         vm.startPrank(DEFAULT_SENDER);
 
-        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWithGateway(
-            DEFAULT_IPC_GATEWAY_ADDR
-        );
+        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(DEFAULT_IPC_GATEWAY_ADDR);
         registrySubnetFacet.newSubnetActor(params);
         require(registrySubnetGetterFacet.latestSubnetDeployed(DEFAULT_SENDER) != address(0));
     }

@@ -4,6 +4,7 @@
 use async_trait::async_trait;
 
 use fvm_ipld_blockstore::Blockstore;
+use fvm_ipld_encoding::RawBytes;
 use fvm_shared::{address::Address, error::ExitCode};
 
 use crate::CheckInterpreter;
@@ -16,6 +17,7 @@ pub struct FvmCheckRet {
     pub sender: Address,
     pub gas_limit: u64,
     pub exit_code: ExitCode,
+    pub return_data: Option<RawBytes>,
     pub info: Option<String>,
 }
 
@@ -41,7 +43,11 @@ where
         msg: Self::Message,
         _is_recheck: bool,
     ) -> anyhow::Result<(Self::State, Self::Output)> {
-        let checked = |state, exit_code: ExitCode, gas_used: Option<u64>, info: Option<String>| {
+        let checked = |state,
+                       exit_code: ExitCode,
+                       gas_used: Option<u64>,
+                       return_data: Option<RawBytes>,
+                       info: Option<String>| {
             tracing::info!(
                 exit_code = exit_code.value(),
                 from = msg.from.to_string(),
@@ -56,6 +62,7 @@ where
                 sender: msg.from,
                 gas_limit: msg.gas_limit,
                 exit_code,
+                return_data,
                 info,
             };
             Ok((state, ret))
@@ -65,6 +72,7 @@ where
             return checked(
                 state,
                 ExitCode::SYS_ASSERTION_FAILED,
+                None,
                 None,
                 Some(format!("pre-check failure: {:#}", e)),
             );
@@ -82,6 +90,7 @@ where
                         state,
                         ExitCode::SYS_SENDER_STATE_INVALID,
                         None,
+                        None,
                         Some(
                             format! {"actor balance {} less than needed {}", actor.balance, balance_needed},
                         ),
@@ -90,6 +99,7 @@ where
                     return checked(
                         state,
                         ExitCode::SYS_SENDER_STATE_INVALID,
+                        None,
                         None,
                         Some(
                             format! {"expected sequence {}, got {}", actor.sequence, msg.sequence},
@@ -101,10 +111,12 @@ where
 
                     // This will stack the effect for subsequent transactions added to the mempool.
                     let (apply_ret, _) = state.execute_explicit(msg.clone())?;
+
                     return checked(
                         state,
                         apply_ret.msg_receipt.exit_code,
                         Some(apply_ret.msg_receipt.gas_used),
+                        Some(apply_ret.msg_receipt.return_data),
                         apply_ret
                             .failure_info
                             .map(|i| i.to_string())
@@ -115,7 +127,7 @@ where
                     actor.balance -= balance_needed;
                     state_tree.set_actor(id, actor);
 
-                    return checked(state, ExitCode::OK, None, None);
+                    return checked(state, ExitCode::OK, None, None, None);
                 }
             }
         }
@@ -123,6 +135,7 @@ where
         checked(
             state,
             ExitCode::SYS_SENDER_INVALID,
+            None,
             None,
             Some(format! {"cannot find actor {}", msg.from}),
         )

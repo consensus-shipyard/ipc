@@ -1,5 +1,5 @@
 [package]
-name = "fendermint_testing_materializer"
+name = "fendermint_materializer"
 description = "Toolkit to instantiate testnets"
 version = "0.1.0"
 authors.workspace = true
@@ -12,21 +12,30 @@ license.workspace = true
 anyhow = { workspace = true }
 async-recursion = { workspace = true }
 async-trait = { workspace = true }
+bollard = { workspace = true }
 ethers = { workspace = true }
+futures = { workspace = true }
 fvm_shared = { workspace = true }
 hex = { workspace = true }
+lazy_static = { workspace = true }
 multihash = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 tendermint-rpc = { workspace = true }
+tokio = { workspace = true }
+toml = { workspace = true }
 tracing = { workspace = true }
 
-lazy_static = { workspace = true, optional = true }
 arbitrary = { workspace = true, optional = true }
 quickcheck = { workspace = true, optional = true }
 
+ipc-api = { path = "../../../ipc/api" }
+
+fendermint_crypto = { path = "../../crypto" }
+fendermint_vm_actor_interface = { path = "../../vm/actor_interface" }
+fendermint_vm_core = { path = "../../vm/core" }
 fendermint_vm_genesis = { path = "../../vm/genesis" }
 fendermint_vm_encoding = { path = "../../vm/encoding" }
 fendermint_testing = { path = "..", optional = true }
@@ -40,11 +49,12 @@ quickcheck_async = { workspace = true }
 quickcheck_macros = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
+serial_test = { workspace = true }
+tempfile = { workspace = true }
 tokio = { workspace = true }
-toml = { workspace = true }
 
 # Enable arb on self for tests.
-fendermint_testing_materializer = { path = ".", features = ["arb"] }
+fendermint_materializer = { path = ".", features = ["arb"] }
 fendermint_testing = { path = "..", features = ["golden"] }
 
 [features]
@@ -52,7 +62,6 @@ default = []
 arb = [
   "arbitrary",
   "quickcheck",
-  "lazy_static",
   "fvm_shared/arb",
   "fendermint_testing/arb",
   "fendermint_vm_genesis/arb",

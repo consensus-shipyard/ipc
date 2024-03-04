@@ -11,6 +11,7 @@ use serde_with::{serde_as, DurationSeconds};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tendermint_rpc::Url;
+use utils::EnvInterpol;
 
 use fendermint_vm_encoding::{human_readable_delegate, human_readable_str};
 use fendermint_vm_topdown::BlockHeight;
@@ -23,6 +24,7 @@ use ipc_provider::config::deserialize::deserialize_eth_address_from_str;
 pub mod eth;
 pub mod fvm;
 pub mod resolver;
+pub mod utils;
 
 /// Marker to be used with the `#[serde_as(as = "IsHumanReadable")]` annotations.
 ///
@@ -128,6 +130,9 @@ pub struct TopDownSettings {
     pub exponential_retry_limit: usize,
     /// The parent rpc http endpoint
     pub parent_http_endpoint: Url,
+    /// Timeout for calls to the parent Ethereum API.
+    #[serde_as(as = "Option<DurationSeconds<u64>>")]
+    pub parent_http_timeout: Option<Duration>,
     /// The parent registry address
     #[serde(deserialize_with = "deserialize_eth_address_from_str")]
     pub parent_registry: Address,
@@ -144,6 +149,9 @@ pub struct IpcSettings {
     /// Interval with which votes can be gossiped.
     #[serde_as(as = "DurationSeconds<u64>")]
     pub vote_interval: Duration,
+    /// Timeout after which the last vote is re-published.
+    #[serde_as(as = "DurationSeconds<u64>")]
+    pub vote_timeout: Duration,
     /// The config for top down checkpoint. It's None if subnet id is root or not activating
     /// any top down checkpoint related operations
     pub topdown: Option<TopDownSettings>,
@@ -215,29 +223,6 @@ pub struct Settings {
     pub ipc: IpcSettings,
 }
 
-#[macro_export]
-macro_rules! home_relative {
-    // Using this inside something that has a `.home_dir()` function.
-    ($($name:ident),+) => {
-        $(
-        pub fn $name(&self) -> std::path::PathBuf {
-            expand_path(&self.home_dir(), &self.$name)
-        }
-        )+
-    };
-
-    // Using this outside something that requires a `home_dir` parameter to be passed to it.
-    ($settings:ty { $($name:ident),+ } ) => {
-      impl $settings {
-        $(
-        pub fn $name(&self, home_dir: &std::path::Path) -> std::path::PathBuf {
-            $crate::expand_path(home_dir, &self.$name)
-        }
-        )+
-      }
-    };
-}
-
 impl Settings {
     home_relative!(
         data_dir,
@@ -252,14 +237,18 @@ impl Settings {
     /// then overrides from the local environment.
     pub fn new(config_dir: &Path, home_dir: &Path, run_mode: &str) -> Result<Self, ConfigError> {
         let c = Config::builder()
-            .add_source(File::from(config_dir.join("default")))
+            .add_source(EnvInterpol(File::from(config_dir.join("default"))))
             // Optional mode specific overrides, checked into git.
-            .add_source(File::from(config_dir.join(run_mode)).required(false))
+            .add_source(EnvInterpol(
+                File::from(config_dir.join(run_mode)).required(false),
+            ))
             // Optional local overrides, not checked into git.
-            .add_source(File::from(config_dir.join("local")).required(false))
+            .add_source(EnvInterpol(
+                File::from(config_dir.join("local")).required(false),
+            ))
             // Add in settings from the environment (with a prefix of FM)
             // e.g. `FM_DB__DATA_DIR=./foo/bar ./target/app` would set the database location.
-            .add_source(
+            .add_source(EnvInterpol(
                 Environment::with_prefix("fm")
                     .prefix_separator("_")
                     .separator("__")
@@ -268,7 +257,7 @@ impl Settings {
                     .list_separator(",") // need to list keys explicitly below otherwise it can't pase simple `String` type
                     .with_list_parse_key("resolver.discovery.static_addresses")
                     .with_list_parse_key("resolver.membership.static_subnets"),
-            )
+            ))
             // Set the home directory based on what was passed to the CLI,
             // so everything in the config can be relative to it.
             // The `home_dir` key is not added to `default.toml` so there is no confusion
@@ -306,49 +295,12 @@ impl Settings {
     }
 }
 
-/// Expand a path which can either be :
-/// * absolute, e.g. "/foo/bar"
-/// * relative to the system `$HOME` directory, e.g. "~/foo/bar"
-/// * relative to the configured `--home-dir` directory, e.g. "foo/bar"
-pub fn expand_path(home_dir: &Path, path: &Path) -> PathBuf {
-    if path.starts_with("/") {
-        PathBuf::from(path)
-    } else if path.starts_with("~") {
-        expand_tilde(path)
-    } else {
-        expand_tilde(home_dir.join(path))
-    }
-}
-
-/// Expand paths that begin with "~" to `$HOME`.
-pub fn expand_tilde<P: AsRef<Path>>(path: P) -> PathBuf {
-    let p = path.as_ref().to_path_buf();
-    if !p.starts_with("~") {
-        return p;
-    }
-    if p == Path::new("~") {
-        return dirs::home_dir().unwrap_or(p);
-    }
-    dirs::home_dir()
-        .map(|mut h| {
-            if h == Path::new("/") {
-                // `~/foo` becomes just `/foo` instead of `//foo` if `/` is home.
-                p.strip_prefix("~").unwrap().to_path_buf()
-            } else {
-                h.push(p.strip_prefix("~/").unwrap());
-                h
-            }
-        })
-        .unwrap_or(p)
-}
-
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
 
     use serial_test::serial;
 
-    use super::expand_tilde;
     use super::Settings;
 
     fn try_parse_config(run_mode: &str) -> Result<Settings, config::ConfigError> {
@@ -376,22 +328,10 @@ mod tests {
     // Run these tests serially because they modify the environment.
     #[serial]
     mod env {
-        use crate::tests::try_parse_config;
+        use multiaddr::multiaddr;
 
-        /// Set some env vars, run a fallible piece of code, then unset the variables otherwise they would affect the next test.
-        fn with_env_vars<F, T, E>(vars: Vec<(&str, &str)>, f: F) -> Result<T, E>
-        where
-            F: FnOnce() -> Result<T, E>,
-        {
-            for (k, v) in vars.iter() {
-                std::env::set_var(k, v);
-            }
-            let result = f();
-            for (k, _) in vars {
-                std::env::remove_var(k);
-            }
-            result
-        }
+        use crate::tests::try_parse_config;
+        use crate::utils::tests::with_env_vars;
 
         #[test]
         fn parse_comma_separated() {
@@ -418,14 +358,30 @@ mod tests {
             assert_eq!(settings.resolver.discovery.static_addresses.len(), 0);
             assert_eq!(settings.resolver.membership.static_subnets.len(), 0);
         }
-    }
 
-    #[test]
-    fn tilde_expands_to_home() {
-        let home = std::env::var("HOME").expect("should work on Linux");
-        let home_project = PathBuf::from(format!("{}/.project", home));
-        assert_eq!(expand_tilde("~/.project"), home_project);
-        assert_eq!(expand_tilde("/foo/bar"), PathBuf::from("/foo/bar"));
-        assert_eq!(expand_tilde("~foo/bar"), PathBuf::from("~foo/bar"));
+        #[test]
+        fn parse_with_interpolation() {
+            let settings = with_env_vars(
+                vec![
+                    ("FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES", "/dns4/${SEED_1_HOST}/tcp/${SEED_1_PORT},/dns4/${SEED_2_HOST}/tcp/${SEED_2_PORT}"),
+                    ("SEED_1_HOST", "foo.io"),
+                    ("SEED_1_PORT", "1234"),
+                    ("SEED_2_HOST", "bar.ai"),
+                    ("SEED_2_PORT", "5678"),
+                ],
+                || try_parse_config(""),
+            )
+            .unwrap();
+
+            assert_eq!(settings.resolver.discovery.static_addresses.len(), 2);
+            assert_eq!(
+                settings.resolver.discovery.static_addresses[0],
+                multiaddr!(Dns4("foo.io"), Tcp(1234u16))
+            );
+            assert_eq!(
+                settings.resolver.discovery.static_addresses[1],
+                multiaddr!(Dns4("bar.ai"), Tcp(5678u16))
+            );
+        }
     }
 }

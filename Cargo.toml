@@ -39,6 +39,8 @@ license-file = "LICENSE-APACHE"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+## dummy trigger ci
+
 [workspace.dependencies]
 anyhow = "1"
 arbitrary = { version = "1", features = ["derive"] }
@@ -49,10 +51,11 @@ async-trait = "0.1"
 async-channel = "1.8.0"
 axum = { version = "0.6", features = ["ws"] }
 base64 = "0.21"
+bollard = "0.15"
 blake2b_simd = "1.0"
 bloom = "0.3"
 bytes = "1.4"
-clap = { version = "4.1", features = ["derive", "env"] }
+clap = { version = "4.1", features = ["derive", "env", "string"] }
 config = "0.13"
 dirs = "5.0"
 dircpy = "0.3"
@@ -160,6 +163,9 @@ ipc-types = { path = "ipc/types" }
 ipc_actors_abis = { path = "contracts/binding" }
 
 # Vendored for cross-compilation, see https://github.com/cross-rs/cross/wiki/Recipes#openssl
+# Make sure every top level build target actually imports this dependency, and don't end up
+# depending on the same _without_ the "vendored" feature, because then the Docker build for
+# for ARM64 on AMD64 will fail, it won't find the OpenSSL installation.
 openssl = { version = "0.10", features = ["vendored"] }
 
 # NOTE: When upgrading the FVM it may cause our fendermint/actors/build.rs to fail as it can

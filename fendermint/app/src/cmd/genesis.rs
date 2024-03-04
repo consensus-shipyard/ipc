@@ -294,6 +294,7 @@ async fn new_genesis_from_parent(
                 .ok_or_else(|| anyhow!("subnet is not a child"))?,
             config: SubnetConfig::Fevm(EVMSubnet {
                 provider_http: args.parent_endpoint.clone(),
+                provider_timeout: None,
                 auth_token: None,
                 registry_addr: args.parent_registry,
                 gateway_addr: args.parent_gateway,

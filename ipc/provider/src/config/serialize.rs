@@ -129,6 +129,7 @@ mod tests {
             config: SubnetConfig::Fevm(EVMSubnet {
                 gateway_addr: Address::from(eth_addr1),
                 provider_http: "http://127.0.0.1:3030/rpc/v1".parse().unwrap(),
+                provider_timeout: None,
                 auth_token: None,
                 registry_addr: Address::from(eth_addr1),
             }),

@@ -31,7 +31,7 @@ jobs:
         with:
           cache: false
 
-      - name: Cache Solidity ABI arfiacts
+      - name: Cache Solidity ABI artifacts
         uses: actions/cache@v2
         with:
           path: ./contracts/out
@@ -42,3 +42,9 @@ jobs:
 
       - name: Run tests
         run: cd contracts; forge test -vvv --ffi
+
+      - name: Run axelar-token tests
+        run: cd extras/axelar-token; forge test -vvv --ffi
+
+      - name: Run linked-token tests
+        run: cd extras/linked-token; forge test -vvv --ffi

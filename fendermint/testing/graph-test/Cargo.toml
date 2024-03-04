@@ -1,5 +1,5 @@
 [package]
-name = "graph-test"
+name = "fendermint_graph_test"
 version = "0.1.0"
 edition = "2021"
 

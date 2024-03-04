@@ -4,13 +4,13 @@ use async_trait::async_trait;
 use ethers::types::H160;
 use fendermint_vm_genesis::Collateral;
 use fvm_shared::econ::TokenAmount;
-use std::collections::BTreeMap;
-use std::fmt::Debug;
+use std::{collections::BTreeMap, fmt::Display};
 use tendermint_rpc::Url;
 
 use crate::{
     manifest::Balance,
-    materializer::{Materializer, Materials, NodeConfig, SubmitConfig, SubnetConfig},
+    materializer::{Materializer, NodeConfig, SubmitConfig, SubnetConfig},
+    materials::Materials,
     AccountName, NodeName, RelayerName, ResourceHash, SubnetName, TestnetName,
 };
 
@@ -31,23 +31,21 @@ impl<M, R> Materializer<M> for LoggingMaterializer<R>
 where
     M: Materials + Send + Sync + 'static,
     R: Materializer<M> + Send + Sync,
-    M::Network: Debug,
-    M::Deployment: Debug,
-    M::Account: Debug,
-    M::Genesis: Debug,
-    M::Subnet: Debug,
-    M::Node: Debug,
-    M::Relayer: Debug,
+    M::Network: Display,
+    M::Deployment: Display,
+    M::Account: Display,
+    M::Genesis: Display,
+    M::Subnet: Display,
+    M::Node: Display,
+    M::Relayer: Display,
 {
     async fn create_network(&mut self, testnet_name: &TestnetName) -> anyhow::Result<M::Network> {
-        eprintln!("create_network({testnet_name:?}");
-        tracing::info!(self.tag, ?testnet_name, "create_network");
+        tracing::info!(self.tag, %testnet_name, "create_network");
         self.inner.create_network(testnet_name).await
     }
 
     fn create_account(&mut self, account_name: &AccountName) -> anyhow::Result<M::Account> {
-        eprintln!("create_account({account_name:?})");
-        tracing::info!(self.tag, ?account_name, "create_account");
+        tracing::info!(self.tag, %account_name, "create_account");
         self.inner.create_account(account_name)
     }
 
@@ -59,8 +57,7 @@ where
     where
         's: 'a,
     {
-        eprintln!("fund_from_faucet({account:?})");
-        tracing::info!(self.tag, ?account, "fund_from_faucet");
+        tracing::info!(self.tag, %account, "fund_from_faucet");
         self.inner.fund_from_faucet(account, reference).await
     }
 
@@ -73,8 +70,7 @@ where
     where
         's: 'a,
     {
-        eprintln!("new_deployment({subnet_name:?}, {deployer:?})");
-        tracing::info!(self.tag, ?subnet_name, ?deployer, "new_deployment");
+        tracing::info!(self.tag, %subnet_name, %deployer, "new_deployment");
         self.inner.new_deployment(subnet_name, deployer, urls).await
     }
 
@@ -84,15 +80,13 @@ where
         gateway: H160,
         registry: H160,
     ) -> anyhow::Result<M::Deployment> {
-        eprintln!("existing_deployment({subnet_name:?})");
-        tracing::info!(self.tag, ?subnet_name, "existing_deployment");
+        tracing::info!(self.tag, %subnet_name, "existing_deployment");
         self.inner
             .existing_deployment(subnet_name, gateway, registry)
     }
 
     fn default_deployment(&mut self, subnet_name: &SubnetName) -> anyhow::Result<M::Deployment> {
-        eprintln!("default_deployment({subnet_name:?})");
-        tracing::info!(self.tag, ?subnet_name, "default_deployment");
+        tracing::info!(self.tag, %subnet_name, "default_deployment");
         self.inner.default_deployment(subnet_name)
     }
 
@@ -102,8 +96,7 @@ where
         validators: BTreeMap<&'a M::Account, Collateral>,
         balances: BTreeMap<&'a M::Account, Balance>,
     ) -> anyhow::Result<M::Genesis> {
-        eprintln!("create_root_genesis({subnet_name:?})");
-        tracing::info!(self.tag, ?subnet_name, "create_root_genesis");
+        tracing::info!(self.tag, %subnet_name, "create_root_genesis");
         self.inner
             .create_root_genesis(subnet_name, validators, balances)
     }
@@ -116,8 +109,7 @@ where
     where
         's: 'a,
     {
-        eprintln!("create_node({node_name:?})");
-        tracing::info!(self.tag, ?node_name, "create_node");
+        tracing::info!(self.tag, %node_name, "create_node");
         self.inner.create_node(node_name, node_config).await
     }
 
@@ -129,8 +121,7 @@ where
     where
         's: 'a,
     {
-        eprintln!("start_node({node:?}");
-        tracing::info!(self.tag, ?node, "start_node");
+        tracing::info!(self.tag, %node, "start_node");
         self.inner.start_node(node, seed_nodes).await
     }
 
@@ -143,8 +134,7 @@ where
     where
         's: 'a,
     {
-        eprintln!("create_subnet({subnet_name:?})");
-        tracing::info!(self.tag, ?subnet_name, "create_subnet");
+        tracing::info!(self.tag, %subnet_name, "create_subnet");
         self.inner
             .create_subnet(parent_submit_config, subnet_name, subnet_config)
             .await
@@ -161,8 +151,7 @@ where
     where
         's: 'a,
     {
-        eprintln!("fund_subnet({subnet:?}, {account:?}, {amount})");
-        tracing::info!(self.tag, ?subnet, ?account, "fund_subnet");
+        tracing::info!(self.tag, %subnet, %account, "fund_subnet");
         self.inner
             .fund_subnet(parent_submit_config, account, subnet, amount, reference)
             .await
@@ -180,11 +169,7 @@ where
     where
         's: 'a,
     {
-        eprintln!(
-            "join_subnet({subnet:?}, {account:?}, {}, {})",
-            collateral.0, balance.0
-        );
-        tracing::info!(self.tag, ?subnet, ?account, "join_subnet");
+        tracing::info!(self.tag, %subnet, %account, "join_subnet");
         self.inner
             .join_subnet(
                 parent_submit_config,
@@ -205,8 +190,7 @@ where
     where
         's: 'a,
     {
-        eprintln!("create_subnet_genesis({subnet:?})");
-        tracing::info!(self.tag, ?subnet, "create_subnet_genesis");
+        tracing::info!(self.tag, %subnet, "create_subnet_genesis");
         self.inner
             .create_subnet_genesis(parent_submit_config, subnet)
             .await
@@ -223,8 +207,7 @@ where
     where
         's: 'a,
     {
-        eprintln!("create_relayer({relayer_name:?})");
-        tracing::info!(self.tag, ?relayer_name, "create_relayer");
+        tracing::info!(self.tag, %relayer_name, "create_relayer");
         self.inner
             .create_relayer(
                 parent_submit_config,

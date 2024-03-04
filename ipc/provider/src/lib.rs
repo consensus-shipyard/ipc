@@ -669,6 +669,15 @@ impl IpcProvider {
         conn.manager().get_chain_id().await
     }
 
+    pub async fn get_commit_sha(&self, subnet: &SubnetID) -> anyhow::Result<[u8; 32]> {
+        let conn = match self.connection(subnet) {
+            None => return Err(anyhow!("target subnet not found")),
+            Some(conn) => conn,
+        };
+
+        conn.manager().get_commit_sha().await
+    }
+
     pub async fn get_chain_head_height(&self, subnet: &SubnetID) -> anyhow::Result<ChainEpoch> {
         let conn = match self.connection(subnet) {
             None => return Err(anyhow!("target subnet not found")),

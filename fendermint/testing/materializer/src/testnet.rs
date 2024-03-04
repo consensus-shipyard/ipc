@@ -14,9 +14,11 @@ use crate::{
         BalanceMap, CollateralMap, IpcDeployment, Manifest, Node, NodeMode, ParentNode, Rootnet,
         Subnet,
     },
-    materializer::{Materializer, Materials, NodeConfig, SubmitConfig, SubnetConfig, TargetConfig},
-    AccountId, NodeId, NodeName, RelayerName, ResourceHash, SubnetId, SubnetName, TestnetId,
-    TestnetName,
+    materializer::{
+        Materializer, NodeConfig, ParentConfig, SubmitConfig, SubnetConfig, TargetConfig,
+    },
+    materials::Materials,
+    AccountId, NodeId, NodeName, RelayerName, ResourceHash, SubnetId, SubnetName, TestnetName,
 };
 
 /// The `Testnet` parses a [Manifest] and is able to derive the steps
@@ -45,20 +47,27 @@ pub struct Testnet<M: Materials, R> {
     _phantom_materializer: PhantomData<R>,
 }
 
+impl<M: Materials, R> Drop for Testnet<M, R> {
+    fn drop(&mut self) {
+        // Make sure anything that can use a common network is dropped first.
+        drop(std::mem::take(&mut self.relayers));
+        drop(std::mem::take(&mut self.nodes));
+    }
+}
+
 impl<M, R> Testnet<M, R>
 where
     M: Materials,
     R: Materializer<M> + Sync + Send,
 {
-    pub async fn new(m: &mut R, id: &TestnetId) -> anyhow::Result<Self> {
-        let name = TestnetName::new(id);
+    pub async fn new(m: &mut R, name: &TestnetName) -> anyhow::Result<Self> {
         let network = m
-            .create_network(&name)
+            .create_network(name)
             .await
             .context("failed to create the network")?;
 
         Ok(Self {
-            name,
+            name: name.clone(),
             network,
             externals: Default::default(),
             accounts: Default::default(),
@@ -71,6 +80,10 @@ where
         })
     }
 
+    pub fn name(&self) -> &TestnetName {
+        &self.name
+    }
+
     pub fn root(&self) -> SubnetName {
         self.name.root()
     }
@@ -79,8 +92,8 @@ where
     ///
     /// To validate a manifest, we can first create a testnet with a [Materializer]
     /// that only creates symbolic resources.
-    pub async fn setup(m: &mut R, id: &TestnetId, manifest: &Manifest) -> anyhow::Result<Self> {
-        let mut t = Self::new(m, id).await?;
+    pub async fn setup(m: &mut R, name: &TestnetName, manifest: &Manifest) -> anyhow::Result<Self> {
+        let mut t = Self::new(m, name).await?;
         let root_name = t.root();
 
         // Create keys for accounts.
@@ -160,6 +173,11 @@ where
             .collect()
     }
 
+    /// Iterate all the nodes in the testnet.
+    pub fn nodes(&self) -> impl Iterator<Item = (&NodeName, &M::Node)> {
+        self.nodes.iter()
+    }
+
     /// Where can we send transactions and queries on a subnet.
     pub fn submit_config(&self, subnet_name: &SubnetName) -> anyhow::Result<SubmitConfig<M>> {
         let deployment = self.deployment(subnet_name)?;
@@ -229,13 +247,13 @@ where
         for (node_id, node) in node_ids.iter() {
             self.create_node(m, subnet_name, node_id, node)
                 .await
-                .with_context(|| "failed to create node {node_id} in {subnet_name:?}")?;
+                .with_context(|| format!("failed to create node {node_id} in {subnet_name:?}"))?;
         }
 
         for (node_id, node) in node_ids.iter() {
             self.start_node(m, subnet_name, node_id, node)
                 .await
-                .with_context(|| "failed to start node {node_id} in {subnet_name:?}")?;
+                .with_context(|| format!("failed to start node {node_id} in {subnet_name:?}"))?;
         }
 
         Ok(())
@@ -256,12 +274,24 @@ where
         let node_name = subnet_name.node(node_id);
 
         let parent_node = match (subnet_name.parent(), &node.parent_node) {
-            (Some(ps), Some(ParentNode::Internal(id))) => Some(TargetConfig::<M>::Internal(
-                self.node(&ps.node(id))
-                    .with_context(|| format!("invalid parent node in {node_name:?}"))?,
-            )),
+            (Some(ps), Some(ParentNode::Internal(id))) => {
+                let tc = TargetConfig::<M>::Internal(
+                    self.node(&ps.node(id))
+                        .with_context(|| format!("invalid parent node in {node_name:?}"))?,
+                );
+                let deployment = self.deployment(&ps)?;
+                Some(ParentConfig {
+                    node: tc,
+                    deployment,
+                })
+            }
             (Some(ps), Some(ParentNode::External(url))) if ps.is_root() => {
-                Some(TargetConfig::External(url.clone()))
+                let tc = TargetConfig::External(url.clone());
+                let deployment = self.deployment(&ps)?;
+                Some(ParentConfig {
+                    node: tc,
+                    deployment,
+                })
             }
             (Some(_), Some(ParentNode::External(_))) => {
                 bail!("node {node_name:?} specifies external URL for parent, but it's on a non-root subnet")
