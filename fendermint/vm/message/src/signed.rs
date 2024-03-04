@@ -176,7 +176,9 @@ impl SignedMessage {
                     .map_err(|e| SignedMessageError::Ethereum(anyhow!(e)))?;
 
                 if rec == from {
-                    verify_eth_method(message)
+                    // FIXME(sander): Eth accounts are blocked from touching non-EVM actors
+                    // verify_eth_method(message)
+                    Ok(())
                 } else {
                     Err(SignedMessageError::InvalidSignature(format!("the Ethereum delegated address did not match the one recovered from the signature (sighash = {:?})", hash)))
                 }

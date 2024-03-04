@@ -10,7 +10,6 @@ use ethers_core::types as et;
 use fendermint_crypto::{RecoveryId, Signature};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::eam::EAM_ACTOR_ID;
-use fvm_ipld_encoding::BytesDe;
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::chainid::ChainID;
@@ -113,12 +112,6 @@ pub fn to_eth_transaction_request(
         gas_premium,
     } = msg;
 
-    let data = if params.len() > 0 {
-        fvm_ipld_encoding::from_slice::<BytesDe>(params).map(|bz| bz.0)?
-    } else {
-        vec![]
-    };
-
     let mut tx = et::Eip1559TransactionRequest::new()
         .chain_id(chain_id)
         .from(to_eth_address(from).unwrap_or_default())
@@ -126,7 +119,7 @@ pub fn to_eth_transaction_request(
         .gas(*gas_limit)
         .max_fee_per_gas(to_eth_tokens(gas_fee_cap)?)
         .max_priority_fee_per_gas(to_eth_tokens(gas_premium)?)
-        .data(et::Bytes::from(data));
+        .data(et::Bytes::from(params.bytes().to_vec()));
 
     tx.to = to_eth_address(to).map(et::NameOrAddress::Address);
 
