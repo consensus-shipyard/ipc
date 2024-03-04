@@ -13,7 +13,7 @@ use bollard::{
 };
 
 use super::{
-    dropper::{DropCommand, DropHandle},
+    dropper::{DropChute, DropCommand, DropPolicy},
     DockerConstruct,
 };
 
@@ -22,12 +22,12 @@ const KILL_TIMEOUT_SECS: i64 = 5;
 
 pub struct DockerContainer {
     docker: Docker,
-    dropper: DropHandle,
+    dropper: DropChute,
     container: DockerConstruct,
 }
 
 impl DockerContainer {
-    pub fn new(docker: Docker, dropper: DropHandle, container: DockerConstruct) -> Self {
+    pub fn new(docker: Docker, dropper: DropChute, container: DockerConstruct) -> Self {
         Self {
             docker,
             dropper,
@@ -42,7 +42,8 @@ impl DockerContainer {
     /// Get a container by name, if it exists.
     pub async fn get(
         docker: Docker,
-        dropper: DropHandle,
+        dropper: DropChute,
+        drop_policy: &DropPolicy,
         name: String,
     ) -> anyhow::Result<Option<Self>> {
         let mut filters = HashMap::new();
@@ -65,15 +66,15 @@ impl DockerContainer {
                     .clone()
                     .ok_or_else(|| anyhow!("docker container {name} has no id"))?;
 
-                Ok(Some(Self {
+                Ok(Some(Self::new(
                     docker,
                     dropper,
-                    container: DockerConstruct {
+                    DockerConstruct {
                         id,
                         name,
-                        external: true,
+                        keep: drop_policy.keep(false),
                     },
-                }))
+                )))
             }
         }
     }
@@ -137,7 +138,7 @@ impl DockerContainer {
 
 impl Drop for DockerContainer {
     fn drop(&mut self) {
-        if self.container.external {
+        if self.container.keep {
             return;
         }
         if self
