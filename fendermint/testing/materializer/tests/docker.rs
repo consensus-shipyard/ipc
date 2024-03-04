@@ -31,7 +31,7 @@ pub type DockerTestnet = Testnet<DockerMaterials, DockerMaterializer>;
 lazy_static! {
     static ref CI_PROFILE: bool = std::env::var("PROFILE").unwrap_or_default() == "ci";
     static ref STARTUP_TIMEOUT: Duration = Duration::from_secs(60);
-    static ref TEARDOWN_TIMEOUT: Duration = Duration::from_secs(5);
+    static ref TEARDOWN_TIMEOUT: Duration = Duration::from_secs(30);
     static ref PRINT_LOGS_ON_ERROR: bool = *CI_PROFILE;
 }
 
@@ -130,7 +130,8 @@ where
     // otherwise the system shuts down too quick, but
     // at least we can inspect the containers.
     // If they don't all get dropped, `docker system prune` helps.
-    tokio::time::sleep(*TEARDOWN_TIMEOUT).await;
+    let drop_handle = materializer.take_dropper();
+    let _ = tokio::time::timeout(*TEARDOWN_TIMEOUT, drop_handle).await;
 
     res
 }

@@ -13,7 +13,7 @@ use bollard::{
 };
 
 use super::{
-    dropper::{DropCommand, DropHandle, DropPolicy},
+    dropper::{DropChute, DropCommand, DropPolicy},
     DockerConstruct,
 };
 
@@ -22,12 +22,12 @@ const KILL_TIMEOUT_SECS: i64 = 5;
 
 pub struct DockerContainer {
     docker: Docker,
-    dropper: DropHandle,
+    dropper: DropChute,
     container: DockerConstruct,
 }
 
 impl DockerContainer {
-    pub fn new(docker: Docker, dropper: DropHandle, container: DockerConstruct) -> Self {
+    pub fn new(docker: Docker, dropper: DropChute, container: DockerConstruct) -> Self {
         Self {
             docker,
             dropper,
@@ -42,7 +42,7 @@ impl DockerContainer {
     /// Get a container by name, if it exists.
     pub async fn get(
         docker: Docker,
-        dropper: DropHandle,
+        dropper: DropChute,
         drop_policy: &DropPolicy,
         name: String,
     ) -> anyhow::Result<Option<Self>> {

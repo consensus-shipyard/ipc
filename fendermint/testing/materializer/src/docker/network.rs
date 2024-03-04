@@ -13,13 +13,13 @@ use bollard::{
 use crate::TestnetName;
 
 use super::{
-    dropper::{DropCommand, DropHandle, DropPolicy},
+    dropper::{DropChute, DropCommand, DropPolicy},
     DockerConstruct,
 };
 
 pub struct DockerNetwork {
     docker: Docker,
-    dropper: DropHandle,
+    dropper: DropChute,
     /// There is a single docker network created for the entire testnet.
     testnet_name: TestnetName,
     network: DockerConstruct,
@@ -38,7 +38,7 @@ impl DockerNetwork {
     /// if not, create a new docker network for the testnet.
     pub async fn get_or_create(
         docker: Docker,
-        dropper: DropHandle,
+        dropper: DropChute,
         testnet_name: TestnetName,
         drop_policy: &DropPolicy,
     ) -> anyhow::Result<Self> {
@@ -126,18 +126,21 @@ mod tests {
         let tn = TestnetName::new("test-network");
 
         let docker = Docker::connect_with_local_defaults().expect("failed to connect to docker");
-        let dropper = dropper::start(docker.clone());
+        let (drop_handle, drop_chute) = dropper::start(docker.clone());
         let drop_policy = DropPolicy::default();
 
-        let n1 =
-            DockerNetwork::get_or_create(docker.clone(), dropper.clone(), tn.clone(), &drop_policy)
-                .await
-                .expect("failed to create network");
+        let n1 = DockerNetwork::get_or_create(
+            docker.clone(),
+            drop_chute.clone(),
+            tn.clone(),
+            &drop_policy,
+        )
+        .await
+        .expect("failed to create network");
 
-        let n2 =
-            DockerNetwork::get_or_create(docker.clone(), dropper.clone(), tn.clone(), &drop_policy)
-                .await
-                .expect("failed to get network");
+        let n2 = DockerNetwork::get_or_create(docker.clone(), drop_chute, tn.clone(), &drop_policy)
+            .await
+            .expect("failed to get network");
 
         assert!(
             !n1.network.keep,
@@ -163,6 +166,9 @@ mod tests {
         assert!(exists().await, "network still exists after n2 dropped");
 
         drop(n1);
+
+        let _ = drop_handle.await;
+
         assert!(
             !exists().await,
             "network should be removed when n1 is dropped"

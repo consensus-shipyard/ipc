@@ -15,7 +15,8 @@ pub enum DropCommand {
     DropContainer(String),
 }
 
-pub type DropHandle = tokio::sync::mpsc::UnboundedSender<DropCommand>;
+pub type DropChute = tokio::sync::mpsc::UnboundedSender<DropCommand>;
+pub type DropHandle = tokio::task::JoinHandle<()>;
 
 /// Decide whether to keep or discard constructs when they go out of scope.
 #[derive(Clone, Debug)]
@@ -71,10 +72,10 @@ impl Default for DropPolicy {
 /// Start a background task to remove docker constructs.
 ///
 /// The loop will exit when all clones of the sender channel have been dropped.
-pub fn start(docker: Docker) -> DropHandle {
+pub fn start(docker: Docker) -> (DropHandle, DropChute) {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 
-    tokio::task::spawn(async move {
+    let handle = tokio::task::spawn(async move {
         while let Some(cmd) = rx.recv().await {
             match cmd {
                 DropCommand::DropNetwork(id) => {
@@ -131,5 +132,5 @@ pub fn start(docker: Docker) -> DropHandle {
         }
     });
 
-    tx
+    (handle, tx)
 }

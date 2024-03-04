@@ -19,13 +19,13 @@ use crate::NodeName;
 
 use super::{
     container::DockerContainer,
-    dropper::{DropHandle, DropPolicy},
+    dropper::{DropChute, DropPolicy},
     DockerConstruct, DockerNetwork, Volumes,
 };
 
 pub struct DockerRunner {
     docker: Docker,
-    dropper: DropHandle,
+    dropper: DropChute,
     drop_policy: DropPolicy,
     node_name: NodeName,
     user: u32,
@@ -36,7 +36,7 @@ pub struct DockerRunner {
 impl DockerRunner {
     pub fn new(
         docker: Docker,
-        dropper: DropHandle,
+        dropper: DropChute,
         drop_policy: DropPolicy,
         node_name: NodeName,
         user: u32,

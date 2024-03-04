@@ -15,7 +15,7 @@ use lazy_static::lazy_static;
 
 use super::{
     container::DockerContainer,
-    dropper::{DropHandle, DropPolicy},
+    dropper::{DropChute, DropPolicy},
     runner::DockerRunner,
     DockerMaterials, DockerPortRange, EnvVars, Volumes,
 };
@@ -74,7 +74,7 @@ impl DockerNode {
     pub async fn get_or_create<'a>(
         root: impl AsRef<Path>,
         docker: Docker,
-        dropper: DropHandle,
+        dropper: DropChute,
         drop_policy: &DropPolicy,
         node_name: &NodeName,
         node_config: NodeConfig<'a, DockerMaterials>,
@@ -586,12 +586,12 @@ mod tests {
     fn make_runner() -> DockerRunner {
         let nn = TestnetName::new("test-network").root().node("test-node");
         let docker = Docker::connect_with_local_defaults().expect("failed to connect to docker");
-        let dropper = dropper::start(docker.clone());
-        let drop_policy = DropPolicy::TRANSIENT;
+        let (_drop_handle, drop_chute) = dropper::start(docker.clone());
+        let drop_policy = DropPolicy::EPHEMERAL;
 
         DockerRunner::new(
             docker,
-            dropper,
+            drop_chute,
             drop_policy,
             nn,
             0,

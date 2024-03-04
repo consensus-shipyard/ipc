@@ -50,6 +50,8 @@ pub use network::DockerNetwork;
 pub use node::DockerNode;
 pub use relayer::DockerRelayer;
 
+use self::dropper::DropHandle;
+
 const STATE_JSON_FILE_NAME: &str = "materializer-state.json";
 
 const DOCKER_ENTRY_SCRIPT: &str = include_str!("../../scripts/docker-entry.sh");
@@ -137,7 +139,8 @@ pub struct DockerMaterializer {
     dir: PathBuf,
     rng: StdRng,
     docker: bollard::Docker,
-    dropper: dropper::DropHandle,
+    drop_handle: dropper::DropHandle,
+    drop_chute: dropper::DropChute,
     drop_policy: dropper::DropPolicy,
     state: DockerMaterializerState,
 }
@@ -150,7 +153,7 @@ impl DockerMaterializer {
             Docker::connect_with_local_defaults().context("failed to connect to Docker")?;
 
         // Create a runtime for the execution of drop tasks.
-        let dropper = dropper::start(docker.clone());
+        let (drop_handle, drop_chute) = dropper::start(docker.clone());
 
         // Read in the state if it exists, otherwise create a default one.
         let state = import_json(dir.join(STATE_JSON_FILE_NAME))
@@ -161,7 +164,8 @@ impl DockerMaterializer {
             dir: dir.into(),
             rng: StdRng::seed_from_u64(seed),
             docker,
-            dropper,
+            drop_handle,
+            drop_chute,
             state,
             drop_policy: DropPolicy::default(),
         };
@@ -241,6 +245,16 @@ impl DockerMaterializer {
         };
 
         Ok(())
+    }
+
+    /// Replace the dropper with a new one and return the existing one so that we can await all the drop tasks being completed.
+    pub fn take_dropper(&mut self) -> DropHandle {
+        let (mut drop_handle, mut drop_chute) = dropper::start(self.docker.clone());
+        std::mem::swap(&mut drop_handle, &mut self.drop_handle);
+        std::mem::swap(&mut drop_chute, &mut self.drop_chute);
+        // By dropping the `drop_chute` the only the existing docker constructs will keep a reference to it.
+        // The caller can decide when it's time to wait on the handle, when the testnet have been dropped.
+        drop_handle
     }
 
     /// Path to a directory based on a resource name.
@@ -336,7 +350,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     ) -> anyhow::Result<<DockerMaterials as Materials>::Network> {
         DockerNetwork::get_or_create(
             self.docker.clone(),
-            self.dropper.clone(),
+            self.drop_chute.clone(),
             testnet_name.clone(),
             &self.drop_policy,
         )
@@ -464,7 +478,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         DockerNode::get_or_create(
             &self.dir,
             self.docker.clone(),
-            self.dropper.clone(),
+            self.drop_chute.clone(),
             &self.drop_policy,
             node_name,
             node_config,
