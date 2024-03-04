@@ -429,7 +429,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
                 validators: validators
                     .into_iter()
                     .map(|(v, c)| Validator {
-                        public_key: ValidatorKey(v.public_key),
+                        public_key: ValidatorKey(v.public_key().clone()),
                         power: c,
                     })
                     .collect(),
