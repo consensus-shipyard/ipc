@@ -125,7 +125,8 @@ cmd! {
                     .recover(handle_rejection);
 
                 if let Some(listen_addr) = settings.listen.to_socket_addrs()?.next() {
-                    Ok(warp::serve(router).run(listen_addr).await)
+                    warp::serve(router).run(listen_addr).await;
+                    Ok(())
                 } else {
                     Err(anyhow!("failed to convert to any socket address"))
                 }
@@ -176,7 +177,7 @@ async fn handle_os_upload(
 ) -> Result<impl Reply, Rejection> {
     let mut nonce_lck = nonce.lock().await;
     args.sequence = *nonce_lck;
-    args.gas_limit = gas_limit.unwrap_or_else(|| BLOCK_GAS_LIMIT);
+    args.gas_limit = gas_limit.unwrap_or(BLOCK_GAS_LIMIT);
 
     let mut tmp = TempFile::new().await.map_err(|e| {
         Rejection::from(BadRequest {
@@ -249,7 +250,7 @@ async fn handle_os_delete(
 ) -> Result<impl Reply, Rejection> {
     let mut nonce_lck = nonce.lock().await;
     args.sequence = *nonce_lck;
-    args.gas_limit = gas_limit.unwrap_or_else(|| BLOCK_GAS_LIMIT);
+    args.gas_limit = gas_limit.unwrap_or(BLOCK_GAS_LIMIT);
 
     let res = os_delete(client, args, key).await.map_err(|e| {
         Rejection::from(BadRequest {
@@ -264,13 +265,13 @@ async fn handle_os_delete(
 fn get_range_params(range: String, size: u64) -> Result<(u64, u64), ProxyError> {
     let range: Vec<String> = range
         .replace("bytes=", "")
-        .split("-")
+        .split('-')
         .map(|n| n.to_string())
         .collect();
     if range.len() != 2 {
         return Err(RangeHeaderInvalid);
     }
-    let (start, end): (u64, u64) = match (range[0].len() > 0, range[1].len() > 0) {
+    let (start, end): (u64, u64) = match (!range[0].is_empty(), !range[1].is_empty()) {
         (true, true) => (range[0].parse::<u64>()?, range[1].parse::<u64>()?),
         (true, false) => (range[0].parse::<u64>()?, size - 1),
         (false, true) => {
@@ -311,7 +312,7 @@ async fn handle_os_get(
     hq: HeightQuery,
     range: Option<String>,
 ) -> Result<impl Reply, Rejection> {
-    let res = os_get(client, args, key, hq.height.unwrap_or_else(|| 0))
+    let res = os_get(client, args, key, hq.height.unwrap_or(0))
         .await
         .map_err(|e| {
             Rejection::from(BadRequest {
@@ -386,7 +387,7 @@ async fn handle_os_list(
     args: TransArgs,
     hq: HeightQuery,
 ) -> Result<impl Reply, Rejection> {
-    let res = os_list(client, args, hq.height.unwrap_or_else(|| 0))
+    let res = os_list(client, args, hq.height.unwrap_or(0))
         .await
         .map_err(|e| {
             Rejection::from(BadRequest {
@@ -420,7 +421,7 @@ async fn handle_acc_push(
 ) -> Result<impl Reply, Rejection> {
     let mut nonce_lck = nonce.lock().await;
     args.sequence = *nonce_lck;
-    args.gas_limit = gas_limit.unwrap_or_else(|| BLOCK_GAS_LIMIT);
+    args.gas_limit = gas_limit.unwrap_or(BLOCK_GAS_LIMIT);
 
     let res = acc_push(client.clone(), args.clone(), body)
         .await
@@ -439,7 +440,7 @@ async fn handle_acc_root(
     args: TransArgs,
     hq: HeightQuery,
 ) -> Result<impl Reply, Rejection> {
-    let res = acc_root(client, args, hq.height.unwrap_or_else(|| 0))
+    let res = acc_root(client, args, hq.height.unwrap_or(0))
         .await
         .map_err(|e| {
             Rejection::from(BadRequest {

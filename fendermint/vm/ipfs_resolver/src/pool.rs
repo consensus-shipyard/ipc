@@ -125,7 +125,7 @@ where
             Ok(status)
         } else {
             let status = ResolveStatus::new(item);
-            items.insert(key.clone(), status.clone());
+            items.insert(key, status.clone());
             self.items.write(items)?;
             self.queue.write(ResolveTask {
                 key,

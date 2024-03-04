@@ -194,7 +194,7 @@ pub mod tests {
         let mut rng = StdRng::seed_from_u64(seed);
         let sk = SecretKey::random(&mut rng);
 
-        let msg = SignedMessage::new_secp256k1(msg.into_message(), &sk, &chain_id)
+        let msg = SignedMessage::new_secp256k1(msg.into_message(), None, &sk, &chain_id)
             .map_err(|e| format!("failed to sign: {e}"))?;
 
         let sig0 = msg.signature();
@@ -251,6 +251,7 @@ pub mod tests {
         let signed = SignedMessage {
             message: msg1,
             signature: Signature::new_secp256k1(sig.to_vec()),
+            object: None,
         };
 
         signed.verify(&chain_id).expect("signature should be valid")

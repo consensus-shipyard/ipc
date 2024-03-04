@@ -425,7 +425,7 @@ where
                         key: obj.key,
                         value: obj.value,
                     };
-                    let params = RawBytes::serialize(&input)?;
+                    let params = RawBytes::serialize(input)?;
                     let msg = Message {
                         version: Default::default(),
                         from,
