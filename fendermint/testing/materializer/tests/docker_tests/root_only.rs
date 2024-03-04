@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use anyhow::{anyhow, bail};
@@ -14,6 +16,8 @@ const MANIFEST: &str = "root-only.yaml";
 async fn test_full_node_sync() {
     with_testnet(MANIFEST, |_materializer, _manifest, testnet| {
         let test = async {
+            // Allow a little bit of time for node-2 to catch up with node-1.
+            tokio::time::sleep(Duration::from_secs(1)).await;
             // Check that node2 is following node1.
             let node2 = testnet.root().node("node-2");
             let dnode2 = testnet.node(&node2)?;
@@ -25,7 +29,7 @@ async fn test_full_node_sync() {
             let bn = provider.get_block_number().await?;
 
             if bn <= U64::one() {
-                bail!("expected positive block number");
+                bail!("expected a block beyond genesis");
             }
 
             Ok(())
