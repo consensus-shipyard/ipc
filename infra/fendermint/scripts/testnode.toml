@@ -61,6 +61,7 @@ run_task = { name = [
     "proxy-destroy",
     "ipfs-destroy",
     "docker-network-rm",
+    "destroy-log-volume",
 ] }
 
 # This task create all necessary data structures to run Fendermint:

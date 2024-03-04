@@ -8,7 +8,7 @@
 # 2. You may need to rerun the script after docker installation for the first time
 # 2. You may need to manually install nodejs and npm on the host
 
-set -euo pipefail
+set -euxo pipefail
 
 DASHES='------'
 if [[ ! -v IPC_FOLDER ]]; then
