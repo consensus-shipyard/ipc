@@ -8,6 +8,7 @@
   },
   "rootnet": {
     "type": "External",
+    "chain_id": 98765,
     "deployment": {
       "type": "New",
       "deployer": "JExQ"

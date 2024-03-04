@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 use anyhow::{anyhow, bail, Ok};
 use async_trait::async_trait;
+use either::Either;
 use ethers::types::H160;
 use fendermint_vm_genesis::Collateral;
-use fvm_shared::econ::TokenAmount;
+use fvm_shared::{chainid::ChainID, econ::TokenAmount};
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::Debug,
@@ -242,6 +243,14 @@ impl Materializer<ValidationMaterials> for ValidatingMaterializer {
             *balance = b.0;
         }
 
+        Ok(subnet_name.clone())
+    }
+
+    fn create_root_subnet<'a>(
+        &mut self,
+        subnet_name: &SubnetName,
+        _params: Either<ChainID, &'a VGenesis>,
+    ) -> anyhow::Result<VSubnet> {
         Ok(subnet_name.clone())
     }
 

@@ -5,6 +5,7 @@ use ethers::{
     core::rand::{rngs::StdRng, SeedableRng},
     types::H160,
 };
+use fendermint_vm_core::chainid;
 use lazy_static::lazy_static;
 use std::{
     cmp::min,
@@ -137,6 +138,9 @@ fn gen_manifest(
 
     let rootnet = if bool::arbitrary(g) {
         Rootnet::External {
+            chain_id: chainid::from_str_hashed(&String::arbitrary(g))
+                .unwrap_or(12345u64.into())
+                .into(),
             deployment: if bool::arbitrary(g) {
                 let [gateway, registry] = gen_addresses::<2>(g);
                 IpcDeployment::Existing { gateway, registry }

@@ -13,6 +13,7 @@ anyhow = { workspace = true }
 async-recursion = { workspace = true }
 async-trait = { workspace = true }
 bollard = { workspace = true }
+either = { workspace= true }
 ethers = { workspace = true }
 futures = { workspace = true }
 fvm_shared = { workspace = true }

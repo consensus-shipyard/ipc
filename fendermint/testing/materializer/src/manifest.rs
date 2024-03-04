@@ -112,6 +112,8 @@ pub enum Rootnet {
     ///
     /// This implies using some sort of Faucet to get balances for the accounts.
     External {
+        /// We need to know the ID of the chain to be able to create a `SubnetID` for it.
+        chain_id: u64,
         /// Indicate whether we have to (re)deploy the IPC contract or we can use an existing one.
         deployment: IpcDeployment,
         /// Addresses of JSON-RPC endpoints on the external L1.

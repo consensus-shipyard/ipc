@@ -3048,6 +3048,7 @@ dependencies = [
  "async-recursion",
  "async-trait",
  "bollard",
+ "either",
  "env_logger 0.10.2",
  "ethers",
  "fendermint_crypto",

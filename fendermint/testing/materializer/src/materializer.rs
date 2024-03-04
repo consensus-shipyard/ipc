@@ -1,8 +1,9 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use async_trait::async_trait;
+use either::Either;
 use ethers::types::H160;
-use fvm_shared::econ::TokenAmount;
+use fvm_shared::{chainid::ChainID, econ::TokenAmount};
 use std::collections::BTreeMap;
 use tendermint_rpc::Url;
 
@@ -100,6 +101,13 @@ pub trait Materializer<M: Materials> {
         validators: BTreeMap<&'a M::Account, Collateral>,
         balances: BTreeMap<&'a M::Account, Balance>,
     ) -> anyhow::Result<M::Genesis>;
+
+    /// Create a subnet to represent the root.
+    fn create_root_subnet<'a>(
+        &mut self,
+        subnet_name: &SubnetName,
+        params: Either<ChainID, &'a M::Genesis>,
+    ) -> anyhow::Result<M::Subnet>;
 
     /// Construct the configuration for a node.
     ///
@@ -229,6 +237,8 @@ pub struct SubnetConfig<'a, M: Materials> {
 pub struct SubmitConfig<'a, M: Materials> {
     /// The nodes to which we can send transactions or queries.
     pub nodes: Vec<TargetConfig<'a, M>>,
+    /// The identity of the subnet to which we submit the transaction.
+    pub subnet: &'a M::Subnet,
     /// The location of the IPC contracts on the (generally parent) subnet.
     pub deployment: &'a M::Deployment,
 }

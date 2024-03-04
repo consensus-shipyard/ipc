@@ -1,9 +1,10 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use async_trait::async_trait;
+use either::Either;
 use ethers::types::H160;
 use fendermint_vm_genesis::Collateral;
-use fvm_shared::econ::TokenAmount;
+use fvm_shared::{chainid::ChainID, econ::TokenAmount};
 use std::{collections::BTreeMap, fmt::Display};
 use tendermint_rpc::Url;
 
@@ -99,6 +100,15 @@ where
         tracing::info!(self.tag, %subnet_name, "create_root_genesis");
         self.inner
             .create_root_genesis(subnet_name, validators, balances)
+    }
+
+    fn create_root_subnet<'a>(
+        &mut self,
+        subnet_name: &SubnetName,
+        params: Either<ChainID, &'a M::Genesis>,
+    ) -> anyhow::Result<M::Subnet> {
+        tracing::info!(self.tag, %subnet_name,  "create_root_subnet");
+        self.inner.create_root_subnet(subnet_name, params)
     }
 
     async fn create_node<'s, 'a>(

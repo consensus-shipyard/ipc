@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 use anyhow::{anyhow, bail, Context};
 use async_recursion::async_recursion;
+use either::Either;
+use fvm_shared::chainid::ChainID;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Display,
@@ -181,6 +183,7 @@ where
     /// Where can we send transactions and queries on a subnet.
     pub fn submit_config(&self, subnet_name: &SubnetName) -> anyhow::Result<SubmitConfig<M>> {
         let deployment = self.deployment(subnet_name)?;
+        let subnet = self.subnet(subnet_name)?;
 
         let mut nodes = self
             .nodes_by_subnet(subnet_name)
@@ -192,7 +195,11 @@ where
             nodes.extend(self.externals.iter().cloned().map(TargetConfig::External));
         }
 
-        Ok(SubmitConfig { deployment, nodes })
+        Ok(SubmitConfig {
+            subnet,
+            deployment,
+            nodes,
+        })
     }
 
     /// Resolve account IDs in a map to account references.
@@ -363,7 +370,11 @@ where
         rootnet: &Rootnet,
     ) -> anyhow::Result<()> {
         match rootnet {
-            Rootnet::External { deployment, urls } => {
+            Rootnet::External {
+                chain_id,
+                deployment,
+                urls,
+            } => {
                 // Establish balances.
                 for (id, a) in self.accounts.iter() {
                     let reference = ResourceHash::digest(format!("funding {id} from faucet"));
@@ -385,6 +396,11 @@ where
                     }
                 };
 
+                let subnet = m
+                    .create_root_subnet(root_name, Either::Left(ChainID::from(*chain_id)))
+                    .context("failed to create root subnet")?;
+
+                self.subnets.insert(root_name.clone(), subnet);
                 self.deployments.insert(root_name.clone(), deployment);
                 self.externals = urls.clone();
             }
@@ -393,11 +409,17 @@ where
                 balances,
                 nodes,
             } => {
-                let deployment = m.default_deployment(root_name)?;
-                self.deployments.insert(root_name.clone(), deployment);
-
                 self.create_root_genesis(m, root_name, validators.clone(), balances.clone())
                     .context("failed to create root genesis")?;
+
+                let genesis = self.genesis(root_name)?;
+                let subnet = m
+                    .create_root_subnet(root_name, Either::Right(genesis))
+                    .context("failed to create root subnet")?;
+                let deployment = m.default_deployment(root_name)?;
+
+                self.subnets.insert(root_name.clone(), subnet);
+                self.deployments.insert(root_name.clone(), deployment);
 
                 self.create_and_start_nodes(m, root_name, nodes)
                     .await
@@ -586,7 +608,7 @@ where
                     .create_relayer(
                         &SubmitConfig {
                             nodes: vec![submit_node],
-                            deployment: parent_submit_config.deployment,
+                            ..parent_submit_config
                         },
                         &relayer_name,
                         created_subnet,

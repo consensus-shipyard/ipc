@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::{bail, Context};
+use anyhow::{anyhow, bail, Context};
 use async_trait::async_trait;
 use bollard::{
     container::{ListContainersOptions, RemoveContainerOptions},
@@ -9,6 +9,7 @@ use bollard::{
     secret::{ContainerSummary, Network},
     Docker,
 };
+use either::Either;
 use ethers::{
     core::rand::{rngs::StdRng, SeedableRng},
     types::H160,
@@ -19,7 +20,7 @@ use fendermint_vm_genesis::{
     ipc::{GatewayParams, IpcParams},
     Account, Actor, ActorMeta, Collateral, Genesis, SignerAddr, Validator, ValidatorKey,
 };
-use fvm_shared::{bigint::Zero, econ::TokenAmount, version::NetworkVersion};
+use fvm_shared::{bigint::Zero, chainid::ChainID, econ::TokenAmount, version::NetworkVersion};
 use ipc_api::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -490,6 +491,30 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
                 }),
             };
             Ok(genesis)
+        })
+    }
+
+    fn create_root_subnet<'a>(
+        &mut self,
+        subnet_name: &SubnetName,
+        params: Either<ChainID, &'a DefaultGenesis>,
+    ) -> anyhow::Result<DefaultSubnet> {
+        let subnet_id = match params {
+            Either::Left(id) => SubnetID::new_root(id.into()),
+            Either::Right(g) => {
+                let ipc = g
+                    .genesis
+                    .ipc
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("IPC configuration missing from genesis"))?;
+
+                ipc.gateway.subnet_id.clone()
+            }
+        };
+
+        Ok(DefaultSubnet {
+            name: subnet_name.clone(),
+            subnet_id,
         })
     }
 
