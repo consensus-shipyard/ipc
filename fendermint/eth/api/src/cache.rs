@@ -3,6 +3,7 @@
 
 use std::sync::{Arc, Mutex};
 
+use crate::state::ActorType;
 use anyhow::Context;
 use fendermint_rpc::client::FendermintClient;
 use fendermint_rpc::query::QueryClient;
@@ -20,6 +21,7 @@ pub struct AddressCache<C> {
     client: FendermintClient<C>,
     addr_to_id: Arc<Mutex<LruCache<Address, ActorID>>>,
     id_to_addr: Arc<Mutex<LruCache<ActorID, Address>>>,
+    addr_to_actor_type: Arc<Mutex<LruCache<Address, ActorType>>>,
 }
 
 impl<C> AddressCache<C>
@@ -31,6 +33,7 @@ where
             client,
             addr_to_id: Arc::new(Mutex::new(LruCache::with_capacity(capacity))),
             id_to_addr: Arc::new(Mutex::new(LruCache::with_capacity(capacity))),
+            addr_to_actor_type: Arc::new(Mutex::new(LruCache::with_capacity(capacity))),
         }
     }
 
@@ -106,5 +109,55 @@ where
     fn set_addr(&self, id: ActorID, addr: Address) {
         let mut c = self.id_to_addr.lock().unwrap();
         c.insert(id, addr);
+    }
+
+    pub fn set_actor_type_for_addr(&self, addr: Address, actor_type: ActorType) {
+        let mut c = self.addr_to_actor_type.lock().unwrap();
+        c.insert(addr, actor_type);
+    }
+
+    pub fn get_actor_type_from_addr(&self, addr: &Address) -> Option<ActorType> {
+        let mut c = self.addr_to_actor_type.lock().unwrap();
+        c.get(addr).cloned()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::cache::AddressCache;
+    use crate::state::ActorType;
+    use cid::Cid;
+    use fendermint_rpc::FendermintClient;
+    use fvm_shared::address::Address;
+    use std::str::FromStr;
+    use tendermint_rpc::HttpClient;
+
+    #[test]
+    fn test_read_and_write_addr_to_actor_type() {
+        let client = FendermintClient::new(HttpClient::new("http://localhost").unwrap());
+        let addr_cache = AddressCache::new(client.clone(), 1000);
+
+        let address1 = Address::from_str("f410fivboj67m6ut4j6xx3lhc426io22r7l3h6yha5bi").unwrap();
+        let address2 = Address::from_str("f410fmpohbjcmznke3e7pbxomsbg5uae6o2sfjurchxa").unwrap();
+        let address3 = Address::from_str("f410fxbfwpcrgbjg2ab6fevpoi4qlcfosw2vk5kzo5ga").unwrap();
+        let address4 = Address::from_str("f410fggjevhgketpz6gw6ordusynlgcd5piyug4aomuq").unwrap();
+
+        addr_cache.set_actor_type_for_addr(address1, ActorType::EVM);
+        addr_cache.set_actor_type_for_addr(address2, ActorType::Unknown(Cid::default()));
+        addr_cache.set_actor_type_for_addr(address3, ActorType::Inexistent);
+
+        assert_eq!(
+            addr_cache.get_actor_type_from_addr(&address1).unwrap(),
+            ActorType::EVM
+        );
+        assert_eq!(
+            addr_cache.get_actor_type_from_addr(&address2).unwrap(),
+            ActorType::Unknown(Cid::default())
+        );
+        assert_eq!(
+            addr_cache.get_actor_type_from_addr(&address3).unwrap(),
+            ActorType::Inexistent
+        );
+        assert_eq!(addr_cache.get_actor_type_from_addr(&address4), None);
     }
 }

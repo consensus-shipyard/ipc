@@ -29,6 +29,7 @@ use tendermint_rpc::{
 use tendermint_rpc::{Order, Subscription, SubscriptionClient};
 use tokio::sync::mpsc::{Sender, UnboundedSender};
 use tokio::sync::RwLock;
+use tracing::log;
 
 use crate::cache::AddressCache;
 use crate::conv::from_tm;
@@ -442,6 +443,12 @@ where
         height: FvmQueryHeight,
     ) -> JsonRpcResult<ActorType> {
         let addr = to_fvm_address(*address);
+
+        if let Some(actor_type) = self.addr_cache.get_actor_type_from_addr(&addr) {
+            log::debug!("cache contains the result: {:?}, return it", actor_type);
+            return Ok(actor_type);
+        }
+
         let Some((
             _,
             ActorState {
@@ -457,6 +464,8 @@ where
             Some((typ, _)) => ActorType::Known(Cow::Owned(typ)),
             None => ActorType::Unknown(actor_type_cid),
         };
+        log::debug!("put result into cache: {:?} => {:?}", addr, ret);
+        self.addr_cache.set_actor_type_for_addr(addr, ret.clone());
         Ok(ret)
     }
 }
