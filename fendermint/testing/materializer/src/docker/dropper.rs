@@ -25,10 +25,10 @@ pub struct DropPolicy {
 }
 
 impl DropPolicy {
-    /// A completely transient network that aims to drop even what exists,
-    /// assuming it only exists because it was created by it earlier, but
-    /// due to some error it failed to be removed.
-    pub const TRANSIENT: DropPolicy = DropPolicy {
+    /// A network meant to be ephemeral, which aims to drop even what exists,
+    /// assuming it only exists because it was created by itself earlier,
+    /// but due to some error it failed to be removed.
+    pub const EPHEMERAL: DropPolicy = DropPolicy {
         keep_existing: false,
         keep_created: false,
     };
@@ -42,6 +42,11 @@ impl DropPolicy {
 
     /// Policy which only tries to remove artifacts which were created
     /// by this materializer, but leaves existing resources around.
+    /// This can be useful for reading manifests for networks that
+    /// exists outside the tests, run tests agains the containers,
+    /// then leave them around for another round of testing, while
+    /// still maintaining the option of adding some ephemeral resources
+    /// form the test itself.
     pub const DROP_CREATED: DropPolicy = DropPolicy {
         keep_created: false,
         keep_existing: true,
