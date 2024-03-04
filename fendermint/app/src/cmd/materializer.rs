@@ -5,6 +5,7 @@ use std::path::Path;
 
 use anyhow::anyhow;
 use fendermint_app_options::materializer::*;
+use fendermint_app_settings::utils::expand_tilde;
 use fendermint_materializer::{
     docker::{DockerMaterializer, DropPolicy},
     manifest::Manifest,
@@ -16,7 +17,8 @@ use crate::cmd;
 
 cmd! {
   MaterializerArgs(self) {
-    let m = || DockerMaterializer::new(&self.data_dir, self.seed).map(|m| m.with_policy(DropPolicy::PERSISTENT));
+    let d = expand_tilde(&self.data_dir);
+    let m = || DockerMaterializer::new(&d, self.seed).map(|m| m.with_policy(DropPolicy::PERSISTENT));
     match &self.command {
         MaterializerCommands::Validate(args) => args.exec(()).await,
         MaterializerCommands::Setup(args) => args.exec(m()?).await,
