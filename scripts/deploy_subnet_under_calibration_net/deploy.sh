@@ -231,10 +231,6 @@ sleep 30
 echo "Finished waiting"
 
 cd ${IPC_FOLDER}
-cargo make --makefile infra/fendermint/Makefile.toml \
-    -e NODE_NAME=validator-0 \
-    -e FM_PULL_SKIP=1 \
-    child-validator-down
 bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=validator-0 \
     -e PRIVATE_KEY_PATH=${IPC_CONFIG_FOLDER}/validator_0.sk \
@@ -266,10 +262,6 @@ echo "$DASHES Start the other validator nodes"
 cd ${IPC_FOLDER}
 for i in {1..2}
 do
-  cargo make --makefile infra/fendermint/Makefile.toml \
-      -e NODE_NAME=validator-${i} \
-      -e FM_PULL_SKIP=1 \
-      child-validator-down
   cargo make --makefile infra/fendermint/Makefile.toml \
       -e NODE_NAME=validator-${i} \
       -e PRIVATE_KEY_PATH=${IPC_CONFIG_FOLDER}/validator_${i}.sk \
