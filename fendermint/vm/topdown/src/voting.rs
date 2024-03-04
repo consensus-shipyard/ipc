@@ -380,6 +380,7 @@ pub async fn publish_vote_loop<V, F>(
             Ok(Ok(vs)) => vs,
             Err(_) => {
                 if let Some(ref vs) = prev {
+                    tracing::debug!("vote timeout; re-publishing previous vote");
                     vs.clone()
                 } else {
                     tracing::debug!("vote timeout, but no previous vote to re-publish");
