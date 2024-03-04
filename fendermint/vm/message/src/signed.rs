@@ -290,6 +290,7 @@ fn maybe_eth_address(addr: &Address) -> Option<et::H160> {
 ///
 /// The method ID is not part of the signature, so someone could modify it, which is
 /// why we have to check explicitly that there is nothing untowards going on.
+#[allow(dead_code)]
 fn verify_eth_method(msg: &Message) -> Result<(), SignedMessageError> {
     if msg.to == eam::EAM_ACTOR_ADDR {
         if msg.method_num != eam::Method::CreateExternal as u64 {
