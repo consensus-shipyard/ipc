@@ -123,7 +123,7 @@ impl DefaultAccount {
             export(&acc.path, "secret", "hex", hex::encode(sk))?;
             export(&acc.path, "public", "b64", to_b64(pk.as_ref()))?;
             export(&acc.path, "public", "hex", hex::encode(pk))?;
-            export(&acc.path, "eth-addr", "", acc.eth_addr().to_string())?;
+            export(&acc.path, "eth-addr", "", format!("{:?}", acc.eth_addr()))?;
             export(&acc.path, "fvm-addr", "", acc.fvm_addr().to_string())?;
         }
 

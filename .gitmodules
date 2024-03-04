@@ -25,3 +25,9 @@
 [submodule "extras/axelar-token/lib/forge-std"]
 	path = extras/axelar-token/lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
+[submodule "extras/linked-token/lib/forge-std"]
+	path = extras/linked-token/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
+[submodule "extras/linked-token/lib/openzeppelin-contracts"]
+	path = extras/linked-token/lib/openzeppelin-contracts
+	url = https://github.com/openzeppelin/openzeppelin-contracts

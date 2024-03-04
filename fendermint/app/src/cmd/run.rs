@@ -174,6 +174,7 @@ async fn run(ipfs_addr: String, settings: Settings) -> anyhow::Result<()> {
                     publish_vote_loop(
                         parent_finality_votes,
                         settings.ipc.vote_interval,
+                        settings.ipc.vote_timeout,
                         key,
                         own_subnet_id,
                         client,
@@ -368,6 +369,7 @@ fn make_ipc_provider_proxy(settings: &Settings) -> anyhow::Result<IPCProviderPro
                 .to_string()
                 .parse()
                 .unwrap(),
+            provider_timeout: topdown_config.parent_http_timeout,
             auth_token: None,
             registry_addr: topdown_config.parent_registry,
             gateway_addr: topdown_config.parent_gateway,

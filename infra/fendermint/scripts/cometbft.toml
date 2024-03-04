@@ -173,6 +173,10 @@ echo $id@${NODE_EXTERNAL_IP}:${CMT_P2P_HOST_PORT}
 env = { "CONTAINER_NAME" = "${CMT_CONTAINER_NAME}" }
 run_task = "docker-destroy"
 
+[tasks.cometbft-stop]
+env = { "CONTAINER_NAME" = "${CMT_CONTAINER_NAME}" }
+run_task = "docker-stop"
+
 [tasks.cometbft-logs]
 extend = "docker-logs"
 env = { "CONTAINER_NAME" = "${CMT_CONTAINER_NAME}" }

@@ -322,7 +322,10 @@ where
 /// Poll the vote tally for new finalized blocks and publish a vote about them if the validator is part of the power table.
 pub async fn publish_vote_loop<V, F>(
     vote_tally: VoteTally,
+    // Throttle votes to maximum 1/interval
     vote_interval: Duration,
+    // Publish a vote after a timeout even if it's the same as before.
+    vote_timeout: Duration,
     key: libp2p::identity::Keypair,
     subnet_id: ipc_api::subnet_id::SubnetID,
     client: ipc_ipld_resolver::Client<V>,
@@ -336,46 +339,69 @@ pub async fn publish_vote_loop<V, F>(
     let mut vote_interval = tokio::time::interval(vote_interval);
     vote_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
-    let mut prev_height = 0;
+    let mut prev = None;
 
     loop {
-        let result = atomically_or_err(|| {
-            let next_height = vote_tally.latest_height()?;
+        let prev_height = prev
+            .as_ref()
+            .map(|(height, _, _)| *height)
+            .unwrap_or_default();
 
-            if next_height == prev_height {
-                retry()?;
-            }
+        let result = tokio::time::timeout(
+            vote_timeout,
+            atomically_or_err(|| {
+                let next_height = vote_tally.latest_height()?;
 
-            let next_hash = match vote_tally.block_hash(next_height)? {
-                Some(next_hash) => next_hash,
-                None => retry()?,
-            };
+                if next_height == prev_height {
+                    retry()?;
+                }
 
-            let has_power = vote_tally.has_power(&validator_key)?;
+                let next_hash = match vote_tally.block_hash(next_height)? {
+                    Some(next_hash) => next_hash,
+                    None => retry()?,
+                };
 
-            if has_power {
-                // Add our own vote to the tally directly rather than expecting a message from the gossip channel.
-                // TODO (ENG-622): I'm not sure gossip messages published by this node would be delivered to it, so this might be the only way.
-                // NOTE: We should not see any other error from this as we just checked that the validator had power,
-                //       but for piece of mind let's return and log any potential errors, rather than ignore them.
-                vote_tally.add_vote(validator_key.clone(), next_height, next_hash.clone())?;
-            }
+                let has_power = vote_tally.has_power(&validator_key)?;
 
-            Ok((next_height, next_hash, has_power))
-        })
+                if has_power {
+                    // Add our own vote to the tally directly rather than expecting a message from the gossip channel.
+                    // TODO (ENG-622): I'm not sure gossip messages published by this node would be delivered to it, so this might be the only way.
+                    // NOTE: We should not see any other error from this as we just checked that the validator had power,
+                    //       but for piece of mind let's return and log any potential errors, rather than ignore them.
+                    vote_tally.add_vote(validator_key.clone(), next_height, next_hash.clone())?;
+                }
+
+                Ok((next_height, next_hash, has_power))
+            }),
+        )
         .await;
 
         let (next_height, next_hash, has_power) = match result {
-            Ok(vs) => vs,
-            Err(e) => {
-                tracing::error!(error = e.to_string(), "faled to get next height to vote on");
+            Ok(Ok(vs)) => vs,
+            Err(_) => {
+                if let Some(ref vs) = prev {
+                    tracing::debug!("vote timeout; re-publishing previous vote");
+                    vs.clone()
+                } else {
+                    tracing::debug!("vote timeout, but no previous vote to re-publish");
+                    continue;
+                }
+            }
+            Ok(Err(e)) => {
+                tracing::error!(
+                    error = e.to_string(),
+                    "failed to get next height to vote on"
+                );
                 continue;
             }
         };
 
         if has_power && prev_height > 0 {
             tracing::debug!(block_height = next_height, "publishing finality vote");
-            match VoteRecord::signed(&key, subnet_id.clone(), to_vote(next_height, next_hash)) {
+
+            let vote = to_vote(next_height, next_hash.clone());
+
+            match VoteRecord::signed(&key, subnet_id.clone(), vote) {
                 Ok(vote) => {
                     if let Err(e) = client.publish_vote(vote) {
                         tracing::error!(error = e.to_string(), "failed to publish vote");
@@ -393,6 +419,6 @@ pub async fn publish_vote_loop<V, F>(
             vote_interval.tick().await;
         }
 
-        prev_height = next_height;
+        prev = Some((next_height, next_hash, has_power));
     }
 }

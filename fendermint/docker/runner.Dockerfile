@@ -7,7 +7,7 @@
 FROM debian:bookworm-slim
 
 RUN apt-get update && \
-  apt-get install -y libssl3 ca-certificates && \
+  apt-get install -y libssl3 ca-certificates curl && \
   rm -rf /var/lib/apt/lists/*
 
 ENV FM_HOME_DIR=/fendermint
@@ -15,6 +15,8 @@ ENV HOME=$FM_HOME_DIR
 WORKDIR $FM_HOME_DIR
 
 EXPOSE 26658
+EXPOSE 8445
+EXPOSE 8001
 
 ENTRYPOINT ["docker-entry.sh"]
 CMD ["run"]

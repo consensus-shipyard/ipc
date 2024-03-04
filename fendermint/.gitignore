@@ -4,6 +4,8 @@ docker/.artifacts
 docker/Dockerfile
 cometbft
 test-network
+testing/materializer/tests/docker-materializer-data
 .idea
 .make
 .contracts-gen
+.vscode
