@@ -26,7 +26,7 @@ library LibQuorum {
         bytes32[] memory membershipProof,
         uint256 weight,
         bytes memory signature
-    ) internal {
+    ) internal returns (bool isQuorumReached) {
         // get quorum info for height
         QuorumInfo storage info = self.quorumInfo[height];
 
@@ -73,6 +73,7 @@ library LibQuorum {
                     objHash: info.hash,
                     quorumWeight: info.currentWeight
                 });
+                return true;
             } else {
                 emit QuorumWeightUpdated({
                     objKind: self.quorumObjKind,
@@ -82,6 +83,7 @@ library LibQuorum {
                 });
             }
         }
+        return false;
     }
 
     /// @notice creates the quorum info from a quorum object.

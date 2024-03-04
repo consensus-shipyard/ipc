@@ -15,8 +15,8 @@ struct GatewayActorStorage {
     uint256 latestParentHeight;
     /// @notice bottom-up period in number of epochs for the subnet
     uint256 bottomUpCheckPeriod;
-    /// @notice bottom-up message batch period in number of epochs for the subnet
-    uint256 bottomUpMsgBatchPeriod;
+    /// @notice the previous bottom-up checkpoint height committed
+    uint256 prevBottomUpCheckpointHeight;
     /// @notice nonce for bottom-up messages
     uint64 bottomUpNonce;
     /// @notice AppliedNonces keep track of the next nonce of the message to be applied.
