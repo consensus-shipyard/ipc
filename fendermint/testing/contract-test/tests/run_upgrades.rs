@@ -38,7 +38,7 @@ fn my_secret_key() -> SecretKey {
 #[tokio::test]
 async fn test_applying_upgrades() {
     use bytes::Bytes;
-    use fendermint_rpc::message::{GasParams, MessageFactory};
+    use fendermint_rpc::message::{GasParams, SignedMessageFactory};
     use lazy_static::lazy_static;
 
     lazy_static! {
@@ -69,7 +69,8 @@ async fn test_applying_upgrades() {
                 );
 
                 // create a message for deploying the contract
-                let mut mf = MessageFactory::new_secp256k1(my_secret_key(), 1, state.chain_id());
+                let mut mf =
+                    SignedMessageFactory::new_secp256k1(my_secret_key(), 1, state.chain_id());
                 let message = match mf
                     .fevm_create(
                         Bytes::from(
@@ -130,7 +131,8 @@ async fn test_applying_upgrades() {
                 );
 
                 // create a message for sending the balance
-                let mut mf = MessageFactory::new_secp256k1(my_secret_key(), 1, state.chain_id());
+                let mut mf =
+                    SignedMessageFactory::new_secp256k1(my_secret_key(), 1, state.chain_id());
                 let message = match mf
                     .fevm_invoke(
                         Address::from_str(CONTRACT_ADDRESS).unwrap(),
@@ -172,7 +174,8 @@ async fn test_applying_upgrades() {
                 let call =
                     simple_coin.get_balance(EthAddress::from(my_secret_key().public_key()).into());
 
-                let mut mf = MessageFactory::new_secp256k1(my_secret_key(), 1, state.chain_id());
+                let mut mf =
+                    SignedMessageFactory::new_secp256k1(my_secret_key(), 1, state.chain_id());
                 let message = match mf
                     .fevm_invoke(
                         Address::from_str(CONTRACT_ADDRESS).unwrap(),
