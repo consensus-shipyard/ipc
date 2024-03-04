@@ -1203,7 +1203,8 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             blockHeight: batch.blockHeight,
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
-            msgs: batch.msgs
+            msgs: batch.msgs,
+            prevHeight: 0
         });
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
@@ -1232,7 +1233,8 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             blockHeight: e,
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
-            msgs: msgs
+            msgs: msgs,
+            prevHeight: 0
         });
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);

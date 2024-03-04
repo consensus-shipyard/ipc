@@ -681,7 +681,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHeight: saDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
-            msgs: msgs
+            msgs: msgs,
+            prevHeight: 0
         });
 
         BottomUpCheckpoint memory checkpointWithIncorrectHeight = BottomUpCheckpoint({
@@ -689,7 +690,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHeight: 1,
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
-            msgs: msgs
+            msgs: msgs,
+            prevHeight: 0
         });
 
         vm.deal(address(saDiamond), 100 ether);
@@ -774,7 +776,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHeight: saDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
-            msgs: msgs
+            msgs: msgs,
+            prevHeight: 0
         });
 
         vm.deal(address(saDiamond), 100 ether);
@@ -816,7 +819,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHeight: 2 * saDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
-            msgs: msgs
+            msgs: msgs,
+            prevHeight: 0
         });
 
         hash = keccak256(abi.encode(checkpoint));

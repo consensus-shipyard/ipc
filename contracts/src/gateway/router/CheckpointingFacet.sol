@@ -17,8 +17,6 @@ import {CrossMsgHelper} from "../../lib/CrossMsgHelper.sol";
 import {IpcEnvelope, SubnetID} from "../../structs/CrossNet.sol";
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
 
-import "forge-std/Test.sol";
-
 contract CheckpointingFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for IpcEnvelope;
@@ -62,29 +60,33 @@ contract CheckpointingFacet is GatewayActorModifiers {
         //    revert InvalidCheckpointEpoch();
         // }
         //
-        // First of all, the check is buggy in the first place as it does not support 
-        // a full message batch before a checkpoint period is reached. 
+        // First of all, the check is buggy in the first place as it does not support
+        // a full message batch before a checkpoint period is reached.
         // Then, `prevBottomUpCheckpointHeight` is introduced, as long as BU checkpoints
         // can form a chain, it should be fine.
-        // 
+        //
         // Instead, one can add the following check:
         //
         // if (checkpoint.prevHeight != s.prevBottomUpCheckpointHeight) {
         //     revert InvalidCheckpointEpoch();
         // }
         //
-        // However, we are restricting to ONLY sequential creation 
+        // However, we are restricting to ONLY sequential creation
         // of bottom up checkpoints. One can only submit the next one if the current
         // checkpoint quorum is reached. This would slow down the creation process.
         //
-        // Or we can enforce (checkpoint.msgs.length != 0 || s.prevConfigNumber < checkpoint.nextConfigurationNumber)
+        // Or we can enforce:
+        //
+        // checkpoint.msgs.length != 0 || s.prevConfigNumber < checkpoint.nextConfigurationNumber
+        //
         // so that no empty checkpoint will be created. The drawback is we might have long block intervals with
         // no checkpoints at all. We can get around this with some `maxBUGap` or something along this line, so that
-        // when no bottom up checkpoints, we dont allow long gap where there is no bottom up checkpoints.
+        // when no bottom up checkpoints, we dont allow long gap where there is no bottom up checkpoints. This also
+        // has sequential submission restriction
         //
         // Or we dont enforce any check at all here, so that we let the child subnet decide whatever checkpoint
         // the validator wants to create, but as long as quorum is reached and submitted to the parent, the parent
-        // will enforce checkpoints are sequential.
+        // will enforce checkpoints are sequential. This initial implementation took this approach.
 
         if (LibGateway.bottomUpCheckpointExists(checkpoint.blockHeight)) {
             revert CheckpointAlreadyExists();

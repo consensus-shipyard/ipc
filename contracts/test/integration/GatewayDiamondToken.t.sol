@@ -163,7 +163,8 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
             blockHash: blockhash(block.number),
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             nextConfigurationNumber: 0,
-            msgs: msgs
+            msgs: msgs,
+            prevHeight: 0
         });
 
         vm.prank(address(saDiamond));
@@ -221,7 +222,8 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
             blockHash: blockhash(block.number),
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             nextConfigurationNumber: 0,
-            msgs: msgs
+            msgs: msgs,
+            prevHeight: 0
         });
 
         // Verify that we received the call and that the recipient has the tokens.

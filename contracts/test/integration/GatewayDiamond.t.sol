@@ -1047,7 +1047,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             blockHeight: 0,
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 1,
-            msgs: new IpcEnvelope[](0)
+            msgs: new IpcEnvelope[](0),
+            prevHeight: 0
         });
 
         BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
@@ -1055,7 +1056,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 1,
-            msgs: new IpcEnvelope[](0)
+            msgs: new IpcEnvelope[](0),
+            prevHeight: 0
         });
 
         // failed to create a checkpoint with zero membership weight
@@ -1096,7 +1098,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             blockHeight: d,
             blockHash: keccak256("block"),
             nextConfigurationNumber: 2,
-            msgs: new IpcEnvelope[](0)
+            msgs: new IpcEnvelope[](0),
+            prevHeight: 0
         });
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
@@ -1108,17 +1111,17 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         );
         vm.stopPrank();
 
-        // failed to create a checkpoint with the height not multiple to checkpoint period
+        // now one can create a checkpoint that is not a multiple of checkpoint period
         checkpoint = BottomUpCheckpoint({
             subnetID: gatewayDiamond.getter().getNetworkName(),
             blockHeight: d + d / 2,
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 2,
-            msgs: new IpcEnvelope[](0)
+            msgs: new IpcEnvelope[](0),
+            prevHeight: 0
         });
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        vm.expectRevert(InvalidCheckpointEpoch.selector);
         gatewayDiamond.checkpointer().createBottomUpCheckpoint(
             checkpoint,
             membershipRoot,
@@ -1126,9 +1129,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         );
         vm.stopPrank();
 
-        (bool ok, uint256 e, ) = gatewayDiamond.getter().getCurrentBottomUpCheckpoint();
-        require(ok, "checkpoint not exist");
-        require(e == d, "out height incorrect");
+        BottomUpCheckpoint memory c = gatewayDiamond.getter().bottomUpCheckpoint(d + d / 2);
+        require(c.blockHeight == d + d / 2, "out height incorrect");
     }
 
     function testGatewayDiamond_commitBottomUpCheckpoint_InvalidCheckpointSource() public {
@@ -1137,7 +1139,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 1,
-            msgs: new IpcEnvelope[](0)
+            msgs: new IpcEnvelope[](0),
+            prevHeight: 0
         });
 
         vm.expectRevert(InvalidCheckpointSource.selector);
@@ -1158,7 +1161,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 1,
-            msgs: new IpcEnvelope[](0)
+            msgs: new IpcEnvelope[](0),
+            prevHeight: 0
         });
 
         vm.prank(caller);
@@ -1204,7 +1208,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 1,
-            msgs: msgs
+            msgs: msgs,
+            prevHeight: 0
         });
 
         vm.prank(caller);
@@ -1224,7 +1229,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 1,
-            msgs: new IpcEnvelope[](0)
+            msgs: new IpcEnvelope[](0),
+            prevHeight: 0
         });
 
         BottomUpCheckpoint memory checkpoint2 = BottomUpCheckpoint({
@@ -1232,7 +1238,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             blockHeight: 2 * gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 1,
-            msgs: new IpcEnvelope[](0)
+            msgs: new IpcEnvelope[](0),
+            prevHeight: 0
         });
 
         // create a checkpoint
@@ -1296,7 +1303,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block"),
             nextConfigurationNumber: 1,
-            msgs: new IpcEnvelope[](0)
+            msgs: new IpcEnvelope[](0),
+            prevHeight: 0
         });
 
         // create a checkpoint
@@ -1357,7 +1365,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block"),
             nextConfigurationNumber: 1,
-            msgs: new IpcEnvelope[](0)
+            msgs: new IpcEnvelope[](0),
+            prevHeight: 0
         });
 
         // create a checkpoint
@@ -1440,7 +1449,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block"),
             nextConfigurationNumber: 1,
-            msgs: new IpcEnvelope[](0)
+            msgs: new IpcEnvelope[](0),
+            prevHeight: 0
         });
 
         // create a checkpoint
@@ -1474,7 +1484,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block"),
             nextConfigurationNumber: 1,
-            msgs: new IpcEnvelope[](0)
+            msgs: new IpcEnvelope[](0),
+            prevHeight: 0
         });
 
         // create a checkpoint
@@ -1514,6 +1525,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             .createMerkleProofsForValidators(addrs, weights);
 
         BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
+            prevHeight: 0,
             subnetID: gatewayDiamond.getter().getNetworkName(),
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block"),
@@ -1566,7 +1578,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
                 blockHeight: i * gatewayDiamond.getter().bottomUpCheckPeriod(),
                 blockHash: keccak256("block"),
                 nextConfigurationNumber: 1,
-                msgs: new IpcEnvelope[](0)
+                msgs: new IpcEnvelope[](0),
+                prevHeight: (i - 1) * gatewayDiamond.getter().bottomUpCheckPeriod()
             });
 
             gatewayDiamond.checkpointer().createBottomUpCheckpoint(checkpoint, membershipRoot, 10);
@@ -1629,7 +1642,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 1,
-            msgs: msgs
+            msgs: msgs,
+            prevHeight: 0
         });
 
         vm.prank(caller);
