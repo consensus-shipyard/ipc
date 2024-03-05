@@ -443,4 +443,19 @@ mod tests {
         }
         Ok(())
     }
+
+    /// Check that we can send from an ethereum account to a non-ethereum one and sign it.
+    #[quickcheck]
+    fn eth_to_non_eth_sign_and_verify(msg: EthMessage, chain_id: u64, from: KeyPair, to: KeyPair) {
+        let chain_id = ChainID::from(chain_id);
+        let mut msg = msg.0;
+
+        msg.from = Address::from(EthAddress::from(from.pk));
+        msg.to = Address::new_secp256k1(&to.pk.serialize()).expect("f1 address");
+
+        let signed =
+            SignedMessage::new_secp256k1(msg, &from.sk, &chain_id).expect("message can be signed");
+
+        signed.verify(&chain_id).expect("signature should be valid")
+    }
 }
