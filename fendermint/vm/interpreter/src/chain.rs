@@ -417,8 +417,8 @@ where
                 IpcMessage::ObjectResolved(obj) => {
                     let from = system::SYSTEM_ACTOR_ADDR;
                     let to = objectstore::OBJECTSTORE_ACTOR_ADDR;
-                    let method_num = fendermint_actor_objectstore::Method::PutObject as u64;
-                    let gas_limit = 10_000_000_000;
+                    let method_num = fendermint_actor_objectstore::Method::ResolveObject as u64;
+                    let gas_limit = 10_000_000_000; // max
 
                     // TODO(sander): Clean up with From.
                     let input = fendermint_actor_objectstore::ObjectParams {
@@ -432,7 +432,7 @@ where
                         to,
                         sequence: 0, // TODO(sander): This works but is it okay?
                         value: TokenAmount::zero(),
-                        method_num: fendermint_actor_objectstore::Method::ResolveObject as u64,
+                        method_num,
                         params,
                         gas_limit,
                         gas_fee_cap: TokenAmount::zero(),

@@ -47,10 +47,10 @@ fendermint_testing = { path = "../../testing", features = ["golden"] }
 
 [features]
 arb = [
-  "arbitrary",
-  "quickcheck",
-  "fvm_shared/arb",
-  "cid/arb",
-  "rand",
-  "fendermint_testing/arb",
+    "arbitrary",
+    "quickcheck",
+    "fvm_shared/arb",
+    "cid/arb",
+    "rand",
+    "fendermint_testing/arb",
 ]

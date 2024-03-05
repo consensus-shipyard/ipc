@@ -1,0 +1,5 @@
+[resolver.connection]
+listen_addr = "/ip4/127.0.0.1/tcp/3001"
+
+[ipc]
+subnet_id = "/r31415926"

@@ -11,12 +11,13 @@
 # cargo make teardown
 
 extend = [
-  { path = "../../../infra/fendermint/scripts/docker.toml" },
-  { path = "../../../infra/fendermint/scripts/cometbft.toml" },
-  { path = "../../../infra/fendermint/scripts/ethapi.toml" },
-  { path = "../../../infra/fendermint/scripts/fendermint.toml" },
-  { path = "../../../infra/fendermint/scripts/promtail.toml" },
-  { path = "./fendermint.toml" },
+    { path = "../../../infra/fendermint/scripts/docker.toml" },
+    { path = "../../../infra/fendermint/scripts/cometbft.toml" },
+    { path = "../../../infra/fendermint/scripts/ethapi.toml" },
+    { path = "../../../infra/fendermint/scripts/fendermint.toml" },
+    { path = "../../../infra/fendermint/scripts/promtail.toml" },
+    { path = "../../../infra/fendermint/scripts/ipfs.toml" },
+    { path = "./fendermint.toml" },
 ]
 
 
@@ -32,28 +33,29 @@ extend = [
 [tasks.default]
 clear = true
 run_task = { name = [
-  "setup",
-  "test",
+    "setup",
+    "test",
 ], fork = true, cleanup_task = "teardown" }
 
 # Waiting before starting the Eth API for the CometBFT websocket to start listening.
 [tasks.setup]
 dependencies = [
-  "create-log-volume",
-  "test-data-dir",
-  "test-data-env",
-  "test-node-dir",
-  "docker-network-create",
-  "cometbft-init",
-  "fendermint-init",
-  "fendermint-start",
-  "cometbft-start",
-  "ethapi-start",
-  "cometbft-wait",
-  "promtail-start",
-  "fendermint-logs",
-  "cometbft-logs",
-  "ethapi-logs",
+    "create-log-volume",
+    "test-data-dir",
+    "test-data-env",
+    "test-node-dir",
+    "docker-network-create",
+    "cometbft-init",
+    "fendermint-init",
+    "fendermint-start",
+    "cometbft-start",
+    "ethapi-start",
+    "ipfs-start",
+    "cometbft-wait",
+    "promtail-start",
+    "fendermint-logs",
+    "cometbft-logs",
+    "ethapi-logs",
 ]
 
 [tasks.test]
@@ -63,13 +65,14 @@ dependencies = []
 [tasks.teardown]
 # `dependencies` doesn't seem to work with `cleanup_task`.
 run_task = { name = [
-  "cometbft-destroy",
-  "fendermint-destroy",
-  "ethapi-destroy",
-  "promtail-destroy",
-  "docker-network-rm",
-  "test-data-dir-rm",
-  "destroy-log-volume",
+    "cometbft-destroy",
+    "fendermint-destroy",
+    "ethapi-destroy",
+    "ipfs-destroy",
+    "promtail-destroy",
+    "docker-network-rm",
+    "test-data-dir-rm",
+    "destroy-log-volume",
 ] }
 
 
