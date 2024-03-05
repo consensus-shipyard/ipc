@@ -57,7 +57,6 @@ fendermint_vm_message = { path = "../vm/message" }
 fendermint_vm_resolver = { path = "../vm/resolver" }
 fendermint_vm_snapshot = { path = "../vm/snapshot" }
 fendermint_vm_topdown = { path = "../vm/topdown" }
-fendermint_vm_upgrade_scheduler = { path = "../vm/upgrade_scheduler" }
 
 fvm = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }
