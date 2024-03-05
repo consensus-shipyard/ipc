@@ -733,3 +733,40 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         todo!("docker run relayer unless it is already running")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use fendermint_vm_actor_interface::ipc;
+    use ipc_api::subnet_id::SubnetID;
+    use ipc_provider::config::subnet::{
+        EVMSubnet, Subnet as IpcCliSubnet, SubnetConfig as IpcCliSubnetConfig,
+    };
+    use ipc_provider::config::Config as IpcCliConfig;
+    use std::time::Duration;
+
+    #[test]
+    fn test_ipc_cli_config_toml_roundtrip() {
+        let mut config0 = IpcCliConfig {
+            keystore_path: Some("~/.ipc".to_string()),
+            subnets: Default::default(),
+        };
+
+        config0.add_subnet(IpcCliSubnet {
+            id: SubnetID::new_root(12345),
+            config: IpcCliSubnetConfig::Fevm(EVMSubnet {
+                provider_http: url::Url::parse("http://example.net").unwrap(),
+                provider_timeout: Some(Duration::from_secs(30)),
+                auth_token: None,
+                registry_addr: ipc::SUBNETREGISTRY_ACTOR_ADDR,
+                gateway_addr: ipc::GATEWAY_ACTOR_ADDR,
+            }),
+        });
+
+        let config_toml = toml::to_string_pretty(&config0).expect("failed to serialize");
+        eprintln!("{config_toml}");
+
+        let config1 = IpcCliConfig::from_toml_str(&config_toml).expect("failed to deserialize");
+
+        assert_eq!(config0, config1);
+    }
+}
