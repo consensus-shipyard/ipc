@@ -27,7 +27,6 @@ use fendermint_vm_genesis::{Account, Actor, ActorMeta, Genesis, PermissionMode, 
 use fendermint_vm_interpreter::fvm::store::memory::MemoryBlockstore;
 use fendermint_vm_interpreter::fvm::upgrades::{Upgrade, UpgradeScheduler};
 use fendermint_vm_interpreter::fvm::{bundle::contracts_path, FvmMessageInterpreter};
-use fendermint_vm_message::chain::ChainMessage;
 
 // returns a seeded secret key which is guaranteed to be the same every time
 fn my_secret_key() -> SecretKey {
@@ -38,16 +37,17 @@ fn my_secret_key() -> SecretKey {
 #[tokio::test]
 async fn test_applying_upgrades() {
     use bytes::Bytes;
-    use fendermint_rpc::message::{GasParams, SignedMessageFactory};
+    use fendermint_rpc::message::{GasParams, MessageFactory};
     use lazy_static::lazy_static;
 
     lazy_static! {
-        /// Default gas params based on the testkit.
-        static ref GAS_PARAMS: GasParams = GasParams {
-            gas_limit: 10_000_000_000,
-            gas_fee_cap: TokenAmount::default(),
-            gas_premium: TokenAmount::default(),
-        };
+       /// Default gas params based on the testkit.
+       static ref GAS_PARAMS: GasParams = GasParams {
+           gas_limit: 10_000_000_000,
+           gas_fee_cap: TokenAmount::default(),
+           gas_premium: TokenAmount::default(),
+       };
+       static ref ADDR: Address = Address::new_secp256k1(&my_secret_key().public_key().serialize()).unwrap();
     }
 
     // this is the contract we want to deploy
@@ -58,20 +58,20 @@ async fn test_applying_upgrades() {
     const CONTRACT_ADDRESS: &str = "f410fnz5jdky3zzcj6pejqkomkggw72pcuvkpihz2rwa";
     // the amount we want to send to the contract
     const SEND_BALANCE_AMOUNT: u64 = 1000;
+    const CHAIN_NAME: &str = "mychain";
 
     let mut upgrade_scheduler = UpgradeScheduler::new();
     upgrade_scheduler
         .add(
-            Upgrade::new("mychain", 1, Some(1), |state| {
+            Upgrade::new(CHAIN_NAME, 1, Some(1), |state| {
                 println!(
                     "[Upgrade at height {}] Deploy simple contract",
                     state.block_height()
                 );
 
                 // create a message for deploying the contract
-                let mut mf =
-                    SignedMessageFactory::new_secp256k1(my_secret_key(), 1, state.chain_id());
-                let message = match mf
+                let mut mf = MessageFactory::new(*ADDR, 1);
+                let message = mf
                     .fevm_create(
                         Bytes::from(
                             hex::decode(CONTRACT_HEX)
@@ -82,11 +82,7 @@ async fn test_applying_upgrades() {
                         TokenAmount::default(),
                         GAS_PARAMS.clone(),
                     )
-                    .unwrap()
-                {
-                    ChainMessage::Signed(signed) => signed.into_message(),
-                    _ => panic!("unexpected message type"),
-                };
+                    .unwrap();
 
                 // execute the message
                 let (res, _) = state.execute_implicit(message).unwrap();
@@ -114,7 +110,7 @@ async fn test_applying_upgrades() {
 
     upgrade_scheduler
         .add(
-            Upgrade::new("mychain", 2, None, |state| {
+            Upgrade::new(CHAIN_NAME, 2, None, |state| {
                 println!(
                     "[Upgrade at height {}] Sends a balance",
                     state.block_height()
@@ -131,20 +127,15 @@ async fn test_applying_upgrades() {
                 );
 
                 // create a message for sending the balance
-                let mut mf =
-                    SignedMessageFactory::new_secp256k1(my_secret_key(), 1, state.chain_id());
-                let message = match mf
+                let mut mf = MessageFactory::new(*ADDR, 1);
+                let message = mf
                     .fevm_invoke(
                         Address::from_str(CONTRACT_ADDRESS).unwrap(),
                         call.calldata().unwrap().0,
                         TokenAmount::default(),
                         GAS_PARAMS.clone(),
                     )
-                    .unwrap()
-                {
-                    ChainMessage::Signed(signed) => signed.into_message(),
-                    _ => panic!("unexpected message type"),
-                };
+                    .unwrap();
 
                 // execute the message
                 let (res, _) = state.execute_implicit(message).unwrap();
@@ -162,7 +153,7 @@ async fn test_applying_upgrades() {
 
     upgrade_scheduler
         .add(
-            Upgrade::new("mychain", 3, None, |state| {
+            Upgrade::new(CHAIN_NAME, 3, None, |state| {
                 println!(
                     "[Upgrade at height {}] Returns a balance",
                     state.block_height()
@@ -174,20 +165,15 @@ async fn test_applying_upgrades() {
                 let call =
                     simple_coin.get_balance(EthAddress::from(my_secret_key().public_key()).into());
 
-                let mut mf =
-                    SignedMessageFactory::new_secp256k1(my_secret_key(), 1, state.chain_id());
-                let message = match mf
+                let mut mf = MessageFactory::new(*ADDR, 1);
+                let message = mf
                     .fevm_invoke(
                         Address::from_str(CONTRACT_ADDRESS).unwrap(),
                         call.calldata().unwrap().0,
                         TokenAmount::default(),
                         GAS_PARAMS.clone(),
                     )
-                    .unwrap()
-                {
-                    ChainMessage::Signed(signed) => signed.into_message(),
-                    _ => panic!("unexpected message type"),
-                };
+                    .unwrap();
 
                 // execute the message
                 let (res, _) = state.execute_implicit(message).unwrap();
@@ -220,24 +206,19 @@ async fn test_applying_upgrades() {
 
     let mut tester = Tester::new(interpreter, MemoryBlockstore::new());
 
-    // include test actor with some balance
-    let actor = Actor {
-        meta: ActorMeta::Account(Account {
-            owner: SignerAddr(
-                Address::new_secp256k1(&my_secret_key().public_key().serialize()).unwrap(),
-            ),
-        }),
-        balance: TokenAmount::from_atto(1000),
-    };
-
     let genesis = Genesis {
-        chain_name: "mychain".to_string(),
+        chain_name: CHAIN_NAME.to_string(),
         timestamp: Timestamp(0),
         network_version: NetworkVersion::V21,
         base_fee: TokenAmount::zero(),
         power_scale: 0,
         validators: Vec::new(),
-        accounts: vec![actor],
+        accounts: vec![Actor {
+            meta: ActorMeta::Account(Account {
+                owner: SignerAddr(*ADDR),
+            }),
+            balance: TokenAmount::from_atto(0),
+        }],
         eam_permission_mode: PermissionMode::Unrestricted,
         ipc: None,
     };
