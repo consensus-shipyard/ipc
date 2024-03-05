@@ -8,7 +8,7 @@ use fvm_shared::econ::TokenAmount;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::{collections::BTreeMap, path::Path};
-use tendermint_rpc::Url;
+use url::Url;
 
 use fendermint_vm_encoding::IsHumanReadable;
 use fendermint_vm_genesis::Collateral;

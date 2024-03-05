@@ -329,11 +329,11 @@ impl ToString for ResourceHash {
 
 pub trait HasEthApi {
     /// URL of the HTTP endpoint, if it's enabled.
-    fn ethapi_http_endpoint(&self) -> Option<String>;
+    fn ethapi_http_endpoint(&self) -> Option<url::Url>;
 
     fn ethapi_http_provider(&self) -> anyhow::Result<Option<Provider<Http>>> {
         match self.ethapi_http_endpoint() {
-            Some(url) => Ok(Some(Provider::<Http>::try_from(url)?)),
+            Some(url) => Ok(Some(Provider::<Http>::try_from(url.to_string())?)),
             None => Ok(None),
         }
     }

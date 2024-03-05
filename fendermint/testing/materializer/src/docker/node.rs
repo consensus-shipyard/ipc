@@ -488,12 +488,13 @@ impl DockerNode {
 }
 
 impl HasEthApi for DockerNode {
-    fn ethapi_http_endpoint(&self) -> Option<String> {
+    fn ethapi_http_endpoint(&self) -> Option<url::Url> {
         self.ethapi.as_ref().map(|_| {
-            format!(
+            url::Url::parse(&format!(
                 "http://127.0.0.1:{}",
                 self.port_range.ethapi_rpc_host_port()
-            )
+            ))
+            .expect("valid url")
         })
     }
 }

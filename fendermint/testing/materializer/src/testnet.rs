@@ -9,7 +9,7 @@ use std::{
     fmt::Display,
     marker::PhantomData,
 };
-use tendermint_rpc::Url;
+use url::Url;
 
 use crate::{
     manifest::{

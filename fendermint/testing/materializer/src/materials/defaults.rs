@@ -15,7 +15,7 @@ use fvm_shared::address::Address;
 use ipc_api::subnet_id::SubnetID;
 
 use super::export;
-use crate::{AccountName, SubnetName};
+use crate::{AccountId, AccountName, SubnetName};
 
 pub struct DefaultDeployment {
     pub name: SubnetName,
@@ -79,6 +79,10 @@ impl Debug for DefaultAccount {
 }
 
 impl DefaultAccount {
+    pub fn account_id(&self) -> AccountId {
+        self.name.0.id()
+    }
+
     pub fn eth_addr(&self) -> EthAddress {
         EthAddress::from(self.public_key)
     }

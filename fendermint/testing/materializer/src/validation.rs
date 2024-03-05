@@ -11,7 +11,7 @@ use std::{
     fmt::Debug,
     ops::{Add, Sub},
 };
-use tendermint_rpc::Url;
+use url::Url;
 
 use crate::{
     logging::LoggingMaterializer,
@@ -246,10 +246,10 @@ impl Materializer<ValidationMaterials> for ValidatingMaterializer {
         Ok(subnet_name.clone())
     }
 
-    fn create_root_subnet<'a>(
+    fn create_root_subnet(
         &mut self,
         subnet_name: &SubnetName,
-        _params: Either<ChainID, &'a VGenesis>,
+        _params: Either<ChainID, &VGenesis>,
     ) -> anyhow::Result<VSubnet> {
         Ok(subnet_name.clone())
     }

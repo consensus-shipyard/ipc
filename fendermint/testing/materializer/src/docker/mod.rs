@@ -22,22 +22,27 @@ use fendermint_vm_genesis::{
 };
 use fvm_shared::{bigint::Zero, chainid::ChainID, econ::TokenAmount, version::NetworkVersion};
 use ipc_api::subnet_id::SubnetID;
+use ipc_provider::config::subnet::{
+    EVMSubnet, Subnet as IpcCliSubnet, SubnetConfig as IpcCliSubnetConfig,
+};
+use ipc_provider::config::Config as IpcCliConfig;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
+    time::Duration,
 };
-use tendermint_rpc::Url;
+use url::Url;
 
 use crate::{
     manifest::Balance,
-    materializer::{Materializer, NodeConfig, SubmitConfig, SubnetConfig},
+    materializer::{Materializer, NodeConfig, SubmitConfig, SubnetConfig, TargetConfig},
     materials::{
         export_json, export_script, import_json, DefaultAccount, DefaultDeployment, DefaultGenesis,
         DefaultSubnet, Materials,
     },
-    NodeName, RelayerName, ResourceHash, ResourceName, SubnetName, TestnetName,
+    HasEthApi, NodeName, RelayerName, ResourceHash, ResourceName, SubnetName, TestnetName,
 };
 
 mod container;
@@ -286,6 +291,32 @@ impl DockerMaterializer {
         Ok(())
     }
 
+    /// Update the config file of the `ipc-cli` in a given testnet.
+    fn update_ipc_cli_config<F, T>(&mut self, testnet_name: &TestnetName, f: F) -> anyhow::Result<T>
+    where
+        F: FnOnce(&mut IpcCliConfig) -> T,
+    {
+        let file_name = self.ipc_dir(testnet_name).join("config.toml");
+
+        let mut config = if !file_name.exists() {
+            IpcCliConfig {
+                keystore_path: Some("~/.ipc".to_string()),
+                subnets: Default::default(),
+            }
+        } else {
+            IpcCliConfig::from_file(&file_name).context("failed to read ipc-cli config")?
+        };
+
+        let value = f(&mut config);
+
+        let config_toml =
+            toml::to_string_pretty(&config).context("failed to serialize ipc-cli config")?;
+
+        std::fs::write(&file_name, config_toml).context("failed to write ipc-cli config")?;
+
+        Ok(value)
+    }
+
     /// Update the state, save it to JSON, then return whatever value the update returns.
     fn update_state<F, T>(&mut self, f: F) -> anyhow::Result<T>
     where
@@ -347,11 +378,19 @@ impl DockerMaterializer {
         Ok(range)
     }
 
+    fn ipc_dir(&self, testnet_name: &TestnetName) -> PathBuf {
+        self.path(testnet_name).join(".ipc")
+    }
+
+    fn accounts_dir(&self, testnet_name: &TestnetName) -> PathBuf {
+        self.path(testnet_name).join("accounts")
+    }
+
     /// Create an instance of an `ipc-cli` command runner.
     fn ipc_cli_runner(&self, testnet_name: &TestnetName) -> anyhow::Result<DockerRunner> {
         // Create a directory to hold the wallet.
-        let ipc_dir = self.path(testnet_name).join(".ipc");
-        let accounts_dir = self.path(testnet_name).join("accounts");
+        let ipc_dir = self.ipc_dir(testnet_name);
+        let accounts_dir = self.accounts_dir(testnet_name);
         // Create a `~/.ipc` directory, as expected by default by the `ipc-cli`.
         std::fs::create_dir_all(&ipc_dir).context("failed to create .ipc dir")?;
         // Use the owner of the directory for the container, so we don't get permission issues.
@@ -494,10 +533,10 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         })
     }
 
-    fn create_root_subnet<'a>(
+    fn create_root_subnet(
         &mut self,
         subnet_name: &SubnetName,
-        params: Either<ChainID, &'a DefaultGenesis>,
+        params: Either<ChainID, &DefaultGenesis>,
     ) -> anyhow::Result<DefaultSubnet> {
         let subnet_id = match params {
             Either::Left(id) => SubnetID::new_root(id.into()),
@@ -570,10 +609,11 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
-        let runner = self.ipc_cli_runner(&subnet_name.testnet())?;
+        let testnet_name = subnet_name.testnet();
+        let runner = self.ipc_cli_runner(&testnet_name)?;
 
-        let account_id = subnet_config.creator.name.0.id();
-        let account_id = account_id.as_ref();
+        let account_id = subnet_config.creator.account_id();
+        let account_id: &str = account_id.as_ref();
         let eth_addr = format!("{:?}", subnet_config.creator.eth_addr());
 
         let cmd = format!(
@@ -588,9 +628,33 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             .await
             .context("failed to import wallet")?;
 
-        // TODO: Look up the subnet ID from the parent subnet deployment.
-        // TODO: Why don't we pass the parent subnet to `create_subnet`?
-        let parent_subnet_id: SubnetID = todo!();
+        let parent_subnet_id = parent_submit_config.subnet.subnet_id.clone();
+
+        // Find a node to which the `ipc-cli` can connect to create the subnet.
+        let parent_url = parent_submit_config
+            .nodes
+            .iter()
+            .filter_map(|tc| match tc {
+                TargetConfig::External(url) => Some(url.clone()),
+                TargetConfig::Internal(node) => node.ethapi_http_endpoint(),
+            })
+            .next()
+            .ok_or_else(|| anyhow!("there has to be some parent nodes with eth API"))?;
+
+        // Create a config.toml file for the ipc-cli based on the deployment of the parent.
+        self.update_ipc_cli_config(&testnet_name, |config| {
+            config.add_subnet(IpcCliSubnet {
+                id: parent_subnet_id.clone(),
+                config: IpcCliSubnetConfig::Fevm(EVMSubnet {
+                    provider_http: parent_url,
+                    provider_timeout: Some(Duration::from_secs(30)),
+                    auth_token: None,
+                    registry_addr: parent_submit_config.deployment.registry.into(),
+                    gateway_addr: parent_submit_config.deployment.gateway.into(),
+                }),
+            })
+        })
+        .context("failed to update CLI config")?;
 
         // TODO: All the hardcoded values need to go into the config.
         let cmd = format!(
@@ -602,12 +666,8 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
                 --permission-mode collateral
                 --supply-source-kind native
                 ",
-            parent_subnet_id.to_string(),
-            subnet_config.min_validators
+            parent_subnet_id, subnet_config.min_validators
         );
-
-        // TODO: Create a config.toml file for the ipc-cli based
-        // on the deployment of the parent.
 
         // TODO: Skip this if the subnet already exists.
         runner

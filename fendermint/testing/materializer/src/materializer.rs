@@ -5,7 +5,7 @@ use either::Either;
 use ethers::types::H160;
 use fvm_shared::{chainid::ChainID, econ::TokenAmount};
 use std::collections::BTreeMap;
-use tendermint_rpc::Url;
+use url::Url;
 
 use fendermint_vm_genesis::Collateral;
 
@@ -103,10 +103,10 @@ pub trait Materializer<M: Materials> {
     ) -> anyhow::Result<M::Genesis>;
 
     /// Create a subnet to represent the root.
-    fn create_root_subnet<'a>(
+    fn create_root_subnet(
         &mut self,
         subnet_name: &SubnetName,
-        params: Either<ChainID, &'a M::Genesis>,
+        params: Either<ChainID, &M::Genesis>,
     ) -> anyhow::Result<M::Subnet>;
 
     /// Construct the configuration for a node.

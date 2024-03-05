@@ -11,9 +11,8 @@ use std::{
     cmp::min,
     collections::BTreeMap,
     ops::{Mul, SubAssign},
-    str::FromStr,
 };
-use tendermint_rpc::Url;
+use url::Url;
 
 use fendermint_vm_genesis::Collateral;
 use fvm_shared::{
@@ -203,7 +202,7 @@ fn gen_urls(g: &mut Gen) -> Vec<Url> {
         // The glif.io addresses are load balanced, but let's pretend we can target a specific node.
         // Alternatively we could vary the ports or whatever.
         let url = format!("https://{}.api.calibration.node.glif.io/rpc/v1", id.0);
-        let url = Url::from_str(&url).expect("URL should parse");
+        let url = Url::parse(&url).expect("URL should parse");
         urls.push(url);
     }
     urls

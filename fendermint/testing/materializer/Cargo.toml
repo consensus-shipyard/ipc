@@ -13,7 +13,7 @@ anyhow = { workspace = true }
 async-recursion = { workspace = true }
 async-trait = { workspace = true }
 bollard = { workspace = true }
-either = { workspace= true }
+either = { workspace = true }
 ethers = { workspace = true }
 futures = { workspace = true }
 fvm_shared = { workspace = true }
@@ -28,11 +28,13 @@ tendermint-rpc = { workspace = true }
 tokio = { workspace = true }
 toml = { workspace = true }
 tracing = { workspace = true }
+url = { workspace = true }
 
 arbitrary = { workspace = true, optional = true }
 quickcheck = { workspace = true, optional = true }
 
 ipc-api = { path = "../../../ipc/api" }
+ipc-provider = { path = "../../../ipc/provider" }
 
 fendermint_crypto = { path = "../../crypto" }
 fendermint_vm_actor_interface = { path = "../../vm/actor_interface" }
