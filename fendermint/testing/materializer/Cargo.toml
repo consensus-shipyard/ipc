@@ -20,6 +20,7 @@ fvm_shared = { workspace = true }
 hex = { workspace = true }
 lazy_static = { workspace = true }
 multihash = { workspace = true }
+regex = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
 serde_json = { workspace = true }

@@ -26,11 +26,14 @@ use ipc_provider::config::subnet::{
     EVMSubnet, Subnet as IpcCliSubnet, SubnetConfig as IpcCliSubnetConfig,
 };
 use ipc_provider::config::Config as IpcCliConfig;
+use lazy_static::lazy_static;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
+    str::FromStr,
     time::Duration,
 };
 use url::Url;
@@ -670,13 +673,22 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         );
 
         // TODO: Skip this if the subnet already exists.
-        runner
+        let logs = runner
             .run_cmd(&cmd)
             .await
             .context("failed to create subnet")?;
 
-        // TODO: Parse the subnet ID from the command output.
-        todo!()
+        // Parse the subnet ID from the command output.
+        let subnet_id = logs
+            .last()
+            .and_then(find_subnet_id)
+            .ok_or_else(|| anyhow!("cannot find a subnet ID in the logs"))?
+            .context("failed to parse subnet ID")?;
+
+        Ok(DefaultSubnet {
+            name: subnet_name.clone(),
+            subnet_id,
+        })
     }
 
     async fn fund_subnet<'s, 'a>(
@@ -734,15 +746,31 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     }
 }
 
+/// The `ipc-cli` puts the output in a human readable log instead of printing JSON.
+fn find_subnet_id(log: impl AsRef<str>) -> Option<Result<SubnetID, ipc_api::error::Error>> {
+    lazy_static! {
+        static ref SUBNET_ID_RE: Regex =
+            Regex::new(r"(/r\d+(/[tf]410[0-9a-z]{40})+)").expect("subnet regex parses");
+    }
+    SUBNET_ID_RE
+        .find(log.as_ref())
+        .map(|m| m.as_str())
+        .map(SubnetID::from_str)
+}
+
 #[cfg(test)]
 mod tests {
     use fendermint_vm_actor_interface::ipc;
+    use fvm_shared::address::Address;
     use ipc_api::subnet_id::SubnetID;
     use ipc_provider::config::subnet::{
         EVMSubnet, Subnet as IpcCliSubnet, SubnetConfig as IpcCliSubnetConfig,
     };
     use ipc_provider::config::Config as IpcCliConfig;
+    use std::str::FromStr;
     use std::time::Duration;
+
+    use super::find_subnet_id;
 
     #[test]
     fn test_ipc_cli_config_toml_roundtrip() {
@@ -768,5 +796,23 @@ mod tests {
         let config1 = IpcCliConfig::from_toml_str(&config_toml).expect("failed to deserialize");
 
         assert_eq!(config0, config1);
+    }
+
+    #[test]
+    fn test_parse_subnet_id_from_log() {
+        let example = "[2024-03-05T15:10:01Z INFO  ipc_cli::commands::subnet::create] created subnet actor with id: /r314159/f410fu6ua642sypnlukccd3gaizwhonk5kwlpml6r3pa";
+        let expected = SubnetID::new_from_parent(
+            &SubnetID::new_root(314159),
+            Address::from_str("f410fu6ua642sypnlukccd3gaizwhonk5kwlpml6r3pa").unwrap(),
+        );
+        assert_eq!(find_subnet_id(example), Some(Ok(expected)));
+    }
+
+    #[test]
+    fn test_parse_subnet_id_from_log_wrong_network() {
+        let example = "[2024-03-05T15:10:01Z INFO  ipc_cli::commands::subnet::create] created subnet actor with id: /r314159/t410fu6ua642sypnlukccd3gaizwhonk5kwlpml6r3pa";
+        find_subnet_id(example)
+            .expect("should find the subnet ID")
+            .expect_err("should fail to parse t410 address");
     }
 }

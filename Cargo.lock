@@ -3068,6 +3068,7 @@ dependencies = [
  "quickcheck",
  "quickcheck_async",
  "quickcheck_macros",
+ "regex",
  "serde",
  "serde_json",
  "serde_with 2.3.3",
