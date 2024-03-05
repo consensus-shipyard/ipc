@@ -1,6 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 
 use fendermint_vm_core::chainid::HasChainID;
@@ -148,7 +148,9 @@ where
                 Ok((state, Err(InvalidSignature(s))))
             }
             Ok(()) => {
-                let domain_hash = msg.domain_hash(&chain_id)?;
+                let domain_hash = msg
+                    .domain_hash(&chain_id)
+                    .context("failed to compute domain hash")?;
                 let (state, ret) = self.inner.deliver(state, msg.into_message()).await?;
                 let ret = SignedMessageApplyRet {
                     fvm: ret,
