@@ -7,6 +7,9 @@ pub mod chain;
 pub mod fvm;
 pub mod signed;
 
+#[cfg(feature = "arb")]
+mod arb;
+
 /// Initialize the chain state.
 ///
 /// This could be from the original genesis file, or perhaps a checkpointed snapshot.

@@ -30,7 +30,7 @@ use ethers_core::{
     },
 };
 use fendermint_crypto::SecretKey;
-use fendermint_rpc::message::MessageFactory;
+use fendermint_rpc::message::SignedMessageFactory;
 use fendermint_vm_actor_interface::eam::EthAddress;
 
 pub type TestMiddleware<C> = SignerMiddleware<Provider<C>, Wallet<SigningKey>>;
@@ -43,7 +43,7 @@ pub struct TestAccount {
 
 impl TestAccount {
     pub fn new(sk: &Path) -> anyhow::Result<Self> {
-        let sk = MessageFactory::read_secret_key(sk)?;
+        let sk = SignedMessageFactory::read_secret_key(sk)?;
         let ea = EthAddress::from(sk.public_key());
         let h = Address::from_slice(&ea.0);
 

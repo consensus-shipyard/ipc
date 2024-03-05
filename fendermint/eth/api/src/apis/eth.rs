@@ -12,7 +12,7 @@ use anyhow::Context;
 use ethers_core::types::transaction::eip2718::TypedTransaction;
 use ethers_core::types::{self as et, BlockNumber};
 use ethers_core::utils::rlp;
-use fendermint_rpc::message::MessageFactory;
+use fendermint_rpc::message::SignedMessageFactory;
 use fendermint_rpc::query::QueryClient;
 use fendermint_rpc::response::{decode_data, decode_fevm_invoke, decode_fevm_return_data};
 use fendermint_vm_actor_interface::eam::{EthAddress, EAM_ACTOR_ADDR};
@@ -624,7 +624,7 @@ where
         signature: Signature::new_secp256k1(sig.to_vec()),
     };
     let msg = ChainMessage::Signed(msg);
-    let bz: Vec<u8> = MessageFactory::serialize(&msg)?;
+    let bz: Vec<u8> = SignedMessageFactory::serialize(&msg)?;
 
     // Use the broadcast version which waits for basic checks to complete,
     // but not the execution results - those will have to be polled with get_transaction_receipt.
