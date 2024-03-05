@@ -37,7 +37,7 @@ pub enum SignedMessageError {
     Ipld(#[from] fvm_ipld_encoding::Error),
     #[error("invalid signature: {0}")]
     InvalidSignature(String),
-    #[error("message cannot be converted to ethereum")]
+    #[error("message cannot be converted to ethereum: {0}")]
     Ethereum(#[from] anyhow::Error),
 }
 
@@ -110,13 +110,11 @@ impl SignedMessage {
         // so at least for now they are easy to tell apart: any `f410` address is coming from Ethereum API and must have
         // been signed according to the Ethereum scheme, and it could not have been signed by an `f1` address, it doesn't
         // work with regular accounts.
-
-        // Detect the case where the recipient is not an ethereum address. If that is the case then use regular signing rules,
+        //
+        // We detect the case where the recipient is not an ethereum address. If that is the case then use regular signing rules,
         // which should allow messages from ethereum accounts to go to any other type of account, e.g. custom Wasm actors.
-        let is_to_eth = || from_fvm::to_eth_address(&message.to).is_ok();
-
         match maybe_eth_address(&message.from) {
-            Some(addr) if is_to_eth() => {
+            Some(addr) if is_eth_addr_compat(&message.to) => {
                 let tx: TypedTransaction = from_fvm::to_eth_transaction_request(message, chain_id)
                     .map_err(SignedMessageError::Ethereum)?
                     .into();
@@ -185,7 +183,7 @@ impl SignedMessage {
         &self,
         chain_id: &ChainID,
     ) -> Result<Option<DomainHash>, SignedMessageError> {
-        if maybe_eth_address(&self.message.from).is_some() {
+        if is_eth_addr_deleg(&self.message.from) && is_eth_addr_compat(&self.message.to) {
             let tx: TypedTransaction =
                 from_fvm::to_eth_transaction_request(self.message(), chain_id)
                     .map_err(SignedMessageError::Ethereum)?
@@ -271,6 +269,16 @@ fn maybe_eth_address(addr: &Address) -> Option<et::H160> {
         }
         _ => None,
     }
+}
+
+/// Check if the address can be converted to an Ethereum one.
+fn is_eth_addr_compat(addr: &Address) -> bool {
+    from_fvm::to_eth_address(addr).is_ok()
+}
+
+/// Check if the address is an Ethereum delegated one.
+fn is_eth_addr_deleg(addr: &Address) -> bool {
+    maybe_eth_address(addr).is_some()
 }
 
 /// Verify that the method ID and the recipient are one of the allowed combination,
