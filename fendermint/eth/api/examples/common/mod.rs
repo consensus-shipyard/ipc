@@ -36,6 +36,9 @@ use fendermint_vm_actor_interface::eam::EthAddress;
 pub type TestMiddleware<C> = SignerMiddleware<Provider<C>, Wallet<SigningKey>>;
 pub type TestContractCall<C, T> = ContractCall<TestMiddleware<C>, T>;
 
+/// Gas limit to set for transactions.
+pub const ENOUGH_GAS: u64 = 10_000_000_000u64;
+
 pub struct TestAccount {
     pub secret_key: SecretKey,
     pub eth_addr: H160,
@@ -107,10 +110,22 @@ where
 pub async fn prepare_call<C, T>(
     mw: &TestMiddleware<C>,
     mut call: TestContractCall<C, T>,
+    prevent_estimation: bool,
 ) -> anyhow::Result<TestContractCall<C, T>>
 where
     C: JsonRpcClient + 'static,
 {
+    if prevent_estimation {
+        // Set the gas based on the testkit so it doesn't trigger estimation.
+        let tx = call.tx.as_eip1559_mut();
+        let tx = tx.expect("eip1559");
+
+        tx.gas = Some(ENOUGH_GAS.into());
+        tx.max_fee_per_gas = Some(0.into());
+        tx.max_priority_fee_per_gas = Some(0.into());
+    }
+
+    // Fill in the missing fields like `from` and `nonce` (which involves querying the API).
     mw.fill_transaction(&mut call.tx, Some(BlockId::Number(BlockNumber::Latest)))
         .await
         .context("failed to fill transaction")?;
