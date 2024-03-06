@@ -444,7 +444,11 @@ where
         let addr = to_fvm_address(*address);
 
         if let Some(actor_type) = self.addr_cache.get_actor_type_from_addr(&addr) {
-            tracing::debug!(?addr, ?actor_type, "addr cache hit, directly return the actor type");
+            tracing::debug!(
+                ?addr,
+                ?actor_type,
+                "addr cache hit, directly return the actor type"
+            );
             return Ok(actor_type);
         }
 
@@ -460,10 +464,15 @@ where
         };
 
         if let Some(actor_type) = self.addr_cache.get_actor_type_from_cid(&actor_type_cid) {
-            tracing::debug!(?actor_type_cid, ?actor_type, "cid cache hit, directly return the actor type");
+            tracing::debug!(
+                ?actor_type_cid,
+                ?actor_type,
+                "cid cache hit, directly return the actor type"
+            );
             tracing::debug!(?addr, ?actor_type, "put result into addr cache");
-            self.addr_cache.set_actor_type_for_addr(addr, actor_type.clone());
-            return Ok(actor_type)
+            self.addr_cache
+                .set_actor_type_for_addr(addr, actor_type.clone());
+            return Ok(actor_type);
         }
 
         let registry = self.client.builtin_actors(height).await?.value.registry;
@@ -473,7 +482,8 @@ where
         };
 
         tracing::debug!(?actor_type_cid, ?ret, "put result into cid cache");
-        self.addr_cache.set_actor_type_for_cid(actor_type_cid, ret.clone());
+        self.addr_cache
+            .set_actor_type_for_cid(actor_type_cid, ret.clone());
         tracing::debug!(?addr, ?ret, "put result into addr cache");
         self.addr_cache.set_actor_type_for_addr(addr, ret.clone());
 

@@ -143,11 +143,13 @@ mod tests {
     use fendermint_rpc::FendermintClient;
     use fvm_shared::address::Address;
     use std::str::FromStr;
-    use tendermint_rpc::{MockClient};
+    use tendermint_rpc::MockClient;
 
     #[test]
     fn test_read_and_write_addr_to_actor_type() {
-        let client = FendermintClient::new(MockClient::new(tendermint_rpc::MockRequestMethodMatcher::default()).0);
+        let client = FendermintClient::new(
+            MockClient::new(tendermint_rpc::MockRequestMethodMatcher::default()).0,
+        );
         let addr_cache = AddressCache::new(client, 1000);
 
         let address1 = Address::from_str("f410fivboj67m6ut4j6xx3lhc426io22r7l3h6yha5bi").unwrap();
@@ -176,13 +178,19 @@ mod tests {
 
     #[test]
     fn test_read_and_write_cid_to_actor_type() {
-        let client = FendermintClient::new(MockClient::new(tendermint_rpc::MockRequestMethodMatcher::default()).0);
+        let client = FendermintClient::new(
+            MockClient::new(tendermint_rpc::MockRequestMethodMatcher::default()).0,
+        );
         let addr_cache = AddressCache::new(client, 1000);
 
-        let cid1 = Cid::from_str("bafk2bzacecmnyfiwb52tkbwmm2dsd7ysi3nvuxl3lmspy7pl26wxj4zj7w4wi").unwrap();
-        let cid2 = Cid::from_str("bafy2bzaceas2zajrutdp7ugb6w2lpmow3z3klr3gzqimxtuz22tkkqallfch4").unwrap();
-        let cid3 = Cid::from_str("k51qzi5uqu5dlvj2baxnqndepeb86cbk3ng7n3i46uzyxzyqj2xjonzllnv0v8").unwrap();
-        let cid4 = Cid::from_str("bafybeiemxf5abjwjbikoz4mc3a3dla6ual3jsgpdr4cjr3oz3evfyavhwq").unwrap();
+        let cid1 = Cid::from_str("bafk2bzacecmnyfiwb52tkbwmm2dsd7ysi3nvuxl3lmspy7pl26wxj4zj7w4wi")
+            .unwrap();
+        let cid2 = Cid::from_str("bafy2bzaceas2zajrutdp7ugb6w2lpmow3z3klr3gzqimxtuz22tkkqallfch4")
+            .unwrap();
+        let cid3 = Cid::from_str("k51qzi5uqu5dlvj2baxnqndepeb86cbk3ng7n3i46uzyxzyqj2xjonzllnv0v8")
+            .unwrap();
+        let cid4 =
+            Cid::from_str("bafybeiemxf5abjwjbikoz4mc3a3dla6ual3jsgpdr4cjr3oz3evfyavhwq").unwrap();
 
         addr_cache.set_actor_type_for_cid(cid1, ActorType::EVM);
         addr_cache.set_actor_type_for_cid(cid2, ActorType::Unknown(Cid::default()));
