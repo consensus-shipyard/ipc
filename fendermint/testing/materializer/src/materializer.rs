@@ -10,8 +10,9 @@ use url::Url;
 use fendermint_vm_genesis::Collateral;
 
 use crate::{
-    manifest::Balance, materials::Materials, AccountName, NodeName, RelayerName, ResourceHash,
-    SubnetName, TestnetName,
+    manifest::{Balance, EnvMap},
+    materials::Materials,
+    AccountName, NodeName, RelayerName, ResourceHash, SubnetName, TestnetName,
 };
 
 /// The materializer is a component to provision resources of a testnet, and
@@ -221,6 +222,8 @@ pub struct NodeConfig<'a, M: Materials> {
     pub parent_node: Option<ParentConfig<'a, M>>,
     /// Run the Ethereum API facade or not.
     pub ethapi: bool,
+    /// Arbitrary env vars, e.g. to regulate block production rates.
+    pub env: &'a EnvMap,
 }
 
 /// Options regarding subnet configuration, e.g. how many validators are required.

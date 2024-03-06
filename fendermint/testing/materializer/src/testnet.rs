@@ -13,8 +13,8 @@ use url::Url;
 
 use crate::{
     manifest::{
-        BalanceMap, CollateralMap, IpcDeployment, Manifest, Node, NodeMode, ParentNode, Rootnet,
-        Subnet,
+        BalanceMap, CollateralMap, EnvMap, IpcDeployment, Manifest, Node, NodeMode, ParentNode,
+        Rootnet, Subnet,
     },
     materializer::{
         Materializer, NodeConfig, ParentConfig, SubmitConfig, SubnetConfig, TargetConfig,
@@ -248,11 +248,12 @@ where
         m: &mut R,
         subnet_name: &SubnetName,
         nodes: &BTreeMap<NodeId, Node>,
+        env: &EnvMap,
     ) -> anyhow::Result<()> {
         let node_ids = sort_by_seeds(nodes).context("invalid root subnet topology")?;
 
         for (node_id, node) in node_ids.iter() {
-            self.create_node(m, subnet_name, node_id, node)
+            self.create_node(m, subnet_name, node_id, node, env)
                 .await
                 .with_context(|| format!("failed to create node {node_id} in {subnet_name:?}"))?;
         }
@@ -275,6 +276,7 @@ where
         subnet_name: &SubnetName,
         node_id: &NodeId,
         node: &Node,
+        env: &EnvMap,
     ) -> anyhow::Result<()> {
         let genesis = self.genesis(subnet_name)?;
         let network = self.network();
@@ -323,6 +325,7 @@ where
             },
             parent_node,
             ethapi: node.ethapi,
+            env,
         };
 
         let node = m
@@ -408,6 +411,7 @@ where
                 validators,
                 balances,
                 nodes,
+                env,
             } => {
                 self.create_root_genesis(m, root_name, validators.clone(), balances.clone())
                     .context("failed to create root genesis")?;
@@ -421,7 +425,7 @@ where
                 self.subnets.insert(root_name.clone(), subnet);
                 self.deployments.insert(root_name.clone(), deployment);
 
-                self.create_and_start_nodes(m, root_name, nodes)
+                self.create_and_start_nodes(m, root_name, nodes, env)
                     .await
                     .context("failed to start root nodes")?;
             }
@@ -545,7 +549,7 @@ where
             self.genesis.insert(subnet_name.clone(), genesis);
 
             // Create and start nodes.
-            self.create_and_start_nodes(m, &subnet_name, &subnet.nodes)
+            self.create_and_start_nodes(m, &subnet_name, &subnet.nodes, &subnet.env)
                 .await
                 .context("failed to start subnet nodes in {subnet_name:?}")?;
         }

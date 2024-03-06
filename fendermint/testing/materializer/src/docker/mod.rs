@@ -75,12 +75,11 @@ const PORT_RANGE_START: u32 = 30000;
 const PORT_RANGE_SIZE: u32 = 100;
 
 type Volumes = Vec<(PathBuf, &'static str)>;
-type EnvVars = BTreeMap<&'static str, String>;
 
 #[macro_export]
 macro_rules! env_vars {
     ( $($key:literal => $value:expr),* $(,)? ) => {
-        BTreeMap::from([ $( ($key, $value.to_string()) ),* ])
+        BTreeMap::from([ $( ($key.to_string(), $value.to_string()) ),* ])
     };
 }
 

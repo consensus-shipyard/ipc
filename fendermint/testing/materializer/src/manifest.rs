@@ -20,6 +20,7 @@ pub type BalanceMap = BTreeMap<AccountId, Balance>;
 pub type CollateralMap = BTreeMap<AccountId, Collateral>;
 pub type NodeMap = BTreeMap<NodeId, Node>;
 pub type RelayerMap = BTreeMap<RelayerId, Relayer>;
+pub type EnvMap = BTreeMap<String, String>;
 
 /// The manifest is a static description of a testnet.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -133,6 +134,9 @@ pub enum Rootnet {
         balances: BalanceMap,
         /// Nodes that participate in running the root chain.
         nodes: NodeMap,
+        /// Arbitrary env vars to pass on to the nodes.
+        #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+        env: EnvMap,
     },
 }
 
@@ -164,6 +168,9 @@ pub struct Subnet {
     /// The subnet ID exists so we can find the outcome of existing deployments in the log.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub subnets: SubnetMap,
+    /// Arbitrary env vars to pass on to the nodes.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub env: EnvMap,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]

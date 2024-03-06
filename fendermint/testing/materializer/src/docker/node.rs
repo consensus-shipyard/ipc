@@ -17,11 +17,12 @@ use super::{
     container::DockerContainer,
     dropper::{DropChute, DropPolicy},
     runner::DockerRunner,
-    DockerMaterials, DockerPortRange, EnvVars, Volumes, COMETBFT_IMAGE, FENDERMINT_IMAGE,
+    DockerMaterials, DockerPortRange, Volumes, COMETBFT_IMAGE, FENDERMINT_IMAGE,
 };
 use crate::{
     docker::DOCKER_ENTRY_FILE_NAME,
     env_vars,
+    manifest::EnvMap,
     materializer::{NodeConfig, TargetConfig},
     materials::export_file,
     HasCometBftApi, HasEthApi, NodeName, ResourceHash,
@@ -244,7 +245,10 @@ impl DockerNode {
                 fvm_shared::address::Network::Testnet => "testnet",
             };
 
-            let mut env: EnvVars = env_vars![
+            // Start with the subnet level variables.
+            let mut env: EnvMap = node_config.env.clone();
+
+            env.extend(env_vars![
                 "LOG_LEVEL"        => "info",
                 "RUST_BACKTRACE"   => 1,
                 "FM_NETWORK"       => network,
@@ -260,7 +264,7 @@ impl DockerNode {
                 "TENDERMINT_WS_URL"     => format!("ws://{cometbft_name}:{COMETBFT_RPC_PORT}/websocket"),
                 "FM_ABCI__LISTEN__PORT" => FENDERMINT_ABCI_PORT,
                 "FM_ETH__LISTEN__PORT"  => ETHAPI_RPC_PORT,
-            ];
+            ]);
 
             if node_config.validator.is_some() {
                 env.extend(env_vars![
@@ -541,7 +545,7 @@ where
     Ok(ss.join(","))
 }
 
-fn export_env(file_path: impl AsRef<Path>, env: &EnvVars) -> anyhow::Result<()> {
+fn export_env(file_path: impl AsRef<Path>, env: &EnvMap) -> anyhow::Result<()> {
     let env = env
         .iter()
         .map(|(k, v)| format!("{k}={v}"))
