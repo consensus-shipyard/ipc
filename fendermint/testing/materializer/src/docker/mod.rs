@@ -501,6 +501,25 @@ impl DockerMaterializer {
 
         Ok(())
     }
+
+    fn reference_path(&self, rh: &ResourceHash) -> PathBuf {
+        self.dir.join("refs").join(hex::encode(rh.0))
+    }
+
+    fn has_reference(&self, reference: &Option<ResourceHash>) -> bool {
+        reference
+            .as_ref()
+            .map(|rh| self.reference_path(&rh).exists())
+            .unwrap_or_default()
+    }
+
+    fn add_reference(&self, reference: &Option<ResourceHash>) -> anyhow::Result<()> {
+        if let Some(ref rh) = reference {
+            export_file(self.reference_path(rh), "").context("failed to write reference")
+        } else {
+            Ok(())
+        }
+    }
 }
 
 #[async_trait]
@@ -773,6 +792,10 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
+        if self.has_reference(&reference) {
+            return Ok(());
+        }
+
         let cmd = format!(
             "ipc-cli subnet send-value
                 --subnet {}
@@ -788,7 +811,9 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
 
         self.ipc_cli_run_cmd(parent_submit_config, account, cmd)
             .await
-            .context("failed to fund subnet")
+            .context("failed to fund subnet")?;
+
+        self.add_reference(&reference)
     }
 
     async fn join_subnet<'s, 'a>(
@@ -803,6 +828,10 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
+        if self.has_reference(&reference) {
+            return Ok(());
+        }
+
         let cmd = format!(
             "ipc-cli subnet join
                 --subnet {}
@@ -820,7 +849,9 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
 
         self.ipc_cli_run_cmd(parent_submit_config, account, cmd)
             .await
-            .context("failed to join subnet")
+            .context("failed to join subnet")?;
+
+        self.add_reference(&reference)
     }
 
     async fn create_subnet_genesis<'s, 'a>(
