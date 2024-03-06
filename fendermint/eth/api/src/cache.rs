@@ -130,12 +130,12 @@ mod tests {
     use fendermint_rpc::FendermintClient;
     use fvm_shared::address::Address;
     use std::str::FromStr;
-    use tendermint_rpc::HttpClient;
+    use tendermint_rpc::{MockClient};
 
     #[test]
     fn test_read_and_write_addr_to_actor_type() {
-        let client = FendermintClient::new(HttpClient::new("http://localhost").unwrap());
-        let addr_cache = AddressCache::new(client.clone(), 1000);
+        let client = FendermintClient::new(MockClient::new(tendermint_rpc::MockRequestMethodMatcher::default()).0);
+        let addr_cache = AddressCache::new(client, 1000);
 
         let address1 = Address::from_str("f410fivboj67m6ut4j6xx3lhc426io22r7l3h6yha5bi").unwrap();
         let address2 = Address::from_str("f410fmpohbjcmznke3e7pbxomsbg5uae6o2sfjurchxa").unwrap();

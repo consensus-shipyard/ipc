@@ -445,7 +445,7 @@ where
         let addr = to_fvm_address(*address);
 
         if let Some(actor_type) = self.addr_cache.get_actor_type_from_addr(&addr) {
-            log::debug!("cache contains the result: {:?}, return it", actor_type);
+            tracing::debug!(addr, actor_type, "cache hit, directly return the actor type");
             return Ok(actor_type);
         }
 
@@ -464,7 +464,7 @@ where
             Some((typ, _)) => ActorType::Known(Cow::Owned(typ)),
             None => ActorType::Unknown(actor_type_cid),
         };
-        log::debug!("put result into cache: {:?} => {:?}", addr, ret);
+        tracing::debug!(addr, ret, "put result into cache");
         self.addr_cache.set_actor_type_for_addr(addr, ret.clone());
         Ok(ret)
     }
