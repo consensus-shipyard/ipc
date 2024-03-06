@@ -94,13 +94,5 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
         if (checkpoint.msgs.length == s.maxMsgsPerBottomUpBatch) {
             return;
         }
-
-        // the max batch size not reached, we only support checkpoint period submission.
-        uint256 lastBottomUpCheckpointHeight = s.lastBottomUpCheckpointHeight;
-        if (checkpoint.blockHeight != lastBottomUpCheckpointHeight + s.bottomUpCheckPeriod) {
-            if (checkpoint.blockHeight != lastBottomUpCheckpointHeight) {
-                revert InvalidCheckpointEpoch();
-            }
-        }
     }
 }
