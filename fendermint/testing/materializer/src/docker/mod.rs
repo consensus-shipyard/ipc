@@ -45,7 +45,7 @@ use crate::{
         export_json, export_script, import_json, DefaultAccount, DefaultDeployment, DefaultGenesis,
         DefaultSubnet, Materials,
     },
-    HasEthApi, NodeName, RelayerName, ResourceHash, ResourceName, SubnetName, TestnetName,
+    NodeName, RelayerName, ResourceHash, ResourceName, SubnetName, TestnetName,
 };
 
 mod container;
@@ -633,17 +633,19 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         let parent_subnet_id = parent_submit_config.subnet.subnet_id.clone();
 
         // Find a node to which the `ipc-cli` can connect to create the subnet.
+        // Using the internal HTTP address, assumign that the dockerized `ipc-cli`
+        // will always mount the config file and talk to the nodes within the docker network.
         let parent_url = parent_submit_config
             .nodes
             .iter()
             .filter_map(|tc| match tc {
                 TargetConfig::External(url) => Some(url.clone()),
-                TargetConfig::Internal(node) => node.ethapi_http_endpoint(),
+                TargetConfig::Internal(node) => node.internal_ethapi_http_endpoint(),
             })
             .next()
             .ok_or_else(|| anyhow!("there has to be some parent nodes with eth API"))?;
 
-        // Create a config.toml file for the ipc-cli based on the deployment of the parent.
+        // Create a `config.toml`` file for the `ipc-cli` based on the deployment of the parent.
         self.update_ipc_cli_config(&testnet_name, |config| {
             config.add_subnet(IpcCliSubnet {
                 id: parent_subnet_id.clone(),
@@ -675,7 +677,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             subnet_config.bottom_up_checkpoint.period
         );
 
-        // TODO: Skip this if the subnet already exists.
+        // Now run the command and capture the output.
         let logs = runner
             .run_cmd(&cmd)
             .await

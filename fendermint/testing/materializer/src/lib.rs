@@ -328,7 +328,7 @@ impl ToString for ResourceHash {
 }
 
 pub trait HasEthApi {
-    /// URL of the HTTP endpoint, if it's enabled.
+    /// URL of the HTTP endpoint *on the host*, if it's enabled.
     fn ethapi_http_endpoint(&self) -> Option<url::Url>;
 
     fn ethapi_http_provider(&self) -> anyhow::Result<Option<Provider<Http>>> {
@@ -340,7 +340,7 @@ pub trait HasEthApi {
 }
 
 pub trait HasCometBftApi {
-    /// URL of the HTTP endpoint.
+    /// URL of the HTTP endpoint *on the host*.
     fn cometbft_http_endpoint(&self) -> tendermint_rpc::Url;
 
     fn cometbft_http_provider(&self) -> anyhow::Result<tendermint_rpc::HttpClient> {

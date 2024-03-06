@@ -13,6 +13,7 @@ use bollard::Docker;
 use ethers::types::H160;
 use fvm_shared::bigint::Zero;
 use lazy_static::lazy_static;
+use url::Url;
 
 use super::{
     container::DockerContainer,
@@ -497,6 +498,14 @@ impl DockerNode {
             None => Vec::new(),
             Some(ref c) => c.logs().await,
         }
+    }
+
+    /// The HTTP endpoint of the Ethereum API *inside Docker*, if it's enabled.
+    pub fn internal_ethapi_http_endpoint(&self) -> Option<Url> {
+        self.ethapi.as_ref().map(|c| {
+            url::Url::parse(&format!("http://{}:{}", c.hostname(), ETHAPI_RPC_PORT))
+                .expect("valid url")
+        })
     }
 }
 
