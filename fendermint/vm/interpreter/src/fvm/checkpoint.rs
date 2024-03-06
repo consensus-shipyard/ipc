@@ -131,6 +131,7 @@ where
         block_hash = hex::encode(block_hash),
         msgs = num_msgs,
         next_configuration_number,
+        power_updates = ?power_updates,
     );
 
     Ok(Some((checkpoint, power_updates)))

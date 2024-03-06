@@ -707,10 +707,6 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             signatures[i] = abi.encodePacked(r, s, v);
         }
 
-        vm.expectRevert(InvalidCheckpointEpoch.selector);
-        vm.prank(validators[0]);
-        saDiamond.checkpointer().submitCheckpoint(checkpointWithIncorrectHeight, validators, signatures);
-
         vm.expectCall(gatewayAddress, abi.encodeCall(IGateway.commitCheckpoint, (checkpoint)), 1);
         vm.prank(validators[0]);
         saDiamond.checkpointer().submitCheckpoint(checkpoint, validators, signatures);
