@@ -253,7 +253,7 @@ where
         let node_ids = sort_by_seeds(nodes).context("invalid root subnet topology")?;
 
         for (node_id, node) in node_ids.iter() {
-            self.create_node(m, subnet_name, node_id, node, env)
+            self.create_node(m, subnet_name, node_id, node, env, node_ids.len())
                 .await
                 .with_context(|| format!("failed to create node {node_id} in {subnet_name:?}"))?;
         }
@@ -277,6 +277,7 @@ where
         node_id: &NodeId,
         node: &Node,
         env: &EnvMap,
+        peer_count: usize,
     ) -> anyhow::Result<()> {
         let genesis = self.genesis(subnet_name)?;
         let network = self.network();
@@ -326,6 +327,7 @@ where
             parent_node,
             ethapi: node.ethapi,
             env,
+            peer_count,
         };
 
         let node = m

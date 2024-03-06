@@ -224,6 +224,8 @@ pub struct NodeConfig<'a, M: Materials> {
     pub ethapi: bool,
     /// Arbitrary env vars, e.g. to regulate block production rates.
     pub env: &'a EnvMap,
+    /// Number of nodes to be expected in the subnet, including this node, or 0 if unknown.
+    pub peer_count: usize,
 }
 
 /// Options regarding subnet configuration, e.g. how many validators are required.

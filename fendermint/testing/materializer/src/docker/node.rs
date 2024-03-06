@@ -11,6 +11,7 @@ use std::{
 use anyhow::{anyhow, bail, Context};
 use bollard::Docker;
 use ethers::types::H160;
+use fvm_shared::bigint::Zero;
 use lazy_static::lazy_static;
 
 use super::{
@@ -271,6 +272,14 @@ impl DockerNode {
                     "FM_VALIDATOR_KEY__KIND" => "ethereum",
                     "FM_VALIDATOR_KEY__PATH" => "/fendermint/keys/validator_key.sk",
                 ]);
+            }
+
+            // Configure the outbound peers so once fully connected, CometBFT can stop looking for peers.
+            if !node_config.peer_count.is_zero() {
+                env.insert(
+                    "CMT_P2P_MAX_NUM_OUTBOUND_PEERS".into(),
+                    (node_config.peer_count - 1).to_string(),
+                );
             }
 
             if let Some(pc) = node_config.parent_node {
