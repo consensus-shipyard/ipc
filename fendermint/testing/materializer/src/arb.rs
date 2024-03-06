@@ -158,7 +158,7 @@ fn gen_manifest(
             validators: subnet.validators,
             balances: initial_balances,
             nodes: subnet.nodes,
-            env: EnvMap::arbitrary(g),
+            env: gen_env(g),
         }
     };
 
@@ -337,10 +337,10 @@ fn gen_subnets(
             nodes,
             relayers,
             subnets: child_subnets,
-            env: EnvMap::arbitrary(g),
+            env: gen_env(g),
             bottom_up_checkpoint: CheckpointConfig {
-                // Adding one because 0 is not accepted by the contracts.
-                period: u64::arbitrary(g).saturating_add(1),
+                // Adding 1 because 0 is not accepted by the contracts.
+                period: u64::arbitrary(g).mod_floor(&86400u64) + 1,
             },
         };
 
@@ -372,6 +372,16 @@ fn gen_root_subnet(
     let mut s = ss.into_iter().next().unwrap().1;
     s.relayers.clear();
     s
+}
+
+fn gen_env(g: &mut Gen) -> EnvMap {
+    let mut env = EnvMap::default();
+    for _ in 0..usize::arbitrary(g) % 5 {
+        let prefix = if bool::arbitrary(g) { "CMT_" } else { "FM_" };
+        let key = format!("{prefix}_{}", ResourceId::arbitrary(g).0);
+        env.insert(key, String::arbitrary(g));
+    }
+    env
 }
 
 /// Choose some balance, up to 10% of the remaining balance of the account, minimum 1 atto.
