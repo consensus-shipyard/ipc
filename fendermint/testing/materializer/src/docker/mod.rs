@@ -418,6 +418,89 @@ impl DockerMaterializer {
 
         Ok(runner)
     }
+
+    /// Import the private key of an account into the `ipc-cli` wallet.
+    async fn ipc_cli_wallet_import(
+        runner: &DockerRunner,
+        account: &DefaultAccount,
+    ) -> anyhow::Result<()> {
+        let account_id = account.account_id();
+        let account_id: &str = account_id.as_ref();
+
+        let cmd = format!(
+            "ipc-cli wallet import
+                --wallet-type evm
+                --path /fendermint/accounts/{account_id}/secret.hex"
+        );
+
+        // TODO: It would be nice to skip if already imported, but not crucial.
+        runner
+            .run_cmd(&cmd)
+            .await
+            .context("failed to import wallet")?;
+
+        Ok(())
+    }
+
+    /// Add the subnet to the `config.toml` of the `ipc-cli`.
+    fn ipc_cli_config_add_subnet(
+        &mut self,
+        submit_config: &SubmitConfig<DockerMaterials>,
+    ) -> anyhow::Result<()> {
+        let testnet_name = submit_config.subnet.name.testnet();
+        let subnet_id = submit_config.subnet.subnet_id.clone();
+
+        // Find a node to which the `ipc-cli` can connect to create the subnet.
+        // Using the internal HTTP address, assumign that the dockerized `ipc-cli`
+        // will always mount the config file and talk to the nodes within the docker network.
+        let url = submit_config
+            .nodes
+            .iter()
+            .filter_map(|tc| match tc {
+                TargetConfig::External(url) => Some(url.clone()),
+                TargetConfig::Internal(node) => node.internal_ethapi_http_endpoint(),
+            })
+            .next()
+            .ok_or_else(|| anyhow!("there has to be some nodes with eth API enabled"))?;
+
+        // Create a `config.toml`` file for the `ipc-cli` based on the deployment of the parent.
+        self.update_ipc_cli_config(&testnet_name, |config| {
+            config.add_subnet(IpcCliSubnet {
+                id: subnet_id,
+                config: IpcCliSubnetConfig::Fevm(EVMSubnet {
+                    provider_http: url,
+                    provider_timeout: Some(Duration::from_secs(30)),
+                    auth_token: None,
+                    registry_addr: submit_config.deployment.registry.into(),
+                    gateway_addr: submit_config.deployment.gateway.into(),
+                }),
+            })
+        })
+        .context("failed to update CLI config")?;
+
+        Ok(())
+    }
+
+    /// Run some kind of command with the `ipc-cli` that needs to be executed as
+    /// transaction by an account on a given subnet.
+    async fn ipc_cli_run_cmd<'a>(
+        &mut self,
+        submit_config: &SubmitConfig<'a, DockerMaterials>,
+        account: &DefaultAccount,
+        cmd: String,
+    ) -> anyhow::Result<()> {
+        let runner = self.ipc_cli_runner(&submit_config.subnet.name.testnet())?;
+
+        Self::ipc_cli_wallet_import(&runner, account).await?;
+        self.ipc_cli_config_add_subnet(submit_config)?;
+
+        runner
+            .run_cmd(&cmd)
+            .await
+            .context("failed to run ipc-cli command")?;
+
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -634,67 +717,25 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             return Ok(subnet);
         }
 
-        let testnet_name = subnet_name.testnet();
-        let runner = self.ipc_cli_runner(&testnet_name)?;
+        let runner = self.ipc_cli_runner(&subnet_name.testnet())?;
 
-        let account_id = subnet_config.creator.account_id();
-        let account_id: &str = account_id.as_ref();
-        let eth_addr = format!("{:?}", subnet_config.creator.eth_addr());
-
-        let cmd = format!(
-            "ipc-cli wallet import
-                --wallet-type evm
-                --path /fendermint/accounts/{account_id}/secret.hex"
-        );
-
-        // TODO: It would be nice to skip if already imported, but not crucial.
-        runner
-            .run_cmd(&cmd)
-            .await
-            .context("failed to import wallet")?;
-
-        let parent_subnet_id = parent_submit_config.subnet.subnet_id.clone();
-
-        // Find a node to which the `ipc-cli` can connect to create the subnet.
-        // Using the internal HTTP address, assumign that the dockerized `ipc-cli`
-        // will always mount the config file and talk to the nodes within the docker network.
-        let parent_url = parent_submit_config
-            .nodes
-            .iter()
-            .filter_map(|tc| match tc {
-                TargetConfig::External(url) => Some(url.clone()),
-                TargetConfig::Internal(node) => node.internal_ethapi_http_endpoint(),
-            })
-            .next()
-            .ok_or_else(|| anyhow!("there has to be some parent nodes with eth API"))?;
-
-        // Create a `config.toml`` file for the `ipc-cli` based on the deployment of the parent.
-        self.update_ipc_cli_config(&testnet_name, |config| {
-            config.add_subnet(IpcCliSubnet {
-                id: parent_subnet_id.clone(),
-                config: IpcCliSubnetConfig::Fevm(EVMSubnet {
-                    provider_http: parent_url,
-                    provider_timeout: Some(Duration::from_secs(30)),
-                    auth_token: None,
-                    registry_addr: parent_submit_config.deployment.registry.into(),
-                    gateway_addr: parent_submit_config.deployment.gateway.into(),
-                }),
-            })
-        })
-        .context("failed to update CLI config")?;
+        Self::ipc_cli_wallet_import(&runner, subnet_config.creator).await?;
+        self.ipc_cli_config_add_subnet(parent_submit_config)?;
 
         // TODO: Move --permission-mode to the config
         // TODO: Move --supply-source-kind to the config
         let cmd = format!(
             "ipc-cli subnet create
                 --parent {}
+                --from {:?},
                 --min-validators {}
                 --min-validator-stake {}
                 --bottom-up-check-period {}
                 --permission-mode collateral
                 --supply-source-kind native
                 ",
-            parent_subnet_id,
+            parent_submit_config.subnet.subnet_id,
+            subnet_config.creator.eth_addr(),
             subnet_config.min_validators,
             subnet_config.min_validator_stake,
             subnet_config.bottom_up_checkpoint.period
@@ -732,7 +773,22 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
-        todo!("use the ipc-cli to fund an existing subnet on the parent")
+        let cmd = format!(
+            "ipc-cli subnet send-value
+                --subnet {}
+                --from {:?}
+                --to {:?}
+                {}
+            ",
+            subnet.subnet_id,
+            account.eth_addr(),
+            account.eth_addr(),
+            amount
+        );
+
+        self.ipc_cli_run_cmd(parent_submit_config, account, cmd)
+            .await
+            .context("failed to fund subnet")
     }
 
     async fn join_subnet<'s, 'a>(
@@ -747,7 +803,24 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
-        todo!("use the ipc-cli to join an existing subnet on the parent")
+        let cmd = format!(
+            "ipc-cli subnet join
+                --subnet {}
+                --from {:?}
+                --public-key {}
+                --collateral {}
+                --initial-balance {}
+            ",
+            subnet.subnet_id,
+            account.eth_addr(),
+            hex::encode(account.public_key().serialize()),
+            collateral.0,
+            balance.0
+        );
+
+        self.ipc_cli_run_cmd(parent_submit_config, account, cmd)
+            .await
+            .context("failed to join subnet")
     }
 
     async fn create_subnet_genesis<'s, 'a>(
