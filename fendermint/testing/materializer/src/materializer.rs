@@ -10,7 +10,7 @@ use url::Url;
 use fendermint_vm_genesis::Collateral;
 
 use crate::{
-    manifest::{Balance, EnvMap},
+    manifest::{Balance, CheckpointConfig, EnvMap},
     materials::Materials,
     AccountName, NodeName, RelayerName, ResourceHash, SubnetName, TestnetName,
 };
@@ -236,6 +236,8 @@ pub struct SubnetConfig<'a, M: Materials> {
     pub creator: &'a M::Account,
     /// Number of validators required for bootstrapping a subnet.
     pub min_validators: usize,
+    pub min_validator_stake: TokenAmount,
+    pub bottom_up_checkpoint: &'a CheckpointConfig,
 }
 
 /// Options for how to submit IPC transactions to a subnet.

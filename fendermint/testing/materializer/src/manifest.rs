@@ -134,7 +134,7 @@ pub enum Rootnet {
         balances: BalanceMap,
         /// Nodes that participate in running the root chain.
         nodes: NodeMap,
-        /// Arbitrary env vars to pass on to the nodes.
+        /// Custom env vars to pass on to the nodes.
         #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
         env: EnvMap,
     },
@@ -163,14 +163,16 @@ pub struct Subnet {
     pub nodes: NodeMap,
     /// Relayers that submit bottom-up checkpoints to the parent subnet.
     pub relayers: RelayerMap,
+    /// Bottom-up checkpoint configuration.
+    pub bottom_up_checkpoint: CheckpointConfig,
+    /// Custom env vars to pass on to the nodes.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub env: EnvMap,
     /// Child subnets under this parent.
     ///
     /// The subnet ID exists so we can find the outcome of existing deployments in the log.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub subnets: SubnetMap,
-    /// Arbitrary env vars to pass on to the nodes.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub env: EnvMap,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -218,6 +220,12 @@ pub struct Relayer {
     /// The node where the relayer submits the checkpoints;
     /// or leave it empty if the parent is CalibrationNet.
     pub submit_node: ParentNode,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CheckpointConfig {
+    /// Number of blocks between checkpoints.
+    pub period: u64,
 }
 
 #[cfg(test)]

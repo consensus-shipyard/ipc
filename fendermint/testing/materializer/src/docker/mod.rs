@@ -658,17 +658,21 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         })
         .context("failed to update CLI config")?;
 
-        // TODO: All the hardcoded values need to go into the config.
+        // TODO: Move --permission-mode to the config
+        // TODO: Move --supply-source-kind to the config
         let cmd = format!(
             "ipc-cli subnet create
                 --parent {}
                 --min-validators {}
-                --min-validator-stake 1
-                --bottom-up-check-period 1000
+                --min-validator-stake {}
+                --bottom-up-check-period {}
                 --permission-mode collateral
                 --supply-source-kind native
                 ",
-            parent_subnet_id, subnet_config.min_validators
+            parent_subnet_id,
+            subnet_config.min_validators,
+            subnet_config.min_validator_stake,
+            subnet_config.bottom_up_checkpoint.period
         );
 
         // TODO: Skip this if the subnet already exists.

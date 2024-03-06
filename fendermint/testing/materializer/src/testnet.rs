@@ -3,7 +3,7 @@
 use anyhow::{anyhow, bail, Context};
 use async_recursion::async_recursion;
 use either::Either;
-use fvm_shared::chainid::ChainID;
+use fvm_shared::{bigint::Zero, chainid::ChainID, econ::TokenAmount};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Display,
@@ -463,6 +463,9 @@ where
                         creator: self.account(&subnet.creator).context("invalid creator")?,
                         // Make the number such that the last validator to join activates the subnet.
                         min_validators: subnet.validators.len(),
+                        // Let validators join with any amount configured in the manifest.
+                        min_validator_stake: TokenAmount::zero(),
+                        bottom_up_checkpoint: &subnet.bottom_up_checkpoint,
                     },
                 )
                 .await

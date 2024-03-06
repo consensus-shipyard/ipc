@@ -23,8 +23,8 @@ use quickcheck::{Arbitrary, Gen};
 
 use crate::{
     manifest::{
-        Account, Balance, BalanceMap, CollateralMap, EnvMap, IpcDeployment, Manifest, Node,
-        NodeMap, NodeMode, ParentNode, Relayer, Rootnet, Subnet, SubnetMap,
+        Account, Balance, BalanceMap, CheckpointConfig, CollateralMap, EnvMap, IpcDeployment,
+        Manifest, Node, NodeMap, NodeMode, ParentNode, Relayer, Rootnet, Subnet, SubnetMap,
     },
     AccountId, NodeId, RelayerId, ResourceId, SubnetId,
 };
@@ -338,6 +338,10 @@ fn gen_subnets(
             relayers,
             subnets: child_subnets,
             env: EnvMap::arbitrary(g),
+            bottom_up_checkpoint: CheckpointConfig {
+                // Adding one because 0 is not accepted by the contracts.
+                period: u64::arbitrary(g).saturating_add(1),
+            },
         };
 
         let sid = SubnetId::arbitrary(g);
