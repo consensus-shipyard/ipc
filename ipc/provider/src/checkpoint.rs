@@ -10,6 +10,7 @@ use fvm_shared::clock::ChainEpoch;
 use ipc_wallet::{EthKeyAddress, PersistentKeyStore};
 use std::cmp::max;
 use std::fmt::{Display, Formatter};
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
@@ -30,6 +31,8 @@ pub struct BottomUpCheckpointManager<T> {
     child_handler: T,
     /// The number of blocks away from the chain head that is considered final
     finalization_blocks: ChainEpoch,
+
+    last_scanned_block: Arc<AtomicI64>,
 }
 
 impl<T: BottomUpCheckpointRelayer> BottomUpCheckpointManager<T> {
@@ -52,6 +55,7 @@ impl<T: BottomUpCheckpointRelayer> BottomUpCheckpointManager<T> {
             parent_handler,
             child_handler,
             finalization_blocks: 0,
+            last_scanned_block: Arc::new(Default::default()),
         })
     }
 
@@ -123,12 +127,19 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
             .map_err(|e| {
                 anyhow!("cannot obtain the last bottom up checkpoint height due to: {e:}")
             })?;
+        let last_checkpoint_epoch = max(
+            self.last_scanned_block.load(Ordering::SeqCst) as ChainEpoch,
+            last_checkpoint_epoch,
+        );
+
         let current_height = self.child_handler.current_epoch().await?;
         let finalized_height = max(1, current_height - self.finalization_blocks);
 
         log::debug!("last_checkpoint_epoch: {last_checkpoint_epoch}, current height: {current_height}, finalized_height: {finalized_height}");
 
         if finalized_height <= last_checkpoint_epoch {
+            self.last_scanned_block
+                .store(finalized_height, Ordering::SeqCst);
             return Ok(());
         }
 
@@ -141,6 +152,8 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
             .await?;
         if events.is_empty() {
             log::debug!("no reached events from {} to {}", start, finalized_height);
+            self.last_scanned_block
+                .store(finalized_height, Ordering::SeqCst);
             return Ok(());
         }
 
@@ -168,6 +181,9 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                 epoch
             );
         }
+
+        self.last_scanned_block
+            .store(finalized_height, Ordering::SeqCst);
 
         Ok(())
     }
