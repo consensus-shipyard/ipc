@@ -147,8 +147,10 @@ impl SignedMessage {
         // We detect the case where the recipient is not an ethereum address. If that is the case then use regular signing rules,
         // which should allow messages from ethereum accounts to go to any other type of account, e.g. custom Wasm actors.
         // FIXME(sander): Figure out how to include the object in the eth style signature.
+        tracing::info!("message => {:#?}", message);
         match maybe_eth_address(&message.from) {
             Some(addr) if is_eth_addr_compat_no_masked(&message.to) => {
+                tracing::info!("signable: Signable::Ethereum");
                 let tx: TypedTransaction = from_fvm::to_eth_transaction_request(message, chain_id)
                     .map_err(SignedMessageError::Ethereum)?
                     .into();
@@ -156,6 +158,7 @@ impl SignedMessage {
                 Ok(Signable::Ethereum((tx.sighash(), addr)))
             }
             Some(addr) => {
+                tracing::info!("signable: Signable::RegularFromEth");
                 let mut data = Self::cid(message)?.to_bytes();
                 data.extend(chain_id_bytes(chain_id).iter());
                 if let Some(obj) = object {
@@ -164,6 +167,7 @@ impl SignedMessage {
                 Ok(Signable::RegularFromEth((data, addr)))
             }
             None => {
+                tracing::info!("signable: Signable::Regular");
                 let mut data = Self::cid(message)?.to_bytes();
                 data.extend(chain_id_bytes(chain_id).iter());
                 if let Some(obj) = object {
@@ -183,6 +187,7 @@ impl SignedMessage {
     ) -> Result<(), SignedMessageError> {
         match Self::signable(message, object, chain_id)? {
             Signable::Ethereum((hash, from)) => {
+                tracing::info!("verifying Signable::Ethereum");
                 // If the sender is ethereum, recover the public key from the signature (which verifies it),
                 // then turn it into an `EthAddress` and verify it matches the `from` of the message.
                 let sig = from_fvm::to_eth_signature(signature, true)
@@ -192,6 +197,7 @@ impl SignedMessage {
                     .recover(hash)
                     .map_err(|e| SignedMessageError::Ethereum(anyhow!(e)))?;
 
+                tracing::info!("rec {}; from {}", rec, from);
                 if rec == from {
                     verify_eth_method(message)
                 } else {
@@ -199,17 +205,20 @@ impl SignedMessage {
                 }
             }
             Signable::Regular(data) => {
+                tracing::info!("verifying Signable::Regular");
                 // This works when `from` corresponds to the signature type.
                 signature
                     .verify(&data, &message.from)
                     .map_err(SignedMessageError::InvalidSignature)
             }
             Signable::RegularFromEth((data, from)) => {
+                tracing::info!("verifying Signable::RegularFromEth");
                 let rec = recover_secp256k1(signature, &data)
                     .map_err(SignedMessageError::InvalidSignature)?;
 
                 let rec_addr = EthAddress::from(rec);
 
+                tracing::info!("rec {}; from {}", rec_addr, from);
                 if rec_addr.0 == from.0 {
                     Ok(())
                 } else {
