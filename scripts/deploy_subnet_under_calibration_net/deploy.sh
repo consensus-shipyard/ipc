@@ -282,16 +282,22 @@ do
       child-validator
 done
 
-# Tableland: Fund proxy wallet in the subnet
-echo "$DASHES Fund proxy wallet in the subnet"
-$IPC_CLI wallet import --wallet-type evm --private-key $(cat ${IPC_CONFIG_FOLDER}/proxy_key.sk) --fendermint
-$IPC_CLI cross-msg fund --from $(cat ${IPC_CONFIG_FOLDER}/proxy_address) --subnet ${subnet_id} 2
-
-# Tableland: Give validator-0 the funded proxy key
-echo "$DASHES Give validator-0 the funded proxy key"
+# Remove leading '/' and change middle '/' into '-'
 subnet_folder=$IPC_CONFIG_FOLDER/$(echo $subnet_id | sed 's|^/||;s|/|-|g')
-cp ${IPC_CONFIG_FOLDER}/proxy_key.* ${subnet_folder}/validator-0/validator-0/keys
-chmod 600 ${subnet_folder}/validator-0/validator-0/keys/proxy_key.*
+
+# Tableland: Fund proxy wallet in the subnet
+echo "$DASHES Fund proxy wallets in the subnet"
+for i in {0..2}
+do
+  proxy_key=$(cat ${IPC_CONFIG_FOLDER}/evm_keystore_proxy.json | jq .[$i].private_key | tr -d '"')
+  proxy_address=$(cat ${IPC_CONFIG_FOLDER}/evm_keystore_proxy.json | jq .[$i].address | tr -d '"')
+  $IPC_CLI wallet import --wallet-type evm --private-key ${proxy_key}
+  $IPC_CLI cross-msg fund --from ${proxy_address} --subnet ${subnet_id} 2
+  out=${subnet_folder}/validator-${i}/validator-${i}/keys/proxy_key.sk
+  $IPC_CLI wallet export --wallet-type evm --address ${proxy_address} --fendermint > ${out}
+  chmod 600 ${subnet_folder}/validator-${i}/validator-${i}/keys/proxy_key.sk
+  $IPC_CLI wallet remove --wallet-type evm --address ${proxy_address}
+done
 
 # Step 9a: Test ETH API endpoint
 echo "$DASHES Test ETH API endpoints of validator nodes"
@@ -322,9 +328,6 @@ echo "$DASHES Start relayer process (in the background)"
 nohup $IPC_CLI checkpoint relayer --subnet $subnet_id > nohup.out 2> nohup.err < /dev/null &
 
 # Step 11: Print a summary of the deployment
-# Remove leading '/' and change middle '/' into '-'
-subnet_folder=$IPC_CONFIG_FOLDER/$(echo $subnet_id | sed 's|^/||;s|/|-|g')
-
 cat << EOF
 ############################
 #                          #
