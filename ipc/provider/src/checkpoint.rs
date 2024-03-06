@@ -183,39 +183,38 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         let prev_h = next_submission_height - self.checkpoint_period();
         log::debug!("start querying quorum reached events from : {prev_h} to {finalized_height}");
 
-        for h in (prev_h + 1)..=finalized_height {
-            let events = self.child_handler.quorum_reached_events(h).await?;
-            if events.is_empty() {
-                log::debug!("no reached events at height : {h}");
-                continue;
-            }
+        let events = self
+            .child_handler
+            .quorum_reached_events(prev_h + 1, finalized_height)
+            .await?;
+        if events.is_empty() {
+            log::debug!("no reached events from {} to {}", prev_h + 1, finalized_height);
+            return Ok(());
+        }
 
-            log::debug!("found reached events at height : {h}");
+        for event in events {
+            let bundle = self
+                .child_handler
+                .checkpoint_bundle_at(event.height)
+                .await?;
+            log::debug!("bottom up bundle: {bundle:?}");
 
-            for event in events {
-                let bundle = self
-                    .child_handler
-                    .checkpoint_bundle_at(event.height)
-                    .await?;
-                log::debug!("bottom up bundle: {bundle:?}");
+            let epoch = self
+                .parent_handler
+                .submit_checkpoint(
+                    submitter,
+                    bundle.checkpoint,
+                    bundle.signatures,
+                    bundle.signatories,
+                )
+                .await
+                .map_err(|e| anyhow!("cannot submit bottom up checkpoint due to: {e:}"))?;
 
-                let epoch = self
-                    .parent_handler
-                    .submit_checkpoint(
-                        submitter,
-                        bundle.checkpoint,
-                        bundle.signatures,
-                        bundle.signatories,
-                    )
-                    .await
-                    .map_err(|e| anyhow!("cannot submit bottom up checkpoint due to: {e:}"))?;
-
-                log::info!(
-                    "submitted bottom up checkpoint({}) in parent at height {}",
-                    event.height,
-                    epoch
-                );
-            }
+            log::info!(
+                "submitted bottom up checkpoint({}) in parent at height {}",
+                event.height,
+                epoch
+            );
         }
 
         Ok(())

@@ -725,7 +725,7 @@ impl IpcProvider {
             Some(conn) => conn,
         };
 
-        conn.manager().quorum_reached_events(height).await
+        conn.manager().quorum_reached_events(height, height).await
     }
 
     /// Advertises the endpoint of a bootstrap node for the subnet.

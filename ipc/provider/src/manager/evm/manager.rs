@@ -1093,7 +1093,11 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
         })
     }
 
-    async fn quorum_reached_events(&self, height: ChainEpoch) -> Result<Vec<QuorumReachedEvent>> {
+    async fn quorum_reached_events(
+        &self,
+        from: ChainEpoch,
+        to: ChainEpoch,
+    ) -> Result<Vec<QuorumReachedEvent>> {
         let contract = checkpointing_facet::CheckpointingFacet::new(
             self.ipc_contract_info.gateway_addr,
             Arc::new(self.ipc_contract_info.provider.clone()),
@@ -1101,8 +1105,8 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
 
         let ev = contract
             .event::<lib_quorum::QuorumReachedFilter>()
-            .from_block(height as u64)
-            .to_block(height as u64);
+            .from_block(from as u64)
+            .to_block(to as u64);
 
         let mut events = vec![];
         for (event, _meta) in query_with_meta(ev, contract.client()).await? {

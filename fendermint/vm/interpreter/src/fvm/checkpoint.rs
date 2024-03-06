@@ -93,7 +93,8 @@ where
 
     let num_msgs = msgs.len();
 
-    let last_height = gateway.last_bottom_up_checkpoint_height(state)
+    let last_height = gateway
+        .last_bottom_up_checkpoint_height(state)
         .context("failed to get last stored checkpoint height")?;
 
     // Construct checkpoint.
@@ -308,16 +309,17 @@ fn convert_tokenizables<Source: Tokenizable, Target: Tokenizable>(
 /// child ateway with the next configuration number to be applied to.
 fn has_validators_changed<DB>(
     gateway: &GatewayCaller<DB>,
-    state: &mut FvmExecState<DB>
+    state: &mut FvmExecState<DB>,
 ) -> anyhow::Result<bool>
-    where
-        DB: Blockstore + Clone,
+where
+    DB: Blockstore + Clone,
 {
     let next_configuration_number = gateway
         .latest_configuration_number(state)
         .context("failed to get validator changes")?;
 
-    let last_configuration_number = gateway.last_stored_configuration_number(state)
+    let last_configuration_number = gateway
+        .last_stored_configuration_number(state)
         .context("failed to get last stored configuration number")?;
 
     Ok(last_configuration_number != next_configuration_number)
