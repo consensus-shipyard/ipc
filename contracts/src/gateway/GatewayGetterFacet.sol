@@ -258,13 +258,18 @@ contract GatewayGetterFacet {
         return (exists, epoch, checkpoint);
     }
 
-    /// @notice Queries the configuration number of the `lastBottomUpCheckpointHeight`.
-    function lastStoredConfigurationNumber() external view returns(uint256) {
-        uint256 h = s.lastBottomUpCheckpointHeight;
-        return s.bottomUpCheckpoints[h].nextConfigurationNumber;
+    function lastBottomUpCheckpointHeight() external view returns (uint256) {
+        return s.lastBottomUpCheckpointHeight;
     }
 
-    function lastBottomUpCheckpointHeight() external view returns(uint256) {
-        return s.lastBottomUpCheckpointHeight;
+    /// @notice Checks if the validator set has changed since the last stored bottom up checkpoint
+    function hasValidatorSetChanged() external view returns (bool) {
+        uint256 h = s.lastBottomUpCheckpointHeight;
+        uint64 lastConfigNumber = s.bottomUpCheckpoints[h].nextConfigurationNumber;
+
+        // latest configuration number is the next configuration number to be applied minus 1
+        uint64 lastestConfigNumber = s.validatorsTracker.changes.nextConfigurationNumber - 1;
+
+        return lastestConfigNumber > lastConfigNumber;
     }
 }

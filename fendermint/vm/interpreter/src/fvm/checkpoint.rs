@@ -305,31 +305,6 @@ fn convert_tokenizables<Source: Tokenizable, Target: Tokenizable>(
         .collect::<Result<Vec<_>, _>>()?)
 }
 
-/// Checks if the validators has changed by comparing the last stored configuration number in the
-/// child ateway with the next configuration number to be applied to.
-fn has_validators_changed<DB>(
-    gateway: &GatewayCaller<DB>,
-    state: &mut FvmExecState<DB>,
-) -> anyhow::Result<bool>
-where
-    DB: Blockstore + Clone,
-{
-    let next_configuration_number = gateway
-        .latest_configuration_number(state)
-        .context("failed to get validator changes")?;
-
-    let last_configuration_number = gateway
-        .last_stored_configuration_number(state)
-        .context("failed to get last stored configuration number")?;
-
-    tracing::debug!(
-        next = next_configuration_number,
-        last = last_configuration_number,
-        "next config number vs last stored config number"
-    );
-    Ok(last_configuration_number != next_configuration_number)
-}
-
 fn should_create_checkpoint<DB>(
     gateway: &GatewayCaller<DB>,
     state: &mut FvmExecState<DB>,
@@ -356,7 +331,7 @@ where
             height = height.value(),
             "bottom up msg batch exists at height"
         );
-    } else if has_validators_changed(gateway, state)? {
+    } else if gateway.has_validator_set_changed(state)? {
         tracing::debug!(
             height = height.value(),
             "validator set has changed, create checkpoint"
