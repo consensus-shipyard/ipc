@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::state::ActorType;
 use anyhow::Context;
+use cid::Cid;
 use fendermint_rpc::client::FendermintClient;
 use fendermint_rpc::query::QueryClient;
 use fendermint_vm_message::query::FvmQueryHeight;
@@ -22,6 +23,7 @@ pub struct AddressCache<C> {
     addr_to_id: Arc<Mutex<LruCache<Address, ActorID>>>,
     id_to_addr: Arc<Mutex<LruCache<ActorID, Address>>>,
     addr_to_actor_type: Arc<Mutex<LruCache<Address, ActorType>>>,
+    cid_to_actor_type: Arc<Mutex<LruCache<Cid, ActorType>>>,
 }
 
 impl<C> AddressCache<C>
@@ -34,6 +36,7 @@ where
             addr_to_id: Arc::new(Mutex::new(LruCache::with_capacity(capacity))),
             id_to_addr: Arc::new(Mutex::new(LruCache::with_capacity(capacity))),
             addr_to_actor_type: Arc::new(Mutex::new(LruCache::with_capacity(capacity))),
+            cid_to_actor_type: Arc::new(Mutex::new(LruCache::with_capacity(capacity))),
         }
     }
 
@@ -120,6 +123,16 @@ where
         let mut c = self.addr_to_actor_type.lock().unwrap();
         c.get(addr).cloned()
     }
+
+    pub fn set_actor_type_for_cid(&self, cid: Cid, actor_type: ActorType) {
+        let mut c = self.cid_to_actor_type.lock().unwrap();
+        c.insert(cid, actor_type);
+    }
+
+    pub fn get_actor_type_from_cid(&self, cid: &Cid) -> Option<ActorType> {
+        let mut c = self.cid_to_actor_type.lock().unwrap();
+        c.get(cid).cloned()
+    }
 }
 
 #[cfg(test)]
@@ -159,5 +172,34 @@ mod tests {
             ActorType::Inexistent
         );
         assert_eq!(addr_cache.get_actor_type_from_addr(&address4), None);
+    }
+
+    #[test]
+    fn test_read_and_write_cid_to_actor_type() {
+        let client = FendermintClient::new(MockClient::new(tendermint_rpc::MockRequestMethodMatcher::default()).0);
+        let addr_cache = AddressCache::new(client, 1000);
+
+        let cid1 = Cid::from_str("bafk2bzacecmnyfiwb52tkbwmm2dsd7ysi3nvuxl3lmspy7pl26wxj4zj7w4wi").unwrap();
+        let cid2 = Cid::from_str("bafy2bzaceas2zajrutdp7ugb6w2lpmow3z3klr3gzqimxtuz22tkkqallfch4").unwrap();
+        let cid3 = Cid::from_str("k51qzi5uqu5dlvj2baxnqndepeb86cbk3ng7n3i46uzyxzyqj2xjonzllnv0v8").unwrap();
+        let cid4 = Cid::from_str("bafybeiemxf5abjwjbikoz4mc3a3dla6ual3jsgpdr4cjr3oz3evfyavhwq").unwrap();
+
+        addr_cache.set_actor_type_for_cid(cid1, ActorType::EVM);
+        addr_cache.set_actor_type_for_cid(cid2, ActorType::Unknown(Cid::default()));
+        addr_cache.set_actor_type_for_cid(cid3, ActorType::Inexistent);
+
+        assert_eq!(
+            addr_cache.get_actor_type_from_cid(&cid1).unwrap(),
+            ActorType::EVM
+        );
+        assert_eq!(
+            addr_cache.get_actor_type_from_cid(&cid2).unwrap(),
+            ActorType::Unknown(Cid::default())
+        );
+        assert_eq!(
+            addr_cache.get_actor_type_from_cid(&cid3).unwrap(),
+            ActorType::Inexistent
+        );
+        assert_eq!(addr_cache.get_actor_type_from_cid(&cid4), None);
     }
 }
