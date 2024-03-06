@@ -322,6 +322,11 @@ where
         .last_stored_configuration_number(state)
         .context("failed to get last stored configuration number")?;
 
+    tracing::debug!(
+        next = next_configuration_number,
+        last = last_configuration_number,
+        "next config number vs last stored config number"
+    );
     Ok(last_configuration_number != next_configuration_number)
 }
 

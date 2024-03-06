@@ -188,7 +188,11 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
             .quorum_reached_events(prev_h + 1, finalized_height)
             .await?;
         if events.is_empty() {
-            log::debug!("no reached events from {} to {}", prev_h + 1, finalized_height);
+            log::debug!(
+                "no reached events from {} to {}",
+                prev_h + 1,
+                finalized_height
+            );
             return Ok(());
         }
 
