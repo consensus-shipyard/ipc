@@ -42,8 +42,8 @@ use crate::{
     manifest::Balance,
     materializer::{Materializer, NodeConfig, SubmitConfig, SubnetConfig, TargetConfig},
     materials::{
-        export_json, export_script, import_json, DefaultAccount, DefaultDeployment, DefaultGenesis,
-        DefaultSubnet, Materials,
+        export_file, export_json, export_script, import_json, DefaultAccount, DefaultDeployment,
+        DefaultGenesis, DefaultSubnet, Materials,
     },
     NodeName, RelayerName, ResourceHash, ResourceName, SubnetName, TestnetName,
 };
@@ -611,6 +611,29 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
+        let subnet_dir = self.path(subnet_name);
+        let subnet_id_file = subnet_dir.join("subnet-id");
+
+        if subnet_id_file.exists() {
+            let subnet_id = std::fs::read_to_string(&subnet_id_file)
+                .context("failed to read subnet ID from file")?;
+
+            let subnet_id = SubnetID::from_str(&subnet_id).with_context(|| {
+                format!(
+                    "failed to parse subnet ID in {}: {}",
+                    subnet_id_file.to_string_lossy(),
+                    subnet_id
+                )
+            })?;
+
+            let subnet = DefaultSubnet {
+                subnet_id,
+                name: subnet_name.clone(),
+            };
+
+            return Ok(subnet);
+        }
+
         let testnet_name = subnet_name.testnet();
         let runner = self.ipc_cli_runner(&testnet_name)?;
 
@@ -689,6 +712,8 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             .and_then(find_subnet_id)
             .ok_or_else(|| anyhow!("cannot find a subnet ID in the logs"))?
             .context("failed to parse subnet ID")?;
+
+        export_file(subnet_id_file, subnet_id.to_string()).context("failed to export subnet ID")?;
 
         Ok(DefaultSubnet {
             name: subnet_name.clone(),
