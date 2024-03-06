@@ -71,6 +71,8 @@ pub struct BottomUpMsgBatch {
 
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
 pub struct BottomUpCheckpoint {
+    /// The previous bottom up checkpoint height
+    pub last_height: ChainEpoch,
     /// Child subnet ID, for replay protection from other subnets where the exact same validators operate.
     /// Alternatively it can be appended to the hash before signing, similar to how we use the chain ID.
     pub subnet_id: SubnetID,

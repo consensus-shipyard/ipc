@@ -16,7 +16,7 @@ struct ParentFinality {
 /// @notice A bottom-up checkpoint type.
 struct BottomUpCheckpoint {
     /// @dev The height of the previous bottom up checkpoint
-    uint256 prevHeight;
+    uint256 lastHeight;
     /// @dev Child subnet ID, for replay protection from other subnets where the exact same validators operate.
     /// Alternatively it can be appended to the hash before signing, similar to how we use the chain ID.
     SubnetID subnetID;

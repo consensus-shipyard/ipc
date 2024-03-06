@@ -35,19 +35,28 @@ contract TopDownFinalityFacet is GatewayActorModifiers {
         s.validatorsTracker.batchStoreChange(changeRequests);
     }
 
-    /// @notice Apply all changes committed through the commitment of parent finality.
-    /// @return configurationNumber The configuration number of the changes set that has been confirmed.
-    function applyFinalityChanges() external systemActorOnly returns (uint64) {
+    /// @notice Obtains the configuration number to execute changes to
+    function latestConfigurationNumber() public view returns(uint64 configurationNumber) {
         // get the latest configuration number for the change set
-        uint64 configurationNumber = s.validatorsTracker.changes.nextConfigurationNumber - 1;
+        configurationNumber = s.validatorsTracker.changes.nextConfigurationNumber - 1;
         // return immediately if there are no changes to confirm by looking at next configNumber
         if (
             // nextConfiguration == startConfiguration (i.e. no changes)
             (configurationNumber + 1) == s.validatorsTracker.changes.startConfigurationNumber
         ) {
             // 0 flags that there are no changes
+            configurationNumber = 0;
+        }
+    }
+
+    /// @notice Apply all changes committed through the commitment of parent finality.
+    /// @return configurationNumber The configuration number of the changes set that has been confirmed.
+    function applyFinalityChanges() external systemActorOnly returns (uint64) {
+        uint64 configurationNumber = latestConfigurationNumber();
+        if (configurationNumber == 0) {
             return 0;
         }
+
         // confirm the change
         s.validatorsTracker.confirmChange(configurationNumber);
 

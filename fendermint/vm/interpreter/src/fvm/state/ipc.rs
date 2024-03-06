@@ -105,6 +105,20 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
             .as_u64())
     }
 
+    /// Queries the configuration number of the `lastBottomUpCheckpointHeight`.
+    pub fn last_stored_configuration_number(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<u64> {
+        Ok(self
+            .getter
+            .call(state, |c| c.last_stored_configuration_number())?
+            .as_u64())
+    }
+
+    pub fn last_bottom_up_checkpoint_height(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<ethers::types::U256> {
+        self
+            .getter
+            .call(state, |c| c.last_bottom_up_checkpoint_height())
+    }
+
     /// Fetch the bottom-up message batch enqueued for a given checkpoint height.
     pub fn bottom_up_msg_batch(
         &self,
@@ -149,6 +163,12 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
     /// Apply all pending validator changes, returning the newly adopted configuration number, or 0 if there were no changes.
     pub fn apply_validator_changes(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<u64> {
         self.topdown.call(state, |c| c.apply_finality_changes())
+    }
+
+    /// Obtains the configuration number to execute changes to or 0 if there were no changes.
+    /// Does not perform the changes
+    pub fn latest_configuration_number(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<u64> {
+        self.topdown.call(state, |c| c.latest_configuration_number())
     }
 
     /// Get the currently active validator set.

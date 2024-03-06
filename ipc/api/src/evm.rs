@@ -126,6 +126,7 @@ macro_rules! bottom_up_checkpoint_conversion {
 
             fn try_from(checkpoint: BottomUpCheckpoint) -> Result<Self, Self::Error> {
                 Ok($module::BottomUpCheckpoint {
+                    last_height: ethers::core::types::U256::from(checkpoint.last_height),
                     subnet_id: $module::SubnetID::try_from(&checkpoint.subnet_id)?,
                     block_height: ethers::core::types::U256::from(checkpoint.block_height),
                     block_hash: vec_to_bytes32(checkpoint.block_hash)?,
@@ -144,6 +145,7 @@ macro_rules! bottom_up_checkpoint_conversion {
 
             fn try_from(value: $module::BottomUpCheckpoint) -> Result<Self, Self::Error> {
                 Ok(BottomUpCheckpoint {
+                    last_height: value.last_height.as_u128() as ChainEpoch,
                     subnet_id: SubnetID::try_from(value.subnet_id)?,
                     block_height: value.block_height.as_u128() as ChainEpoch,
                     block_hash: value.block_hash.to_vec(),

@@ -257,4 +257,14 @@ contract GatewayGetterFacet {
         (exists, epoch, checkpoint) = LibGateway.getCurrentBottomUpCheckpoint();
         return (exists, epoch, checkpoint);
     }
+
+    /// @notice Queries the configuration number of the `lastBottomUpCheckpointHeight`.
+    function lastStoredConfigurationNumber() external view returns(uint256) {
+        uint256 h = s.lastBottomUpCheckpointHeight;
+        return s.bottomUpCheckpoints[h].nextConfigurationNumber;
+    }
+
+    function lastBottomUpCheckpointHeight() external view returns(uint256) {
+        return s.lastBottomUpCheckpointHeight;
+    }
 }

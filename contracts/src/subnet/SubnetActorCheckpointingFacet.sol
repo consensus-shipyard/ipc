@@ -32,7 +32,7 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
 
         bytes32 checkpointHash = keccak256(abi.encode(checkpoint));
 
-        if (checkpoint.prevHeight == s.lastBottomUpCheckpointHeight) {
+        if (checkpoint.lastHeight == s.lastBottomUpCheckpointHeight) {
             // validate signatures and quorum threshold, revert if validation fails
             validateActiveQuorumSignatures({signatories: signatories, hash: checkpointHash, signatures: signatures});
 

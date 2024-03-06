@@ -785,7 +785,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             blockHash: keccak256(abi.encode(h)),
             nextConfigurationNumber: nextConfigNum - 1,
             msgs: new IpcEnvelope[](0),
-            prevHeight: saDiamond.getter().lastBottomUpCheckpointHeight()
+            lastHeight: saDiamond.getter().lastBottomUpCheckpointHeight()
         });
 
         vm.deal(address(saDiamond), 100 ether);

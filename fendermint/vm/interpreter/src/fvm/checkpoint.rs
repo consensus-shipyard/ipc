@@ -93,6 +93,9 @@ where
 
     let num_msgs = msgs.len();
 
+    let last_height = gateway.last_bottom_up_checkpoint_height(state)
+        .context("failed to get last stored checkpoint height")?;
+
     // Construct checkpoint.
     let checkpoint = BottomUpCheckpoint {
         subnet_id,
@@ -100,6 +103,7 @@ where
         block_hash,
         next_configuration_number,
         msgs,
+        last_height,
     };
 
     // Save the checkpoint in the ledger.
@@ -240,6 +244,7 @@ where
                 block_hash: cp.block_hash,
                 next_configuration_number: cp.next_configuration_number,
                 msgs: convert_tokenizables(cp.msgs)?,
+                last_height: cp.last_height,
             };
 
             // We mustn't do these in parallel because of how nonces are fetched.
@@ -299,6 +304,25 @@ fn convert_tokenizables<Source: Tokenizable, Target: Tokenizable>(
         .collect::<Result<Vec<_>, _>>()?)
 }
 
+/// Checks if the validators has changed by comparing the last stored configuration number in the
+/// child ateway with the next configuration number to be applied to.
+fn has_validators_changed<DB>(
+    gateway: &GatewayCaller<DB>,
+    state: &mut FvmExecState<DB>
+) -> anyhow::Result<bool>
+    where
+        DB: Blockstore + Clone,
+{
+    let next_configuration_number = gateway
+        .latest_configuration_number(state)
+        .context("failed to get validator changes")?;
+
+    let last_configuration_number = gateway.last_stored_configuration_number(state)
+        .context("failed to get last stored configuration number")?;
+
+    Ok(last_configuration_number != next_configuration_number)
+}
+
 fn should_create_checkpoint<DB>(
     gateway: &GatewayCaller<DB>,
     state: &mut FvmExecState<DB>,
@@ -325,10 +349,10 @@ where
             height = height.value(),
             "bottom up msg batch exists at height"
         );
-    } else if height.value() % gateway.bottom_up_check_period(state)? == 0 {
+    } else if has_validators_changed(gateway, state)? {
         tracing::debug!(
             height = height.value(),
-            "bottom up checkpoint period reached height"
+            "validator set has changed, create checkpoint"
         );
     } else {
         return Ok(None);
