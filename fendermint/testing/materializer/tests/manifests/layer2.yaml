@@ -5,6 +5,7 @@ accounts:
 
 rootnet:
   type: New
+  # Balances and collateral are in atto
   validators:
     alice: '100'
   balances:
@@ -24,12 +25,13 @@ rootnet:
 subnets:
   england:
     creator: bob
+    # Minimum collateral is 1 nanoFIL
     validators:
-      charlie: '80'
-      alice: '20'
+      charlie: '1000000000'
+      alice:   '2000000000'
     balances:
-      bob: '5000000000'
-      charlie: '8000000000'
+      bob:     '50000000000'
+      charlie: '80000000000'
     bottom_up_checkpoint:
       period: 1000
 
