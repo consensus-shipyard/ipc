@@ -502,20 +502,24 @@ impl DockerMaterializer {
         Ok(())
     }
 
-    fn reference_path(&self, rh: &ResourceHash) -> PathBuf {
-        self.dir.join("refs").join(hex::encode(rh.0))
+    fn reference_path(&self, sn: &SubnetName, rh: &ResourceHash) -> PathBuf {
+        self.path(sn.testnet()).join("refs").join(hex::encode(rh.0))
     }
 
-    fn has_reference(&self, reference: &Option<ResourceHash>) -> bool {
+    fn has_reference(&self, sn: &SubnetName, reference: &Option<ResourceHash>) -> bool {
         reference
             .as_ref()
-            .map(|rh| self.reference_path(&rh).exists())
+            .map(|rh| self.reference_path(sn, rh).exists())
             .unwrap_or_default()
     }
 
-    fn add_reference(&self, reference: &Option<ResourceHash>) -> anyhow::Result<()> {
+    fn add_reference(
+        &self,
+        sn: &SubnetName,
+        reference: &Option<ResourceHash>,
+    ) -> anyhow::Result<()> {
         if let Some(ref rh) = reference {
-            export_file(self.reference_path(rh), "").context("failed to write reference")
+            export_file(self.reference_path(sn, rh), "").context("failed to write reference")
         } else {
             Ok(())
         }
@@ -792,7 +796,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
-        if self.has_reference(&reference) {
+        if self.has_reference(&subnet.name, &reference) {
             return Ok(());
         }
 
@@ -813,7 +817,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             .await
             .context("failed to fund subnet")?;
 
-        self.add_reference(&reference)
+        self.add_reference(&subnet.name, &reference)
     }
 
     async fn join_subnet<'s, 'a>(
@@ -828,7 +832,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
-        if self.has_reference(&reference) {
+        if self.has_reference(&subnet.name, &reference) {
             return Ok(());
         }
 
@@ -851,7 +855,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             .await
             .context("failed to join subnet")?;
 
-        self.add_reference(&reference)
+        self.add_reference(&subnet.name, &reference)
     }
 
     async fn create_subnet_genesis<'s, 'a>(
