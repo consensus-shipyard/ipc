@@ -67,7 +67,14 @@ impl DockerRunner {
 
     /// Run a short lived container.
     pub async fn run_cmd(&self, cmd: &str) -> anyhow::Result<Vec<String>> {
-        let cmdv = cmd.split(' ').map(|s| s.to_string()).collect();
+        let cmdv = cmd
+            .split(' ')
+            .filter_map(|s| {
+                Some(s.trim())
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.to_string())
+            })
+            .collect();
 
         // Set the network otherwise we might be be able to parse addresses we created.
         let env = vec![format!("FM_NETWORK={}", current_network())];
