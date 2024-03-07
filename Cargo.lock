@@ -5156,6 +5156,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "ipcvisor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap 4.5.1",
+ "serde",
+ "serde_json",
+ "serde_with 2.3.3",
+]
+
+[[package]]
 name = "ipnet"
 version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

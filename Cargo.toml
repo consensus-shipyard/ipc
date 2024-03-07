@@ -10,6 +10,8 @@ members = [
   "ipc/api",
   "ipc/types",
 
+  "ipcvisor",
+
   # ipld
   "ipld/resolver",
 
