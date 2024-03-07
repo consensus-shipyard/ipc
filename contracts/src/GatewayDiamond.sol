@@ -87,6 +87,12 @@ contract GatewayDiamond {
                 v,
                 params.genesisValidators[i].federatedPower
             );
+
+            validators[i] = Validator({
+                weight: params.genesisValidators[i].weight,
+                addr: v,
+                metadata: params.genesisValidators[i].metadata
+            });
             unchecked {
                 i++;
             }
