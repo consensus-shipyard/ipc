@@ -314,12 +314,6 @@ impl DockerMaterializer {
         let config_toml =
             toml::to_string_pretty(&config).context("failed to serialize ipc-cli config")?;
 
-        eprintln!(
-            "EXPORTING CONFIG TO {}: {}",
-            file_name.to_string_lossy(),
-            config_toml
-        );
-
         std::fs::write(&file_name, config_toml).context("failed to write ipc-cli config")?;
 
         Ok(value)
@@ -759,7 +753,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
                 --from {:?} \
                 --min-validators {} \
                 --min-validator-stake {} \
-                --bottom-up-check-period {} \
+                --bottomup-check-period {} \
                 --permission-mode collateral \
                 --supply-source-kind native \
                 ",
