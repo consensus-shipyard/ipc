@@ -191,10 +191,11 @@ impl DockerNode {
         // Convert fendermint genesis to cometbft.
         fendermint_runner
             .run_cmd(
-                "genesis
-                    --genesis-file /fendermint/genesis.json
-                    into-tendermint
-                    --out /cometbft/config/genesis.json",
+                "genesis \
+                    --genesis-file /fendermint/genesis.json \
+                    into-tendermint \
+                    --out /cometbft/config/genesis.json \
+                    ",
             )
             .await
             .context("failed to convert genesis")?;
@@ -207,9 +208,10 @@ impl DockerNode {
 
             fendermint_runner
                 .run_cmd(
-                    "key into-tendermint
-                        --secret-key /fendermint/keys/validator_key.sk
-                        --out /cometbft/config/priv_validator_key.json",
+                    "key into-tendermint \
+                        --secret-key /fendermint/keys/validator_key.sk \
+                        --out /cometbft/config/priv_validator_key.json \
+                        ",
                 )
                 .await
                 .context("failed to convert validator key")?;

@@ -748,14 +748,14 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         // TODO: Move --permission-mode to the config
         // TODO: Move --supply-source-kind to the config
         let cmd = format!(
-            "ipc-cli subnet create
-                --parent {}
-                --from {:?},
-                --min-validators {}
-                --min-validator-stake {}
-                --bottom-up-check-period {}
-                --permission-mode collateral
-                --supply-source-kind native
+            "ipc-cli subnet create \
+                --parent {} \
+                --from {:?} \
+                --min-validators {} \
+                --min-validator-stake {} \
+                --bottom-up-check-period {} \
+                --permission-mode collateral \
+                --supply-source-kind native \
                 ",
             parent_submit_config.subnet.subnet_id,
             subnet_config.creator.eth_addr(),
@@ -801,11 +801,11 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         }
 
         let cmd = format!(
-            "ipc-cli subnet send-value
-                --subnet {}
-                --from {:?}
-                --to {:?}
-                {}
+            "ipc-cli subnet send-value \
+                --subnet {} \
+                --from {:?} \
+                --to {:?} \
+                {} \
             ",
             subnet.subnet_id,
             account.eth_addr(),
@@ -837,12 +837,12 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         }
 
         let cmd = format!(
-            "ipc-cli subnet join
-                --subnet {}
-                --from {:?}
-                --public-key {}
-                --collateral {}
-                --initial-balance {}
+            "ipc-cli subnet join \
+                --subnet {} \
+                --from {:?} \
+                --public-key {} \
+                --collateral {} \
+                --initial-balance {} \
             ",
             subnet.subnet_id,
             account.eth_addr(),
