@@ -236,7 +236,6 @@ pub struct SubnetConfig<'a, M: Materials> {
     pub creator: &'a M::Account,
     /// Number of validators required for bootstrapping a subnet.
     pub min_validators: usize,
-    pub min_validator_stake: TokenAmount,
     pub bottom_up_checkpoint: &'a CheckpointConfig,
 }
 
