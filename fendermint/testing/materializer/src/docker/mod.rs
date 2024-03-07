@@ -388,6 +388,35 @@ impl DockerMaterializer {
         self.path(testnet_name).join("accounts")
     }
 
+    /// Create an instance of an `fendermint` command runner.
+    fn fendermint_cli_runner(
+        &self,
+        subnet_name: &SubnetName,
+        network_name: Option<&NetworkName>,
+    ) -> anyhow::Result<DockerRunner> {
+        let subnet_dir = self.path(subnet_name);
+        // Use the owner of the directory for the container, so we don't get permission issues.
+        let user = subnet_dir.metadata()?.uid();
+        // Mount the subnet so we can create files there
+        let volumes = vec![(subnet_dir, "/fendermint/subnet")];
+
+        // TODO: The runner wants a node name, which we technically don't have here.
+        let node_name = subnet_name.node("fendermint-cli");
+
+        let runner = DockerRunner::new(
+            self.docker.clone(),
+            self.drop_chute.clone(),
+            self.drop_policy.clone(),
+            node_name,
+            user,
+            FENDERMINT_IMAGE,
+            volumes,
+            network_name.cloned(),
+        );
+
+        Ok(runner)
+    }
+
     /// Create an instance of an `ipc-cli` command runner.
     fn ipc_cli_runner(
         &self,
@@ -884,7 +913,67 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
-        todo!("use the fendermint CLI to fetch the genesis of a subnet from the parent")
+        let network_name = parent_submit_config
+            .nodes
+            .iter()
+            .filter_map(|tc| match tc {
+                TargetConfig::Internal(node) => Some(node),
+                TargetConfig::External(_) => None,
+            })
+            .next()
+            .map(|n| n.network_name());
+
+        let parent_url: Url = parent_submit_config
+            .nodes
+            .iter()
+            .filter_map(|tc| match tc {
+                TargetConfig::External(url) => Some(url.clone()),
+                TargetConfig::Internal(node) => node.internal_ethapi_http_endpoint(),
+            })
+            .next()
+            .ok_or_else(|| anyhow!("there has to be some nodes with eth API enabled"))?;
+
+        // TODO: Move --base-fee to config
+        // TODO: Move --power-scale to config
+        let cmd = format!(
+            "genesis \
+                --genesis-file /fendermint/subnet/genesis.json \
+                ipc from-parent \
+                    --subnet-id {} \
+                    --parent-endpoint {} \
+                    --parent-gateway {:?} \
+                    --parent-registry {:?} \
+                    --base-fee {} \
+                    --power-scale {} \
+                ",
+            subnet.subnet_id,
+            parent_url,
+            parent_submit_config.deployment.gateway,
+            parent_submit_config.deployment.registry,
+            TokenAmount::zero().atto(),
+            9, // to work with nanoFIL
+        );
+
+        let runner = self.fendermint_cli_runner(&subnet.name, network_name)?;
+
+        runner
+            .run_cmd(&cmd)
+            .await
+            .context("failed to fetch genesis from parent")?;
+
+        let genesis_path = self.path(&subnet.name).join("genesis.json");
+
+        let genesis = import_json::<Genesis>(&genesis_path)
+            .context("failed to read genesis.json")?
+            .ok_or_else(|| anyhow!("genesis.json doesn't exist after fetching from parent"))?;
+
+        let genesis = DefaultGenesis {
+            name: subnet.name.clone(),
+            genesis,
+            path: genesis_path,
+        };
+
+        Ok(genesis)
     }
 
     async fn create_relayer<'s, 'a>(
