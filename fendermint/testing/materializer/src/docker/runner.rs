@@ -15,7 +15,7 @@ use bollard::{
 };
 use futures::StreamExt;
 
-use crate::NodeName;
+use crate::{docker::current_network, NodeName};
 
 use super::{
     container::DockerContainer,
@@ -68,6 +68,10 @@ impl DockerRunner {
     /// Run a short lived container.
     pub async fn run_cmd(&self, cmd: &str) -> anyhow::Result<Vec<String>> {
         let cmdv = cmd.split(' ').map(|s| s.to_string()).collect();
+
+        // Set the network otherwise we might be be able to parse addresses we created.
+        let env = vec![format!("FM_NETWORK={}", current_network())];
+
         let config = Config {
             image: Some(self.image.clone()),
             user: Some(self.user.to_string()),
@@ -76,6 +80,7 @@ impl DockerRunner {
             attach_stdout: Some(true),
             tty: Some(true),
             labels: Some(self.labels()),
+            env: Some(env),
             host_config: Some(HostConfig {
                 // We'll remove it explicitly at the end after collecting the output.
                 auto_remove: Some(false),

@@ -892,6 +892,14 @@ fn find_subnet_id(log: impl AsRef<str>) -> Option<Result<SubnetID, ipc_api::erro
         .map(SubnetID::from_str)
 }
 
+/// The current address network needs to be set on the containers to match the addresses we created.
+fn current_network() -> &'static str {
+    match fvm_shared::address::current_network() {
+        fvm_shared::address::Network::Mainnet => "mainnet",
+        fvm_shared::address::Network::Testnet => "testnet",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use fendermint_vm_actor_interface::ipc;

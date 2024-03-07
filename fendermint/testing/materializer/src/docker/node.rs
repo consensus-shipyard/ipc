@@ -17,6 +17,7 @@ use url::Url;
 
 use super::{
     container::DockerContainer,
+    current_network,
     dropper::{DropChute, DropPolicy},
     runner::DockerRunner,
     DockerMaterials, DockerPortRange, Volumes, COMETBFT_IMAGE, FENDERMINT_IMAGE,
@@ -242,10 +243,6 @@ impl DockerNode {
                 .ok_or_else(|| anyhow!("ipc config missing"))?;
 
             let resolver_host_port: u32 = port_range.from;
-            let network = match fvm_shared::address::current_network() {
-                fvm_shared::address::Network::Mainnet => "mainnet",
-                fvm_shared::address::Network::Testnet => "testnet",
-            };
 
             // Start with the subnet level variables.
             let mut env: EnvMap = node_config.env.clone();
@@ -253,7 +250,7 @@ impl DockerNode {
             env.extend(env_vars![
                 "LOG_LEVEL"        => "info",
                 "RUST_BACKTRACE"   => 1,
-                "FM_NETWORK"       => network,
+                "FM_NETWORK"       => current_network(),
                 "FM_DATA_DIR"      => "/fendermint/data",
                 "FM_LOG_DIR"       => "/fendermint/logs",
                 "FM_SNAPSHOTS_DIR" => "/fendermint/snapshots",
