@@ -143,6 +143,17 @@ struct IPCAddress {
     FvmAddress rawAddress;
 }
 
+/// @notice Validator struct for gateway constructor.
+struct GenesisValidator {
+    /// The initial collateral deposited in the parent, 0 if none.
+    uint256 collateral;
+    /// The initial federated power set by super admin in the parent, 0 if none.
+    uint256 federatedPower;
+    uint256 weight;
+    address addr;
+    bytes metadata;
+}
+
 /// @notice Validator struct stored in the gateway.
 struct Validator {
     uint256 weight;

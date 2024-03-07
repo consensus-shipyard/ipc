@@ -200,7 +200,7 @@ library LibValidatorSet {
     }
 
     /// @notice Set validator data
-    function setMetadata(ValidatorSet storage validators, address validator, bytes calldata metadata) internal {
+    function setMetadata(ValidatorSet storage validators, address validator, bytes memory metadata) internal {
         validators.validators[validator].metadata = metadata;
     }
 
@@ -456,7 +456,7 @@ library LibStaking {
     }
 
     /// @notice Set the validator metadata directly without queueing the request
-    function setMetadataWithConfirm(address validator, bytes calldata metadata) internal {
+    function setMetadataWithConfirm(address validator, bytes memory metadata) internal {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
         s.validatorSet.setMetadata(validator, metadata);
     }

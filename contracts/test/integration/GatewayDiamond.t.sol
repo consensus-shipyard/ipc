@@ -14,7 +14,7 @@ import {IDiamondCut} from "../../src/interfaces/IDiamondCut.sol";
 import {QuorumInfo} from "../../src/structs/Quorum.sol";
 import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
-import {SubnetID, Subnet, IPCAddress, Validator, StakingChange, StakingChangeRequest, StakingOperation} from "../../src/structs/Subnet.sol";
+import {SubnetID, Subnet, IPCAddress, Validator, GenesisValidator, StakingChange, ValidatorInfo, StakingChangeRequest, StakingOperation} from "../../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
@@ -69,6 +69,35 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         IpcEnvelope memory storableMsg = gatewayDiamond.getter().postbox(0);
         IpcEnvelope memory msg1;
         require(msg1.toHash() == storableMsg.toHash(), "unexpected hash");
+    }
+
+    /// Test the membership and validator staking are actually in sync
+    function testGatewayDiamond_validatorStakingUpdated() external {
+        GatewayDiamond.ConstructorParams memory params = defaultGatewayParams();
+
+        uint256 numValidators = 2;
+
+        params.genesisValidators = new GenesisValidator[](numValidators);
+        for (uint256 i = 0; i < numValidators; i += 1) {
+            params.genesisValidators[i] = GenesisValidator({
+                collateral: 1000 * i,
+                federatedPower: i,
+                weight: 1,
+                addr: address(uint160(i)),
+                metadata: new bytes(10)
+            });
+        }
+
+        GatewayDiamond gw2 = createGatewayDiamond(params);
+
+        for (uint256 i = 0; i < numValidators; i += 1) {
+            ValidatorInfo memory info = gatewayDiamond.getter().parentValidatorStakingInfo(address(uint160(i)));
+
+            require(info.federatedPower == i, "federated power not set");
+            require(info.confirmedCollateral == 1000 * i, "confirmed collateral not set");
+            require(info.totalCollateral == 1000 * i, "total collateral not set");
+            require(keccak256(info.metadata) == keccak256(new bytes(10)), "metadata not equal");
+        }
     }
 
     function testGatewayDiamond_NewGatewayWithDefaultParams() public view {
@@ -177,7 +206,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             networkName: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
             bottomUpCheckPeriod: checkpointPeriod,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            genesisValidators: new Validator[](0),
+            genesisValidators: new GenesisValidator[](0),
             activeValidatorsLimit: 100,
             commitSha: DEFAULT_COMMIT_SHA
         });
@@ -210,7 +239,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: checkpointPeriod,
             majorityPercentage: 100,
-            genesisValidators: new Validator[](0),
+            genesisValidators: new GenesisValidator[](0),
             activeValidatorsLimit: 100,
             commitSha: DEFAULT_COMMIT_SHA
         });
@@ -714,7 +743,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            genesisValidators: new Validator[](0),
+            genesisValidators: new GenesisValidator[](0),
             activeValidatorsLimit: 100,
             commitSha: DEFAULT_COMMIT_SHA
         });
@@ -742,7 +771,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            genesisValidators: new Validator[](0),
+            genesisValidators: new GenesisValidator[](0),
             activeValidatorsLimit: 100,
             commitSha: DEFAULT_COMMIT_SHA
         });
@@ -769,7 +798,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            genesisValidators: new Validator[](0),
+            genesisValidators: new GenesisValidator[](0),
             activeValidatorsLimit: 100,
             commitSha: DEFAULT_COMMIT_SHA
         });
@@ -797,7 +826,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            genesisValidators: new Validator[](0),
+            genesisValidators: new GenesisValidator[](0),
             activeValidatorsLimit: 100,
             commitSha: DEFAULT_COMMIT_SHA
         });
@@ -1649,7 +1678,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            genesisValidators: new Validator[](0),
+            genesisValidators: new GenesisValidator[](0),
             activeValidatorsLimit: 100,
             commitSha: DEFAULT_COMMIT_SHA
         });
