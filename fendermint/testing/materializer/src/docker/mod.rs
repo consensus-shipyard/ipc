@@ -428,9 +428,10 @@ impl DockerMaterializer {
         let account_id: &str = account_id.as_ref();
 
         let cmd = format!(
-            "ipc-cli wallet import
-                --wallet-type evm
-                --path /fendermint/accounts/{account_id}/secret.hex"
+            "ipc-cli wallet import \
+                --wallet-type evm \
+                --path /fendermint/accounts/{account_id}/secret.hex \
+                "
         );
 
         // TODO: It would be nice to skip if already imported, but not crucial.

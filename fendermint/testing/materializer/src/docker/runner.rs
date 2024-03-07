@@ -135,7 +135,7 @@ impl DockerRunner {
             out.push(output.to_string());
         }
 
-        eprintln!("NODE: {}", self.node_name);
+        eprintln!("NODE: {} ({id})", self.node_name);
         eprintln!("CMD: {cmd}");
         for o in out.iter() {
             eprint!("OUT: {o}");
@@ -158,12 +158,12 @@ impl DockerRunner {
             )
             .await?;
 
-        if let Some(state) = inspect.state {
+        if let Some(ref state) = inspect.state {
             let exit_code = state.exit_code.unwrap_or_default();
             if exit_code != 0 {
                 bail!(
-                    "ctonainer exited with code {exit_code}: {}",
-                    state.error.unwrap_or_default()
+                    "container exited with code {exit_code}: '{}'",
+                    state.error.clone().unwrap_or_default()
                 );
             }
         }
