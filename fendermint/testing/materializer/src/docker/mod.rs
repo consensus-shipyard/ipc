@@ -847,7 +847,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         }
 
         let cmd = format!(
-            "ipc-cli subnet send-value \
+            "ipc-cli cross-msg fund \
                 --subnet {} \
                 --from {:?} \
                 --to {:?} \

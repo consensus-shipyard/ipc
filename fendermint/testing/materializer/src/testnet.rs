@@ -255,13 +255,13 @@ where
         for (node_id, node) in node_ids.iter() {
             self.create_node(m, subnet_name, node_id, node, env, node_ids.len())
                 .await
-                .with_context(|| format!("failed to create node {node_id} in {subnet_name:?}"))?;
+                .with_context(|| format!("failed to create node {node_id} in {subnet_name}"))?;
         }
 
         for (node_id, node) in node_ids.iter() {
             self.start_node(m, subnet_name, node_id, node)
                 .await
-                .with_context(|| format!("failed to start node {node_id} in {subnet_name:?}"))?;
+                .with_context(|| format!("failed to start node {node_id} in {subnet_name}"))?;
         }
 
         Ok(())
@@ -467,7 +467,7 @@ where
                     },
                 )
                 .await
-                .with_context(|| format!("failed to create {subnet_name:?}"))?;
+                .with_context(|| format!("failed to create {subnet_name}"))?;
 
             self.subnets.insert(subnet_name.clone(), created_subnet);
         };
@@ -498,12 +498,12 @@ where
                 for (label, id, amount) in cs.chain(bs) {
                     let account = self
                         .account(id)
-                        .with_context(|| format!("invalid {label} in {subnet_name:?}"))?;
+                        .with_context(|| format!("invalid {label} in {subnet_name}"))?;
 
                     // Assign a reference so we can remember that we did it, within each subnet,
                     // which can turn this into an idempotent operation.
                     let reference = ResourceHash::digest(format!(
-                        "funds from the top for {label} {id} for {subnet_name:?}"
+                        "funds from the top for {label} {id} for {subnet_name}"
                     ));
 
                     m.fund_subnet(
@@ -522,12 +522,12 @@ where
             for (id, c) in &subnet.validators {
                 let account = self
                     .account(id)
-                    .with_context(|| format!("invalid validator {id} in {subnet_name:?}"))?;
+                    .with_context(|| format!("invalid validator {id} in {subnet_name}"))?;
 
                 let b = subnet.balances.get(id).cloned().unwrap_or_default();
 
                 let reference =
-                    ResourceHash::digest(format!("initial join by {id} for {subnet_name:?}"));
+                    ResourceHash::digest(format!("initial join by {id} for {subnet_name}"));
 
                 m.join_subnet(
                     &parent_submit_config,
@@ -538,23 +538,21 @@ where
                     Some(reference),
                 )
                 .await
-                .with_context(|| {
-                    format!("failed to join with validator {id} in {subnet_name:?}")
-                })?;
+                .with_context(|| format!("failed to join with validator {id} in {subnet_name}"))?;
             }
 
             // Create genesis by fetching from the parent.
             let genesis = m
                 .create_subnet_genesis(&parent_submit_config, created_subnet)
                 .await
-                .context("failed to create subnet genesis in {subnet_name:?}")?;
+                .with_context(|| format!("failed to create subnet genesis in {subnet_name}"))?;
 
             self.genesis.insert(subnet_name.clone(), genesis);
 
             // Create and start nodes.
             self.create_and_start_nodes(m, &subnet_name, &subnet.nodes, &subnet.env)
                 .await
-                .context("failed to start subnet nodes in {subnet_name:?}")?;
+                .with_context(|| format!("failed to start subnet nodes in {subnet_name}"))?;
         }
 
         // Interact with the running subnet .
@@ -569,13 +567,13 @@ where
             for (id, b) in &subnet.balances {
                 let account = self
                     .account(id)
-                    .with_context(|| format!("invalid balance in {subnet_name:?}"))?;
+                    .with_context(|| format!("invalid balance in {subnet_name}"))?;
 
                 if subnet.validators.contains_key(id) {
                     continue;
                 }
 
-                let reference = ResourceHash::digest(format!("fund {id} in {subnet_name:?}"));
+                let reference = ResourceHash::digest(format!("fund {id} in {subnet_name}"));
 
                 m.fund_subnet(
                     &parent_submit_config,
@@ -585,7 +583,7 @@ where
                     Some(reference),
                 )
                 .await
-                .with_context(|| format!("failed to join with {id} in {subnet_name:?}"))?;
+                .with_context(|| format!("failed to fund {id} in {subnet_name}"))?;
             }
 
             // Create relayers for bottom-up checkpointing.
@@ -603,10 +601,10 @@ where
                     (Some(p), ParentNode::Internal(s)) => TargetConfig::Internal(self.node(&p.node(s)).context("invalid submit node")?),
                     (Some(p), ParentNode::External(url)) if p.is_root() => TargetConfig::External(url.clone()),
                     (Some(_), ParentNode::External(_))  => bail!(
-                        "invalid relayer {id} in {subnet_name:?}: parent is not root, but submit node is external"
+                        "invalid relayer {id} in {subnet_name}: parent is not root, but submit node is external"
                     ),
                     (None, _) => bail!(
-                        "invalid relayer {id} in {subnet_name:?}: there is no parent subnet to relay to"
+                        "invalid relayer {id} in {subnet_name}: there is no parent subnet to relay to"
                     ),
                 };
 
@@ -634,9 +632,7 @@ where
         for (subnet_id, subnet) in &subnet.subnets {
             self.create_and_start_subnet(m, &subnet_name, subnet_id, subnet)
                 .await
-                .with_context(|| {
-                    format!("failed to start subnet {subnet_id} in {subnet_name:?}")
-                })?;
+                .with_context(|| format!("failed to start subnet {subnet_id} in {subnet_name}"))?;
         }
 
         Ok(())
