@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 use anyhow::{anyhow, Context};
 use bollard::{
@@ -25,6 +25,12 @@ pub struct DockerNetwork {
     /// There is a single docker network created for the entire testnet.
     testnet_name: TestnetName,
     network: DockerConstruct,
+}
+
+impl Display for DockerNetwork {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.network_name(), f)
+    }
 }
 
 impl DockerNetwork {

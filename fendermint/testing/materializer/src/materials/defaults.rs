@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use std::{
-    fmt::Debug,
+    fmt::{Debug, Display},
     path::{Path, PathBuf},
 };
 
@@ -21,6 +21,12 @@ pub struct DefaultDeployment {
     pub name: SubnetName,
     pub gateway: EthAddress,
     pub registry: EthAddress,
+}
+
+impl Display for DefaultDeployment {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.name, f)
+    }
 }
 
 impl DefaultDeployment {
@@ -42,10 +48,22 @@ pub struct DefaultGenesis {
     pub path: PathBuf,
 }
 
+impl Display for DefaultGenesis {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.name, f)
+    }
+}
+
 pub struct DefaultSubnet {
     pub name: SubnetName,
     /// ID allocated to the subnet during creation.
     pub subnet_id: SubnetID,
+}
+
+impl Display for DefaultSubnet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.name, f)
+    }
 }
 
 #[derive(PartialEq, Eq)]
@@ -75,6 +93,12 @@ impl Debug for DefaultAccount {
             .field("name", &self.name)
             .field("public_key", &self.public_key)
             .finish()
+    }
+}
+
+impl Display for DefaultAccount {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.name, f)
     }
 }
 

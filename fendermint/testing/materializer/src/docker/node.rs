@@ -3,6 +3,7 @@
 
 use std::{
     collections::BTreeMap,
+    fmt::Display,
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
     str::FromStr,
@@ -70,6 +71,12 @@ pub struct DockerNode {
     /// This is the file system directory were all the artifacts
     /// regarding this node are stored, such as docker volumes and keys.
     path: PathBuf,
+}
+
+impl Display for DockerNode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.node_name, f)
+    }
 }
 
 impl DockerNode {
