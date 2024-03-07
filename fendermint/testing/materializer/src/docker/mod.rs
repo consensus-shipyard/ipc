@@ -60,7 +60,7 @@ pub use network::DockerNetwork;
 pub use node::DockerNode;
 pub use relayer::DockerRelayer;
 
-use self::{dropper::DropHandle, runner::DockerRunner};
+use self::{dropper::DropHandle, network::NetworkName, runner::DockerRunner};
 
 // TODO: Add these to the materializer.
 const COMETBFT_IMAGE: &str = "cometbft/cometbft:v0.37.x";
@@ -389,7 +389,11 @@ impl DockerMaterializer {
     }
 
     /// Create an instance of an `ipc-cli` command runner.
-    fn ipc_cli_runner(&self, testnet_name: &TestnetName) -> anyhow::Result<DockerRunner> {
+    fn ipc_cli_runner(
+        &self,
+        testnet_name: &TestnetName,
+        network_name: Option<&NetworkName>,
+    ) -> anyhow::Result<DockerRunner> {
         // Create a directory to hold the wallet.
         let ipc_dir = self.ipc_dir(testnet_name);
         let accounts_dir = self.accounts_dir(testnet_name);
@@ -414,6 +418,7 @@ impl DockerMaterializer {
             user,
             FENDERMINT_IMAGE,
             volumes,
+            network_name.cloned(),
         );
 
         Ok(runner)
@@ -493,7 +498,19 @@ impl DockerMaterializer {
         // Make sure the config file exists before trying to run any commands.
         self.ipc_cli_config_add_subnet(submit_config)?;
 
-        let runner = self.ipc_cli_runner(&submit_config.subnet.name.testnet())?;
+        let submit_node = submit_config
+            .nodes
+            .iter()
+            .filter_map(|tc| match tc {
+                TargetConfig::Internal(node) => Some(node),
+                TargetConfig::External(_) => None,
+            })
+            .next();
+
+        let runner = self.ipc_cli_runner(
+            &submit_config.subnet.name.testnet(),
+            submit_node.map(|n| n.network_name()),
+        )?;
 
         // Make sure the account we run the command with exists in the wallet.
         Self::ipc_cli_wallet_import(&runner, account).await?;

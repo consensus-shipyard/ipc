@@ -20,7 +20,8 @@ use crate::{docker::current_network, NodeName};
 use super::{
     container::DockerContainer,
     dropper::{DropChute, DropPolicy},
-    DockerConstruct, DockerNetwork, Volumes,
+    network::NetworkName,
+    DockerConstruct, Volumes,
 };
 
 pub struct DockerRunner {
@@ -31,9 +32,11 @@ pub struct DockerRunner {
     user: u32,
     image: String,
     volumes: Volumes,
+    network_name: Option<NetworkName>,
 }
 
 impl DockerRunner {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         docker: Docker,
         dropper: DropChute,
@@ -42,6 +45,7 @@ impl DockerRunner {
         user: u32,
         image: &str,
         volumes: Volumes,
+        network_name: Option<NetworkName>,
     ) -> Self {
         Self {
             docker,
@@ -51,6 +55,7 @@ impl DockerRunner {
             user,
             image: image.to_string(),
             volumes,
+            network_name,
         }
     }
 
@@ -98,6 +103,7 @@ impl DockerRunner {
                         .map(|(h, c)| format!("{}:{c}", h.to_string_lossy()))
                         .collect(),
                 ),
+                network_mode: self.network_name.clone(),
                 ..Default::default()
             }),
             ..Default::default()
@@ -175,7 +181,6 @@ impl DockerRunner {
     pub async fn create(
         &self,
         name: String,
-        network: &DockerNetwork,
         // Host <-> Container port mappings
         ports: Vec<(u32, u32)>,
         entrypoint: Vec<String>,
@@ -234,16 +239,18 @@ impl DockerRunner {
         eprintln!("---");
 
         // host_config.network_mode should work as well.
-        self.docker
-            .connect_network(
-                network.network_name(),
-                ConnectNetworkOptions {
-                    container: id.clone(),
-                    ..Default::default()
-                },
-            )
-            .await
-            .context("failed to connect container to network")?;
+        if let Some(network_name) = self.network_name.as_ref() {
+            self.docker
+                .connect_network(
+                    network_name,
+                    ConnectNetworkOptions {
+                        container: id.clone(),
+                        ..Default::default()
+                    },
+                )
+                .await
+                .context("failed to connect container to network")?;
+        }
 
         Ok(DockerContainer::new(
             self.docker.clone(),

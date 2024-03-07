@@ -19,6 +19,7 @@ use super::{
     container::DockerContainer,
     current_network,
     dropper::{DropChute, DropPolicy},
+    network::NetworkName,
     runner::DockerRunner,
     DockerMaterials, DockerPortRange, Volumes, COMETBFT_IMAGE, FENDERMINT_IMAGE,
 };
@@ -61,6 +62,7 @@ lazy_static! {
 pub struct DockerNode {
     /// Logical name of the node in the subnet hierarchy.
     node_name: NodeName,
+    network_name: String,
     fendermint: DockerContainer,
     cometbft: DockerContainer,
     ethapi: Option<DockerContainer>,
@@ -124,6 +126,7 @@ impl DockerNode {
                 user,
                 image,
                 volumes,
+                Some(node_config.network.network_name().to_string()),
             )
         };
 
@@ -380,7 +383,6 @@ impl DockerNode {
                 creator
                     .create(
                         fendermint_name,
-                        node_config.network,
                         vec![(port_range.resolver_p2p_host_port(), RESOLVER_P2P_PORT)],
                         entrypoint("fendermint run"),
                     )
@@ -401,7 +403,6 @@ impl DockerNode {
                 creator
                     .create(
                         cometbft_name,
-                        node_config.network,
                         vec![
                             (port_range.cometbft_p2p_host_port(), COMETBFT_P2P_PORT),
                             (port_range.cometbft_rpc_host_port(), COMETBFT_RPC_PORT),
@@ -421,7 +422,6 @@ impl DockerNode {
                 let c = creator
                     .create(
                         ethapi_name,
-                        node_config.network,
                         vec![(port_range.ethapi_rpc_host_port(), ETHAPI_RPC_PORT)],
                         entrypoint("fendermint eth run"),
                     )
@@ -436,6 +436,7 @@ impl DockerNode {
         // Construct the DockerNode
         Ok(DockerNode {
             node_name: node_name.clone(),
+            network_name: node_config.network.network_name().to_string(),
             fendermint,
             cometbft,
             ethapi,
@@ -474,12 +475,12 @@ impl DockerNode {
         Ok(())
     }
 
-    /// Read the CometBFT node ID from the file we persisted during creation.
+    /// Read the CometBFT node ID (network identity) from the file we persisted during creation.
     pub fn cometbft_node_id(&self) -> anyhow::Result<String> {
         read_file(self.path.join("keys").join(COMETBFT_NODE_ID))
     }
 
-    /// Read the libp2p peer ID from the file we persisted during creation.
+    /// Read the libp2p peer ID (network identity) from the file we persisted during creation.
     pub fn fendermint_peer_id(&self) -> anyhow::Result<String> {
         read_file(self.path.join("keys").join(FENDERMINT_PEER_ID))
     }
@@ -505,6 +506,11 @@ impl DockerNode {
             url::Url::parse(&format!("http://{}:{}", c.hostname(), ETHAPI_RPC_PORT))
                 .expect("valid url")
         })
+    }
+
+    /// Name of the docker network.
+    pub fn network_name(&self) -> &NetworkName {
+        &self.network_name
     }
 }
 
@@ -620,6 +626,7 @@ mod tests {
             0,
             COMETBFT_IMAGE,
             Vec::new(),
+            None,
         )
     }
 

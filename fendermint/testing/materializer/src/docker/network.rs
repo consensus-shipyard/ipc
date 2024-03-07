@@ -17,6 +17,8 @@ use super::{
     DockerConstruct,
 };
 
+pub type NetworkName = String;
+
 pub struct DockerNetwork {
     docker: Docker,
     dropper: DropChute,
@@ -30,7 +32,7 @@ impl DockerNetwork {
         &self.testnet_name
     }
 
-    pub fn network_name(&self) -> &str {
+    pub fn network_name(&self) -> &NetworkName {
         &self.network.name
     }
 
