@@ -314,6 +314,12 @@ impl DockerMaterializer {
         let config_toml =
             toml::to_string_pretty(&config).context("failed to serialize ipc-cli config")?;
 
+        eprintln!(
+            "EXPORTING CONFIG TO {}: {}",
+            file_name.to_string_lossy(),
+            config_toml
+        );
+
         std::fs::write(&file_name, config_toml).context("failed to write ipc-cli config")?;
 
         Ok(value)
@@ -381,7 +387,7 @@ impl DockerMaterializer {
     }
 
     fn ipc_dir(&self, testnet_name: &TestnetName) -> PathBuf {
-        self.path(testnet_name).join(".ipc")
+        self.path(testnet_name).join("ipc")
     }
 
     fn accounts_dir(&self, testnet_name: &TestnetName) -> PathBuf {
@@ -454,7 +460,7 @@ impl DockerMaterializer {
         // Find a node to which the `ipc-cli` can connect to create the subnet.
         // Using the internal HTTP address, assumign that the dockerized `ipc-cli`
         // will always mount the config file and talk to the nodes within the docker network.
-        let url = submit_config
+        let url: Url = submit_config
             .nodes
             .iter()
             .filter_map(|tc| match tc {
@@ -489,18 +495,21 @@ impl DockerMaterializer {
         submit_config: &SubmitConfig<'a, DockerMaterials>,
         account: &DefaultAccount,
         cmd: String,
-    ) -> anyhow::Result<()> {
-        let runner = self.ipc_cli_runner(&submit_config.subnet.name.testnet())?;
-
-        Self::ipc_cli_wallet_import(&runner, account).await?;
+    ) -> anyhow::Result<Vec<String>> {
+        // Make sure the config file exists before trying to run any commands.
         self.ipc_cli_config_add_subnet(submit_config)?;
 
-        runner
+        let runner = self.ipc_cli_runner(&submit_config.subnet.name.testnet())?;
+
+        // Make sure the account we run the command with exists in the wallet.
+        Self::ipc_cli_wallet_import(&runner, account).await?;
+
+        let logs = runner
             .run_cmd(&cmd)
             .await
             .context("failed to run ipc-cli command")?;
 
-        Ok(())
+        Ok(logs)
     }
 
     fn reference_path(&self, sn: &SubnetName, rh: &ResourceHash) -> PathBuf {
@@ -721,6 +730,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         let subnet_dir = self.path(subnet_name);
         let subnet_id_file = subnet_dir.join("subnet-id");
 
+        // Check if we have already created the subnet.
         if subnet_id_file.exists() {
             let subnet_id = std::fs::read_to_string(&subnet_id_file)
                 .context("failed to read subnet ID from file")?;
@@ -740,11 +750,6 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
 
             return Ok(subnet);
         }
-
-        let runner = self.ipc_cli_runner(&subnet_name.testnet())?;
-
-        Self::ipc_cli_wallet_import(&runner, subnet_config.creator).await?;
-        self.ipc_cli_config_add_subnet(parent_submit_config)?;
 
         // TODO: Move --permission-mode to the config
         // TODO: Move --supply-source-kind to the config
@@ -766,8 +771,8 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         );
 
         // Now run the command and capture the output.
-        let logs = runner
-            .run_cmd(&cmd)
+        let logs = self
+            .ipc_cli_run_cmd(parent_submit_config, subnet_config.creator, cmd)
             .await
             .context("failed to create subnet")?;
 
@@ -814,7 +819,8 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             amount
         );
 
-        self.ipc_cli_run_cmd(parent_submit_config, account, cmd)
+        let logs = self
+            .ipc_cli_run_cmd(parent_submit_config, account, cmd)
             .await
             .context("failed to fund subnet")?;
 
