@@ -74,24 +74,28 @@ contract GatewayDiamond {
         // empty validator change logs
         s.validatorsTracker.changes.startConfigurationNumber = LibStaking.INITIAL_CONFIGURATION_NUMBER;
         // set initial validators and update membership
-        uint256 totalValidators = params.genesisValidators.length;
+        initMembership(params.genesisValidators);
+    }
+
+    function initMembership(GenesisValidator[] memory genesisValidators) internal {
+        uint256 totalValidators = genesisValidators.length;
         Validator[] memory validators = new Validator[](totalValidators);
 
         for (uint256 i = 0; i < totalValidators; ) {
-            address v = params.genesisValidators[i].addr;
-            LibValidatorSet.recordDeposit(s.validatorsTracker.validators, v, params.genesisValidators[i].collateral);
-            LibValidatorSet.confirmDeposit(s.validatorsTracker.validators, v, params.genesisValidators[i].collateral);
-            LibValidatorSet.setMetadata(s.validatorsTracker.validators, v, params.genesisValidators[i].metadata);
+            address v = genesisValidators[i].addr;
+            LibValidatorSet.recordDeposit(s.validatorsTracker.validators, v, genesisValidators[i].collateral);
+            LibValidatorSet.confirmDeposit(s.validatorsTracker.validators, v, genesisValidators[i].collateral);
+            LibValidatorSet.setMetadata(s.validatorsTracker.validators, v, genesisValidators[i].metadata);
             LibValidatorSet.confirmFederatedPower(
                 s.validatorsTracker.validators,
                 v,
-                params.genesisValidators[i].federatedPower
+                genesisValidators[i].federatedPower
             );
 
             validators[i] = Validator({
-                weight: params.genesisValidators[i].weight,
+                weight: genesisValidators[i].weight,
                 addr: v,
-                metadata: params.genesisValidators[i].metadata
+                metadata: genesisValidators[i].metadata
             });
             unchecked {
                 i++;

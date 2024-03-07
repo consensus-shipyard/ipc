@@ -91,7 +91,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         GatewayDiamond gw2 = createGatewayDiamond(params);
 
         for (uint256 i = 0; i < numValidators; i += 1) {
-            ValidatorInfo memory info = gatewayDiamond.getter().parentValidatorStakingInfo(address(uint160(i)));
+            ValidatorInfo memory info = gw2.getter().parentValidatorStakingInfo(address(uint160(i)));
 
             require(info.federatedPower == i, "federated power not set");
             require(info.confirmedCollateral == 1000 * i, "confirmed collateral not set");
