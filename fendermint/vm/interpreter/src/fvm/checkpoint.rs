@@ -122,7 +122,7 @@ where
 
         debug_assert_eq!(next_power_configuration_number, next_configuration_number);
 
-        tracing::info!(curr = ?curr_power_table, next = ?next_power_table, "tables");
+        tracing::info!(next_configuration_number, curr = ?curr_power_table, next = ?next_power_table, "tables");
         power_diff(curr_power_table, next_power_table)
     };
 
