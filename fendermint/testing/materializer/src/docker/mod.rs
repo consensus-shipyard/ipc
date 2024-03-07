@@ -777,7 +777,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             parent_submit_config.subnet.subnet_id,
             subnet_config.creator.eth_addr(),
             subnet_config.min_validators,
-            TokenAmount::from_atto(1), // The minimum for native mode
+            TokenAmount::from_nano(1), // The minimum for native mode that the CLI parses
             subnet_config.bottom_up_checkpoint.period
         );
 
