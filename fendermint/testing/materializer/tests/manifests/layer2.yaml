@@ -13,7 +13,7 @@ rootnet:
     bob: '2000000000000000000'
     charlie: '3000000000000000000'
   env:
-    CMT_CONSENSUS_TIMEOUT_COMMIT: 5s
+    CMT_CONSENSUS_TIMEOUT_COMMIT: 2s
 
   nodes:
     brussels:

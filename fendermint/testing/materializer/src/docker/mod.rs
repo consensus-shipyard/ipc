@@ -74,6 +74,10 @@ const DOCKER_ENTRY_FILE_NAME: &str = "docker-entry.sh";
 const PORT_RANGE_START: u32 = 30000;
 const PORT_RANGE_SIZE: u32 = 100;
 
+lazy_static! {
+    static ref STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
+}
+
 type Volumes = Vec<(PathBuf, &'static str)>;
 
 #[macro_export]
@@ -755,7 +759,11 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         's: 'a,
     {
         // Overwrite the env file which has seed addresses, then start the node (unless it's already running).
-        node.start(seed_nodes).await
+        node.start(seed_nodes).await?;
+        node.wait_for_started(*STARTUP_TIMEOUT).await?;
+        // Trying to avoid `Tendermint RPC error: server returned malformatted JSON (no 'result' or 'error')` on first subnet creation attempt.
+        tokio::time::sleep(Duration::from_secs(5)).await;
+        Ok(())
     }
 
     async fn create_subnet<'s, 'a>(

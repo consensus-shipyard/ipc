@@ -7,13 +7,15 @@ use std::{
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
     str::FromStr,
+    time::{Duration, Instant},
 };
 
 use anyhow::{anyhow, bail, Context};
 use bollard::Docker;
-use ethers::types::H160;
+use ethers::{providers::Middleware, types::H160};
 use fvm_shared::bigint::Zero;
 use lazy_static::lazy_static;
+use tendermint_rpc::Client;
 use url::Url;
 
 use super::{
@@ -480,6 +482,32 @@ impl DockerNode {
         }
 
         Ok(())
+    }
+
+    /// Allow time for things to consolidate and APIs to start.
+    pub async fn wait_for_started(&self, timeout: Duration) -> anyhow::Result<bool> {
+        let start = Instant::now();
+
+        loop {
+            if start.elapsed() > timeout {
+                return Ok(false);
+            }
+            tokio::time::sleep(Duration::from_secs(1)).await;
+
+            let client = self.cometbft_http_provider()?;
+
+            if let Err(e) = client.abci_info().await {
+                continue;
+            }
+
+            if let Some(client) = self.ethapi_http_provider()? {
+                if let Err(e) = client.get_chainid().await {
+                    continue;
+                }
+            }
+
+            return Ok(true);
+        }
     }
 
     /// Read the CometBFT node ID (network identity) from the file we persisted during creation.
