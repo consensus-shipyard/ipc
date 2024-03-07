@@ -314,7 +314,7 @@ impl DockerMaterializer {
         let config_toml =
             toml::to_string_pretty(&config).context("failed to serialize ipc-cli config")?;
 
-        std::fs::write(&file_name, config_toml).context("failed to write ipc-cli config")?;
+        export_file(&file_name, config_toml).context("failed to write ipc-cli config")?;
 
         Ok(value)
     }
