@@ -22,7 +22,7 @@ help:
 
 .PHONY: deploy-handler
 deploy-handler:
-	forge script ./script/Deploy.s.sol \
+	forge script ./script/Deploy.s.sol:Deploy \
 		--sig "deployTokenHandler()" \
 		--rpc-url "${$(DEST_NETWORK)__RPC_URL}" \
 		--broadcast \
@@ -30,7 +30,7 @@ deploy-handler:
 
 .PHONY: deploy-sender
 deploy-sender:
-	forge script ./script/Deploy.s.sol \
+	forge script ./script/Deploy.s.sol:Deploy \
 		--sig "deployTokenSender()" \
 		--rpc-url "${$(ORIGIN_NETWORK)__RPC_URL}" \
 		--broadcast \
