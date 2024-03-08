@@ -51,10 +51,12 @@ subnets:
         mode:
           type: Validator
           validator: charlie
+        parent_node: brussels
         ethapi: true
 
       manchester:
         mode:
           type: Validator
           validator: alice
+        parent_node: brussels
         ethapi: true

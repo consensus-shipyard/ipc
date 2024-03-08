@@ -309,6 +309,9 @@ where
             (None, Some(_)) => {
                 bail!("node {node_name:?} specifies parent node, but there is no parent subnet")
             }
+            (Some(_), None) => {
+                bail!("node {node_name:?} is on a subnet, but doesn't specify a parent node")
+            }
             _ => None,
         };
 
