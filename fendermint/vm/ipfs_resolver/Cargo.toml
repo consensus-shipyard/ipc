@@ -16,8 +16,10 @@ tracing = { workspace = true }
 tokio = { workspace = true }
 
 cid = { workspace = true }
+libp2p = { workspace = true }
 ipc-api = { workspace = true }
 ipc_ipld_resolver = { workspace = true }
+fendermint_vm_topdown = { path = "../topdown" }
 
 [dev-dependencies]
 tokio = { workspace = true }

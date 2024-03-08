@@ -4,28 +4,50 @@
 
 use std::time::Duration;
 
-use async_stm::{atomically, queues::TQueueLike};
-use ipc_ipld_resolver::IpfsResolver as Resolver;
+use async_stm::{atomically, atomically_or_err, queues::TQueueLike};
+use cid::Cid;
+use fendermint_vm_topdown::voting::VoteTally;
+use ipc_api::subnet_id::SubnetID;
+use ipc_ipld_resolver::{Client, ResolverIpfs, ValidatorKey, VoteRecord};
+use libp2p::identity::Keypair;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 use crate::pool::{ResolveQueue, ResolveTask};
 
 /// The IPLD Resolver takes resolution tasks from the [ResolvePool] and
 /// uses the [ipc_ipld_resolver] to fetch the content from subnets.
-pub struct IpfsResolver<C> {
-    client: C,
+pub struct IpfsResolver<V> {
+    client: Client<V>,
     queue: ResolveQueue,
     retry_delay: Duration,
+    vote_tally: VoteTally,
+    key: Keypair,
+    subnet_id: SubnetID,
+    to_vote: fn(Cid) -> V,
 }
 
-impl<C> IpfsResolver<C>
+impl<V> IpfsResolver<V>
 where
-    C: Resolver + Clone + Send + 'static,
+    V: Clone + Send + Sync + Serialize + DeserializeOwned + 'static,
 {
-    pub fn new(client: C, queue: ResolveQueue, retry_delay: Duration) -> Self {
+    pub fn new(
+        client: Client<V>,
+        queue: ResolveQueue,
+        retry_delay: Duration,
+        vote_tally: VoteTally,
+        key: Keypair,
+        subnet_id: SubnetID,
+        to_vote: fn(Cid) -> V,
+    ) -> Self {
         Self {
             client,
             queue,
             retry_delay,
+            vote_tally,
+            key,
+            subnet_id,
+            to_vote,
         }
     }
 
@@ -43,6 +65,10 @@ where
                 self.client.clone(),
                 self.queue.clone(),
                 self.retry_delay,
+                self.vote_tally.clone(),
+                self.key.clone(),
+                self.subnet_id.clone(),
+                self.to_vote,
             );
         }
     }
@@ -50,11 +76,21 @@ where
 
 /// Run task resolution in the background, so as not to block items from other
 /// subnets being tried.
-fn start_resolve<C>(task: ResolveTask, client: C, queue: ResolveQueue, retry_delay: Duration)
-where
-    C: Resolver + Send + 'static,
+#[allow(clippy::too_many_arguments)]
+fn start_resolve<V>(
+    task: ResolveTask,
+    client: Client<V>,
+    queue: ResolveQueue,
+    retry_delay: Duration,
+    vote_tally: VoteTally,
+    key: Keypair,
+    subnet_id: SubnetID,
+    to_vote: fn(Cid) -> V,
+) where
+    V: Clone + Send + Sync + Serialize + DeserializeOwned + 'static,
 {
     tokio::spawn(async move {
+        tracing::info!(cid = ?task.cid(), "starting ipfs content resolve");
         let res = client.resolve_ipfs(task.cid()).await;
 
         let err = match res {
@@ -75,6 +111,35 @@ where
             None => {
                 tracing::info!(cid = ?task.cid(), "ipfs content resolved");
                 atomically(|| task.set_resolved()).await;
+
+                let vote = to_vote(task.cid());
+
+                match VoteRecord::signed(&key, subnet_id, vote) {
+                    Ok(vote) => {
+                        let validator_key = ValidatorKey::from(key.public());
+                        let res = atomically_or_err(|| {
+                            vote_tally.add_object_vote(validator_key.clone(), task.cid().to_bytes())
+                        })
+                        .await;
+
+                        match res {
+                            Ok(_) => {
+                                if let Err(e) = client.publish_vote(vote) {
+                                    tracing::error!(
+                                        error = e.to_string(),
+                                        "failed to publish vote"
+                                    );
+                                }
+                            }
+                            Err(e) => {
+                                tracing::warn!(error = e.to_string(), "failed to handle own vote");
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!(error = e.to_string(), "failed to sign vote");
+                    }
+                }
             }
             Some(e) => {
                 tracing::error!(

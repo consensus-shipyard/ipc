@@ -23,7 +23,7 @@ use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::proxy::IPCProviderProxy;
 use fendermint_vm_topdown::sync::launch_polling_syncer;
 use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
-use fendermint_vm_topdown::{CachedFinalityProvider, IPCParentFinality, Toggle};
+use fendermint_vm_topdown::{CachedFinalityProvider, IPCObjectFinality, IPCParentFinality, Toggle};
 use fvm_shared::address::Address;
 use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
@@ -158,15 +158,10 @@ async fn run(ipfs_addr: String, settings: Settings) -> anyhow::Result<()> {
             own_subnet_id.clone(),
         );
 
-        let ipfs_resolver = IpfsResolver::new(
-            client.clone(),
-            ipfs_pin_pool.queue(),
-            settings.resolver.retry_delay,
-        );
-
         if topdown_enabled {
-            if let Some(key) = validator_keypair {
+            if let Some(key) = validator_keypair.clone() {
                 let parent_finality_votes = parent_finality_votes.clone();
+                let own_subnet_id = own_subnet_id.clone();
 
                 tracing::info!("starting the parent finality vote gossip loop...");
                 let client = client.clone();
@@ -189,6 +184,21 @@ async fn run(ipfs_addr: String, settings: Settings) -> anyhow::Result<()> {
             tracing::info!("parent finality vote gossip disabled");
         }
 
+        if let Some(key) = validator_keypair {
+            let ipfs_resolver = IpfsResolver::new(
+                client.clone(),
+                ipfs_pin_pool.queue(),
+                settings.resolver.retry_delay,
+                parent_finality_votes.clone(),
+                key,
+                own_subnet_id,
+                |value| AppVote::ObjectFinality(IPCObjectFinality { object: value }),
+            );
+
+            tracing::info!("starting the IPFS Resolver...");
+            tokio::spawn(async move { ipfs_resolver.run().await });
+        }
+
         tracing::info!("subscribing to gossip...");
         let rx = service.subscribe();
         let parent_finality_votes = parent_finality_votes.clone();
@@ -205,9 +215,6 @@ async fn run(ipfs_addr: String, settings: Settings) -> anyhow::Result<()> {
 
         tracing::info!("starting the IPLD Resolver...");
         tokio::spawn(async move { resolver.run().await });
-
-        tracing::info!("starting the IPFS Resolver...");
-        tokio::spawn(async move { ipfs_resolver.run().await });
     } else {
         tracing::info!("IPLD Resolver disabled.")
     }
@@ -487,6 +494,27 @@ async fn dispatch_vote(
                     f.height,
                     f.block_hash.clone(),
                 )
+            })
+            .await;
+
+            match res {
+                Ok(_) => {}
+                Err(e @ VoteError::Equivocation(_, _, _, _)) => {
+                    tracing::warn!(error = e.to_string(), "failed to handle vote");
+                }
+                Err(e @ (
+                VoteError::Uninitialized // early vote, we're not ready yet
+                | VoteError::UnpoweredValidator(_) // maybe arrived too early or too late, or spam
+                | VoteError::UnexpectedBlock(_, _) // won't happen here
+                )) => {
+                    tracing::debug!(error = e.to_string(), "failed to handle vote")
+                }
+            }
+        }
+        AppVote::ObjectFinality(f) => {
+            tracing::warn!("received vote {}", f);
+            let res = atomically_or_err(|| {
+                parent_finality_votes.add_object_vote(vote.public_key.clone(), f.object.to_bytes())
             })
             .await;
 

@@ -3417,9 +3417,11 @@ version = "0.1.0"
 dependencies = [
  "async-stm",
  "cid",
+ "fendermint_vm_topdown",
  "im",
  "ipc-api",
  "ipc_ipld_resolver",
+ "libp2p",
  "serde",
  "tokio",
  "tracing",

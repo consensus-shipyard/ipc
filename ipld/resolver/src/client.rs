@@ -115,7 +115,7 @@ where
 
 /// Trait to limit the capabilities to resolving CIDs from IPFS.
 #[async_trait]
-pub trait IpfsResolver {
+pub trait ResolverIpfs {
     /// Send a CID for resolution from a local IPFS node, await its completion,
     /// then return the result, to be inspected by the caller.
     ///
@@ -124,7 +124,7 @@ pub trait IpfsResolver {
 }
 
 #[async_trait]
-impl<V> IpfsResolver for Client<V>
+impl<V> ResolverIpfs for Client<V>
 where
     V: Sync + Send + 'static,
 {
