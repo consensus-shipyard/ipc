@@ -11,7 +11,7 @@ import {InvalidCollateral, InvalidSubmissionPeriod, InvalidMajorityPercentage} f
 import {LibDiamond} from "./lib/LibDiamond.sol";
 import {LibGateway} from "./lib/LibGateway.sol";
 import {SubnetID} from "./structs/Subnet.sol";
-import {LibStaking, LibValidatorSet} from "./lib/LibStaking.sol";
+import {LibStaking, LibValidatorSet, LibValidatorTracking} from "./lib/LibStaking.sol";
 import {BATCH_PERIOD, MAX_MSGS_PER_BATCH} from "./structs/CrossNet.sol";
 
 error FunctionNotFound(bytes4 _functionSelector);
@@ -67,43 +67,7 @@ contract GatewayDiamond {
         // through the gateway constructor in the future.
         s.maxMsgsPerBottomUpBatch = MAX_MSGS_PER_BATCH;
 
-        s.validatorsTracker.validators.activeLimit = params.activeValidatorsLimit;
-        // Start the next configuration number from 1, 0 is reserved for no change and the genesis membership
-        s.validatorsTracker.changes.nextConfigurationNumber = LibStaking.INITIAL_CONFIGURATION_NUMBER;
-        // The startConfiguration number is also 1 to match with nextConfigurationNumber, indicating we have
-        // empty validator change logs
-        s.validatorsTracker.changes.startConfigurationNumber = LibStaking.INITIAL_CONFIGURATION_NUMBER;
-        // set initial validators and update membership
-        initMembership(params.genesisValidators);
-    }
-
-    function initMembership(GenesisValidator[] memory genesisValidators) internal {
-        uint256 totalValidators = genesisValidators.length;
-        Validator[] memory validators = new Validator[](totalValidators);
-
-        for (uint256 i = 0; i < totalValidators; ) {
-            address v = genesisValidators[i].addr;
-            LibValidatorSet.recordDeposit(s.validatorsTracker.validators, v, genesisValidators[i].collateral);
-            LibValidatorSet.confirmDeposit(s.validatorsTracker.validators, v, genesisValidators[i].collateral);
-            LibValidatorSet.setMetadata(s.validatorsTracker.validators, v, genesisValidators[i].metadata);
-            LibValidatorSet.confirmFederatedPower(
-                s.validatorsTracker.validators,
-                v,
-                genesisValidators[i].federatedPower
-            );
-
-            validators[i] = Validator({
-                weight: genesisValidators[i].weight,
-                addr: v,
-                metadata: genesisValidators[i].metadata
-            });
-            unchecked {
-                i++;
-            }
-        }
-
-        Membership memory initial = Membership({configurationNumber: 0, validators: validators});
-        LibGateway.updateMembership(initial);
+        LibValidatorTracking.init(s.validatorsTracker, params.activeValidatorsLimit, params.genesisValidators);
     }
 
     function _fallback() internal {

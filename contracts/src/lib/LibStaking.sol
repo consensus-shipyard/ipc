@@ -6,7 +6,7 @@ import {LibSubnetActorStorage, SubnetActorStorage} from "./LibSubnetActorStorage
 import {LibMaxPQ, MaxPQ} from "./priority/LibMaxPQ.sol";
 import {LibMinPQ, MinPQ} from "./priority/LibMinPQ.sol";
 import {LibStakingChangeLog} from "./LibStakingChangeLog.sol";
-import {PermissionMode, StakingReleaseQueue, StakingChangeLog, StakingChange, StakingChangeRequest, StakingOperation, StakingRelease, ValidatorSet, AddressStakingReleases, ParentValidatorsTracker, Validator} from "../structs/Subnet.sol";
+import {PermissionMode, StakingReleaseQueue, StakingChangeLog, StakingChange, StakingChangeRequest, StakingOperation, StakingRelease, ValidatorSet, AddressStakingReleases, ParentValidatorsTracker, GenesisValidator, Validator} from "../structs/Subnet.sol";
 import {WithdrawExceedingCollateral, NotValidator, CannotConfirmFutureChanges, NoCollateralToWithdraw, AddressShouldBeValidator, InvalidConfigurationNumber} from "../errors/IPCErrors.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
 
@@ -606,6 +606,46 @@ library LibStaking {
 library LibValidatorTracking {
     using LibValidatorSet for ValidatorSet;
     using LibStakingChangeLog for StakingChangeLog;
+
+    function init(
+        ParentValidatorsTracker storage self,
+        uint16 activeValidatorsLimit,
+        GenesisValidator[] memory validators
+    ) internal returns (Validator[] memory membership) {
+        self.validators.activeLimit = activeValidatorsLimit;
+        // Start the next configuration number from 1, 0 is reserved for no change and the genesis membership
+        self.changes.nextConfigurationNumber = LibStaking.INITIAL_CONFIGURATION_NUMBER;
+        // The startConfiguration number is also 1 to match with nextConfigurationNumber, indicating we have
+        // empty validator change logs
+        self.changes.startConfigurationNumber = LibStaking.INITIAL_CONFIGURATION_NUMBER;
+
+        initValidators(self, validators);
+    }
+
+    function initValidators(
+        ParentValidatorsTracker storage self,
+        GenesisValidator[] memory validators
+    ) internal returns (Validator[] memory membership) {
+        uint256 total = validators.length;
+        membership = new Validator[](total);
+
+        for (uint256 i = 0; i < total; ) {
+            address v = validators[i].addr;
+            self.validators.recordDeposit(v, validators[i].collateral);
+            self.validators.confirmDeposit(v, validators[i].collateral);
+            self.validators.setMetadata(v, validators[i].metadata);
+            self.validators.confirmFederatedPower(v, validators[i].federatedPower);
+
+            membership[i] = Validator({
+                weight: validators[i].federatedPower + validators[i].collateral,
+                addr: v,
+                metadata: validators[i].metadata
+            });
+            unchecked {
+                i++;
+            }
+        }
+    }
 
     function storeChange(ParentValidatorsTracker storage self, StakingChangeRequest calldata changeRequest) internal {
         uint64 configurationNumber = self.changes.recordChange({

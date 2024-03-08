@@ -82,7 +82,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             params.genesisValidators[i] = GenesisValidator({
                 collateral: 1000 * i,
                 federatedPower: i,
-                weight: 1,
                 addr: address(uint160(i)),
                 metadata: new bytes(10)
             });
