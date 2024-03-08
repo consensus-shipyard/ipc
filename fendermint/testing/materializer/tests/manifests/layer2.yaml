@@ -37,16 +37,15 @@ subnets:
       period: 1000
 
     relayers:
-      # TODO: Implement `create_relayer`.
-      # euston:
-      #   submitter: bob
-      #   follow_node: london
-      #   submit_node: brussels
+      euston:
+        submitter: bob
+        follow_node: london
+        submit_node: brussels
 
-      # piccadilly:
-      #   submitter: alice
-      #   follow_node: manchester
-      #   submit_node: brussels
+      piccadilly:
+        submitter: alice
+        follow_node: manchester
+        submit_node: brussels
 
     nodes:
       london:
