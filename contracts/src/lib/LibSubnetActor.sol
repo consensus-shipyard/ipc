@@ -14,7 +14,7 @@ import {LibSubnetActorStorage, SubnetActorStorage} from "./LibSubnetActorStorage
 library LibSubnetActor {
     using EnumerableSet for EnumerableSet.AddressSet;
 
-    event SubnetBootstrapped(Validator[]);
+    event SubnetBootstrapped(address[]);
 
     /// @notice Ensures that the subnet is operating under Collateral-based permission mode.
     /// @dev Reverts if the subnet is not in Collateral mode.
@@ -48,7 +48,7 @@ library LibSubnetActor {
         if (totalCollateral >= s.minActivationCollateral) {
             if (LibStaking.totalActiveValidators() >= s.minValidators) {
                 s.bootstrapped = true;
-                emit SubnetBootstrapped(s.genesisValidators);
+                emit SubnetBootstrapped(s.genesisValidators.values());
 
                 // register adding the genesis circulating supply (if it exists)
                 IGateway(s.ipcGatewayAddr).register{value: totalCollateral + s.genesisCircSupply}(s.genesisCircSupply);
@@ -98,8 +98,7 @@ library LibSubnetActor {
 
             LibStaking.setMetadataWithConfirm(validators[i], publicKeys[i]);
             LibStaking.setFederatedPowerWithConfirm(validators[i], powers[i]);
-
-            s.genesisValidators.push(Validator({addr: validators[i], weight: powers[i], metadata: publicKeys[i]}));
+            LibStaking.addGenesisValidator(validators[i]);
 
             unchecked {
                 ++i;
@@ -107,7 +106,7 @@ library LibSubnetActor {
         }
 
         s.bootstrapped = true;
-        emit SubnetBootstrapped(s.genesisValidators);
+        emit SubnetBootstrapped(s.genesisValidators.values());
 
         // register adding the genesis circulating supply (if it exists)
         IGateway(s.ipcGatewayAddr).register{value: s.genesisCircSupply}(s.genesisCircSupply);

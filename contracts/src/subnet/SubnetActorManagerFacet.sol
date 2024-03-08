@@ -142,6 +142,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             // confirm validators deposit immediately
             LibStaking.setMetadataWithConfirm(msg.sender, publicKey);
             LibStaking.depositWithConfirm(msg.sender, msg.value);
+            LibStaking.addGenesisValidator(msg.sender);
 
             LibSubnetActor.bootstrapSubnetIfNeeded();
         } else {
@@ -169,6 +170,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
 
         if (!s.bootstrapped) {
             LibStaking.depositWithConfirm(msg.sender, msg.value);
+            LibStaking.addGenesisValidator(msg.sender);
 
             LibSubnetActor.bootstrapSubnetIfNeeded();
         } else {
@@ -198,6 +200,12 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
         }
         if (!s.bootstrapped) {
             LibStaking.withdrawWithConfirm(msg.sender, amount);
+
+            uint256 amount = LibStaking.totalValidatorCollateral(msg.sender);
+            if (amount == 0) {
+                LibStaking.removeGenesisValidator(msg.sender);
+            }
+
             return;
         }
 
@@ -237,6 +245,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
 
             // interaction must be performed after checks and changes
             LibStaking.withdrawWithConfirm(msg.sender, amount);
+            LibStaking.removeGenesisValidator(msg.sender);
             return;
         }
         LibStaking.withdraw(msg.sender, amount);

@@ -56,7 +56,7 @@ import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.
         /// @notice contains all committed bottom-up checkpoint at specific epoch
         mapping(uint256 => BottomUpCheckpoint) committedCheckpoints;
         /// @notice initial set of validators joining in genesis
-        Validator[] genesisValidators;
+        EnumerableSet.AddressSet genesisValidators;
         /// @notice genesis balance to be allocated to the subnet in genesis.
         mapping(address => uint256) genesisBalance;
         /// @notice genesis balance addresses
