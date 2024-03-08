@@ -4,7 +4,6 @@
 use std::{
     collections::BTreeMap,
     fmt::Display,
-    os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
     str::FromStr,
     time::{Duration, Instant},
@@ -24,7 +23,7 @@ use super::{
     dropper::{DropChute, DropPolicy},
     network::NetworkName,
     runner::DockerRunner,
-    DockerMaterials, DockerPortRange, Volumes, COMETBFT_IMAGE, FENDERMINT_IMAGE,
+    user_id, DockerMaterials, DockerPortRange, Volumes, COMETBFT_IMAGE, FENDERMINT_IMAGE,
 };
 use crate::{
     docker::DOCKER_ENTRY_FILE_NAME,
@@ -124,7 +123,7 @@ impl DockerNode {
         std::fs::create_dir_all(&node_dir).context("failed to create node dir")?;
 
         // Get the current user ID to use with docker containers.
-        let user = node_dir.metadata()?.uid();
+        let user = user_id(&node_dir)?;
 
         let make_runner = |image, volumes| {
             DockerRunner::new(

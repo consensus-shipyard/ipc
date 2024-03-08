@@ -45,7 +45,8 @@ use crate::{
         export_file, export_json, export_script, import_json, DefaultAccount, DefaultDeployment,
         DefaultGenesis, DefaultSubnet, Materials,
     },
-    NodeName, RelayerName, ResourceHash, ResourceName, SubnetName, TestnetName,
+    CliName, NodeName, RelayerName, ResourceHash, ResourceName, SubnetName, TestnetName,
+    TestnetResource,
 };
 
 mod container;
@@ -397,21 +398,20 @@ impl DockerMaterializer {
         &self,
         subnet_name: &SubnetName,
         network_name: Option<&NetworkName>,
-    ) -> anyhow::Result<DockerRunner> {
+    ) -> anyhow::Result<DockerRunner<CliName>> {
         let subnet_dir = self.path(subnet_name);
         // Use the owner of the directory for the container, so we don't get permission issues.
-        let user = subnet_dir.metadata()?.uid();
+        let user = user_id(&subnet_dir)?;
         // Mount the subnet so we can create files there
         let volumes = vec![(subnet_dir, "/fendermint/subnet")];
 
-        // TODO: The runner wants a node name, which we technically don't have here.
-        let node_name = subnet_name.node("fendermint-cli");
+        let cli_name = subnet_name.cli("fendermint");
 
         let runner = DockerRunner::new(
             self.docker.clone(),
             self.drop_chute.clone(),
             self.drop_policy.clone(),
-            node_name,
+            cli_name,
             user,
             FENDERMINT_IMAGE,
             volumes,
@@ -426,28 +426,27 @@ impl DockerMaterializer {
         &self,
         testnet_name: &TestnetName,
         network_name: Option<&NetworkName>,
-    ) -> anyhow::Result<DockerRunner> {
+    ) -> anyhow::Result<DockerRunner<CliName>> {
         // Create a directory to hold the wallet.
         let ipc_dir = self.ipc_dir(testnet_name);
         let accounts_dir = self.accounts_dir(testnet_name);
         // Create a `~/.ipc` directory, as expected by default by the `ipc-cli`.
         std::fs::create_dir_all(&ipc_dir).context("failed to create .ipc dir")?;
         // Use the owner of the directory for the container, so we don't get permission issues.
-        let user = ipc_dir.metadata()?.uid();
+        let user = user_id(&ipc_dir)?;
         // Mount the `~/.ipc` directory and all the keys to be imported.
         let volumes = vec![
             (ipc_dir, "/fendermint/.ipc"),
             (accounts_dir, "/fendermint/accounts"),
         ];
 
-        // TODO: The runner wants a node name, which we technically don't have here.
-        let node_name = testnet_name.root().node("ipc-cli");
+        let cli_name = testnet_name.root().cli("ipc");
 
         let runner = DockerRunner::new(
             self.docker.clone(),
             self.drop_chute.clone(),
             self.drop_policy.clone(),
-            node_name,
+            cli_name,
             user,
             FENDERMINT_IMAGE,
             volumes,
@@ -459,7 +458,7 @@ impl DockerMaterializer {
 
     /// Import the private key of an account into the `ipc-cli` wallet.
     async fn ipc_cli_wallet_import(
-        runner: &DockerRunner,
+        runner: &DockerRunner<CliName>,
         account: &DefaultAccount,
     ) -> anyhow::Result<()> {
         let account_id = account.account_id();
@@ -728,7 +727,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
-        // Pick a port range.
+        // Pick a port range on the host.
         let port_range = self
             .port_range(node_name)
             .context("failed to pick port range")?;
@@ -995,6 +994,12 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
+        // TODO:
+        // * Add the submitter to the IPC wallet
+        // * Add the parent subnet to the config.toml
+        // * Add the child subnet to the config.toml
+        // * Create a relayer
+        // * Start the relayer
         todo!("docker run relayer unless it is already running")
     }
 }
@@ -1017,6 +1022,13 @@ fn current_network() -> &'static str {
         fvm_shared::address::Network::Mainnet => "mainnet",
         fvm_shared::address::Network::Testnet => "testnet",
     }
+}
+
+/// Get the user ID we can use with docker to have the same file permissions
+/// as some file or directory on the file system, so that files created by a
+/// container can be owned by the same user, rather than root.
+fn user_id(path: impl AsRef<Path>) -> anyhow::Result<u32> {
+    Ok(path.as_ref().metadata()?.uid())
 }
 
 #[cfg(test)]

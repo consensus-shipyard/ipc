@@ -170,7 +170,7 @@ where
     pub fn nodes_by_subnet(&self, subnet_name: &SubnetName) -> Vec<&M::Node> {
         self.nodes
             .iter()
-            .filter(|(node_name, _)| node_name.is_in_subnet(subnet_name))
+            .filter(|(node_name, _)| subnet_name.contains(node_name))
             .map(|(_, n)| n)
             .collect()
     }

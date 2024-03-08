@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 use anyhow::{bail, Context};
 use bollard::{
@@ -15,7 +15,7 @@ use bollard::{
 };
 use futures::StreamExt;
 
-use crate::{docker::current_network, NodeName};
+use crate::{docker::current_network, ResourceName, TestnetResource};
 
 use super::{
     container::DockerContainer,
@@ -24,24 +24,27 @@ use super::{
     DockerConstruct, Volumes,
 };
 
-pub struct DockerRunner {
+pub struct DockerRunner<N> {
     docker: Docker,
     dropper: DropChute,
     drop_policy: DropPolicy,
-    node_name: NodeName,
+    name: N,
     user: u32,
     image: String,
     volumes: Volumes,
     network_name: Option<NetworkName>,
 }
 
-impl DockerRunner {
+impl<N> DockerRunner<N>
+where
+    N: AsRef<ResourceName> + TestnetResource + Display,
+{
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         docker: Docker,
         dropper: DropChute,
         drop_policy: DropPolicy,
-        node_name: NodeName,
+        name: N,
         user: u32,
         image: &str,
         volumes: Volumes,
@@ -51,7 +54,7 @@ impl DockerRunner {
             docker,
             dropper,
             drop_policy,
-            node_name,
+            name,
             user,
             image: image.to_string(),
             volumes,
@@ -62,8 +65,8 @@ impl DockerRunner {
     // Tag containers with resource names.
     fn labels(&self) -> HashMap<String, String> {
         [
-            ("testnet", self.node_name.testnet().path()),
-            ("node", self.node_name.path()),
+            ("testnet", self.name.testnet().path()),
+            ("resource", self.name.as_ref().path()),
         ]
         .into_iter()
         .map(|(n, p)| (n.to_string(), p.to_string_lossy().to_string()))
@@ -72,14 +75,7 @@ impl DockerRunner {
 
     /// Run a short lived container.
     pub async fn run_cmd(&self, cmd: &str) -> anyhow::Result<Vec<String>> {
-        let cmdv = cmd
-            .split(' ')
-            .filter_map(|s| {
-                Some(s.trim())
-                    .filter(|s| !s.is_empty())
-                    .map(|s| s.to_string())
-            })
-            .collect();
+        let cmdv = split_cmd(cmd);
 
         // Set the network otherwise we might be be able to parse addresses we created.
         let env = vec![format!("FM_NETWORK={}", current_network())];
@@ -141,7 +137,7 @@ impl DockerRunner {
             out.push(output.to_string());
         }
 
-        eprintln!("NODE: {} ({id})", self.node_name);
+        eprintln!("RESOURCE: {} ({id})", self.name);
         eprintln!("CMD: {cmd}");
         for o in out.iter() {
             eprint!("OUT: {o}");
@@ -234,7 +230,7 @@ impl DockerRunner {
             .context("failed to create container")?
             .id;
 
-        eprintln!("NODE: {}", self.node_name);
+        eprintln!("RESOURCE: {}", self.name);
         eprintln!("CREATED CONTAINER: {} ({})", name, id);
         eprintln!("---");
 
@@ -262,4 +258,14 @@ impl DockerRunner {
             },
         ))
     }
+}
+
+pub fn split_cmd(cmd: &str) -> Vec<String> {
+    cmd.split(' ')
+        .filter_map(|s| {
+            Some(s.trim())
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string())
+        })
+        .collect()
 }
