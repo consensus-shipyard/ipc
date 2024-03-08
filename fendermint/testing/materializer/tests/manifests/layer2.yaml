@@ -20,6 +20,7 @@ rootnet:
       mode:
         type: Validator
         validator: alice
+      seed_nodes: []
       ethapi: true
 
 subnets:
@@ -36,6 +37,7 @@ subnets:
       period: 1000
 
     relayers:
+      # TODO: Implement `create_relayer`.
       # euston:
       #   submitter: bob
       #   follow_node: london
@@ -52,6 +54,7 @@ subnets:
           type: Validator
           validator: charlie
         parent_node: brussels
+        seed_nodes: []
         ethapi: true
 
       manchester:
@@ -59,4 +62,5 @@ subnets:
           type: Validator
           validator: alice
         parent_node: brussels
+        seed_nodes: [london]
         ethapi: true

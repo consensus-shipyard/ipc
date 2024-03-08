@@ -182,10 +182,18 @@ pub struct Node {
     /// Indicate whether to run the Ethereum API.
     pub ethapi: bool,
     /// The nodes from which CometBFT should bootstrap itself.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    ///
+    /// We can leave it empty for standalone nodes and in cases
+    /// where we don't want mutual seeding, however it's best to
+    /// still show the field in the manifest explicitly, to make
+    /// sure it's not forgotten, which would prevent the nodes
+    /// discovering each other.
     pub seed_nodes: Vec<NodeId>,
     /// The parent node that the top-down syncer follows;
     /// or leave it empty if node is on the rootnet.
+    ///
+    /// We can skip this field if it's empty because validation
+    /// will tell us that all subnet nodes need a parent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_node: Option<ParentNode>,
 }

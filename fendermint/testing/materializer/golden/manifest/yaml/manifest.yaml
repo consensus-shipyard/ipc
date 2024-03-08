@@ -1,111 +1,153 @@
 accounts:
-  1U_71lDB: {}
-  FfPSKr13: {}
-  ZehBW: {}
+  3VK: {}
+  A49ag: {}
+  KnRAxXtK: {}
+  NU7: {}
+  eWn: {}
 rootnet:
-  type: External
-  chain_id: 1926368011083839
-  deployment:
-    type: New
-    deployer: 1U_71lDB
-  urls:
-  - https://sjbm_yu.api.calibration.node.glif.io/rpc/v1
-  - https://3f_6sw.api.calibration.node.glif.io/rpc/v1
-  - https://bbr.api.calibration.node.glif.io/rpc/v1
+  type: New
+  validators:
+    A49ag: '1400098391792422484'
+  balances:
+    3VK: '100000000000000000000'
+    A49ag: '100000000000000000000'
+    KnRAxXtK: '100000000000000000000'
+    NU7: '100000000000000000000'
+    eWn: '100000000000000000000'
+  nodes:
+    yCG:
+      mode:
+        type: Validator
+        validator: A49ag
+      ethapi: false
+      seed_nodes: []
 subnets:
-  5W_z_V9:
-    creator: ZehBW
+  BzD5vI2O:
+    creator: A49ag
     validators:
-      1U_71lDB: '4441017364863675661'
-      ZehBW: '1'
+      3VK: '7529731445287884387'
+      A49ag: '9167930837587646193'
+      KnRAxXtK: '7827548757745403291'
+      NU7: '6425733186569988379'
     balances:
-      FfPSKr13: '1'
+      NU7: '1'
     nodes:
-      J5gufS:
-        mode:
-          type: Full
-        ethapi: false
-        seed_nodes:
-        - gys
-        parent_node: https://3f_6sw.api.calibration.node.glif.io/rpc/v1
-      gys:
+      10ZnopA:
         mode:
           type: Validator
-          validator: 1U_71lDB
+          validator: 3VK
         ethapi: false
-        parent_node: https://bbr.api.calibration.node.glif.io/rpc/v1
-    relayers:
-      CUl:
-        submitter: ZehBW
-        follow_node: J5gufS
-        submit_node: https://bbr.api.calibration.node.glif.io/rpc/v1
-      ddBcC:
-        submitter: 1U_71lDB
-        follow_node: J5gufS
-        submit_node: https://3f_6sw.api.calibration.node.glif.io/rpc/v1
-    bottom_up_checkpoint:
-      period: 32962
-    env:
-      CMT__jMOhPHkE: "\x17&}"
-      CMT__o_3ZN: T`
-      FM__7lBG: ''
-  Wp4:
-    creator: FfPSKr13
-    validators:
-      1U_71lDB: '1878451217058234368'
-      FfPSKr13: '6693288172569006336'
-    balances:
-      1U_71lDB: '1'
-    nodes:
-      AIBll:
+        seed_nodes: []
+        parent_node: yCG
+      e8q2cGc:
         mode:
           type: Validator
-          validator: FfPSKr13
-        ethapi: false
-        seed_nodes:
-        - vZExdkUf
-        parent_node: https://bbr.api.calibration.node.glif.io/rpc/v1
-      vZExdkUf:
-        mode:
-          type: Validator
-          validator: 1U_71lDB
+          validator: KnRAxXtK
         ethapi: true
-        parent_node: https://3f_6sw.api.calibration.node.glif.io/rpc/v1
+        seed_nodes:
+        - zRtBr_Bs
+        parent_node: yCG
+      zRtBr_Bs:
+        mode:
+          type: Validator
+          validator: A49ag
+        ethapi: false
+        seed_nodes:
+        - 10ZnopA
+        parent_node: yCG
+      zhH18:
+        mode:
+          type: Validator
+          validator: NU7
+        ethapi: false
+        seed_nodes:
+        - 10ZnopA
+        - e8q2cGc
+        parent_node: yCG
     relayers:
-      LAh51:
-        submitter: FfPSKr13
-        follow_node: AIBll
-        submit_node: https://bbr.api.calibration.node.glif.io/rpc/v1
+      9nQ:
+        submitter: eWn
+        follow_node: e8q2cGc
+        submit_node: yCG
+      VbOB:
+        submitter: A49ag
+        follow_node: zRtBr_Bs
+        submit_node: yCG
     bottom_up_checkpoint:
-      period: 75470
+      period: 2
     env:
-      CMT__5K1xq: g
+      FM__tS0: ":\b￼ᩀ/_y"
     subnets:
-      6Vun:
-        creator: 1U_71lDB
+      hnhRk:
+        creator: NU7
         validators:
-          1U_71lDB: '9552989243848343499'
+          KnRAxXtK: '8643995327005714255'
+          eWn: '1'
         balances:
-          1U_71lDB: '8405021718201801879'
+          3VK: '8541113104596080524'
+          A49ag: '4271512068964340951'
+          KnRAxXtK: '4260071654886967116'
+          NU7: '5270641239536351101'
         nodes:
-          VKnM:
+          jmeholol:
+            mode:
+              type: Full
+            ethapi: false
+            seed_nodes:
+            - xAAuRFO
+            parent_node: zhH18
+          xAAuRFO:
             mode:
               type: Validator
-              validator: 1U_71lDB
-            ethapi: true
-            parent_node: AIBll
+              validator: KnRAxXtK
+            ethapi: false
+            seed_nodes: []
+            parent_node: e8q2cGc
         relayers:
-          9ksTUyQj:
-            submitter: 1U_71lDB
-            follow_node: VKnM
-            submit_node: AIBll
-          D3Bkuo:
-            submitter: 1U_71lDB
-            follow_node: VKnM
-            submit_node: AIBll
-          dQRn:
-            submitter: 1U_71lDB
-            follow_node: VKnM
-            submit_node: vZExdkUf
+          Q9kaeW:
+            submitter: NU7
+            follow_node: xAAuRFO
+            submit_node: e8q2cGc
+          gS23B:
+            submitter: NU7
+            follow_node: xAAuRFO
+            submit_node: e8q2cGc
+          hBBPy:
+            submitter: NU7
+            follow_node: xAAuRFO
+            submit_node: e8q2cGc
         bottom_up_checkpoint:
-          period: 23628
+          period: 79709
+        env:
+          CMT__3DhVhDAP: "\x92　𝽮"
+          CMT__PUwq5p_i: "?7\x81"
+          FM__w5FBBJmm: 〤H
+  xmCp:
+    creator: A49ag
+    validators:
+      NU7: '8966640422312622504'
+    balances:
+      NU7: '1'
+    nodes:
+      C1nz:
+        mode:
+          type: Validator
+          validator: NU7
+        ethapi: true
+        seed_nodes: []
+        parent_node: yCG
+    relayers:
+      LJZCa1ci:
+        submitter: A49ag
+        follow_node: C1nz
+        submit_node: yCG
+      urpBK_h:
+        submitter: eWn
+        follow_node: C1nz
+        submit_node: yCG
+    bottom_up_checkpoint:
+      period: 64612
+    env:
+      CMT__6UItA: ⁮⁃T󿿿
+      CMT__GRhPQ: ﷆ
+      FM__imh_l6if: ''
