@@ -39,3 +39,9 @@ env = { "CMD" = """genesis --genesis-file /data/genesis.json ipc gateway --subne
 extend = "fendermint-tool"
 env = { "CMD" = "genesis --genesis-file /data/genesis.json into-tendermint --out /data/genesis.committed.json" }
 script.post = "cp ${BASE_DIR}/genesis.committed.json ${CMT_DIR}/config/genesis.json"
+
+[tasks.genesis-copy]
+script.main = """
+    echo ${BASE_DIR}
+    cp ${BASE_DIR}/genesis.json ${BASE_DIR}/${NODE_NAME}/cometbft/config
+"""

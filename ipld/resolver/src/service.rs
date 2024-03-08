@@ -206,7 +206,7 @@ where
         let (event_tx, _) = broadcast::channel(config.connection.event_buffer_capacity as usize);
 
         let ipfs_client = IpfsClient::from_multiaddr_str(&config.ipfs_addr)
-            .expect("failed to create IPFS client");
+            .expect("failed to create ipfs client");
 
         let service = Self {
             peer_id,
@@ -528,11 +528,11 @@ where
             let res = ipfs.pin_add(&cid.to_string(), true).await;
             match res {
                 Ok(_) => {
-                    info!("resolved {} from IPFS", cid);
+                    tracing::info!("resolved {} from IPFS", cid);
                     send_resolve_result(response_channel, Ok(()))
                 }
                 Err(e) => {
-                    info!("resolving {} from IPFS failed with {}", cid, e);
+                    tracing::info!("resolving {} from IPFS failed with {}", cid, e);
                     send_resolve_result(response_channel, Err(anyhow!(e)))
                 }
             }

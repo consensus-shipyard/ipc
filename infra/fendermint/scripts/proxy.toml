@@ -8,7 +8,7 @@ docker run \
   --network ${NETWORK_NAME} \
   --volume ${BASE_DIR}:/data \
   --publish ${PROXY_HOST_PORT}:8001 \
-  --env FM_CHAIN_NAME=${NETWORK_NAME} \
+  --env FM_CHAIN_NAME=${SUBNET_ID} \
   --env FM_PROXY_SECRET_KEY=/data/${NODE_NAME}/${PROXY_PRIV_KEY_PATH} \
   --env FM_PROXY_ACCOUNT_KIND=ethereum \
   --env FM_PROXY_BROADCAST_MODE=async \

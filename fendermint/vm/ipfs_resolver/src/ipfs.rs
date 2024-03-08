@@ -73,7 +73,7 @@ where
 
         match err {
             None => {
-                tracing::debug!(cid = ?task.cid(), "ipfs content resolved");
+                tracing::info!(cid = ?task.cid(), "ipfs content resolved");
                 atomically(|| task.set_resolved()).await;
             }
             Some(e) => {

@@ -3453,7 +3453,6 @@ dependencies = [
  "serde_tuple",
  "serde_with 2.3.3",
  "thiserror",
- "tracing",
 ]
 
 [[package]]
@@ -5256,6 +5255,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

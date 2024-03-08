@@ -234,7 +234,7 @@ pub struct TransArgs {
     #[arg(long, value_parser = parse_token_amount, default_value = "0")]
     pub gas_premium: TokenAmount,
     /// Whether to wait for the results from Tendermint or not.
-    #[arg(long, short, default_value = "commit")]
+    #[arg(long, short, default_value = "commit", env = "FM_PROXY_BROADCAST_MODE")]
     pub broadcast_mode: BroadcastMode,
 }
 
