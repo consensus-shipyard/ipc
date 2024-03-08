@@ -10,6 +10,7 @@ license.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
+cid = { workspace = true }
 ethers = { workspace = true }
 fvm = { workspace = true }
 fvm_shared = { workspace = true }
@@ -17,6 +18,8 @@ fvm_ipld_blockstore = { workspace = true }
 hex = { workspace = true }
 rand = { workspace = true }
 tendermint-rpc = { workspace = true }
+tokio = { workspace = true }
+byteorder = { workspace = true }
 
 ipc-api = { workspace = true }
 ipc_actors_abis = { workspace = true }
@@ -27,11 +30,17 @@ fendermint_vm_actor_interface = { path = "../../vm/actor_interface" }
 fendermint_vm_core = { path = "../../vm/core" }
 fendermint_vm_genesis = { path = "../../vm/genesis" }
 fendermint_vm_message = { path = "../../vm/message" }
-fendermint_vm_interpreter = { path = "../../vm/interpreter", features = ["bundle"] }
-
+fendermint_vm_interpreter = { path = "../../vm/interpreter", features = [
+    "bundle",
+] }
 
 [dev-dependencies]
 arbitrary = { workspace = true }
 arbtest = { workspace = true }
+async-trait = { workspace = true }
 rand = { workspace = true }
-tokio = { workspace = true }
+fendermint_rpc = { path = "../../rpc" }
+lazy_static = { workspace = true }
+bytes = { workspace = true }
+fvm_ipld_encoding = { workspace = true }
+multihash = { workspace = true }

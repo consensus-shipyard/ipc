@@ -1,19 +1,22 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use fendermint_app_options::materializer::*;
 use fendermint_app_settings::utils::expand_tilde;
 use fendermint_materializer::{
     docker::{DockerMaterializer, DropPolicy},
     manifest::Manifest,
+    materials::DefaultAccount,
     testnet::Testnet,
-    TestnetId, TestnetName,
+    AccountId, TestnetId, TestnetName,
 };
 
 use crate::cmd;
+
+use super::key::{read_secret_key, read_secret_key_hex};
 
 cmd! {
   MaterializerArgs(self) {
@@ -23,6 +26,7 @@ cmd! {
         MaterializerCommands::Validate(args) => args.exec(()).await,
         MaterializerCommands::Setup(args) => args.exec(m()?).await,
         MaterializerCommands::Remove(args) => args.exec(m()?).await,
+        MaterializerCommands::ImportKey(args) => args.exec(d).await,
     }
   }
 }
@@ -42,6 +46,12 @@ cmd! {
 cmd! {
   MaterializerRemoveArgs(self, m: DockerMaterializer) {
     remove(m, self.testnet_id.clone()).await
+  }
+}
+
+cmd! {
+  MaterializerImportKeyArgs(self, data_dir: PathBuf) {
+    import_key(&data_dir, &self.secret_key, &self.manifest_file, &self.account_id)
   }
 }
 
@@ -86,4 +96,27 @@ fn read_manifest(manifest_file: &Path) -> anyhow::Result<(TestnetName, Manifest)
     let manifest = Manifest::from_file(manifest_file)?;
 
     Ok((name, manifest))
+}
+
+/// Import a secret key as one of the accounts in a manifest.
+fn import_key(
+    data_dir: &Path,
+    secret_key: &Path,
+    manifest_file: &Path,
+    account_id: &AccountId,
+) -> anyhow::Result<()> {
+    let (testnet_name, manifest) = read_manifest(manifest_file)?;
+
+    if !manifest.accounts.contains_key(account_id) {
+        bail!(
+            "account {account_id} cannot be found in the manifest at {}",
+            manifest_file.to_string_lossy()
+        );
+    }
+
+    let sk = read_secret_key(secret_key).or_else(|_| read_secret_key_hex(secret_key))?;
+
+    let _acc = DefaultAccount::create(data_dir, &testnet_name.account(account_id), sk)?;
+
+    Ok(())
 }

@@ -14,7 +14,7 @@ use tendermint_rpc::{WebSocketClient, WebSocketClientDriver, WebSocketClientUrl}
 
 use fendermint_vm_message::query::{FvmQuery, FvmQueryHeight};
 
-use crate::message::MessageFactory;
+use crate::message::SignedMessageFactory;
 use crate::query::QueryClient;
 use crate::tx::{
     AsyncResponse, BoundClient, CommitResponse, SyncResponse, TxAsync, TxClient, TxCommit, TxSync,
@@ -97,7 +97,7 @@ impl<C> FendermintClient<C> {
     }
 
     /// Attach a message factory to the client.
-    pub fn bind(self, message_factory: MessageFactory) -> BoundFendermintClient<C> {
+    pub fn bind(self, message_factory: SignedMessageFactory) -> BoundFendermintClient<C> {
         BoundFendermintClient::new(self.inner, message_factory)
     }
 }
@@ -134,11 +134,11 @@ where
 /// Fendermint client capable of signing transactions.
 pub struct BoundFendermintClient<C = HttpClient> {
     inner: C,
-    message_factory: MessageFactory,
+    message_factory: SignedMessageFactory,
 }
 
 impl<C> BoundFendermintClient<C> {
-    pub fn new(inner: C, message_factory: MessageFactory) -> Self {
+    pub fn new(inner: C, message_factory: SignedMessageFactory) -> Self {
         Self {
             inner,
             message_factory,
@@ -147,7 +147,7 @@ impl<C> BoundFendermintClient<C> {
 }
 
 impl<C> BoundClient for BoundFendermintClient<C> {
-    fn message_factory_mut(&mut self) -> &mut MessageFactory {
+    fn message_factory_mut(&mut self) -> &mut SignedMessageFactory {
         &mut self.message_factory
     }
 }
@@ -177,7 +177,7 @@ where
     where
         F: FnOnce(&DeliverTx) -> anyhow::Result<T> + Sync + Send,
     {
-        let data = MessageFactory::serialize(&msg)?;
+        let data = SignedMessageFactory::serialize(&msg)?;
         let response = self.inner.broadcast_tx_async(data).await?;
         let response = AsyncResponse {
             response,
@@ -200,7 +200,7 @@ where
     where
         F: FnOnce(&DeliverTx) -> anyhow::Result<T> + Sync + Send,
     {
-        let data = MessageFactory::serialize(&msg)?;
+        let data = SignedMessageFactory::serialize(&msg)?;
         let response = self.inner.broadcast_tx_sync(data).await?;
         let response = SyncResponse {
             response,
@@ -223,7 +223,7 @@ where
     where
         F: FnOnce(&DeliverTx) -> anyhow::Result<T> + Sync + Send,
     {
-        let data = MessageFactory::serialize(&msg)?;
+        let data = SignedMessageFactory::serialize(&msg)?;
         let response = self.inner.broadcast_tx_commit(data).await?;
         // We have a fully `DeliverTx` with default fields even if `CheckTx` indicates failure.
         let return_data = if response.check_tx.code.is_err() || response.deliver_tx.code.is_err() {

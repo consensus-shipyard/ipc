@@ -153,6 +153,7 @@ where
                     circ_supply,
                     chain_id,
                     power_scale,
+                    app_version: 0,
                 };
 
                 let exec_state =
