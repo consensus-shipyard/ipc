@@ -642,11 +642,11 @@ mod tests {
             dropper::{self, DropPolicy},
             node::parse_cometbft_node_id,
         },
-        TestnetName,
+        NodeName, TestnetName,
     };
     use bollard::Docker;
 
-    fn make_runner() -> DockerRunner {
+    fn make_runner() -> DockerRunner<NodeName> {
         let nn = TestnetName::new("test-network").root().node("test-node");
         let docker = Docker::connect_with_local_defaults().expect("failed to connect to docker");
         let (_drop_handle, drop_chute) = dropper::start(docker.clone());

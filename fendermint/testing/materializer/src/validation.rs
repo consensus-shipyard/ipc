@@ -129,7 +129,10 @@ impl ValidatingMaterializer {
         amount: TokenAmount,
         credit_child: bool,
     ) -> anyhow::Result<()> {
-        let parent = parent_name(subnet)?;
+        let parent = subnet
+            .parent()
+            .ok_or_else(|| anyhow!("{subnet} must have a parent to fund from"))?;
+
         self.ensure_subnet_exists(&parent)?;
         self.ensure_subnet_exists(subnet)?;
 
@@ -276,7 +279,7 @@ impl Materializer<ValidationMaterials> for ValidatingMaterializer {
 
     async fn create_subnet<'s, 'a>(
         &'s mut self,
-        _parent_submit_config: &SubmitConfig<'a, ValidationMaterials>,
+        parent_submit_config: &SubmitConfig<'a, ValidationMaterials>,
         subnet_name: &SubnetName,
         subnet_config: SubnetConfig<'a, ValidationMaterials>,
     ) -> anyhow::Result<VSubnet>
@@ -285,8 +288,8 @@ impl Materializer<ValidationMaterials> for ValidatingMaterializer {
     {
         self.ensure_contains(subnet_name)?;
         // Check that the submitter has balance on the parent subnet to create the child.
-        let parent = parent_name(subnet_name)?;
-        self.ensure_balance(&parent, subnet_config.creator)?;
+        let parent = parent_submit_config.subnet;
+        self.ensure_balance(parent, subnet_config.creator)?;
         // Insert child subnet balances entry.
         self.balances
             .insert(subnet_name.clone(), Default::default());
@@ -344,28 +347,20 @@ impl Materializer<ValidationMaterials> for ValidatingMaterializer {
 
     async fn create_relayer<'s, 'a>(
         &'s mut self,
-        _parent_submit_config: &SubmitConfig<'a, ValidationMaterials>,
+        parent_submit_config: &SubmitConfig<'a, ValidationMaterials>,
+        _child_follow_config: &SubmitConfig<'a, ValidationMaterials>,
         relayer_name: &RelayerName,
-        subnet: &'a VSubnet,
         submitter: &'a VAccount,
-        _follow_node: &'a VNode,
     ) -> anyhow::Result<VRelayer>
     where
         's: 'a,
     {
         self.ensure_contains(relayer_name)?;
         // Check that submitter has balance on the parent.
-        let parent = parent_name(subnet)?;
-        self.ensure_balance(&parent, submitter)?;
+        let parent = parent_submit_config.subnet;
+        self.ensure_balance(parent, submitter)?;
         Ok(relayer_name.clone())
     }
-}
-
-/// Get the parent of a subnet, or fail if it doesn't have one.
-fn parent_name(subnet: &SubnetName) -> anyhow::Result<SubnetName> {
-    subnet
-        .parent()
-        .ok_or_else(|| anyhow!("{subnet:?} has no parent"))
 }
 
 #[cfg(test)]

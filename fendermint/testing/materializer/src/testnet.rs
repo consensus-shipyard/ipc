@@ -561,6 +561,7 @@ where
         // Interact with the running subnet .
         {
             let created_subnet = self.subnet(&subnet_name)?;
+            let created_deployment = self.deployment(&subnet_name)?;
 
             // Where can we reach the gateway and the registry.
             let parent_submit_config = self.submit_config(parent_subnet_name)?;
@@ -618,10 +619,13 @@ where
                             nodes: vec![submit_node],
                             ..parent_submit_config
                         },
+                        &SubmitConfig {
+                            nodes: vec![TargetConfig::Internal(follow_node)],
+                            subnet: created_subnet,
+                            deployment: created_deployment,
+                        },
                         &relayer_name,
-                        created_subnet,
                         submitter,
-                        follow_node,
                     )
                     .await
                     .with_context(|| format!("failed to create relayer {id}"))?;

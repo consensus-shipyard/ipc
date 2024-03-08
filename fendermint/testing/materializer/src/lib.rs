@@ -368,7 +368,7 @@ pub trait HasCometBftApi {
 mod tests {
     use std::path::PathBuf;
 
-    use crate::TestnetName;
+    use crate::{TestnetName, TestnetResource};
 
     #[test]
     fn test_path_join() {
@@ -417,7 +417,7 @@ mod tests {
         let sn = tn.root().subnet("foo");
         let node = sn.node("node-1");
 
-        assert!(node.is_in_subnet(&sn));
+        assert!(sn.contains(&node));
         assert_eq!(node.testnet(), tn, "testnet is the prefix");
     }
 

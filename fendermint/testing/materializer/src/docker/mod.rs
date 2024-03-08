@@ -920,24 +920,11 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
-        let network_name = parent_submit_config
-            .nodes
-            .iter()
-            .filter_map(|tc| match tc {
-                TargetConfig::Internal(node) => Some(node),
-                TargetConfig::External(_) => None,
-            })
-            .next()
-            .map(|n| n.network_name());
+        let network_name =
+            parent_submit_config.find_node(|n| Some(n.network_name().clone()), |_| None);
 
         let parent_url: Url = parent_submit_config
-            .nodes
-            .iter()
-            .filter_map(|tc| match tc {
-                TargetConfig::External(url) => Some(url.clone()),
-                TargetConfig::Internal(node) => node.internal_ethapi_http_endpoint(),
-            })
-            .next()
+            .find_node(|n| n.internal_ethapi_http_endpoint(), |u| Some(u.clone()))
             .ok_or_else(|| anyhow!("there has to be some nodes with eth API enabled"))?;
 
         // TODO: Move --base-fee to config
@@ -961,7 +948,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             9, // to work with nanoFIL
         );
 
-        let runner = self.fendermint_cli_runner(&subnet.name, network_name)?;
+        let runner = self.fendermint_cli_runner(&subnet.name, network_name.as_ref())?;
 
         runner
             .run_cmd(&cmd)
@@ -986,19 +973,42 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     async fn create_relayer<'s, 'a>(
         &'s mut self,
         parent_submit_config: &SubmitConfig<'a, DockerMaterials>,
+        child_follow_config: &SubmitConfig<'a, DockerMaterials>,
         relayer_name: &RelayerName,
-        subnet: &'a DefaultSubnet,
         submitter: &'a DefaultAccount,
-        follow_node: &'a DockerNode,
     ) -> anyhow::Result<DockerRelayer>
     where
         's: 'a,
     {
-        // TODO:
-        // * Add the submitter to the IPC wallet
-        // * Add the parent subnet to the config.toml
-        // * Add the child subnet to the config.toml
-        // * Create a relayer
+        let network_name =
+            child_follow_config.find_node(|n| Some(n.network_name().clone()), |_| None);
+
+        // Add the parent subnet to the config.toml
+        self.ipc_cli_config_add_subnet(parent_submit_config)?;
+
+        // Add the child subnet to the config.toml
+        self.ipc_cli_config_add_subnet(child_follow_config)?;
+
+        // Add the submitter to the IPC wallet
+        Self::ipc_cli_wallet_import(
+            &self.ipc_cli_runner(&parent_submit_config.subnet.name.testnet(), None)?,
+            submitter,
+        )
+        .await?;
+
+        // Create a relayer
+        let relayer = DockerRelayer::get_or_create(
+            &self.dir,
+            self.docker.clone(),
+            self.drop_chute.clone(),
+            &self.drop_policy,
+            relayer_name,
+            child_follow_config.subnet,
+            submitter,
+            network_name,
+        )
+        .await?;
+
         // * Start the relayer
         todo!("docker run relayer unless it is already running")
     }

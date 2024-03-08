@@ -199,10 +199,9 @@ pub trait Materializer<M: Materials> {
     async fn create_relayer<'s, 'a>(
         &'s mut self,
         parent_submit_config: &SubmitConfig<'a, M>,
+        child_follow_config: &SubmitConfig<'a, M>,
         relayer_name: &RelayerName,
-        subnet: &'a M::Subnet,
         submitter: &'a M::Account,
-        follow_node: &'a M::Node,
     ) -> anyhow::Result<M::Relayer>
     where
         's: 'a;
@@ -241,9 +240,9 @@ pub struct SubnetConfig<'a, M: Materials> {
 
 /// Options for how to submit IPC transactions to a subnet.
 pub struct SubmitConfig<'a, M: Materials> {
-    /// The nodes to which we can send transactions or queries.
+    /// The nodes to which we can send transactions or queries, ie. any of the parent nodes.
     pub nodes: Vec<TargetConfig<'a, M>>,
-    /// The identity of the subnet to which we submit the transaction.
+    /// The identity of the subnet to which we submit the transaction, ie. the parent subnet.
     pub subnet: &'a M::Subnet,
     /// The location of the IPC contracts on the (generally parent) subnet.
     pub deployment: &'a M::Deployment,
@@ -261,4 +260,20 @@ pub struct ParentConfig<'a, M: Materials> {
 pub enum TargetConfig<'a, M: Materials> {
     External(Url),
     Internal(&'a M::Node),
+}
+
+impl<'a, M: Materials> SubmitConfig<'a, M> {
+    pub fn find_node<F, G, T>(&self, f: F, g: G) -> Option<T>
+    where
+        F: Fn(&M::Node) -> Option<T>,
+        G: Fn(&Url) -> Option<T>,
+    {
+        self.nodes
+            .iter()
+            .filter_map(|tc| match tc {
+                TargetConfig::Internal(n) => f(n),
+                TargetConfig::External(u) => g(u),
+            })
+            .next()
+    }
 }

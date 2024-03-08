@@ -11,14 +11,11 @@ use crate::{
         runner::{split_cmd, DockerRunner},
         user_id, FENDERMINT_IMAGE,
     },
-    materializer::SubmitConfig,
     materials::{DefaultAccount, DefaultSubnet},
     RelayerName, ResourceHash, TestnetResource,
 };
 
-use super::{
-    container::DockerContainer, dropper::DropChute, DockerMaterials, DockerNode, DropPolicy,
-};
+use super::{container::DockerContainer, dropper::DropChute, network::NetworkName, DropPolicy};
 
 pub struct DockerRelayer {
     relayer_name: RelayerName,
@@ -32,16 +29,20 @@ impl Display for DockerRelayer {
 }
 
 impl DockerRelayer {
+    /// Get or create the relayer container.
+    ///
+    /// This assumes that the submitter and the involved parent and child
+    /// subnets have been added to the `ipc-cli` config.
+    #[allow(clippy::too_many_arguments)]
     pub async fn get_or_create<'a>(
         root: impl AsRef<Path>,
         docker: Docker,
         dropper: DropChute,
         drop_policy: &DropPolicy,
         relayer_name: &RelayerName,
-        parent_submit_config: &SubmitConfig<'a, DockerMaterials>,
         subnet: &DefaultSubnet,
         submitter: &DefaultAccount,
-        follow_node: &DockerNode,
+        network_name: Option<NetworkName>,
     ) -> anyhow::Result<Self> {
         let container_name = container_name(relayer_name);
 
@@ -64,7 +65,6 @@ impl DockerRelayer {
         let ipc_dir = root.as_ref().join(subnet.name.testnet()).join("ipc");
 
         let user = user_id(&ipc_dir)?;
-        let network_name = follow_node.network_name().clone();
 
         // TODO: Logs?
         let volumes = vec![(ipc_dir, "/fendermint/.ipc")];
@@ -77,7 +77,7 @@ impl DockerRelayer {
             user,
             FENDERMINT_IMAGE,
             volumes,
-            Some(network_name),
+            network_name,
         );
 
         // TODO: Do we need to use any env vars with the relayer?

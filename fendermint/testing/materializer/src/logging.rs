@@ -209,10 +209,9 @@ where
     async fn create_relayer<'s, 'a>(
         &'s mut self,
         parent_submit_config: &SubmitConfig<'a, M>,
+        child_follow_config: &SubmitConfig<'a, M>,
         relayer_name: &RelayerName,
-        subnet: &'a M::Subnet,
         submitter: &'a M::Account,
-        follow_node: &'a M::Node,
     ) -> anyhow::Result<M::Relayer>
     where
         's: 'a,
@@ -221,10 +220,9 @@ where
         self.inner
             .create_relayer(
                 parent_submit_config,
+                child_follow_config,
                 relayer_name,
-                subnet,
                 submitter,
-                follow_node,
             )
             .await
     }
