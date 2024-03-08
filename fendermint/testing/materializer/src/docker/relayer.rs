@@ -102,6 +102,11 @@ impl DockerRelayer {
             relayer,
         })
     }
+
+    /// Start the relayer, unless it's already running.
+    pub async fn start(&self) -> anyhow::Result<()> {
+        self.relayer.start().await
+    }
 }
 
 /// Create a container name from the relayer name.

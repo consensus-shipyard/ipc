@@ -996,7 +996,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         )
         .await?;
 
-        // Create a relayer
+        // Create the relayer
         let relayer = DockerRelayer::get_or_create(
             &self.dir,
             self.docker.clone(),
@@ -1009,8 +1009,10 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         )
         .await?;
 
-        // * Start the relayer
-        todo!("docker run relayer unless it is already running")
+        // Start the relayer
+        relayer.start().await?;
+
+        Ok(relayer)
     }
 }
 
