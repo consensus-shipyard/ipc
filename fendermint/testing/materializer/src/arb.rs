@@ -377,7 +377,7 @@ fn gen_root_subnet(
 fn gen_env(g: &mut Gen) -> EnvMap {
     let mut env = EnvMap::default();
     for _ in 0..usize::arbitrary(g) % 5 {
-        let prefix = if bool::arbitrary(g) { "CMT_" } else { "FM_" };
+        let prefix = if bool::arbitrary(g) { "CMT" } else { "FM" };
         let key = format!("{prefix}_{}", ResourceId::arbitrary(g).0);
         env.insert(key, String::arbitrary(g));
     }
