@@ -89,9 +89,10 @@ export async function getFacets(diamondAddress: string): Promise<FacetMap> {
 async function startGanache() {
     return new Promise((resolve, reject) => {
         const server = ganache.server({
-            gasPrice: '0x0', // Set gas price to 0
+            miner: { defaultGasPrice: '0x0' },
+            chain: { hardfork: 'berlin' },
         })
-        server.listen(8545, (err) => {
+        server.listen(18678, (err) => {
             if (err) reject(err)
             else resolve(server)
         })
@@ -114,10 +115,10 @@ export async function getRuntimeBytecode(bytecode) {
     }
     const ganacheServer = await startGanache()
 
-    const provider = new providers.JsonRpcProvider('http://127.0.0.1:8545')
+    const provider = new providers.JsonRpcProvider('http://127.0.0.1:18678')
     const wallet = new Wallet(process.env.PRIVATE_KEY, provider)
     const contractFactory = new ContractFactory([], bytecode, wallet)
-    const contract = await contractFactory.deploy()
+    const contract = await contractFactory.deploy({ gasPrice: 0 })
     await contract.deployed()
 
     const runtimeBytecode = await provider.getCode(contract.address)
