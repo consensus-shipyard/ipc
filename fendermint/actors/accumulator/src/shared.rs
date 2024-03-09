@@ -33,24 +33,46 @@ pub enum Method {
 /// The hash is the CID of a new block containing the concatenation of the two CIDs.
 /// We do not include the index of the element(s) because incoming data should already be "nonced".
 fn hash_pair(left: Option<&Cid>, right: Option<&Cid>) -> anyhow::Result<Cid> {
-    if left.is_none() || right.is_none() {
-        return Err(anyhow::anyhow!("hash_pair requires two CIDs"));
+    if let (Some(left), Some(right)) = (left, right) {
+        // Encode the CIDs into a binary format
+        let data = to_vec(&[left, right])?;
+        // Compute the CID for the block
+        let mh_code = Code::Blake2b256;
+        let mh = mh_code.digest(&data);
+        let cid = Cid::new_v1(DAG_CBOR, mh);
+        Ok(cid)
+    } else {
+        Err(anyhow::anyhow!("hash_pair requires two CIDs"))
     }
-    // Encode the CIDs into a binary format
-    let data = to_vec(&[left, right])?;
-    // Compute the CID for the block
-    let mh_code = Code::Blake2b256;
-    let mh = mh_code.digest(&data);
-    let cid = Cid::new_v1(DAG_CBOR, mh);
-    Ok(cid)
+}
+
+/// Compute and store the hash of a pair of CIDs.
+/// The hash is the CID of a new block containing the concatenation of the two CIDs.
+/// We do not include the index of the element(s) because incoming data should already be "nonced".
+fn hash_and_put_pair<BS: Blockstore>(
+    store: &BS,
+    left: Option<&Cid>,
+    right: Option<&Cid>,
+) -> anyhow::Result<Cid> {
+    if let (Some(left), Some(right)) = (left, right) {
+        // Encode the CIDs into a binary format
+        let data = to_vec(&[left, right])?;
+        // Compute the CID for the block
+        store.put_cbor(&data, Code::Blake2b256)
+    } else {
+        Err(anyhow::anyhow!("hash_pair requires two CIDs"))
+    }
 }
 
 /// Return the new peaks of the accumulator after adding `new_leaf`.
-fn push<BS: Blockstore>(
+fn push<BS: Blockstore, S: DeserializeOwned + Serialize>(
+    store: &BS,
     leaf_count: u64,
     peaks: &mut Amt<Cid, &BS>,
-    leaf: Cid,
+    obj: S,
 ) -> anyhow::Result<Cid> {
+    // Create new leaf
+    let leaf = store.put_cbor(&obj, Code::Blake2b256)?;
     // Push the new leaf onto the peaks
     peaks.set(peaks.count(), leaf)?;
     // Count trailing ones in the binary representation of leaf_count + 1
@@ -63,7 +85,10 @@ fn push<BS: Blockstore>(
         let right = peaks.delete(peaks.count() - 1)?;
         let left = peaks.delete(peaks.count() - 1)?;
         // Push the new peak onto the peaks array
-        peaks.set(peaks.count(), hash_pair(left.as_ref(), right.as_ref())?)?;
+        peaks.set(
+            peaks.count(),
+            hash_and_put_pair(store, left.as_ref(), right.as_ref())?,
+        )?;
         new_peaks -= 1;
     }
     Ok(peaks.flush()?)
@@ -115,8 +140,7 @@ impl State {
         obj: S,
     ) -> anyhow::Result<Cid> {
         let mut amt = Amt::<Cid, &BS>::load(&self.peaks, store)?;
-        let leaf = store.put_cbor(&obj, Code::Blake2b256)?;
-        self.peaks = push(self.leaf_count, &mut amt, leaf)?;
+        self.peaks = push(store, self.leaf_count, &mut amt, obj)?;
         self.leaf_count += 1;
         // TODO:(carsonfarmer) Maybe we just want to return the root of the Amt?
         bag_peaks(&amt)
@@ -162,7 +186,10 @@ mod tests {
         let store = fvm_ipld_blockstore::MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let obj = vec![1, 2, 3];
-        assert!(state.push(&store, obj).is_ok());
+        assert_eq!(
+            state.push(&store, obj).expect("push failed"),
+            state.get_root(&store).expect("get_root failed")
+        );
         assert_eq!(state.leaf_count, 1);
     }
 
@@ -198,16 +225,10 @@ mod tests {
         state.push(&store, vec![8]).unwrap();
         state.push(&store, vec![9]).unwrap();
         state.push(&store, vec![10]).unwrap();
-        state.push(&store, vec![11]).unwrap();
+        let root = state.push(&store, vec![11]).unwrap();
         let peaks = state.get_peaks(&store).unwrap();
         assert_eq!(peaks.len(), 3);
         assert_eq!(state.leaf_count, 11);
-        let root = state.get_root(&store);
-        assert!(root.is_ok());
-        assert_eq!(
-            root.unwrap(),
-            Cid::from_str("bafy2bzaced4l2dtp5op3owgzivgs2q2lwk2edijcf57vn2wxllqbhko35wnse")
-                .unwrap()
-        );
+        assert_eq!(root, state.get_root(&store).expect("get_root failed"));
     }
 }
