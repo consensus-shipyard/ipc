@@ -91,6 +91,7 @@ async function startGanache() {
         const server = ganache.server({
             miner: { defaultGasPrice: '0x0' },
             chain: { hardfork: 'berlin' },
+            logging: { quiet: true },
         })
         server.listen(18678, (err) => {
             if (err) reject(err)
@@ -122,9 +123,7 @@ export async function getRuntimeBytecode(bytecode) {
     await contract.deployed()
 
     const runtimeBytecode = await provider.getCode(contract.address)
-
-    await stopGanache(ganacheServer)
-
+    stopGanache(ganacheServer)
     return runtimeBytecode
 }
 
