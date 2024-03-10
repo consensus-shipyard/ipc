@@ -303,7 +303,7 @@ where
     where
         C: Client + Sync + Send,
     {
-        let block = enrich_block(&self.client, block).await?;
+        let block = enrich_block(&self.client, &block).await?;
 
         let block = if full_tx {
             map_rpc_block_txs(block, serde_json::to_value).context("failed to convert to JSON")?
@@ -579,7 +579,7 @@ impl<C> JsonRpcState<C> {
 
 pub async fn enrich_block<C>(
     client: &FendermintClient<C>,
-    block: tendermint::Block,
+    block: &tendermint::Block,
 ) -> JsonRpcResult<et::Block<et::Transaction>>
 where
     C: Client + Sync + Send,

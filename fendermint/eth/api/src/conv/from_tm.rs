@@ -99,7 +99,7 @@ pub fn is_block_zero(block: &tendermint::Block) -> bool {
 
 /// Convert a Tendermint block to Ethereum with only the block hashes in the body.
 pub fn to_eth_block(
-    block: tendermint::Block,
+    block: &tendermint::Block,
     block_results: tendermint_rpc::endpoint::block_results::Response,
     base_fee: TokenAmount,
     chain_id: ChainID,
@@ -449,7 +449,7 @@ pub fn to_eth_block_zero(block: tendermint::Block) -> anyhow::Result<et::Block<s
         validator_updates: Vec::new(),
         consensus_param_updates: None,
     };
-    let block = to_eth_block(block, block_results, TokenAmount::zero(), ChainID::from(0))
+    let block = to_eth_block(&block, block_results, TokenAmount::zero(), ChainID::from(0))
         .context("failed to map block zero to eth")?;
     let block =
         map_rpc_block_txs(block, serde_json::to_value).context("failed to convert to JSON")?;
