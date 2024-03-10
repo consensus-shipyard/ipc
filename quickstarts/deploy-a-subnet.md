@@ -83,16 +83,6 @@ cargo build --release
 ./target/release/fendermint --version
 ```
 {% endtab %}
-
-{% tab title="Docker" %}
-* Run docker desktop
-
-```
-docker pull  ghcr.io/consensus-shipyard/fendermint:latest
-
-alias ipc-cli='docker run  ghcr.io/consensus-shipyard/fendermint  ipc-cli'
-```
-{% endtab %}
 {% endtabs %}
 
 ### Step 2: Initialise your config
@@ -104,15 +94,6 @@ alias ipc-cli='docker run  ghcr.io/consensus-shipyard/fendermint  ipc-cli'
 ```
 alias ipc-cli="cargo run -q -p ipc-cli --release --"
 ipc-cli config init
-```
-{% endtab %}
-
-{% tab title="Docker" %}
-```
-alias ipc-cli='docker run  ghcr.io/consensus-shipyard/fendermint  ipc-cli'
-ipc-cli config init
-
-alias ipc-cli="docker run -it --rm -u $(id -u) -v $HOME/.ipc:/fendermint/.ipc ghcr.io/consensus-shipyard/fendermint ipc-cli"
 ```
 {% endtab %}
 {% endtabs %}
