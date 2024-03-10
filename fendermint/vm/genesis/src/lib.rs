@@ -40,7 +40,7 @@ pub struct Genesis {
     /// Validators in genesis are given with their FIL collateral to maintain the
     /// highest possible fidelity when we are deriving a genesis file in IPC,
     /// where the parent subnet tracks collateral.
-    pub validators: Vec<Validator<Collateral>>,
+    pub validators: Vec<Validator<LibStakingPower>>,
     pub accounts: Vec<Actor>,
     /// The custom eam permission mode that controls who can deploy contracts
     pub eam_permission_mode: PermissionMode,
@@ -93,6 +93,45 @@ pub struct Actor {
     pub meta: ActorMeta,
     #[serde_as(as = "IsHumanReadable")]
     pub balance: TokenAmount,
+}
+
+/// Total power from IPC LibStaking, consists of the collateral staked by the validator and the
+/// federated power assigned by the super admin/owner of the subnet
+#[serde_as]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct LibStakingPower {
+    #[serde_as(as = "IsHumanReadable")]
+    pub collateral: TokenAmount,
+    #[serde_as(as = "IsHumanReadable")]
+    pub federated_power: TokenAmount,
+}
+
+impl LibStakingPower {
+    /// Convert from [LibStakingPower] to [Power] by specifying the number of significant
+    /// decimal places per FIL that grant 1 power.
+    ///
+    /// For example:
+    /// * with 3 decimal places, we get 1 power per milli FIL: 0.001 FIL => 1 power
+    /// * with 0 decimal places, we get 1 power per whole FIL: 1 FIL => 1 power
+    pub fn into_power(self: LibStakingPower, scale: PowerScale) -> Power {
+        let atto_per_power = Collateral::atto_per_power(scale);
+        let atto = self.federated_power.atto() + self.collateral.atto();
+        // Rounding away from zero, so with little collateral (e.g. in testing)
+        // we don't end up with everyone having 0 power and then being unable
+        // to produce a checkpoint because the threshold is 0.
+        let power = atto.div_ceil(&atto_per_power);
+        let power = power.min(BigInt::from(u64::MAX));
+        Power(power.try_into().expect("clipped to u64::MAX"))
+    }
+}
+
+impl Default for LibStakingPower {
+    fn default() -> Self {
+        Self {
+            collateral: TokenAmount::from_atto(0),
+            federated_power: TokenAmount::from_atto(0),
+        }
+    }
 }
 
 /// Total amount of tokens delegated to a validator.

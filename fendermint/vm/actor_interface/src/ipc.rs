@@ -299,11 +299,11 @@ pub mod gateway {
     use ethers::contract::{EthAbiCodec, EthAbiType};
     use ethers::core::types::{Bytes, H160, U256};
     use fendermint_vm_genesis::ipc::GatewayParams;
-    use fendermint_vm_genesis::{Collateral, Validator};
+    use fendermint_vm_genesis::{LibStakingPower, Validator};
     use fvm_shared::address::Error as AddressError;
     use fvm_shared::econ::TokenAmount;
 
-    use ipc_actors_abis::gateway_diamond::SubnetID as GatewaySubnetID;
+    use ipc_actors_abis::gateway_diamond::{GenesisValidator, SubnetID as GatewaySubnetID};
     pub use ipc_actors_abis::gateway_getter_facet::Validator as GatewayValidator;
 
     use crate::eam::EthAddress;
@@ -323,13 +323,13 @@ pub mod gateway {
         pub active_validators_limit: u16,
         pub majority_percentage: u8,
         pub network_name: GatewaySubnetID,
-        pub validators: Vec<GatewayValidator>,
+        pub validators: Vec<GenesisValidator>,
     }
 
     impl ConstructorParameters {
         pub fn new(
             params: GatewayParams,
-            validators: Vec<Validator<Collateral>>,
+            validators: Vec<Validator<LibStakingPower>>,
         ) -> anyhow::Result<Self> {
             // Every validator has an Ethereum address.
             let validators = validators
@@ -337,10 +337,10 @@ pub mod gateway {
                 .map(|v| {
                     let pk = v.public_key.0.serialize();
                     let addr = EthAddress::new_secp256k1(&pk)?;
-                    let collateral = tokens_to_u256(v.power.0);
-                    Ok(GatewayValidator {
+                    Ok(GenesisValidator {
                         addr: H160::from(addr.0),
-                        weight: collateral,
+                        collateral: tokens_to_u256(v.power.collateral),
+                        federated_power: tokens_to_u256(v.power.federated_power),
                         metadata: Bytes::from(pk),
                     })
                 })
