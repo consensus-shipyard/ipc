@@ -64,7 +64,7 @@ contract SubnetActorGetterFacet {
             ValidatorInfo memory info = getValidator(addr);
             validators[i] = GenesisValidator({
                 // for genesis validators, totalCollateral == confirmedCollateral
-                collateral: info.totalCollateral, 
+                collateral: info.totalCollateral,
                 federatedPower: info.federatedPower,
                 addr: addr,
                 metadata: info.metadata
