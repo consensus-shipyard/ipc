@@ -5,14 +5,16 @@ import {VALIDATOR_SECP256K1_PUBLIC_KEY_LENGTH} from "../constants/Constants.sol"
 import {ERR_PERMISSIONED_AND_BOOTSTRAPPED} from "../errors/IPCErrors.sol";
 import {NotEnoughGenesisValidators, DuplicatedGenesisValidator, NotOwnerOfPublicKey, MethodNotAllowed} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
-import {Validator, ValidatorSet, PermissionMode} from "../structs/Subnet.sol";
+import {Validator, ValidatorSet, PermissionMode, SubnetGenesis} from "../structs/Subnet.sol";
 import {SubnetActorModifiers} from "../lib/LibSubnetActorStorage.sol";
 import {LibValidatorSet, LibStaking} from "../lib/LibStaking.sol";
+import {LibGenesis} from "../lib/LibGenesis.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 import {LibSubnetActorStorage, SubnetActorStorage} from "./LibSubnetActorStorage.sol";
 
 library LibSubnetActor {
     using EnumerableSet for EnumerableSet.AddressSet;
+    using LibGenesis for SubnetGenesis;
 
     event SubnetBootstrapped(address[]);
 
@@ -48,7 +50,8 @@ library LibSubnetActor {
         if (totalCollateral >= s.minActivationCollateral) {
             if (LibStaking.totalActiveValidators() >= s.minValidators) {
                 s.bootstrapped = true;
-                emit SubnetBootstrapped(s.genesisValidators.values());
+                s.genesis.bootstrap(s.validatorSet);
+                emit SubnetBootstrapped(s.genesis.validators.values());
 
                 // register adding the genesis circulating supply (if it exists)
                 IGateway(s.ipcGatewayAddr).register{value: totalCollateral + s.genesisCircSupply}(s.genesisCircSupply);
@@ -98,7 +101,7 @@ library LibSubnetActor {
 
             LibStaking.setMetadataWithConfirm(validators[i], publicKeys[i]);
             LibStaking.setFederatedPowerWithConfirm(validators[i], powers[i]);
-            LibStaking.addGenesisValidator(validators[i]);
+            s.genesis.addValidator(validators[i]);
 
             unchecked {
                 ++i;
@@ -106,7 +109,8 @@ library LibSubnetActor {
         }
 
         s.bootstrapped = true;
-        emit SubnetBootstrapped(s.genesisValidators.values());
+        s.genesis.bootstrap(s.validatorSet);
+        emit SubnetBootstrapped(s.genesis.validators.values());
 
         // register adding the genesis circulating supply (if it exists)
         IGateway(s.ipcGatewayAddr).register{value: s.genesisCircSupply}(s.genesisCircSupply);
