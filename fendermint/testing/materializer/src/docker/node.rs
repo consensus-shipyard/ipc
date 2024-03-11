@@ -159,6 +159,12 @@ impl DockerNode {
             std::fs::create_dir(fendermint_dir.join("snapshots"))?;
         }
 
+        // Create a directory for ethapi logs
+        let ethapi_dir = node_dir.join("ethapi");
+        if !ethapi_dir.exists() {
+            std::fs::create_dir_all(&ethapi_dir.join("logs"))?;
+        }
+
         // We'll need to run some cometbft and fendermint commands.
         // NOTE: Currently the Fendermint CLI commands live in the
         // `app` crate in a way that they can't be imported. We
@@ -425,7 +431,10 @@ impl DockerNode {
         // Create a ethapi container
         let ethapi = match ethapi {
             None if node_config.ethapi => {
-                let creator = make_runner(FENDERMINT_IMAGE, volumes(vec![]));
+                let creator = make_runner(
+                    FENDERMINT_IMAGE,
+                    volumes(vec![(ethapi_dir.join("logs"), "/fendermint/logs")]),
+                );
 
                 let c = creator
                     .create(
