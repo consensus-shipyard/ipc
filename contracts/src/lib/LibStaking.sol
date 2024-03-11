@@ -174,7 +174,6 @@ library LibValidatorSet {
         collateral += getTotalConfirmedCollateral(validators);
     }
 
-
     /// @notice Get the total power of the validators.
     /// The function reverts if at least one validator is not in the active validator set.
     function getTotalPowerOfValidators(
@@ -518,20 +517,6 @@ library LibStaking {
     }
 
     // =============== Other functions ================
-
-    /// @notice Adds the validator to the list of genesis validators if not already added 
-    function addGenesisValidator(address validator) internal {
-        SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-
-        // the address set will perform deduplication
-        s.genesisValidators.add(validator);
-    }
-
-    function removeGenesisValidator(address validator) internal {
-        SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-        s.genesisValidators.remove(validator);
-    }
-
     /// @notice Claim the released collateral
     function claimCollateral(address validator) internal {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
@@ -601,7 +586,7 @@ library LibValidatorTracking {
         ParentValidatorsTracker storage self,
         uint16 activeValidatorsLimit,
         GenesisValidator[] memory validators
-    ) internal returns (Validator[] memory membership) {
+    ) internal returns (Validator[] memory) {
         self.validators.activeLimit = activeValidatorsLimit;
         // Start the next configuration number from 1, 0 is reserved for no change and the genesis membership
         self.changes.nextConfigurationNumber = LibStaking.INITIAL_CONFIGURATION_NUMBER;

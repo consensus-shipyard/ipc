@@ -56,11 +56,27 @@ contract SubnetActorGetterFacet {
 
     /// @notice Returns the initial set of validators of the genesis block.
     function genesisValidators() external view returns (GenesisValidator[] memory validators) {
-        uint256 total = s.genesisValidators.length();
+        uint256 total = s.genesis.validators.length();
+
         validators = new GenesisValidator[](total);
 
+        if (s.bootstrapped) {
+            // subnet boostrapped, that means validator information at genesis should be locked
+            // and cannot be changed anymore, fetch from s.genesis
+
+            for (uint256 i = 0; i < total; ) {
+                address addr = s.genesis.validators.at(i);
+                validators[i] = s.genesis.validatorInfo[addr];
+
+                unchecked {
+                    i++;
+                }
+            }
+            return validators;
+        }
+
         for (uint256 i = 0; i < total; ) {
-            address addr = s.genesisValidators.at(i);
+            address addr = s.genesis.validators.at(i);
             ValidatorInfo memory info = getValidator(addr);
             validators[i] = GenesisValidator({
                 // for genesis validators, totalCollateral == confirmedCollateral

@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 import {ConsensusType} from "../enums/ConsensusType.sol";
 import {NotGateway, SubnetAlreadyKilled} from "../errors/IPCErrors.sol";
 import {BottomUpCheckpoint, BottomUpMsgBatchInfo} from "../structs/CrossNet.sol";
-import {SubnetID, ValidatorSet, StakingChangeLog, StakingReleaseQueue, SupplySource, Validator, PermissionMode} from "../structs/Subnet.sol";
+import {SubnetID, ValidatorSet, StakingChangeLog, StakingReleaseQueue, SupplySource, Validator, SubnetGenesis, PermissionMode} from "../structs/Subnet.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 
     struct SubnetActorStorage {
@@ -55,8 +55,8 @@ import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.
         EnumerableSet.AddressSet bootstrapOwners;
         /// @notice contains all committed bottom-up checkpoint at specific epoch
         mapping(uint256 => BottomUpCheckpoint) committedCheckpoints;
-        /// @notice initial set of validators joining in genesis
-        EnumerableSet.AddressSet genesisValidators;
+        /// @notice Tracks the subnet genesis state
+        SubnetGenesis genesis;
         /// @notice genesis balance to be allocated to the subnet in genesis.
         mapping(address => uint256) genesisBalance;
         /// @notice genesis balance addresses

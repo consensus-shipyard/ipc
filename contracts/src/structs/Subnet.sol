@@ -4,6 +4,7 @@ pragma solidity ^0.8.23;
 import {FvmAddress} from "./FvmAddress.sol";
 import {MaxPQ} from "../lib/priority/LibMaxPQ.sol";
 import {MinPQ} from "../lib/priority/LibMinPQ.sol";
+import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice A subnet identity type.
 struct SubnetID {
@@ -151,6 +152,17 @@ struct GenesisValidator {
     uint256 federatedPower;
     address addr;
     bytes metadata;
+}
+
+/// @notice Maintains the genesis information related to a particular subnet
+struct SubnetGenesis {
+    /// The genesis validators
+    EnumerableSet.AddressSet validators;
+    /// Tracks the validator info. This is only populated when the subnet is bootstrapped
+    mapping(address => GenesisValidator) validatorInfo;
+
+    /// TODO: migrating all the genesis related fields to this struct so that one can handle
+    ///       them all in a library.
 }
 
 /// @notice Validator struct stored in the gateway.
