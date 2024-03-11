@@ -491,8 +491,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         IpcEnvelope[] memory crossMsgs = new IpcEnvelope[](1);
         crossMsgs[0] = resultMsg;
 
-        GatewayManagerFacet manager = GatewayManagerFacet(nativeSubnet.gatewayAddr);
-
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
             nativeSubnet.id,
             nativeSubnet.gateway,
@@ -533,8 +531,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         IpcEnvelope memory resultMsg = CrossMsgHelper.createResultMsg(crossMsg, OutcomeType.ActorErr, new bytes(0));
         IpcEnvelope[] memory crossMsgs = new IpcEnvelope[](1);
         crossMsgs[0] = resultMsg;
-
-        GatewayManagerFacet manager = GatewayManagerFacet(nativeSubnet.gatewayAddr);
 
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
             nativeSubnet.id,
@@ -580,8 +576,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         IpcEnvelope memory resultMsg = CrossMsgHelper.createResultMsg(crossMsg, OutcomeType.SystemErr, new bytes(0));
         IpcEnvelope[] memory crossMsgs = new IpcEnvelope[](1);
         crossMsgs[0] = resultMsg;
-
-        GatewayManagerFacet manager = GatewayManagerFacet(nativeSubnet.gatewayAddr);
 
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
             nativeSubnet.id,
@@ -652,7 +646,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
     function testMultiSubnet_Erc20_FundResultOkFromChildToParent() public {
         address caller = address(new MockIpcContract());
-        address recipient = address(new MockIpcContractPayable());
         uint256 amount = 3;
 
         token.transfer(caller, amount);
@@ -698,7 +691,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
     function testMultiSubnet_Erc20_FundResultSystemErrFromChildToParent() public {
         address caller = address(new MockIpcContract());
-        address recipient = address(new MockIpcContractPayable());
         uint256 amount = 3;
 
         token.transfer(caller, amount);
@@ -744,7 +736,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
     function testMultiSubnet_Erc20_FundResultActorErrFromChildToParent() public {
         address caller = address(new MockIpcContract());
-        address recipient = address(new MockIpcContractPayable());
         uint256 amount = 3;
 
         token.transfer(caller, amount);
@@ -1221,7 +1212,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
     ) internal returns (BottomUpCheckpoint memory checkpoint) {
         uint256 e = getNextEpoch(block.number, DEFAULT_CHECKPOINT_PERIOD);
 
-        GatewayGetterFacet getter = gw.getter();
         CheckpointingFacet checkpointer = gw.checkpointer();
 
         (, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
