@@ -82,7 +82,12 @@ where
 
     fn env(&self) -> Vec<String> {
         // Set the network otherwise we might be be able to parse addresses we created.
-        let mut env = vec![format!("FM_NETWORK={}", current_network())];
+        let network = current_network();
+        let mut env = vec![
+            format!("FM_NETWORK={}", network),
+            format!("IPC_NETWORK={}", network),
+            format!("NETWORK={}", network),
+        ];
         env.extend(self.env.iter().map(|(k, v)| format!("{k}={v}")));
         env
     }
