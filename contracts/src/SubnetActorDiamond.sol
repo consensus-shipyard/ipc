@@ -38,7 +38,7 @@ contract SubnetActorDiamond {
         SubnetID parentId;
     }
 
-    constructor(IDiamond.FacetCut[] memory _diamondCut, ConstructorParams memory params) {
+    constructor(IDiamond.FacetCut[] memory _diamondCut, ConstructorParams memory params, address owner) {
         if (params.ipcGatewayAddr == address(0)) {
             revert GatewayCannotBeZero();
         }
@@ -58,7 +58,7 @@ contract SubnetActorDiamond {
 
         params.supplySource.validate();
 
-        LibDiamond.setContractOwner(msg.sender);
+        LibDiamond.setContractOwner(owner);
         LibDiamond.diamondCut({_diamondCut: _diamondCut, _init: address(0), _calldata: new bytes(0)});
 
         LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();

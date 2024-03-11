@@ -407,7 +407,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             })
         );
 
-        saDiamond = new SubnetActorDiamond(diamondCut, params);
+        saDiamond = new SubnetActorDiamond(diamondCut, params, address(this));
         return saDiamond;
     }
 
@@ -478,7 +478,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             })
         );
 
-        SubnetActorDiamond diamond = new SubnetActorDiamond(diamondCut, params);
+        SubnetActorDiamond diamond = new SubnetActorDiamond(diamondCut, params, address(this));
 
         return diamond;
     }
@@ -555,7 +555,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
 
         SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(gw);
 
-        SubnetActorDiamond d = new SubnetActorDiamond(diamondCut, params);
+        SubnetActorDiamond d = new SubnetActorDiamond(diamondCut, params, address(this));
 
         return d;
     }

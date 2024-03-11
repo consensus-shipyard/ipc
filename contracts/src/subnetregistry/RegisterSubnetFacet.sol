@@ -58,7 +58,7 @@ contract RegisterSubnetFacet is ReentrancyGuard {
         });
 
         // slither-disable-next-line reentrancy-benign
-        subnetAddr = address(new SubnetActorDiamond(diamondCut, _params));
+        subnetAddr = address(new SubnetActorDiamond(diamondCut, _params, msg.sender));
 
         //nonces start with 1, similar to eip 161
         ++s.userNonces[msg.sender];
