@@ -4,7 +4,6 @@
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_actors_abis::subnet_actor_getter_facet;
 
-use crate::error::Error;
 use crate::{
     eth_to_fil_amount, ethers_address_to_fil_address,
     evm::{fil_to_eth_amount, payload_to_evm_address},
