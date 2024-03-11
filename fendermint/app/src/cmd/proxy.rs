@@ -327,11 +327,12 @@ async fn handle_os_get(
                     message: format!("failed to decode value: {}", e),
                 })
             })?;
-            if !obj.resolved {
-                return Err(Rejection::from(BadRequest {
-                    message: "object is not resolved".to_string(),
-                }));
-            }
+            // TODO: Uncomment this check when object voting is implemented.
+            // if !obj.resolved {
+            //     return Err(Rejection::from(BadRequest {
+            //         message: "object is not resolved".to_string(),
+            //     }));
+            // }
             let val = value.to_string();
 
             let stat = ipfs.object_links(&val).await.map_err(|e| {

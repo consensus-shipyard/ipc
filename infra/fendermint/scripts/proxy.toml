@@ -11,7 +11,7 @@ docker run \
   --env FM_CHAIN_NAME=${SUBNET_ID} \
   --env FM_PROXY_SECRET_KEY=/data/${NODE_NAME}/${PROXY_PRIV_KEY_PATH} \
   --env FM_PROXY_ACCOUNT_KIND=ethereum \
-  --env FM_PROXY_BROADCAST_MODE=async \
+  --env FM_PROXY_BROADCAST_MODE=sync \
   --env FM_PROXY_SEQUENCE=0 \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
   --env IPFS_RPC_ADDR=/dns4/${IPFS_CONTAINER_NAME}/tcp/5001 \
