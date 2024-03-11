@@ -296,13 +296,15 @@ impl DockerNode {
             if let Some(pc) = node_config.parent_node {
                 let gateway: H160 = pc.deployment.gateway.into();
                 let registry: H160 = pc.deployment.registry.into();
+                env.extend(env_vars![
+                    "FM_IPC__TOPDOWN__PARENT_REGISTRY" => format!("{registry:?}"),
+                    "FM_IPC__TOPDOWN__PARENT_GATEWAY"  => format!("{gateway:?}"),
+                ]);
                 let topdown = match pc.node {
                     // Assume Lotus
                     TargetConfig::External(url) => env_vars![
                         "FM_IPC__TOPDOWN__CHAIN_HEAD_DELAY"        => 20,
                         "FM_IPC__TOPDOWN__PARENT_HTTP_ENDPOINT"    => url,
-                        "FM_IPC__TOPDOWN__PARENT_REGISTRY"         => registry,
-                        "FM_IPC__TOPDOWN__PARENT_GATEWAY"          => gateway,
                         "FM_IPC__TOPDOWN__EXPONENTIAL_BACK_OFF"    => 5,
                         "FM_IPC__TOPDOWN__EXPONENTIAL_RETRY_LIMIT" => 5                ,
                         "FM_IPC__TOPDOWN__POLLING_INTERVAL"        => 10,
@@ -320,8 +322,6 @@ impl DockerNode {
                         env_vars![
                             "FM_IPC__TOPDOWN__CHAIN_HEAD_DELAY"        => 1,
                             "FM_IPC__TOPDOWN__PARENT_HTTP_ENDPOINT"    => format!("http://{}:{ETHAPI_RPC_PORT}", parent_ethapi.hostname()),
-                            "FM_IPC__TOPDOWN__PARENT_REGISTRY"         => registry,
-                            "FM_IPC__TOPDOWN__PARENT_GATEWAY"          => gateway,
                             "FM_IPC__TOPDOWN__EXPONENTIAL_BACK_OFF"    => 5,
                             "FM_IPC__TOPDOWN__EXPONENTIAL_RETRY_LIMIT" => 5                ,
                             "FM_IPC__TOPDOWN__POLLING_INTERVAL"        => 1,
