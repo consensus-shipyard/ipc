@@ -9,9 +9,10 @@ rootnet:
   validators:
     alice: '100'
   balances:
-    alice: '1000000000000000000'
-    bob: '2000000000000000000'
-    charlie: '3000000000000000000'
+    # 100FIL is 100_000_000_000_000_000_000
+    alice: '100000000000000000000'
+    bob: '200000000000000000000'
+    charlie: '300000000000000000000'
   env:
     CMT_CONSENSUS_TIMEOUT_COMMIT: 2s
     FM_LOG_LEVEL: info,fendermint=debug
@@ -27,13 +28,14 @@ rootnet:
 subnets:
   england:
     creator: bob
-    # Minimum collateral is 1 nanoFIL
+    # Minimum collateral is 1 nanoFIL, which is 1_000_000_000 atto
     validators:
       charlie: '1000000000'
-      alice:   '2000000000'
+      bob:     '2000000000'
+    # Submitting a signature for a checkpoint says it needs 0.059552996FIL
     balances:
-      bob:     '50000000000'
-      charlie: '80000000000'
+      bob:     '20000000000000000000'
+      charlie: '30000000000000000000'
     bottom_up_checkpoint:
       period: 100
     env:
@@ -64,7 +66,7 @@ subnets:
       manchester:
         mode:
           type: Validator
-          validator: alice
+          validator: bob
         parent_node: brussels
         seed_nodes: [london]
         ethapi: true
