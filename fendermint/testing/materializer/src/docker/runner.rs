@@ -15,7 +15,7 @@ use bollard::{
 };
 use futures::StreamExt;
 
-use crate::{docker::current_network, ResourceName, TestnetResource};
+use crate::{docker::current_network, manifest::EnvMap, ResourceName, TestnetResource};
 
 use super::{
     container::DockerContainer,
@@ -33,6 +33,7 @@ pub struct DockerRunner<N> {
     image: String,
     volumes: Volumes,
     network_name: Option<NetworkName>,
+    env: EnvMap,
 }
 
 impl<N> DockerRunner<N>
@@ -59,7 +60,13 @@ where
             image: image.to_string(),
             volumes,
             network_name,
+            env: EnvMap::default(),
         }
+    }
+
+    pub fn with_env(mut self, env: EnvMap) -> Self {
+        self.env = env;
+        self
     }
 
     // Tag containers with resource names.
@@ -73,12 +80,16 @@ where
         .collect()
     }
 
+    fn env(&self) -> Vec<String> {
+        // Set the network otherwise we might be be able to parse addresses we created.
+        let mut env = vec![format!("FM_NETWORK={}", current_network())];
+        env.extend(self.env.iter().map(|(k, v)| format!("{k}={v}")));
+        env
+    }
+
     /// Run a short lived container.
     pub async fn run_cmd(&self, cmd: &str) -> anyhow::Result<Vec<String>> {
         let cmdv = split_cmd(cmd);
-
-        // Set the network otherwise we might be be able to parse addresses we created.
-        let env = vec![format!("FM_NETWORK={}", current_network())];
 
         let config = Config {
             image: Some(self.image.clone()),
@@ -88,7 +99,7 @@ where
             attach_stdout: Some(true),
             tty: Some(true),
             labels: Some(self.labels()),
-            env: Some(env),
+            env: Some(self.env()),
             host_config: Some(HostConfig {
                 // We'll remove it explicitly at the end after collecting the output.
                 auto_remove: Some(false),
@@ -187,6 +198,7 @@ where
             user: Some(self.user.to_string()),
             entrypoint: Some(entrypoint),
             labels: Some(self.labels()),
+            env: Some(self.env()),
             cmd: None,
             host_config: Some(HostConfig {
                 init: Some(true),

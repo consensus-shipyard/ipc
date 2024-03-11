@@ -19,7 +19,6 @@ use url::Url;
 
 use super::{
     container::DockerContainer,
-    current_network,
     dropper::{DropChute, DropPolicy},
     network::NetworkName,
     runner::DockerRunner,
@@ -268,7 +267,6 @@ impl DockerNode {
 
             env.extend(env_vars![
                 "RUST_BACKTRACE"   => 1,
-                "FM_NETWORK"       => current_network(),
                 "FM_DATA_DIR"      => "/fendermint/data",
                 "FM_LOG_DIR"       => "/fendermint/logs",
                 "FM_SNAPSHOTS_DIR" => "/fendermint/snapshots",

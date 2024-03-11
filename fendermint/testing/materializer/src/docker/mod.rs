@@ -1008,6 +1008,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             relayer_config.follow_config.subnet,
             relayer_config.submitter,
             network_name,
+            relayer_config.env,
         )
         .await?;
 

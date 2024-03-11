@@ -11,6 +11,7 @@ use crate::{
         runner::{split_cmd, DockerRunner},
         user_id, FENDERMINT_IMAGE,
     },
+    manifest::EnvMap,
     materials::{DefaultAccount, DefaultSubnet},
     RelayerName, ResourceHash, TestnetResource,
 };
@@ -43,6 +44,7 @@ impl DockerRelayer {
         subnet: &DefaultSubnet,
         submitter: &DefaultAccount,
         network_name: Option<NetworkName>,
+        env: &EnvMap,
     ) -> anyhow::Result<Self> {
         let container_name = container_name(relayer_name);
 
@@ -66,7 +68,7 @@ impl DockerRelayer {
 
         let user = user_id(&ipc_dir)?;
 
-        // TODO: Logs?
+        // The CLI only logs to the output. Its log level can be configured with the general env vars.
         let volumes = vec![(ipc_dir, "/fendermint/.ipc")];
 
         let creator = DockerRunner::new(
@@ -78,7 +80,8 @@ impl DockerRelayer {
             FENDERMINT_IMAGE,
             volumes,
             network_name,
-        );
+        )
+        .with_env(env.clone());
 
         // TODO: Do we need to use any env vars with the relayer?
         let entrypoint = split_cmd(&format!(
