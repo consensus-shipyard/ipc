@@ -87,7 +87,7 @@ impl DockerNode {
         dropper: DropChute,
         drop_policy: &DropPolicy,
         node_name: &NodeName,
-        node_config: NodeConfig<'a, DockerMaterials>,
+        node_config: &NodeConfig<'a, DockerMaterials>,
         port_range: DockerPortRange,
     ) -> anyhow::Result<Self> {
         let fendermint_name = container_name(node_name, "fendermint");
@@ -162,7 +162,7 @@ impl DockerNode {
         // Create a directory for ethapi logs
         let ethapi_dir = node_dir.join("ethapi");
         if !ethapi_dir.exists() {
-            std::fs::create_dir_all(&ethapi_dir.join("logs"))?;
+            std::fs::create_dir_all(ethapi_dir.join("logs"))?;
         }
 
         // We'll need to run some cometbft and fendermint commands.
@@ -267,7 +267,6 @@ impl DockerNode {
             let mut env: EnvMap = node_config.env.clone();
 
             env.extend(env_vars![
-                "LOG_LEVEL"        => "info",
                 "RUST_BACKTRACE"   => 1,
                 "FM_NETWORK"       => current_network(),
                 "FM_DATA_DIR"      => "/fendermint/data",
@@ -299,7 +298,7 @@ impl DockerNode {
                 );
             }
 
-            if let Some(pc) = node_config.parent_node {
+            if let Some(ref pc) = node_config.parent_node {
                 let gateway: H160 = pc.deployment.gateway.into();
                 let registry: H160 = pc.deployment.registry.into();
                 env.extend(env_vars![
@@ -308,7 +307,7 @@ impl DockerNode {
                 ]);
                 let topdown = match pc.node {
                     // Assume Lotus
-                    TargetConfig::External(url) => env_vars![
+                    TargetConfig::External(ref url) => env_vars![
                         "FM_IPC__TOPDOWN__CHAIN_HEAD_DELAY"        => 20,
                         "FM_IPC__TOPDOWN__PARENT_HTTP_ENDPOINT"    => url,
                         "FM_IPC__TOPDOWN__EXPONENTIAL_BACK_OFF"    => 5,

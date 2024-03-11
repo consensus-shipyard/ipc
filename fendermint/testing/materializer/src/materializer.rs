@@ -120,7 +120,7 @@ pub trait Materializer<M: Materials> {
     async fn create_node<'s, 'a>(
         &'s mut self,
         node_name: &NodeName,
-        node_config: NodeConfig<'a, M>,
+        node_config: &NodeConfig<'a, M>,
     ) -> anyhow::Result<M::Node>
     where
         's: 'a;
@@ -146,7 +146,7 @@ pub trait Materializer<M: Materials> {
         &'s mut self,
         parent_submit_config: &SubmitConfig<'a, M>,
         subnet_name: &SubnetName,
-        subnet_config: SubnetConfig<'a, M>,
+        subnet_config: &SubnetConfig<'a, M>,
     ) -> anyhow::Result<M::Subnet>
     where
         's: 'a;
@@ -194,14 +194,11 @@ pub trait Materializer<M: Materials> {
         's: 'a;
 
     /// Create and start a relayer.
-    ///
-    /// It should follow the given node. If the submit node is empty, it should submit to an external rootnet.
     async fn create_relayer<'s, 'a>(
         &'s mut self,
         parent_submit_config: &SubmitConfig<'a, M>,
-        child_follow_config: &SubmitConfig<'a, M>,
         relayer_name: &RelayerName,
-        submitter: &'a M::Account,
+        relayer_config: RelayerConfig<'a, M>,
     ) -> anyhow::Result<M::Relayer>
     where
         's: 'a;
@@ -225,6 +222,16 @@ pub struct NodeConfig<'a, M: Materials> {
     pub env: &'a EnvMap,
     /// Number of nodes to be expected in the subnet, including this node, or 0 if unknown.
     pub peer_count: usize,
+}
+
+/// Options regarding relayer configuration
+pub struct RelayerConfig<'a, M: Materials> {
+    /// Where to send queries on the child subnet.
+    pub follow_config: &'a SubmitConfig<'a, M>,
+    /// The account to use to submit transactions on the parent subnet.
+    pub submitter: &'a M::Account,
+    /// Arbitrary env vars, e.g. to set the logging level.
+    pub env: &'a EnvMap,
 }
 
 /// Options regarding subnet configuration, e.g. how many validators are required.
@@ -263,6 +270,7 @@ pub enum TargetConfig<'a, M: Materials> {
 }
 
 impl<'a, M: Materials> SubmitConfig<'a, M> {
+    /// Map over the internal and external target configurations to find a first non-empty result.
     pub fn find_node<F, G, T>(&self, f: F, g: G) -> Option<T>
     where
         F: Fn(&M::Node) -> Option<T>,

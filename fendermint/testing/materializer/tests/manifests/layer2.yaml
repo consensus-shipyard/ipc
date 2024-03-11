@@ -14,6 +14,7 @@ rootnet:
     charlie: '3000000000000000000'
   env:
     CMT_CONSENSUS_TIMEOUT_COMMIT: 2s
+    FM_LOG_LEVEL: debug
 
   nodes:
     brussels:
@@ -35,6 +36,10 @@ subnets:
       charlie: '80000000000'
     bottom_up_checkpoint:
       period: 1000
+    env:
+      FM_LOG_LEVEL: debug
+      # Enable debug log on the relayers
+      RUST_LOG: debug
 
     relayers:
       euston:

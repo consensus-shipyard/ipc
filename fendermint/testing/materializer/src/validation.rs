@@ -16,7 +16,7 @@ use url::Url;
 use crate::{
     logging::LoggingMaterializer,
     manifest::{Balance, Manifest},
-    materializer::{Materializer, NodeConfig, SubmitConfig, SubnetConfig},
+    materializer::{Materializer, NodeConfig, RelayerConfig, SubmitConfig, SubnetConfig},
     materials::Materials,
     testnet::Testnet,
     AccountName, NodeName, RelayerName, ResourceHash, ResourceName, SubnetName, TestnetName,
@@ -260,7 +260,7 @@ impl Materializer<ValidationMaterials> for ValidatingMaterializer {
     async fn create_node<'s, 'a>(
         &'s mut self,
         node_name: &NodeName,
-        _node_config: NodeConfig<'a, ValidationMaterials>,
+        _node_config: &NodeConfig<'a, ValidationMaterials>,
     ) -> anyhow::Result<VNode>
     where
         's: 'a,
@@ -281,7 +281,7 @@ impl Materializer<ValidationMaterials> for ValidatingMaterializer {
         &'s mut self,
         parent_submit_config: &SubmitConfig<'a, ValidationMaterials>,
         subnet_name: &SubnetName,
-        subnet_config: SubnetConfig<'a, ValidationMaterials>,
+        subnet_config: &SubnetConfig<'a, ValidationMaterials>,
     ) -> anyhow::Result<VSubnet>
     where
         's: 'a,
@@ -348,9 +348,8 @@ impl Materializer<ValidationMaterials> for ValidatingMaterializer {
     async fn create_relayer<'s, 'a>(
         &'s mut self,
         parent_submit_config: &SubmitConfig<'a, ValidationMaterials>,
-        _child_follow_config: &SubmitConfig<'a, ValidationMaterials>,
         relayer_name: &RelayerName,
-        submitter: &'a VAccount,
+        relayer_config: RelayerConfig<'a, ValidationMaterials>,
     ) -> anyhow::Result<VRelayer>
     where
         's: 'a,
@@ -358,7 +357,7 @@ impl Materializer<ValidationMaterials> for ValidatingMaterializer {
         self.ensure_contains(relayer_name)?;
         // Check that submitter has balance on the parent.
         let parent = parent_submit_config.subnet;
-        self.ensure_balance(parent, submitter)?;
+        self.ensure_balance(parent, relayer_config.submitter)?;
         Ok(relayer_name.clone())
     }
 }

@@ -10,7 +10,7 @@ use url::Url;
 
 use crate::{
     manifest::Balance,
-    materializer::{Materializer, NodeConfig, SubmitConfig, SubnetConfig},
+    materializer::{Materializer, NodeConfig, RelayerConfig, SubmitConfig, SubnetConfig},
     materials::Materials,
     AccountName, NodeName, RelayerName, ResourceHash, SubnetName, TestnetName,
 };
@@ -114,7 +114,7 @@ where
     async fn create_node<'s, 'a>(
         &'s mut self,
         node_name: &NodeName,
-        node_config: NodeConfig<'a, M>,
+        node_config: &NodeConfig<'a, M>,
     ) -> anyhow::Result<M::Node>
     where
         's: 'a,
@@ -139,7 +139,7 @@ where
         &'s mut self,
         parent_submit_config: &SubmitConfig<'a, M>,
         subnet_name: &SubnetName,
-        subnet_config: SubnetConfig<'a, M>,
+        subnet_config: &SubnetConfig<'a, M>,
     ) -> anyhow::Result<M::Subnet>
     where
         's: 'a,
@@ -209,21 +209,15 @@ where
     async fn create_relayer<'s, 'a>(
         &'s mut self,
         parent_submit_config: &SubmitConfig<'a, M>,
-        child_follow_config: &SubmitConfig<'a, M>,
         relayer_name: &RelayerName,
-        submitter: &'a M::Account,
+        relayer_config: RelayerConfig<'a, M>,
     ) -> anyhow::Result<M::Relayer>
     where
         's: 'a,
     {
         tracing::info!(%relayer_name, ctx=self.ctx, "create_relayer");
         self.inner
-            .create_relayer(
-                parent_submit_config,
-                child_follow_config,
-                relayer_name,
-                submitter,
-            )
+            .create_relayer(parent_submit_config, relayer_name, relayer_config)
             .await
     }
 }

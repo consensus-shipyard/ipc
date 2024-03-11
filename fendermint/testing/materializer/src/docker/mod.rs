@@ -40,7 +40,9 @@ use url::Url;
 
 use crate::{
     manifest::Balance,
-    materializer::{Materializer, NodeConfig, SubmitConfig, SubnetConfig, TargetConfig},
+    materializer::{
+        Materializer, NodeConfig, RelayerConfig, SubmitConfig, SubnetConfig, TargetConfig,
+    },
     materials::{
         export_file, export_json, export_script, import_json, DefaultAccount, DefaultDeployment,
         DefaultGenesis, DefaultSubnet, Materials,
@@ -722,7 +724,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     async fn create_node<'s, 'a>(
         &'s mut self,
         node_name: &NodeName,
-        node_config: NodeConfig<'a, DockerMaterials>,
+        node_config: &NodeConfig<'a, DockerMaterials>,
     ) -> anyhow::Result<DockerNode>
     where
         's: 'a,
@@ -769,7 +771,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         &'s mut self,
         parent_submit_config: &SubmitConfig<'a, DockerMaterials>,
         subnet_name: &SubnetName,
-        subnet_config: SubnetConfig<'a, DockerMaterials>,
+        subnet_config: &SubnetConfig<'a, DockerMaterials>,
     ) -> anyhow::Result<DefaultSubnet>
     where
         's: 'a,
@@ -973,26 +975,26 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     async fn create_relayer<'s, 'a>(
         &'s mut self,
         parent_submit_config: &SubmitConfig<'a, DockerMaterials>,
-        child_follow_config: &SubmitConfig<'a, DockerMaterials>,
         relayer_name: &RelayerName,
-        submitter: &'a DefaultAccount,
+        relayer_config: RelayerConfig<'a, DockerMaterials>,
     ) -> anyhow::Result<DockerRelayer>
     where
         's: 'a,
     {
-        let network_name =
-            child_follow_config.find_node(|n| Some(n.network_name().clone()), |_| None);
+        let network_name = relayer_config
+            .follow_config
+            .find_node(|n| Some(n.network_name().clone()), |_| None);
 
         // Add the parent subnet to the config.toml
         self.ipc_cli_config_add_subnet(parent_submit_config)?;
 
         // Add the child subnet to the config.toml
-        self.ipc_cli_config_add_subnet(child_follow_config)?;
+        self.ipc_cli_config_add_subnet(relayer_config.follow_config)?;
 
         // Add the submitter to the IPC wallet
         Self::ipc_cli_wallet_import(
             &self.ipc_cli_runner(&parent_submit_config.subnet.name.testnet(), None)?,
-            submitter,
+            relayer_config.submitter,
         )
         .await?;
 
@@ -1003,8 +1005,8 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             self.drop_chute.clone(),
             &self.drop_policy,
             relayer_name,
-            child_follow_config.subnet,
-            submitter,
+            relayer_config.follow_config.subnet,
+            relayer_config.submitter,
             network_name,
         )
         .await?;
