@@ -11,7 +11,11 @@
 set -euxo pipefail
 
 DASHES='------'
-IPC_FOLDER=${HOME}/ipc
+if [[ ! -v IPC_FOLDER ]]; then
+    IPC_FOLDER=${HOME}/ipc
+else
+    IPC_FOLDER=${IPC_FOLDER}
+fi
 IPC_CLI=${IPC_FOLDER}/target/release/ipc-cli
 IPC_CONFIG_FOLDER=${HOME}/.ipc
 
@@ -21,6 +25,10 @@ CMT_P2P_HOST_PORTS=(26656 26756 26856)
 CMT_RPC_HOST_PORTS=(26657 26757 26857)
 ETHAPI_HOST_PORTS=(8545 8645 8745)
 RESOLVER_HOST_PORTS=(26655 26755 26855)
+PROXY_HOST_PORTS=(8001 8002 8003)
+IPFS_SWARM_HOST_PORTS=(4001 4002 4003)
+IPFS_RPC_HOST_PORTS=(5001 5002 5003)
+IPFS_GATEWAY_HOST_PORTS=(8080 8081 8082)
 
 if (($# != 1)); then
   echo "Arguments: <Specify github remote branch name to use to deploy. Or use 'local' (without quote) to indicate using local repo instead. If not provided, will default to main branch"
@@ -70,6 +78,17 @@ else
   foundryup
 fi
 
+# Step 1.3.1: Install node
+echo "$DASHES Check node..."
+if which node ; then
+  echo "$DASHES node is already installed."
+else
+  echo "$DASHES Need to install node"
+  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
+  source "$HOME/.bashrc"
+  nvm install --default lts/*
+fi
+
 # Step 1.4: Install docker
 echo "$DASHES check docker"
 if which docker ; then
@@ -108,11 +127,10 @@ set -u
 # Step 2: Prepare code repo and build ipc-cli
 if ! $local_deploy ; then
   echo "$DASHES Preparing ipc repo..."
-  cd $HOME
   if ! ls $IPC_FOLDER ; then
-    git clone --recurse-submodules -j8 https://github.com/consensus-shipyard/ipc.git
+    git clone --recurse-submodules -j8 https://github.com/tablelandnetwork/ipc.git ${IPC_FOLDER}
   fi
-  cd ${IPC_FOLDER}/contracts
+  cd ${IPC_FOLDER}
   git fetch
   git stash
   git checkout $head_ref
@@ -202,8 +220,8 @@ done
 # Step 8: Start validators
 
 # Step 8.1 (optional): Rebuild fendermint docker
-# cd ${IPC_FOLDER}/fendermint
-# make docker-build
+cd ${IPC_FOLDER}/fendermint
+make docker-build
 
 # Step 8.2: Start the bootstrap validator node
 echo "$DASHES Start the first validator node as bootstrap"
@@ -213,9 +231,6 @@ sleep 30
 echo "Finished waiting"
 
 cd ${IPC_FOLDER}
-cargo make --makefile infra/fendermint/Makefile.toml \
-    -e NODE_NAME=validator-0 \
-    child-validator-down
 bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=validator-0 \
     -e PRIVATE_KEY_PATH=${IPC_CONFIG_FOLDER}/validator_0.sk \
@@ -224,6 +239,10 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e CMT_RPC_HOST_PORT=${CMT_RPC_HOST_PORTS[0]} \
     -e ETHAPI_HOST_PORT=${ETHAPI_HOST_PORTS[0]} \
     -e RESOLVER_HOST_PORT=${RESOLVER_HOST_PORTS[0]} \
+    -e PROXY_HOST_PORT=${PROXY_HOST_PORTS[0]} \
+    -e IPFS_SWARM_HOST_PORT=${IPFS_SWARM_HOST_PORTS[0]} \
+    -e IPFS_RPC_HOST_PORT=${IPFS_RPC_HOST_PORTS[0]} \
+    -e IPFS_GATEWAY_HOST_PORT=${IPFS_GATEWAY_HOST_PORTS[0]} \
     -e PARENT_REGISTRY=${parent_registry_address} \
     -e PARENT_GATEWAY=${parent_gateway_address} \
     -e FM_PULL_SKIP=1 \
@@ -245,16 +264,16 @@ for i in {1..2}
 do
   cargo make --makefile infra/fendermint/Makefile.toml \
       -e NODE_NAME=validator-${i} \
-      -e FM_PULL_SKIP=1 \
-      child-validator-down
-  cargo make --makefile infra/fendermint/Makefile.toml \
-      -e NODE_NAME=validator-${i} \
       -e PRIVATE_KEY_PATH=${IPC_CONFIG_FOLDER}/validator_${i}.sk \
       -e SUBNET_ID=${subnet_id} \
       -e CMT_P2P_HOST_PORT=${CMT_P2P_HOST_PORTS[i]} \
       -e CMT_RPC_HOST_PORT=${CMT_RPC_HOST_PORTS[i]} \
       -e ETHAPI_HOST_PORT=${ETHAPI_HOST_PORTS[i]} \
       -e RESOLVER_HOST_PORT=${RESOLVER_HOST_PORTS[i]} \
+      -e PROXY_HOST_PORT=${PROXY_HOST_PORTS[i]} \
+      -e IPFS_SWARM_HOST_PORT=${IPFS_SWARM_HOST_PORTS[i]} \
+      -e IPFS_RPC_HOST_PORT=${IPFS_RPC_HOST_PORTS[i]} \
+      -e IPFS_GATEWAY_HOST_PORT=${IPFS_GATEWAY_HOST_PORTS[i]} \
       -e RESOLVER_BOOTSTRAPS=${bootstrap_resolver_endpoint} \
       -e BOOTSTRAPS=${bootstrap_node_endpoint} \
       -e PARENT_REGISTRY=${parent_registry_address} \
@@ -263,7 +282,24 @@ do
       child-validator
 done
 
-# Step 9: Test ETH API endpoint
+# Remove leading '/' and change middle '/' into '-'
+subnet_folder=$IPC_CONFIG_FOLDER/$(echo $subnet_id | sed 's|^/||;s|/|-|g')
+
+# Tableland: Fund proxy wallet in the subnet
+echo "$DASHES Fund proxy wallets in the subnet"
+for i in {0..2}
+do
+  proxy_key=$(cat ${IPC_CONFIG_FOLDER}/evm_keystore_proxy.json | jq .[$i].private_key | tr -d '"' | tr -d '\n')
+  proxy_address=$(cat ${IPC_CONFIG_FOLDER}/evm_keystore_proxy.json | jq .[$i].address | tr -d '"' | tr -d '\n')
+  $IPC_CLI wallet import --wallet-type evm --private-key ${proxy_key}
+  $IPC_CLI cross-msg fund --from ${proxy_address} --subnet ${subnet_id} 2
+  out=${subnet_folder}/validator-${i}/validator-${i}/keys/proxy_key.sk
+  $IPC_CLI wallet export --wallet-type evm --address ${proxy_address} --fendermint | tr -d '\n' > ${out}
+  chmod 600 ${subnet_folder}/validator-${i}/validator-${i}/keys/proxy_key.sk
+  $IPC_CLI wallet remove --wallet-type evm --address ${proxy_address}
+done
+
+# Step 9a: Test ETH API endpoint
 echo "$DASHES Test ETH API endpoints of validator nodes"
 for i in {0..2}
 do
@@ -277,6 +313,13 @@ do
   }'
 done
 
+# Step 9b: Test proxy endpoint
+echo "$DASHES Test proxy endpoints of validator nodes"
+for i in {0..2}
+do
+  curl --location http://localhost:${PROXY_HOST_PORTS[i]}/health
+done
+
 # Step 10: Start a relayer process
 # Kill existing relayer if there's one
 pkill -f "relayer" || true
@@ -285,9 +328,6 @@ echo "$DASHES Start relayer process (in the background)"
 nohup $IPC_CLI checkpoint relayer --subnet $subnet_id > nohup.out 2> nohup.err < /dev/null &
 
 # Step 11: Print a summary of the deployment
-# Remove leading '/' and change middle '/' into '-'
-subnet_folder=$IPC_CONFIG_FOLDER/$(echo $subnet_id | sed 's|^/||;s|/|-|g')
-
 cat << EOF
 ############################
 #                          #
@@ -296,6 +336,16 @@ cat << EOF
 ############################
 Subnet ID:
 $subnet_id
+
+Proxy API:
+http://localhost:${PROXY_HOST_PORTS[0]}
+http://localhost:${PROXY_HOST_PORTS[1]}
+http://localhost:${PROXY_HOST_PORTS[2]}
+
+IPFS API:
+http://localhost:${IPFS_RPC_HOST_PORTS[0]}
+http://localhost:${IPFS_RPC_HOST_PORTS[1]}
+http://localhost:${IPFS_RPC_HOST_PORTS[2]}
 
 ETH API:
 http://localhost:${ETHAPI_HOST_PORTS[0]}

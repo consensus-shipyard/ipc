@@ -34,27 +34,39 @@ import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
 import {TestUtils, MockIpcContract} from "../helpers/TestUtils.sol";
 import {IntegrationTestBase} from "../IntegrationTestBase.sol";
 import {SelectorLibrary} from "../helpers/SelectorLibrary.sol";
+import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
+
+import {SubnetActorDiamond} from "../../src/SubnetActorDiamond.sol";
+import {SubnetActorFacetsHelper} from "../helpers/SubnetActorFacetsHelper.sol";
 
 contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for IpcEnvelope;
     using FvmAddressHelper for FvmAddress;
+    using GatewayFacetsHelper for GatewayDiamond;
+    using SubnetActorFacetsHelper for SubnetActorDiamond;
 
     function setUp() public override {
         super.setUp();
     }
 
     function testGatewayDiamond_Constructor() public view {
-        require(gwGetter.totalSubnets() == 0, "unexpected totalSubnets");
-        require(gwGetter.bottomUpNonce() == 0, "unexpected bottomUpNonce");
-        require(gwGetter.bottomUpCheckPeriod() == DEFAULT_CHECKPOINT_PERIOD, "unexpected bottomUpCheckPeriod");
+        require(gatewayDiamond.getter().totalSubnets() == 0, "unexpected totalSubnets");
+        require(gatewayDiamond.getter().bottomUpNonce() == 0, "unexpected bottomUpNonce");
         require(
-            gwGetter.getNetworkName().equals(SubnetID({root: ROOTNET_CHAINID, route: new address[](0)})),
+            gatewayDiamond.getter().bottomUpCheckPeriod() == DEFAULT_CHECKPOINT_PERIOD,
+            "unexpected bottomUpCheckPeriod"
+        );
+        require(
+            gatewayDiamond.getter().getNetworkName().equals(SubnetID({root: ROOTNET_CHAINID, route: new address[](0)})),
             "unexpected getNetworkName"
         );
-        require(gwGetter.majorityPercentage() == DEFAULT_MAJORITY_PERCENTAGE, "unexpected majorityPercentage");
+        require(
+            gatewayDiamond.getter().majorityPercentage() == DEFAULT_MAJORITY_PERCENTAGE,
+            "unexpected majorityPercentage"
+        );
 
-        IpcEnvelope memory storableMsg = gwGetter.postbox(0);
+        IpcEnvelope memory storableMsg = gatewayDiamond.getter().postbox(0);
         IpcEnvelope memory msg1;
         require(msg1.toHash() == storableMsg.toHash(), "unexpected hash");
     }
@@ -62,15 +74,30 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     function testGatewayDiamond_NewGatewayWithDefaultParams() public view {
         GatewayDiamond.ConstructorParams memory params = defaultGatewayParams();
 
-        require(gwGetter.bottomUpCheckPeriod() == params.bottomUpCheckPeriod, "unexpected bottom-up period");
-        require(gwGetter.majorityPercentage() == params.majorityPercentage, "unexpected majority percentage");
+        require(
+            gatewayDiamond.getter().bottomUpCheckPeriod() == params.bottomUpCheckPeriod,
+            "unexpected bottom-up period"
+        );
+        require(
+            gatewayDiamond.getter().majorityPercentage() == params.majorityPercentage,
+            "unexpected majority percentage"
+        );
     }
 
     function testGatewayDiamond_LoupeFunction() public view {
-        require(gwLouper.facets().length == 8, "unexpected length");
-        require(gwLouper.supportsInterface(type(IERC165).interfaceId) == true, "IERC165 not supported");
-        require(gwLouper.supportsInterface(type(IDiamondCut).interfaceId) == true, "IDiamondCut not supported");
-        require(gwLouper.supportsInterface(type(IDiamondLoupe).interfaceId) == true, "IDiamondLoupe not supported");
+        require(gatewayDiamond.diamondLouper().facets().length == 8, "unexpected length");
+        require(
+            gatewayDiamond.diamondLouper().supportsInterface(type(IERC165).interfaceId) == true,
+            "IERC165 not supported"
+        );
+        require(
+            gatewayDiamond.diamondLouper().supportsInterface(type(IDiamondCut).interfaceId) == true,
+            "IDiamondCut not supported"
+        );
+        require(
+            gatewayDiamond.diamondLouper().supportsInterface(type(IDiamondLoupe).interfaceId) == true,
+            "IDiamondLoupe not supported"
+        );
     }
 
     function testGatewayDiamond_DiamondCut() public {
@@ -146,24 +173,21 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     function testGatewayDiamond_Deployment_Works_Root(uint64 checkpointPeriod) public {
         vm.assume(checkpointPeriod >= DEFAULT_CHECKPOINT_PERIOD);
 
-        GatewayDiamond dep;
-        GatewayManagerFacet depManager = new GatewayManagerFacet();
-        GatewayGetterFacet depGetter = new GatewayGetterFacet();
-
         GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
             bottomUpCheckPeriod: checkpointPeriod,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
-            activeValidatorsLimit: 100
+            activeValidatorsLimit: 100,
+            commitSha: DEFAULT_COMMIT_SHA
         });
 
-        dep = createGatewayDiamond(constructorParams);
-        depGetter = GatewayGetterFacet(address(dep));
-        depManager = GatewayManagerFacet(address(dep));
+        GatewayDiamond dep = createGatewayDiamond(constructorParams);
+        GatewayGetterFacet depGetter = dep.getter();
 
         SubnetID memory networkName = depGetter.getNetworkName();
 
+        require(depGetter.getCommitSha() == bytes32(DEFAULT_COMMIT_SHA), "unexpected commit sha");
         require(networkName.isRoot(), "unexpected networkName");
         require(depGetter.bottomUpCheckPeriod() == checkpointPeriod, "gw.bottomUpCheckPeriod() == checkpointPeriod");
         require(
@@ -179,16 +203,16 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         path[0] = address(0);
         path[1] = address(1);
 
-        GatewayDiamond dep;
-        GatewayManagerFacet depManager = new GatewayManagerFacet();
         GatewayGetterFacet depGetter = new GatewayGetterFacet();
+        GatewayManagerFacet depManager = new GatewayManagerFacet();
 
         GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: checkpointPeriod,
             majorityPercentage: 100,
             genesisValidators: new Validator[](0),
-            activeValidatorsLimit: 100
+            activeValidatorsLimit: 100,
+            commitSha: DEFAULT_COMMIT_SHA
         });
 
         IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](2);
@@ -209,10 +233,9 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             })
         );
 
-        dep = new GatewayDiamond(diamondCut, constructorParams);
-
-        depGetter = GatewayGetterFacet(address(dep));
-        depManager = GatewayManagerFacet(address(dep));
+        GatewayDiamond dep = new GatewayDiamond(diamondCut, constructorParams);
+        depGetter = dep.getter();
+        depManager = dep.manager();
 
         SubnetID memory networkName = depGetter.getNetworkName();
 
@@ -228,13 +251,13 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         vm.deal(subnetAddress, subnetCollateral);
 
         registerSubnet(subnetCollateral, subnetAddress);
-        require(gwGetter.totalSubnets() == 1, "unexpected totalSubnets");
-        Subnet[] memory subnets = gwGetter.listSubnets();
+        require(gatewayDiamond.getter().totalSubnets() == 1, "unexpected totalSubnets");
+        Subnet[] memory subnets = gatewayDiamond.getter().listSubnets();
         require(subnets.length == 1, "unexpected subnets length");
 
-        SubnetID memory subnetId = gwGetter.getNetworkName().createSubnetId(subnetAddress);
+        SubnetID memory subnetId = gatewayDiamond.getter().getNetworkName().createSubnetId(subnetAddress);
 
-        (bool ok, Subnet memory targetSubnet) = gwGetter.getSubnet(subnetId);
+        (bool ok, Subnet memory targetSubnet) = gatewayDiamond.getter().getSubnet(subnetId);
 
         require(ok, "subnet not found");
 
@@ -256,8 +279,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             registerSubnet(DEFAULT_COLLATERAL_AMOUNT, subnetAddress);
         }
 
-        require(gwGetter.totalSubnets() == numberOfSubnets, "unexpected total subnets");
-        Subnet[] memory subnets = gwGetter.listSubnets();
+        require(gatewayDiamond.getter().totalSubnets() == numberOfSubnets, "unexpected total subnets");
+        Subnet[] memory subnets = gatewayDiamond.getter().listSubnets();
         require(subnets.length == numberOfSubnets, "unexpected length");
     }
 
@@ -266,7 +289,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         vm.expectRevert(AlreadyRegisteredSubnet.selector);
 
-        gwManager.register{value: DEFAULT_COLLATERAL_AMOUNT}(0);
+        gatewayDiamond.manager().register{value: DEFAULT_COLLATERAL_AMOUNT}(0);
     }
 
     function testGatewayDiamond_AddStake_Works_SingleStaking(uint256 stakeAmount, uint256 registerAmount) public {
@@ -296,7 +319,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         vm.deal(subnetAddress, registerAmount);
 
         registerSubnet(registerAmount, subnetAddress);
-        gwManager.releaseStake(registerAmount);
+        gatewayDiamond.manager().releaseStake(registerAmount);
 
         vm.deal(subnetAddress, stakeAmount);
         addStake(stakeAmount, subnetAddress);
@@ -315,7 +338,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         vm.deal(subnetAddress, registerAmount);
 
         registerSubnet(registerAmount, subnetAddress);
-        gwManager.releaseStake(registerAmount);
+        gatewayDiamond.manager().releaseStake(registerAmount);
 
         vm.deal(subnetAddress, stakeAmount);
         addStake(stakeAmount, subnetAddress);
@@ -354,13 +377,13 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         vm.expectRevert(NotEnoughFunds.selector);
 
-        gwManager.addStake{value: 0}();
+        gatewayDiamond.manager().addStake{value: 0}();
     }
 
     function testGatewayDiamond_AddStake_Fail_SubnetNotExists() public {
         vm.expectRevert(NotRegisteredSubnet.selector);
 
-        gwManager.addStake{value: 1}();
+        gatewayDiamond.manager().addStake{value: 1}();
     }
 
     function testGatewayDiamond_ReleaseStake_Works_FullAmount(uint256 stakeAmount) public {
@@ -377,7 +400,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         registerSubnet(registerAmount, subnetAddress);
         addStake(stakeAmount, subnetAddress);
 
-        gwManager.releaseStake(fullAmount);
+        gatewayDiamond.manager().releaseStake(fullAmount);
 
         (, uint256 stake, , , ) = getSubnet(subnetAddress);
 
@@ -391,7 +414,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         vm.deal(subnetAddress, DEFAULT_COLLATERAL_AMOUNT);
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, subnetAddress);
 
-        gwManager.releaseStake(DEFAULT_COLLATERAL_AMOUNT / 2);
+        gatewayDiamond.manager().releaseStake(DEFAULT_COLLATERAL_AMOUNT / 2);
 
         (, uint256 stake, , , ) = getSubnet(subnetAddress);
         require(stake == DEFAULT_COLLATERAL_AMOUNT / 2, "unexpected stake");
@@ -411,7 +434,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         registerSubnet(registerAmount, subnetAddress);
         addStake(partialAmount, subnetAddress);
 
-        gwManager.releaseStake(partialAmount);
+        gatewayDiamond.manager().releaseStake(partialAmount);
 
         (, uint256 stake, , , ) = getSubnet(subnetAddress);
 
@@ -424,7 +447,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         vm.expectRevert(CannotReleaseZero.selector);
 
-        gwManager.releaseStake(0);
+        gatewayDiamond.manager().releaseStake(0);
     }
 
     function testGatewayDiamond_ReleaseStake_Fail_InsufficientSubnetBalance(
@@ -442,13 +465,13 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         vm.expectRevert(NotEnoughFundsToRelease.selector);
 
-        gwManager.releaseStake(releaseAmount);
+        gatewayDiamond.manager().releaseStake(releaseAmount);
     }
 
     function testGatewayDiamond_ReleaseStake_Fail_NotRegisteredSubnet() public {
         vm.expectRevert(NotRegisteredSubnet.selector);
 
-        gwManager.releaseStake(1);
+        gatewayDiamond.manager().releaseStake(1);
     }
 
     function testGatewayDiamond_ReleaseStake_Works_TransitionToInactive() public {
@@ -459,7 +482,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, subnetAddress);
 
-        gwManager.releaseStake(10);
+        gatewayDiamond.manager().releaseStake(10);
 
         (, uint256 stake, , , ) = getSubnet(subnetAddress);
 
@@ -476,7 +499,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         require(subnetAddress.balance == 0, "unexpected balance");
 
-        gwManager.kill();
+        gatewayDiamond.manager().kill();
 
         (SubnetID memory id, uint256 stake, uint256 nonce, , uint256 circSupply) = getSubnet(subnetAddress);
 
@@ -484,16 +507,16 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         require(stake == 0, "unexpected stake");
         require(nonce == 0, "unexpected nonce");
         require(circSupply == 0, "unexpected circSupply");
-        require(gwGetter.totalSubnets() == 0, "unexpected total subnets");
+        require(gatewayDiamond.getter().totalSubnets() == 0, "unexpected total subnets");
         require(subnetAddress.balance == DEFAULT_COLLATERAL_AMOUNT, "unexpected balance");
-        require(gwGetter.listSubnets().length == 0, "unexpected number of subnets");
-        require(gwGetter.getSubnetKeys().length == 0, "unexpected number of subnet keys");
+        require(gatewayDiamond.getter().listSubnets().length == 0, "unexpected number of subnets");
+        require(gatewayDiamond.getter().getSubnetKeys().length == 0, "unexpected number of subnet keys");
     }
 
     function testGatewayDiamond_Kill_Fail_SubnetNotExists() public {
         vm.expectRevert(NotRegisteredSubnet.selector);
 
-        gwManager.kill();
+        gatewayDiamond.manager().kill();
     }
 
     function testGatewayDiamond_SendCrossMessage_Fails_NoFunds() public {
@@ -502,10 +525,10 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE + 2);
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
 
-        SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(caller);
+        SubnetID memory destinationSubnet = gatewayDiamond.getter().getNetworkName().createSubnetId(caller);
 
         vm.expectRevert(abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Value));
-        gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE}(
+        gatewayDiamond.messenger().sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE}(
             TestUtils.newXnetCallMsg(
                 IPCAddress({
                     subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
@@ -527,7 +550,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
 
         vm.expectRevert();
-        gwMessenger.sendContractXnetMessage{value: fee - 1}(
+        gatewayDiamond.messenger().sendContractXnetMessage{value: fee - 1}(
             TestUtils.newXnetCallMsg(
                 IPCAddress({
                     subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
@@ -571,9 +594,9 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         fund(funderAddress, fundAmount);
         vm.stopPrank();
 
-        vm.startPrank(address(saManager));
+        vm.startPrank(address(saDiamond));
         vm.expectRevert(NotEmptySubnetCircSupply.selector);
-        gwManager.kill();
+        gatewayDiamond.manager().kill();
     }
 
     function testGatewayDiamond_Fund_Revert_OnZeroValue() public {
@@ -582,10 +605,10 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         address funderAddress = address(101);
 
-        (SubnetID memory subnetId, , , , ) = getSubnet(address(saManager));
+        (SubnetID memory subnetId, , , , ) = getSubnet(address(saDiamond));
 
         vm.expectRevert(abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Value));
-        gwManager.fund{value: 0}(subnetId, FvmAddressHelper.from(funderAddress));
+        gatewayDiamond.manager().fund{value: 0}(subnetId, FvmAddressHelper.from(funderAddress));
     }
 
     function testGatewayDiamond_Fund_Works_MultipleFundings(uint8 numberOfFunds) public {
@@ -617,9 +640,9 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         vm.deal(funderAddress, amount);
 
-        (SubnetID memory subnetId, , , , ) = getSubnet(address(saManager));
+        (SubnetID memory subnetId, , , , ) = getSubnet(address(saDiamond));
         vm.prank(funderAddress);
-        gwManager.fund{value: amount}(subnetId, FvmAddressHelper.from(msg.sender));
+        gatewayDiamond.manager().fund{value: amount}(subnetId, FvmAddressHelper.from(msg.sender));
     }
 
     function testGatewayDiamond_Fund_Fails_NotRegistered() public {
@@ -644,10 +667,13 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         SubnetID memory wrongSubnetId = SubnetID({root: ROOTNET_CHAINID, route: wrongSubnetPath});
 
         vm.expectRevert(NotRegisteredSubnet.selector);
-        gwManager.fund{value: fundAmount}(wrongSubnetId, FvmAddressHelper.from(msg.sender));
+        gatewayDiamond.manager().fund{value: fundAmount}(wrongSubnetId, FvmAddressHelper.from(msg.sender));
 
         vm.expectRevert(NotRegisteredSubnet.selector);
-        gwManager.fund{value: fundAmount}(SubnetID(ROOTNET_CHAINID, wrongPath), FvmAddressHelper.from(msg.sender));
+        gatewayDiamond.manager().fund{value: fundAmount}(
+            SubnetID(ROOTNET_CHAINID, wrongPath),
+            FvmAddressHelper.from(msg.sender)
+        );
     }
 
     function testGatewayDiamond_Fund_Works_BLSAccountSingleFunding() public {
@@ -668,7 +694,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         join(validatorAddress, publicKey);
 
         vm.prank(validatorAddress);
-        saManager.leave();
+        saDiamond.manager().leave();
 
         join(validatorAddress, publicKey);
 
@@ -689,15 +715,10 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
-            activeValidatorsLimit: 100
+            activeValidatorsLimit: 100,
+            commitSha: DEFAULT_COMMIT_SHA
         });
         gatewayDiamond = createGatewayDiamond(constructorParams);
-        gwGetter = GatewayGetterFacet(address(gatewayDiamond));
-        gwManager = GatewayManagerFacet(address(gatewayDiamond));
-
-        gwCheckpointingFacet = CheckpointingFacet(address(gatewayDiamond));
-        gwXnetMessagingFacet = XnetMessagingFacet(address(gatewayDiamond));
-        gwTopDownFinalityFacet = TopDownFinalityFacet(address(gatewayDiamond));
 
         address callerAddress = address(100);
 
@@ -705,7 +726,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         vm.deal(callerAddress, 1 ether);
         vm.expectRevert(abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Value));
 
-        gwManager.release{value: 0 ether}(FvmAddressHelper.from(msg.sender));
+        gatewayDiamond.manager().release{value: 0 ether}(FvmAddressHelper.from(msg.sender));
     }
 
     function testGatewayDiamond_Release_Works_BLSAccount(uint256 releaseAmount, uint256 crossMsgFee) public {
@@ -722,14 +743,11 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
-            activeValidatorsLimit: 100
+            activeValidatorsLimit: 100,
+            commitSha: DEFAULT_COMMIT_SHA
         });
+
         gatewayDiamond = createGatewayDiamond(constructorParams);
-        gwGetter = GatewayGetterFacet(address(gatewayDiamond));
-        gwManager = GatewayManagerFacet(address(gatewayDiamond));
-        gwCheckpointingFacet = CheckpointingFacet(address(gatewayDiamond));
-        gwXnetMessagingFacet = XnetMessagingFacet(address(gatewayDiamond));
-        gwTopDownFinalityFacet = TopDownFinalityFacet(address(gatewayDiamond));
 
         vm.roll(0);
         vm.warp(0);
@@ -752,15 +770,11 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
-            activeValidatorsLimit: 100
+            activeValidatorsLimit: 100,
+            commitSha: DEFAULT_COMMIT_SHA
         });
-        gatewayDiamond = createGatewayDiamond(constructorParams);
-        gwGetter = GatewayGetterFacet(address(gatewayDiamond));
-        gwManager = GatewayManagerFacet(address(gatewayDiamond));
-        gwCheckpointingFacet = CheckpointingFacet(address(gatewayDiamond));
-        gwXnetMessagingFacet = XnetMessagingFacet(address(gatewayDiamond));
-        gwTopDownFinalityFacet = TopDownFinalityFacet(address(gatewayDiamond));
 
+        gatewayDiamond = createGatewayDiamond(constructorParams);
         address callerAddress = address(100);
 
         vm.roll(0);
@@ -784,14 +798,11 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
-            activeValidatorsLimit: 100
+            activeValidatorsLimit: 100,
+            commitSha: DEFAULT_COMMIT_SHA
         });
+
         gatewayDiamond = createGatewayDiamond(constructorParams);
-        gwGetter = GatewayGetterFacet(address(gatewayDiamond));
-        gwManager = GatewayManagerFacet(address(gatewayDiamond));
-        gwCheckpointingFacet = CheckpointingFacet(address(gatewayDiamond));
-        gwXnetMessagingFacet = XnetMessagingFacet(address(gatewayDiamond));
-        gwTopDownFinalityFacet = TopDownFinalityFacet(address(gatewayDiamond));
 
         address callerAddress = address(100);
 
@@ -811,7 +822,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
 
         vm.expectRevert(abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.DstSubnet));
-        gwMessenger.sendContractXnetMessage{value: 1}(
+        gatewayDiamond.messenger().sendContractXnetMessage{value: 1}(
             TestUtils.newXnetCallMsg(
                 IPCAddress({
                     subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
@@ -832,10 +843,10 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         vm.startPrank(caller);
         vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE + 2);
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
-        SubnetID memory destinationSubnet = gwGetter.getNetworkName();
+        SubnetID memory destinationSubnet = gatewayDiamond.getter().getNetworkName();
 
         vm.expectRevert(CannotSendCrossMsgToItself.selector);
-        gwMessenger.sendContractXnetMessage{value: 1}(
+        gatewayDiamond.messenger().sendContractXnetMessage{value: 1}(
             TestUtils.newXnetCallMsg(
                 IPCAddress({
                     subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
@@ -853,10 +864,10 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         vm.startPrank(caller);
         vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE + 2);
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
-        SubnetID memory destinationSubnet = gwGetter.getNetworkName().createSubnetId(caller);
+        SubnetID memory destinationSubnet = gatewayDiamond.getter().getNetworkName().createSubnetId(caller);
 
         vm.expectRevert(abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Value));
-        gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE}(
+        gatewayDiamond.messenger().sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE}(
             TestUtils.newXnetCallMsg(
                 IPCAddress({
                     subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
@@ -879,7 +890,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         SubnetID memory destinationSubnet = SubnetID(0, new address[](0));
         vm.expectRevert(abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Sender));
 
-        gwMessenger.sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE}(
+        gatewayDiamond.messenger().sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE}(
             TestUtils.newXnetCallMsg(
                 IPCAddress({
                     subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
@@ -904,7 +915,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         vm.expectRevert(abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.DstSubnet));
 
-        gwMessenger.sendContractXnetMessage{value: 1}(
+        gatewayDiamond.messenger().sendContractXnetMessage{value: 1}(
             TestUtils.newXnetCallMsg(
                 IPCAddress({
                     subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
@@ -930,7 +941,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
 
-        gwTopDownFinalityFacet.commitParentFinality(finality);
+        gatewayDiamond.topDownFinalizer().commitParentFinality(finality);
     }
 
     function testGatewayDiamond_applyFinality_works() public {
@@ -951,12 +962,15 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
 
-        gwTopDownFinalityFacet.storeValidatorChanges(changes);
-        uint64 configNumber = gwTopDownFinalityFacet.applyFinalityChanges();
+        gatewayDiamond.topDownFinalizer().storeValidatorChanges(changes);
+        uint64 configNumber = gatewayDiamond.topDownFinalizer().applyFinalityChanges();
         require(configNumber == 2, "wrong config number after applying finality");
-        require(gwGetter.getCurrentMembership().validators.length == 2, "current membership should be 2");
-        require(gwGetter.getCurrentConfigurationNumber() == 2, "unexpected config number");
-        require(gwGetter.getLastConfigurationNumber() == 0, "unexpected last config number");
+        require(
+            gatewayDiamond.getter().getCurrentMembership().validators.length == 2,
+            "current membership should be 2"
+        );
+        require(gatewayDiamond.getter().getCurrentConfigurationNumber() == 2, "unexpected config number");
+        require(gatewayDiamond.getter().getLastConfigurationNumber() == 0, "unexpected last config number");
 
         vm.stopPrank();
 
@@ -970,21 +984,30 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
 
-        gwTopDownFinalityFacet.storeValidatorChanges(changes);
-        configNumber = gwTopDownFinalityFacet.applyFinalityChanges();
+        gatewayDiamond.topDownFinalizer().storeValidatorChanges(changes);
+        configNumber = gatewayDiamond.topDownFinalizer().applyFinalityChanges();
         require(configNumber == 3, "wrong config number after applying finality");
-        require(gwGetter.getLastConfigurationNumber() == 2, "apply result: unexpected last config number");
-        require(gwGetter.getCurrentConfigurationNumber() == 3, "apply result: unexpected config number");
-        require(gwGetter.getCurrentMembership().validators.length == 1, "current membership should be 1");
-        require(gwGetter.getLastMembership().validators.length == 2, "last membership should be 2");
+        require(
+            gatewayDiamond.getter().getLastConfigurationNumber() == 2,
+            "apply result: unexpected last config number"
+        );
+        require(gatewayDiamond.getter().getCurrentConfigurationNumber() == 3, "apply result: unexpected config number");
+        require(
+            gatewayDiamond.getter().getCurrentMembership().validators.length == 1,
+            "current membership should be 1"
+        );
+        require(gatewayDiamond.getter().getLastMembership().validators.length == 2, "last membership should be 2");
 
         // no changes
-        configNumber = gwTopDownFinalityFacet.applyFinalityChanges();
+        configNumber = gatewayDiamond.topDownFinalizer().applyFinalityChanges();
         require(configNumber == 0, "wrong config number after applying finality");
-        require(gwGetter.getLastConfigurationNumber() == 2, "no changes: unexpected last config number");
-        require(gwGetter.getCurrentConfigurationNumber() == 3, "no changes: unexpected config number");
-        require(gwGetter.getCurrentMembership().validators.length == 1, "current membership should be 1");
-        require(gwGetter.getLastMembership().validators.length == 2, "last membership should be 2");
+        require(gatewayDiamond.getter().getLastConfigurationNumber() == 2, "no changes: unexpected last config number");
+        require(gatewayDiamond.getter().getCurrentConfigurationNumber() == 3, "no changes: unexpected config number");
+        require(
+            gatewayDiamond.getter().getCurrentMembership().validators.length == 1,
+            "current membership should be 1"
+        );
+        require(gatewayDiamond.getter().getLastMembership().validators.length == 2, "last membership should be 2");
 
         vm.stopPrank();
     }
@@ -1004,12 +1027,12 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
 
-        gwTopDownFinalityFacet.commitParentFinality(finality);
-        ParentFinality memory committedFinality = gwGetter.getParentFinality(block.number);
+        gatewayDiamond.topDownFinalizer().commitParentFinality(finality);
+        ParentFinality memory committedFinality = gatewayDiamond.getter().getParentFinality(block.number);
 
         require(committedFinality.height == finality.height, "heights are not equal");
         require(committedFinality.blockHash == finality.blockHash, "blockHash is not equal");
-        require(gwGetter.getLatestParentFinality().height == block.number, "finality height not equal");
+        require(gatewayDiamond.getter().getLatestParentFinality().height == block.number, "finality height not equal");
 
         vm.stopPrank();
     }
@@ -1020,7 +1043,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         (bytes32 membershipRoot, ) = MerkleTreeHelper.createMerkleProofsForValidators(addrs, weights);
 
         BottomUpCheckpoint memory old = BottomUpCheckpoint({
-            subnetID: gwGetter.getNetworkName(),
+            subnetID: gatewayDiamond.getter().getNetworkName(),
             blockHeight: 0,
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 1,
@@ -1028,8 +1051,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         });
 
         BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
-            subnetID: gwGetter.getNetworkName(),
-            blockHeight: gwGetter.bottomUpCheckPeriod(),
+            subnetID: gatewayDiamond.getter().getNetworkName(),
+            blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 1,
             msgs: new IpcEnvelope[](0)
@@ -1038,28 +1061,38 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         // failed to create a checkpoint with zero membership weight
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
         vm.expectRevert(ZeroMembershipWeight.selector);
-        gwCheckpointingFacet.createBottomUpCheckpoint(checkpoint, membershipRoot, 0);
+        gatewayDiamond.checkpointer().createBottomUpCheckpoint(checkpoint, membershipRoot, 0);
         vm.stopPrank();
 
         // failed create a processed checkpoint
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
         vm.expectRevert(QuorumAlreadyProcessed.selector);
-        gwCheckpointingFacet.createBottomUpCheckpoint(old, membershipRoot, weights[0] + weights[1] + weights[2]);
+        gatewayDiamond.checkpointer().createBottomUpCheckpoint(
+            old,
+            membershipRoot,
+            weights[0] + weights[1] + weights[2]
+        );
         vm.stopPrank();
 
         // create a checkpoint
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        gwCheckpointingFacet.createBottomUpCheckpoint(checkpoint, membershipRoot, weights[0] + weights[1] + weights[2]);
+        gatewayDiamond.checkpointer().createBottomUpCheckpoint(
+            checkpoint,
+            membershipRoot,
+            weights[0] + weights[1] + weights[2]
+        );
         vm.stopPrank();
 
-        BottomUpCheckpoint memory recv = gwGetter.bottomUpCheckpoint(gwGetter.bottomUpCheckPeriod());
+        BottomUpCheckpoint memory recv = gatewayDiamond.getter().bottomUpCheckpoint(
+            gatewayDiamond.getter().bottomUpCheckPeriod()
+        );
         require(recv.nextConfigurationNumber == 1, "nextConfigurationNumber incorrect");
         require(recv.blockHash == keccak256("block1"), "block hash incorrect");
-        uint256 d = gwGetter.bottomUpCheckPeriod();
+        uint256 d = gatewayDiamond.getter().bottomUpCheckPeriod();
 
         // failed to create a checkpoint with the same height
         checkpoint = BottomUpCheckpoint({
-            subnetID: gwGetter.getNetworkName(),
+            subnetID: gatewayDiamond.getter().getNetworkName(),
             blockHeight: d,
             blockHash: keccak256("block"),
             nextConfigurationNumber: 2,
@@ -1068,12 +1101,16 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
         vm.expectRevert(CheckpointAlreadyExists.selector);
-        gwCheckpointingFacet.createBottomUpCheckpoint(checkpoint, membershipRoot, weights[0] + weights[1] + weights[2]);
+        gatewayDiamond.checkpointer().createBottomUpCheckpoint(
+            checkpoint,
+            membershipRoot,
+            weights[0] + weights[1] + weights[2]
+        );
         vm.stopPrank();
 
         // failed to create a checkpoint with the height not multiple to checkpoint period
         checkpoint = BottomUpCheckpoint({
-            subnetID: gwGetter.getNetworkName(),
+            subnetID: gatewayDiamond.getter().getNetworkName(),
             blockHeight: d + d / 2,
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 2,
@@ -1082,25 +1119,29 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
         vm.expectRevert(InvalidCheckpointEpoch.selector);
-        gwCheckpointingFacet.createBottomUpCheckpoint(checkpoint, membershipRoot, weights[0] + weights[1] + weights[2]);
+        gatewayDiamond.checkpointer().createBottomUpCheckpoint(
+            checkpoint,
+            membershipRoot,
+            weights[0] + weights[1] + weights[2]
+        );
         vm.stopPrank();
 
-        (bool ok, uint256 e, ) = gwGetter.getCurrentBottomUpCheckpoint();
+        (bool ok, uint256 e, ) = gatewayDiamond.getter().getCurrentBottomUpCheckpoint();
         require(ok, "checkpoint not exist");
         require(e == d, "out height incorrect");
     }
 
     function testGatewayDiamond_commitBottomUpCheckpoint_InvalidCheckpointSource() public {
         BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
-            subnetID: gwGetter.getNetworkName(),
-            blockHeight: gwGetter.bottomUpCheckPeriod(),
+            subnetID: gatewayDiamond.getter().getNetworkName(),
+            blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 1,
             msgs: new IpcEnvelope[](0)
         });
 
         vm.expectRevert(InvalidCheckpointSource.selector);
-        gwCheckpointingFacet.commitCheckpoint(checkpoint);
+        gatewayDiamond.checkpointer().commitCheckpoint(checkpoint);
     }
 
     function testGatewayDiamond_commitBottomUpCheckpoint_Works_NoMessages() public {
@@ -1114,14 +1155,14 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
             subnetID: subnetId,
-            blockHeight: gwGetter.bottomUpCheckPeriod(),
+            blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 1,
             msgs: new IpcEnvelope[](0)
         });
 
         vm.prank(caller);
-        gwCheckpointingFacet.commitCheckpoint(checkpoint);
+        gatewayDiamond.checkpointer().commitCheckpoint(checkpoint);
     }
 
     function testGatewayDiamond_commitBottomUpCheckpoint_Works_WithMessages() public {
@@ -1134,19 +1175,25 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         uint256 amount = 1;
 
         (SubnetID memory subnetId, , , , ) = getSubnet(address(caller));
-        (bool exist, Subnet memory subnetInfo) = gwGetter.getSubnet(subnetId);
+        (bool exist, Subnet memory subnetInfo) = gatewayDiamond.getter().getSubnet(subnetId);
         require(exist, "subnet does not exist");
         require(subnetInfo.circSupply == 0, "unexpected initial circulation supply");
 
-        gwManager.fund{value: DEFAULT_COLLATERAL_AMOUNT}(subnetId, FvmAddressHelper.from(address(caller)));
-        (, subnetInfo) = gwGetter.getSubnet(subnetId);
+        gatewayDiamond.manager().fund{value: DEFAULT_COLLATERAL_AMOUNT}(
+            subnetId,
+            FvmAddressHelper.from(address(caller))
+        );
+        (, subnetInfo) = gatewayDiamond.getter().getSubnet(subnetId);
         require(subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT, "unexpected circulation supply after funding");
 
         IpcEnvelope[] memory msgs = new IpcEnvelope[](10);
         for (uint64 i = 0; i < 10; i++) {
             msgs[i] = TestUtils.newXnetCallMsg(
                 IPCAddress({subnetId: subnetId, rawAddress: FvmAddressHelper.from(caller)}),
-                IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(vm.addr(100 + i))}),
+                IPCAddress({
+                    subnetId: gatewayDiamond.getter().getNetworkName(),
+                    rawAddress: FvmAddressHelper.from(vm.addr(100 + i))
+                }),
                 amount,
                 i
             );
@@ -1154,16 +1201,16 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
             subnetID: subnetId,
-            blockHeight: gwGetter.bottomUpCheckPeriod(),
+            blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 1,
             msgs: msgs
         });
 
         vm.prank(caller);
-        gwCheckpointingFacet.commitCheckpoint(checkpoint);
+        gatewayDiamond.checkpointer().commitCheckpoint(checkpoint);
 
-        (, subnetInfo) = gwGetter.getSubnet(subnetId);
+        (, subnetInfo) = gatewayDiamond.getter().getSubnet(subnetId);
         require(subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT - 10 * amount, "unexpected circulating supply");
     }
 
@@ -1173,16 +1220,16 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         (bytes32 membershipRoot, ) = MerkleTreeHelper.createMerkleProofsForValidators(addrs, weights);
 
         BottomUpCheckpoint memory checkpoint1 = BottomUpCheckpoint({
-            subnetID: gwGetter.getNetworkName(),
-            blockHeight: gwGetter.bottomUpCheckPeriod(),
+            subnetID: gatewayDiamond.getter().getNetworkName(),
+            blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 1,
             msgs: new IpcEnvelope[](0)
         });
 
         BottomUpCheckpoint memory checkpoint2 = BottomUpCheckpoint({
-            subnetID: gwGetter.getNetworkName(),
-            blockHeight: 2 * gwGetter.bottomUpCheckPeriod(),
+            subnetID: gatewayDiamond.getter().getNetworkName(),
+            blockHeight: 2 * gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 1,
             msgs: new IpcEnvelope[](0)
@@ -1190,43 +1237,51 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         // create a checkpoint
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        gwCheckpointingFacet.createBottomUpCheckpoint(
+        gatewayDiamond.checkpointer().createBottomUpCheckpoint(
             checkpoint1,
             membershipRoot,
             weights[0] + weights[1] + weights[2]
         );
-        gwCheckpointingFacet.createBottomUpCheckpoint(
+        gatewayDiamond.checkpointer().createBottomUpCheckpoint(
             checkpoint2,
             membershipRoot,
             weights[0] + weights[1] + weights[2]
         );
         vm.stopPrank();
 
-        uint256[] memory heights = gwGetter.getIncompleteCheckpointHeights();
+        uint256[] memory heights = gatewayDiamond.getter().getIncompleteCheckpointHeights();
 
         require(heights.length == 2, "unexpected heights");
-        require(heights[0] == gwGetter.bottomUpCheckPeriod(), "heights[0] == period");
-        require(heights[1] == 2 * gwGetter.bottomUpCheckPeriod(), "heights[1] == 2*period");
+        require(heights[0] == gatewayDiamond.getter().bottomUpCheckPeriod(), "heights[0] == period");
+        require(heights[1] == 2 * gatewayDiamond.getter().bottomUpCheckPeriod(), "heights[1] == 2*period");
 
-        QuorumInfo memory info = gwGetter.getCheckpointInfo(gwGetter.bottomUpCheckPeriod());
+        QuorumInfo memory info = gatewayDiamond.getter().getCheckpointInfo(
+            gatewayDiamond.getter().bottomUpCheckPeriod()
+        );
         require(info.rootHash == membershipRoot, "info.rootHash == membershipRoot");
         require(
-            info.threshold == gwGetter.getQuorumThreshold(weights[0] + weights[1] + weights[2]),
+            info.threshold == gatewayDiamond.getter().getQuorumThreshold(weights[0] + weights[1] + weights[2]),
             "checkpoint 1 correct threshold"
         );
 
-        info = gwGetter.getCheckpointInfo(2 * gwGetter.bottomUpCheckPeriod());
+        info = gatewayDiamond.getter().getCheckpointInfo(2 * gatewayDiamond.getter().bottomUpCheckPeriod());
         require(info.rootHash == membershipRoot, "info.rootHash == membershipRoot");
         require(
-            info.threshold == gwGetter.getQuorumThreshold(weights[0] + weights[1] + weights[2]),
+            info.threshold == gatewayDiamond.getter().getQuorumThreshold(weights[0] + weights[1] + weights[2]),
             "checkpoint 2 correct threshold"
         );
 
-        BottomUpCheckpoint[] memory incomplete = gwGetter.getIncompleteCheckpoints();
+        BottomUpCheckpoint[] memory incomplete = gatewayDiamond.getter().getIncompleteCheckpoints();
         require(incomplete.length == 2, "incomplete.length == 2");
-        require(incomplete[0].blockHeight == gwGetter.bottomUpCheckPeriod(), "incomplete[0].blockHeight");
+        require(
+            incomplete[0].blockHeight == gatewayDiamond.getter().bottomUpCheckPeriod(),
+            "incomplete[0].blockHeight"
+        );
         require(incomplete[0].blockHash == keccak256("block1"), "incomplete[0].blockHash");
-        require(incomplete[1].blockHeight == 2 * gwGetter.bottomUpCheckPeriod(), "incomplete[1].blockHeight");
+        require(
+            incomplete[1].blockHeight == 2 * gatewayDiamond.getter().bottomUpCheckPeriod(),
+            "incomplete[1].blockHeight"
+        );
         require(incomplete[1].blockHash == keccak256("block2"), "incomplete[1].blockHash");
     }
 
@@ -1237,8 +1292,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             .createMerkleProofsForValidators(addrs, weights);
 
         BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
-            subnetID: gwGetter.getNetworkName(),
-            blockHeight: gwGetter.bottomUpCheckPeriod(),
+            subnetID: gatewayDiamond.getter().getNetworkName(),
+            blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block"),
             nextConfigurationNumber: 1,
             msgs: new IpcEnvelope[](0)
@@ -1246,7 +1301,11 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         // create a checkpoint
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        gwCheckpointingFacet.createBottomUpCheckpoint(checkpoint, membershipRoot, weights[0] + weights[1] + weights[2]);
+        gatewayDiamond.checkpointer().createBottomUpCheckpoint(
+            checkpoint,
+            membershipRoot,
+            weights[0] + weights[1] + weights[2]
+        );
         vm.stopPrank();
 
         // adds signatures
@@ -1261,7 +1320,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             signature = abi.encodePacked(r, s, v);
 
             vm.startPrank(vm.addr(privKeys[i]));
-            gwCheckpointingFacet.addCheckpointSignature(
+            gatewayDiamond.checkpointer().addCheckpointSignature(
                 checkpoint.blockHeight,
                 membershipProofs[i],
                 weights[i],
@@ -1271,7 +1330,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         }
 
         require(
-            gwGetter.getCheckpointCurrentWeight(checkpoint.blockHeight) == totalWeight(weights),
+            gatewayDiamond.getter().getCheckpointCurrentWeight(checkpoint.blockHeight) == totalWeight(weights),
             "checkpoint weight was not updated"
         );
 
@@ -1280,7 +1339,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             QuorumInfo memory info,
             address[] memory signatories,
             bytes[] memory signatures
-        ) = gwGetter.getCheckpointSignatureBundle(gwGetter.bottomUpCheckPeriod());
+        ) = gatewayDiamond.getter().getCheckpointSignatureBundle(gatewayDiamond.getter().bottomUpCheckPeriod());
         require(ch.blockHash == keccak256("block"), "unexpected block hash");
         require(info.hash == keccak256(abi.encode(checkpoint)), "unexpected checkpoint hash");
         require(signatories.length == 3, "unexpected signatories length");
@@ -1294,8 +1353,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             .createMerkleProofsForValidators(addrs, weights);
 
         BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
-            subnetID: gwGetter.getNetworkName(),
-            blockHeight: gwGetter.bottomUpCheckPeriod(),
+            subnetID: gatewayDiamond.getter().getNetworkName(),
+            blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block"),
             nextConfigurationNumber: 1,
             msgs: new IpcEnvelope[](0)
@@ -1303,7 +1362,11 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         // create a checkpoint
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        gwCheckpointingFacet.createBottomUpCheckpoint(checkpoint, membershipRoot, weights[0] + weights[1] + weights[2]);
+        gatewayDiamond.checkpointer().createBottomUpCheckpoint(
+            checkpoint,
+            membershipRoot,
+            weights[0] + weights[1] + weights[2]
+        );
         vm.stopPrank();
 
         // adds signatures
@@ -1318,7 +1381,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             signature = abi.encodePacked(r, s, v);
 
             vm.startPrank(vm.addr(privKeys[i]));
-            gwCheckpointingFacet.addCheckpointSignature(
+            gatewayDiamond.checkpointer().addCheckpointSignature(
                 checkpoint.blockHeight,
                 membershipProofs[i],
                 weights[i],
@@ -1327,32 +1390,42 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             vm.stopPrank();
         }
 
-        QuorumInfo memory info = gwGetter.getCheckpointInfo(1);
+        QuorumInfo memory info = gatewayDiamond.getter().getCheckpointInfo(1);
         require(!info.reached, "not reached");
-        require(gwGetter.getIncompleteCheckpointHeights().length == 1, "unexpected size");
+        require(gatewayDiamond.getter().getIncompleteCheckpointHeights().length == 1, "unexpected size");
 
-        info = gwGetter.getCheckpointInfo(1);
+        info = gatewayDiamond.getter().getCheckpointInfo(1);
 
         (v, r, s) = vm.sign(privKeys[2], keccak256(abi.encode(checkpoint)));
         signature = abi.encodePacked(r, s, v);
 
         vm.startPrank(vm.addr(privKeys[2]));
-        gwCheckpointingFacet.addCheckpointSignature(checkpoint.blockHeight, membershipProofs[2], weights[2], signature);
+        gatewayDiamond.checkpointer().addCheckpointSignature(
+            checkpoint.blockHeight,
+            membershipProofs[2],
+            weights[2],
+            signature
+        );
         vm.stopPrank();
 
-        info = gwGetter.getCheckpointInfo(checkpoint.blockHeight);
+        info = gatewayDiamond.getter().getCheckpointInfo(checkpoint.blockHeight);
         require(info.reached, "not reached");
-        require(gwGetter.getIncompleteCheckpointHeights().length == 0, "unexpected size");
+        require(gatewayDiamond.getter().getIncompleteCheckpointHeights().length == 0, "unexpected size");
 
         require(
-            gwGetter.getCheckpointCurrentWeight(checkpoint.blockHeight) == totalWeight(weights),
+            gatewayDiamond.getter().getCheckpointCurrentWeight(checkpoint.blockHeight) == totalWeight(weights),
             "checkpoint weight was not updated"
         );
         (v, r, s) = vm.sign(privKeys[3], keccak256(abi.encode(checkpoint)));
         signature = abi.encodePacked(r, s, v);
 
         vm.startPrank(vm.addr(privKeys[3]));
-        gwCheckpointingFacet.addCheckpointSignature(checkpoint.blockHeight, membershipProofs[3], weights[3], signature);
+        gatewayDiamond.checkpointer().addCheckpointSignature(
+            checkpoint.blockHeight,
+            membershipProofs[3],
+            weights[3],
+            signature
+        );
         vm.stopPrank();
     }
 
@@ -1363,8 +1436,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             .createMerkleProofsForValidators(addrs, weights);
 
         BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
-            subnetID: gwGetter.getNetworkName(),
-            blockHeight: gwGetter.bottomUpCheckPeriod(),
+            subnetID: gatewayDiamond.getter().getNetworkName(),
+            blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block"),
             nextConfigurationNumber: 1,
             msgs: new IpcEnvelope[](0)
@@ -1372,7 +1445,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         // create a checkpoint
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        gwCheckpointingFacet.createBottomUpCheckpoint(checkpoint, membershipRoot, 10);
+        gatewayDiamond.checkpointer().createBottomUpCheckpoint(checkpoint, membershipRoot, 10);
         vm.stopPrank();
 
         uint8 v;
@@ -1383,10 +1456,10 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         (v, r, s) = vm.sign(privKeys[0], keccak256(abi.encode(checkpoint)));
         signature = abi.encodePacked(r, s, v);
 
-        uint256 h = gwGetter.bottomUpCheckPeriod();
+        uint256 h = gatewayDiamond.getter().bottomUpCheckPeriod();
         vm.startPrank(vm.addr(privKeys[1]));
         vm.expectRevert(abi.encodeWithSelector(NotAuthorized.selector, vm.addr(privKeys[0])));
-        gwCheckpointingFacet.addCheckpointSignature(h, membershipProofs[2], weights[2], signature);
+        gatewayDiamond.checkpointer().addCheckpointSignature(h, membershipProofs[2], weights[2], signature);
         vm.stopPrank();
     }
 
@@ -1397,8 +1470,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             .createMerkleProofsForValidators(addrs, weights);
 
         BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
-            subnetID: gwGetter.getNetworkName(),
-            blockHeight: gwGetter.bottomUpCheckPeriod(),
+            subnetID: gatewayDiamond.getter().getNetworkName(),
+            blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block"),
             nextConfigurationNumber: 1,
             msgs: new IpcEnvelope[](0)
@@ -1406,7 +1479,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         // create a checkpoint
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        gwCheckpointingFacet.createBottomUpCheckpoint(checkpoint, membershipRoot, 10);
+        gatewayDiamond.checkpointer().createBottomUpCheckpoint(checkpoint, membershipRoot, 10);
         vm.stopPrank();
 
         uint8 v;
@@ -1417,19 +1490,19 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         (v, r, s) = vm.sign(privKeys[0], keccak256(abi.encode(checkpoint)));
         signature = abi.encodePacked(r, s, v);
 
-        uint256 h = gwGetter.bottomUpCheckPeriod();
+        uint256 h = gatewayDiamond.getter().bottomUpCheckPeriod();
         vm.startPrank(vm.addr(privKeys[0]));
 
         // send incorrect signature
         vm.expectRevert(InvalidSignature.selector);
-        gwCheckpointingFacet.addCheckpointSignature(h, membershipProofs[0], weights[0], new bytes(0));
+        gatewayDiamond.checkpointer().addCheckpointSignature(h, membershipProofs[0], weights[0], new bytes(0));
 
         // send correct signature
-        gwCheckpointingFacet.addCheckpointSignature(h, membershipProofs[0], weights[0], signature);
+        gatewayDiamond.checkpointer().addCheckpointSignature(h, membershipProofs[0], weights[0], signature);
 
         // replay the previous signature
         vm.expectRevert(SignatureReplay.selector);
-        gwCheckpointingFacet.addCheckpointSignature(h, membershipProofs[0], weights[0], signature);
+        gatewayDiamond.checkpointer().addCheckpointSignature(h, membershipProofs[0], weights[0], signature);
 
         vm.stopPrank();
     }
@@ -1441,8 +1514,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             .createMerkleProofsForValidators(addrs, weights);
 
         BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
-            subnetID: gwGetter.getNetworkName(),
-            blockHeight: gwGetter.bottomUpCheckPeriod(),
+            subnetID: gatewayDiamond.getter().getNetworkName(),
+            blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block"),
             nextConfigurationNumber: 1,
             msgs: new IpcEnvelope[](0)
@@ -1450,7 +1523,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         // create a checkpoint
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        gwCheckpointingFacet.createBottomUpCheckpoint(checkpoint, membershipRoot, 10);
+        gatewayDiamond.checkpointer().createBottomUpCheckpoint(checkpoint, membershipRoot, 10);
         vm.stopPrank();
 
         uint8 v;
@@ -1465,11 +1538,11 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         // send correct signature for incorrect height
         vm.expectRevert(QuorumAlreadyProcessed.selector);
-        gwCheckpointingFacet.addCheckpointSignature(0, membershipProofs[0], weights[0], signature);
+        gatewayDiamond.checkpointer().addCheckpointSignature(0, membershipProofs[0], weights[0], signature);
 
         // send correct signature for incorrect height
         vm.expectRevert(CheckpointNotCreated.selector);
-        gwCheckpointingFacet.addCheckpointSignature(100, membershipProofs[0], weights[0], signature);
+        gatewayDiamond.checkpointer().addCheckpointSignature(100, membershipProofs[0], weights[0], signature);
 
         vm.stopPrank();
     }
@@ -1479,7 +1552,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         (bytes32 membershipRoot, ) = MerkleTreeHelper.createMerkleProofsForValidators(addrs, weights);
 
-        uint256 index = gwGetter.getCheckpointRetentionHeight();
+        uint256 index = gatewayDiamond.getter().getCheckpointRetentionHeight();
         require(index == 1, "unexpected height");
 
         BottomUpCheckpoint memory checkpoint;
@@ -1489,30 +1562,30 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
         for (uint64 i = 1; i <= n; i++) {
             checkpoint = BottomUpCheckpoint({
-                subnetID: gwGetter.getNetworkName(),
-                blockHeight: i * gwGetter.bottomUpCheckPeriod(),
+                subnetID: gatewayDiamond.getter().getNetworkName(),
+                blockHeight: i * gatewayDiamond.getter().bottomUpCheckPeriod(),
                 blockHash: keccak256("block"),
                 nextConfigurationNumber: 1,
                 msgs: new IpcEnvelope[](0)
             });
 
-            gwCheckpointingFacet.createBottomUpCheckpoint(checkpoint, membershipRoot, 10);
+            gatewayDiamond.checkpointer().createBottomUpCheckpoint(checkpoint, membershipRoot, 10);
         }
         vm.stopPrank();
 
-        index = gwGetter.getCheckpointRetentionHeight();
+        index = gatewayDiamond.getter().getCheckpointRetentionHeight();
         require(index == 1, "retention height is not 1");
 
-        uint256[] memory heights = gwGetter.getIncompleteCheckpointHeights();
+        uint256[] memory heights = gatewayDiamond.getter().getIncompleteCheckpointHeights();
         require(heights.length == n, "heights.len is not n");
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        gwCheckpointingFacet.pruneBottomUpCheckpoints(4);
+        gatewayDiamond.checkpointer().pruneBottomUpCheckpoints(4);
         vm.stopPrank();
 
-        index = gwGetter.getCheckpointRetentionHeight();
+        index = gatewayDiamond.getter().getCheckpointRetentionHeight();
         require(index == 4, "height was not updated");
-        heights = gwGetter.getIncompleteCheckpointHeights();
+        heights = gatewayDiamond.getter().getIncompleteCheckpointHeights();
         require(heights.length == n, "index is not the same");
     }
 
@@ -1526,20 +1599,26 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         uint256 amount = 1;
 
         (SubnetID memory subnetId, , , , ) = getSubnet(address(caller));
-        (bool exist, Subnet memory subnetInfo) = gwGetter.getSubnet(subnetId);
+        (bool exist, Subnet memory subnetInfo) = gatewayDiamond.getter().getSubnet(subnetId);
         require(exist, "subnet does not exist");
         require(subnetInfo.circSupply == 0, "unexpected initial circulation supply");
 
-        gwManager.fund{value: DEFAULT_COLLATERAL_AMOUNT}(subnetId, FvmAddressHelper.from(address(caller)));
-        (, subnetInfo) = gwGetter.getSubnet(subnetId);
+        gatewayDiamond.manager().fund{value: DEFAULT_COLLATERAL_AMOUNT}(
+            subnetId,
+            FvmAddressHelper.from(address(caller))
+        );
+        (, subnetInfo) = gatewayDiamond.getter().getSubnet(subnetId);
         require(subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT, "unexpected circulation supply after funding");
 
-        uint64 size = gwGetter.maxMsgsPerBottomUpBatch() + 1;
+        uint64 size = gatewayDiamond.getter().maxMsgsPerBottomUpBatch() + 1;
         IpcEnvelope[] memory msgs = new IpcEnvelope[](size);
         for (uint64 i = 0; i < size; i++) {
             msgs[i] = TestUtils.newXnetCallMsg(
                 IPCAddress({subnetId: subnetId, rawAddress: FvmAddressHelper.from(caller)}),
-                IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(caller)}),
+                IPCAddress({
+                    subnetId: gatewayDiamond.getter().getNetworkName(),
+                    rawAddress: FvmAddressHelper.from(caller)
+                }),
                 amount,
                 i
             );
@@ -1547,7 +1626,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
             subnetID: subnetId,
-            blockHeight: gwGetter.bottomUpCheckPeriod(),
+            blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 1,
             msgs: msgs
@@ -1555,7 +1634,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         vm.prank(caller);
         vm.expectRevert(MaxMsgsPerBatchExceeded.selector);
-        gwCheckpointingFacet.commitCheckpoint(checkpoint);
+        gatewayDiamond.checkpointer().commitCheckpoint(checkpoint);
     }
 
     function testGatewayDiamond_PopulateBottomUpMsgBatch_Works() public {
@@ -1571,16 +1650,12 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
-            activeValidatorsLimit: 100
+            activeValidatorsLimit: 100,
+            commitSha: DEFAULT_COMMIT_SHA
         });
-        gatewayDiamond = createGatewayDiamond(constructorParams);
-        gwGetter = GatewayGetterFacet(address(gatewayDiamond));
-        gwManager = GatewayManagerFacet(address(gatewayDiamond));
-        gwCheckpointingFacet = CheckpointingFacet(address(gatewayDiamond));
-        gwXnetMessagingFacet = XnetMessagingFacet(address(gatewayDiamond));
-        gwTopDownFinalityFacet = TopDownFinalityFacet(address(gatewayDiamond));
 
-        uint256 d = gwGetter.bottomUpCheckPeriod();
+        gatewayDiamond = createGatewayDiamond(constructorParams);
+        uint256 d = gatewayDiamond.getter().bottomUpCheckPeriod();
 
         // a few messags in first batch
         uint64 numMsgs = 10;
@@ -1591,9 +1666,9 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         for (uint64 i = 0; i < numMsgs; i++) {
             release(releaseAmount);
         }
-        require(gwGetter.bottomUpMsgBatch(d).msgs.length == numMsgs, "no messages");
+        require(gatewayDiamond.getter().bottomUpMsgBatch(d).msgs.length == numMsgs, "no messages");
 
-        numMsgs = gwGetter.maxMsgsPerBottomUpBatch() + 10;
+        numMsgs = gatewayDiamond.getter().maxMsgsPerBottomUpBatch() + 10;
         vm.roll(d + 1);
         vm.startPrank(from);
         vm.deal(from, numMsgs * (releaseAmount + DEFAULT_CROSS_MSG_FEE));
@@ -1604,18 +1679,28 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         // one batch should be overflow in d+1 and the rest of the messages should have been
         // added to the next batch
         require(
-            gwGetter.bottomUpMsgBatch(d + 1).msgs.length == gwGetter.maxMsgsPerBottomUpBatch(),
+            gatewayDiamond.getter().bottomUpMsgBatch(d + 1).msgs.length ==
+                gatewayDiamond.getter().maxMsgsPerBottomUpBatch(),
             "wrong number of messages in full batch"
         );
-        require(gwGetter.bottomUpMsgBatch(2 * d).msgs.length == 10, "wrong number of messages after full batch");
+        require(
+            gatewayDiamond.getter().bottomUpMsgBatch(2 * d).msgs.length == 10,
+            "wrong number of messages after full batch"
+        );
     }
 
     function newListOfMessages(uint64 size) internal view returns (IpcEnvelope[] memory msgs) {
         msgs = new IpcEnvelope[](size);
         for (uint64 i = 0; i < size; i++) {
             msgs[i] = TestUtils.newXnetCallMsg(
-                IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(address(this))}),
-                IPCAddress({subnetId: gwGetter.getNetworkName(), rawAddress: FvmAddressHelper.from(address(this))}),
+                IPCAddress({
+                    subnetId: gatewayDiamond.getter().getNetworkName(),
+                    rawAddress: FvmAddressHelper.from(address(this))
+                }),
+                IPCAddress({
+                    subnetId: gatewayDiamond.getter().getNetworkName(),
+                    rawAddress: FvmAddressHelper.from(address(this))
+                }),
                 0,
                 i
                 // method: this.callback.selector,

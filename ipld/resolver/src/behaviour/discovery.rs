@@ -98,12 +98,18 @@ impl Behaviour {
             return Err(ConfigError::InvalidNetwork(nc.network_name));
         }
 
+        let local_peer_id = nc.local_peer_id();
+
         // Parse static addresses.
         let mut static_addresses = Vec::new();
         for multiaddr in dc.static_addresses {
             let mut addr = multiaddr.clone();
             if let Some(Protocol::P2p(peer_id)) = addr.pop() {
-                static_addresses.push((peer_id, addr))
+                // Trying to add the local peer to the routing table would be ignored,
+                // but if it's the only one we could falsely believe we can bootstrap.
+                if peer_id != local_peer_id {
+                    static_addresses.push((peer_id, addr));
+                }
             } else {
                 return Err(ConfigError::InvalidBootstrapAddress(multiaddr));
             }
@@ -124,9 +130,9 @@ impl Behaviour {
             // messages to store content in the memory of our node.
             kad_config.set_record_filtering(kad::StoreInserts::FilterBoth);
 
-            let store = MemoryStore::new(nc.local_peer_id());
+            let store = MemoryStore::new(local_peer_id);
 
-            let mut kademlia = kad::Behaviour::with_config(nc.local_peer_id(), store, kad_config);
+            let mut kademlia = kad::Behaviour::with_config(local_peer_id, store, kad_config);
 
             // Setting the mode to server so that it doesn't deny connections until the external address is established.
             // At least this seems to prevent in-memory tests from working, I'm not sure about what will happen with real servers.

@@ -1,4 +1,4 @@
 #!/bin/sh
 set -eu
 
-fendermint proxy start --secret-key test-network/keys/alice.sk --chain-name test --broadcast-mode async --sequence 0
+fendermint proxy run --secret-key test-network/keys/alice.sk --account-kind ethereum --chain-name test --broadcast-mode async --sequence 0

@@ -1,4 +1,4 @@
-// Copyright 2024 Textile Inc
+// Copyright 2024 Textile
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
@@ -98,7 +98,7 @@ impl State {
         value: Cid,
     ) -> anyhow::Result<Cid> {
         let mut hamt = Hamt::<_, Object>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
-        match hamt.get(&key).map(|v| v.map(|inner| inner.clone()))? {
+        match hamt.get(&key).map(|v| v.cloned())? {
             Some(mut obj) => {
                 // Ignore if value changed before it was resolved.
                 if obj.value == value.to_bytes() {
@@ -124,7 +124,7 @@ impl State {
             self.root = hamt.flush()?;
             return Ok((value, self.root));
         }
-        return Err(anyhow::anyhow!("key not found"));
+        Err(anyhow::anyhow!("key not found"))
     }
 
     pub fn get<BS: Blockstore>(
@@ -133,7 +133,7 @@ impl State {
         key: &BytesKey,
     ) -> anyhow::Result<Option<Object>> {
         let hamt = Hamt::<_, Object>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
-        let value = hamt.get(key).map(|v| v.map(|inner| inner.clone()))?;
+        let value = hamt.get(key).map(|v| v.cloned())?;
         Ok(value)
     }
 

@@ -41,6 +41,7 @@ use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 use tendermint::abci::request::CheckTxKind;
 use tendermint::abci::{request, response};
+use tracing::instrument;
 
 use crate::{tmconv::*, VERSION};
 use crate::{BlockHeight, APP_VERSION};
@@ -525,6 +526,7 @@ where
     }
 
     /// Query the application for data at the current or past height.
+    #[instrument(skip(self))]
     async fn query(&self, request: request::Query) -> AbciResult<response::Query> {
         let db = self.state_store_clone();
         let height = FvmQueryHeight::from(request.height.value());
@@ -654,7 +656,8 @@ where
             time = request.time.to_string(),
             "process proposal"
         );
-        let txs = request.txs.into_iter().map(|tx| tx.to_vec()).collect();
+        let txs: Vec<_> = request.txs.into_iter().map(|tx| tx.to_vec()).collect();
+        let num_txs = txs.len();
 
         let accept = self
             .interpreter
@@ -662,6 +665,14 @@ where
             .await
             .context("failed to process proposal")?;
 
+        emit!(
+            EventType::ProposalProcessed,
+            is_accepted = accept,
+            height = request.height.value(),
+            size = num_txs,
+            hash = request.hash.to_string(),
+            proposer = request.proposer_address.to_string()
+        );
         if accept {
             Ok(response::ProcessProposal::Accept)
         } else {

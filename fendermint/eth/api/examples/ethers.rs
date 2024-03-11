@@ -81,11 +81,11 @@ pub struct Options {
     /// Secret key used to send funds, expected to be in Base64 format.
     ///
     /// Assumed to exist with a non-zero balance.
-    #[arg(long, short)]
+    #[arg(long)]
     pub secret_key_from: PathBuf,
 
     /// Secret key used to receive funds, expected to be in Base64 format.
-    #[arg(long, short)]
+    #[arg(long)]
     pub secret_key_to: PathBuf,
 
     /// Enable DEBUG logs.

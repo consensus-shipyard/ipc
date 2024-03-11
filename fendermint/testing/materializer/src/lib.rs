@@ -1,3 +1,4 @@
+use ethers::providers::{Http, Provider};
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use multihash::MultihashDigest;
@@ -98,6 +99,10 @@ impl ResourceName {
     pub fn is_prefix_of(&self, other: &ResourceName) -> bool {
         other.0.starts_with(&self.0)
     }
+
+    pub fn path_string(&self) -> String {
+        self.0.to_string_lossy().to_string()
+    }
 }
 
 impl From<&str> for ResourceName {
@@ -120,12 +125,16 @@ impl Debug for ResourceName {
 
 macro_rules! resource_name {
     ($name:ident) => {
-        #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+        #[derive(Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
         pub struct $name(ResourceName);
 
         impl $name {
             pub fn path(&self) -> &Path {
                 &self.0 .0
+            }
+
+            pub fn path_string(&self) -> String {
+                self.0.path_string()
             }
         }
 
@@ -149,6 +158,12 @@ macro_rules! resource_name {
                     stringify!($name).trim_end_matches("Name"),
                     self.0
                 )
+            }
+        }
+
+        impl Debug for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                Display::fmt(&self, f)
             }
         }
     };
@@ -296,6 +311,29 @@ impl ToString for ResourceHash {
     }
 }
 
+pub trait HasEthApi {
+    /// URL of the HTTP endpoint, if it's enabled.
+    fn ethapi_http_endpoint(&self) -> Option<String>;
+
+    fn ethapi_http_provider(&self) -> anyhow::Result<Option<Provider<Http>>> {
+        match self.ethapi_http_endpoint() {
+            Some(url) => Ok(Some(Provider::<Http>::try_from(url)?)),
+            None => Ok(None),
+        }
+    }
+}
+
+pub trait HasCometBftApi {
+    /// URL of the HTTP endpoint.
+    fn cometbft_http_endpoint(&self) -> tendermint_rpc::Url;
+
+    fn cometbft_http_provider(&self) -> anyhow::Result<tendermint_rpc::HttpClient> {
+        Ok(tendermint_rpc::HttpClient::new(
+            self.cometbft_http_endpoint(),
+        )?)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
@@ -351,5 +389,12 @@ mod tests {
 
         assert!(node.is_in_subnet(&sn));
         assert_eq!(node.testnet(), tn, "testnet is the prefix");
+    }
+
+    #[test]
+    fn test_resource_name_display() {
+        let tn = TestnetName::new("display-test");
+        assert_eq!(format!("{tn}"), "Testnet('testnets/display-test')");
+        assert_eq!(format!("{tn:?}"), "Testnet('testnets/display-test')");
     }
 }

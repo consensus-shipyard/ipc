@@ -1,3 +1,4 @@
+// Copyright 2024 Textile
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
@@ -72,7 +73,7 @@ where
 
         match err {
             None => {
-                tracing::debug!(cid = ?task.cid(), "ipfs content resolved");
+                tracing::info!(cid = ?task.cid(), "ipfs content resolved");
                 atomically(|| task.set_resolved()).await;
             }
             Some(e) => {

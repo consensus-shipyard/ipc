@@ -122,7 +122,7 @@ impl MessageFactory {
             key: key.clone().into_bytes(),
             value: object_value,
         };
-        let params = RawBytes::serialize(&input)?;
+        let params = RawBytes::serialize(input)?;
         let message = self.transaction(
             objectstore::OBJECTSTORE_ACTOR_ADDR,
             fendermint_actor_objectstore::Method::PutObject as u64,

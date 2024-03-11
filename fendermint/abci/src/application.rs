@@ -162,28 +162,34 @@ where
 
         let res = async move {
             let res = match req {
-                Request::Echo(r) => Response::Echo(app.echo(r).await?),
-                Request::Info(r) => Response::Info(app.info(r).await?),
-                Request::InitChain(r) => Response::InitChain(app.init_chain(r).await?),
-                Request::Query(r) => Response::Query(app.query(r).await?),
-                Request::CheckTx(r) => Response::CheckTx(app.check_tx(r).await?),
+                Request::Echo(r) => Response::Echo(log_error(app.echo(r).await)?),
+                Request::Info(r) => Response::Info(log_error(app.info(r).await)?),
+                Request::InitChain(r) => Response::InitChain(log_error(app.init_chain(r).await)?),
+                Request::Query(r) => Response::Query(log_error(app.query(r).await)?),
+                Request::CheckTx(r) => Response::CheckTx(log_error(app.check_tx(r).await)?),
                 Request::PrepareProposal(r) => {
-                    Response::PrepareProposal(app.prepare_proposal(r).await?)
+                    Response::PrepareProposal(log_error(app.prepare_proposal(r).await)?)
                 }
                 Request::ProcessProposal(r) => {
-                    Response::ProcessProposal(app.process_proposal(r).await?)
+                    Response::ProcessProposal(log_error(app.process_proposal(r).await)?)
                 }
-                Request::BeginBlock(r) => Response::BeginBlock(app.begin_block(r).await?),
-                Request::DeliverTx(r) => Response::DeliverTx(app.deliver_tx(r).await?),
-                Request::EndBlock(r) => Response::EndBlock(app.end_block(r).await?),
-                Request::Commit => Response::Commit(app.commit().await?),
-                Request::ListSnapshots => Response::ListSnapshots(app.list_snapshots().await?),
-                Request::OfferSnapshot(r) => Response::OfferSnapshot(app.offer_snapshot(r).await?),
+                Request::BeginBlock(r) => {
+                    Response::BeginBlock(log_error(app.begin_block(r).await)?)
+                }
+                Request::DeliverTx(r) => Response::DeliverTx(log_error(app.deliver_tx(r).await)?),
+                Request::EndBlock(r) => Response::EndBlock(log_error(app.end_block(r).await)?),
+                Request::Commit => Response::Commit(log_error(app.commit().await)?),
+                Request::ListSnapshots => {
+                    Response::ListSnapshots(log_error(app.list_snapshots().await)?)
+                }
+                Request::OfferSnapshot(r) => {
+                    Response::OfferSnapshot(log_error(app.offer_snapshot(r).await)?)
+                }
                 Request::LoadSnapshotChunk(r) => {
-                    Response::LoadSnapshotChunk(app.load_snapshot_chunk(r).await?)
+                    Response::LoadSnapshotChunk(log_error(app.load_snapshot_chunk(r).await)?)
                 }
                 Request::ApplySnapshotChunk(r) => {
-                    Response::ApplySnapshotChunk(app.apply_snapshot_chunk(r).await?)
+                    Response::ApplySnapshotChunk(log_error(app.apply_snapshot_chunk(r).await)?)
                 }
                 Request::Flush => panic!("Flush should be handled by the Server!"),
             };
@@ -191,4 +197,11 @@ where
         };
         res.boxed()
     }
+}
+
+fn log_error<T>(res: AbciResult<T>) -> AbciResult<T> {
+    if let Err(ref e) = res {
+        tracing::error!("failed to execute ABCI request: {e:#}");
+    }
+    res
 }

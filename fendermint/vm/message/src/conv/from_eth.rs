@@ -122,6 +122,7 @@ mod tests {
         let msg = SignedMessage {
             message: to_fvm_message(tx0.as_eip1559_ref().unwrap()).expect("to_fvm_message"),
             signature: Signature::new_secp256k1(sig.to_vec()),
+            object: None,
         };
 
         let domain_hash = msg.domain_hash(&chain_id).expect("domain_hash");

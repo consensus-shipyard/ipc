@@ -1,3 +1,7 @@
+// Copyright 2024 Textile
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: Apache-2.0, MIT
+
 use ambassador::Delegate;
 use cid::Cid;
 use fvm::call_manager::CallManager;

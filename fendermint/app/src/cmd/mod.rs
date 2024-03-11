@@ -5,7 +5,7 @@
 
 use crate::{
     options::{Commands, Options},
-    settings::{expand_tilde, Settings},
+    settings::{utils::expand_tilde, Settings},
 };
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
@@ -13,6 +13,7 @@ use async_trait::async_trait;
 pub mod eth;
 pub mod genesis;
 pub mod key;
+pub mod materializer;
 pub mod proxy;
 pub mod rpc;
 pub mod run;
@@ -65,7 +66,8 @@ pub async fn exec(opts: &Options) -> anyhow::Result<()> {
         Commands::Genesis(args) => args.exec(()).await,
         Commands::Rpc(args) => args.exec(()).await,
         Commands::Eth(args) => args.exec(settings(opts)?.eth).await,
-        Commands::Proxy(args) => args.exec(()).await,
+        Commands::Materializer(args) => args.exec(()).await,
+        Commands::Proxy(args) => args.exec(settings(opts)?.proxy).await,
     }
 }
 

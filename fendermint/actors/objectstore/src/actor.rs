@@ -1,4 +1,4 @@
-// Copyright 2024 Textile Inc
+// Copyright 2024 Textile
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
@@ -95,6 +95,7 @@ impl Actor {
             .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get object"))
     }
 
+    #[allow(clippy::type_complexity)]
     fn list_objects(rt: &impl Runtime) -> Result<Option<Vec<(Vec<u8>, Object)>>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 

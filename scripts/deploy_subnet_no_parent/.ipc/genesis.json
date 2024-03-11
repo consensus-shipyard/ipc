@@ -1,0 +1,106 @@
+{
+  "genesis_time": "1970-01-17T08:25:13Z",
+  "chain_id": "2022913529944675",
+  "initial_height": "1",
+  "consensus_params": {
+    "block": {
+      "max_bytes": "22020096",
+      "max_gas": "-1",
+      "time_iota_ms": "1000"
+    },
+    "evidence": {
+      "max_age_num_blocks": "100000",
+      "max_age_duration": "172800000000000",
+      "max_bytes": "1048576"
+    },
+    "validator": {
+      "pub_key_types": [
+        "secp256k1"
+      ]
+    }
+  },
+  "validators": [],
+  "app_hash": "",
+  "app_state": {
+    "accounts": [
+      {
+        "balance": "1000000000000000000",
+        "meta": {
+          "Account": {
+            "owner": "t410favumzh4cmz4ohr6f54hh4s2a7ivjs3dm6cyzugi"
+          }
+        }
+      },
+      {
+        "balance": "1000000000000000000",
+        "meta": {
+          "Account": {
+            "owner": "t410figo3ovvqiipmav6oyofddpd72bwbpdjqyywzq6i"
+          }
+        }
+      },
+      {
+        "balance": "1000000000000000000",
+        "meta": {
+          "Account": {
+            "owner": "t410fucfot2gahdfps5s5pw3slstdvex46ewojfhqjuq"
+          }
+        }
+      },
+      {
+        "balance": "1000000000000000000",
+        "meta": {
+          "Account": {
+            "owner": "t410fvonza3uucdleykleyw5wmlhtwlwlkrwhxohsfsa"
+          }
+        }
+      },
+      {
+        "balance": "1000000000000000000",
+        "meta": {
+          "Account": {
+            "owner": "t410frl6yippxnk6vgpr6a3ey7ljf6dixp5bspmju4tq"
+          }
+        }
+      },
+      {
+        "balance": "1000000000000000000",
+        "meta": {
+          "Account": {
+            "owner": "t410f2gkuvrxzdwpujhwlnozlipeyswv4c646wqukakq"
+          }
+        }
+      }
+    ],
+    "base_fee": "1000",
+    "chain_name": "/r314159/t410f726d2jv6uj4mpkcbgg5ndlpp3l7dd5rlcpgzkoi",
+    "eam_permission_mode": {
+      "mode": "unrestricted"
+    },
+    "ipc": {
+      "gateway": {
+        "active_validators_limit": 100,
+        "bottom_up_check_period": 30,
+        "majority_percentage": 67,
+        "subnet_id": "/r314159/t410f726d2jv6uj4mpkcbgg5ndlpp3l7dd5rlcpgzkoi"
+      }
+    },
+    "network_version": 21,
+    "power_scale": 3,
+    "timestamp": 1412713,
+    "validators": [
+      {
+        "power": "10000000000000000000",
+        "public_key": "FILL IN"
+      },
+      {
+        "power": "10000000000000000000",
+        "public_key": "FILL IN"
+      },
+      {
+        "power": "10000000000000000000",
+        "public_key": "FILL IN"
+      }
+    ]
+  }
+}

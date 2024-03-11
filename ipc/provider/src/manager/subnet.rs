@@ -134,6 +134,9 @@ pub trait SubnetManager: Send + Sync + TopDownFinalityQuery + BottomUpCheckpoint
     /// networks is a `U256` that wouldn't fit in an integer type.
     async fn get_chain_id(&self) -> Result<String>;
 
+    /// Get commit sha for deployed contracts
+    async fn get_commit_sha(&self) -> Result<[u8; 32]>;
+
     /// Gets the genesis information required to bootstrap a child subnet
     async fn get_genesis_info(&self, subnet: &SubnetID) -> Result<SubnetGenesisInfo>;
 

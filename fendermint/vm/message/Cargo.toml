@@ -37,7 +37,6 @@ hex = { workspace = true }
 quickcheck = { workspace = true }
 quickcheck_macros = { workspace = true }
 
-
 # Enable arb on self for tests.
 # Ideally we could do this with `#[cfg(any(test, feature = "arb"))]`,
 # however in that case all the extra dependencies would not kick in,
@@ -47,10 +46,10 @@ fendermint_testing = { path = "../../testing", features = ["golden"] }
 
 [features]
 arb = [
-  "arbitrary",
-  "quickcheck",
-  "fvm_shared/arb",
-  "cid/arb",
-  "rand",
-  "fendermint_testing/arb",
+    "arbitrary",
+    "quickcheck",
+    "fvm_shared/arb",
+    "cid/arb",
+    "rand",
+    "fendermint_testing/arb",
 ]

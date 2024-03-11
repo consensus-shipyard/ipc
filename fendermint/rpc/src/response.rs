@@ -76,6 +76,7 @@ pub fn decode_os_get(deliver_tx: &DeliverTx) -> anyhow::Result<Option<Object>> {
 }
 
 /// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as a list of bytes.
+#[allow(clippy::type_complexity)]
 pub fn decode_os_list(deliver_tx: &DeliverTx) -> anyhow::Result<Option<Vec<(Vec<u8>, Object)>>> {
     let data = decode_data(&deliver_tx.data)?;
     fvm_ipld_encoding::from_slice::<Option<Vec<(Vec<u8>, Object)>>>(&data)

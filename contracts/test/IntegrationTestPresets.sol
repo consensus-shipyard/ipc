@@ -9,19 +9,17 @@ import {GatewayGetterFacet} from "../src/gateway/GatewayGetterFacet.sol";
 import {GatewayManagerFacet} from "../src/gateway/GatewayManagerFacet.sol";
 import {GatewayMessengerFacet} from "../src/gateway/GatewayMessengerFacet.sol";
 import {XnetMessagingFacet} from "../src/gateway/router/XnetMessagingFacet.sol";
+import {GatewayFacetsHelper} from "./helpers/GatewayFacetsHelper.sol";
+import {DiamondFacetsHelper} from "./helpers/DiamondFacetsHelper.sol";
 import {IntegrationTestBase} from "./IntegrationTestBase.sol";
 
 contract L1GatewayActorDiamond is IntegrationTestBase {
+    using GatewayFacetsHelper for GatewayDiamond;
+    using DiamondFacetsHelper for GatewayDiamond;
+
     function setUp() public virtual override {
         GatewayDiamond.ConstructorParams memory gwConstructorParams = defaultGatewayParams();
         gatewayDiamond = createGatewayDiamond(gwConstructorParams);
-
-        gwGetter = GatewayGetterFacet(address(gatewayDiamond));
-        gwManager = GatewayManagerFacet(address(gatewayDiamond));
-        gwXnetMessagingFacet = XnetMessagingFacet(address(gatewayDiamond));
-        gwMessenger = GatewayMessengerFacet(address(gatewayDiamond));
-        gwLouper = DiamondLoupeFacet(address(gatewayDiamond));
-        gwCutter = DiamondCutFacet(address(gatewayDiamond));
     }
 
     function defaultGatewayParams() internal pure override returns (GatewayDiamond.ConstructorParams memory) {
@@ -33,7 +31,8 @@ contract L1GatewayActorDiamond is IntegrationTestBase {
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
-            activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT
+            activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
+            commitSha: DEFAULT_COMMIT_SHA
         });
 
         return params;
@@ -41,16 +40,12 @@ contract L1GatewayActorDiamond is IntegrationTestBase {
 }
 
 contract L2GatewayActorDiamond is IntegrationTestBase {
+    using GatewayFacetsHelper for GatewayDiamond;
+    using DiamondFacetsHelper for GatewayDiamond;
+
     function setUp() public virtual override {
         GatewayDiamond.ConstructorParams memory gwConstructorParams = defaultGatewayParams();
         gatewayDiamond = createGatewayDiamond(gwConstructorParams);
-
-        gwGetter = GatewayGetterFacet(address(gatewayDiamond));
-        gwManager = GatewayManagerFacet(address(gatewayDiamond));
-        gwXnetMessagingFacet = XnetMessagingFacet(address(gatewayDiamond));
-        gwMessenger = GatewayMessengerFacet(address(gatewayDiamond));
-        gwLouper = DiamondLoupeFacet(address(gatewayDiamond));
-        gwCutter = DiamondCutFacet(address(gatewayDiamond));
     }
 
     function defaultGatewayParams() internal pure override returns (GatewayDiamond.ConstructorParams memory) {
@@ -63,7 +58,8 @@ contract L2GatewayActorDiamond is IntegrationTestBase {
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
-            activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT
+            activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
+            commitSha: DEFAULT_COMMIT_SHA
         });
 
         return params;
@@ -71,18 +67,14 @@ contract L2GatewayActorDiamond is IntegrationTestBase {
 }
 
 contract L3GatewayActorDiamond is IntegrationTestBase {
+    using GatewayFacetsHelper for GatewayDiamond;
+    using DiamondFacetsHelper for GatewayDiamond;
+
     address constant CHILD_NETWORK_ADDRESS_3 = address(31);
 
     function setUp() public virtual override {
         GatewayDiamond.ConstructorParams memory gwConstructorParams = defaultGatewayParams();
         gatewayDiamond = createGatewayDiamond(gwConstructorParams);
-
-        gwGetter = GatewayGetterFacet(address(gatewayDiamond));
-        gwManager = GatewayManagerFacet(address(gatewayDiamond));
-        gwXnetMessagingFacet = XnetMessagingFacet(address(gatewayDiamond));
-        gwMessenger = GatewayMessengerFacet(address(gatewayDiamond));
-        gwLouper = DiamondLoupeFacet(address(gatewayDiamond));
-        gwCutter = DiamondCutFacet(address(gatewayDiamond));
     }
 
     function defaultGatewayParams() internal pure override returns (GatewayDiamond.ConstructorParams memory) {
@@ -96,7 +88,8 @@ contract L3GatewayActorDiamond is IntegrationTestBase {
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
-            activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT
+            activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
+            commitSha: DEFAULT_COMMIT_SHA
         });
 
         return params;

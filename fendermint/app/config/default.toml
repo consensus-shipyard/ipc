@@ -113,6 +113,15 @@ host = "127.0.0.1"
 port = 8545
 
 
+# Proxy API facade
+[proxy]
+
+[proxy.listen]
+# Only accept local connections by default.
+host = "127.0.0.1"
+port = 8001
+
+
 # IPLD Resolver Configuration
 [resolver]
 # Time to wait between attempts to resolve a CID after an error.
@@ -168,7 +177,7 @@ max_provider_age = 300
 [resolver.connection]
 # The address where we will listen to incoming connections.
 # Leaving it empty disables the IPLD Resolver.
-listen_addr = "/ip4/127.0.0.1/tcp/3001"
+listen_addr = ""
 
 # Maximum number of incoming connections.
 max_incoming = 30
@@ -194,9 +203,14 @@ rate_limit_period = 0
 # IPC related configuration parameters
 [ipc]
 # Default subnet ID, which basically means IPC is disabled.
-subnet_id = "/r31415926"
+subnet_id = "/r0"
 # Voting interval about things such as the top-down finality, in seconds.
 # It's limited to avoid GossipSub throttling or banning the node for over production.
 # The minimum is 1 seconds which is about the minimum target block time as well;
 # ideally one round of gossip per block should be as frequent as we would go.
 vote_interval = 1
+# Voting timeout about top-down finality, in seconds. After this time, if there is
+# no new height to vote on, the previous vote is re-published. This is to avoid
+# potential stalling because peers missed an important vote and the cache is full,
+# pausing the syncer, preventing new events to trigger votes.
+vote_timeout = 60

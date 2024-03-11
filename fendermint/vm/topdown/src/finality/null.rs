@@ -73,15 +73,8 @@ impl FinalityWithNull {
         maybe_payload: Option<ParentViewPayload>,
     ) -> StmResult<(), Error> {
         if let Some((block_hash, validator_changes, top_down_msgs)) = maybe_payload {
-            emit!(
-                EventType::NewParentView,
-                is_null = false,
-                height,
-                block_hash = hex::encode(&block_hash)
-            );
             self.parent_block_filled(height, block_hash, validator_changes, top_down_msgs)
         } else {
-            emit!(EventType::NewParentView, is_null = true, height);
             self.parent_null_round(height)
         }
     }
@@ -172,15 +165,12 @@ impl FinalityWithNull {
         };
         Ok(Some(h))
     }
-}
 
-/// All the private functions
-impl FinalityWithNull {
-    /// Get the first non-null block in the range [start, end].
-    fn first_non_null_block_before(&self, height: BlockHeight) -> Stm<Option<BlockHeight>> {
+    /// Get the first non-null block in the range of earliest cache block till the height specified, inclusive.
+    pub(crate) fn first_non_null_block(&self, height: BlockHeight) -> Stm<Option<BlockHeight>> {
         let cache = self.cached_data.read()?;
         Ok(cache.lower_bound().and_then(|lower_bound| {
-            for h in (lower_bound..height).rev() {
+            for h in (lower_bound..=height).rev() {
                 if let Some(Some(_)) = cache.get_value(h) {
                     return Some(h);
                 }
@@ -188,7 +178,10 @@ impl FinalityWithNull {
             None
         }))
     }
+}
 
+/// All the private functions
+impl FinalityWithNull {
     fn propose_next_height(&self) -> Stm<Option<BlockHeight>> {
         let latest_height = if let Some(h) = self.latest_height_in_cache()? {
             h
@@ -207,18 +200,17 @@ impl FinalityWithNull {
         let candidate_height = min(max_proposal_height, latest_height);
         tracing::debug!(max_proposal_height, candidate_height, "propose heights");
 
-        let first_non_null_height =
-            if let Some(h) = self.first_non_null_block_before(candidate_height)? {
-                h
-            } else {
-                tracing::debug!(height = candidate_height, "no non-null block found before");
-                return Ok(None);
-            };
+        let first_non_null_height = if let Some(h) = self.first_non_null_block(candidate_height)? {
+            h
+        } else {
+            tracing::debug!(height = candidate_height, "no non-null block found before");
+            return Ok(None);
+        };
 
         tracing::debug!(first_non_null_height, candidate_height);
         // an extra layer of delay
         let maybe_proposal_height =
-            self.first_non_null_block_before(first_non_null_height - self.config.proposal_delay())?;
+            self.first_non_null_block(first_non_null_height - self.config.proposal_delay())?;
         tracing::debug!(
             delayed_height = maybe_proposal_height,
             delay = self.config.proposal_delay()
@@ -407,19 +399,18 @@ mod tests {
         let parent_blocks = vec![
             (100, Some((vec![0; 32], vec![], vec![]))), // last committed block
             (101, Some((vec![1; 32], vec![], vec![]))), // cache start
-            (102, Some((vec![2; 32], vec![], vec![]))), // final proposal height
-            (103, Some((vec![3; 32], vec![], vec![]))), // final delayed height
-            (104, Some((vec![4; 32], vec![], vec![]))),
-            (105, Some((vec![5; 32], vec![], vec![]))), // first non null block
-            (106, Some((vec![6; 32], vec![], vec![]))), // max proposal height (last committed + 6)
-            (107, Some((vec![7; 32], vec![], vec![]))),
-            (108, Some((vec![8; 32], vec![], vec![]))), // cache latest height
+            (102, Some((vec![2; 32], vec![], vec![]))),
+            (103, Some((vec![3; 32], vec![], vec![]))),
+            (104, Some((vec![4; 32], vec![], vec![]))), // final delayed height + proposal height
+            (105, Some((vec![5; 32], vec![], vec![]))),
+            (106, Some((vec![6; 32], vec![], vec![]))), // max proposal height (last committed + 6), first non null block
+            (107, Some((vec![7; 32], vec![], vec![]))), // cache latest height
         ];
         let provider = new_provider(parent_blocks).await;
 
         let f = IPCParentFinality {
-            height: 102,
-            block_hash: vec![2; 32],
+            height: 104,
+            block_hash: vec![4; 32],
         };
         assert_eq!(
             atomically(|| provider.next_proposal()).await,
@@ -439,7 +430,7 @@ mod tests {
         );
 
         // this ensures sequential insertion is still valid
-        atomically_or_err(|| provider.new_parent_view(109, None))
+        atomically_or_err(|| provider.new_parent_view(108, None))
             .await
             .unwrap();
     }
@@ -449,11 +440,11 @@ mod tests {
         // max_proposal_range is 6. proposal_delay is 2
         let parent_blocks = vec![
             (100, Some((vec![0; 32], vec![], vec![]))), // last committed block
-            (101, Some((vec![1; 32], vec![], vec![]))), // cache start and final height
-            (102, Some((vec![2; 32], vec![], vec![]))), // delayed height
-            (103, Some((vec![3; 32], vec![], vec![]))),
-            (104, Some((vec![4; 32], vec![], vec![]))), // first non null block
-            (105, Some((vec![4; 32], vec![], vec![]))), // cache latest height
+            (101, Some((vec![1; 32], vec![], vec![]))),
+            (102, Some((vec![2; 32], vec![], vec![]))),
+            (103, Some((vec![3; 32], vec![], vec![]))), // delayed height + final height
+            (104, Some((vec![4; 32], vec![], vec![]))),
+            (105, Some((vec![4; 32], vec![], vec![]))), // cache latest height, first non null block
                                                         // max proposal height is 106
         ];
         let provider = new_provider(parent_blocks).await;
@@ -461,8 +452,8 @@ mod tests {
         assert_eq!(
             atomically(|| provider.next_proposal()).await,
             Some(IPCParentFinality {
-                height: 101,
-                block_hash: vec![1; 32]
+                height: 103,
+                block_hash: vec![3; 32]
             })
         );
     }
@@ -497,14 +488,14 @@ mod tests {
             (104, None), // we wont have a proposal because after delay, there is no more non-null proposal
             (105, None),
             (106, None),
-            (107, Some((vec![7; 32], vec![], vec![]))), // first non null block
-            (108, None),
-            (109, None),
-            (110, Some((vec![10; 32], vec![], vec![]))), // cache latest height
+            (107, None),
+            (108, None), // delayed block
+            (109, Some((vec![8; 32], vec![], vec![]))),
+            (110, Some((vec![10; 32], vec![], vec![]))), // cache latest height, first non null block
                                                          // max proposal height is 112
         ];
         let mut provider = new_provider(parent_blocks).await;
-        provider.config.max_proposal_range = Some(8);
+        provider.config.max_proposal_range = Some(10);
 
         assert_eq!(atomically(|| provider.next_proposal()).await, None);
     }
@@ -514,24 +505,52 @@ mod tests {
         // max_proposal_range is 10. proposal_delay is 2
         let parent_blocks = vec![
             (102, Some((vec![2; 32], vec![], vec![]))), // last committed block
-            (103, Some((vec![3; 32], vec![], vec![]))), // first non null delayed block, final
+            (103, Some((vec![3; 32], vec![], vec![]))),
             (104, None),
-            (105, None), // delayed block
+            (105, None),
             (106, None),
-            (107, Some((vec![7; 32], vec![], vec![]))), // first non null block
-            (108, None),
+            (107, Some((vec![7; 32], vec![], vec![]))), // first non null after delay
+            (108, None),                                // delayed block
             (109, None),
-            (110, Some((vec![10; 32], vec![], vec![]))), // cache latest height
+            (110, Some((vec![10; 32], vec![], vec![]))), // cache latest height, first non null block
                                                          // max proposal height is 112
         ];
         let mut provider = new_provider(parent_blocks).await;
-        provider.config.max_proposal_range = Some(8);
+        provider.config.max_proposal_range = Some(10);
 
         assert_eq!(
             atomically(|| provider.next_proposal()).await,
             Some(IPCParentFinality {
-                height: 103,
-                block_hash: vec![3; 32]
+                height: 107,
+                block_hash: vec![7; 32]
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn test_with_partially_null_blocks_iii() {
+        let parent_blocks = vec![
+            (102, Some((vec![2; 32], vec![], vec![]))), // last committed block
+            (103, Some((vec![3; 32], vec![], vec![]))),
+            (104, None),
+            (105, None),
+            (106, None),
+            (107, Some((vec![7; 32], vec![], vec![]))), // first non null delayed block, final
+            (108, None),                                // delayed block
+            (109, None),
+            (110, Some((vec![10; 32], vec![], vec![]))), // first non null block
+            (111, None),
+            (112, None),
+            // max proposal height is 122
+        ];
+        let mut provider = new_provider(parent_blocks).await;
+        provider.config.max_proposal_range = Some(20);
+
+        assert_eq!(
+            atomically(|| provider.next_proposal()).await,
+            Some(IPCParentFinality {
+                height: 107,
+                block_hash: vec![7; 32]
             })
         );
     }

@@ -4,7 +4,7 @@ env = { "ENTRY" = "fendermint", "CMD" = "run", "FLAGS" = "-d" }
 
 [tasks.fendermint-pull]
 condition = { env_not_set = [
-  "FM_PULL_SKIP",
+    "FM_PULL_SKIP",
 ], fail_message = "Skipped pulling fendermint Docker image." }
 script = """
   docker pull ghcr.io/consensus-shipyard/fendermint:${FM_DOCKER_TAG}
@@ -29,6 +29,7 @@ docker run \
   --env FM_SNAPSHOTS_DIR=/data/${NODE_NAME}/fendermint/snapshots \
   --env FM_CHAIN_NAME=${NETWORK_NAME} \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
+  --env IPFS_RPC_ADDR=/dns4/${IPFS_CONTAINER_NAME}/tcp/5001 \
   --env LOG_LEVEL=${FM_LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
   --entrypoint ${ENTRY} \
@@ -59,6 +60,7 @@ docker run \
   --env FM_IPC__SUBNET_ID=${SUBNET_ID} \
   --env FM_IPC__TOPDOWN__CHAIN_HEAD_DELAY=${TOPDOWN_CHAIN_HEAD_DELAY} \
   --env FM_IPC__TOPDOWN__PARENT_HTTP_ENDPOINT=${PARENT_ENDPOINT} \
+  --env FM_IPC__TOPDOWN__PARENT_HTTP_TIMEOUT=60 \
   --env FM_IPC__TOPDOWN__PARENT_REGISTRY=${PARENT_REGISTRY} \
   --env FM_IPC__TOPDOWN__PARENT_GATEWAY=${PARENT_GATEWAY} \
   --env FM_IPC__TOPDOWN__EXPONENTIAL_BACK_OFF=5 \
@@ -73,7 +75,43 @@ docker run \
   --env FM_VALIDATOR_KEY__PATH=/data/${NODE_NAME}/${VALIDATOR_PRIV_KEY_PATH} \
   --env FM_VALIDATOR_KEY__KIND=ethereum \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
-  --env LOG_LEVEL=${LOG_LEVEL} \
+  --env IPFS_RPC_ADDR=/dns4/${IPFS_CONTAINER_NAME}/tcp/5001 \
+  --env LOG_LEVEL=${FM_LOG_LEVEL} \
+  --env RUST_BACKTRACE=1 \
+  ${FM_DOCKER_IMAGE} \
+  --network=${FM_NETWORK} \
+  ${CMD}
+"""
+dependencies = ["docker-network-create", "fendermint-deps"]
+
+[tasks.fendermint-start-validator-no-parent]
+extend = "fendermint-run-validator-no-parent"
+env = { "CMD" = "run", "FLAGS" = "-d" }
+
+[tasks.fendermint-run-validator-no-parent]
+script = """
+docker run \
+  ${FLAGS} \
+  --name ${FM_CONTAINER_NAME} \
+  --init \
+  --user $(id -u) \
+  --network ${NETWORK_NAME} \
+  --volume ${BASE_DIR}:/data \
+  --publish ${RESOLVER_HOST_PORT}:${RESOLVER_HOST_PORT} \
+  --env FM_DATA_DIR=/data/${NODE_NAME}/fendermint/data \
+  --env FM_LOG_DIR=/data/${NODE_NAME}/fendermint/data/logs \
+  --env FM_SNAPSHOTS_DIR=/data/${NODE_NAME}/fendermint/snapshots \
+  --env FM_CHAIN_NAME=${NETWORK_NAME} \
+  --env FM_IPC__SUBNET_ID=${SUBNET_ID} \
+  --env FM_RESOLVER__NETWORK__LOCAL_KEY=/data/${NODE_NAME}/${NETWORK_PRIV_KEY_PATH} \
+  --env FM_RESOLVER__CONNECTION__LISTEN_ADDR=/ip4/0.0.0.0/tcp/${RESOLVER_HOST_PORT} \
+  --env FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES=${RESOLVER_BOOTSTRAPS} \
+  --env FM_TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
+  --env FM_VALIDATOR_KEY__PATH=/data/${NODE_NAME}/${VALIDATOR_PRIV_KEY_PATH} \
+  --env FM_VALIDATOR_KEY__KIND=ethereum \
+  --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
+  --env IPFS_RPC_ADDR=/dns4/${IPFS_CONTAINER_NAME}/tcp/5001 \
+  --env LOG_LEVEL=${FM_LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
   ${FM_DOCKER_IMAGE} \
   --network=${FM_NETWORK} \
@@ -104,6 +142,7 @@ docker run \
   --env FM_IPC__SUBNET_ID=${SUBNET_ID} \
   --env FM_IPC__TOPDOWN__CHAIN_HEAD_DELAY=${TOPDOWN_CHAIN_HEAD_DELAY} \
   --env FM_IPC__TOPDOWN__PARENT_HTTP_ENDPOINT=${PARENT_ENDPOINT} \
+  --env FM_IPC__TOPDOWN__PARENT_HTTP_TIMEOUT=60 \
   --env FM_IPC__TOPDOWN__PARENT_REGISTRY=${PARENT_REGISTRY} \
   --env FM_IPC__TOPDOWN__PARENT_GATEWAY=${PARENT_GATEWAY} \
   --env FM_IPC__TOPDOWN__EXPONENTIAL_BACK_OFF=5 \
@@ -116,7 +155,8 @@ docker run \
   --env FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES=${RESOLVER_BOOTSTRAPS} \
   --env FM_TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
-  --env LOG_LEVEL=${LOG_LEVEL} \
+  --env IPFS_RPC_ADDR=/dns4/${IPFS_CONTAINER_NAME}/tcp/5001 \
+  --env LOG_LEVEL=${FM_LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
   ${FM_DOCKER_IMAGE} \
   --network=${FM_NETWORK} \
@@ -131,7 +171,7 @@ docker run \
   --init \
   --user $(id -u) \
   --volume ${BASE_DIR}:/data \
-  --env LOG_LEVEL=${LOG_LEVEL} \
+  --env LOG_LEVEL=${FM_LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
   ${FM_DOCKER_IMAGE} \
   --network=${FM_NETWORK} \
@@ -151,6 +191,12 @@ script.post = "chmod 600 ${BASE_DIR}/${NODE_NAME}/${KEYS_SUBDIR}/${NETWORK_KEY_N
 extend = "fendermint-tool"
 env = { "CMD" = "key show-peer-id --public-key /data/${NODE_NAME}/${NETWORK_PUB_KEY_PATH}" }
 
+[tasks.fendermint-new-proxy-key]
+extend = "fendermint-tool"
+env = { "CMD" = "key gen --out-dir /data/${NODE_NAME}/${KEYS_SUBDIR} --name ${PROXY_KEY_NAME}" }
+script.pre = "mkdir -p ${BASE_DIR}/${NODE_NAME}/${KEYS_SUBDIR}"
+script.post = "chmod 600 ${BASE_DIR}/${NODE_NAME}/${KEYS_SUBDIR}/${PROXY_KEY_NAME}.sk"
+
 
 [tasks.fendermint-deps]
 script = """
@@ -164,6 +210,10 @@ else
     make docker-build
 fi
 """
+
+[tasks.fendermint-stop]
+env = { "CONTAINER_NAME" = "${FM_CONTAINER_NAME}" }
+run_task = "docker-stop"
 
 [tasks.fendermint-destroy]
 env = { "CONTAINER_NAME" = "${FM_CONTAINER_NAME}" }
