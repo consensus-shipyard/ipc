@@ -594,7 +594,7 @@ library LibValidatorTracking {
         // empty validator change logs
         self.changes.startConfigurationNumber = LibStaking.INITIAL_CONFIGURATION_NUMBER;
 
-        initValidators(self, validators);
+        return initValidators(self, validators);
     }
 
     function initValidators(
