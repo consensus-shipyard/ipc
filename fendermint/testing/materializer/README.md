@@ -110,6 +110,14 @@ For troubleshooting we can look at the logs, either by using `docker logs` and t
 * `docker logs brussels-fendermint-955632`
 
 
+#### Env vars
+
+The node containers all get same env vars, which are written to the `static.env` and `dynamic.env` files and actuated by the entry point. If something doesn't look right, the files can be inspected, or the parsed configuration printed like this:
+
+```console
+❯ docker exec -it london-fendermint-05d823 bash
+I have no name!@london-fendermint-05d823:~$ /opt/docker/docker-entry.sh "fendermint config" /opt/docker/static.env /opt/docker/dynamic.env
+```
 
 
 ### Teardown
