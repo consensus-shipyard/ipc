@@ -35,7 +35,7 @@ subnets:
       bob:     '50000000000'
       charlie: '80000000000'
     bottom_up_checkpoint:
-      period: 1000
+      period: 100
     env:
       FM_LOG_LEVEL: info,fendermint=debug
       # Enable debug log on the relayers

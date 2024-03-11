@@ -266,12 +266,12 @@ impl DockerNode {
             let mut env: EnvMap = node_config.env.clone();
 
             env.extend(env_vars![
-                "RUST_BACKTRACE"   => 1,
-                "FM_DATA_DIR"      => "/fendermint/data",
-                "FM_LOG_DIR"       => "/fendermint/logs",
-                "FM_SNAPSHOTS_DIR" => "/fendermint/snapshots",
-                "FM_CHAIN_NAME"    => genesis.chain_name.clone(),
-                "FM_IPC_SUBNET_ID" => ipc.gateway.subnet_id,
+                "RUST_BACKTRACE"    => 1,
+                "FM_DATA_DIR"       => "/fendermint/data",
+                "FM_LOG_DIR"        => "/fendermint/logs",
+                "FM_SNAPSHOTS_DIR"  => "/fendermint/snapshots",
+                "FM_CHAIN_NAME"     => genesis.chain_name.clone(),
+                "FM_IPC__SUBNET_ID" => ipc.gateway.subnet_id,
                 "FM_RESOLVER__NETWORK__LOCAL_KEY"      => "/fendermint/keys/network_key.sk",
                 "FM_RESOLVER__CONNECTION__LISTEN_ADDR" => format!("/ip4/0.0.0.0/tcp/{RESOLVER_P2P_PORT}"),
                 "FM_TENDERMINT_RPC_URL" => format!("http://{cometbft_name}:{COMETBFT_RPC_PORT}"),
