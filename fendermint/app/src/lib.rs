@@ -13,3 +13,10 @@ pub use store::{AppStore, BitswapBlockstore};
 pub type BlockHeight = u64;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+#[derive(Debug)]
+pub enum AppExitCode {
+    Ok = 0,
+    UnknownError = 1,
+    Halt = 2,
+}
