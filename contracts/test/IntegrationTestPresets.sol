@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {SubnetID, Subnet, IPCAddress, Validator} from "../src/structs/Subnet.sol";
+import {SubnetID, Subnet, IPCAddress, Validator, GenesisValidator} from "../src/structs/Subnet.sol";
 import {DiamondCutFacet} from "../src/diamond/DiamondCutFacet.sol";
 import {DiamondLoupeFacet} from "../src/diamond/DiamondLoupeFacet.sol";
 import {GatewayDiamond} from "../src/GatewayDiamond.sol";
@@ -30,7 +30,7 @@ contract L1GatewayActorDiamond is IntegrationTestBase {
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            genesisValidators: new Validator[](0),
+            genesisValidators: new GenesisValidator[](0),
             activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
             commitSha: DEFAULT_COMMIT_SHA
         });
@@ -57,7 +57,7 @@ contract L2GatewayActorDiamond is IntegrationTestBase {
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            genesisValidators: new Validator[](0),
+            genesisValidators: new GenesisValidator[](0),
             activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
             commitSha: DEFAULT_COMMIT_SHA
         });
@@ -87,7 +87,7 @@ contract L3GatewayActorDiamond is IntegrationTestBase {
             networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            genesisValidators: new Validator[](0),
+            genesisValidators: new GenesisValidator[](0),
             activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
             commitSha: DEFAULT_COMMIT_SHA
         });

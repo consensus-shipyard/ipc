@@ -6,9 +6,10 @@ import {LibSubnetActorStorage, SubnetActorStorage} from "./LibSubnetActorStorage
 import {LibMaxPQ, MaxPQ} from "./priority/LibMaxPQ.sol";
 import {LibMinPQ, MinPQ} from "./priority/LibMinPQ.sol";
 import {LibStakingChangeLog} from "./LibStakingChangeLog.sol";
-import {PermissionMode, StakingReleaseQueue, StakingChangeLog, StakingChange, StakingChangeRequest, StakingOperation, StakingRelease, ValidatorSet, AddressStakingReleases, ParentValidatorsTracker, Validator} from "../structs/Subnet.sol";
+import {PermissionMode, StakingReleaseQueue, StakingChangeLog, StakingChange, StakingChangeRequest, StakingOperation, StakingRelease, ValidatorSet, AddressStakingReleases, ParentValidatorsTracker, GenesisValidator, Validator} from "../structs/Subnet.sol";
 import {WithdrawExceedingCollateral, NotValidator, CannotConfirmFutureChanges, NoCollateralToWithdraw, AddressShouldBeValidator, InvalidConfigurationNumber} from "../errors/IPCErrors.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
+import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 
 library LibAddressStakingReleases {
     /// @notice Add new release to the storage. Caller makes sure the release.releasedAt is ordered
@@ -173,7 +174,6 @@ library LibValidatorSet {
         collateral += getTotalConfirmedCollateral(validators);
     }
 
-
     /// @notice Get the total power of the validators.
     /// The function reverts if at least one validator is not in the active validator set.
     function getTotalPowerOfValidators(
@@ -200,7 +200,7 @@ library LibValidatorSet {
     }
 
     /// @notice Set validator data
-    function setMetadata(ValidatorSet storage validators, address validator, bytes calldata metadata) internal {
+    function setMetadata(ValidatorSet storage validators, address validator, bytes memory metadata) internal {
         validators.validators[validator].metadata = metadata;
     }
 
@@ -377,6 +377,7 @@ library LibStaking {
     using LibMaxPQ for MaxPQ;
     using LibMinPQ for MinPQ;
     using Address for address payable;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     uint64 internal constant INITIAL_CONFIGURATION_NUMBER = 1;
 
@@ -456,7 +457,7 @@ library LibStaking {
     }
 
     /// @notice Set the validator metadata directly without queueing the request
-    function setMetadataWithConfirm(address validator, bytes calldata metadata) internal {
+    function setMetadataWithConfirm(address validator, bytes memory metadata) internal {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
         s.validatorSet.setMetadata(validator, metadata);
     }
@@ -469,31 +470,6 @@ library LibStaking {
         s.validatorSet.recordDeposit(validator, amount);
         // confirm deposit that updates the confirmed collateral
         s.validatorSet.confirmDeposit(validator, amount);
-
-        if (!s.bootstrapped) {
-            // add to initial validators avoiding duplicates if it
-            // is a genesis validator.
-            bool alreadyValidator;
-            uint256 length = s.genesisValidators.length;
-            for (uint256 i; i < length; ) {
-                if (s.genesisValidators[i].addr == validator) {
-                    alreadyValidator = true;
-                    break;
-                }
-                unchecked {
-                    ++i;
-                }
-            }
-            if (!alreadyValidator) {
-                uint256 collateral = s.validatorSet.validators[validator].confirmedCollateral;
-                Validator memory val = Validator({
-                    addr: validator,
-                    weight: collateral,
-                    metadata: s.validatorSet.validators[validator].metadata
-                });
-                s.genesisValidators.push(val);
-            }
-        }
     }
 
     /// @notice Confirm the withdraw directly without going through the confirmation process
@@ -541,7 +517,6 @@ library LibStaking {
     }
 
     // =============== Other functions ================
-
     /// @notice Claim the released collateral
     function claimCollateral(address validator) internal {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
@@ -606,6 +581,46 @@ library LibStaking {
 library LibValidatorTracking {
     using LibValidatorSet for ValidatorSet;
     using LibStakingChangeLog for StakingChangeLog;
+
+    function init(
+        ParentValidatorsTracker storage self,
+        uint16 activeValidatorsLimit,
+        GenesisValidator[] memory validators
+    ) internal returns (Validator[] memory) {
+        self.validators.activeLimit = activeValidatorsLimit;
+        // Start the next configuration number from 1, 0 is reserved for no change and the genesis membership
+        self.changes.nextConfigurationNumber = LibStaking.INITIAL_CONFIGURATION_NUMBER;
+        // The startConfiguration number is also 1 to match with nextConfigurationNumber, indicating we have
+        // empty validator change logs
+        self.changes.startConfigurationNumber = LibStaking.INITIAL_CONFIGURATION_NUMBER;
+
+        return initValidators(self, validators);
+    }
+
+    function initValidators(
+        ParentValidatorsTracker storage self,
+        GenesisValidator[] memory validators
+    ) internal returns (Validator[] memory membership) {
+        uint256 total = validators.length;
+        membership = new Validator[](total);
+
+        for (uint256 i = 0; i < total; ) {
+            address v = validators[i].addr;
+            self.validators.recordDeposit(v, validators[i].collateral);
+            self.validators.confirmDeposit(v, validators[i].collateral);
+            self.validators.setMetadata(v, validators[i].metadata);
+            self.validators.confirmFederatedPower(v, validators[i].federatedPower);
+
+            membership[i] = Validator({
+                weight: validators[i].federatedPower + validators[i].collateral,
+                addr: v,
+                metadata: validators[i].metadata
+            });
+            unchecked {
+                i++;
+            }
+        }
+    }
 
     function storeChange(ParentValidatorsTracker storage self, StakingChangeRequest calldata changeRequest) internal {
         uint64 configurationNumber = self.changes.recordChange({

@@ -9,7 +9,7 @@ import {ConsensusType} from "../src/enums/ConsensusType.sol";
 import {IDiamond} from "../src/interfaces/IDiamond.sol";
 import {IpcEnvelope, BottomUpCheckpoint, IpcMsgKind, ParentFinality, CallMsg} from "../src/structs/CrossNet.sol";
 import {FvmAddress} from "../src/structs/FvmAddress.sol";
-import {SubnetID, SupplyKind, PermissionMode, PermissionMode, Subnet, SupplySource, IPCAddress, Validator} from "../src/structs/Subnet.sol";
+import {SubnetID, SupplyKind, PermissionMode, PermissionMode, Subnet, SupplySource, IPCAddress, Validator, GenesisValidator} from "../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../src/lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../src/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../src/lib/CrossMsgHelper.sol";
@@ -257,7 +257,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             networkName: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            genesisValidators: new Validator[](0),
+            genesisValidators: new GenesisValidator[](0),
             activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
             commitSha: DEFAULT_COMMIT_SHA
         });
@@ -269,7 +269,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             networkName: id,
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            genesisValidators: new Validator[](0),
+            genesisValidators: new GenesisValidator[](0),
             activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
             commitSha: DEFAULT_COMMIT_SHA
         });

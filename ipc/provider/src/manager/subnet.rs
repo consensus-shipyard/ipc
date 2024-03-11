@@ -14,7 +14,7 @@ use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::{StakingChangeRequest, ValidatorInfo};
 use ipc_api::subnet::{ConstructParams, PermissionMode, SupplySource};
 use ipc_api::subnet_id::SubnetID;
-use ipc_api::validator::Validator;
+use ipc_api::validator::GenesisValidator;
 
 use crate::lotus::message::ipc::SubnetInfo;
 
@@ -166,7 +166,7 @@ pub struct SubnetGenesisInfo {
     pub active_validators_limit: u16,
     pub min_collateral: TokenAmount,
     pub genesis_epoch: ChainEpoch,
-    pub validators: Vec<Validator>,
+    pub validators: Vec<GenesisValidator>,
     pub genesis_balances: BTreeMap<Address, TokenAmount>,
     pub permission_mode: PermissionMode,
     pub supply_source: SupplySource,
