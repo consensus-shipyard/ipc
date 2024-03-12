@@ -15,7 +15,7 @@ import { IInterchainTokenExecutable } from '@axelar-network/interchain-token-ser
  * will only be called by the interchain token service.
  */
 
-abstract contract InterchainTokenExecutable is Initializable,  IInterchainTokenExecutable {
+abstract contract InterchainTokenExecutableUpgradeable is Initializable,  IInterchainTokenExecutable {
     error NotService(address caller);
 
     address public interchainTokenService;

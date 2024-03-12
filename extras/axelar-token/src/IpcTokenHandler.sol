@@ -11,7 +11,7 @@ import { IpcMsgKind, ResultMsg, OutcomeType, IpcEnvelope } from "@ipc/src/struct
 import { FvmAddressHelper } from "@ipc/src/lib/FvmAddressHelper.sol";
 import { SubnetIDHelper } from "@ipc/src/lib/SubnetIDHelper.sol";
 
-import { InterchainTokenExecutable } from './InterchainTokenExecutable.sol';
+import { InterchainTokenExecutableUpgradeable } from './InterchainTokenExecutableUpgradeable.sol';
 
 
 
@@ -27,7 +27,7 @@ interface SubnetActor {
 //         IpcTokenSender via the Axelar ITS, receiving some token value to deposit into an IPC subnet (specified in the
 //         incoming message). The IpcTokenHandler handles deposit failures by crediting the value back to the original
 //         beneficiary, and making it available from them to withdraw() on the rootnet.
-contract IpcTokenHandler is Initializable, InterchainTokenExecutable, IpcHandler {
+contract IpcTokenHandler is Initializable, InterchainTokenExecutableUpgradeable, IpcHandler {
 
     using FvmAddressHelper for address;
     using FvmAddressHelper for FvmAddress;
