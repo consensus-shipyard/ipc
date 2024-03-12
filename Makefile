@@ -2,9 +2,7 @@
 # instead of making an even more compilicated common one, let's delegate to them.
 
 default:
-	cd ipc/contracts
-	make gen
-	cd ..
+	cd contracts && make gen
 	cargo build --release
 	./target/release/ipc-cli --version
 	./target/release/fendermint --version
