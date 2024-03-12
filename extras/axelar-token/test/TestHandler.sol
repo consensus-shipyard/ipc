@@ -2,9 +2,15 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
+
 import "../src/IpcTokenHandler.sol";
+
 import "./DummyERC20.sol";
 import { FvmAddressHelper } from "@ipc/src/lib/FvmAddressHelper.sol";
+
+
+
+import "openzeppelin-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 contract TestHandler is Test {
     using FvmAddressHelper for address;
@@ -14,10 +20,14 @@ contract TestHandler is Test {
         address ipcGateway = vm.addr(2);
         DummyERC20 token = new DummyERC20("Test token", "TST", 10000);
 
-        IpcTokenHandler handler = new IpcTokenHandler({
+        IpcTokenHandler initialImplementation = new IpcTokenHandler();
+        TransparentUpgradeableProxy transparentProxy = new TransparentUpgradeableProxy(address(initialImplementation), address(this), "");
+        IpcTokenHandler handler = IpcTokenHandler(address(transparentProxy));
+        handler.initialize({
             axelarIts: axelarIts,
             ipcGateway: ipcGateway
         });
+
 
         address[] memory route = new address[](1);
         route[0] = 0x2a3eF0F414c626e51AFA2F29f3F7Be7a45C6DB09;
