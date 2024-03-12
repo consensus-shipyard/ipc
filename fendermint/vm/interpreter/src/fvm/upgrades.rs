@@ -12,7 +12,7 @@ use std::collections::btree_map::Entry::{Occupied, Vacant};
 use super::state::{snapshot::BlockHeight, FvmExecState};
 
 #[derive(PartialEq, Eq, Clone)]
-struct UpgradeKey(ChainID, BlockHeight);
+struct UpgradeKey(ChainID, u64);
 
 impl PartialOrd for UpgradeKey {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
@@ -31,24 +31,95 @@ impl Ord for UpgradeKey {
     }
 }
 
+#[derive(Clone)]
+pub struct UpgradeInfo {
+    /// the chain name on which the upgrade should be executed
+    pub chain_name: String,
+    /// the chain id is calculated from the chain_name
+    pub chain_id: ChainID,
+    /// the block height at which the upgrade should be executed
+    pub block_height: BlockHeight,
+    /// the fendermint app version version this Upgrade will migrate to
+    pub new_app_version: u64,
+    /// the required cometbft version for the upgrade
+    pub cometbft_version: String,
+    /// whether the upgrade is backwards compatible or not. In case a
+    /// non-backwards compatible upgrade is scheduled where we don't have
+    /// the corresponding Upgrade defined to migrate to that version, then
+    /// fendermint will freeze and not process any more blocks.
+    pub backwards_compatible: bool,
+}
+
+impl UpgradeInfo {
+    pub fn new(
+        chain_name: impl ToString,
+        block_height: BlockHeight,
+        cometbft_version: impl ToString,
+        new_app_version: u64,
+        backwards_compatible: bool,
+    ) -> anyhow::Result<Self> {
+        let mut upgrade_info = Self {
+            chain_name: chain_name.to_string(),
+            chain_id: 0.into(),
+            block_height,
+            cometbft_version: cometbft_version.to_string(),
+            new_app_version,
+            backwards_compatible,
+        };
+
+        upgrade_info.chain_id = chainid::from_str_hashed(&upgrade_info.chain_name)?;
+
+        Ok(upgrade_info)
+    }
+}
+
+#[derive(Clone)]
+pub struct UpgradeSchedule {
+    // schedule of upgrades to be executed at given chain and height
+    schedule: BTreeMap<UpgradeKey, UpgradeInfo>,
+}
+
+impl UpgradeSchedule {
+    pub fn new() -> Self {
+        Self {
+            schedule: BTreeMap::new(),
+        }
+    }
+
+    pub fn add(&mut self, upgrade_info: UpgradeInfo) -> anyhow::Result<()> {
+        match self
+            .schedule
+            .entry(UpgradeKey(upgrade_info.chain_id, upgrade_info.block_height))
+        {
+            Vacant(entry) => {
+                entry.insert(upgrade_info);
+                Ok(())
+            }
+            Occupied(_) => {
+                bail!("Upgrade schedule already exists");
+            }
+        }
+    }
+
+    pub fn get(&self, chain_id: ChainID, block_height: u64) -> Option<&UpgradeInfo> {
+        let key = UpgradeKey(chain_id, block_height);
+        self.schedule.get(&key)
+    }
+}
+
 /// a function type for migration
 // TODO: Add missing parameters
 pub type MigrationFunc<DB> = fn(state: &mut FvmExecState<DB>) -> anyhow::Result<()>;
 
-/// Upgrade represents a single upgrade to be executed at a given height
+/// Upgrade implements a migration function to be executed on the fendermint app state which
+/// will then upgrade the fendermint version to new_app_version after successful execution
 #[derive(Clone)]
 pub struct Upgrade<DB>
 where
     DB: Blockstore + 'static + Clone,
 {
-    /// the chain name on which the upgrade should be executed
-    chain_name: String,
-    /// the chain id is calculated from the chain_name
-    chain_id: ChainID,
-    /// the block height at which the upgrade should be executed
-    block_height: BlockHeight,
-    /// the application version after the upgrade (or None if not affected)
-    new_app_version: Option<u64>,
+    /// the fendermint app version version this Upgrade will migrate to
+    new_app_version: u64,
     /// the migration function to be executed
     migration: MigrationFunc<DB>,
 }
@@ -57,53 +128,31 @@ impl<DB> Upgrade<DB>
 where
     DB: Blockstore + 'static + Clone,
 {
-    pub fn new(
-        chain_name: impl ToString,
-        block_height: BlockHeight,
-        new_app_version: Option<u64>,
-        migration: MigrationFunc<DB>,
-    ) -> anyhow::Result<Self> {
-        let mut upgrade = Self {
-            chain_name: chain_name.to_string(),
-            chain_id: 0.into(),
-            block_height,
+    pub fn new(new_app_version: u64, migration: MigrationFunc<DB>) -> Self {
+        Self {
             new_app_version,
             migration,
-        };
-
-        upgrade.chain_id = chainid::from_str_hashed(&upgrade.chain_name)?;
-
-        Ok(upgrade)
+        }
     }
 
-    pub fn execute(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<Option<u64>> {
+    pub fn execute(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<u64> {
         (self.migration)(state)?;
 
         Ok(self.new_app_version)
     }
 }
 
-/// UpgradeScheduler represents a list of upgrades to be executed at given heights
-/// During each block height we check if there is an upgrade scheduled at that
-/// height, and if so the migration for that upgrade is performed.
+// Upgrades is a collection of all the available upgrades
 #[derive(Clone)]
-pub struct UpgradeScheduler<DB>
+pub struct Upgrades<DB>
 where
     DB: Blockstore + 'static + Clone,
 {
-    upgrades: BTreeMap<UpgradeKey, Upgrade<DB>>,
+    /// a map of all the available hardcoded upgrades
+    upgrades: BTreeMap<u64, Upgrade<DB>>,
 }
 
-impl<DB> Default for UpgradeScheduler<DB>
-where
-    DB: Blockstore + 'static + Clone,
-{
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<DB> UpgradeScheduler<DB>
+impl<DB> Upgrades<DB>
 where
     DB: Blockstore + 'static + Clone,
 {
@@ -114,16 +163,12 @@ where
     }
 }
 
-impl<DB> UpgradeScheduler<DB>
+impl<DB> Upgrades<DB>
 where
     DB: Blockstore + 'static + Clone,
 {
-    // add a new upgrade to the schedule
     pub fn add(&mut self, upgrade: Upgrade<DB>) -> anyhow::Result<()> {
-        match self
-            .upgrades
-            .entry(UpgradeKey(upgrade.chain_id, upgrade.block_height))
-        {
+        match self.upgrades.entry(upgrade.new_app_version) {
             Vacant(entry) => {
                 entry.insert(upgrade);
                 Ok(())
@@ -134,9 +179,8 @@ where
         }
     }
 
-    // check if there is an upgrade scheduled for the given chain_id at a given height
-    pub fn get(&self, chain_id: ChainID, height: BlockHeight) -> Option<&Upgrade<DB>> {
-        self.upgrades.get(&UpgradeKey(chain_id, height))
+    pub fn get(&self, new_app_version: u64) -> Option<&Upgrade<DB>> {
+        self.upgrades.get(&new_app_version)
     }
 }
 
@@ -144,23 +188,14 @@ where
 fn test_validate_upgrade_schedule() {
     use crate::fvm::store::memory::MemoryBlockstore;
 
-    let mut upgrade_scheduler: UpgradeScheduler<MemoryBlockstore> = UpgradeScheduler::new();
-
-    let upgrade = Upgrade::new("mychain", 10, None, |_state| Ok(())).unwrap();
-    upgrade_scheduler.add(upgrade).unwrap();
-
-    let upgrade = Upgrade::new("mychain", 20, None, |_state| Ok(())).unwrap();
-    upgrade_scheduler.add(upgrade).unwrap();
+    let mut upgrades: Upgrades<MemoryBlockstore> = Upgrades::new();
+    upgrades.add(Upgrade::new(1, |_state| Ok(()))).unwrap();
+    upgrades.add(Upgrade::new(2, |_state| Ok(()))).unwrap();
 
     // adding an upgrade with the same chain_id and height should fail
-    let upgrade = Upgrade::new("mychain", 20, None, |_state| Ok(())).unwrap();
-    let res = upgrade_scheduler.add(upgrade);
+    let res = upgrades.add(Upgrade::new(2, |_state| Ok(())));
     assert!(res.is_err());
 
-    let mychain_id = chainid::from_str_hashed("mychain").unwrap();
-    let otherhain_id = chainid::from_str_hashed("otherchain").unwrap();
-
-    assert!(upgrade_scheduler.get(mychain_id, 9).is_none());
-    assert!(upgrade_scheduler.get(mychain_id, 10).is_some());
-    assert!(upgrade_scheduler.get(otherhain_id, 10).is_none());
+    assert!(upgrades.get(0).is_none());
+    assert!(upgrades.get(1).is_some());
 }

@@ -29,8 +29,8 @@ pub use query::FvmQueryRet;
 use tendermint_rpc::Client;
 
 pub use self::broadcast::Broadcaster;
-use self::{state::ipc::GatewayCaller, upgrades::UpgradeScheduler};
-
+use self::state::ipc::GatewayCaller;
+use self::upgrades::{UpgradeSchedule, Upgrades};
 pub type FvmMessage = fvm_shared::message::Message;
 
 #[derive(Clone)]
@@ -77,8 +77,10 @@ where
     /// when they are added to the mempool, or just the most basic ones are performed.
     exec_in_check: bool,
     gateway: GatewayCaller<DB>,
+    /// Upgrade infos to be executed at given heights.
+    upgrade_schedule: UpgradeSchedule,
     /// Upgrade scheduler stores all the upgrades to be executed at given heights.
-    upgrade_scheduler: UpgradeScheduler<DB>,
+    upgrades: Upgrades<DB>,
 }
 
 impl<DB, C> FvmMessageInterpreter<DB, C>
@@ -92,7 +94,8 @@ where
         gas_overestimation_rate: f64,
         gas_search_step: f64,
         exec_in_check: bool,
-        upgrade_scheduler: UpgradeScheduler<DB>,
+        upgrade_schedule: UpgradeSchedule,
+        upgrades: Upgrades<DB>,
     ) -> Self {
         Self {
             client,
@@ -102,7 +105,8 @@ where
             gas_search_step,
             exec_in_check,
             gateway: GatewayCaller::default(),
-            upgrade_scheduler,
+            upgrade_schedule,
+            upgrades,
         }
     }
 }

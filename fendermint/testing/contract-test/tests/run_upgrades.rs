@@ -25,7 +25,7 @@ use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Account, Actor, ActorMeta, Genesis, PermissionMode, SignerAddr};
 use fendermint_vm_interpreter::fvm::store::memory::MemoryBlockstore;
-use fendermint_vm_interpreter::fvm::upgrades::{Upgrade, UpgradeScheduler};
+use fendermint_vm_interpreter::fvm::upgrades::{Upgrade, UpgradeInfo, UpgradeSchedule, Upgrades};
 use fendermint_vm_interpreter::fvm::{bundle::contracts_path, FvmMessageInterpreter};
 
 // returns a seeded secret key which is guaranteed to be the same every time
@@ -60,138 +60,139 @@ async fn test_applying_upgrades() {
     const SEND_BALANCE_AMOUNT: u64 = 1000;
     const CHAIN_NAME: &str = "mychain";
 
-    let mut upgrade_scheduler = UpgradeScheduler::new();
-    upgrade_scheduler
-        .add(
-            Upgrade::new(CHAIN_NAME, 1, Some(1), |state| {
-                println!(
-                    "[Upgrade at height {}] Deploy simple contract",
-                    state.block_height()
-                );
+    let mut upgrade_schedule = UpgradeSchedule::new();
+    upgrade_schedule
+        .add(UpgradeInfo::new(CHAIN_NAME, 1, "0.37", 11, true).unwrap())
+        .unwrap();
+    upgrade_schedule
+        .add(UpgradeInfo::new(CHAIN_NAME, 2, "0.37", 12, true).unwrap())
+        .unwrap();
+    upgrade_schedule
+        .add(UpgradeInfo::new(CHAIN_NAME, 3, "0.37", 13, true).unwrap())
+        .unwrap();
 
-                // create a message for deploying the contract
-                let mut mf = MessageFactory::new(*ADDR, 1);
-                let message = mf
-                    .fevm_create(
-                        Bytes::from(
-                            hex::decode(CONTRACT_HEX)
-                                .context("error parsing contract")
-                                .unwrap(),
-                        ),
-                        Bytes::default(),
-                        TokenAmount::default(),
-                        GAS_PARAMS.clone(),
-                    )
-                    .unwrap();
+    let mut upgrades = Upgrades::new();
+    upgrades
+        .add(Upgrade::new(11, |state| {
+            println!(
+                "[Upgrade at height {}] Deploy simple contract",
+                state.block_height()
+            );
 
-                // execute the message
-                let (res, _) = state.execute_implicit(message).unwrap();
-                assert!(
-                    res.msg_receipt.exit_code.is_success(),
-                    "{:?}",
-                    res.failure_info
-                );
-
-                // parse the message receipt data and make sure the contract was deployed to the expected address
-                let res = fvm_ipld_encoding::from_slice::<eam::CreateReturn>(
-                    &res.msg_receipt.return_data,
+            // create a message for deploying the contract
+            let mut mf = MessageFactory::new(*ADDR, 1);
+            let message = mf
+                .fevm_create(
+                    Bytes::from(
+                        hex::decode(CONTRACT_HEX)
+                            .context("error parsing contract")
+                            .unwrap(),
+                    ),
+                    Bytes::default(),
+                    TokenAmount::default(),
+                    GAS_PARAMS.clone(),
                 )
                 .unwrap();
-                assert_eq!(
-                    res.delegated_address(),
-                    Address::from_str(CONTRACT_ADDRESS).unwrap()
-                );
 
-                Ok(())
-            })
-            .unwrap(),
-        )
+            // execute the message
+            let (res, _) = state.execute_implicit(message).unwrap();
+            assert!(
+                res.msg_receipt.exit_code.is_success(),
+                "{:?}",
+                res.failure_info
+            );
+
+            // parse the message receipt data and make sure the contract was deployed to the expected address
+            let res =
+                fvm_ipld_encoding::from_slice::<eam::CreateReturn>(&res.msg_receipt.return_data)
+                    .unwrap();
+            assert_eq!(
+                res.delegated_address(),
+                Address::from_str(CONTRACT_ADDRESS).unwrap()
+            );
+
+            Ok(())
+        }))
         .unwrap();
 
-    upgrade_scheduler
-        .add(
-            Upgrade::new(CHAIN_NAME, 2, None, |state| {
-                println!(
-                    "[Upgrade at height {}] Sends a balance",
-                    state.block_height()
-                );
+    upgrades
+        .add(Upgrade::new(12, |state| {
+            println!(
+                "[Upgrade at height {}] Sends a balance",
+                state.block_height()
+            );
 
-                // build the calldata for the send_coin function
-                let (client, _mock) = ethers::providers::Provider::mocked();
-                let simple_coin = SimpleCoin::new(EthAddress::from_id(101), client.into());
-                let call = simple_coin.send_coin(
-                    // the address we are sending the balance to (which is us in this case)
-                    EthAddress::from(my_secret_key().public_key()).into(),
-                    // the amount we are sending
-                    U256::from(SEND_BALANCE_AMOUNT),
-                );
+            // build the calldata for the send_coin function
+            let (client, _mock) = ethers::providers::Provider::mocked();
+            let simple_coin = SimpleCoin::new(EthAddress::from_id(101), client.into());
+            let call = simple_coin.send_coin(
+                // the address we are sending the balance to (which is us in this case)
+                EthAddress::from(my_secret_key().public_key()).into(),
+                // the amount we are sending
+                U256::from(SEND_BALANCE_AMOUNT),
+            );
 
-                // create a message for sending the balance
-                let mut mf = MessageFactory::new(*ADDR, 1);
-                let message = mf
-                    .fevm_invoke(
-                        Address::from_str(CONTRACT_ADDRESS).unwrap(),
-                        call.calldata().unwrap().0,
-                        TokenAmount::default(),
-                        GAS_PARAMS.clone(),
-                    )
-                    .unwrap();
+            // create a message for sending the balance
+            let mut mf = MessageFactory::new(*ADDR, 1);
+            let message = mf
+                .fevm_invoke(
+                    Address::from_str(CONTRACT_ADDRESS).unwrap(),
+                    call.calldata().unwrap().0,
+                    TokenAmount::default(),
+                    GAS_PARAMS.clone(),
+                )
+                .unwrap();
 
-                // execute the message
-                let (res, _) = state.execute_implicit(message).unwrap();
-                assert!(
-                    res.msg_receipt.exit_code.is_success(),
-                    "{:?}",
-                    res.failure_info
-                );
+            // execute the message
+            let (res, _) = state.execute_implicit(message).unwrap();
+            assert!(
+                res.msg_receipt.exit_code.is_success(),
+                "{:?}",
+                res.failure_info
+            );
 
-                Ok(())
-            })
-            .unwrap(),
-        )
+            Ok(())
+        }))
         .unwrap();
 
-    upgrade_scheduler
-        .add(
-            Upgrade::new(CHAIN_NAME, 3, None, |state| {
-                println!(
-                    "[Upgrade at height {}] Returns a balance",
-                    state.block_height()
-                );
+    upgrades
+        .add(Upgrade::new(13, |state| {
+            println!(
+                "[Upgrade at height {}] Returns a balance",
+                state.block_height()
+            );
 
-                // build the calldata for the get_balance function
-                let (client, _mock) = ethers::providers::Provider::mocked();
-                let simple_coin = SimpleCoin::new(EthAddress::from_id(0), client.into());
-                let call =
-                    simple_coin.get_balance(EthAddress::from(my_secret_key().public_key()).into());
+            // build the calldata for the get_balance function
+            let (client, _mock) = ethers::providers::Provider::mocked();
+            let simple_coin = SimpleCoin::new(EthAddress::from_id(0), client.into());
+            let call =
+                simple_coin.get_balance(EthAddress::from(my_secret_key().public_key()).into());
 
-                let mut mf = MessageFactory::new(*ADDR, 1);
-                let message = mf
-                    .fevm_invoke(
-                        Address::from_str(CONTRACT_ADDRESS).unwrap(),
-                        call.calldata().unwrap().0,
-                        TokenAmount::default(),
-                        GAS_PARAMS.clone(),
-                    )
-                    .unwrap();
+            let mut mf = MessageFactory::new(*ADDR, 1);
+            let message = mf
+                .fevm_invoke(
+                    Address::from_str(CONTRACT_ADDRESS).unwrap(),
+                    call.calldata().unwrap().0,
+                    TokenAmount::default(),
+                    GAS_PARAMS.clone(),
+                )
+                .unwrap();
 
-                // execute the message
-                let (res, _) = state.execute_implicit(message).unwrap();
-                assert!(
-                    res.msg_receipt.exit_code.is_success(),
-                    "{:?}",
-                    res.failure_info
-                );
+            // execute the message
+            let (res, _) = state.execute_implicit(message).unwrap();
+            assert!(
+                res.msg_receipt.exit_code.is_success(),
+                "{:?}",
+                res.failure_info
+            );
 
-                // parse the message receipt data and make sure the balance we sent in previous upgrade is returned
-                let bytes = decode_fevm_return_data(res.msg_receipt.return_data).unwrap();
-                let balance = U256::from_big_endian(&bytes);
-                assert_eq!(balance, U256::from(SEND_BALANCE_AMOUNT));
+            // parse the message receipt data and make sure the balance we sent in previous upgrade is returned
+            let bytes = decode_fevm_return_data(res.msg_receipt.return_data).unwrap();
+            let balance = U256::from_big_endian(&bytes);
+            assert_eq!(balance, U256::from(SEND_BALANCE_AMOUNT));
 
-                Ok(())
-            })
-            .unwrap(),
-        )
+            Ok(())
+        }))
         .unwrap();
 
     let interpreter: FvmMessageInterpreter<MemoryBlockstore, _> = FvmMessageInterpreter::new(
@@ -201,7 +202,8 @@ async fn test_applying_upgrades() {
         1.05,
         1.05,
         false,
-        upgrade_scheduler,
+        upgrade_schedule,
+        upgrades,
     );
 
     let mut tester = Tester::new(interpreter, MemoryBlockstore::new());
@@ -235,7 +237,7 @@ async fn test_applying_upgrades() {
         tester.commit().await.unwrap();
 
         // check that the app_version was upgraded to 1
-        assert_eq!(tester.state_params().app_version, 1);
+        assert_eq!(tester.state_params().app_version, block_height as u64 + 10);
     }
 }
 

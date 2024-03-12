@@ -5,6 +5,7 @@ use anyhow::{anyhow, Context, Result};
 use byteorder::{BigEndian, WriteBytesExt};
 use cid::Cid;
 use fendermint_vm_core::Timestamp;
+use fendermint_vm_interpreter::fvm::upgrades::{UpgradeSchedule, Upgrades};
 use fendermint_vm_interpreter::fvm::PowerUpdates;
 use fvm_shared::{bigint::Zero, clock::ChainEpoch, econ::TokenAmount, version::NetworkVersion};
 use std::{future::Future, sync::Arc};
@@ -15,7 +16,6 @@ use fendermint_vm_interpreter::{
         bundle::{bundle_path, contracts_path, custom_actors_bundle_path},
         state::{FvmExecState, FvmGenesisState, FvmStateParams, FvmUpdatableParams},
         store::memory::MemoryBlockstore,
-        upgrades::UpgradeScheduler,
         FvmApplyRet, FvmGenesisOutput, FvmMessage, FvmMessageInterpreter,
     },
     ExecInterpreter, GenesisInterpreter,
@@ -56,7 +56,8 @@ pub async fn init_exec_state(
         1.05,
         1.05,
         false,
-        UpgradeScheduler::new(),
+        UpgradeSchedule::new(),
+        Upgrades::new(),
     );
 
     let (state, out) = interpreter
