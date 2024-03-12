@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "openzeppelin-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import { Script, console2 as console } from "forge-std/Script.sol";
 import "../src/IpcTokenHandler.sol";
 import "../src/IpcTokenSender.sol";
@@ -15,10 +16,15 @@ contract Deploy is Script {
         console.log("deploying token handler to %s...", network);
 
         vm.startBroadcast(privateKey);
-        IpcTokenHandler handler = new IpcTokenHandler({
+
+        IpcTokenHandler initialImplementation = new IpcTokenHandler();
+        TransparentUpgradeableProxy transparentProxy = new TransparentUpgradeableProxy(address(initialImplementation), address(this), "");
+        IpcTokenHandler handler = IpcTokenHandler(address(transparentProxy));
+        handler.initialize({
             axelarIts: vm.envAddress(string.concat(network, "__AXELAR_ITS_ADDRESS")),
             ipcGateway: vm.envAddress(string.concat(network, "__IPC_GATEWAY_ADDRESS"))
         });
+
         vm.stopBroadcast();
 
         console.log("token handler deployed on %s: %s", network, address(handler));
