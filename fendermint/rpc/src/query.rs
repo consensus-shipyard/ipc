@@ -3,6 +3,7 @@
 
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
+use fendermint_vm_message::ipc::UpgradeInfo;
 use fvm_ipld_encoding::serde::Serialize;
 use fvm_shared::message::Message;
 use prost::Message as ProstMessage;
@@ -111,6 +112,19 @@ pub trait QueryClient: Sync {
             })?;
             BuiltinActors { registry }
         };
+        Ok(QueryResponse { height, value })
+    }
+
+    async fn upgrade_schedule(
+        &self,
+        height: FvmQueryHeight,
+    ) -> anyhow::Result<QueryResponse<Vec<UpgradeInfo>>> {
+        let res = self.perform(FvmQuery::UpgradeSchedule, height).await?;
+        let height = res.height;
+        let value = extract(res, |res| {
+            fvm_ipld_encoding::from_slice(&res.value)
+                .context("failed to decode StateParams from query")
+        })?;
         Ok(QueryResponse { height, value })
     }
 

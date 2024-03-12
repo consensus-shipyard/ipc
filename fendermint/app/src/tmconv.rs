@@ -262,6 +262,7 @@ pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> anyhow::Result<r
         FvmQueryRet::Call(_) | FvmQueryRet::EstimateGas(_) => ExitCode::OK,
         FvmQueryRet::StateParams(_) => ExitCode::OK,
         FvmQueryRet::BuiltinActors(_) => ExitCode::OK,
+        FvmQueryRet::UpgradeSchedule(_) => ExitCode::OK,
     };
 
     // The return value has a `key` field which is supposed to be set to the data matched.
@@ -300,6 +301,10 @@ pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> anyhow::Result<r
         }
         FvmQueryRet::BuiltinActors(ba) => {
             let v = ipld_encode!(ba);
+            (Vec::new(), v)
+        }
+        FvmQueryRet::UpgradeSchedule(us) => {
+            let v = ipld_encode!(us);
             (Vec::new(), v)
         }
     };

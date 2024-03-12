@@ -76,6 +76,8 @@ pub enum FvmQuery {
     StateParams,
     /// Query the built-in actors known by the System actor.
     BuiltinActors,
+    /// Query the current upgrade schedule
+    UpgradeSchedule,
 }
 
 /// State of all actor implementations.

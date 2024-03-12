@@ -212,8 +212,7 @@ where
             PowerUpdates::default()
         };
 
-        let block_height: u64 = state.block_height().try_into().unwrap();
-        if let Some(upgrade_info) = self.upgrade_schedule.get(block_height) {
+        if let Some(upgrade_info) = self.upgrade_schedule.get(state.block_height()) {
             match self.upgrades.get(upgrade_info.new_app_version) {
                 Some(upgrade) => {
                     let new_app_version = upgrade.execute(&mut state).context("upgrade failed")?;

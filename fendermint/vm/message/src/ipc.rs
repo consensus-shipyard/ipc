@@ -103,6 +103,37 @@ pub struct ParentFinality {
     pub block_hash: Vec<u8>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpgradeInfo {
+    /// the block height at which the upgrade should be executed
+    pub height: ChainEpoch,
+    /// the fendermint app version version this Upgrade will migrate to
+    pub new_app_version: u64,
+    /// the required cometbft version for the upgrade
+    pub cometbft_version: String,
+    /// whether the upgrade is backwards compatible or not. In case a
+    /// non-backwards compatible upgrade is scheduled where we don't have
+    /// the corresponding Upgrade defined to migrate to that version, then
+    /// fendermint will freeze and not process any more blocks.
+    pub backwards_compatible: bool,
+}
+
+impl UpgradeInfo {
+    pub fn new(
+        height: ChainEpoch,
+        cometbft_version: impl ToString,
+        new_app_version: u64,
+        backwards_compatible: bool,
+    ) -> Self {
+        Self {
+            height,
+            cometbft_version: cometbft_version.to_string(),
+            new_app_version,
+            backwards_compatible,
+        }
+    }
+}
+
 #[cfg(feature = "arb")]
 mod arb {
 

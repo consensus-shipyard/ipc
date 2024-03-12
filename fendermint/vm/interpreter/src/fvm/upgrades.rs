@@ -4,46 +4,18 @@
 use std::{collections::BTreeMap, path::Path};
 
 use anyhow::{bail, Context};
+use fendermint_vm_message::ipc::UpgradeInfo;
 use fvm_ipld_blockstore::Blockstore;
 use serde::{Deserialize, Serialize};
 use std::collections::btree_map::Entry::{Occupied, Vacant};
 
-use super::state::{snapshot::BlockHeight, FvmExecState};
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct UpgradeInfo {
-    /// the block height at which the upgrade should be executed
-    pub block_height: BlockHeight,
-    /// the fendermint app version version this Upgrade will migrate to
-    pub new_app_version: u64,
-    /// the required cometbft version for the upgrade
-    pub cometbft_version: String,
-    /// whether the upgrade is backwards compatible or not. In case a
-    /// non-backwards compatible upgrade is scheduled where we don't have
-    /// the corresponding Upgrade defined to migrate to that version, then
-    /// fendermint will freeze and not process any more blocks.
-    pub backwards_compatible: bool,
-}
-
-impl UpgradeInfo {
-    pub fn new(
-        block_height: BlockHeight,
-        cometbft_version: impl ToString,
-        new_app_version: u64,
-        backwards_compatible: bool,
-    ) -> Self {
-        Self {
-            block_height,
-            cometbft_version: cometbft_version.to_string(),
-            new_app_version,
-            backwards_compatible,
-        }
-    }
-}
+use super::state::FvmExecState;
+use fvm_shared::clock::ChainEpoch;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UpgradeSchedule {
     // schedule of upgrades to be executed at given height
-    schedule: BTreeMap<u64, UpgradeInfo>,
+    schedule: BTreeMap<ChainEpoch, UpgradeInfo>,
 }
 
 impl UpgradeSchedule {
@@ -67,20 +39,15 @@ impl UpgradeSchedule {
     }
 
     pub fn to_file(&self, path: impl AsRef<Path>) -> anyhow::Result<()> {
-        let values = self
-            .schedule
-            .values()
-            .cloned()
-            .collect::<Vec<UpgradeInfo>>();
-        let json =
-            serde_json::to_string_pretty(&values).context("failed to serialize upgrade_info")?;
+        let json = serde_json::to_string_pretty(&self.get_all())
+            .context("failed to serialize upgrade_info")?;
         std::fs::write(path, &json)?;
 
         Ok(())
     }
 
     pub fn add(&mut self, upgrade_info: UpgradeInfo) -> anyhow::Result<()> {
-        match self.schedule.entry(upgrade_info.block_height) {
+        match self.schedule.entry(upgrade_info.height) {
             Vacant(entry) => {
                 entry.insert(upgrade_info);
                 Ok(())
@@ -91,12 +58,15 @@ impl UpgradeSchedule {
         }
     }
 
-    pub fn get(&self, block_height: u64) -> Option<&UpgradeInfo> {
-        self.schedule.get(&block_height)
+    pub fn get(&self, height: ChainEpoch) -> Option<&UpgradeInfo> {
+        self.schedule.get(&height)
     }
 
-    pub fn schedule(&self) -> &BTreeMap<u64, UpgradeInfo> {
-        &self.schedule
+    pub fn get_all(&self) -> Vec<UpgradeInfo> {
+        self.schedule
+            .values()
+            .cloned()
+            .collect::<Vec<UpgradeInfo>>()
     }
 }
 

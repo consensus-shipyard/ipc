@@ -92,6 +92,8 @@ pub enum RpcQueryCommands {
     },
     /// Get the slowly changing state parameters.
     StateParams,
+    /// Query the current upgrade schedule
+    UpgradeSchedule,
 }
 
 #[derive(Subcommand, Debug, Clone)]

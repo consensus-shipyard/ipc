@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 use async_trait::async_trait;
 use cid::Cid;
-use fendermint_vm_message::query::{ActorState, FvmQuery, GasEstimate, StateParams};
+use fendermint_vm_message::{
+    ipc::UpgradeInfo,
+    query::{ActorState, FvmQuery, GasEstimate, StateParams},
+};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::{
@@ -31,6 +34,8 @@ pub enum FvmQueryRet {
     StateParams(StateParams),
     /// Builtin actors known by the system.
     BuiltinActors(Vec<(String, Cid)>),
+    /// The current upgrade schedule.
+    UpgradeSchedule(Vec<UpgradeInfo>),
 }
 
 #[async_trait]
@@ -154,6 +159,10 @@ where
             FvmQuery::BuiltinActors => {
                 let (state, ret) = state.builtin_actors().await?;
                 Ok((state, FvmQueryRet::BuiltinActors(ret)))
+            }
+            FvmQuery::UpgradeSchedule => {
+                let ret = self.upgrade_schedule.get_all();
+                Ok((state, FvmQueryRet::UpgradeSchedule(ret)))
             }
         }
     }

@@ -103,6 +103,11 @@ async fn query(
             let json = json!({ "response": res });
             print_json(&json)?;
         }
+        RpcQueryCommands::UpgradeSchedule => {
+            let res = client.upgrade_schedule(height).await?;
+            let json = json!({ "response": res });
+            print_json(&json)?;
+        }
     };
     Ok(())
 }
