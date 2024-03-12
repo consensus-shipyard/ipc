@@ -23,7 +23,7 @@ jobs:
           host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
           username: ubuntu
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
-          source: "scripts/depoy_linked_token_to_subnet.sh"
+          source: "scripts/deploy_linked_token_to_subnet.sh"
           target: "/home/ubuntu"
       - name: Run deploy scripts on the host
         uses: appleboy/ssh-action@v1.0.3
@@ -31,5 +31,5 @@ jobs:
           host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
           username: ubuntu
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
-          script: bash -il /home/ubuntu/deploy-linked-token-to-dedicated-host.sh ${{ github.head_ref }}
+          script: bash -il /home/ubuntu/deploy_linked_token_to_subnet.sh ${{ github.head_ref }}
           command_timeout: 30m
