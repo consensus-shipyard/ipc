@@ -52,4 +52,5 @@ contract TestHandler is Test {
 
     // TODO test_handler_err_deposit (e.g. sending to a non-ERC20 subnet)
 
+    // TODO test_upgrade (test that contract upgrades work)
 }

@@ -17,4 +17,5 @@ contract TestSender is Test {
 
     // TODO test_sender_fails_axelar (the Axelar gateway reverts)
 
+    // TODO test_upgrade (test that contract upgrades work)
 }
