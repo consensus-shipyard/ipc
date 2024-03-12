@@ -58,11 +58,16 @@ contract Deploy is Script {
 
         // Deploy the sender on Mumbai.
         vm.startBroadcast(privateKey);
-        IpcTokenSender sender = new IpcTokenSender({
+
+        IpcTokenSender initialImplementation = new IpcTokenSender();
+        TransparentUpgradeableProxy transparentProxy = new TransparentUpgradeableProxy(address(initialImplementation), address(this), "");
+        IpcTokenSender sender = IpcTokenSender(address(transparentProxy));
+        sender.initialize({
             axelarIts: vm.envAddress(string.concat(originNetwork, "__AXELAR_ITS_ADDRESS")),
             destinationChain: vm.envString(string.concat(destNetwork, "__AXELAR_CHAIN_NAME")),
             destinationTokenHandler: handlerAddr
         });
+
         vm.stopBroadcast();
 
         console.log("token sender deployed on %s: %s", originNetwork, address(sender));

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import { IInterchainTokenService } from "@axelar-network/interchain-token-service/interfaces/IInterchainTokenService.sol";
 import { AddressBytes } from "@axelar-network/axelar-gmp-sdk-solidity/contracts/libs/AddressBytes.sol";
 import { IERC20 } from "openzeppelin-contracts/interfaces/IERC20.sol";
@@ -10,12 +11,12 @@ import { SubnetID } from "@ipc/src/structs/Subnet.sol";
 //         token (e.g. Ethereum, Polygon, etc.) we want to transfer to an token-supply IPC subnet anchored on another
 //         Axelar-supported L1 (e.g. Filecoin). The duo of IpcTokenSender and IpcTokenkHandler achieve this in a single
 //         atomic step.
-contract IpcTokenSender {
-    IInterchainTokenService public immutable _axelarIts;
+contract IpcTokenSender is Initializable{
+    IInterchainTokenService public _axelarIts;
     string public _destinationChain;
     bytes public _destinationTokenHandler;
 
-    constructor(address axelarIts, string memory destinationChain, address destinationTokenHandler) {
+    function initialize( address axelarIts, string memory destinationChain, address destinationTokenHandler) public initializer {
         _axelarIts = IInterchainTokenService(axelarIts);
         _destinationChain = destinationChain;
         _destinationTokenHandler = AddressBytes.toBytes(destinationTokenHandler);
