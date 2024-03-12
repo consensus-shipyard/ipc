@@ -88,6 +88,8 @@ where
         .await
         .context("failed to validate manifest")?;
 
+    // NOTE: Add `with_policy(DropPolicy::PERSISTENT)` if you want containers to stick around for inspection,
+    // but logs and env vars should be available on disk even if the testnet is torn down at the end.
     let mut materializer = DockerMaterializer::new(&test_data_dir(), 0)?;
 
     // make sure we start with clean slate by removing any previous files
