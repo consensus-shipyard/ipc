@@ -16,7 +16,7 @@ jobs:
       - name: Checkout code repo
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ github.head_ref }}
       - name: Copy deployment script files to the host
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -31,5 +31,5 @@ jobs:
           host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
           username: ubuntu
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
-          script: bash -il /home/ubuntu/deploy-linked-token-to-dedicated-host.yaml ${{ github.ref_name }}
+          script: bash -il /home/ubuntu/deploy-linked-token-to-dedicated-host.yaml ${{ github.head_ref }}
           command_timeout: 30m
