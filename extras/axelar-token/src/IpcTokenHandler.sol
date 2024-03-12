@@ -1,15 +1,19 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.21;
 
-import { InterchainTokenExecutable } from '@axelar-network/interchain-token-service/executable/InterchainTokenExecutable.sol';
-import { IERC20 } from "openzeppelin-contracts/interfaces/IERC20.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import { SubnetID, SupplySource, SupplyKind } from "@ipc/src/structs/Subnet.sol";
 import { FvmAddress } from "@ipc/src/structs/FvmAddress.sol";
 import { IpcHandler } from "@ipc/sdk/IpcContract.sol";
 import { IpcMsgKind, ResultMsg, OutcomeType, IpcEnvelope } from "@ipc/src/structs/CrossNet.sol";
 import { FvmAddressHelper } from "@ipc/src/lib/FvmAddressHelper.sol";
 import { SubnetIDHelper } from "@ipc/src/lib/SubnetIDHelper.sol";
-import { SafeERC20 } from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
+
+import { InterchainTokenExecutable } from './InterchainTokenExecutable.sol';
+
+
 
 interface TokenFundedGateway {
     function fundWithToken(SubnetID calldata subnetId, FvmAddress calldata to, uint256 amount) external;
@@ -23,24 +27,26 @@ interface SubnetActor {
 //         IpcTokenSender via the Axelar ITS, receiving some token value to deposit into an IPC subnet (specified in the
 //         incoming message). The IpcTokenHandler handles deposit failures by crediting the value back to the original
 //         beneficiary, and making it available from them to withdraw() on the rootnet.
-contract IpcTokenHandler is InterchainTokenExecutable, IpcHandler {
+contract IpcTokenHandler is Initializable, InterchainTokenExecutable, IpcHandler {
+
     using FvmAddressHelper for address;
     using FvmAddressHelper for FvmAddress;
     using SubnetIDHelper for SubnetID;
-    using SafeERC20 for IERC20;
-
+    using SafeERC20Upgradeable for IERC20Upgradeable;
+    using AddressUpgradeable for address;
     error NothingToWithdraw();
 
-    TokenFundedGateway public _ipcGateway;
+    TokenFundedGateway public _ipcGateway; 
     mapping(address beneficiary => mapping(address token => uint256 value)) private _claims;
 
     event SubnetFunded(SubnetID indexed subnet, address indexed recipient, uint256 value);
     event FundingFailed(SubnetID indexed subnet, address indexed recipient, uint256 value);
 
-    constructor(address axelarIts, address ipcGateway) InterchainTokenExecutable(axelarIts) {
+    function initialize(address axelarIts, address ipcGateway) public initializer {
+        __InterchainTokenExecutable_init(axelarIts);
         _ipcGateway = TokenFundedGateway(ipcGateway);
     }
-
+    
     // @notice The InterchainTokenExecutable abstract parent contract hands off to this function after verifying that
     //         the call originated at the Axelar ITS.
     function _executeWithInterchainToken(
@@ -54,7 +60,7 @@ contract IpcTokenHandler is InterchainTokenExecutable, IpcHandler {
     ) internal override {
         (SubnetID memory subnet, address recipient) = abi.decode(data, (SubnetID, address));
 
-        IERC20 token = IERC20(tokenAddr);
+        IERC20Upgradeable token = IERC20Upgradeable(tokenAddr);
         require(token.balanceOf(address(this)) >= amount, "insufficient balance");
 
         // Authorize the IPC gateway to spend these tokens on our behalf.
@@ -105,7 +111,7 @@ contract IpcTokenHandler is InterchainTokenExecutable, IpcHandler {
         }
 
         delete _claims[msg.sender][token];
-        IERC20(token).safeTransfer(msg.sender, available);
+        IERC20Upgradeable(token).safeTransfer(msg.sender, available);
     }
 
     // @notice Queries the claim of a beneficiary over a particular token.
