@@ -15,10 +15,11 @@ import {SubnetIDHelper} from "./lib/SubnetIDHelper.sol";
 import {LibStaking} from "./lib/LibStaking.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {SupplySourceHelper} from "./lib/SupplySourceHelper.sol";
+import {Ownable} from "./Ownable.sol";
 
 error FunctionNotFound(bytes4 _functionSelector);
 
-contract SubnetActorDiamond {
+contract SubnetActorDiamond is Ownable {
     SubnetActorStorage internal s;
 
     using SubnetIDHelper for SubnetID;

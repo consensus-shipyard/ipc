@@ -50,6 +50,19 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         super.setUp();
     }
 
+    function testGatewayDiamond_TransferOwnership() public {
+        address owner = gatewayDiamond.owner();
+
+        gatewayDiamond.transferOwnership(address(1));
+
+        address newOwner = gatewayDiamond.owner();
+        require(owner != newOwner, "ownership should be updated");
+        require(newOwner == address(1), "new owner not address 1");
+
+        vm.expectRevert(LibDiamond.NotOwner.selector);
+        gatewayDiamond.transferOwnership(address(1));
+    }
+
     function testGatewayDiamond_Constructor() public view {
         require(gatewayDiamond.getter().totalSubnets() == 0, "unexpected totalSubnets");
         require(gatewayDiamond.getter().bottomUpNonce() == 0, "unexpected bottomUpNonce");

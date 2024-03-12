@@ -13,6 +13,7 @@ import {LibGateway} from "./lib/LibGateway.sol";
 import {SubnetID} from "./structs/Subnet.sol";
 import {LibStaking} from "./lib/LibStaking.sol";
 import {BATCH_PERIOD, MAX_MSGS_PER_BATCH} from "./structs/CrossNet.sol";
+import {Ownable} from "./Ownable.sol";
 
 error FunctionNotFound(bytes4 _functionSelector);
 
@@ -20,7 +21,7 @@ bool constant FEATURE_MULTILEVEL_CROSSMSG = false;
 bool constant FEATURE_GENERAL_PUPRPOSE_CROSSMSG = true;
 uint8 constant FEATURE_SUBNET_DEPTH = 2;
 
-contract GatewayDiamond {
+contract GatewayDiamond is Ownable {
     GatewayActorStorage internal s;
 
     struct ConstructorParams {
