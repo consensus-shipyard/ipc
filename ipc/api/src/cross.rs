@@ -26,10 +26,9 @@ pub struct IpcEnvelope {
     /// Value included in the envelope
     pub value: TokenAmount,
     /// address sending the message
-    #[serde_as(as = "HumanReadable")]
     pub from: IPCAddress,
     /// abi.encoded message
-    #[serde_as(as = "serde_with::hex::Hex")]
+    #[serde_as(as = "HumanReadable")]
     pub message: Vec<u8>,
     /// outgoing nonce for the envelope.
     /// This nonce is set by the gateway when committing the message for propagation
