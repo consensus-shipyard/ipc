@@ -278,11 +278,7 @@ where
 }
 
 pub fn split_cmd(cmd: &str) -> Vec<String> {
-    cmd.split(' ')
-        .filter_map(|s| {
-            Some(s.trim())
-                .filter(|s| !s.is_empty())
-                .map(|s| s.to_string())
-        })
+    cmd.split_ascii_whitespace()
+        .map(|s| s.to_string())
         .collect()
 }
