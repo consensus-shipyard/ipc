@@ -31,5 +31,5 @@ jobs:
           host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
           username: ubuntu
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
-          script: bash -il /home/ubuntu/deploy-linked-token-to-dedicated-host.yaml ${{ github.head_ref }}
+          script: bash -il /home/ubuntu/deploy-linked-token-to-dedicated-host.sh ${{ github.head_ref }}
           command_timeout: 30m
