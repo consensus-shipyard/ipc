@@ -203,10 +203,10 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                     .checkpoint_bundle_at(event.height)
                     .await?
                 else {
-                    return Err(anyhow!(
+                    bail!(
                         "inconsistent contract state, quorum reached event found at height {} but not bundle",
                         event.height
-                    ));
+                    );
                 };
 
                 log::debug!(bundle = serde_json::to_string(&bundle)?, height = event.height, "bottom up event");
