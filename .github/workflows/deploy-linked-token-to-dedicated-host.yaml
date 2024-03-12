@@ -1,0 +1,35 @@
+name: Deploy LinkedToken contracts to dedicated host running IPC subnet
+
+on:
+  workflow_dispatch:
+  pull_request:
+
+concurrency:
+  # Only allow one run at a time for this workflow
+  group: deploy-to-dedicated-host
+  cancel-in-progress: true
+
+jobs:
+  deploy_to_dedicated_host:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code repo
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - name: Copy deployment script files to the host
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
+          username: ubuntu
+          key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
+          source: "scripts/depoy_linked_token_to_subnet.sh"
+          target: "/home/ubuntu"
+      - name: Run deploy scripts on the host
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
+          username: ubuntu
+          key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
+          script: bash -il /home/ubuntu/deploy-linked-token-to-dedicated-host.yaml ${{ github.ref_name }}
+          command_timeout: 30m
