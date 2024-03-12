@@ -110,6 +110,14 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         self.getter.call(state, |c| c.has_validator_set_changed())
     }
 
+    pub fn last_configuration_number(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<u64> {
+        self.getter.call(state, |c| c.last_configuration_number())
+    }
+
+    pub fn latest_configuration_number(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<u64> {
+        self.getter.call(state, |c| c.latest_configuration_number())
+    }
+
     pub fn last_bottom_up_checkpoint_height(
         &self,
         state: &mut FvmExecState<DB>,

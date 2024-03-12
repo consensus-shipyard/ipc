@@ -328,6 +328,14 @@ where
 
     let batch = gateway.bottom_up_msg_batch(state, height.into())?;
 
+    let last_configuration_number = gateway.last_configuration_number(state)?;
+    let latest_configuration_number = gateway.latest_configuration_number(state)?;
+    tracing::debug!(
+        last_configuration_number,
+        latest_configuration_number,
+        "configuration numbers"
+    );
+
     if batch.block_height.as_u64() != 0 {
         tracing::debug!(
             height = height.value(),
