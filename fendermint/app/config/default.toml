@@ -15,6 +15,9 @@ builtin_actors_bundle = "bundle.car"
 custom_actors_bundle = "custom_actors_bundle.car"
 # Where to reach CometBFT for queries or broadcasting transactions.
 tendermint_rpc_url = "http://127.0.0.1:26657"
+# The upgrade_info JSON file contains mapping from block height to upgrade info which is
+# used to determine when to run an upgrade migration while progressing through the chain.
+upgrade_info = "upgrade_info.json"
 
 # Secp256k1 private key used for signing transactions. Leave empty if not validating,
 # or if it's not needed to sign and broadcast transactions as a validator.

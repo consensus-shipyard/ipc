@@ -107,6 +107,20 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         ValidatorContext::new(sk, broadcaster)
     });
 
+    let upgrade_schedule = if settings.upgrade_info().exists() {
+        // load existing upgrade schedule
+        UpgradeSchedule::from_file(&settings.upgrade_info())?
+    } else {
+        // create an empty upgrade schedule
+        UpgradeSchedule::new().to_file(&settings.upgrade_info())?;
+        UpgradeSchedule::new()
+    };
+    tracing::info!(
+        path = settings.upgrade_info().to_string_lossy().into_owned(),
+        schedule = ?upgrade_schedule,
+        "loaded upgrade_schedule"
+    );
+
     let interpreter = FvmMessageInterpreter::<NamespaceBlockstore, _>::new(
         tendermint_client.clone(),
         validator_ctx,
@@ -114,7 +128,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         settings.fvm.gas_overestimation_rate,
         settings.fvm.gas_search_step,
         settings.fvm.exec_in_check,
-        UpgradeSchedule::new(),
+        upgrade_schedule,
         Upgrades::new(),
     );
     let interpreter = SignedMessageInterpreter::new(interpreter);

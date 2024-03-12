@@ -1,42 +1,16 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, path::Path};
 
-use anyhow::bail;
-use fendermint_vm_core::chainid;
+use anyhow::{bail, Context};
 use fvm_ipld_blockstore::Blockstore;
-use fvm_shared::chainid::ChainID;
+use serde::{Deserialize, Serialize};
 use std::collections::btree_map::Entry::{Occupied, Vacant};
 
 use super::state::{snapshot::BlockHeight, FvmExecState};
-
-#[derive(PartialEq, Eq, Clone)]
-struct UpgradeKey(ChainID, u64);
-
-impl PartialOrd for UpgradeKey {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for UpgradeKey {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        if self.0 == other.0 {
-            self.1.cmp(&other.1)
-        } else {
-            let chain_id: u64 = self.0.into();
-            chain_id.cmp(&other.0.into())
-        }
-    }
-}
-
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UpgradeInfo {
-    /// the chain name on which the upgrade should be executed
-    pub chain_name: String,
-    /// the chain id is calculated from the chain_name
-    pub chain_id: ChainID,
     /// the block height at which the upgrade should be executed
     pub block_height: BlockHeight,
     /// the fendermint app version version this Upgrade will migrate to
@@ -52,31 +26,24 @@ pub struct UpgradeInfo {
 
 impl UpgradeInfo {
     pub fn new(
-        chain_name: impl ToString,
         block_height: BlockHeight,
         cometbft_version: impl ToString,
         new_app_version: u64,
         backwards_compatible: bool,
-    ) -> anyhow::Result<Self> {
-        let mut upgrade_info = Self {
-            chain_name: chain_name.to_string(),
-            chain_id: 0.into(),
+    ) -> Self {
+        Self {
             block_height,
             cometbft_version: cometbft_version.to_string(),
             new_app_version,
             backwards_compatible,
-        };
-
-        upgrade_info.chain_id = chainid::from_str_hashed(&upgrade_info.chain_name)?;
-
-        Ok(upgrade_info)
+        }
     }
 }
 
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UpgradeSchedule {
-    // schedule of upgrades to be executed at given chain and height
-    schedule: BTreeMap<UpgradeKey, UpgradeInfo>,
+    // schedule of upgrades to be executed at given height
+    schedule: BTreeMap<u64, UpgradeInfo>,
 }
 
 impl UpgradeSchedule {
@@ -86,11 +53,34 @@ impl UpgradeSchedule {
         }
     }
 
-    pub fn add(&mut self, upgrade_info: UpgradeInfo) -> anyhow::Result<()> {
-        match self
+    pub fn from_file(path: impl AsRef<Path>) -> anyhow::Result<UpgradeSchedule> {
+        let json = std::fs::read_to_string(path).context("failed to read upgrade_info file")?;
+        let schedules = serde_json::from_str::<Vec<UpgradeInfo>>(&json)
+            .context("failed to parse upgrade_info")?;
+
+        let mut us = UpgradeSchedule::new();
+        for upgrade_info in schedules {
+            us.add(upgrade_info)?;
+        }
+
+        Ok(us)
+    }
+
+    pub fn to_file(&self, path: impl AsRef<Path>) -> anyhow::Result<()> {
+        let values = self
             .schedule
-            .entry(UpgradeKey(upgrade_info.chain_id, upgrade_info.block_height))
-        {
+            .values()
+            .cloned()
+            .collect::<Vec<UpgradeInfo>>();
+        let json =
+            serde_json::to_string_pretty(&values).context("failed to serialize upgrade_info")?;
+        std::fs::write(path, &json)?;
+
+        Ok(())
+    }
+
+    pub fn add(&mut self, upgrade_info: UpgradeInfo) -> anyhow::Result<()> {
+        match self.schedule.entry(upgrade_info.block_height) {
             Vacant(entry) => {
                 entry.insert(upgrade_info);
                 Ok(())
@@ -101,9 +91,12 @@ impl UpgradeSchedule {
         }
     }
 
-    pub fn get(&self, chain_id: ChainID, block_height: u64) -> Option<&UpgradeInfo> {
-        let key = UpgradeKey(chain_id, block_height);
-        self.schedule.get(&key)
+    pub fn get(&self, block_height: u64) -> Option<&UpgradeInfo> {
+        self.schedule.get(&block_height)
+    }
+
+    pub fn schedule(&self) -> &BTreeMap<u64, UpgradeInfo> {
+        &self.schedule
     }
 }
 

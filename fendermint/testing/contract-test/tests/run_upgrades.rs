@@ -58,17 +58,16 @@ async fn test_applying_upgrades() {
     const CONTRACT_ADDRESS: &str = "f410fnz5jdky3zzcj6pejqkomkggw72pcuvkpihz2rwa";
     // the amount we want to send to the contract
     const SEND_BALANCE_AMOUNT: u64 = 1000;
-    const CHAIN_NAME: &str = "mychain";
 
     let mut upgrade_schedule = UpgradeSchedule::new();
     upgrade_schedule
-        .add(UpgradeInfo::new(CHAIN_NAME, 1, "0.37", 11, true).unwrap())
+        .add(UpgradeInfo::new(1, "0.37", 11, true))
         .unwrap();
     upgrade_schedule
-        .add(UpgradeInfo::new(CHAIN_NAME, 2, "0.37", 12, true).unwrap())
+        .add(UpgradeInfo::new(2, "0.37", 12, true))
         .unwrap();
     upgrade_schedule
-        .add(UpgradeInfo::new(CHAIN_NAME, 3, "0.37", 13, true).unwrap())
+        .add(UpgradeInfo::new(3, "0.37", 13, true))
         .unwrap();
 
     let mut upgrades = Upgrades::new();
@@ -209,7 +208,7 @@ async fn test_applying_upgrades() {
     let mut tester = Tester::new(interpreter, MemoryBlockstore::new());
 
     let genesis = Genesis {
-        chain_name: CHAIN_NAME.to_string(),
+        chain_name: "mychain".to_string(),
         timestamp: Timestamp(0),
         network_version: NetworkVersion::V21,
         base_fee: TokenAmount::zero(),
