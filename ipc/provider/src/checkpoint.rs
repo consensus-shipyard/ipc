@@ -147,7 +147,7 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         }
 
         let Some(bundle) = self.child_handler.checkpoint_bundle_at(height).await? else {
-            return Err(anyhow!(
+            bail!(
                 "inconsistent contract state, last bottom up checkpoint height occurs at {height} but no checkpoint bundle found"
             ));
         };
