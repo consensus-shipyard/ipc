@@ -147,12 +147,12 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         }
 
         let Some(bundle) = self.child_handler.checkpoint_bundle_at(height).await? else {
-            return Err(anyhow!(
+            bail!(
                 "inconsistent contract state, last bottom up checkpoint height occurs at {height} but no checkpoint bundle found"
             ));
         };
 
-        log::debug!("bottom up bundle: {}", serde_json::to_string(&bundle)?);
+        log::debug!(bundle = serde_json::to_string(&bundle)?, "bottom up checkpoint");
 
         let epoch = self
             .parent_handler
@@ -203,13 +203,13 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                     .checkpoint_bundle_at(event.height)
                     .await?
                 else {
-                    return Err(anyhow!(
+                    bail!(
                         "inconsistent contract state, quorum reached event found at height {} but not bundle",
                         event.height
-                    ));
+                    );
                 };
 
-                log::debug!("bottom up bundle: {}", serde_json::to_string(&bundle)?);
+                log::debug!(bundle = serde_json::to_string(&bundle)?, height = event.height, "bottom up event");
 
                 let epoch = self
                     .parent_handler
