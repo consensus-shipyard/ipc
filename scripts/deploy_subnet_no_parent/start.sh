@@ -38,7 +38,7 @@ fi
 
 # Step 1.1: Install build dependencies
 echo "${DASHES} Installing build dependencies..."
-#sudo apt update && sudo apt install build-essential libssl-dev mesa-opencl-icd ocl-icd-opencl-dev gcc git bzr jq pkg-config curl clang hwloc libhwloc-dev wget ca-certificates gnupg -y
+sudo apt update && sudo apt install build-essential libssl-dev mesa-opencl-icd ocl-icd-opencl-dev gcc git bzr jq pkg-config curl clang hwloc libhwloc-dev wget ca-certificates gnupg -y
 
 # Step 1.2: Install rust + cargo
 echo "$DASHES Check rustc & cargo..."
@@ -226,6 +226,7 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e IPFS_SWARM_HOST_PORT=${IPFS_SWARM_HOST_PORTS[0]} \
     -e IPFS_RPC_HOST_PORT=${IPFS_RPC_HOST_PORTS[0]} \
     -e IPFS_GATEWAY_HOST_PORT=${IPFS_GATEWAY_HOST_PORTS[0]} \
+    -e IPFS_PROFILE="local-discovery" \
     -e FM_PULL_SKIP=1 \
     child-validator-no-parent 2>&1)
 echo "$bootstrap_output"
@@ -255,6 +256,7 @@ do
       -e IPFS_SWARM_HOST_PORT=${IPFS_SWARM_HOST_PORTS[i]} \
       -e IPFS_RPC_HOST_PORT=${IPFS_RPC_HOST_PORTS[i]} \
       -e IPFS_GATEWAY_HOST_PORT=${IPFS_GATEWAY_HOST_PORTS[i]} \
+      -e IPFS_PROFILE="local-discovery" \
       -e RESOLVER_BOOTSTRAPS=${bootstrap_resolver_endpoint} \
       -e BOOTSTRAPS=${bootstrap_node_endpoint} \
       -e FM_PULL_SKIP=1 \

@@ -108,6 +108,8 @@ FM_REMOTE_DOCKER_IMAGE = "ghcr.io/consensus-shipyard/fendermint:${FM_DOCKER_TAG}
 PROMTAIL_DOCKER_IMAGE = "grafana/promtail:latest"
 IPFS_DOCKER_IMAGE = "ipfs/kubo:latest"
 
+IPFS_PROFILE = { value = "server", condition = { env_not_set = ["IPFS_PROFILE"] } }
+
 # If this wasn't present, any wait task is skipped.
 CARGO_MAKE_WAIT_MILLISECONDS = 5000
 # This wait time seems to work locally.
