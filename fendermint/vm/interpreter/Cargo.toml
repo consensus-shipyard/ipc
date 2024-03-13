@@ -24,6 +24,7 @@ fendermint_actors = { path = "../../actors" }
 fendermint_actor_chainmetadata = { path = "../../actors/chainmetadata" }
 fendermint_actor_eam = { workspace = true }
 fendermint_testing = { path = "../../testing", optional = true }
+fendermint_actor_customsyscall = { path = "../../actors/customsyscall" }
 ipc_actors_abis = { workspace = true }
 
 ipc-api = { workspace = true }
@@ -56,6 +57,7 @@ tokio = { workspace = true }
 pin-project = { workspace = true }
 tokio-stream = { workspace = true }
 tokio-util = { workspace = true }
+ambassador = { workspace = true }
 
 arbitrary = { workspace = true, optional = true }
 quickcheck = { workspace = true, optional = true }
