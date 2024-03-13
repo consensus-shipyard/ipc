@@ -46,25 +46,25 @@ check-balance:
 
 deploy-replica:
 	@echo "Deploying token replica contract on subnet..."
-	@USDCTEST_ADDR=$$(cat config.json | jq -r '.LinkedToken.USDCTest'); \
-	forge script script/DeployIpcTokenReplica.s.sol:DeployIpcTokenReplica --skip-simulation --rpc-url $$SUBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "run(address,address,uint64,address[])" -- $$SUBNET_GATEWAY $$USDCTEST_ADDR $$CALIBNET_CHAIN_ID '[]'
+	forge script script/DeployIpcTokenReplica.s.sol:DeployIpcTokenReplica --skip-simulation --rpc-url $$SUBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "deployIpcTokenReplica()"
 
 deploy-controller:
 	@echo "Deploying token controller contract on Calibnet..."
-	@USDCTEST_ADDR=$$(cat config.json | jq -r '.LinkedToken.USDCTest'); \
-	forge script script/DeployIpcTokenController.s.sol:DeployIpcTokenController --skip-simulation --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "run(address,address,uint64,address[])" -- $$CALIBNET_GATEWAY $$USDCTEST_ADDR $$CALIBNET_CHAIN_ID "[$$SUBNET_ROUTE_IN_ETH_FORMAT]"
+	forge script script/DeployIpcTokenController.s.sol:DeployIpcTokenController --skip-simulation --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "deployIpcTokenController()"
 
 initialize-replica:
 	@echo "Updating replica with controller's address..."
 	@REPLICA_ADDR=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenReplica'); \
+	USDCTEST_ADDR=$$(cat config.json | jq -r '.LinkedToken.USDCTest'); \
 	CONTROLLER_ADDR=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenController'); \
-	cast send $$REPLICA_ADDR "initialize(address)" $$CONTROLLER_ADDR --rpc-url $$SUBNET_RPC_URL --private-key $$PRIVATE_KEY
+	forge script script/DeployIpcTokenReplica.s.sol:DeployIpcTokenReplica --skip-simulation --rpc-url $$SUBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "initializeIpcTokenReplica(address,address,address,uint64,address[],address)" -- $$REPLICA_ADDR $$SUBNET_GATEWAY $$USDCTEST_ADDR $$CALIBNET_CHAIN_ID '[]' $$CONTROLLER_ADDR
 
 initialize-controller:
 	@echo "Updating controller with replica's address..."
 	@CONTROLLER_ADDR=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenController'); \
+	USDCTEST_ADDR=$$(cat config.json | jq -r '.LinkedToken.USDCTest'); \
 	REPLICA_ADDR=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenReplica'); \
-	cast send $$CONTROLLER_ADDR "initialize(address)" $$REPLICA_ADDR --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY
+	forge script script/DeployIpcTokenController.s.sol:DeployIpcTokenController --skip-simulation --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "initializeIpcTokenController(address,address,address,uint64,address[],address)" -- $$CONTROLLER_ADDR $$CALIBNET_GATEWAY $$USDCTEST_ADDR $$CALIBNET_CHAIN_ID "[$$SUBNET_ROUTE_IN_ETH_FORMAT]" $$REPLICA_ADDR
 
 approve-usdc:
 	@echo "Approving USDC for Controller Contract..."

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
+import {IERC20Upgradeable} from  "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+
 import {IntegrationTestBase, RootSubnetDefinition, TestSubnetDefinition} from "@ipc/test/IntegrationTestBase.sol";
 import {ERC20PresetFixedSupply} from "@ipc/test/helpers/ERC20PresetFixedSupply.sol";
 import {TestUtils} from "@ipc/test/helpers/TestUtils.sol";
@@ -42,6 +44,8 @@ import {IpcHandler} from "@ipc/sdk/IpcContract.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import "forge-std/console.sol";
 
+import "openzeppelin-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+
 contract MultiSubnetTest is IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
     using GatewayFacetsHelper for GatewayDiamond;
@@ -65,6 +69,7 @@ contract MultiSubnetTest is IntegrationTestBase {
     SubnetID nativeSubnetName;
 
     IERC20 public token;
+    USDCTest testUSDC;
 
     function setUp() public override {
         token = new ERC20PresetFixedSupply("TestToken", "TEST", 1_000_000, address(this));
@@ -115,17 +120,6 @@ contract MultiSubnetTest is IntegrationTestBase {
             subnetActorAddr: address(rootTokenSubnetActor),
             path: tokenSubnetPath
         });
-    }
-
-    function testMultiSubnet_Native_FundFromParentToChild_USDCBridge() public {
-        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
-        IpcEnvelope memory expected;
-
-        address holder = vm.addr(100);
-        address recipient = vm.addr(200);
-        address owner = address(this);
-        uint256 transferAmount = 300;
-        uint256 holderTotalAmount = 1000;
 
         vm.deal(address(rootTokenSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
         vm.prank(address(rootTokenSubnetActor));
@@ -143,11 +137,56 @@ contract MultiSubnetTest is IntegrationTestBase {
             rootGateway
         );
 
+        testUSDC = new USDCTest();
+
+        //set up controller with proxy
+        LinkedTokenController initialControllerImplementation = new LinkedTokenController();
+        TransparentUpgradeableProxy transparentProxyController = new TransparentUpgradeableProxy(address(initialControllerImplementation), address(this), "");
+        ipcTokenController = LinkedTokenController(address(transparentProxyController));
+
+
+        //set up replica with proxy
+        LinkedTokenReplica initialReplicaImplementation = new LinkedTokenReplica();
+        TransparentUpgradeableProxy transparentProxyReplica = new TransparentUpgradeableProxy(address(initialReplicaImplementation), address(this), "");
+        ipcTokenReplica = LinkedTokenReplica(address(transparentProxyReplica));
+
+
+        // initialize controller & replica
+
+        ipcTokenController.initialize(
+             address(rootGateway),
+             address(testUSDC),
+             nativeSubnetName,
+            address(ipcTokenReplica)
+        );
+
+        ipcTokenReplica.initialize(
+             address(nativeSubnetGateway),
+             address(testUSDC),
+             rootSubnetName,
+            address(ipcTokenController)
+        );
+
+
+
+
+
+    }
+
+    function testMultiSubnet_Native_FundFromParentToChild_USDCBridge() public {
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
+        IpcEnvelope memory expected;
+
+        address holder = vm.addr(100);
+        address recipient = vm.addr(200);
+        address owner = address(this);
+        uint256 transferAmount = 300;
+        uint256 holderTotalAmount = 1000;
+
         console.log(
             "--------------- transfer and mint (top-down) ---------------"
         );
 
-        USDCTest testUSDC = new USDCTest();
 
         testUSDC.mint(100_000);
         testUSDC.transfer(holder, holderTotalAmount);
@@ -158,21 +197,6 @@ contract MultiSubnetTest is IntegrationTestBase {
             "unexpected balance"
         );
 
-        // the token replica sits in a native supply child subnet.
-        ipcTokenReplica = new LinkedTokenReplica({
-            gateway: address(nativeSubnetGateway),
-            underlyingToken: address(testUSDC),
-            linkedSubnet: rootSubnetName
-        });
-
-        // the token controller sits in the root network.
-        ipcTokenController = new LinkedTokenController({
-            gateway: address(rootGateway),
-            underlyingToken: address(testUSDC),
-            linkedSubnet: nativeSubnetName
-        });
-        ipcTokenReplica.initialize(address(ipcTokenController));
-        ipcTokenController.initialize(address(ipcTokenReplica));
 
         vm.prank(holder);
         testUSDC.approve(address(ipcTokenController), transferAmount);
@@ -234,12 +258,12 @@ contract MultiSubnetTest is IntegrationTestBase {
         );
 
         console.log("fail:");
-        console.log(IERC20(ipcTokenReplica).balanceOf(recipient));
+        console.log(IERC20Upgradeable(ipcTokenReplica).balanceOf(recipient));
         console.log(transferAmount);
 
         //ensure that tokens are delivered on subnet
         require(
-            IERC20(ipcTokenReplica).balanceOf(recipient) == transferAmount,
+            IERC20Upgradeable(ipcTokenReplica).balanceOf(recipient) == transferAmount,
             "incorrect proxy token balance"
         );
 
