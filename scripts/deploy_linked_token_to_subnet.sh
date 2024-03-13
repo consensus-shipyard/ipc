@@ -76,7 +76,7 @@ $IPC_CLI cross-msg fund \
 10
 
 # Step 4: Deploy the USDCTest contract to calibration net
-echo "$DASHES Deploying USDCTest contract in calibration net"
+echo "$DASHES Deploying USDCTest contract to calibration net"
 cd $LINKED_TOKEN_FOLDER
 make deploy-usdctest || true
 
@@ -88,12 +88,13 @@ make mint-usdc || true
 # Step 6: Check tokens has been minted
 echo "$DASHES Check token balance"
 cd $LINKED_TOKEN_FOLDER
+sleep 10
 for retry in {0..20}
 do
   check_balance_output=$(make check-balance)
   balance=$(echo $check_balance_output | grep -oP '0x[\S]+')
   if [ $balance = '0x0000000000000000000000000000000000000000000000000000000000000000' ]; then
-    if (( $retry < 4 )); then
+    if (( $retry < 20 )); then
       echo "Balance $balance is still zero. Will wait and retry...(attempt $retry)"
       sleep 10
     else
