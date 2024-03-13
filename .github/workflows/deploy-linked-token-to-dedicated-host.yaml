@@ -15,9 +15,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  deploy-subnet-to-dedicated-host:
+    uses: ./.github/workflows/deploy-to-dedicated-host.yaml
   deploy-linked-token-to-dedicated-host:
     runs-on: ubuntu-latest
-    needs: [deploy-to-dedicated-host]
+    needs: [deploy-subnet-to-dedicated-host]
     steps:
       - name: Checkout code repo
         uses: actions/checkout@v4
