@@ -263,6 +263,7 @@ pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> anyhow::Result<r
         FvmQueryRet::StateParams(_) => ExitCode::OK,
         FvmQueryRet::BuiltinActors(_) => ExitCode::OK,
         FvmQueryRet::UpgradeSchedule(_) => ExitCode::OK,
+        FvmQueryRet::NodeState(_) => ExitCode::OK,
     };
 
     // The return value has a `key` field which is supposed to be set to the data matched.
@@ -305,6 +306,10 @@ pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> anyhow::Result<r
         }
         FvmQueryRet::UpgradeSchedule(us) => {
             let v = ipld_encode!(us);
+            (Vec::new(), v)
+        }
+        FvmQueryRet::NodeState(ns) => {
+            let v = ipld_encode!(ns);
             (Vec::new(), v)
         }
     };

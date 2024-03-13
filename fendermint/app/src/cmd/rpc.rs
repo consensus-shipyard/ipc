@@ -108,6 +108,11 @@ async fn query(
             let json = json!({ "response": res });
             print_json(&json)?;
         }
+        RpcQueryCommands::NodeState => {
+            let res = client.node_state(height).await?;
+            let json = json!({ "response": res });
+            print_json(&json)?;
+        }
     };
     Ok(())
 }

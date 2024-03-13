@@ -3,7 +3,11 @@
 
 use anyhow::Context;
 use async_trait::async_trait;
-use std::{collections::HashMap, thread::sleep};
+use std::{
+    collections::HashMap,
+    sync::atomic::{AtomicBool, Ordering},
+    thread::sleep,
+};
 
 use fendermint_vm_actor_interface::{chainmetadata, cron, system};
 use fvm::executor::ApplyRet;
@@ -18,6 +22,9 @@ use super::{
     state::FvmExecState,
     FvmMessage, FvmMessageInterpreter,
 };
+
+/// Indicates whether the node has been frozen due to not having a required upgrade.
+pub static IS_FROZEN: AtomicBool = AtomicBool::new(false);
 
 /// The return value extended with some things from the message that
 /// might not be available to the caller, because of the message lookups
@@ -239,6 +246,9 @@ where
                     );
 
                     if upgrade_info.required {
+                        // mark the node as frozen
+                        IS_FROZEN.store(true, Ordering::Relaxed);
+
                         // sleep forever, we can't proceed any further using our current fendermint version
                         loop {
                             tracing::error!(

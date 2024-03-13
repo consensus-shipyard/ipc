@@ -17,7 +17,7 @@ use fvm_shared::ActorID;
 use fvm_shared::{address::Address, error::ExitCode};
 
 use fendermint_vm_message::query::{
-    ActorState, BuiltinActors, FvmQuery, FvmQueryHeight, GasEstimate, StateParams,
+    ActorState, BuiltinActors, FvmQuery, FvmQueryHeight, GasEstimate, NodeState, StateParams,
 };
 
 use crate::response::encode_data;
@@ -123,7 +123,17 @@ pub trait QueryClient: Sync {
         let height = res.height;
         let value = extract(res, |res| {
             fvm_ipld_encoding::from_slice(&res.value)
-                .context("failed to decode StateParams from query")
+                .context("failed to decode UpgradeSchedule from query")
+        })?;
+        Ok(QueryResponse { height, value })
+    }
+
+    async fn node_state(&self, height: FvmQueryHeight) -> anyhow::Result<QueryResponse<NodeState>> {
+        let res = self.perform(FvmQuery::NodeState, height).await?;
+        let height = res.height;
+        let value = extract(res, |res| {
+            fvm_ipld_encoding::from_slice(&res.value)
+                .context("failed to decode NodeState from query")
         })?;
         Ok(QueryResponse { height, value })
     }

@@ -78,6 +78,8 @@ pub enum FvmQuery {
     BuiltinActors,
     /// Query the current upgrade schedule
     UpgradeSchedule,
+    /// Query the current node state
+    NodeState,
 }
 
 /// State of all actor implementations.
@@ -150,6 +152,11 @@ pub struct StateParams {
 pub struct BuiltinActors {
     /// Registry of built-in actors known by the system.
     pub registry: Vec<(String, Cid)>,
+}
+
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+pub struct NodeState {
+    pub frozen: bool,
 }
 
 #[cfg(feature = "arb")]
