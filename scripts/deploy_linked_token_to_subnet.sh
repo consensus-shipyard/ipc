@@ -29,7 +29,7 @@ cd $IPC_FOLDER/extras/tools/fvm-eth-address-converter
 npm install
 
 # Step 2: Prepare wallet address
-echo "$DASHES Prepare wallet address"
+echo "$DASHES Preparing wallet address..."
 for i in {0..3}
 do
   addr=$(cat ${IPC_CONFIG_FOLDER}/evm_keystore.json | jq .[$i].address | tr -d '"')
@@ -53,7 +53,7 @@ do
 done
 
 # Step 2: Configure the dot env file
-echo "${DASHES} Configuring .env file for linked token deployment"
+echo "$DASHES Configuring .env file for linked token deployment..."
 cp $DOT_ENV_TEMPLATE $DOT_ENV_FILE
 calib_net_gateway_address=$(toml get ~/.ipc/config.toml subnets[0].config.gateway_addr | tr -d '"')
 subnet_id=$(toml get ~/.ipc/config.toml subnets[1].id | tr -d '"')
@@ -69,7 +69,7 @@ echo "Final .env file:"
 cat $DOT_ENV_FILE
 
 # Step 3: Fund address in subnet
-echo "$DASHES Fund address in subnet"
+echo "$DASHES Funding address in subnet..."
 $IPC_CLI cross-msg fund \
 --subnet $subnet_id \
 --from $default_wallet_address \
@@ -112,9 +112,9 @@ make deploy-replica
 
 # Step 8: Deploy token controller contract to calibration net
 echo "$DASHES Deploy token controller contract to calibration net"
-! make deploy-controller
+make deploy-controller || true
 
 # Step 9: Initialize contracts
 echo "$DASHES Initialize contracts"
-make initialize-replica || true
+make initialize-replica
 make initialize-controller || true
