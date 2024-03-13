@@ -87,6 +87,7 @@ impl<DB, C> FvmMessageInterpreter<DB, C>
 where
     DB: Blockstore + 'static + Clone,
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         client: C,
         validator_ctx: Option<ValidatorContext<C>>,

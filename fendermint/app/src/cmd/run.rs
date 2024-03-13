@@ -109,10 +109,10 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
 
     let upgrade_schedule = if settings.upgrade_info().exists() {
         // load existing upgrade schedule
-        UpgradeSchedule::from_file(&settings.upgrade_info())?
+        UpgradeSchedule::from_file(settings.upgrade_info())?
     } else {
         // create an empty upgrade schedule
-        UpgradeSchedule::new().to_file(&settings.upgrade_info())?;
+        UpgradeSchedule::new().to_file(settings.upgrade_info())?;
         UpgradeSchedule::new()
     };
     tracing::info!(

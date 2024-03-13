@@ -18,6 +18,12 @@ pub struct UpgradeSchedule {
     schedule: BTreeMap<ChainEpoch, UpgradeInfo>,
 }
 
+impl Default for UpgradeSchedule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl UpgradeSchedule {
     pub fn new() -> Self {
         Self {
@@ -41,7 +47,7 @@ impl UpgradeSchedule {
     pub fn to_file(&self, path: impl AsRef<Path>) -> anyhow::Result<()> {
         let json = serde_json::to_string_pretty(&self.get_all())
             .context("failed to serialize upgrade_info")?;
-        std::fs::write(path, &json)?;
+        std::fs::write(path, json)?;
 
         Ok(())
     }
@@ -113,6 +119,15 @@ where
 {
     /// a map of all the available hardcoded upgrades
     upgrades: BTreeMap<u64, Upgrade<DB>>,
+}
+
+impl<DB> Default for Upgrades<DB>
+where
+    DB: Blockstore + 'static + Clone,
+{
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<DB> Upgrades<DB>
