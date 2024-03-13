@@ -40,4 +40,4 @@ jobs:
           username: ubuntu
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
           script: bash -il /home/ubuntu/scripts/deploy_linked_token_to_subnet.sh ${{ github.head_ref }}
-          command_timeout: 30m
+          command_timeout: 40m
