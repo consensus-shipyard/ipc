@@ -76,19 +76,19 @@ $IPC_CLI cross-msg fund \
 10
 
 # Step 5: Deploy the USDCTest contract to calibration net
-echo "$DASHES Deploying USDCTest contract to calibration net"
+echo "$DASHES Deploying USDCTest contract to calibration net..."
 cd $LINKED_TOKEN_FOLDER
 make deploy-usdctest || true
 
 # Step 6: Mint USDCTest tokens on calibration net
-echo "$DASHES Mint USDCTest tokens on calibration net"
+echo "$DASHES Minting USDCTest tokens on calibration net..."
 cd $LINKED_TOKEN_FOLDER
 make mint-usdc || true
 
 # Step 7: Check tokens has been minted
-echo "$DASHES Check token balance"
+echo "$DASHES Checking token balance..."
+sleep 10
 cd $LINKED_TOKEN_FOLDER
-sleep 10  # To avoid weird output from "make check-balance"
 for retry in {0..20}
 do
   check_balance_output=$(make check-balance)
@@ -108,16 +108,73 @@ do
 done
 
 # Step 8: Deploy token replica contract to subnet
-echo "$DASHES Deploy token replica contract to subnet"
-sleep 30  # To increase the success rate of such deployment
+echo "$DASHES Deploying token replica contract to subnet..."
+sleep 30
 make deploy-replica
 
 # Step 9: Deploy token controller contract to calibration net
-echo "$DASHES Deploy token controller contract to calibration net"
+echo "$DASHES Deploying token controller contract to calibration net..."
 make deploy-controller || true
 
 # Step 10: Initialize contracts
-echo "$DASHES Initialize replicat contract on subnet"
+echo "$DASHES Initializing replicat contract on subnet..."
 make initialize-replica
-echo "$DASHES Initialize controller contract on calibration net"
+echo "$DASHES Initializing controller contract on calibration net..."
 make initialize-controller || true
+
+# Now all contracts have been deployed and initialized. We will now start testing
+# the interaction with the contracts.
+
+# Step 11: Approve the USDCTest token to be transferred.
+echo "$DASHES Approving token (on calibration net) to be transferred..."
+make approve-usdc || true
+
+# Step 12: Transfer the USDCTest token from calibration to subnet.
+echo "$DASHES Depositing token from calibration net to subnet..."
+sleep 30
+make deposit-usdc || true
+
+# Step 13: Verify that token balance has been moved.
+echo "$DASHES Checking token balance after deposit..."
+sleep 10
+for retry in {0..20}
+do
+  check_balance_output=$(make check-balance)
+  balance=$(echo $check_balance_output | grep -oP '0x[\S]+')
+  if [ $balance != '0x0000000000000000000000000000000000000000000000000000000000000000' ]; then
+    if (( $retry < 20 )); then
+      echo "Balance $balance has not been reduced. Will wait and retry...(attempt $retry)"
+      sleep 10
+    else
+      echo "Balance $balance was not reduced. Token deposition failed."
+      exit 1
+    fi
+  else
+    echo "Token balance has reduced. Balance is now $balance for addr $default_wallet_address"
+    break
+  fi
+done
+
+# Step 14: Verify that token balance has been moved to replica contract.
+# (This verifies top-down finality propagation from calibration net to subnet.)
+echo "$DASHES Checking token balance on replica contract after deposit..."
+sleep 10
+for retry in {0..20}
+do
+  check_balance_output=$(make check-replica-balance)
+  balance=$(echo $check_balance_output | grep -oP '0x[\S]+')
+  if [ $balance = '0x0000000000000000000000000000000000000000000000000000000000000000' ]; then
+    if (( $retry < 20 )); then
+      echo "Balance $balance has not been increased in replica contract. Will wait and retry...(attempt $retry)"
+      sleep 10
+    else
+      echo "Balance $balance was not increased in replica contract. Token deposition failed."
+      exit 1
+    fi
+  else
+    echo "Token balance has been increased in replica contract. Balance is now $balance"
+    break
+  fi
+done
+
+# TODO: Verify bottom-up checkpointing by withdrawing the USDCToken
