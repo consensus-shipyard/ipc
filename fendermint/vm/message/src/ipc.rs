@@ -121,14 +121,14 @@ pub struct UpgradeInfo {
 impl UpgradeInfo {
     pub fn new(
         height: ChainEpoch,
-        cometbft_version: impl ToString,
         new_app_version: u64,
+        cometbft_version: impl ToString,
         required: bool,
     ) -> Self {
         Self {
             height,
-            cometbft_version: cometbft_version.to_string(),
             new_app_version,
+            cometbft_version: cometbft_version.to_string(),
             required,
         }
     }

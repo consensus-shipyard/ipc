@@ -9,7 +9,7 @@ use tracing_subscriber::EnvFilter;
 
 use self::{
     eth::EthArgs, genesis::GenesisArgs, key::KeyArgs, materializer::MaterializerArgs, rpc::RpcArgs,
-    run::RunArgs,
+    run::RunArgs, upgrade::UpgradeArgs,
 };
 
 pub mod eth;
@@ -18,6 +18,7 @@ pub mod key;
 pub mod materializer;
 pub mod rpc;
 pub mod run;
+pub mod upgrade;
 
 mod log;
 mod parse;
@@ -160,6 +161,8 @@ pub enum Commands {
     /// Subcommands related to the Testnet Materializer.
     #[clap(aliases  = &["mat", "matr", "mate"])]
     Materializer(MaterializerArgs),
+    // Subcommands related to managing the upgrade_info.json file
+    Upgrade(UpgradeArgs),
 }
 
 #[cfg(test)]
