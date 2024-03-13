@@ -28,14 +28,15 @@ jobs:
     runs-on: ubuntu-latest
     # Required permissions
     permissions:
+      contents: read
       pull-requests: read
     # Set job outputs to values from filter step
     outputs:
-      workspace:     ${{ steps.filter.outputs.workspace }}
-      contracts:     ${{ steps.filter.outputs.contracts }}
-      ipc:           ${{ steps.filter.outputs.ipc }}
+      workspace: ${{ steps.filter.outputs.workspace }}
+      contracts: ${{ steps.filter.outputs.contracts }}
+      ipc: ${{ steps.filter.outputs.ipc }}
       ipld-resolver: ${{ steps.filter.outputs.ipld-resolver }}
-      fendermint:    ${{ steps.filter.outputs.fendermint }}
+      fendermint: ${{ steps.filter.outputs.fendermint }}
     steps:
       # For pull requests it's not necessary to checkout the code,
       # but the workflow is also triggered on pushes to `main`.
@@ -61,7 +62,7 @@ jobs:
 
   contracts-prettier:
     uses: ./.github/workflows/contracts-prettier.yaml
-    needs: [changes]
+    needs: [ changes ]
     if: >-
       needs.changes.outputs.contracts == 'true' ||
       github.ref == 'refs/heads/main' ||
@@ -73,27 +74,27 @@ jobs:
 
   contracts-test:
     uses: ./.github/workflows/contracts-test.yaml
-    needs: [contracts-prettier]
+    needs: [ contracts-prettier ]
 
   contracts-storage:
     uses: ./.github/workflows/contracts-storage.yaml
-    needs: [contracts-prettier]
+    needs: [ contracts-prettier ]
 
   contracts-npm-audit:
     uses: ./.github/workflows/contracts-npm-audit.yaml
-    needs: [contracts-prettier]
+    needs: [ contracts-prettier ]
 
   contracts-sast:
     uses: ./.github/workflows/contracts-sast.yaml
-    needs: [contracts-prettier]
+    needs: [ contracts-prettier ]
 
   extras:
     uses: ./.github/workflows/extras.yaml
-    needs: [contracts-prettier]
+    needs: [ contracts-prettier ]
 
   ipc:
     uses: ./.github/workflows/ipc.yaml
-    needs: [changes, license]
+    needs: [ changes, license ]
     if: >-
       needs.changes.outputs.workspace == 'true' ||
       needs.changes.outputs.contracts == 'true' ||
@@ -103,7 +104,7 @@ jobs:
 
   ipld-resolver:
     uses: ./.github/workflows/ipld-resolver.yaml
-    needs: [changes, license]
+    needs: [ changes, license ]
     if: >-
       needs.changes.outputs.workspace == 'true' ||
       needs.changes.outputs.ipld-resolver == 'true' ||
@@ -113,7 +114,7 @@ jobs:
   fendermint-test:
     uses: ./.github/workflows/fendermint-test.yaml
     secrets: inherit
-    needs: [changes, license]
+    needs: [ changes, license ]
     if: >-
       needs.changes.outputs.workspace == 'true' ||
       needs.changes.outputs.contracts == 'true' ||
@@ -126,7 +127,7 @@ jobs:
   fevm-contract-tests:
     uses: ./.github/workflows/fevm-contract-tests.yaml
     secrets: inherit
-    needs: [changes, license]
+    needs: [ changes, license ]
     if: >-
       needs.changes.outputs.workspace == 'true' ||
       needs.changes.outputs.contracts == 'true' ||
