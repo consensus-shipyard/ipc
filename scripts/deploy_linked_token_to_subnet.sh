@@ -23,6 +23,11 @@ else
   fi
 fi
 
+# Step 1: Make sure dependencies are installed
+echo "$DASHES Installing dependencies..."
+cd $IPC_FOLDER/extra/tools/fvm-eth-address-converter
+npm install
+
 # Step 1: Checkout code repo
 #echo "${DASHES} Checking out code repo"
 #if ! $local_deploy ; then
@@ -67,4 +72,15 @@ done
 # Step 2: Configure the dot env file
 echo "${DASHES} Configuring .env file for linked token deployment"
 cp $DOT_ENV_TEMPLATE $DOT_ENV_FILE
+calib_net_gateway_address=$(toml get ~/.ipc/config.toml subnets[0].config.gateway_addr | tr -d '"')
+subnet_id=$(toml get ~/.ipc/config.toml subnets[1].id | tr -d '"')
+subnet_id=$(basename $subnet_id)
+cd $IPC_FOLDER/extra/tools/fvm-eth-address-converter
+subnet_id_as_eth_addr=$(npx ts-node fvm-addr-to-eth-addr.ts $subnet_id)
+# Write config to dot env file
 echo "export PRIVATE_KEY=$default_private_key" >> $DOT_ENV_FILE
+echo "export CALIBNET_GATEWAY=$calib_net_gateway_address" >> $DOT_ENV_FILE
+echo "export SUBNET_ROUTE_IN_ETH_FORMAT=$subnet_id_as_eth_addr"
+# Preview the dot env file
+echo "Final .env file:"
+echo $DOT_ENV_FILE
