@@ -11,7 +11,7 @@ use fendermint_crypto::SecretKey;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::chain::ChainEnv;
-use fendermint_vm_interpreter::fvm::upgrades::{UpgradeSchedule, Upgrades};
+use fendermint_vm_interpreter::fvm::upgrades::{Upgrade, UpgradeSchedule, Upgrades};
 use fendermint_vm_interpreter::{
     bytes::{BytesMessageInterpreter, ProposalPrepareMode},
     chain::{ChainMessageInterpreter, CheckpointPool},
@@ -121,6 +121,9 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         "loaded upgrade_schedule"
     );
 
+    let mut upgrades = Upgrades::new();
+    upgrades.add(Upgrade::new(1, |_state| Ok(()))).unwrap();
+
     let interpreter = FvmMessageInterpreter::<NamespaceBlockstore, _>::new(
         tendermint_client.clone(),
         validator_ctx,
@@ -129,7 +132,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         settings.fvm.gas_search_step,
         settings.fvm.exec_in_check,
         upgrade_schedule,
-        Upgrades::new(),
+        upgrades,
     );
     let interpreter = SignedMessageInterpreter::new(interpreter);
     let interpreter = ChainMessageInterpreter::<_, NamespaceBlockstore>::new(interpreter);
