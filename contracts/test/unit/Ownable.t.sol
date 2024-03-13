@@ -14,7 +14,7 @@ contract OwnableInstance is Ownable {
 }
 
 contract OwnableTest is Test {
-    function testOwnableOk() public {
+    function testOwnable() public {
         address firstOwner = address(1);
         address secondOwner = address(2);
         vm.deal(firstOwner, 1 ether);
@@ -31,5 +31,10 @@ contract OwnableTest is Test {
         vm.prank(firstOwner);
         o.transferOwnership(secondOwner);
         require(o.owner() == secondOwner, "second owner not correct");
+
+        // new owner cannot set zero address as next owner
+        vm.prank(secondOwner);
+        vm.expectRevert(LibDiamond.InvalidAddress.selector);
+        o.transferOwnership(address(0));
     }
 }
