@@ -6,11 +6,11 @@ on:
 
 concurrency:
   # Only allow one run at a time for this workflow
-  group: deploy-to-dedicated-host
+  group: deploy-subnet-to-dedicated-host
   cancel-in-progress: true
 
 jobs:
-  deploy-to-dedicated-host:
+  deploy-subnet-to-dedicated-host:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code repo

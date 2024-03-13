@@ -11,12 +11,12 @@ on:
 
 concurrency:
   # Only allow one run at a time for this workflow
-  group: deploy-to-dedicated-host
+  group: deploy-linked-token-to-dedicated-host
   cancel-in-progress: true
 
 jobs:
   deploy-subnet-to-dedicated-host:
-    uses: ./.github/workflows/deploy-to-dedicated-host.yaml
+    uses: ./.github/workflows/deploy-subnet-to-dedicated-host.yaml
   deploy-linked-token-to-dedicated-host:
     runs-on: ubuntu-latest
     needs: [deploy-subnet-to-dedicated-host]
