@@ -17,6 +17,7 @@ concurrency:
 jobs:
   deploy-subnet-to-dedicated-host:
     uses: ./.github/workflows/deploy-subnet-to-dedicated-host.yaml
+    secrets: inherit
   deploy-linked-token-to-dedicated-host:
     runs-on: ubuntu-latest
     needs: [deploy-subnet-to-dedicated-host]
