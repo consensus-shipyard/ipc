@@ -24,26 +24,9 @@ else
 fi
 
 # Step 1: Make sure dependencies are installed
-echo "$DASHES Installing dependencies..."
-cd $IPC_FOLDER/extra/tools/fvm-eth-address-converter
-npm install
-
-# Step 1: Checkout code repo
-#echo "${DASHES} Checking out code repo"
-#if ! $local_deploy ; then
-#  echo "$DASHES Preparing ipc repo..."
-#  cd $HOME
-#  if ! ls $IPC_FOLDER ; then
-#    git clone --recurse-submodules -j8 https://github.com/consensus-shipyard/ipc.git
-#  fi
-#  cd ${IPC_FOLDER}/contracts
-#  git fetch
-#  git stash
-#  git checkout $head_ref
-#  git pull --rebase origin $head_ref
-#  git submodule sync
-#  git submodule update --init --recursive
-#fi
+#echo "$DASHES Installing dependencies..."
+#cd $IPC_FOLDER/extra/tools/fvm-eth-address-converter
+#npm install
 
 # Step 2: Prepare wallet address
 echo "$DASHES Prepare wallet address"
@@ -75,7 +58,7 @@ cp $DOT_ENV_TEMPLATE $DOT_ENV_FILE
 calib_net_gateway_address=$(toml get ~/.ipc/config.toml subnets[0].config.gateway_addr | tr -d '"')
 subnet_id=$(toml get ~/.ipc/config.toml subnets[1].id | tr -d '"')
 subnet_id=$(basename $subnet_id)
-cd $IPC_FOLDER/extra/tools/fvm-eth-address-converter
+cd $IPC_FOLDER/extras/tools/fvm-eth-address-converter
 subnet_id_as_eth_addr=$(npx ts-node fvm-addr-to-eth-addr.ts $subnet_id)
 # Write config to dot env file
 echo "export PRIVATE_KEY=$default_private_key" >> $DOT_ENV_FILE
