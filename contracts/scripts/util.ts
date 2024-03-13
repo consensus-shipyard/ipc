@@ -9,7 +9,7 @@ const fs = require('fs')
 
 export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 
-const isolatedPort = 18678;
+const isolatedPort = 18678
 
 export async function deployContractWithDeployer(
     deployer: SignerWithAddress,
@@ -118,7 +118,9 @@ export async function getRuntimeBytecode(bytecode) {
     }
     const ganacheServer = await startGanache()
 
-    const provider = new providers.JsonRpcProvider(`http://127.0.0.1:${isolatedPort}`);
+    const provider = new providers.JsonRpcProvider(
+        `http://127.0.0.1:${isolatedPort}`,
+    )
     const wallet = new Wallet(process.env.PRIVATE_KEY, provider)
     const contractFactory = new ContractFactory([], bytecode, wallet)
     const contract = await contractFactory.deploy({ gasPrice: 0 })
