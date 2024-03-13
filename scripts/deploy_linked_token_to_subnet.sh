@@ -52,7 +52,7 @@ do
   fi
 done
 
-# Step 2: Configure the dot env file
+# Step 3: Configure the dot env file
 echo "$DASHES Configuring .env file for linked token deployment..."
 cp $DOT_ENV_TEMPLATE $DOT_ENV_FILE
 calib_net_gateway_address=$(toml get ~/.ipc/config.toml subnets[0].config.gateway_addr | tr -d '"')
@@ -68,27 +68,27 @@ echo "export SUBNET_ROUTE_IN_ETH_FORMAT=$subnet_id_as_eth_addr" >> $DOT_ENV_FILE
 echo "Final .env file:"
 cat $DOT_ENV_FILE
 
-# Step 3: Fund address in subnet
+# Step 4: Fund address in subnet
 echo "$DASHES Funding address in subnet..."
 $IPC_CLI cross-msg fund \
 --subnet $subnet_id \
 --from $default_wallet_address \
 10
 
-# Step 4: Deploy the USDCTest contract to calibration net
+# Step 5: Deploy the USDCTest contract to calibration net
 echo "$DASHES Deploying USDCTest contract to calibration net"
 cd $LINKED_TOKEN_FOLDER
 make deploy-usdctest || true
 
-# Step 5: Mint USDCTest tokens on calibration net
-echo "$DASHES Mint USDCTest tokens"
+# Step 6: Mint USDCTest tokens on calibration net
+echo "$DASHES Mint USDCTest tokens on calibration net"
 cd $LINKED_TOKEN_FOLDER
 make mint-usdc || true
 
-# Step 6: Check tokens has been minted
+# Step 7: Check tokens has been minted
 echo "$DASHES Check token balance"
 cd $LINKED_TOKEN_FOLDER
-sleep 10
+sleep 10  # To avoid weird output from "make check-balance"
 for retry in {0..20}
 do
   check_balance_output=$(make check-balance)
@@ -107,15 +107,17 @@ do
   fi
 done
 
-# Step 7: Deploy token replica contract to subnet
+# Step 8: Deploy token replica contract to subnet
 echo "$DASHES Deploy token replica contract to subnet"
+sleep 30  # To increase the success rate of such deployment
 make deploy-replica
 
-# Step 8: Deploy token controller contract to calibration net
+# Step 9: Deploy token controller contract to calibration net
 echo "$DASHES Deploy token controller contract to calibration net"
 make deploy-controller || true
 
-# Step 9: Initialize contracts
-echo "$DASHES Initialize contracts"
+# Step 10: Initialize contracts
+echo "$DASHES Initialize replicat contract on subnet"
 make initialize-replica
+echo "$DASHES Initialize controller contract on calibration net"
 make initialize-controller || true
