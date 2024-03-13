@@ -108,7 +108,7 @@ done
 
 # Step 7: Deploy token replica contract to subnet
 echo "$DASHES Deploy token replica contract to subnet"
-make deploy-replica
+make deploy-replica || true
 
 # Step 8: Deploy token controller contract to calibration net
 echo "$DASHES Deploy token controller contract to calibration net"
