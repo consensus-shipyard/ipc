@@ -159,12 +159,12 @@ done
 # (This verifies top-down finality propagation from calibration net to subnet.)
 echo "$DASHES Checking token balance on replica contract after deposit..."
 sleep 10
-for retry in {0..60}
+for retry in {0..100}
 do
   check_balance_output=$(make check-replica-balance)
   balance=$(echo $check_balance_output | grep -oP '0x[\S]+')
   if [ $balance = '0x0000000000000000000000000000000000000000000000000000000000000000' ]; then
-    if (( $retry < 60 )); then
+    if (( $retry < 100 )); then
       echo "Balance $balance has not been increased in replica contract. Will wait and retry...(attempt $retry)"
       sleep 10
     else
