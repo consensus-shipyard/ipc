@@ -111,11 +111,11 @@ pub struct UpgradeInfo {
     pub new_app_version: u64,
     /// the required cometbft version for the upgrade
     pub cometbft_version: String,
-    /// whether the upgrade is backwards compatible or not. In case a
-    /// non-backwards compatible upgrade is scheduled where we don't have
-    /// the corresponding Upgrade defined to migrate to that version, then
-    /// fendermint will freeze and not process any more blocks.
-    pub backwards_compatible: bool,
+    /// whether this is a required upgrade or not. A required upgrade
+    /// will cause the node to freeze and not process any more blocks
+    /// if it does not have the corresponding Upgrade defined to
+    /// migrate to that version
+    pub required: bool,
 }
 
 impl UpgradeInfo {
@@ -123,13 +123,13 @@ impl UpgradeInfo {
         height: ChainEpoch,
         cometbft_version: impl ToString,
         new_app_version: u64,
-        backwards_compatible: bool,
+        required: bool,
     ) -> Self {
         Self {
             height,
             cometbft_version: cometbft_version.to_string(),
             new_app_version,
-            backwards_compatible,
+            required,
         }
     }
 }

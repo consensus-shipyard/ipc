@@ -213,6 +213,14 @@ where
         };
 
         if let Some(upgrade_info) = self.upgrade_schedule.get(state.block_height()) {
+            tracing::info!(
+                app_version = state.app_version(),
+                new_app_version = upgrade_info.new_app_version,
+                height = state.block_height(),
+                upgrade_info = ?upgrade_info,
+                "upgrade scheduled"
+            );
+
             match self.upgrades.get(upgrade_info.new_app_version) {
                 Some(upgrade) => {
                     let new_app_version = upgrade.execute(&mut state).context("upgrade failed")?;
@@ -221,23 +229,23 @@ where
                         *app_version = new_app_version;
                     });
 
-                    tracing::info!(app_version = state.app_version(), "upgraded app version");
+                    tracing::info!(app_version = state.app_version(), "upgrade successful");
                 }
                 None => {
                     tracing::warn!(
-                        "upgrade not found for app version {}",
-                        upgrade_info.new_app_version
+                        height = state.block_height(),
+                        upgrade_info = ?upgrade_info,
+                        "upgrade not found"
                     );
 
-                    if !upgrade_info.backwards_compatible {
-                        tracing::error!(
-                            "upgrade not found for app version {} and is not backwards compatible",
-                            upgrade_info.new_app_version
-                        );
-
+                    if upgrade_info.required {
                         // sleep forever, we can't proceed any further using our current fendermint version
                         loop {
-                            tracing::error!("node frozen due to missing upgrade, please upgrade the node to newer version to continue");
+                            tracing::error!(
+                                height = state.block_height(),
+                                upgrade_info = ?upgrade_info,
+                                "node frozen, please restart with a newer version which has the required upgrade"
+                            );
                             sleep(std::time::Duration::from_secs(60));
                         }
                     }

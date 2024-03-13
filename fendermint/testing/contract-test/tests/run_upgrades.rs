@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use ethers::types::U256;
 use fendermint_contract_test::Tester;
 use fendermint_rpc::response::decode_fevm_return_data;
+use fendermint_vm_message::ipc::UpgradeInfo;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use std::str::FromStr;
@@ -25,7 +26,7 @@ use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Account, Actor, ActorMeta, Genesis, PermissionMode, SignerAddr};
 use fendermint_vm_interpreter::fvm::store::memory::MemoryBlockstore;
-use fendermint_vm_interpreter::fvm::upgrades::{Upgrade, UpgradeInfo, UpgradeSchedule, Upgrades};
+use fendermint_vm_interpreter::fvm::upgrades::{Upgrade, UpgradeSchedule, Upgrades};
 use fendermint_vm_interpreter::fvm::{bundle::contracts_path, FvmMessageInterpreter};
 
 // returns a seeded secret key which is guaranteed to be the same every time
@@ -61,13 +62,13 @@ async fn test_applying_upgrades() {
 
     let mut upgrade_schedule = UpgradeSchedule::new();
     upgrade_schedule
-        .add(UpgradeInfo::new(1, "0.37", 11, true))
+        .add(UpgradeInfo::new(1, "0.37", 11, false))
         .unwrap();
     upgrade_schedule
-        .add(UpgradeInfo::new(2, "0.37", 12, true))
+        .add(UpgradeInfo::new(2, "0.37", 12, false))
         .unwrap();
     upgrade_schedule
-        .add(UpgradeInfo::new(3, "0.37", 13, true))
+        .add(UpgradeInfo::new(3, "0.37", 13, false))
         .unwrap();
 
     let mut upgrades = Upgrades::new();
