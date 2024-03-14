@@ -55,6 +55,10 @@
         "1096544|json5": {
             "decision": "ignore",
             "madeAt": 1708963077846
+        },
+        "1096644|browserify-sign": {
+            "decision": "ignore",
+            "madeAt": 1710415772020
         }
     },
     "rules": {},
