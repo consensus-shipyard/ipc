@@ -24,12 +24,13 @@ jobs:
       RPC_URL: https://calibration.filfox.info/rpc/v1
       PRIVATE_KEY: ${{ secrets.CONTRACTS_DEPLOYER_PRIVATE_KEY }}
     steps:
-      - name: Checkout cd/contract branch
+      - name: Checkout cd/contracts branch
         uses: actions/checkout@v4
         with:
           ref: cd/contracts
           submodules: recursive
           fetch-depth: 0
+          token: ${{ secrets.WORKFLOW_PAT_JIE }}
 
       - name: (Dry run) Try merge from main branch to see if there's any conflicts that can't be resolved itself
         run: |
@@ -86,12 +87,13 @@ jobs:
           echo "gateway_address: $gateway_address"
           echo "registry_address: $registry_address"
 
-      - name: Switch code repo to cd/contract branch
+      - name: Switch code repo to cd/contracts branch
         uses: actions/checkout@v4
         with:
           ref: cd/contracts
           submodules: recursive
           fetch-depth: 0
+          token: ${{ secrets.WORKFLOW_PAT_JIE }}
 
       - name: Merge from main branch and update cd/contracts branch
         run: |

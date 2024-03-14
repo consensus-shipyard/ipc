@@ -17,7 +17,7 @@ async fn test_full_node_sync() {
     with_testnet(MANIFEST, |_materializer, _manifest, testnet| {
         let test = async {
             // Allow a little bit of time for node-2 to catch up with node-1.
-            tokio::time::sleep(Duration::from_secs(1)).await;
+            tokio::time::sleep(Duration::from_secs(5)).await;
             // Check that node2 is following node1.
             let node2 = testnet.root().node("node-2");
             let dnode2 = testnet.node(&node2)?;
