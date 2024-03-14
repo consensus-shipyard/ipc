@@ -7,7 +7,7 @@ import {IDiamond} from "../interfaces/IDiamond.sol";
 library LibDiamond {
     bytes32 public constant DIAMOND_STORAGE_POSITION = keccak256("libdiamond.lib.diamond.storage");
 
-    error ZeroAddressNotAllowed();
+    error InvalidAddress();
     error NotOwner();
     error NoBytecodeAtAddress(address _contractAddress, string _message);
     error IncorrectFacetCutAction(IDiamondCut.FacetCutAction _action);
@@ -46,8 +46,8 @@ library LibDiamond {
      * Can only be called by the current owner.
      */
     function transferOwnership(address newOwner) internal onlyOwner {
-        if(newOwner == address(0)) {
-            revert ZeroAddressNotAllowed();
+        if (newOwner == address(0)) {
+            revert InvalidAddress();
         }
         setContractOwner(newOwner);
     }
