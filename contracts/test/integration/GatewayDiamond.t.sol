@@ -53,7 +53,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     function testGatewayDiamond_TransferOwnership() public {
         address owner = gatewayDiamond.ownership().owner();
 
-        vm.expectRevert(LibDiamond.ZeroAddressNotAllowed.selector);
+        vm.expectRevert(LibDiamond.InvalidAddress.selector);
         gatewayDiamond.ownership().transferOwnership(address(0));
 
         gatewayDiamond.ownership().transferOwnership(address(1));
