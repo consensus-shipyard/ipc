@@ -24,6 +24,7 @@ import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
 import {GatewayDiamond} from "../../src/GatewayDiamond.sol";
 import {SubnetActorDiamond, FunctionNotFound} from "../../src/SubnetActorDiamond.sol";
 import {SubnetActorManagerFacet} from "../../src/subnet/SubnetActorManagerFacet.sol";
+import {OwnershipFacet} from "../../src/OwnershipFacet.sol";
 import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
 import {SubnetActorPauseFacet} from "../../src/subnet/SubnetActorPauseFacet.sol";
 import {SubnetActorCheckpointingFacet} from "../../src/subnet/SubnetActorCheckpointingFacet.sol";
@@ -75,7 +76,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testSubnetActorDiamondReal_LoupeFunction() public view {
-        require(saDiamond.diamondLouper().facets().length == 7, "unexpected length");
+        require(saDiamond.diamondLouper().facets().length == 8, "unexpected length");
         require(
             saDiamond.diamondLouper().supportsInterface(type(IERC165).interfaceId) == true,
             "IERC165 not supported"
@@ -318,6 +319,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         SubnetActorPauseFacet saDupPauserFaucet = new SubnetActorPauseFacet();
         SubnetActorRewardFacet saDupRewardFaucet = new SubnetActorRewardFacet();
         SubnetActorCheckpointingFacet saDupCheckpointerFaucet = new SubnetActorCheckpointingFacet();
+        OwnershipFacet saOwnershipFacet = new OwnershipFacet();
 
         SupplySource memory native = SupplySourceHelper.native();
 
@@ -340,7 +342,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             address(saDupMangerFaucet),
             address(saDupPauserFaucet),
             address(saDupRewardFaucet),
-            address(saDupCheckpointerFaucet)
+            address(saDupCheckpointerFaucet),
+            address(saOwnershipFacet)
         );
     }
 

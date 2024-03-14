@@ -20,7 +20,6 @@ use fendermint_materializer::{
     docker::{DockerMaterializer, DockerMaterials},
     manifest::Manifest,
     testnet::Testnet,
-    validation::validate_manifest,
     HasCometBftApi, HasEthApi, TestnetName,
 };
 use futures::Future;
@@ -32,7 +31,7 @@ pub type DockerTestnet = Testnet<DockerMaterials, DockerMaterializer>;
 lazy_static! {
     static ref CI_PROFILE: bool = std::env::var("PROFILE").unwrap_or_default() == "ci";
     static ref STARTUP_TIMEOUT: Duration = Duration::from_secs(60);
-    static ref TEARDOWN_TIMEOUT: Duration = Duration::from_secs(5);
+    static ref TEARDOWN_TIMEOUT: Duration = Duration::from_secs(30);
     static ref PRINT_LOGS_ON_ERROR: bool = *CI_PROFILE;
 }
 
@@ -54,13 +53,7 @@ fn test_data_dir() -> PathBuf {
 /// Parse a manifest from the `tests/manifests` directory.
 fn read_manifest(file_name: &str) -> anyhow::Result<Manifest> {
     let manifest = tests_dir().join("manifests").join(file_name);
-    let manifest = std::fs::read_to_string(&manifest).with_context(|| {
-        format!(
-            "failed to read manifest from {}",
-            manifest.to_string_lossy()
-        )
-    })?;
-    let manifest = serde_yaml::from_str(&manifest).context("failed to parse manifest")?;
+    let manifest = Manifest::from_file(&manifest)?;
     Ok(manifest)
 }
 
@@ -86,7 +79,8 @@ where
     let manifest = read_manifest(manifest_file_name)?;
 
     // First make sure it's a sound manifest.
-    validate_manifest(&testnet_name, &manifest)
+    manifest
+        .validate(&testnet_name)
         .await
         .context("failed to validate manifest")?;
 
@@ -136,7 +130,8 @@ where
     // otherwise the system shuts down too quick, but
     // at least we can inspect the containers.
     // If they don't all get dropped, `docker system prune` helps.
-    tokio::time::sleep(*TEARDOWN_TIMEOUT).await;
+    let drop_handle = materializer.take_dropper();
+    let _ = tokio::time::timeout(*TEARDOWN_TIMEOUT, drop_handle).await;
 
     res
 }
