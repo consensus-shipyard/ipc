@@ -1,4 +1,4 @@
-import { deployContractWithDeployer, getTransactionFees } from './util'
+import { deployContractWithDeployer, getTransactionFees, subnetCreationPermissionMode } from './util'
 import { ethers } from 'hardhat'
 
 const { getSelectors, FacetCutAction } = require('./js/diamond.js')
@@ -12,6 +12,17 @@ export async function deploy() {
             deployer.address
         } and balance: ${balance.toString()}`,
     )
+
+    const mode = subnetCreationPermissionMode();
+    console.log(
+        `
+            ********************************************************************
+            **                                                                **
+            **  Subnet creation permission mode: ${mode}                      **
+            **                                                                **
+            ********************************************************************
+        `
+    );
 
     const gatewayAddress = GATEWAY.Gateway
     const txArgs = await getTransactionFees()
@@ -76,6 +87,7 @@ export async function deploy() {
         subnetActorRewarderSelectors: rewarderSelectors,
         subnetActorCheckpointerSelectors: checkpointerSelectors,
         subnetActorPauserSelectors: pauserSelectors,
+        permissionMode: Number(mode),
     }
 
     const facetCuts = [] //TODO

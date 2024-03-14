@@ -11,6 +11,11 @@ export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 
 const isolatedPort = 18678
 
+export enum SubnetCreationPermissionMode {
+    Unpermissioned = 0,
+    Owner = 1,
+};
+
 export async function deployContractWithDeployer(
     deployer: SignerWithAddress,
     contractName: string,
@@ -22,6 +27,14 @@ export async function deployContractWithDeployer(
         libraries: libs,
     })
     return contractFactory.deploy(...args)
+}
+
+export function subnetCreationPermissionMode(): SubnetCreationPermissionMode {
+    const raw = Number(process.env.REGISTRY_PERMISSION_MODE ) || 0;
+    if (raw == 1) {
+        return SubnetCreationPermissionMode.Owner;
+    }
+    return SubnetCreationPermissionMode.Unpermissioned
 }
 
 export async function getTransactionFees() {
