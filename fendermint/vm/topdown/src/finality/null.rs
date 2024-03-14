@@ -6,10 +6,12 @@ use crate::finality::{
 };
 use crate::{BlockHash, BlockHeight, Config, Error, IPCParentFinality, SequentialKeyCache};
 use async_stm::{abort, atomically, Stm, StmResult, TVar};
-use fendermint_vm_event::{emit, EventType};
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
 use std::cmp::min;
+
+use fendermint_tracing::emit;
+use fendermint_vm_event::ParentFinalityCommitted;
 
 /// Finality provider that can handle null blocks
 #[derive(Clone)]
@@ -122,11 +124,10 @@ impl FinalityWithNull {
         self.last_committed_finality.write(Some(finality))?;
 
         // emit event only after successful write
-        emit!(
-            EventType::ParentFinalityCommitted,
-            height,
-            block_hash = hash
-        );
+        emit!(ParentFinalityCommitted {
+            block_height: height,
+            block_hash: &hash
+        });
 
         Ok(())
     }
