@@ -8,9 +8,9 @@ Ready to test the waters with your first subnet? This guide will deploy a subnet
 
 Several steps in this guide involve running long-lived processes. In each of these cases, the guide advises starting a new _session_. Depending on your set-up, you may do this using tools like `screen` or `tmux`, or, if using a graphical environment, by opening a new terminal tab, pane, or window.
 
-## Step 1: Prepare your system
+### Step 1: Prepare your system
 
-### Install the basic requirements for IPC:
+#### Install the basic requirements for IPC:
 
 {% tabs %}
 {% tab title="Linux" %}
@@ -29,16 +29,16 @@ sudo apt update && sudo apt install build-essential libssl-dev mesa-opencl-icd o
 
 {% tab title="MacOS" %}
 * Install Xcode from App Store or terminal: `xcode-select --install`
-* Install Homebrew. See [instructions](https://brew.sh/).&#x20;
+* Install Homebrew. See [instructions](https://brew.sh/).
 * Install dependencies: `brew install jq`
 * Install Rust. See [instructions](https://www.rust-lang.org/tools/install). (if you have homebrew installed rust, you may need to uninstall that if you get errors in the build)
 * Install Cargo make: `cargo install --force cargo-make`
 * Install docker. See [instructions](https://docs.docker.com/desktop/install/mac-install/).
-* Install foundry. See [instructions](https://book.getfoundry.sh/getting-started/installation).&#x20;
+* Install foundry. See [instructions](https://book.getfoundry.sh/getting-started/installation).
 {% endtab %}
 {% endtabs %}
 
-### Building:
+#### Building:
 
 {% hint style="info" %}
 NOTE: this step may take a while to compile, depending on OS version and hardware build
@@ -47,8 +47,9 @@ NOTE: this step may take a while to compile, depending on OS version and hardwar
 {% tabs %}
 {% tab title="Linux" %}
 ```
-# make sure that rust has the wasm32 target
+# make sure that rust has the wasm32 target & use stable version of rustc
 rustup target add wasm32-unknown-unknown
+rustup default stable
 
 # add your user to the docker group
 sudo usermod -aG docker $USER && newgrp docker
@@ -68,8 +69,9 @@ cargo build --release
 
 {% tab title="MacOS" %}
 ```
-# make sure that rust has the wasm32 target
+# make sure that rust has the wasm32 target & use stable version of rustc
 rustup target add wasm32-unknown-unknown
+rustup default stable
 
 # clone this repo and build
 git clone https://github.com/consensus-shipyard/ipc.git
@@ -87,7 +89,7 @@ cargo build --release
 
 ### Step 2: Initialise your config
 
-* Initialise the config&#x20;
+* Initialise the config
 
 {% tabs %}
 {% tab title="Linux/MacOS" %}
@@ -100,7 +102,7 @@ ipc-cli config init
 
 This should have populated a default config file with all the parameters required to connect to calibration at `~/.ipc/config.toml`. Feel free to update this configuration to fit your needs.
 
-The IPC stack is changing rapidly. In order to make sure you use the latest contracts deployed on Filecoin Calibration:
+The IPC stack is changing rapidly. To make sure you use the latest contracts deployed on Filecoin Calibration:
 
 * Run `nano ~/.ipc/config.toml` to see your configuration
 
@@ -125,13 +127,13 @@ registry_addr = "<REGISTRY_ADDR>"
 
 ### Step 3: Set up your wallets
 
-You'll need to create a set of wallets to spawn and interact of the subnet.&#x20;
+Since we are setting up a subnet with multiple validators, we will create a set of wallets to spawn and interact within the subnet.
 
 {% hint style="info" %}
 TIP: Note down wallet and subnet addresses and keys as you go along
 {% endhint %}
 
-* Create the four different wallets (we recommend a minimum of 4 for BFT security)
+* Create four different wallets (we recommend a minimum of 4 for BFT security)
 
 ```
 ipc-cli wallet new --wallet-type evm
@@ -158,15 +160,18 @@ TIP: If you'd like to import an EVM account into Metamask, you can use export th
 
 ### Step 4: Create a child subnet
 
-* The next step is to create a subnet under `/r314159` in calibration. Remember to set a default wallet or explicitly specifying the wallet from which you want to perform the action with the `--from` flag.
+* The next step is to create a subnet under `/r314159` calibration. Remember to set a default wallet or explicitly specify the wallet from which you want to perform the action with the `--from` flag.
 
 ```
-ipc-cli subnet create --parent /r314159 --min-validator-stake 1 --min-validators 4 --bottomup-check-period 30 --from <PLEASE PUT ACCOUNT ADDRESS> --permission-mode collateral --supply-source-kind native
+ipc-cli subnet create --parent /r314159 --min-validator-stake 1 --min-validators 4 --bottomup-check-period 300 --from <PLEASE PUT ACCOUNT ADDRESS> --permission-mode collateral --supply-source-kind native
 ```
 
-This will output your subnet ID, which you will use below.&#x20;
+This will output your subnet ID, similar to the following:
 
-* Make a note of the address of the subnet you created.
+<pre><code><strong>/r314159/t410fx2xy6x6idpy6yfywiilp6uitq4eerhpdr72wtmi
+</strong></code></pre>
+
+Make a note of the address of the subnet you created because you will use it below.&#x20;
 
 ### Step 5: Join the subnet
 
@@ -181,7 +186,7 @@ ipc-cli wallet pub-key --wallet-type evm --address <PLEASE PUT ADDRESS 3>
 ipc-cli wallet pub-key --wallet-type evm --address <PLEASE PUT ADDRESS 4>
 ```
 
-* Join the subnet with each validator
+* Join the subnet with each validator.
 
 ```
 ipc-cli subnet join --from=<PLEASE PUT ADDRESS 1> --subnet=<PLEASE PUT SUBNET ID> --collateral=10 --public-key=<PLEASE PUT PUBLIC KEY RELATED TO ADDRESS 1> --initial-balance 1
@@ -192,7 +197,7 @@ ipc-cli subnet join --from=<PLEASE PUT ADDRESS 3> --subnet=<PLEASE PUT SUBNET ID
 
 ### Step 6: Deploy the infrastructure
 
-First we need to export the validator private keys for all or wallets into separate files.
+First, we need to export the validator private keys for all wallets into separate files which we will use to set up a validator node.
 
 ```
 ipc-cli wallet export --wallet-type evm --address <PLEASE PUT ADDRESS 1> --hex > ~/.ipc/validator_1.sk
@@ -201,7 +206,7 @@ ipc-cli wallet export --wallet-type evm --address <PLEASE PUT ADDRESS 3> --hex >
 ipc-cli wallet export --wallet-type evm --address <PLEASE PUT ADDRESS 4> --hex > ~/.ipc/validator_4.sk
 ```
 
-Let's start our first validator and make it be the one the others will bootstrap from.
+Let's start our first validator which the rest of the validators will bootstrap from. Make sure you have docker running before running this command.
 
 ```
 cargo make --makefile infra/fendermint/Makefile.toml \
@@ -212,13 +217,65 @@ cargo make --makefile infra/fendermint/Makefile.toml \
     -e CMT_RPC_HOST_PORT=26657 \
     -e ETHAPI_HOST_PORT=8545 \
     -e RESOLVER_HOST_PORT=26655 \
-    -e PARENT_GATEWAY=<PLEASE PUT GATEWAY_ADDR> \
-    -e PARENT_REGISTRY=<PLEASE PUT REGISTRY_ADD> \
+    -e PARENT_GATEWAY=`curl -s https://raw.githubusercontent.com/consensus-shipyard/ipc/cd/contracts/deployments/r314159.json | jq -r '.gateway_addr'` \
+    -e PARENT_REGISTRY=`curl -s https://raw.githubusercontent.com/consensus-shipyard/ipc/cd/contracts/deployments/r314159.json | jq -r '.registry_addr'` \
     -e FM_PULL_SKIP=1 \
     child-validator
 ```
 
-Now, the 2nd validator:
+Once the first validator is up and running, it will print out the relative information for this validator.&#x20;
+
+{% hint style="info" %}
+TIP: Highly recommend documenting that information which will be useful to bootstrap other validators, connect to the IPC subnet on MetaMask, etc.
+{% endhint %}
+
+```
+#################################
+#                               #
+# Subnet node ready! 🚀         #
+#                               #
+#################################
+
+Subnet ID:
+	/r314159/t410f6b2qto756ox3qfoonq4ii6pdrylxwyretgpixuy
+
+Eth API:
+	http://0.0.0.0:8545
+
+Chain ID:
+	3684170297508395
+
+Fendermint API:
+	http://localhost:26658
+
+CometBFT API:
+	http://0.0.0.0:26657
+
+CometBFT node ID:
+	ca644ac3194d39a2834f5d98e141d682772c149b
+
+CometBFT P2P:
+	http://0.0.0.0:26656
+
+IPLD Resolver Multiaddress:
+	/ip4/0.0.0.0/tcp/26655/p2p/16Uiu2HAkwhrWn9hYFQMR2QmW5Ky7HJKSGVkT8xKnQr1oUGCkqWms
+```
+
+You'll need the final component of the `IPLD Resolver Multiaddress` (the `peer ID`) and the `CometBFT node ID` for the next nodes to start.
+
+*   _**BOOTSTRAPS**_: \<CometBFT node ID for validator1>@validator-1-cometbft:26656
+
+    ```
+    // An example
+    ca644ac3194d39a2834f5d98e141d682772c149b@validator-1-cometbft:26656
+    ```
+*   _**RESOLVER\_BOOTSTRAPS**_: /dns/validator-1-fendermint/tcp/26655/p2p/\<Peer ID in IPLD Resolver Multiaddress>
+
+    <pre><code>// An example
+    <strong>/dns/validator-1-fendermint/tcp/26655/p2p/16Uiu2HAkwhrWn9hYFQMR2QmW5Ky7HJKSGVkT8xKnQr1oUGCkqWms
+    </strong></code></pre>
+
+Now, run the 2nd validator in a separate terminal.&#x20;
 
 ```
 cargo make --makefile infra/fendermint/Makefile.toml \
@@ -280,8 +337,6 @@ NOTE:
 * If you are deploying all validators on a single server, ports will need to be different, as shown in above examples. If you are deploying them from different servers, the ports can be similar.
 {% endhint %}
 
-You'll need the final component of the `IPLD Resolver Multiaddress` (the `peer ID`) and the `CometBFT node ID` for the next nodes to start.
-
 ### Step 7: Interact with your subnet using the IPC CLI
 
 * Make sure `~/.ipc/config.toml` contains the configuration of your subnet in the "Subnet template" section. Uncomment the section and populate the corresponding fields
@@ -302,7 +357,7 @@ registry_addr = "0x74539671a1d2f1c8f200826baba665179f53a1b7"
 NOTE: The ETH addresses for `gateway_addr` and `registry_addr` used when they are deployed in genesis in a child subnet by Fendermint are `0x77aa40b105843728088c0132e43fc44348881da8` and `0x74539671a1d2f1c8f200826baba665179f53a1b7`, respectively, so no need to change them.
 {% endhint %}
 
-* Fetch the balances of your wallets using the following command. The result should show the initial balance that you have included for your validators address in genesis:
+* Fetch the balances of your wallets using the following command. The result should show the initial balance that you have included for your validator address in genesis:
 
 ```
 ipc-cli wallet balances --wallet-type evm --subnet=<SUBNET_ID>
@@ -310,7 +365,7 @@ ipc-cli wallet balances --wallet-type evm --subnet=<SUBNET_ID>
 
 ### Step 8: Run a relayer
 
-IPC relies on the role of a specific type of peer on the network called the relayers that are responsible for submitting bottom-up checkpoints that have been finalized in a child subnet to its parent.&#x20;
+IPC relies on the role of a specific type of peer on the network called the relayers that are responsible for submitting bottom-up checkpoints that have been finalized in a child subnet to its parent.
 
 This process is key for the commitment of child subnet checkpoints in the parent, and the execution of bottom-up cross-net messages. Without relayers, cross-net messages will only flow from top levels of the hierarchy to the bottom, but not the other way around.
 
