@@ -32,7 +32,7 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
 
         bytes32 checkpointHash = keccak256(abi.encode(checkpoint));
 
-        // When a bottom up msg batch becomes full, a bottom up checkpoint will be 
+        // When a bottom up msg batch becomes full, a bottom up checkpoint will be
         // created before the next checkpoint period is reached.
         if (checkpoint.blockHeight <= s.lastBottomUpCheckpointHeight + s.bottomUpCheckPeriod) {
             // validate signatures and quorum threshold, revert if validation fails
