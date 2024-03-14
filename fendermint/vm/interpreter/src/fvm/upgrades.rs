@@ -47,7 +47,7 @@ impl UpgradeSchedule {
     pub fn to_file(&self, path: impl AsRef<Path>) -> anyhow::Result<()> {
         let json = serde_json::to_string_pretty(&self.get_all())
             .context("failed to serialize upgrade_info")?;
-        std::fs::write(path, json)?;
+        std::fs::write(path, json).context("failed to write to upgrade_info file")?;
 
         Ok(())
     }

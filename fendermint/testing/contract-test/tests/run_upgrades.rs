@@ -62,13 +62,13 @@ async fn test_applying_upgrades() {
 
     let mut upgrade_schedule = UpgradeSchedule::new();
     upgrade_schedule
-        .add(UpgradeInfo::new(1, 11, "0.37", false))
+        .add(UpgradeInfo::new(1, 11, "0.37.1", false))
         .unwrap();
     upgrade_schedule
-        .add(UpgradeInfo::new(2, 12, "0.37", false))
+        .add(UpgradeInfo::new(2, 12, "0.37.1", false))
         .unwrap();
     upgrade_schedule
-        .add(UpgradeInfo::new(3, 13, "0.37", false))
+        .add(UpgradeInfo::new(3, 13, "0.37.1", false))
         .unwrap();
 
     let mut upgrades = Upgrades::new();
