@@ -51,16 +51,19 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testGatewayDiamond_TransferOwnership() public {
-        address owner = gatewayDiamond.owner();
+        address owner = gatewayDiamond.ownership().owner();
 
-        gatewayDiamond.transferOwnership(address(1));
+        vm.expectRevert(LibDiamond.ZeroAddressNotAllowed.selector);
+        gatewayDiamond.ownership().transferOwnership(address(0));
 
-        address newOwner = gatewayDiamond.owner();
+        gatewayDiamond.ownership().transferOwnership(address(1));
+
+        address newOwner = gatewayDiamond.ownership().owner();
         require(owner != newOwner, "ownership should be updated");
         require(newOwner == address(1), "new owner not address 1");
 
         vm.expectRevert(LibDiamond.NotOwner.selector);
-        gatewayDiamond.transferOwnership(address(1));
+        gatewayDiamond.ownership().transferOwnership(address(1));
     }
 
     function testGatewayDiamond_Constructor() public view {
@@ -98,7 +101,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testGatewayDiamond_LoupeFunction() public view {
-        require(gatewayDiamond.diamondLouper().facets().length == 8, "unexpected length");
+        require(gatewayDiamond.diamondLouper().facets().length == 9, "unexpected length");
         require(
             gatewayDiamond.diamondLouper().supportsInterface(type(IERC165).interfaceId) == true,
             "IERC165 not supported"
