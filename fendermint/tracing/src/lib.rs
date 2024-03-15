@@ -30,11 +30,11 @@
 macro_rules! emit {
     ($event:ident { $($field:ident $(: $value:expr)?),* $(,)? } ) => {{
         // Make sure the emitted fields match the schema of the event.
-        let _dummy = || {
+        if false {
             let _event = $event {
                 $($field $(: $value)?),*
             };
-        };
+        }
         tracing::event!(
             name: stringify!($event),
             tracing::Level::INFO,
