@@ -527,14 +527,8 @@ where
         tokio::spawn(async move {
             let res = ipfs.pin_add(&cid.to_string(), true).await;
             match res {
-                Ok(_) => {
-                    tracing::info!("resolved {} from IPFS", cid);
-                    send_resolve_result(response_channel, Ok(()))
-                }
-                Err(e) => {
-                    tracing::info!("resolving {} from IPFS failed with {}", cid, e);
-                    send_resolve_result(response_channel, Err(anyhow!(e)))
-                }
+                Ok(_) => send_resolve_result(response_channel, Ok(())),
+                Err(e) => send_resolve_result(response_channel, Err(anyhow!(e))),
             }
         });
     }

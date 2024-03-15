@@ -134,6 +134,7 @@ impl Display for IPCParentFinality {
 /// The finality view for an IPC object at certain height.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct IPCObjectFinality {
+    /// The Cid of the object
     pub object: Cid,
 }
 

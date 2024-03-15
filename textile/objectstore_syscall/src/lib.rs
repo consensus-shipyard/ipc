@@ -10,7 +10,6 @@ use fvm::kernel::{ExecutionError, Result, SyscallError};
 use fvm::syscalls::Context;
 use fvm_shared::error::ErrorNumber;
 use ipfs_api_backend_hyper::{IpfsApi, IpfsClient, TryFromUri};
-use log::info;
 use num_traits::FromPrimitive;
 use std::fmt::Display;
 
@@ -40,10 +39,14 @@ pub fn cid_rm(context: Context<'_, impl ObjectStoreOps>, cid_off: u32, cid_len: 
             tokio::spawn(async move {
                 match IpfsClient::from_multiaddr_str(&ipfs_addr) {
                     Ok(ipfs) => match ipfs.pin_rm(&cid.to_string(), true).await {
-                        Ok(_) => info!("unresolved {} from IPFS", cid),
-                        Err(e) => info!("unresolving {} from IPFS failed with {}", cid, e),
+                        Ok(_) => tracing::debug!(cid = ?cid, "unresolved content from ipfs"),
+                        Err(e) => {
+                            tracing::error!(cid = ?cid, error = e.to_string(), "unresolving content from ipfs failed")
+                        }
                     },
-                    Err(e) => info!("unresolving {} from IPFS failed with {}", cid, e),
+                    Err(e) => {
+                        tracing::error!(cid = ?cid, error = e.to_string(), "unresolving content from ipfs failed")
+                    }
                 }
             });
             Ok(())

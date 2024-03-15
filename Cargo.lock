@@ -5257,7 +5257,6 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -6875,9 +6874,9 @@ dependencies = [
  "fvm_ipld_blockstore",
  "fvm_shared",
  "ipfs-api-backend-hyper",
- "log",
  "num-traits",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

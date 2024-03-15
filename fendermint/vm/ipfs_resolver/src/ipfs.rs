@@ -15,8 +15,8 @@ use serde::Serialize;
 
 use crate::pool::{ResolveQueue, ResolveTask};
 
-/// The IPLD Resolver takes resolution tasks from the [ResolvePool] and
-/// uses the [ipc_ipld_resolver] to fetch the content from subnets.
+/// The IPFS Resolver takes resolution tasks from the [ResolvePool] and
+/// uses the [ipc_ipld_resolver] to fetch the content from the local IPFS node.
 pub struct IpfsResolver<V> {
     client: Client<V>,
     queue: ResolveQueue,
@@ -51,7 +51,7 @@ where
         }
     }
 
-    /// Start taking tasks from the resolver pool and resolving them using the IPLD Resolver.
+    /// Start taking tasks from the resolver pool and resolving them using the IPFS Resolver.
     pub async fn run(self) {
         loop {
             let task = atomically(|| {
@@ -90,7 +90,7 @@ fn start_resolve<V>(
     V: Clone + Send + Sync + Serialize + DeserializeOwned + 'static,
 {
     tokio::spawn(async move {
-        tracing::info!(cid = ?task.cid(), "starting ipfs content resolve");
+        tracing::debug!(cid = ?task.cid(), "starting ipfs content resolve");
         let res = client.resolve_ipfs(task.cid()).await;
 
         let err = match res {
@@ -109,13 +109,15 @@ fn start_resolve<V>(
 
         match err {
             None => {
-                tracing::info!(cid = ?task.cid(), "ipfs content resolved");
+                tracing::debug!(cid = ?task.cid(), "ipfs content resolved");
+
+                // Mark task as resolved
                 atomically(|| task.set_resolved()).await;
 
                 let vote = to_vote(task.cid());
-
                 match VoteRecord::signed(&key, subnet_id, vote) {
                     Ok(vote) => {
+                        // Add our own vote
                         let validator_key = ValidatorKey::from(key.public());
                         let res = atomically_or_err(|| {
                             vote_tally.add_object_vote(validator_key.clone(), task.cid().to_bytes())
@@ -123,16 +125,19 @@ fn start_resolve<V>(
                         .await;
 
                         match res {
-                            Ok(_) => {
-                                if let Err(e) = client.publish_vote(vote) {
-                                    tracing::error!(
-                                        error = e.to_string(),
-                                        "failed to publish vote"
-                                    );
+                            Ok(added) => {
+                                if added {
+                                    // Send own vote to peers
+                                    if let Err(e) = client.publish_vote(vote) {
+                                        tracing::error!(
+                                            error = e.to_string(),
+                                            "failed to publish vote"
+                                        );
+                                    }
                                 }
                             }
                             Err(e) => {
-                                tracing::warn!(error = e.to_string(), "failed to handle own vote");
+                                tracing::error!(error = e.to_string(), "failed to handle own vote");
                             }
                         }
                     }

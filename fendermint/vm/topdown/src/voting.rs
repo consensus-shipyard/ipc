@@ -64,8 +64,17 @@ pub struct VoteTally<K = ValidatorKey, V = BlockHash, O = Object> {
     /// and is often retried due to votes being added.
     pause_votes: TVar<bool>,
 
+    /// The *finalized collection* of objects as observed by this node.
+    ///
+    /// The record of this collection will have been included on chain, but we'll need to
+    /// figure out pruning and how to make this resilient to node restarts.
     objects: TVar<im::HashMap<O, bool>>,
+
+    /// Index votes received by object.
     object_votes: TVar<im::HashMap<O, im::HashSet<K>>>,
+
+    /// Adding votes can be paused if we observe that looking for a quorum takes too long
+    /// and is often retried due to votes being added.
     pause_object_votes: TVar<bool>,
 }
 
@@ -299,14 +308,18 @@ where
         Ok(())
     }
 
-    /// Add a vote we received.
+    /// Add a vote for an object we received.
     ///
     /// Returns `true` if this vote was added, `false` if it was ignored as a
-    /// duplicate or a height we already finalized, and an error if it's an
+    /// duplicate or was already finalized, and an error if it's an
     /// equivocation or from a validator we don't know.
     pub fn add_object_vote(&self, validator_key: K, object: O) -> StmResult<bool, Error<K, O>> {
         if *self.pause_object_votes.read()? {
             retry()?;
+        }
+
+        if self.is_object_finalized(&object)? {
+            return Ok(false);
         }
 
         if !self.has_power(&validator_key)? {
@@ -331,7 +344,8 @@ where
         self.pause_object_votes.write(true)
     }
 
-    /// Find a block on the (from our perspective) finalized chain that gathered enough votes from validators.
+    /// Determine if a quorum exists on an object (from our perspective) from gathered enough
+    /// votes from validators.
     pub fn find_object_quorum(&self, object: &O) -> Stm<bool> {
         self.pause_object_votes.write(false)?;
 
@@ -357,6 +371,8 @@ where
         Ok(weight >= quorum_threshold)
     }
 
+    /// Determine whether an object is finalized. Finalized means that a quorum was reached and
+    /// "finalized" on chain.
     pub fn is_object_finalized(&self, object: &O) -> Stm<bool> {
         Ok(self.objects.read()?.contains_key(object))
     }
