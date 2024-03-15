@@ -26,6 +26,7 @@ members = [
   "fendermint/testing",
   "fendermint/testing/materializer",
   "fendermint/testing/*-test",
+  "fendermint/tracing",
   "fendermint/vm/*",
   "fendermint/actors",
   "fendermint/actors/chainmetadata",
