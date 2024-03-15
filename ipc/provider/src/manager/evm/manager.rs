@@ -820,19 +820,19 @@ impl SubnetManager for EthSubnetManager {
         let addresses: Vec<ethers::core::types::Address> = validators.iter().map(
             |validator_address| payload_to_evm_address(validator_address.payload()).unwrap()
         ).collect();
-        log::info!("converted addresses {:?}:", addresses);
+        log::debug!("converted addresses {:?}:", addresses);
 
         let pubkeys: Vec<ethers::core::types::Bytes> = public_keys.iter().map(
             |key| ethers::core::types::Bytes::from(key.clone())
         ).collect();
-        log::info!("converted pubkeys {:?}:", pubkeys);
+        log::debug!("converted pubkeys {:?}:", pubkeys);
 
         let power_u256: Vec<ethers::core::types::U256> = federated_power.iter().map(
             |power| ethers::core::types::U256::from(*power)
         ).collect();
-        log::info!("converted power {:?}:", power_u256);
+        log::debug!("converted power {:?}:", power_u256);
 
-        log::info!("from address {:?}:", from);
+        log::debug!("from address {:?}:", from);
 
         let signer = Arc::new(self.get_signer(from)?);
         let call = contract.set_federated_power(addresses, pubkeys, power_u256);
