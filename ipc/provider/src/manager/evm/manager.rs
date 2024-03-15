@@ -803,33 +803,34 @@ impl SubnetManager for EthSubnetManager {
         &self,
         from: &Address,
         subnet: &SubnetID,
-        validators: &Vec<Address>,
-        public_keys: &Vec<Vec<u8>>,
-        federated_power: &Vec<u128>,
+        validators: &[Address],
+        public_keys: &[Vec<u8>],
+        federated_power: &[u128],
     ) -> Result<ChainEpoch> {
-        let address = contract_address_from_subnet(&subnet)?;
-        log::info!(
-            "interacting with evm subnet contract: {address:}"
-        );
+        let address = contract_address_from_subnet(subnet)?;
+        log::info!("interacting with evm subnet contract: {address:}");
 
         let contract = subnet_actor_manager_facet::SubnetActorManagerFacet::new(
             address,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
 
-        let addresses: Vec<ethers::core::types::Address> = validators.iter().map(
-            |validator_address| payload_to_evm_address(validator_address.payload()).unwrap()
-        ).collect();
+        let addresses: Vec<ethers::core::types::Address> = validators
+            .iter()
+            .map(|validator_address| payload_to_evm_address(validator_address.payload()).unwrap())
+            .collect();
         log::debug!("converted addresses {:?}:", addresses);
 
-        let pubkeys: Vec<ethers::core::types::Bytes> = public_keys.iter().map(
-            |key| ethers::core::types::Bytes::from(key.clone())
-        ).collect();
+        let pubkeys: Vec<ethers::core::types::Bytes> = public_keys
+            .iter()
+            .map(|key| ethers::core::types::Bytes::from(key.clone()))
+            .collect();
         log::debug!("converted pubkeys {:?}:", pubkeys);
 
-        let power_u256: Vec<ethers::core::types::U256> = federated_power.iter().map(
-            |power| ethers::core::types::U256::from(*power)
-        ).collect();
+        let power_u256: Vec<ethers::core::types::U256> = federated_power
+            .iter()
+            .map(|power| ethers::core::types::U256::from(*power))
+            .collect();
         log::debug!("converted power {:?}:", power_u256);
 
         log::debug!("from address {:?}:", from);

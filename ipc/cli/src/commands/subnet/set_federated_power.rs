@@ -1,10 +1,10 @@
-use std::str::FromStr;
+use crate::commands::{get_ipc_provider, require_fil_addr_from_str};
+use crate::{CommandLineHandler, GlobalArguments};
 use async_trait::async_trait;
 use clap::Args;
 use fvm_shared::address::Address;
 use ipc_api::subnet_id::SubnetID;
-use crate::{CommandLineHandler, GlobalArguments};
-use crate::commands::{get_ipc_provider, require_fil_addr_from_str};
+use std::str::FromStr;
 
 /// The command to set federated power.
 pub struct SetFederatedPower;
@@ -19,17 +19,29 @@ impl CommandLineHandler for crate::commands::subnet::SetFederatedPower {
         let provider = get_ipc_provider(global)?;
         let subnet = SubnetID::from_str(&arguments.subnet)?;
 
-        let addresses: Vec<Address> = arguments.validator_addresses.iter().map(
-            |address| require_fil_addr_from_str(address).unwrap()
-        ).collect();
+        let addresses: Vec<Address> = arguments
+            .validator_addresses
+            .iter()
+            .map(|address| require_fil_addr_from_str(address).unwrap())
+            .collect();
 
-        let public_keys: Vec<Vec<u8>> = arguments.validator_pubkeys.iter().map(
-            |key| hex::decode(key).unwrap()
-        ).collect();
+        let public_keys: Vec<Vec<u8>> = arguments
+            .validator_pubkeys
+            .iter()
+            .map(|key| hex::decode(key).unwrap())
+            .collect();
 
         let from_address = require_fil_addr_from_str(&arguments.from).unwrap();
 
-        let chain_epoch = provider.set_federated_power(&from_address, &subnet, &addresses, &public_keys, &arguments.validator_power).await?;
+        let chain_epoch = provider
+            .set_federated_power(
+                &from_address,
+                &subnet,
+                &addresses,
+                &public_keys,
+                &arguments.validator_power,
+            )
+            .await?;
         println!("New federated power is set at epoch {chain_epoch}");
 
         Ok(())

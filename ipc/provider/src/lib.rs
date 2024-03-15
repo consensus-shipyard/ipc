@@ -770,20 +770,22 @@ impl IpcProvider {
         conn.manager().latest_parent_finality().await
     }
 
-
     pub async fn set_federated_power(
         &self,
         from: &Address,
         subnet: &SubnetID,
-        validators: &Vec<Address>,
-        public_keys: &Vec<Vec<u8>>,
-        federated_power: &Vec<u128>) -> anyhow::Result<ChainEpoch> {
+        validators: &[Address],
+        public_keys: &[Vec<u8>],
+        federated_power: &[u128],
+    ) -> anyhow::Result<ChainEpoch> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
         let conn = match self.connection(&parent) {
             None => return Err(anyhow!("target parent subnet not found")),
             Some(conn) => conn,
         };
-        conn.manager().set_federated_power(from, subnet, validators, public_keys, federated_power).await
+        conn.manager()
+            .set_federated_power(from, subnet, validators, public_keys, federated_power)
+            .await
     }
 }
 

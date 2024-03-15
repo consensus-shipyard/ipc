@@ -9,13 +9,13 @@ pub use crate::commands::subnet::leave::{LeaveSubnet, LeaveSubnetArgs};
 use crate::commands::subnet::list_subnets::{ListSubnets, ListSubnetsArgs};
 use crate::commands::subnet::rpc::{RPCSubnet, RPCSubnetArgs};
 use crate::commands::subnet::send_value::{SendValue, SendValueArgs};
+use crate::commands::subnet::set_federated_power::{SetFederatedPower, SetFederatedPowerArgs};
 use crate::commands::subnet::show_gateway_contract_commit_sha::{
     ShowGatewayContractCommitSha, ShowGatewayContractCommitShaArgs,
 };
 use crate::commands::subnet::validator::{ValidatorInfo, ValidatorInfoArgs};
 use crate::{CommandLineHandler, GlobalArguments};
 use clap::{Args, Subcommand};
-use crate::commands::subnet::set_federated_power::{SetFederatedPower, SetFederatedPowerArgs};
 
 use self::bootstrap::{AddBootstrap, AddBootstrapArgs, ListBootstraps, ListBootstrapsArgs};
 use self::join::{StakeSubnet, StakeSubnetArgs, UnstakeSubnet, UnstakeSubnetArgs};
@@ -31,9 +31,9 @@ pub mod leave;
 pub mod list_subnets;
 pub mod rpc;
 pub mod send_value;
+mod set_federated_power;
 pub mod show_gateway_contract_commit_sha;
 mod validator;
-mod set_federated_power;
 
 #[derive(Debug, Args)]
 #[command(
