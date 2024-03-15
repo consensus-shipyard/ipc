@@ -11,7 +11,7 @@ DOT_ENV_FILE=${HOME}/ipc/extras/linked-token/.env
 DOT_ENV_TEMPLATE=${HOME}/ipc/extras/linked-token/.env.template
 
 if (($# != 1)); then
-  echo "Arguments: <Specify github remote branch name to use to deploy. Or use 'local' (without quote) to indicate using local repo instead. If not provided, will default to main branch"
+  echo "Arguments: <branch_name>: Specify github remote branch name to use to deploy. Or use 'local' (without quote) to indicate using local repo instead. If not provided, will default to main branch"
   head_ref=main
   local_deploy=false
 else
