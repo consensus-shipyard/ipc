@@ -38,7 +38,7 @@ macro_rules! emit {
         tracing::event!(
             name: stringify!($event),
             tracing::Level::INFO,
-            { $($field $(= $value)?),* }
+            { event = stringify!($event), $($field $(= $value)?),* }
         )
     }};
 }
