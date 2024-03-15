@@ -49,6 +49,7 @@ fendermint_tracing = { path = "../tracing" }
 fendermint_vm_actor_interface = { path = "../vm/actor_interface" }
 fendermint_vm_core = { path = "../vm/core" }
 fendermint_vm_encoding = { path = "../vm/encoding" }
+fendermint_vm_event = { path = "../vm/event" }
 fendermint_vm_genesis = { path = "../vm/genesis" }
 fendermint_vm_interpreter = { path = "../vm/interpreter", features = [
     "bundle",

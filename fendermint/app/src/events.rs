@@ -3,6 +3,9 @@
 
 use crate::BlockHeight;
 
+/// Re-export other events, just to provide the visibility of where they are.
+pub use fendermint_vm_event::{NewBottomUpCheckpoint, NewParentView, ParentFinalityCommitted};
+
 pub struct ProposalProcessed<'a> {
     pub is_accepted: bool,
     pub block_height: BlockHeight,
