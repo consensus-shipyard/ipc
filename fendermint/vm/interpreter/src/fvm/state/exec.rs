@@ -60,6 +60,7 @@ pub struct FvmStateParams {
     /// Conversion from collateral to voting power.
     pub power_scale: PowerScale,
     /// The application protocol version.
+    #[serde(default)]
     pub app_version: u64,
 }
 
