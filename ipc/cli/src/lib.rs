@@ -34,13 +34,18 @@ pub trait CommandLineHandler {
 pub struct GlobalArguments {
     #[arg(
         long,
-        help = "The toml config file path for IPC Agent, default to ${HOME}/.ipc-agent/config.toml"
+        help = "The toml config file path for IPC Agent, default to ${HOME}/.ipc/config.toml",
+        env = "IPC_CLI_CONFIG_PATH"
     )]
     config_path: Option<String>,
 
     /// Set the FVM Address Network. It's value affects whether `f` (main) or `t` (test) prefixed addresses are accepted.
-    #[arg(long, default_value = "testnet", env = "NETWORK", value_parser = parse_network)]
-    pub network: Network,
+    #[arg(long, default_value = "testnet", env = "IPC_NETWORK", value_parser = parse_network)]
+    _network: Network,
+
+    /// Legacy env var for network
+    #[arg(hide = true, env = "NETWORK", value_parser = parse_network)]
+    __network: Option<Network>,
 }
 
 impl GlobalArguments {
@@ -53,6 +58,10 @@ impl GlobalArguments {
     pub fn config(&self) -> Result<Config> {
         let config_path = self.config_path();
         Config::from_file(config_path)
+    }
+
+    pub fn network(&self) -> Network {
+        self.__network.unwrap_or(self._network)
     }
 }
 
