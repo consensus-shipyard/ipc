@@ -42,7 +42,7 @@ jobs:
         run: cargo install aderyn
 
       - name: Run aderyn
-        run: cd contracts && aderyn ./
+        run: cd contracts && aderyn ./ -o report.json
 
       - name: Check results
         run: cd contracts && ./tools/check_aderyn.sh

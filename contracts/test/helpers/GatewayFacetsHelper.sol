@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
+import {OwnershipFacet} from "../../src/OwnershipFacet.sol";
 import {GatewayGetterFacet} from "../../src/gateway/GatewayGetterFacet.sol";
 import {GatewayManagerFacet} from "../../src/gateway/GatewayManagerFacet.sol";
 import {GatewayMessengerFacet} from "../../src/gateway/GatewayMessengerFacet.sol";
@@ -12,6 +13,11 @@ import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 
 library GatewayFacetsHelper {
+    function ownership(address gw) internal pure returns (OwnershipFacet) {
+        OwnershipFacet facet = OwnershipFacet(gw);
+        return facet;
+    }
+
     function getter(address gw) internal pure returns (GatewayGetterFacet) {
         GatewayGetterFacet facet = GatewayGetterFacet(gw);
         return facet;
@@ -43,6 +49,10 @@ library GatewayFacetsHelper {
     }
 
     //
+    function ownership(GatewayDiamond gw) internal pure returns (OwnershipFacet) {
+        OwnershipFacet facet = OwnershipFacet(address(gw));
+        return facet;
+    }
 
     function getter(GatewayDiamond gw) internal pure returns (GatewayGetterFacet) {
         GatewayGetterFacet facet = GatewayGetterFacet(address(gw));
