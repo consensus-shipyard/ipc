@@ -1,3 +1,6 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: MIT
+
 //! The one place where the parameters send to ipc contracts are preprocessed, i.e.
 //! setting default/missing parameter, checking if the parameters are valid.
 
