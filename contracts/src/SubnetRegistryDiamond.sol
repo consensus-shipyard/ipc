@@ -8,6 +8,7 @@ import {IERC165} from "./interfaces/IERC165.sol";
 import {SubnetRegistryActorStorage} from "./lib/LibSubnetRegistryStorage.sol";
 import {GatewayCannotBeZero, FacetCannotBeZero} from "./errors/IPCErrors.sol";
 import {LibDiamond} from "./lib/LibDiamond.sol";
+
 error FunctionNotFound(bytes4 _functionSelector);
 
 contract SubnetRegistryDiamond {

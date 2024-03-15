@@ -532,6 +532,7 @@ mod tests {
             bundle::{bundle_path, contracts_path, custom_actors_bundle_path},
             state::ipc::GatewayCaller,
             store::memory::MemoryBlockstore,
+            upgrades::UpgradeScheduler,
             FvmMessageInterpreter,
         },
         GenesisInterpreter,
@@ -651,7 +652,15 @@ mod tests {
     fn make_interpreter(
     ) -> FvmMessageInterpreter<MemoryBlockstore, MockClient<MockRequestMethodMatcher>> {
         let (client, _) = MockClient::new(MockRequestMethodMatcher::default());
-        FvmMessageInterpreter::new(client, None, contracts_path(), 1.05, 1.05, false)
+        FvmMessageInterpreter::new(
+            client,
+            None,
+            contracts_path(),
+            1.05,
+            1.05,
+            false,
+            UpgradeScheduler::new(),
+        )
     }
 
     fn read_bundle() -> Vec<u8> {

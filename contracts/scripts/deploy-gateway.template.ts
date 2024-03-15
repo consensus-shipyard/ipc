@@ -92,6 +92,7 @@ export async function deploy(libs: { [key in string]: string }) {
             libs: xnetMessagingFacetLibs,
         },
         { name: 'TopDownFinalityFacet', libs: topDownFinalityFacetLibs },
+        { name: 'OwnershipFacet', libs: {} },
     ]
 
     for (const facet of facets) {

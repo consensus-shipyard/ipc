@@ -374,6 +374,7 @@ mod tests {
             circ_supply: Default::default(),
             chain_id: 1024,
             power_scale: 0,
+            app_version: 0,
         };
         let block_height = 2048;
 

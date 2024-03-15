@@ -12,7 +12,7 @@ import {METHOD_SEND} from "../../src/constants/Constants.sol";
 import {ConsensusType} from "../../src/enums/ConsensusType.sol";
 import {BottomUpMsgBatch, IpcEnvelope, BottomUpCheckpoint} from "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
-import {SubnetID, PermissionMode, IPCAddress, Subnet, SupplySource, ValidatorInfo} from "../../src/structs/Subnet.sol";
+import {SubnetID, PermissionMode, IPCAddress, Subnet, SupplySource, ValidatorInfo, GenesisValidator} from "../../src/structs/Subnet.sol";
 import {IERC165} from "../../src/interfaces/IERC165.sol";
 import {IGateway} from "../../src/interfaces/IGateway.sol";
 import {IDiamond} from "../../src/interfaces/IDiamond.sol";
@@ -24,6 +24,7 @@ import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
 import {GatewayDiamond} from "../../src/GatewayDiamond.sol";
 import {SubnetActorDiamond, FunctionNotFound} from "../../src/SubnetActorDiamond.sol";
 import {SubnetActorManagerFacet} from "../../src/subnet/SubnetActorManagerFacet.sol";
+import {OwnershipFacet} from "../../src/OwnershipFacet.sol";
 import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
 import {SubnetActorPauseFacet} from "../../src/subnet/SubnetActorPauseFacet.sol";
 import {SubnetActorCheckpointingFacet} from "../../src/subnet/SubnetActorCheckpointingFacet.sol";
@@ -75,7 +76,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testSubnetActorDiamondReal_LoupeFunction() public view {
-        require(saDiamond.diamondLouper().facets().length == 7, "unexpected length");
+        require(saDiamond.diamondLouper().facets().length == 8, "unexpected length");
         require(
             saDiamond.diamondLouper().supportsInterface(type(IERC165).interfaceId) == true,
             "IERC165 not supported"
@@ -88,6 +89,79 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             saDiamond.diamondLouper().supportsInterface(type(IDiamondLoupe).interfaceId) == true,
             "IDiamondLoupe not supported"
         );
+    }
+
+    /// @notice Testing the genesis validator's collateral
+    function testSubnetActorDiamond_GenesisValidators() public {
+        (address validator1, , bytes memory publicKey1) = TestUtils.newValidator(100);
+        uint256 validator1Stake = DEFAULT_MIN_VALIDATOR_STAKE / 2;
+
+        // initial validator joins
+        vm.deal(validator1, 10 ether); // gas concern free
+        vm.startPrank(validator1);
+
+        saDiamond.manager().join{value: validator1Stake}(publicKey1);
+
+        GenesisValidator[] memory validators = saDiamond.getter().genesisValidators();
+        require(validators[0].addr == validator1);
+        require(validators[0].collateral == validator1Stake);
+        require(keccak256(validators[0].metadata) == keccak256(publicKey1));
+        require(validators[0].federatedPower == 0);
+
+        // subnet will be bootstrapped
+        saDiamond.manager().stake{value: validator1Stake + 1}();
+        validators = saDiamond.getter().genesisValidators();
+        require(validators[0].addr == validator1);
+        require(validators[0].collateral == validator1Stake * 2 + 1);
+
+        // subnet already bootstrapped, will no longer trigger chanes
+        saDiamond.manager().stake{value: validator1Stake + 1}();
+        validators = saDiamond.getter().genesisValidators();
+        require(validators[0].addr == validator1);
+        require(validators[0].collateral == validator1Stake * 2 + 1);
+
+        saDiamond.manager().leave();
+        validators = saDiamond.getter().genesisValidators();
+        require(validators[0].addr == validator1);
+        require(validators[0].collateral == validator1Stake * 2 + 1);
+    }
+
+    /// @notice Testing the genesis validator's collateral
+    function testSubnetActorDiamond_RemoveGenesisValidators() public {
+        (address validator1, , bytes memory publicKey1) = TestUtils.newValidator(100);
+        uint256 validator1Stake = DEFAULT_MIN_VALIDATOR_STAKE / 2;
+
+        // initial validator joins
+        vm.deal(validator1, 10 ether); // gas concern free
+        vm.startPrank(validator1);
+
+        saDiamond.manager().join{value: validator1Stake}(publicKey1);
+
+        saDiamond.manager().leave();
+        require(saDiamond.getter().genesisValidators().length == 0);
+    }
+
+    /// @notice Testing the genesis validator's collateral
+    function testSubnetActorDiamond_UnstakeGenesisValidators() public {
+        (address validator1, , bytes memory publicKey1) = TestUtils.newValidator(100);
+        uint256 validator1Stake = DEFAULT_MIN_VALIDATOR_STAKE / 2;
+
+        // initial validator joins
+        vm.deal(validator1, 10 ether); // gas concern free
+        vm.startPrank(validator1);
+
+        saDiamond.manager().join{value: validator1Stake}(publicKey1);
+        GenesisValidator[] memory validators = saDiamond.getter().genesisValidators();
+        require(validators[0].addr == validator1);
+
+        saDiamond.manager().unstake(validator1Stake / 2);
+        validators = saDiamond.getter().genesisValidators();
+        require(validators[0].addr == validator1);
+        require(validators[0].collateral == validator1Stake / 2, "collateral not match");
+
+        // unstake everything else
+        saDiamond.manager().unstake(validator1Stake / 2);
+        require(saDiamond.getter().genesisValidators().length == 0, "should not be validator");
     }
 
     /// @notice Testing the basic join, stake, leave lifecycle of validators
@@ -318,6 +392,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         SubnetActorPauseFacet saDupPauserFaucet = new SubnetActorPauseFacet();
         SubnetActorRewardFacet saDupRewardFaucet = new SubnetActorRewardFacet();
         SubnetActorCheckpointingFacet saDupCheckpointerFaucet = new SubnetActorCheckpointingFacet();
+        OwnershipFacet saOwnershipFacet = new OwnershipFacet();
 
         SupplySource memory native = SupplySourceHelper.native();
 
@@ -340,7 +415,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             address(saDupMangerFaucet),
             address(saDupPauserFaucet),
             address(saDupRewardFaucet),
-            address(saDupCheckpointerFaucet)
+            address(saDupCheckpointerFaucet),
+            address(saOwnershipFacet)
         );
     }
 

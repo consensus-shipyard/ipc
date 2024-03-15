@@ -70,6 +70,7 @@ def main():
          'src/GatewayDiamond.sol',
          'src/SubnetActorDiamond.sol',
          'src/SubnetRegistryDiamond.sol',
+         'src/OwnershipFacet.sol',
          'src/diamond/DiamondCutFacet.sol',
          'src/diamond/DiamondLoupeFacet.sol',
          'src/gateway/GatewayGetterFacet.sol',

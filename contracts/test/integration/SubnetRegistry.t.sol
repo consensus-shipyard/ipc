@@ -88,7 +88,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
     }
 
     function test_Registry_Deployment_IERC165() public view {
-        require(registryLouper.facets().length == 4, "unexpected length");
+        require(registryLouper.facets().length == 5, "unexpected length");
         require(registryLouper.facetAddresses().length == registryLouper.facets().length, "inconsistent diamond size");
         require(registryLouper.supportsInterface(type(IERC165).interfaceId) == true, "IERC165 not supported");
         require(registryLouper.supportsInterface(type(IDiamondCut).interfaceId) == true, "IDiamondCut not supported");

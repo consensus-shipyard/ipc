@@ -42,6 +42,7 @@ async function deploySubnetActorDiamond(
         { name: 'SubnetActorRewardFacet', libs: rewarderFacetLibs },
         { name: 'SubnetActorCheckpointingFacet', libs: checkpointerFacetLibs },
         { name: 'SubnetActorPauseFacet', libs: pauserFacetLibs },
+        { name: 'OwnershipFacet', libs: {} },
     ]
     // The `facetCuts` variable is the FacetCut[] that contains the functions to add during diamond deployment
     const facetCuts = []

@@ -12,4 +12,3 @@ pub use store::{AppStore, BitswapBlockstore};
 pub type BlockHeight = u64;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const APP_VERSION: u64 = 0;
