@@ -1,3 +1,7 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: MIT
+//! Set federated power cli handler
+
 use crate::commands::{get_ipc_provider, require_fil_addr_from_str};
 use crate::{CommandLineHandler, GlobalArguments};
 use async_trait::async_trait;
