@@ -92,7 +92,7 @@ cd $LINKED_TOKEN_FOLDER
 for retry in {0..20}
 do
   check_balance_output=$(make check-balance)
-  balance=$(echo $check_balance_output | grep -oP '0x[\S]+')
+  balance=$(echo $check_balance_output | grep -oP '0x[\S]*')
   if [ $balance = '0x0000000000000000000000000000000000000000000000000000000000000000' ]; then
     if (( $retry < 20 )); then
       echo "Balance $balance is still zero. Will wait and retry...(attempt $retry)"
@@ -140,7 +140,7 @@ sleep 10
 for retry in {0..20}
 do
   check_balance_output=$(make check-balance)
-  balance=$(echo $check_balance_output | grep -oP '0x[\S]+')
+  balance=$(echo $check_balance_output | grep -oP '0x[\S]*')
   if [ $balance != '0x0000000000000000000000000000000000000000000000000000000000000000' ]; then
     if (( $retry < 20 )); then
       echo "Balance $balance has not been reduced. Will wait and retry...(attempt $retry)"
@@ -162,7 +162,7 @@ sleep 10
 for retry in {0..100}
 do
   check_balance_output=$(make check-replica-balance)
-  balance=$(echo $check_balance_output | grep -oP '0x[\S]+')
+  balance=$(echo $check_balance_output | grep -oP '0x[\S]*')
   if [ $balance = '0x0000000000000000000000000000000000000000000000000000000000000000' ]; then
     if (( $retry < 100 )); then
       echo "Balance $balance has not been increased in replica contract. Will wait and retry...(attempt $retry)"
