@@ -265,6 +265,8 @@ impl Settings {
             .set_override("home_dir", home_dir.to_string_lossy().as_ref())?
             .build()?;
 
+        eprintln!("CONFIG = {:?}", c.cache);
+
         // Deserialize (and thus freeze) the entire configuration.
         c.try_deserialize()
     }
