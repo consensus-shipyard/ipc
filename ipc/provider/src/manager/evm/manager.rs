@@ -37,7 +37,7 @@ use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::{Signer, SignerMiddleware};
 use ethers::providers::{Authorization, Http, Middleware, Provider};
 use ethers::signers::{LocalWallet, Wallet};
-use ethers::types::{Eip1559TransactionRequest, I256, U256};
+use ethers::types::{Eip1559TransactionRequest, ValueOrArray, I256, U256};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_api::checkpoint::{
@@ -132,7 +132,8 @@ impl TopDownFinalityQuery for EthSubnetManager {
             .event::<lib_gateway::NewTopDownMessageFilter>()
             .from_block(epoch as u64)
             .to_block(epoch as u64)
-            .topic1(topic1);
+            .topic1(topic1)
+            .address(ValueOrArray::Value(gateway_contract.address()));
 
         let mut messages = vec![];
         let mut hash = None;
@@ -193,7 +194,8 @@ impl TopDownFinalityQuery for EthSubnetManager {
         let ev = contract
             .event::<lib_staking_change_log::NewStakingChangeRequestFilter>()
             .from_block(epoch as u64)
-            .to_block(epoch as u64);
+            .to_block(epoch as u64)
+            .address(ValueOrArray::Value(contract.address()));
 
         let mut changes = vec![];
         let mut hash = None;
@@ -1102,7 +1104,8 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
         let ev = contract
             .event::<lib_quorum::QuorumReachedFilter>()
             .from_block(height as u64)
-            .to_block(height as u64);
+            .to_block(height as u64)
+            .address(ValueOrArray::Value(contract.address()));
 
         let mut events = vec![];
         for (event, _meta) in query_with_meta(ev, contract.client()).await? {
