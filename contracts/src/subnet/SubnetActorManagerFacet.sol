@@ -5,11 +5,12 @@ import {VALIDATOR_SECP256K1_PUBLIC_KEY_LENGTH} from "../constants/Constants.sol"
 import {ERR_VALIDATOR_JOINED, ERR_VALIDATOR_NOT_JOINED} from "../errors/IPCErrors.sol";
 import {InvalidFederationPayload, SubnetAlreadyBootstrapped, NotEnoughFunds, CollateralIsZero, CannotReleaseZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalance, NotEnoughCollateral, NotValidator, NotAllValidatorsHaveLeft, InvalidPublicKeyLength, MethodNotAllowed, SubnetNotBootstrapped} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
-import {Validator, ValidatorSet} from "../structs/Subnet.sol";
+import {Validator, ValidatorSet, SubnetGenesis} from "../structs/Subnet.sol";
 import {LibDiamond} from "../lib/LibDiamond.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
 import {SubnetActorModifiers} from "../lib/LibSubnetActorStorage.sol";
 import {LibValidatorSet, LibStaking} from "../lib/LibStaking.sol";
+import {LibGenesis} from "../lib/LibGenesis.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
 import {LibSubnetActor} from "../lib/LibSubnetActor.sol";
@@ -18,6 +19,7 @@ import {Pausable} from "../lib/LibPausable.sol";
 contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausable {
     using EnumerableSet for EnumerableSet.AddressSet;
     using LibValidatorSet for ValidatorSet;
+    using LibGenesis for SubnetGenesis;
     using Address for address payable;
 
     /// @notice method to add some initial balance into a subnet that hasn't yet bootstrapped.
@@ -142,6 +144,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             // confirm validators deposit immediately
             LibStaking.setMetadataWithConfirm(msg.sender, publicKey);
             LibStaking.depositWithConfirm(msg.sender, msg.value);
+            s.genesis.addValidator(msg.sender);
 
             LibSubnetActor.bootstrapSubnetIfNeeded();
         } else {
@@ -169,7 +172,6 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
 
         if (!s.bootstrapped) {
             LibStaking.depositWithConfirm(msg.sender, msg.value);
-
             LibSubnetActor.bootstrapSubnetIfNeeded();
         } else {
             LibStaking.deposit(msg.sender, msg.value);
@@ -193,11 +195,17 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
         if (collateral == 0) {
             revert NotValidator(msg.sender);
         }
-        if (collateral <= amount) {
+        if (collateral < amount) {
             revert NotEnoughCollateral();
         }
         if (!s.bootstrapped) {
             LibStaking.withdrawWithConfirm(msg.sender, amount);
+
+            uint256 total = LibStaking.totalValidatorCollateral(msg.sender);
+            if (total == 0) {
+                s.genesis.removeValidator(msg.sender);
+            }
+
             return;
         }
 
@@ -237,6 +245,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
 
             // interaction must be performed after checks and changes
             LibStaking.withdrawWithConfirm(msg.sender, amount);
+            s.genesis.removeValidator(msg.sender);
             return;
         }
         LibStaking.withdraw(msg.sender, amount);

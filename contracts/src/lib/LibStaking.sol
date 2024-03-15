@@ -9,6 +9,7 @@ import {LibStakingChangeLog} from "./LibStakingChangeLog.sol";
 import {PermissionMode, StakingReleaseQueue, StakingChangeLog, StakingChange, StakingChangeRequest, StakingOperation, StakingRelease, ValidatorSet, AddressStakingReleases, ParentValidatorsTracker, GenesisValidator, Validator} from "../structs/Subnet.sol";
 import {WithdrawExceedingCollateral, NotValidator, CannotConfirmFutureChanges, NoCollateralToWithdraw, AddressShouldBeValidator, InvalidConfigurationNumber} from "../errors/IPCErrors.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
+import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 
 library LibAddressStakingReleases {
     /// @notice Add new release to the storage. Caller makes sure the release.releasedAt is ordered
@@ -172,7 +173,6 @@ library LibValidatorSet {
         }
         collateral += getTotalConfirmedCollateral(validators);
     }
-
 
     /// @notice Get the total power of the validators.
     /// The function reverts if at least one validator is not in the active validator set.
@@ -377,6 +377,7 @@ library LibStaking {
     using LibMaxPQ for MaxPQ;
     using LibMinPQ for MinPQ;
     using Address for address payable;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     uint64 internal constant INITIAL_CONFIGURATION_NUMBER = 1;
 
@@ -469,31 +470,6 @@ library LibStaking {
         s.validatorSet.recordDeposit(validator, amount);
         // confirm deposit that updates the confirmed collateral
         s.validatorSet.confirmDeposit(validator, amount);
-
-        if (!s.bootstrapped) {
-            // add to initial validators avoiding duplicates if it
-            // is a genesis validator.
-            bool alreadyValidator;
-            uint256 length = s.genesisValidators.length;
-            for (uint256 i; i < length; ) {
-                if (s.genesisValidators[i].addr == validator) {
-                    alreadyValidator = true;
-                    break;
-                }
-                unchecked {
-                    ++i;
-                }
-            }
-            if (!alreadyValidator) {
-                uint256 collateral = s.validatorSet.validators[validator].confirmedCollateral;
-                Validator memory val = Validator({
-                    addr: validator,
-                    weight: collateral,
-                    metadata: s.validatorSet.validators[validator].metadata
-                });
-                s.genesisValidators.push(val);
-            }
-        }
     }
 
     /// @notice Confirm the withdraw directly without going through the confirmation process
@@ -541,7 +517,6 @@ library LibStaking {
     }
 
     // =============== Other functions ================
-
     /// @notice Claim the released collateral
     function claimCollateral(address validator) internal {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
@@ -611,7 +586,7 @@ library LibValidatorTracking {
         ParentValidatorsTracker storage self,
         uint16 activeValidatorsLimit,
         GenesisValidator[] memory validators
-    ) internal returns (Validator[] memory membership) {
+    ) internal returns (Validator[] memory) {
         self.validators.activeLimit = activeValidatorsLimit;
         // Start the next configuration number from 1, 0 is reserved for no change and the genesis membership
         self.changes.nextConfigurationNumber = LibStaking.INITIAL_CONFIGURATION_NUMBER;
@@ -619,7 +594,7 @@ library LibValidatorTracking {
         // empty validator change logs
         self.changes.startConfigurationNumber = LibStaking.INITIAL_CONFIGURATION_NUMBER;
 
-        initValidators(self, validators);
+        return initValidators(self, validators);
     }
 
     function initValidators(

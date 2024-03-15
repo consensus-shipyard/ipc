@@ -67,7 +67,13 @@ contract GatewayDiamond {
         // through the gateway constructor in the future.
         s.maxMsgsPerBottomUpBatch = MAX_MSGS_PER_BATCH;
 
-        LibValidatorTracking.init(s.validatorsTracker, params.activeValidatorsLimit, params.genesisValidators);
+        Validator[] memory validators = LibValidatorTracking.init(
+            s.validatorsTracker,
+            params.activeValidatorsLimit,
+            params.genesisValidators
+        );
+        Membership memory initial = Membership({configurationNumber: 0, validators: validators});
+        LibGateway.updateMembership(initial);
     }
 
     function _fallback() internal {
