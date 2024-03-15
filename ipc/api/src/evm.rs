@@ -9,7 +9,7 @@ use crate::checkpoint::BottomUpMsgBatch;
 use crate::cross::{IpcEnvelope, IpcMsgKind};
 use crate::staking::StakingChange;
 use crate::staking::StakingChangeRequest;
-use crate::subnet::SupplySource;
+use crate::subnet::{ConstructParams, SupplySource};
 use crate::subnet_id::SubnetID;
 use crate::{eth_to_fil_amount, ethers_address_to_fil_address};
 use anyhow::anyhow;
@@ -22,6 +22,7 @@ use ipc_actors_abis::{
     register_subnet_facet, subnet_actor_checkpointing_facet, subnet_actor_diamond,
     subnet_actor_getter_facet, top_down_finality_facet, xnet_messaging_facet,
 };
+use num_traits::cast::ToPrimitive;
 
 /// The type conversion for IPC structs to evm solidity contracts. We need this convenient macro because
 /// the abigen is creating the same struct but under different modules. This save a lot of
@@ -229,6 +230,60 @@ impl TryFrom<SupplySource> for register_subnet_facet::SupplySource {
             kind: value.kind as u8,
             token_address,
         })
+    }
+}
+
+impl TryFrom<ConstructParams> for register_subnet_facet::ConstructorParams {
+    type Error = anyhow::Error;
+
+    fn try_from(params: ConstructParams) -> Result<Self, Self::Error> {
+        let gateway = params
+            .ipc_gateway_addr
+            .ok_or_else(|| anyhow!("gateway is not defined"))?;
+        let active_validators_limit = params
+            .active_validators_limit
+            .ok_or_else(|| anyhow!("active validators limit is not defined"))?;
+        let power_scale = params
+            .power_scale
+            .ok_or_else(|| anyhow!("power scale is not defined"))?;
+        let consensus = params
+            .consensus
+            .ok_or_else(|| anyhow!("consensus is not defined"))? as u64
+            as u8;
+        let majority_percentage = params
+            .majority_percentage
+            .ok_or_else(|| anyhow!("majority percentage is not defined"))?;
+
+        let ipc_gateway_addr = payload_to_evm_address(gateway.payload())?;
+
+        let min_validator_stake = params
+            .min_validator_stake
+            .atto()
+            .to_u128()
+            .ok_or_else(|| anyhow!("invalid min validator stake"))?;
+
+        let route = subnet_id_to_evm_addresses(&params.parent)?;
+        log::debug!("root SubnetID as Ethereum type: {route:?}");
+
+        let params = register_subnet_facet::ConstructorParams {
+            ipc_gateway_addr,
+            consensus,
+            majority_percentage,
+            active_validators_limit,
+            power_scale,
+
+            parent_id: register_subnet_facet::SubnetID {
+                root: params.parent.root_id(),
+                route,
+            },
+            min_activation_collateral: ethers::types::U256::from(min_validator_stake),
+            min_validators: params.min_validators,
+            bottom_up_check_period: params.bottomup_check_period as u64,
+            permission_mode: params.permission_mode as u8,
+            supply_source: register_subnet_facet::SupplySource::try_from(params.supply_source)?,
+        };
+
+        Ok(params)
     }
 }
 

@@ -67,16 +67,48 @@ pub enum SupplyKind {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ConstructParams {
+    // optional fields, set to default if not provided
+    pub ipc_gateway_addr: Option<Address>,
+    pub power_scale: Option<i8>,
+    pub consensus: Option<ConsensusType>,
+    pub majority_percentage: Option<u8>,
+    pub active_validators_limit: Option<u16>,
+
     pub parent: SubnetID,
-    pub ipc_gateway_addr: Address,
-    pub consensus: ConsensusType,
     pub min_validator_stake: TokenAmount,
     pub min_validators: u64,
     pub bottomup_check_period: ChainEpoch,
-    pub active_validators_limit: u16,
     pub min_cross_msg_fee: TokenAmount,
     pub permission_mode: PermissionMode,
     pub supply_source: SupplySource,
+}
+
+impl ConstructParams {
+    pub fn new(
+        parent: SubnetID,
+        min_validators: u64,
+        min_validator_stake: TokenAmount,
+        bottomup_check_period: ChainEpoch,
+        min_cross_msg_fee: TokenAmount,
+        permission_mode: PermissionMode,
+        supply_source: SupplySource,
+    ) -> Self {
+        Self {
+            ipc_gateway_addr: None,
+            power_scale: None,
+            consensus: None,
+            majority_percentage: None,
+            active_validators_limit: None,
+
+            parent,
+            min_validator_stake,
+            min_validators,
+            bottomup_check_period,
+            min_cross_msg_fee,
+            permission_mode,
+            supply_source,
+        }
+    }
 }
 
 /// Consensus types supported by hierarchical consensus

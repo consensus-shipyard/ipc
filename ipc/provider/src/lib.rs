@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: MIT
 //! Ipc agent sdk, contains the json rpc client to interact with the IPC agent rpc server.
 
+use crate::dryrun::IPCDryRunProvider;
 use crate::manager::{GetBlockHashResult, TopDownQueryPayload};
+use crate::preflight::Preflight;
 use anyhow::anyhow;
 use base64::Engine;
 use config::Config;
@@ -34,9 +36,11 @@ use zeroize::Zeroize;
 
 pub mod checkpoint;
 pub mod config;
+pub mod dryrun;
 pub mod jsonrpc;
 pub mod lotus;
 pub mod manager;
+pub mod preflight;
 
 const DEFAULT_REPO_PATH: &str = ".ipc";
 const DEFAULT_CONFIG_NAME: &str = "config.toml";
@@ -61,6 +65,7 @@ impl Connection {
 
 #[derive(Clone)]
 pub struct IpcProvider {
+    preflight: Preflight,
     sender: Option<Address>,
     config: Arc<Config>,
     fvm_wallet: Option<Arc<RwLock<Wallet>>>,
@@ -74,10 +79,19 @@ impl IpcProvider {
         evm_keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
     ) -> Self {
         Self {
+            preflight: Preflight {
+                config: config.clone(),
+            },
             sender: None,
             config,
             fvm_wallet: Some(fvm_wallet),
             evm_keystore: Some(evm_keystore),
+        }
+    }
+
+    pub fn dry_run(self) -> IPCDryRunProvider {
+        IPCDryRunProvider {
+            preflight: self.preflight,
         }
     }
 
@@ -110,6 +124,9 @@ impl IpcProvider {
             Ok(Self::new(config, fvm_wallet, evm_keystore))
         } else {
             Ok(Self {
+                preflight: Preflight {
+                    config: config.clone(),
+                },
                 sender: None,
                 config,
                 fvm_wallet: None,
@@ -227,23 +244,12 @@ impl IpcProvider {
 /// with the subnet configuration. This has been inherited by the daemon
 /// configuration and will be slowly deprecated.
 impl IpcProvider {
-    // FIXME: Once the arguments for subnet creation are stabilized,
-    // use a SubnetOpts struct to provide the creation arguments and
-    // remove this allow
-    #[allow(clippy::too_many_arguments)]
     pub async fn create_subnet(
         &mut self,
         from: Option<Address>,
-        parent: SubnetID,
-        min_validators: u64,
-        min_validator_stake: TokenAmount,
-        bottomup_check_period: ChainEpoch,
-        active_validators_limit: u16,
-        min_cross_msg_fee: TokenAmount,
-        permission_mode: PermissionMode,
-        supply_source: SupplySource,
+        params: ConstructParams,
     ) -> anyhow::Result<Address> {
-        let conn = match self.connection(&parent) {
+        let conn = match self.connection(&params.parent) {
             None => return Err(anyhow!("target parent subnet not found")),
             Some(conn) => conn,
         };
@@ -251,22 +257,8 @@ impl IpcProvider {
         let subnet_config = conn.subnet();
         let sender = self.check_sender(subnet_config, from)?;
 
-        let constructor_params = ConstructParams {
-            parent,
-            ipc_gateway_addr: subnet_config.gateway_addr(),
-            consensus: ConsensusType::Fendermint,
-            min_validators,
-            min_validator_stake,
-            bottomup_check_period,
-            active_validators_limit,
-            min_cross_msg_fee,
-            permission_mode,
-            supply_source,
-        };
-
-        conn.manager()
-            .create_subnet(sender, constructor_params)
-            .await
+        let params = self.preflight.create_subnet(params)?;
+        conn.manager().create_subnet(sender, params).await
     }
 
     pub async fn join_subnet(

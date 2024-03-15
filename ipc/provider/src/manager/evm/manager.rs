@@ -66,16 +66,13 @@ const ETH_PROVIDER_POLLING_TIME: Duration = Duration::from_secs(1);
 /// roots (like Calibration and mainnet).
 const TRANSACTION_RECEIPT_RETRIES: usize = 200;
 
-/// The majority vote percentage for checkpoint submission when creating a subnet.
-const SUBNET_MAJORITY_PERCENTAGE: u8 = 67;
-
 pub struct EthSubnetManager {
     keystore: Option<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>>,
     ipc_contract_info: IPCContractInfo,
 }
 
 /// Keep track of the on chain information for the subnet manager
-struct IPCContractInfo {
+pub(crate) struct IPCContractInfo {
     gateway_addr: ethers::types::Address,
     registry_addr: ethers::types::Address,
     chain_id: u64,
@@ -234,38 +231,6 @@ impl TopDownFinalityQuery for EthSubnetManager {
 #[async_trait]
 impl SubnetManager for EthSubnetManager {
     async fn create_subnet(&self, from: Address, params: ConstructParams) -> Result<Address> {
-        self.ensure_same_gateway(&params.ipc_gateway_addr)?;
-
-        let min_validator_stake = params
-            .min_validator_stake
-            .atto()
-            .to_u128()
-            .ok_or_else(|| anyhow!("invalid min validator stake"))?;
-
-        log::debug!("calling create subnet for EVM manager");
-
-        let route = subnet_id_to_evm_addresses(&params.parent)?;
-        log::debug!("root SubnetID as Ethereum type: {route:?}");
-
-        let params = register_subnet_facet::ConstructorParams {
-            parent_id: register_subnet_facet::SubnetID {
-                root: params.parent.root_id(),
-                route,
-            },
-            ipc_gateway_addr: self.ipc_contract_info.gateway_addr,
-            consensus: params.consensus as u64 as u8,
-            min_activation_collateral: ethers::types::U256::from(min_validator_stake),
-            min_validators: params.min_validators,
-            bottom_up_check_period: params.bottomup_check_period as u64,
-            majority_percentage: SUBNET_MAJORITY_PERCENTAGE,
-            active_validators_limit: params.active_validators_limit,
-            power_scale: 3,
-            permission_mode: params.permission_mode as u8,
-            supply_source: register_subnet_facet::SupplySource::try_from(params.supply_source)?,
-        };
-
-        log::info!("creating subnet on evm with params: {params:?}");
-
         let signer = self.get_signer(&from)?;
         let signer = Arc::new(signer);
         let registry_contract = register_subnet_facet::RegisterSubnetFacet::new(
@@ -273,9 +238,11 @@ impl SubnetManager for EthSubnetManager {
             signer.clone(),
         );
 
+        let params = register_subnet_facet::ConstructorParams::try_from(params)?;
+        log::info!("creating subnet on evm with params: {params:?}");
+
         let call = call_with_premium_estimation(signer, registry_contract.new_subnet_actor(params))
             .await?;
-        // TODO: Edit call to get estimate premium
         let pending_tx = call.send().await?;
         // We need the retry to parse the deployment event. At the time of this writing, it's a bug
         // in current FEVM that without the retries, events are not picked up.

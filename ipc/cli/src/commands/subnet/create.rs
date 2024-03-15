@@ -9,22 +9,22 @@ use async_trait::async_trait;
 use clap::Args;
 use fvm_shared::clock::ChainEpoch;
 
-use ipc_api::subnet::{PermissionMode, SupplyKind, SupplySource};
+use ipc_api::subnet::{ConstructParams, PermissionMode, SupplyKind, SupplySource};
 use ipc_api::subnet_id::SubnetID;
 
 use crate::commands::get_ipc_provider;
 use crate::{f64_to_token_amount, require_fil_addr_from_str, CommandLineHandler, GlobalArguments};
 
-const DEFAULT_ACTIVE_VALIDATORS: u16 = 100;
-
 /// The command to create a new subnet actor.
 pub struct CreateSubnet;
 
-impl CreateSubnet {
-    pub async fn create(
-        global: &GlobalArguments,
-        arguments: &CreateSubnetArgs,
-    ) -> anyhow::Result<String> {
+#[async_trait]
+impl CommandLineHandler for CreateSubnet {
+    type Arguments = CreateSubnetArgs;
+
+    async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
+        log::debug!("create subnet with args: {:?}", arguments);
+
         let mut provider = get_ipc_provider(global)?;
         let parent = SubnetID::from_str(&arguments.parent)?;
 
@@ -42,34 +42,23 @@ impl CreateSubnet {
             kind: arguments.supply_source_kind,
             token_address,
         };
-        let addr = provider
-            .create_subnet(
-                from,
-                parent,
-                arguments.min_validators,
-                f64_to_token_amount(arguments.min_validator_stake)?,
-                arguments.bottomup_check_period,
-                arguments
-                    .active_validators_limit
-                    .unwrap_or(DEFAULT_ACTIVE_VALIDATORS),
-                f64_to_token_amount(arguments.min_cross_msg_fee)?,
-                arguments.permission_mode,
-                supply_source,
-            )
-            .await?;
 
-        Ok(addr.to_string())
-    }
-}
+        let params = ConstructParams::new(
+            parent,
+            arguments.min_validators,
+            f64_to_token_amount(arguments.min_validator_stake)?,
+            arguments.bottomup_check_period,
+            f64_to_token_amount(arguments.min_cross_msg_fee)?,
+            arguments.permission_mode,
+            supply_source,
+        );
 
-#[async_trait]
-impl CommandLineHandler for CreateSubnet {
-    type Arguments = CreateSubnetArgs;
+        if arguments.dry_run {
+            provider.dry_run().create_subnet(params)?;
+            return Ok(());
+        }
 
-    async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
-        log::debug!("create subnet with args: {:?}", arguments);
-
-        let address = CreateSubnet::create(global, arguments).await?;
+        let address = provider.create_subnet(from, params).await?;
 
         log::info!(
             "created subnet actor with id: {}/{}",
@@ -84,6 +73,13 @@ impl CommandLineHandler for CreateSubnet {
 #[derive(Debug, Args)]
 #[command(name = "create", about = "Create a new subnet actor")]
 pub struct CreateSubnetArgs {
+    #[arg(
+        long,
+        help = "Dry run only will not submit to chain, prints the calldata instead",
+        default_value = "false"
+    )]
+    pub dry_run: bool,
+
     #[arg(long, help = "The address that creates the subnet")]
     pub from: Option<String>,
     #[arg(long, help = "The parent subnet to create the new actor in")]
