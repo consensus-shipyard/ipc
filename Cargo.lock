@@ -4962,6 +4962,7 @@ dependencies = [
  "lazy_static",
  "log",
  "num-traits",
+ "num_enum",
  "serde",
  "serde_json",
  "serde_tuple",
