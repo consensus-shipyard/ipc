@@ -1,6 +1,9 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-use crate::{ipc, Account, Actor, ActorMeta, Collateral, Genesis, Multisig, PermissionMode, Power, SignerAddr, Validator, ValidatorKey, GenesisPower};
+use crate::{
+    ipc, Account, Actor, ActorMeta, Collateral, Genesis, GenesisPower, Multisig, PermissionMode,
+    Power, SignerAddr, Validator, ValidatorKey,
+};
 use cid::multihash::MultihashDigest;
 use fendermint_crypto::SecretKey;
 use fendermint_testing::arb::{ArbSubnetID, ArbTokenAmount};

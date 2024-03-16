@@ -50,4 +50,3 @@ pub fn vec_try_from<T, W: TryFrom<T>>(values: Vec<T>) -> anyhow::Result<Vec<W>, 
         .collect::<Result<Vec<_>, _>>()?;
     Ok(out)
 }
-
