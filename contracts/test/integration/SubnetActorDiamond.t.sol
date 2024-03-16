@@ -159,8 +159,9 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         require(validators[0].addr == validator1);
         require(validators[0].collateral == validator1Stake / 2, "collateral not match");
 
-        // unstake everything else
-        saDiamond.manager().unstake(validator1Stake / 2);
+        // unstake everything else minus 1, then leave
+        saDiamond.manager().unstake(validator1Stake / 2 - 1);
+        saDiamond.manager().leave();
         require(saDiamond.getter().genesisValidators().length == 0, "should not be validator");
     }
 

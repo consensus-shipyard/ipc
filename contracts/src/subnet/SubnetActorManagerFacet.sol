@@ -195,7 +195,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
         if (collateral == 0) {
             revert NotValidator(msg.sender);
         }
-        if (collateral < amount) {
+        if (collateral <= amount) {
             revert NotEnoughCollateral();
         }
         if (!s.bootstrapped) {
