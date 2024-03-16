@@ -119,7 +119,7 @@ impl Arbitrary for Genesis {
 }
 
 impl Arbitrary for ipc::GatewayParams {
-    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+    fn arbitrary(g: &mut Gen) -> Self {
         Self {
             subnet_id: ArbSubnetID::arbitrary(g).0,
             // Gateway constructor would reject 0.
@@ -131,7 +131,7 @@ impl Arbitrary for ipc::GatewayParams {
 }
 
 impl Arbitrary for ipc::IpcParams {
-    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+    fn arbitrary(g: &mut Gen) -> Self {
         Self {
             gateway: ipc::GatewayParams::arbitrary(g),
         }
@@ -141,8 +141,8 @@ impl Arbitrary for ipc::IpcParams {
 impl Arbitrary for GenesisPower {
     fn arbitrary(g: &mut Gen) -> Self {
         Self {
-            collateral: u64::arbitrary(g).unwrap().saturating_add(1),
-            federated_power: u64::arbitrary(g).unwrap().saturating_add(1),
+            collateral: ArbTokenAmount::arbitrary(g).0,
+            federated_power: ArbTokenAmount::arbitrary(g).0,
         }
     }
 }
