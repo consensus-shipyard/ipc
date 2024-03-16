@@ -14,6 +14,11 @@ import {ERC20Upgradeable} from  "@openzeppelin/contracts-upgradeable/token/ERC20
 contract LinkedTokenReplica is Initializable, LinkedToken, ERC20Upgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(
         address gateway,
         address underlyingToken,

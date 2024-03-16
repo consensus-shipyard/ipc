@@ -16,6 +16,11 @@ contract IpcTokenSender is Initializable{
     string public _destinationChain;
     bytes public _destinationTokenHandler;
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize( address axelarIts, string memory destinationChain, address destinationTokenHandler) public initializer {
         _axelarIts = IInterchainTokenService(axelarIts);
         _destinationChain = destinationChain;

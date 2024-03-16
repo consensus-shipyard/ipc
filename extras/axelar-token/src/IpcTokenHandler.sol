@@ -42,6 +42,11 @@ contract IpcTokenHandler is Initializable, InterchainTokenExecutableUpgradeable,
     event SubnetFunded(SubnetID indexed subnet, address indexed recipient, uint256 value);
     event FundingFailed(SubnetID indexed subnet, address indexed recipient, uint256 value);
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(address axelarIts, address ipcGateway) public initializer {
         __InterchainTokenExecutable_init(axelarIts);
         _ipcGateway = TokenFundedGateway(ipcGateway);
