@@ -12,21 +12,14 @@ use std::fmt::{Display, Formatter};
 
 pub type ConfigurationNumber = u64;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, num_enum::TryFromPrimitive)]
+#[non_exhaustive]
+#[repr(u8)]
 pub enum StakingOperation {
-    Deposit,
-    Withdraw,
-    SetMetadata,
-}
-
-impl From<u8> for StakingOperation {
-    fn from(value: u8) -> Self {
-        match value {
-            0 => Self::Deposit,
-            1 => Self::Withdraw,
-            _ => Self::SetMetadata,
-        }
-    }
+    Deposit = 0,
+    Withdraw = 1,
+    SetMetadata = 2,
+    SetFederatedPower = 3,
 }
 
 #[derive(Clone, Debug)]
@@ -52,7 +45,7 @@ impl TryFrom<lib_staking_change_log::NewStakingChangeRequestFilter> for StakingC
         Ok(Self {
             configuration_number: value.configuration_number,
             change: StakingChange {
-                op: StakingOperation::from(value.op),
+                op: StakingOperation::try_from(value.op)?,
                 payload: value.payload.to_vec(),
                 validator: ethers_address_to_fil_address(&value.validator)?,
             },
