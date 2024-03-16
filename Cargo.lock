@@ -2855,6 +2855,7 @@ dependencies = [
  "fendermint_rocksdb",
  "fendermint_rpc",
  "fendermint_storage",
+ "fendermint_tracing",
  "fendermint_vm_actor_interface",
  "fendermint_vm_core",
  "fendermint_vm_encoding",
@@ -3177,6 +3178,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_tracing"
+version = "0.1.0"
+dependencies = [
+ "tracing",
+]
+
+[[package]]
 name = "fendermint_vm_actor_interface"
 version = "0.1.0"
 dependencies = [
@@ -3286,6 +3294,7 @@ dependencies = [
  "fendermint_eth_hardhat",
  "fendermint_rpc",
  "fendermint_testing",
+ "fendermint_tracing",
  "fendermint_vm_actor_interface",
  "fendermint_vm_core",
  "fendermint_vm_encoding",
@@ -3418,6 +3427,7 @@ dependencies = [
  "ethers",
  "fendermint_crypto",
  "fendermint_testing",
+ "fendermint_tracing",
  "fendermint_vm_event",
  "fendermint_vm_genesis",
  "fvm_ipld_encoding",
@@ -4952,6 +4962,7 @@ dependencies = [
  "lazy_static",
  "log",
  "num-traits",
+ "num_enum",
  "serde",
  "serde_json",
  "serde_tuple",

@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand};
 use fvm_shared::address::Network;
+use lazy_static::lazy_static;
 use tracing_subscriber::EnvFilter;
 
 use self::{
@@ -25,15 +26,36 @@ mod parse;
 use log::{parse_log_level, LogLevel};
 use parse::parse_network;
 
+lazy_static! {
+    static ref ENV_ALIASES: Vec<(&'static str, Vec<&'static str>)> = vec![
+        ("FM_NETWORK", vec!["IPC_NETWORK", "NETWORK"]),
+        ("FM_LOG_LEVEL", vec!["LOG_LEVEL", "RUST_LOG"])
+    ];
+}
+
 /// Parse the main arguments by:
+/// 0. Detecting aliased env vars
 /// 1. Parsing the [GlobalOptions]
 /// 2. Setting any system wide parameters based on the globals
 /// 3. Parsing and returning the final [Options]
 pub fn parse() -> Options {
+    set_env_from_aliases();
     let opts: GlobalOptions = GlobalOptions::parse();
     fvm_shared::address::set_current_network(opts.global.network);
     let opts: Options = Options::parse();
     opts
+}
+
+/// Assign value to env vars from aliases, if the canonic key doesn't exist but the alias does.
+fn set_env_from_aliases() {
+    'keys: for (key, aliases) in ENV_ALIASES.iter() {
+        for alias in aliases {
+            if let (Err(_), Ok(value)) = (std::env::var(key), std::env::var(alias)) {
+                std::env::set_var(key, value);
+                continue 'keys;
+            }
+        }
+    }
 }
 
 #[derive(Args, Debug)]
@@ -96,10 +118,6 @@ pub struct Options {
     )]
     log_level: LogLevel,
 
-    /// Fallback for the `log_level` with a legacy env var name.
-    #[arg(hide = true, value_enum, env = "LOG_LEVEL", value_parser = parse_log_level,)]
-    _log_level: Option<LogLevel>,
-
     /// Set the logging level of the log file. If missing, it defaults to the same level as the console.
     #[arg(
         long,
@@ -124,10 +142,7 @@ impl Options {
     /// because the `tracing_subscriber` setup methods like `with_filter` and `with_level`
     /// produce different static types and it's not obvious how to use them as alternatives.
     pub fn log_console_filter(&self) -> anyhow::Result<EnvFilter> {
-        self._log_level
-            .as_ref()
-            .unwrap_or(&self.log_level)
-            .to_filter()
+        self.log_level.to_filter()
     }
 
     /// Tracing filter for the log file.
@@ -169,6 +184,21 @@ mod tests {
     use fvm_shared::address::Network;
     use tracing::level_filters::LevelFilter;
 
+    /// Set some env vars, run a fallible piece of code, then unset the variables otherwise they would affect the next test.
+    pub fn with_env_vars<F, T>(vars: &[(&str, &str)], f: F) -> T
+    where
+        F: FnOnce() -> T,
+    {
+        for (k, v) in vars.iter() {
+            std::env::set_var(k, v);
+        }
+        let result = f();
+        for (k, _) in vars {
+            std::env::remove_var(k);
+        }
+        result
+    }
+
     #[test]
     fn parse_global() {
         let cmd = "fendermint --network testnet genesis --genesis-file ./genesis.json ipc gateway --subnet-id /r123/t0456 -b 10 -t 10 -f 10 -m 65";
@@ -180,6 +210,33 @@ mod tests {
     fn global_options_ignore_help() {
         let cmd = "fendermint --help";
         let _opts: GlobalOptions = GlobalOptions::parse_from(cmd.split_ascii_whitespace());
+    }
+
+    #[test]
+    fn network_from_env() {
+        for (key, _) in ENV_ALIASES.iter() {
+            std::env::remove_var(key);
+        }
+
+        let examples = [
+            (vec![], Network::Mainnet),
+            (vec![("IPC_NETWORK", "testnet")], Network::Testnet),
+            (vec![("NETWORK", "testnet")], Network::Testnet),
+            (vec![("FM_NETWORK", "testnet")], Network::Testnet),
+            (
+                vec![("IPC_NETWORK", "testnet"), ("FM_NETWORK", "mainnet")],
+                Network::Mainnet,
+            ),
+        ];
+
+        for (i, (vars, network)) in examples.iter().enumerate() {
+            let opts = with_env_vars(vars, || {
+                set_env_from_aliases();
+                let opts: GlobalOptions = GlobalOptions::parse_from(["fendermint", "run"]);
+                opts
+            });
+            assert_eq!(opts.global.network, *network, "example {i}");
+        }
     }
 
     #[test]

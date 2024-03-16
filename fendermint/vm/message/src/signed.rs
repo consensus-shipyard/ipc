@@ -304,7 +304,10 @@ mod arb {
 #[cfg(test)]
 mod tests {
     use fendermint_vm_actor_interface::eam::EthAddress;
-    use fvm_shared::{address::Address, chainid::ChainID};
+    use fvm_shared::{
+        address::{Address, Payload, Protocol},
+        chainid::ChainID,
+    };
     use quickcheck_macros::quickcheck;
 
     use crate::conv::tests::{EthMessage, KeyPair};
@@ -344,7 +347,7 @@ mod tests {
         let chain_id = ChainID::from(chain_id);
         let KeyPair { sk, pk } = key;
 
-        // Set the message to the address we are going to sign with.
+        // Set the sender to the address we are going to sign with.
         let ea = EthAddress::from(pk);
         let mut msg = msg.0;
         msg.from = Address::from(ea);
@@ -353,5 +356,33 @@ mod tests {
             SignedMessage::new_secp256k1(msg, &sk, &chain_id).map_err(|e| e.to_string())?;
 
         signed.verify(&chain_id).map_err(|e| e.to_string())
+    }
+
+    #[quickcheck]
+    fn eth_sign_and_tamper(msg: EthMessage, chain_id: u64, key: KeyPair) -> Result<(), String> {
+        let chain_id = ChainID::from(chain_id);
+        let KeyPair { sk, pk } = key;
+
+        // Set the sender to the address we are going to sign with.
+        let ea = EthAddress::from(pk);
+        let mut msg = msg.0;
+        msg.from = Address::from(ea);
+
+        let mut signed =
+            SignedMessage::new_secp256k1(msg, &sk, &chain_id).map_err(|e| e.to_string())?;
+
+        // Set the recipient to an address which is a different kind, but the same hash: pretend that it's an f1 address.
+        // If this succeeded, an attacker can change the recipient of the message and thus funds can get lost.
+        let Payload::Delegated(da) = signed.message.to.payload() else {
+            return Err("expected delegated addresss".to_string());
+        };
+        let mut bz = da.subaddress().to_vec();
+        bz.insert(0, Protocol::Secp256k1 as u8);
+        signed.message.to = Address::from_bytes(&bz).map_err(|e| e.to_string())?;
+
+        if signed.verify(&chain_id).is_ok() {
+            return Err("signature verification should have failed".to_string());
+        }
+        Ok(())
     }
 }
