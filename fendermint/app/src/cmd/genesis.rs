@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{
-    ipc, Account, Actor, ActorMeta, Collateral, Genesis, Multisig, PermissionMode, SignerAddr,
+    ipc, Account, Actor, ActorMeta, Genesis, GenesisPower, Multisig, PermissionMode, SignerAddr,
     Validator, ValidatorKey,
 };
 
@@ -169,7 +169,10 @@ fn add_validator(genesis_file: &PathBuf, args: &GenesisAddValidatorArgs) -> anyh
         }
         let validator = Validator {
             public_key: vk,
-            power: Collateral(args.power.clone()),
+            power: GenesisPower {
+                collateral: args.collateral.clone(),
+                federated_power: args.federated_power.clone(),
+            },
         };
         genesis.validators.push(validator);
         Ok(genesis)
@@ -332,7 +335,10 @@ async fn new_genesis_from_parent(
         let pk = PublicKey::parse_slice(&v.metadata, None)?;
         genesis.validators.push(Validator {
             public_key: ValidatorKey(pk),
-            power: Collateral(v.weight),
+            power: GenesisPower {
+                collateral: v.collateral,
+                federated_power: v.federated_power,
+            },
         })
     }
 

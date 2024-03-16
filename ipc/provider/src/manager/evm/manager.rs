@@ -14,7 +14,7 @@ use ipc_actors_abis::{
     subnet_actor_reward_facet,
 };
 use ipc_api::evm::{fil_to_eth_amount, payload_to_evm_address, subnet_id_to_evm_addresses};
-use ipc_api::validator::from_contract_validators;
+use ipc_api::validator::vec_try_from;
 use reqwest::header::HeaderValue;
 use reqwest::Client;
 use std::net::{IpAddr, SocketAddr};
@@ -729,7 +729,7 @@ impl SubnetManager for EthSubnetManager {
             // Minimum collateral required for subnets to register into the subnet
             min_collateral: eth_to_fil_amount(&contract.min_activation_collateral().call().await?)?,
             // Custom message fee that the child subnet wants to set for cross-net messages
-            validators: from_contract_validators(contract.genesis_validators().call().await?)?,
+            validators: vec_try_from(contract.genesis_validators().call().await?)?,
             genesis_balances: into_genesis_balance_map(genesis_balances.0, genesis_balances.1)?,
             // TODO: fixme https://github.com/consensus-shipyard/ipc-monorepo/issues/496
             permission_mode: PermissionMode::Collateral,

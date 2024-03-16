@@ -17,7 +17,8 @@ use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{
     ipc::{GatewayParams, IpcParams},
-    Account, Actor, ActorMeta, Collateral, Genesis, SignerAddr, Validator, ValidatorKey,
+    Account, Actor, ActorMeta, Collateral, Genesis, GenesisPower, SignerAddr, Validator,
+    ValidatorKey,
 };
 use fvm_shared::{bigint::Zero, econ::TokenAmount, version::NetworkVersion};
 use ipc_api::subnet_id::SubnetID;
@@ -430,7 +431,10 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
                     .into_iter()
                     .map(|(v, c)| Validator {
                         public_key: ValidatorKey(*v.public_key()),
-                        power: c,
+                        power: GenesisPower {
+                            collateral: c.0,
+                            federated_power: TokenAmount::zero(),
+                        },
                     })
                     .collect(),
                 accounts: balances

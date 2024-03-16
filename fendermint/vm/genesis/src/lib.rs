@@ -40,7 +40,7 @@ pub struct Genesis {
     /// Validators in genesis are given with their FIL collateral to maintain the
     /// highest possible fidelity when we are deriving a genesis file in IPC,
     /// where the parent subnet tracks collateral.
-    pub validators: Vec<Validator<Collateral>>,
+    pub validators: Vec<Validator<GenesisPower>>,
     pub accounts: Vec<Actor>,
     /// The custom eam permission mode that controls who can deploy contracts
     pub eam_permission_mode: PermissionMode,
@@ -93,6 +93,32 @@ pub struct Actor {
     pub meta: ActorMeta,
     #[serde_as(as = "IsHumanReadable")]
     pub balance: TokenAmount,
+}
+
+/// Total power from IPC LibStaking, consists of the collateral staked by the validator and the
+/// federated power assigned by the super admin/owner of the subnet
+#[serde_as]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct GenesisPower {
+    #[serde_as(as = "IsHumanReadable")]
+    pub collateral: TokenAmount,
+    #[serde_as(as = "IsHumanReadable")]
+    pub federated_power: TokenAmount,
+}
+
+impl GenesisPower {
+    pub fn into_power(self: GenesisPower, scale: PowerScale) -> Power {
+        Collateral(self.federated_power + self.collateral).into_power(scale)
+    }
+}
+
+impl Default for GenesisPower {
+    fn default() -> Self {
+        Self {
+            collateral: TokenAmount::from_atto(0),
+            federated_power: TokenAmount::from_atto(0),
+        }
+    }
 }
 
 /// Total amount of tokens delegated to a validator.

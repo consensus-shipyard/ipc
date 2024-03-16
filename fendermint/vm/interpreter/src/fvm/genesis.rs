@@ -312,6 +312,7 @@ where
 
                 let params = ConstructorParameters::new(ipc_params.gateway, genesis.validators)
                     .context("failed to create gateway constructor")?;
+                tracing::debug!("subnet gateway constructor params: {params:?}");
 
                 let facets = deployer
                     .facets(ipc::gateway::CONTRACT_NAME)
