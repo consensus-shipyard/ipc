@@ -299,7 +299,7 @@ pub mod gateway {
     use ethers::contract::{EthAbiCodec, EthAbiType};
     use ethers::core::types::{Bytes, H160, U256};
     use fendermint_vm_genesis::ipc::GatewayParams;
-    use fendermint_vm_genesis::{LibStakingPower, Validator};
+    use fendermint_vm_genesis::{GenesisPower, Validator};
     use fvm_shared::address::Error as AddressError;
     use fvm_shared::econ::TokenAmount;
 
@@ -329,7 +329,7 @@ pub mod gateway {
     impl ConstructorParameters {
         pub fn new(
             params: GatewayParams,
-            validators: Vec<Validator<LibStakingPower>>,
+            validators: Vec<Validator<GenesisPower>>,
         ) -> anyhow::Result<Self> {
             // Every validator has an Ethereum address.
             let validators = validators
