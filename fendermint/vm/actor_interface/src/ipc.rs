@@ -372,7 +372,7 @@ pub mod gateway {
         };
         use fvm_shared::{bigint::BigInt, econ::TokenAmount};
         use ipc_actors_abis::gateway_diamond::SubnetID as GatewaySubnetID;
-        use ipc_actors_abis::gateway_getter_facet::Validator as GatewayValidator;
+        use ipc_actors_abis::gateway_diamond::GenesisValidator;
         use std::str::FromStr;
 
         use crate::ipc::tests::{check_param_types, constructor_param_types};
@@ -388,9 +388,10 @@ pub mod gateway {
                 },
                 bottom_up_check_period: U256::from(100),
                 majority_percentage: 67,
-                validators: vec![GatewayValidator {
+                validators: vec![GenesisValidator {
                     addr: H160::zero(),
-                    weight: U256::zero(),
+                    collateral: U256::zero(),
+                    federated_power: U256::zero(),
                     metadata: Bytes::new(),
                 }],
                 active_validators_limit: 100,
