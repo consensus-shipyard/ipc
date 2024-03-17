@@ -371,8 +371,8 @@ pub mod gateway {
             types::{Bytes, H160},
         };
         use fvm_shared::{bigint::BigInt, econ::TokenAmount};
-        use ipc_actors_abis::gateway_diamond::SubnetID as GatewaySubnetID;
         use ipc_actors_abis::gateway_diamond::GenesisValidator;
+        use ipc_actors_abis::gateway_diamond::SubnetID as GatewaySubnetID;
         use std::str::FromStr;
 
         use crate::ipc::tests::{check_param_types, constructor_param_types};
