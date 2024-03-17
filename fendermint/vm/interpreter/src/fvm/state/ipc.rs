@@ -135,6 +135,11 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
             p.saturating_add(et::U256::from(v.power.0))
         });
 
+        tracing::debug!(
+            root_hash = hex::encode(tree.root_hash().0),
+            total_power = total_power.to_string(),
+            "parameters to create checkpoint"
+        );
         self.checkpointing.call(state, |c| {
             c.create_bottom_up_checkpoint(checkpoint, tree.root_hash().0, total_power)
         })

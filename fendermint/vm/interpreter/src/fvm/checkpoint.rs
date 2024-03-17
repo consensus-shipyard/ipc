@@ -103,6 +103,8 @@ where
         msgs,
     };
 
+    tracing::debug!(?checkpoint, "checkpoint to create");
+
     // Save the checkpoint in the ledger.
     // Pass in the current power table, because these are the validators who can sign this checkpoint.
     gateway
@@ -120,6 +122,8 @@ where
 
         power_diff(curr_power_table, next_power_table)
     };
+
+    tracing::debug!(?power_updates, "power updates");
 
     emit!(NewBottomUpCheckpoint {
         block_height: height.value(),
