@@ -32,6 +32,7 @@ tracing = { workspace = true }
 
 fendermint_vm_genesis = { path = "../genesis" }
 fendermint_vm_event = { path = "../event" }
+fendermint_tracing = { path = "../../tracing" }
 
 [dev-dependencies]
 arbitrary = { workspace = true }
