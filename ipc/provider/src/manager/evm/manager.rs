@@ -810,7 +810,7 @@ impl SubnetManager for EthSubnetManager {
         let address = contract_address_from_subnet(subnet)?;
         log::info!("interacting with evm subnet contract: {address:}");
 
-        let signer = Arc::new(self.get_signer(&from)?);
+        let signer = Arc::new(self.get_signer(from)?);
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
