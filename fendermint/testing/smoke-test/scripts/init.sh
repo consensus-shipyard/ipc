@@ -52,7 +52,7 @@ done
 # Add a validator
 fendermint \
   genesis --genesis-file $GENESIS_FILE \
-  add-validator --public-key $KEYS_DIR/bob.pk --power 1
+  add-validator --public-key $KEYS_DIR/bob.pk --collateral 1
 
 # Enable IPC with some dummy values to test contract deployment.
 fendermint \

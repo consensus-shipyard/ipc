@@ -25,7 +25,7 @@ env = { "CMD" = "genesis --genesis-file /data/genesis.json add-account --kind et
 
 [tasks.genesis-add-validator]
 extend = "fendermint-tool"
-env = { "CMD" = "genesis --genesis-file /data/genesis.json add-validator --public-key /data/${NODE_NAME}/${VALIDATOR_PUB_KEY_PATH} --power 1" }
+env = { "CMD" = "genesis --genesis-file /data/genesis.json add-validator --public-key /data/${NODE_NAME}/${VALIDATOR_PUB_KEY_PATH} --collateral 1" }
 
 [tasks.genesis-new-gateway]
 extend = "fendermint-tool"

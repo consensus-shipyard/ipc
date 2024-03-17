@@ -40,7 +40,7 @@ VALIDATOR_NAME=victoria
 
 fendermint \
   genesis --genesis-file $GENESIS_FILE \
-  add-validator --public-key $KEYS_DIR/$VALIDATOR_NAME.pk --power 1
+  add-validator --public-key $KEYS_DIR/$VALIDATOR_NAME.pk --collateral 1
 
 # Convert FM genesis to CMT
 fendermint \

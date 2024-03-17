@@ -42,7 +42,7 @@ cat test-network/genesis.json | jq .accounts
 #9
 fendermint \
   genesis --genesis-file test-network/genesis.json \
-  add-validator --public-key test-network/keys/bob.pk --power 1
+  add-validator --public-key test-network/keys/bob.pk --collateral 1
 
 #10
 rm -rf ~/.tendermint

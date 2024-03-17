@@ -130,7 +130,7 @@ pub struct GenesisAddValidatorArgs {
     #[arg(long, short = 'c', value_parser = parse_full_fil)]
     pub collateral: TokenAmount,
     /// The federated power assigned by the super admin.
-    #[arg(long, short = 'f', value_parser = parse_full_fil)]
+    #[arg(long, short = 'f', value_parser = parse_full_fil, default_value = "0")]
     pub federated_power: TokenAmount,
 }
 

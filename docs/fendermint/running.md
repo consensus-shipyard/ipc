@@ -163,7 +163,7 @@ Finally, let's add one validator to the Genesis, with a monopoly on voting power
 ```shell
 cargo run -p fendermint_app --release -- \
       genesis --genesis-file test-network/genesis.json \
-      add-validator --public-key test-network/keys/bob.pk --power 1;
+      add-validator --public-key test-network/keys/bob.pk --collateral 1;
 ```
 
 The value of power doesn't matter in this case, as `bob` is our only validator. It's value is expressed in tokens,
