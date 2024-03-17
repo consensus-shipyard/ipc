@@ -60,12 +60,7 @@ contract TopDownFinalityFacet is GatewayActorModifiers {
             ValidatorInfo storage info = s.validatorsTracker.validators.validators[addr];
 
             // Extract the consensus weight for validator.
-            uint256 weight = info.confirmedCollateral;
-            if (s.validatorsTracker.validators.permissionMode == PermissionMode.Federated) {
-                // Use the explicit federated power for power accounting if in Federated permissioning mode.
-                // Sum it to the confirmedCollateral (which was locked pre-bootstrap and can no longer be adjusted after genesis)
-                weight += info.federatedPower;
-            }
+            uint256 weight = info.confirmedCollateral + info.federatedPower;
 
             vs[i] = Validator({weight: weight, addr: addr, metadata: info.metadata});
             unchecked {

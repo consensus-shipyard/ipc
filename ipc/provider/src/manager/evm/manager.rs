@@ -810,32 +810,30 @@ impl SubnetManager for EthSubnetManager {
         let address = contract_address_from_subnet(subnet)?;
         log::info!("interacting with evm subnet contract: {address:}");
 
-        let contract = subnet_actor_manager_facet::SubnetActorManagerFacet::new(
-            address,
-            Arc::new(self.ipc_contract_info.provider.clone()),
-        );
+        let signer = Arc::new(self.get_signer(from)?);
+        let contract =
+            subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
         let addresses: Vec<ethers::core::types::Address> = validators
             .iter()
             .map(|validator_address| payload_to_evm_address(validator_address.payload()).unwrap())
             .collect();
-        log::debug!("converted addresses {:?}:", addresses);
+        log::debug!("converted addresses: {:?}", addresses);
 
         let pubkeys: Vec<ethers::core::types::Bytes> = public_keys
             .iter()
             .map(|key| ethers::core::types::Bytes::from(key.clone()))
             .collect();
-        log::debug!("converted pubkeys {:?}:", pubkeys);
+        log::debug!("converted pubkeys: {:?}", pubkeys);
 
         let power_u256: Vec<ethers::core::types::U256> = federated_power
             .iter()
             .map(|power| ethers::core::types::U256::from(*power))
             .collect();
-        log::debug!("converted power {:?}:", power_u256);
+        log::debug!("converted power: {:?}", power_u256);
 
-        log::debug!("from address {:?}:", from);
+        log::debug!("from address: {:?}", from);
 
-        let signer = Arc::new(self.get_signer(from)?);
         let call = contract.set_federated_power(addresses, pubkeys, power_u256);
         let txn = call_with_premium_estimation(signer, call).await?;
         let pending_tx = txn.send().await?;

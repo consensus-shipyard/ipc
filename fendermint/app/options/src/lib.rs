@@ -94,6 +94,10 @@ pub struct Options {
     )]
     pub home_dir: PathBuf,
 
+    /// Set a custom directory for configuration files
+    #[arg(long, env = "FM_CONFIG_DIR")]
+    config_dir: Option<PathBuf>,
+
     /// Set a custom directory for ipc log files.
     #[arg(long, env = "FM_LOG_DIR")]
     pub log_dir: Option<PathBuf>,
@@ -154,8 +158,14 @@ impl Options {
         }
     }
 
+    /// Path to the configuration directories.
+    ///
+    /// If not specified then returns the default under the home directory.
     pub fn config_dir(&self) -> PathBuf {
-        self.home_dir.join("config")
+        self.config_dir
+            .as_ref()
+            .cloned()
+            .unwrap_or(self.home_dir.join("config"))
     }
 }
 

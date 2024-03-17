@@ -53,7 +53,10 @@ impl CommandLineHandler for crate::commands::subnet::SetFederatedPower {
 }
 
 #[derive(Debug, Args)]
-#[command(name = "stake", about = "Set federated power for validators")]
+#[command(
+    name = "set-federated-power",
+    about = "Set federated power for validators"
+)]
 pub struct SetFederatedPowerArgs {
     #[arg(long, help = "The address to sign and pay for this transaction.")]
     pub from: String,
