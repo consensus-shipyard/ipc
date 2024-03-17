@@ -16,7 +16,8 @@ contract TestHandler is Test {
 
         IpcTokenHandler handler = new IpcTokenHandler({
             axelarIts: axelarIts,
-            ipcGateway: ipcGateway
+            ipcGateway: ipcGateway,
+            admin: address(0)
         });
 
         address[] memory route = new address[](1);

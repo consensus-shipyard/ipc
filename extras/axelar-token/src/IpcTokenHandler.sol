@@ -31,14 +31,15 @@ contract IpcTokenHandler is InterchainTokenExecutable, IpcHandler {
 
     error NothingToWithdraw();
 
-    TokenFundedGateway public _ipcGateway;
-    mapping(address beneficiary => mapping(address token => uint256 value)) private _claims;
-
     event SubnetFunded(SubnetID indexed subnet, address indexed recipient, uint256 value);
     event FundingFailed(SubnetID indexed subnet, address indexed recipient, uint256 value);
 
-    constructor(address axelarIts, address ipcGateway) InterchainTokenExecutable(axelarIts) {
+    TokenFundedGateway public _ipcGateway;
+    address public _admin;
+
+    constructor(address axelarIts, address ipcGateway, address admin) InterchainTokenExecutable(axelarIts) {
         _ipcGateway = TokenFundedGateway(ipcGateway);
+        _admin = admin;
     }
 
     // @notice The InterchainTokenExecutable abstract parent contract hands off to this function after verifying that
@@ -52,13 +53,38 @@ contract IpcTokenHandler is InterchainTokenExecutable, IpcHandler {
         address tokenAddr,
         uint256 amount
     ) internal override {
-        (SubnetID memory subnet, address recipient) = abi.decode(data, (SubnetID, address));
-
         IERC20 token = IERC20(tokenAddr);
         require(token.balanceOf(address(this)) >= amount, "insufficient balance");
 
         // Authorize the IPC gateway to spend these tokens on our behalf.
-        token.approve(address(_ipcGateway), amount);
+        token.safeIncreaseAllowance(address(_ipcGateway), amount);
+
+        // To be extra safe, we wrap the decoding of parameters and the interaction with the IPC gateway
+        // in a low-level call, so we can detect when any of those revert and send the funds to the admin account.
+        (bool success, ) = address(this).call(
+            abi.encodeWithSignature("_fallibleFundSubnet(bytes,uint256)", data, amount)
+        );
+
+        if (!success) {
+            // Restore the original allowance.
+            token.safeDecreaseAllowance(address(_ipcGateway), amount);
+
+            // Increase the allowance of the admin address so they can retrieve these otherwise lost tokens.
+            token.safeIncreaseAllowance(_admin, amount);
+
+            // Emit a FundingFailed event; we can't associate a specific subnet or recipient since parsing may have failed.
+            SubnetID memory nilSubnet;
+            emit FundingFailed(nilSubnet, address(0), amount);
+        }
+    }
+
+    // Note: this is public only so we can CALL it via opcode above, but the only authorized caller is us.
+    function _fallibleFundSubnet(bytes calldata data, uint256 amount) public {
+        require(msg.sender == address(this), "unauthorized");
+
+        // Try to decode the payload. Solidity does not support try/catch for abi.decode (or tryDecode),
+        // so to be failsafe we do this too in the fallible block.
+        (SubnetID memory subnet, address recipient) = abi.decode(data, (SubnetID, address));
 
         // Fund the designated subnet via the IPC gateway.
         _ipcGateway.fundWithToken(subnet, recipient.from(), amount);
@@ -78,17 +104,15 @@ contract IpcTokenHandler is InterchainTokenExecutable, IpcHandler {
 
         ResultMsg memory result = abi.decode(envelope.message, (ResultMsg));
         if (result.outcome != OutcomeType.Ok) {
-            // Note: IPC only supports deploying subnets via our blessed registry, so we can trust the code behind
-            // the subnet actor.
+            // Verify that the subnet is indeed an ERC20 subnet.
             SupplySource memory supplySource = SubnetActor(envelope.from.subnetId.getAddress()).supplySource();
             require(supplySource.kind == SupplyKind.ERC20, "expected ERC20 supply source");
 
+            // Increase the allowance of the admin address so they can retrieve these otherwise lost tokens.
+            IERC20(supplySource.tokenAddress).safeIncreaseAllowance(_admin, envelope.value);
+
             // Results will carry the original beneficiary in the 'from' address.
             address beneficiary = envelope.from.rawAddress.extractEvmAddress();
-
-            // We credit the token funds to the beneficiary. The beneficiary will have to call withdraw() to pull the
-            // funds out on this network.
-            _claims[beneficiary][supplySource.tokenAddress] += envelope.value;
 
             // Emit an event.
             emit FundingFailed(envelope.from.subnetId, beneficiary, envelope.value);
@@ -97,19 +121,11 @@ contract IpcTokenHandler is InterchainTokenExecutable, IpcHandler {
         return bytes("");
     }
 
-    // @notice Withdraws all available balance for the specified token for the sender.
-    function withdraw(address token) external {
-        uint256 available = _claims[msg.sender][token];
-        if (available == 0) {
-            revert NothingToWithdraw();
-        }
-
-        delete _claims[msg.sender][token];
-        IERC20(token).safeTransfer(msg.sender, available);
+    // @notice The ultimate backstop in case the error-handling logic itself failed unexpectedly and we failed to
+    //         increase the recovery allowances of the admin address.
+    function adminTokenIncreaseAllowance(address token, uint256 amount) external {
+        require(msg.sender == _admin, "unauthorized");
+        IERC20(token).safeIncreaseAllowance(_admin, amount);
     }
 
-    // @notice Queries the claim of a beneficiary over a particular token.
-    function getClaimFor(address beneficiary, address token) external view returns (uint256) {
-        return _claims[beneficiary][token];
-    }
 }
