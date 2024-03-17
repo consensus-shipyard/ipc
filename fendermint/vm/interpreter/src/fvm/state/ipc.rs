@@ -174,8 +174,10 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         let membership = self
             .current_membership(state)
             .context("failed to get current membership")?;
+        tracing::debug!(?membership, "current membership");
 
         let power_table = membership_to_power_table(&membership, state.power_scale());
+        tracing::debug!(?power_table, "power table");
 
         Ok((membership.configuration_number, power_table))
     }
