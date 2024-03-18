@@ -24,6 +24,13 @@ library SelectorLibrary {
                     (bytes4[])
                 );
         }
+        if (keccak256(abi.encodePacked(facetName)) == keccak256(abi.encodePacked("OwnershipFacet"))) {
+            return
+                abi.decode(
+                    hex"000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000028da5cb5b00000000000000000000000000000000000000000000000000000000f2fde38b00000000000000000000000000000000000000000000000000000000",
+                    (bytes4[])
+                );
+        }
         if (keccak256(abi.encodePacked(facetName)) == keccak256(abi.encodePacked("DiamondCutFacet"))) {
             return
                 abi.decode(

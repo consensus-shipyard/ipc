@@ -16,7 +16,7 @@ use fendermint_crypto::SecretKey;
 use fendermint_rpc::message::GasParams;
 use fendermint_rpc::query::QueryClient;
 use fendermint_rpc::tx::{CallClient, TxClient, TxSync};
-use fendermint_rpc::{client::FendermintClient, message::MessageFactory};
+use fendermint_rpc::{client::FendermintClient, message::SignedMessageFactory};
 use fendermint_vm_message::query::FvmQueryHeight;
 
 macro_rules! retry {
@@ -121,7 +121,7 @@ where
                 .context("failed to get broadcaster sequence")?;
 
             let factory =
-                MessageFactory::new(self.secret_key.clone(), self.addr, sequence, chain_id);
+                SignedMessageFactory::new(self.secret_key.clone(), self.addr, sequence, chain_id);
 
             // Using the bound client as a one-shot transaction sender.
             let mut client = self.client.clone().bind(factory);

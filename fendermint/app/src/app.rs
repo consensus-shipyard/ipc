@@ -13,8 +13,8 @@ use fendermint_abci::{AbciResult, Application};
 use fendermint_storage::{
     Codec, Encode, KVCollection, KVRead, KVReadable, KVStore, KVWritable, KVWrite,
 };
+use fendermint_tracing::emit;
 use fendermint_vm_core::Timestamp;
-use fendermint_vm_event::{emit, EventType};
 use fendermint_vm_interpreter::bytes::{
     BytesMessageApplyRes, BytesMessageCheckRes, BytesMessageQuery, BytesMessageQueryRes,
 };
@@ -43,8 +43,9 @@ use tendermint::abci::request::CheckTxKind;
 use tendermint::abci::{request, response};
 use tracing::instrument;
 
+use crate::events::{NewBlock, ProposalProcessed};
+use crate::BlockHeight;
 use crate::{tmconv::*, VERSION};
-use crate::{BlockHeight, APP_VERSION};
 
 #[derive(Serialize)]
 #[repr(u8)]
@@ -235,6 +236,7 @@ where
                     circ_supply: TokenAmount::zero(),
                     chain_id: 0,
                     power_scale: 0,
+                    app_version: 0,
                 },
             };
             self.set_committed_state(state)?;
@@ -430,7 +432,7 @@ where
         let info = response::Info {
             data: "fendermint".to_string(),
             version: VERSION.to_owned(),
-            app_version: APP_VERSION,
+            app_version: state.state_params.app_version,
             last_block_height: height,
             last_block_app_hash: state.app_hash(),
         };
@@ -502,6 +504,7 @@ where
                 circ_supply: out.circ_supply,
                 chain_id: out.chain_id.into(),
                 power_scale: out.power_scale,
+                app_version: 0,
             },
         };
 
@@ -665,14 +668,14 @@ where
             .await
             .context("failed to process proposal")?;
 
-        emit!(
-            EventType::ProposalProcessed,
-            is_accepted = accept,
-            height = request.height.value(),
-            size = num_txs,
-            hash = request.hash.to_string(),
-            proposer = request.proposer_address.to_string()
-        );
+        emit!(ProposalProcessed {
+            is_accepted: accept,
+            block_height: request.height.value(),
+            block_hash: request.hash.to_string().as_str(),
+            num_txs,
+            proposer: request.proposer_address.to_string().as_str()
+        });
+
         if accept {
             Ok(response::ProcessProposal::Accept)
         } else {
@@ -766,7 +769,9 @@ where
 
         let r = to_end_block(ret)?;
 
-        emit!(EventType::NewBlock, height = request.height);
+        emit!(NewBlock {
+            block_height: request.height as BlockHeight
+        });
 
         Ok(r)
     }
@@ -785,6 +790,7 @@ where
             FvmUpdatableParams {
                 power_scale,
                 circ_supply,
+                app_version,
             },
             _,
         ) = exec_state.commit().context("failed to commit FVM")?;
@@ -792,6 +798,7 @@ where
         state.state_params.state_root = state_root;
         state.state_params.power_scale = power_scale;
         state.state_params.circ_supply = circ_supply;
+        state.state_params.app_version = app_version;
 
         let app_hash = state.app_hash();
         let block_height = state.block_height;
