@@ -5,14 +5,15 @@ pub use crate::state::PermissionModeParams;
 
 pub use crate::state::State;
 use fil_actor_eam::EamActor;
-pub use fil_actor_eam::Method;
 use fil_actors_runtime::runtime::{ActorCode, Runtime};
 use fil_actors_runtime::ActorError;
 use fil_actors_runtime::EAM_ACTOR_ID;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_ipld_encoding::tuple::*;
-use fvm_shared::{ActorID, MethodNum};
+use fvm_shared::{ActorID, MethodNum, METHOD_CONSTRUCTOR};
+use num_derive::FromPrimitive;
+
 mod state;
 
 #[cfg(feature = "fil-actor")]
@@ -22,6 +23,19 @@ pub const IPC_EAM_ACTOR_NAME: &str = "eam";
 pub const IPC_EAM_ACTOR_ID: ActorID = EAM_ACTOR_ID;
 
 pub struct IPCEamActor;
+
+#[derive(FromPrimitive)]
+#[repr(u64)]
+pub enum Method {
+    // Copied from the upstream EAM.
+    Constructor = METHOD_CONSTRUCTOR,
+    Create = 2,
+    Create2 = 3,
+    CreateExternal = 4,
+    //
+    // leave a gap before extensions
+    //
+}
 
 impl IPCEamActor {
     /// Creates the actor. If the `whitelisted_deployers` is empty, that means there is no restriction
@@ -36,10 +50,11 @@ impl IPCEamActor {
     }
 
     fn ensure_deployer_allowed(rt: &impl Runtime) -> Result<(), ActorError> {
-        let caller = rt.message().caller();
+        // The caller is guaranteed to be an ID address.
+        let caller_id = rt.message().caller().id().unwrap();
 
         let state: State = rt.state()?;
-        if !state.can_deploy(rt.store(), &caller)? {
+        if !state.can_deploy(rt, caller_id)? {
             return Err(ActorError::forbidden(String::from(
                 "sender not allowed to deploy contracts",
             )));
