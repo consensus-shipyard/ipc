@@ -133,6 +133,8 @@ pub struct TopDownSettings {
     /// Timeout for calls to the parent Ethereum API.
     #[serde_as(as = "Option<DurationSeconds<u64>>")]
     pub parent_http_timeout: Option<Duration>,
+    /// Bearer token for any Authorization header.
+    pub parent_http_auth_token: Option<String>,
     /// The parent registry address
     #[serde(deserialize_with = "deserialize_eth_address_from_str")]
     pub parent_registry: Address,
