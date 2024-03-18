@@ -5,7 +5,7 @@ import {VALIDATOR_SECP256K1_PUBLIC_KEY_LENGTH} from "../constants/Constants.sol"
 import {ERR_VALIDATOR_JOINED, ERR_VALIDATOR_NOT_JOINED} from "../errors/IPCErrors.sol";
 import {InvalidFederationPayload, SubnetAlreadyBootstrapped, NotEnoughFunds, CollateralIsZero, CannotReleaseZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalance, NotEnoughCollateral, NotValidator, NotAllValidatorsHaveLeft, InvalidPublicKeyLength, MethodNotAllowed, SubnetNotBootstrapped} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
-import {Validator, ValidatorSet} from "../structs/Subnet.sol";
+import {Validator, ValidatorSet, SupplySource, SupplyKind} from "../structs/Subnet.sol";
 import {LibDiamond} from "../lib/LibDiamond.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
 import {SubnetActorModifiers} from "../lib/LibSubnetActorStorage.sol";
@@ -14,9 +14,11 @@ import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
 import {LibSubnetActor} from "../lib/LibSubnetActor.sol";
 import {Pausable} from "../lib/LibPausable.sol";
+import {SupplySourceHelper} from "../lib/SupplySourceHelper.sol";
 
 contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausable {
     using EnumerableSet for EnumerableSet.AddressSet;
+    using SupplySourceHelper for SupplySource;
     using LibValidatorSet for ValidatorSet;
     using Address for address payable;
 
@@ -24,20 +26,27 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
     /// @dev This balance is added to user addresses in genesis, and becomes part of the genesis
     /// circulating supply.
     function preFund() external payable {
-        if (msg.value == 0) {
-            revert NotEnoughFunds();
-        }
+        SupplySource memory supplySource = s.supplySource;
 
-        if (s.bootstrapped) {
-            revert SubnetAlreadyBootstrapped();
-        }
+        // Ensures that the supply strategy is Native.
+        supplySource.expect(SupplyKind.Native);
 
-        if (s.genesisBalance[msg.sender] == 0) {
-            s.genesisBalanceKeys.push(msg.sender);
-        }
+        preFundCommon(msg.value);
+    }
 
-        s.genesisBalance[msg.sender] += msg.value;
-        s.genesisCircSupply += msg.value;
+    /// @notice method to add some initial balance into a subnet that hasn't yet bootstrapped.
+    /// @dev This balance is added to user addresses in genesis, and becomes part of the genesis
+    /// circulating supply.
+    function preFundWithToken(uint256 amount) external payable {
+        SupplySource memory supplySource = s.supplySource;
+
+        // Ensures that the supply strategy is ERC20.
+        supplySource.expect(SupplyKind.ERC20);
+
+        // Lock the specified amount into custody.
+        supplySource.lock({value: amount});
+
+        preFundCommon(amount);
     }
 
     /// @notice method to remove funds from the initial balance of a subnet.
@@ -267,5 +276,22 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
         s.bootstrapNodes[msg.sender] = netAddress;
         // slither-disable-next-line unused-return
         s.bootstrapOwners.add(msg.sender);
+    }
+
+    function preFundCommon(uint256 amount) internal {
+        if (amount == 0) {
+            revert NotEnoughFunds();
+        }
+
+        if (s.bootstrapped) {
+            revert SubnetAlreadyBootstrapped();
+        }
+
+        if (s.genesisBalance[msg.sender] == 0) {
+            s.genesisBalanceKeys.push(msg.sender);
+        }
+
+        s.genesisBalance[msg.sender] += amount;
+        s.genesisCircSupply += amount;
     }
 }

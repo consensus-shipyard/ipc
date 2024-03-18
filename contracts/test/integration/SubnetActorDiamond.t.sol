@@ -12,7 +12,7 @@ import {METHOD_SEND} from "../../src/constants/Constants.sol";
 import {ConsensusType} from "../../src/enums/ConsensusType.sol";
 import {BottomUpMsgBatch, IpcEnvelope, BottomUpCheckpoint} from "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
-import {SubnetID, PermissionMode, IPCAddress, Subnet, SupplySource, ValidatorInfo} from "../../src/structs/Subnet.sol";
+import {SubnetID, PermissionMode, IPCAddress, Subnet, SupplySource, SupplyKind, ValidatorInfo} from "../../src/structs/Subnet.sol";
 import {IERC165} from "../../src/interfaces/IERC165.sol";
 import {IGateway} from "../../src/interfaces/IGateway.sol";
 import {IDiamond} from "../../src/interfaces/IDiamond.sol";
@@ -41,6 +41,9 @@ import {IntegrationTestBase} from "../IntegrationTestBase.sol";
 import {SubnetActorFacetsHelper} from "../helpers/SubnetActorFacetsHelper.sol";
 import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 
+import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
+import {ERC20PresetFixedSupply} from "../helpers/ERC20PresetFixedSupply.sol";
+
 contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
     using FilAddress for address;
@@ -49,11 +52,14 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     using GatewayFacetsHelper for GatewayDiamond;
 
     address gatewayAddress;
+    IERC20 private token;
 
     function setUp() public override {
         super.setUp();
 
         gatewayAddress = address(gatewayDiamond);
+
+        token = new ERC20PresetFixedSupply("TestToken", "TEST", 1_000 ether, address(this));
     }
 
     function testSubnetActorDiamond_NewSubnetActorWithDefaultParams() public view {
@@ -1066,6 +1072,121 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.expectRevert(SubnetAlreadyBootstrapped.selector);
         saDiamond.manager().preRelease(fundAmount);
         vm.stopPrank();
+    }
+
+    function testSubnetActorDiamond_PreFundWithToken_notERC20() public {
+        (address validator1, bytes memory publicKey1) = TestUtils.deriveValidatorAddress(100);
+        vm.deal(validator1, 1 ether); // no need to worry about gas
+
+        vm.expectRevert(SupplySourceHelper.UnexpectedSupplySource.selector);
+        saDiamond.manager().preFundWithToken(100);
+    }
+
+    function testSubnetActorDiamond_PreFundWithToken_transferZero() public {
+        SubnetActorDiamond.ConstructorParams memory saConstructorParams = defaultSubnetActorParamsWith(
+            address(gatewayDiamond)
+        );
+        saConstructorParams.supplySource = SupplySource({kind: SupplyKind.ERC20, tokenAddress: address(token)});
+        saDiamond = createSubnetActor(saConstructorParams);
+
+        (address validator1, bytes memory publicKey1) = TestUtils.deriveValidatorAddress(100);
+        vm.deal(validator1, 1 ether); // no need to worry about gas
+
+        vm.expectRevert(NotEnoughFunds.selector);
+        saDiamond.manager().preFundWithToken(0);
+    }
+
+    function testSubnetActorDiamond_PreFundWithToken_works() public {
+        SubnetActorDiamond.ConstructorParams memory saConstructorParams = defaultSubnetActorParamsWith(
+            address(gatewayDiamond)
+        );
+        saConstructorParams.supplySource = SupplySource({kind: SupplyKind.ERC20, tokenAddress: address(token)});
+        saDiamond = createSubnetActor(saConstructorParams);
+
+        (address validator1, bytes memory publicKey1) = TestUtils.deriveValidatorAddress(100);
+        (address validator2, bytes memory publicKey2) = TestUtils.deriveValidatorAddress(101);
+
+        token.transfer(validator1, 1 ether);
+        vm.deal(validator1, 1 ether); // no need to worry about gas
+        token.transfer(validator2, 1 ether);
+        vm.deal(validator2, 1 ether); // no need to worry about gas
+
+        uint256 fundAmount = 100;
+
+        // validator 1 funds
+        vm.startPrank(validator1);
+        token.approve(address(saDiamond.manager()), 1 ether); // aprove once and for all
+
+        // pre-fund from validator
+        saDiamond.manager().preFundWithToken(fundAmount);
+
+        require(
+            token.balanceOf(address(saDiamond)) == fundAmount,
+            "subnet balance is incorrect after validator1 funds"
+        );
+        require(saDiamond.getter().genesisCircSupply() == fundAmount, "genesis circ supply not correct");
+        (address[] memory genesisAddrs, uint256[] memory balances) = saDiamond.getter().genesisBalances();
+        require(genesisAddrs.length == 1, "not one genesis addresses");
+        require(genesisAddrs[0] == validator1, "genesis validator not correct");
+        require(balances[0] == fundAmount, "genesis validator balance not correct");
+
+        // fund again
+        saDiamond.manager().preFundWithToken(fundAmount);
+
+        require(
+            token.balanceOf(address(saDiamond)) == fundAmount * 2,
+            "subnet balance is incorrect after validator1 funds again"
+        );
+        require(
+            saDiamond.getter().genesisCircSupply() == fundAmount * 2,
+            "genesis circ supply not correct after funding again"
+        );
+        (genesisAddrs, balances) = saDiamond.getter().genesisBalances();
+        require(genesisAddrs.length == 1, "not one genesis addresses");
+        require(genesisAddrs[0] == validator1, "genesis validator not correct");
+        require(balances[0] == fundAmount * 2, "genesis validator balance not correct");
+
+        vm.stopPrank();
+
+        // validator 2 funds
+        vm.startPrank(validator2);
+        token.approve(address(saDiamond.manager()), 1 ether); // aprove once and for all
+
+        // pre-fund from validator2
+        saDiamond.manager().preFundWithToken(fundAmount);
+
+        require(
+            token.balanceOf(address(saDiamond)) == fundAmount * 3,
+            "subnet balance is incorrect after validator2 funds"
+        );
+        require(
+            saDiamond.getter().genesisCircSupply() == fundAmount * 3,
+            "genesis circ supply not correc after validator2 funds"
+        );
+        (genesisAddrs, balances) = saDiamond.getter().genesisBalances();
+        require(genesisAddrs.length == 2, "not two genesis addresses");
+        require(genesisAddrs[0] == validator1, "genesis validator not correct");
+        require(genesisAddrs[1] == validator2, "genesis validator not correct");
+        require(balances[0] == fundAmount * 2, "genesis validator1 balance not correct");
+        require(balances[1] == fundAmount, "genesis validator2 balance not correct");
+
+        // fund again
+        saDiamond.manager().preFundWithToken(fundAmount);
+
+        require(
+            token.balanceOf(address(saDiamond)) == fundAmount * 4,
+            "subnet balance is incorrect after validator2 funds"
+        );
+        require(
+            saDiamond.getter().genesisCircSupply() == fundAmount * 4,
+            "genesis circ supply not correc after validator2 funds"
+        );
+        (genesisAddrs, balances) = saDiamond.getter().genesisBalances();
+        require(genesisAddrs.length == 2, "not two genesis addresses");
+        require(genesisAddrs[0] == validator1, "genesis validator not correct");
+        require(genesisAddrs[1] == validator2, "genesis validator not correct");
+        require(balances[0] == fundAmount * 2, "genesis validator1 balance not correct");
+        require(balances[1] == fundAmount * 2, "genesis validator2 balance not correct");
     }
 
     function testSubnetActorDiamond_MultipleJoins_Works_GetValidators() public {
