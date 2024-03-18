@@ -236,14 +236,15 @@ mod tests {
 
     #[test]
     fn test_create_allowed() {
-        let deployers = vec![Address::new_id(1000), Address::new_id(2000)];
-        let rt = construct_and_verify(deployers);
-
         let id_addr = Address::new_id(1000);
         let eth_addr = EthAddress(hex_literal::hex!(
             "CAFEB0BA00000000000000000000000000000000"
         ));
         let f4_eth_addr = Address::new_delegated(10, &eth_addr.0).unwrap();
+
+        let deployers = vec![f4_eth_addr];
+
+        let rt = construct_and_verify(deployers);
         rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
 
         rt.set_caller(*EVM_ACTOR_CODE_ID, id_addr);
