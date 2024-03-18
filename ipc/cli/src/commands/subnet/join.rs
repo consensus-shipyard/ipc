@@ -5,6 +5,7 @@
 use async_trait::async_trait;
 use clap::Args;
 use ipc_api::subnet_id::SubnetID;
+use num_traits::Zero;
 use std::{fmt::Debug, str::FromStr};
 
 use crate::{
@@ -29,7 +30,7 @@ impl CommandLineHandler for JoinSubnet {
             None => None,
         };
         let public_key = hex::decode(&arguments.public_key)?;
-        if let Some(initial_balance) = arguments.initial_balance {
+        if let Some(initial_balance) = arguments.initial_balance.filter(|x| !x.is_zero()) {
             log::info!("pre-funding address with {initial_balance}");
             provider
                 .pre_fund(subnet.clone(), from, f64_to_token_amount(initial_balance)?)

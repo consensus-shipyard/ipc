@@ -90,7 +90,7 @@ pub struct CreateSubnetArgs {
     pub parent: String,
     #[arg(
         long,
-        help = "The minimum number of collateral required for validators"
+        help = "The minimum number of collateral required for validators in (in whole FIL; the minimum is 1 nanoFIL)"
     )]
     pub min_validator_stake: f64,
     #[arg(
@@ -105,7 +105,7 @@ pub struct CreateSubnetArgs {
     #[arg(
         long,
         default_value = "0.000001",
-        help = "Minimum fee for cross-net messages in subnet (in whole FIL)"
+        help = "Minimum fee for cross-net messages in subnet (in whole FIL; the minimum is 1 nanoFIL)"
     )]
     pub min_cross_msg_fee: f64,
     #[arg(

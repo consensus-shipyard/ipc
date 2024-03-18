@@ -4,6 +4,7 @@
 use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand};
+use config::ConfigArgs;
 use fvm_shared::address::Network;
 use lazy_static::lazy_static;
 use tracing_subscriber::EnvFilter;
@@ -13,6 +14,7 @@ use self::{
     run::RunArgs,
 };
 
+pub mod config;
 pub mod eth;
 pub mod genesis;
 pub mod key;
@@ -172,6 +174,8 @@ impl Options {
 #[allow(clippy::large_enum_variant)]
 #[derive(Subcommand, Debug)]
 pub enum Commands {
+    /// Parse the configuration file and print it to the console.
+    Config(ConfigArgs),
     /// Run the `App`, listening to ABCI requests from Tendermint.
     Run(RunArgs),
     /// Subcommands related to the construction of signing keys.

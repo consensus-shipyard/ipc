@@ -836,10 +836,10 @@ impl IpcProvider {
         out
     }
 
-    pub fn import_fvm_key(&self, keyinfo: String) -> anyhow::Result<Address> {
+    pub fn import_fvm_key(&self, keyinfo: &str) -> anyhow::Result<Address> {
         let wallet = self.fvm_wallet()?;
         let mut wallet = wallet.write().unwrap();
-        let keyinfo = LotusJsonKeyType::from_str(&keyinfo)?;
+        let keyinfo = LotusJsonKeyType::from_str(keyinfo)?;
 
         let key_type = if WalletKeyType::from_str(&keyinfo.r#type)? == WalletKeyType::BLS {
             SignatureType::BLS
@@ -855,24 +855,22 @@ impl IpcProvider {
         Ok(wallet.import(key_info)?)
     }
 
-    pub fn import_evm_key_from_privkey(
-        &self,
-        private_key: String,
-    ) -> anyhow::Result<EthKeyAddress> {
+    pub fn import_evm_key_from_privkey(&self, private_key: &str) -> anyhow::Result<EthKeyAddress> {
         let keystore = self.evm_wallet()?;
         let mut keystore = keystore.write().unwrap();
 
         let private_key = if !private_key.starts_with("0x") {
-            hex::decode(&private_key)?
+            hex::decode(private_key)?
         } else {
-            hex::decode(&private_key.as_str()[2..])?
+            hex::decode(&private_key[2..])?
         };
         keystore.put(ipc_wallet::EvmKeyInfo::new(private_key))
     }
 
-    pub fn import_evm_key_from_json(&self, keyinfo: String) -> anyhow::Result<EthKeyAddress> {
-        let persisted: ipc_wallet::PersistentKeyInfo = serde_json::from_str(&keyinfo)?;
-        self.import_evm_key_from_privkey(persisted.private_key().parse()?)
+    pub fn import_evm_key_from_json(&self, keyinfo: &str) -> anyhow::Result<EthKeyAddress> {
+        let persisted: ipc_wallet::PersistentKeyInfo = serde_json::from_str(keyinfo)?;
+        let persisted: String = persisted.private_key().parse()?;
+        self.import_evm_key_from_privkey(&persisted)
     }
 }
 

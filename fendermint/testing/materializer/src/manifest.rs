@@ -8,7 +8,7 @@ use fvm_shared::econ::TokenAmount;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::{collections::BTreeMap, path::Path};
-use tendermint_rpc::Url;
+use url::Url;
 
 use fendermint_vm_encoding::IsHumanReadable;
 use fendermint_vm_genesis::Collateral;
@@ -20,6 +20,7 @@ pub type BalanceMap = BTreeMap<AccountId, Balance>;
 pub type CollateralMap = BTreeMap<AccountId, Collateral>;
 pub type NodeMap = BTreeMap<NodeId, Node>;
 pub type RelayerMap = BTreeMap<RelayerId, Relayer>;
+pub type EnvMap = BTreeMap<String, String>;
 
 /// The manifest is a static description of a testnet.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -112,6 +113,8 @@ pub enum Rootnet {
     ///
     /// This implies using some sort of Faucet to get balances for the accounts.
     External {
+        /// We need to know the ID of the chain to be able to create a `SubnetID` for it.
+        chain_id: u64,
         /// Indicate whether we have to (re)deploy the IPC contract or we can use an existing one.
         deployment: IpcDeployment,
         /// Addresses of JSON-RPC endpoints on the external L1.
@@ -131,6 +134,9 @@ pub enum Rootnet {
         balances: BalanceMap,
         /// Nodes that participate in running the root chain.
         nodes: NodeMap,
+        /// Custom env vars to pass on to the nodes.
+        #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+        env: EnvMap,
     },
 }
 
@@ -157,6 +163,11 @@ pub struct Subnet {
     pub nodes: NodeMap,
     /// Relayers that submit bottom-up checkpoints to the parent subnet.
     pub relayers: RelayerMap,
+    /// Bottom-up checkpoint configuration.
+    pub bottom_up_checkpoint: CheckpointConfig,
+    /// Custom env vars to pass on to the nodes.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub env: EnvMap,
     /// Child subnets under this parent.
     ///
     /// The subnet ID exists so we can find the outcome of existing deployments in the log.
@@ -171,10 +182,18 @@ pub struct Node {
     /// Indicate whether to run the Ethereum API.
     pub ethapi: bool,
     /// The nodes from which CometBFT should bootstrap itself.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    ///
+    /// We can leave it empty for standalone nodes and in cases
+    /// where we don't want mutual seeding, however it's best to
+    /// still show the field in the manifest explicitly, to make
+    /// sure it's not forgotten, which would prevent the nodes
+    /// discovering each other.
     pub seed_nodes: Vec<NodeId>,
     /// The parent node that the top-down syncer follows;
     /// or leave it empty if node is on the rootnet.
+    ///
+    /// We can skip this field if it's empty because validation
+    /// will tell us that all subnet nodes need a parent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_node: Option<ParentNode>,
 }
@@ -209,6 +228,12 @@ pub struct Relayer {
     /// The node where the relayer submits the checkpoints;
     /// or leave it empty if the parent is CalibrationNet.
     pub submit_node: ParentNode,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CheckpointConfig {
+    /// Number of blocks between checkpoints.
+    pub period: u64,
 }
 
 #[cfg(test)]
