@@ -37,7 +37,8 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
     /// @notice method to add some initial balance into a subnet that hasn't yet bootstrapped.
     /// @dev This balance is added to user addresses in genesis, and becomes part of the genesis
     /// circulating supply.
-    function preFundWithToken(uint256 amount) external payable {
+    /// @param amount The amount of ERC20 tokens to be sent.
+    function preFundWithToken(uint256 amount) external nonReentrant {
         SupplySource memory supplySource = s.supplySource;
 
         // Ensures that the supply strategy is ERC20.

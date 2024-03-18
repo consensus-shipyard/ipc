@@ -1074,12 +1074,46 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.stopPrank();
     }
 
+    function testSubnetActorDiamond_PreFundWithToken_notNative() public {
+        (address validator1, ) = TestUtils.deriveValidatorAddress(100);
+        vm.deal(validator1, 1 ether); // no need to worry about gas
+
+        SubnetActorDiamond.ConstructorParams memory saConstructorParams = defaultSubnetActorParamsWith(
+            address(gatewayDiamond)
+        );
+        saConstructorParams.supplySource = SupplySource({kind: SupplyKind.ERC20, tokenAddress: address(token)});
+        saDiamond = createSubnetActor(saConstructorParams);
+
+        vm.expectRevert(SupplySourceHelper.UnexpectedSupplySource.selector);
+        saDiamond.manager().preFund{value: 100}();
+    }
+
     function testSubnetActorDiamond_PreFundWithToken_notERC20() public {
-        (address validator1, bytes memory publicKey1) = TestUtils.deriveValidatorAddress(100);
+        (address validator1, ) = TestUtils.deriveValidatorAddress(100);
         vm.deal(validator1, 1 ether); // no need to worry about gas
 
         vm.expectRevert(SupplySourceHelper.UnexpectedSupplySource.selector);
         saDiamond.manager().preFundWithToken(100);
+    }
+
+    function testSubnetActorDiamond_PreFundWithToken_bootstrapped() public {
+        SubnetActorDiamond.ConstructorParams memory saConstructorParams = defaultSubnetActorParamsWith(
+            address(gatewayDiamond)
+        );
+        saConstructorParams.supplySource = SupplySource({kind: SupplyKind.ERC20, tokenAddress: address(token)});
+        saDiamond = createSubnetActor(saConstructorParams);
+
+        (address validator1, bytes memory publicKey1) = TestUtils.deriveValidatorAddress(100);
+        vm.deal(validator1, 1 ether); // no need to worry about gas
+
+        token.transfer(validator1, 1 ether);
+
+        vm.startPrank(validator1);
+        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey1);
+        token.approve(address(saDiamond.manager()), 1 ether); // aprove once and for all
+
+        vm.expectRevert(SubnetAlreadyBootstrapped.selector);
+        saDiamond.manager().preFundWithToken(1000);
     }
 
     function testSubnetActorDiamond_PreFundWithToken_transferZero() public {
@@ -1089,7 +1123,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         saConstructorParams.supplySource = SupplySource({kind: SupplyKind.ERC20, tokenAddress: address(token)});
         saDiamond = createSubnetActor(saConstructorParams);
 
-        (address validator1, bytes memory publicKey1) = TestUtils.deriveValidatorAddress(100);
+        (address validator1, ) = TestUtils.deriveValidatorAddress(100);
         vm.deal(validator1, 1 ether); // no need to worry about gas
 
         vm.expectRevert(NotEnoughFunds.selector);
@@ -1103,8 +1137,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         saConstructorParams.supplySource = SupplySource({kind: SupplyKind.ERC20, tokenAddress: address(token)});
         saDiamond = createSubnetActor(saConstructorParams);
 
-        (address validator1, bytes memory publicKey1) = TestUtils.deriveValidatorAddress(100);
-        (address validator2, bytes memory publicKey2) = TestUtils.deriveValidatorAddress(101);
+        (address validator1, ) = TestUtils.deriveValidatorAddress(100);
+        (address validator2, ) = TestUtils.deriveValidatorAddress(101);
 
         token.transfer(validator1, 1 ether);
         vm.deal(validator1, 1 ether); // no need to worry about gas
