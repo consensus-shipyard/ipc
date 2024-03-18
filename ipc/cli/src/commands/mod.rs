@@ -113,7 +113,7 @@ struct GlobalOptions {
 /// ```
 pub async fn cli() -> anyhow::Result<()> {
     let global = GlobalOptions::parse();
-    set_current_network(global.global_params.network);
+    set_current_network(global.global_params.network());
 
     // parse the arguments
     let args = IPCAgentCliCommands::parse();

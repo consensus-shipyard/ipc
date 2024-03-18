@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import {GatewayActorModifiers} from "../../lib/LibGatewayActorStorage.sol";
 import {ParentFinality} from "../../structs/CrossNet.sol";
-import {Validator, ValidatorInfo, StakingChangeRequest, Membership} from "../../structs/Subnet.sol";
+import {PermissionMode, Validator, ValidatorInfo, StakingChangeRequest, Membership} from "../../structs/Subnet.sol";
 import {LibGateway} from "../../lib/LibGateway.sol";
 
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
@@ -51,20 +51,24 @@ contract TopDownFinalityFacet is GatewayActorModifiers {
         // confirm the change
         s.validatorsTracker.confirmChange(configurationNumber);
 
-        // get the active validators
+        // Get active validators and populate the new power table.
         address[] memory validators = s.validatorsTracker.validators.listActiveValidators();
         uint256 vLength = validators.length;
         Validator[] memory vs = new Validator[](vLength);
         for (uint256 i; i < vLength; ) {
             address addr = validators[i];
             ValidatorInfo storage info = s.validatorsTracker.validators.validators[addr];
-            vs[i] = Validator({weight: info.confirmedCollateral, addr: addr, metadata: info.metadata});
+
+            // Extract the consensus weight for validator.
+            uint256 weight = info.confirmedCollateral + info.federatedPower;
+
+            vs[i] = Validator({weight: weight, addr: addr, metadata: info.metadata});
             unchecked {
                 ++i;
             }
         }
 
-        // update membership with the applied changes
+        // update membership with the resulting power table.
         LibGateway.updateMembership(Membership({configurationNumber: configurationNumber, validators: vs}));
         return configurationNumber;
     }

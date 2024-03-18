@@ -13,8 +13,8 @@ use fendermint_abci::{AbciResult, Application};
 use fendermint_storage::{
     Codec, Encode, KVCollection, KVRead, KVReadable, KVStore, KVWritable, KVWrite,
 };
+use fendermint_tracing::emit;
 use fendermint_vm_core::Timestamp;
-use fendermint_vm_event::{emit, EventType};
 use fendermint_vm_interpreter::bytes::{
     BytesMessageApplyRes, BytesMessageCheckRes, BytesMessageQuery, BytesMessageQueryRes,
 };
@@ -43,6 +43,7 @@ use tendermint::abci::request::CheckTxKind;
 use tendermint::abci::{request, response};
 use tracing::instrument;
 
+use crate::events::{NewBlock, ProposalProcessed};
 use crate::BlockHeight;
 use crate::{tmconv::*, VERSION};
 
@@ -667,14 +668,14 @@ where
             .await
             .context("failed to process proposal")?;
 
-        emit!(
-            EventType::ProposalProcessed,
-            is_accepted = accept,
-            height = request.height.value(),
-            size = num_txs,
-            hash = request.hash.to_string(),
-            proposer = request.proposer_address.to_string()
-        );
+        emit!(ProposalProcessed {
+            is_accepted: accept,
+            block_height: request.height.value(),
+            block_hash: request.hash.to_string().as_str(),
+            num_txs,
+            proposer: request.proposer_address.to_string().as_str()
+        });
+
         if accept {
             Ok(response::ProcessProposal::Accept)
         } else {
@@ -768,7 +769,9 @@ where
 
         let r = to_end_block(ret)?;
 
-        emit!(EventType::NewBlock, height = request.height);
+        emit!(NewBlock {
+            block_height: request.height as BlockHeight
+        });
 
         Ok(r)
     }
