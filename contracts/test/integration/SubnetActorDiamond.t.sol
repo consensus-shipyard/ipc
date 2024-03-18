@@ -712,6 +712,18 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.prank(validators[0]);
         saDiamond.checkpointer().submitCheckpoint(checkpointWithIncorrectHeight, validators, signatures);
 
+        // skip the current checkpoint, should fail
+        checkpointWithIncorrectHeight.blockHeight = saDiamond.getter().bottomUpCheckPeriod() + 1;
+        vm.expectRevert(InvalidCheckpointEpoch.selector);
+        vm.prank(validators[0]);
+        saDiamond.checkpointer().submitCheckpoint(checkpointWithIncorrectHeight, validators, signatures);
+
+        // skip the curent checkpoint but submit at the next bottom up checkpoint, should fail
+        checkpointWithIncorrectHeight.blockHeight = saDiamond.getter().bottomUpCheckPeriod() * 2;
+        vm.expectRevert(InvalidCheckpointEpoch.selector);
+        vm.prank(validators[0]);
+        saDiamond.checkpointer().submitCheckpoint(checkpointWithIncorrectHeight, validators, signatures);
+
         vm.expectCall(gatewayAddress, abi.encodeCall(IGateway.commitCheckpoint, (checkpoint)), 1);
         vm.prank(validators[0]);
         saDiamond.checkpointer().submitCheckpoint(checkpoint, validators, signatures);
@@ -812,6 +824,20 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         saDiamond.checkpointer().submitCheckpoint(checkpoint, validators, signatures);
 
         require(saDiamond.getter().lastBottomUpCheckpointHeight() == 1, " checkpoint height correct");
+
+        // submit another again
+        checkpoint.blockHeight = 2;
+        hash = keccak256(abi.encode(checkpoint));
+
+        for (uint256 i = 0; i < 3; i++) {
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(keys[i], hash);
+            signatures[i] = abi.encodePacked(r, s, v);
+        }
+
+        vm.expectCall(gatewayAddress, abi.encodeCall(IGateway.commitCheckpoint, (checkpoint)), 1);
+        vm.prank(validators[0]);
+        saDiamond.checkpointer().submitCheckpoint(checkpoint, validators, signatures);
+
     }
 
     function testSubnetActorDiamond_submitCheckpointWithReward() public {
