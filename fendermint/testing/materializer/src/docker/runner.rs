@@ -15,12 +15,13 @@ use bollard::{
 };
 use futures::StreamExt;
 
-use crate::NodeName;
+use crate::{docker::current_network, NodeName};
 
 use super::{
     container::DockerContainer,
     dropper::{DropChute, DropPolicy},
-    DockerConstruct, DockerNetwork, Volumes,
+    network::NetworkName,
+    DockerConstruct, Volumes,
 };
 
 pub struct DockerRunner {
@@ -31,9 +32,11 @@ pub struct DockerRunner {
     user: u32,
     image: String,
     volumes: Volumes,
+    network_name: Option<NetworkName>,
 }
 
 impl DockerRunner {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         docker: Docker,
         dropper: DropChute,
@@ -42,6 +45,7 @@ impl DockerRunner {
         user: u32,
         image: &str,
         volumes: Volumes,
+        network_name: Option<NetworkName>,
     ) -> Self {
         Self {
             docker,
@@ -51,6 +55,7 @@ impl DockerRunner {
             user,
             image: image.to_string(),
             volumes,
+            network_name,
         }
     }
 
@@ -67,7 +72,18 @@ impl DockerRunner {
 
     /// Run a short lived container.
     pub async fn run_cmd(&self, cmd: &str) -> anyhow::Result<Vec<String>> {
-        let cmdv = cmd.split(' ').map(|s| s.to_string()).collect();
+        let cmdv = cmd
+            .split(' ')
+            .filter_map(|s| {
+                Some(s.trim())
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.to_string())
+            })
+            .collect();
+
+        // Set the network otherwise we might be be able to parse addresses we created.
+        let env = vec![format!("FM_NETWORK={}", current_network())];
+
         let config = Config {
             image: Some(self.image.clone()),
             user: Some(self.user.to_string()),
@@ -76,6 +92,7 @@ impl DockerRunner {
             attach_stdout: Some(true),
             tty: Some(true),
             labels: Some(self.labels()),
+            env: Some(env),
             host_config: Some(HostConfig {
                 // We'll remove it explicitly at the end after collecting the output.
                 auto_remove: Some(false),
@@ -86,6 +103,7 @@ impl DockerRunner {
                         .map(|(h, c)| format!("{}:{c}", h.to_string_lossy()))
                         .collect(),
                 ),
+                network_mode: self.network_name.clone(),
                 ..Default::default()
             }),
             ..Default::default()
@@ -123,7 +141,7 @@ impl DockerRunner {
             out.push(output.to_string());
         }
 
-        eprintln!("NODE: {}", self.node_name);
+        eprintln!("NODE: {} ({id})", self.node_name);
         eprintln!("CMD: {cmd}");
         for o in out.iter() {
             eprint!("OUT: {o}");
@@ -146,12 +164,12 @@ impl DockerRunner {
             )
             .await?;
 
-        if let Some(state) = inspect.state {
+        if let Some(ref state) = inspect.state {
             let exit_code = state.exit_code.unwrap_or_default();
             if exit_code != 0 {
                 bail!(
-                    "ctonainer exited with code {exit_code}: {}",
-                    state.error.unwrap_or_default()
+                    "container exited with code {exit_code}: '{}'",
+                    state.error.clone().unwrap_or_default()
                 );
             }
         }
@@ -163,7 +181,6 @@ impl DockerRunner {
     pub async fn create(
         &self,
         name: String,
-        network: &DockerNetwork,
         // Host <-> Container port mappings
         ports: Vec<(u32, u32)>,
         entrypoint: Vec<String>,
@@ -222,16 +239,18 @@ impl DockerRunner {
         eprintln!("---");
 
         // host_config.network_mode should work as well.
-        self.docker
-            .connect_network(
-                network.network_name(),
-                ConnectNetworkOptions {
-                    container: id.clone(),
-                    ..Default::default()
-                },
-            )
-            .await
-            .context("failed to connect container to network")?;
+        if let Some(network_name) = self.network_name.as_ref() {
+            self.docker
+                .connect_network(
+                    network_name,
+                    ConnectNetworkOptions {
+                        container: id.clone(),
+                        ..Default::default()
+                    },
+                )
+                .await
+                .context("failed to connect container to network")?;
+        }
 
         Ok(DockerContainer::new(
             self.docker.clone(),

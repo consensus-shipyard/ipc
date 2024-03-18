@@ -65,6 +65,12 @@ impl From<&ResourceId> for ResourceId {
     }
 }
 
+impl AsRef<str> for ResourceId {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
 /// A human readable name for a testnet.
 pub type TestnetId = ResourceId;
 
@@ -102,6 +108,16 @@ impl ResourceName {
 
     pub fn path_string(&self) -> String {
         self.0.to_string_lossy().to_string()
+    }
+
+    pub fn id(&self) -> ResourceId {
+        ResourceId(
+            self.0
+                .file_name()
+                .expect("resource name has file segment")
+                .to_string_lossy()
+                .to_string(),
+        )
     }
 }
 
@@ -312,19 +328,19 @@ impl ToString for ResourceHash {
 }
 
 pub trait HasEthApi {
-    /// URL of the HTTP endpoint, if it's enabled.
-    fn ethapi_http_endpoint(&self) -> Option<String>;
+    /// URL of the HTTP endpoint *on the host*, if it's enabled.
+    fn ethapi_http_endpoint(&self) -> Option<url::Url>;
 
     fn ethapi_http_provider(&self) -> anyhow::Result<Option<Provider<Http>>> {
         match self.ethapi_http_endpoint() {
-            Some(url) => Ok(Some(Provider::<Http>::try_from(url)?)),
+            Some(url) => Ok(Some(Provider::<Http>::try_from(url.to_string())?)),
             None => Ok(None),
         }
     }
 }
 
 pub trait HasCometBftApi {
-    /// URL of the HTTP endpoint.
+    /// URL of the HTTP endpoint *on the host*.
     fn cometbft_http_endpoint(&self) -> tendermint_rpc::Url;
 
     fn cometbft_http_provider(&self) -> anyhow::Result<tendermint_rpc::HttpClient> {

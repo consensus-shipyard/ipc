@@ -1,0 +1,66 @@
+accounts:
+  alice: {}
+  bob: {}
+  charlie: {}
+
+rootnet:
+  type: New
+  # Balances and collateral are in atto
+  validators:
+    alice: '100'
+  balances:
+    alice: '1000000000000000000'
+    bob: '2000000000000000000'
+    charlie: '3000000000000000000'
+  env:
+    CMT_CONSENSUS_TIMEOUT_COMMIT: 2s
+
+  nodes:
+    brussels:
+      mode:
+        type: Validator
+        validator: alice
+      seed_nodes: []
+      ethapi: true
+
+subnets:
+  england:
+    creator: bob
+    # Minimum collateral is 1 nanoFIL
+    validators:
+      charlie: '1000000000'
+      alice:   '2000000000'
+    balances:
+      bob:     '50000000000'
+      charlie: '80000000000'
+    bottom_up_checkpoint:
+      period: 1000
+
+    relayers:
+      # TODO: Implement `create_relayer`.
+      # euston:
+      #   submitter: bob
+      #   follow_node: london
+      #   submit_node: brussels
+
+      # piccadilly:
+      #   submitter: alice
+      #   follow_node: manchester
+      #   submit_node: brussels
+
+    nodes:
+      london:
+        mode:
+          type: Validator
+          validator: charlie
+        parent_node: brussels
+        seed_nodes: []
+        ethapi: true
+
+      manchester:
+        mode:
+          type: Validator
+          validator: alice
+        parent_node: brussels
+        seed_nodes: [london]
+        ethapi: true

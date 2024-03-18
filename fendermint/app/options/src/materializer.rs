@@ -34,6 +34,7 @@ pub enum MaterializerCommands {
     /// Setup a testnet.
     Setup(MaterializerSetupArgs),
     /// Tear down a testnet.
+    #[clap(aliases  = &["teardown", "rm"])]
     Remove(MaterializerRemoveArgs),
     /// Import an existing secret key into a testnet; for example to use an already funded account on Calibration net.
     ImportKey(MaterializerImportKeyArgs),

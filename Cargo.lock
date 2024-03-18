@@ -3057,6 +3057,7 @@ dependencies = [
  "async-recursion",
  "async-trait",
  "bollard",
+ "either",
  "env_logger 0.10.2",
  "ethers",
  "fendermint_crypto",
@@ -3070,11 +3071,13 @@ dependencies = [
  "fvm_shared",
  "hex",
  "ipc-api",
+ "ipc-provider",
  "lazy_static",
  "multihash 0.18.1",
  "quickcheck",
  "quickcheck_async",
  "quickcheck_macros",
+ "regex",
  "serde",
  "serde_json",
  "serde_with 2.3.3",
@@ -3085,6 +3088,7 @@ dependencies = [
  "tokio",
  "toml 0.8.10",
  "tracing",
+ "url",
 ]
 
 [[package]]
@@ -5045,6 +5049,7 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "serde_tuple",
+ "serde_with 2.3.3",
  "strum 0.26.1",
  "tempfile",
  "thiserror",

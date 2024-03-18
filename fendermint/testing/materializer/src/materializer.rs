@@ -1,16 +1,18 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use async_trait::async_trait;
+use either::Either;
 use ethers::types::H160;
-use fvm_shared::econ::TokenAmount;
+use fvm_shared::{chainid::ChainID, econ::TokenAmount};
 use std::collections::BTreeMap;
-use tendermint_rpc::Url;
+use url::Url;
 
 use fendermint_vm_genesis::Collateral;
 
 use crate::{
-    manifest::Balance, materials::Materials, AccountName, NodeName, RelayerName, ResourceHash,
-    SubnetName, TestnetName,
+    manifest::{Balance, CheckpointConfig, EnvMap},
+    materials::Materials,
+    AccountName, NodeName, RelayerName, ResourceHash, SubnetName, TestnetName,
 };
 
 /// The materializer is a component to provision resources of a testnet, and
@@ -100,6 +102,13 @@ pub trait Materializer<M: Materials> {
         validators: BTreeMap<&'a M::Account, Collateral>,
         balances: BTreeMap<&'a M::Account, Balance>,
     ) -> anyhow::Result<M::Genesis>;
+
+    /// Create a subnet to represent the root.
+    fn create_root_subnet(
+        &mut self,
+        subnet_name: &SubnetName,
+        params: Either<ChainID, &M::Genesis>,
+    ) -> anyhow::Result<M::Subnet>;
 
     /// Construct the configuration for a node.
     ///
@@ -213,6 +222,10 @@ pub struct NodeConfig<'a, M: Materials> {
     pub parent_node: Option<ParentConfig<'a, M>>,
     /// Run the Ethereum API facade or not.
     pub ethapi: bool,
+    /// Arbitrary env vars, e.g. to regulate block production rates.
+    pub env: &'a EnvMap,
+    /// Number of nodes to be expected in the subnet, including this node, or 0 if unknown.
+    pub peer_count: usize,
 }
 
 /// Options regarding subnet configuration, e.g. how many validators are required.
@@ -223,12 +236,15 @@ pub struct SubnetConfig<'a, M: Materials> {
     pub creator: &'a M::Account,
     /// Number of validators required for bootstrapping a subnet.
     pub min_validators: usize,
+    pub bottom_up_checkpoint: &'a CheckpointConfig,
 }
 
 /// Options for how to submit IPC transactions to a subnet.
 pub struct SubmitConfig<'a, M: Materials> {
     /// The nodes to which we can send transactions or queries.
     pub nodes: Vec<TargetConfig<'a, M>>,
+    /// The identity of the subnet to which we submit the transaction.
+    pub subnet: &'a M::Subnet,
     /// The location of the IPC contracts on the (generally parent) subnet.
     pub deployment: &'a M::Deployment,
 }
