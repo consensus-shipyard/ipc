@@ -17,7 +17,8 @@ use crate::{
         Rootnet, Subnet,
     },
     materializer::{
-        Materializer, NodeConfig, ParentConfig, SubmitConfig, SubnetConfig, TargetConfig,
+        Materializer, NodeConfig, ParentConfig, RelayerConfig, SubmitConfig, SubnetConfig,
+        TargetConfig,
     },
     materials::Materials,
     AccountId, NodeId, NodeName, RelayerName, ResourceHash, SubnetId, SubnetName, TestnetName,
@@ -170,7 +171,7 @@ where
     pub fn nodes_by_subnet(&self, subnet_name: &SubnetName) -> Vec<&M::Node> {
         self.nodes
             .iter()
-            .filter(|(node_name, _)| node_name.is_in_subnet(subnet_name))
+            .filter(|(node_name, _)| subnet_name.contains(node_name))
             .map(|(_, n)| n)
             .collect()
     }
@@ -334,7 +335,7 @@ where
         };
 
         let node = m
-            .create_node(&node_name, node_config)
+            .create_node(&node_name, &node_config)
             .await
             .context("failed to create node")?;
 
@@ -462,7 +463,7 @@ where
                 .create_subnet(
                     &parent_submit_config,
                     &subnet_name,
-                    SubnetConfig {
+                    &SubnetConfig {
                         creator: self.account(&subnet.creator).context("invalid creator")?,
                         // Make the number such that the last validator to join activates the subnet.
                         min_validators: subnet.validators.len(),
@@ -558,9 +559,10 @@ where
                 .with_context(|| format!("failed to start subnet nodes in {subnet_name}"))?;
         }
 
-        // Interact with the running subnet .
+        // Interact with the running subnet.
         {
             let created_subnet = self.subnet(&subnet_name)?;
+            let created_deployment = self.deployment(&subnet_name)?;
 
             // Where can we reach the gateway and the registry.
             let parent_submit_config = self.submit_config(parent_subnet_name)?;
@@ -619,9 +621,15 @@ where
                             ..parent_submit_config
                         },
                         &relayer_name,
-                        created_subnet,
-                        submitter,
-                        follow_node,
+                        RelayerConfig {
+                            follow_config: &SubmitConfig {
+                                nodes: vec![TargetConfig::Internal(follow_node)],
+                                subnet: created_subnet,
+                                deployment: created_deployment,
+                            },
+                            submitter,
+                            env: &subnet.env,
+                        },
                     )
                     .await
                     .with_context(|| format!("failed to create relayer {id}"))?;

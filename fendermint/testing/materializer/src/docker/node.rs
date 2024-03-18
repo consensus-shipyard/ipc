@@ -4,7 +4,6 @@
 use std::{
     collections::BTreeMap,
     fmt::Display,
-    os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
     str::FromStr,
     time::{Duration, Instant},
@@ -20,11 +19,10 @@ use url::Url;
 
 use super::{
     container::DockerContainer,
-    current_network,
     dropper::{DropChute, DropPolicy},
     network::NetworkName,
     runner::DockerRunner,
-    DockerMaterials, DockerPortRange, Volumes, COMETBFT_IMAGE, FENDERMINT_IMAGE,
+    user_id, DockerMaterials, DockerPortRange, Volumes, COMETBFT_IMAGE, FENDERMINT_IMAGE,
 };
 use crate::{
     docker::DOCKER_ENTRY_FILE_NAME,
@@ -88,7 +86,7 @@ impl DockerNode {
         dropper: DropChute,
         drop_policy: &DropPolicy,
         node_name: &NodeName,
-        node_config: NodeConfig<'a, DockerMaterials>,
+        node_config: &NodeConfig<'a, DockerMaterials>,
         port_range: DockerPortRange,
     ) -> anyhow::Result<Self> {
         let fendermint_name = container_name(node_name, "fendermint");
@@ -124,7 +122,7 @@ impl DockerNode {
         std::fs::create_dir_all(&node_dir).context("failed to create node dir")?;
 
         // Get the current user ID to use with docker containers.
-        let user = node_dir.metadata()?.uid();
+        let user = user_id(&node_dir)?;
 
         let make_runner = |image, volumes| {
             DockerRunner::new(
@@ -158,6 +156,12 @@ impl DockerNode {
             std::fs::create_dir(fendermint_dir.join("data"))?;
             std::fs::create_dir(fendermint_dir.join("logs"))?;
             std::fs::create_dir(fendermint_dir.join("snapshots"))?;
+        }
+
+        // Create a directory for ethapi logs
+        let ethapi_dir = node_dir.join("ethapi");
+        if !ethapi_dir.exists() {
+            std::fs::create_dir_all(ethapi_dir.join("logs"))?;
         }
 
         // We'll need to run some cometbft and fendermint commands.
@@ -262,14 +266,12 @@ impl DockerNode {
             let mut env: EnvMap = node_config.env.clone();
 
             env.extend(env_vars![
-                "LOG_LEVEL"        => "info",
-                "RUST_BACKTRACE"   => 1,
-                "FM_NETWORK"       => current_network(),
-                "FM_DATA_DIR"      => "/fendermint/data",
-                "FM_LOG_DIR"       => "/fendermint/logs",
-                "FM_SNAPSHOTS_DIR" => "/fendermint/snapshots",
-                "FM_CHAIN_NAME"    => genesis.chain_name.clone(),
-                "FM_IPC_SUBNET_ID" => ipc.gateway.subnet_id,
+                "RUST_BACKTRACE"    => 1,
+                "FM_DATA_DIR"       => "/fendermint/data",
+                "FM_LOG_DIR"        => "/fendermint/logs",
+                "FM_SNAPSHOTS_DIR"  => "/fendermint/snapshots",
+                "FM_CHAIN_NAME"     => genesis.chain_name.clone(),
+                "FM_IPC__SUBNET_ID" => ipc.gateway.subnet_id,
                 "FM_RESOLVER__NETWORK__LOCAL_KEY"      => "/fendermint/keys/network_key.sk",
                 "FM_RESOLVER__CONNECTION__LISTEN_ADDR" => format!("/ip4/0.0.0.0/tcp/{RESOLVER_P2P_PORT}"),
                 "FM_TENDERMINT_RPC_URL" => format!("http://{cometbft_name}:{COMETBFT_RPC_PORT}"),
@@ -294,16 +296,18 @@ impl DockerNode {
                 );
             }
 
-            if let Some(pc) = node_config.parent_node {
+            if let Some(ref pc) = node_config.parent_node {
                 let gateway: H160 = pc.deployment.gateway.into();
                 let registry: H160 = pc.deployment.registry.into();
+                env.extend(env_vars![
+                    "FM_IPC__TOPDOWN__PARENT_REGISTRY" => format!("{registry:?}"),
+                    "FM_IPC__TOPDOWN__PARENT_GATEWAY"  => format!("{gateway:?}"),
+                ]);
                 let topdown = match pc.node {
                     // Assume Lotus
-                    TargetConfig::External(url) => env_vars![
+                    TargetConfig::External(ref url) => env_vars![
                         "FM_IPC__TOPDOWN__CHAIN_HEAD_DELAY"        => 20,
                         "FM_IPC__TOPDOWN__PARENT_HTTP_ENDPOINT"    => url,
-                        "FM_IPC__TOPDOWN__PARENT_REGISTRY"         => registry,
-                        "FM_IPC__TOPDOWN__PARENT_GATEWAY"          => gateway,
                         "FM_IPC__TOPDOWN__EXPONENTIAL_BACK_OFF"    => 5,
                         "FM_IPC__TOPDOWN__EXPONENTIAL_RETRY_LIMIT" => 5                ,
                         "FM_IPC__TOPDOWN__POLLING_INTERVAL"        => 10,
@@ -321,8 +325,6 @@ impl DockerNode {
                         env_vars![
                             "FM_IPC__TOPDOWN__CHAIN_HEAD_DELAY"        => 1,
                             "FM_IPC__TOPDOWN__PARENT_HTTP_ENDPOINT"    => format!("http://{}:{ETHAPI_RPC_PORT}", parent_ethapi.hostname()),
-                            "FM_IPC__TOPDOWN__PARENT_REGISTRY"         => registry,
-                            "FM_IPC__TOPDOWN__PARENT_GATEWAY"          => gateway,
                             "FM_IPC__TOPDOWN__EXPONENTIAL_BACK_OFF"    => 5,
                             "FM_IPC__TOPDOWN__EXPONENTIAL_RETRY_LIMIT" => 5                ,
                             "FM_IPC__TOPDOWN__POLLING_INTERVAL"        => 1,
@@ -426,7 +428,10 @@ impl DockerNode {
         // Create a ethapi container
         let ethapi = match ethapi {
             None if node_config.ethapi => {
-                let creator = make_runner(FENDERMINT_IMAGE, volumes(vec![]));
+                let creator = make_runner(
+                    FENDERMINT_IMAGE,
+                    volumes(vec![(ethapi_dir.join("logs"), "/fendermint/logs")]),
+                );
 
                 let c = creator
                     .create(
@@ -643,11 +648,11 @@ mod tests {
             dropper::{self, DropPolicy},
             node::parse_cometbft_node_id,
         },
-        TestnetName,
+        NodeName, TestnetName,
     };
     use bollard::Docker;
 
-    fn make_runner() -> DockerRunner {
+    fn make_runner() -> DockerRunner<NodeName> {
         let nn = TestnetName::new("test-network").root().node("test-node");
         let docker = Docker::connect_with_local_defaults().expect("failed to connect to docker");
         let (_drop_handle, drop_chute) = dropper::start(docker.clone());

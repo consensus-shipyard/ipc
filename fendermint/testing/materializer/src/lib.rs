@@ -110,6 +110,10 @@ impl ResourceName {
         self.0.to_string_lossy().to_string()
     }
 
+    pub fn path(&self) -> &Path {
+        self.0.as_path()
+    }
+
     pub fn id(&self) -> ResourceId {
         ResourceId(
             self.0
@@ -137,6 +141,10 @@ impl Debug for ResourceName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self)
     }
+}
+
+pub trait TestnetResource {
+    fn testnet(&self) -> TestnetName;
 }
 
 macro_rules! resource_name {
@@ -183,13 +191,24 @@ macro_rules! resource_name {
             }
         }
     };
+
+    ($name:ident: Testnet) => {
+        resource_name!($name);
+
+        impl TestnetResource for $name {
+            fn testnet(&self) -> TestnetName {
+                TestnetName::from_prefix(&self.0)
+            }
+        }
+    };
 }
 
 resource_name!(TestnetName);
-resource_name!(AccountName);
-resource_name!(SubnetName);
-resource_name!(NodeName);
-resource_name!(RelayerName);
+resource_name!(AccountName: Testnet);
+resource_name!(SubnetName: Testnet);
+resource_name!(NodeName: Testnet);
+resource_name!(RelayerName: Testnet);
+resource_name!(CliName: Testnet);
 
 impl TestnetName {
     pub fn new<T: Into<TestnetId>>(id: T) -> Self {
@@ -221,16 +240,6 @@ impl TestnetName {
     }
 }
 
-impl NodeName {
-    pub fn is_in_subnet(&self, subnet_name: &SubnetName) -> bool {
-        subnet_name.0.is_prefix_of(&self.0)
-    }
-
-    pub fn testnet(&self) -> TestnetName {
-        TestnetName::from_prefix(&self.0)
-    }
-}
-
 impl SubnetName {
     pub fn subnet<T: Into<SubnetId>>(&self, id: T) -> Self {
         Self(self.0.join("subnets").join_id(&id.into()))
@@ -242,6 +251,10 @@ impl SubnetName {
 
     pub fn relayer<T: Into<RelayerId>>(&self, id: T) -> RelayerName {
         RelayerName(self.0.join("relayers").join_id(&id.into()))
+    }
+
+    pub fn cli(&self, id: &str) -> CliName {
+        CliName(self.0.join("cli").join(id))
     }
 
     /// Check if this is the root subnet, ie. it ends with `root` and it parent is a `testnet`
@@ -302,8 +315,9 @@ impl SubnetName {
         hops
     }
 
-    pub fn testnet(&self) -> TestnetName {
-        TestnetName::from_prefix(&self.0)
+    /// Check that the subnet contains a certain resource name, ie. it's a prefix of it.
+    pub fn contains<T: AsRef<ResourceName>>(&self, name: T) -> bool {
+        self.0.is_prefix_of(name.as_ref())
     }
 }
 
@@ -354,7 +368,7 @@ pub trait HasCometBftApi {
 mod tests {
     use std::path::PathBuf;
 
-    use crate::TestnetName;
+    use crate::{TestnetName, TestnetResource};
 
     #[test]
     fn test_path_join() {
@@ -403,7 +417,7 @@ mod tests {
         let sn = tn.root().subnet("foo");
         let node = sn.node("node-1");
 
-        assert!(node.is_in_subnet(&sn));
+        assert!(sn.contains(&node));
         assert_eq!(node.testnet(), tn, "testnet is the prefix");
     }
 
