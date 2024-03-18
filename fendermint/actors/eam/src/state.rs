@@ -15,7 +15,10 @@ pub type DeployerMap<BS> = Map2<BS, Address, ()>;
 pub enum PermissionModeParams {
     /// No restriction, everyone can deploy
     Unrestricted,
-    /// Only whitelisted addresses can deploy
+    /// Only whitelisted addresses can deploy.
+    ///
+    /// Use FVM delegated addresses of Ethereum accounts,
+    /// because those are predictable in genesis.
     AllowList(Vec<Address>),
 }
 
@@ -51,6 +54,7 @@ impl State {
         Ok(State { permission_mode })
     }
 
+    /// Check if an actor can deploy a contract.
     pub fn can_deploy(
         &self,
         store: &impl Blockstore,

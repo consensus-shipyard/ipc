@@ -36,7 +36,14 @@ impl IPCEamActor {
     }
 
     fn ensure_deployer_allowed(rt: &impl Runtime) -> Result<(), ActorError> {
-        let caller = rt.message().caller();
+        let mut caller = rt.message().caller();
+        // For the FVM runtime this is really the actor ID, an f0 type address.
+        // See https://github.com/filecoin-project/builtin-actors/blob/a66372756f7f42cecd661d5bc5ac64d5a3847bb3/runtime/src/runtime/fvm.rs#L89-L91
+        if let Ok(id) = caller.id() {
+            if let Some(deleg) = rt.lookup_delegated_address(id) {
+                caller = deleg;
+            }
+        }
 
         let state: State = rt.state()?;
         if !state.can_deploy(rt.store(), &caller)? {
