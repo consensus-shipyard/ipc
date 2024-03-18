@@ -10,7 +10,7 @@ import {NumberContractFacetSeven} from "../helpers/NumberContractFacetSeven.sol"
 import {NumberContractFacetEight} from "../helpers/NumberContractFacetEight.sol";
 import {METHOD_SEND} from "../../src/constants/Constants.sol";
 import {ConsensusType} from "../../src/enums/ConsensusType.sol";
-import {BottomUpMsgBatch, IpcEnvelope, BottomUpCheckpoint} from "../../src/structs/CrossNet.sol";
+import {BottomUpMsgBatch, IpcEnvelope, BottomUpCheckpoint, MAX_MSGS_PER_BATCH} from "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
 import {SubnetID, PermissionMode, IPCAddress, Subnet, SupplySource, ValidatorInfo} from "../../src/structs/Subnet.sol";
 import {IERC165} from "../../src/interfaces/IERC165.sol";
@@ -721,6 +721,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             " checkpoint height correct"
         );
 
+        vm.expectRevert(BottomUpCheckpointAlreadySubmitted.selector);
         vm.prank(validators[0]);
         saDiamond.checkpointer().submitCheckpoint(checkpoint, validators, signatures);
         require(
@@ -743,6 +744,74 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.prank(validators[0]);
         vm.expectRevert(Pausable.EnforcedPause.selector);
         saDiamond.checkpointer().submitCheckpoint(checkpoint, validators, signatures);
+    }
+
+    function testSubnetActorDiamond_submitCheckpoint_msgBatchFull() public {
+        (uint256[] memory keys, address[] memory validators, ) = TestUtils.getThreeValidators(vm);
+        bytes[] memory pubKeys = new bytes[](3);
+        bytes[] memory signatures = new bytes[](3);
+
+        for (uint256 i = 0; i < 3; i++) {
+            vm.deal(validators[i], 10 gwei);
+            pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
+            vm.prank(validators[i]);
+            saDiamond.manager().join{value: 10}(pubKeys[i]);
+        }
+
+        SubnetID memory localSubnetID = saDiamond.getter().getParent().createSubnetId(address(saDiamond));
+
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](MAX_MSGS_PER_BATCH);
+        for (uint256 i = 0; i < MAX_MSGS_PER_BATCH; i++) {
+            IpcEnvelope memory crossMsg = TestUtils.newXnetCallMsg(
+                IPCAddress({subnetId: localSubnetID, rawAddress: FvmAddressHelper.from(address(saDiamond))}),
+                IPCAddress({
+                    subnetId: saDiamond.getter().getParent(),
+                    rawAddress: FvmAddressHelper.from(address(saDiamond))
+                }),
+                1,
+                uint64(i)
+            );
+            msgs[i] = crossMsg;
+        }
+
+        BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
+            subnetID: localSubnetID,
+            blockHeight: 1,
+            blockHash: keccak256("block1"),
+            nextConfigurationNumber: 0,
+            msgs: msgs
+        });
+
+        BottomUpCheckpoint memory checkpointWithIncorrectHeight = BottomUpCheckpoint({
+            subnetID: saDiamond.getter().getParent(),
+            blockHeight: 1,
+            blockHash: keccak256("block1"),
+            nextConfigurationNumber: 0,
+            msgs: new IpcEnvelope[](0)
+        });
+
+        vm.deal(address(saDiamond), 100 ether);
+        vm.prank(address(saDiamond));
+        gatewayDiamond.manager().register{value: DEFAULT_MIN_VALIDATOR_STAKE + 3 * DEFAULT_CROSS_MSG_FEE}(
+            3 * DEFAULT_CROSS_MSG_FEE
+        );
+
+        bytes32 hash = keccak256(abi.encode(checkpoint));
+
+        for (uint256 i = 0; i < 3; i++) {
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(keys[i], hash);
+            signatures[i] = abi.encodePacked(r, s, v);
+        }
+
+        vm.expectRevert(InvalidCheckpointEpoch.selector);
+        vm.prank(validators[0]);
+        saDiamond.checkpointer().submitCheckpoint(checkpointWithIncorrectHeight, validators, signatures);
+
+        vm.expectCall(gatewayAddress, abi.encodeCall(IGateway.commitCheckpoint, (checkpoint)), 1);
+        vm.prank(validators[0]);
+        saDiamond.checkpointer().submitCheckpoint(checkpoint, validators, signatures);
+
+        require(saDiamond.getter().lastBottomUpCheckpointHeight() == 1, " checkpoint height correct");
     }
 
     function testSubnetActorDiamond_submitCheckpointWithReward() public {

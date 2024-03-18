@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {InvalidBatchEpoch, MaxMsgsPerBatchExceeded, InvalidSignatureErr, InvalidCheckpointEpoch} from "../errors/IPCErrors.sol";
+import {InvalidBatchEpoch, MaxMsgsPerBatchExceeded, InvalidSignatureErr, BottomUpCheckpointAlreadySubmitted, InvalidCheckpointEpoch} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {BottomUpCheckpoint, BottomUpMsgBatch, BottomUpMsgBatchInfo} from "../structs/CrossNet.sol";
 import {Validator, ValidatorSet} from "../structs/Subnet.sol";
@@ -31,6 +31,10 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
         ensureValidCheckpoint(checkpoint);
 
         bytes32 checkpointHash = keccak256(abi.encode(checkpoint));
+
+        if (checkpoint.blockHeight <= s.lastBottomUpCheckpointHeight) {
+            revert BottomUpCheckpointAlreadySubmitted();
+        }
 
         // When a bottom up msg batch becomes full, a bottom up checkpoint will be
         // created before the next checkpoint period is reached.

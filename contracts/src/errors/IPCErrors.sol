@@ -12,6 +12,7 @@ error BatchAlreadyExists();
 error MaxMsgsPerBatchExceeded();
 error QuorumAlreadyProcessed();
 error CheckpointNotCreated();
+error BottomUpCheckpointAlreadySubmitted();
 error BatchNotCreated();
 error CollateralIsZero();
 error EmptyAddress();
