@@ -1,18 +1,17 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-pub use crate::state::PermissionModeParams;
-
-pub use crate::state::State;
-use fil_actor_eam::EamActor;
+use fil_actor_eam::{EamActor, Method};
 use fil_actors_runtime::runtime::{ActorCode, Runtime};
 use fil_actors_runtime::ActorError;
 use fil_actors_runtime::EAM_ACTOR_ID;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_ipld_encoding::tuple::*;
-use fvm_shared::{ActorID, MethodNum, METHOD_CONSTRUCTOR};
-use num_derive::FromPrimitive;
+use fvm_shared::{ActorID, MethodNum};
+
+pub use crate::state::PermissionModeParams;
+pub use crate::state::State;
 
 mod state;
 
@@ -23,19 +22,6 @@ pub const IPC_EAM_ACTOR_NAME: &str = "eam";
 pub const IPC_EAM_ACTOR_ID: ActorID = EAM_ACTOR_ID;
 
 pub struct IPCEamActor;
-
-#[derive(FromPrimitive)]
-#[repr(u64)]
-pub enum Method {
-    // Copied from the upstream EAM.
-    Constructor = METHOD_CONSTRUCTOR,
-    Create = 2,
-    Create2 = 3,
-    CreateExternal = 4,
-    //
-    // leave a gap before extensions
-    //
-}
 
 impl IPCEamActor {
     /// Creates the actor. If the `whitelisted_deployers` is empty, that means there is no restriction
@@ -96,8 +82,6 @@ pub struct ConstructorParams {
 
 #[cfg(test)]
 mod tests {
-    use crate::state::PermissionModeParams;
-    use crate::{ConstructorParams as IPCConstructorParams, IPCEamActor, Method};
     use fil_actor_eam::ext::evm::ConstructorParams;
     use fil_actor_eam::ext::init::{Exec4Params, Exec4Return, EXEC4_METHOD};
     use fil_actor_eam::{compute_address_create, CreateParams, Return};
@@ -113,6 +97,9 @@ mod tests {
     use fvm_shared::address::Address;
     use fvm_shared::econ::TokenAmount;
     use fvm_shared::error::ExitCode;
+
+    use crate::state::PermissionModeParams;
+    use crate::{ConstructorParams as IPCConstructorParams, IPCEamActor, Method};
 
     pub fn construct_and_verify(deployers: Vec<Address>) -> MockRuntime {
         let rt = MockRuntime {
