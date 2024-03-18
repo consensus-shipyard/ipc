@@ -159,9 +159,15 @@ export async function getRuntimeBytecode(bytecode) {
 export async function getBytecodeFromFacet(facet) {
     const facetName = facet.name
     const libs = facet.libs
-    const bytecodeNeedsLink = getBytecodeFromFacetTypeChainFilename(
-        findFileInDir(`${facetName}__factory.ts`, `./typechain/factories/`),
+    const factoryFileName = findFileInDir(
+        `${facetName}__factory.ts`,
+        `./typechain/factories/`,
     )
+    if (factoryFileName === null) {
+        throw new Error('Typescript bindings for Facet not found')
+    }
+    const bytecodeNeedsLink =
+        getBytecodeFromFacetTypeChainFilename(factoryFileName)
     let libs2 = {}
     // Loop through each key in the libs
     for (let key in libs) {
