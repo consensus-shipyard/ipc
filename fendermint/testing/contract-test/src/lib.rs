@@ -228,17 +228,19 @@ where
         let (
             state_root,
             FvmUpdatableParams {
-                power_scale,
-                circ_supply,
                 app_version,
+                base_fee,
+                circ_supply,
+                power_scale,
             },
             _,
         ) = exec_state.commit().context("failed to commit FVM")?;
 
         self.state_params.state_root = state_root;
-        self.state_params.power_scale = power_scale;
-        self.state_params.circ_supply = circ_supply;
         self.state_params.app_version = app_version;
+        self.state_params.base_fee = base_fee;
+        self.state_params.circ_supply = circ_supply;
+        self.state_params.power_scale = power_scale;
 
         eprintln!("self.state_params: {:?}", self.state_params);
 
