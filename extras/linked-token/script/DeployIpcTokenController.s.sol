@@ -13,11 +13,18 @@ contract DeployIpcTokenController is ConfigManager {
         LinkedTokenController initialImplementation = new LinkedTokenController();
         vm.stopBroadcast();
 
+        // Log the address of the deployed contract implementation
+        writeConfig("LinkedTokenControllerImplementation", vm.toString(address(initialImplementation)));
+    }
+
+
+    function deployIpcTokenControllerProxy(address controller) external{
+
         vm.startBroadcast();
-        TransparentUpgradeableProxy transparentProxy = new TransparentUpgradeableProxy(address(initialImplementation), address(msg.sender), "");
+        TransparentUpgradeableProxy transparentProxy = new TransparentUpgradeableProxy(address(controller), address(msg.sender), "");
         vm.stopBroadcast();
 
-        // Log the address of the deployed contract
+        // Log the address of the deployed contract proxy
         writeConfig("LinkedTokenController", vm.toString(address(transparentProxy)));
     }
 

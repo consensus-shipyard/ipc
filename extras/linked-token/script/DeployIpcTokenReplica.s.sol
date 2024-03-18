@@ -11,13 +11,22 @@ contract DeployIpcTokenReplica is ConfigManager {
 
         vm.startBroadcast();
         LinkedTokenReplica initialImplementation = new LinkedTokenReplica();
-        TransparentUpgradeableProxy transparentProxy = new TransparentUpgradeableProxy(address(initialImplementation), address(this), "");
-        LinkedTokenReplica replica = LinkedTokenReplica(address(transparentProxy));
         vm.stopBroadcast();
 
-        // Log the address of the deployed contract
-        writeConfig("LinkedTokenController", vm.toString(address(replica)));
+        // Log the address of the deployed contract implementation
+        writeConfig("LinkedTokenReplicaImplementation", vm.toString(address(initialImplementation)));
     }
+
+    function deployIpcTokenReplicaProxy(address replica) external{
+
+        vm.startBroadcast();
+        TransparentUpgradeableProxy transparentProxy = new TransparentUpgradeableProxy(replica, address(msg.sender), "");
+        vm.stopBroadcast();
+
+        // Log the address of the deployed contract proxy
+        writeConfig("LinkedTokenController", vm.toString(address(transparentProxy)));
+    }
+
 
     function initializeIpcTokenReplica(address replicaProxy, address gateway, address tokenContractAddress, uint64 _rootNetChainId, address[] memory _route, address linkedContract) external {
 
