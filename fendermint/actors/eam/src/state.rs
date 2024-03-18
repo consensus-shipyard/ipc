@@ -66,7 +66,9 @@ impl State {
                     // We cannot normalize the allowlist at construction time because the addresses may not be bound to IDs yet (counterfactual usage).
                     // Unfortunately, API of Hamt::for_each won't let us stop iterating on match, so this is more wasteful than we'd like. We can optimize later.
                     // Hamt has implemented Iterator recently, but it's not exposed through Map2 (see ENG-800).
-                    allowed |= rt.resolve_address(&k) == Some(deployer);
+                    if !allowed {
+                        allowed = rt.resolve_address(&k) == Some(deployer);
+                    }
                     Ok(())
                 })?;
                 allowed
