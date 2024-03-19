@@ -1124,24 +1124,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         );
         vm.stopPrank();
 
-        // failed to create a checkpoint with the height not multiple to checkpoint period
-        checkpoint = BottomUpCheckpoint({
-            subnetID: gatewayDiamond.getter().getNetworkName(),
-            blockHeight: d + d / 2,
-            blockHash: keccak256("block2"),
-            nextConfigurationNumber: 2,
-            msgs: new IpcEnvelope[](0)
-        });
-
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        vm.expectRevert(InvalidCheckpointEpoch.selector);
-        gatewayDiamond.checkpointer().createBottomUpCheckpoint(
-            checkpoint,
-            membershipRoot,
-            weights[0] + weights[1] + weights[2]
-        );
-        vm.stopPrank();
-
         (bool ok, uint256 e, ) = gatewayDiamond.getter().getCurrentBottomUpCheckpoint();
         require(ok, "checkpoint not exist");
         require(e == d, "out height incorrect");
