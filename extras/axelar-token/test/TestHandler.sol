@@ -86,6 +86,50 @@ contract TestHandler is Test {
         require(token.allowance(address(handler), owner) == 1);
     }
 
-    // TODO test_handler_err_deposit (e.g. sending to a non-ERC20 subnet)
+    function test_handler_fail_unexpected() public {
+        address axelarIts = vm.addr(1);
+        address ipcGateway = vm.addr(2);
+        address owner = vm.addr(3);
+        DummyERC20 token = new DummyERC20("Test token", "TST", 10000);
+
+        IpcTokenHandler handler = new IpcTokenHandler({
+            axelarIts: axelarIts,
+            ipcGateway: ipcGateway,
+            admin: owner
+        });
+
+        address[] memory route = new address[](1);
+        route[0] = 0x2a3eF0F414c626e51AFA2F29f3F7Be7a45C6DB09;
+        SubnetID memory subnet = SubnetID({ root: 314159, route: route });
+
+        address recipient = 0x6B505cdCCCA34aE8eea5D382aBaD40d2AfEa74ad;
+
+        // garbage
+        bytes memory params = abi.encode(1);
+
+        token.transfer(address(handler), 4200);
+        vm.startPrank(axelarIts);
+
+        // will revert due to garbage.
+        vm.expectRevert();
+        handler.executeWithInterchainToken(bytes32(""), "", "", params, bytes32(""), address(token), 4200);
+
+        // let's ensure we can recover the tokens
+        require(token.allowance(address(handler), owner) == 0);
+
+        // this should revert when called by the previous pranked account (non-owner).
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, axelarIts));
+        handler.adminTokenIncreaseAllowance(address(token), 4200);
+
+        // now act like the owner.
+        vm.startPrank(owner);
+
+        handler.adminTokenIncreaseAllowance(address(token), 4200);
+        require(token.allowance(address(handler), owner) == 4200);
+
+        token.transferFrom(address(handler), owner, 4200);
+        require(token.allowance(address(handler), owner) == 0);
+        require(token.balanceOf(owner) == 4200);
+    }
 
 }
