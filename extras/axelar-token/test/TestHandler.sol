@@ -67,12 +67,11 @@ contract TestHandler is Test {
         token.transfer(address(handler), 1);
         vm.startPrank(axelarIts);
 
-        SubnetID memory nilSubnet;
         vm.expectEmit();
         emit IERC20.Approval(address(handler), address(ipcGateway), 1);
         emit IERC20.Approval(address(handler), address(ipcGateway), 0);
         emit IERC20.Approval(address(handler), address(owner), 1);
-        emit IpcTokenHandler.FundingFailed(nilSubnet, address(0), 1);
+        emit IpcTokenHandler.FundingFailed(subnet, recipient, 1);
 
         vm.mockCallRevert(
             address(ipcGateway),
@@ -97,13 +96,7 @@ contract TestHandler is Test {
             ipcGateway: ipcGateway,
             admin: owner
         });
-
-        address[] memory route = new address[](1);
-        route[0] = 0x2a3eF0F414c626e51AFA2F29f3F7Be7a45C6DB09;
-        SubnetID memory subnet = SubnetID({ root: 314159, route: route });
-
-        address recipient = 0x6B505cdCCCA34aE8eea5D382aBaD40d2AfEa74ad;
-
+        
         // garbage
         bytes memory params = abi.encode(1);
 

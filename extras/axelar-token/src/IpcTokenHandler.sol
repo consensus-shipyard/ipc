@@ -73,9 +73,8 @@ contract IpcTokenHandler is InterchainTokenExecutable, IpcHandler, Ownable {
             // Increase the allowance of the admin address so they can retrieve these otherwise lost tokens.
             token.safeIncreaseAllowance(owner(), amount);
 
-            // Emit a FundingFailed event; we can't associate a specific subnet or recipient since parsing may have failed.
-            SubnetID memory nilSubnet;
-            emit FundingFailed(nilSubnet, address(0), amount);
+            // Emit a FundingFailed event.
+            emit FundingFailed(subnet, recipient, amount);
 
             return;
         }
