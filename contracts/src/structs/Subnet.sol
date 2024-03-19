@@ -105,7 +105,7 @@ enum PermissionMode {
 }
 
 /// @notice Determines the permission mode for who can create subet
-enum SubnetCreationPermissionMode {
+enum SubnetCreationPrivileges {
     /// No permission check at all, any address can create
     Unpermissioned,
     /// Only the owner can create subnet

@@ -1,4 +1,4 @@
-import { deployContractWithDeployer, getTransactionFees, subnetCreationPermissionMode } from './util'
+import { deployContractWithDeployer, getTransactionFees, subnetCreationPrivileges } from './util'
 import { ethers } from 'hardhat'
 
 const { getSelectors, FacetCutAction } = require('./js/diamond.js')
@@ -13,14 +13,14 @@ export async function deploy() {
         } and balance: ${balance.toString()}`,
     )
 
-    const mode = subnetCreationPermissionMode();
+    const mode = subnetCreationPrivileges();
     console.log(
         `
-            ********************************************************************
-            **                                                                **
-            **  Subnet creation permission mode: ${mode}                      **
-            **                                                                **
-            ********************************************************************
+            ***************************************************************
+            **                                                           **
+            **  Subnet creation privileges: ${mode}                      **
+            **                                                           **
+            ***************************************************************
         `
     );
 
@@ -87,7 +87,7 @@ export async function deploy() {
         subnetActorRewarderSelectors: rewarderSelectors,
         subnetActorCheckpointerSelectors: checkpointerSelectors,
         subnetActorPauserSelectors: pauserSelectors,
-        permissionMode: Number(mode),
+        creationPrivileges: Number(mode),
     }
 
     const facetCuts = [] //TODO

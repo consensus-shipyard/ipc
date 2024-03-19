@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {SubnetCreationPermissionMode} from "../structs/Subnet.sol";
+import {SubnetCreationPrivileges} from "../structs/Subnet.sol";
 
 struct SubnetRegistryActorStorage {
     // solhint-disable-next-line var-name-mixedcase
@@ -35,6 +35,6 @@ struct SubnetRegistryActorStorage {
     /// subnet for each user.
     /// owner => nonce
     mapping(address => uint64) userNonces;
-    /// @notice The subnet creation permission mode
-    SubnetCreationPermissionMode permissionMode;
+    /// @notice The subnet creation privileges.
+    SubnetCreationPrivileges creationPrivileges;
 }

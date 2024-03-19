@@ -18,7 +18,7 @@ import {SubnetActorPauseFacet} from "../../src/subnet/SubnetActorPauseFacet.sol"
 import {SubnetActorCheckpointingFacet} from "../../src/subnet/SubnetActorCheckpointingFacet.sol";
 import {SubnetActorRewardFacet} from "../../src/subnet/SubnetActorRewardFacet.sol";
 import {SubnetActorDiamond} from "../../src/SubnetActorDiamond.sol";
-import {SubnetID, PermissionMode, SubnetCreationPermissionMode} from "../../src/structs/Subnet.sol";
+import {SubnetID, PermissionMode, SubnetCreationPrivileges} from "../../src/structs/Subnet.sol";
 import {SubnetRegistryDiamond} from "../../src/SubnetRegistryDiamond.sol";
 
 import {RegisterSubnetFacet} from "../../src/subnetregistry/RegisterSubnetFacet.sol";
@@ -67,7 +67,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         params.subnetActorCheckpointerSelectors = mockedSelectors4;
         params.subnetActorPauserSelectors = mockedSelectors5;
 
-        params.permissionMode = SubnetCreationPermissionMode.Unpermissioned;
+        params.creationPrivileges = SubnetCreationPrivileges.Unpermissioned;
 
         return params;
     }
@@ -84,7 +84,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
 
     function test_Registry_NoPermission() public {
         SubnetRegistryDiamond.ConstructorParams memory p = defaultParams();
-        p.permissionMode = SubnetCreationPermissionMode.Owner;
+        p.creationPrivileges = SubnetCreationPrivileges.Owner;
 
         SubnetRegistryDiamond s = createSubnetRegistry(p);
 
