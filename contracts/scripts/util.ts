@@ -96,7 +96,6 @@ export async function getFacets(diamondAddress: string): Promise<FacetMap> {
     ]
 
     const provider = ethers.provider
-    console.log("diamondAddress",diamondAddress)
     const diamond = new Contract(diamondAddress, diamondLoupeABI, provider)
     const facetsData = await diamond.facets()
 
