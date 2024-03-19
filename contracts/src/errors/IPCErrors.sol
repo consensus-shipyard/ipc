@@ -22,6 +22,7 @@ error FailedRemoveIncompleteQuorum();
 error GatewayCannotBeZero();
 error InvalidActorAddress();
 error InvalidCheckpointEpoch();
+error CannotSubmitFutureCheckpoint();
 error InvalidBatchEpoch();
 error InvalidCheckpointSource();
 error InvalidBatchSource();
