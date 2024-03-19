@@ -39,7 +39,7 @@ const isolatedPort = 18678
 export enum SubnetCreationPrivileges {
     Unpermissioned = 0,
     Owner = 1,
-};
+}
 
 export async function deployContractWithDeployer(
     deployer: SignerWithAddress,
@@ -55,8 +55,10 @@ export async function deployContractWithDeployer(
 }
 
 export function subnetCreationPrivileges(): SubnetCreationPrivileges {
-    const value = process.env.REGISTRY_CREATION_PRIVILEGES || "owner";
-    return value === "owner" ? SubnetCreationPrivileges.Owner : SubnetCreationPrivileges.Unpermissioned;
+    const value = process.env.REGISTRY_CREATION_PRIVILEGES || 'owner'
+    return value === 'owner'
+        ? SubnetCreationPrivileges.Owner
+        : SubnetCreationPrivileges.Unpermissioned
 }
 
 export async function getTransactionFees() {
