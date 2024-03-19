@@ -117,6 +117,19 @@ export async function deploy() {
         address: diamondLoupeFacet.address,
     })
 
+    const ownershipFacet = await deployContractWithDeployer(
+        deployer,
+        'OwnershipFacet',
+        {},
+        txArgs,
+    )
+    const ownershipSelectors = getSelectors(ownershipFacet)
+    subnetActorDeployFacets.push({
+        name: 'OwnershipFacet',
+        libs: {},
+        address: ownershipFacet.address,
+    })
+
     //deploy subnet registry diamond
     const registry = await ethers.getContractFactory('SubnetRegistryDiamond', {
         signer: deployer,
@@ -131,6 +144,7 @@ export async function deploy() {
         pauserFacet: pauserFacet.address,
         diamondCutFacet: diamondCutFacet.address,
         diamondLoupeFacet: diamondLoupeFacet.address,
+        ownershipFacet: ownershipFacet.address,
         subnetActorGetterSelectors: getterSelectors,
         subnetActorManagerSelectors: managerSelectors,
         subnetActorRewarderSelectors: rewarderSelectors,
@@ -138,6 +152,8 @@ export async function deploy() {
         subnetActorPauserSelectors: pauserSelectors,
         subnetActorDiamondCutSelectors: diamondCutSelectors,
         subnetActorDiamondLoupeSelectors: diamondLoupeSelectors,
+        subnetActorOwnershipSelectors: ownershipSelectors,
+
     }
 
     const facetCuts = [] //TODO
