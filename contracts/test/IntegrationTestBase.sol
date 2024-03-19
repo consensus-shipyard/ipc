@@ -35,6 +35,8 @@ import {SubnetRegistryDiamond} from "../src/SubnetRegistryDiamond.sol";
 import {RegisterSubnetFacet} from "../src/subnetregistry/RegisterSubnetFacet.sol";
 import {SubnetGetterFacet} from "../src/subnetregistry/SubnetGetterFacet.sol";
 
+import {OwnershipFacet} from "../src/OwnershipFacet.sol";
+
 import {DiamondLoupeFacet} from "../src/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../src/diamond/DiamondCutFacet.sol";
 import {SupplySourceHelper} from "../src/lib/SupplySourceHelper.sol";
@@ -89,18 +91,21 @@ contract TestRegistry is Test, TestParams {
     bytes4[] registerSubnetGetterFacetSelectors;
     bytes4[] registerCutterSelectors;
     bytes4[] registerLouperSelectors;
+    bytes4[] registerOwnershipSelectors;
 
     SubnetRegistryDiamond registryDiamond;
     DiamondLoupeFacet registryLouper;
     DiamondCutFacet registryCutter;
     RegisterSubnetFacet registrySubnetFacet;
     SubnetGetterFacet registrySubnetGetterFacet;
+    OwnershipFacet ownershipFacet;
 
     constructor() {
         registerSubnetFacetSelectors = SelectorLibrary.resolveSelectors("RegisterSubnetFacet");
         registerSubnetGetterFacetSelectors = SelectorLibrary.resolveSelectors("SubnetGetterFacet");
         registerCutterSelectors = SelectorLibrary.resolveSelectors("DiamondCutFacet");
         registerLouperSelectors = SelectorLibrary.resolveSelectors("DiamondLoupeFacet");
+        registerOwnershipSelectors = SelectorLibrary.resolveSelectors("OwnershipFacet");
     }
 }
 
@@ -116,6 +121,8 @@ contract TestGatewayActor is Test, TestParams {
     bytes4[] gwCutterSelectors;
     bytes4[] gwLoupeSelectors;
 
+    bytes4[] gwOwnershipSelectors;
+
     GatewayDiamond gatewayDiamond;
 
     constructor() {
@@ -128,6 +135,8 @@ contract TestGatewayActor is Test, TestParams {
         gwMessengerSelectors = SelectorLibrary.resolveSelectors("GatewayMessengerFacet");
         gwCutterSelectors = SelectorLibrary.resolveSelectors("DiamondCutFacet");
         gwLoupeSelectors = SelectorLibrary.resolveSelectors("DiamondLoupeFacet");
+
+        gwOwnershipSelectors = SelectorLibrary.resolveSelectors("OwnershipFacet");
     }
 }
 
@@ -140,6 +149,7 @@ contract TestSubnetActor is Test, TestParams {
     bytes4[] saManagerMockedSelectors;
     bytes4[] saCutterSelectors;
     bytes4[] saLouperSelectors;
+    bytes4[] saOwnershipSelectors;
 
     SubnetActorDiamond saDiamond;
     SubnetActorMock saMock;
@@ -153,6 +163,7 @@ contract TestSubnetActor is Test, TestParams {
         saManagerMockedSelectors = SelectorLibrary.resolveSelectors("SubnetActorMock");
         saCutterSelectors = SelectorLibrary.resolveSelectors("DiamondCutFacet");
         saLouperSelectors = SelectorLibrary.resolveSelectors("DiamondLoupeFacet");
+        saOwnershipSelectors = SelectorLibrary.resolveSelectors("OwnershipFacet");
     }
 
     function defaultSubnetActorParamsWith(
@@ -285,8 +296,9 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         GatewayMessengerFacet messenger = new GatewayMessengerFacet();
         DiamondCutFacet cutter = new DiamondCutFacet();
         DiamondLoupeFacet louper = new DiamondLoupeFacet();
+        OwnershipFacet ownership = new OwnershipFacet();
 
-        IDiamond.FacetCut[] memory gwDiamondCut = new IDiamond.FacetCut[](8);
+        IDiamond.FacetCut[] memory gwDiamondCut = new IDiamond.FacetCut[](9);
 
         gwDiamondCut[0] = (
             IDiamond.FacetCut({
@@ -352,6 +364,13 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             })
         );
 
+        gwDiamondCut[8] = (
+            IDiamond.FacetCut({
+                facetAddress: address(ownership),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: gwOwnershipSelectors
+            })
+        );
         gatewayDiamond = new GatewayDiamond(gwDiamondCut, params);
 
         return gatewayDiamond;
@@ -363,9 +382,10 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         address manager,
         address pauser,
         address rewarder,
-        address checkpointer
+        address checkpointer,
+        address ownership
     ) public returns (SubnetActorDiamond) {
-        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](5);
+        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](6);
 
         diamondCut[0] = (
             IDiamond.FacetCut({
@@ -407,7 +427,15 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             })
         );
 
-        saDiamond = new SubnetActorDiamond(diamondCut, params);
+        diamondCut[5] = (
+            IDiamond.FacetCut({
+                facetAddress: ownership,
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: saOwnershipSelectors
+            })
+        );
+
+        saDiamond = new SubnetActorDiamond(diamondCut, params, address(this));
         return saDiamond;
     }
 
@@ -419,8 +447,9 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         SubnetActorCheckpointingFacet checkpointer = new SubnetActorCheckpointingFacet();
         DiamondLoupeFacet louper = new DiamondLoupeFacet();
         DiamondCutFacet cutter = new DiamondCutFacet();
+        OwnershipFacet ownership = new OwnershipFacet();
 
-        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](7);
+        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](8);
 
         diamondCut[0] = (
             IDiamond.FacetCut({
@@ -478,7 +507,15 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             })
         );
 
-        SubnetActorDiamond diamond = new SubnetActorDiamond(diamondCut, params);
+        diamondCut[7] = (
+            IDiamond.FacetCut({
+                facetAddress: address(ownership),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: saOwnershipSelectors
+            })
+        );
+
+        SubnetActorDiamond diamond = new SubnetActorDiamond(diamondCut, params, address(this));
 
         return diamond;
     }
@@ -534,8 +571,9 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     function createMockedSubnetActorWithGateway(address gw) public returns (SubnetActorDiamond) {
         SubnetActorMock mockedManager = new SubnetActorMock();
         SubnetActorGetterFacet getter = new SubnetActorGetterFacet();
+        OwnershipFacet ownership = new OwnershipFacet();
 
-        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](2);
+        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](3);
 
         diamondCut[0] = (
             IDiamond.FacetCut({
@@ -553,9 +591,17 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             })
         );
 
+        diamondCut[2] = (
+            IDiamond.FacetCut({
+                facetAddress: address(ownership),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: saOwnershipSelectors
+            })
+        );
+
         SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(gw);
 
-        SubnetActorDiamond d = new SubnetActorDiamond(diamondCut, params);
+        SubnetActorDiamond d = new SubnetActorDiamond(diamondCut, params, address(this));
 
         return d;
     }
@@ -564,12 +610,13 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     function createSubnetRegistry(
         SubnetRegistryDiamond.ConstructorParams memory params
     ) public returns (SubnetRegistryDiamond) {
-        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](4);
+        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](5);
 
         DiamondCutFacet regCutFacet = new DiamondCutFacet();
         DiamondLoupeFacet regLoupeFacet = new DiamondLoupeFacet();
         RegisterSubnetFacet regSubnetFacet = new RegisterSubnetFacet();
         SubnetGetterFacet regGetterFacet = new SubnetGetterFacet();
+        OwnershipFacet ownership = new OwnershipFacet();
 
         diamondCut[0] = (
             IDiamond.FacetCut({
@@ -597,6 +644,14 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
                 facetAddress: address(regGetterFacet),
                 action: IDiamond.FacetCutAction.Add,
                 functionSelectors: registerSubnetGetterFacetSelectors
+            })
+        );
+
+        diamondCut[4] = (
+            IDiamond.FacetCut({
+                facetAddress: address(ownership),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: registerOwnershipSelectors
             })
         );
 

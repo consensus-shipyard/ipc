@@ -6,6 +6,7 @@
 use std::str::FromStr;
 
 use anyhow::anyhow;
+use anyhow::bail;
 use ethers_core::types as et;
 use fendermint_crypto::{RecoveryId, Signature};
 use fendermint_vm_actor_interface::eam::EthAddress;
@@ -34,19 +35,18 @@ pub fn to_eth_tokens(amount: &TokenAmount) -> anyhow::Result<et::U256> {
     }
 }
 
-pub fn to_eth_address(addr: &Address) -> Option<et::H160> {
+pub fn to_eth_address(addr: &Address) -> anyhow::Result<Option<et::H160>> {
     match addr.payload() {
         Payload::Delegated(d) if d.namespace() == EAM_ACTOR_ID && d.subaddress().len() == 20 => {
-            Some(et::H160::from_slice(d.subaddress()))
+            Ok(Some(et::H160::from_slice(d.subaddress())))
         }
         // Deployments should be sent with an empty `to`.
-        Payload::ID(EAM_ACTOR_ID) => None,
+        Payload::ID(EAM_ACTOR_ID) => Ok(None),
         // It should be possible to send to an ethereum account by ID.
-        Payload::ID(id) => Some(et::H160::from_slice(&EthAddress::from_id(*id).0)),
-        // XXX: The following fit into the type but are not valid ethereum addresses.
-        Payload::Secp256k1(h) => Some(et::H160::from_slice(h)),
-        Payload::Actor(h) => Some(et::H160::from_slice(h)),
-        _ => None, // BLS or an invalid delegated address. Just move on.
+        Payload::ID(id) => Ok(Some(et::H160::from_slice(&EthAddress::from_id(*id).0))),
+        // The following fit into the type but are not valid ethereum addresses.
+        // Return an error so we can prevent tampering with the address when we convert ethereum transactions to FVM messages.
+        _ => bail!("not an Ethereum address: {addr}"), // f1, f2, f3 or an invalid delegated address.
     }
 }
 
@@ -117,14 +117,14 @@ pub fn to_eth_transaction_request(
 
     let mut tx = et::Eip1559TransactionRequest::new()
         .chain_id(chain_id)
-        .from(to_eth_address(from).unwrap_or_default())
+        .from(to_eth_address(from)?.unwrap_or_default())
         .nonce(*sequence)
         .gas(*gas_limit)
         .max_fee_per_gas(to_eth_tokens(gas_fee_cap)?)
         .max_priority_fee_per_gas(to_eth_tokens(gas_premium)?)
         .data(et::Bytes::from(data));
 
-    tx.to = to_eth_address(to).map(et::NameOrAddress::Address);
+    tx.to = to_eth_address(to)?.map(et::NameOrAddress::Address);
 
     // NOTE: It's impossible to tell if the original Ethereum transaction sent None or Some(0).
     // The ethers deployer sends None, so let's assume that's the useful behavour to match.

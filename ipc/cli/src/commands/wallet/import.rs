@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 //! Wallet import cli handler
 
+use anyhow::bail;
 use async_trait::async_trait;
 use clap::{ArgGroup, Args};
 use ipc_wallet::WalletType;
@@ -22,33 +23,33 @@ impl CommandLineHandler for WalletImport {
         let provider = get_ipc_provider(global)?;
         let wallet_type = WalletType::from_str(&arguments.wallet_type)?;
 
-        if matches!(wallet_type, WalletType::Evm) {
-            if let Some(key) = &arguments.private_key {
-                println!(
-                    "{:?}",
-                    provider
-                        .import_evm_key_from_privkey(key.to_string())?
-                        .to_string()
-                );
-                Ok(())
-            } else {
-                Err(anyhow::anyhow!("no private key supported"))
+        if let Some(key) = &arguments.private_key {
+            if !matches!(wallet_type, WalletType::Evm) {
+                bail!("--private-key only supported by --wallet-type=evm");
             }
+            println!(
+                "{:?}",
+                provider.import_evm_key_from_privkey(key)?.to_string()
+            );
+            Ok(())
         } else {
             // Get keyinfo from file or stdin
             let keyinfo = if arguments.path.is_some() {
                 std::fs::read_to_string(arguments.path.as_ref().unwrap())?
             } else {
                 // FIXME: Accept keyinfo from stdin
-                return Err(anyhow::anyhow!("stdin not supported yet"));
+                bail!("stdin not supported yet")
             };
 
             match wallet_type {
-                WalletType::Fvm => println!("{:?}", provider.import_fvm_key(keyinfo)?),
-                WalletType::Evm => println!(
-                    "{:?}",
-                    provider.import_evm_key_from_json(keyinfo)?.to_string()
-                ),
+                WalletType::Fvm => println!("{:?}", provider.import_fvm_key(&keyinfo)?),
+                WalletType::Evm => {
+                    let key = provider
+                        .import_evm_key_from_privkey(&keyinfo)
+                        .or_else(|_| provider.import_evm_key_from_json(&keyinfo))?;
+
+                    println!("{:?}", key.to_string())
+                }
             };
             Ok(())
         }

@@ -102,6 +102,7 @@ export async function deploy() {
         { name: 'SubnetGetterFacet', libs: {} },
         { name: 'DiamondLoupeFacet', libs: {} },
         { name: 'DiamondCutFacet', libs: {} },
+        { name: 'OwnershipFacet', libs: {} },
     ]
 
     for (const facet of facets) {

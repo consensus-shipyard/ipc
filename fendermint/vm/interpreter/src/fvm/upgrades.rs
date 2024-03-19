@@ -41,9 +41,7 @@ pub struct Upgrade<DB>
 where
     DB: Blockstore + 'static + Clone,
 {
-    /// the chain name on which the upgrade should be executed
-    chain_name: String,
-    /// the chain id is calculated from the chain_name
+    /// the chain_id should match the chain_id from the network configuration
     chain_id: ChainID,
     /// the block height at which the upgrade should be executed
     block_height: BlockHeight,
@@ -63,17 +61,26 @@ where
         new_app_version: Option<u64>,
         migration: MigrationFunc<DB>,
     ) -> anyhow::Result<Self> {
-        let mut upgrade = Self {
-            chain_name: chain_name.to_string(),
-            chain_id: 0.into(),
+        Ok(Self {
+            chain_id: chainid::from_str_hashed(&chain_name.to_string())?,
             block_height,
             new_app_version,
             migration,
-        };
+        })
+    }
 
-        upgrade.chain_id = chainid::from_str_hashed(&upgrade.chain_name)?;
-
-        Ok(upgrade)
+    pub fn new_by_id(
+        chain_id: ChainID,
+        block_height: BlockHeight,
+        new_app_version: Option<u64>,
+        migration: MigrationFunc<DB>,
+    ) -> Self {
+        Self {
+            chain_id,
+            block_height,
+            new_app_version,
+            migration,
+        }
     }
 
     pub fn execute(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<Option<u64>> {
