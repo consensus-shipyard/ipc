@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 import {ConsensusType} from "../enums/ConsensusType.sol";
 import {BottomUpCheckpoint, IpcEnvelope} from "../structs/CrossNet.sol";
 import {SubnetID, SupplySource} from "../structs/Subnet.sol";
-import {SubnetID, ValidatorInfo, Validator, PermissionMode} from "../structs/Subnet.sol";
+import {SubnetID, ValidatorInfo, Validator, GenesisValidator, PermissionMode} from "../structs/Subnet.sol";
 import {SubnetActorStorage} from "../lib/LibSubnetActorStorage.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
@@ -55,8 +55,40 @@ contract SubnetActorGetterFacet {
     }
 
     /// @notice Returns the initial set of validators of the genesis block.
-    function genesisValidators() external view returns (Validator[] memory) {
-        return s.genesisValidators;
+    function genesisValidators() external view returns (GenesisValidator[] memory validators) {
+        uint256 total = s.genesis.validators.length();
+
+        validators = new GenesisValidator[](total);
+
+        if (s.bootstrapped) {
+            // subnet boostrapped, that means validator information at genesis should be locked
+            // and cannot be changed anymore, fetch from s.genesis
+
+            for (uint256 i = 0; i < total; ) {
+                address addr = s.genesis.validators.at(i);
+                validators[i] = s.genesis.validatorInfo[addr];
+
+                unchecked {
+                    i++;
+                }
+            }
+            return validators;
+        }
+
+        for (uint256 i = 0; i < total; ) {
+            address addr = s.genesis.validators.at(i);
+            ValidatorInfo memory info = getValidator(addr);
+            validators[i] = GenesisValidator({
+                // for genesis validators, totalCollateral == confirmedCollateral
+                collateral: info.totalCollateral,
+                federatedPower: info.federatedPower,
+                addr: addr,
+                metadata: info.metadata
+            });
+            unchecked {
+                i++;
+            }
+        }
     }
 
     // @notice Provides the circulating supply of the genesis block.
@@ -114,7 +146,7 @@ contract SubnetActorGetterFacet {
 
     /// @notice Returns detailed information about a specific validator.
     /// @param validatorAddress The address of the validator to query information for.
-    function getValidator(address validatorAddress) external view returns (ValidatorInfo memory validator) {
+    function getValidator(address validatorAddress) public view returns (ValidatorInfo memory validator) {
         validator = s.validatorSet.validators[validatorAddress];
     }
 

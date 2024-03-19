@@ -6,12 +6,12 @@ import {IDiamond} from "./interfaces/IDiamond.sol";
 import {IDiamondCut} from "./interfaces/IDiamondCut.sol";
 import {IDiamondLoupe} from "./interfaces/IDiamondLoupe.sol";
 import {IERC165} from "./interfaces/IERC165.sol";
-import {Validator, Membership} from "./structs/Subnet.sol";
+import {Validator, GenesisValidator, Membership} from "./structs/Subnet.sol";
 import {InvalidCollateral, InvalidSubmissionPeriod, InvalidMajorityPercentage} from "./errors/IPCErrors.sol";
 import {LibDiamond} from "./lib/LibDiamond.sol";
 import {LibGateway} from "./lib/LibGateway.sol";
 import {SubnetID} from "./structs/Subnet.sol";
-import {LibStaking} from "./lib/LibStaking.sol";
+import {LibStaking, LibValidatorSet, LibValidatorTracking} from "./lib/LibStaking.sol";
 import {BATCH_PERIOD, MAX_MSGS_PER_BATCH} from "./structs/CrossNet.sol";
 
 error FunctionNotFound(bytes4 _functionSelector);
@@ -28,7 +28,7 @@ contract GatewayDiamond {
         uint16 activeValidatorsLimit;
         uint8 majorityPercentage;
         SubnetID networkName;
-        Validator[] genesisValidators;
+        GenesisValidator[] genesisValidators;
         bytes32 commitSha;
     }
 
@@ -67,14 +67,12 @@ contract GatewayDiamond {
         // through the gateway constructor in the future.
         s.maxMsgsPerBottomUpBatch = MAX_MSGS_PER_BATCH;
 
-        s.validatorsTracker.validators.activeLimit = params.activeValidatorsLimit;
-        // Start the next configuration number from 1, 0 is reserved for no change and the genesis membership
-        s.validatorsTracker.changes.nextConfigurationNumber = LibStaking.INITIAL_CONFIGURATION_NUMBER;
-        // The startConfiguration number is also 1 to match with nextConfigurationNumber, indicating we have
-        // empty validator change logs
-        s.validatorsTracker.changes.startConfigurationNumber = LibStaking.INITIAL_CONFIGURATION_NUMBER;
-        // set initial validators and update membership
-        Membership memory initial = Membership({configurationNumber: 0, validators: params.genesisValidators});
+        Validator[] memory validators = LibValidatorTracking.init(
+            s.validatorsTracker,
+            params.activeValidatorsLimit,
+            params.genesisValidators
+        );
+        Membership memory initial = Membership({configurationNumber: 0, validators: validators});
         LibGateway.updateMembership(initial);
     }
 

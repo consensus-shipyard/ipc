@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 import {BottomUpCheckpoint, BottomUpMsgBatch, IpcEnvelope, ParentFinality} from "../structs/CrossNet.sol";
 import {QuorumInfo} from "../structs/Quorum.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
-import {Membership} from "../structs/Subnet.sol";
+import {Membership, ValidatorInfo} from "../structs/Subnet.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {LibQuorum} from "../lib/LibQuorum.sol";
 import {GatewayActorStorage} from "../lib/LibGatewayActorStorage.sol";
@@ -19,6 +19,13 @@ contract GatewayGetterFacet {
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;
     using EnumerableSet for EnumerableSet.Bytes32Set;
+
+    /// @notice Get the validator's staking information in the parent. This information is constantly
+    /// synced from the parent to child throw top down checkpointing and bottom up apply validator changes.
+    /// It should be aligned with the staking information in the parent.
+    function parentValidatorStakingInfo(address validator) external view returns (ValidatorInfo memory info) {
+        info = s.validatorsTracker.validators.validators[validator];
+    }
 
     /// @notice Returns code commit SHA where this contract is from.
     function getCommitSha() external view returns (bytes32) {

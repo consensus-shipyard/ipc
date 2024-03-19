@@ -1,8 +1,8 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use crate::{
-    ipc, Account, Actor, ActorMeta, Collateral, Genesis, Multisig, PermissionMode, Power,
-    SignerAddr, Validator, ValidatorKey,
+    ipc, Account, Actor, ActorMeta, Collateral, Genesis, GenesisPower, Multisig, PermissionMode,
+    Power, SignerAddr, Validator, ValidatorKey,
 };
 use cid::multihash::MultihashDigest;
 use fendermint_crypto::SecretKey;
@@ -119,7 +119,7 @@ impl Arbitrary for Genesis {
 }
 
 impl Arbitrary for ipc::GatewayParams {
-    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+    fn arbitrary(g: &mut Gen) -> Self {
         Self {
             subnet_id: ArbSubnetID::arbitrary(g).0,
             // Gateway constructor would reject 0.
@@ -131,9 +131,18 @@ impl Arbitrary for ipc::GatewayParams {
 }
 
 impl Arbitrary for ipc::IpcParams {
-    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+    fn arbitrary(g: &mut Gen) -> Self {
         Self {
             gateway: ipc::GatewayParams::arbitrary(g),
+        }
+    }
+}
+
+impl Arbitrary for GenesisPower {
+    fn arbitrary(g: &mut Gen) -> Self {
+        Self {
+            collateral: ArbTokenAmount::arbitrary(g).0,
+            federated_power: ArbTokenAmount::arbitrary(g).0,
         }
     }
 }

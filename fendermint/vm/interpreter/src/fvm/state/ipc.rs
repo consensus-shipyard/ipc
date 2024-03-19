@@ -126,6 +126,8 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
     ) -> anyhow::Result<()> {
         // Construct a Merkle tree from the power table, which we can use to validate validator set membership
         // when the signatures are submitted in transactions for accumulation.
+        tracing::debug!(?power_table, "constructing Merkle tree of powers");
+
         let tree =
             ValidatorMerkleTree::new(power_table).context("failed to create validator tree")?;
 

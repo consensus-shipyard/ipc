@@ -127,8 +127,11 @@ pub struct GenesisAddValidatorArgs {
     #[arg(long, short)]
     pub public_key: PathBuf,
     /// The collateral staked by the validator, lending it its voting power.
-    #[arg(long, short = 'v', value_parser = parse_full_fil)]
-    pub power: TokenAmount,
+    #[arg(long, short = 'c', value_parser = parse_full_fil)]
+    pub collateral: TokenAmount,
+    /// The federated power assigned by the super admin.
+    #[arg(long, short = 'f', value_parser = parse_full_fil)]
+    pub federated_power: TokenAmount,
 }
 
 #[derive(Args, Debug)]
