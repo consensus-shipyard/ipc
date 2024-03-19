@@ -46,13 +46,10 @@ export async function deploy() {
     const managerSelectors = getSelectors(managerFacet)
 
     subnetActorDeployFacets.push({
-        name: "SubnetActorManagerFacet",
-        libs:{},
-        address: managerFacet.address
-    });
-
-
-
+        name: 'SubnetActorManagerFacet',
+        libs: {},
+        address: managerFacet.address,
+    })
 
     const pauserFacet = await deployContractWithDeployer(
         deployer,
@@ -63,11 +60,10 @@ export async function deploy() {
     const pauserSelectors = getSelectors(pauserFacet)
 
     subnetActorDeployFacets.push({
-        name: "SubnetActorPauseFacet",
-        libs:{},
-        address: pauserFacet.address
-    });
-
+        name: 'SubnetActorPauseFacet',
+        libs: {},
+        address: pauserFacet.address,
+    })
 
     const rewarderFacet = await deployContractWithDeployer(
         deployer,
@@ -77,11 +73,10 @@ export async function deploy() {
     )
     const rewarderSelectors = getSelectors(rewarderFacet)
     subnetActorDeployFacets.push({
-        name: "SubnetActorRewardFacet",
-        libs:{},
-        address: rewarderFacet.address
-    });
-
+        name: 'SubnetActorRewardFacet',
+        libs: {},
+        address: rewarderFacet.address,
+    })
 
     const checkpointerFacet = await deployContractWithDeployer(
         deployer,
@@ -91,11 +86,10 @@ export async function deploy() {
     )
     const checkpointerSelectors = getSelectors(checkpointerFacet)
     subnetActorDeployFacets.push({
-        name: "SubnetActorCheckpointingFacet",
-        libs:{},
-        address: checkpointerFacet.address
-    });
-
+        name: 'SubnetActorCheckpointingFacet',
+        libs: {},
+        address: checkpointerFacet.address,
+    })
 
     const diamondCutFacet = await deployContractWithDeployer(
         deployer,
@@ -105,11 +99,10 @@ export async function deploy() {
     )
     const diamondCutSelectors = getSelectors(diamondCutFacet)
     subnetActorDeployFacets.push({
-        name: "DiamondCutFacet",
-        libs:{},
-        address: diamondCutFacet.address
-    });
-
+        name: 'DiamondCutFacet',
+        libs: {},
+        address: diamondCutFacet.address,
+    })
 
     const diamondLoupeFacet = await deployContractWithDeployer(
         deployer,
@@ -119,10 +112,10 @@ export async function deploy() {
     )
     const diamondLoupeSelectors = getSelectors(diamondLoupeFacet)
     subnetActorDeployFacets.push({
-        name: "DiamondLoupeFacet",
-        libs:{},
-        address: diamondLoupeFacet.address
-    });
+        name: 'DiamondLoupeFacet',
+        libs: {},
+        address: diamondLoupeFacet.address,
+    })
 
     //deploy subnet registry diamond
     const registry = await ethers.getContractFactory('SubnetRegistryDiamond', {

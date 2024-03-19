@@ -74,7 +74,7 @@ contract SubnetRegistryDiamond {
         s.SUBNET_ACTOR_CHECKPOINTING_FACET = params.checkpointerFacet;
         s.SUBNET_ACTOR_PAUSE_FACET = params.pauserFacet;
         s.SUBNET_ACTOR_DIAMOND_CUT_FACET = params.diamondCutFacet;
-        s.SUBNET_ACTOR_LOUPE_FACET =   params.diamondLoupeFacet;
+        s.SUBNET_ACTOR_LOUPE_FACET = params.diamondLoupeFacet;
 
         s.subnetActorGetterSelectors = params.subnetActorGetterSelectors;
         s.subnetActorManagerSelectors = params.subnetActorManagerSelectors;
