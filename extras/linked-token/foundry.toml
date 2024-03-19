@@ -1,9 +1,12 @@
 [profile.default]
 src = "src"
 out = "out"
-libs = ["lib"]
+libs = ["node_modules", "lib"]
 allow_paths = ["../../contracts/"]
-fs_permissions = [{ access = "read-write", path = "./config.json"}]
+fs_permissions = [{ access = "read-write", path = "./config.json"}, {access = "read", path = "./out/"}, {access = "read", path = "../../contracts/"} ]
+
+build_info = true
+extra_output = ["storageLayout"]
 
 
 

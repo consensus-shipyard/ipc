@@ -5,26 +5,25 @@ import "../src/LinkedTokenReplica.sol";
 import "./ConfigManager.sol";
 import "@ipc/src/structs/Subnet.sol";
 import "openzeppelin-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
+import "forge-std/console.sol";
 
 contract DeployIpcTokenReplica is ConfigManager {
-    function deployIpcTokenReplica() external {
+    function deployIpcTokenReplicaProxy(address replicaProxy, address gateway, address tokenContractAddress, uint64 _rootNetChainId, address[] memory _route)  external {
+        // Example for setting up the SubnetID, adjust according to your actual setup
+        SubnetID memory destinationSubnet = SubnetID({root: _rootNetChainId, route: _route});
 
         vm.startBroadcast();
-        LinkedTokenReplica initialImplementation = new LinkedTokenReplica();
+        address beacon = Upgrades.deployBeacon("../out/LinkedTokenReplica.sol:LinkedTokenReplica", msg.sender);
+        console.log("Beacon");
+        console.log(vm.toString(beacon));
+        Upgrades.deployBeaconProxy(beacon, abi.encodeCall(LinkedTokenReplica.initialize, ( gateway, tokenContractAddress, destinationSubnet, msg.sender)));
+        console.log("Beacon");
+        console.log(vm.toString(beacon));
         vm.stopBroadcast();
 
         // Log the address of the deployed contract implementation
-        writeConfig("LinkedTokenReplicaImplementation", vm.toString(address(initialImplementation)));
-    }
-
-    function deployIpcTokenReplicaProxy(address replica) external{
-
-        vm.startBroadcast();
-        TransparentUpgradeableProxy transparentProxy = new TransparentUpgradeableProxy(replica, address(msg.sender), "");
-        vm.stopBroadcast();
-
-        // Log the address of the deployed contract proxy
-        writeConfig("LinkedTokenController", vm.toString(address(transparentProxy)));
+        writeConfig("LinkedTokenReplicaImplementation", vm.toString(beacon));
     }
 
 

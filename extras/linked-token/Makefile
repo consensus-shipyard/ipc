@@ -55,8 +55,10 @@ deploy-replica-implementation:
 
 deploy-replica-proxy:
 	@echo "Deploying token replica proxy contract on Calibnet..."
-	@LinkedTokenReplicaImplementation=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenReplicaImplementation'); \
-	forge script script/DeployIpcTokenReplica.s.sol:DeployIpcTokenReplica --skip-simulation --rpc-url $$SUBNET_RPC_URL --private-key $$SUBNET_PRIVATE_KEY --broadcast -vvvv --ffi --sig "deployIpcTokenReplicaProxy(address)" -- $$LinkedTokenReplicaImplementation
+	@REPLICA_ADDR=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenReplica'); \
+	USDCTEST_ADDR=$$(cat config.json | jq -r '.LinkedToken.USDCTest'); \
+	CONTROLLER_ADDR=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenController'); \
+	forge script script/DeployIpcTokenReplica.s.sol:DeployIpcTokenReplica --skip-simulation --rpc-url $$SUBNET_RPC_URL --private-key $$SUBNET_PRIVATE_KEY --broadcast -vvvv --ffi --sig "deployIpcTokenReplicaProxy(address,address,address,uint64,address[])" -- $$REPLICA_ADDR $$SUBNET_GATEWAY $$USDCTEST_ADDR $$CALIBNET_CHAIN_ID '[]' 
 
 deploy-controller-implementation:
 	@echo "Deploying token controller implementation contract on Calibnet..."
