@@ -30,6 +30,7 @@ contract SubnetRegistryDiamond {
         bytes4[] subnetActorPauserSelectors;
         bytes4[] subnetActorDiamondCutSelectors;
         bytes4[] subnetActorDiamondLoupeSelectors;
+        bytes4[] subnetActorOwnershipSelectors;
     }
 
     constructor(IDiamond.FacetCut[] memory _diamondCut, ConstructorParams memory params) {
@@ -57,6 +58,9 @@ contract SubnetRegistryDiamond {
         if (params.diamondLoupeFacet == address(0)) {
             revert FacetCannotBeZero();
         }
+        if (params.ownershipFacet == address(0)) {
+            revert FacetCannotBeZero();
+        }
 
         LibDiamond.setContractOwner(msg.sender);
         LibDiamond.diamondCut({_diamondCut: _diamondCut, _init: address(0), _calldata: new bytes(0)});
@@ -75,6 +79,7 @@ contract SubnetRegistryDiamond {
         s.SUBNET_ACTOR_PAUSE_FACET = params.pauserFacet;
         s.SUBNET_ACTOR_DIAMOND_CUT_FACET = params.diamondCutFacet;
         s.SUBNET_ACTOR_LOUPE_FACET = params.diamondLoupeFacet;
+        s.SUBNET_ACTOR_OWNERSHIP_FACET = params.ownershipFacet;
 
         s.subnetActorGetterSelectors = params.subnetActorGetterSelectors;
         s.subnetActorManagerSelectors = params.subnetActorManagerSelectors;
@@ -83,6 +88,7 @@ contract SubnetRegistryDiamond {
         s.subnetActorPauserSelectors = params.subnetActorPauserSelectors;
         s.subnetActorDiamondCutSelectors = params.subnetActorDiamondCutSelectors;
         s.subnetActorDiamondLoupeSelectors = params.subnetActorDiamondLoupeSelectors;
+        s.subnetActorOwnershipSelectors = params.subnetActorOwnershipSelectors;
     }
 
     function _fallback() internal {
