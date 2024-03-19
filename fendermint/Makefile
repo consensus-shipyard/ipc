@@ -43,7 +43,42 @@ test: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 	FM_BUILTIN_ACTORS_BUNDLE=$(BUILTIN_ACTORS_BUNDLE) \
 	FM_CUSTOM_ACTORS_BUNDLE=$(CUSTOM_ACTORS_BUNDLE) \
 	FM_CONTRACTS_DIR=$(IPC_ACTORS_OUT) \
-	cargo test --release $(shell echo $(PACKAGE) | sed 's/--package fendermint_materializer//g')
+	cargo test --release \
+		-p fendermint_abci \
+		-p fendermint_app \
+		-p fendermint_actor_objectstore \
+		-p fendermint_app_options \
+		-p fendermint_crypto \
+		-p fendermint_testing \
+		-p fendermint_vm_actor_interface \
+		-p fendermint_vm_genesis \
+		-p fendermint_vm_core \
+		-p fendermint_vm_encoding \
+		-p fendermint_app_settings \
+		-p fendermint_vm_topdown \
+		-p fendermint_vm_event \
+		-p fendermint_eth_api \
+		-p fendermint_rpc \
+		-p fendermint_actor_accumulator \
+		-p fendermint_vm_message \
+		-p fendermint_rocksdb \
+		-p fendermint_storage \
+		-p fendermint_actor_chainmetadata \
+		-p fendermint_actors \
+		-p fendermint_eth_hardhat \
+		-p fendermint_vm_ipfs_resolver \
+		-p fendermint_vm_resolver \
+		-p fendermint_graph_test \
+		-p fendermint_smoke_test \
+		-p fendermint_snapshot_test
+	FM_BUILTIN_ACTORS_BUNDLE=$(BUILTIN_ACTORS_BUNDLE) \
+	FM_CUSTOM_ACTORS_BUNDLE=$(CUSTOM_ACTORS_BUNDLE) \
+	FM_CONTRACTS_DIR=$(IPC_ACTORS_OUT) \
+	cargo test --release \
+		-p fendermint_actor_eam \
+		-p fendermint_vm_interpreter \
+		-p fendermint_vm_snapshot \
+		-p fendermint_contract_test
 
 # Not using --release beause the build has been done in docker and the wasm code runs inside the container.
 e2e: docker-build | cargo-make

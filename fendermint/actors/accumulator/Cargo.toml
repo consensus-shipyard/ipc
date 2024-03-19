@@ -14,7 +14,6 @@ cid = { workspace = true, default-features = false }
 fil_actors_runtime = { workspace = true, optional = true, features = [
     "fil-actor",
 ] }
-multihash = { workspace = true }
 fvm_shared = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }

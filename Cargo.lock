@@ -2841,7 +2841,6 @@ dependencies = [
  "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
  "fvm_shared",
- "multihash 0.18.1",
  "num-derive 0.3.3",
  "num-traits",
  "serde",
