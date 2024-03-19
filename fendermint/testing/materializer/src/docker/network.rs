@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 use anyhow::{anyhow, Context};
 use bollard::{
@@ -17,6 +17,8 @@ use super::{
     DockerConstruct,
 };
 
+pub type NetworkName = String;
+
 pub struct DockerNetwork {
     docker: Docker,
     dropper: DropChute,
@@ -25,12 +27,18 @@ pub struct DockerNetwork {
     network: DockerConstruct,
 }
 
+impl Display for DockerNetwork {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.network_name(), f)
+    }
+}
+
 impl DockerNetwork {
     pub fn testnet_name(&self) -> &TestnetName {
         &self.testnet_name
     }
 
-    pub fn network_name(&self) -> &str {
+    pub fn network_name(&self) -> &NetworkName {
         &self.network.name
     }
 

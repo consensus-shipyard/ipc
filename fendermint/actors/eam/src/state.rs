@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use cid::Cid;
+use fil_actors_runtime::runtime::Runtime;
 use fil_actors_runtime::{ActorError, Map2, DEFAULT_HAMT_CONFIG};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
+use fvm_shared::ActorID;
 use serde::{Deserialize, Serialize};
 
 pub type DeployerMap<BS> = Map2<BS, Address, ()>;
@@ -51,16 +53,23 @@ impl State {
         Ok(State { permission_mode })
     }
 
-    pub fn can_deploy(
-        &self,
-        store: &impl Blockstore,
-        deployer: &Address,
-    ) -> Result<bool, ActorError> {
+    pub fn can_deploy(&self, rt: &impl Runtime, deployer: ActorID) -> Result<bool, ActorError> {
         Ok(match &self.permission_mode {
             PermissionMode::Unrestricted => true,
             PermissionMode::AllowList(cid) => {
-                let deployers = DeployerMap::load(store, cid, DEFAULT_HAMT_CONFIG, "verifiers")?;
-                deployers.contains_key(deployer)?
+                let deployers =
+                    DeployerMap::load(rt.store(), cid, DEFAULT_HAMT_CONFIG, "verifiers")?;
+                let mut allowed = false;
+                deployers.for_each(|k, _| {
+                    // Normalize allowed addresses to ID addresses, so we can compare any kind of allowlisted address.
+                    // This includes f1, f2, f3, etc.
+                    // We cannot normalize the allowlist at construction time because the addresses may not be bound to IDs yet (counterfactual usage).
+                    // Unfortunately, API of Hamt::for_each won't let us stop iterating on match, so this is more wasteful than we'd like. We can optimize later.
+                    // Hamt has implemented Iterator recently, but it's not exposed through Map2 (see ENG-800).
+                    allowed = allowed || rt.resolve_address(&k) == Some(deployer);
+                    Ok(())
+                })?;
+                allowed
             }
         })
     }
@@ -68,8 +77,9 @@ impl State {
 
 #[cfg(test)]
 mod tests {
-    use crate::state::PermissionMode;
     use cid::Cid;
+
+    use crate::state::PermissionMode;
 
     #[test]
     fn test_serialization() {

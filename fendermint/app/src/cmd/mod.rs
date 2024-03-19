@@ -10,6 +10,7 @@ use crate::{
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 
+pub mod config;
 pub mod eth;
 pub mod genesis;
 pub mod key;
@@ -60,6 +61,7 @@ macro_rules! cmd {
 /// Execute the command specified in the options.
 pub async fn exec(opts: &Options) -> anyhow::Result<()> {
     match &opts.command {
+        Commands::Config(args) => args.exec(settings(opts)?).await,
         Commands::Run(args) => args.exec(settings(opts)?).await,
         Commands::Key(args) => args.exec(()).await,
         Commands::Genesis(args) => args.exec(()).await,
