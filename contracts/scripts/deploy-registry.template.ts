@@ -153,7 +153,6 @@ export async function deploy() {
         subnetActorDiamondCutSelectors: diamondCutSelectors,
         subnetActorDiamondLoupeSelectors: diamondLoupeSelectors,
         subnetActorOwnershipSelectors: ownershipSelectors,
-
     }
 
     const facetCuts = [] //TODO
