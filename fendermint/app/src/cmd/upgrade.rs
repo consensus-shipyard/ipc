@@ -22,15 +22,7 @@ cmd! {
 
 cmd! {
     AddUpgrade(self, upgrade_file: PathBuf) {
-        let mut us = if upgrade_file.exists() {
-            // load existing upgrade schedule
-            UpgradeSchedule::from_file(&upgrade_file)?
-        } else {
-            // create an empty upgrade schedule
-            UpgradeSchedule::new().to_file(&upgrade_file)?;
-            UpgradeSchedule::new()
-        };
-
+        let mut us = UpgradeSchedule::get_or_create(&upgrade_file)?;
         us.add(UpgradeInfo::new(
             self.height.try_into().unwrap(),
             self.new_app_version,

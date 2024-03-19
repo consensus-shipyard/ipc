@@ -207,7 +207,7 @@ pub struct Settings {
     /// Custom actors CAR file.
     custom_actors_bundle: PathBuf,
     /// upgrade_info JSON file.
-    pub upgrade_info: PathBuf,
+    upgrade_info: PathBuf,
 
     /// Where to reach CometBFT for queries or broadcasting transactions.
     tendermint_rpc_url: Url,

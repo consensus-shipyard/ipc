@@ -107,14 +107,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         ValidatorContext::new(sk, broadcaster)
     });
 
-    let upgrade_schedule = if settings.upgrade_info().exists() {
-        // load existing upgrade schedule
-        UpgradeSchedule::from_file(settings.upgrade_info())?
-    } else {
-        // create an empty upgrade schedule
-        UpgradeSchedule::new().to_file(settings.upgrade_info())?;
-        UpgradeSchedule::new()
-    };
+    let upgrade_schedule = UpgradeSchedule::get_or_create(settings.upgrade_info())?;
     tracing::info!(
         path = settings.upgrade_info().to_string_lossy().into_owned(),
         schedule = ?upgrade_schedule,

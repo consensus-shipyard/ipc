@@ -31,6 +31,17 @@ impl UpgradeSchedule {
         }
     }
 
+    pub fn get_or_create(path: impl AsRef<Path>) -> anyhow::Result<Self> {
+        if path.as_ref().exists() {
+            // load existing upgrade schedule
+            UpgradeSchedule::from_file(path)
+        } else {
+            // create an empty upgrade schedule
+            UpgradeSchedule::new().to_file(path)?;
+            Ok(UpgradeSchedule::new())
+        }
+    }
+
     pub fn from_file(path: impl AsRef<Path>) -> anyhow::Result<UpgradeSchedule> {
         let json = std::fs::read_to_string(path).context("failed to read upgrade_info file")?;
         let schedules = serde_json::from_str::<Vec<UpgradeInfo>>(&json)
