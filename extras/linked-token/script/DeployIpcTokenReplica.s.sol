@@ -38,5 +38,12 @@ contract DeployIpcTokenReplica is ConfigManager {
         replica.initialize(gateway, tokenContractAddress, destinationSubnet, linkedContract);
         vm.stopBroadcast();
     }
+
+    function upgradeIpcTokenReplica(address replicaProxy, address newReplicaImplementation) external {
+        vm.startBroadcast();
+        LinkedTokenReplica replica = LinkedTokenReplica(replicaProxy);
+        replica.upgradeTo(newReplicaImplementation);
+        vm.stopBroadcast();
+    }
 }
 

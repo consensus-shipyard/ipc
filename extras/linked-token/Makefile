@@ -22,6 +22,8 @@ help:
 	@echo "  deposit-usdc                         - Deposit USDC to the subnet."
 	@echo "  check-replica-balance                - Check Replica Token balance."
 	@echo "  withdraw-usdc                        - Withdraw USDC from the subnet."
+	@echo "  upgrade-controller-proxy             - Upgrade the token controller proxy to a new implementation. \n\t\t\t\tPlease run make deploy-controller-implementation to deploy a new implementation and upgrade config.json before running this command."
+	@echo "  upgrade-replica-proxy                - Upgrade the token replica proxy to a new implementation. \n\t\t\t\tPlease run make deploy-replica-implementation to deploy a new implementation and upgrade config.json before running this command."
 	@echo ""
 	@echo "Usage:"
 	@echo "  make <target>                        - Run a specific target."
@@ -102,3 +104,15 @@ withdraw-usdc:
 	@WALLET_ADDRESS=$$(cast wallet address --private-key $$SUBNET_PRIVATE_KEY); \
 	REPLICA_ADDR=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenReplica'); \
 	cast send $$REPLICA_ADDR "linkedTransfer(address,uint256)" $$WALLET_ADDRESS $$AMOUNT --rpc-url $$SUBNET_RPC_URL --private-key $$SUBNET_PRIVATE_KEY
+
+upgrade-controller-proxy:
+	@echo "Upgrading token controller proxy contract on Calibnet... Please run make deploy-controller-implementation to deploy a new implementation and upgrade config.json before running this command."
+	@LinkedTokenControllerImplementation=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenControllerImplementation'); \
+	LinkedTokenControllerProxy=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenController'); \
+	forge script script/DeployIpcTokenController.s.sol:DeployIpcTokenController --skip-simulation --rpc-url $$CALIBNET_RPC_URL --private-key $$CALIBNET_PRIVATE_KEY --broadcast -vvvv --ffi --sig "upgradeIpcTokenController(address,address)" -- $$LinkedTokenControllerProxy $$LinkedTokenControllerImplementation
+
+upgrade-replica-proxy:
+	@echo "Upgrading token replica proxy contract on IPC... Please run make deploy-replica-implementation to deploy a new implementation and upgrade config.json before running this command."
+	@LinkedTokenReplicaImplementation=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenReplicaImplementation'); \
+	LinkedTokenReplicaProxy=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenReplica'); \
+	forge script script/DeployIpcTokenReplica.s.sol:DeployIpcTokenReplica --skip-simulation --rpc-url $$CALIBNET_RPC_URL --private-key $$CALIBNET_PRIVATE_KEY --broadcast -vvvv --ffi --sig "upgradeIpcTokenReplica(address,addrese)" -- $$LinkedTokenReplicaProxy $$LinkedTokenReplicaImplementation

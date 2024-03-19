@@ -38,5 +38,12 @@ contract DeployIpcTokenController is ConfigManager {
         controller.initialize(gateway, tokenContractAddress, destinationSubnet, linkedContract);
         vm.stopBroadcast();
     }
+
+    function upgradeIpcTokenController(address controllerProxy, address newControllerImplementation) external {
+        vm.startBroadcast();
+        LinkedTokenController controller = LinkedTokenController(controllerProxy);
+        controller.upgradeToAndCall(newControllerImplementation, "");
+        vm.stopBroadcast();
+    }
 }
 
