@@ -30,7 +30,7 @@ cmd! {
             self.required,
         ))?;
 
-        us.to_file(upgrade_file)?;
+        us.export_file(upgrade_file)?;
 
         Ok(())
   }

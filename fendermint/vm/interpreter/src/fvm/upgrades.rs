@@ -37,8 +37,9 @@ impl UpgradeSchedule {
             UpgradeSchedule::from_file(path)
         } else {
             // create an empty upgrade schedule
-            UpgradeSchedule::new().to_file(path)?;
-            Ok(UpgradeSchedule::new())
+            let us = UpgradeSchedule::new();
+            us.export_file(path)?;
+            Ok(us)
         }
     }
 
@@ -55,7 +56,7 @@ impl UpgradeSchedule {
         Ok(us)
     }
 
-    pub fn to_file(&self, path: impl AsRef<Path>) -> anyhow::Result<()> {
+    pub fn export_file(&self, path: impl AsRef<Path>) -> anyhow::Result<()> {
         let json = serde_json::to_string_pretty(&self.get_all())
             .context("failed to serialize upgrade_info")?;
         std::fs::write(path, json).context("failed to write to upgrade_info file")?;
