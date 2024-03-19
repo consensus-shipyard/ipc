@@ -55,7 +55,7 @@ export async function deployContractWithDeployer(
 }
 
 export function subnetCreationPrivileges(): SubnetCreationPrivileges {
-    const value = process.env.REGISTRY_CREATION_PRIVILEGES || 'owner'
+    const value = process.env.REGISTRY_CREATION_PRIVILEGES || 'unpermissioned'
     return value === 'owner'
         ? SubnetCreationPrivileges.Owner
         : SubnetCreationPrivileges.Unpermissioned
