@@ -103,6 +103,37 @@ pub struct ParentFinality {
     pub block_hash: Vec<u8>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpgradeInfo {
+    /// the block height at which the upgrade should be executed
+    pub height: ChainEpoch,
+    /// the fendermint app version version this Upgrade will migrate to
+    pub new_app_version: u64,
+    /// the required cometbft version for the upgrade
+    pub cometbft_version: String,
+    /// whether this is a required upgrade or not. A required upgrade
+    /// will cause the node to freeze and not process any more blocks
+    /// if it does not have the corresponding Upgrade defined to
+    /// migrate to that version
+    pub required: bool,
+}
+
+impl UpgradeInfo {
+    pub fn new(
+        height: ChainEpoch,
+        new_app_version: u64,
+        cometbft_version: impl ToString,
+        required: bool,
+    ) -> Self {
+        Self {
+            height,
+            new_app_version,
+            cometbft_version: cometbft_version.to_string(),
+            required,
+        }
+    }
+}
+
 #[cfg(feature = "arb")]
 mod arb {
 

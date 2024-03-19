@@ -17,6 +17,7 @@ pub mod key;
 pub mod materializer;
 pub mod rpc;
 pub mod run;
+pub mod upgrade;
 
 #[async_trait]
 pub trait Cmd {
@@ -68,6 +69,7 @@ pub async fn exec(opts: &Options) -> anyhow::Result<()> {
         Commands::Rpc(args) => args.exec(()).await,
         Commands::Eth(args) => args.exec(settings(opts)?.eth).await,
         Commands::Materializer(args) => args.exec(()).await,
+        Commands::Upgrade(args) => args.exec(()).await,
     }
 }
 

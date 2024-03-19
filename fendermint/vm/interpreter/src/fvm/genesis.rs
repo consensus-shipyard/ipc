@@ -531,7 +531,7 @@ mod tests {
             bundle::{bundle_path, contracts_path, custom_actors_bundle_path},
             state::ipc::GatewayCaller,
             store::memory::MemoryBlockstore,
-            upgrades::UpgradeScheduler,
+            upgrades::{UpgradeSchedule, Upgrades},
             FvmMessageInterpreter,
         },
         GenesisInterpreter,
@@ -658,7 +658,8 @@ mod tests {
             1.05,
             1.05,
             false,
-            UpgradeScheduler::new(),
+            UpgradeSchedule::new(),
+            Upgrades::new(),
         )
     }
 

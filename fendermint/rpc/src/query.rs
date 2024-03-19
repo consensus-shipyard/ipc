@@ -3,6 +3,7 @@
 
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
+use fendermint_vm_message::ipc::UpgradeInfo;
 use fvm_ipld_encoding::serde::Serialize;
 use fvm_shared::message::Message;
 use prost::Message as ProstMessage;
@@ -16,7 +17,7 @@ use fvm_shared::ActorID;
 use fvm_shared::{address::Address, error::ExitCode};
 
 use fendermint_vm_message::query::{
-    ActorState, BuiltinActors, FvmQuery, FvmQueryHeight, GasEstimate, StateParams,
+    ActorState, BuiltinActors, FvmQuery, FvmQueryHeight, GasEstimate, NodeState, StateParams,
 };
 
 use crate::response::encode_data;
@@ -111,6 +112,29 @@ pub trait QueryClient: Sync {
             })?;
             BuiltinActors { registry }
         };
+        Ok(QueryResponse { height, value })
+    }
+
+    async fn upgrade_schedule(
+        &self,
+        height: FvmQueryHeight,
+    ) -> anyhow::Result<QueryResponse<Vec<UpgradeInfo>>> {
+        let res = self.perform(FvmQuery::UpgradeSchedule, height).await?;
+        let height = res.height;
+        let value = extract(res, |res| {
+            fvm_ipld_encoding::from_slice(&res.value)
+                .context("failed to decode UpgradeSchedule from query")
+        })?;
+        Ok(QueryResponse { height, value })
+    }
+
+    async fn node_state(&self, height: FvmQueryHeight) -> anyhow::Result<QueryResponse<NodeState>> {
+        let res = self.perform(FvmQuery::NodeState, height).await?;
+        let height = res.height;
+        let value = extract(res, |res| {
+            fvm_ipld_encoding::from_slice(&res.value)
+                .context("failed to decode NodeState from query")
+        })?;
         Ok(QueryResponse { height, value })
     }
 

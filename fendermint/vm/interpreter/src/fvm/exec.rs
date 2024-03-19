@@ -3,7 +3,11 @@
 
 use anyhow::Context;
 use async_trait::async_trait;
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::atomic::{AtomicBool, Ordering},
+    time::Duration,
+};
 
 use fendermint_vm_actor_interface::{chainmetadata, cron, system};
 use fvm::executor::ApplyRet;
@@ -18,6 +22,9 @@ use super::{
     state::FvmExecState,
     FvmMessage, FvmMessageInterpreter,
 };
+
+/// Indicates whether the node has been frozen due to not having a required upgrade.
+pub static IS_FROZEN: AtomicBool = AtomicBool::new(false);
 
 /// The return value extended with some things from the message that
 /// might not be available to the caller, because of the message lookups
@@ -54,6 +61,47 @@ where
     ) -> anyhow::Result<(Self::State, Self::BeginOutput)> {
         // Block height (FVM epoch) as sequence is intentional
         let height = state.block_height();
+
+        // Check if there is an upgrade scheduled for this height.
+        if let Some(upgrade_info) = self.upgrade_schedule.get(height) {
+            tracing::info!(
+                app_version = state.app_version(),
+                new_app_version = upgrade_info.new_app_version,
+                height = state.block_height(),
+                upgrade_info = ?upgrade_info,
+                "upgrade scheduled"
+            );
+
+            match self.upgrades.get(upgrade_info.new_app_version) {
+                Some(upgrade) => {
+                    upgrade.execute(&mut state).context("upgrade failed")?;
+                    tracing::info!("upgrade successful");
+                }
+                None => {
+                    tracing::warn!(
+                        height = state.block_height(),
+                        upgrade_info = ?upgrade_info,
+                        "upgrade not found"
+                    );
+
+                    if upgrade_info.required {
+                        // mark the node as frozen
+                        IS_FROZEN.store(true, Ordering::Relaxed);
+
+                        // sleep forever, we can't proceed any further using our current fendermint version
+                        loop {
+                            tracing::error!(
+                                height = state.block_height(),
+                                upgrade_info = ?upgrade_info,
+                                "node frozen, please restart with a newer version which has the required upgrade"
+                            );
+                            tokio::time::sleep(Duration::from_secs(60)).await;
+                        }
+                    }
+                }
+            }
+        }
+
         // Arbitrarily large gas limit for cron (matching how Forest does it, which matches Lotus).
         // XXX: Our blocks are not necessarily expected to be 30 seconds apart, so the gas limit might be wrong.
         let gas_limit = BLOCK_GAS_LIMIT * 10000;
@@ -211,24 +259,6 @@ where
         } else {
             PowerUpdates::default()
         };
-
-        // check for upgrades in the upgrade_scheduler
-        let chain_id = state.chain_id();
-        let block_height: u64 = state.block_height().try_into().unwrap();
-        if let Some(upgrade) = self.upgrade_scheduler.get(chain_id, block_height) {
-            // TODO: consider using an explicit tracing enum for upgrades
-            tracing::info!(?chain_id, height = block_height, "Executing an upgrade");
-
-            // there is an upgrade scheduled for this height, lets run the migration
-            let res = upgrade.execute(&mut state).context("upgrade failed")?;
-            if let Some(new_app_version) = res {
-                state.update_app_version(|app_version| {
-                    *app_version = new_app_version;
-                });
-
-                tracing::info!(app_version = state.app_version(), "upgraded app version");
-            }
-        }
 
         Ok((state, updates))
     }

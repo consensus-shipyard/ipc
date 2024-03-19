@@ -1,8 +1,13 @@
+use std::sync::atomic::Ordering;
+
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use async_trait::async_trait;
 use cid::Cid;
-use fendermint_vm_message::query::{ActorState, FvmQuery, GasEstimate, StateParams};
+use fendermint_vm_message::{
+    ipc::UpgradeInfo,
+    query::{ActorState, FvmQuery, GasEstimate, NodeState, StateParams},
+};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::{
@@ -12,7 +17,7 @@ use num_traits::Zero;
 
 use crate::QueryInterpreter;
 
-use super::{state::FvmQueryState, FvmApplyRet, FvmMessageInterpreter};
+use super::{exec::IS_FROZEN, state::FvmQueryState, FvmApplyRet, FvmMessageInterpreter};
 
 /// Internal return type for queries. It will never be serialized
 /// and sent over the wire as it is, only its internal parts are
@@ -31,6 +36,10 @@ pub enum FvmQueryRet {
     StateParams(StateParams),
     /// Builtin actors known by the system.
     BuiltinActors(Vec<(String, Cid)>),
+    /// The current upgrade schedule.
+    UpgradeSchedule(Vec<UpgradeInfo>),
+    /// The node state
+    NodeState(NodeState),
 }
 
 #[async_trait]
@@ -154,6 +163,16 @@ where
             FvmQuery::BuiltinActors => {
                 let (state, ret) = state.builtin_actors().await?;
                 Ok((state, FvmQueryRet::BuiltinActors(ret)))
+            }
+            FvmQuery::UpgradeSchedule => {
+                let ret = self.upgrade_schedule.get_all();
+                Ok((state, FvmQueryRet::UpgradeSchedule(ret)))
+            }
+            FvmQuery::NodeState => {
+                let ret = NodeState {
+                    frozen: IS_FROZEN.load(Ordering::Relaxed),
+                };
+                Ok((state, FvmQueryRet::NodeState(ret)))
             }
         }
     }
