@@ -6,6 +6,31 @@ import * as linker from 'solc/linker'
 
 const { getSelectors, FacetCutAction } = require('./js/diamond.js')
 const fs = require('fs')
+const path = require('path')
+
+function findFileInDir(filename, folder) {
+    // This function checks each entry in the directory: if it's a file matching the filename, it returns its path.
+    // If it's a directory, the function recurses into it.
+    function searchDirectory(currentPath) {
+        const entries = fs.readdirSync(currentPath, { withFileTypes: true })
+
+        for (let entry of entries) {
+            const entryPath = path.join(currentPath, entry.name)
+
+            if (entry.isDirectory()) {
+                const result = searchDirectory(entryPath)
+                if (result) return result
+            } else if (entry.isFile() && entry.name === filename) {
+                return entryPath
+            }
+        }
+
+        // If no file is found, return null.
+        return null
+    }
+
+    return searchDirectory(folder)
+}
 
 export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 
@@ -134,9 +159,15 @@ export async function getRuntimeBytecode(bytecode) {
 export async function getBytecodeFromFacet(facet) {
     const facetName = facet.name
     const libs = facet.libs
-    const bytecodeNeedsLink = getBytecodeFromFacetTypeChainFilename(
-        `./typechain/factories/${facetName}__factory.ts`,
+    const factoryFileName = findFileInDir(
+        `${facetName}__factory.ts`,
+        `./typechain/factories/`,
     )
+    if (factoryFileName === null) {
+        throw new Error('Typescript bindings for Facet not found')
+    }
+    const bytecodeNeedsLink =
+        getBytecodeFromFacetTypeChainFilename(factoryFileName)
     let libs2 = {}
     // Loop through each key in the libs
     for (let key in libs) {

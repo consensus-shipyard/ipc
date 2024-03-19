@@ -3,33 +3,35 @@
 
 use std::{
     collections::BTreeMap,
-    os::unix::fs::MetadataExt,
+    fmt::Display,
     path::{Path, PathBuf},
     str::FromStr,
+    time::{Duration, Instant},
 };
 
 use anyhow::{anyhow, bail, Context};
 use bollard::Docker;
-use ethers::types::H160;
+use ethers::{providers::Middleware, types::H160};
+use fvm_shared::bigint::Zero;
 use lazy_static::lazy_static;
+use tendermint_rpc::Client;
+use url::Url;
 
 use super::{
     container::DockerContainer,
     dropper::{DropChute, DropPolicy},
+    network::NetworkName,
     runner::DockerRunner,
-    DockerMaterials, DockerPortRange, EnvVars, Volumes,
+    user_id, DockerMaterials, DockerPortRange, Volumes, COMETBFT_IMAGE, FENDERMINT_IMAGE,
 };
 use crate::{
     docker::DOCKER_ENTRY_FILE_NAME,
     env_vars,
+    manifest::EnvMap,
     materializer::{NodeConfig, TargetConfig},
     materials::export_file,
     HasCometBftApi, HasEthApi, NodeName, ResourceHash,
 };
-
-// TODO: Add these to the materializer.
-const COMETBFT_IMAGE: &str = "cometbft/cometbft:v0.37.x";
-const FENDERMINT_IMAGE: &str = "fendermint:latest";
 
 /// The static environment variables are the ones we can assign during node creation,
 /// ie. they don't depend on other nodes' values which get determined during their creation.
@@ -61,6 +63,7 @@ lazy_static! {
 pub struct DockerNode {
     /// Logical name of the node in the subnet hierarchy.
     node_name: NodeName,
+    network_name: String,
     fendermint: DockerContainer,
     cometbft: DockerContainer,
     ethapi: Option<DockerContainer>,
@@ -70,6 +73,12 @@ pub struct DockerNode {
     path: PathBuf,
 }
 
+impl Display for DockerNode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.node_name, f)
+    }
+}
+
 impl DockerNode {
     pub async fn get_or_create<'a>(
         root: impl AsRef<Path>,
@@ -77,7 +86,7 @@ impl DockerNode {
         dropper: DropChute,
         drop_policy: &DropPolicy,
         node_name: &NodeName,
-        node_config: NodeConfig<'a, DockerMaterials>,
+        node_config: &NodeConfig<'a, DockerMaterials>,
         port_range: DockerPortRange,
     ) -> anyhow::Result<Self> {
         let fendermint_name = container_name(node_name, "fendermint");
@@ -113,7 +122,7 @@ impl DockerNode {
         std::fs::create_dir_all(&node_dir).context("failed to create node dir")?;
 
         // Get the current user ID to use with docker containers.
-        let user = node_dir.metadata()?.uid();
+        let user = user_id(&node_dir)?;
 
         let make_runner = |image, volumes| {
             DockerRunner::new(
@@ -124,6 +133,7 @@ impl DockerNode {
                 user,
                 image,
                 volumes,
+                Some(node_config.network.network_name().to_string()),
             )
         };
 
@@ -146,6 +156,12 @@ impl DockerNode {
             std::fs::create_dir(fendermint_dir.join("data"))?;
             std::fs::create_dir(fendermint_dir.join("logs"))?;
             std::fs::create_dir(fendermint_dir.join("snapshots"))?;
+        }
+
+        // Create a directory for ethapi logs
+        let ethapi_dir = node_dir.join("ethapi");
+        if !ethapi_dir.exists() {
+            std::fs::create_dir_all(ethapi_dir.join("logs"))?;
         }
 
         // We'll need to run some cometbft and fendermint commands.
@@ -190,11 +206,15 @@ impl DockerNode {
 
         // Convert fendermint genesis to cometbft.
         fendermint_runner
-                .run_cmd(
-                    "genesis --genesis-file /fendermint/genesis.json into-tendermint --out /cometbft/config/genesis.json",
-                )
-                .await
-                .context("failed to convert genesis")?;
+            .run_cmd(
+                "genesis \
+                    --genesis-file /fendermint/genesis.json \
+                    into-tendermint \
+                    --out /cometbft/config/genesis.json \
+                    ",
+            )
+            .await
+            .context("failed to convert genesis")?;
 
         // Convert validator private key to cometbft.
         if let Some(v) = node_config.validator {
@@ -203,11 +223,14 @@ impl DockerNode {
                 .context("failed to copy validator key")?;
 
             fendermint_runner
-                    .run_cmd(
-                        "key into-tendermint --secret-key /fendermint/keys/validator_key.sk --out /cometbft/config/priv_validator_key.json",
-                    )
-                    .await
-                    .context("failed to convert validator key")?;
+                .run_cmd(
+                    "key into-tendermint \
+                        --secret-key /fendermint/keys/validator_key.sk \
+                        --out /cometbft/config/priv_validator_key.json \
+                        ",
+                )
+                .await
+                .context("failed to convert validator key")?;
         }
 
         // Create a network key for the resolver.
@@ -238,20 +261,17 @@ impl DockerNode {
                 .ok_or_else(|| anyhow!("ipc config missing"))?;
 
             let resolver_host_port: u32 = port_range.from;
-            let network = match fvm_shared::address::current_network() {
-                fvm_shared::address::Network::Mainnet => "mainnet",
-                fvm_shared::address::Network::Testnet => "testnet",
-            };
 
-            let mut env: EnvVars = env_vars![
-                "LOG_LEVEL"        => "info",
-                "RUST_BACKTRACE"   => 1,
-                "FM_NETWORK"       => network,
-                "FM_DATA_DIR"      => "/fendermint/data",
-                "FM_LOG_DIR"       => "/fendermint/logs",
-                "FM_SNAPSHOTS_DIR" => "/fendermint/snapshots",
-                "FM_CHAIN_NAME"    => genesis.chain_name.clone(),
-                "FM_IPC_SUBNET_ID" => ipc.gateway.subnet_id,
+            // Start with the subnet level variables.
+            let mut env: EnvMap = node_config.env.clone();
+
+            env.extend(env_vars![
+                "RUST_BACKTRACE"    => 1,
+                "FM_DATA_DIR"       => "/fendermint/data",
+                "FM_LOG_DIR"        => "/fendermint/logs",
+                "FM_SNAPSHOTS_DIR"  => "/fendermint/snapshots",
+                "FM_CHAIN_NAME"     => genesis.chain_name.clone(),
+                "FM_IPC__SUBNET_ID" => ipc.gateway.subnet_id,
                 "FM_RESOLVER__NETWORK__LOCAL_KEY"      => "/fendermint/keys/network_key.sk",
                 "FM_RESOLVER__CONNECTION__LISTEN_ADDR" => format!("/ip4/0.0.0.0/tcp/{RESOLVER_P2P_PORT}"),
                 "FM_TENDERMINT_RPC_URL" => format!("http://{cometbft_name}:{COMETBFT_RPC_PORT}"),
@@ -259,7 +279,7 @@ impl DockerNode {
                 "TENDERMINT_WS_URL"     => format!("ws://{cometbft_name}:{COMETBFT_RPC_PORT}/websocket"),
                 "FM_ABCI__LISTEN__PORT" => FENDERMINT_ABCI_PORT,
                 "FM_ETH__LISTEN__PORT"  => ETHAPI_RPC_PORT,
-            ];
+            ]);
 
             if node_config.validator.is_some() {
                 env.extend(env_vars![
@@ -268,16 +288,26 @@ impl DockerNode {
                 ]);
             }
 
-            if let Some(pc) = node_config.parent_node {
+            // Configure the outbound peers so once fully connected, CometBFT can stop looking for peers.
+            if !node_config.peer_count.is_zero() {
+                env.insert(
+                    "CMT_P2P_MAX_NUM_OUTBOUND_PEERS".into(),
+                    (node_config.peer_count - 1).to_string(),
+                );
+            }
+
+            if let Some(ref pc) = node_config.parent_node {
                 let gateway: H160 = pc.deployment.gateway.into();
                 let registry: H160 = pc.deployment.registry.into();
+                env.extend(env_vars![
+                    "FM_IPC__TOPDOWN__PARENT_REGISTRY" => format!("{registry:?}"),
+                    "FM_IPC__TOPDOWN__PARENT_GATEWAY"  => format!("{gateway:?}"),
+                ]);
                 let topdown = match pc.node {
                     // Assume Lotus
-                    TargetConfig::External(url) => env_vars![
+                    TargetConfig::External(ref url) => env_vars![
                         "FM_IPC__TOPDOWN__CHAIN_HEAD_DELAY"        => 20,
                         "FM_IPC__TOPDOWN__PARENT_HTTP_ENDPOINT"    => url,
-                        "FM_IPC__TOPDOWN__PARENT_REGISTRY"         => registry,
-                        "FM_IPC__TOPDOWN__PARENT_GATEWAY"          => gateway,
                         "FM_IPC__TOPDOWN__EXPONENTIAL_BACK_OFF"    => 5,
                         "FM_IPC__TOPDOWN__EXPONENTIAL_RETRY_LIMIT" => 5                ,
                         "FM_IPC__TOPDOWN__POLLING_INTERVAL"        => 10,
@@ -295,8 +325,6 @@ impl DockerNode {
                         env_vars![
                             "FM_IPC__TOPDOWN__CHAIN_HEAD_DELAY"        => 1,
                             "FM_IPC__TOPDOWN__PARENT_HTTP_ENDPOINT"    => format!("http://{}:{ETHAPI_RPC_PORT}", parent_ethapi.hostname()),
-                            "FM_IPC__TOPDOWN__PARENT_REGISTRY"         => registry,
-                            "FM_IPC__TOPDOWN__PARENT_GATEWAY"          => gateway,
                             "FM_IPC__TOPDOWN__EXPONENTIAL_BACK_OFF"    => 5,
                             "FM_IPC__TOPDOWN__EXPONENTIAL_RETRY_LIMIT" => 5                ,
                             "FM_IPC__TOPDOWN__POLLING_INTERVAL"        => 1,
@@ -366,7 +394,6 @@ impl DockerNode {
                 creator
                     .create(
                         fendermint_name,
-                        node_config.network,
                         vec![(port_range.resolver_p2p_host_port(), RESOLVER_P2P_PORT)],
                         entrypoint("fendermint run"),
                     )
@@ -387,7 +414,6 @@ impl DockerNode {
                 creator
                     .create(
                         cometbft_name,
-                        node_config.network,
                         vec![
                             (port_range.cometbft_p2p_host_port(), COMETBFT_P2P_PORT),
                             (port_range.cometbft_rpc_host_port(), COMETBFT_RPC_PORT),
@@ -402,12 +428,14 @@ impl DockerNode {
         // Create a ethapi container
         let ethapi = match ethapi {
             None if node_config.ethapi => {
-                let creator = make_runner(FENDERMINT_IMAGE, volumes(vec![]));
+                let creator = make_runner(
+                    FENDERMINT_IMAGE,
+                    volumes(vec![(ethapi_dir.join("logs"), "/fendermint/logs")]),
+                );
 
                 let c = creator
                     .create(
                         ethapi_name,
-                        node_config.network,
                         vec![(port_range.ethapi_rpc_host_port(), ETHAPI_RPC_PORT)],
                         entrypoint("fendermint eth run"),
                     )
@@ -422,6 +450,7 @@ impl DockerNode {
         // Construct the DockerNode
         Ok(DockerNode {
             node_name: node_name.clone(),
+            network_name: node_config.network.network_name().to_string(),
             fendermint,
             cometbft,
             ethapi,
@@ -460,12 +489,38 @@ impl DockerNode {
         Ok(())
     }
 
-    /// Read the CometBFT node ID from the file we persisted during creation.
+    /// Allow time for things to consolidate and APIs to start.
+    pub async fn wait_for_started(&self, timeout: Duration) -> anyhow::Result<bool> {
+        let start = Instant::now();
+
+        loop {
+            if start.elapsed() > timeout {
+                return Ok(false);
+            }
+            tokio::time::sleep(Duration::from_secs(1)).await;
+
+            let client = self.cometbft_http_provider()?;
+
+            if let Err(e) = client.abci_info().await {
+                continue;
+            }
+
+            if let Some(client) = self.ethapi_http_provider()? {
+                if let Err(e) = client.get_chainid().await {
+                    continue;
+                }
+            }
+
+            return Ok(true);
+        }
+    }
+
+    /// Read the CometBFT node ID (network identity) from the file we persisted during creation.
     pub fn cometbft_node_id(&self) -> anyhow::Result<String> {
         read_file(self.path.join("keys").join(COMETBFT_NODE_ID))
     }
 
-    /// Read the libp2p peer ID from the file we persisted during creation.
+    /// Read the libp2p peer ID (network identity) from the file we persisted during creation.
     pub fn fendermint_peer_id(&self) -> anyhow::Result<String> {
         read_file(self.path.join("keys").join(FENDERMINT_PEER_ID))
     }
@@ -484,15 +539,29 @@ impl DockerNode {
             Some(ref c) => c.logs().await,
         }
     }
+
+    /// The HTTP endpoint of the Ethereum API *inside Docker*, if it's enabled.
+    pub fn internal_ethapi_http_endpoint(&self) -> Option<Url> {
+        self.ethapi.as_ref().map(|c| {
+            url::Url::parse(&format!("http://{}:{}", c.hostname(), ETHAPI_RPC_PORT))
+                .expect("valid url")
+        })
+    }
+
+    /// Name of the docker network.
+    pub fn network_name(&self) -> &NetworkName {
+        &self.network_name
+    }
 }
 
 impl HasEthApi for DockerNode {
-    fn ethapi_http_endpoint(&self) -> Option<String> {
+    fn ethapi_http_endpoint(&self) -> Option<url::Url> {
         self.ethapi.as_ref().map(|_| {
-            format!(
+            url::Url::parse(&format!(
                 "http://127.0.0.1:{}",
                 self.port_range.ethapi_rpc_host_port()
-            )
+            ))
+            .expect("valid url")
         })
     }
 }
@@ -539,7 +608,7 @@ where
     Ok(ss.join(","))
 }
 
-fn export_env(file_path: impl AsRef<Path>, env: &EnvVars) -> anyhow::Result<()> {
+fn export_env(file_path: impl AsRef<Path>, env: &EnvMap) -> anyhow::Result<()> {
     let env = env
         .iter()
         .map(|(k, v)| format!("{k}={v}"))
@@ -579,11 +648,11 @@ mod tests {
             dropper::{self, DropPolicy},
             node::parse_cometbft_node_id,
         },
-        TestnetName,
+        NodeName, TestnetName,
     };
     use bollard::Docker;
 
-    fn make_runner() -> DockerRunner {
+    fn make_runner() -> DockerRunner<NodeName> {
         let nn = TestnetName::new("test-network").root().node("test-node");
         let docker = Docker::connect_with_local_defaults().expect("failed to connect to docker");
         let (_drop_handle, drop_chute) = dropper::start(docker.clone());
@@ -597,6 +666,7 @@ mod tests {
             0,
             COMETBFT_IMAGE,
             Vec::new(),
+            None,
         )
     }
 

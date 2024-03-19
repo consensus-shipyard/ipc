@@ -37,7 +37,7 @@ use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::{Signer, SignerMiddleware};
 use ethers::providers::{Authorization, Http, Middleware, Provider};
 use ethers::signers::{LocalWallet, Wallet};
-use ethers::types::{Eip1559TransactionRequest, ValueOrArray, I256, U256};
+use ethers::types::{BlockId, Eip1559TransactionRequest, ValueOrArray, I256, U256};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_api::checkpoint::{
@@ -334,6 +334,9 @@ impl SubnetManager for EthSubnetManager {
         let mut txn = contract.join(ethers::types::Bytes::from(pub_key));
         txn.tx.set_value(collateral);
         let txn = call_with_premium_estimation(signer, txn).await?;
+
+        // Use the pending state to get the nonce because there could have been a pre-fund. Best would be to use this for everything.
+        let txn = txn.block(BlockId::Number(ethers::types::BlockNumber::Pending));
 
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;

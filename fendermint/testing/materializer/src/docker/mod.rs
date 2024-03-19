@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::{bail, Context};
+use anyhow::{anyhow, bail, Context};
 use async_trait::async_trait;
 use bollard::{
     container::{ListContainersOptions, RemoveContainerOptions},
@@ -9,6 +9,7 @@ use bollard::{
     secret::{ContainerSummary, Network},
     Docker,
 };
+use either::Either;
 use ethers::{
     core::rand::{rngs::StdRng, SeedableRng},
     types::H160,
@@ -19,23 +20,35 @@ use fendermint_vm_genesis::{
     ipc::{GatewayParams, IpcParams},
     Account, Actor, ActorMeta, Collateral, Genesis, SignerAddr, Validator, ValidatorKey,
 };
-use fvm_shared::{bigint::Zero, econ::TokenAmount, version::NetworkVersion};
+use fvm_shared::{bigint::Zero, chainid::ChainID, econ::TokenAmount, version::NetworkVersion};
 use ipc_api::subnet_id::SubnetID;
+use ipc_provider::config::subnet::{
+    EVMSubnet, Subnet as IpcCliSubnet, SubnetConfig as IpcCliSubnetConfig,
+};
+use ipc_provider::config::Config as IpcCliConfig;
+use lazy_static::lazy_static;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
+    os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
+    str::FromStr,
+    time::Duration,
 };
-use tendermint_rpc::Url;
+use url::Url;
 
 use crate::{
     manifest::Balance,
-    materializer::{Materializer, NodeConfig, SubmitConfig, SubnetConfig},
-    materials::{
-        export_json, export_script, import_json, DefaultAccount, DefaultDeployment, DefaultGenesis,
-        DefaultSubnet, Materials,
+    materializer::{
+        Materializer, NodeConfig, RelayerConfig, SubmitConfig, SubnetConfig, TargetConfig,
     },
-    NodeName, RelayerName, ResourceHash, ResourceName, SubnetName, TestnetName,
+    materials::{
+        export_file, export_json, export_script, import_json, DefaultAccount, DefaultDeployment,
+        DefaultGenesis, DefaultSubnet, Materials,
+    },
+    CliName, NodeName, RelayerName, ResourceHash, ResourceName, SubnetName, TestnetName,
+    TestnetResource,
 };
 
 mod container;
@@ -50,7 +63,11 @@ pub use network::DockerNetwork;
 pub use node::DockerNode;
 pub use relayer::DockerRelayer;
 
-use self::dropper::DropHandle;
+use self::{dropper::DropHandle, network::NetworkName, runner::DockerRunner};
+
+// TODO: Add these to the materializer.
+const COMETBFT_IMAGE: &str = "cometbft/cometbft:v0.37.x";
+const FENDERMINT_IMAGE: &str = "fendermint:latest";
 
 const STATE_JSON_FILE_NAME: &str = "materializer-state.json";
 
@@ -60,13 +77,16 @@ const DOCKER_ENTRY_FILE_NAME: &str = "docker-entry.sh";
 const PORT_RANGE_START: u32 = 30000;
 const PORT_RANGE_SIZE: u32 = 100;
 
+lazy_static! {
+    static ref STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
+}
+
 type Volumes = Vec<(PathBuf, &'static str)>;
-type EnvVars = BTreeMap<&'static str, String>;
 
 #[macro_export]
 macro_rules! env_vars {
     ( $($key:literal => $value:expr),* $(,)? ) => {
-        BTreeMap::from([ $( ($key, $value.to_string()) ),* ])
+        BTreeMap::from([ $( ($key.to_string(), $value.to_string()) ),* ])
     };
 }
 
@@ -280,6 +300,32 @@ impl DockerMaterializer {
         Ok(())
     }
 
+    /// Update the config file of the `ipc-cli` in a given testnet.
+    fn update_ipc_cli_config<F, T>(&mut self, testnet_name: &TestnetName, f: F) -> anyhow::Result<T>
+    where
+        F: FnOnce(&mut IpcCliConfig) -> T,
+    {
+        let file_name = self.ipc_dir(testnet_name).join("config.toml");
+
+        let mut config = if !file_name.exists() {
+            IpcCliConfig {
+                keystore_path: Some("~/.ipc".to_string()),
+                subnets: Default::default(),
+            }
+        } else {
+            IpcCliConfig::from_file(&file_name).context("failed to read ipc-cli config")?
+        };
+
+        let value = f(&mut config);
+
+        let config_toml =
+            toml::to_string_pretty(&config).context("failed to serialize ipc-cli config")?;
+
+        export_file(&file_name, config_toml).context("failed to write ipc-cli config")?;
+
+        Ok(value)
+    }
+
     /// Update the state, save it to JSON, then return whatever value the update returns.
     fn update_state<F, T>(&mut self, f: F) -> anyhow::Result<T>
     where
@@ -339,6 +385,199 @@ impl DockerMaterializer {
         let range = DockerPortRange { from, to };
         self.update_state(|s| s.port_ranges.insert(node_name.clone(), range.clone()))?;
         Ok(range)
+    }
+
+    fn ipc_dir(&self, testnet_name: &TestnetName) -> PathBuf {
+        self.path(testnet_name).join("ipc")
+    }
+
+    fn accounts_dir(&self, testnet_name: &TestnetName) -> PathBuf {
+        self.path(testnet_name).join("accounts")
+    }
+
+    /// Create an instance of an `fendermint` command runner.
+    fn fendermint_cli_runner(
+        &self,
+        subnet_name: &SubnetName,
+        network_name: Option<&NetworkName>,
+    ) -> anyhow::Result<DockerRunner<CliName>> {
+        let subnet_dir = self.path(subnet_name);
+        // Use the owner of the directory for the container, so we don't get permission issues.
+        let user = user_id(&subnet_dir)?;
+        // Mount the subnet so we can create files there
+        let volumes = vec![(subnet_dir, "/fendermint/subnet")];
+
+        let cli_name = subnet_name.cli("fendermint");
+
+        let runner = DockerRunner::new(
+            self.docker.clone(),
+            self.drop_chute.clone(),
+            self.drop_policy.clone(),
+            cli_name,
+            user,
+            FENDERMINT_IMAGE,
+            volumes,
+            network_name.cloned(),
+        );
+
+        Ok(runner)
+    }
+
+    /// Create an instance of an `ipc-cli` command runner.
+    fn ipc_cli_runner(
+        &self,
+        testnet_name: &TestnetName,
+        network_name: Option<&NetworkName>,
+    ) -> anyhow::Result<DockerRunner<CliName>> {
+        // Create a directory to hold the wallet.
+        let ipc_dir = self.ipc_dir(testnet_name);
+        let accounts_dir = self.accounts_dir(testnet_name);
+        // Create a `~/.ipc` directory, as expected by default by the `ipc-cli`.
+        std::fs::create_dir_all(&ipc_dir).context("failed to create .ipc dir")?;
+        // Use the owner of the directory for the container, so we don't get permission issues.
+        let user = user_id(&ipc_dir)?;
+        // Mount the `~/.ipc` directory and all the keys to be imported.
+        let volumes = vec![
+            (ipc_dir, "/fendermint/.ipc"),
+            (accounts_dir, "/fendermint/accounts"),
+        ];
+
+        let cli_name = testnet_name.root().cli("ipc");
+
+        let runner = DockerRunner::new(
+            self.docker.clone(),
+            self.drop_chute.clone(),
+            self.drop_policy.clone(),
+            cli_name,
+            user,
+            FENDERMINT_IMAGE,
+            volumes,
+            network_name.cloned(),
+        );
+
+        Ok(runner)
+    }
+
+    /// Import the private key of an account into the `ipc-cli` wallet.
+    async fn ipc_cli_wallet_import(
+        runner: &DockerRunner<CliName>,
+        account: &DefaultAccount,
+    ) -> anyhow::Result<()> {
+        let account_id = account.account_id();
+        let account_id: &str = account_id.as_ref();
+
+        let cmd = format!(
+            "ipc-cli wallet import \
+                --wallet-type evm \
+                --path /fendermint/accounts/{account_id}/secret.hex \
+                "
+        );
+
+        // TODO: It would be nice to skip if already imported, but not crucial.
+        runner
+            .run_cmd(&cmd)
+            .await
+            .context("failed to import wallet")?;
+
+        Ok(())
+    }
+
+    /// Add the subnet to the `config.toml` of the `ipc-cli`.
+    fn ipc_cli_config_add_subnet(
+        &mut self,
+        submit_config: &SubmitConfig<DockerMaterials>,
+    ) -> anyhow::Result<()> {
+        let testnet_name = submit_config.subnet.name.testnet();
+        let subnet_id = submit_config.subnet.subnet_id.clone();
+
+        // Find a node to which the `ipc-cli` can connect to create the subnet.
+        // Using the internal HTTP address, assumign that the dockerized `ipc-cli`
+        // will always mount the config file and talk to the nodes within the docker network.
+        let url: Url = submit_config
+            .nodes
+            .iter()
+            .filter_map(|tc| match tc {
+                TargetConfig::External(url) => Some(url.clone()),
+                TargetConfig::Internal(node) => node.internal_ethapi_http_endpoint(),
+            })
+            .next()
+            .ok_or_else(|| anyhow!("there has to be some nodes with eth API enabled"))?;
+
+        // Create a `config.toml`` file for the `ipc-cli` based on the deployment of the parent.
+        self.update_ipc_cli_config(&testnet_name, |config| {
+            config.add_subnet(IpcCliSubnet {
+                id: subnet_id,
+                config: IpcCliSubnetConfig::Fevm(EVMSubnet {
+                    provider_http: url,
+                    provider_timeout: Some(Duration::from_secs(30)),
+                    auth_token: None,
+                    registry_addr: submit_config.deployment.registry.into(),
+                    gateway_addr: submit_config.deployment.gateway.into(),
+                }),
+            })
+        })
+        .context("failed to update CLI config")?;
+
+        Ok(())
+    }
+
+    /// Run some kind of command with the `ipc-cli` that needs to be executed as
+    /// transaction by an account on a given subnet.
+    async fn ipc_cli_run_cmd<'a>(
+        &mut self,
+        submit_config: &SubmitConfig<'a, DockerMaterials>,
+        account: &DefaultAccount,
+        cmd: String,
+    ) -> anyhow::Result<Vec<String>> {
+        // Make sure the config file exists before trying to run any commands.
+        self.ipc_cli_config_add_subnet(submit_config)?;
+
+        let submit_node = submit_config
+            .nodes
+            .iter()
+            .filter_map(|tc| match tc {
+                TargetConfig::Internal(node) => Some(node),
+                TargetConfig::External(_) => None,
+            })
+            .next();
+
+        let runner = self.ipc_cli_runner(
+            &submit_config.subnet.name.testnet(),
+            submit_node.map(|n| n.network_name()),
+        )?;
+
+        // Make sure the account we run the command with exists in the wallet.
+        Self::ipc_cli_wallet_import(&runner, account).await?;
+
+        let logs = runner
+            .run_cmd(&cmd)
+            .await
+            .context("failed to run ipc-cli command")?;
+
+        Ok(logs)
+    }
+
+    fn reference_path(&self, sn: &SubnetName, rh: &ResourceHash) -> PathBuf {
+        self.path(sn.testnet()).join("refs").join(hex::encode(rh.0))
+    }
+
+    fn has_reference(&self, sn: &SubnetName, reference: &Option<ResourceHash>) -> bool {
+        reference
+            .as_ref()
+            .map(|rh| self.reference_path(sn, rh).exists())
+            .unwrap_or_default()
+    }
+
+    fn add_reference(
+        &self,
+        sn: &SubnetName,
+        reference: &Option<ResourceHash>,
+    ) -> anyhow::Result<()> {
+        if let Some(ref rh) = reference {
+            export_file(self.reference_path(sn, rh), "").context("failed to write reference")
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -457,16 +696,40 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         })
     }
 
+    fn create_root_subnet(
+        &mut self,
+        subnet_name: &SubnetName,
+        params: Either<ChainID, &DefaultGenesis>,
+    ) -> anyhow::Result<DefaultSubnet> {
+        let subnet_id = match params {
+            Either::Left(id) => SubnetID::new_root(id.into()),
+            Either::Right(g) => {
+                let ipc = g
+                    .genesis
+                    .ipc
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("IPC configuration missing from genesis"))?;
+
+                ipc.gateway.subnet_id.clone()
+            }
+        };
+
+        Ok(DefaultSubnet {
+            name: subnet_name.clone(),
+            subnet_id,
+        })
+    }
+
     /// Get or create all docker containers that constitute to a Node.
     async fn create_node<'s, 'a>(
         &'s mut self,
         node_name: &NodeName,
-        node_config: NodeConfig<'a, DockerMaterials>,
+        node_config: &NodeConfig<'a, DockerMaterials>,
     ) -> anyhow::Result<DockerNode>
     where
         's: 'a,
     {
-        // Pick a port range.
+        // Pick a port range on the host.
         let port_range = self
             .port_range(node_name)
             .context("failed to pick port range")?;
@@ -497,19 +760,84 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         's: 'a,
     {
         // Overwrite the env file which has seed addresses, then start the node (unless it's already running).
-        node.start(seed_nodes).await
+        node.start(seed_nodes).await?;
+        node.wait_for_started(*STARTUP_TIMEOUT).await?;
+        // Trying to avoid `Tendermint RPC error: server returned malformatted JSON (no 'result' or 'error')` on first subnet creation attempt.
+        tokio::time::sleep(Duration::from_secs(5)).await;
+        Ok(())
     }
 
     async fn create_subnet<'s, 'a>(
         &'s mut self,
         parent_submit_config: &SubmitConfig<'a, DockerMaterials>,
         subnet_name: &SubnetName,
-        subnet_config: SubnetConfig<'a, DockerMaterials>,
+        subnet_config: &SubnetConfig<'a, DockerMaterials>,
     ) -> anyhow::Result<DefaultSubnet>
     where
         's: 'a,
     {
-        todo!("use the ipc-cli to create a new subnet on the parent")
+        let subnet_dir = self.path(subnet_name);
+        let subnet_id_file = subnet_dir.join("subnet-id");
+
+        // Check if we have already created the subnet.
+        if subnet_id_file.exists() {
+            let subnet_id = std::fs::read_to_string(&subnet_id_file)
+                .context("failed to read subnet ID from file")?;
+
+            let subnet_id = SubnetID::from_str(&subnet_id).with_context(|| {
+                format!(
+                    "failed to parse subnet ID in {}: {}",
+                    subnet_id_file.to_string_lossy(),
+                    subnet_id
+                )
+            })?;
+
+            let subnet = DefaultSubnet {
+                subnet_id,
+                name: subnet_name.clone(),
+            };
+
+            return Ok(subnet);
+        }
+
+        // TODO: Move --permission-mode to the config
+        // TODO: Move --supply-source-kind to the config
+        let cmd = format!(
+            "ipc-cli subnet create \
+                --parent {} \
+                --from {:?} \
+                --min-validators {} \
+                --min-validator-stake {} \
+                --bottomup-check-period {} \
+                --permission-mode collateral \
+                --supply-source-kind native \
+                ",
+            parent_submit_config.subnet.subnet_id,
+            subnet_config.creator.eth_addr(),
+            subnet_config.min_validators,
+            TokenAmount::from_nano(1), // The minimum for native mode that the CLI parses
+            subnet_config.bottom_up_checkpoint.period
+        );
+
+        // Now run the command and capture the output.
+        let logs = self
+            .ipc_cli_run_cmd(parent_submit_config, subnet_config.creator, cmd)
+            .await
+            .context("failed to create subnet")?;
+
+        // Parse the subnet ID from the command output.
+        let subnet_id = logs
+            .last()
+            .and_then(find_subnet_id)
+            .ok_or_else(|| anyhow!("cannot find a subnet ID in the logs"))?
+            .context("failed to parse subnet ID")?;
+
+        export_file(subnet_id_file, subnet_id.to_string()).context("failed to export subnet ID")?;
+
+        Ok(DefaultSubnet {
+            name: subnet_name.clone(),
+            subnet_id,
+        })
     }
 
     async fn fund_subnet<'s, 'a>(
@@ -523,7 +851,29 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
-        todo!("use the ipc-cli to fund an existing subnet on the parent")
+        if self.has_reference(&subnet.name, &reference) {
+            return Ok(());
+        }
+
+        let cmd = format!(
+            "ipc-cli cross-msg fund \
+                --subnet {} \
+                --from {:?} \
+                --to {:?} \
+                {} \
+            ",
+            subnet.subnet_id,
+            account.eth_addr(),
+            account.eth_addr(),
+            amount
+        );
+
+        let logs = self
+            .ipc_cli_run_cmd(parent_submit_config, account, cmd)
+            .await
+            .context("failed to fund subnet")?;
+
+        self.add_reference(&subnet.name, &reference)
     }
 
     async fn join_subnet<'s, 'a>(
@@ -538,7 +888,30 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
-        todo!("use the ipc-cli to join an existing subnet on the parent")
+        if self.has_reference(&subnet.name, &reference) {
+            return Ok(());
+        }
+
+        let cmd = format!(
+            "ipc-cli subnet join \
+                --subnet {} \
+                --from {:?} \
+                --public-key {} \
+                --collateral {} \
+                --initial-balance {} \
+            ",
+            subnet.subnet_id,
+            account.eth_addr(),
+            hex::encode(account.public_key().serialize()),
+            collateral.0,
+            balance.0
+        );
+
+        self.ipc_cli_run_cmd(parent_submit_config, account, cmd)
+            .await
+            .context("failed to join subnet")?;
+
+        self.add_reference(&subnet.name, &reference)
     }
 
     async fn create_subnet_genesis<'s, 'a>(
@@ -549,20 +922,185 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
-        todo!("use the fendermint CLI to fetch the genesis of a subnet from the parent")
+        let network_name =
+            parent_submit_config.find_node(|n| Some(n.network_name().clone()), |_| None);
+
+        let parent_url: Url = parent_submit_config
+            .find_node(|n| n.internal_ethapi_http_endpoint(), |u| Some(u.clone()))
+            .ok_or_else(|| anyhow!("there has to be some nodes with eth API enabled"))?;
+
+        // TODO: Move --base-fee to config
+        // TODO: Move --power-scale to config
+        let cmd = format!(
+            "genesis \
+                --genesis-file /fendermint/subnet/genesis.json \
+                ipc from-parent \
+                    --subnet-id {} \
+                    --parent-endpoint {} \
+                    --parent-gateway {:?} \
+                    --parent-registry {:?} \
+                    --base-fee {} \
+                    --power-scale {} \
+                ",
+            subnet.subnet_id,
+            parent_url,
+            parent_submit_config.deployment.gateway,
+            parent_submit_config.deployment.registry,
+            TokenAmount::zero().atto(),
+            9, // to work with nanoFIL
+        );
+
+        let runner = self.fendermint_cli_runner(&subnet.name, network_name.as_ref())?;
+
+        runner
+            .run_cmd(&cmd)
+            .await
+            .context("failed to fetch genesis from parent")?;
+
+        let genesis_path = self.path(&subnet.name).join("genesis.json");
+
+        let genesis = import_json::<Genesis>(&genesis_path)
+            .context("failed to read genesis.json")?
+            .ok_or_else(|| anyhow!("genesis.json doesn't exist after fetching from parent"))?;
+
+        let genesis = DefaultGenesis {
+            name: subnet.name.clone(),
+            genesis,
+            path: genesis_path,
+        };
+
+        Ok(genesis)
     }
 
     async fn create_relayer<'s, 'a>(
         &'s mut self,
         parent_submit_config: &SubmitConfig<'a, DockerMaterials>,
         relayer_name: &RelayerName,
-        subnet: &'a DefaultSubnet,
-        submitter: &'a DefaultAccount,
-        follow_node: &'a DockerNode,
+        relayer_config: RelayerConfig<'a, DockerMaterials>,
     ) -> anyhow::Result<DockerRelayer>
     where
         's: 'a,
     {
-        todo!("docker run relayer unless it is already running")
+        let network_name = relayer_config
+            .follow_config
+            .find_node(|n| Some(n.network_name().clone()), |_| None);
+
+        // Add the parent subnet to the config.toml
+        self.ipc_cli_config_add_subnet(parent_submit_config)?;
+
+        // Add the child subnet to the config.toml
+        self.ipc_cli_config_add_subnet(relayer_config.follow_config)?;
+
+        // Add the submitter to the IPC wallet
+        Self::ipc_cli_wallet_import(
+            &self.ipc_cli_runner(&parent_submit_config.subnet.name.testnet(), None)?,
+            relayer_config.submitter,
+        )
+        .await?;
+
+        // Create the relayer
+        let relayer = DockerRelayer::get_or_create(
+            &self.dir,
+            self.docker.clone(),
+            self.drop_chute.clone(),
+            &self.drop_policy,
+            relayer_name,
+            relayer_config.follow_config.subnet,
+            relayer_config.submitter,
+            network_name,
+            relayer_config.env,
+        )
+        .await?;
+
+        // Start the relayer
+        relayer.start().await?;
+
+        Ok(relayer)
+    }
+}
+
+/// The `ipc-cli` puts the output in a human readable log instead of printing JSON.
+fn find_subnet_id(log: impl AsRef<str>) -> Option<Result<SubnetID, ipc_api::error::Error>> {
+    lazy_static! {
+        static ref SUBNET_ID_RE: Regex =
+            Regex::new(r"(/r\d+(/[tf]410[0-9a-z]{40})+)").expect("subnet regex parses");
+    }
+    SUBNET_ID_RE
+        .find(log.as_ref())
+        .map(|m| m.as_str())
+        .map(SubnetID::from_str)
+}
+
+/// The current address network needs to be set on the containers to match the addresses we created.
+fn current_network() -> &'static str {
+    match fvm_shared::address::current_network() {
+        fvm_shared::address::Network::Mainnet => "mainnet",
+        fvm_shared::address::Network::Testnet => "testnet",
+    }
+}
+
+/// Get the user ID we can use with docker to have the same file permissions
+/// as some file or directory on the file system, so that files created by a
+/// container can be owned by the same user, rather than root.
+fn user_id(path: impl AsRef<Path>) -> anyhow::Result<u32> {
+    Ok(path.as_ref().metadata()?.uid())
+}
+
+#[cfg(test)]
+mod tests {
+    use fendermint_vm_actor_interface::ipc;
+    use fvm_shared::address::Address;
+    use ipc_api::subnet_id::SubnetID;
+    use ipc_provider::config::subnet::{
+        EVMSubnet, Subnet as IpcCliSubnet, SubnetConfig as IpcCliSubnetConfig,
+    };
+    use ipc_provider::config::Config as IpcCliConfig;
+    use std::str::FromStr;
+    use std::time::Duration;
+
+    use super::find_subnet_id;
+
+    #[test]
+    fn test_ipc_cli_config_toml_roundtrip() {
+        let mut config0 = IpcCliConfig {
+            keystore_path: Some("~/.ipc".to_string()),
+            subnets: Default::default(),
+        };
+
+        config0.add_subnet(IpcCliSubnet {
+            id: SubnetID::new_root(12345),
+            config: IpcCliSubnetConfig::Fevm(EVMSubnet {
+                provider_http: url::Url::parse("http://example.net").unwrap(),
+                provider_timeout: Some(Duration::from_secs(30)),
+                auth_token: None,
+                registry_addr: ipc::SUBNETREGISTRY_ACTOR_ADDR,
+                gateway_addr: ipc::GATEWAY_ACTOR_ADDR,
+            }),
+        });
+
+        let config_toml = toml::to_string_pretty(&config0).expect("failed to serialize");
+        eprintln!("{config_toml}");
+
+        let config1 = IpcCliConfig::from_toml_str(&config_toml).expect("failed to deserialize");
+
+        assert_eq!(config0, config1);
+    }
+
+    #[test]
+    fn test_parse_subnet_id_from_log() {
+        let example = "[2024-03-05T15:10:01Z INFO  ipc_cli::commands::subnet::create] created subnet actor with id: /r314159/f410fu6ua642sypnlukccd3gaizwhonk5kwlpml6r3pa";
+        let expected = SubnetID::new_from_parent(
+            &SubnetID::new_root(314159),
+            Address::from_str("f410fu6ua642sypnlukccd3gaizwhonk5kwlpml6r3pa").unwrap(),
+        );
+        assert_eq!(find_subnet_id(example), Some(Ok(expected)));
+    }
+
+    #[test]
+    fn test_parse_subnet_id_from_log_wrong_network() {
+        let example = "[2024-03-05T15:10:01Z INFO  ipc_cli::commands::subnet::create] created subnet actor with id: /r314159/t410fu6ua642sypnlukccd3gaizwhonk5kwlpml6r3pa";
+        find_subnet_id(example)
+            .expect("should find the subnet ID")
+            .expect_err("should fail to parse t410 address");
     }
 }
