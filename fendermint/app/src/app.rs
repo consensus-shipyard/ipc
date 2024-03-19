@@ -44,6 +44,7 @@ use tendermint::abci::{request, response};
 use tracing::instrument;
 
 use crate::events::{NewBlock, ProposalProcessed};
+use crate::AppExitCode;
 use crate::BlockHeight;
 use crate::{tmconv::*, VERSION};
 
@@ -111,6 +112,8 @@ pub struct AppConfig<S: KVStore> {
     pub builtin_actors_bundle: PathBuf,
     /// Path to the custom actor WASM bundle.
     pub custom_actors_bundle: PathBuf,
+    /// Block height where we should gracefully stop the node
+    pub halt_height: i64,
 }
 
 /// Handle ABCI requests.
@@ -136,6 +139,8 @@ where
     builtin_actors_bundle: PathBuf,
     /// Path to the custom actor WASM bundle.
     custom_actors_bundle: PathBuf,
+    /// Block height where we should gracefully stop the node
+    halt_height: i64,
     /// Namespace to store app state.
     namespace: S::Namespace,
     /// Collection of past state parameters.
@@ -189,6 +194,7 @@ where
             multi_engine: Arc::new(MultiEngine::new(1)),
             builtin_actors_bundle: config.builtin_actors_bundle,
             custom_actors_bundle: config.custom_actors_bundle,
+            halt_height: config.halt_height,
             namespace: config.app_namespace,
             state_hist: KVCollection::new(config.state_hist_namespace),
             state_hist_size: config.state_hist_size,
@@ -690,6 +696,14 @@ where
             tendermint::Hash::Sha256(h) => h,
             tendermint::Hash::None => return Err(anyhow!("empty block hash").into()),
         };
+
+        if self.halt_height != 0 && block_height == self.halt_height {
+            tracing::info!(
+                height = block_height,
+                "Stopping node due to reaching halt height"
+            );
+            std::process::exit(AppExitCode::Halt as i32);
+        }
 
         let db = self.state_store_clone();
         let state = self.committed_state()?;

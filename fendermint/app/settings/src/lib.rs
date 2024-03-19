@@ -212,6 +212,9 @@ pub struct Settings {
     /// Where to reach CometBFT for queries or broadcasting transactions.
     tendermint_rpc_url: Url,
 
+    /// Block height where we should gracefully stop the node
+    pub halt_height: i64,
+
     /// Secp256k1 private key used for signing transactions sent in the validator's name. Leave empty if not validating.
     pub validator_key: Option<SigningKey>,
 
