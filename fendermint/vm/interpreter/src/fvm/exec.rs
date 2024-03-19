@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use std::{
     collections::HashMap,
     sync::atomic::{AtomicBool, Ordering},
-    thread::sleep,
+    time::Duration,
 };
 
 use fendermint_vm_actor_interface::{chainmetadata, cron, system};
@@ -256,7 +256,7 @@ where
                                 upgrade_info = ?upgrade_info,
                                 "node frozen, please restart with a newer version which has the required upgrade"
                             );
-                            sleep(std::time::Duration::from_secs(60));
+                            tokio::time::sleep(Duration::from_secs(60)).await;
                         }
                     }
                 }
