@@ -23,6 +23,7 @@ contract SubnetRegistryDiamond {
         address pauserFacet;
         address diamondCutFacet;
         address diamondLoupeFacet;
+        address ownershipFacet;
         bytes4[] subnetActorGetterSelectors;
         bytes4[] subnetActorManagerSelectors;
         bytes4[] subnetActorRewarderSelectors;
