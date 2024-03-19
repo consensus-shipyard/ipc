@@ -140,8 +140,8 @@ mod tests {
         expect_empty, MockRuntime, ETHACCOUNT_ACTOR_CODE_ID, EVM_ACTOR_CODE_ID,
         SYSTEM_ACTOR_CODE_ID,
     };
+    use fil_actors_runtime::INIT_ACTOR_ADDR;
     use fil_actors_runtime::SYSTEM_ACTOR_ADDR;
-    use fil_actors_runtime::{AsActorError, INIT_ACTOR_ADDR};
     use fvm_ipld_encoding::ipld_block::IpldBlock;
     use fvm_ipld_encoding::RawBytes;
     use fvm_shared::address::Address;
@@ -417,13 +417,14 @@ mod tests {
         let deployers = vec![Address::new_id(1000)];
         let rt = construct_and_verify(deployers);
 
+        struct AddrTriple {
+            eth: EthAddress,
+            f410: Address,
+            id: Address,
+        }
+
         macro_rules! create_address {
             ($hex_addr:expr, $id:expr) => {{
-                struct AddrTriple {
-                    eth: EthAddress,
-                    f410: Address,
-                    id: Address,
-                };
                 let eth = EthAddress(hex_literal::hex!($hex_addr));
                 let f410 = Address::new_delegated(10, &eth.0).unwrap();
                 rt.set_delegated_address($id, f410);
