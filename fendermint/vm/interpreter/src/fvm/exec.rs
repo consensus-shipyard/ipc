@@ -61,6 +61,47 @@ where
     ) -> anyhow::Result<(Self::State, Self::BeginOutput)> {
         // Block height (FVM epoch) as sequence is intentional
         let height = state.block_height();
+
+        // Check if there is an upgrade scheduled for this height.
+        if let Some(upgrade_info) = self.upgrade_schedule.get(height) {
+            tracing::info!(
+                app_version = state.app_version(),
+                new_app_version = upgrade_info.new_app_version,
+                height = state.block_height(),
+                upgrade_info = ?upgrade_info,
+                "upgrade scheduled"
+            );
+
+            match self.upgrades.get(upgrade_info.new_app_version) {
+                Some(upgrade) => {
+                    upgrade.execute(&mut state).context("upgrade failed")?;
+                    tracing::info!("upgrade successful");
+                }
+                None => {
+                    tracing::warn!(
+                        height = state.block_height(),
+                        upgrade_info = ?upgrade_info,
+                        "upgrade not found"
+                    );
+
+                    if upgrade_info.required {
+                        // mark the node as frozen
+                        IS_FROZEN.store(true, Ordering::Relaxed);
+
+                        // sleep forever, we can't proceed any further using our current fendermint version
+                        loop {
+                            tracing::error!(
+                                height = state.block_height(),
+                                upgrade_info = ?upgrade_info,
+                                "node frozen, please restart with a newer version which has the required upgrade"
+                            );
+                            tokio::time::sleep(Duration::from_secs(60)).await;
+                        }
+                    }
+                }
+            }
+        }
+
         // Arbitrarily large gas limit for cron (matching how Forest does it, which matches Lotus).
         // XXX: Our blocks are not necessarily expected to be 30 seconds apart, so the gas limit might be wrong.
         let gas_limit = BLOCK_GAS_LIMIT * 10000;
@@ -218,45 +259,6 @@ where
         } else {
             PowerUpdates::default()
         };
-
-        if let Some(upgrade_info) = self.upgrade_schedule.get(state.block_height()) {
-            tracing::info!(
-                app_version = state.app_version(),
-                new_app_version = upgrade_info.new_app_version,
-                height = state.block_height(),
-                upgrade_info = ?upgrade_info,
-                "upgrade scheduled"
-            );
-
-            match self.upgrades.get(upgrade_info.new_app_version) {
-                Some(upgrade) => {
-                    upgrade.execute(&mut state).context("upgrade failed")?;
-                    tracing::info!("upgrade successful");
-                }
-                None => {
-                    tracing::warn!(
-                        height = state.block_height(),
-                        upgrade_info = ?upgrade_info,
-                        "upgrade not found"
-                    );
-
-                    if upgrade_info.required {
-                        // mark the node as frozen
-                        IS_FROZEN.store(true, Ordering::Relaxed);
-
-                        // sleep forever, we can't proceed any further using our current fendermint version
-                        loop {
-                            tracing::error!(
-                                height = state.block_height(),
-                                upgrade_info = ?upgrade_info,
-                                "node frozen, please restart with a newer version which has the required upgrade"
-                            );
-                            tokio::time::sleep(Duration::from_secs(60)).await;
-                        }
-                    }
-                }
-            }
-        }
 
         Ok((state, updates))
     }
