@@ -14,19 +14,24 @@ import {
  * @returns An object of updated facets.
  */
 async function upgradeSubnetActorDiamond(deployments) {
-    const gatewayDiamondAddress = deployments.SubnetActorDiamond
+    const subnetActorDiamondAddress = deployments.SubnetActorDiamond
+    console.log("subnetActorDiamondAddress", subnetActorDiamondAddress)
 
-    const onChainFacets = await getFacets(gatewayDiamondAddress)
+    const onChainFacets = await getFacets(subnetActorDiamondAddress)
+    console.log('onChainFacets',onChainFacets)
+    
     const updatedFacets = {}
     const onChainFacetBytecodes = await getOnChainBytecodeFromFacets(
         onChainFacets,
     )
+    console.log("onChainFacetBytecodes", onChainFacetBytecodes)
 
     for (const facet of deployments.Facets) {
+        console.log("Facet", facet);
         await upgradeFacet(
             facet,
             onChainFacets,
-            gatewayDiamondAddress,
+            subnetActorDiamondAddress,
             updatedFacets,
             onChainFacetBytecodes,
             deployments,

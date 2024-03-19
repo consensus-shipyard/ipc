@@ -291,14 +291,24 @@ task(
     async (args, hre: HardhatRuntimeEnvironment) => {
         await hre.run('compile')
         const network = hre.network.name
-        const deployments = await getSubnetActor(network)
+        if (!args.address) {
+            console.error(
+                'No address provided. Usage: npx hardhat upgrade-sa-diamond --address 0x80afa...',
+            )
+            process.exit(1)
+        }
+        const subnetRegistry = await getSubnetRegistry(network)
+        console.log(subnetRegistry)
+        const deployments = { SubnetActorDiamond: args.address , Facets: subnetRegistry.SubnetActorFacets }
+        console.log(deployments);
+
         const { upgradeDiamond } = await lazyImport(
             './scripts/upgrade-sa-diamond',
         )
         const updatedFacets = await upgradeDiamond(deployments)
         await saveDeploymentsFacets('subnet.actor.json', network, updatedFacets)
     },
-)
+).addParam('address', 'The address to upgrade', undefined, types.string, false)
 
 /** @type import('hardhat/config').HardhatUserConfig */
 const config: HardhatUserConfig = {
