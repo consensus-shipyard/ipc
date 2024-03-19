@@ -84,13 +84,15 @@ impl UpgradeSchedule {
         self.schedule
             .values()
             .cloned()
+            .rev()
             .collect::<Vec<UpgradeInfo>>()
     }
 }
 
 /// a function type for migration
 // TODO: Add missing parameters
-pub type MigrationFunc<DB> = fn(state: &mut FvmExecState<DB>) -> anyhow::Result<()>;
+pub type MigrationFunc<DB> =
+    fn(upgrade: &Upgrade<DB>, state: &mut FvmExecState<DB>) -> anyhow::Result<()>;
 
 /// Upgrade implements a migration function to be executed on the fendermint app state which
 /// will then upgrade the fendermint version to new_app_version after successful execution
@@ -116,10 +118,12 @@ where
         }
     }
 
-    pub fn execute(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<u64> {
-        (self.migration)(state)?;
+    pub fn execute(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<()> {
+        (self.migration)(self, state)
+    }
 
-        Ok(self.new_app_version)
+    pub fn new_app_version(&self) -> u64 {
+        self.new_app_version
     }
 }
 
@@ -179,11 +183,15 @@ fn test_validate_upgrade_schedule() {
     use crate::fvm::store::memory::MemoryBlockstore;
 
     let mut upgrades: Upgrades<MemoryBlockstore> = Upgrades::new();
-    upgrades.add(Upgrade::new(1, |_state| Ok(()))).unwrap();
-    upgrades.add(Upgrade::new(2, |_state| Ok(()))).unwrap();
+    upgrades
+        .add(Upgrade::new(1, |_upgrade, _state| Ok(())))
+        .unwrap();
+    upgrades
+        .add(Upgrade::new(2, |_upgrade, _state| Ok(())))
+        .unwrap();
 
     // adding an upgrade with the same chain_id and height should fail
-    let res = upgrades.add(Upgrade::new(2, |_state| Ok(())));
+    let res = upgrades.add(Upgrade::new(2, |_upgrade, _state| Ok(())));
     assert!(res.is_err());
 
     assert!(upgrades.get(0).is_none());

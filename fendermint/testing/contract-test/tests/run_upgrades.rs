@@ -73,7 +73,7 @@ async fn test_applying_upgrades() {
 
     let mut upgrades = Upgrades::new();
     upgrades
-        .add(Upgrade::new(11, |state| {
+        .add(Upgrade::new(11, |upgrade, state| {
             println!(
                 "[Upgrade at height {}] Deploy simple contract",
                 state.block_height()
@@ -111,12 +111,16 @@ async fn test_applying_upgrades() {
                 Address::from_str(CONTRACT_ADDRESS).unwrap()
             );
 
+            state.update_app_version(|app_version| {
+                *app_version = upgrade.new_app_version();
+            });
+
             Ok(())
         }))
         .unwrap();
 
     upgrades
-        .add(Upgrade::new(12, |state| {
+        .add(Upgrade::new(12, |upgrade, state| {
             println!(
                 "[Upgrade at height {}] Sends a balance",
                 state.block_height()
@@ -151,12 +155,16 @@ async fn test_applying_upgrades() {
                 res.failure_info
             );
 
+            state.update_app_version(|app_version| {
+                *app_version = upgrade.new_app_version();
+            });
+
             Ok(())
         }))
         .unwrap();
 
     upgrades
-        .add(Upgrade::new(13, |state| {
+        .add(Upgrade::new(13, |upgrade, state| {
             println!(
                 "[Upgrade at height {}] Returns a balance",
                 state.block_height()
@@ -190,6 +198,10 @@ async fn test_applying_upgrades() {
             let bytes = decode_fevm_return_data(res.msg_receipt.return_data).unwrap();
             let balance = U256::from_big_endian(&bytes);
             assert_eq!(balance, U256::from(SEND_BALANCE_AMOUNT));
+
+            state.update_app_version(|app_version| {
+                *app_version = upgrade.new_app_version();
+            });
 
             Ok(())
         }))

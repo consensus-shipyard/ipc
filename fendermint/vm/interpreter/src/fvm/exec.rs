@@ -230,13 +230,8 @@ where
 
             match self.upgrades.get(upgrade_info.new_app_version) {
                 Some(upgrade) => {
-                    let new_app_version = upgrade.execute(&mut state).context("upgrade failed")?;
-
-                    state.update_app_version(|app_version| {
-                        *app_version = new_app_version;
-                    });
-
-                    tracing::info!(app_version = state.app_version(), "upgrade successful");
+                    upgrade.execute(&mut state).context("upgrade failed")?;
+                    tracing::info!("upgrade successful");
                 }
                 None => {
                     tracing::warn!(
