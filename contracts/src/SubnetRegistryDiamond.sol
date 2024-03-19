@@ -21,11 +21,15 @@ contract SubnetRegistryDiamond {
         address rewarderFacet;
         address checkpointerFacet;
         address pauserFacet;
+        address diamondCutFacet;
+        address diamondLoupeFacet;
         bytes4[] subnetActorGetterSelectors;
         bytes4[] subnetActorManagerSelectors;
         bytes4[] subnetActorRewarderSelectors;
         bytes4[] subnetActorCheckpointerSelectors;
         bytes4[] subnetActorPauserSelectors;
+        bytes4[] subnetActorDiamondCutSelectors;
+        bytes4[] subnetActorDiamondLoupeSelectors;
     }
 
     constructor(IDiamond.FacetCut[] memory _diamondCut, ConstructorParams memory params) {
@@ -47,6 +51,12 @@ contract SubnetRegistryDiamond {
         if (params.pauserFacet == address(0)) {
             revert FacetCannotBeZero();
         }
+        if (params.diamondCutFacet == address(0)) {
+            revert FacetCannotBeZero();
+        }
+        if (params.diamondLoupeFacet == address(0)) {
+            revert FacetCannotBeZero();
+        }
 
         LibDiamond.setContractOwner(msg.sender);
         LibDiamond.diamondCut({_diamondCut: _diamondCut, _init: address(0), _calldata: new bytes(0)});
@@ -63,12 +73,16 @@ contract SubnetRegistryDiamond {
         s.SUBNET_ACTOR_REWARD_FACET = params.rewarderFacet;
         s.SUBNET_ACTOR_CHECKPOINTING_FACET = params.checkpointerFacet;
         s.SUBNET_ACTOR_PAUSE_FACET = params.pauserFacet;
+        s.SUBNET_ACTOR_DIAMOND_CUT_FACET = params.diamondCutFacet;
+        s.SUBNET_ACTOR_LOUPE_FACET =   params.diamondLoupeFacet;
 
         s.subnetActorGetterSelectors = params.subnetActorGetterSelectors;
         s.subnetActorManagerSelectors = params.subnetActorManagerSelectors;
         s.subnetActorRewarderSelectors = params.subnetActorRewarderSelectors;
         s.subnetActorCheckpointerSelectors = params.subnetActorCheckpointerSelectors;
         s.subnetActorPauserSelectors = params.subnetActorPauserSelectors;
+        s.subnetActorDiamondCutSelectors = params.subnetActorDiamondCutSelectors;
+        s.subnetActorDiamondLoupeSelectors = params.subnetActorDiamondLoupeSelectors;
     }
 
     function _fallback() internal {
