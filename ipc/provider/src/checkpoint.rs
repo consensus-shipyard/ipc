@@ -123,6 +123,8 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
             .map_err(|e| {
                 anyhow!("cannot obtain the last bottom up checkpoint height due to: {e:}")
             })?;
+        log::info!("last submission height: {last_checkpoint_epoch}");
+
         let current_height = self.child_handler.current_epoch().await?;
         let finalized_height = max(1, current_height - self.finalization_blocks);
 
@@ -169,7 +171,12 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                         bundle.signatories,
                     )
                     .await
-                    .map_err(|e| anyhow!("cannot submit bottom up checkpoint due to: {e:}"))?;
+                    .map_err(|e| {
+                        anyhow!(
+                            "cannot submit bottom up checkpoint at height {} due to: {e:}",
+                            event.height
+                        )
+                    })?;
 
                 log::info!(
                     "submitted bottom up checkpoint({}) in parent at height {}",
