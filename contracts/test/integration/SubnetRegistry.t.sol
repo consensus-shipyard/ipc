@@ -18,16 +18,19 @@ import {SubnetActorPauseFacet} from "../../src/subnet/SubnetActorPauseFacet.sol"
 import {SubnetActorCheckpointingFacet} from "../../src/subnet/SubnetActorCheckpointingFacet.sol";
 import {SubnetActorRewardFacet} from "../../src/subnet/SubnetActorRewardFacet.sol";
 import {SubnetActorDiamond} from "../../src/SubnetActorDiamond.sol";
-import {SubnetID, PermissionMode} from "../../src/structs/Subnet.sol";
+import {SubnetID, PermissionMode, SubnetCreationPrivileges} from "../../src/structs/Subnet.sol";
 import {SubnetRegistryDiamond} from "../../src/SubnetRegistryDiamond.sol";
 
 import {RegisterSubnetFacet} from "../../src/subnetregistry/RegisterSubnetFacet.sol";
 import {SubnetGetterFacet} from "../../src/subnetregistry/SubnetGetterFacet.sol";
 import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
+import {OwnershipFacet} from "../../src/OwnershipFacet.sol";
 import {SupplySourceHelper} from "../../src/lib/SupplySourceHelper.sol";
 import {RegistryFacetsHelper} from "../helpers/RegistryFacetsHelper.sol";
 import {DiamondFacetsHelper} from "../helpers/DiamondFacetsHelper.sol";
+
+import {SelectorLibrary} from "../helpers/SelectorLibrary.sol";
 
 import {IntegrationTestBase, TestRegistry} from "../IntegrationTestBase.sol";
 
@@ -37,7 +40,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
 
     bytes4[] empty;
 
-    function setUp() public virtual override {
+    function defaultParams() internal returns (SubnetRegistryDiamond.ConstructorParams memory params) {
         bytes4[] memory mockedSelectors = new bytes4[](1);
         mockedSelectors[0] = 0x6cb2ecee;
 
@@ -53,7 +56,6 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         bytes4[] memory mockedSelectors5 = new bytes4[](1);
         mockedSelectors5[0] = 0x233f74ea;
 
-        SubnetRegistryDiamond.ConstructorParams memory params;
         params.gateway = DEFAULT_IPC_GATEWAY_ADDR;
 
         params.getterFacet = address(new SubnetActorGetterFacet());
@@ -61,18 +63,46 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         params.rewarderFacet = address(new SubnetActorRewardFacet());
         params.checkpointerFacet = address(new SubnetActorCheckpointingFacet());
         params.pauserFacet = address(new SubnetActorPauseFacet());
+        params.diamondCutFacet = address(new DiamondCutFacet());
+        params.diamondLoupeFacet = address(new DiamondLoupeFacet());
+        params.ownershipFacet = address(new OwnershipFacet());
 
         params.subnetActorGetterSelectors = mockedSelectors;
         params.subnetActorManagerSelectors = mockedSelectors2;
         params.subnetActorRewarderSelectors = mockedSelectors3;
         params.subnetActorCheckpointerSelectors = mockedSelectors4;
         params.subnetActorPauserSelectors = mockedSelectors5;
+        params.subnetActorDiamondCutSelectors = SelectorLibrary.resolveSelectors("DiamondCutFacet");
+        params.subnetActorDiamondLoupeSelectors = SelectorLibrary.resolveSelectors("DiamondLoupeFacet");
+        params.subnetActorOwnershipSelectors = SelectorLibrary.resolveSelectors("OwnershipFacet");
+
+        params.creationPrivileges = SubnetCreationPrivileges.Unrestricted;
+
+        return params;
+    }
+
+    function setUp() public virtual override {
+        SubnetRegistryDiamond.ConstructorParams memory params = defaultParams();
 
         registryDiamond = createSubnetRegistry(params);
         registryLouper = registryDiamond.diamondLouper();
         registryCutter = registryDiamond.diamondCutter();
         registrySubnetFacet = registryDiamond.register();
         registrySubnetGetterFacet = registryDiamond.getter();
+    }
+
+    function test_Registry_NoPermission() public {
+        SubnetRegistryDiamond.ConstructorParams memory p = defaultParams();
+        p.creationPrivileges = SubnetCreationPrivileges.Owner;
+
+        SubnetRegistryDiamond s = createSubnetRegistry(p);
+
+        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(DEFAULT_IPC_GATEWAY_ADDR);
+        params.permissionMode = PermissionMode.Collateral;
+
+        vm.prank(address(1));
+        vm.expectRevert(LibDiamond.NotOwner.selector);
+        s.register().newSubnetActor(params);
     }
 
     function test_Registry_FacetFunctionSelectors() public view {
@@ -103,6 +133,9 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         params.gateway = DEFAULT_IPC_GATEWAY_ADDR;
         params.subnetActorGetterSelectors = empty;
         params.subnetActorManagerSelectors = empty;
+        params.subnetActorDiamondLoupeSelectors = empty;
+        params.subnetActorDiamondCutSelectors = empty;
+        params.subnetActorOwnershipSelectors = empty;
 
         IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](0);
         vm.expectRevert(FacetCannotBeZero.selector);
@@ -125,6 +158,18 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         new SubnetRegistryDiamond(diamondCut, params);
 
         params.pauserFacet = address(5);
+        vm.expectRevert(FacetCannotBeZero.selector);
+        new SubnetRegistryDiamond(diamondCut, params);
+
+        params.diamondLoupeFacet = address(6);
+        vm.expectRevert(FacetCannotBeZero.selector);
+        new SubnetRegistryDiamond(diamondCut, params);
+
+        params.diamondCutFacet = address(7);
+        vm.expectRevert(FacetCannotBeZero.selector);
+        new SubnetRegistryDiamond(diamondCut, params);
+
+        params.ownershipFacet = address(8);
         new SubnetRegistryDiamond(diamondCut, params);
     }
 

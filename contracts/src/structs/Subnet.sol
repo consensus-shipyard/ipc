@@ -104,6 +104,14 @@ enum PermissionMode {
     Static
 }
 
+/// @notice Determines the permission mode for who can create subet
+enum SubnetCreationPrivileges {
+    /// No permission check at all, any address can create
+    Unrestricted,
+    /// Only the owner can create subnet
+    Owner
+}
+
 /// @notice Keeping track of the list of validators.
 /// @dev There are two types of validators:
 ///     - Active
