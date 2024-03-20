@@ -8,6 +8,7 @@ import {IERC165} from "./interfaces/IERC165.sol";
 import {SubnetRegistryActorStorage} from "./lib/LibSubnetRegistryStorage.sol";
 import {GatewayCannotBeZero, FacetCannotBeZero} from "./errors/IPCErrors.sol";
 import {LibDiamond} from "./lib/LibDiamond.sol";
+import {SubnetCreationPrivileges} from "./structs/Subnet.sol";
 
 error FunctionNotFound(bytes4 _functionSelector);
 
@@ -32,6 +33,7 @@ contract SubnetRegistryDiamond {
         bytes4[] subnetActorDiamondCutSelectors;
         bytes4[] subnetActorDiamondLoupeSelectors;
         bytes4[] subnetActorOwnershipSelectors;
+        SubnetCreationPrivileges creationPrivileges;
     }
 
     constructor(IDiamond.FacetCut[] memory _diamondCut, ConstructorParams memory params) {
@@ -90,6 +92,8 @@ contract SubnetRegistryDiamond {
         s.subnetActorDiamondCutSelectors = params.subnetActorDiamondCutSelectors;
         s.subnetActorDiamondLoupeSelectors = params.subnetActorDiamondLoupeSelectors;
         s.subnetActorOwnershipSelectors = params.subnetActorOwnershipSelectors;
+
+        s.creationPrivileges = params.creationPrivileges;
     }
 
     function _fallback() internal {

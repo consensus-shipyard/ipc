@@ -8,6 +8,9 @@ import {SubnetRegistryActorStorage} from "../lib/LibSubnetRegistryStorage.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
 import {WrongGateway} from "../errors/IPCErrors.sol";
 
+import {SubnetCreationPrivileges} from "../structs/Subnet.sol";
+import {LibDiamond} from "../lib/LibDiamond.sol";
+
 contract RegisterSubnetFacet is ReentrancyGuard {
     SubnetRegistryActorStorage internal s;
 
@@ -22,6 +25,8 @@ contract RegisterSubnetFacet is ReentrancyGuard {
         if (_params.ipcGatewayAddr != s.GATEWAY) {
             revert WrongGateway();
         }
+
+        ensurePrivileges();
 
         IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](8);
 
@@ -85,5 +90,12 @@ contract RegisterSubnetFacet is ReentrancyGuard {
         emit SubnetDeployed(subnetAddr);
 
         return subnetAddr;
+    }
+
+    function ensurePrivileges() internal view {
+        if (s.creationPrivileges == SubnetCreationPrivileges.Unrestricted) {
+            return;
+        }
+        LibDiamond.enforceIsContractOwner();
     }
 }

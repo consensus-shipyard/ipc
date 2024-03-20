@@ -361,6 +361,7 @@ where
                     subnet_actor_diamond_cut_selectors: diamond_cut_facet.function_selectors,
                     subnet_actor_diamond_loupe_selectors: diamond_loupe_facet.function_selectors,
                     subnet_actor_ownership_selectors: ownership_facet.function_selectors,
+                    creation_privileges: 0,
                 };
 
                 deployer.deploy_contract(

@@ -478,6 +478,7 @@ pub mod registry {
         pub subnet_actor_diamond_cut_selectors: Vec<FunctionSelector>,
         pub subnet_actor_diamond_loupe_selectors: Vec<FunctionSelector>,
         pub subnet_actor_ownership_selectors: Vec<FunctionSelector>,
+        pub creation_privileges: u8, // 0 = Unrestricted, 1 = Owner.
     }
 }
 
