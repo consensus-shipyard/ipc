@@ -16,7 +16,7 @@ import {ERC20Facet} from "erc20-diamond-facet/facets/ERC20Facet.sol";
  * @title IpcTokenController
  * @notice Contract to handle token transfer from L1, lock them and mint on L2.
  */
-contract LinkedTokenReplica is LinkedTokenFacet, ERC20Facet {
+contract LinkedTokenReplicaFacet is LinkedTokenFacet, ERC20Facet {
     using SafeERC20 for IERC20;
 
     function _captureTokens(address holder, uint256 amount) internal override {
