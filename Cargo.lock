@@ -2848,6 +2848,7 @@ dependencies = [
  "bytes",
  "cid",
  "fendermint_abci",
+ "fendermint_actor_chainmetadata",
  "fendermint_app_options",
  "fendermint_app_settings",
  "fendermint_crypto",

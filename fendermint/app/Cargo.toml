@@ -39,6 +39,9 @@ tracing-appender = { workspace = true }
 tracing-subscriber = { workspace = true }
 literally = { workspace = true }
 
+lazy_static = { workspace = true }
+fendermint_actor_chainmetadata = { path = "../actors/chainmetadata" }
+
 fendermint_abci = { path = "../abci" }
 fendermint_app_options = { path = "./options" }
 fendermint_app_settings = { path = "./settings" }
