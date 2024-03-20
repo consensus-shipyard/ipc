@@ -5,14 +5,14 @@ use ethers::{
     core::rand::{rngs::StdRng, SeedableRng},
     types::H160,
 };
+use fendermint_vm_core::chainid;
 use lazy_static::lazy_static;
 use std::{
     cmp::min,
     collections::BTreeMap,
     ops::{Mul, SubAssign},
-    str::FromStr,
 };
-use tendermint_rpc::Url;
+use url::Url;
 
 use fendermint_vm_genesis::Collateral;
 use fvm_shared::{
@@ -23,8 +23,8 @@ use quickcheck::{Arbitrary, Gen};
 
 use crate::{
     manifest::{
-        Account, Balance, BalanceMap, CollateralMap, IpcDeployment, Manifest, Node, NodeMap,
-        NodeMode, ParentNode, Relayer, Rootnet, Subnet, SubnetMap,
+        Account, Balance, BalanceMap, CheckpointConfig, CollateralMap, EnvMap, IpcDeployment,
+        Manifest, Node, NodeMap, NodeMode, ParentNode, Relayer, Rootnet, Subnet, SubnetMap,
     },
     AccountId, NodeId, RelayerId, ResourceId, SubnetId,
 };
@@ -137,6 +137,9 @@ fn gen_manifest(
 
     let rootnet = if bool::arbitrary(g) {
         Rootnet::External {
+            chain_id: chainid::from_str_hashed(&String::arbitrary(g))
+                .unwrap_or(12345u64.into())
+                .into(),
             deployment: if bool::arbitrary(g) {
                 let [gateway, registry] = gen_addresses::<2>(g);
                 IpcDeployment::Existing { gateway, registry }
@@ -155,6 +158,7 @@ fn gen_manifest(
             validators: subnet.validators,
             balances: initial_balances,
             nodes: subnet.nodes,
+            env: gen_env(g),
         }
     };
 
@@ -199,7 +203,7 @@ fn gen_urls(g: &mut Gen) -> Vec<Url> {
         // The glif.io addresses are load balanced, but let's pretend we can target a specific node.
         // Alternatively we could vary the ports or whatever.
         let url = format!("https://{}.api.calibration.node.glif.io/rpc/v1", id.0);
-        let url = Url::from_str(&url).expect("URL should parse");
+        let url = Url::parse(&url).expect("URL should parse");
         urls.push(url);
     }
     urls
@@ -333,6 +337,11 @@ fn gen_subnets(
             nodes,
             relayers,
             subnets: child_subnets,
+            env: gen_env(g),
+            bottom_up_checkpoint: CheckpointConfig {
+                // Adding 1 because 0 is not accepted by the contracts.
+                period: u64::arbitrary(g).mod_floor(&86400u64) + 1,
+            },
         };
 
         let sid = SubnetId::arbitrary(g);
@@ -363,6 +372,16 @@ fn gen_root_subnet(
     let mut s = ss.into_iter().next().unwrap().1;
     s.relayers.clear();
     s
+}
+
+fn gen_env(g: &mut Gen) -> EnvMap {
+    let mut env = EnvMap::default();
+    for _ in 0..usize::arbitrary(g) % 5 {
+        let prefix = if bool::arbitrary(g) { "CMT" } else { "FM" };
+        let key = format!("{prefix}_{}", ResourceId::arbitrary(g).0);
+        env.insert(key, String::arbitrary(g));
+    }
+    env
 }
 
 /// Choose some balance, up to 10% of the remaining balance of the account, minimum 1 atto.

@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import { InterchainTokenExecutable } from '@axelar-network/interchain-token-service/executable/InterchainTokenExecutable.sol';
 import { IERC20 } from "openzeppelin-contracts/interfaces/IERC20.sol";
+import { Ownable } from "openzeppelin-contracts/access/Ownable.sol";
 import { SubnetID, SupplySource, SupplyKind } from "@ipc/src/structs/Subnet.sol";
 import { FvmAddress } from "@ipc/src/structs/FvmAddress.sol";
 import { IpcHandler } from "@ipc/sdk/IpcContract.sol";
@@ -23,7 +24,7 @@ interface SubnetActor {
 //         IpcTokenSender via the Axelar ITS, receiving some token value to deposit into an IPC subnet (specified in the
 //         incoming message). The IpcTokenHandler handles deposit failures by crediting the value back to the original
 //         beneficiary, and making it available from them to withdraw() on the rootnet.
-contract IpcTokenHandler is InterchainTokenExecutable, IpcHandler {
+contract IpcTokenHandler is InterchainTokenExecutable, IpcHandler, Ownable {
     using FvmAddressHelper for address;
     using FvmAddressHelper for FvmAddress;
     using SubnetIDHelper for SubnetID;
@@ -31,13 +32,12 @@ contract IpcTokenHandler is InterchainTokenExecutable, IpcHandler {
 
     error NothingToWithdraw();
 
-    TokenFundedGateway public _ipcGateway;
-    mapping(address beneficiary => mapping(address token => uint256 value)) private _claims;
-
     event SubnetFunded(SubnetID indexed subnet, address indexed recipient, uint256 value);
     event FundingFailed(SubnetID indexed subnet, address indexed recipient, uint256 value);
 
-    constructor(address axelarIts, address ipcGateway) InterchainTokenExecutable(axelarIts) {
+    TokenFundedGateway public _ipcGateway;
+
+    constructor(address axelarIts, address ipcGateway, address admin) InterchainTokenExecutable(axelarIts) Ownable(admin) {
         _ipcGateway = TokenFundedGateway(ipcGateway);
     }
 
@@ -52,18 +52,33 @@ contract IpcTokenHandler is InterchainTokenExecutable, IpcHandler {
         address tokenAddr,
         uint256 amount
     ) internal override {
-        (SubnetID memory subnet, address recipient) = abi.decode(data, (SubnetID, address));
-
         IERC20 token = IERC20(tokenAddr);
         require(token.balanceOf(address(this)) >= amount, "insufficient balance");
 
         // Authorize the IPC gateway to spend these tokens on our behalf.
-        token.approve(address(_ipcGateway), amount);
+        token.safeIncreaseAllowance(address(_ipcGateway), amount);
 
-        // Fund the designated subnet via the IPC gateway.
-        _ipcGateway.fundWithToken(subnet, recipient.from(), amount);
+        // Try to decode the payload. Note: Solidity does not support try/catch for abi.decode (or tryDecode), so
+        // this may fail if there's a bug in the sender (in which case funds can be retrieved through the admin path).
+        (SubnetID memory subnet, address recipient) = abi.decode(data, (SubnetID, address));
 
-        // Emit an event.
+        (bool success, ) = address(_ipcGateway).call(
+            abi.encodeWithSelector(TokenFundedGateway.fundWithToken.selector, subnet, recipient.from(), amount)
+        );
+
+        if (!success) {
+            // Restore the original allowance.
+            token.safeDecreaseAllowance(address(_ipcGateway), amount);
+
+            // Increase the allowance of the admin address so they can retrieve these otherwise lost tokens.
+            token.safeIncreaseAllowance(owner(), amount);
+
+            // Emit a FundingFailed event.
+            emit FundingFailed(subnet, recipient, amount);
+
+            return;
+        }
+
         emit SubnetFunded(subnet, recipient, amount);
     }
 
@@ -78,17 +93,15 @@ contract IpcTokenHandler is InterchainTokenExecutable, IpcHandler {
 
         ResultMsg memory result = abi.decode(envelope.message, (ResultMsg));
         if (result.outcome != OutcomeType.Ok) {
-            // Note: IPC only supports deploying subnets via our blessed registry, so we can trust the code behind
-            // the subnet actor.
+            // Verify that the subnet is indeed an ERC20 subnet.
             SupplySource memory supplySource = SubnetActor(envelope.from.subnetId.getAddress()).supplySource();
             require(supplySource.kind == SupplyKind.ERC20, "expected ERC20 supply source");
 
+            // Increase the allowance of the admin address so they can retrieve these otherwise lost tokens.
+            IERC20(supplySource.tokenAddress).safeIncreaseAllowance(owner(), envelope.value);
+
             // Results will carry the original beneficiary in the 'from' address.
             address beneficiary = envelope.from.rawAddress.extractEvmAddress();
-
-            // We credit the token funds to the beneficiary. The beneficiary will have to call withdraw() to pull the
-            // funds out on this network.
-            _claims[beneficiary][supplySource.tokenAddress] += envelope.value;
 
             // Emit an event.
             emit FundingFailed(envelope.from.subnetId, beneficiary, envelope.value);
@@ -97,19 +110,10 @@ contract IpcTokenHandler is InterchainTokenExecutable, IpcHandler {
         return bytes("");
     }
 
-    // @notice Withdraws all available balance for the specified token for the sender.
-    function withdraw(address token) external {
-        uint256 available = _claims[msg.sender][token];
-        if (available == 0) {
-            revert NothingToWithdraw();
-        }
-
-        delete _claims[msg.sender][token];
-        IERC20(token).safeTransfer(msg.sender, available);
+    // @notice The ultimate backstop in case the error-handling logic itself failed unexpectedly and we failed to
+    //         increase the recovery allowances of the admin address.
+    function adminTokenIncreaseAllowance(address token, uint256 amount) external onlyOwner {
+        IERC20(token).safeIncreaseAllowance(owner(), amount);
     }
 
-    // @notice Queries the claim of a beneficiary over a particular token.
-    function getClaimFor(address beneficiary, address token) external view returns (uint256) {
-        return _claims[beneficiary][token];
-    }
 }
