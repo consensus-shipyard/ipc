@@ -64,6 +64,18 @@ lazy_static! {
                             name: "XnetMessagingFacet",
                             abi: ia::xnet_messaging_facet::XNETMESSAGINGFACET_ABI.to_owned(),
                         },
+                        EthFacet {
+                            name: "DiamondLoupeFacet",
+                            abi: ia::diamond_loupe_facet::DIAMONDLOUPEFACET_ABI.to_owned(),
+                        },
+                        EthFacet {
+                            name: "DiamondCutFacet",
+                            abi: ia::diamond_cut_facet::DIAMONDCUTFACET_ABI.to_owned(),
+                        },
+                        EthFacet {
+                            name: "OwnershipFacet",
+                            abi: ia::ownership_facet::OWNERSHIPFACET_ABI.to_owned(),
+                        },
                     ],
                 },
             ),
@@ -105,18 +117,19 @@ lazy_static! {
                         },
                         EthFacet {
                             name: "SubnetGetterFacet",
-                            abi: ia::subnet_getter_facet::SUBNETGETTERFACET_ABI
-                                .to_owned(),
+                            abi: ia::subnet_getter_facet::SUBNETGETTERFACET_ABI.to_owned(),
                         },
                         EthFacet {
                             name: "DiamondLoupeFacet",
-                            abi: ia::diamond_loupe_facet::DIAMONDLOUPEFACET_ABI
-                                .to_owned(),
+                            abi: ia::diamond_loupe_facet::DIAMONDLOUPEFACET_ABI.to_owned(),
                         },
                         EthFacet {
                             name: "DiamondCutFacet",
-                            abi: ia::diamond_cut_facet::DIAMONDCUTFACET_ABI
-                                .to_owned(),
+                            abi: ia::diamond_cut_facet::DIAMONDCUTFACET_ABI.to_owned(),
+                        },
+                        EthFacet {
+                            name: "OwnershipFacet",
+                            abi: ia::ownership_facet::OWNERSHIPFACET_ABI.to_owned(),
                         },
                     ],
                 },
@@ -159,6 +172,18 @@ lazy_static! {
                         EthFacet {
                             name: "SubnetActorPauseFacet",
                             abi: ia::subnet_actor_pause_facet::SUBNETACTORPAUSEFACET_ABI.to_owned(),
+                        },
+                        EthFacet {
+                            name: "DiamondLoupeFacet",
+                            abi: ia::diamond_loupe_facet::DIAMONDLOUPEFACET_ABI.to_owned(),
+                        },
+                        EthFacet {
+                            name: "DiamondCutFacet",
+                            abi: ia::diamond_cut_facet::DIAMONDCUTFACET_ABI.to_owned(),
+                        },
+                        EthFacet {
+                            name: "OwnershipFacet",
+                            abi: ia::ownership_facet::OWNERSHIPFACET_ABI.to_owned(),
                         },
                     ],
                 },
@@ -449,6 +474,9 @@ pub mod registry {
         pub subnet_rewarder_selectors: Vec<FunctionSelector>,
         pub subnet_pauser_selectors: Vec<FunctionSelector>,
         pub subnet_checkpointer_selectors: Vec<FunctionSelector>,
+        pub subnet_actor_diamond_cut_selectors: Vec<FunctionSelector>,
+        pub subnet_actor_diamond_loupe_selectors: Vec<FunctionSelector>,
+        pub subnet_actor_ownership_selectors: Vec<FunctionSelector>,
     }
 }
 

@@ -337,6 +337,9 @@ where
                 let rewarder_facet = facets.remove(0);
                 let checkpointer_facet = facets.remove(0);
                 let pauser_facet = facets.remove(0);
+                let diamond_loupe_facet = facets.remove(0);
+                let diamond_cut_facet = facets.remove(0);
+                let ownership_facet = facets.remove(0);
 
                 debug_assert_eq!(facets.len(), 4, "SubnetRegistry has 4 facets of its own");
 
@@ -352,6 +355,9 @@ where
                     subnet_rewarder_selectors: rewarder_facet.function_selectors,
                     subnet_checkpointer_selectors: checkpointer_facet.function_selectors,
                     subnet_pauser_selectors: pauser_facet.function_selectors,
+                    subnet_actor_diamond_cut_selectors: diamond_cut_facet.function_selectors,
+                    subnet_actor_diamond_loupe_selectors: diamond_loupe_facet.function_selectors,
+                    subnet_actor_ownership_selectors: ownership_facet.function_selectors,
                 };
 
                 deployer.deploy_contract(
