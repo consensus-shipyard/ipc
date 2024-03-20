@@ -259,7 +259,7 @@ impl SignedMessageFactory {
         };
 
         // Roll back the sequence, we don't really want to invoke anything.
-        self.set_sequence(message.sequence);
+        self.inner.set_sequence(message.sequence);
 
         Ok(message)
     }
@@ -286,7 +286,7 @@ impl SignedMessageFactory {
         };
 
         // Roll back the sequence, we don't really want to invoke anything.
-        self.set_sequence(message.sequence);
+        self.inner.set_sequence(message.sequence);
 
         Ok(message)
     }
@@ -332,7 +332,7 @@ impl SignedMessageFactory {
         };
 
         // Roll back the sequence, we don't really want to invoke anything.
-        self.set_sequence(message.sequence);
+        self.inner.set_sequence(message.sequence);
 
         Ok(message)
     }
