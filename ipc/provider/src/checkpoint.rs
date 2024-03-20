@@ -114,8 +114,8 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         }
     }
 
-    /// Derive the next submission checkpoint height
-    async fn next_submission_height(&self) -> Result<ChainEpoch> {
+    /// Checks if the relayer has already submitted at the next submission epoch, if not it submits it.
+    async fn submit_next_epoch(&self, submitter: &Address) -> Result<()> {
         let last_checkpoint_epoch = self
             .parent_handler
             .last_bottom_up_checkpoint_height(&self.metadata.child.id)
@@ -123,25 +123,19 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
             .map_err(|e| {
                 anyhow!("cannot obtain the last bottom up checkpoint height due to: {e:}")
             })?;
-        Ok(last_checkpoint_epoch + self.checkpoint_period())
-    }
-
-    /// Checks if the relayer has already submitted at the next submission epoch, if not it submits it.
-    async fn submit_next_epoch(&self, submitter: &Address) -> Result<()> {
-        let next_submission_height = self.next_submission_height().await?;
         let current_height = self.child_handler.current_epoch().await?;
         let finalized_height = max(1, current_height - self.finalization_blocks);
 
-        log::debug!("next_submission_height: {next_submission_height}, current height: {current_height}, finalized_height: {finalized_height}");
+        log::debug!("last submission height: {last_checkpoint_epoch}, current height: {current_height}, finalized_height: {finalized_height}");
 
-        if finalized_height < next_submission_height {
+        if finalized_height <= last_checkpoint_epoch {
             return Ok(());
         }
 
-        let prev_h = next_submission_height - self.checkpoint_period();
-        log::debug!("start querying quorum reached events from : {prev_h} to {finalized_height}");
+        let start = last_checkpoint_epoch + 1;
+        log::debug!("start querying quorum reached events from : {start} to {finalized_height}");
 
-        for h in (prev_h + 1)..=finalized_height {
+        for h in start..=finalized_height {
             let events = self.child_handler.quorum_reached_events(h).await?;
             if events.is_empty() {
                 log::debug!("no reached events at height : {h}");
