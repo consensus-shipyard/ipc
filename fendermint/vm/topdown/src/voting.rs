@@ -6,7 +6,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::hash::Hash;
 use std::{fmt::Debug, time::Duration};
 
-use crate::{BlockHash, BlockHeight};
+use crate::{BlockHash, BlockHeight, Object};
 
 // Usign this type because it's `Hash`, unlike the normal `libsecp256k1::PublicKey`.
 pub use ipc_ipld_resolver::ValidatorKey;
@@ -38,7 +38,7 @@ pub enum Error<K = ValidatorKey, V: AsRef<[u8]> = BlockHash> {
 /// so that we can ask for proposals that are not going to be voted
 /// down.
 #[derive(Clone)]
-pub struct VoteTally<K = ValidatorKey, V = BlockHash> {
+pub struct VoteTally<K = ValidatorKey, V = BlockHash, O = Object> {
     /// Current validator weights. These are the ones who will vote on the blocks,
     /// so these are the weights which need to form a quorum.
     power_table: TVar<im::HashMap<K, Weight>>,
@@ -63,12 +63,26 @@ pub struct VoteTally<K = ValidatorKey, V = BlockHash> {
     /// Adding votes can be paused if we observe that looking for a quorum takes too long
     /// and is often retried due to votes being added.
     pause_votes: TVar<bool>,
+
+    /// The *finalized collection* of objects as observed by this node.
+    ///
+    /// The record of this collection will have been included on chain, but we'll need to
+    /// figure out pruning and how to make this resilient to node restarts.
+    objects: TVar<im::HashMap<O, bool>>,
+
+    /// Index votes received by object.
+    object_votes: TVar<im::HashMap<O, im::HashSet<K>>>,
+
+    /// Adding votes can be paused if we observe that looking for a quorum takes too long
+    /// and is often retried due to votes being added.
+    pause_object_votes: TVar<bool>,
 }
 
-impl<K, V> VoteTally<K, V>
+impl<K, V, O> VoteTally<K, V, O>
 where
     K: Clone + Hash + Eq + Sync + Send + 'static,
     V: AsRef<[u8]> + Clone + Hash + Eq + Sync + Send + 'static,
+    O: AsRef<[u8]> + Clone + Hash + Eq + Sync + Send + 'static,
 {
     /// Create an uninitialized instance. Before blocks can be added to it
     /// we will have to set the last finalized block.
@@ -81,6 +95,9 @@ where
             chain: TVar::default(),
             votes: TVar::default(),
             pause_votes: TVar::new(false),
+            objects: TVar::default(),
+            object_votes: TVar::default(),
+            pause_object_votes: TVar::new(false),
         }
     }
 
@@ -93,6 +110,9 @@ where
             chain: TVar::new(im::OrdMap::from_iter([(height, Some(hash))])),
             votes: TVar::default(),
             pause_votes: TVar::new(false),
+            objects: TVar::default(),
+            object_votes: TVar::default(),
+            pause_object_votes: TVar::new(false),
         }
     }
 
@@ -284,6 +304,90 @@ where
         })?;
 
         self.votes.update(|votes| votes.split(&block_height).1)?;
+
+        Ok(())
+    }
+
+    /// Add a vote for an object we received.
+    ///
+    /// Returns `true` if this vote was added, `false` if it was ignored as a
+    /// duplicate or was already finalized, and an error if it's an
+    /// equivocation or from a validator we don't know.
+    pub fn add_object_vote(&self, validator_key: K, object: O) -> StmResult<bool, Error<K, O>> {
+        if *self.pause_object_votes.read()? {
+            retry()?;
+        }
+
+        if self.is_object_finalized(&object)? {
+            return Ok(false);
+        }
+
+        if !self.has_power(&validator_key)? {
+            return abort(Error::UnpoweredValidator(validator_key));
+        }
+
+        let mut votes = self.object_votes.read_clone()?;
+        let votes_for_object = votes.entry(object).or_default();
+
+        if votes_for_object.insert(validator_key).is_some() {
+            return Ok(false);
+        }
+
+        self.object_votes.write(votes)?;
+
+        Ok(true)
+    }
+
+    /// Pause adding more votes until we are finished calling `find_quorum` which
+    /// automatically re-enables them.
+    pub fn pause_object_votes_until_find_quorum(&self) -> Stm<()> {
+        self.pause_object_votes.write(true)
+    }
+
+    /// Determine if a quorum exists on an object (from our perspective) from gathered enough
+    /// votes from validators.
+    pub fn find_object_quorum(&self, object: &O) -> Stm<bool> {
+        self.pause_object_votes.write(false)?;
+
+        let quorum_threshold = self.quorum_threshold()?;
+
+        let votes = self.object_votes.read()?;
+        let power_table = self.power_table.read()?;
+
+        let mut weight = 0;
+        let mut voters = im::HashSet::new();
+
+        let Some(votes_for_object) = votes.get(object) else {
+            return Ok(false);
+        };
+
+        for vk in votes_for_object {
+            if voters.insert(vk.clone()).is_none() {
+                // New voter, get their current weight; it might be 0 if they have been removed.
+                weight += power_table.get(vk).cloned().unwrap_or_default();
+            }
+        }
+
+        Ok(weight >= quorum_threshold)
+    }
+
+    /// Determine whether an object is finalized. Finalized means that a quorum was reached and
+    /// "finalized" on chain.
+    pub fn is_object_finalized(&self, object: &O) -> Stm<bool> {
+        Ok(self.objects.read()?.contains_key(object))
+    }
+
+    /// Sets an object as having been finalized by voting.
+    pub fn finalize_object(&self, object: O) -> Stm<()> {
+        self.objects.update(|mut objects| {
+            objects.insert(object.clone(), true);
+            objects
+        })?;
+
+        self.object_votes.update(|mut votes| {
+            votes.remove(&object);
+            votes
+        })?;
 
         Ok(())
     }

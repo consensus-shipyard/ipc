@@ -96,6 +96,7 @@ touch ${TEST_DATA_DIR}/.env
 script = """
 mkdir -p ${TEST_DATA_DIR}/${NODE_NAME}/fendermint/data/logs;
 mkdir -p ${TEST_DATA_DIR}/${NODE_NAME}/cometbft;
+mkdir -p ${TEST_DATA_DIR}/${NODE_NAME}/ipfs;
 """
 
 [tasks.test-node-dir-rm]

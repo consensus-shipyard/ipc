@@ -13,6 +13,7 @@ pub mod voting;
 
 use async_stm::Stm;
 use async_trait::async_trait;
+use cid::Cid;
 use ethers::utils::hex;
 use fvm_shared::clock::ChainEpoch;
 use ipc_api::cross::IpcEnvelope;
@@ -29,6 +30,7 @@ pub use crate::toggle::Toggle;
 pub type BlockHeight = u64;
 pub type Bytes = Vec<u8>;
 pub type BlockHash = Bytes;
+pub type Object = Bytes;
 
 /// The null round error message
 pub(crate) const NULL_ROUND_ERR_MSG: &str = "requested epoch was a null round";
@@ -126,6 +128,25 @@ impl Display for IPCParentFinality {
             self.height,
             hex::encode(&self.block_hash)
         )
+    }
+}
+
+/// The finality view for an IPC object at certain height.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct IPCObjectFinality {
+    /// The Cid of the object
+    pub object: Cid,
+}
+
+impl IPCObjectFinality {
+    pub fn new(value: Cid) -> Self {
+        Self { object: value }
+    }
+}
+
+impl Display for IPCObjectFinality {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "IPCObjectFinality(value: {})", self.object)
     }
 }
 

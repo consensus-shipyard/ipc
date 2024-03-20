@@ -14,5 +14,5 @@ fvm_shared = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }
 num-traits = { workspace = true }
 tokio = { workspace = true }
-log = { workspace = true }
+tracing = { workspace = true }
 ipfs-api-backend-hyper = { version = "0.6.0", features = ["with-send-sync"] }

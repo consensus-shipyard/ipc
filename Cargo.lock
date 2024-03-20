@@ -2841,7 +2841,6 @@ dependencies = [
  "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
  "fvm_shared",
- "multihash 0.18.1",
  "num-derive 0.3.3",
  "num-traits",
  "serde",
@@ -3417,9 +3416,11 @@ version = "0.1.0"
 dependencies = [
  "async-stm",
  "cid",
+ "fendermint_vm_topdown",
  "im",
  "ipc-api",
  "ipc_ipld_resolver",
+ "libp2p",
  "serde",
  "tokio",
  "tracing",
@@ -5255,7 +5256,6 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -6873,9 +6873,9 @@ dependencies = [
  "fvm_ipld_blockstore",
  "fvm_shared",
  "ipfs-api-backend-hyper",
- "log",
  "num-traits",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
