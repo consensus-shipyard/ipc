@@ -31,3 +31,6 @@
 [submodule "extras/linked-token/lib/openzeppelin-contracts"]
 	path = extras/linked-token/lib/openzeppelin-contracts
 	url = https://github.com/openzeppelin/openzeppelin-contracts
+[submodule "extras/linked-token/lib/erc20-diamond-facet"]
+	path = extras/linked-token/lib/erc20-diamond-facet
+	url = https://github.com/danfinlay/erc20-diamond-facet
