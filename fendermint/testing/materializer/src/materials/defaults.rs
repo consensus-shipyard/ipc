@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use std::{
-    fmt::Debug,
+    fmt::{Debug, Display},
     path::{Path, PathBuf},
 };
 
@@ -15,12 +15,18 @@ use fvm_shared::address::Address;
 use ipc_api::subnet_id::SubnetID;
 
 use super::export;
-use crate::{AccountName, SubnetName};
+use crate::{AccountId, AccountName, SubnetName};
 
 pub struct DefaultDeployment {
     pub name: SubnetName,
     pub gateway: EthAddress,
     pub registry: EthAddress,
+}
+
+impl Display for DefaultDeployment {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.name, f)
+    }
 }
 
 impl DefaultDeployment {
@@ -42,10 +48,22 @@ pub struct DefaultGenesis {
     pub path: PathBuf,
 }
 
+impl Display for DefaultGenesis {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.name, f)
+    }
+}
+
 pub struct DefaultSubnet {
     pub name: SubnetName,
     /// ID allocated to the subnet during creation.
     pub subnet_id: SubnetID,
+}
+
+impl Display for DefaultSubnet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.name, f)
+    }
 }
 
 #[derive(PartialEq, Eq)]
@@ -78,7 +96,17 @@ impl Debug for DefaultAccount {
     }
 }
 
+impl Display for DefaultAccount {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.name, f)
+    }
+}
+
 impl DefaultAccount {
+    pub fn account_id(&self) -> AccountId {
+        self.name.0.id()
+    }
+
     pub fn eth_addr(&self) -> EthAddress {
         EthAddress::from(self.public_key)
     }

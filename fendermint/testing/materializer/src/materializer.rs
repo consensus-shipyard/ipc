@@ -1,16 +1,18 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use async_trait::async_trait;
+use either::Either;
 use ethers::types::H160;
-use fvm_shared::econ::TokenAmount;
+use fvm_shared::{chainid::ChainID, econ::TokenAmount};
 use std::collections::BTreeMap;
-use tendermint_rpc::Url;
+use url::Url;
 
 use fendermint_vm_genesis::Collateral;
 
 use crate::{
-    manifest::Balance, materials::Materials, AccountName, NodeName, RelayerName, ResourceHash,
-    SubnetName, TestnetName,
+    manifest::{Balance, CheckpointConfig, EnvMap},
+    materials::Materials,
+    AccountName, NodeName, RelayerName, ResourceHash, SubnetName, TestnetName,
 };
 
 /// The materializer is a component to provision resources of a testnet, and
@@ -101,6 +103,13 @@ pub trait Materializer<M: Materials> {
         balances: BTreeMap<&'a M::Account, Balance>,
     ) -> anyhow::Result<M::Genesis>;
 
+    /// Create a subnet to represent the root.
+    fn create_root_subnet(
+        &mut self,
+        subnet_name: &SubnetName,
+        params: Either<ChainID, &M::Genesis>,
+    ) -> anyhow::Result<M::Subnet>;
+
     /// Construct the configuration for a node.
     ///
     /// This should create keys, configurations, but hold on from starting so that we can
@@ -111,7 +120,7 @@ pub trait Materializer<M: Materials> {
     async fn create_node<'s, 'a>(
         &'s mut self,
         node_name: &NodeName,
-        node_config: NodeConfig<'a, M>,
+        node_config: &NodeConfig<'a, M>,
     ) -> anyhow::Result<M::Node>
     where
         's: 'a;
@@ -137,7 +146,7 @@ pub trait Materializer<M: Materials> {
         &'s mut self,
         parent_submit_config: &SubmitConfig<'a, M>,
         subnet_name: &SubnetName,
-        subnet_config: SubnetConfig<'a, M>,
+        subnet_config: &SubnetConfig<'a, M>,
     ) -> anyhow::Result<M::Subnet>
     where
         's: 'a;
@@ -185,15 +194,11 @@ pub trait Materializer<M: Materials> {
         's: 'a;
 
     /// Create and start a relayer.
-    ///
-    /// It should follow the given node. If the submit node is empty, it should submit to an external rootnet.
     async fn create_relayer<'s, 'a>(
         &'s mut self,
         parent_submit_config: &SubmitConfig<'a, M>,
         relayer_name: &RelayerName,
-        subnet: &'a M::Subnet,
-        submitter: &'a M::Account,
-        follow_node: &'a M::Node,
+        relayer_config: RelayerConfig<'a, M>,
     ) -> anyhow::Result<M::Relayer>
     where
         's: 'a;
@@ -213,6 +218,20 @@ pub struct NodeConfig<'a, M: Materials> {
     pub parent_node: Option<ParentConfig<'a, M>>,
     /// Run the Ethereum API facade or not.
     pub ethapi: bool,
+    /// Arbitrary env vars, e.g. to regulate block production rates.
+    pub env: &'a EnvMap,
+    /// Number of nodes to be expected in the subnet, including this node, or 0 if unknown.
+    pub peer_count: usize,
+}
+
+/// Options regarding relayer configuration
+pub struct RelayerConfig<'a, M: Materials> {
+    /// Where to send queries on the child subnet.
+    pub follow_config: &'a SubmitConfig<'a, M>,
+    /// The account to use to submit transactions on the parent subnet.
+    pub submitter: &'a M::Account,
+    /// Arbitrary env vars, e.g. to set the logging level.
+    pub env: &'a EnvMap,
 }
 
 /// Options regarding subnet configuration, e.g. how many validators are required.
@@ -223,12 +242,15 @@ pub struct SubnetConfig<'a, M: Materials> {
     pub creator: &'a M::Account,
     /// Number of validators required for bootstrapping a subnet.
     pub min_validators: usize,
+    pub bottom_up_checkpoint: &'a CheckpointConfig,
 }
 
 /// Options for how to submit IPC transactions to a subnet.
 pub struct SubmitConfig<'a, M: Materials> {
-    /// The nodes to which we can send transactions or queries.
+    /// The nodes to which we can send transactions or queries, ie. any of the parent nodes.
     pub nodes: Vec<TargetConfig<'a, M>>,
+    /// The identity of the subnet to which we submit the transaction, ie. the parent subnet.
+    pub subnet: &'a M::Subnet,
     /// The location of the IPC contracts on the (generally parent) subnet.
     pub deployment: &'a M::Deployment,
 }
@@ -245,4 +267,21 @@ pub struct ParentConfig<'a, M: Materials> {
 pub enum TargetConfig<'a, M: Materials> {
     External(Url),
     Internal(&'a M::Node),
+}
+
+impl<'a, M: Materials> SubmitConfig<'a, M> {
+    /// Map over the internal and external target configurations to find a first non-empty result.
+    pub fn find_node<F, G, T>(&self, f: F, g: G) -> Option<T>
+    where
+        F: Fn(&M::Node) -> Option<T>,
+        G: Fn(&Url) -> Option<T>,
+    {
+        self.nodes
+            .iter()
+            .filter_map(|tc| match tc {
+                TargetConfig::Internal(n) => f(n),
+                TargetConfig::External(u) => g(u),
+            })
+            .next()
+    }
 }

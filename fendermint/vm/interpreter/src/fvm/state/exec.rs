@@ -71,6 +71,11 @@ pub struct FvmStateParams {
 /// TODO: `base_fee` should surely be here.
 #[derive(Debug)]
 pub struct FvmUpdatableParams {
+    /// The application protocol version, which changes during upgrades.
+    pub app_version: u64,
+    /// The base fee has currently no automatic rules of being updated,
+    /// but it's exposed to upgrades.
+    pub base_fee: TokenAmount,
     /// The circulating supply changes if IPC is enabled and
     /// funds/releases are carried out with the parent.
     pub circ_supply: TokenAmount,
@@ -78,8 +83,6 @@ pub struct FvmUpdatableParams {
     /// Doesn't change at the moment but in theory it could,
     /// and it doesn't have a place within the FVM.
     pub power_scale: PowerScale,
-    /// The application protocol version.
-    pub app_version: u64,
 }
 
 pub type MachineBlockstore<DB> = <DefaultMachine<DB, FendermintExterns<DB>> as Machine>::Blockstore;
@@ -128,7 +131,7 @@ where
         // * circ_supply; by default it's for Filecoin
         // * base_fee; by default it's zero
         let mut mc = nc.for_epoch(block_height, params.timestamp.0, params.state_root);
-        mc.set_base_fee(params.base_fee);
+        mc.set_base_fee(params.base_fee.clone());
         mc.set_circulating_supply(params.circ_supply.clone());
 
         // Creating a new machine every time is prohibitively slow.
@@ -144,9 +147,10 @@ where
             executor,
             block_hash: None,
             params: FvmUpdatableParams {
+                app_version: params.app_version,
+                base_fee: params.base_fee,
                 circ_supply: params.circ_supply,
                 power_scale: params.power_scale,
-                app_version: params.app_version,
             },
             params_dirty: false,
         })
@@ -257,19 +261,28 @@ where
         Ok(emitters)
     }
 
+    /// Update the application version.
+    pub fn update_app_version<F>(&mut self, f: F)
+    where
+        F: FnOnce(&mut u64),
+    {
+        self.update_params(|p| f(&mut p.app_version))
+    }
+
+    /// Update the application version.
+    pub fn update_base_fee<F>(&mut self, f: F)
+    where
+        F: FnOnce(&mut TokenAmount),
+    {
+        self.update_params(|p| f(&mut p.base_fee))
+    }
+
     /// Update the circulating supply, effective from the next block.
     pub fn update_circ_supply<F>(&mut self, f: F)
     where
         F: FnOnce(&mut TokenAmount),
     {
         self.update_params(|p| f(&mut p.circ_supply))
-    }
-
-    pub fn update_app_version<F>(&mut self, f: F)
-    where
-        F: FnOnce(&mut u64),
-    {
-        self.update_params(|p| f(&mut p.app_version))
     }
 
     /// Update the parameters and mark them as dirty.
