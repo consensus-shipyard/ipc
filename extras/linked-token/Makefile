@@ -115,4 +115,4 @@ upgrade-replica-proxy:
 	@echo "Upgrading token replica proxy contract on IPC... Please run make deploy-replica-implementation to deploy a new implementation and upgrade config.json before running this command."
 	@LinkedTokenReplicaImplementation=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenReplicaImplementation'); \
 	LinkedTokenReplicaProxy=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenReplica'); \
-	forge script script/DeployIpcTokenReplica.s.sol:DeployIpcTokenReplica --skip-simulation --rpc-url $$CALIBNET_RPC_URL --private-key $$CALIBNET_PRIVATE_KEY --broadcast -vvvv --ffi --sig "upgradeIpcTokenReplica(address,addrese)" -- $$LinkedTokenReplicaProxy $$LinkedTokenReplicaImplementation
+	forge script script/DeployIpcTokenReplica.s.sol:DeployIpcTokenReplica --skip-simulation --rpc-url $$CALIBNET_RPC_URL --private-key $$CALIBNET_PRIVATE_KEY --broadcast -vvvv --ffi --sig "upgradeIpcTokenReplica(address,address)" -- $$LinkedTokenReplicaProxy $$LinkedTokenReplicaImplementation
