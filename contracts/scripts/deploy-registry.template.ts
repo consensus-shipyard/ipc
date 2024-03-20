@@ -31,6 +31,8 @@ export async function deploy() {
     const gatewayAddress = GATEWAY.Gateway
     const txArgs = await getTransactionFees()
 
+    const subnetActorDeployFacets = []
+
     // deploy
     const getterFacet = await deployContractWithDeployer(
         deployer,
@@ -42,6 +44,14 @@ export async function deploy() {
     )
     const getterSelectors = getSelectors(getterFacet)
 
+    subnetActorDeployFacets.push({
+        name: 'SubnetActorGetterFacet',
+        libs: {
+            SubnetIDHelper: LIBMAP['SubnetIDHelper'],
+        },
+        address: getterFacet.address,
+    })
+
     const managerFacet = await deployContractWithDeployer(
         deployer,
         'SubnetActorManagerFacet',
@@ -49,6 +59,12 @@ export async function deploy() {
         txArgs,
     )
     const managerSelectors = getSelectors(managerFacet)
+
+    subnetActorDeployFacets.push({
+        name: 'SubnetActorManagerFacet',
+        libs: {},
+        address: managerFacet.address,
+    })
 
     const pauserFacet = await deployContractWithDeployer(
         deployer,
@@ -58,6 +74,12 @@ export async function deploy() {
     )
     const pauserSelectors = getSelectors(pauserFacet)
 
+    subnetActorDeployFacets.push({
+        name: 'SubnetActorPauseFacet',
+        libs: {},
+        address: pauserFacet.address,
+    })
+
     const rewarderFacet = await deployContractWithDeployer(
         deployer,
         'SubnetActorRewardFacet',
@@ -65,6 +87,11 @@ export async function deploy() {
         txArgs,
     )
     const rewarderSelectors = getSelectors(rewarderFacet)
+    subnetActorDeployFacets.push({
+        name: 'SubnetActorRewardFacet',
+        libs: {},
+        address: rewarderFacet.address,
+    })
 
     const checkpointerFacet = await deployContractWithDeployer(
         deployer,
@@ -73,6 +100,50 @@ export async function deploy() {
         txArgs,
     )
     const checkpointerSelectors = getSelectors(checkpointerFacet)
+    subnetActorDeployFacets.push({
+        name: 'SubnetActorCheckpointingFacet',
+        libs: {},
+        address: checkpointerFacet.address,
+    })
+
+    const diamondCutFacet = await deployContractWithDeployer(
+        deployer,
+        'DiamondCutFacet',
+        {},
+        txArgs,
+    )
+    const diamondCutSelectors = getSelectors(diamondCutFacet)
+    subnetActorDeployFacets.push({
+        name: 'DiamondCutFacet',
+        libs: {},
+        address: diamondCutFacet.address,
+    })
+
+    const diamondLoupeFacet = await deployContractWithDeployer(
+        deployer,
+        'DiamondLoupeFacet',
+        {},
+        txArgs,
+    )
+    const diamondLoupeSelectors = getSelectors(diamondLoupeFacet)
+    subnetActorDeployFacets.push({
+        name: 'DiamondLoupeFacet',
+        libs: {},
+        address: diamondLoupeFacet.address,
+    })
+
+    const ownershipFacet = await deployContractWithDeployer(
+        deployer,
+        'OwnershipFacet',
+        {},
+        txArgs,
+    )
+    const ownershipSelectors = getSelectors(ownershipFacet)
+    subnetActorDeployFacets.push({
+        name: 'OwnershipFacet',
+        libs: {},
+        address: ownershipFacet.address,
+    })
 
     //deploy subnet registry diamond
     const registry = await ethers.getContractFactory('SubnetRegistryDiamond', {
@@ -86,11 +157,17 @@ export async function deploy() {
         rewarderFacet: rewarderFacet.address,
         checkpointerFacet: checkpointerFacet.address,
         pauserFacet: pauserFacet.address,
+        diamondCutFacet: diamondCutFacet.address,
+        diamondLoupeFacet: diamondLoupeFacet.address,
+        ownershipFacet: ownershipFacet.address,
         subnetActorGetterSelectors: getterSelectors,
         subnetActorManagerSelectors: managerSelectors,
         subnetActorRewarderSelectors: rewarderSelectors,
         subnetActorCheckpointerSelectors: checkpointerSelectors,
         subnetActorPauserSelectors: pauserSelectors,
+        subnetActorDiamondCutSelectors: diamondCutSelectors,
+        subnetActorDiamondLoupeSelectors: diamondLoupeSelectors,
+        subnetActorOwnershipSelectors: ownershipSelectors,
         creationPrivileges: Number(mode),
     }
 
@@ -143,5 +220,6 @@ export async function deploy() {
     return {
         SubnetRegistry: subnetRegistryAddress,
         Facets: facets,
+        SubnetActorFacets: subnetActorDeployFacets,
     }
 }

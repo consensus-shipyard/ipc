@@ -81,25 +81,36 @@ async function saveSubnetRegistry(
     fs.writeFileSync(subnetRegistryJsonPath, JSON.stringify(subnetRegistryJson))
 }
 
-async function saveSubnetActor(
-    env: string,
-    subnetRegistryData: { [key in string]: string },
-) {
-    const subnetRegistryJsonPath = `${process.cwd()}/subnet.actor.json`
-
-    let subnetRegistryJson = { [env]: {} }
-    if (fs.existsSync(subnetRegistryJsonPath)) {
-        subnetRegistryJson = JSON.parse(
-            fs.readFileSync(subnetRegistryJsonPath).toString(),
+async function readSubnetActor(subnetActorAddress, network) {
+    const subnetActorJsonPath = `${process.cwd()}/subnet.actor-${subnetActorAddress}.json`
+    if (fs.existsSync(subnetActorJsonPath)) {
+        const subnetActor = JSON.parse(
+            fs.readFileSync(subnetActorJsonPath).toString(),
         )
+        return subnetActor
     }
-
-    subnetRegistryJson[env] = {
-        ...subnetRegistryJson[env],
-        ...subnetRegistryData,
+    const subnetRegistry = await getSubnetRegistry(network)
+    const deployments = {
+        SubnetActorDiamond: subnetActorAddress,
+        Facets: subnetRegistry.SubnetActorFacets,
     }
+    return deployments
+}
 
-    fs.writeFileSync(subnetRegistryJsonPath, JSON.stringify(subnetRegistryJson))
+async function saveSubnetActor(
+    deployments,
+    updatedFacets: { [key in string]: string },
+) {
+    const subnetActorJsonPath = `${process.cwd()}/subnet.actor-${
+        deployments.SubnetActorDiamond
+    }.json`
+    for (const facetIndex in deployments.Facets) {
+        const facetName = deployments.Facets[facetIndex].name
+        if (updatedFacets[facetName]) {
+            deployments.Facets[facetIndex].address = updatedFacets[facetName]
+        }
+    }
+    fs.writeFileSync(subnetActorJsonPath, JSON.stringify(deployments))
 }
 
 async function getSubnetRegistry(
@@ -203,25 +214,6 @@ task(
 )
 
 task(
-    'deploy-sa-diamond-and-facets',
-    'Builds and deploys Subnet Actor diamond and its facets',
-    async (args, hre: HardhatRuntimeEnvironment) => {
-        await hre.run('compile')
-
-        const network = hre.network.name
-        const deployments = await getDeployments(network)
-        const { deployDiamond } = await lazyImport(
-            './scripts/deploy-sa-diamond',
-        )
-        const subnetActorDiamond = await deployDiamond(
-            deployments.Gateway,
-            deployments.libs,
-        )
-        await saveSubnetActor(network, subnetActorDiamond)
-    },
-)
-
-task(
     'deploy',
     'Builds and deploys all contracts on the selected network',
     async (args, hre: HardhatRuntimeEnvironment) => {
@@ -291,14 +283,22 @@ task(
     async (args, hre: HardhatRuntimeEnvironment) => {
         await hre.run('compile')
         const network = hre.network.name
-        const deployments = await getSubnetActor(network)
+        if (!args.address) {
+            console.error(
+                'No address provided. Usage: npx hardhat upgrade-sa-diamond --address 0x80afa...',
+            )
+            process.exit(1)
+        }
+
+        const deployments = await readSubnetActor(args.address, network)
+
         const { upgradeDiamond } = await lazyImport(
             './scripts/upgrade-sa-diamond',
         )
         const updatedFacets = await upgradeDiamond(deployments)
-        await saveDeploymentsFacets('subnet.actor.json', network, updatedFacets)
+        await saveSubnetActor(deployments, updatedFacets)
     },
-)
+).addParam('address', 'The address to upgrade', undefined, types.string, false)
 
 /** @type import('hardhat/config').HardhatUserConfig */
 const config: HardhatUserConfig = {
