@@ -352,6 +352,7 @@ where
                     subnet_rewarder_selectors: rewarder_facet.function_selectors,
                     subnet_checkpointer_selectors: checkpointer_facet.function_selectors,
                     subnet_pauser_selectors: pauser_facet.function_selectors,
+                    creation_privileges: 0,
                 };
 
                 deployer.deploy_contract(

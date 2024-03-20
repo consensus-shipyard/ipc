@@ -2811,6 +2811,7 @@ dependencies = [
  "fil_actor_eam",
  "fil_actors_evm_shared",
  "fil_actors_runtime",
+ "frc42_dispatch",
  "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
  "fvm_shared",

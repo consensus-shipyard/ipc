@@ -23,7 +23,7 @@ pub enum PermissionModeParams {
 
 /// The permission mode for controlling who can deploy contracts
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-enum PermissionMode {
+pub enum PermissionMode {
     /// No restriction, everyone can deploy
     Unrestricted,
     /// Only whitelisted addresses can deploy
@@ -32,7 +32,7 @@ enum PermissionMode {
 
 #[derive(Serialize_tuple, Deserialize_tuple, Debug, Clone)]
 pub struct State {
-    permission_mode: PermissionMode,
+    pub permission_mode: PermissionMode,
 }
 
 impl State {

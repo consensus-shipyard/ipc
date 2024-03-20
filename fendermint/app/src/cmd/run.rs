@@ -251,6 +251,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             state_hist_size: settings.db.state_hist_size,
             builtin_actors_bundle: settings.builtin_actors_bundle(),
             custom_actors_bundle: settings.custom_actors_bundle(),
+            halt_height: settings.halt_height,
         },
         db,
         state_store,

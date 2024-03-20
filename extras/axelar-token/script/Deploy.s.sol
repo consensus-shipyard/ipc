@@ -17,7 +17,8 @@ contract Deploy is Script {
         vm.startBroadcast(privateKey);
         IpcTokenHandler handler = new IpcTokenHandler({
             axelarIts: vm.envAddress(string.concat(network, "__AXELAR_ITS_ADDRESS")),
-            ipcGateway: vm.envAddress(string.concat(network, "__IPC_GATEWAY_ADDRESS"))
+            ipcGateway: vm.envAddress(string.concat(network, "__IPC_GATEWAY_ADDRESS")),
+            admin: vm.envAddress(string.concat(network, "__HANDLER_ADMIN_ADDRESS"))
         });
         vm.stopBroadcast();
 
