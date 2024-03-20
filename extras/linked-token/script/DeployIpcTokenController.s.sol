@@ -18,7 +18,22 @@ import "./SelectorLibrary.sol";
 
 
 contract DeployIpcTokenController is ConfigManager {
-    function run(address gateway, address tokenContractAddress, uint64 _rootNetChainId, address[] memory _route) external {
+    function deployFacets() external {
+        vm.startBroadcast();
+
+        // Deploy facets
+        DiamondCutFacet cutFacet = new DiamondCutFacet();
+        DiamondLoupeFacet loupeFacet = new DiamondLoupeFacet();
+        OwnershipFacet ownershipFacet = new OwnershipFacet();
+        LinkedTokenControllerFacet linkedTokenControllerFacet = new LinkedTokenControllerFacet();
+
+        writeConfig("LinkedTokenController.DiamondCutFacet", vm.toString(address(cutFacet)));
+        writeConfig("LinkedTokenController.DiamondLoupeFacet", vm.toString(address(loupeFacet)));
+        writeConfig("LinkedTokenController.OwnershipFacet", vm.toString(address(ownershipFacet)));
+        writeConfig("LinkedTokenController.LinkedTokenControllerFacet", vm.toString(address(linkedTokenControllerFacet)));
+
+    }
+    function deployDiamond(address gateway, address tokenContractAddress, uint64 _rootNetChainId, address[] memory _route, address cutFacet, address loupeFacet, address ownershipFacet, address linkedTokenControllerFacet ) external {
 
         vm.startBroadcast();
 
@@ -28,30 +43,24 @@ contract DeployIpcTokenController is ConfigManager {
         params.underlyingToken=tokenContractAddress;
         params.linkedSubnet = destinationSubnet;
 
-
-        // Deploy facets
-        DiamondCutFacet cutFacet = new DiamondCutFacet();
-        DiamondLoupeFacet loupeFacet = new DiamondLoupeFacet();
-        OwnershipFacet ownershipFacet = new OwnershipFacet();
-        LinkedTokenControllerFacet linkedTokenControllerFacet = new LinkedTokenControllerFacet();
-
         // Prepare diamond cut with all facets
         IDiamond.FacetCut[] memory cuts = new IDiamond.FacetCut[](4);
 
-        cuts[0] = createCut(address(cutFacet), SelectorLibrary.resolveSelectors("DiamondCutFacet"));
-        cuts[1] = createCut(address(loupeFacet), SelectorLibrary.resolveSelectors("DiamondLoupeFacet"));
-        cuts[2] = createCut(address(ownershipFacet), SelectorLibrary.resolveSelectors("OwnershipFacet"));
-        cuts[3] = createCut(address(linkedTokenControllerFacet), SelectorLibrary.resolveSelectors("LinkedTokenControllerFacet"));
+        cuts[0] = createCut(cutFacet, SelectorLibrary.resolveSelectors("DiamondCutFacet"));
+        cuts[1] = createCut(loupeFacet, SelectorLibrary.resolveSelectors("DiamondLoupeFacet"));
+        cuts[2] = createCut(ownershipFacet, SelectorLibrary.resolveSelectors("OwnershipFacet"));
+        cuts[3] = createCut(linkedTokenControllerFacet, SelectorLibrary.resolveSelectors("LinkedTokenControllerFacet"));
         //
         // Deploy the diamond with all facet cuts
 
         LinkedTokenDiamond diamond = new LinkedTokenDiamond(cuts, params);
 
-        writeConfig("LinkedTokenController", vm.toString(address(diamond)));
+        writeConfig("LinkedTokenController.LinkedTokenController", vm.toString(address(diamond)));
 
         vm.stopBroadcast();
     }
-        function createCut(address _facet, bytes4[] memory _selectors) internal pure returns (IDiamond.FacetCut memory cut) {
+
+    function createCut(address _facet, bytes4[] memory _selectors) internal pure returns (IDiamond.FacetCut memory cut) {
         return IDiamond.FacetCut({
             facetAddress: _facet,
             action: IDiamond.FacetCutAction.Add,

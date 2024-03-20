@@ -49,10 +49,19 @@ deploy-replica:
 	@USDCTEST_ADDR=$$(cat config.json | jq -r '.LinkedToken.USDCTest'); \
 	forge script script/DeployIpcTokenReplica.s.sol:DeployIpcTokenReplica --skip-simulation --rpc-url $$SUBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "run(address,address,uint64,address[])" -- $$SUBNET_GATEWAY $$USDCTEST_ADDR $$CALIBNET_CHAIN_ID '[]'
 
-deploy-controller:
+deploy-controller-facets:
+	@echo "Deploying Token Controller Facets"
+	forge script script/DeployIpcTokenController.s.sol:DeployIpcTokenController --skip-simulation --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "deployFacets()"
+
+deploy-controller-diamond:
 	@echo "Deploying token controller contract on Calibnet..."
 	@USDCTEST_ADDR=$$(cat config.json | jq -r '.LinkedToken.USDCTest'); \
-	forge script script/DeployIpcTokenController.s.sol:DeployIpcTokenController --skip-simulation --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "run(address,address,uint64,address[])" -- $$CALIBNET_GATEWAY $$USDCTEST_ADDR $$CALIBNET_CHAIN_ID "[$$SUBNET_ROUTE_IN_ETH_FORMAT]"
+	DiamondCutFacet_ADDR=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenController.DiamondCutFacet'); \
+	DiamondLoupeFacet_ADDR=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenController.DiamondLoupeFacet'); \
+	DiamondLoupeFacet_ADDR=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenController.DiamondLoupeFacet'); \
+	OwnershipFacet_ADDR=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenController.OwnershipFacet'); \
+	LinkedTokenControllerFacet_ADDR=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenController.LinkedTokenControllerFacet'); \
+	forge script script/DeployIpcTokenController.s.sol:DeployIpcTokenController --skip-simulation --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --broadcast -vvvv --ffi --sig "deployDiamond(address,address,uint64,address[],address,address,address,address)" -- $$CALIBNET_GATEWAY $$USDCTEST_ADDR $$CALIBNET_CHAIN_ID "[$$SUBNET_ROUTE_IN_ETH_FORMAT]" $$DiamondCutFacet_ADDR $$DiamondLoupeFacet_ADDR $$OwnershipFacet_ADDR $$LinkedTokenControllerFacet_ADDR
 
 initialize-replica:
 	@echo "Updating replica with controller's address..."
