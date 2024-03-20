@@ -449,6 +449,7 @@ pub mod registry {
         pub subnet_rewarder_selectors: Vec<FunctionSelector>,
         pub subnet_pauser_selectors: Vec<FunctionSelector>,
         pub subnet_checkpointer_selectors: Vec<FunctionSelector>,
+        pub creation_privileges: u8, // 0 = Unrestricted, 1 = Owner.
     }
 }
 

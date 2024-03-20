@@ -18,7 +18,7 @@ import {SubnetActorPauseFacet} from "../../src/subnet/SubnetActorPauseFacet.sol"
 import {SubnetActorCheckpointingFacet} from "../../src/subnet/SubnetActorCheckpointingFacet.sol";
 import {SubnetActorRewardFacet} from "../../src/subnet/SubnetActorRewardFacet.sol";
 import {SubnetActorDiamond} from "../../src/SubnetActorDiamond.sol";
-import {SubnetID, PermissionMode} from "../../src/structs/Subnet.sol";
+import {SubnetID, PermissionMode, SubnetCreationPrivileges} from "../../src/structs/Subnet.sol";
 import {SubnetRegistryDiamond} from "../../src/SubnetRegistryDiamond.sol";
 
 import {RegisterSubnetFacet} from "../../src/subnetregistry/RegisterSubnetFacet.sol";
@@ -37,7 +37,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
 
     bytes4[] empty;
 
-    function setUp() public virtual override {
+    function defaultParams() internal returns (SubnetRegistryDiamond.ConstructorParams memory params) {
         bytes4[] memory mockedSelectors = new bytes4[](1);
         mockedSelectors[0] = 0x6cb2ecee;
 
@@ -53,7 +53,6 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         bytes4[] memory mockedSelectors5 = new bytes4[](1);
         mockedSelectors5[0] = 0x233f74ea;
 
-        SubnetRegistryDiamond.ConstructorParams memory params;
         params.gateway = DEFAULT_IPC_GATEWAY_ADDR;
 
         params.getterFacet = address(new SubnetActorGetterFacet());
@@ -68,11 +67,33 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         params.subnetActorCheckpointerSelectors = mockedSelectors4;
         params.subnetActorPauserSelectors = mockedSelectors5;
 
+        params.creationPrivileges = SubnetCreationPrivileges.Unrestricted;
+
+        return params;
+    }
+
+    function setUp() public virtual override {
+        SubnetRegistryDiamond.ConstructorParams memory params = defaultParams();
+
         registryDiamond = createSubnetRegistry(params);
         registryLouper = registryDiamond.diamondLouper();
         registryCutter = registryDiamond.diamondCutter();
         registrySubnetFacet = registryDiamond.register();
         registrySubnetGetterFacet = registryDiamond.getter();
+    }
+
+    function test_Registry_NoPermission() public {
+        SubnetRegistryDiamond.ConstructorParams memory p = defaultParams();
+        p.creationPrivileges = SubnetCreationPrivileges.Owner;
+
+        SubnetRegistryDiamond s = createSubnetRegistry(p);
+
+        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(DEFAULT_IPC_GATEWAY_ADDR);
+        params.permissionMode = PermissionMode.Collateral;
+
+        vm.prank(address(1));
+        vm.expectRevert(LibDiamond.NotOwner.selector);
+        s.register().newSubnetActor(params);
     }
 
     function test_Registry_FacetFunctionSelectors() public view {
