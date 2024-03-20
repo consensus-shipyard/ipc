@@ -5,3 +5,4 @@ fevmate/=../../contracts/lib/fevmate/contracts/
 @ipc/=../../contracts/
 elliptic-curve-solidity/=../../contracts/lib/elliptic-curve-solidity/
 murky/=../../contracts/lib/murky/src
+erc20-diamond-facet/=./lib/erc20-diamond-facet/contracts/

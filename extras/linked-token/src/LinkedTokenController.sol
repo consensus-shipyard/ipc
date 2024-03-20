@@ -5,7 +5,7 @@ import {
     SafeERC20
 } from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
-import {LinkedToken} from "./LinkedToken.sol";
+import {LinkedTokenFacet} from "./LinkedTokenFacet.sol";
 import {SubnetID} from "@ipc/src/structs/Subnet.sol";
 
 contract LinkedTokenControllerFacet is LinkedTokenFacet {

@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
+import {SubnetID} from "@ipc/src/structs/Subnet.sol";
+import {IpcEnvelope} from "@ipc/src/structs/CrossNet.sol";
 
 struct LinkedTokenStorage {
-    IERC20 public _underlying;
-    address public _gatewayAddr;
-    SubnetID public _linkedSubnet;
+    IERC20 _underlying;
+    address _gatewayAddr;
+    SubnetID _linkedSubnet;
 
-    address public _linkedContract;
+    address _linkedContract;
 
-    mapping(bytes32 => UnconfirmedTransfer) public _unconfirmedTransfers;
-    mapping(bytes32 => IpcEnvelope) public inflightMsgs;
+    mapping(bytes32 => UnconfirmedTransfer) _unconfirmedTransfers;
+    mapping(bytes32 => IpcEnvelope) inflightMsgs;
 
 }
 

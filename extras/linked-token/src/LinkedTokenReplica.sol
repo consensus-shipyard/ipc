@@ -6,11 +6,11 @@ import {ERC20} from "openzeppelin-contracts/token/ERC20/ERC20.sol";
 import {
     SafeERC20
 } from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
-import {LinkedToken} from "./LinkedToken.sol";
+import {LinkedTokenFacet} from "./LinkedTokenFacet.sol";
 import {SubnetID} from "@ipc/src/structs/Subnet.sol";
 
 
-import {ERC20Facet} from "@PieVaults/facets/ERC20/ERC20Facet.sol";
+import {ERC20Facet} from "erc20-diamond-facet/facets/ERC20Facet.sol";
 
 /**
  * @title IpcTokenController

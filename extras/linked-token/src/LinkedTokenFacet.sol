@@ -5,20 +5,23 @@ import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol"
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {FvmAddressHelper} from "@ipc/src/lib/FvmAddressHelper.sol";
 import {FvmAddress} from "@ipc/src/structs/FvmAddress.sol";
-import {IpcExchange} from "@ipc/sdk/IpcContract.sol";
+import {IpcExchangeFacet} from "./IpcContractFacet.sol";
 import {IpcEnvelope, ResultMsg, CallMsg, OutcomeType, IpcMsgKind} from "@ipc/src/structs/CrossNet.sol";
 import {IPCAddress, SubnetID} from "@ipc/src/structs/Subnet.sol";
 import {CrossMsgHelper} from "@ipc/src/lib/CrossMsgHelper.sol";
 import {SubnetIDHelper} from "@ipc/src/lib/SubnetIDHelper.sol";
 
-import {UnconfirmedTransfer} from "lib/LibLinkedTokenStorage.sol";
+import {UnconfirmedTransfer } from "./lib/LibLinkedTokenStorage.sol";
+
+import {LibDiamond} from "@ipc/src/lib/LibDiamond.sol";
+
 
 error InvalidOriginContract();
 error InvalidOriginSubnet();
 
-string private constant ERR_ZERO_ADDRESS = "zero address is not allowed";
-string private constant ERR_VALUE_MUST_BE_ZERO = "value must be zero";
-string private constant ERR_AMOUNT_CANNOT_BE_ZERO = "amount cannot be zero";
+string constant ERR_ZERO_ADDRESS = "zero address is not allowed";
+string constant ERR_VALUE_MUST_BE_ZERO = "value must be zero";
+string constant ERR_AMOUNT_CANNOT_BE_ZERO = "amount cannot be zero";
 
 error InvalidEnvelope(string reason);
 error TransferRejected(string reason);
@@ -49,8 +52,6 @@ abstract contract LinkedTokenFacet is IpcExchangeFacet {
     using CrossMsgHelper for IpcEnvelope;
     using SubnetIDHelper for SubnetID;
     using FvmAddressHelper for FvmAddress;
-
-    LinkedTokenStorage internal s;
 
 
     function getLinkedSubnet() public view returns (SubnetID memory) {
@@ -122,9 +123,11 @@ abstract contract LinkedTokenFacet is IpcExchangeFacet {
     // Linked contract management.
     // ----------------------------
 
-    function initialize(address linkedContract) external onlyOwner {
+    function initialize(address linkedContract) external {
         // Note: for now, this allows changing the linked contract for upgradeability purposes.
         // Consider disallowing this if we anyway switch to something like https://docs.openzeppelin.com/upgrades.
+
+        LibDiamond.enforceIsContractOwner();
 
         s._linkedContract = linkedContract;
 
@@ -230,7 +233,8 @@ abstract contract LinkedTokenFacet is IpcExchangeFacet {
     }
 
     // Method for the contract owner to manually drop an entry from unconfirmedTransfers
-    function removeUnconfirmedTransfer(bytes32 id) external onlyOwner {
+    function removeUnconfirmedTransfer(bytes32 id) external {
+        LibDiamond.enforceIsContractOwner();
         _removeUnconfirmedTransfer(id, false);
     }
 

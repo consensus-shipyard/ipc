@@ -1,13 +1,17 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {IpcEnvelope, ResultMsg, CallMsg, IpcMsgKind} from "../src/structs/CrossNet.sol";
-import {IPCAddress} from "../src/structs/Subnet.sol";
-import {EMPTY_BYTES} from "../src/constants/Constants.sol";
-import {IGateway} from "../src/interfaces/IGateway.sol";
+import {IpcEnvelope, ResultMsg, CallMsg, IpcMsgKind} from "@ipc/src/structs/CrossNet.sol";
+import {IPCAddress} from "@ipc/src/structs/Subnet.sol";
+import {EMPTY_BYTES} from "@ipc/src/constants/Constants.sol";
+import {IGateway} from "@ipc/src/interfaces/IGateway.sol";
+import {CrossMsgHelper} from "@ipc/src/lib/CrossMsgHelper.sol";
+
 import {ReentrancyGuard} from "openzeppelin-contracts/utils/ReentrancyGuard.sol";
 import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
-import {CrossMsgHelper} from "../src/lib/CrossMsgHelper.sol";
+
+import {LinkedTokenStorage} from "./lib/LibLinkedTokenStorage.sol";
+import {LibDiamond} from "@ipc/src/lib/LibDiamond.sol";
 
 // Interface that needs to be implemented by IPC-aware contracts.
 //
@@ -24,6 +28,10 @@ interface IpcHandler {
 
 abstract contract IpcExchangeFacet is IpcHandler, ReentrancyGuard {
     using CrossMsgHelper for IpcEnvelope;
+
+    LinkedTokenStorage internal s;
+
+
 
 
     /// @notice Entrypoint for IPC-enabled contracts. This function is always called by
@@ -77,7 +85,7 @@ abstract contract IpcExchangeFacet is IpcHandler, ReentrancyGuard {
         uint256 value
     ) internal nonReentrant returns (IpcEnvelope memory envelope) {
         // Queue the cross-net message for dispatch.
-        envelope = IGateway(s.gatewayAddr).sendContractXnetMessage{value: value}(
+        envelope = IGateway(s._gatewayAddr).sendContractXnetMessage{value: value}(
             IpcEnvelope({
                 kind: IpcMsgKind.Call,
                 from: to, // TODO: will anyway be replaced by sendContractXnetMessage.
@@ -106,7 +114,7 @@ abstract contract IpcExchangeFacet is IpcHandler, ReentrancyGuard {
 
     function _onlyGateway() private view {
         // only the gateway address is allowed to deliver xnet messages.
-        if (msg.sender != s.gatewayAddr) {
+        if (msg.sender != s._gatewayAddr) {
             revert IpcHandler.CallerIsNotGateway();
         }
     }

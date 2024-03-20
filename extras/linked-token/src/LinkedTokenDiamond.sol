@@ -3,13 +3,15 @@ pragma solidity ^0.8.23;
 
 import {LinkedTokenStorage} from "./lib/LibLinkedTokenStorage.sol";
 
-import {IDiamond} from "./interfaces/IDiamond.sol";
-import {IDiamondCut} from "./interfaces/IDiamondCut.sol";
-import {IDiamondLoupe} from "./interfaces/IDiamondLoupe.sol";
-import {IERC165} from "./interfaces/IERC165.sol";
-import {LibDiamond} from "./lib/LibDiamond.sol";
+import {IDiamond} from "@ipc/src/interfaces/IDiamond.sol";
+import {IDiamondCut} from "@ipc/src/interfaces/IDiamondCut.sol";
+import {IDiamondLoupe} from "@ipc/src/interfaces/IDiamondLoupe.sol";
+import {IERC165} from "@ipc/src/interfaces/IERC165.sol";
+import {LibDiamond} from "@ipc/src/lib/LibDiamond.sol";
 
-import {SubnetID} from "./structs/Subnet.sol";
+import {SubnetID} from "@ipc/src/structs/Subnet.sol";
+import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
+
 
 error FunctionNotFound(bytes4 _functionSelector);
 
@@ -17,9 +19,9 @@ contract LinkedTokenDiamond {
     LinkedTokenStorage internal s;
 
     struct ConstructorParams {
-        address gateway,
-        address underlyingToken,
-        SubnetID memory linkedSubnet
+        address gateway;
+        address underlyingToken;
+        SubnetID linkedSubnet;
     }
 
 
@@ -36,7 +38,7 @@ contract LinkedTokenDiamond {
 
         s._underlying = IERC20(params.underlyingToken);
         s._gatewayAddr = params.gateway;
-        s._linkedSubnet = params._linkedSubnet;
+        s._linkedSubnet = params.linkedSubnet;
 
     }
 
