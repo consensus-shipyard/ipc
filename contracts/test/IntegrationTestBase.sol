@@ -851,10 +851,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             signatures[i] = abi.encodePacked(r, s, v);
         }
 
-        for (uint256 i = 0; i < n; i++) {
-            vm.prank(validators[i]);
-            saDiamond.checkpointer().submitCheckpoint(checkpoint, validators, signatures);
-        }
+        vm.prank(validators[0]);
+        saDiamond.checkpointer().submitCheckpoint(checkpoint, validators, signatures);
     }
 
     function release(uint256 releaseAmount) public {
