@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {InvalidBatchEpoch, MaxMsgsPerBatchExceeded, InvalidSignatureErr, InvalidCheckpointEpoch} from "../errors/IPCErrors.sol";
+import {InvalidBatchEpoch, MaxMsgsPerBatchExceeded, InvalidSignatureErr, BottomUpCheckpointAlreadySubmitted, CannotSubmitFutureCheckpoint, InvalidCheckpointEpoch} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {BottomUpCheckpoint, BottomUpMsgBatch, BottomUpMsgBatchInfo} from "../structs/CrossNet.sol";
 import {Validator, ValidatorSet} from "../structs/Subnet.sol";
@@ -12,6 +12,7 @@ import {LibValidatorSet, LibStaking} from "../lib/LibStaking.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 import {LibSubnetActor} from "../lib/LibSubnetActor.sol";
 import {Pausable} from "../lib/LibPausable.sol";
+import {LibGateway} from "../lib/LibGateway.sol";
 
 contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard, Pausable {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -32,22 +33,20 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
 
         bytes32 checkpointHash = keccak256(abi.encode(checkpoint));
 
-        if (checkpoint.blockHeight == s.lastBottomUpCheckpointHeight + s.bottomUpCheckPeriod) {
-            // validate signatures and quorum threshold, revert if validation fails
-            validateActiveQuorumSignatures({signatories: signatories, hash: checkpointHash, signatures: signatures});
+        // validate signatures and quorum threshold, revert if validation fails
+        validateActiveQuorumSignatures({signatories: signatories, hash: checkpointHash, signatures: signatures});
 
-            // If the checkpoint height is the next expected height then this is a new checkpoint which must be executed
-            // in the Gateway Actor, the checkpoint and the relayer must be stored, last bottom-up checkpoint updated.
-            s.committedCheckpoints[checkpoint.blockHeight] = checkpoint;
+        // If the checkpoint height is the next expected height then this is a new checkpoint which must be executed
+        // in the Gateway Actor, the checkpoint and the relayer must be stored, last bottom-up checkpoint updated.
+        s.committedCheckpoints[checkpoint.blockHeight] = checkpoint;
 
-            s.lastBottomUpCheckpointHeight = checkpoint.blockHeight;
+        s.lastBottomUpCheckpointHeight = checkpoint.blockHeight;
 
-            // Commit in gateway to distribute rewards
-            IGateway(s.ipcGatewayAddr).commitCheckpoint(checkpoint);
+        // Commit in gateway to distribute rewards
+        IGateway(s.ipcGatewayAddr).commitCheckpoint(checkpoint);
 
-            // confirming the changes in membership in the child
-            LibStaking.confirmChange(checkpoint.nextConfigurationNumber);
-        }
+        // confirming the changes in membership in the child
+        LibStaking.confirmChange(checkpoint.nextConfigurationNumber);
     }
 
     /// @notice Checks whether the signatures are valid for the provided signatories and hash within the current validator set.
@@ -90,17 +89,30 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
             revert MaxMsgsPerBatchExceeded();
         }
 
-        // if the bottom up messages' length is max, we consider that epoch valid
+        uint256 lastBottomUpCheckpointHeight = s.lastBottomUpCheckpointHeight;
+        uint256 bottomUpCheckPeriod = s.bottomUpCheckPeriod;
+
+        // cannot submit past bottom up checkpoint
+        if (checkpoint.blockHeight <= lastBottomUpCheckpointHeight) {
+            revert BottomUpCheckpointAlreadySubmitted();
+        }
+
+        uint256 nextCheckpointHeight = LibGateway.getNextEpoch(lastBottomUpCheckpointHeight, bottomUpCheckPeriod);
+
+        if (checkpoint.blockHeight > nextCheckpointHeight) {
+            revert CannotSubmitFutureCheckpoint();
+        }
+
+        // the expected bottom up checkpoint height, valid height
+        if (checkpoint.blockHeight == nextCheckpointHeight) {
+            return;
+        }
+
+        // if the bottom up messages' length is max, we consider that epoch valid, allow early submission
         if (checkpoint.msgs.length == s.maxMsgsPerBottomUpBatch) {
             return;
         }
 
-        // the max batch size not reached, we only support checkpoint period submission.
-        uint256 lastBottomUpCheckpointHeight = s.lastBottomUpCheckpointHeight;
-        if (checkpoint.blockHeight != lastBottomUpCheckpointHeight + s.bottomUpCheckPeriod) {
-            if (checkpoint.blockHeight != lastBottomUpCheckpointHeight) {
-                revert InvalidCheckpointEpoch();
-            }
-        }
+        revert InvalidCheckpointEpoch();
     }
 }

@@ -194,7 +194,7 @@ contract MockIpcContractRevert is IpcHandler {
     bool public reverted = true;
 
     /* solhint-disable-next-line unused-vars */
-    function handleIpcMessage(IpcEnvelope calldata) external payable returns (bytes memory ret) {
+    function handleIpcMessage(IpcEnvelope calldata) external payable returns (bytes memory) {
         // success execution of this methid will set reverted to false, by default it's true
         reverted = false;
 

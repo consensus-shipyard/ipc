@@ -18,24 +18,121 @@ use fvm_shared::{
 
 use crate::B64_ENGINE;
 
-/// Factory methods for signed transaction payload construction.
+/// Factory methods for transaction payload construction.
 ///
 /// It assumes the sender is an `f1` type address, it won't work with `f410` addresses.
 /// For those one must use the Ethereum API, with a suitable client library such as [ethers].
 pub struct MessageFactory {
-    sk: SecretKey,
     addr: Address,
     sequence: u64,
-    chain_id: ChainID,
 }
 
 impl MessageFactory {
+    pub fn new(addr: Address, sequence: u64) -> Self {
+        Self { addr, sequence }
+    }
+
+    pub fn address(&self) -> &Address {
+        &self.addr
+    }
+
+    /// Set the sequence to an arbitrary value.
+    pub fn set_sequence(&mut self, sequence: u64) {
+        self.sequence = sequence;
+    }
+
+    pub fn transaction(
+        &mut self,
+        to: Address,
+        method_num: MethodNum,
+        params: RawBytes,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> Message {
+        let msg = Message {
+            version: Default::default(), // TODO: What does this do?
+            from: self.addr,
+            to,
+            sequence: self.sequence,
+            value,
+            method_num,
+            params,
+            gas_limit: gas_params.gas_limit,
+            gas_fee_cap: gas_params.gas_fee_cap,
+            gas_premium: gas_params.gas_premium,
+        };
+
+        self.sequence += 1;
+
+        msg
+    }
+
+    pub fn fevm_create(
+        &mut self,
+        contract: Bytes,
+        constructor_args: Bytes,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<Message> {
+        let initcode = [contract.to_vec(), constructor_args.to_vec()].concat();
+        let initcode = RawBytes::serialize(BytesSer(&initcode))?;
+        Ok(self.transaction(
+            eam::EAM_ACTOR_ADDR,
+            eam::Method::CreateExternal as u64,
+            initcode,
+            value,
+            gas_params,
+        ))
+    }
+
+    pub fn fevm_invoke(
+        &mut self,
+        contract: Address,
+        calldata: Bytes,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<Message> {
+        let calldata = RawBytes::serialize(BytesSer(&calldata))?;
+        Ok(self.transaction(
+            contract,
+            evm::Method::InvokeContract as u64,
+            calldata,
+            value,
+            gas_params,
+        ))
+    }
+
+    pub fn fevm_call(
+        &mut self,
+        contract: Address,
+        calldata: Bytes,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<Message> {
+        let msg = self.fevm_invoke(contract, calldata, value, gas_params)?;
+
+        // Roll back the sequence, we don't really want to invoke anything.
+        self.set_sequence(msg.sequence);
+
+        Ok(msg)
+    }
+}
+/// Wrapper for MessageFactory which generates signed messages
+///
+/// It assumes the sender is an `f1` type address, it won't work with `f410` addresses.
+/// For those one must use the Ethereum API, with a suitable client library such as [ethers].
+pub struct SignedMessageFactory {
+    inner: MessageFactory,
+    sk: SecretKey,
+    chain_id: ChainID,
+}
+
+impl SignedMessageFactory {
     /// Create a factor from a secret key and its corresponding address, which could be a delegated one.
     pub fn new(sk: SecretKey, addr: Address, sequence: u64, chain_id: ChainID) -> Self {
         Self {
+            inner: MessageFactory::new(addr, sequence),
             sk,
-            addr,
-            sequence,
             chain_id,
         }
     }
@@ -64,12 +161,7 @@ impl MessageFactory {
 
     /// Actor address.
     pub fn address(&self) -> &Address {
-        &self.addr
-    }
-
-    /// Set the sequence to an arbitrary value.
-    pub fn set_sequence(&mut self, sequence: u64) {
-        self.sequence = sequence;
+        self.inner.address()
     }
 
     /// Transfer tokens to another account.
@@ -92,19 +184,9 @@ impl MessageFactory {
         gas_params: GasParams,
         object: Option<Object>,
     ) -> anyhow::Result<ChainMessage> {
-        let message = Message {
-            version: Default::default(), // TODO: What does this do?
-            from: self.addr,
-            to,
-            sequence: self.sequence,
-            value,
-            method_num,
-            params,
-            gas_limit: gas_params.gas_limit,
-            gas_fee_cap: gas_params.gas_fee_cap,
-            gas_premium: gas_params.gas_premium,
-        };
-        self.sequence += 1;
+        let message = self
+            .inner
+            .transaction(to, method_num, params, value, gas_params);
         let signed = SignedMessage::new_secp256k1(message, object, &self.sk, &self.chain_id)?;
         let chain = ChainMessage::Signed(signed);
         Ok(chain)
@@ -313,7 +395,7 @@ impl MessageFactory {
         };
 
         // Roll back the sequence, we don't really want to invoke anything.
-        self.set_sequence(msg.sequence);
+        self.inner.set_sequence(msg.sequence);
 
         Ok(msg)
     }

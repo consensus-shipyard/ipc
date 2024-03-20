@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use std::{
-    fmt::Debug,
+    fmt::{Debug, Display},
     path::{Path, PathBuf},
 };
 
@@ -15,12 +15,18 @@ use fvm_shared::address::Address;
 use ipc_api::subnet_id::SubnetID;
 
 use super::export;
-use crate::{AccountName, SubnetName};
+use crate::{AccountId, AccountName, SubnetName};
 
 pub struct DefaultDeployment {
     pub name: SubnetName,
     pub gateway: EthAddress,
     pub registry: EthAddress,
+}
+
+impl Display for DefaultDeployment {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.name, f)
+    }
 }
 
 impl DefaultDeployment {
@@ -42,19 +48,31 @@ pub struct DefaultGenesis {
     pub path: PathBuf,
 }
 
+impl Display for DefaultGenesis {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.name, f)
+    }
+}
+
 pub struct DefaultSubnet {
     pub name: SubnetName,
     /// ID allocated to the subnet during creation.
     pub subnet_id: SubnetID,
 }
 
+impl Display for DefaultSubnet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.name, f)
+    }
+}
+
 #[derive(PartialEq, Eq)]
 pub struct DefaultAccount {
-    pub name: AccountName,
-    pub secret_key: SecretKey,
-    pub public_key: PublicKey,
+    name: AccountName,
+    secret_key: SecretKey,
+    public_key: PublicKey,
     /// Path to the directory where the keys are exported.
-    pub path: PathBuf,
+    path: PathBuf,
 }
 
 impl PartialOrd for DefaultAccount {
@@ -78,7 +96,17 @@ impl Debug for DefaultAccount {
     }
 }
 
+impl Display for DefaultAccount {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.name, f)
+    }
+}
+
 impl DefaultAccount {
+    pub fn account_id(&self) -> AccountId {
+        self.name.0.id()
+    }
+
     pub fn eth_addr(&self) -> EthAddress {
         EthAddress::from(self.public_key)
     }
@@ -96,18 +124,17 @@ impl DefaultAccount {
         let dir = root.as_ref().join(name.path());
         let sk = dir.join("secret.hex");
 
-        let (sk, pk, is_new) = if sk.exists() {
+        let (sk, is_new) = if sk.exists() {
             let sk = std::fs::read_to_string(sk).context("failed to read private key")?;
             let sk = hex::decode(sk).context("cannot decode hex private key")?;
             let sk = SecretKey::try_from(sk).context("failed to parse secret key")?;
-            let pk = sk.public_key();
-            (sk, pk, false)
+            (sk, false)
         } else {
             let sk = SecretKey::random(rng);
-            let pk = sk.public_key();
-            (sk, pk, true)
+            (sk, true)
         };
 
+        let pk = sk.public_key();
         let acc = Self {
             name: name.clone(),
             secret_key: sk,
@@ -116,22 +143,51 @@ impl DefaultAccount {
         };
 
         if is_new {
-            let sk = acc.secret_key.serialize();
-            let pk = acc.public_key.serialize();
-
-            export(&acc.path, "secret", "b64", to_b64(sk.as_ref()))?;
-            export(&acc.path, "secret", "hex", hex::encode(sk))?;
-            export(&acc.path, "public", "b64", to_b64(pk.as_ref()))?;
-            export(&acc.path, "public", "hex", hex::encode(pk))?;
-            export(&acc.path, "eth-addr", "", format!("{:?}", acc.eth_addr()))?;
-            export(&acc.path, "fvm-addr", "", acc.fvm_addr().to_string())?;
+            acc.export()?;
         }
 
         Ok(acc)
     }
 
+    /// Create (or overwrite) an account with a given secret key.
+    pub fn create(
+        root: impl AsRef<Path>,
+        name: &AccountName,
+        sk: SecretKey,
+    ) -> anyhow::Result<Self> {
+        let pk = sk.public_key();
+        let dir = root.as_ref().join(name.path());
+        let acc = Self {
+            name: name.clone(),
+            secret_key: sk,
+            public_key: pk,
+            path: dir,
+        };
+        acc.export()?;
+        Ok(acc)
+    }
+
+    /// Write the keys to files.
+    fn export(&self) -> anyhow::Result<()> {
+        let sk = self.secret_key.serialize();
+        let pk = self.public_key.serialize();
+
+        export(&self.path, "secret", "b64", to_b64(sk.as_ref()))?;
+        export(&self.path, "secret", "hex", hex::encode(sk))?;
+        export(&self.path, "public", "b64", to_b64(pk.as_ref()))?;
+        export(&self.path, "public", "hex", hex::encode(pk))?;
+        export(&self.path, "eth-addr", "", format!("{:?}", self.eth_addr()))?;
+        export(&self.path, "fvm-addr", "", self.fvm_addr().to_string())?;
+
+        Ok(())
+    }
+
     pub fn secret_key_path(&self) -> PathBuf {
         self.path.join("secret.b64")
+    }
+
+    pub fn public_key(&self) -> &PublicKey {
+        &self.public_key
     }
 }
 

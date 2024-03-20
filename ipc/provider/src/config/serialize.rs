@@ -58,6 +58,7 @@ fn address_to_eth_address(addr: &Address) -> anyhow::Result<EthAddress> {
             bytes.copy_from_slice(&inner.subaddress()[0..20]);
             Ok(EthAddress(bytes))
         }
+        Payload::ID(id) => Ok(EthAddress::from_id(*id)),
         _ => Err(anyhow!("not eth address")),
     }
 }

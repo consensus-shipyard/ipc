@@ -21,6 +21,14 @@ contract SimpleCoin {
         return true;
     }
 
+    function sendCoinOrRevert(
+        address receiver,
+        uint256 amount
+    ) public {
+        require(balances[msg.sender] >= amount, "sender doesn't have enough balance");
+        assert(sendCoin(receiver, amount));
+    }
+
     function getBalanceInEth(address addr) public view returns (uint256) {
         return getBalance(addr) * 2;
     }

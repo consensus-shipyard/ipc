@@ -29,7 +29,7 @@ use tendermint::abci::response::DeliverTx;
 use tendermint::block::Height;
 use tendermint_rpc::HttpClient;
 
-use fendermint_rpc::message::{GasParams, MessageFactory};
+use fendermint_rpc::message::{GasParams, SignedMessageFactory};
 use fendermint_rpc::{client::FendermintClient, query::QueryClient};
 use fendermint_vm_actor_interface::eam::{self, CreateReturn, EthAddress};
 
@@ -462,7 +462,7 @@ impl TransClient {
         let sk = read_secret_key(&args.secret_key)?;
         let addr = to_address(&sk, &args.account_kind)?;
         let chain_id = chainid::from_str_hashed(&args.chain_name)?;
-        let mf = MessageFactory::new(sk, addr, args.sequence, chain_id);
+        let mf = SignedMessageFactory::new(sk, addr, args.sequence, chain_id);
         let client = client.bind(mf);
         let client = Self {
             inner: client,
@@ -473,7 +473,7 @@ impl TransClient {
 }
 
 impl BoundClient for TransClient {
-    fn message_factory_mut(&mut self) -> &mut MessageFactory {
+    fn message_factory_mut(&mut self) -> &mut SignedMessageFactory {
         self.inner.message_factory_mut()
     }
 }

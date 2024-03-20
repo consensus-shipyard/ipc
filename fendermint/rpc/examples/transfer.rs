@@ -27,7 +27,7 @@ use tracing::Level;
 use fvm_shared::econ::TokenAmount;
 
 use fendermint_rpc::client::FendermintClient;
-use fendermint_rpc::message::{GasParams, MessageFactory};
+use fendermint_rpc::message::{GasParams, SignedMessageFactory};
 use fendermint_rpc::tx::{TxClient, TxCommit};
 
 lazy_static! {
@@ -81,7 +81,9 @@ async fn main() {
 
     let client = FendermintClient::new_http(opts.url, None).expect("error creating client");
 
-    let sk = MessageFactory::read_secret_key(&opts.secret_key).expect("error reading secret key");
+    let sk =
+        SignedMessageFactory::read_secret_key(&opts.secret_key).expect("error reading secret key");
+
     let pk = sk.public_key();
 
     let f1_addr = Address::new_secp256k1(&pk.serialize()).expect("valid public key");
@@ -100,7 +102,7 @@ async fn main() {
         .value
         .chain_id;
 
-    let mf = MessageFactory::new(sk, f410_addr, sn, ChainID::from(chain_id));
+    let mf = SignedMessageFactory::new(sk, f410_addr, sn, ChainID::from(chain_id));
 
     let mut client = client.bind(mf);
 

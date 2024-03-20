@@ -4,5 +4,6 @@
 //! so that they can be annotated with the `#[serial]` macro and run one by one,
 //! sharing their materializer state.
 
-/// Tests using the `root_only.yaml` manifest.
+// Tests using the manifest bearing their name.
+pub mod layer2;
 pub mod root_only;

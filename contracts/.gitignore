@@ -31,6 +31,7 @@ lcov.info
 
 # Aderyn scanner
 report.md
+report.json
 
 #vim
 *.un~
