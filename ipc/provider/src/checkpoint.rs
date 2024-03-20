@@ -145,6 +145,15 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
             log::debug!("found reached events at height : {h}");
 
             for event in events {
+                // Note that the event will be emitted later than the checkpoint height.
+                // For example, if the checkpoint height is 400 but it's actually created
+                // in fendermint at height 403. This means the event.height == 400 which is
+                // already committed.
+                if event.height <= last_checkpoint_epoch {
+                    log::debug!("event height already committed: {}", event.height);
+                    continue;
+                }
+
                 let bundle = self
                     .child_handler
                     .checkpoint_bundle_at(event.height)
