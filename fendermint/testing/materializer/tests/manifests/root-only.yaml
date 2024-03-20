@@ -16,6 +16,7 @@ rootnet:
         type: Validator
         validator: alice
       ethapi: false
+      seed_nodes: []
 
     node-2:
       mode:

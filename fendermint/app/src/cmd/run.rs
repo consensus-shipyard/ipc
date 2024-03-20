@@ -251,6 +251,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             state_hist_size: settings.db.state_hist_size,
             builtin_actors_bundle: settings.builtin_actors_bundle(),
             custom_actors_bundle: settings.custom_actors_bundle(),
+            halt_height: settings.halt_height,
         },
         db,
         state_store,
@@ -352,7 +353,7 @@ fn make_ipc_provider_proxy(settings: &Settings) -> anyhow::Result<IPCProviderPro
                 .parse()
                 .unwrap(),
             provider_timeout: topdown_config.parent_http_timeout,
-            auth_token: None,
+            auth_token: topdown_config.parent_http_auth_token.as_ref().cloned(),
             registry_addr: topdown_config.parent_registry,
             gateway_addr: topdown_config.parent_gateway,
         }),

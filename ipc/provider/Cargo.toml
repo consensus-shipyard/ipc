@@ -32,6 +32,7 @@ serde_bytes = { workspace = true }
 thiserror = { workspace = true }
 hex = { workspace = true }
 serde_tuple = { workspace = true }
+serde_with = { workspace = true }
 zeroize = { workspace = true }
 
 ethers-contract = { workspace = true }

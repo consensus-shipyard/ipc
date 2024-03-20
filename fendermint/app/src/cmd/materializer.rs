@@ -8,6 +8,7 @@ use fendermint_app_options::materializer::*;
 use fendermint_app_settings::utils::expand_tilde;
 use fendermint_materializer::{
     docker::{DockerMaterializer, DropPolicy},
+    logging::LoggingMaterializer,
     manifest::Manifest,
     materials::DefaultAccount,
     testnet::Testnet,
@@ -20,13 +21,14 @@ use super::key::{read_secret_key, read_secret_key_hex};
 
 cmd! {
   MaterializerArgs(self) {
-    let d = expand_tilde(&self.data_dir);
-    let m = || DockerMaterializer::new(&d, self.seed).map(|m| m.with_policy(DropPolicy::PERSISTENT));
+    let data_dir = expand_tilde(&self.data_dir);
+    let dm = || DockerMaterializer::new(&data_dir, self.seed).map(|m| m.with_policy(DropPolicy::PERSISTENT));
+    let lm = || dm().map(|m| LoggingMaterializer::new(m, "cli".to_string()));
     match &self.command {
         MaterializerCommands::Validate(args) => args.exec(()).await,
-        MaterializerCommands::Setup(args) => args.exec(m()?).await,
-        MaterializerCommands::Remove(args) => args.exec(m()?).await,
-        MaterializerCommands::ImportKey(args) => args.exec(d).await,
+        MaterializerCommands::Setup(args) => args.exec(lm()?).await,
+        MaterializerCommands::Remove(args) => args.exec(dm()?).await,
+        MaterializerCommands::ImportKey(args) => args.exec(data_dir).await,
     }
   }
 }
@@ -38,7 +40,7 @@ cmd! {
 }
 
 cmd! {
-  MaterializerSetupArgs(self, m: DockerMaterializer) {
+  MaterializerSetupArgs(self, m: LoggingMaterializer<DockerMaterializer>) {
     setup(m, &self.manifest_file, self.validate).await
   }
 }
@@ -63,7 +65,7 @@ async fn validate(manifest_file: &Path) -> anyhow::Result<()> {
 
 /// Setup a testnet.
 async fn setup(
-    mut m: DockerMaterializer,
+    mut m: LoggingMaterializer<DockerMaterializer>,
     manifest_file: &Path,
     validate: bool,
 ) -> anyhow::Result<()> {
