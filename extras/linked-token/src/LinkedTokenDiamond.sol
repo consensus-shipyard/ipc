@@ -34,7 +34,7 @@ contract LinkedTokenDiamond {
         ds.supportedInterfaces[type(IDiamondCut).interfaceId] = true;
         ds.supportedInterfaces[type(IDiamondLoupe).interfaceId] = true;
 
-        s._underlying = params.underlyingToken;
+        s._underlying = IERC20(params.underlyingToken);
         s._gatewayAddr = params.gateway;
         s._linkedSubnet = params._linkedSubnet;
 

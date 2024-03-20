@@ -8,17 +8,11 @@ import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {LinkedToken} from "./LinkedToken.sol";
 import {SubnetID} from "@ipc/src/structs/Subnet.sol";
 
-contract LinkedTokenController is LinkedToken {
+contract LinkedTokenControllerFacet is LinkedTokenFacet {
     using SafeERC20 for IERC20;
 
-    constructor(
-        address gateway,
-        address underlyingToken,
-        SubnetID memory linkedSubnet
-    ) LinkedToken(gateway, underlyingToken, linkedSubnet) {}
-
     function _captureTokens(address holder, uint256 amount) internal override {
-        _underlying.safeTransferFrom({
+        s._underlying.safeTransferFrom({
             from: msg.sender,
             to: address(this),
             value: amount
@@ -29,6 +23,6 @@ contract LinkedTokenController is LinkedToken {
         internal
         override
     {
-        _underlying.safeTransfer(beneficiary, amount);
+        s._underlying.safeTransfer(beneficiary, amount);
     }
 }

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
+import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 
 struct LinkedTokenStorage {
     IERC20 public _underlying;

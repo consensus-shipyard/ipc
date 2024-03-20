@@ -10,71 +10,51 @@ import {IpcEnvelope, ResultMsg, CallMsg, OutcomeType, IpcMsgKind} from "@ipc/src
 import {IPCAddress, SubnetID} from "@ipc/src/structs/Subnet.sol";
 import {CrossMsgHelper} from "@ipc/src/lib/CrossMsgHelper.sol";
 import {SubnetIDHelper} from "@ipc/src/lib/SubnetIDHelper.sol";
+
+import {UnconfirmedTransfer} from "lib/LibLinkedTokenStorage.sol";
+
 error InvalidOriginContract();
 error InvalidOriginSubnet();
 
+string private constant ERR_ZERO_ADDRESS = "zero address is not allowed";
+string private constant ERR_VALUE_MUST_BE_ZERO = "value must be zero";
+string private constant ERR_AMOUNT_CANNOT_BE_ZERO = "amount cannot be zero";
+
+error InvalidEnvelope(string reason);
+error TransferRejected(string reason);
+
+event LinkedTokenInitialized(
+    address indexed underlying,
+    SubnetID indexed linkedSubnet,
+    address indexed linkedContract
+);
+
+event LinkedTokensSent(
+    address indexed underlying,
+    address indexed sender,
+    address indexed recipient,
+    bytes32 id,
+    uint64 nonce,
+    uint256 value
+);
+
+event LinkedTokenReceived(address indexed recipient, uint256 amount);
 
 /**
  * @title LinkedToken
  * @notice Contract to handle token transfer from L1, lock them and mint on L2.
  */
-abstract contract LinkedToken is IpcExchange {
+abstract contract LinkedTokenFacet is IpcExchangeFacet {
     using SafeERC20 for IERC20;
     using CrossMsgHelper for IpcEnvelope;
     using SubnetIDHelper for SubnetID;
     using FvmAddressHelper for FvmAddress;
 
-    IERC20 public immutable _underlying;
-    address public _linkedContract;
-    SubnetID public _linkedSubnet;
+    LinkedTokenStorage internal s;
 
-    mapping(bytes32 => UnconfirmedTransfer) public _unconfirmedTransfers;
-
-    string private constant ERR_ZERO_ADDRESS = "zero address is not allowed";
-    string private constant ERR_VALUE_MUST_BE_ZERO = "value must be zero";
-    string private constant ERR_AMOUNT_CANNOT_BE_ZERO = "amount cannot be zero";
-
-    error InvalidEnvelope(string reason);
-    error TransferRejected(string reason);
-    struct UnconfirmedTransfer {
-        address sender;
-        uint256 value;
-    }
-
-    event LinkedTokenInitialized(
-        address indexed underlying,
-        SubnetID indexed linkedSubnet,
-        address indexed linkedContract
-    );
-
-    event LinkedTokensSent(
-        address indexed underlying,
-        address indexed sender,
-        address indexed recipient,
-        bytes32 id,
-        uint64 nonce,
-        uint256 value
-    );
-
-    event LinkedTokenReceived(address indexed recipient, uint256 amount);
-
-    /**
-     * @dev Constructor for IpcTokenController
-     * @param gateway Address of the gateway for cross-network communication
-     * @param underlyingToken Address of the destination contract for minting
-     * @param linkedSubnet SubnetID of the destination network
-     */
-    constructor(
-        address gateway,
-        address underlyingToken,
-        SubnetID memory linkedSubnet
-    ) IpcExchange(gateway) {
-        _underlying = IERC20(underlyingToken);
-        _linkedSubnet = linkedSubnet;
-    }
 
     function getLinkedSubnet() public view returns (SubnetID memory) {
-        return _linkedSubnet;
+        return s._linkedSubnet;
     }
 
 
@@ -109,8 +89,8 @@ abstract contract LinkedToken is IpcExchange {
             params: abi.encode(recipient, amount)
         });
         IPCAddress memory destination = IPCAddress({
-            subnetId: _linkedSubnet,
-            rawAddress: FvmAddressHelper.from(_linkedContract)
+            subnetId: s._linkedSubnet,
+            rawAddress: FvmAddressHelper.from(s._linkedContract)
         });
 
         // Route through GMP.
@@ -120,7 +100,7 @@ abstract contract LinkedToken is IpcExchange {
         _addUnconfirmedTransfer(committed.toHash(), msg.sender, amount);
 
         emit LinkedTokensSent({
-            underlying: address(_underlying),
+            underlying: address(s._underlying),
             sender: msg.sender,
             recipient: recipient,
             id: committed.toHash(),
@@ -146,12 +126,12 @@ abstract contract LinkedToken is IpcExchange {
         // Note: for now, this allows changing the linked contract for upgradeability purposes.
         // Consider disallowing this if we anyway switch to something like https://docs.openzeppelin.com/upgrades.
 
-        _linkedContract = linkedContract;
+        s._linkedContract = linkedContract;
 
         emit LinkedTokenInitialized({
-            underlying: address(_underlying),
-            linkedSubnet: _linkedSubnet,
-            linkedContract: _linkedContract
+            underlying: address(s._underlying),
+            linkedSubnet: s._linkedSubnet,
+            linkedContract: s._linkedContract
         });
     }
 
@@ -201,19 +181,19 @@ abstract contract LinkedToken is IpcExchange {
     // ----------------------------
 
     function _validateInitialized() internal {
-        require(_linkedContract != address(0), "linked token not initialized");
+        require(s._linkedContract != address(0), "linked token not initialized");
     }
 
     // Only accept messages from our linked token contract.
     // Made public for testing
     function _validateEnvelope(IpcEnvelope memory envelope) public {
         SubnetID memory subnetId = envelope.from.subnetId;
-        if (!subnetId.equals(_linkedSubnet)) {
+        if (!subnetId.equals(s._linkedSubnet)) {
             revert InvalidOriginSubnet();
         }
 
         FvmAddress memory rawAddress = envelope.from.rawAddress;
-        if (!rawAddress.equal(FvmAddressHelper.from(_linkedContract))) {
+        if (!rawAddress.equal(FvmAddressHelper.from(s._linkedContract))) {
             revert InvalidOriginContract();
         }
     }
@@ -245,7 +225,7 @@ abstract contract LinkedToken is IpcExchange {
     // ----------------------------
 
     function getUnconfirmedTransfer(bytes32 id) public view returns (address, uint256) {
-        UnconfirmedTransfer storage details = _unconfirmedTransfers[id];
+        UnconfirmedTransfer storage details = s._unconfirmedTransfers[id];
         return (details.sender, details.value);
     }
 
@@ -255,12 +235,12 @@ abstract contract LinkedToken is IpcExchange {
     }
 
     function _addUnconfirmedTransfer(bytes32 hash, address sender, uint256 value) internal {
-        _unconfirmedTransfers[hash] = UnconfirmedTransfer(sender, value);
+        s._unconfirmedTransfers[hash] = UnconfirmedTransfer(sender, value);
     }
 
     function _removeUnconfirmedTransfer(bytes32 id, bool refund) internal {
         (address sender, uint256 value) = getUnconfirmedTransfer(id);
-        delete _unconfirmedTransfers[id];
+        delete s._unconfirmedTransfers[id];
 
         if (refund) {
             require(sender != address(0), "internal error: no such unconfirmed transfer");

@@ -9,21 +9,15 @@ import {
 import {LinkedToken} from "./LinkedToken.sol";
 import {SubnetID} from "@ipc/src/structs/Subnet.sol";
 
+
+import {ERC20Facet} from "@PieVaults/facets/ERC20/ERC20Facet.sol";
+
 /**
  * @title IpcTokenController
  * @notice Contract to handle token transfer from L1, lock them and mint on L2.
  */
-contract LinkedTokenReplica is LinkedToken, ERC20 {
+contract LinkedTokenReplica is LinkedTokenFacet, ERC20Facet {
     using SafeERC20 for IERC20;
-
-    constructor(
-        address gateway,
-        address underlyingToken,
-        SubnetID memory linkedSubnet
-    )
-        LinkedToken(gateway, underlyingToken, linkedSubnet)
-        ERC20("USDCTestReplica", "USDCtR")
-    {}
 
     function _captureTokens(address holder, uint256 amount) internal override {
         _burn(holder, amount);
