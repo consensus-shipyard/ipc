@@ -67,7 +67,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         params.subnetActorCheckpointerSelectors = mockedSelectors4;
         params.subnetActorPauserSelectors = mockedSelectors5;
 
-        params.creationPrivileges = SubnetCreationPrivileges.Unpermissioned;
+        params.creationPrivileges = SubnetCreationPrivileges.Unrestricted;
 
         return params;
     }

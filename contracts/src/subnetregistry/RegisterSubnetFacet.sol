@@ -75,7 +75,7 @@ contract RegisterSubnetFacet is ReentrancyGuard {
     }
 
     function ensurePrivileges() internal view {
-        if (s.creationPrivileges == SubnetCreationPrivileges.Unpermissioned) {
+        if (s.creationPrivileges == SubnetCreationPrivileges.Unrestricted) {
             return;
         }
         LibDiamond.enforceIsContractOwner();

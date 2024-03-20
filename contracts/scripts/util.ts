@@ -37,7 +37,7 @@ export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 const isolatedPort = 18678
 
 export enum SubnetCreationPrivileges {
-    Unpermissioned = 0,
+    Unrestricted = 0,
     Owner = 1,
 }
 
@@ -55,10 +55,10 @@ export async function deployContractWithDeployer(
 }
 
 export function subnetCreationPrivileges(): SubnetCreationPrivileges {
-    const value = process.env.REGISTRY_CREATION_PRIVILEGES || 'unpermissioned'
+    const value = process.env.REGISTRY_CREATION_PRIVILEGES || 'unrestricted'
     return value === 'owner'
         ? SubnetCreationPrivileges.Owner
-        : SubnetCreationPrivileges.Unpermissioned
+        : SubnetCreationPrivileges.Unrestricted
 }
 
 export async function getTransactionFees() {
