@@ -88,13 +88,11 @@ lazy_static! {
                         // The registry incorporates the SubnetActor facets, although these aren't expected differently in the constructor.
                         EthFacet {
                             name: "SubnetActorGetterFacet",
-                            abi: ia::subnet_actor_getter_facet::SUBNETACTORGETTERFACET_ABI
-                                .to_owned(),
+                            abi: ia::subnet_actor_getter_facet::SUBNETACTORGETTERFACET_ABI.to_owned(),
                         },
                         EthFacet {
                             name: "SubnetActorManagerFacet",
-                            abi: ia::subnet_actor_manager_facet::SUBNETACTORMANAGERFACET_ABI
-                                .to_owned(),
+                            abi: ia::subnet_actor_manager_facet::SUBNETACTORMANAGERFACET_ABI.to_owned(),
                         },
                         EthFacet {
                             name: "SubnetActorRewardFacet",
@@ -108,17 +106,6 @@ lazy_static! {
                             name: "SubnetActorPauseFacet",
                             abi: ia::subnet_actor_pause_facet::SUBNETACTORPAUSEFACET_ABI.to_owned(),
                         },
-                        // The registry has its own facets:
-                        // https://github.com/consensus-shipyard/ipc-solidity-actors/blob/b01a2dffe367745f55111a65536a3f6fea9165f5/scripts/deploy-registry.template.ts#L58-L67
-                        EthFacet {
-                            name: "RegisterSubnetFacet",
-                            abi: ia::register_subnet_facet::REGISTERSUBNETFACET_ABI
-                                .to_owned(),
-                        },
-                        EthFacet {
-                            name: "SubnetGetterFacet",
-                            abi: ia::subnet_getter_facet::SUBNETGETTERFACET_ABI.to_owned(),
-                        },
                         EthFacet {
                             name: "DiamondLoupeFacet",
                             abi: ia::diamond_loupe_facet::DIAMONDLOUPEFACET_ABI.to_owned(),
@@ -130,6 +117,17 @@ lazy_static! {
                         EthFacet {
                             name: "OwnershipFacet",
                             abi: ia::ownership_facet::OWNERSHIPFACET_ABI.to_owned(),
+                        },
+                        // The registry has its own facets:
+                        // https://github.com/consensus-shipyard/ipc-solidity-actors/blob/b01a2dffe367745f55111a65536a3f6fea9165f5/scripts/deploy-registry.template.ts#L58-L67
+                        EthFacet {
+                            name: "RegisterSubnetFacet",
+                            abi: ia::register_subnet_facet::REGISTERSUBNETFACET_ABI
+                                .to_owned(),
+                        },
+                        EthFacet {
+                            name: "SubnetGetterFacet",
+                            abi: ia::subnet_getter_facet::SUBNETGETTERFACET_ABI.to_owned(),
                         },
                     ],
                 },
@@ -469,6 +467,9 @@ pub mod registry {
         pub rewarder_facet: Address,
         pub pauser_facet: Address,
         pub checkpointer_facet: Address,
+        pub diamond_cut_facet: Address,
+        pub diamond_loupe_facet: Address,
+        pub ownership_facet: Address,
         pub subnet_getter_selectors: Vec<FunctionSelector>,
         pub subnet_manager_selectors: Vec<FunctionSelector>,
         pub subnet_rewarder_selectors: Vec<FunctionSelector>,

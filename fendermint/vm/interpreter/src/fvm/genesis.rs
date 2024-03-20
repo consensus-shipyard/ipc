@@ -341,15 +341,18 @@ where
                 let diamond_cut_facet = facets.remove(0);
                 let ownership_facet = facets.remove(0);
 
-                debug_assert_eq!(facets.len(), 4, "SubnetRegistry has 4 facets of its own");
+                debug_assert_eq!(facets.len(), 2, "SubnetRegistry has 2 facets of its own");
 
                 let params = ConstructorParameters {
                     gateway: gateway_addr,
                     getter_facet: getter_facet.facet_address,
                     manager_facet: manager_facet.facet_address,
                     rewarder_facet: rewarder_facet.facet_address,
-                    checkpointer_facet: checkpointer_facet.facet_address,
                     pauser_facet: pauser_facet.facet_address,
+                    checkpointer_facet: checkpointer_facet.facet_address,
+                    diamond_cut_facet: diamond_cut_facet.facet_address,
+                    diamond_loupe_facet: diamond_loupe_facet.facet_address,
+                    ownership_facet: ownership_facet.facet_address,
                     subnet_getter_selectors: getter_facet.function_selectors,
                     subnet_manager_selectors: manager_facet.function_selectors,
                     subnet_rewarder_selectors: rewarder_facet.function_selectors,
