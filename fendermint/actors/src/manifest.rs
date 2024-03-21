@@ -3,6 +3,7 @@
 use anyhow::{anyhow, Context};
 use cid::Cid;
 use fendermint_actor_accumulator::ACCUMULATOR_ACTOR_NAME;
+use fendermint_actor_adm::IPC_ADM_ACTOR_NAME;
 use fendermint_actor_chainmetadata::CHAINMETADATA_ACTOR_NAME;
 use fendermint_actor_eam::IPC_EAM_ACTOR_NAME;
 use fendermint_actor_objectstore::OBJECTSTORE_ACTOR_NAME;
@@ -14,6 +15,7 @@ use std::collections::HashMap;
 pub const REQUIRED_ACTORS: &[&str] = &[
     CHAINMETADATA_ACTOR_NAME,
     IPC_EAM_ACTOR_NAME,
+    IPC_ADM_ACTOR_NAME,
     OBJECTSTORE_ACTOR_NAME,
     ACCUMULATOR_ACTOR_NAME,
 ];

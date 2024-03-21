@@ -19,13 +19,14 @@ use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::MethodNum;
 
-use fendermint_vm_actor_interface::eam::CreateReturn;
+use fendermint_vm_actor_interface::{adm, eam};
 use fendermint_vm_message::chain::ChainMessage;
 
 use crate::message::{GasParams, SignedMessageFactory};
 use crate::query::{QueryClient, QueryResponse};
 use crate::response::{
-    decode_bytes, decode_cid, decode_fevm_create, decode_fevm_invoke, decode_os_get, decode_os_list,
+    decode_bytes, decode_cid, decode_fevm_create, decode_fevm_invoke, decode_machine_create,
+    decode_os_get, decode_os_list,
 };
 
 /// Abstracting away what the return value is based on whether
@@ -75,15 +76,29 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
         Ok(res)
     }
 
+    /// Create an object store.
+    async fn os_create(
+        &mut self,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<M::Response<adm::CreateReturn>> {
+        let mf = self.message_factory_mut();
+        let msg = mf.os_create(value, gas_params)?;
+        let fut = self.perform(msg, decode_machine_create);
+        let res = fut.await?;
+        Ok(res)
+    }
+
     /// Put an object into an object store.
     async fn os_put(
         &mut self,
+        address: Address,
         params: ObjectPutParams,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<M::Response<Cid>> {
         let mf = self.message_factory_mut();
-        let msg = mf.os_put(params, value, gas_params)?;
+        let msg = mf.os_put(address, params, value, gas_params)?;
         let fut = self.perform(msg, decode_cid);
         let res = fut.await?;
         Ok(res)
@@ -92,12 +107,13 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
     /// Delete an object from an object store.
     async fn os_delete(
         &mut self,
+        address: Address,
         params: ObjectDeleteParams,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<M::Response<Cid>> {
         let mf = self.message_factory_mut();
-        let msg = mf.os_delete(params, value, gas_params)?;
+        let msg = mf.os_delete(address, params, value, gas_params)?;
         let fut = self.perform(msg, decode_cid);
         let res = fut.await?;
         Ok(res)
@@ -106,12 +122,13 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
     /// Push an event to an accumulator.
     async fn acc_push(
         &mut self,
+        address: Address,
         event: Bytes,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<M::Response<Cid>> {
         let mf = self.message_factory_mut();
-        let msg = mf.acc_push(event, value, gas_params)?;
+        let msg = mf.acc_push(address, event, value, gas_params)?;
         let fut = self.perform(msg, decode_cid);
         let res = fut.await?;
         Ok(res)
@@ -124,7 +141,7 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
         constructor_args: Bytes,
         value: TokenAmount,
         gas_params: GasParams,
-    ) -> anyhow::Result<M::Response<CreateReturn>> {
+    ) -> anyhow::Result<M::Response<eam::CreateReturn>> {
         let mf = self.message_factory_mut();
         let msg = mf.fevm_create(contract, constructor_args, value, gas_params)?;
         let fut = self.perform(msg, decode_fevm_create);
@@ -159,6 +176,7 @@ pub trait CallClient: QueryClient + BoundClient {
     /// Get an object in an object store without including a transaction on the blockchain.
     async fn os_get_call(
         &mut self,
+        address: Address,
         params: ObjectGetParams,
         value: TokenAmount,
         gas_params: GasParams,
@@ -166,7 +184,7 @@ pub trait CallClient: QueryClient + BoundClient {
     ) -> anyhow::Result<CallResponse<Object>> {
         let msg = self
             .message_factory_mut()
-            .os_get(params, value, gas_params)?;
+            .os_get(address, params, value, gas_params)?;
 
         let response = self.call(msg, height).await?;
         if response.value.code.is_err() {
@@ -186,6 +204,7 @@ pub trait CallClient: QueryClient + BoundClient {
     /// List objects in an object store without including a transaction on the blockchain.
     async fn os_list_call(
         &mut self,
+        address: Address,
         params: ObjectListParams,
         value: TokenAmount,
         gas_params: GasParams,
@@ -193,7 +212,7 @@ pub trait CallClient: QueryClient + BoundClient {
     ) -> anyhow::Result<CallResponse<ObjectList>> {
         let msg = self
             .message_factory_mut()
-            .os_list(params, value, gas_params)?;
+            .os_list(address, params, value, gas_params)?;
 
         let response = self.call(msg, height).await?;
         if response.value.code.is_err() {
@@ -213,11 +232,14 @@ pub trait CallClient: QueryClient + BoundClient {
     /// Get root commitment in an accumulator without including a transaction on the blockchain.
     async fn acc_root_call(
         &mut self,
+        address: Address,
         value: TokenAmount,
         gas_params: GasParams,
         height: FvmQueryHeight,
     ) -> anyhow::Result<CallResponse<Cid>> {
-        let msg = self.message_factory_mut().acc_root(value, gas_params)?;
+        let msg = self
+            .message_factory_mut()
+            .acc_root(address, value, gas_params)?;
 
         let response = self.call(msg, height).await?;
         if response.value.code.is_err() {

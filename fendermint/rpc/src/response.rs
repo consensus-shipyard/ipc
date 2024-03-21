@@ -5,7 +5,7 @@ use base64::Engine;
 use bytes::Bytes;
 use cid::Cid;
 use fendermint_actor_objectstore::{Object, ObjectList};
-use fendermint_vm_actor_interface::eam::{self, CreateReturn};
+use fendermint_vm_actor_interface::{adm, eam};
 use fvm_ipld_encoding::{BytesDe, RawBytes};
 use tendermint::abci::response::DeliverTx;
 
@@ -35,7 +35,7 @@ pub fn decode_bytes(deliver_tx: &DeliverTx) -> anyhow::Result<RawBytes> {
 }
 
 /// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as [`CreateReturn`].
-pub fn decode_fevm_create(deliver_tx: &DeliverTx) -> anyhow::Result<CreateReturn> {
+pub fn decode_fevm_create(deliver_tx: &DeliverTx) -> anyhow::Result<eam::CreateReturn> {
     let data = decode_data(&deliver_tx.data)?;
     fvm_ipld_encoding::from_slice::<eam::CreateReturn>(&data)
         .map_err(|e| anyhow!("error parsing as CreateReturn: {e}"))
@@ -66,6 +66,13 @@ pub fn decode_cid(deliver_tx: &DeliverTx) -> anyhow::Result<Cid> {
     let data = decode_data(&deliver_tx.data)?;
     fvm_ipld_encoding::from_slice::<Cid>(&data)
         .map_err(|e| anyhow!("error parsing as Vec<u8>: {e}"))
+}
+
+/// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as [`CreateReturn`].
+pub fn decode_machine_create(deliver_tx: &DeliverTx) -> anyhow::Result<adm::CreateReturn> {
+    let data = decode_data(&deliver_tx.data)?;
+    fvm_ipld_encoding::from_slice::<adm::CreateReturn>(&data)
+        .map_err(|e| anyhow!("error parsing as CreateReturn: {e}"))
 }
 
 /// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as bytes.

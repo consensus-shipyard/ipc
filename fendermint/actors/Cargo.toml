@@ -10,6 +10,9 @@ fendermint_actor_chainmetadata = { path = "chainmetadata", features = [
     "fil-actor",
 ] }
 fendermint_actor_eam = { path = "eam", features = ["fil-actor"] }
+fendermint_actor_adm = { path = "adm", features = [
+    "fil-actor",
+] }
 fendermint_actor_objectstore = { path = "objectstore", features = [
     "fil-actor",
 ] }
@@ -24,6 +27,7 @@ fvm_ipld_blockstore = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 fendermint_actor_chainmetadata = { path = "chainmetadata" }
 fendermint_actor_eam = { path = "eam" }
+fendermint_actor_adm = { path = "adm" }
 fendermint_actor_objectstore = { path = "objectstore" }
 fendermint_actor_accumulator = { path = "accumulator" }
 

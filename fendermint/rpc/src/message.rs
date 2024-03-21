@@ -10,7 +10,7 @@ use fendermint_actor_objectstore::{
     ObjectDeleteParams, ObjectGetParams, ObjectKind, ObjectListParams, ObjectPutParams,
 };
 use fendermint_crypto::SecretKey;
-use fendermint_vm_actor_interface::{accumulator, eam, evm, objectstore};
+use fendermint_vm_actor_interface::{adm, eam, evm};
 use fendermint_vm_message::signed::Object;
 use fendermint_vm_message::{chain::ChainMessage, signed::SignedMessage};
 use fvm_ipld_encoding::{BytesSer, RawBytes};
@@ -194,9 +194,31 @@ impl SignedMessageFactory {
         Ok(chain)
     }
 
+    /// Create an object store.
+    pub fn os_create(
+        &mut self,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<ChainMessage> {
+        let input = adm::CreateExternalParams {
+            kind: adm::MachineKind::ObjectStore,
+        };
+        let params = RawBytes::serialize(input)?;
+        let message = self.transaction(
+            adm::ADM_ACTOR_ADDR,
+            adm::Method::CreateExternal as u64,
+            params,
+            value,
+            gas_params,
+            None,
+        )?;
+        Ok(message)
+    }
+
     /// Put an object into an object store.
     pub fn os_put(
         &mut self,
+        address: Address,
         params: ObjectPutParams,
         value: TokenAmount,
         gas_params: GasParams,
@@ -207,7 +229,7 @@ impl SignedMessageFactory {
         };
         let params = RawBytes::serialize(params)?;
         let message = self.transaction(
-            objectstore::OBJECTSTORE_ACTOR_ADDR,
+            address,
             fendermint_actor_objectstore::Method::PutObject as u64,
             params,
             value,
@@ -220,13 +242,14 @@ impl SignedMessageFactory {
     /// Delete an object from an object store.
     pub fn os_delete(
         &mut self,
+        address: Address,
         params: ObjectDeleteParams,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
         let params = RawBytes::serialize(params)?;
         let message = self.transaction(
-            objectstore::OBJECTSTORE_ACTOR_ADDR,
+            address,
             fendermint_actor_objectstore::Method::DeleteObject as u64,
             params,
             value,
@@ -239,13 +262,14 @@ impl SignedMessageFactory {
     /// Get an object from an object store. This will not create a transaction.
     pub fn os_get(
         &mut self,
+        address: Address,
         params: ObjectGetParams,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<Message> {
         let params = RawBytes::serialize(params)?;
         let message = self.transaction(
-            objectstore::OBJECTSTORE_ACTOR_ADDR,
+            address,
             fendermint_actor_objectstore::Method::GetObject as u64,
             params,
             value,
@@ -268,13 +292,14 @@ impl SignedMessageFactory {
     /// List objects in an object store. This will not create a transaction.
     pub fn os_list(
         &mut self,
+        address: Address,
         params: ObjectListParams,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<Message> {
         let params = RawBytes::serialize(params)?;
         let message = self.transaction(
-            objectstore::OBJECTSTORE_ACTOR_ADDR,
+            address,
             fendermint_actor_objectstore::Method::ListObjects as u64,
             params,
             value,
@@ -297,13 +322,14 @@ impl SignedMessageFactory {
     /// Push an event to an accumulator.
     pub fn acc_push(
         &mut self,
+        address: Address,
         event: Bytes,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
         let params = RawBytes::serialize(event.to_vec())?;
         let message = self.transaction(
-            accumulator::ACCUMULATOR_ACTOR_ADDR,
+            address,
             fendermint_actor_accumulator::Method::Push as u64,
             params,
             value,
@@ -316,11 +342,12 @@ impl SignedMessageFactory {
     /// Get the root commitment in an accumulator. This will not create a transaction.
     pub fn acc_root(
         &mut self,
+        address: Address,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<Message> {
         let message = self.transaction(
-            accumulator::ACCUMULATOR_ACTOR_ADDR,
+            address,
             fendermint_actor_accumulator::Method::Root as u64,
             RawBytes::default(),
             value,

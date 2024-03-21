@@ -11,7 +11,7 @@ use crate::{
 use anyhow::{bail, Context};
 use async_stm::atomically;
 use async_trait::async_trait;
-use fendermint_vm_actor_interface::{ipc, objectstore, system};
+use fendermint_vm_actor_interface::{adm, ipc, system};
 use fendermint_vm_ipfs_resolver::pool::{
     ResolveKey as IpfsResolveKey, ResolvePool as IpfsResolvePool,
 };
@@ -485,7 +485,7 @@ where
                 }
                 IpcMessage::ObjectResolved(obj) => {
                     let from = system::SYSTEM_ACTOR_ADDR;
-                    let to = objectstore::OBJECTSTORE_ACTOR_ADDR;
+                    let to = adm::ADM_ACTOR_ADDR; // FIXME: Object needs to carry address
                     let method_num =
                         fendermint_actor_objectstore::Method::ResolveExternalObject as u64;
                     let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;

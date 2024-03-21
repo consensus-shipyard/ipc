@@ -56,6 +56,6 @@ mkdir -p "$HOME/.fendermint/contracts"
 cp -r ./contracts/out/* "$HOME/.fendermint/contracts"
 
 # Build actors
-(cd fendermint && make actor-bundle)
+#(cd fendermint && make actor-bundle)
 cp fendermint/builtin-actors/output/bundle.car "$HOME/.fendermint/bundle.car"
 cp fendermint/actors/output/custom_actors_bundle.car "$HOME/.fendermint/custom_actors_bundle.car"

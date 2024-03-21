@@ -15,8 +15,7 @@ use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
 use fendermint_vm_actor_interface::{
-    account, accumulator, burntfunds, chainmetadata, cron, eam, init, ipc, objectstore, reward,
-    system, EMPTY_ARR,
+    account, adm, burntfunds, chainmetadata, cron, eam, init, ipc, reward, system, EMPTY_ARR,
 };
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Genesis, Power, PowerScale, Validator};
@@ -263,29 +262,20 @@ where
             )
             .context("failed to replace built in eam actor")?;
 
-        // Initialize the object store actor.
-        let objectstore_state = fendermint_actor_objectstore::State::new(&state.store())?;
+        // Initialize the adm actor.
+        let adm_state = fendermint_actor_adm::State::new(
+            &state.store(),
+            fendermint_actor_adm::PermissionModeParams::Unrestricted,
+        )?;
         state
             .create_custom_actor(
-                fendermint_actor_objectstore::OBJECTSTORE_ACTOR_NAME,
-                objectstore::OBJECTSTORE_ACTOR_ID,
-                &objectstore_state,
+                adm::ADM_ACTOR_NAME,
+                adm::ADM_ACTOR_ID,
+                &adm_state,
                 TokenAmount::zero(),
                 None,
             )
-            .context("failed to create objectstore actor")?;
-
-        // Initialize the accumulator actor.
-        let accumulator_state = fendermint_actor_accumulator::State::new(&state.store())?;
-        state
-            .create_custom_actor(
-                fendermint_actor_accumulator::ACCUMULATOR_ACTOR_NAME,
-                accumulator::ACCUMULATOR_ACTOR_ID,
-                &accumulator_state,
-                TokenAmount::zero(),
-                None,
-            )
-            .context("failed to create accumulator actor")?;
+            .context("failed to create built in adm actor")?;
 
         // STAGE 2: Create non-builtin accounts which do not have a fixed ID.
 

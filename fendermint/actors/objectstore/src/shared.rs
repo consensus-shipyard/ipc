@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use cid::Cid;
+use fil_actors_evm_shared::address::EthAddress;
 use fvm_ipld_encoding::{strict_bytes, tuple::*};
 use fvm_shared::METHOD_CONSTRUCTOR;
 use num_derive::FromPrimitive;
@@ -10,6 +11,12 @@ use num_derive::FromPrimitive;
 pub use crate::state::{Object, ObjectKind, ObjectList, ObjectListItem, State};
 
 pub const OBJECTSTORE_ACTOR_NAME: &str = "objectstore";
+
+#[derive(Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct ConstructorParams {
+    /// The machine creator
+    pub creator: EthAddress,
+}
 
 /// Params for putting an object.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
@@ -28,16 +35,16 @@ pub struct ObjectResolveParams {
     pub value: Cid,
 }
 
-/// Params for getting an object.
+/// Params for deleting an object.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct ObjectGetParams {
+pub struct ObjectDeleteParams {
     #[serde(with = "strict_bytes")]
     pub key: Vec<u8>,
 }
 
-/// Params for deleting an object.
+/// Params for getting an object.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct ObjectDeleteParams {
+pub struct ObjectGetParams {
     #[serde(with = "strict_bytes")]
     pub key: Vec<u8>,
 }

@@ -5,9 +5,8 @@
 use cid::Cid;
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
-    builtin::singletons::SYSTEM_ACTOR_ADDR,
     runtime::{ActorCode, Runtime},
-    ActorDowncast, ActorError, FIRST_EXPORTED_METHOD_NUMBER,
+    ActorDowncast, ActorError, FIRST_EXPORTED_METHOD_NUMBER, SYSTEM_ACTOR_ADDR,
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::{error::ExitCode, MethodNum};

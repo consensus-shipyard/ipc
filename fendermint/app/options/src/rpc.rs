@@ -67,20 +67,6 @@ pub enum RpcCommands {
         #[command(flatten)]
         args: TransArgs,
     },
-    /// Subcommands related to Object Stores.
-    Os {
-        #[command(subcommand)]
-        command: RpcObjectStoreCommands,
-        #[command(flatten)]
-        args: TransArgs,
-    },
-    /// Subcommands related to Accumulators.
-    Acc {
-        #[command(subcommand)]
-        command: RpcAccumulatorCommands,
-        #[command(flatten)]
-        args: TransArgs,
-    },
     /// Subcommands related to FEVM.
     Fevm {
         #[command(subcommand)]
@@ -106,61 +92,6 @@ pub enum RpcQueryCommands {
     },
     /// Get the slowly changing state parameters.
     StateParams,
-}
-
-#[derive(Subcommand, Debug, Clone)]
-pub enum RpcObjectStoreCommands {
-    // Object Store operations
-    /// Put a new key-value pair into an object store.
-    Put {
-        #[arg(long, short)]
-        key: String,
-        #[arg(long, short)]
-        value: Cid,
-    },
-    /// Delete the value at a key from an object store.
-    Delete {
-        #[arg(long, short)]
-        key: String,
-    },
-    /// Get the value of a key from an object store.
-    Get {
-        #[arg(long, short)]
-        key: String,
-        /// Block height to query; 0 means latest.
-        #[arg(long, short = 'b', default_value_t = 0)]
-        height: u64,
-    },
-    /// List all keys in an object store.
-    List {
-        #[arg(long, short, default_value = "")]
-        prefix: String,
-        #[arg(long, short, default_value = "")]
-        delimiter: String,
-        #[arg(long, short, default_value_t = 0)]
-        offset: u64,
-        #[arg(long, short, default_value_t = 0)]
-        limit: u64,
-        /// Block height to query; 0 means latest.
-        #[arg(long, short = 'b', default_value_t = 0)]
-        height: u64,
-    },
-}
-
-#[derive(Subcommand, Debug, Clone)]
-pub enum RpcAccumulatorCommands {
-    /// Push a new event into an accumulator.
-    Push {
-        /// Content to push into the data repo for tracking.
-        #[arg(long, short)]
-        event: Bytes,
-    },
-    /// Get the root commitment of an accumulator.
-    Root {
-        /// Block height to query; 0 means latest.
-        #[arg(long, short = 'b', default_value_t = 0)]
-        height: u64,
-    },
 }
 
 #[derive(Subcommand, Debug, Clone)]

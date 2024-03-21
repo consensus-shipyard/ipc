@@ -15,6 +15,7 @@ use bytes::{Buf, Bytes};
 use cid::Cid;
 use futures_util::{Stream, StreamExt};
 use fvm_ipld_encoding::strict_bytes::ByteBuf;
+use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::BLOCK_GAS_LIMIT;
 use ipfs_api_backend_hyper::{IpfsApi, IpfsClient, TryFromUri};
@@ -38,6 +39,7 @@ use fendermint_app_settings::proxy::ProxySettings;
 use fendermint_rpc::client::FendermintClient;
 use fendermint_rpc::message::GasParams;
 use fendermint_rpc::tx::{CallClient, TxClient};
+use fendermint_vm_actor_interface::adm::CreateReturn;
 use fendermint_vm_message::query::FvmQueryHeight;
 
 use crate::cmd;
@@ -68,7 +70,14 @@ cmd! {
                     .and(warp::get()).and_then(health);
 
                 // Object Store routes
-                let upload_route = warp::path!("v1" / "os" / String)
+                let os_create_route = warp::path!("v1" / "os")
+                    .and(warp::post())
+                    .and(with_client(client.clone()))
+                    .and(with_args(args.clone()))
+                    .and(with_nonce(nonce.clone()))
+                    .and(warp::header::optional::<u64>("X-DataRepo-GasLimit"))
+                    .and_then(handle_os_create);
+                let os_upload_route = warp::path!("v1" / "os" / Address / String)
                     .and(warp::put())
                     .and(warp::body::content_length_limit(MAX_OBJECT_LENGTH))
                     .and(with_client(client.clone()))
@@ -79,14 +88,14 @@ cmd! {
                     .and(warp::header::optional::<u64>("X-DataRepo-GasLimit"))
                     .and(warp::body::stream())
                     .and_then(handle_os_upload);
-                let delete_route = warp::path!("v1" / "os" / String)
+                let os_delete_route = warp::path!("v1" / "os" / Address / String)
                     .and(warp::delete())
                     .and(with_client(client.clone()))
                     .and(with_args(args.clone()))
                     .and(with_nonce(nonce.clone()))
                     .and(warp::header::optional::<u64>("X-DataRepo-GasLimit"))
                     .and_then(handle_os_delete);
-                let get_route = warp::path!("v1" / "os" / String)
+                let os_get_route = warp::path!("v1" / "os" / Address / String)
                     .and(
                         warp::get().or(warp::head()).unify()
                     )
@@ -96,7 +105,7 @@ cmd! {
                     .and(warp::query::<HeightQuery>())
                     .and(warp::header::optional::<String>("Range"))
                     .and_then(handle_os_get);
-                let list_route = warp::path!("v1" / "os")
+                let os_list_route = warp::path!("v1" / "os" / Address)
                     .and(warp::get())
                     .and(with_client(client.clone()))
                     .and(with_args(args.clone()))
@@ -105,7 +114,7 @@ cmd! {
                     .and_then(handle_os_list);
 
                 // Accumulator routes
-                let push_route = warp::path!("v1" / "acc")
+                let acc_push_route = warp::path!("v1" / "acc" / Address)
                     .and(warp::put())
                     .and(warp::body::content_length_limit(MAX_EVENT_LENGTH))
                     .and(with_client(client.clone()))
@@ -114,7 +123,7 @@ cmd! {
                     .and(warp::header::optional::<u64>("X-DataRepo-GasLimit"))
                     .and(warp::body::bytes())
                     .and_then(handle_acc_push);
-                let root_route = warp::path!("v1" / "acc")
+                let acc_root_route = warp::path!("v1" / "acc" / Address)
                     .and(warp::get())
                     .and(with_client(client))
                     .and(with_args(args))
@@ -122,12 +131,13 @@ cmd! {
                     .and_then(handle_acc_root);
 
                 let router = health_route
-                    .or(upload_route)
-                    .or(delete_route)
-                    .or(get_route)
-                    .or(list_route)
-                    .or(push_route)
-                    .or(root_route)
+                    .or(os_create_route)
+                    .or(os_upload_route)
+                    .or(os_delete_route)
+                    .or(os_get_route)
+                    .or(os_list_route)
+                    .or(acc_push_route)
+                    .or(acc_root_route)
                     .with(warp::cors().allow_any_origin()
                         .allow_headers(vec!["Content-Type"])
                         .allow_methods(vec!["PUT", "DEL", "GET", "HEAD"]))
@@ -175,8 +185,29 @@ async fn health() -> Result<impl Reply, Rejection> {
     Ok(warp::reply::reply())
 }
 
+async fn handle_os_create(
+    client: FendermintClient,
+    mut args: TransArgs,
+    nonce: Arc<Mutex<u64>>,
+    gas_limit: Option<u64>,
+) -> Result<impl Reply, Rejection> {
+    let mut nonce_lck = nonce.lock().await;
+    args.sequence = *nonce_lck;
+    args.gas_limit = gas_limit.unwrap_or(BLOCK_GAS_LIMIT);
+
+    let res = os_create(client, args).await.map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("create error: {}", e),
+        })
+    })?;
+
+    *nonce_lck += 1;
+    Ok(warp::reply::json(&res))
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn handle_os_upload(
+    address: Address,
     key: String,
     client: FendermintClient,
     ipfs: IpfsClient,
@@ -273,7 +304,7 @@ async fn handle_os_upload(
         }
     };
 
-    let res = os_put(client, args, params).await.map_err(|e| {
+    let res = os_put(client, args, address, params).await.map_err(|e| {
         Rejection::from(BadRequest {
             message: format!("put error: {}", e),
         })
@@ -284,6 +315,7 @@ async fn handle_os_upload(
 }
 
 async fn handle_os_delete(
+    address: Address,
     key: String,
     client: FendermintClient,
     mut args: TransArgs,
@@ -297,11 +329,13 @@ async fn handle_os_delete(
     let params = ObjectDeleteParams {
         key: key.into_bytes(),
     };
-    let res = os_delete(client, args, params).await.map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("delete error: {}", e),
-        })
-    })?;
+    let res = os_delete(client, args, address, params)
+        .await
+        .map_err(|e| {
+            Rejection::from(BadRequest {
+                message: format!("delete error: {}", e),
+            })
+        })?;
 
     *nonce_lck += 1;
     Ok(warp::reply::json(&res))
@@ -350,6 +384,7 @@ impl From<ParseIntError> for ProxyError {
 }
 
 async fn handle_os_get(
+    address: Address,
     key: String,
     client: FendermintClient,
     ipfs: IpfsClient,
@@ -360,7 +395,7 @@ async fn handle_os_get(
     let params = ObjectGetParams {
         key: key.into_bytes(),
     };
-    let res = os_get(client, args, params, hq.height.unwrap_or(0))
+    let res = os_get(client, args, address, params, hq.height.unwrap_or(0))
         .await
         .map_err(|e| {
             Rejection::from(BadRequest {
@@ -478,6 +513,7 @@ struct ListQuery {
 }
 
 async fn handle_os_list(
+    address: Address,
     client: FendermintClient,
     args: TransArgs,
     options: ListQuery,
@@ -489,7 +525,7 @@ async fn handle_os_list(
         offset: options.offset.unwrap_or(0),
         limit: options.limit.unwrap_or(0),
     };
-    let res = os_list(client, args, params, hq.height.unwrap_or(0))
+    let res = os_list(client, args, address, params, hq.height.unwrap_or(0))
         .await
         .map_err(|e| {
             Rejection::from(BadRequest {
@@ -528,6 +564,7 @@ async fn handle_os_list(
 }
 
 async fn handle_acc_push(
+    address: Address,
     client: FendermintClient,
     mut args: TransArgs,
     nonce: Arc<Mutex<u64>>,
@@ -538,7 +575,7 @@ async fn handle_acc_push(
     args.sequence = *nonce_lck;
     args.gas_limit = gas_limit.unwrap_or(BLOCK_GAS_LIMIT);
 
-    let res = acc_push(client.clone(), args.clone(), body)
+    let res = acc_push(client.clone(), args.clone(), address, body)
         .await
         .map_err(|e| {
             Rejection::from(BadRequest {
@@ -551,11 +588,12 @@ async fn handle_acc_push(
 }
 
 async fn handle_acc_root(
+    address: Address,
     client: FendermintClient,
     args: TransArgs,
     hq: HeightQuery,
 ) -> Result<impl Reply, Rejection> {
-    let res = acc_root(client, args, hq.height.unwrap_or(0))
+    let res = acc_root(client, args, address, hq.height.unwrap_or(0))
         .await
         .map_err(|e| {
             Rejection::from(BadRequest {
@@ -615,7 +653,7 @@ enum TxnStatus {
 }
 
 #[derive(Clone, Debug, Serialize)]
-struct Txn {
+struct Txn<D> {
     pub status: TxnStatus,
     pub hash: Hash,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -623,40 +661,40 @@ struct Txn {
     #[serde(skip_serializing_if = "i64::is_zero")]
     pub gas_used: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub state: Option<String>,
+    pub data: Option<D>,
 }
 
-impl Txn {
+impl<D> Txn<D> {
     fn pending(hash: Hash) -> Self {
         Txn {
             status: TxnStatus::Pending,
             hash,
             height: None,
             gas_used: 0,
-            state: None,
+            data: None,
         }
     }
 
-    fn committed(hash: Hash, height: Height, gas_used: i64, state: Cid) -> Self {
+    fn committed(hash: Hash, height: Height, gas_used: i64, data: Option<D>) -> Self {
         Txn {
             status: TxnStatus::Committed,
             hash,
             height: Some(height),
             gas_used,
-            state: Some(state.to_string()),
+            data,
         }
     }
 }
 
 /// Create a client, make a call to Tendermint with a closure, then maybe extract some JSON
 /// depending on the return value, finally return the result in JSON.
-async fn broadcast<F>(client: FendermintClient, args: TransArgs, f: F) -> anyhow::Result<Txn>
+async fn broadcast<F, D>(client: FendermintClient, args: TransArgs, f: F) -> anyhow::Result<Txn<D>>
 where
     F: FnOnce(
         TransClient,
         TokenAmount,
         GasParams,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<BroadcastResponse<Cid>>> + Send>>,
+    ) -> Pin<Box<dyn Future<Output = anyhow::Result<BroadcastResponse<D>>> + Send>>,
 {
     let client = TransClient::new(client, &args)?;
     let gas_params = gas_params(&args);
@@ -679,19 +717,27 @@ where
                 res.response.hash,
                 res.response.height,
                 res.response.deliver_tx.gas_used,
-                res.return_data.unwrap_or_default(),
+                res.return_data,
             )
         }
     })
 }
 
+async fn os_create(client: FendermintClient, args: TransArgs) -> anyhow::Result<Txn<CreateReturn>> {
+    broadcast(client, args, |mut client, value, gas_params| {
+        Box::pin(async move { client.os_create(value, gas_params).await })
+    })
+    .await
+}
+
 async fn os_put(
     client: FendermintClient,
     args: TransArgs,
+    address: Address,
     params: ObjectPutParams,
-) -> anyhow::Result<Txn> {
+) -> anyhow::Result<Txn<Cid>> {
     broadcast(client, args, |mut client, value, gas_params| {
-        Box::pin(async move { client.os_put(params, value, gas_params).await })
+        Box::pin(async move { client.os_put(address, params, value, gas_params).await })
     })
     .await
 }
@@ -699,10 +745,11 @@ async fn os_put(
 async fn os_delete(
     client: FendermintClient,
     args: TransArgs,
+    address: Address,
     params: ObjectDeleteParams,
-) -> anyhow::Result<Txn> {
+) -> anyhow::Result<Txn<Cid>> {
     broadcast(client, args, |mut client, value, gas_params| {
-        Box::pin(async move { client.os_delete(params, value, gas_params).await })
+        Box::pin(async move { client.os_delete(address, params, value, gas_params).await })
     })
     .await
 }
@@ -710,6 +757,7 @@ async fn os_delete(
 async fn os_get(
     client: FendermintClient,
     args: TransArgs,
+    address: Address,
     params: ObjectGetParams,
     height: u64,
 ) -> anyhow::Result<Option<Object>> {
@@ -719,7 +767,7 @@ async fn os_get(
 
     let res = client
         .inner
-        .os_get_call(params, TokenAmount::default(), gas_params, h)
+        .os_get_call(address, params, TokenAmount::default(), gas_params, h)
         .await?;
 
     Ok(res.return_data)
@@ -728,6 +776,7 @@ async fn os_get(
 async fn os_list(
     client: FendermintClient,
     args: TransArgs,
+    address: Address,
     params: ObjectListParams,
     height: u64,
 ) -> anyhow::Result<Option<ObjectList>> {
@@ -737,15 +786,20 @@ async fn os_list(
 
     let res = client
         .inner
-        .os_list_call(params, TokenAmount::default(), gas_params, h)
+        .os_list_call(address, params, TokenAmount::default(), gas_params, h)
         .await?;
 
     Ok(res.return_data)
 }
 
-async fn acc_push(client: FendermintClient, args: TransArgs, event: Bytes) -> anyhow::Result<Txn> {
+async fn acc_push(
+    client: FendermintClient,
+    args: TransArgs,
+    address: Address,
+    event: Bytes,
+) -> anyhow::Result<Txn<Cid>> {
     broadcast(client, args, |mut client, value, gas_params| {
-        Box::pin(async move { client.acc_push(event, value, gas_params).await })
+        Box::pin(async move { client.acc_push(address, event, value, gas_params).await })
     })
     .await
 }
@@ -753,6 +807,7 @@ async fn acc_push(client: FendermintClient, args: TransArgs, event: Bytes) -> an
 async fn acc_root(
     client: FendermintClient,
     args: TransArgs,
+    address: Address,
     height: u64,
 ) -> anyhow::Result<Option<Cid>> {
     let mut client = TransClient::new(client, &args)?;
@@ -761,7 +816,7 @@ async fn acc_root(
 
     let res = client
         .inner
-        .acc_root_call(TokenAmount::default(), gas_params, h)
+        .acc_root_call(address, TokenAmount::default(), gas_params, h)
         .await?;
 
     Ok(res.return_data)
