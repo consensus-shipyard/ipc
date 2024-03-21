@@ -28,6 +28,24 @@ library LibLinkedToken {
         s._linkedContract = linkedContract;
     }
 
+    function setGateway(address gateway) internal  {
+        LinkedTokenStorage storage s = LibLinkedTokenStorage.appStorage();
+        s._gatewayAddr = gateway;
+    }
+
+    function setLinkedSubnet(SubnetID memory linkedSubnet) internal  {
+        LinkedTokenStorage storage s = LibLinkedTokenStorage.appStorage();
+        s._linkedSubnet = linkedSubnet;
+    }
+
+
+
+
+
+    function setUnderlyingToken(address tokenAddress) internal returns (IERC20) {
+        LinkedTokenStorage storage s = LibLinkedTokenStorage.appStorage();
+        s._underlying = IERC20(tokenAddress);
+    }
 
 
     function getUnderlyingToken() internal view returns (IERC20) {

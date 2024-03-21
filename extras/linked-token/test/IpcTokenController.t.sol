@@ -117,11 +117,11 @@ contract IpcTokenControllerTest is Test, IntegrationTestBase, LinkedTokenTestBas
                 kind: IpcMsgKind.Call,
                 from: IPCAddress({
                     subnetId: replicaSubnetName,
-                    rawAddress: FvmAddressHelper.from(address(controller))
+                    rawAddress: FvmAddressHelper.from(address(replica))
                 }),
                 to: IPCAddress({
                     subnetId: controllerSubnet,
-                    rawAddress: FvmAddressHelper.from(address(replica))
+                    rawAddress: FvmAddressHelper.from(address(controller))
                 }),
                 value: DEFAULT_CROSS_MSG_FEE,
                 nonce: 0,
@@ -137,7 +137,7 @@ contract IpcTokenControllerTest is Test, IntegrationTestBase, LinkedTokenTestBas
                 }),
                 to: IPCAddress({
                     subnetId: controllerSubnet,
-                    rawAddress: FvmAddressHelper.from(address(replica))
+                    rawAddress: FvmAddressHelper.from(address(controller))
                 }),
                 value: DEFAULT_CROSS_MSG_FEE,
                 nonce: 0,
@@ -149,21 +149,20 @@ contract IpcTokenControllerTest is Test, IntegrationTestBase, LinkedTokenTestBas
                 kind: IpcMsgKind.Call,
                 from: IPCAddress({
                     subnetId: controllerSubnet, /* invalid */
-                    rawAddress: FvmAddressHelper.from(address(controller))
+                    rawAddress: FvmAddressHelper.from(address(replica))
                 }),
                 to: IPCAddress({
                     subnetId: controllerSubnet,
-                    rawAddress: FvmAddressHelper.from(address(replica))
+                    rawAddress: FvmAddressHelper.from(address(controller))
                 }),
                 value: DEFAULT_CROSS_MSG_FEE,
                 nonce: 0,
                 message: abi.encode(message)
             });
 
+        LinkedTokenControllerFacet(address(controller))._validateEnvelope(validMsg);
 
-        //TODO investigate valid envelope and the correct type in the invalidContract revert
-
-        vm.expectRevert();
+        vm.expectRevert( InvalidOriginContract.selector);
         LinkedTokenControllerFacet(address(controller))._validateEnvelope(invalidContract);
 
         vm.expectRevert(InvalidOriginSubnet.selector);
@@ -179,8 +178,7 @@ contract IpcTokenControllerTest is Test, IntegrationTestBase, LinkedTokenTestBas
         );
     }
 
-    // XXX TODO investigate
-    function _testParentSubnet() public {
+    function testParentSubnet() public {
         assertTrue(
             controllerSubnet.equals(LinkedTokenReplicaFacet(address(replica)).getLinkedSubnet()),
             "replica Subnetdoes not match"

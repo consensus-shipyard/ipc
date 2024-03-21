@@ -2,6 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {LinkedTokenStorage} from "./lib/LibLinkedTokenStorage.sol";
+import {LibLinkedToken} from "./lib/LibLinkedToken.sol";
 
 import {IDiamond} from "@ipc/src/interfaces/IDiamond.sol";
 import {IDiamondCut} from "@ipc/src/interfaces/IDiamondCut.sol";
@@ -37,9 +38,9 @@ contract LinkedTokenDiamond {
         ds.supportedInterfaces[type(IDiamondCut).interfaceId] = true;
         ds.supportedInterfaces[type(IDiamondLoupe).interfaceId] = true;
 
-        s._underlying = IERC20(params.underlyingToken);
-        s._gatewayAddr = params.gateway;
-        s._linkedSubnet = params.linkedSubnet;
+        LibLinkedToken.setUnderlyingToken(params.underlyingToken);
+        LibLinkedToken.setGateway(params.gateway);
+        LibLinkedToken.setLinkedSubnet(params.linkedSubnet);
 
     }
 
