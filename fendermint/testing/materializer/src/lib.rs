@@ -405,7 +405,7 @@ mod tests {
 
         let hops0 = bar.ancestor_hops(false);
         let hops1 = bar.ancestor_hops(true);
-        let hops = vec![(rn, foo.clone()), (foo, bar)];
+        let hops = [(rn, foo.clone()), (foo, bar)];
 
         assert_eq!(hops0[..], hops[..1]);
         assert_eq!(hops1[..], hops[..]);

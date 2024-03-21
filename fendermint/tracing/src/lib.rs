@@ -11,11 +11,12 @@
 /// we won't have the restriction of flat events.
 ///
 /// The emitted [tracing::Event] will contain the name of the event twice:
-/// in the [tracing::metadata::Metadata::name] field and under the `event` key in the [tracing::field::ValueSet].
+/// in the [tracing::metadata::Metadata::name] field as `"event::<name>"` and under the `event` key in the [tracing::field::ValueSet].
 /// The rationale is that we can write a [tracing::Subscriber] that looks for the events it is interested in using
-/// the `name`, which by default would be `event <file>:<line>`. But it turns out it's impossible to ask the
+/// the `name`, or find all events by filtering on the `event::` prefix.
+/// By default `name` would be `event <file>:<line>`, but it turns out it's impossible to ask the
 /// [log formatter](https://github.com/tokio-rs/tracing/blob/908cc432a5994f6e17c8f36e13c217dc40085704/tracing-subscriber/src/fmt/format/mod.rs#L930)
-/// to output the name, and for all other traces it would be redundant with the filename and line we print,
+/// to output the `name``, and for all other traces it would be redundant with the filename and line we print,
 /// which are available separately on the metadata, hence the `event` key which will be displayed instead.
 ///
 /// ### Example
@@ -44,7 +45,7 @@ macro_rules! emit {
             };
         }
         tracing::event!(
-            name: stringify!($event),
+            name: concat!("event::", stringify!($event)),
             tracing::Level::INFO,
             { event = tracing::field::display(stringify!($event)), $($field $(= $value)?),* }
         )

@@ -208,7 +208,7 @@ where
                         is_null: true,
                         block_height: height,
                         block_hash: None::<BlockHashHex>,
-                        num_topdown_msgs: 0,
+                        num_msgs: 0,
                         num_validator_changes: 0
                     });
 
@@ -259,7 +259,7 @@ where
             is_null: false,
             block_height: height,
             block_hash: Some(&hex::encode(&data.0)),
-            num_topdown_msgs: data.2.len(),
+            num_msgs: data.2.len(),
             num_validator_changes: data.1.len(),
         });
 
