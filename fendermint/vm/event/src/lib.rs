@@ -5,6 +5,7 @@ pub type BlockHeight = u64;
 /// Hex encoded block hash.
 pub type BlockHashHex<'a> = &'a str;
 
+#[derive(Debug, Default)]
 pub struct NewParentView<'a> {
     pub is_null: bool,
     pub block_height: BlockHeight,
@@ -13,11 +14,13 @@ pub struct NewParentView<'a> {
     pub num_validator_changes: usize,
 }
 
+#[derive(Debug, Default)]
 pub struct ParentFinalityCommitted<'a> {
     pub block_height: BlockHeight,
     pub block_hash: BlockHashHex<'a>,
 }
 
+#[derive(Debug, Default)]
 pub struct NewBottomUpCheckpoint<'a> {
     pub block_height: BlockHeight,
     pub block_hash: BlockHashHex<'a>,

@@ -4,11 +4,11 @@
 
 use std::marker::PhantomData;
 
-use prometheus;
 use tracing::{Event, Level, Subscriber};
 use tracing_subscriber::{filter, layer, registry::LookupSpan, Layer};
 
 use super::prometheus::app as am;
+use crate::events::*;
 
 pub fn layer<S>() -> impl Layer<S>
 where
@@ -32,53 +32,79 @@ impl<S> MetricsLayer<S> {
     }
 }
 
+macro_rules! check_field {
+    ($event_ty:ident :: $field:ident) => {{
+        if false {
+            // Check that the field exist; if it doesn't this won't compile.
+            let _event = $event_ty {
+                $field: 0,
+                ..Default::default()
+            };
+        }
+    }};
+}
+
+macro_rules! set_gauge {
+    ($event:expr, $event_ty:ident :: $field:ident, $gauge:expr) => {
+        check_field!($event_ty::$field);
+        let mut fld = visitors::FindU64::new(stringify!($field));
+        $event.record(&mut fld);
+        $gauge.set(fld.value as i64);
+    };
+}
+
+macro_rules! inc_counter {
+    ($event:expr, $event_ty:ident :: $field:ident, $counter:expr) => {
+        check_field!($event_ty::$field);
+        let mut fld = visitors::FindU64::new(stringify!($field));
+        $event.record(&mut fld);
+        $counter.inc_by(fld.value);
+    };
+}
+
 impl<S: Subscriber> Layer<S> for MetricsLayer<S> {
     fn on_event(&self, event: &Event<'_>, _ctx: layer::Context<'_, S>) {
         match event.metadata().name() {
             "event::NewParentView" => {
-                set_block_height(event, &am::TOPDOWN_VIEW_BLOCK_HEIGHT);
-                inc_num_msgs(event, &am::TOPDOWN_VIEW_NUM_MSGS);
-                inc_counter(
+                set_gauge!(
                     event,
-                    &am::TOPDOWN_VIEW_NUM_VAL_CHNGS,
-                    "num_validator_changes",
+                    NewParentView::block_height,
+                    &am::TOPDOWN_VIEW_BLOCK_HEIGHT
+                );
+                inc_counter!(event, NewParentView::num_msgs, &am::TOPDOWN_VIEW_NUM_MSGS);
+                inc_counter!(
+                    event,
+                    NewParentView::num_validator_changes,
+                    am::TOPDOWN_VIEW_NUM_VAL_CHNGS
                 );
             }
             "event::ParentFinalityCommitted" => {
-                set_block_height(event, &am::TOPDOWN_FINALIZED_BLOCK_HEIGHT);
+                set_gauge!(
+                    event,
+                    ParentFinalityCommitted::block_height,
+                    &am::TOPDOWN_FINALIZED_BLOCK_HEIGHT
+                );
             }
             "event::NewBottomUpCheckpoint" => {
-                set_block_height(event, &am::BOTTOMUP_CKPT_BLOCK_HEIGHT);
-                inc_num_msgs(event, &am::BOTTOMUP_CKPT_NUM_MSGS);
-                set_gauge(
+                set_gauge!(
                     event,
-                    &am::BOTTOMUP_CKPT_CONFIG_NUM,
-                    "next_configuration_number",
+                    NewBottomUpCheckpoint::block_height,
+                    &am::BOTTOMUP_CKPT_BLOCK_HEIGHT
+                );
+                set_gauge!(
+                    event,
+                    NewBottomUpCheckpoint::next_configuration_number,
+                    &am::BOTTOMUP_CKPT_CONFIG_NUM
+                );
+                inc_counter!(
+                    event,
+                    NewBottomUpCheckpoint::num_msgs,
+                    &am::BOTTOMUP_CKPT_NUM_MSGS
                 );
             }
             _ => {}
         }
     }
-}
-
-fn set_block_height(event: &Event<'_>, gauge: &prometheus::IntGauge) {
-    set_gauge(event, gauge, "block_height")
-}
-
-fn set_gauge(event: &Event<'_>, gauge: &prometheus::IntGauge, name: &str) {
-    let mut block_height = visitors::FindU64::new(name);
-    event.record(&mut block_height);
-    gauge.set(block_height.value as i64);
-}
-
-fn inc_num_msgs(event: &Event<'_>, counter: &prometheus::IntCounter) {
-    inc_counter(event, counter, "num_msgs")
-}
-
-fn inc_counter(event: &Event<'_>, counter: &prometheus::IntCounter, name: &str) {
-    let mut num_msgs = visitors::FindU64::new(name);
-    event.record(&mut num_msgs);
-    counter.inc_by(num_msgs.value);
 }
 
 mod visitors {
