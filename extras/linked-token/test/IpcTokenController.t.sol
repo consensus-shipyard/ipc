@@ -2,7 +2,7 @@
 pragma solidity 0.8.23;
 
 import "forge-std/Test.sol";
-import "../src/LinkedTokenReplica.sol";
+import "../src/LinkedTokenDiamond.sol";
 import {IntegrationTestBase} from "@ipc/test/IntegrationTestBase.sol";
 import {GatewayDiamond} from "@ipc/src/GatewayDiamond.sol";
 import {SubnetIDHelper} from "@ipc/src/lib/SubnetIDHelper.sol";
@@ -10,22 +10,31 @@ import {SubnetID, IPCAddress} from "@ipc/src/structs/Subnet.sol";
 import {FvmAddressHelper} from "@ipc/src/lib/FvmAddressHelper.sol";
 import {FvmAddress} from "@ipc/src/structs/FvmAddress.sol";
 
+import "../src/LinkedTokenControllerFacet.sol";
+import "../src/LinkedTokenReplicaFacet.sol";
+import "@ipc/src/diamond/DiamondCutFacet.sol";
+import "@ipc/src/diamond/DiamondLoupeFacet.sol";
+import "@ipc/src/OwnershipFacet.sol";
+
+
 import {
     InvalidOriginContract,
     InvalidOriginSubnet
-} from "../src/LinkedToken.sol";
+} from "../src/LinkedTokenFacet.sol";
+
+
 import {IpcEnvelope, CallMsg, IpcMsgKind} from "@ipc/src/structs/CrossNet.sol";
 
 import {SubnetActorDiamond} from "@ipc/src/SubnetActorDiamond.sol";
-import {LinkedTokenController} from "../src/LinkedTokenController.sol";
+import {LinkedTokenDiamond} from "../src/LinkedTokenDiamond.sol";
 //import {InvalidOriginContract, InvalidOriginSubnet} from "../src/@ipc/src/examples/cross-token/IpcCrossTokenErrors.sol";
 import {USDCTest} from "../src/USDCTest.sol";
 
 contract IpcTokenControllerTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
 
-    LinkedTokenController controller;
-    LinkedTokenReplica replica;
+    LinkedTokenControllerFacet controller;
+    LinkedTokenReplicaFacet replica;
     address controllerSubnetUSDC;
     SubnetID controllerSubnet;
     SubnetID replicaSubnetName;
@@ -51,11 +60,6 @@ contract IpcTokenControllerTest is Test, IntegrationTestBase {
         require(controllerSubnet.isRoot(), "not root");
         rootGateway = createGatewayDiamond(gatewayParams(controllerSubnet));
         gateway = address(rootGateway);
-        replica = new LinkedTokenReplica(
-            gateway,
-            controllerSubnetUSDC,
-            controllerSubnet
-        );
         rootNativeSubnetActor = createSubnetActor(
             defaultSubnetActorParamsWith(address(rootGateway), controllerSubnet)
         );
@@ -73,15 +77,47 @@ contract IpcTokenControllerTest is Test, IntegrationTestBase {
             address(rootNativeSubnetActor),
             rootGateway
         );
-
+/*
         controller = new LinkedTokenController(
             gateway,
             controllerSubnetUSDC,
             replicaSubnetName
         );
 
+        replica = new LinkedTokenReplica(
+            gateway,
+            controllerSubnetUSDC,
+            controllerSubnet
+        );
         replica.initialize(address(controller));
         controller.initialize(address(replica));
+*/
+        //replica, controller = setUpLinkedTokenContracts(gatway, controllerSubnetUSDC, replicaSubnetName, controllerSubnet);
+    }
+
+
+    function setUpLinkedTokenContracts (address gateway, address controllerSubnetUSDC, SubnetID memory replicaSubnetName,  SubnetID memory controllerSubnet) internal returns (address, address) {
+
+        //Controller 
+
+        // Deploy controller facets
+        DiamondCutFacet cutFacet = new DiamondCutFacet();
+        DiamondLoupeFacet loupeFacet = new DiamondLoupeFacet();
+        OwnershipFacet ownershipFacet = new OwnershipFacet();
+        LinkedTokenControllerFacet linkedTokenControllerFacet = new LinkedTokenControllerFacet();
+
+        // controller diamond constructor params
+        LinkedTokenDiamond.ConstructorParams memory paramsController;
+        paramsController.gateway=gateway;
+        paramsController.underlyingToken=controllerSubnetUSDC;
+        paramsController.linkedSubnet = replicaSubnetName;
+        //
+        // replica diamond constructor params
+        LinkedTokenDiamond.ConstructorParams memory paramsReplica;
+        paramsReplica.gateway=gateway;
+        paramsReplica.underlyingToken=controllerSubnetUSDC;
+        paramsReplica.linkedSubnet = controllerSubnet;
+
     }
 
     function testHandleIpcMessageOrigin() public {
@@ -154,7 +190,7 @@ contract IpcTokenControllerTest is Test, IntegrationTestBase {
     function testParentSubnetUSDCAddress() public {
         // Test to check if controllerSubnetUSDC address is correctly set
         assertEq(
-            controller._linkedContract(),
+            controller.getLinkedContract(),
             address(replica),
             "controllerSubnetUSDC address does not match"
         );

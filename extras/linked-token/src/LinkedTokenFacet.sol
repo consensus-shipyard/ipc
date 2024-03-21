@@ -138,6 +138,11 @@ abstract contract LinkedTokenFacet is IpcExchangeFacet {
         });
     }
 
+    function getLinkedContract() external returns (address) {
+        require(s._linkedContract != address(0), "linked token not initialized");
+        return s._linkedContract;
+    }
+
     // ----------------------------
     // IPC GMP entrypoints.
     // ----------------------------
