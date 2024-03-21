@@ -1,7 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use fendermint_app::metrics;
 pub use fendermint_app_options as options;
 pub use fendermint_app_settings as settings;
 use tracing_appender::{
@@ -57,8 +56,11 @@ fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
         None => (None, None),
     };
 
-    // TODO: Should metrics have a configuration? At this level they are just in-memory structures for incrementing counters.
-    let metrics_layer = metrics::layer();
+    let metrics_layer = if opts.metrics_enabled() {
+        Some(fendermint_app::metrics::layer())
+    } else {
+        None
+    };
 
     let registry = tracing_subscriber::registry()
         .with(console_layer)
