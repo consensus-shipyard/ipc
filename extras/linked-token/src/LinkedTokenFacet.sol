@@ -54,10 +54,6 @@ abstract contract LinkedTokenFacet is IpcExchangeFacet {
     using FvmAddressHelper for FvmAddress;
 
 
-    function getLinkedSubnet() public view returns (SubnetID memory) {
-        return s._linkedSubnet;
-    }
-
 
     function _captureTokens(address holder, uint256 amount) internal virtual;
 
@@ -136,6 +132,14 @@ abstract contract LinkedTokenFacet is IpcExchangeFacet {
             linkedSubnet: s._linkedSubnet,
             linkedContract: s._linkedContract
         });
+    }
+
+    function getLinkedGateway() public view returns (address) {
+        return s._gatewayAddr;
+    }
+
+    function getLinkedSubnet() public view returns (SubnetID memory) {
+        return s._linkedSubnet;
     }
 
     function getLinkedContract() public returns (address) {

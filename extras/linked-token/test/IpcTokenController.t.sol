@@ -191,6 +191,17 @@ contract IpcTokenControllerTest is Test, IntegrationTestBase, LinkedTokenTestBas
         );
     }
 
+    function testControllerGatewayGet() public {
+        // Test to check if controllerSubnetUSDC address is correctly set
+        assertEq(
+            LinkedTokenControllerFacet(address(controller)).getLinkedGateway(),
+            address(gateway),
+            "controller gateway address does not match"
+        );
+    }
+
+
+
     function testDepositTokens() public {
         // Test depositTokens function of IpcTokenReplica
         // This is a placeholder test
