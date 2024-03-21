@@ -27,9 +27,10 @@ interface IpcHandler {
 }
 
 abstract contract IpcExchangeFacet is IpcHandler, ReentrancyGuard {
+    LinkedTokenStorage internal s;
+
     using CrossMsgHelper for IpcEnvelope;
 
-    LinkedTokenStorage internal s;
 
 
 

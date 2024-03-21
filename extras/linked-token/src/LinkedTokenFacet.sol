@@ -138,7 +138,7 @@ abstract contract LinkedTokenFacet is IpcExchangeFacet {
         });
     }
 
-    function getLinkedContract() external returns (address) {
+    function getLinkedContract() public returns (address) {
         require(s._linkedContract != address(0), "linked token not initialized");
         return s._linkedContract;
     }

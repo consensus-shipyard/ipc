@@ -16,6 +16,7 @@ import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 error FunctionNotFound(bytes4 _functionSelector);
 
 contract LinkedTokenDiamond {
+
     LinkedTokenStorage internal s;
 
     struct ConstructorParams {
