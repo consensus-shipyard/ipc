@@ -37,7 +37,7 @@ macro_rules! check_field {
         if false {
             // Check that the field exist; if it doesn't this won't compile.
             let _event = $event_ty {
-                $field: 0,
+                $field: Default::default(),
                 ..Default::default()
             };
         }
@@ -106,7 +106,7 @@ impl<S: Subscriber> Layer<S> for MetricsLayer<S> {
             NewBottomUpCheckpoint {
                 block_height              => gauges   / &am::BOTTOMUP_CKPT_BLOCK_HEIGHT,
                 next_configuration_number => gauges   / &am::BOTTOMUP_CKPT_CONFIG_NUM,
-                block_height              => counters / &am::BOTTOMUP_CKPT_NUM_MSGS,
+                num_msgs                  => counters / &am::BOTTOMUP_CKPT_NUM_MSGS,
             }
         });
     }

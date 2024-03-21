@@ -41,3 +41,12 @@ pub mod app {
 pub mod eth {
     // TODO: Define Ethereum metrics and events.
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn can_register_metrics() {
+        let r = prometheus::Registry::new();
+        super::app::register_metrics(&r).unwrap();
+    }
+}
