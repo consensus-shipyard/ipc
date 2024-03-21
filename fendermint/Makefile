@@ -90,7 +90,7 @@ docker-build: docker-deps $(FENDERMINT_CODE)
 			-f docker/Dockerfile \
 			-t $(BUILDX_TAG) $(PWD)/..; \
 			--cache-from type=gha \
-			--cache-to type=gha,mode=max
+			--cache-to type=gha,mode=max \
 	else \
 		cat docker/builder.local.Dockerfile docker/runner.Dockerfile > docker/Dockerfile ; \
 		DOCKER_BUILDKIT=1 \
