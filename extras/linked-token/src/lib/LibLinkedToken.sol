@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
+import {IpcEnvelope} from "@ipc/src/structs/CrossNet.sol";
 import {LinkedTokenStorage, LibLinkedTokenStorage, UnconfirmedTransfer} from "./LibLinkedTokenStorage.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {SubnetID} from "@ipc/src/structs/Subnet.sol";
@@ -33,6 +34,23 @@ library LibLinkedToken {
         LinkedTokenStorage storage s = LibLinkedTokenStorage.appStorage();
         return s._underlying;
     }
+
+
+    function addInflightMessages(bytes32 id, IpcEnvelope memory envelope) internal{
+        LinkedTokenStorage storage s = LibLinkedTokenStorage.appStorage();
+        s.inflightMsgs[id] = envelope;
+    }
+
+    function deleteInflightMessages(bytes32 id) internal{
+        LinkedTokenStorage storage s = LibLinkedTokenStorage.appStorage();
+        delete s.inflightMsgs[id];
+    }
+
+    function getInflightMessages(bytes32 id) internal returns (IpcEnvelope storage){
+        LinkedTokenStorage storage s = LibLinkedTokenStorage.appStorage();
+        return s.inflightMsgs[id];
+    }
+
 
     function addUnconfirmedTransfer(bytes32 hash, address sender, uint256 value) internal  {
         LinkedTokenStorage storage s = LibLinkedTokenStorage.appStorage();

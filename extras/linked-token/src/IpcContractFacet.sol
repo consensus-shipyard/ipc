@@ -28,7 +28,6 @@ interface IpcHandler {
 }
 
 abstract contract IpcExchangeFacet is IpcHandler, ReentrancyGuard {
-    LinkedTokenStorage internal s;
 
     using CrossMsgHelper for IpcEnvelope;
 
@@ -49,14 +48,14 @@ abstract contract IpcExchangeFacet is IpcHandler, ReentrancyGuard {
 
             // Recover the original message.
             // If we were not tracking it, or if some details don't match, refuse to handle the receipt.
-            IpcEnvelope storage orig = s.inflightMsgs[result.id];
+            IpcEnvelope storage orig = LibLinkedToken.getInflightMessages(result.id);
             if (orig.message.length == 0 || keccak256(abi.encode(envelope.from)) != keccak256(abi.encode(orig.to))) {
                 revert IpcHandler.UnrecognizedResult();
             }
 
             /// Note: if the result handler reverts, we will
             _handleIpcResult(orig, envelope, result);
-            delete s.inflightMsgs[result.id];
+            LibLinkedToken.deleteInflightMessages(result.id);
             return EMPTY_BYTES;
         }
         revert UnsupportedMsgKind();
@@ -100,7 +99,7 @@ abstract contract IpcExchangeFacet is IpcHandler, ReentrancyGuard {
         );
         // Add the message to the list of inflights
         bytes32 id = envelope.toHash();
-        s.inflightMsgs[id] = envelope;
+        LibLinkedToken.addInflightMessages(id, envelope);
     }
 
     function dropMessages(bytes32[] calldata ids) public {
@@ -108,7 +107,7 @@ abstract contract IpcExchangeFacet is IpcHandler, ReentrancyGuard {
 
         uint256 length = ids.length;
         for (uint256 i; i < length; ) {
-            delete s.inflightMsgs[ids[i]];
+            LibLinkedToken.deleteInflightMessages(ids[i]);
             unchecked {
                 ++i;
             }
