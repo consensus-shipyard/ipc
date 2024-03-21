@@ -1,6 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use fendermint_app::metrics;
 pub use fendermint_app_options as options;
 pub use fendermint_app_settings as settings;
 use tracing_appender::{
@@ -17,7 +18,7 @@ fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
     let file_filter = opts.log_file_filter().expect("invalid filter");
 
     // log all traces to stderr (reserving stdout for any actual output such as from the CLI commands)
-    let console_layer = tracing_subscriber::fmt::layer()
+    let console_layer = fmt::layer()
         .with_writer(std::io::stderr)
         .with_target(false)
         .with_file(true)
@@ -42,7 +43,7 @@ fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
 
             let (non_blocking, file_guard) = tracing_appender::non_blocking(appender);
 
-            let file_layer = fmt::Layer::new()
+            let file_layer = fmt::layer()
                 .json()
                 .with_writer(non_blocking)
                 .with_span_events(FmtSpan::CLOSE)
@@ -56,9 +57,13 @@ fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
         None => (None, None),
     };
 
+    // TODO: Should metrics have a configuration? At this level they are just in-memory structures for incrementing counters.
+    let metrics_layer = metrics::layer();
+
     let registry = tracing_subscriber::registry()
         .with(console_layer)
-        .with(file_layer);
+        .with(file_layer)
+        .with(metrics_layer);
 
     tracing::subscriber::set_global_default(registry).expect("Unable to set a global collector");
 
