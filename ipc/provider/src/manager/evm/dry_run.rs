@@ -11,12 +11,16 @@ use ipc_api::subnet::ConstructParams;
 use serde::Serialize;
 use std::collections::btree_map::BTreeMap;
 
+use crate::config::serialize::serialize_bytes_to_str;
+
 #[derive(Serialize)]
 pub struct MockedTxn {
     from: Address,
     to: Address,
     value: U256,
+    #[serde(serialize_with = "serialize_bytes_to_str")]
     pub calldata: Vec<u8>,
+    #[serde(serialize_with = "serialize_bytes_to_str")]
     method: Selector,
 }
 
@@ -29,14 +33,17 @@ impl EvmDryRun {
         params: ConstructParams,
     ) -> anyhow::Result<MockedTxn> {
         let converted = register_subnet_facet::ConstructorParams::try_from(params)?;
+        log::debug!("converted constructor params: {converted:?}");
 
         let to = converted.ipc_gateway_addr;
         let from = payload_to_evm_address(from.payload())?;
+        log::debug!("from: {}, to: {}", from, to);
 
         let (calldata, method) = to_evm_calldata(
             &register_subnet_facet::REGISTERSUBNETFACET_ABI.functions,
             "newSubnetActor",
-            converted,
+            // ethers needs the params to be tuple here
+            (converted,),
         )?;
 
         Ok(MockedTxn {

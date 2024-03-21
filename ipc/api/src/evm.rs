@@ -248,8 +248,7 @@ impl TryFrom<ConstructParams> for register_subnet_facet::ConstructorParams {
             .ok_or_else(|| anyhow!("power scale is not defined"))?;
         let consensus = params
             .consensus
-            .ok_or_else(|| anyhow!("consensus is not defined"))? as u64
-            as u8;
+            .ok_or_else(|| anyhow!("consensus is not defined"))? as u8;
         let majority_percentage = params
             .majority_percentage
             .ok_or_else(|| anyhow!("majority percentage is not defined"))?;
@@ -266,19 +265,18 @@ impl TryFrom<ConstructParams> for register_subnet_facet::ConstructorParams {
         log::debug!("root SubnetID as Ethereum type: {route:?}");
 
         let params = register_subnet_facet::ConstructorParams {
-            ipc_gateway_addr,
-            consensus,
-            majority_percentage,
-            active_validators_limit,
-            power_scale,
-
             parent_id: register_subnet_facet::SubnetID {
                 root: params.parent.root_id(),
                 route,
             },
+            ipc_gateway_addr,
+            consensus,
             min_activation_collateral: ethers::types::U256::from(min_validator_stake),
             min_validators: params.min_validators,
             bottom_up_check_period: params.bottomup_check_period as u64,
+            majority_percentage,
+            active_validators_limit,
+            power_scale,
             permission_mode: params.permission_mode as u8,
             supply_source: register_subnet_facet::SupplySource::try_from(params.supply_source)?,
         };

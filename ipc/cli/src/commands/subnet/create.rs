@@ -76,8 +76,7 @@ impl CommandLineHandler for CreateSubnet {
 pub struct CreateSubnetArgs {
     #[arg(
         long,
-        help = "Dry run in the specified network, prints the calldata only",
-        default_value = "evm"
+        help = "Dry run in the specified network, prints the calldata only"
     )]
     pub dry_run: Option<Network>,
 

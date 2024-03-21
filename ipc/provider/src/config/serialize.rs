@@ -51,6 +51,13 @@ where
     s.serialize_str(&format!("0x{:?}", addr))
 }
 
+pub fn serialize_bytes_to_str<S>(data: &[u8], s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    s.serialize_str(&format!("0x{}", hex::encode(data)))
+}
+
 fn address_to_eth_address(addr: &Address) -> anyhow::Result<EthAddress> {
     match addr.payload() {
         Payload::Delegated(inner) => {

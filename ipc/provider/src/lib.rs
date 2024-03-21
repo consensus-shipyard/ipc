@@ -87,7 +87,7 @@ impl IpcProvider {
     pub fn dry_run(self, network: &Network) -> IPCDryRunProvider {
         match network {
             Network::Evm => IPCDryRunProvider::evm(self.preflight, EvmDryRun),
-            Network::Fvm => IPCDryRunProvider::fvm(self.preflight, FvmDryRun {  evm: EvmDryRun }),
+            Network::Fvm => IPCDryRunProvider::fvm(self.preflight, FvmDryRun { evm: EvmDryRun }),
         }
     }
 
