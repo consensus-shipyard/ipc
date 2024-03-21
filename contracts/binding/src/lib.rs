@@ -26,6 +26,8 @@ pub mod lib_staking;
 #[allow(clippy::all)]
 pub mod lib_staking_change_log;
 #[allow(clippy::all)]
+pub mod ownership_facet;
+#[allow(clippy::all)]
 pub mod register_subnet_facet;
 #[allow(clippy::all)]
 pub mod subnet_actor_checkpointing_facet;

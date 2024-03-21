@@ -8,6 +8,7 @@ import {IERC165} from "./interfaces/IERC165.sol";
 import {SubnetRegistryActorStorage} from "./lib/LibSubnetRegistryStorage.sol";
 import {GatewayCannotBeZero, FacetCannotBeZero} from "./errors/IPCErrors.sol";
 import {LibDiamond} from "./lib/LibDiamond.sol";
+import {SubnetCreationPrivileges} from "./structs/Subnet.sol";
 
 error FunctionNotFound(bytes4 _functionSelector);
 
@@ -21,11 +22,18 @@ contract SubnetRegistryDiamond {
         address rewarderFacet;
         address checkpointerFacet;
         address pauserFacet;
+        address diamondCutFacet;
+        address diamondLoupeFacet;
+        address ownershipFacet;
         bytes4[] subnetActorGetterSelectors;
         bytes4[] subnetActorManagerSelectors;
         bytes4[] subnetActorRewarderSelectors;
         bytes4[] subnetActorCheckpointerSelectors;
         bytes4[] subnetActorPauserSelectors;
+        bytes4[] subnetActorDiamondCutSelectors;
+        bytes4[] subnetActorDiamondLoupeSelectors;
+        bytes4[] subnetActorOwnershipSelectors;
+        SubnetCreationPrivileges creationPrivileges;
     }
 
     constructor(IDiamond.FacetCut[] memory _diamondCut, ConstructorParams memory params) {
@@ -47,6 +55,15 @@ contract SubnetRegistryDiamond {
         if (params.pauserFacet == address(0)) {
             revert FacetCannotBeZero();
         }
+        if (params.diamondCutFacet == address(0)) {
+            revert FacetCannotBeZero();
+        }
+        if (params.diamondLoupeFacet == address(0)) {
+            revert FacetCannotBeZero();
+        }
+        if (params.ownershipFacet == address(0)) {
+            revert FacetCannotBeZero();
+        }
 
         LibDiamond.setContractOwner(msg.sender);
         LibDiamond.diamondCut({_diamondCut: _diamondCut, _init: address(0), _calldata: new bytes(0)});
@@ -63,12 +80,20 @@ contract SubnetRegistryDiamond {
         s.SUBNET_ACTOR_REWARD_FACET = params.rewarderFacet;
         s.SUBNET_ACTOR_CHECKPOINTING_FACET = params.checkpointerFacet;
         s.SUBNET_ACTOR_PAUSE_FACET = params.pauserFacet;
+        s.SUBNET_ACTOR_DIAMOND_CUT_FACET = params.diamondCutFacet;
+        s.SUBNET_ACTOR_LOUPE_FACET = params.diamondLoupeFacet;
+        s.SUBNET_ACTOR_OWNERSHIP_FACET = params.ownershipFacet;
 
         s.subnetActorGetterSelectors = params.subnetActorGetterSelectors;
         s.subnetActorManagerSelectors = params.subnetActorManagerSelectors;
         s.subnetActorRewarderSelectors = params.subnetActorRewarderSelectors;
         s.subnetActorCheckpointerSelectors = params.subnetActorCheckpointerSelectors;
         s.subnetActorPauserSelectors = params.subnetActorPauserSelectors;
+        s.subnetActorDiamondCutSelectors = params.subnetActorDiamondCutSelectors;
+        s.subnetActorDiamondLoupeSelectors = params.subnetActorDiamondLoupeSelectors;
+        s.subnetActorOwnershipSelectors = params.subnetActorOwnershipSelectors;
+
+        s.creationPrivileges = params.creationPrivileges;
     }
 
     function _fallback() internal {

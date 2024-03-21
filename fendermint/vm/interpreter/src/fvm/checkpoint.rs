@@ -6,9 +6,6 @@ use std::time::Duration;
 
 use anyhow::{anyhow, Context};
 use ethers::abi::Tokenizable;
-use fendermint_crypto::PublicKey;
-use fendermint_vm_actor_interface::eam::EthAddress;
-use ipc_api::staking::ConfigurationNumber;
 use tendermint::block::Height;
 use tendermint_rpc::endpoint::commit;
 use tendermint_rpc::{endpoint::validators, Client, Paging};
@@ -16,11 +13,17 @@ use tendermint_rpc::{endpoint::validators, Client, Paging};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::{address::Address, chainid::ChainID};
 
+use fendermint_crypto::PublicKey;
 use fendermint_crypto::SecretKey;
+use fendermint_tracing::emit;
+use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::BottomUpCheckpoint;
+use fendermint_vm_event::NewBottomUpCheckpoint;
 use fendermint_vm_genesis::{Power, Validator, ValidatorKey};
+
 use ipc_actors_abis::checkpointing_facet as checkpoint;
 use ipc_actors_abis::gateway_getter_facet as getter;
+use ipc_api::staking::ConfigurationNumber;
 
 use super::state::ipc::tokens_to_burn;
 use super::{
@@ -28,8 +31,6 @@ use super::{
     state::{ipc::GatewayCaller, FvmExecState},
     ValidatorContext,
 };
-
-use fendermint_vm_event::{emit, EventType};
 
 /// Validator voting power snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -120,13 +121,12 @@ where
         power_diff(curr_power_table, next_power_table)
     };
 
-    emit!(
-        EventType::NewBottomUpCheckpoint,
-        height = height.value(),
-        block_hash = hex::encode(block_hash),
-        msgs = num_msgs,
+    emit!(NewBottomUpCheckpoint {
+        block_height: height.value(),
+        block_hash: &hex::encode(block_hash),
+        num_msgs,
         next_configuration_number,
-    );
+    });
 
     Ok(Some((checkpoint, power_updates)))
 }

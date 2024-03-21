@@ -20,7 +20,7 @@ upgrade-gw-diamond:
 	./ops/upgrade-gw-diamond.sh $(NETWORK)
 
 upgrade-sa-diamond:
-	./ops/upgrade-sa-diamond.sh $(NETWORK)
+	./ops/upgrade-sa-diamond.sh $(NETWORK) $(SUBNET_ACTOR_ADDRESS)
 
 upgrade-sr-diamond:
 	./ops/upgrade-sr-diamond.sh $(NETWORK)

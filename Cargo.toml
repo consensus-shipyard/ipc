@@ -26,6 +26,7 @@ members = [
   "fendermint/testing",
   "fendermint/testing/materializer",
   "fendermint/testing/*-test",
+  "fendermint/tracing",
   "fendermint/vm/*",
   "fendermint/actors",
   "fendermint/actors/chainmetadata",
@@ -60,6 +61,7 @@ byteorder = "1.5.0"
 config = "0.13"
 dirs = "5.0"
 dircpy = "0.3"
+either = "1.10"
 env_logger = "0.10"
 erased-serde = "0.3"
 ethers = { version = "2.0.13", features = ["abigen", "ws"] }
@@ -115,6 +117,7 @@ multihash = { version = "0.18.1", default-features = false, features = [
 num-bigint = "0.4"
 num-derive = "0.3"
 num-traits = "0.2"
+num_enum = "0.7.2"
 paste = "1"
 pin-project = "1.1.2"
 prometheus = "0.13"

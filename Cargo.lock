@@ -2811,6 +2811,7 @@ dependencies = [
  "fil_actor_eam",
  "fil_actors_evm_shared",
  "fil_actors_runtime",
+ "frc42_dispatch",
  "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
  "fvm_shared",
@@ -2855,6 +2856,7 @@ dependencies = [
  "fendermint_rocksdb",
  "fendermint_rpc",
  "fendermint_storage",
+ "fendermint_tracing",
  "fendermint_vm_actor_interface",
  "fendermint_vm_core",
  "fendermint_vm_encoding",
@@ -3056,6 +3058,7 @@ dependencies = [
  "async-recursion",
  "async-trait",
  "bollard",
+ "either",
  "env_logger 0.10.2",
  "ethers",
  "fendermint_crypto",
@@ -3065,15 +3068,19 @@ dependencies = [
  "fendermint_vm_core",
  "fendermint_vm_encoding",
  "fendermint_vm_genesis",
+ "fendermint_vm_message",
  "futures",
  "fvm_shared",
  "hex",
  "ipc-api",
+ "ipc-provider",
+ "ipc_actors_abis",
  "lazy_static",
  "multihash 0.18.1",
  "quickcheck",
  "quickcheck_async",
  "quickcheck_macros",
+ "regex",
  "serde",
  "serde_json",
  "serde_with 2.3.3",
@@ -3084,6 +3091,7 @@ dependencies = [
  "tokio",
  "toml 0.8.10",
  "tracing",
+ "url",
 ]
 
 [[package]]
@@ -3174,6 +3182,13 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "toml 0.8.10",
+]
+
+[[package]]
+name = "fendermint_tracing"
+version = "0.1.0"
+dependencies = [
+ "tracing",
 ]
 
 [[package]]
@@ -3286,6 +3301,7 @@ dependencies = [
  "fendermint_eth_hardhat",
  "fendermint_rpc",
  "fendermint_testing",
+ "fendermint_tracing",
  "fendermint_vm_actor_interface",
  "fendermint_vm_core",
  "fendermint_vm_encoding",
@@ -3418,6 +3434,7 @@ dependencies = [
  "ethers",
  "fendermint_crypto",
  "fendermint_testing",
+ "fendermint_tracing",
  "fendermint_vm_event",
  "fendermint_vm_genesis",
  "fvm_ipld_encoding",
@@ -4952,6 +4969,7 @@ dependencies = [
  "lazy_static",
  "log",
  "num-traits",
+ "num_enum",
  "serde",
  "serde_json",
  "serde_tuple",
@@ -5034,6 +5052,7 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "serde_tuple",
+ "serde_with 2.3.3",
  "strum 0.26.1",
  "tempfile",
  "thiserror",
@@ -6231,9 +6250,9 @@ dependencies = [
 
 [[package]]
 name = "mio"
-version = "0.8.10"
+version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f3d0b296e374a4e6f3c7b0a1f5a51d748a0d34c85e7dc48fc3fa9a87657fe09"
+checksum = "a4a650543ca06a924e8b371db273b2756685faae30f8487da1b56505a8f78b0c"
 dependencies = [
  "libc",
  "wasi",

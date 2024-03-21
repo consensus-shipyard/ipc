@@ -39,6 +39,7 @@ fn main() {
         "IDiamond",
         "DiamondLoupeFacet",
         "DiamondCutFacet",
+        "OwnershipFacet",
         "GatewayDiamond",
         "GatewayManagerFacet",
         "GatewayGetterFacet",

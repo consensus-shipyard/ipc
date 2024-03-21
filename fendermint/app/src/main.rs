@@ -98,7 +98,7 @@ async fn main() {
 
     if let Err(e) = cmd::exec(&opts).await {
         tracing::error!("failed to execute {:?}: {e:?}", opts);
-        std::process::exit(1);
+        std::process::exit(fendermint_app::AppExitCode::UnknownError as i32);
     }
 }
 

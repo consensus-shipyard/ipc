@@ -59,7 +59,7 @@ fn read_manifest(file_name: &str) -> anyhow::Result<Manifest> {
 
 /// Parse a manifest file in the `manifests` directory, clean up any corresponding
 /// testnet resources, then materialize a testnet and run some tests.
-pub async fn with_testnet<F>(manifest_file_name: &str, f: F) -> anyhow::Result<()>
+pub async fn with_testnet<F, G>(manifest_file_name: &str, alter: G, test: F) -> anyhow::Result<()>
 where
     // https://users.rust-lang.org/t/function-that-takes-a-closure-with-mutable-reference-that-returns-a-future/54324
     F: for<'a> FnOnce(
@@ -67,6 +67,7 @@ where
         &mut DockerMaterializer,
         &'a mut DockerTestnet,
     ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + 'a>>,
+    G: FnOnce(&mut Manifest),
 {
     let testnet_name = TestnetName::new(
         PathBuf::from(manifest_file_name)
@@ -76,14 +77,19 @@ where
             .to_string(),
     );
 
-    let manifest = read_manifest(manifest_file_name)?;
+    let mut manifest = read_manifest(manifest_file_name)?;
 
-    // First make sure it's a sound manifest.
+    // Make any test-specific modifications to the manifest if that makes sense.
+    alter(&mut manifest);
+
+    // Make sure it's a sound manifest.
     manifest
         .validate(&testnet_name)
         .await
         .context("failed to validate manifest")?;
 
+    // NOTE: Add `with_policy(DropPolicy::PERSISTENT)` if you want containers to stick around for inspection,
+    // but logs and env vars should be available on disk even if the testnet is torn down at the end.
     let mut materializer = DockerMaterializer::new(&test_data_dir(), 0)?;
 
     // make sure we start with clean slate by removing any previous files
@@ -99,7 +105,7 @@ where
     let started = wait_for_startup(&testnet).await?;
 
     let res = if started {
-        f(&manifest, &mut materializer, &mut testnet).await
+        test(&manifest, &mut materializer, &mut testnet).await
     } else {
         Err(anyhow!("the startup sequence timed out"))
     };

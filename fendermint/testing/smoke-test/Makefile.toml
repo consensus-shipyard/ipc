@@ -30,15 +30,26 @@ EOF
 clear = true
 dependencies = [
   "simplecoin-example",
+  "transfer-example",
   "ethers-example",
   "query-blockhash-example",
 ]
+
 
 [tasks.simplecoin-example]
 script = """
 cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint
 cargo run -p fendermint_rpc --example simplecoin -- \
   --secret-key testing/smoke-test/test-data/keys/alice.sk \
+  ${VERBOSITY}
+"""
+
+
+[tasks.transfer-example]
+script = """
+cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint
+cargo run -p fendermint_rpc --example transfer -- \
+  --secret-key testing/smoke-test/test-data/keys/eric.sk \
   ${VERBOSITY}
 """
 
