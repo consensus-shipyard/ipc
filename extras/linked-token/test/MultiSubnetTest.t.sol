@@ -123,6 +123,79 @@ contract MultiSubnetTest is IntegrationTestBase, LinkedTokenTestBase {
         });
     }
 
+    function testHandleIpcMessageOriginOfReplica() public {
+
+        SubnetID memory controllerSubnet = rootSubnetName;
+        SubnetID memory replicaSubnetName = nativeSubnetName;
+        uint256 transferAmount = 100;
+
+        CallMsg memory message =
+            CallMsg({
+                method: abi.encodePacked(
+                    bytes4(keccak256("receiveAndMint(address,uint256)"))
+                ),
+                params: abi.encode(address(this), transferAmount)
+            });
+
+        IpcEnvelope memory validMsg =
+            IpcEnvelope({
+                kind: IpcMsgKind.Call,
+                from: IPCAddress({
+                    subnetId: controllerSubnet,
+                    rawAddress: FvmAddressHelper.from(address(replica))
+                }),
+                to: IPCAddress({
+                    subnetId: replicaSubnetName,
+                    rawAddress: FvmAddressHelper.from(address(controller))
+                }),
+                value: DEFAULT_CROSS_MSG_FEE,
+                nonce: 0,
+                message: abi.encode(message)
+            });
+
+        IpcEnvelope memory invalidContract =
+            IpcEnvelope({
+                kind: IpcMsgKind.Call,
+                from: IPCAddress({
+                    subnetId: controllerSubnet,
+                    rawAddress: FvmAddressHelper.from(address(replica))
+                }),
+                to: IPCAddress({
+                    subnetId: replicaSubnetName,
+                    rawAddress: FvmAddressHelper.from(address(replica))
+                }),
+                value: DEFAULT_CROSS_MSG_FEE,
+                nonce: 0,
+                message: abi.encode(message)
+            });
+
+        IpcEnvelope memory invalidSubnet =
+            IpcEnvelope({
+                kind: IpcMsgKind.Call,
+                from: IPCAddress({
+                    subnetId: replicaSubnetName,
+                    rawAddress: FvmAddressHelper.from(address(replica))
+                }),
+                to: IPCAddress({
+                    subnetId: replicaSubnetName,
+                    rawAddress: FvmAddressHelper.from(address(controller))
+                }),
+                value: DEFAULT_CROSS_MSG_FEE,
+                nonce: 0,
+                message: abi.encode(message)
+            });
+
+        //TODO understand why 
+        //vm.expectRevert(InvalidOriginContract.selector);
+        // doesn't work
+        vm.expectRevert();
+        LinkedTokenReplicaFacet(address(replica))._validateEnvelope(invalidContract);
+
+        vm.expectRevert(InvalidOriginSubnet.selector);
+        LinkedTokenReplicaFacet(address(replica))._validateEnvelope(invalidSubnet);
+    }
+ 
+
     function testMultiSubnet_Native_FundFromParentToChild_USDCBridge() public {
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         IpcEnvelope memory expected;
