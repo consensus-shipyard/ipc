@@ -318,6 +318,7 @@ mod tests {
             bundle::{bundle_path, contracts_path, custom_actors_bundle_path},
             state::{snapshot::Snapshot, FvmGenesisState, FvmStateParams},
             store::memory::MemoryBlockstore,
+            upgrades::UpgradeScheduler,
             FvmMessageInterpreter,
         },
         GenesisInterpreter,
@@ -456,8 +457,15 @@ mod tests {
                 .await
                 .expect("failed to create state");
 
-        let interpreter =
-            FvmMessageInterpreter::new(mock_client(), None, contracts_path(), 1.05, 1.05, false);
+        let interpreter = FvmMessageInterpreter::new(
+            mock_client(),
+            None,
+            contracts_path(),
+            1.05,
+            1.05,
+            false,
+            UpgradeScheduler::new(),
+        );
 
         let (state, out) = interpreter
             .init(state, genesis)
@@ -474,6 +482,7 @@ mod tests {
             circ_supply: out.circ_supply,
             chain_id: out.chain_id.into(),
             power_scale: out.power_scale,
+            app_version: 0,
         };
 
         (state_params, store)

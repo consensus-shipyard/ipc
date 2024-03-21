@@ -50,6 +50,22 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         super.setUp();
     }
 
+    function testGatewayDiamond_TransferOwnership() public {
+        address owner = gatewayDiamond.ownership().owner();
+
+        vm.expectRevert(LibDiamond.InvalidAddress.selector);
+        gatewayDiamond.ownership().transferOwnership(address(0));
+
+        gatewayDiamond.ownership().transferOwnership(address(1));
+
+        address newOwner = gatewayDiamond.ownership().owner();
+        require(owner != newOwner, "ownership should be updated");
+        require(newOwner == address(1), "new owner not address 1");
+
+        vm.expectRevert(LibDiamond.NotOwner.selector);
+        gatewayDiamond.ownership().transferOwnership(address(1));
+    }
+
     function testGatewayDiamond_Constructor() public view {
         require(gatewayDiamond.getter().totalSubnets() == 0, "unexpected totalSubnets");
         require(gatewayDiamond.getter().bottomUpNonce() == 0, "unexpected bottomUpNonce");
@@ -85,7 +101,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testGatewayDiamond_LoupeFunction() public view {
-        require(gatewayDiamond.diamondLouper().facets().length == 8, "unexpected length");
+        require(gatewayDiamond.diamondLouper().facets().length == 9, "unexpected length");
         require(
             gatewayDiamond.diamondLouper().supportsInterface(type(IERC165).interfaceId) == true,
             "IERC165 not supported"
@@ -1101,24 +1117,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
         vm.expectRevert(CheckpointAlreadyExists.selector);
-        gatewayDiamond.checkpointer().createBottomUpCheckpoint(
-            checkpoint,
-            membershipRoot,
-            weights[0] + weights[1] + weights[2]
-        );
-        vm.stopPrank();
-
-        // failed to create a checkpoint with the height not multiple to checkpoint period
-        checkpoint = BottomUpCheckpoint({
-            subnetID: gatewayDiamond.getter().getNetworkName(),
-            blockHeight: d + d / 2,
-            blockHash: keccak256("block2"),
-            nextConfigurationNumber: 2,
-            msgs: new IpcEnvelope[](0)
-        });
-
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        vm.expectRevert(InvalidCheckpointEpoch.selector);
         gatewayDiamond.checkpointer().createBottomUpCheckpoint(
             checkpoint,
             membershipRoot,

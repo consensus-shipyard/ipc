@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 
 use clap::{Args, Subcommand};
-use fendermint_materializer::TestnetId;
+use fendermint_materializer::{AccountId, TestnetId};
 
 #[derive(Args, Debug)]
 pub struct MaterializerArgs {
@@ -34,7 +34,10 @@ pub enum MaterializerCommands {
     /// Setup a testnet.
     Setup(MaterializerSetupArgs),
     /// Tear down a testnet.
+    #[clap(aliases  = &["teardown", "rm"])]
     Remove(MaterializerRemoveArgs),
+    /// Import an existing secret key into a testnet; for example to use an already funded account on Calibration net.
+    ImportKey(MaterializerImportKeyArgs),
 }
 
 #[derive(Args, Debug)]
@@ -66,4 +69,21 @@ pub struct MaterializerRemoveArgs {
     /// ID of the testnet to remove.
     #[arg(long, short)]
     pub testnet_id: TestnetId,
+}
+
+#[derive(Args, Debug)]
+pub struct MaterializerImportKeyArgs {
+    /// Path to the manifest file.
+    ///
+    /// This is used to determine the testnet ID as well as to check that the account exists.
+    #[arg(long, short)]
+    pub manifest_file: PathBuf,
+
+    /// Path to the Secp256k1 private key exported in base64 or hexadecimal format.
+    #[arg(long, short)]
+    pub secret_key: PathBuf,
+
+    /// Run validation before attempting to set up the testnet.
+    #[arg(long, short)]
+    pub account_id: AccountId,
 }

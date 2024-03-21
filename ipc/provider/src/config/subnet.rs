@@ -5,6 +5,7 @@ use std::time::Duration;
 use fvm_shared::address::Address;
 use ipc_api::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DurationSeconds};
 use url::Url;
 
 use crate::config::deserialize::{
@@ -79,9 +80,11 @@ pub struct FVMSubnet {
 }
 
 /// The EVM subnet config parameters
+#[serde_as]
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct EVMSubnet {
     pub provider_http: Url,
+    #[serde_as(as = "Option<DurationSeconds<u64>>")]
     pub provider_timeout: Option<Duration>,
     pub auth_token: Option<String>,
 

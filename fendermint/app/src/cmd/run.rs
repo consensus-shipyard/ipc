@@ -11,6 +11,7 @@ use fendermint_crypto::SecretKey;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::chain::ChainEnv;
+use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
 use fendermint_vm_interpreter::{
     bytes::{BytesMessageInterpreter, ProposalPrepareMode},
     chain::{ChainMessageInterpreter, CheckpointPool, ObjectPool},
@@ -114,6 +115,7 @@ async fn run(ipfs_addr: String, settings: Settings) -> anyhow::Result<()> {
         settings.fvm.gas_overestimation_rate,
         settings.fvm.gas_search_step,
         settings.fvm.exec_in_check,
+        UpgradeScheduler::new(),
     );
     let interpreter = SignedMessageInterpreter::new(interpreter);
     let interpreter = ChainMessageInterpreter::<_, NamespaceBlockstore>::new(interpreter);
@@ -273,6 +275,7 @@ async fn run(ipfs_addr: String, settings: Settings) -> anyhow::Result<()> {
             state_hist_size: settings.db.state_hist_size,
             builtin_actors_bundle: settings.builtin_actors_bundle(),
             custom_actors_bundle: settings.custom_actors_bundle(),
+            halt_height: settings.halt_height,
         },
         db,
         state_store,
@@ -377,7 +380,7 @@ fn make_ipc_provider_proxy(settings: &Settings) -> anyhow::Result<IPCProviderPro
                 .parse()
                 .unwrap(),
             provider_timeout: topdown_config.parent_http_timeout,
-            auth_token: None,
+            auth_token: topdown_config.parent_http_auth_token.as_ref().cloned(),
             registry_addr: topdown_config.parent_registry,
             gateway_addr: topdown_config.parent_gateway,
         }),

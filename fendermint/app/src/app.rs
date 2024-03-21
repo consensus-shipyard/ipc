@@ -13,8 +13,8 @@ use fendermint_abci::{AbciResult, Application};
 use fendermint_storage::{
     Codec, Encode, KVCollection, KVRead, KVReadable, KVStore, KVWritable, KVWrite,
 };
+use fendermint_tracing::emit;
 use fendermint_vm_core::Timestamp;
-use fendermint_vm_event::{emit, EventType};
 use fendermint_vm_interpreter::bytes::{
     BytesMessageApplyRes, BytesMessageCheckRes, BytesMessageQuery, BytesMessageQueryRes,
 };
@@ -43,8 +43,10 @@ use tendermint::abci::request::CheckTxKind;
 use tendermint::abci::{request, response};
 use tracing::instrument;
 
+use crate::events::{NewBlock, ProposalProcessed};
+use crate::AppExitCode;
+use crate::BlockHeight;
 use crate::{tmconv::*, VERSION};
-use crate::{BlockHeight, APP_VERSION};
 
 #[derive(Serialize)]
 #[repr(u8)]
@@ -110,6 +112,8 @@ pub struct AppConfig<S: KVStore> {
     pub builtin_actors_bundle: PathBuf,
     /// Path to the custom actor WASM bundle.
     pub custom_actors_bundle: PathBuf,
+    /// Block height where we should gracefully stop the node
+    pub halt_height: i64,
 }
 
 /// Handle ABCI requests.
@@ -135,6 +139,8 @@ where
     builtin_actors_bundle: PathBuf,
     /// Path to the custom actor WASM bundle.
     custom_actors_bundle: PathBuf,
+    /// Block height where we should gracefully stop the node
+    halt_height: i64,
     /// Namespace to store app state.
     namespace: S::Namespace,
     /// Collection of past state parameters.
@@ -188,6 +194,7 @@ where
             multi_engine: Arc::new(MultiEngine::new(1)),
             builtin_actors_bundle: config.builtin_actors_bundle,
             custom_actors_bundle: config.custom_actors_bundle,
+            halt_height: config.halt_height,
             namespace: config.app_namespace,
             state_hist: KVCollection::new(config.state_hist_namespace),
             state_hist_size: config.state_hist_size,
@@ -235,6 +242,7 @@ where
                     circ_supply: TokenAmount::zero(),
                     chain_id: 0,
                     power_scale: 0,
+                    app_version: 0,
                 },
             };
             self.set_committed_state(state)?;
@@ -430,7 +438,7 @@ where
         let info = response::Info {
             data: "fendermint".to_string(),
             version: VERSION.to_owned(),
-            app_version: APP_VERSION,
+            app_version: state.state_params.app_version,
             last_block_height: height,
             last_block_app_hash: state.app_hash(),
         };
@@ -502,6 +510,7 @@ where
                 circ_supply: out.circ_supply,
                 chain_id: out.chain_id.into(),
                 power_scale: out.power_scale,
+                app_version: 0,
             },
         };
 
@@ -665,14 +674,14 @@ where
             .await
             .context("failed to process proposal")?;
 
-        emit!(
-            EventType::ProposalProcessed,
-            is_accepted = accept,
-            height = request.height.value(),
-            size = num_txs,
-            hash = request.hash.to_string(),
-            proposer = request.proposer_address.to_string()
-        );
+        emit!(ProposalProcessed {
+            is_accepted: accept,
+            block_height: request.height.value(),
+            block_hash: request.hash.to_string().as_str(),
+            num_txs,
+            proposer: request.proposer_address.to_string().as_str()
+        });
+
         if accept {
             Ok(response::ProcessProposal::Accept)
         } else {
@@ -687,6 +696,14 @@ where
             tendermint::Hash::Sha256(h) => h,
             tendermint::Hash::None => return Err(anyhow!("empty block hash").into()),
         };
+
+        if self.halt_height != 0 && block_height == self.halt_height {
+            tracing::info!(
+                height = block_height,
+                "Stopping node due to reaching halt height"
+            );
+            std::process::exit(AppExitCode::Halt as i32);
+        }
 
         let db = self.state_store_clone();
         let state = self.committed_state()?;
@@ -766,7 +783,9 @@ where
 
         let r = to_end_block(ret)?;
 
-        emit!(EventType::NewBlock, height = request.height);
+        emit!(NewBlock {
+            block_height: request.height as BlockHeight
+        });
 
         Ok(r)
     }
@@ -783,15 +802,19 @@ where
         let (
             state_root,
             FvmUpdatableParams {
-                power_scale,
+                app_version,
+                base_fee,
                 circ_supply,
+                power_scale,
             },
             _,
         ) = exec_state.commit().context("failed to commit FVM")?;
 
         state.state_params.state_root = state_root;
-        state.state_params.power_scale = power_scale;
+        state.state_params.app_version = app_version;
+        state.state_params.base_fee = base_fee;
         state.state_params.circ_supply = circ_supply;
+        state.state_params.power_scale = power_scale;
 
         let app_hash = state.app_hash();
         let block_height = state.block_height;

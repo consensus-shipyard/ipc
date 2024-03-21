@@ -3,7 +3,7 @@ name: Mono CI
 on:
   push:
     branches:
-      - main
+      - develop
     # Pattern matched against refs/tags
     tags:
       # Push events to every git tag not containing /

@@ -12,9 +12,11 @@ use crate::{
 use anyhow::anyhow;
 use async_stm::{atomically, atomically_or_err, StmError};
 use ethers::utils::hex;
-use fendermint_vm_event::{emit, EventType};
 use std::sync::Arc;
 use tracing::instrument;
+
+use fendermint_tracing::emit;
+use fendermint_vm_event::{BlockHashHex, NewParentView};
 
 /// Parent syncer that constantly poll parent. This struct handles lotus null blocks and deferred
 /// execution. For ETH based parent, it should work out of the box as well.
@@ -202,7 +204,13 @@ where
                     })
                     .await?;
 
-                    emit!(EventType::NewParentView, is_null = true, height);
+                    emit!(NewParentView {
+                        is_null: true,
+                        block_height: height,
+                        block_hash: None::<BlockHashHex>,
+                        num_topdown_msgs: 0,
+                        num_validator_changes: 0
+                    });
 
                     // Null block received, no block hash for the current height being polled.
                     // Return the previous parent hash as the non-null block hash.
@@ -247,14 +255,14 @@ where
         })
         .await?;
 
-        emit!(
-            EventType::NewParentView,
-            is_null = false,
-            height,
-            block_hash = hex::encode(&data.0),
-            num_topdown_messages = data.2.len(),
-            num_validator_changes = data.1.len(),
-        );
+        emit!(NewParentView {
+            is_null: false,
+            block_height: height,
+            block_hash: Some(&hex::encode(&data.0)),
+            num_topdown_msgs: data.2.len(),
+            num_validator_changes: data.1.len(),
+        });
+
         Ok(data.0)
     }
 

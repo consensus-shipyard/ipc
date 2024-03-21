@@ -135,6 +135,8 @@ pub struct TopDownSettings {
     /// Timeout for calls to the parent Ethereum API.
     #[serde_as(as = "Option<DurationSeconds<u64>>")]
     pub parent_http_timeout: Option<Duration>,
+    /// Bearer token for any Authorization header.
+    pub parent_http_auth_token: Option<String>,
     /// The parent registry address
     #[serde(deserialize_with = "deserialize_eth_address_from_str")]
     pub parent_registry: Address,
@@ -212,6 +214,9 @@ pub struct Settings {
     /// Where to reach CometBFT for queries or broadcasting transactions.
     tendermint_rpc_url: Url,
 
+    /// Block height where we should gracefully stop the node
+    pub halt_height: i64,
+
     /// Secp256k1 private key used for signing transactions sent in the validator's name. Leave empty if not validating.
     pub validator_key: Option<SigningKey>,
 
@@ -237,9 +242,15 @@ impl Settings {
 
     /// Load the default configuration from a directory,
     /// then potential overrides specific to the run mode,
-    /// then overrides from the local environment.
+    /// then overrides from the local environment,
+    /// finally parse it into the [Settings] type.
     pub fn new(config_dir: &Path, home_dir: &Path, run_mode: &str) -> Result<Self, ConfigError> {
-        let c = Config::builder()
+        Self::config(config_dir, home_dir, run_mode).and_then(Self::parse)
+    }
+
+    /// Load the configuration into a generic data structure.
+    fn config(config_dir: &Path, home_dir: &Path, run_mode: &str) -> Result<Config, ConfigError> {
+        Config::builder()
             .add_source(EnvInterpol(File::from(config_dir.join("default"))))
             // Optional mode specific overrides, checked into git.
             .add_source(EnvInterpol(
@@ -266,10 +277,13 @@ impl Settings {
             // The `home_dir` key is not added to `default.toml` so there is no confusion
             // about where it will be coming from.
             .set_override("home_dir", home_dir.to_string_lossy().as_ref())?
-            .build()?;
+            .build()
+    }
 
+    /// Try to parse the config into [Settings].
+    fn parse(config: Config) -> Result<Self, ConfigError> {
         // Deserialize (and thus freeze) the entire configuration.
-        c.try_deserialize()
+        config.try_deserialize()
     }
 
     /// The configured home directory.
@@ -309,7 +323,12 @@ mod tests {
     fn try_parse_config(run_mode: &str) -> Result<Settings, config::ConfigError> {
         let current_dir = PathBuf::from(".");
         let default_dir = PathBuf::from("../config");
-        Settings::new(&default_dir, &current_dir, run_mode)
+        let c = Settings::config(&default_dir, &current_dir, run_mode)?;
+        // Trying to debug the following sporadic error on CI:
+        // thread 'tests::parse_test_config' panicked at fendermint/app/settings/src/lib.rs:315:36:
+        // failed to parse Settings: failed to parse: invalid digit found in string
+        eprintln!("CONFIG = {:?}", c.cache);
+        Settings::parse(c)
     }
 
     fn parse_config(run_mode: &str) -> Settings {

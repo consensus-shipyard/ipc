@@ -1,14 +1,14 @@
 # See fendermint/testing/snapshot-test/src/lib.rs for description.
 
 extend = [
-  { path = "../scripts/common.toml" },
+    { path = "../scripts/common.toml" },
 ]
 
 env_files = [
-  # `snapshot.env` is the environment for `cargo make`.
-  { path = "./scripts/snapshot.env" },
-  { path = "../scripts/common.env" },
-  { path = "../scripts/ci.env", profile = "ci" },
+    # `snapshot.env` is the environment for `cargo make`.
+    { path = "./scripts/snapshot.env" },
+    { path = "../scripts/common.env" },
+    { path = "../scripts/ci.env", profile = "ci" },
 ]
 
 # Overriding the env file to enable snapshotting.
@@ -34,14 +34,15 @@ EOF
 [tasks.test]
 clear = true
 run_task = { name = [
-  "node-1-setup",
-  "node-1-sync-test",
-  "node-2-setup",
-  "node-2-sync-test",
-  "snapshot-wait",
-  "snapshot-created",
-  "node-3-setup",
-  "node-3-sync-test",
+    "node-1-setup",
+    "node-1-sync-test",
+    "node-2-setup",
+    "node-2-sync-test",
+    "snapshot-wait",
+    "snapshot-created",
+    "node-3-setup",
+    "sync-wait",
+    "node-3-sync-test",
 ], fork = true, cleanup_task = "snapshot-teardown" }
 
 # Wait enough time that some snapshots should be exported.
@@ -59,12 +60,16 @@ if [ -z "$(ls -A $FM_SNAPSOTS_DIR)" ]; then
 fi
 """
 
+[tasks.sync-wait]
+extend = "wait"
+env = { "CARGO_MAKE_WAIT_MILLISECONDS" = "10000" }
+
 # Shut down all non-default nodes.
 [tasks.snapshot-teardown]
 run_task = { name = [
-  "node-1-teardown",
-  "node-2-teardown",
-  "node-3-teardown",
+    "node-1-teardown",
+    "node-2-teardown",
+    "node-3-teardown",
 ] }
 
 
@@ -74,17 +79,17 @@ run_task = { name = [
 # Export node-0 ID.
 dependencies = ["cometbft-export-node-id"]
 run_task = { name = [
-  "test-node-dir",
-  "node-env",
-  "cometbft-init",
-  "node-set-seed",
-  "node-copy-genesis",
-  "fendermint-start",
-  "cometbft-start",
-  "cometbft-wait",
-  "cometbft-export-node-id",
-  "fendermint-logs",
-  "cometbft-logs",
+    "test-node-dir",
+    "node-env",
+    "cometbft-init",
+    "node-set-seed",
+    "node-copy-genesis",
+    "fendermint-start",
+    "cometbft-start",
+    "cometbft-wait",
+    "cometbft-export-node-id",
+    "fendermint-logs",
+    "cometbft-logs",
 ] }
 
 # Set the persistent peer address to that of the default node-0.
@@ -104,9 +109,9 @@ cp $BASE_DIR/${SEED_NODE_NAME}/cometbft/config/genesis.json \
 
 [tasks.node-teardown]
 run_task = { name = [
-  "cometbft-destroy",
-  "fendermint-destroy",
-  "test-node-dir-rm",
+    "cometbft-destroy",
+    "fendermint-destroy",
+    "test-node-dir-rm",
 ] }
 
 # See if it managed to sync.
