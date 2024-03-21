@@ -5,17 +5,19 @@
 use std::marker::PhantomData;
 
 use prometheus;
-use tracing::{Event, Subscriber};
+use tracing::{Event, Level, Subscriber};
 use tracing_subscriber::{filter, layer, registry::LookupSpan, Layer};
 
-use super::prometheus as pm;
+use super::prometheus::app as am;
 
 pub fn layer<S>() -> impl Layer<S>
 where
     S: Subscriber,
     for<'a> S: LookupSpan<'a>,
 {
-    MetricsLayer::new().with_filter(filter::filter_fn(|md| md.name().starts_with("event::")))
+    MetricsLayer::new().with_filter(filter::filter_fn(|md| {
+        md.level() == &Level::INFO && md.name().starts_with("event::")
+    }))
 }
 
 struct MetricsLayer<S> {
@@ -34,23 +36,23 @@ impl<S: Subscriber> Layer<S> for MetricsLayer<S> {
     fn on_event(&self, event: &Event<'_>, _ctx: layer::Context<'_, S>) {
         match event.metadata().name() {
             "event::NewParentView" => {
-                set_block_height(event, &pm::TOPDOWN_VIEW_BLOCK_HEIGHT);
-                inc_num_msgs(event, &pm::TOPDOWN_VIEW_NUM_MSGS);
+                set_block_height(event, &am::TOPDOWN_VIEW_BLOCK_HEIGHT);
+                inc_num_msgs(event, &am::TOPDOWN_VIEW_NUM_MSGS);
                 inc_counter(
                     event,
-                    &pm::TOPDOWN_VIEW_NUM_VAL_CHNGS,
+                    &am::TOPDOWN_VIEW_NUM_VAL_CHNGS,
                     "num_validator_changes",
                 );
             }
             "event::ParentFinalityCommitted" => {
-                set_block_height(event, &pm::TOPDOWN_FINALIZED_BLOCK_HEIGHT);
+                set_block_height(event, &am::TOPDOWN_FINALIZED_BLOCK_HEIGHT);
             }
             "event::NewBottomUpCheckpoint" => {
-                set_block_height(event, &pm::BOTTOMUP_CKPT_BLOCK_HEIGHT);
-                inc_num_msgs(event, &pm::BOTTOMUP_CKPT_NUM_MSGS);
+                set_block_height(event, &am::BOTTOMUP_CKPT_BLOCK_HEIGHT);
+                inc_num_msgs(event, &am::BOTTOMUP_CKPT_NUM_MSGS);
                 set_gauge(
                     event,
-                    &pm::BOTTOMUP_CKPT_CONFIG_NUM,
+                    &am::BOTTOMUP_CKPT_CONFIG_NUM,
                     "next_configuration_number",
                 );
             }

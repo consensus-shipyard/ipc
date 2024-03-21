@@ -4,5 +4,5 @@
 mod prometheus;
 mod tracing;
 
-pub use prometheus::register_metrics;
+pub use prometheus::app::register_metrics as register_app_metrics;
 pub use tracing::layer;
