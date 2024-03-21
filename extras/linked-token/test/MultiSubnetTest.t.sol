@@ -7,9 +7,16 @@ import {TestUtils} from "@ipc/test/helpers/TestUtils.sol";
 import {MerkleTreeHelper} from "@ipc/test/helpers/MerkleTreeHelper.sol";
 import {GatewayFacetsHelper} from "@ipc/test/helpers/GatewayFacetsHelper.sol";
 import {SubnetActorFacetsHelper} from "@ipc/test/helpers/SubnetActorFacetsHelper.sol";
-import {LinkedTokenController} from "../src/LinkedTokenController.sol";
-import {LinkedTokenReplica} from "../src/LinkedTokenReplica.sol";
+
 import {USDCTest} from "../src/USDCTest.sol";
+import "../src/LinkedTokenFacet.sol";
+import "../src/LinkedTokenControllerFacet.sol";
+import "../src/LinkedTokenReplicaFacet.sol";
+import "@ipc/src/diamond/DiamondCutFacet.sol";
+import "@ipc/src/diamond/DiamondLoupeFacet.sol";
+import "@ipc/src/OwnershipFacet.sol";
+
+import "./../script/SelectorLibrary.sol";
 
 import {
     SubnetID,
@@ -42,7 +49,8 @@ import {IpcHandler} from "@ipc/sdk/IpcContract.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import "forge-std/console.sol";
 
-contract MultiSubnetTest is IntegrationTestBase {
+import { LinkedTokenTestBase} from "./LinkedTokenTestBase.t.sol";
+contract MultiSubnetTest is IntegrationTestBase, LinkedTokenTestBase {
     using SubnetIDHelper for SubnetID;
     using GatewayFacetsHelper for GatewayDiamond;
     using SubnetActorFacetsHelper for SubnetActorDiamond;
@@ -50,8 +58,6 @@ contract MultiSubnetTest is IntegrationTestBase {
     // a contract from native subnet with a contract in token subnet through the rootnet.
     using CrossMsgHelper for IpcEnvelope;
 
-    LinkedTokenReplica ipcTokenReplica;
-    LinkedTokenController ipcTokenController;
 
     RootSubnetDefinition public rootSubnet;
     TestSubnetDefinition public nativeSubnet;
@@ -158,44 +164,30 @@ contract MultiSubnetTest is IntegrationTestBase {
             "unexpected balance"
         );
 
-        // the token replica sits in a native supply child subnet.
-        ipcTokenReplica = new LinkedTokenReplica({
-            gateway: address(nativeSubnetGateway),
-            underlyingToken: address(testUSDC),
-            linkedSubnet: rootSubnetName
-        });
-
-        // the token controller sits in the root network.
-        ipcTokenController = new LinkedTokenController({
-            gateway: address(rootGateway),
-            underlyingToken: address(testUSDC),
-            linkedSubnet: nativeSubnetName
-        });
-        ipcTokenReplica.initialize(address(ipcTokenController));
-        ipcTokenController.initialize(address(ipcTokenReplica));
+        setUpLinkedTokenContracts(address(rootGateway), address(nativeSubnetGateway), address(testUSDC), nativeSubnetName, rootSubnetName);
 
         vm.prank(holder);
-        testUSDC.approve(address(ipcTokenController), transferAmount);
+        testUSDC.approve(address(controller), transferAmount);
 
         console.log("mock usdc contract: %s", address(testUSDC));
         console.log("mock usdc owner: %s", owner);
         console.log("mock usdc holder: %s", address(holder));
-        console.log("ipcTokenController: %s", address(ipcTokenController));
+        console.log("controller: %s", address(controller));
         console.log(
             "controller allowance for holder: %d",
-            testUSDC.allowance(address(holder), address(ipcTokenController))
+            testUSDC.allowance(address(holder), address(controller))
         );
 
         vm.prank(address(holder));
         IpcEnvelope memory lockAndTransferEnvelope =
-            ipcTokenController.lockAndTransferWithReturn(
+            LinkedTokenControllerFacet(address(controller)).linkedTransfer(
                 recipient,
                 transferAmount
             );
 
         // Check that the message is in unconfirmedTransfers
         (address receiptSender, uint256 receiptValue) =
-            ipcTokenController.getUnconfirmedTransfer(
+            LinkedTokenControllerFacet(address(controller)).getUnconfirmedTransfer(
                 lockAndTransferEnvelope.toHash()
             );
         require(
@@ -210,7 +202,7 @@ contract MultiSubnetTest is IntegrationTestBase {
         //confirm that token replica only accept calls to Ipc from the gateway
         vm.prank(owner);
         vm.expectRevert(IpcHandler.CallerIsNotGateway.selector);
-        ipcTokenReplica.handleIpcMessage(expected);
+        LinkedTokenReplicaFacet(address(replica)).handleIpcMessage(expected);
 
         // the message the root gateway's postbox is being executed in the token subnet's gateway
 
@@ -218,7 +210,7 @@ contract MultiSubnetTest is IntegrationTestBase {
             kind: IpcMsgKind.Call,
             from: IPCAddress({
                 subnetId: rootSubnetName,
-                rawAddress: FvmAddressHelper.from(address(ipcTokenController))
+                rawAddress: FvmAddressHelper.from(address(controller))
             }),
             to: lockAndTransferEnvelope.to,
             value: 0,
@@ -234,12 +226,12 @@ contract MultiSubnetTest is IntegrationTestBase {
         );
 
         console.log("fail:");
-        console.log(IERC20(ipcTokenReplica).balanceOf(recipient));
+        console.log(IERC20(address(replica)).balanceOf(recipient));
         console.log(transferAmount);
 
         //ensure that tokens are delivered on subnet
         require(
-            IERC20(ipcTokenReplica).balanceOf(recipient) == transferAmount,
+            IERC20(address(replica)).balanceOf(recipient) == transferAmount,
             "incorrect proxy token balance"
         );
 
@@ -254,10 +246,10 @@ contract MultiSubnetTest is IntegrationTestBase {
         );
 
         vm.prank(recipient);
-        expected = ipcTokenReplica.linkedTransfer(holder, transferAmount);
+        expected = LinkedTokenReplicaFacet(address(replica)).linkedTransfer(holder, transferAmount);
 
         // check that the message is in unconfirmedTransfers
-        (receiptSender, receiptValue) = ipcTokenReplica.getUnconfirmedTransfer(
+        (receiptSender, receiptValue) = LinkedTokenReplicaFacet(address(replica)).getUnconfirmedTransfer(
             expected.toHash()
         );
         require(
@@ -285,12 +277,12 @@ contract MultiSubnetTest is IntegrationTestBase {
         );
         //ensure that the tokens in the subnet are minted and the token bridge and the usdc holder does not own any
         require(
-            0 == ipcTokenReplica.balanceOf(holder),
-            "unexpected holder balance in ipcTokenReplica"
+            0 == LinkedTokenReplicaFacet(address(replica)).balanceOf(holder),
+            "unexpected holder balance in replica"
         );
         require(
-            0 == ipcTokenReplica.balanceOf(address(ipcTokenReplica)),
-            "unexpected ipcTokenReplica balance in ipcTokenReplica"
+            0 == LinkedTokenReplicaFacet(address(replica)).balanceOf(address(replica)),
+            "unexpected replica balance in replica"
         );
     }
 

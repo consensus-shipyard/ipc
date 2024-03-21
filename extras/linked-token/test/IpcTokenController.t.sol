@@ -11,8 +11,9 @@ import {SubnetID, IPCAddress} from "@ipc/src/structs/Subnet.sol";
 import {FvmAddressHelper} from "@ipc/src/lib/FvmAddressHelper.sol";
 import {FvmAddress} from "@ipc/src/structs/FvmAddress.sol";
 
-import "../src/LinkedTokenControllerFacet.sol";
+import {USDCTest} from "../src/USDCTest.sol";
 import "../src/LinkedTokenFacet.sol";
+import "../src/LinkedTokenControllerFacet.sol";
 import "../src/LinkedTokenReplicaFacet.sol";
 import "@ipc/src/diamond/DiamondCutFacet.sol";
 import "@ipc/src/diamond/DiamondLoupeFacet.sol";
@@ -31,13 +32,12 @@ import {IpcEnvelope, CallMsg, IpcMsgKind} from "@ipc/src/structs/CrossNet.sol";
 import {SubnetActorDiamond} from "@ipc/src/SubnetActorDiamond.sol";
 import {LinkedTokenDiamond} from "../src/LinkedTokenDiamond.sol";
 //import {InvalidOriginContract, InvalidOriginSubnet} from "../src/@ipc/src/examples/cross-token/IpcCrossTokenErrors.sol";
-import {USDCTest} from "../src/USDCTest.sol";
 
-contract IpcTokenControllerTest is Test, IntegrationTestBase {
+import { LinkedTokenTestBase} from "./LinkedTokenTestBase.t.sol";
+
+contract IpcTokenControllerTest is Test, IntegrationTestBase, LinkedTokenTestBase {
     using SubnetIDHelper for SubnetID;
 
-    LinkedTokenDiamond controller;
-    LinkedTokenDiamond replica;
     address controllerSubnetUSDC;
     SubnetID controllerSubnet;
     SubnetID replicaSubnetName;
@@ -95,71 +95,10 @@ contract IpcTokenControllerTest is Test, IntegrationTestBase {
         replica.initialize(address(controller));
         controller.initialize(address(replica));
 */
-         setUpLinkedTokenContracts(gateway, controllerSubnetUSDC, replicaSubnetName, controllerSubnet);
+         setUpLinkedTokenContracts(gateway, gateway, controllerSubnetUSDC, replicaSubnetName, controllerSubnet);
     }
 
 
-    function setUpLinkedTokenContracts (address gateway, address controllerSubnetUSDC, SubnetID memory replicaSubnetName,  SubnetID memory controllerSubnet) internal  {
-
-        //Controller 
-
-        // Deploy controller facets
-        DiamondCutFacet cutFacetC = new DiamondCutFacet();
-        DiamondLoupeFacet loupeFacetC = new DiamondLoupeFacet();
-        OwnershipFacet ownershipFacetC = new OwnershipFacet();
-        LinkedTokenControllerFacet linkedTokenControllerFacetC = new LinkedTokenControllerFacet();
-
-        // controller diamond constructor params
-        LinkedTokenDiamond.ConstructorParams memory paramsController;
-        paramsController.gateway=gateway;
-        paramsController.underlyingToken=controllerSubnetUSDC;
-        paramsController.linkedSubnet = replicaSubnetName;
-
-        // Prepare diamond cut with all facets
-        IDiamond.FacetCut[] memory cuts = new IDiamond.FacetCut[](4);
-
-        cuts[0] = createCut(address(cutFacetC), SelectorLibrary.resolveSelectors("DiamondCutFacet"));
-        cuts[1] = createCut(address(loupeFacetC), SelectorLibrary.resolveSelectors("DiamondLoupeFacet"));
-        cuts[2] = createCut(address(ownershipFacetC), SelectorLibrary.resolveSelectors("OwnershipFacet"));
-        cuts[3] = createCut(address(linkedTokenControllerFacetC), SelectorLibrary.resolveSelectors("LinkedTokenControllerFacet"));
-        //
-        // Deploy the diamond with all facet cuts
-
-        controller = new LinkedTokenDiamond(cuts, paramsController);
-
-      
-
-        //Replica
-        
-        //Deploy replica facets
-        DiamondCutFacet cutFacetR = new DiamondCutFacet();
-        DiamondLoupeFacet loupeFacetR = new DiamondLoupeFacet();
-        OwnershipFacet ownershipFacetR = new OwnershipFacet();
-        LinkedTokenReplicaFacet linkedTokenReplicaFacetR = new LinkedTokenReplicaFacet();
-
-        // replica diamond constructor params
-        LinkedTokenDiamond.ConstructorParams memory paramsReplica;
-        paramsReplica.gateway=gateway;
-        paramsReplica.underlyingToken=controllerSubnetUSDC;
-        paramsReplica.linkedSubnet = controllerSubnet;
-
-
-        // Prepare diamond cut with all facets
-        IDiamond.FacetCut[] memory cutsR = new IDiamond.FacetCut[](4);
-
-        cutsR[0] = createCut(address(cutFacetR), SelectorLibrary.resolveSelectors("DiamondCutFacet"));
-        cutsR[1] = createCut(address(loupeFacetR), SelectorLibrary.resolveSelectors("DiamondLoupeFacet"));
-        cutsR[2] = createCut(address(ownershipFacetR), SelectorLibrary.resolveSelectors("OwnershipFacet"));
-        cutsR[3] = createCut(address(linkedTokenReplicaFacetR), SelectorLibrary.resolveSelectors("LinkedTokenReplicaFacet"));
-        //
-        // Deploy the diamond with all facet cuts
-
-
-        replica = new LinkedTokenDiamond(cutsR, paramsReplica);
-
-        LinkedTokenReplicaFacet(address(replica)).initialize(address(controller));
-        LinkedTokenControllerFacet(address(controller)).initialize(address(replica));
-    }
 
     function testHandleIpcMessageOrigin() public {
         testUSDC.approve(address(controller), transferAmount);
@@ -258,11 +197,4 @@ contract IpcTokenControllerTest is Test, IntegrationTestBase {
         assertTrue(true, "depositTokens not implemented");
     }
 
-    function createCut(address _facet, bytes4[] memory _selectors) internal pure returns (IDiamond.FacetCut memory cut) {
-        return IDiamond.FacetCut({
-            facetAddress: _facet,
-            action: IDiamond.FacetCutAction.Add,
-            functionSelectors: _selectors
-        });
-    }
 }
