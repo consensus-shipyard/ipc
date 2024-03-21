@@ -12,6 +12,7 @@ import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
 
 import {LinkedTokenStorage} from "./lib/LibLinkedTokenStorage.sol";
 import {LibDiamond} from "@ipc/src/lib/LibDiamond.sol";
+import {LibLinkedToken} from "./lib/LibLinkedToken.sol";
 
 // Interface that needs to be implemented by IPC-aware contracts.
 //
@@ -86,7 +87,8 @@ abstract contract IpcExchangeFacet is IpcHandler, ReentrancyGuard {
         uint256 value
     ) internal nonReentrant returns (IpcEnvelope memory envelope) {
         // Queue the cross-net message for dispatch.
-        envelope = IGateway(s._gatewayAddr).sendContractXnetMessage{value: value}(
+        address gatewayAddr = LibLinkedToken.getLinkedGateway();
+        envelope = IGateway(gatewayAddr).sendContractXnetMessage{value: value}(
             IpcEnvelope({
                 kind: IpcMsgKind.Call,
                 from: to, // TODO: will anyway be replaced by sendContractXnetMessage.
@@ -115,7 +117,8 @@ abstract contract IpcExchangeFacet is IpcHandler, ReentrancyGuard {
 
     function _onlyGateway() private view {
         // only the gateway address is allowed to deliver xnet messages.
-        if (msg.sender != s._gatewayAddr) {
+        address gatewayAddr = LibLinkedToken.getLinkedGateway();
+        if (msg.sender != gatewayAddr) {
             revert IpcHandler.CallerIsNotGateway();
         }
     }

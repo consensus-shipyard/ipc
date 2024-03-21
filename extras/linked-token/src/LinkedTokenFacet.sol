@@ -15,6 +15,8 @@ import {UnconfirmedTransfer } from "./lib/LibLinkedTokenStorage.sol";
 
 import {LibDiamond} from "@ipc/src/lib/LibDiamond.sol";
 
+import {LibLinkedToken} from "./lib/LibLinkedToken.sol";
+
 
 error InvalidOriginContract();
 error InvalidOriginSubnet();
@@ -135,7 +137,7 @@ abstract contract LinkedTokenFacet is IpcExchangeFacet {
     }
 
     function getLinkedGateway() public view returns (address) {
-        return s._gatewayAddr;
+        return LibLinkedToken.getLinkedGateway();
     }
 
     function getLinkedSubnet() public view returns (SubnetID memory) {
@@ -237,8 +239,7 @@ abstract contract LinkedTokenFacet is IpcExchangeFacet {
     // ----------------------------
 
     function getUnconfirmedTransfer(bytes32 id) public view returns (address, uint256) {
-        UnconfirmedTransfer storage details = s._unconfirmedTransfers[id];
-        return (details.sender, details.value);
+        return LibLinkedToken.getUnconfirmedTransfer(id);
     }
 
     // Method for the contract owner to manually drop an entry from unconfirmedTransfers

@@ -21,3 +21,12 @@ struct UnconfirmedTransfer {
     uint256 value;
 }
 
+library LibLinkedTokenStorage {
+    function appStorage() internal pure returns (LinkedTokenStorage storage ds) {
+        assembly {
+            ds.slot := 0
+        }
+        return ds;
+    }
+}
+
