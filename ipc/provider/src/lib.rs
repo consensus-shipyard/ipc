@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: MIT
 //! Ipc agent sdk, contains the json rpc client to interact with the IPC agent rpc server.
 
-use crate::dryrun::IPCDryRunProvider;
+use crate::dry_run::{IPCDryRunProvider, Network};
+use crate::manager::evm::dry_run::EvmDryRun;
+use crate::manager::fvm::FvmDryRun;
 use crate::manager::{GetBlockHashResult, TopDownQueryPayload};
 use crate::preflight::Preflight;
 use anyhow::anyhow;
@@ -31,7 +33,7 @@ use zeroize::Zeroize;
 
 pub mod checkpoint;
 pub mod config;
-pub mod dryrun;
+pub mod dry_run;
 pub mod jsonrpc;
 pub mod lotus;
 pub mod manager;
@@ -74,9 +76,7 @@ impl IpcProvider {
         evm_keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
     ) -> Self {
         Self {
-            preflight: Preflight {
-                config: config.clone(),
-            },
+            preflight: Preflight::new(config.clone(), Some(evm_keystore.clone())),
             sender: None,
             config,
             fvm_wallet: Some(fvm_wallet),
@@ -84,9 +84,10 @@ impl IpcProvider {
         }
     }
 
-    pub fn dry_run(self) -> IPCDryRunProvider {
-        IPCDryRunProvider {
-            preflight: self.preflight,
+    pub fn dry_run(self, network: &Network) -> IPCDryRunProvider {
+        match network {
+            Network::Evm => IPCDryRunProvider::evm(self.preflight, EvmDryRun),
+            Network::Fvm => IPCDryRunProvider::fvm(self.preflight, FvmDryRun {  evm: EvmDryRun }),
         }
     }
 
@@ -119,9 +120,7 @@ impl IpcProvider {
             Ok(Self::new(config, fvm_wallet, evm_keystore))
         } else {
             Ok(Self {
-                preflight: Preflight {
-                    config: config.clone(),
-                },
+                preflight: Preflight::new(config.clone(), None),
                 sender: None,
                 config,
                 fvm_wallet: None,
@@ -173,7 +172,9 @@ impl IpcProvider {
 
     /// Returns the evm wallet if it is configured, and throws an error if no wallet configured.
     ///
-    /// This method should be used when we want the wallet retrieval to throw an error
+    /// This method should be used when:
+    /// 1. Signing txns
+    /// 2. Get the default wallet used for operations
     /// if it is not configured (i.e. when the provider needs to sign transactions).
     pub fn evm_wallet(&self) -> anyhow::Result<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>> {
         if let Some(wallet) = &self.evm_keystore {
@@ -250,9 +251,10 @@ impl IpcProvider {
         };
 
         let subnet_config = conn.subnet();
-        let sender = self.check_sender(subnet_config, from)?;
 
+        let sender = self.check_sender(subnet_config, from)?;
         let params = self.preflight.create_subnet(params)?;
+
         conn.manager().create_subnet(sender, params).await
     }
 

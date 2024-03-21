@@ -1,6 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
 
+pub mod dry_run;
 mod manager;
 
 use async_trait::async_trait;

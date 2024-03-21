@@ -11,6 +11,7 @@ use fvm_shared::clock::ChainEpoch;
 
 use ipc_api::subnet::{ConstructParams, PermissionMode, SupplyKind, SupplySource};
 use ipc_api::subnet_id::SubnetID;
+use ipc_provider::dry_run::Network;
 
 use crate::commands::get_ipc_provider;
 use crate::{f64_to_token_amount, require_fil_addr_from_str, CommandLineHandler, GlobalArguments};
@@ -53,8 +54,8 @@ impl CommandLineHandler for CreateSubnet {
             supply_source,
         );
 
-        if arguments.dry_run {
-            provider.dry_run().create_subnet(params)?;
+        if let Some(dry_run) = arguments.dry_run.as_ref() {
+            provider.dry_run(dry_run).create_subnet(from, params)?;
             return Ok(());
         }
 
@@ -75,10 +76,10 @@ impl CommandLineHandler for CreateSubnet {
 pub struct CreateSubnetArgs {
     #[arg(
         long,
-        help = "Dry run only will not submit to chain, prints the calldata instead",
-        default_value = "false"
+        help = "Dry run in the specified network, prints the calldata only",
+        default_value = "evm"
     )]
-    pub dry_run: bool,
+    pub dry_run: Option<Network>,
 
     #[arg(long, help = "The address that creates the subnet")]
     pub from: Option<String>,

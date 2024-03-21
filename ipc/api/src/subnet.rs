@@ -7,6 +7,7 @@
 /// However, we should either deprecate the native actors, or make
 /// them use the types from this sdk directly.
 use crate::subnet_id::SubnetID;
+use anyhow::anyhow;
 use fvm_ipld_encoding::repr::*;
 use fvm_shared::{address::Address, clock::ChainEpoch, econ::TokenAmount};
 use serde::{Deserialize, Serialize};
@@ -108,6 +109,28 @@ impl ConstructParams {
             permission_mode,
             supply_source,
         }
+    }
+
+    pub fn validate(&self) -> anyhow::Result<()> {
+        ensure_not_none(self.ipc_gateway_addr.as_ref(), "gateway is not defined")?;
+        ensure_not_none(
+            self.active_validators_limit.as_ref(),
+            "active validators limit is not defined",
+        )?;
+        ensure_not_none(self.power_scale.as_ref(), "power scale is not defined")?;
+        ensure_not_none(self.consensus.as_ref(), "consensus is not defined")?;
+        ensure_not_none(
+            self.majority_percentage.as_ref(),
+            "majority percentage is not defined",
+        )
+    }
+}
+
+fn ensure_not_none<T>(val: Option<&T>, err_msg: &'static str) -> anyhow::Result<()> {
+    if val.is_none() {
+        Err(anyhow!(err_msg))
+    } else {
+        Ok(())
     }
 }
 

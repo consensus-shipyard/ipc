@@ -6,9 +6,11 @@
 
 use crate::config::{Config, Subnet};
 use anyhow::anyhow;
+use fvm_shared::address::Address;
 use ipc_api::subnet::{ConsensusType, ConstructParams};
 use ipc_api::subnet_id::SubnetID;
-use std::sync::Arc;
+use ipc_wallet::{EthKeyAddress, EvmKeyStore, PersistentKeyStore};
+use std::sync::{Arc, RwLock};
 
 const DEFAULT_ACTIVE_VALIDATORS: u16 = 100;
 const DEFAULT_POWER_SCALE: i8 = 3;
@@ -20,10 +22,35 @@ const SUBNET_MAJORITY_PERCENTAGE: u8 = 67;
 /// setting default/missing parameter, checking if the parameters are valid.
 #[derive(Clone)]
 pub struct Preflight {
-    pub config: Arc<Config>,
+    config: Arc<Config>,
+    evm_keystore: Option<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>>,
 }
 
 impl Preflight {
+    pub fn new(
+        config: Arc<Config>,
+        evm_keystore: Option<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>>,
+    ) -> Self {
+        Self {
+            config,
+            evm_keystore,
+        }
+    }
+
+    pub fn get_default_signer(&self) -> anyhow::Result<Option<Address>> {
+        let wallet = if let Some(wallet) = &self.evm_keystore {
+            wallet
+        } else {
+            return Ok(None);
+        };
+
+        Ok(if let Some(addr) = wallet.write().unwrap().get_default()? {
+            Some(Address::try_from(addr)?)
+        } else {
+            None
+        })
+    }
+
     pub fn create_subnet(&self, mut params: ConstructParams) -> anyhow::Result<ConstructParams> {
         let config = self.config(&params.parent)?;
 
