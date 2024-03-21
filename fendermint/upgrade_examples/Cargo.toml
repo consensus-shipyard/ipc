@@ -1,0 +1,19 @@
+[package]
+name = "fendermint_upgrade_examples"
+description = "Upgrade examples for the Upgrade scheduler"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cid = { workspace = true }
+fendermint_rocksdb = { path = "../rocksdb" }
+fendermint_vm_actor_interface = { path = "../vm/actor_interface" }
+fendermint_vm_interpreter = { path = "../vm/interpreter" }
+fvm = { workspace = true }
+fendermint_actor_chainmetadata = { path = "../actors/chainmetadata" }
+fvm_shared = { workspace = true }
+fvm_ipld_encoding = { workspace = true }
+fvm_ipld_blockstore = { workspace = true }
+anyhow = { workspace = true }

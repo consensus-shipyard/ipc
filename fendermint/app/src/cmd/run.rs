@@ -9,9 +9,9 @@ use fendermint_app::{App, AppConfig, AppStore, BitswapBlockstore};
 use fendermint_app_settings::AccountKind;
 use fendermint_crypto::SecretKey;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
+use fendermint_upgrade_examples::get_example_upgrade_scheduler;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::chain::ChainEnv;
-use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
 use fendermint_vm_interpreter::{
     bytes::{BytesMessageInterpreter, ProposalPrepareMode},
     chain::{ChainMessageInterpreter, CheckpointPool},
@@ -35,7 +35,6 @@ use tokio::sync::broadcast::error::RecvError;
 use tracing::info;
 
 use crate::cmd::key::read_secret_key;
-use crate::cmd::upgrades::patch_actor_state::UPGRADE_EXAMPLE_PATCH_STATE;
 use crate::{cmd, options::run::RunArgs, settings::Settings};
 
 cmd! {
@@ -115,11 +114,6 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         ValidatorContext::new(sk, broadcaster)
     });
 
-    let mut upgrade_scheduler = UpgradeScheduler::new();
-    upgrade_scheduler
-        .add(UPGRADE_EXAMPLE_PATCH_STATE.clone())
-        .unwrap();
-
     let interpreter = FvmMessageInterpreter::<NamespaceBlockstore, _>::new(
         tendermint_client.clone(),
         validator_ctx,
@@ -127,7 +121,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         settings.fvm.gas_overestimation_rate,
         settings.fvm.gas_search_step,
         settings.fvm.exec_in_check,
-        upgrade_scheduler,
+        get_example_upgrade_scheduler(),
     );
     let interpreter = SignedMessageInterpreter::new(interpreter);
     let interpreter = ChainMessageInterpreter::<_, NamespaceBlockstore>::new(interpreter);

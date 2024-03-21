@@ -110,6 +110,13 @@ where
             if let Some(err) = apply_ret.failure_info {
                 anyhow::bail!("failed to apply chainmetadata message: {}", err);
             }
+
+            if height > 10 {
+                let nr_items =
+                    fvm_ipld_encoding::from_slice::<u64>(&apply_ret.msg_receipt.return_data)
+                        .unwrap();
+                println!("nr_items: {}", nr_items);
+            }
         }
 
         let ret = FvmApplyRet {
