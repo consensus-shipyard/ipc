@@ -335,12 +335,15 @@ async fn handle_os_get(
             // }
             let val = value.to_string();
 
-            let stat = ipfs.object_links(&val).await.map_err(|e| {
-                Rejection::from(BadRequest {
-                    message: format!("failed to stat object: {}", e),
-                })
-            })?;
-            let size = stat.links.iter().fold(0, |sum, i| sum + (i.size));
+            let stat = ipfs
+                .files_stat(format!("/ipfs/{val}").as_str())
+                .await
+                .map_err(|e| {
+                    Rejection::from(BadRequest {
+                        message: format!("failed to stat object: {}", e),
+                    })
+                })?;
+            let size = stat.size;
 
             let (stream, start, end, len) = match range {
                 Some(range) => {
