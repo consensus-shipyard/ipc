@@ -1,6 +1,7 @@
 import {SubnetID} from "@ipc/src/structs/Subnet.sol";
 
 import "../src/LinkedTokenDiamond.sol";
+import {LinkedTokenReplicaDiamond} from "../src/LinkedTokenReplicaDiamond.sol";
 import {USDCTest} from "../src/USDCTest.sol";
 import "../src/LinkedTokenFacet.sol";
 import "../src/LinkedTokenControllerFacet.sol";
@@ -14,7 +15,7 @@ import "./../script/SelectorLibrary.sol";
 contract LinkedTokenTestBase {
 
     LinkedTokenDiamond controller;
-    LinkedTokenDiamond replica;
+    LinkedTokenReplicaDiamond replica;
 
     function setUpLinkedTokenContracts (address controllerGateway,address replicaGateway, address controllerSubnetUSDC, SubnetID memory replicaSubnetName,  SubnetID memory controllerSubnet) internal  {
 
@@ -55,10 +56,13 @@ contract LinkedTokenTestBase {
         LinkedTokenReplicaFacet linkedTokenReplicaFacetR = new LinkedTokenReplicaFacet();
 
         // replica diamond constructor params
-        LinkedTokenDiamond.ConstructorParams memory paramsReplica;
+        LinkedTokenReplicaDiamond.ConstructorParams memory paramsReplica;
         paramsReplica.gateway=replicaGateway;
         paramsReplica.underlyingToken=controllerSubnetUSDC;
         paramsReplica.linkedSubnet = controllerSubnet;
+        paramsReplica.tokenName = "TOKENAME";
+        paramsReplica.tokenSymbol = "TKN";
+        paramsReplica.tokenDecimals = 3;
 
 
         // Prepare diamond cut with all facets
@@ -72,7 +76,7 @@ contract LinkedTokenTestBase {
         // Deploy the diamond with all facet cuts
 
 
-        replica = new LinkedTokenDiamond(cutsR, paramsReplica);
+        replica = new LinkedTokenReplicaDiamond(cutsR, paramsReplica);
 
         LinkedTokenReplicaFacet(address(replica)).initialize(address(controller));
         LinkedTokenControllerFacet(address(controller)).initialize(address(replica));

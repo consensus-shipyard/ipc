@@ -88,8 +88,8 @@ abstract contract LinkedTokenFacet is IpcExchangeFacet {
             params: abi.encode(recipient, amount)
         });
         IPCAddress memory destination = IPCAddress({
-            subnetId: s._linkedSubnet,
-            rawAddress: FvmAddressHelper.from(s._linkedContract)
+            subnetId: LibLinkedToken.getLinkedSubnet(),
+            rawAddress: FvmAddressHelper.from(LibLinkedToken.getLinkedContract())
         });
 
         // Route through GMP.
@@ -99,7 +99,7 @@ abstract contract LinkedTokenFacet is IpcExchangeFacet {
         _addUnconfirmedTransfer(committed.toHash(), msg.sender, amount);
 
         emit LinkedTokensSent({
-            underlying: address(s._underlying),
+            underlying: address(LibLinkedToken.getUnderlyingToken()),
             sender: msg.sender,
             recipient: recipient,
             id: committed.toHash(),
@@ -127,12 +127,12 @@ abstract contract LinkedTokenFacet is IpcExchangeFacet {
 
         LibDiamond.enforceIsContractOwner();
 
-        s._linkedContract = linkedContract;
+        LibLinkedToken.setLinkedContract(linkedContract);
 
         emit LinkedTokenInitialized({
-            underlying: address(s._underlying),
-            linkedSubnet: s._linkedSubnet,
-            linkedContract: s._linkedContract
+            underlying: address(LibLinkedToken.getUnderlyingToken()),
+            linkedSubnet: LibLinkedToken.getLinkedSubnet(),
+            linkedContract: LibLinkedToken.getLinkedContract()
         });
     }
 
@@ -141,12 +141,13 @@ abstract contract LinkedTokenFacet is IpcExchangeFacet {
     }
 
     function getLinkedSubnet() public view returns (SubnetID memory) {
-        return s._linkedSubnet;
+        return LibLinkedToken.getLinkedSubnet();
     }
 
     function getLinkedContract() public returns (address) {
-        require(s._linkedContract != address(0), "linked token not initialized");
-        return s._linkedContract;
+        address linkedContract = LibLinkedToken.getLinkedContract();
+        require(linkedContract != address(0), "linked token not initialized");
+        return LibLinkedToken.getLinkedContract();
     }
 
     // ----------------------------
@@ -195,19 +196,22 @@ abstract contract LinkedTokenFacet is IpcExchangeFacet {
     // ----------------------------
 
     function _validateInitialized() internal {
-        require(s._linkedContract != address(0), "linked token not initialized");
+        address linkedContract = LibLinkedToken.getLinkedContract();
+        require(linkedContract != address(0), "linked token not initialized");
     }
 
     // Only accept messages from our linked token contract.
     // Made public for testing
     function _validateEnvelope(IpcEnvelope memory envelope) public {
         SubnetID memory subnetId = envelope.from.subnetId;
-        if (!subnetId.equals(s._linkedSubnet)) {
+        SubnetID memory linkedSubnet = LibLinkedToken.getLinkedSubnet();
+        if (!subnetId.equals(linkedSubnet)) {
             revert InvalidOriginSubnet();
         }
 
         FvmAddress memory rawAddress = envelope.from.rawAddress;
-        if (!rawAddress.equal(FvmAddressHelper.from(s._linkedContract))) {
+        address linkedContract = LibLinkedToken.getLinkedContract();
+        if (!rawAddress.equal(FvmAddressHelper.from(linkedContract))) {
             revert InvalidOriginContract();
         }
     }
@@ -249,12 +253,12 @@ abstract contract LinkedTokenFacet is IpcExchangeFacet {
     }
 
     function _addUnconfirmedTransfer(bytes32 hash, address sender, uint256 value) internal {
-        s._unconfirmedTransfers[hash] = UnconfirmedTransfer(sender, value);
+        LibLinkedToken.addUnconfirmedTransfer(hash, sender, value);
     }
 
     function _removeUnconfirmedTransfer(bytes32 id, bool refund) internal {
         (address sender, uint256 value) = getUnconfirmedTransfer(id);
-        delete s._unconfirmedTransfers[id];
+        LibLinkedToken.deleteUnconfirmedTransfer(id);
 
         if (refund) {
             require(sender != address(0), "internal error: no such unconfirmed transfer");
