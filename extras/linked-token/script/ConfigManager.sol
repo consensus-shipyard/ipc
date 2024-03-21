@@ -41,7 +41,7 @@ contract ConfigManager is Script {
                     "\"DiamondCutFacet\":{}, "
                     "\"DiamondLoupeFacet\":{}, "
                     "\"OwnershipFacet\":{}, "
-                    "\"LinkedTokenControllerFacet\":{}"
+                    "\"LinkedTokenReplicaFacet\":{}"
                 "}, "
                 "\"LinkedTokenController\":{"
                     "\"LinkedTokenController\":{}, "

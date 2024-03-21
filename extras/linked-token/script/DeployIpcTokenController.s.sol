@@ -4,8 +4,8 @@ pragma solidity ^0.8.23;
 import "./ConfigManager.sol";
 import "@ipc/src/structs/Subnet.sol";
 
-import "forge-std/Script.sol";
 import "../src/LinkedTokenDiamond.sol";
+
 import "../src/LinkedTokenControllerFacet.sol";
 import "@ipc/src/diamond/DiamondCutFacet.sol";
 import "@ipc/src/diamond/DiamondLoupeFacet.sol";
@@ -14,8 +14,6 @@ import "@ipc/src/OwnershipFacet.sol";
 import {IDiamond} from "@ipc/src/interfaces/IDiamond.sol";
 
 import "./SelectorLibrary.sol";
-
-
 
 contract DeployIpcTokenController is ConfigManager {
     function deployFacets() external {
