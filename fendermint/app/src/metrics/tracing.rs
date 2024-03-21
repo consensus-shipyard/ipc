@@ -45,7 +45,7 @@ macro_rules! check_field {
 }
 
 macro_rules! set_gauge {
-    ($event:expr, $event_ty:ident :: $field:ident, $gauge:expr) => {
+    ($event:ident, $event_ty:ident :: $field:ident, $gauge:expr) => {
         check_field!($event_ty::$field);
         let mut fld = visitors::FindU64::new(stringify!($field));
         $event.record(&mut fld);
@@ -54,7 +54,7 @@ macro_rules! set_gauge {
 }
 
 macro_rules! inc_counter {
-    ($event:expr, $event_ty:ident :: $field:ident, $counter:expr) => {
+    ($event:ident, $event_ty:ident :: $field:ident, $counter:expr) => {
         check_field!($event_ty::$field);
         let mut fld = visitors::FindU64::new(stringify!($field));
         $event.record(&mut fld);
@@ -62,48 +62,53 @@ macro_rules! inc_counter {
     };
 }
 
-impl<S: Subscriber> Layer<S> for MetricsLayer<S> {
-    fn on_event(&self, event: &Event<'_>, _ctx: layer::Context<'_, S>) {
-        match event.metadata().name() {
-            "event::NewParentView" => {
-                set_gauge!(
-                    event,
-                    NewParentView::block_height,
-                    &am::TOPDOWN_VIEW_BLOCK_HEIGHT
-                );
-                inc_counter!(event, NewParentView::num_msgs, &am::TOPDOWN_VIEW_NUM_MSGS);
-                inc_counter!(
-                    event,
-                    NewParentView::num_validator_changes,
-                    am::TOPDOWN_VIEW_NUM_VAL_CHNGS
-                );
-            }
-            "event::ParentFinalityCommitted" => {
-                set_gauge!(
-                    event,
-                    ParentFinalityCommitted::block_height,
-                    &am::TOPDOWN_FINALIZED_BLOCK_HEIGHT
-                );
-            }
-            "event::NewBottomUpCheckpoint" => {
-                set_gauge!(
-                    event,
-                    NewBottomUpCheckpoint::block_height,
-                    &am::BOTTOMUP_CKPT_BLOCK_HEIGHT
-                );
-                set_gauge!(
-                    event,
-                    NewBottomUpCheckpoint::next_configuration_number,
-                    &am::BOTTOMUP_CKPT_CONFIG_NUM
-                );
-                inc_counter!(
-                    event,
-                    NewBottomUpCheckpoint::num_msgs,
-                    &am::BOTTOMUP_CKPT_NUM_MSGS
-                );
-            }
+macro_rules! event_name {
+    ($event_ty:ident) => {
+        concat!("event::", stringify!($event_ty))
+    };
+}
+
+macro_rules! event_mapping {
+    (gauges, $event:ident, $event_ty:ident :: $field:ident, $metric:expr) => {
+        set_gauge!($event, $event_ty::$field, $metric);
+    };
+    (counters, $event:ident, $event_ty:ident :: $field:ident, $metric:expr) => {
+        inc_counter!($event, $event_ty::$field, $metric);
+    };
+}
+
+macro_rules! event_match {
+    ($event:ident { $( $event_ty:ident { $( $field:ident => $kind:ident / $metric:expr  ),* $(,)? } ),* } ) => {
+        match $event.metadata().name() {
+            $(
+                event_name!($event_ty) => {
+                    $(
+                        event_mapping!($kind, $event, $event_ty :: $field, $metric);
+                    )*
+                }
+            )*
             _ => {}
         }
+    };
+}
+
+impl<S: Subscriber> Layer<S> for MetricsLayer<S> {
+    fn on_event(&self, event: &Event<'_>, _ctx: layer::Context<'_, S>) {
+        event_match!(event {
+            NewParentView {
+                block_height              => gauges   / &am::TOPDOWN_VIEW_BLOCK_HEIGHT,
+                num_msgs                  => counters / &am::TOPDOWN_VIEW_NUM_MSGS,
+                num_validator_changes     => counters / &am::TOPDOWN_VIEW_NUM_VAL_CHNGS,
+            },
+            ParentFinalityCommitted {
+                block_height              => gauges   / &am::TOPDOWN_FINALIZED_BLOCK_HEIGHT,
+            },
+            NewBottomUpCheckpoint {
+                block_height              => gauges   / &am::BOTTOMUP_CKPT_BLOCK_HEIGHT,
+                next_configuration_number => gauges   / &am::BOTTOMUP_CKPT_CONFIG_NUM,
+                block_height              => counters / &am::BOTTOMUP_CKPT_NUM_MSGS,
+            }
+        });
     }
 }
 
