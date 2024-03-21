@@ -9,7 +9,7 @@ pub struct NewParentView<'a> {
     pub is_null: bool,
     pub block_height: BlockHeight,
     pub block_hash: Option<BlockHashHex<'a>>, // hex encoded, unless null block
-    pub num_topdown_msgs: usize,
+    pub num_msgs: usize,
     pub num_validator_changes: usize,
 }
 

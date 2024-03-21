@@ -35,9 +35,24 @@ impl<S: Subscriber> Layer<S> for MetricsLayer<S> {
         match event.metadata().name() {
             "event::NewParentView" => {
                 set_block_height(event, &pm::TOPDOWN_VIEW_BLOCK_HEIGHT);
+                inc_num_msgs(event, &pm::TOPDOWN_VIEW_NUM_MSGS);
+                inc_counter(
+                    event,
+                    &pm::TOPDOWN_VIEW_NUM_VAL_CHNGS,
+                    "num_validator_changes",
+                );
             }
             "event::ParentFinalityCommitted" => {
                 set_block_height(event, &pm::TOPDOWN_FINALIZED_BLOCK_HEIGHT);
+            }
+            "event::NewBottomUpCheckpoint" => {
+                set_block_height(event, &pm::BOTTOMUP_CKPT_BLOCK_HEIGHT);
+                inc_num_msgs(event, &pm::BOTTOMUP_CKPT_NUM_MSGS);
+                set_gauge(
+                    event,
+                    &pm::BOTTOMUP_CKPT_CONFIG_NUM,
+                    "next_configuration_number",
+                );
             }
             _ => {}
         }
@@ -45,30 +60,40 @@ impl<S: Subscriber> Layer<S> for MetricsLayer<S> {
 }
 
 fn set_block_height(event: &Event<'_>, gauge: &prometheus::IntGauge) {
-    let mut block_height = visitors::block_height();
+    set_gauge(event, gauge, "block_height")
+}
+
+fn set_gauge(event: &Event<'_>, gauge: &prometheus::IntGauge, name: &str) {
+    let mut block_height = visitors::FindU64::new(name);
     event.record(&mut block_height);
     gauge.set(block_height.value as i64);
+}
+
+fn inc_num_msgs(event: &Event<'_>, counter: &prometheus::IntCounter) {
+    inc_counter(event, counter, "num_msgs")
+}
+
+fn inc_counter(event: &Event<'_>, counter: &prometheus::IntCounter, name: &str) {
+    let mut num_msgs = visitors::FindU64::new(name);
+    event.record(&mut num_msgs);
+    counter.inc_by(num_msgs.value);
 }
 
 mod visitors {
     use tracing::field::{Field, Visit};
 
-    pub fn block_height() -> FindU64 {
-        FindU64::new("block_height")
-    }
-
-    pub struct FindU64 {
-        pub name: &'static str,
+    pub struct FindU64<'a> {
+        pub name: &'a str,
         pub value: u64,
     }
 
-    impl FindU64 {
-        pub fn new(name: &'static str) -> Self {
+    impl<'a> FindU64<'a> {
+        pub fn new(name: &'a str) -> Self {
             Self { name, value: 0 }
         }
     }
 
-    impl Visit for FindU64 {
+    impl<'a> Visit for FindU64<'a> {
         fn record_u64(&mut self, field: &Field, value: u64) {
             if field.name() == self.name {
                 self.value = value;
