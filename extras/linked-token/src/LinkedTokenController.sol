@@ -28,6 +28,17 @@ contract LinkedTokenController is Initializable, LinkedToken, UUPSUpgradeable   
         __UUPSUpgradeable_init();
     }
 
+    function reinitialize(
+        address gateway,
+        address underlyingToken,
+        SubnetID memory linkedSubnet,
+        address linkedContract
+    ) public reinitializer(2){
+        __LinkedToken_init(gateway, underlyingToken, linkedSubnet, linkedContract);
+        __UUPSUpgradeable_init();
+    }
+
+
     // upgrade proxy - onlyOwner can upgrade
     // owner is set in inherited initializer -> __LinkedToken_init -> __IpcExchangeUpgradeable_init
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}

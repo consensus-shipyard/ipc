@@ -27,8 +27,21 @@ contract LinkedTokenReplica is Initializable, LinkedToken, ERC20Upgradeable, UUP
         address linkedContract
     ) public initializer{
         __LinkedToken_init(gateway, underlyingToken, linkedSubnet, linkedContract);
+        __UUPSUpgradeable_init();
         __ERC20_init("USDCTestReplica", "USDCtR");
     }
+
+    function reinitialize(
+        address gateway,
+        address underlyingToken,
+        SubnetID memory linkedSubnet,
+        address linkedContract
+    ) public reinitializer(2) {
+        __LinkedToken_init(gateway, underlyingToken, linkedSubnet, linkedContract);
+        __UUPSUpgradeable_init();
+        __ERC20_init("USDCTestReplica", "USDCtR");
+    }
+
 
     // upgrade proxy - onlyOwner can upgrade
     // owner is set in inherited initializer -> __LinkedToken_init -> __IpcExchangeUpgradeable_init

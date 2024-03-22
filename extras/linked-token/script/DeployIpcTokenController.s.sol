@@ -18,31 +18,27 @@ contract DeployIpcTokenController is ConfigManager {
     }
 
 
-    function deployIpcTokenControllerProxy(address controller) external{
+	//address,address,address,uint64,address[])" -- $$LinkedTokenReplicaImplementation $$SUBNET_GATEWAY $$USDCTEST_ADDR $$CALIBNET_CHAIN_ID '[]' 
+    function deployIpcTokenControllerProxy(address initialImplementation, address gateway, address tokenContractAddress, uint64 _rootNetChainId, address[] memory _route) external {
 
         vm.startBroadcast();
-        TransparentUpgradeableProxy transparentProxy = new TransparentUpgradeableProxy(address(controller), address(msg.sender), "");
-        vm.stopBroadcast();
-
-        // Log the address of the deployed contract proxy
-        writeConfig("LinkedTokenController", vm.toString(address(transparentProxy)));
-    }
-
-    function initializeIpcTokenController(address controllerProxy, address gateway, address tokenContractAddress, uint64 _rootNetChainId, address[] memory _route, address linkedContract) external {
 
         // Example for setting up the SubnetID, adjust according to your actual setup
         SubnetID memory destinationSubnet = SubnetID({root: _rootNetChainId, route: _route});
 
-        vm.startBroadcast();
-        LinkedTokenController controller = LinkedTokenController(controllerProxy);
-        controller.initialize(gateway, tokenContractAddress, destinationSubnet, linkedContract);
+        bytes memory initCall = abi.encodeCall(LinkedTokenController.initialize, (gateway, tokenContractAddress, destinationSubnet, 0x0000000000000000000000000000000000000000));
+        TransparentUpgradeableProxy transparentProxy = new TransparentUpgradeableProxy(initialImplementation, address(msg.sender), initCall);
         vm.stopBroadcast();
+        writeConfig("LinkedTokenController", vm.toString(address(transparentProxy)));
     }
 
-    function upgradeIpcTokenController(address controllerProxy, address newControllerImplementation) external {
+    function upgradeIpcTokenController(address controllerProxy, address newControllerImplementation, address gateway, address tokenContractAddress, uint64 _rootNetChainId, address[] memory _route, address replicaProxy) external {
+        SubnetID memory destinationSubnet = SubnetID({root: _rootNetChainId, route: _route});
+        bytes memory initCall = abi.encodeCall(LinkedTokenController.reinitialize, (gateway, tokenContractAddress, destinationSubnet, replicaProxy));
+
         vm.startBroadcast();
         LinkedTokenController controller = LinkedTokenController(controllerProxy);
-        controller.upgradeToAndCall(newControllerImplementation, "");
+        controller.upgradeToAndCall(newControllerImplementation, initCall);
         vm.stopBroadcast();
     }
 }

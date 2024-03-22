@@ -60,6 +60,12 @@ abstract contract LinkedToken is Initializable, IpcExchangeUpgradeable {
 
     event LinkedTokenReceived(address indexed recipient, uint256 amount);
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+
     /**
      * @dev Initialize function for IpcTokenController
      * @param gateway Address of the gateway for cross-network communication
@@ -85,9 +91,9 @@ abstract contract LinkedToken is Initializable, IpcExchangeUpgradeable {
         });
     }
 
-
-
-
+    function setLinkedContract(address linkedContract) external onlyOwner {
+        _linkedContract = linkedContract;
+    }
 
     function getLinkedSubnet() public view returns (SubnetID memory) {
         return _linkedSubnet;

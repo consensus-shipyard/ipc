@@ -35,6 +35,12 @@ abstract contract IpcExchangeUpgradeable is Initializable, IpcHandler, OwnableUp
     // List of messages in-flight for which the contract hasn't received a receipt yet.
     mapping(bytes32 => IpcEnvelope) public inflightMsgs;
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+
      function __IpcExchangeUpgradeable_init(address gatewayAddr_) public onlyInitializing {
          gatewayAddr = gatewayAddr_;
          __Ownable_init();
