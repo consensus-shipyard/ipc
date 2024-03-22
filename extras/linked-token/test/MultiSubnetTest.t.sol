@@ -141,32 +141,25 @@ contract MultiSubnetTest is IntegrationTestBase {
 
         //set up controller with proxy
         LinkedTokenController initialControllerImplementation = new LinkedTokenController();
-        TransparentUpgradeableProxy transparentProxyController = new TransparentUpgradeableProxy(address(initialControllerImplementation), address(this), "");
+
+        bytes memory initCallController = abi.encodeCall(LinkedTokenController.initialize, ( address(rootGateway), address(testUSDC), nativeSubnetName, 0x0000000000000000000000000000000000000000));
+        TransparentUpgradeableProxy transparentProxyController = new TransparentUpgradeableProxy(address(initialControllerImplementation), address(this), initCallController);
+
         ipcTokenController = LinkedTokenController(address(transparentProxyController));
 
 
         //set up replica with proxy
         LinkedTokenReplica initialReplicaImplementation = new LinkedTokenReplica();
-        TransparentUpgradeableProxy transparentProxyReplica = new TransparentUpgradeableProxy(address(initialReplicaImplementation), address(this), "");
+
+        bytes memory initCallReplica = abi.encodeCall(LinkedTokenReplica.initialize, ( address(nativeSubnetGateway), address(testUSDC), rootSubnetName, 0x0000000000000000000000000000000000000000));
+        TransparentUpgradeableProxy transparentProxyReplica = new TransparentUpgradeableProxy(address(initialReplicaImplementation), address(this), initCallReplica);
+
         ipcTokenReplica = LinkedTokenReplica(address(transparentProxyReplica));
 
 
-        // initialize controller & replica
-
-        ipcTokenController.initialize(
-             address(rootGateway),
-             address(testUSDC),
-             nativeSubnetName,
-            address(ipcTokenReplica)
-        );
-
-        ipcTokenReplica.initialize(
-             address(nativeSubnetGateway),
-             address(testUSDC),
-             rootSubnetName,
-            address(ipcTokenController)
-        );
-
+        // set linked contract controller & replica
+        ipcTokenController.setLinkedContract(address(ipcTokenReplica));
+        ipcTokenReplica.setLinkedContract(address(ipcTokenController));
 
 
 
