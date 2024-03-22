@@ -42,7 +42,7 @@ impl CommandLineHandler for Status {
         let max_pending = arguments.max_pending.unwrap_or(DEFAULT_MAX_PENDING);
 
         let start = height + 1;
-        let ending = max_pending as ChainEpoch * period + start;
+        let ending = max_unsubmitted as ChainEpoch * period + start;
         let mut checkpoints_ahead = 0;
         for h in start..=ending {
             let c = provider.get_bottom_up_bundle(&subnet, h).await?;
