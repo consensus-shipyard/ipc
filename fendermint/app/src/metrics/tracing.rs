@@ -136,3 +136,40 @@ mod visitors {
         fn record_debug(&mut self, _field: &Field, _value: &dyn std::fmt::Debug) {}
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use fendermint_tracing::emit;
+    use fendermint_vm_event::ParentFinalityCommitted;
+    use prometheus::IntGauge;
+    use tracing_subscriber::layer::SubscriberExt;
+
+    #[test]
+    fn test_metrics_layer() {
+        let gauge: &IntGauge = &super::super::prometheus::app::TOPDOWN_FINALIZED_BLOCK_HEIGHT;
+
+        let v0 = gauge.get();
+        gauge.inc();
+        let v1 = gauge.get();
+        assert!(v1 > v0, "gague should change without being registered");
+
+        let block_height = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let subscriber = tracing_subscriber::registry().with(super::layer());
+
+        tracing::subscriber::with_default(subscriber, || {
+            emit! {
+                ParentFinalityCommitted { block_height, block_hash: "metrics-test-block" }
+            }
+        });
+
+        assert_eq!(
+            gauge.get() as u64,
+            block_height,
+            "metrics should be captured"
+        );
+    }
+}
