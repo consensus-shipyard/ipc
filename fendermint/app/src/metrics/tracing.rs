@@ -107,6 +107,9 @@ impl<S: Subscriber> Layer<S> for MetricsLayer<S> {
                 block_height              => gauges   / &am::BOTTOMUP_CKPT_BLOCK_HEIGHT,
                 next_configuration_number => gauges   / &am::BOTTOMUP_CKPT_CONFIG_NUM,
                 num_msgs                  => counters / &am::BOTTOMUP_CKPT_NUM_MSGS,
+            },
+            NewBlock {
+                block_height              => gauges   / &am::ABCI_COMMITTED_BLOCK_HEIGHT
             }
         });
     }
