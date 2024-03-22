@@ -30,7 +30,6 @@ contract LinkedTokenReplica is
 {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
-
     string _token_name;
     string _token_symbol;
     uint8 _token_decimals;
@@ -49,7 +48,6 @@ contract LinkedTokenReplica is
         string memory token_symbol,
         uint8 token_decimals
     ) public initializer {
-
         _token_name = token_name;
         _token_symbol = token_symbol;
         _token_decimals = token_decimals;
@@ -73,7 +71,6 @@ contract LinkedTokenReplica is
         string memory token_symbol,
         uint8 token_decimals
     ) public reinitializer(2) {
-
         _token_name = token_name;
         _token_symbol = token_symbol;
         _token_decimals = token_decimals;
