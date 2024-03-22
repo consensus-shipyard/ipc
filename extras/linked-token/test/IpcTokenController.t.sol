@@ -73,16 +73,26 @@ contract IpcTokenControllerTest is Test, IntegrationTestBase {
         );
 
         //set up controller with proxy
-        LinkedTokenController initialControllerImplementation = new LinkedTokenController();
-        TransparentUpgradeableProxy transparentProxyController = new TransparentUpgradeableProxy(address(initialControllerImplementation), address(this), "");
+        LinkedTokenController initialControllerImplementation =
+            new LinkedTokenController();
+        TransparentUpgradeableProxy transparentProxyController =
+            new TransparentUpgradeableProxy(
+                address(initialControllerImplementation),
+                address(this),
+                ""
+            );
         controller = LinkedTokenController(address(transparentProxyController));
 
-
         //set up replica with proxy
-        LinkedTokenReplica initialReplicaImplementation = new LinkedTokenReplica();
-        TransparentUpgradeableProxy transparentProxyReplica = new TransparentUpgradeableProxy(address(initialReplicaImplementation), address(this), "");
+        LinkedTokenReplica initialReplicaImplementation =
+            new LinkedTokenReplica();
+        TransparentUpgradeableProxy transparentProxyReplica =
+            new TransparentUpgradeableProxy(
+                address(initialReplicaImplementation),
+                address(this),
+                ""
+            );
         replica = LinkedTokenReplica(address(transparentProxyReplica));
-
 
         // initialize controller & replica
 
@@ -99,10 +109,6 @@ contract IpcTokenControllerTest is Test, IntegrationTestBase {
             controllerSubnet,
             address(controller)
         );
-
-
-
-
     }
 
     function testHandleIpcMessageOrigin() public {
