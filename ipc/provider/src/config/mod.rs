@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use deserialize::deserialize_subnets_from_vec;
 use ipc_api::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
@@ -78,8 +78,16 @@ impl Config {
 
     /// Reads a TOML configuration file specified in the `path` and returns a [`Config`] struct.
     pub fn from_file(path: impl AsRef<Path>) -> Result<Self> {
-        let contents = fs::read_to_string(path)?;
-        let config: Config = Config::from_toml_str(contents.as_str())?;
+        let contents = fs::read_to_string(&path).with_context(|| {
+            format!(
+                "failed to read config from {}",
+                path.as_ref().to_string_lossy()
+            )
+        })?;
+
+        let config: Config =
+            Config::from_toml_str(contents.as_str()).context("failed to parse config TOML")?;
+
         Ok(config)
     }
 

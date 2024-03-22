@@ -18,7 +18,7 @@ use fvm_shared::MethodNum;
 use fendermint_vm_actor_interface::eam::CreateReturn;
 use fendermint_vm_message::chain::ChainMessage;
 
-use crate::message::{GasParams, MessageFactory};
+use crate::message::{GasParams, SignedMessageFactory};
 use crate::query::{QueryClient, QueryResponse};
 use crate::response::{decode_bytes, decode_fevm_create, decode_fevm_invoke};
 
@@ -29,7 +29,7 @@ pub trait BroadcastMode {
 }
 
 pub trait BoundClient {
-    fn message_factory_mut(&mut self) -> &mut MessageFactory;
+    fn message_factory_mut(&mut self) -> &mut SignedMessageFactory;
 
     fn address(&mut self) -> Address {
         *self.message_factory_mut().address()

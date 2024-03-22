@@ -7,6 +7,7 @@ import {IDiamond} from "../interfaces/IDiamond.sol";
 library LibDiamond {
     bytes32 public constant DIAMOND_STORAGE_POSITION = keccak256("libdiamond.lib.diamond.storage");
 
+    error InvalidAddress();
     error NotOwner();
     error NoBytecodeAtAddress(address _contractAddress, string _message);
     error IncorrectFacetCutAction(IDiamondCut.FacetCutAction _action);
@@ -24,6 +25,8 @@ library LibDiamond {
     error CannotRemoveFunctionThatDoesNotExist(bytes4 _selector);
     error CannotRemoveImmutableFunction(bytes4 _selector);
 
+    event OwnershipTransferred(address oldOwner, address newOwner);
+
     struct FacetAddressAndSelectorPosition {
         address facetAddress;
         uint16 selectorPosition;
@@ -38,6 +41,17 @@ library LibDiamond {
         address contractOwner;
     }
 
+    /**
+     * @dev Transfers ownership of the contract to a new account (`newOwner`).
+     * Can only be called by the current owner.
+     */
+    function transferOwnership(address newOwner) internal onlyOwner {
+        if (newOwner == address(0)) {
+            revert InvalidAddress();
+        }
+        setContractOwner(newOwner);
+    }
+
     function diamondStorage() internal pure returns (DiamondStorage storage ds) {
         bytes32 position = DIAMOND_STORAGE_POSITION;
         assembly {
@@ -47,7 +61,10 @@ library LibDiamond {
 
     function setContractOwner(address _newOwner) internal {
         DiamondStorage storage ds = diamondStorage();
+
+        address oldOwner = ds.contractOwner;
         ds.contractOwner = _newOwner;
+        emit OwnershipTransferred(oldOwner, _newOwner);
     }
 
     function contractOwner() internal view returns (address contractOwner_) {

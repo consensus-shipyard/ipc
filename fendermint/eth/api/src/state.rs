@@ -303,7 +303,7 @@ where
     where
         C: Client + Sync + Send,
     {
-        let block = enrich_block(&self.client, block).await?;
+        let block = enrich_block(&self.client, &block).await?;
 
         let block = if full_tx {
             map_rpc_block_txs(block, serde_json::to_value).context("failed to convert to JSON")?
@@ -442,6 +442,16 @@ where
         height: FvmQueryHeight,
     ) -> JsonRpcResult<ActorType> {
         let addr = to_fvm_address(*address);
+
+        if let Some(actor_type) = self.addr_cache.get_actor_type_from_addr(&addr) {
+            tracing::debug!(
+                ?addr,
+                ?actor_type,
+                "addr cache hit, directly return the actor type"
+            );
+            return Ok(actor_type);
+        }
+
         let Some((
             _,
             ActorState {
@@ -452,11 +462,31 @@ where
         else {
             return Ok(ActorType::Inexistent);
         };
+
+        if let Some(actor_type) = self.addr_cache.get_actor_type_from_cid(&actor_type_cid) {
+            tracing::debug!(
+                ?actor_type_cid,
+                ?actor_type,
+                "cid cache hit, directly return the actor type"
+            );
+            tracing::debug!(?addr, ?actor_type, "put result into addr cache");
+            self.addr_cache
+                .set_actor_type_for_addr(addr, actor_type.clone());
+            return Ok(actor_type);
+        }
+
         let registry = self.client.builtin_actors(height).await?.value.registry;
         let ret = match registry.into_iter().find(|(_, cid)| cid == &actor_type_cid) {
             Some((typ, _)) => ActorType::Known(Cow::Owned(typ)),
             None => ActorType::Unknown(actor_type_cid),
         };
+
+        tracing::debug!(?actor_type_cid, ?ret, "put result into cid cache");
+        self.addr_cache
+            .set_actor_type_for_cid(actor_type_cid, ret.clone());
+        tracing::debug!(?addr, ?ret, "put result into addr cache");
+        self.addr_cache.set_actor_type_for_addr(addr, ret.clone());
+
         Ok(ret)
     }
 }
@@ -579,7 +609,7 @@ impl<C> JsonRpcState<C> {
 
 pub async fn enrich_block<C>(
     client: &FendermintClient<C>,
-    block: tendermint::Block,
+    block: &tendermint::Block,
 ) -> JsonRpcResult<et::Block<et::Transaction>>
 where
     C: Client + Sync + Send,

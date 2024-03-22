@@ -32,6 +32,7 @@ use crate::{
     error::JsonRpcError,
     handlers::ws::{MethodNotification, Notification},
     state::{enrich_block, WebSocketSender},
+    JsonRpcResult,
 };
 
 /// Check whether to keep a log according to the topic filter.
@@ -526,7 +527,12 @@ impl FilterDriver {
                                         |block| {
                                             let client = client.clone();
                                             Box::pin(async move {
-                                                let block = enrich_block(&client, block).await?;
+                                                let block =
+                                                    enrich_block_with_retry(&client, &block)
+                                                        .await
+                                                        .context(
+                                                            "failed to enrich block in event",
+                                                        )?;
                                                 let block: anyhow::Result<et::Block<et::TxHash>> =
                                                     map_rpc_block_txs(block, |tx| Ok(tx.hash()));
                                                 block
@@ -631,6 +637,34 @@ fn notification(subscription: FilterId, result: serde_json::Value) -> MethodNoti
             subscription,
             result,
         },
+    }
+}
+
+/// It looks like it might not be true that when we receive a `NewBlock` event from Tendermint,
+/// (which includes begin and end events, so we can assume it's been executed), then it's safe
+/// to query the API for the block results, which is what `enrich_block` does to fill stuff
+/// like gas used, etc.
+async fn enrich_block_with_retry<C: Client + Send + Sync>(
+    client: &FendermintClient<C>,
+    block: &tendermint::block::Block,
+) -> JsonRpcResult<et::Block<et::Transaction>> {
+    // TODO: Assuming at ~1 block time; move this to config.
+    const SLEEP_SECS: u64 = 1;
+    const MAX_ATTEMPT: u32 = 5;
+    let mut attempt = 0;
+    loop {
+        match enrich_block(client, block).await {
+            Err(e) if attempt < MAX_ATTEMPT => {
+                tracing::debug!(
+                    error = e.to_string(),
+                    height = block.header().height.value(),
+                    "failed to enrich block; retrying..."
+                );
+                tokio::time::sleep(Duration::from_secs(SLEEP_SECS)).await;
+                attempt += 1;
+            }
+            other => return other,
+        }
     }
 }
 

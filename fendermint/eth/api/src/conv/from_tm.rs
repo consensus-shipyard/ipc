@@ -99,7 +99,7 @@ pub fn is_block_zero(block: &tendermint::Block) -> bool {
 
 /// Convert a Tendermint block to Ethereum with only the block hashes in the body.
 pub fn to_eth_block(
-    block: tendermint::Block,
+    block: &tendermint::Block,
     block_results: tendermint_rpc::endpoint::block_results::Response,
     base_fee: TokenAmount,
     chain_id: ChainID,
@@ -319,8 +319,8 @@ pub async fn to_eth_receipt(
         transaction_index,
         block_hash: Some(block_hash),
         block_number: Some(block_number),
-        from: to_eth_address(&msg.from).unwrap_or_default(),
-        to: to_eth_address(&msg.to),
+        from: to_eth_address(&msg.from).ok().flatten().unwrap_or_default(),
+        to: to_eth_address(&msg.to).ok().flatten(),
         cumulative_gas_used,
         gas_used: Some(et::U256::from(result.tx_result.gas_used)),
         contract_address,
@@ -449,7 +449,7 @@ pub fn to_eth_block_zero(block: tendermint::Block) -> anyhow::Result<et::Block<s
         validator_updates: Vec::new(),
         consensus_param_updates: None,
     };
-    let block = to_eth_block(block, block_results, TokenAmount::zero(), ChainID::from(0))
+    let block = to_eth_block(&block, block_results, TokenAmount::zero(), ChainID::from(0))
         .context("failed to map block zero to eth")?;
     let block =
         map_rpc_block_txs(block, serde_json::to_value).context("failed to convert to JSON")?;
@@ -486,7 +486,8 @@ pub fn to_logs(
             .ok_or_else(|| anyhow!("cannot find the 'emitter.id' key"))?;
 
         let address = addr
-            .and_then(|a| to_eth_address(&a))
+            .and_then(|a| to_eth_address(&a).ok())
+            .flatten()
             .unwrap_or_else(|| et::H160::from(EthAddress::from_id(actor_id).0));
 
         // https://github.com/filecoin-project/lotus/blob/6cc506f5cf751215be6badc94a960251c6453202/node/impl/full/eth.go#LL2240C9-L2240C15

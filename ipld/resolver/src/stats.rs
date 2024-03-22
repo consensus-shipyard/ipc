@@ -89,7 +89,7 @@ metrics! {
     );
 
     CONTENT_RESOLVE_FAILURE: IntCounter = IntCounter::new(
-      "content_resolve_success",
+      "content_resolve_failure",
       "Number of failed resolutions"
     );
 

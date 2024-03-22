@@ -7,73 +7,105 @@ use tracing_appender::{
     non_blocking::WorkerGuard,
     rolling::{RollingFileAppender, Rotation},
 };
-use tracing_subscriber::{
-    fmt::{self, writer::MakeWriterExt},
-    layer::SubscriberExt,
-};
+use tracing_subscriber::fmt::format::FmtSpan;
+use tracing_subscriber::{fmt, layer::SubscriberExt, Layer};
+
 mod cmd;
 
 fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
-    let mut guard = None;
+    let console_filter = opts.log_console_filter().expect("invalid filter");
+    let file_filter = opts.log_file_filter().expect("invalid filter");
 
-    let Some(log_level) = opts.tracing_level() else {
-        return guard;
-    };
-
-    let registry = tracing_subscriber::registry();
+    // log all traces to stderr (reserving stdout for any actual output such as from the CLI commands)
+    let console_layer = fmt::layer()
+        .with_writer(std::io::stderr)
+        .with_target(false)
+        .with_file(true)
+        .with_line_number(true)
+        .with_filter(console_filter);
 
     // add a file layer if log_dir is set
-    let registry = registry.with(if let Some(log_dir) = &opts.log_dir {
-        let filename = match &opts.log_file_prefix {
-            Some(prefix) => format!("{}-{}", prefix, "fendermint"),
-            None => "fendermint".to_string(),
-        };
+    let (file_layer, file_guard) = match &opts.log_dir {
+        Some(log_dir) => {
+            let filename = match &opts.log_file_prefix {
+                Some(prefix) => format!("{}-{}", prefix, "fendermint"),
+                None => "fendermint".to_string(),
+            };
 
-        let appender = RollingFileAppender::builder()
-            .filename_prefix(filename)
-            .filename_suffix("log")
-            .rotation(Rotation::DAILY)
-            .max_log_files(5)
-            .build(log_dir)
-            .expect("failed to initialize rolling file appender");
+            let appender = RollingFileAppender::builder()
+                .filename_prefix(filename)
+                .filename_suffix("log")
+                .rotation(Rotation::DAILY)
+                .max_log_files(7)
+                .build(log_dir)
+                .expect("failed to initialize rolling file appender");
 
-        let (non_blocking, g) = tracing_appender::non_blocking(appender);
-        guard = Some(g);
+            let (non_blocking, file_guard) = tracing_appender::non_blocking(appender);
 
-        Some(
-            fmt::Layer::new()
+            let file_layer = fmt::layer()
                 .json()
-                .with_writer(non_blocking.with_max_level(log_level))
+                .with_writer(non_blocking)
+                .with_span_events(FmtSpan::CLOSE)
                 .with_target(false)
                 .with_file(true)
-                .with_line_number(true),
-        )
+                .with_line_number(true)
+                .with_filter(file_filter);
+
+            (Some(file_layer), Some(file_guard))
+        }
+        None => (None, None),
+    };
+
+    let metrics_layer = if opts.metrics_enabled() {
+        Some(fendermint_app::metrics::layer())
     } else {
         None
-    });
+    };
 
-    // we also log all traces with level INFO or higher to stdout
-    let registry = registry.with(
-        tracing_subscriber::fmt::layer()
-            .with_writer(std::io::stdout.with_max_level(tracing::Level::INFO))
-            .with_target(false)
-            .with_file(true)
-            .with_line_number(true),
-    );
+    let registry = tracing_subscriber::registry()
+        .with(console_layer)
+        .with(file_layer)
+        .with(metrics_layer);
 
     tracing::subscriber::set_global_default(registry).expect("Unable to set a global collector");
 
-    guard
+    file_guard
 }
+
+/// Install a panic handler that prints stuff to the logs, otherwise it only shows up in the console.
+fn init_panic_handler() {
+    let default_hook = std::panic::take_hook();
+
+    std::panic::set_hook(Box::new(move |info| {
+        // Do the default first, just in case logging fails too.
+        default_hook(info);
+
+        // let stacktrace = std::backtrace::Backtrace::capture();
+        let stacktrace = std::backtrace::Backtrace::force_capture();
+
+        tracing::error!(
+            stacktrace = stacktrace.to_string(),
+            info = info.to_string(),
+            "panicking"
+        );
+
+        // We could exit the application if any of the background tokio tasks panic.
+        // However, they are not necessarily critical processes, the chain might still make progress.
+        // std::process::abort();
+    }))
+}
+
 #[tokio::main]
 async fn main() {
     let opts = options::parse();
 
     let _guard = init_tracing(&opts);
 
+    init_panic_handler();
+
     if let Err(e) = cmd::exec(&opts).await {
         tracing::error!("failed to execute {:?}: {e:?}", opts);
-        std::process::exit(1);
+        std::process::exit(fendermint_app::AppExitCode::UnknownError as i32);
     }
 }
 

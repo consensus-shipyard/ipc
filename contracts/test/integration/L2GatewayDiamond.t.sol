@@ -23,9 +23,12 @@ import {L2GatewayActorDiamond} from "../IntegrationTestPresets.sol";
 import {TestUtils} from "../helpers/TestUtils.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 
+import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
+
 contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for IpcEnvelope;
+    using GatewayFacetsHelper for GatewayDiamond;
 
     function testGatewayDiamond_CommitParentFinality_BigNumberOfMessages() public {
         uint256 n = 2000;
@@ -37,14 +40,14 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
         uint256[] memory weights = new uint[](1);
         weights[0] = 100;
 
-        SubnetID memory id = gwGetter.getNetworkName();
+        SubnetID memory id = gatewayDiamond.getter().getNetworkName();
 
         IpcEnvelope[] memory topDownMsgs = new IpcEnvelope[](n);
         for (uint64 i = 0; i < n; i++) {
             topDownMsgs[i] = TestUtils.newXnetCallMsg(
                 IPCAddress({subnetId: id, rawAddress: FvmAddressHelper.from(address(this))}),
                 IPCAddress({
-                    subnetId: gwGetter.getNetworkName().getParentSubnet(),
+                    subnetId: gatewayDiamond.getter().getNetworkName().getParentSubnet(),
                     rawAddress: FvmAddressHelper.from(receipient)
                 }),
                 0,
@@ -54,9 +57,9 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
 
-        gwXnetMessagingFacet.applyCrossMessages(topDownMsgs);
-        require(gwGetter.getSubnetTopDownMsgsLength(id) == 0, "unexpected top-down message");
-        (bool ok, uint64 tdn) = gwGetter.getTopDownNonce(id);
+        gatewayDiamond.xnetMessenger().applyCrossMessages(topDownMsgs);
+        require(gatewayDiamond.getter().getSubnetTopDownMsgsLength(id) == 0, "unexpected top-down message");
+        (bool ok, uint64 tdn) = gatewayDiamond.getter().getTopDownNonce(id);
         require(!ok && tdn == 0, "unexpected nonce");
 
         vm.stopPrank();
@@ -76,7 +79,7 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
 
         vm.expectCall(caller, 1 ether, new bytes(0), 1);
         vm.prank(caller);
-        gwMessenger.propagate{value: 1 ether}(postboxId);
+        gatewayDiamond.messenger().propagate{value: 1 ether}(postboxId);
 
         require(caller.balance == 1 ether, "unexpected balance");
     }
@@ -93,7 +96,7 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
 
         vm.prank(caller);
         vm.expectCall(caller, 0, EMPTY_BYTES, 0);
-        gwMessenger.propagate{value: 0}(postboxId);
+        gatewayDiamond.messenger().propagate{value: 0}(postboxId);
         require(caller.balance == 0, "unexpected balance");
     }
 
@@ -102,11 +105,11 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
 
         IpcEnvelope memory crossMsg = TestUtils.newXnetCallMsg(
             IPCAddress({
-                subnetId: gwGetter.getNetworkName().createSubnetId(caller),
+                subnetId: gatewayDiamond.getter().getNetworkName().createSubnetId(caller),
                 rawAddress: FvmAddressHelper.from(caller)
             }),
             IPCAddress({
-                subnetId: gwGetter.getNetworkName().createSubnetId(address(this)),
+                subnetId: gatewayDiamond.getter().getNetworkName().createSubnetId(address(this)),
                 rawAddress: FvmAddressHelper.from(address(this))
             }),
             DEFAULT_CROSS_MSG_FEE + 1,
@@ -116,7 +119,7 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
         msgs[0] = crossMsg;
 
         vm.prank(FilAddress.SYSTEM_ACTOR);
-        gwXnetMessagingFacet.applyCrossMessages(msgs);
+        gatewayDiamond.xnetMessenger().applyCrossMessages(msgs);
 
         return crossMsg.toHash();
     }

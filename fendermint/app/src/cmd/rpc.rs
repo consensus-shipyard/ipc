@@ -9,7 +9,7 @@ use anyhow::Context;
 use async_trait::async_trait;
 use bytes::Bytes;
 use fendermint_app_options::genesis::AccountKind;
-use fendermint_crypto::SecretKey;
+use fendermint_crypto::{to_b64, SecretKey};
 use fendermint_rpc::client::BoundFendermintClient;
 use fendermint_rpc::tx::{
     AsyncResponse, BoundClient, CallClient, CommitResponse, SyncResponse, TxAsync, TxClient,
@@ -28,16 +28,13 @@ use tendermint::abci::response::DeliverTx;
 use tendermint::block::Height;
 use tendermint_rpc::HttpClient;
 
-use fendermint_rpc::message::{GasParams, MessageFactory};
+use fendermint_rpc::message::{GasParams, SignedMessageFactory};
 use fendermint_rpc::{client::FendermintClient, query::QueryClient};
 use fendermint_vm_actor_interface::eam::{self, CreateReturn, EthAddress};
 
 use crate::cmd;
 use crate::options::rpc::{BroadcastMode, FevmArgs, RpcFevmCommands, TransArgs};
-use crate::{
-    cmd::to_b64,
-    options::rpc::{RpcArgs, RpcCommands, RpcQueryCommands},
-};
+use crate::options::rpc::{RpcArgs, RpcCommands, RpcQueryCommands};
 
 use super::key::read_secret_key;
 
@@ -333,7 +330,7 @@ impl TransClient {
         let sk = read_secret_key(&args.secret_key)?;
         let addr = to_address(&sk, &args.account_kind)?;
         let chain_id = chainid::from_str_hashed(&args.chain_name)?;
-        let mf = MessageFactory::new(sk, addr, args.sequence, chain_id);
+        let mf = SignedMessageFactory::new(sk, addr, args.sequence, chain_id);
         let client = client.bind(mf);
         let client = Self {
             inner: client,
@@ -344,7 +341,7 @@ impl TransClient {
 }
 
 impl BoundClient for TransClient {
-    fn message_factory_mut(&mut self) -> &mut MessageFactory {
+    fn message_factory_mut(&mut self) -> &mut SignedMessageFactory {
         self.inner.message_factory_mut()
     }
 }

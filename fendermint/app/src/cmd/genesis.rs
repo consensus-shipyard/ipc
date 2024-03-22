@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::{anyhow, Context};
-use fendermint_app::APP_VERSION;
 use fendermint_crypto::PublicKey;
 use fvm_shared::address::Address;
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
@@ -47,7 +46,7 @@ cmd! {
       validators: Vec::new(),
       accounts: Vec::new(),
       eam_permission_mode: PermissionMode::Unrestricted,
-      ipc: None
+      ipc: None,
     };
 
     let json = serde_json::to_string_pretty(&genesis)?;
@@ -241,7 +240,7 @@ fn into_tendermint(genesis_file: &PathBuf, args: &GenesisIntoTendermintArgs) -> 
             validator: tendermint::consensus::params::ValidatorParams {
                 pub_key_types: vec![tendermint::public_key::Algorithm::Secp256k1],
             },
-            version: Some(tendermint::consensus::params::VersionParams { app: APP_VERSION }),
+            version: Some(tendermint::consensus::params::VersionParams { app: 0 }),
         },
         // Validators will be returnd from `init_chain`.
         validators: Vec::new(),
@@ -294,6 +293,7 @@ async fn new_genesis_from_parent(
                 .ok_or_else(|| anyhow!("subnet is not a child"))?,
             config: SubnetConfig::Fevm(EVMSubnet {
                 provider_http: args.parent_endpoint.clone(),
+                provider_timeout: None,
                 auth_token: None,
                 registry_addr: args.parent_registry,
                 gateway_addr: args.parent_gateway,

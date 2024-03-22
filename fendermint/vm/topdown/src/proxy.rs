@@ -10,6 +10,7 @@ use ipc_api::staking::StakingChangeRequest;
 use ipc_api::subnet_id::SubnetID;
 use ipc_provider::manager::{GetBlockHashResult, TopDownQueryPayload};
 use ipc_provider::IpcProvider;
+use tracing::instrument;
 
 /// The interface to querying state of the parent
 #[async_trait]
@@ -75,6 +76,7 @@ impl ParentQueryProxy for IPCProviderProxy {
     }
 
     /// Getting the block hash at the target height.
+    #[instrument(skip(self))]
     async fn get_block_hash(&self, height: BlockHeight) -> anyhow::Result<GetBlockHashResult> {
         self.ipc_provider
             .get_block_hash(&self.parent_subnet, height as ChainEpoch)
@@ -82,6 +84,7 @@ impl ParentQueryProxy for IPCProviderProxy {
     }
 
     /// Get the top down messages from the starting to the ending height.
+    #[instrument(skip(self))]
     async fn get_top_down_msgs(
         &self,
         height: BlockHeight,
@@ -97,6 +100,7 @@ impl ParentQueryProxy for IPCProviderProxy {
     }
 
     /// Get the validator set at the specified height.
+    #[instrument(skip(self))]
     async fn get_validator_changes(
         &self,
         height: BlockHeight,

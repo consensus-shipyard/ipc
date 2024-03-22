@@ -31,10 +31,13 @@ import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {ERC20PresetFixedSupply} from "../helpers/ERC20PresetFixedSupply.sol";
 import {IERC20Errors} from "openzeppelin-contracts/interfaces/draft-IERC6093.sol";
 
+import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
+
 contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for IpcEnvelope;
     using FvmAddressHelper for FvmAddress;
+    using GatewayFacetsHelper for GatewayDiamond;
 
     IERC20 private token;
 
@@ -51,11 +54,11 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         address caller = vm.addr(1);
         vm.deal(caller, 100);
 
-        (SubnetID memory subnetId, , , , ) = getSubnet(address(saManager));
+        (SubnetID memory subnetId, , , , ) = getSubnet(address(saDiamond));
 
         vm.prank(caller);
         vm.expectRevert(SupplySourceHelper.UnexpectedSupplySource.selector);
-        gwManager.fundWithToken(subnetId, FvmAddressHelper.from(caller), 100);
+        gatewayDiamond.manager().fundWithToken(subnetId, FvmAddressHelper.from(caller), 100);
     }
 
     function test_fund_TokenSupply_Reverts() public {
@@ -66,7 +69,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
 
         vm.prank(caller);
         vm.expectRevert(SupplySourceHelper.UnexpectedSupplySource.selector);
-        gwManager.fund{value: 100}(subnet.id, FvmAddressHelper.from(caller));
+        gatewayDiamond.manager().fund{value: 100}(subnet.id, FvmAddressHelper.from(caller));
     }
 
     function testFail_InexistentToken() public {
@@ -85,7 +88,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         vm.expectRevert(
             abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(gatewayDiamond), 0, 1)
         );
-        gwManager.fundWithToken(subnet.id, FvmAddressHelper.from(caller), 1);
+        gatewayDiamond.manager().fundWithToken(subnet.id, FvmAddressHelper.from(caller), 1);
     }
 
     function test_fundWithToken() public {
@@ -108,28 +111,28 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         );
         vm.expectEmit(true, true, true, true, address(gatewayDiamond));
         emit LibGateway.NewTopDownMessage(address(saDiamond), expected);
-        gwManager.fundWithToken(subnet.id, FvmAddressHelper.from(caller), 10);
+        gatewayDiamond.manager().fundWithToken(subnet.id, FvmAddressHelper.from(caller), 10);
 
         // Assert post-conditions.
-        (, Subnet memory subnetAfter) = gwGetter.getSubnet(subnet.id);
+        (, Subnet memory subnetAfter) = gatewayDiamond.getter().getSubnet(subnet.id);
         assertEq(subnetAfter.circSupply, 10);
         assertEq(subnetAfter.topDownNonce, 1);
 
         // A new funding attempt with exhausted token balance should fail.
         vm.expectRevert();
-        gwManager.fundWithToken(subnet.id, FvmAddressHelper.from(caller), 10);
+        gatewayDiamond.manager().fundWithToken(subnet.id, FvmAddressHelper.from(caller), 10);
 
         // And the subnet's state should not have been updated.
-        (, subnetAfter) = gwGetter.getSubnet(subnet.id);
+        (, subnetAfter) = gatewayDiamond.getter().getSubnet(subnet.id);
         assertEq(subnetAfter.circSupply, 10);
         assertEq(subnetAfter.topDownNonce, 1);
 
         // After topping up it succeeds again.
         token.approve(address(gatewayDiamond), 5);
-        gwManager.fundWithToken(subnet.id, FvmAddressHelper.from(caller), 5);
+        gatewayDiamond.manager().fundWithToken(subnet.id, FvmAddressHelper.from(caller), 5);
 
         // And the subnet's bookkeeping is correct.
-        (, subnetAfter) = gwGetter.getSubnet(subnet.id);
+        (, subnetAfter) = gatewayDiamond.getter().getSubnet(subnet.id);
         assertEq(subnetAfter.circSupply, 15);
         assertEq(subnetAfter.topDownNonce, 2);
     }
@@ -145,7 +148,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         vm.prank(caller);
         token.approve(address(gatewayDiamond), 15);
         vm.prank(caller);
-        gwManager.fundWithToken(subnet.id, FvmAddressHelper.from(caller), 15);
+        gatewayDiamond.manager().fundWithToken(subnet.id, FvmAddressHelper.from(caller), 15);
 
         // Now create a new recipient on the parent.
         address recipient = vm.addr(42);
@@ -158,7 +161,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         BottomUpCheckpoint memory batch = BottomUpCheckpoint({
             subnetID: subnet.id,
             blockHash: blockhash(block.number),
-            blockHeight: gwGetter.bottomUpCheckPeriod(),
+            blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             nextConfigurationNumber: 0,
             msgs: msgs
         });
@@ -166,10 +169,10 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         vm.prank(address(saDiamond));
         vm.expectEmit(true, true, true, true, address(token));
         emit Transfer(address(gatewayDiamond), recipient, value);
-        gwCheckpointingFacet.commitCheckpoint(batch);
+        gatewayDiamond.checkpointer().commitCheckpoint(batch);
 
         // Assert post-conditions.
-        (, Subnet memory subnetAfter) = gwGetter.getSubnet(subnet.id);
+        (, Subnet memory subnetAfter) = gatewayDiamond.getter().getSubnet(subnet.id);
         assertEq(subnetAfter.circSupply, 7);
         assertEq(subnetAfter.topDownNonce, 2); // 2 because the result msg is also another td message
         assertEq(subnetAfter.appliedBottomUpNonce, 1);
@@ -181,7 +184,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         // This reverts.
         vm.prank(address(saDiamond));
         vm.expectRevert();
-        gwCheckpointingFacet.commitCheckpoint(batch);
+        gatewayDiamond.checkpointer().commitCheckpoint(batch);
     }
 
     // Call a smart contract in the parent through a smart contract and with
@@ -195,7 +198,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         vm.prank(caller);
         token.approve(address(gatewayDiamond), 15);
         vm.prank(caller);
-        gwManager.fundWithToken(subnet.id, FvmAddressHelper.from(caller), 15);
+        gatewayDiamond.manager().fundWithToken(subnet.id, FvmAddressHelper.from(caller), 15);
 
         // Now create a new recipient on the parent.
         address recipient = address(new MockIpcContract());
@@ -216,7 +219,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         BottomUpCheckpoint memory batch = BottomUpCheckpoint({
             subnetID: subnet.id,
             blockHash: blockhash(block.number),
-            blockHeight: gwGetter.bottomUpCheckPeriod(),
+            blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             nextConfigurationNumber: 0,
             msgs: msgs
         });
@@ -224,7 +227,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         // Verify that we received the call and that the recipient has the tokens.
         vm.prank(address(saDiamond));
         vm.expectCall(recipient, abi.encodeCall(IpcHandler.handleIpcMessage, (msgs[0])), 1);
-        gwCheckpointingFacet.commitCheckpoint(batch);
+        gatewayDiamond.checkpointer().commitCheckpoint(batch);
         assertEq(token.balanceOf(recipient), 8);
     }
 
@@ -237,17 +240,13 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
 
     function createTokenSubnet(address tokenAddress) internal returns (Subnet memory) {
         // Create a subnet actor in the root network, with an ERC20 supply source with the specified token address.
-        SubnetActorDiamond.ConstructorParams memory saConstructorParams = defaultSubnetActorParamsWithGateway(
+        SubnetActorDiamond.ConstructorParams memory saConstructorParams = defaultSubnetActorParamsWith(
             address(gatewayDiamond)
         );
         saConstructorParams.supplySource = SupplySource({kind: SupplyKind.ERC20, tokenAddress: tokenAddress});
 
         // Override the state variables with the new subnet.
         saDiamond = createSubnetActor(saConstructorParams);
-        saManager = SubnetActorManagerFacet(address(saDiamond));
-        saGetter = SubnetActorGetterFacet(address(saDiamond));
-        saLouper = DiamondLoupeFacet(address(saDiamond));
-        saCutter = DiamondCutFacet(address(saDiamond));
 
         // increment the block number by 5 (could be other number as well) so that commit
         // parent finality called down stream will work we need this because in setUp,
@@ -260,9 +259,9 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         (address validatorAddress, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
         join(validatorAddress, publicKey);
 
-        SubnetID memory subnetId = gwGetter.getNetworkName().createSubnetId(address(saDiamond));
+        SubnetID memory subnetId = gatewayDiamond.getter().getNetworkName().createSubnetId(address(saDiamond));
 
-        (bool exists, Subnet memory subnet) = gwGetter.getSubnet(subnetId);
+        (bool exists, Subnet memory subnet) = gatewayDiamond.getter().getSubnet(subnetId);
         assert(exists);
         return subnet;
     }

@@ -17,6 +17,7 @@ On Linux (links and instructions for Ubuntu):
 - Install Foundry. See [instructions](https://book.getfoundry.sh/getting-started/installation).
 
 On MacOS:
+
 - Install Xcode from App Store or terminal: xcode-select --install
 - Install Homebrew: https://brew.sh/
 - Install dependencies: brew install jq
@@ -24,7 +25,6 @@ On MacOS:
 - Install Cargo make: cargo install --force cargo-make
 - Install docker: https://docs.docker.com/desktop/install/mac-install/
 - Install foundry: https://book.getfoundry.sh/getting-started/installation
-  
 
 ## Building
 
@@ -37,10 +37,8 @@ sudo usermod -aG docker $USER && newgrp docker
 
 # clone this repo and build
 git clone https://github.com/consensus-shipyard/ipc.git
-cd ipc/contracts
-make gen
-cd ..
-cargo build --release
+cd ipc
+make
 
 # building will generate the following binaries
 ./target/release/ipc-cli --version
@@ -68,11 +66,13 @@ make test
 **We've prepared a [quick start guide](https://docs.ipc.space/quickstarts/deploy-a-subnet) that will have you running and validating on your own subnet quickly, at the cost of detailed explanations.**
 
 For further documentation, see:
+
 - [docs/contracts.md](./docs/ipc/contracts.md) for instructions on how to deploy FEVM actors on subnets.
 - [docs/usage.md](./docs/ipc/usage.md) for instructions on how to use the `ipc-cli` to interact with subnets (from managing your identities, to sending funds to a subnet).
 - [docs/deploying-hierarchy.md](./docs/ipc/deploying-hierarchy.md) for instructions on how to deploy your own instance of IPC on a network.
 
 If you are a developer, see:
+
 - [docs/developers.md](./docs/ipc/developers.md) for useful tips and guides targeted for IPC developers.
 
 ## Connecting to a rootnet
@@ -80,6 +80,7 @@ If you are a developer, see:
 You can deploy an IPC hierarchy from any compatible rootnet. The recommended option is to use Filecoin Calibration, but you can also deploy your own.
 
 ### Running a subnet in Calibration
+
 Calibration is the primary testnet for Filecoin. It already hosts the IPC actors and can be used as a rootnet on which to deploy new subnets.
 
 In order to use the `ipc-cli` with Calibration we need to have access to a full node syncing with the network. The easiest way to achieve this is to use a [public RPC](https://docs.filecoin.io/networks/calibration/rpcs/). You also need the addresses of the deployed contracts.

@@ -58,6 +58,7 @@ fn address_to_eth_address(addr: &Address) -> anyhow::Result<EthAddress> {
             bytes.copy_from_slice(&inner.subaddress()[0..20]);
             Ok(EthAddress(bytes))
         }
+        Payload::ID(id) => Ok(EthAddress::from_id(*id)),
         _ => Err(anyhow!("not eth address")),
     }
 }
@@ -129,6 +130,7 @@ mod tests {
             config: SubnetConfig::Fevm(EVMSubnet {
                 gateway_addr: Address::from(eth_addr1),
                 provider_http: "http://127.0.0.1:3030/rpc/v1".parse().unwrap(),
+                provider_timeout: None,
                 auth_token: None,
                 registry_addr: Address::from(eth_addr1),
             }),

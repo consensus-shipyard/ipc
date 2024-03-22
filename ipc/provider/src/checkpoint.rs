@@ -106,32 +106,16 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         log::info!("launching {self} for {submitter}");
 
         loop {
-            self.submit_checkpoint(&submitter).await;
+            if let Err(e) = self.submit_next_epoch(&submitter).await {
+                log::error!("cannot submit checkpoint for submitter: {submitter} due to {e}");
+            }
+
             tokio::time::sleep(submission_interval).await;
         }
     }
 
-    /// Submit the checkpoint from the target submitter address
-    pub async fn submit_checkpoint(&self, submitter: &Address) {
-        let next_submission_height = if let Ok(h) = self.next_submission_height().await {
-            h
-        } else {
-            log::error!("cannot fetch next submission height for submitter {submitter}");
-            return;
-        };
-
-        if let Err(e) = self.submit_epoch(next_submission_height, submitter).await {
-            log::error!(
-                "cannot submit at bottom up checkpoint for height: {} and submitter {} due to {}",
-                next_submission_height,
-                submitter,
-                e
-            )
-        }
-    }
-
-    /// Derive the next submission checkpoint height
-    async fn next_submission_height(&self) -> Result<ChainEpoch> {
+    /// Checks if the relayer has already submitted at the next submission epoch, if not it submits it.
+    async fn submit_next_epoch(&self, submitter: &Address) -> Result<()> {
         let last_checkpoint_epoch = self
             .parent_handler
             .last_bottom_up_checkpoint_height(&self.metadata.child.id)
@@ -139,28 +123,21 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
             .map_err(|e| {
                 anyhow!("cannot obtain the last bottom up checkpoint height due to: {e:}")
             })?;
-        Ok(last_checkpoint_epoch + self.checkpoint_period())
-    }
+        log::info!("last submission height: {last_checkpoint_epoch}");
 
-    /// Checks if the relayer has already submitted at the next submission epoch, if not it submits it.
-    async fn submit_epoch(
-        &self,
-        next_submission_height: ChainEpoch,
-        submitter: &Address,
-    ) -> Result<()> {
         let current_height = self.child_handler.current_epoch().await?;
         let finalized_height = max(1, current_height - self.finalization_blocks);
 
-        log::debug!("next_submission_height: {next_submission_height}, current height: {current_height}, finalized_height: {finalized_height}");
+        log::debug!("last submission height: {last_checkpoint_epoch}, current height: {current_height}, finalized_height: {finalized_height}");
 
-        if finalized_height < next_submission_height {
+        if finalized_height <= last_checkpoint_epoch {
             return Ok(());
         }
 
-        let prev_h = next_submission_height - self.checkpoint_period();
-        log::debug!("start querying quorum reached events from : {prev_h} to {finalized_height}");
+        let start = last_checkpoint_epoch + 1;
+        log::debug!("start querying quorum reached events from : {start} to {finalized_height}");
 
-        for h in (prev_h + 1)..=finalized_height {
+        for h in start..=finalized_height {
             let events = self.child_handler.quorum_reached_events(h).await?;
             if events.is_empty() {
                 log::debug!("no reached events at height : {h}");
@@ -170,6 +147,15 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
             log::debug!("found reached events at height : {h}");
 
             for event in events {
+                // Note that the event will be emitted later than the checkpoint height.
+                // For example, if the checkpoint height is 400 but it's actually created
+                // in fendermint at height 403. This means the event.height == 400 which is
+                // already committed.
+                if event.height <= last_checkpoint_epoch {
+                    log::debug!("event height already committed: {}", event.height);
+                    continue;
+                }
+
                 let bundle = self
                     .child_handler
                     .checkpoint_bundle_at(event.height)
@@ -185,7 +171,12 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                         bundle.signatories,
                     )
                     .await
-                    .map_err(|e| anyhow!("cannot submit bottom up checkpoint due to: {e:}"))?;
+                    .map_err(|e| {
+                        anyhow!(
+                            "cannot submit bottom up checkpoint at height {} due to: {e:}",
+                            event.height
+                        )
+                    })?;
 
                 log::info!(
                     "submitted bottom up checkpoint({}) in parent at height {}",

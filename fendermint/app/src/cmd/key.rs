@@ -3,15 +3,14 @@
 
 use anyhow::{anyhow, Context};
 use fendermint_app_options::key::KeyShowPeerIdArgs;
-use fendermint_crypto::{PublicKey, SecretKey};
+use fendermint_crypto::{from_b64, to_b64, PublicKey, SecretKey};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fvm_shared::address::Address;
 use rand_chacha::{rand_core::SeedableRng, ChaCha20Rng};
 use serde_json::json;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use tendermint_config::NodeKey;
 
-use super::{from_b64, to_b64};
 use crate::{
     cmd,
     options::key::{
@@ -160,13 +159,13 @@ fn b64_to_secret(b64: &str) -> anyhow::Result<SecretKey> {
     Ok(sk)
 }
 
-pub fn read_public_key(public_key: &PathBuf) -> anyhow::Result<PublicKey> {
+pub fn read_public_key(public_key: &Path) -> anyhow::Result<PublicKey> {
     let b64 = std::fs::read_to_string(public_key).context("failed to read public key")?;
     let pk = b64_to_public(&b64).context("failed to parse public key")?;
     Ok(pk)
 }
 
-pub fn read_secret_key_hex(private_key: &PathBuf) -> anyhow::Result<SecretKey> {
+pub fn read_secret_key_hex(private_key: &Path) -> anyhow::Result<SecretKey> {
     let hex_str = std::fs::read_to_string(private_key).context("failed to read private key")?;
     let mut hex_str = hex_str.trim();
     if hex_str.starts_with("0x") {
@@ -177,7 +176,7 @@ pub fn read_secret_key_hex(private_key: &PathBuf) -> anyhow::Result<SecretKey> {
     Ok(sk)
 }
 
-pub fn read_secret_key(secret_key: &PathBuf) -> anyhow::Result<SecretKey> {
+pub fn read_secret_key(secret_key: &Path) -> anyhow::Result<SecretKey> {
     let b64 = std::fs::read_to_string(secret_key).context("failed to read secret key")?;
     let sk = b64_to_secret(&b64).context("failed to parse secret key")?;
     Ok(sk)

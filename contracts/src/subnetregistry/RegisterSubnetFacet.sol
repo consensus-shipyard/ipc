@@ -8,6 +8,9 @@ import {SubnetRegistryActorStorage} from "../lib/LibSubnetRegistryStorage.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
 import {WrongGateway} from "../errors/IPCErrors.sol";
 
+import {SubnetCreationPrivileges} from "../structs/Subnet.sol";
+import {LibDiamond} from "../lib/LibDiamond.sol";
+
 contract RegisterSubnetFacet is ReentrancyGuard {
     SubnetRegistryActorStorage internal s;
 
@@ -23,7 +26,9 @@ contract RegisterSubnetFacet is ReentrancyGuard {
             revert WrongGateway();
         }
 
-        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](5);
+        ensurePrivileges();
+
+        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](8);
 
         // set the diamond cut for subnet getter
         diamondCut[0] = IDiamond.FacetCut({
@@ -57,8 +62,26 @@ contract RegisterSubnetFacet is ReentrancyGuard {
             functionSelectors: s.subnetActorPauserSelectors
         });
 
+        diamondCut[5] = IDiamond.FacetCut({
+            facetAddress: s.SUBNET_ACTOR_DIAMOND_CUT_FACET,
+            action: IDiamond.FacetCutAction.Add,
+            functionSelectors: s.subnetActorDiamondCutSelectors
+        });
+
+        diamondCut[6] = IDiamond.FacetCut({
+            facetAddress: s.SUBNET_ACTOR_LOUPE_FACET,
+            action: IDiamond.FacetCutAction.Add,
+            functionSelectors: s.subnetActorDiamondLoupeSelectors
+        });
+
+        diamondCut[7] = IDiamond.FacetCut({
+            facetAddress: s.SUBNET_ACTOR_OWNERSHIP_FACET,
+            action: IDiamond.FacetCutAction.Add,
+            functionSelectors: s.subnetActorOwnershipSelectors
+        });
+
         // slither-disable-next-line reentrancy-benign
-        subnetAddr = address(new SubnetActorDiamond(diamondCut, _params));
+        subnetAddr = address(new SubnetActorDiamond(diamondCut, _params, msg.sender));
 
         //nonces start with 1, similar to eip 161
         ++s.userNonces[msg.sender];
@@ -67,5 +90,12 @@ contract RegisterSubnetFacet is ReentrancyGuard {
         emit SubnetDeployed(subnetAddr);
 
         return subnetAddr;
+    }
+
+    function ensurePrivileges() internal view {
+        if (s.creationPrivileges == SubnetCreationPrivileges.Unrestricted) {
+            return;
+        }
+        LibDiamond.enforceIsContractOwner();
     }
 }
