@@ -151,10 +151,6 @@ impl DockerPortRange {
     pub fn fendermint_metrics_host_port(&self) -> u32 {
         self.from + 84
     }
-    /// Mapping the internal 9184 of ethapi to the host.
-    pub fn ethapi_metrics_host_port(&self) -> u32 {
-        self.from + 85
-    }
 }
 
 /// State of the materializer that it persists, so that it can resume operations.

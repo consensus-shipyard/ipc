@@ -441,10 +441,7 @@ impl DockerNode {
                 let c = creator
                     .create(
                         ethapi_name,
-                        vec![
-                            (port_range.ethapi_rpc_host_port(), ETHAPI_RPC_PORT),
-                            (port_range.ethapi_metrics_host_port(), METRICS_RPC_PORT),
-                        ],
+                        vec![(port_range.ethapi_rpc_host_port(), ETHAPI_RPC_PORT)],
                         entrypoint("fendermint eth run"),
                     )
                     .await
