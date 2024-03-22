@@ -28,7 +28,7 @@ impl CommandLineHandler for Status {
         let provider = get_ipc_provider(global)?;
         let subnet = SubnetID::from_str(&arguments.subnet)?;
 
-        let height = provider.last_bottom_up_checkpoint_height(&subnet).await?;
+        let last_checkpointed_height = provider.last_bottom_up_checkpoint_height(&subnet).await?;
         let checkpoint = provider.get_bottom_up_bundle(&subnet, height).await?;
         let period = provider.checkpoint_period(&subnet).await?;
         let chain_head = provider.get_chain_head_height(&subnet).await?;
