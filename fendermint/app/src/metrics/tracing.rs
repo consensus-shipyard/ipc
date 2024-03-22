@@ -69,21 +69,18 @@ macro_rules! event_name {
 }
 
 macro_rules! event_mapping {
-    (gauges, $event:ident, $event_ty:ident :: $field:ident, $metric:expr) => {
-        set_gauge!($event, $event_ty::$field, $metric);
-    };
-    (counters, $event:ident, $event_ty:ident :: $field:ident, $metric:expr) => {
-        inc_counter!($event, $event_ty::$field, $metric);
+    ($op:ident, $event:ident, $event_ty:ident :: $field:ident, $metric:expr) => {
+        $op!($event, $event_ty::$field, $metric);
     };
 }
 
 macro_rules! event_match {
-    ($event:ident { $( $event_ty:ident { $( $field:ident => $kind:ident / $metric:expr  ),* $(,)? } ),* } ) => {
+    ($event:ident { $( $event_ty:ident { $( $field:ident => $op:ident ! $metric:expr  ),* $(,)? } ),* } ) => {
         match $event.metadata().name() {
             $(
                 event_name!($event_ty) => {
                     $(
-                        event_mapping!($kind, $event, $event_ty :: $field, $metric);
+                        event_mapping!($op, $event, $event_ty :: $field, $metric);
                     )*
                 }
             )*
@@ -96,20 +93,20 @@ impl<S: Subscriber> Layer<S> for MetricsLayer<S> {
     fn on_event(&self, event: &Event<'_>, _ctx: layer::Context<'_, S>) {
         event_match!(event {
             NewParentView {
-                block_height              => gauges   / &am::TOPDOWN_VIEW_BLOCK_HEIGHT,
-                num_msgs                  => counters / &am::TOPDOWN_VIEW_NUM_MSGS,
-                num_validator_changes     => counters / &am::TOPDOWN_VIEW_NUM_VAL_CHNGS,
+                block_height              => set_gauge   ! &am::TOPDOWN_VIEW_BLOCK_HEIGHT,
+                num_msgs                  => inc_counter ! &am::TOPDOWN_VIEW_NUM_MSGS,
+                num_validator_changes     => inc_counter ! &am::TOPDOWN_VIEW_NUM_VAL_CHNGS,
             },
             ParentFinalityCommitted {
-                block_height              => gauges   / &am::TOPDOWN_FINALIZED_BLOCK_HEIGHT,
+                block_height              => set_gauge   ! &am::TOPDOWN_FINALIZED_BLOCK_HEIGHT,
             },
             NewBottomUpCheckpoint {
-                block_height              => gauges   / &am::BOTTOMUP_CKPT_BLOCK_HEIGHT,
-                next_configuration_number => gauges   / &am::BOTTOMUP_CKPT_CONFIG_NUM,
-                num_msgs                  => counters / &am::BOTTOMUP_CKPT_NUM_MSGS,
+                block_height              => set_gauge   ! &am::BOTTOMUP_CKPT_BLOCK_HEIGHT,
+                next_configuration_number => set_gauge   ! &am::BOTTOMUP_CKPT_CONFIG_NUM,
+                num_msgs                  => inc_counter ! &am::BOTTOMUP_CKPT_NUM_MSGS,
             },
             NewBlock {
-                block_height              => gauges   / &am::ABCI_COMMITTED_BLOCK_HEIGHT
+                block_height              => set_gauge   ! &am::ABCI_COMMITTED_BLOCK_HEIGHT
             }
         });
     }
