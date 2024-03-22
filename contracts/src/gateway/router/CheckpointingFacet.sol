@@ -52,9 +52,6 @@ contract CheckpointingFacet is GatewayActorModifiers {
         bytes32 membershipRootHash,
         uint256 membershipWeight
     ) external systemActorOnly {
-        if (checkpoint.blockHeight % s.bottomUpCheckPeriod != 0) {
-            revert InvalidCheckpointEpoch();
-        }
         if (LibGateway.bottomUpCheckpointExists(checkpoint.blockHeight)) {
             revert CheckpointAlreadyExists();
         }

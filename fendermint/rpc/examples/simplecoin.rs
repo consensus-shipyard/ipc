@@ -33,7 +33,7 @@ use tracing::Level;
 use fvm_shared::econ::TokenAmount;
 
 use fendermint_rpc::client::FendermintClient;
-use fendermint_rpc::message::{GasParams, MessageFactory};
+use fendermint_rpc::message::{GasParams, SignedMessageFactory};
 use fendermint_rpc::tx::{CallClient, TxClient, TxCommit};
 
 type MockProvider = ethers::providers::Provider<ethers::providers::MockProvider>;
@@ -108,7 +108,8 @@ async fn main() {
 
     let client = FendermintClient::new_http(opts.url, None).expect("error creating client");
 
-    let sk = MessageFactory::read_secret_key(&opts.secret_key).expect("error reading secret key");
+    let sk =
+        SignedMessageFactory::read_secret_key(&opts.secret_key).expect("error reading secret key");
 
     // Query the account nonce from the state, so it doesn't need to be passed as an arg.
     let sn = sequence(&client, &sk)
@@ -124,7 +125,7 @@ async fn main() {
         .value
         .chain_id;
 
-    let mf = MessageFactory::new_secp256k1(sk, sn, ChainID::from(chain_id));
+    let mf = SignedMessageFactory::new_secp256k1(sk, sn, ChainID::from(chain_id));
 
     let mut client = client.bind(mf);
 

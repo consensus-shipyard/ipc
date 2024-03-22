@@ -426,4 +426,29 @@ contract LibGatewayTest is Test {
 
         t.applyMsg(childSubnet, crossMsg);
     }
+
+    function test_nextCheckpointEpoch() public pure {
+        uint64 checkpointPeriod = 10;
+
+        require(LibGateway.getNextEpoch(0, checkpointPeriod) == checkpointPeriod, "next epoch not correct");
+        require(LibGateway.getNextEpoch(1, checkpointPeriod) == checkpointPeriod, "next epoch not correct");
+        require(LibGateway.getNextEpoch(10, checkpointPeriod) == checkpointPeriod * 2, "next epoch not correct");
+        require(LibGateway.getNextEpoch(15, checkpointPeriod) == checkpointPeriod * 2, "next epoch not correct");
+
+        checkpointPeriod = 17;
+
+        require(LibGateway.getNextEpoch(0, checkpointPeriod) == checkpointPeriod, "next epoch not correct");
+        require(
+            LibGateway.getNextEpoch(checkpointPeriod - 1, checkpointPeriod) == checkpointPeriod,
+            "next epoch not correct"
+        );
+        require(
+            LibGateway.getNextEpoch(checkpointPeriod, checkpointPeriod) == checkpointPeriod * 2,
+            "next epoch not correct"
+        );
+        require(
+            LibGateway.getNextEpoch(checkpointPeriod + 1, checkpointPeriod) == checkpointPeriod * 2,
+            "next epoch not correct"
+        );
+    }
 }

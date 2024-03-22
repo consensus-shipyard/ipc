@@ -2,21 +2,26 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 use anyhow::{anyhow, bail, Context};
 use async_recursion::async_recursion;
+use either::Either;
+use fvm_shared::chainid::ChainID;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Display,
     marker::PhantomData,
 };
-use tendermint_rpc::Url;
+use url::Url;
 
 use crate::{
     manifest::{
-        BalanceMap, CollateralMap, IpcDeployment, Manifest, Node, NodeMode, ParentNode, Rootnet,
-        Subnet,
+        BalanceMap, CollateralMap, EnvMap, IpcDeployment, Manifest, Node, NodeMode, ParentNode,
+        Rootnet, Subnet,
     },
-    materializer::{Materializer, Materials, NodeConfig, SubmitConfig, SubnetConfig, TargetConfig},
-    AccountId, NodeId, NodeName, RelayerName, ResourceHash, SubnetId, SubnetName, TestnetId,
-    TestnetName,
+    materializer::{
+        Materializer, NodeConfig, ParentConfig, RelayerConfig, SubmitConfig, SubnetConfig,
+        TargetConfig,
+    },
+    materials::Materials,
+    AccountId, NodeId, NodeName, RelayerName, ResourceHash, SubnetId, SubnetName, TestnetName,
 };
 
 /// The `Testnet` parses a [Manifest] and is able to derive the steps
@@ -45,20 +50,27 @@ pub struct Testnet<M: Materials, R> {
     _phantom_materializer: PhantomData<R>,
 }
 
+impl<M: Materials, R> Drop for Testnet<M, R> {
+    fn drop(&mut self) {
+        // Make sure anything that can use a common network is dropped first.
+        drop(std::mem::take(&mut self.relayers));
+        drop(std::mem::take(&mut self.nodes));
+    }
+}
+
 impl<M, R> Testnet<M, R>
 where
     M: Materials,
     R: Materializer<M> + Sync + Send,
 {
-    pub async fn new(m: &mut R, id: &TestnetId) -> anyhow::Result<Self> {
-        let name = TestnetName::new(id);
+    pub async fn new(m: &mut R, name: &TestnetName) -> anyhow::Result<Self> {
         let network = m
-            .create_network(&name)
+            .create_network(name)
             .await
             .context("failed to create the network")?;
 
         Ok(Self {
-            name,
+            name: name.clone(),
             network,
             externals: Default::default(),
             accounts: Default::default(),
@@ -71,6 +83,10 @@ where
         })
     }
 
+    pub fn name(&self) -> &TestnetName {
+        &self.name
+    }
+
     pub fn root(&self) -> SubnetName {
         self.name.root()
     }
@@ -79,8 +95,8 @@ where
     ///
     /// To validate a manifest, we can first create a testnet with a [Materializer]
     /// that only creates symbolic resources.
-    pub async fn setup(m: &mut R, id: &TestnetId, manifest: &Manifest) -> anyhow::Result<Self> {
-        let mut t = Self::new(m, id).await?;
+    pub async fn setup(m: &mut R, name: &TestnetName, manifest: &Manifest) -> anyhow::Result<Self> {
+        let mut t = Self::new(m, name).await?;
         let root_name = t.root();
 
         // Create keys for accounts.
@@ -123,21 +139,21 @@ where
             .ok_or_else(|| anyhow!("account {id} does not exist"))
     }
 
-    /// Get an node by name.
+    /// Get a node by name.
     pub fn node(&self, name: &NodeName) -> anyhow::Result<&M::Node> {
         self.nodes
             .get(name)
             .ok_or_else(|| anyhow!("node {name:?} does not exist"))
     }
 
-    /// Get an subnet by name.
+    /// Get a subnet by name.
     pub fn subnet(&self, name: &SubnetName) -> anyhow::Result<&M::Subnet> {
         self.subnets
             .get(name)
             .ok_or_else(|| anyhow!("subnet {name:?} does not exist"))
     }
 
-    /// Get an genesis by subnet.
+    /// Get a genesis by subnet.
     pub fn genesis(&self, name: &SubnetName) -> anyhow::Result<&M::Genesis> {
         self.genesis
             .get(name)
@@ -155,14 +171,20 @@ where
     pub fn nodes_by_subnet(&self, subnet_name: &SubnetName) -> Vec<&M::Node> {
         self.nodes
             .iter()
-            .filter(|(node_name, _)| node_name.is_in_subnet(subnet_name))
+            .filter(|(node_name, _)| subnet_name.contains(node_name))
             .map(|(_, n)| n)
             .collect()
+    }
+
+    /// Iterate all the nodes in the testnet.
+    pub fn nodes(&self) -> impl Iterator<Item = (&NodeName, &M::Node)> {
+        self.nodes.iter()
     }
 
     /// Where can we send transactions and queries on a subnet.
     pub fn submit_config(&self, subnet_name: &SubnetName) -> anyhow::Result<SubmitConfig<M>> {
         let deployment = self.deployment(subnet_name)?;
+        let subnet = self.subnet(subnet_name)?;
 
         let mut nodes = self
             .nodes_by_subnet(subnet_name)
@@ -174,7 +196,11 @@ where
             nodes.extend(self.externals.iter().cloned().map(TargetConfig::External));
         }
 
-        Ok(SubmitConfig { deployment, nodes })
+        Ok(SubmitConfig {
+            subnet,
+            deployment,
+            nodes,
+        })
     }
 
     /// Resolve account IDs in a map to account references.
@@ -223,19 +249,20 @@ where
         m: &mut R,
         subnet_name: &SubnetName,
         nodes: &BTreeMap<NodeId, Node>,
+        env: &EnvMap,
     ) -> anyhow::Result<()> {
         let node_ids = sort_by_seeds(nodes).context("invalid root subnet topology")?;
 
         for (node_id, node) in node_ids.iter() {
-            self.create_node(m, subnet_name, node_id, node)
+            self.create_node(m, subnet_name, node_id, node, env, node_ids.len())
                 .await
-                .with_context(|| "failed to create node {node_id} in {subnet_name:?}")?;
+                .with_context(|| format!("failed to create node {node_id} in {subnet_name}"))?;
         }
 
         for (node_id, node) in node_ids.iter() {
             self.start_node(m, subnet_name, node_id, node)
                 .await
-                .with_context(|| "failed to start node {node_id} in {subnet_name:?}")?;
+                .with_context(|| format!("failed to start node {node_id} in {subnet_name}"))?;
         }
 
         Ok(())
@@ -250,24 +277,41 @@ where
         subnet_name: &SubnetName,
         node_id: &NodeId,
         node: &Node,
+        env: &EnvMap,
+        peer_count: usize,
     ) -> anyhow::Result<()> {
         let genesis = self.genesis(subnet_name)?;
         let network = self.network();
         let node_name = subnet_name.node(node_id);
 
         let parent_node = match (subnet_name.parent(), &node.parent_node) {
-            (Some(ps), Some(ParentNode::Internal(id))) => Some(TargetConfig::<M>::Internal(
-                self.node(&ps.node(id))
-                    .with_context(|| format!("invalid parent node in {node_name:?}"))?,
-            )),
+            (Some(ps), Some(ParentNode::Internal(id))) => {
+                let tc = TargetConfig::<M>::Internal(
+                    self.node(&ps.node(id))
+                        .with_context(|| format!("invalid parent node in {node_name:?}"))?,
+                );
+                let deployment = self.deployment(&ps)?;
+                Some(ParentConfig {
+                    node: tc,
+                    deployment,
+                })
+            }
             (Some(ps), Some(ParentNode::External(url))) if ps.is_root() => {
-                Some(TargetConfig::External(url.clone()))
+                let tc = TargetConfig::External(url.clone());
+                let deployment = self.deployment(&ps)?;
+                Some(ParentConfig {
+                    node: tc,
+                    deployment,
+                })
             }
             (Some(_), Some(ParentNode::External(_))) => {
                 bail!("node {node_name:?} specifies external URL for parent, but it's on a non-root subnet")
             }
             (None, Some(_)) => {
                 bail!("node {node_name:?} specifies parent node, but there is no parent subnet")
+            }
+            (Some(_), None) => {
+                bail!("node {node_name:?} is on a subnet, but doesn't specify a parent node")
             }
             _ => None,
         };
@@ -286,10 +330,12 @@ where
             },
             parent_node,
             ethapi: node.ethapi,
+            env,
+            peer_count,
         };
 
         let node = m
-            .create_node(&node_name, node_config)
+            .create_node(&node_name, &node_config)
             .await
             .context("failed to create node")?;
 
@@ -333,7 +379,11 @@ where
         rootnet: &Rootnet,
     ) -> anyhow::Result<()> {
         match rootnet {
-            Rootnet::External { deployment, urls } => {
+            Rootnet::External {
+                chain_id,
+                deployment,
+                urls,
+            } => {
                 // Establish balances.
                 for (id, a) in self.accounts.iter() {
                     let reference = ResourceHash::digest(format!("funding {id} from faucet"));
@@ -355,6 +405,11 @@ where
                     }
                 };
 
+                let subnet = m
+                    .create_root_subnet(root_name, Either::Left(ChainID::from(*chain_id)))
+                    .context("failed to create root subnet")?;
+
+                self.subnets.insert(root_name.clone(), subnet);
                 self.deployments.insert(root_name.clone(), deployment);
                 self.externals = urls.clone();
             }
@@ -362,14 +417,21 @@ where
                 validators,
                 balances,
                 nodes,
+                env,
             } => {
-                let deployment = m.default_deployment(root_name)?;
-                self.deployments.insert(root_name.clone(), deployment);
-
                 self.create_root_genesis(m, root_name, validators.clone(), balances.clone())
                     .context("failed to create root genesis")?;
 
-                self.create_and_start_nodes(m, root_name, nodes)
+                let genesis = self.genesis(root_name)?;
+                let subnet = m
+                    .create_root_subnet(root_name, Either::Right(genesis))
+                    .context("failed to create root subnet")?;
+                let deployment = m.default_deployment(root_name)?;
+
+                self.subnets.insert(root_name.clone(), subnet);
+                self.deployments.insert(root_name.clone(), deployment);
+
+                self.create_and_start_nodes(m, root_name, nodes, env)
                     .await
                     .context("failed to start root nodes")?;
             }
@@ -401,14 +463,15 @@ where
                 .create_subnet(
                     &parent_submit_config,
                     &subnet_name,
-                    SubnetConfig {
+                    &SubnetConfig {
                         creator: self.account(&subnet.creator).context("invalid creator")?,
                         // Make the number such that the last validator to join activates the subnet.
                         min_validators: subnet.validators.len(),
+                        bottom_up_checkpoint: &subnet.bottom_up_checkpoint,
                     },
                 )
                 .await
-                .with_context(|| format!("failed to create {subnet_name:?}"))?;
+                .with_context(|| format!("failed to create {subnet_name}"))?;
 
             self.subnets.insert(subnet_name.clone(), created_subnet);
         };
@@ -439,12 +502,12 @@ where
                 for (label, id, amount) in cs.chain(bs) {
                     let account = self
                         .account(id)
-                        .with_context(|| format!("invalid {label} in {subnet_name:?}"))?;
+                        .with_context(|| format!("invalid {label} in {subnet_name}"))?;
 
                     // Assign a reference so we can remember that we did it, within each subnet,
                     // which can turn this into an idempotent operation.
                     let reference = ResourceHash::digest(format!(
-                        "funds from the top for {label} {id} for {subnet_name:?}"
+                        "funds from the top for {label} {id} for {subnet_name}"
                     ));
 
                     m.fund_subnet(
@@ -463,12 +526,12 @@ where
             for (id, c) in &subnet.validators {
                 let account = self
                     .account(id)
-                    .with_context(|| format!("invalid validator {id} in {subnet_name:?}"))?;
+                    .with_context(|| format!("invalid validator {id} in {subnet_name}"))?;
 
                 let b = subnet.balances.get(id).cloned().unwrap_or_default();
 
                 let reference =
-                    ResourceHash::digest(format!("initial join by {id} for {subnet_name:?}"));
+                    ResourceHash::digest(format!("initial join by {id} for {subnet_name}"));
 
                 m.join_subnet(
                     &parent_submit_config,
@@ -479,28 +542,27 @@ where
                     Some(reference),
                 )
                 .await
-                .with_context(|| {
-                    format!("failed to join with validator {id} in {subnet_name:?}")
-                })?;
+                .with_context(|| format!("failed to join with validator {id} in {subnet_name}"))?;
             }
 
             // Create genesis by fetching from the parent.
             let genesis = m
                 .create_subnet_genesis(&parent_submit_config, created_subnet)
                 .await
-                .context("failed to create subnet genesis in {subnet_name:?}")?;
+                .with_context(|| format!("failed to create subnet genesis in {subnet_name}"))?;
 
             self.genesis.insert(subnet_name.clone(), genesis);
 
             // Create and start nodes.
-            self.create_and_start_nodes(m, &subnet_name, &subnet.nodes)
+            self.create_and_start_nodes(m, &subnet_name, &subnet.nodes, &subnet.env)
                 .await
-                .context("failed to start subnet nodes in {subnet_name:?}")?;
+                .with_context(|| format!("failed to start subnet nodes in {subnet_name}"))?;
         }
 
-        // Interact with the running subnet .
+        // Interact with the running subnet.
         {
             let created_subnet = self.subnet(&subnet_name)?;
+            let created_deployment = self.deployment(&subnet_name)?;
 
             // Where can we reach the gateway and the registry.
             let parent_submit_config = self.submit_config(parent_subnet_name)?;
@@ -510,13 +572,13 @@ where
             for (id, b) in &subnet.balances {
                 let account = self
                     .account(id)
-                    .with_context(|| format!("invalid balance in {subnet_name:?}"))?;
+                    .with_context(|| format!("invalid balance in {subnet_name}"))?;
 
                 if subnet.validators.contains_key(id) {
                     continue;
                 }
 
-                let reference = ResourceHash::digest(format!("fund {id} in {subnet_name:?}"));
+                let reference = ResourceHash::digest(format!("fund {id} in {subnet_name}"));
 
                 m.fund_subnet(
                     &parent_submit_config,
@@ -526,7 +588,7 @@ where
                     Some(reference),
                 )
                 .await
-                .with_context(|| format!("failed to join with {id} in {subnet_name:?}"))?;
+                .with_context(|| format!("failed to fund {id} in {subnet_name}"))?;
             }
 
             // Create relayers for bottom-up checkpointing.
@@ -544,10 +606,10 @@ where
                     (Some(p), ParentNode::Internal(s)) => TargetConfig::Internal(self.node(&p.node(s)).context("invalid submit node")?),
                     (Some(p), ParentNode::External(url)) if p.is_root() => TargetConfig::External(url.clone()),
                     (Some(_), ParentNode::External(_))  => bail!(
-                        "invalid relayer {id} in {subnet_name:?}: parent is not root, but submit node is external"
+                        "invalid relayer {id} in {subnet_name}: parent is not root, but submit node is external"
                     ),
                     (None, _) => bail!(
-                        "invalid relayer {id} in {subnet_name:?}: there is no parent subnet to relay to"
+                        "invalid relayer {id} in {subnet_name}: there is no parent subnet to relay to"
                     ),
                 };
 
@@ -556,12 +618,18 @@ where
                     .create_relayer(
                         &SubmitConfig {
                             nodes: vec![submit_node],
-                            deployment: parent_submit_config.deployment,
+                            ..parent_submit_config
                         },
                         &relayer_name,
-                        created_subnet,
-                        submitter,
-                        follow_node,
+                        RelayerConfig {
+                            follow_config: &SubmitConfig {
+                                nodes: vec![TargetConfig::Internal(follow_node)],
+                                subnet: created_subnet,
+                                deployment: created_deployment,
+                            },
+                            submitter,
+                            env: &subnet.env,
+                        },
                     )
                     .await
                     .with_context(|| format!("failed to create relayer {id}"))?;
@@ -575,9 +643,7 @@ where
         for (subnet_id, subnet) in &subnet.subnets {
             self.create_and_start_subnet(m, &subnet_name, subnet_id, subnet)
                 .await
-                .with_context(|| {
-                    format!("failed to start subnet {subnet_id} in {subnet_name:?}")
-                })?;
+                .with_context(|| format!("failed to start subnet {subnet_id} in {subnet_name}"))?;
         }
 
         Ok(())

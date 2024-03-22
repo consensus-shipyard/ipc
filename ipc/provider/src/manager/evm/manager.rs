@@ -15,6 +15,8 @@ use ipc_actors_abis::{
 };
 use ipc_api::evm::{fil_to_eth_amount, payload_to_evm_address, subnet_id_to_evm_addresses};
 use ipc_api::validator::from_contract_validators;
+use reqwest::header::HeaderValue;
+use reqwest::Client;
 use std::net::{IpAddr, SocketAddr};
 
 use ipc_api::subnet::{PermissionMode, SupplyKind, SupplySource};
@@ -35,7 +37,7 @@ use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::{Signer, SignerMiddleware};
 use ethers::providers::{Authorization, Http, Middleware, Provider};
 use ethers::signers::{LocalWallet, Wallet};
-use ethers::types::{Eip1559TransactionRequest, I256, U256};
+use ethers::types::{BlockId, Eip1559TransactionRequest, ValueOrArray, I256, U256};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_api::checkpoint::{
@@ -65,7 +67,7 @@ const ETH_PROVIDER_POLLING_TIME: Duration = Duration::from_secs(1);
 const TRANSACTION_RECEIPT_RETRIES: usize = 200;
 
 /// The majority vote percentage for checkpoint submission when creating a subnet.
-const SUBNET_MAJORITY_PERCENTAGE: u8 = 60;
+const SUBNET_MAJORITY_PERCENTAGE: u8 = 67;
 
 pub struct EthSubnetManager {
     keystore: Option<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>>,
@@ -130,7 +132,8 @@ impl TopDownFinalityQuery for EthSubnetManager {
             .event::<lib_gateway::NewTopDownMessageFilter>()
             .from_block(epoch as u64)
             .to_block(epoch as u64)
-            .topic1(topic1);
+            .topic1(topic1)
+            .address(ValueOrArray::Value(gateway_contract.address()));
 
         let mut messages = vec![];
         let mut hash = None;
@@ -191,7 +194,8 @@ impl TopDownFinalityQuery for EthSubnetManager {
         let ev = contract
             .event::<lib_staking_change_log::NewStakingChangeRequestFilter>()
             .from_block(epoch as u64)
-            .to_block(epoch as u64);
+            .to_block(epoch as u64)
+            .address(ValueOrArray::Value(contract.address()));
 
         let mut changes = vec![];
         let mut hash = None;
@@ -330,6 +334,9 @@ impl SubnetManager for EthSubnetManager {
         let mut txn = contract.join(ethers::types::Bytes::from(pub_key));
         txn.tx.set_value(collateral);
         let txn = call_with_premium_estimation(signer, txn).await?;
+
+        // Use the pending state to get the nonce because there could have been a pre-fund. Best would be to use this for everything.
+        let txn = txn.block(BlockId::Number(ethers::types::BlockNumber::Pending));
 
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
@@ -682,6 +689,29 @@ impl SubnetManager for EthSubnetManager {
             .to_string())
     }
 
+    async fn get_commit_sha(&self) -> Result<[u8; 32]> {
+        let gateway_contract = gateway_getter_facet::GatewayGetterFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+        log::debug!(
+            "gateway_contract address : {:?}",
+            self.ipc_contract_info.gateway_addr
+        );
+        log::debug!(
+            "gateway_contract_getter_facet address : {:?}",
+            gateway_contract.address()
+        );
+
+        let commit_sha = gateway_contract
+            .get_commit_sha()
+            .call()
+            .await
+            .map_err(|e| anyhow!("cannot get commit sha due to: {e:}"))?;
+
+        Ok(commit_sha)
+    }
+
     async fn get_genesis_info(&self, subnet: &SubnetID) -> Result<SubnetGenesisInfo> {
         let address = contract_address_from_subnet(subnet)?;
         let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
@@ -770,6 +800,48 @@ impl SubnetManager for EthSubnetManager {
             is_active,
             is_waiting,
         })
+    }
+
+    async fn set_federated_power(
+        &self,
+        from: &Address,
+        subnet: &SubnetID,
+        validators: &[Address],
+        public_keys: &[Vec<u8>],
+        federated_power: &[u128],
+    ) -> Result<ChainEpoch> {
+        let address = contract_address_from_subnet(subnet)?;
+        log::info!("interacting with evm subnet contract: {address:}");
+
+        let signer = Arc::new(self.get_signer(from)?);
+        let contract =
+            subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
+
+        let addresses: Vec<ethers::core::types::Address> = validators
+            .iter()
+            .map(|validator_address| payload_to_evm_address(validator_address.payload()).unwrap())
+            .collect();
+        log::debug!("converted addresses: {:?}", addresses);
+
+        let pubkeys: Vec<ethers::core::types::Bytes> = public_keys
+            .iter()
+            .map(|key| ethers::core::types::Bytes::from(key.clone()))
+            .collect();
+        log::debug!("converted pubkeys: {:?}", pubkeys);
+
+        let power_u256: Vec<ethers::core::types::U256> = federated_power
+            .iter()
+            .map(|power| ethers::core::types::U256::from(*power))
+            .collect();
+        log::debug!("converted power: {:?}", power_u256);
+
+        log::debug!("from address: {:?}", from);
+
+        let call = contract.set_federated_power(addresses, pubkeys, power_u256);
+        let txn = call_with_premium_estimation(signer, call).await?;
+        let pending_tx = txn.send().await?;
+        let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
+        block_number_from_receipt(receipt)
     }
 }
 
@@ -937,11 +1009,26 @@ impl EthSubnetManager {
 
         let SubnetConfig::Fevm(config) = &subnet.config;
 
-        let provider = if auth_token.is_some() {
-            Http::new_with_auth(url, Authorization::Bearer(auth_token.unwrap()))?
-        } else {
-            Http::new(url)
-        };
+        let mut client = Client::builder();
+
+        if let Some(auth_token) = auth_token {
+            let auth = Authorization::Bearer(auth_token);
+            let mut auth_value = HeaderValue::from_str(&auth.to_string())?;
+            auth_value.set_sensitive(true);
+
+            let mut headers = reqwest::header::HeaderMap::new();
+            headers.insert(reqwest::header::AUTHORIZATION, auth_value);
+
+            client = client.default_headers(headers);
+        }
+
+        if let Some(timeout) = subnet.rpc_timeout() {
+            client = client.timeout(timeout);
+        }
+
+        let client = client.build()?;
+
+        let provider = Http::new_with_client(url, client);
 
         let mut provider = Provider::new(provider);
         // set polling interval for provider to fit fast child subnets block times.
@@ -1067,7 +1154,8 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
         let ev = contract
             .event::<lib_quorum::QuorumReachedFilter>()
             .from_block(height as u64)
-            .to_block(height as u64);
+            .to_block(height as u64)
+            .address(ValueOrArray::Value(contract.address()));
 
         let mut events = vec![];
         for (event, _meta) in query_with_meta(ev, contract.client()).await? {

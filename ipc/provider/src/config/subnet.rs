@@ -1,8 +1,11 @@
+use std::time::Duration;
+
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
 use fvm_shared::address::Address;
 use ipc_api::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DurationSeconds};
 use url::Url;
 
 use crate::config::deserialize::{
@@ -53,6 +56,12 @@ impl Subnet {
         }
     }
 
+    pub fn rpc_timeout(&self) -> Option<Duration> {
+        match &self.config {
+            SubnetConfig::Fevm(s) => s.provider_timeout,
+        }
+    }
+
     pub fn gateway_addr(&self) -> Address {
         match &self.config {
             SubnetConfig::Fevm(s) => s.gateway_addr,
@@ -71,13 +80,18 @@ pub struct FVMSubnet {
 }
 
 /// The EVM subnet config parameters
+#[serde_as]
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct EVMSubnet {
     pub provider_http: Url,
+    #[serde_as(as = "Option<DurationSeconds<u64>>")]
+    pub provider_timeout: Option<Duration>,
     pub auth_token: Option<String>,
+
     #[serde(deserialize_with = "deserialize_eth_address_from_str")]
     #[serde(serialize_with = "serialize_eth_address_to_str")]
     pub registry_addr: Address,
+
     #[serde(deserialize_with = "deserialize_eth_address_from_str")]
     #[serde(serialize_with = "serialize_eth_address_to_str")]
     pub gateway_addr: Address,

@@ -28,9 +28,9 @@
 
 use std::{fmt::Debug, path::PathBuf, sync::Arc};
 
-use anyhow::Context;
+use anyhow::{bail, Context};
 use clap::Parser;
-use common::TestMiddleware;
+use common::{TestMiddleware, ENOUGH_GAS};
 use ethers::providers::StreamExt;
 use ethers::{
     prelude::{abigen, ContractFactory},
@@ -53,9 +53,6 @@ use crate::common::{
 };
 
 mod common;
-
-/// Gas limit to set for transactions.
-const ENOUGH_GAS: u64 = 10_000_000_000u64;
 
 /// Disabling filters helps when inspecting docker logs. The background data received for filters is rather noisy.
 const FILTERS_ENABLED: bool = true;
@@ -81,11 +78,11 @@ pub struct Options {
     /// Secret key used to send funds, expected to be in Base64 format.
     ///
     /// Assumed to exist with a non-zero balance.
-    #[arg(long, short)]
+    #[arg(long)]
     pub secret_key_from: PathBuf,
 
     /// Secret key used to receive funds, expected to be in Base64 format.
-    #[arg(long, short)]
+    #[arg(long)]
     pub secret_key_to: PathBuf,
 
     /// Enable DEBUG logs.
@@ -530,7 +527,7 @@ where
     let contract = SimpleCoin::new(contract.address(), contract.client());
 
     let coin_balance: TestContractCall<_, U256> =
-        prepare_call(&mw, contract.get_balance(from.eth_addr)).await?;
+        prepare_call(&mw, contract.get_balance(from.eth_addr), false).await?;
 
     request("eth_call", coin_balance.call().await, |coin_balance| {
         *coin_balance == U256::from(10000)
@@ -544,6 +541,25 @@ where
         coin_balance.call().await,
         |coin_balance| *coin_balance == U256::from(10000),
     )?;
+
+    // Call a method that does a revert, to check that the message shows up in the return value.
+    // Try to send more than the available balance of 10,000
+    let coin_send: TestContractCall<_, ()> = prepare_call(
+        &mw,
+        contract.send_coin_or_revert(to.eth_addr, U256::from(10000 * 10)),
+        true,
+    )
+    .await
+    .context("failed to prepare revert call")?;
+
+    match coin_send.call().await {
+        Ok(_) => bail!("call should failed with a revert"),
+        Err(e) => {
+            let e = e.to_string();
+            assert!(e.contains("revert"), "should say revert");
+            assert!(e.contains("0x08c379a"), "should have string selector");
+        }
+    }
 
     // We could calculate the storage location of the balance of the owner of the contract,
     // but let's just see what it returns with at slot 0. See an example at

@@ -28,6 +28,8 @@ struct GatewayActorStorage {
     uint64 maxMsgsPerBottomUpBatch;
     /// @notice majority percentage value (must be greater than or equal to 51)
     uint8 majorityPercentage;
+    /// @notice Code commit SHA where this contract is from
+    bytes32 commitSha;
     //
     // == Feature flags ==
     //

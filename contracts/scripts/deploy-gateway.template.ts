@@ -6,6 +6,13 @@ import { ethers } from 'hardhat'
 
 const { getSelectors, FacetCutAction } = require('./js/diamond.js')
 
+function getGitCommitSha(): string {
+    const commitSha = require('child_process')
+        .execSync('git rev-parse --short HEAD')
+        .toString()
+        .trim()
+    return commitSha
+}
 export async function deploy(libs: { [key in string]: string }) {
     if (!libs || Object.keys(libs).length === 0)
         throw new Error(`Libraries are missing`)
@@ -85,6 +92,7 @@ export async function deploy(libs: { [key in string]: string }) {
             libs: xnetMessagingFacetLibs,
         },
         { name: 'TopDownFinalityFacet', libs: topDownFinalityFacetLibs },
+        { name: 'OwnershipFacet', libs: {} },
     ]
 
     for (const facet of facets) {
@@ -114,6 +122,7 @@ export async function deploy(libs: { [key in string]: string }) {
             route: [],
         },
         genesisValidators: [],
+        commitSha: ethers.utils.formatBytes32String(getGitCommitSha()),
     }
 
     const diamondLibs: Libraries = {}

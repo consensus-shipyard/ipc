@@ -2,23 +2,24 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 use anyhow::{anyhow, bail, Ok};
 use async_trait::async_trait;
+use either::Either;
 use ethers::types::H160;
 use fendermint_vm_genesis::Collateral;
-use fvm_shared::econ::TokenAmount;
+use fvm_shared::{chainid::ChainID, econ::TokenAmount};
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::Debug,
     ops::{Add, Sub},
 };
-use tendermint_rpc::Url;
+use url::Url;
 
 use crate::{
     logging::LoggingMaterializer,
     manifest::{Balance, Manifest},
-    materializer::{Materializer, Materials, NodeConfig, SubmitConfig, SubnetConfig},
+    materializer::{Materializer, NodeConfig, RelayerConfig, SubmitConfig, SubnetConfig},
+    materials::Materials,
     testnet::Testnet,
-    AccountName, NodeName, RelayerName, ResourceHash, ResourceName, SubnetName, TestnetId,
-    TestnetName,
+    AccountName, NodeName, RelayerName, ResourceHash, ResourceName, SubnetName, TestnetName,
 };
 
 const DEFAULT_FAUCET_FIL: u64 = 100;
@@ -27,11 +28,11 @@ const DEFAULT_FAUCET_FIL: u64 = 100;
 /// * we are not over allocating the balances
 /// * relayers have balances on the parent to submit transactions
 /// * subnet creators have balances on the parent to submit transactions
-pub async fn validate_manifest(id: &TestnetId, manifest: &Manifest) -> anyhow::Result<()> {
+pub async fn validate_manifest(name: &TestnetName, manifest: &Manifest) -> anyhow::Result<()> {
     let m = ValidatingMaterializer::default();
     // Wrap with logging so that we can debug the tests easier.
     let mut m = LoggingMaterializer::new(m, "validation".to_string());
-    let _ = Testnet::setup(&mut m, id, manifest).await?;
+    let _ = Testnet::setup(&mut m, name, manifest).await?;
     // We could check here that all subnets have enough validators for a quorum.
     Ok(())
 }
@@ -42,7 +43,7 @@ impl Materials for ValidationMaterials {
     type Network = TestnetName;
     type Deployment = SubnetName;
     type Account = AccountName;
-    type Genesis = ();
+    type Genesis = SubnetName;
     type Subnet = SubnetName;
     type Node = NodeName;
     type Relayer = RelayerName;
@@ -128,7 +129,10 @@ impl ValidatingMaterializer {
         amount: TokenAmount,
         credit_child: bool,
     ) -> anyhow::Result<()> {
-        let parent = parent_name(subnet)?;
+        let parent = subnet
+            .parent()
+            .ok_or_else(|| anyhow!("{subnet} must have a parent to fund from"))?;
+
         self.ensure_subnet_exists(&parent)?;
         self.ensure_subnet_exists(subnet)?;
 
@@ -242,13 +246,21 @@ impl Materializer<ValidationMaterials> for ValidatingMaterializer {
             *balance = b.0;
         }
 
-        Ok(())
+        Ok(subnet_name.clone())
+    }
+
+    fn create_root_subnet(
+        &mut self,
+        subnet_name: &SubnetName,
+        _params: Either<ChainID, &VGenesis>,
+    ) -> anyhow::Result<VSubnet> {
+        Ok(subnet_name.clone())
     }
 
     async fn create_node<'s, 'a>(
         &'s mut self,
         node_name: &NodeName,
-        _node_config: NodeConfig<'a, ValidationMaterials>,
+        _node_config: &NodeConfig<'a, ValidationMaterials>,
     ) -> anyhow::Result<VNode>
     where
         's: 'a,
@@ -267,17 +279,17 @@ impl Materializer<ValidationMaterials> for ValidatingMaterializer {
 
     async fn create_subnet<'s, 'a>(
         &'s mut self,
-        _parent_submit_config: &SubmitConfig<'a, ValidationMaterials>,
+        parent_submit_config: &SubmitConfig<'a, ValidationMaterials>,
         subnet_name: &SubnetName,
-        subnet_config: SubnetConfig<'a, ValidationMaterials>,
+        subnet_config: &SubnetConfig<'a, ValidationMaterials>,
     ) -> anyhow::Result<VSubnet>
     where
         's: 'a,
     {
         self.ensure_contains(subnet_name)?;
         // Check that the submitter has balance on the parent subnet to create the child.
-        let parent = parent_name(subnet_name)?;
-        self.ensure_balance(&parent, subnet_config.creator)?;
+        let parent = parent_submit_config.subnet;
+        self.ensure_balance(parent, subnet_config.creator)?;
         // Insert child subnet balances entry.
         self.balances
             .insert(subnet_name.clone(), Default::default());
@@ -324,45 +336,36 @@ impl Materializer<ValidationMaterials> for ValidatingMaterializer {
     async fn create_subnet_genesis<'s, 'a>(
         &'s mut self,
         _parent_submit_config: &SubmitConfig<'a, ValidationMaterials>,
-        _subnet: &'a VSubnet,
+        subnet: &'a VSubnet,
     ) -> anyhow::Result<VGenesis>
     where
         's: 'a,
     {
         // We're supposed to fetch the data from the parent, there's nothing to check.
-        Ok(())
+        Ok(subnet.clone())
     }
 
     async fn create_relayer<'s, 'a>(
         &'s mut self,
-        _parent_submit_config: &SubmitConfig<'a, ValidationMaterials>,
+        parent_submit_config: &SubmitConfig<'a, ValidationMaterials>,
         relayer_name: &RelayerName,
-        subnet: &'a VSubnet,
-        submitter: &'a VAccount,
-        _follow_node: &'a VNode,
+        relayer_config: RelayerConfig<'a, ValidationMaterials>,
     ) -> anyhow::Result<VRelayer>
     where
         's: 'a,
     {
         self.ensure_contains(relayer_name)?;
         // Check that submitter has balance on the parent.
-        let parent = parent_name(subnet)?;
-        self.ensure_balance(&parent, submitter)?;
+        let parent = parent_submit_config.subnet;
+        self.ensure_balance(parent, relayer_config.submitter)?;
         Ok(relayer_name.clone())
     }
-}
-
-/// Get the parent of a subnet, or fail if it doesn't have one.
-fn parent_name(subnet: &SubnetName) -> anyhow::Result<SubnetName> {
-    subnet
-        .parent()
-        .ok_or_else(|| anyhow!("{subnet:?} has no parent"))
 }
 
 #[cfg(test)]
 mod tests {
 
-    use crate::{manifest::Manifest, validation::validate_manifest, TestnetId};
+    use crate::{manifest::Manifest, validation::validate_manifest, TestnetId, TestnetName};
 
     // Unfortunately doesn't seem to work with quickcheck_async
     // /// Run the tests with `RUST_LOG=info` to see the logs, for example:
@@ -377,6 +380,7 @@ mod tests {
     /// Check that the random manifests we generate would pass validation.
     #[quickcheck_async::tokio]
     async fn prop_validation(id: TestnetId, manifest: Manifest) -> anyhow::Result<()> {
-        validate_manifest(&id, &manifest).await
+        let name = TestnetName::new(id);
+        validate_manifest(&name, &manifest).await
     }
 }

@@ -20,7 +20,7 @@ upgrade-gw-diamond:
 	./ops/upgrade-gw-diamond.sh $(NETWORK)
 
 upgrade-sa-diamond:
-	./ops/upgrade-sa-diamond.sh $(NETWORK)
+	./ops/upgrade-sa-diamond.sh $(NETWORK) $(SUBNET_ACTOR_ADDRESS)
 
 upgrade-sr-diamond:
 	./ops/upgrade-sr-diamond.sh $(NETWORK)
@@ -58,12 +58,6 @@ rust-binding:
 
 slither:
 	slither . --config-file ./slither.config.json
-
-check-gateway:
-	docker run --rm -v $(shell pwd):/app -w /app mythril/myth:latest -v4 analyze --solc-json remappings.json ./src/Gateway.sol --solv 0.8.19
-
-check-subnet:
-	docker run --rm -v $(shell pwd):/app -w /app mythril/myth:latest -v4 analyze --solc-json remappings.json ./src/SubnetActor.sol --solv 0.8.19
 
 # ==============================================================================
 # Development support
