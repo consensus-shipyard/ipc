@@ -37,7 +37,7 @@ impl CommandLineHandler for Status {
             "last checkpoint height: {}, chain head {}",
             height, chain_head
         );
-        println!("last submitted checkpoint: {:?}", checkpoint);
+        println!("last submitted checkpoint (@ subnet height {}): {:?}", height, checkpoint);
 
         let max_pending = arguments.max_pending.unwrap_or(DEFAULT_MAX_PENDING);
 
