@@ -66,7 +66,7 @@ pub(crate) struct StatusArgs {
     pub subnet: String,
     #[arg(
         long,
-        help = "The max number of pending checkpoint to print, default 10"
+        help = "Limit unsubmitted checkpoints to print (looking forward from last submitted), default: 10"
     )]
     pub max_pending: Option<usize>,
 }
