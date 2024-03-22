@@ -34,7 +34,7 @@ impl CommandLineHandler for Status {
         let chain_head = provider.get_chain_head_height(&subnet).await?;
 
         println!(
-            "last checkpoint height: {}, chain head {}",
+            "subnet chain head height: {}",
             height, chain_head
         );
         println!("last submitted checkpoint (@ subnet height {}): {:?}", height, checkpoint);
