@@ -393,7 +393,7 @@ mod tests {
     fn test_subnet_ancestors() {
         let tn = TestnetName::new("example");
         let sn = tn.root().subnet("foo").subnet("bar");
-        assert_eq!(sn.ancestors(), vec![tn.root(), tn.root().subnet("foo")]);
+        assert_eq!(sn.ancestors(), [tn.root(), tn.root().subnet("foo")]);
     }
 
     #[test]
@@ -405,7 +405,7 @@ mod tests {
 
         let hops0 = bar.ancestor_hops(false);
         let hops1 = bar.ancestor_hops(true);
-        let hops = vec![(rn, foo.clone()), (foo, bar)];
+        let hops = [(rn, foo.clone()), (foo, bar)];
 
         assert_eq!(hops0[..], hops[..1]);
         assert_eq!(hops1[..], hops[..]);
