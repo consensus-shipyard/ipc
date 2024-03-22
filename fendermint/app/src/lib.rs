@@ -3,6 +3,7 @@
 mod app;
 pub mod events;
 pub mod ipc;
+pub mod metrics;
 mod store;
 mod tmconv;
 

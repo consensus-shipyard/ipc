@@ -8,23 +8,26 @@ license.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
+async-stm = { workspace = true }
 async-trait = { workspace = true }
 bytes = { workspace = true }
 cid = { workspace = true }
 hex = { workspace = true }
 k256 = { workspace = true }
+lazy_static = { workspace = true }
 libipld = { workspace = true }
 libp2p = { workspace = true }
 libp2p-bitswap = { workspace = true }
 multiaddr = { workspace = true }
 num-traits = { workspace = true }
 openssl = { workspace = true }
+paste = { workspace = true }
+prometheus = { workspace = true }
 prost = { workspace = true }
 rand_chacha = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_with = { workspace = true }
-async-stm = { workspace = true }
 tendermint = { workspace = true }
 tendermint-config = { workspace = true }
 tendermint-rpc = { workspace = true }

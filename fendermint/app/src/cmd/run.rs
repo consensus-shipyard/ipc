@@ -64,6 +64,13 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         tendermint_rpc::HttpClient::new(tendermint_rpc_url)
             .context("failed to create Tendermint client")?;
 
+    // Register metrics
+    let metrics_registry = prometheus::Registry::new();
+    // TODO: Serve metrics over HTTP
+
+    fendermint_app::metrics::register_app_metrics(&metrics_registry)
+        .context("failed to register metrics")?;
+
     let validator = match settings.validator_key {
         Some(ref key) => {
             let sk = key.path(settings.home_dir());
@@ -135,8 +142,13 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
 
     // If enabled, start a resolver that communicates with the application through the resolve pool.
     if settings.resolver_enabled() {
-        let service =
+        let mut service =
             make_resolver_service(&settings, db.clone(), state_store.clone(), ns.bit_store)?;
+
+        // Register all metrics from the IPLD resolver stack;
+        service
+            .register_metrics(&metrics_registry)
+            .context("failed to register IPLD resolver metrics")?;
 
         let client = service.client();
 

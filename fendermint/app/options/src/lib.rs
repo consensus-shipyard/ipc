@@ -169,6 +169,11 @@ impl Options {
             .cloned()
             .unwrap_or(self.home_dir.join("config"))
     }
+
+    /// Check if metrics are supposed to be collected.
+    pub fn metrics_enabled(&self) -> bool {
+        matches!(self.command, Commands::Rpc(_) | Commands::Eth(_))
+    }
 }
 
 #[allow(clippy::large_enum_variant)]
