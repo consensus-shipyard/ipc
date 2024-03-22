@@ -21,6 +21,8 @@ import {LinkedTokenController} from "../src/LinkedTokenController.sol";
 //import {InvalidOriginContract, InvalidOriginSubnet} from "../src/@ipc/src/examples/cross-token/IpcCrossTokenErrors.sol";
 import {USDCTest} from "../src/USDCTest.sol";
 
+import "openzeppelin-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+
 contract IpcTokenControllerTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
 
@@ -51,11 +53,7 @@ contract IpcTokenControllerTest is Test, IntegrationTestBase {
         require(controllerSubnet.isRoot(), "not root");
         rootGateway = createGatewayDiamond(gatewayParams(controllerSubnet));
         gateway = address(rootGateway);
-        replica = new LinkedTokenReplica(
-            gateway,
-            controllerSubnetUSDC,
-            controllerSubnet
-        );
+
         rootNativeSubnetActor = createSubnetActor(
             defaultSubnetActorParamsWith(address(rootGateway), controllerSubnet)
         );
@@ -74,14 +72,37 @@ contract IpcTokenControllerTest is Test, IntegrationTestBase {
             rootGateway
         );
 
-        controller = new LinkedTokenController(
+        //set up controller with proxy
+        LinkedTokenController initialControllerImplementation = new LinkedTokenController();
+        TransparentUpgradeableProxy transparentProxyController = new TransparentUpgradeableProxy(address(initialControllerImplementation), address(this), "");
+        controller = LinkedTokenController(address(transparentProxyController));
+
+
+        //set up replica with proxy
+        LinkedTokenReplica initialReplicaImplementation = new LinkedTokenReplica();
+        TransparentUpgradeableProxy transparentProxyReplica = new TransparentUpgradeableProxy(address(initialReplicaImplementation), address(this), "");
+        replica = LinkedTokenReplica(address(transparentProxyReplica));
+
+
+        // initialize controller & replica
+
+        controller.initialize(
             gateway,
             controllerSubnetUSDC,
-            replicaSubnetName
+            replicaSubnetName,
+            address(replica)
         );
 
-        replica.initialize(address(controller));
-        controller.initialize(address(replica));
+        replica.initialize(
+            gateway,
+            controllerSubnetUSDC,
+            controllerSubnet,
+            address(controller)
+        );
+
+
+
+
     }
 
     function testHandleIpcMessageOrigin() public {

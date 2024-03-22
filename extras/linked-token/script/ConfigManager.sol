@@ -33,7 +33,7 @@ contract ConfigManager is Script {
             jsonData = vm.readFile(path);
         } else {
             // If the file doesn't exist, initialize an empty JSON object
-            jsonData = "{\"LinkedToken\":{\"USDCTest\":{}, \"LinkedTokenReplica\":{}, \"LinkedTokenController\":{}}}";
+            jsonData = "{\"LinkedToken\":{\"USDCTest\":{}, \"LinkedTokenReplica\":{}, \"LinkedTokenController\":{}, \"LinkedTokenControllerImplementation\":{}, \"LinkedTokenReplicaImplementation\":{}}}";
             vm.writeJson(jsonData, path);
         }
 
