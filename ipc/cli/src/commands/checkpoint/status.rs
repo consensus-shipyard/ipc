@@ -39,7 +39,7 @@ impl CommandLineHandler for Status {
         );
         println!("last submitted checkpoint (@ subnet height {}): {:?}", height, checkpoint);
 
-        let max_pending = arguments.max_pending.unwrap_or(DEFAULT_MAX_PENDING);
+        let limit_unsubmitted = arguments.limit_unsubmitted.unwrap_or(DEFAULT_LIMIT_UNSUBMITTED);
 
         let start = height + 1;
         let ending = max_unsubmitted as ChainEpoch * period + start;
