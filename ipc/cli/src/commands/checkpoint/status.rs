@@ -51,7 +51,7 @@ impl CommandLineHandler for Status {
             }
         }
         println!(
-            "there are at least {} number of check ahead",
+            "there are at least {} unsubmitted checkpoints (limiting query to: {})", limit_unsubmitted
             checkpoints_ahead
         );
 
