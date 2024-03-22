@@ -14,9 +14,8 @@ use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use lazy_static::lazy_static;
-use serde::de::Error;
 use serde::ser::SerializeSeq;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer};
 use serde_with::serde_as;
 use std::fmt::{Display, Formatter};
 
@@ -53,12 +52,12 @@ impl Display for QuorumReachedEvent {
 }
 
 /// The collection of items for the bottom up checkpoint submission
+#[serde_as]
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
 pub struct BottomUpCheckpointBundle {
     pub checkpoint: BottomUpCheckpoint,
     /// The list of signatures that have signed the checkpoint hash
-    #[serde(deserialize_with = "deserialize_vec_bytes_from_vec_hex")]
-    #[serde(serialize_with = "serialize_vec_bytes_to_vec_hex")]
+    #[serde_as(as = "Vec<HumanReadable>")]
     pub signatures: Vec<Signature>,
     /// The list of addresses that have signed the checkpoint hash
     pub signatories: Vec<Address>,
@@ -97,23 +96,6 @@ pub struct BottomUpCheckpoint {
     pub msgs: Vec<IpcEnvelope>,
 }
 
-fn deserialize_vec_bytes_from_vec_hex<'de, D>(
-    deserializer: D,
-) -> anyhow::Result<Vec<Vec<u8>>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let data = <Vec<String>>::deserialize(deserializer)?;
-
-    let mut ret = Vec::new();
-    for s in data {
-        let s =
-            hex::decode(&s).map_err(|_| D::Error::custom(format!("cannot decode hex: {}", s)))?;
-        ret.push(s);
-    }
-    Ok(ret)
-}
-
 pub fn serialize_vec_bytes_to_vec_hex<T: AsRef<[u8]>, S>(
     data: &[T],
     s: S,
@@ -131,9 +113,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::address::IPCAddress;
-    use crate::checkpoint::{
-        deserialize_vec_bytes_from_vec_hex, serialize_vec_bytes_to_vec_hex, Signature,
-    };
+    use crate::checkpoint::Signature;
     use crate::subnet_id::SubnetID;
     use crate::HumanReadable;
     use fvm_shared::address::Address;
@@ -146,8 +126,7 @@ mod tests {
         #[serde_as]
         #[derive(Debug, Serialize, Deserialize, PartialEq)]
         struct T {
-            #[serde(deserialize_with = "deserialize_vec_bytes_from_vec_hex")]
-            #[serde(serialize_with = "serialize_vec_bytes_to_vec_hex")]
+            #[serde_as(as = "Vec<HumanReadable>")]
             d: Vec<Signature>,
             #[serde_as(as = "HumanReadable")]
             subnet_id: SubnetID,
