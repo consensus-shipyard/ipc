@@ -62,7 +62,7 @@ impl CommandLineHandler for Status {
 #[derive(Debug, Args)]
 #[command(about = "List bottom up checkpoint status of the subnet")]
 pub(crate) struct StatusArgs {
-    #[arg(long, help = "The target subnet to check status")]
+    #[arg(long, help = "The subnet to inspect")]
     pub subnet: String,
     #[arg(
         long,
