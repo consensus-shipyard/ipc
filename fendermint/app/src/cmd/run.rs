@@ -304,7 +304,10 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
 
     // Start the metrics on a background thread.
     if let Some(registry) = metrics_registry {
-        info!("serving metrics on {}", settings.metrics.listen.to_string());
+        info!(
+            listen_addr = settings.metrics.listen.to_string(),
+            "serving metrics"
+        );
         let mut builder = prometheus_exporter::Builder::new(settings.metrics.listen.try_into()?);
         builder.with_registry(registry);
         let _ = builder.start().context("failed to start metrics server")?;

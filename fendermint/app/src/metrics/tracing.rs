@@ -10,6 +10,7 @@ use tracing_subscriber::{filter, layer, registry::LookupSpan, Layer};
 use super::prometheus::app as am;
 use crate::events::*;
 
+/// Create a layer that handles events by incrementing metrics.
 pub fn layer<S>() -> impl Layer<S>
 where
     S: Subscriber,
@@ -32,10 +33,11 @@ impl<S> MetricsLayer<S> {
     }
 }
 
+/// Check that the field exist on a type; if it doesn't this won't compile.
+/// This ensures that we're mapping fields with the correct name.
 macro_rules! check_field {
     ($event_ty:ident :: $field:ident) => {{
         if false {
-            // Check that the field exist; if it doesn't this won't compile.
             let _event = $event_ty {
                 $field: Default::default(),
                 ..Default::default()
@@ -44,6 +46,7 @@ macro_rules! check_field {
     }};
 }
 
+/// Set a gague to an absolute value based on a field in an event.
 macro_rules! set_gauge {
     ($event:ident, $event_ty:ident :: $field:ident, $gauge:expr) => {
         check_field!($event_ty::$field);
@@ -53,6 +56,7 @@ macro_rules! set_gauge {
     };
 }
 
+/// Increment a counter by the value of a field in the event.
 macro_rules! inc_counter {
     ($event:ident, $event_ty:ident :: $field:ident, $counter:expr) => {
         check_field!($event_ty::$field);
@@ -62,18 +66,21 @@ macro_rules! inc_counter {
     };
 }
 
+/// Produce the prefixed event name from the type name.
 macro_rules! event_name {
     ($event_ty:ident) => {
         concat!("event::", stringify!($event_ty))
     };
 }
 
+/// Call one of the macros that set values on a metric.
 macro_rules! event_mapping {
     ($op:ident, $event:ident, $event_ty:ident :: $field:ident, $metric:expr) => {
         $op!($event, $event_ty::$field, $metric);
     };
 }
 
+/// Match the event name to event DTO types and within the map fields to metrics.
 macro_rules! event_match {
     ($event:ident { $( $event_ty:ident { $( $field:ident => $op:ident ! $metric:expr  ),* $(,)? } ),* } ) => {
         match $event.metadata().name() {
@@ -126,10 +133,29 @@ mod visitors {
         }
     }
 
+    // Looking for multiple values because the callsite might be passed as a literal which turns into an i64 for example.
     impl<'a> Visit for FindU64<'a> {
         fn record_u64(&mut self, field: &Field, value: u64) {
             if field.name() == self.name {
                 self.value = value;
+            }
+        }
+
+        fn record_i64(&mut self, field: &Field, value: i64) {
+            if field.name() == self.name {
+                self.value = value as u64;
+            }
+        }
+
+        fn record_i128(&mut self, field: &Field, value: i128) {
+            if field.name() == self.name {
+                self.value = value as u64;
+            }
+        }
+
+        fn record_u128(&mut self, field: &Field, value: u128) {
+            if field.name() == self.name {
+                self.value = value as u64;
             }
         }
 
