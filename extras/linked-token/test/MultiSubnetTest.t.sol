@@ -21,6 +21,9 @@ import {
 } from "@ipc/test/helpers/SubnetActorFacetsHelper.sol";
 import {LinkedTokenController} from "../src/LinkedTokenController.sol";
 import {LinkedTokenReplica} from "../src/LinkedTokenReplica.sol";
+
+import {LinkedTokenControllerV2} from "./LinkedTokenControllerV2.sol";
+import {LinkedTokenReplicaV2} from "./LinkedTokenReplicaV2.sol";
 import {USDCTest} from "../src/USDCTest.sol";
 
 import {
@@ -277,11 +280,17 @@ contract MultiSubnetTest is IntegrationTestBase {
                     address(ipcTokenReplica)
                 )
             );
-        LinkedTokenController newControllerImplementation =
-            new LinkedTokenController();
+        LinkedTokenControllerV2 newControllerImplementation =
+            new LinkedTokenControllerV2();
         ipcTokenController.upgradeToAndCall(
             address(newControllerImplementation),
             initCallController
+        );
+
+        require(
+            LinkedTokenControllerV2(address(ipcTokenController))
+                .newFunctionReturns7() == 7,
+            "controller upgrade failed"
         );
     }
 
@@ -296,10 +305,16 @@ contract MultiSubnetTest is IntegrationTestBase {
                     address(ipcTokenController)
                 )
             );
-        LinkedTokenReplica newReplicaImplementation = new LinkedTokenReplica();
+        LinkedTokenReplicaV2 newReplicaImplementation =
+            new LinkedTokenReplicaV2();
         ipcTokenReplica.upgradeToAndCall(
             address(newReplicaImplementation),
             initCallReplica
+        );
+        require(
+            LinkedTokenReplicaV2(address(ipcTokenReplica))
+                .newFunctionReturns8() == 8,
+            "replica upgrade failed"
         );
     }
 
