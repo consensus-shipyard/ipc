@@ -160,13 +160,33 @@ contract MultiSubnetTest is IntegrationTestBase {
         // set linked contract controller & replica
         ipcTokenController.setLinkedContract(address(ipcTokenReplica));
         ipcTokenReplica.setLinkedContract(address(ipcTokenController));
-
-
-
-
     }
 
     function testMultiSubnet_Native_FundFromParentToChild_USDCBridge() public {
+        _testLinkedTokenBridge();
+    }
+
+    function testMultiSubnet_Native_FundFromParentToChild_USDCBridge_UPGRADE() public {
+        upgradeController();
+        upgradeReplica();
+        _testLinkedTokenBridge();
+    }
+
+
+    function upgradeController() public {
+        bytes memory initCallController = abi.encodeCall(LinkedTokenController.reinitialize, ( address(rootGateway), address(testUSDC), nativeSubnetName, address(ipcTokenReplica)));
+        LinkedTokenController newControllerImplementation = new LinkedTokenController();
+        ipcTokenController.upgradeToAndCall(address(newControllerImplementation), initCallController);
+    }
+    function upgradeReplica() public {
+        bytes memory initCallReplica = abi.encodeCall(LinkedTokenReplica.reinitialize, ( address(nativeSubnetGateway), address(testUSDC), rootSubnetName, address(ipcTokenController)));
+        LinkedTokenReplica newReplicaImplementation = new LinkedTokenReplica();
+        ipcTokenReplica.upgradeToAndCall(address(newReplicaImplementation), initCallReplica);
+
+    }
+
+
+    function _testLinkedTokenBridge() public {
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         IpcEnvelope memory expected;
 
