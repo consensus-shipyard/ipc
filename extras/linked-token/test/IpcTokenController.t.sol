@@ -23,6 +23,10 @@ import {USDCTest} from "../src/USDCTest.sol";
 
 import "openzeppelin-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
+string constant REPLICA_TOKEN_NAME="USDCTestReplica";
+string constant REPLICA_TOKEN_SYMBOL="USDCtR";
+uint8 constant REPLICA_TOKEN_DECIMALS=6;
+
 contract IpcTokenControllerTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
 
@@ -107,7 +111,10 @@ contract IpcTokenControllerTest is Test, IntegrationTestBase {
             gateway,
             controllerSubnetUSDC,
             controllerSubnet,
-            address(controller)
+            address(controller),
+            REPLICA_TOKEN_NAME,
+            REPLICA_TOKEN_SYMBOL,
+            REPLICA_TOKEN_DECIMALS
         );
     }
 

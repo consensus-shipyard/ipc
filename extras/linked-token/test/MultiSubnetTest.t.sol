@@ -69,6 +69,10 @@ import "forge-std/console.sol";
 
 import "openzeppelin-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
+string constant REPLICA_TOKEN_NAME="USDCTestReplica";
+string constant REPLICA_TOKEN_SYMBOL="USDCtR";
+uint8 constant REPLICA_TOKEN_DECIMALS=6;
+
 contract MultiSubnetTest is IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
     using GatewayFacetsHelper for GatewayDiamond;
@@ -231,7 +235,10 @@ contract MultiSubnetTest is IntegrationTestBase {
                     address(nativeSubnetGateway),
                     address(testUSDC),
                     rootSubnetName,
-                    0x0000000000000000000000000000000000000000
+                    0x0000000000000000000000000000000000000000,
+                    REPLICA_TOKEN_NAME,
+                    REPLICA_TOKEN_SYMBOL,
+                    REPLICA_TOKEN_DECIMALS
                 )
             );
         TransparentUpgradeableProxy transparentProxyReplica =
@@ -302,7 +309,10 @@ contract MultiSubnetTest is IntegrationTestBase {
                     address(nativeSubnetGateway),
                     address(testUSDC),
                     rootSubnetName,
-                    address(ipcTokenController)
+                    address(ipcTokenController),
+            REPLICA_TOKEN_NAME,
+            REPLICA_TOKEN_SYMBOL,
+            REPLICA_TOKEN_DECIMALS
                 )
             );
         LinkedTokenReplicaV2 newReplicaImplementation =
