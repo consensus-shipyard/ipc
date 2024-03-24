@@ -11,11 +11,19 @@ import {
 import {IERC20} from "openzeppelin-contracts/interfaces/IERC20.sol";
 import {SubnetID} from "@ipc/src/structs/Subnet.sol";
 
+import {
+    UUPSUpgradeable
+} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+
 // @notice The IpcTokenSender can be deployed in an Axelar-supported L1 containing the canonical version of some ERC20
 //         token (e.g. Ethereum, Polygon, etc.) we want to transfer to an token-supply IPC subnet anchored on another
 //         Axelar-supported L1 (e.g. Filecoin). The duo of IpcTokenSender and IpcTokenkHandler achieve this in a single
 //         atomic step.
-contract IpcTokenSender is Initializable {
+contract IpcTokenSender is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     IInterchainTokenService public _axelarIts;
     string public _destinationChain;
     bytes public _destinationTokenHandler;
@@ -35,7 +43,30 @@ contract IpcTokenSender is Initializable {
         _destinationTokenHandler = AddressBytes.toBytes(
             destinationTokenHandler
         );
+        __Ownable_init();
+        __UUPSUpgradeable_init();
     }
+
+    function reinitialize(
+        address axelarIts,
+        string memory destinationChain,
+        address destinationTokenHandler
+    ) public reinitializer(2) {
+        _axelarIts = IInterchainTokenService(axelarIts);
+        _destinationChain = destinationChain;
+        _destinationTokenHandler = AddressBytes.toBytes(
+            destinationTokenHandler
+        );
+        __Ownable_init();
+        __UUPSUpgradeable_init();
+    }
+
+    // upgrade proxy - onlyOwner can upgrade
+    function _authorizeUpgrade(address newImplementation)
+        internal
+        override
+        onlyOwner
+    {}
 
     function fundSubnet(
         bytes32 tokenId,

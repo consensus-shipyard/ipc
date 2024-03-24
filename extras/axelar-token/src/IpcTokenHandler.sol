@@ -13,6 +13,13 @@ import { SubnetIDHelper } from "@ipc/src/lib/SubnetIDHelper.sol";
 
 import { InterchainTokenExecutableUpgradeable } from './InterchainTokenExecutableUpgradeable.sol';
 
+import {
+    UUPSUpgradeable
+} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+
+
 
 
 interface TokenFundedGateway {
@@ -27,8 +34,7 @@ interface SubnetActor {
 //         IpcTokenSender via the Axelar ITS, receiving some token value to deposit into an IPC subnet (specified in the
 //         incoming message). The IpcTokenHandler handles deposit failures by crediting the value back to the original
 //         beneficiary, and making it available from them to withdraw() on the rootnet.
-contract IpcTokenHandler is Initializable, InterchainTokenExecutableUpgradeable, IpcHandler {
-
+contract IpcTokenHandler is Initializable, InterchainTokenExecutableUpgradeable, IpcHandler,  OwnableUpgradeable, UUPSUpgradeable {
     using FvmAddressHelper for address;
     using FvmAddressHelper for FvmAddress;
     using SubnetIDHelper for SubnetID;
@@ -50,8 +56,24 @@ contract IpcTokenHandler is Initializable, InterchainTokenExecutableUpgradeable,
     function initialize(address axelarIts, address ipcGateway) public initializer {
         __InterchainTokenExecutable_init(axelarIts);
         _ipcGateway = TokenFundedGateway(ipcGateway);
+         __Ownable_init();
+        __UUPSUpgradeable_init();
     }
     
+    function reinitialize(address axelarIts, address ipcGateway) public reinitializer(2) {
+        __InterchainTokenExecutable_init(axelarIts);
+        _ipcGateway = TokenFundedGateway(ipcGateway);
+         __Ownable_init();
+        __UUPSUpgradeable_init();
+    }
+    
+    // upgrade proxy - onlyOwner can upgrade
+    function _authorizeUpgrade(address newImplementation)
+        internal
+        override
+        onlyOwner
+    {}
+
     // @notice The InterchainTokenExecutable abstract parent contract hands off to this function after verifying that
     //         the call originated at the Axelar ITS.
     function _executeWithInterchainToken(
