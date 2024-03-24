@@ -134,10 +134,6 @@ else
 fi
 """
 
-#[tasks.subnet-genesis-set-eam-permissions]
-#extend = "fendermint-tool"
-#env = { "CMD" = "genesis --genesis-file /data/genesis.json set-eam-permissions --mode unrestricted" }
-
 [tasks.node-report]
 script = """cat << EOF
 #################################
