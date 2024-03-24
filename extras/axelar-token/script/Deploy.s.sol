@@ -9,43 +9,82 @@ import "../src/IpcTokenSender.sol";
 contract Deploy is Script {
     function setUp() public {}
 
+    function deployTokenHandlerImplementation() public {
+        string memory network = vm.envString("DEST_NETWORK");
+        uint256 privateKey = vm.envUint(string.concat(network, "__PRIVATE_KEY"));
+
+        console.log("deploying token handler implementation to %s...", network);
+
+        vm.startBroadcast(privateKey);
+        IpcTokenHandler initialImplementation = new IpcTokenHandler();
+        vm.stopBroadcast();
+
+        console.log("token handler implementation deployed on %s: %s", network, address(initialImplementation));
+        string memory key = "out";
+        vm.serializeString(key, "network", network);
+
+        string memory path = getPath();
+        string memory json = vm.serializeAddress(key, "token_handler_implementation", address(initialImplementation));
+        vm.writeJson(json, path, ".dest");
+    }
+
     function deployTokenHandler() public {
+
         string memory network = vm.envString("DEST_NETWORK");
         uint256 privateKey = vm.envUint(string.concat(network, "__PRIVATE_KEY"));
 
         console.log("deploying token handler to %s...", network);
+        checkPathExists();
+        string memory path = getPath();
+
+        console.log("loading handler implementation address...");
+        string memory readJson = vm.readFile(path);
+        address handlerAddrImplementation = vm.parseJsonAddress(readJson, ".dest.token_handler_implementation");
+        console.log("handler implementation address: %s", handlerAddrImplementation);
+
+
+        address axelarIts= vm.envAddress(string.concat(network, "__AXELAR_ITS_ADDRESS"));
+        address ipcGateway= vm.envAddress(string.concat(network, "__IPC_GATEWAY_ADDRESS"));
+
+        bytes memory initCall = abi.encodeCall(IpcTokenHandler.initialize, (axelarIts, ipcGateway));
 
         vm.startBroadcast(privateKey);
-
-        IpcTokenHandler initialImplementation = new IpcTokenHandler();
-        bytes memory initCall = abi.encodeCall(IpcTokenHandler.initialize, (axelarIts, ipcGateway));
-        TransparentUpgradeableProxy transparentProxy = new TransparentUpgradeableProxy(address(initialImplementation), address(this), initCall);
-        IpcTokenHandler handler = IpcTokenHandler(address(transparentProxy));
+        TransparentUpgradeableProxy transparentProxy = new TransparentUpgradeableProxy(handlerAddrImplementation, address(msg.sender), initCall);
         vm.stopBroadcast();
 
+        IpcTokenHandler handler = IpcTokenHandler(address(transparentProxy));
+
         console.log("token handler deployed on %s: %s", network, address(handler));
-
-        string memory path = string.concat(vm.projectRoot(), "/out/addresses.json");
-        if (!vm.exists(path)) {
-            vm.writeJson("{\"dest\":{\"token_handler\":{}},\"src\":{\"token_sender\":{}}}", path);
-        }
-
         string memory key = "out";
         vm.serializeString(key, "network", network);
+
         string memory json = vm.serializeAddress(key, "token_handler", address(handler));
-        vm.writeJson(json, path, ".dest");
+        string memory finalJson = vm.serializeAddress(json, "token_handler_implementation", handlerAddrImplementation);
+        vm.writeJson(finalJson, path, ".dest");
     }
 
+    function getPath() public returns (string memory path) {
+            path = string.concat(vm.projectRoot(), "/out/addresses.json");
+            if (!vm.exists(path)) {
+                vm.writeJson("{\"dest\":{\"token_handler\":{}, \"token_handler_implementation\":{} },\"src\":{\"token_sender\":{}, \"token_sender_implementation\":{}}}", path);
+            }
+    }
+
+    function checkPathExists() public {
+        string memory path = string.concat(vm.projectRoot(), "/out/addresses.json");
+        require(vm.exists(path), "no addresses.json; please run DeployTokenHandler on the destination chain");
+    }
+
+    function deployTokenSenderImplementation() public {
+    }
     function deployTokenSender() public {
         string memory originNetwork = vm.envString("ORIGIN_NETWORK");
         string memory destNetwork = vm.envString("DEST_NETWORK");
         uint256 privateKey = vm.envUint(string.concat(originNetwork, "__PRIVATE_KEY"));
+        checkPathExists();
+        string memory path = getPath();
 
         console.log("loading handler address...");
-
-        string memory path = string.concat(vm.projectRoot(), "/out/addresses.json");
-        require(vm.exists(path), "no addresses.json; please run DeployTokenHandler on the destination chain");
-
         string memory json = vm.readFile(path);
         address handlerAddr = vm.parseJsonAddress(json, ".dest.token_handler");
         console.log("handler address: %s", handlerAddr);
@@ -55,14 +94,15 @@ contract Deploy is Script {
         // Deploy the sender on Mumbai.
         vm.startBroadcast(privateKey);
 
+
+        address axelarIts= vm.envAddress(string.concat(destNetwork, "__AXELAR_ITS_ADDRESS"));
+        string memory destinationChain= vm.envString(string.concat(destNetwork, "__AXELAR_CHAIN_NAME"));
+
+        bytes memory initCall = abi.encodeCall(IpcTokenSender.initialize, (axelarIts, destinationChain, handlerAddr));
+
         IpcTokenSender initialImplementation = new IpcTokenSender();
-        TransparentUpgradeableProxy transparentProxy = new TransparentUpgradeableProxy(address(initialImplementation), address(this), "");
+        TransparentUpgradeableProxy transparentProxy = new TransparentUpgradeableProxy(address(initialImplementation), address(msg.sender), initCall);
         IpcTokenSender sender = IpcTokenSender(address(transparentProxy));
-        sender.initialize({
-            axelarIts: vm.envAddress(string.concat(originNetwork, "__AXELAR_ITS_ADDRESS")),
-            destinationChain: vm.envString(string.concat(destNetwork, "__AXELAR_CHAIN_NAME")),
-            destinationTokenHandler: handlerAddr
-        });
 
         vm.stopBroadcast();
 
