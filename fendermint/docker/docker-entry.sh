@@ -5,11 +5,11 @@
 CMD=$1
 
 if [[ $CMD == 'ipc-cli' ]]; then
-  exec -t ipc-cli "${@:2}"
+  ipc-cli "${@:2}"
 else
   if (( $# == 0)); then
-    exec fendermint
+    fendermint
   else
-    exec fendermint "$@"
+    fendermint "$@"
   fi
 fi
