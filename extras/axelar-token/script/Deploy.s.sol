@@ -18,13 +18,9 @@ contract Deploy is Script {
         vm.startBroadcast(privateKey);
 
         IpcTokenHandler initialImplementation = new IpcTokenHandler();
-        TransparentUpgradeableProxy transparentProxy = new TransparentUpgradeableProxy(address(initialImplementation), address(this), "");
+        bytes memory initCall = abi.encodeCall(IpcTokenHandler.initialize, (axelarIts, ipcGateway));
+        TransparentUpgradeableProxy transparentProxy = new TransparentUpgradeableProxy(address(initialImplementation), address(this), initCall);
         IpcTokenHandler handler = IpcTokenHandler(address(transparentProxy));
-        handler.initialize({
-            axelarIts: vm.envAddress(string.concat(network, "__AXELAR_ITS_ADDRESS")),
-            ipcGateway: vm.envAddress(string.concat(network, "__IPC_GATEWAY_ADDRESS"))
-        });
-
         vm.stopBroadcast();
 
         console.log("token handler deployed on %s: %s", network, address(handler));
