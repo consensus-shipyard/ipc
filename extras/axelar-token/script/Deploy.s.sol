@@ -59,8 +59,8 @@ contract Deploy is Script {
         vm.serializeString(key, "network", network);
 
         string memory json = vm.serializeAddress(key, "token_handler", address(handler));
-        string memory finalJson = vm.serializeAddress(json, "token_handler_implementation", handlerAddrImplementation);
-        vm.writeJson(finalJson, path, ".dest");
+        json = vm.serializeAddress(key, "token_handler_implementation", handlerAddrImplementation);
+        vm.writeJson(json, path, ".dest");
     }
 
     function getPath() public returns (string memory path) {
