@@ -28,7 +28,7 @@ contract Deploy is Script {
         vm.writeJson(json, path, ".dest");
     }
 
-    function deployTokenHandler() public {
+    function deployTokenHandlerProxy() public {
 
         string memory network = vm.envString("DEST_NETWORK");
         uint256 privateKey = vm.envUint(string.concat(network, "__PRIVATE_KEY"));
@@ -76,18 +76,41 @@ contract Deploy is Script {
     }
 
     function deployTokenSenderImplementation() public {
+        string memory originNetwork = vm.envString("ORIGIN_NETWORK");
+        uint256 privateKey = vm.envUint(string.concat(originNetwork, "__PRIVATE_KEY"));
+        checkPathExists();
+        string memory path = getPath();
+
+        console.log("deploying token sender implementation to %s...", originNetwork);
+
+        vm.startBroadcast(privateKey);
+        IpcTokenSender initialImplementation = new IpcTokenSender();
+        vm.stopBroadcast();
+
+        console.log("token sender implementation deployed on %s: %s", originNetwork, address(initialImplementation));
+        string memory key = "out";
+        vm.serializeString(key, "network", originNetwork);
+
+        string memory json = vm.serializeAddress(key, "token_sender_implementation", address(initialImplementation));
+        vm.writeJson(json, path, ".src");
     }
-    function deployTokenSender() public {
+
+    function deployTokenSenderProxy() public {
         string memory originNetwork = vm.envString("ORIGIN_NETWORK");
         string memory destNetwork = vm.envString("DEST_NETWORK");
         uint256 privateKey = vm.envUint(string.concat(originNetwork, "__PRIVATE_KEY"));
         checkPathExists();
         string memory path = getPath();
 
-        console.log("loading handler address...");
+        console.log("loading handler proxy address...");
         string memory json = vm.readFile(path);
         address handlerAddr = vm.parseJsonAddress(json, ".dest.token_handler");
-        console.log("handler address: %s", handlerAddr);
+        console.log("handler proxy address: %s", handlerAddr);
+
+        console.log("loading sender implementation address...");
+        address senderImplementationAddr = vm.parseJsonAddress(json, ".src.token_sender_implementation");
+        console.log("sender implementation: %s", handlerAddr);
+
 
         console.log("deploying token sender to %s...", originNetwork);
 
@@ -100,8 +123,7 @@ contract Deploy is Script {
 
         bytes memory initCall = abi.encodeCall(IpcTokenSender.initialize, (axelarIts, destinationChain, handlerAddr));
 
-        IpcTokenSender initialImplementation = new IpcTokenSender();
-        TransparentUpgradeableProxy transparentProxy = new TransparentUpgradeableProxy(address(initialImplementation), address(msg.sender), initCall);
+        TransparentUpgradeableProxy transparentProxy = new TransparentUpgradeableProxy(address(senderImplementationAddr), address(msg.sender), initCall);
         IpcTokenSender sender = IpcTokenSender(address(transparentProxy));
 
         vm.stopBroadcast();
@@ -111,6 +133,7 @@ contract Deploy is Script {
         string memory key = "out";
         vm.serializeString(key, "network", originNetwork);
         json = vm.serializeAddress(key, "token_sender", address(sender));
+        json = vm.serializeAddress(key, "token_sender_implementation", senderImplementationAddr);
         vm.writeJson(json, path, ".src");
     }
 }
