@@ -125,7 +125,18 @@ env = { "CMD" = "genesis --genesis-file /data/genesis.json ipc from-parent --sub
 
 [tasks.subnet-genesis-set-eam-permissions]
 extend = "fendermint-tool"
-env = { "CMD" = "genesis --genesis-file /data/genesis.json set-eam-permissions --mode unrestricted" }
+script.pre = """
+echo "ALLOWED_ADDR_LIST=${ALLOWED_ADDR_LIST}"
+if [[ ! -z ${ALLOWED_ADDR_LIST} ]]; then
+  CMD="genesis --genesis-file /data/genesis.json set-eam-permissions --mode allowlist --addresses ${ALLOWED_ADDR_LIST}"
+else
+  CMD="genesis --genesis-file /data/genesis.json set-eam-permissions --mode unrestricted"
+fi
+"""
+
+#[tasks.subnet-genesis-set-eam-permissions]
+#extend = "fendermint-tool"
+#env = { "CMD" = "genesis --genesis-file /data/genesis.json set-eam-permissions --mode unrestricted" }
 
 [tasks.node-report]
 script = """cat << EOF

@@ -59,6 +59,7 @@ pub fn parse_address(s: &str) -> Result<Address, String> {
 }
 
 pub fn parse_signer_addr(s: &str) -> Result<SignerAddr, String> {
+    println!("jiejie: Try parsing input address: {:?}", s);
     Address::from_str(s)
         .map(SignerAddr)
         .map_err(|e| format!("error parsing addresses: {e}"))

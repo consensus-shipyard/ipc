@@ -197,6 +197,11 @@ fn set_eam_permissions(
     genesis_file: &PathBuf,
     args: &GenesisSetEAMPermissionsArgs,
 ) -> anyhow::Result<()> {
+    println!("jiejie: Enter");
+    let temp_addresses = args.addresses.clone();
+    for addr in temp_addresses {
+        println!("jiejie: Input addr: {:?}", addr);
+    }
     update_genesis(genesis_file, |mut genesis| {
         genesis.eam_permission_mode = match args.mode.to_lowercase().as_str() {
             "unrestricted" => PermissionMode::Unrestricted,
