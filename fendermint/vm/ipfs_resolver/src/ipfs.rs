@@ -114,36 +114,47 @@ fn start_resolve<V>(
                 // Mark task as resolved
                 atomically(|| task.set_resolved()).await;
 
-                let vote = to_vote(task.cid());
-                match VoteRecord::signed(&key, subnet_id, vote) {
-                    Ok(vote) => {
-                        // Add our own vote
-                        let validator_key = ValidatorKey::from(key.public());
-                        let res = atomically_or_err(|| {
-                            vote_tally.add_object_vote(validator_key.clone(), task.cid().to_bytes())
-                        })
-                        .await;
+                // Skip voting if this this validator is the IPC root. `is_root` == true
+                // implies that we are running in dev mode with a single node.
+                // we don't need a quorum to reach consensus on ipfs resolution.
+                if !subnet_id.is_root() {
+                    let vote = to_vote(task.cid());
+                    match VoteRecord::signed(&key, subnet_id, vote) {
+                        Ok(vote) => {
+                            // Add our own vote
+                            let validator_key = ValidatorKey::from(key.public());
+                            let res = atomically_or_err(|| {
+                                vote_tally
+                                    .add_object_vote(validator_key.clone(), task.cid().to_bytes())
+                            })
+                            .await;
 
-                        match res {
-                            Ok(added) => {
-                                if added {
-                                    // Send own vote to peers
-                                    if let Err(e) = client.publish_vote(vote) {
-                                        tracing::error!(
-                                            error = e.to_string(),
-                                            "failed to publish vote"
-                                        );
+                            match res {
+                                Ok(added) => {
+                                    if added {
+                                        // Send own vote to peers
+                                        if let Err(e) = client.publish_vote(vote) {
+                                            tracing::error!(
+                                                error = e.to_string(),
+                                                "failed to publish vote"
+                                            );
+                                        }
                                     }
                                 }
-                            }
-                            Err(e) => {
-                                tracing::error!(error = e.to_string(), "failed to handle own vote");
+                                Err(e) => {
+                                    tracing::error!(
+                                        error = e.to_string(),
+                                        "failed to handle own vote"
+                                    );
+                                }
                             }
                         }
+                        Err(e) => {
+                            tracing::error!(error = e.to_string(), "failed to sign vote");
+                        }
                     }
-                    Err(e) => {
-                        tracing::error!(error = e.to_string(), "failed to sign vote");
-                    }
+                } else {
+                    tracing::debug!("skipped publishing vote");
                 }
             }
             Some(e) => {

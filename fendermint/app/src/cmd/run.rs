@@ -285,6 +285,7 @@ async fn run(ipfs_addr: String, settings: Settings) -> anyhow::Result<()> {
             parent_finality_provider: parent_finality_provider.clone(),
             parent_finality_votes: parent_finality_votes.clone(),
             object_pool: ipfs_pin_pool,
+            is_devnet: !settings.topdown_enabled(),
         },
         snapshots,
     )?;

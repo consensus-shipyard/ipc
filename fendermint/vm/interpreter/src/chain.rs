@@ -51,6 +51,9 @@ pub struct ChainEnv {
     pub parent_finality_votes: VoteTally,
     /// IPFS pin resolution pool.
     pub object_pool: ObjectPool,
+    /// Whether the node is running in devnet mode.
+    /// In devnet mode, the node is the IPC root && Topdown Checkpoint is disabled.
+    pub is_devnet: bool,
 }
 
 #[derive(Clone, Hash, PartialEq, Eq)]
@@ -186,10 +189,16 @@ where
         // If the object has already been finalized, i.e., it was proposed in an earlier block with
         // a quorum that did not include _this_ proposer, we can just remove it from the local
         // resolve pool. If we were to propose it, it would be rejected in the process step.
+        //
+        // If the node is running in dev mode where it is the only node in the subnet and is
+        // the IPC root, then directly resolve the object and add it to the chain.
+        // No need for voting.
         let mut objects: Vec<ChainMessage> = vec![];
         for item in local_resolved_objects.iter() {
-            let obj = item.obj.value.to_bytes();
-            let (is_finalized, is_globally_resolved) =
+            let (is_finalized, is_globally_resolved) = if state.is_devnet {
+                (false, true)
+            } else {
+                let obj = item.obj.value.to_bytes();
                 atomically(
                     || match state.parent_finality_votes.is_object_finalized(&obj)? {
                         true => Ok((true, false)),
@@ -199,7 +208,8 @@ where
                         },
                     },
                 )
-                .await;
+                .await
+            };
 
             // Remove here otherwise proposal will be rejected
             if is_finalized {
@@ -263,19 +273,26 @@ where
                 ChainMessage::Ipc(IpcMessage::ObjectResolved(obj)) => {
                     // Ensure that the object is ready to be included on chain. We can accept the
                     // proposal if the object has reached a global quorum and is not yet finalized.
+                    // In the case of a devnet, we can directly resolve the object and add it to the chain.
                     let item = ObjectPoolItem { obj };
                     let obj = item.obj.value.to_bytes();
 
-                    let (is_finalized, is_globally_resolved) = atomically(|| {
-                        match env.parent_finality_votes.is_object_finalized(&obj)? {
-                            true => Ok((true, true)),
-                            false => match env.parent_finality_votes.find_object_quorum(&obj)? {
-                                true => Ok((false, true)),
-                                false => Ok((false, false)),
-                            },
-                        }
-                    })
-                    .await;
+                    let (is_finalized, is_globally_resolved) = if env.is_devnet {
+                        (false, true)
+                    } else {
+                        atomically(|| {
+                            match env.parent_finality_votes.is_object_finalized(&obj)? {
+                                true => Ok((true, true)),
+                                false => {
+                                    match env.parent_finality_votes.find_object_quorum(&obj)? {
+                                        true => Ok((false, true)),
+                                        false => Ok((false, false)),
+                                    }
+                                }
+                            }
+                        })
+                        .await
+                    };
 
                     // If already finalized, reject this proposal
                     if is_finalized {
