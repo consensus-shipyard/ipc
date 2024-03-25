@@ -190,7 +190,14 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                     .await
                     .unwrap();
                 all_submit_tasks.push(tokio::task::spawn(async move {
-                    Self::submit_checkpoint(parent_handler_clone, submitter, bundle, event).await;
+                    match Self::submit_checkpoint(parent_handler_clone, submitter, bundle, event).await {
+                        Ok(()) => {
+                            log::debug!("Successfully submitted checkpoint");
+                        }
+                        Err(_err) => {
+                            log::debug!("Failed to submit checkpoint");
+                        }
+                    }
                     drop(submission_permit);
                 }));
 
@@ -213,7 +220,7 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         submitter: Address,
         bundle: BottomUpCheckpointBundle,
         event: QuorumReachedEvent,
-    ) {
+    ) -> Result<(), anyhow::Error> {
         let epoch = parent_handler
             .submit_checkpoint(
                 &submitter,
@@ -227,13 +234,13 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                     "cannot submit bottom up checkpoint at height {} due to: {e:}",
                     event.height
                 )
-            })
-            .unwrap();
+            })?;
 
         log::info!(
             "submitted bottom up checkpoint({}) in parent at height {}",
             event.height,
             epoch
         );
+        Ok(())
     }
 }
