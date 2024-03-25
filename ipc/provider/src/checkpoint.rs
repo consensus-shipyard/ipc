@@ -78,7 +78,14 @@ impl BottomUpCheckpointManager<EthSubnetManager> {
             EthSubnetManager::from_subnet_with_wallet_store(&parent, Some(keystore.clone()))?;
         let child_handler =
             EthSubnetManager::from_subnet_with_wallet_store(&child, Some(keystore))?;
-        Self::new(parent, child, parent_handler, child_handler, max_parallel_submission).await
+        Self::new(
+            parent,
+            child,
+            parent_handler,
+            child_handler,
+            max_parallel_submission,
+        )
+        .await
     }
 }
 
