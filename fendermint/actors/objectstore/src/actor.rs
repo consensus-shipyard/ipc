@@ -14,7 +14,7 @@ use fvm_shared::{error::ExitCode, MethodNum};
 
 use crate::{
     ConstructorParams, Method, Object, ObjectDeleteParams, ObjectGetParams, ObjectList,
-    ObjectListParams, ObjectPutParams, ObjectResolveParams, State, OBJECTSTORE_ACTOR_NAME,
+    ObjectListParams, ObjectPutParams, ObjectResolveExternalParams, State, OBJECTSTORE_ACTOR_NAME,
 };
 
 #[cfg(feature = "fil-actor")]
@@ -37,7 +37,6 @@ impl Actor {
     }
 
     fn put_object(rt: &impl Runtime, params: ObjectPutParams) -> Result<Cid, ActorError> {
-        // FIXME:(carsonfarmer) We'll want to validate the caller is the owner of the repo.
         rt.validate_immediate_caller_accept_any()?;
 
         let root = rt.transaction(|st: &mut State, rt| {
@@ -52,7 +51,7 @@ impl Actor {
 
     fn resolve_external_object(
         rt: &impl Runtime,
-        params: ObjectResolveParams,
+        params: ObjectResolveExternalParams,
     ) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
@@ -67,7 +66,6 @@ impl Actor {
     }
 
     fn delete_object(rt: &impl Runtime, params: ObjectDeleteParams) -> Result<Cid, ActorError> {
-        // FIXME:(carsonfarmer) We'll want to validate the caller is the owner of the repo.
         rt.validate_immediate_caller_accept_any()?;
 
         let res = rt.transaction(|st: &mut State, rt| {

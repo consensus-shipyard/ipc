@@ -12,6 +12,7 @@ pub use crate::state::{Object, ObjectKind, ObjectList, ObjectListItem, State};
 
 pub const OBJECTSTORE_ACTOR_NAME: &str = "objectstore";
 
+/// Params for creating an object store machine.
 #[derive(Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ConstructorParams {
     /// The machine creator
@@ -29,7 +30,7 @@ pub struct ObjectPutParams {
 
 /// Params for resolving an object.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct ObjectResolveParams {
+pub struct ObjectResolveExternalParams {
     #[serde(with = "strict_bytes")]
     pub key: Vec<u8>,
     pub value: Cid,

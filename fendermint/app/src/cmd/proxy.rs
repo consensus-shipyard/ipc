@@ -2,12 +2,10 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::convert::Infallible;
-use std::future::Future;
-use std::net::ToSocketAddrs;
-use std::num::ParseIntError;
-use std::pin::Pin;
-use std::sync::Arc;
+use std::{
+    convert::Infallible, future::Future, net::ToSocketAddrs, num::ParseIntError, pin::Pin,
+    sync::Arc,
+};
 
 use anyhow::anyhow;
 use async_tempfile::TempFile;
@@ -15,35 +13,36 @@ use bytes::{Buf, Bytes};
 use cid::Cid;
 use futures_util::{Stream, StreamExt};
 use fvm_ipld_encoding::strict_bytes::ByteBuf;
-use fvm_shared::address::Address;
-use fvm_shared::econ::TokenAmount;
-use fvm_shared::BLOCK_GAS_LIMIT;
+use fvm_shared::{address::Address, econ::TokenAmount, ActorID, BLOCK_GAS_LIMIT};
 use ipfs_api_backend_hyper::{IpfsApi, IpfsClient, TryFromUri};
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tendermint::block::Height;
-use tendermint::Hash;
+use tendermint::{block::Height, Hash};
 use thiserror::Error;
-use tokio::io::{AsyncSeekExt, AsyncWriteExt};
-use tokio::sync::Mutex;
+use tokio::{
+    io::{AsyncSeekExt, AsyncWriteExt},
+    sync::Mutex,
+};
 use tokio_util::compat::TokioAsyncReadCompatExt;
-use warp::http::{HeaderMap, HeaderValue};
-use warp::{http::StatusCode, Filter, Rejection, Reply};
+use warp::{
+    http::{HeaderMap, HeaderValue, StatusCode},
+    Filter, Rejection, Reply,
+};
 
 use fendermint_actor_objectstore::{
     Object, ObjectDeleteParams, ObjectGetParams, ObjectKind, ObjectList, ObjectListItem,
     ObjectListParams, ObjectPutParams,
 };
 use fendermint_app_settings::proxy::ProxySettings;
-use fendermint_rpc::client::FendermintClient;
-use fendermint_rpc::message::GasParams;
-use fendermint_rpc::tx::{CallClient, TxClient};
-use fendermint_vm_actor_interface::adm::CreateReturn;
+use fendermint_rpc::{
+    client::FendermintClient,
+    message::GasParams,
+    tx::{CallClient, TxClient},
+};
 use fendermint_vm_message::query::FvmQueryHeight;
 
 use crate::cmd;
-use crate::cmd::proxy::ProxyError::RangeHeaderInvalid;
 use crate::options::{
     proxy::{ProxyArgs, ProxyCommands},
     rpc::TransArgs,
@@ -75,7 +74,7 @@ cmd! {
                     .and(with_client(client.clone()))
                     .and(with_args(args.clone()))
                     .and(with_nonce(nonce.clone()))
-                    .and(warp::header::optional::<u64>("X-DataRepo-GasLimit"))
+                    .and(warp::header::optional::<u64>("X-ADM-GasLimit"))
                     .and_then(handle_os_create);
                 let os_upload_route = warp::path!("v1" / "os" / Address / String)
                     .and(warp::put())
@@ -85,7 +84,7 @@ cmd! {
                     .and(with_args(args.clone()))
                     .and(with_nonce(nonce.clone()))
                     .and(warp::header::<u64>("Content-Length"))
-                    .and(warp::header::optional::<u64>("X-DataRepo-GasLimit"))
+                    .and(warp::header::optional::<u64>("X-ADM-GasLimit"))
                     .and(warp::body::stream())
                     .and_then(handle_os_upload);
                 let os_delete_route = warp::path!("v1" / "os" / Address / String)
@@ -93,7 +92,7 @@ cmd! {
                     .and(with_client(client.clone()))
                     .and(with_args(args.clone()))
                     .and(with_nonce(nonce.clone()))
-                    .and(warp::header::optional::<u64>("X-DataRepo-GasLimit"))
+                    .and(warp::header::optional::<u64>("X-ADM-GasLimit"))
                     .and_then(handle_os_delete);
                 let os_get_route = warp::path!("v1" / "os" / Address / String)
                     .and(
@@ -114,13 +113,20 @@ cmd! {
                     .and_then(handle_os_list);
 
                 // Accumulator routes
+                let acc_create_route = warp::path!("v1" / "acc")
+                    .and(warp::post())
+                    .and(with_client(client.clone()))
+                    .and(with_args(args.clone()))
+                    .and(with_nonce(nonce.clone()))
+                    .and(warp::header::optional::<u64>("X-ADM-GasLimit"))
+                    .and_then(handle_acc_create);
                 let acc_push_route = warp::path!("v1" / "acc" / Address)
                     .and(warp::put())
                     .and(warp::body::content_length_limit(MAX_EVENT_LENGTH))
                     .and(with_client(client.clone()))
                     .and(with_args(args.clone()))
                     .and(with_nonce(nonce))
-                    .and(warp::header::optional::<u64>("X-DataRepo-GasLimit"))
+                    .and(warp::header::optional::<u64>("X-ADM-GasLimit"))
                     .and(warp::body::bytes())
                     .and_then(handle_acc_push);
                 let acc_root_route = warp::path!("v1" / "acc" / Address)
@@ -136,6 +142,7 @@ cmd! {
                     .or(os_delete_route)
                     .or(os_get_route)
                     .or(os_list_route)
+                    .or(acc_create_route)
                     .or(acc_push_route)
                     .or(acc_root_route)
                     .with(warp::cors().allow_any_origin()
@@ -348,7 +355,7 @@ fn get_range_params(range: String, size: u64) -> Result<(u64, u64), ProxyError> 
         .map(|n| n.to_string())
         .collect();
     if range.len() != 2 {
-        return Err(RangeHeaderInvalid);
+        return Err(ProxyError::RangeHeaderInvalid);
     }
     let (start, end): (u64, u64) = match (!range[0].is_empty(), !range[1].is_empty()) {
         (true, true) => (range[0].parse::<u64>()?, range[1].parse::<u64>()?),
@@ -364,7 +371,7 @@ fn get_range_params(range: String, size: u64) -> Result<(u64, u64), ProxyError> 
         (false, false) => (0, size - 1),
     };
     if start > end || end >= size {
-        return Err(RangeHeaderInvalid);
+        return Err(ProxyError::RangeHeaderInvalid);
     }
     Ok((start, end))
 }
@@ -563,6 +570,26 @@ async fn handle_os_list(
     Ok(warp::reply::json(&json))
 }
 
+async fn handle_acc_create(
+    client: FendermintClient,
+    mut args: TransArgs,
+    nonce: Arc<Mutex<u64>>,
+    gas_limit: Option<u64>,
+) -> Result<impl Reply, Rejection> {
+    let mut nonce_lck = nonce.lock().await;
+    args.sequence = *nonce_lck;
+    args.gas_limit = gas_limit.unwrap_or(BLOCK_GAS_LIMIT);
+
+    let res = acc_create(client, args).await.map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("create error: {}", e),
+        })
+    })?;
+
+    *nonce_lck += 1;
+    Ok(warp::reply::json(&res))
+}
+
 async fn handle_acc_push(
     address: Address,
     client: FendermintClient,
@@ -686,8 +713,6 @@ impl<D> Txn<D> {
     }
 }
 
-/// Create a client, make a call to Tendermint with a closure, then maybe extract some JSON
-/// depending on the return value, finally return the result in JSON.
 async fn broadcast<F, D>(client: FendermintClient, args: TransArgs, f: F) -> anyhow::Result<Txn<D>>
 where
     F: FnOnce(
@@ -723,11 +748,34 @@ where
     })
 }
 
-async fn os_create(client: FendermintClient, args: TransArgs) -> anyhow::Result<Txn<CreateReturn>> {
-    broadcast(client, args, |mut client, value, gas_params| {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateReturnPretty {
+    pub actor_id: ActorID,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub robust_address: Option<String>,
+}
+
+async fn os_create(
+    client: FendermintClient,
+    args: TransArgs,
+) -> anyhow::Result<Txn<CreateReturnPretty>> {
+    let tx = broadcast(client, args, |mut client, value, gas_params| {
         Box::pin(async move { client.os_create(value, gas_params).await })
     })
-    .await
+    .await?;
+    let data = tx.data.map(|data| CreateReturnPretty {
+        actor_id: data.actor_id,
+        robust_address: data.robust_address.map(|a| a.to_string()),
+    });
+
+    let tx_pretty: Txn<CreateReturnPretty> = Txn {
+        status: tx.status,
+        hash: tx.hash,
+        height: tx.height,
+        gas_used: tx.gas_used,
+        data,
+    };
+    Ok(tx_pretty)
 }
 
 async fn os_put(
@@ -735,7 +783,7 @@ async fn os_put(
     args: TransArgs,
     address: Address,
     params: ObjectPutParams,
-) -> anyhow::Result<Txn<Cid>> {
+) -> anyhow::Result<Txn<String>> {
     broadcast(client, args, |mut client, value, gas_params| {
         Box::pin(async move { client.os_put(address, params, value, gas_params).await })
     })
@@ -747,7 +795,7 @@ async fn os_delete(
     args: TransArgs,
     address: Address,
     params: ObjectDeleteParams,
-) -> anyhow::Result<Txn<Cid>> {
+) -> anyhow::Result<Txn<String>> {
     broadcast(client, args, |mut client, value, gas_params| {
         Box::pin(async move { client.os_delete(address, params, value, gas_params).await })
     })
@@ -792,12 +840,35 @@ async fn os_list(
     Ok(res.return_data)
 }
 
+async fn acc_create(
+    client: FendermintClient,
+    args: TransArgs,
+) -> anyhow::Result<Txn<CreateReturnPretty>> {
+    let tx = broadcast(client, args, |mut client, value, gas_params| {
+        Box::pin(async move { client.acc_create(value, gas_params).await })
+    })
+    .await?;
+    let data = tx.data.map(|data| CreateReturnPretty {
+        actor_id: data.actor_id,
+        robust_address: data.robust_address.map(|a| a.to_string()),
+    });
+
+    let tx_pretty: Txn<CreateReturnPretty> = Txn {
+        status: tx.status,
+        hash: tx.hash,
+        height: tx.height,
+        gas_used: tx.gas_used,
+        data,
+    };
+    Ok(tx_pretty)
+}
+
 async fn acc_push(
     client: FendermintClient,
     args: TransArgs,
     address: Address,
     event: Bytes,
-) -> anyhow::Result<Txn<Cid>> {
+) -> anyhow::Result<Txn<String>> {
     broadcast(client, args, |mut client, value, gas_params| {
         Box::pin(async move { client.acc_push(address, event, value, gas_params).await })
     })
@@ -809,7 +880,7 @@ async fn acc_root(
     args: TransArgs,
     address: Address,
     height: u64,
-) -> anyhow::Result<Option<Cid>> {
+) -> anyhow::Result<Option<String>> {
     let mut client = TransClient::new(client, &args)?;
     let gas_params = gas_params(&args);
     let h = FvmQueryHeight::from(height);

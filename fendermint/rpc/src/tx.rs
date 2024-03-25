@@ -6,7 +6,6 @@ use std::marker::PhantomData;
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use bytes::Bytes;
-use cid::Cid;
 use fendermint_vm_message::query::{FvmQueryHeight, GasEstimate};
 use tendermint::abci::response::DeliverTx;
 use tendermint_rpc::endpoint::broadcast::{tx_async, tx_commit, tx_sync};
@@ -25,7 +24,7 @@ use fendermint_vm_message::chain::ChainMessage;
 use crate::message::{GasParams, SignedMessageFactory};
 use crate::query::{QueryClient, QueryResponse};
 use crate::response::{
-    decode_bytes, decode_cid, decode_fevm_create, decode_fevm_invoke, decode_machine_create,
+    decode_bytes, decode_cid_string, decode_fevm_create, decode_fevm_invoke, decode_machine_create,
     decode_os_get, decode_os_list,
 };
 
@@ -96,10 +95,10 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
         params: ObjectPutParams,
         value: TokenAmount,
         gas_params: GasParams,
-    ) -> anyhow::Result<M::Response<Cid>> {
+    ) -> anyhow::Result<M::Response<String>> {
         let mf = self.message_factory_mut();
         let msg = mf.os_put(address, params, value, gas_params)?;
-        let fut = self.perform(msg, decode_cid);
+        let fut = self.perform(msg, decode_cid_string);
         let res = fut.await?;
         Ok(res)
     }
@@ -111,10 +110,23 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
         params: ObjectDeleteParams,
         value: TokenAmount,
         gas_params: GasParams,
-    ) -> anyhow::Result<M::Response<Cid>> {
+    ) -> anyhow::Result<M::Response<String>> {
         let mf = self.message_factory_mut();
         let msg = mf.os_delete(address, params, value, gas_params)?;
-        let fut = self.perform(msg, decode_cid);
+        let fut = self.perform(msg, decode_cid_string);
+        let res = fut.await?;
+        Ok(res)
+    }
+
+    /// Create an accumulator.
+    async fn acc_create(
+        &mut self,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<M::Response<adm::CreateReturn>> {
+        let mf = self.message_factory_mut();
+        let msg = mf.acc_create(value, gas_params)?;
+        let fut = self.perform(msg, decode_machine_create);
         let res = fut.await?;
         Ok(res)
     }
@@ -126,10 +138,10 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
         event: Bytes,
         value: TokenAmount,
         gas_params: GasParams,
-    ) -> anyhow::Result<M::Response<Cid>> {
+    ) -> anyhow::Result<M::Response<String>> {
         let mf = self.message_factory_mut();
         let msg = mf.acc_push(address, event, value, gas_params)?;
-        let fut = self.perform(msg, decode_cid);
+        let fut = self.perform(msg, decode_cid_string);
         let res = fut.await?;
         Ok(res)
     }
@@ -236,7 +248,7 @@ pub trait CallClient: QueryClient + BoundClient {
         value: TokenAmount,
         gas_params: GasParams,
         height: FvmQueryHeight,
-    ) -> anyhow::Result<CallResponse<Cid>> {
+    ) -> anyhow::Result<CallResponse<String>> {
         let msg = self
             .message_factory_mut()
             .acc_root(address, value, gas_params)?;
@@ -245,8 +257,8 @@ pub trait CallClient: QueryClient + BoundClient {
         if response.value.code.is_err() {
             return Err(anyhow!("{}", response.value.info));
         }
-        let root =
-            decode_cid(&response.value).context("error decoding data from deliver_tx in call")?;
+        let root = decode_cid_string(&response.value)
+            .context("error decoding data from deliver_tx in call")?;
 
         let response = CallResponse {
             response,
@@ -337,7 +349,7 @@ pub struct CommitResponse<T> {
 
 pub struct CallResponse<T> {
     /// Response from Tendermint.
-    pub response: QueryResponse<tendermint::abci::response::DeliverTx>,
+    pub response: QueryResponse<DeliverTx>,
     /// Parsed return data, if the response indicates success.
     pub return_data: Option<T>,
 }

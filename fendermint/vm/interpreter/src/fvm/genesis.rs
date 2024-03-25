@@ -229,6 +229,25 @@ where
             )
             .context("failed to create reward actor")?;
 
+        // ADM Address Manager (ADM) actor
+        let machine_codes = state
+            .custom_actor_manifest
+            .get_subset(vec!["accumulator", "objectstore"]);
+        let adm_state = fil_actor_adm::State::new(
+            &state.store(),
+            machine_codes,
+            fil_actor_adm::PermissionModeParams::Unrestricted,
+        )?;
+        state
+            .create_builtin_actor(
+                adm::ADM_ACTOR_CODE_ID,
+                adm::ADM_ACTOR_ID,
+                &adm_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create adm actor")?;
+
         // STAGE 1b: Then we initialize the in-repo custom actors.
 
         // Initialize the chain metadata actor which handles saving metadata about the chain
@@ -261,21 +280,6 @@ where
                 None,
             )
             .context("failed to replace built in eam actor")?;
-
-        // Initialize the adm actor.
-        let adm_state = fendermint_actor_adm::State::new(
-            &state.store(),
-            fendermint_actor_adm::PermissionModeParams::Unrestricted,
-        )?;
-        state
-            .create_custom_actor(
-                adm::ADM_ACTOR_NAME,
-                adm::ADM_ACTOR_ID,
-                &adm_state,
-                TokenAmount::zero(),
-                None,
-            )
-            .context("failed to create built in adm actor")?;
 
         // STAGE 2: Create non-builtin accounts which do not have a fixed ID.
 

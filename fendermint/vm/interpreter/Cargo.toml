@@ -63,6 +63,7 @@ arbitrary = { workspace = true, optional = true }
 quickcheck = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 
+fil_actor_adm = { workspace = true }
 fendermint_actor_objectstore = { path = "../../actors/objectstore" }
 fendermint_actor_accumulator = { path = "../../actors/accumulator" }
 objectstore_syscall = { path = "../../../textile/objectstore_syscall" }

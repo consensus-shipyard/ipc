@@ -6,12 +6,12 @@ use cid::Cid;
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
     runtime::{ActorCode, Runtime},
-    ActorDowncast, ActorError, FIRST_EXPORTED_METHOD_NUMBER, SYSTEM_ACTOR_ADDR,
+    ActorDowncast, ActorError, FIRST_EXPORTED_METHOD_NUMBER, INIT_ACTOR_ADDR,
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::{error::ExitCode, MethodNum};
 
-use crate::{Method, State, ACCUMULATOR_ACTOR_NAME};
+use crate::{ConstructorParams, Method, State, ACCUMULATOR_ACTOR_NAME};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
@@ -19,12 +19,10 @@ fil_actors_runtime::wasm_trampoline!(Actor);
 pub struct Actor;
 
 impl Actor {
-    fn constructor(rt: &impl Runtime) -> Result<(), ActorError> {
-        // FIXME:(carsonfarmer) We're setting this up to be a subnet-wide actor for a single repo.
-        // FIXME:(carsonfarmer) In the future, this could be deployed dynamically for multi repo subnets.
-        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
+    fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
+        rt.validate_immediate_caller_is(std::iter::once(&INIT_ACTOR_ADDR))?;
 
-        let state = State::new(rt.store()).map_err(|e| {
+        let state = State::new(rt.store(), params.creator).map_err(|e| {
             e.downcast_default(
                 ExitCode::USR_ILLEGAL_STATE,
                 "failed to construct empty store",
@@ -34,7 +32,6 @@ impl Actor {
     }
 
     fn push(rt: &impl Runtime, obj: Vec<u8>) -> Result<Cid, ActorError> {
-        // FIXME:(carsonfarmer) We'll want to validate the caller is the owner of the repo.
         rt.validate_immediate_caller_accept_any()?;
 
         rt.transaction(|st: &mut State, rt| {

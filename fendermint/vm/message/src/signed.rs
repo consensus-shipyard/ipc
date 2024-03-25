@@ -59,11 +59,16 @@ pub enum DomainHash {
 pub struct Object {
     pub key: Vec<u8>,
     pub value: Cid,
+    pub address: Address,
 }
 
 impl Object {
-    pub fn new(key: Vec<u8>, value: Cid) -> Self {
-        Object { key, value }
+    pub fn new(key: Vec<u8>, value: Cid, address: Address) -> Self {
+        Object {
+            key,
+            value,
+            address,
+        }
     }
 }
 

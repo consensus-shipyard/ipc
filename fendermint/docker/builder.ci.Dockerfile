@@ -86,5 +86,6 @@ RUN set -eux; \
   amd64) ARCH='x86_64'  ;; \
   arm64) ARCH='aarch64' ;; \
   esac; \
+  --mount=type=ssh \
   cargo install --locked --root output --path fendermint/app --target ${ARCH}-unknown-linux-gnu ; \
   cargo install --locked --root output --path ipc/cli --target ${ARCH}-unknown-linux-gnu

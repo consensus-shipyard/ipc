@@ -200,8 +200,8 @@ impl SignedMessageFactory {
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
-        let input = adm::CreateExternalParams {
-            kind: adm::MachineKind::ObjectStore,
+        let input = adm::CreateParams {
+            machine_name: "objectstore".into(),
         };
         let params = RawBytes::serialize(input)?;
         let message = self.transaction(
@@ -225,7 +225,7 @@ impl SignedMessageFactory {
     ) -> anyhow::Result<ChainMessage> {
         let object = match &params.kind {
             ObjectKind::Internal(_) => None,
-            ObjectKind::External(cid) => Some(Object::new(params.key.clone(), *cid)),
+            ObjectKind::External(cid) => Some(Object::new(params.key.clone(), *cid, address)),
         };
         let params = RawBytes::serialize(params)?;
         let message = self.transaction(
@@ -316,6 +316,27 @@ impl SignedMessageFactory {
         // Roll back the sequence, we don't really want to invoke anything.
         self.inner.set_sequence(message.sequence);
 
+        Ok(message)
+    }
+
+    /// Create an accumulator.
+    pub fn acc_create(
+        &mut self,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<ChainMessage> {
+        let input = adm::CreateParams {
+            machine_name: "accumulator".into(),
+        };
+        let params = RawBytes::serialize(input)?;
+        let message = self.transaction(
+            adm::ADM_ACTOR_ADDR,
+            adm::Method::CreateExternal as u64,
+            params,
+            value,
+            gas_params,
+            None,
+        )?;
         Ok(message)
     }
 

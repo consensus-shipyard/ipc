@@ -128,7 +128,7 @@ set -u
 if ! $local_deploy ; then
   echo "$DASHES Preparing ipc repo..."
   if ! ls $IPC_FOLDER ; then
-    git clone --recurse-submodules -j8 git@github.com:amazingdatamachine/ipc.git ${IPC_FOLDER}
+    git clone --recurse-submodules -j8 git@github.com-ipc:amazingdatamachine/ipc.git ${IPC_FOLDER}
   fi
   cd ${IPC_FOLDER}
   git fetch
@@ -137,6 +137,9 @@ if ! $local_deploy ; then
   git pull --rebase origin $head_ref
   git submodule sync
   git submodule update --init --recursive
+  if ! ls $IPC_FOLDER/../builtin-actors ; then
+    git clone -j8 git@github.com:amazingdatamachine/builtin-actors.git ${IPC_FOLDER}/../builtin-actors
+  fi
 fi
 
 echo "$DASHES Building ipc contracts..."

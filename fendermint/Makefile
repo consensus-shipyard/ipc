@@ -1,6 +1,7 @@
 .PHONY: all build test lint license check-fmt check-clippy actor-bundle
 
-BUILTIN_ACTORS_TAG    ?= v12.0.0
+BUILTIN_ACTORS_FOLDER ?= $(PWD)/../../builtin-actors
+BUILTIN_ACTORS_BRANCH ?= v12.0.0+adm
 BUILTIN_ACTORS_BUNDLE := $(PWD)/builtin-actors/output/bundle.car
 CUSTOM_ACTORS_BUNDLE  := $(PWD)/actors/output/custom_actors_bundle.car
 
@@ -119,7 +120,7 @@ docker-deps: $(BUILTIN_ACTORS_BUNDLE) $(CUSTOM_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 docker-build: docker-deps $(FENDERMINT_CODE)
 	if [ "$(PROFILE)" = "ci" ]; then \
 		cat docker/builder.ci.Dockerfile docker/runner.Dockerfile > docker/Dockerfile ; \
-		docker buildx build \
+		docker buildx build --ssh default \
 			$(BUILDX_STORE) \
 			$(BUILDX_FLAGS) \
 			-f docker/Dockerfile \
@@ -127,7 +128,7 @@ docker-build: docker-deps $(FENDERMINT_CODE)
 	else \
 		cat docker/builder.local.Dockerfile docker/runner.Dockerfile > docker/Dockerfile ; \
 		DOCKER_BUILDKIT=1 \
-		docker build \
+		docker build --ssh default \
 			$(BUILDX_STORE) \
 			-f docker/Dockerfile \
 			-t fendermint:latest $(PWD)/..; \
@@ -144,7 +145,8 @@ compile-abi: $(IPC_ACTORS_GEN)
 # Download a released builtin-actors bundle CAR file.
 $(BUILTIN_ACTORS_BUNDLE):
 	mkdir -p $(dir $@)
-	curl -L -o $@ https://github.com/filecoin-project/builtin-actors/releases/download/$(BUILTIN_ACTORS_TAG)/builtin-actors-mainnet.car
+	(cd $(BUILTIN_ACTORS_FOLDER) && git checkout $(BUILTIN_ACTORS_BRANCH) && make bundle-mainnet)
+	cp $(BUILTIN_ACTORS_FOLDER)/output/builtin-actors-mainnet.car $@
 
 # Build a bundle CAR for the custom actors in this repo.
 $(CUSTOM_ACTORS_BUNDLE):
