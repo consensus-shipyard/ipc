@@ -4,23 +4,18 @@ pragma solidity ^0.8.21;
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import { SubnetID, SupplySource, SupplyKind } from "@ipc/src/structs/Subnet.sol";
-import { FvmAddress } from "@ipc/src/structs/FvmAddress.sol";
-import { IpcHandler } from "@ipc/sdk/IpcContract.sol";
-import { IpcMsgKind, ResultMsg, OutcomeType, IpcEnvelope } from "@ipc/src/structs/CrossNet.sol";
-import { FvmAddressHelper } from "@ipc/src/lib/FvmAddressHelper.sol";
-import { SubnetIDHelper } from "@ipc/src/lib/SubnetIDHelper.sol";
+import {SubnetID, SupplySource, SupplyKind} from "@ipc/src/structs/Subnet.sol";
+import {FvmAddress} from "@ipc/src/structs/FvmAddress.sol";
+import {IpcHandler} from "@ipc/sdk/IpcContract.sol";
+import {IpcMsgKind, ResultMsg, OutcomeType, IpcEnvelope} from "@ipc/src/structs/CrossNet.sol";
+import {FvmAddressHelper} from "@ipc/src/lib/FvmAddressHelper.sol";
+import {SubnetIDHelper} from "@ipc/src/lib/SubnetIDHelper.sol";
 
-import { InterchainTokenExecutableUpgradeable } from './InterchainTokenExecutableUpgradeable.sol';
+import {InterchainTokenExecutableUpgradeable} from "./InterchainTokenExecutableUpgradeable.sol";
 
-import {
-    UUPSUpgradeable
-} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-
-
-
 
 interface TokenFundedGateway {
     function fundWithToken(SubnetID calldata subnetId, FvmAddress calldata to, uint256 amount) external;
@@ -34,7 +29,13 @@ interface SubnetActor {
 //         IpcTokenSender via the Axelar ITS, receiving some token value to deposit into an IPC subnet (specified in the
 //         incoming message). The IpcTokenHandler handles deposit failures by crediting the value back to the original
 //         beneficiary, and making it available from them to withdraw() on the rootnet.
-contract IpcTokenHandler is Initializable, InterchainTokenExecutableUpgradeable, IpcHandler,  OwnableUpgradeable, UUPSUpgradeable {
+contract IpcTokenHandler is
+    Initializable,
+    InterchainTokenExecutableUpgradeable,
+    IpcHandler,
+    OwnableUpgradeable,
+    UUPSUpgradeable
+{
     using FvmAddressHelper for address;
     using FvmAddressHelper for FvmAddress;
     using SubnetIDHelper for SubnetID;
@@ -42,7 +43,7 @@ contract IpcTokenHandler is Initializable, InterchainTokenExecutableUpgradeable,
     using AddressUpgradeable for address;
     error NothingToWithdraw();
 
-    TokenFundedGateway public _ipcGateway; 
+    TokenFundedGateway public _ipcGateway;
     mapping(address beneficiary => mapping(address token => uint256 value)) private _claims;
 
     event SubnetFunded(SubnetID indexed subnet, address indexed recipient, uint256 value);
@@ -56,23 +57,19 @@ contract IpcTokenHandler is Initializable, InterchainTokenExecutableUpgradeable,
     function initialize(address axelarIts, address ipcGateway) public initializer {
         __InterchainTokenExecutable_init(axelarIts);
         _ipcGateway = TokenFundedGateway(ipcGateway);
-         __Ownable_init();
+        __Ownable_init();
         __UUPSUpgradeable_init();
     }
-    
+
     function reinitialize(address axelarIts, address ipcGateway) public reinitializer(2) {
         __InterchainTokenExecutable_init(axelarIts);
         _ipcGateway = TokenFundedGateway(ipcGateway);
-         __Ownable_init();
+        __Ownable_init();
         __UUPSUpgradeable_init();
     }
-    
+
     // upgrade proxy - onlyOwner can upgrade
-    function _authorizeUpgrade(address newImplementation)
-        internal
-        override
-        onlyOwner
-    {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     // @notice The InterchainTokenExecutable abstract parent contract hands off to this function after verifying that
     //         the call originated at the Axelar ITS.

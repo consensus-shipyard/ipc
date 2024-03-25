@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-import { IInterchainTokenExecutable } from '@axelar-network/interchain-token-service/interfaces/IInterchainTokenExecutable.sol';
+import {IInterchainTokenExecutable} from "@axelar-network/interchain-token-service/interfaces/IInterchainTokenExecutable.sol";
 
 /**
  * @title InterchainTokenExecutable
@@ -15,18 +15,18 @@ import { IInterchainTokenExecutable } from '@axelar-network/interchain-token-ser
  * will only be called by the interchain token service.
  */
 
-abstract contract InterchainTokenExecutableUpgradeable is Initializable,  IInterchainTokenExecutable {
+abstract contract InterchainTokenExecutableUpgradeable is Initializable, IInterchainTokenExecutable {
     error NotService(address caller);
 
     address public interchainTokenService;
 
-    bytes32 internal constant EXECUTE_SUCCESS = keccak256('its-execute-success');
+    bytes32 internal constant EXECUTE_SUCCESS = keccak256("its-execute-success");
 
     /**
      * @notice Creates a new InterchainTokenExecutable contract.
      * @param interchainTokenService_ The address of the interchain token service that will call this contract.
      */
-    function __InterchainTokenExecutable_init(address interchainTokenService_) public onlyInitializing{
+    function __InterchainTokenExecutable_init(address interchainTokenService_) public onlyInitializing {
         interchainTokenService = interchainTokenService_;
     }
 

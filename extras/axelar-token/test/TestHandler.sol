@@ -19,12 +19,11 @@ contract TestHandler is Test {
         DummyERC20 token = new DummyERC20("Test token", "TST", 10000);
 
         IpcTokenHandler initialImplementation = new IpcTokenHandler();
-        TransparentUpgradeableProxy transparentProxy =
-            new TransparentUpgradeableProxy(
-                address(initialImplementation),
-                address(this),
-                ""
-            );
+        TransparentUpgradeableProxy transparentProxy = new TransparentUpgradeableProxy(
+            address(initialImplementation),
+            address(this),
+            ""
+        );
         IpcTokenHandler handler = IpcTokenHandler(address(transparentProxy));
         handler.initialize({axelarIts: axelarIts, ipcGateway: ipcGateway});
 
@@ -41,23 +40,10 @@ contract TestHandler is Test {
 
         vm.mockCall(
             address(ipcGateway),
-            abi.encodeWithSelector(
-                TokenFundedGateway.fundWithToken.selector,
-                subnet,
-                recipient.from(),
-                1
-            ),
+            abi.encodeWithSelector(TokenFundedGateway.fundWithToken.selector, subnet, recipient.from(), 1),
             abi.encode("")
         );
-        handler.executeWithInterchainToken(
-            bytes32(""),
-            "",
-            "",
-            params,
-            bytes32(""),
-            address(token),
-            1
-        );
+        handler.executeWithInterchainToken(bytes32(""), "", "", params, bytes32(""), address(token), 1);
     }
 
     // TODO test_handler_err_withdrawal (also test getClaims)
