@@ -2,11 +2,8 @@
 // SPDX-License-Identifier: MIT
 //! Ipc agent sdk, contains the json rpc client to interact with the IPC agent rpc server.
 
-use crate::dry_run::{IPCDryRunProvider, Network};
-use crate::manager::evm::dry_run::EvmDryRun;
-use crate::manager::fvm::FvmDryRun;
+use crate::manager::evm::dryrun::EvmSubnetDryRun;
 use crate::manager::{GetBlockHashResult, TopDownQueryPayload};
-use crate::preflight::Preflight;
 use anyhow::anyhow;
 use base64::Engine;
 use config::Config;
@@ -33,14 +30,21 @@ use zeroize::Zeroize;
 
 pub mod checkpoint;
 pub mod config;
-pub mod dry_run;
 pub mod jsonrpc;
 pub mod lotus;
 pub mod manager;
-pub mod preflight;
 
 const DEFAULT_REPO_PATH: &str = ".ipc";
 const DEFAULT_CONFIG_NAME: &str = "config.toml";
+
+/// The vm type the dry run performs in
+#[derive(Debug, Clone, Copy, strum::EnumString)]
+pub enum VMType {
+    #[strum(serialize = "Evm", serialize = "evm")]
+    Evm,
+    #[strum(serialize = "Fvm", serialize = "fvm")]
+    Fvm,
+}
 
 /// The subnet manager connection that holds the subnet config and the manager instance.
 pub struct Connection {
@@ -62,11 +66,12 @@ impl Connection {
 
 #[derive(Clone)]
 pub struct IpcProvider {
-    preflight: Preflight,
     sender: Option<Address>,
     config: Arc<Config>,
     fvm_wallet: Option<Arc<RwLock<Wallet>>>,
     evm_keystore: Option<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>>,
+
+    dry_run: Option<VMType>,
 }
 
 impl IpcProvider {
@@ -76,18 +81,11 @@ impl IpcProvider {
         evm_keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
     ) -> Self {
         Self {
-            preflight: Preflight::new(config.clone(), Some(evm_keystore.clone())),
             sender: None,
             config,
             fvm_wallet: Some(fvm_wallet),
             evm_keystore: Some(evm_keystore),
-        }
-    }
-
-    pub fn dry_run(self, network: &Network) -> IPCDryRunProvider {
-        match network {
-            Network::Evm => IPCDryRunProvider::evm(self.preflight, EvmDryRun),
-            Network::Fvm => IPCDryRunProvider::fvm(self.preflight, FvmDryRun { evm: EvmDryRun }),
+            dry_run: None,
         }
     }
 
@@ -120,11 +118,11 @@ impl IpcProvider {
             Ok(Self::new(config, fvm_wallet, evm_keystore))
         } else {
             Ok(Self {
-                preflight: Preflight::new(config.clone(), None),
                 sender: None,
                 config,
                 fvm_wallet: None,
                 evm_keystore: None,
+                dry_run: None,
             })
         }
     }
@@ -147,16 +145,16 @@ impl IpcProvider {
                             None
                         }
                     };
-                    let manager =
-                        match EthSubnetManager::from_subnet_with_wallet_store(subnet, wallet) {
-                            Ok(w) => Some(w),
-                            Err(e) => {
-                                log::warn!("error initializing evm wallet: {e}");
-                                return None;
-                            }
-                        };
+
+                    let manager: Box<dyn SubnetManager> = match self.dry_run {
+                        Some(v) => Box::new(EvmSubnetDryRun::new(v)),
+                        None => Box::new(
+                            EthSubnetManager::from_subnet_with_wallet_store(subnet, wallet).ok()?,
+                        ),
+                    };
+
                     Some(Connection {
-                        manager: Box::new(manager.unwrap()),
+                        manager,
                         subnet: subnet.clone(),
                     })
                 }
@@ -240,10 +238,15 @@ impl IpcProvider {
 /// with the subnet configuration. This has been inherited by the daemon
 /// configuration and will be slowly deprecated.
 impl IpcProvider {
+    pub fn dry_run(&mut self, vm: VMType) -> &mut Self {
+        self.dry_run = Some(vm);
+        self
+    }
+
     pub async fn create_subnet(
         &mut self,
         from: Option<Address>,
-        params: ConstructParams,
+        mut params: ConstructParams,
     ) -> anyhow::Result<Address> {
         let conn = match self.connection(&params.parent) {
             None => return Err(anyhow!("target parent subnet not found")),
@@ -253,7 +256,7 @@ impl IpcProvider {
         let subnet_config = conn.subnet();
 
         let sender = self.check_sender(subnet_config, from)?;
-        let params = self.preflight.create_subnet(params)?;
+        params.ipc_gateway_addr = Some(subnet_config.gateway_addr());
 
         conn.manager().create_subnet(sender, params).await
     }

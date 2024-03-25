@@ -14,6 +14,11 @@ use serde::{Deserialize, Serialize};
 /// ID used in the builtin-actors bundle manifest
 pub const MANIFEST_ID: &str = "ipc_subnet_actor";
 
+const DEFAULT_ACTIVE_VALIDATORS: u16 = 100;
+const DEFAULT_POWER_SCALE: i8 = 3;
+/// The majority vote percentage for checkpoint submission when creating a subnet.
+const SUBNET_MAJORITY_PERCENTAGE: u8 = 67;
+
 /// Determines the permission mode for validators.
 #[repr(u8)]
 #[derive(
@@ -67,13 +72,14 @@ pub enum SupplyKind {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ConstructParams {
-    // optional fields, set to default if not provided
+    /// The gateway address. If not specified, it will be injected
+    /// with the default value based on each subnet configuration
     pub ipc_gateway_addr: Option<Address>,
-    pub power_scale: Option<i8>,
-    pub consensus: Option<ConsensusType>,
-    pub majority_percentage: Option<u8>,
-    pub active_validators_limit: Option<u16>,
 
+    pub power_scale: i8,
+    pub consensus: ConsensusType,
+    pub majority_percentage: u8,
+    pub active_validators_limit: u16,
     pub parent: SubnetID,
     pub min_validator_stake: TokenAmount,
     pub min_validators: u64,
@@ -95,10 +101,11 @@ impl ConstructParams {
     ) -> Self {
         Self {
             ipc_gateway_addr: None,
-            power_scale: None,
-            consensus: None,
-            majority_percentage: None,
-            active_validators_limit: None,
+
+            power_scale: DEFAULT_POWER_SCALE,
+            consensus: ConsensusType::Fendermint,
+            majority_percentage: SUBNET_MAJORITY_PERCENTAGE,
+            active_validators_limit: DEFAULT_ACTIVE_VALIDATORS,
 
             parent,
             min_validator_stake,

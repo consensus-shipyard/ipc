@@ -8,5 +8,4 @@ pub use subnet::{
 };
 
 pub mod evm;
-pub mod fvm;
 mod subnet;
