@@ -12,10 +12,7 @@ use std::collections::btree_map::BTreeMap;
 use std::collections::HashMap;
 
 use crate::config::serialize::{serialize_address_to_str, serialize_bytes_to_str};
-use crate::manager::{
-    BottomUpCheckpointRelayer, GetBlockHashResult, SubnetGenesisInfo, SubnetInfo, SubnetManager,
-    TopDownFinalityQuery, TopDownQueryPayload,
-};
+use crate::manager::{BottomUpCheckpointRelayer, EthSubnetManager, GetBlockHashResult, SubnetGenesisInfo, SubnetInfo, SubnetManager, TopDownFinalityQuery, TopDownQueryPayload};
 use crate::VMType;
 use fvm_ipld_encoding::{BytesSer, RawBytes};
 use fvm_shared::address::Address;
@@ -73,8 +70,13 @@ impl TryFrom<MockedEVMTxn> for MockedFVMTxn {
     }
 }
 
+/// EVM subnet dry run handler. For call transactions, it will directly execute the transaction and
+/// send to the chain to fetch actual data. For send transactions, it prints the payload to console.
 pub struct EvmSubnetDryRun {
+    /// The vm type that determines the message format
     vm_type: VMType,
+    /// The subnet manager caller
+    caller: EthSubnetManager,
 }
 
 #[async_trait]
@@ -97,146 +99,146 @@ impl SubnetManager for EvmSubnetDryRun {
 
     async fn join_subnet(
         &self,
-        subnet: SubnetID,
-        from: Address,
-        collateral: TokenAmount,
-        metadata: Vec<u8>,
+        _subnet: SubnetID,
+        _from: Address,
+        _collateral: TokenAmount,
+        _metadata: Vec<u8>,
     ) -> anyhow::Result<ChainEpoch> {
-        todo!()
+        self.todo()
     }
 
     async fn pre_fund(
         &self,
-        subnet: SubnetID,
-        from: Address,
-        balance: TokenAmount,
+        _subnet: SubnetID,
+        _from: Address,
+        _balance: TokenAmount,
     ) -> anyhow::Result<()> {
-        todo!()
+        self.todo()
     }
 
     async fn pre_release(
         &self,
-        subnet: SubnetID,
-        from: Address,
-        amount: TokenAmount,
+        _subnet: SubnetID,
+        _from: Address,
+        _amount: TokenAmount,
     ) -> anyhow::Result<()> {
-        todo!()
+        self.todo()
     }
 
     async fn stake(
         &self,
-        subnet: SubnetID,
-        from: Address,
-        collateral: TokenAmount,
+        _subnet: SubnetID,
+        _from: Address,
+        _collateral: TokenAmount,
     ) -> anyhow::Result<()> {
-        todo!()
+        self.todo()
     }
 
     async fn unstake(
         &self,
-        subnet: SubnetID,
-        from: Address,
-        collateral: TokenAmount,
+        _subnet: SubnetID,
+        _from: Address,
+        _collateral: TokenAmount,
     ) -> anyhow::Result<()> {
-        todo!()
+        self.todo()
     }
 
-    async fn leave_subnet(&self, subnet: SubnetID, from: Address) -> anyhow::Result<()> {
-        todo!()
+    async fn leave_subnet(&self, _subnet: SubnetID, _from: Address) -> anyhow::Result<()> {
+        self.todo()
     }
 
-    async fn kill_subnet(&self, subnet: SubnetID, from: Address) -> anyhow::Result<()> {
-        todo!()
+    async fn kill_subnet(&self, _subnet: SubnetID, _from: Address) -> anyhow::Result<()> {
+        self.todo()
     }
 
     async fn list_child_subnets(
         &self,
-        gateway_addr: Address,
+        _gateway_addr: Address,
     ) -> anyhow::Result<HashMap<SubnetID, SubnetInfo>> {
-        todo!()
+        self.todo()
     }
 
-    async fn claim_collateral(&self, subnet: SubnetID, from: Address) -> anyhow::Result<()> {
-        todo!()
+    async fn claim_collateral(&self, _subnet: SubnetID, _from: Address) -> anyhow::Result<()> {
+        self.todo()
     }
 
     async fn fund(
         &self,
-        subnet: SubnetID,
-        gateway_addr: Address,
-        from: Address,
-        to: Address,
-        amount: TokenAmount,
+        _subnet: SubnetID,
+        _gateway_addr: Address,
+        _from: Address,
+        _to: Address,
+        _amount: TokenAmount,
     ) -> anyhow::Result<ChainEpoch> {
-        todo!()
+        self.todo()
     }
 
     async fn fund_with_token(
         &self,
-        subnet: SubnetID,
-        from: Address,
-        to: Address,
-        amount: TokenAmount,
+        _subnet: SubnetID,
+        _from: Address,
+        _to: Address,
+        _amount: TokenAmount,
     ) -> anyhow::Result<ChainEpoch> {
-        todo!()
+        self.todo()
     }
 
     async fn release(
         &self,
-        gateway_addr: Address,
-        from: Address,
-        to: Address,
-        amount: TokenAmount,
+        _gateway_addr: Address,
+        _from: Address,
+        _to: Address,
+        _amount: TokenAmount,
     ) -> anyhow::Result<ChainEpoch> {
-        todo!()
+        self.todo()
     }
 
     async fn propagate(
         &self,
-        subnet: SubnetID,
-        gateway_addr: Address,
-        from: Address,
-        postbox_msg_key: Vec<u8>,
+        _subnet: SubnetID,
+        _gateway_addr: Address,
+        _from: Address,
+        _postbox_msg_key: Vec<u8>,
     ) -> anyhow::Result<()> {
-        todo!()
+        self.todo()
     }
 
     async fn send_value(
         &self,
-        from: Address,
-        to: Address,
-        amount: TokenAmount,
+        _from: Address,
+        _to: Address,
+        _amount: TokenAmount,
     ) -> anyhow::Result<()> {
-        todo!()
+        self.todo()
     }
 
     async fn wallet_balance(&self, address: &Address) -> anyhow::Result<TokenAmount> {
-        todo!()
+        self.caller.wallet_balance(address).await
     }
 
     async fn get_chain_id(&self) -> anyhow::Result<String> {
-        todo!()
+        self.caller.get_chain_id().await
     }
 
     async fn get_commit_sha(&self) -> anyhow::Result<[u8; 32]> {
-        todo!()
+        self.caller.get_commit_sha().await
     }
 
     async fn get_genesis_info(&self, subnet: &SubnetID) -> anyhow::Result<SubnetGenesisInfo> {
-        todo!()
+        self.caller.get_genesis_info(subnet).await
     }
 
     async fn add_bootstrap(
         &self,
-        subnet: &SubnetID,
-        from: &Address,
-        endpoint: String,
+        _subnet: &SubnetID,
+        _from: &Address,
+        _endpoint: String,
     ) -> anyhow::Result<()> {
-        todo!()
+        self.todo()
     }
 
     async fn list_bootstrap_nodes(&self, subnet: &SubnetID) -> anyhow::Result<Vec<String>> {
-        todo!()
+        self.caller.list_bootstrap_nodes(subnet).await
     }
 
     async fn get_validator_info(
@@ -244,18 +246,18 @@ impl SubnetManager for EvmSubnetDryRun {
         subnet: &SubnetID,
         validator: &Address,
     ) -> anyhow::Result<ValidatorInfo> {
-        todo!()
+        self.caller.get_validator_info(subnet, validator).await
     }
 
     async fn set_federated_power(
         &self,
-        from: &Address,
-        subnet: &SubnetID,
-        validators: &[Address],
-        public_keys: &[Vec<u8>],
-        federated_power: &[u128],
+        _from: &Address,
+        _subnet: &SubnetID,
+        _validators: &[Address],
+        _public_keys: &[Vec<u8>],
+        _federated_power: &[u128],
     ) -> anyhow::Result<ChainEpoch> {
-        todo!()
+        self.todo()
     }
 }
 
@@ -263,52 +265,52 @@ impl SubnetManager for EvmSubnetDryRun {
 impl BottomUpCheckpointRelayer for EvmSubnetDryRun {
     async fn submit_checkpoint(
         &self,
-        submitter: &Address,
-        checkpoint: BottomUpCheckpoint,
-        signatures: Vec<Signature>,
-        signatories: Vec<Address>,
+        _submitter: &Address,
+        _checkpoint: BottomUpCheckpoint,
+        _signatures: Vec<Signature>,
+        _signatories: Vec<Address>,
     ) -> anyhow::Result<ChainEpoch> {
-        todo!()
+        self.todo()
     }
 
     async fn last_bottom_up_checkpoint_height(
         &self,
         subnet_id: &SubnetID,
     ) -> anyhow::Result<ChainEpoch> {
-        todo!()
+        self.caller.last_bottom_up_checkpoint_height(subnet_id).await
     }
 
     async fn checkpoint_period(&self, subnet_id: &SubnetID) -> anyhow::Result<ChainEpoch> {
-        todo!()
+        self.caller.checkpoint_period(subnet_id).await
     }
 
     async fn checkpoint_bundle_at(
         &self,
         height: ChainEpoch,
     ) -> anyhow::Result<BottomUpCheckpointBundle> {
-        todo!()
+        self.caller.checkpoint_bundle_at(height).await
     }
 
     async fn quorum_reached_events(
         &self,
         height: ChainEpoch,
     ) -> anyhow::Result<Vec<QuorumReachedEvent>> {
-        todo!()
+        self.caller.quorum_reached_events(height).await
     }
 
     async fn current_epoch(&self) -> anyhow::Result<ChainEpoch> {
-        todo!()
+        BottomUpCheckpointRelayer::current_epoch(&self.caller).await
     }
 }
 
 #[async_trait]
 impl TopDownFinalityQuery for EvmSubnetDryRun {
     async fn genesis_epoch(&self, subnet_id: &SubnetID) -> anyhow::Result<ChainEpoch> {
-        todo!()
+        self.caller.genesis_epoch(subnet_id).await
     }
 
     async fn chain_head_height(&self) -> anyhow::Result<ChainEpoch> {
-        todo!()
+        self.caller.chain_head_height().await
     }
 
     async fn get_top_down_msgs(
@@ -316,11 +318,11 @@ impl TopDownFinalityQuery for EvmSubnetDryRun {
         subnet_id: &SubnetID,
         epoch: ChainEpoch,
     ) -> anyhow::Result<TopDownQueryPayload<Vec<IpcEnvelope>>> {
-        todo!()
+        self.caller.get_top_down_msgs(subnet_id, epoch).await
     }
 
     async fn get_block_hash(&self, height: ChainEpoch) -> anyhow::Result<GetBlockHashResult> {
-        todo!()
+        self.caller.get_block_hash(height).await
     }
 
     async fn get_validator_changeset(
@@ -328,17 +330,22 @@ impl TopDownFinalityQuery for EvmSubnetDryRun {
         subnet_id: &SubnetID,
         epoch: ChainEpoch,
     ) -> anyhow::Result<TopDownQueryPayload<Vec<StakingChangeRequest>>> {
-        todo!()
+        self.caller.get_validator_changeset(subnet_id, epoch).await
     }
 
     async fn latest_parent_finality(&self) -> anyhow::Result<ChainEpoch> {
-        todo!()
+        self.caller.latest_parent_finality().await
     }
 }
 
 impl EvmSubnetDryRun {
-    pub fn new(vm_type: VMType) -> Self {
-        Self { vm_type }
+    pub fn new(vm_type: VMType, caller: EthSubnetManager) -> Self {
+        Self { vm_type, caller }
+    }
+
+    /// A todo marker that does not panic
+    fn todo<T>(&self) -> anyhow::Result<T> {
+        Err(anyhow!("not implemented yet"))
     }
 
     fn create_subnet_evm(
