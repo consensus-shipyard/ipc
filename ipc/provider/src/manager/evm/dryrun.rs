@@ -12,7 +12,10 @@ use std::collections::btree_map::BTreeMap;
 use std::collections::HashMap;
 
 use crate::config::serialize::{serialize_address_to_str, serialize_bytes_to_str};
-use crate::manager::{BottomUpCheckpointRelayer, EthSubnetManager, GetBlockHashResult, SubnetGenesisInfo, SubnetInfo, SubnetManager, TopDownFinalityQuery, TopDownQueryPayload};
+use crate::manager::{
+    BottomUpCheckpointRelayer, EthSubnetManager, GetBlockHashResult, SubnetGenesisInfo, SubnetInfo,
+    SubnetManager, TopDownFinalityQuery, TopDownQueryPayload,
+};
 use crate::VMType;
 use fvm_ipld_encoding::{BytesSer, RawBytes};
 use fvm_shared::address::Address;
@@ -277,7 +280,9 @@ impl BottomUpCheckpointRelayer for EvmSubnetDryRun {
         &self,
         subnet_id: &SubnetID,
     ) -> anyhow::Result<ChainEpoch> {
-        self.caller.last_bottom_up_checkpoint_height(subnet_id).await
+        self.caller
+            .last_bottom_up_checkpoint_height(subnet_id)
+            .await
     }
 
     async fn checkpoint_period(&self, subnet_id: &SubnetID) -> anyhow::Result<ChainEpoch> {

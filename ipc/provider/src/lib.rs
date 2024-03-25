@@ -146,7 +146,8 @@ impl IpcProvider {
                         }
                     };
 
-                    let evm = EthSubnetManager::from_subnet_with_wallet_store(subnet, wallet).ok()?;
+                    let evm =
+                        EthSubnetManager::from_subnet_with_wallet_store(subnet, wallet).ok()?;
                     let manager: Box<dyn SubnetManager> = match self.dry_run {
                         Some(v) => Box::new(EvmSubnetDryRun::new(v, evm)),
                         None => Box::new(evm),
