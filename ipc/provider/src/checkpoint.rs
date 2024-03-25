@@ -5,13 +5,16 @@
 use crate::config::Subnet;
 use crate::manager::{BottomUpCheckpointRelayer, EthSubnetManager};
 use anyhow::{anyhow, Result};
+use futures_util::future::join_all;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
+use ipc_api::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
 use ipc_wallet::{EthKeyAddress, PersistentKeyStore};
 use std::cmp::max;
 use std::fmt::{Display, Formatter};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+use tokio::sync::Semaphore;
 
 /// Tracks the config required for bottom up checkpoint submissions
 /// parent/child subnet and checkpoint period.
@@ -26,10 +29,11 @@ pub struct CheckpointConfig {
 /// Then it will submit at the next submission height for the new checkpoint.
 pub struct BottomUpCheckpointManager<T> {
     metadata: CheckpointConfig,
-    parent_handler: T,
+    parent_handler: Arc<T>,
     child_handler: T,
     /// The number of blocks away from the chain head that is considered final
     finalization_blocks: ChainEpoch,
+    submission_semaphore: Arc<Semaphore>,
 }
 
 impl<T: BottomUpCheckpointRelayer> BottomUpCheckpointManager<T> {
@@ -49,9 +53,10 @@ impl<T: BottomUpCheckpointRelayer> BottomUpCheckpointManager<T> {
                 child,
                 period,
             },
-            parent_handler,
+            parent_handler: Arc::new(parent_handler),
             child_handler,
             finalization_blocks: 0,
+            submission_semaphore: Arc::new(Semaphore::new(4)),
         })
     }
 
@@ -106,16 +111,16 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         log::info!("launching {self} for {submitter}");
 
         loop {
-            if let Err(e) = self.submit_next_epoch(&submitter).await {
+            if let Err(e) = self.submit_next_epoch(submitter.clone()).await {
                 log::error!("cannot submit checkpoint for submitter: {submitter} due to {e}");
             }
-
+            log::debug!("JIEJIE: Sleeping for {:?}", submission_interval);
             tokio::time::sleep(submission_interval).await;
         }
     }
 
     /// Checks if the relayer has already submitted at the next submission epoch, if not it submits it.
-    async fn submit_next_epoch(&self, submitter: &Address) -> Result<()> {
+    async fn submit_next_epoch(&self, submitter: Address) -> Result<()> {
         let last_checkpoint_epoch = self
             .parent_handler
             .last_bottom_up_checkpoint_height(&self.metadata.child.id)
@@ -136,6 +141,10 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
 
         let start = last_checkpoint_epoch + 1;
         log::debug!("start querying quorum reached events from : {start} to {finalized_height}");
+
+        log::debug!("JIEJIE: Start a round of submission!");
+        let mut count = 0;
+        let mut all_submit_tasks = vec![];
 
         for h in start..=finalized_height {
             let events = self.child_handler.quorum_reached_events(h).await?;
@@ -162,30 +171,70 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                     .await?;
                 log::debug!("bottom up bundle: {bundle:?}");
 
-                let epoch = self
-                    .parent_handler
-                    .submit_checkpoint(
-                        submitter,
-                        bundle.checkpoint,
-                        bundle.signatures,
-                        bundle.signatories,
+                log::debug!("JIEJIE: Trying to acquire a permit for submission");
+                log::debug!("JIEJIE: ... available permits: {:}", self.submission_semaphore.available_permits());
+                // We support parallel checkpoint submission using FIFO order with a limited parallelism (controlled by
+                // the size of submission_semaphore).
+                // We need to acquire a permit (from a limited permit pool) before submitting a checkpoint.
+                // We may wait here until a permit is available.
+                let parent_handler_clone = Arc::clone(&self.parent_handler);
+                let submission_permit = self.submission_semaphore.clone().acquire_owned().await.unwrap();
+                log::debug!("JIEJIE: GOT A PERMIT. GOING TO SUBMIT A CHECKPOINT NOW!");
+                all_submit_tasks.push(tokio::task::spawn(async move {
+                    Self::submit_checkpoint(
+                        parent_handler_clone,
+                        submitter.clone(),
+                        bundle,
+                        event,
                     )
-                    .await
-                    .map_err(|e| {
-                        anyhow!(
-                            "cannot submit bottom up checkpoint at height {} due to: {e:}",
-                            event.height
-                        )
-                    })?;
+                    .await;
+                    drop(submission_permit);
+                }));
 
-                log::info!(
-                    "submitted bottom up checkpoint({}) in parent at height {}",
-                    event.height,
-                    epoch
+                count += 1;
+                log::debug!(
+                    "JIEJIE: This round has asynchronously submitted {:} checkpoints!",
+                    count
                 );
             }
         }
 
+        log::debug!("JIEJIE: Waiting for all submissions to finish theirs execution");
+        join_all(all_submit_tasks).await;
+        log::debug!(
+            "JIEJIE: End a round of submission, {:} submit tasks finished!",
+            count
+        );
+
         Ok(())
+    }
+
+    async fn submit_checkpoint(
+        parent_handler: Arc<T>,  // Can't clone. Use Arc
+        submitter: Address,  // Just clone
+        bundle: BottomUpCheckpointBundle,  // Moved here
+        event: QuorumReachedEvent,  // Moved here
+    ) {
+        let epoch = parent_handler
+            .submit_checkpoint(
+                &submitter,
+                bundle.checkpoint,
+                bundle.signatures,
+                bundle.signatories,
+            )
+            .await
+            .map_err(|e| {
+                anyhow!(
+                    "cannot submit bottom up checkpoint at height {} due to: {e:}",
+                    event.height
+                )
+            })
+            .unwrap();
+
+        log::info!(
+            "submitted bottom up checkpoint({}) in parent at height {}",
+            event.height,
+            epoch
+        );
     }
 }
