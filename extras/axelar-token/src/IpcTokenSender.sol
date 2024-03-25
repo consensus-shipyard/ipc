@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import { IInterchainTokenService } from "@axelar-network/interchain-token-service/interfaces/IInterchainTokenService.sol";
-import { AddressBytes } from "@axelar-network/axelar-gmp-sdk-solidity/contracts/libs/AddressBytes.sol";
-import { IERC20 } from "openzeppelin-contracts/interfaces/IERC20.sol";
-import { SubnetID } from "@ipc/src/structs/Subnet.sol";
+import {IInterchainTokenService} from "@axelar-network/interchain-token-service/interfaces/IInterchainTokenService.sol";
+import {AddressBytes} from "@axelar-network/axelar-gmp-sdk-solidity/contracts/libs/AddressBytes.sol";
+import {IERC20} from "openzeppelin-contracts/interfaces/IERC20.sol";
+import {SubnetID} from "@ipc/src/structs/Subnet.sol";
 
 // @notice The IpcTokenSender can be deployed in an Axelar-supported L1 containing the canonical version of some ERC20
 //         token (e.g. Ethereum, Polygon, etc.) we want to transfer to an token-supply IPC subnet anchored on another
@@ -41,7 +41,7 @@ contract IpcTokenSender {
         // Tell the IpcTokenHandler on the IPC L1 rootnet to credit these funds to the specified beneficiary
         // in the designated subnet.
         bytes memory payload = abi.encode(subnet, recipient);
-        _axelarIts.callContractWithInterchainToken{ value: msg.value }(
+        _axelarIts.callContractWithInterchainToken{value: msg.value}(
             tokenId,
             _destinationChain,
             _destinationTokenHandler,

@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { InterchainTokenExecutable } from '@axelar-network/interchain-token-service/executable/InterchainTokenExecutable.sol';
-import { IERC20 } from "openzeppelin-contracts/interfaces/IERC20.sol";
-import { Ownable } from "openzeppelin-contracts/access/Ownable.sol";
-import { SubnetID, SupplySource, SupplyKind } from "@ipc/src/structs/Subnet.sol";
-import { FvmAddress } from "@ipc/src/structs/FvmAddress.sol";
-import { IpcHandler } from "@ipc/sdk/IpcContract.sol";
-import { IpcMsgKind, ResultMsg, OutcomeType, IpcEnvelope } from "@ipc/src/structs/CrossNet.sol";
-import { FvmAddressHelper } from "@ipc/src/lib/FvmAddressHelper.sol";
-import { SubnetIDHelper } from "@ipc/src/lib/SubnetIDHelper.sol";
-import { SafeERC20 } from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
+import {InterchainTokenExecutable} from "@axelar-network/interchain-token-service/executable/InterchainTokenExecutable.sol";
+import {IERC20} from "openzeppelin-contracts/interfaces/IERC20.sol";
+import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
+import {SubnetID, SupplySource, SupplyKind} from "@ipc/src/structs/Subnet.sol";
+import {FvmAddress} from "@ipc/src/structs/FvmAddress.sol";
+import {IpcHandler} from "@ipc/sdk/IpcContract.sol";
+import {IpcMsgKind, ResultMsg, OutcomeType, IpcEnvelope} from "@ipc/src/structs/CrossNet.sol";
+import {FvmAddressHelper} from "@ipc/src/lib/FvmAddressHelper.sol";
+import {SubnetIDHelper} from "@ipc/src/lib/SubnetIDHelper.sol";
+import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 
 interface TokenFundedGateway {
     function fundWithToken(SubnetID calldata subnetId, FvmAddress calldata to, uint256 amount) external;
@@ -37,7 +37,11 @@ contract IpcTokenHandler is InterchainTokenExecutable, IpcHandler, Ownable {
 
     TokenFundedGateway public _ipcGateway;
 
-    constructor(address axelarIts, address ipcGateway, address admin) InterchainTokenExecutable(axelarIts) Ownable(admin) {
+    constructor(
+        address axelarIts,
+        address ipcGateway,
+        address admin
+    ) InterchainTokenExecutable(axelarIts) Ownable(admin) {
         _ipcGateway = TokenFundedGateway(ipcGateway);
     }
 
@@ -115,5 +119,4 @@ contract IpcTokenHandler is InterchainTokenExecutable, IpcHandler, Ownable {
     function adminTokenIncreaseAllowance(address token, uint256 amount) external onlyOwner {
         IERC20(token).safeIncreaseAllowance(owner(), amount);
     }
-
 }
