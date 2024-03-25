@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "openzeppelin-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import { Script, console2 as console } from "forge-std/Script.sol";
+import {Script, console2 as console} from "forge-std/Script.sol";
 import "../src/IpcTokenHandler.sol";
 import "../src/IpcTokenSender.sol";
 
@@ -29,7 +29,6 @@ contract Deploy is Script {
     }
 
     function deployTokenHandlerProxy() public {
-
         string memory network = vm.envString("DEST_NETWORK");
         uint256 privateKey = vm.envUint(string.concat(network, "__PRIVATE_KEY"));
 
@@ -42,15 +41,18 @@ contract Deploy is Script {
         address handlerAddrImplementation = vm.parseJsonAddress(readJson, ".dest.token_handler_implementation");
         console.log("handler implementation address: %s", handlerAddrImplementation);
 
-
         address axelarIts = vm.envAddress(string.concat(network, "__AXELAR_ITS_ADDRESS"));
         address ipcGateway = vm.envAddress(string.concat(network, "__IPC_GATEWAY_ADDRESS"));
-        address handlerAdmin= vm.envAddress(string.concat(network, "__HANDLER_ADMIN_ADDRESS"));
+        address handlerAdmin = vm.envAddress(string.concat(network, "__HANDLER_ADMIN_ADDRESS"));
 
         bytes memory initCall = abi.encodeCall(IpcTokenHandler.initialize, (axelarIts, ipcGateway, handlerAdmin));
 
         vm.startBroadcast(privateKey);
-        TransparentUpgradeableProxy transparentProxy = new TransparentUpgradeableProxy(handlerAddrImplementation, handlerAdmin, initCall);
+        TransparentUpgradeableProxy transparentProxy = new TransparentUpgradeableProxy(
+            handlerAddrImplementation,
+            handlerAdmin,
+            initCall
+        );
         vm.stopBroadcast();
 
         IpcTokenHandler handler = IpcTokenHandler(address(transparentProxy));
@@ -65,10 +67,13 @@ contract Deploy is Script {
     }
 
     function getPath() public returns (string memory path) {
-            path = string.concat(vm.projectRoot(), "/out/addresses.json");
-            if (!vm.exists(path)) {
-                vm.writeJson("{\"dest\":{\"token_handler\":{}, \"token_handler_implementation\":{} },\"src\":{\"token_sender\":{}, \"token_sender_implementation\":{}}}", path);
-            }
+        path = string.concat(vm.projectRoot(), "/out/addresses.json");
+        if (!vm.exists(path)) {
+            vm.writeJson(
+                '{"dest":{"token_handler":{}, "token_handler_implementation":{} },"src":{"token_sender":{}, "token_sender_implementation":{}}}',
+                path
+            );
+        }
     }
 
     function checkPathExists() public {
@@ -112,20 +117,25 @@ contract Deploy is Script {
         address senderImplementationAddr = vm.parseJsonAddress(json, ".src.token_sender_implementation");
         console.log("sender implementation: %s", handlerAddr);
 
-
         console.log("deploying token sender to %s...", originNetwork);
 
         // Deploy the sender on Mumbai.
         vm.startBroadcast(privateKey);
 
-
-        address axelarIts= vm.envAddress(string.concat(destNetwork, "__AXELAR_ITS_ADDRESS"));
-        string memory destinationChain= vm.envString(string.concat(destNetwork, "__AXELAR_CHAIN_NAME"));
+        address axelarIts = vm.envAddress(string.concat(destNetwork, "__AXELAR_ITS_ADDRESS"));
+        string memory destinationChain = vm.envString(string.concat(destNetwork, "__AXELAR_CHAIN_NAME"));
         address senderAdmin = vm.envAddress(string.concat(originNetwork, "__SENDER_ADMIN_ADDRESS"));
 
-        bytes memory initCall = abi.encodeCall(IpcTokenSender.initialize, (axelarIts, destinationChain, handlerAddr, senderAdmin));
+        bytes memory initCall = abi.encodeCall(
+            IpcTokenSender.initialize,
+            (axelarIts, destinationChain, handlerAddr, senderAdmin)
+        );
 
-        TransparentUpgradeableProxy sender = new TransparentUpgradeableProxy(address(senderImplementationAddr), senderAdmin, initCall);
+        TransparentUpgradeableProxy sender = new TransparentUpgradeableProxy(
+            address(senderImplementationAddr),
+            senderAdmin,
+            initCall
+        );
 
         vm.stopBroadcast();
 

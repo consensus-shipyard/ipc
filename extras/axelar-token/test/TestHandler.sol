@@ -13,8 +13,11 @@ import "openzeppelin-contracts/proxy/transparent/TransparentUpgradeableProxy.sol
 contract TestHandler is Test {
     using FvmAddressHelper for address;
 
-
-    function newIpcTokenHandler(address axelarIts, address ipcGateway, address owner) internal returns (IpcTokenHandler handler) {
+    function newIpcTokenHandler(
+        address axelarIts,
+        address ipcGateway,
+        address owner
+    ) internal returns (IpcTokenHandler handler) {
         bytes memory initCall = abi.encodeCall(IpcTokenHandler.initialize, (axelarIts, ipcGateway, owner));
         IpcTokenHandler initialImplementation = new IpcTokenHandler();
         TransparentUpgradeableProxy transparentProxy = new TransparentUpgradeableProxy(

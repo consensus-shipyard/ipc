@@ -2,16 +2,14 @@
 pragma solidity ^0.8.20;
 
 import "openzeppelin-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import { Script, console2 as console } from "forge-std/Script.sol";
+import {Script, console2 as console} from "forge-std/Script.sol";
 import "../src/IpcTokenHandler.sol";
 import "../src/IpcTokenSender.sol";
-
 
 contract Upgrade is Script {
     function setUp() public {}
 
     function upgradeTokenSenderProxy() public {
-
         string memory network = vm.envString("ORIGIN_NETWORK");
         uint256 privateKey = vm.envUint(string.concat(network, "__PRIVATE_KEY"));
 
@@ -32,11 +30,14 @@ contract Upgrade is Script {
         address handlerAddr = vm.parseJsonAddress(readJson, ".dest.token_handler");
         console.log("handler proxy address: %s", handlerAddr);
 
-        address axelarIts= vm.envAddress(string.concat(network, "__AXELAR_ITS_ADDRESS"));
-        string memory destinationChain= vm.envString(string.concat(network, "__AXELAR_CHAIN_NAME"));
+        address axelarIts = vm.envAddress(string.concat(network, "__AXELAR_ITS_ADDRESS"));
+        string memory destinationChain = vm.envString(string.concat(network, "__AXELAR_CHAIN_NAME"));
         address senderAdmin = vm.envAddress(string.concat(network, "__SENDER_ADMIN_ADDRESS"));
 
-        bytes memory initCall = abi.encodeCall(IpcTokenSender.reinitialize, (axelarIts, destinationChain, handlerAddr, senderAdmin));
+        bytes memory initCall = abi.encodeCall(
+            IpcTokenSender.reinitialize,
+            (axelarIts, destinationChain, handlerAddr, senderAdmin)
+        );
 
         vm.startBroadcast(privateKey);
         IpcTokenSender sender = IpcTokenSender(address(senderAddr));
@@ -45,9 +46,7 @@ contract Upgrade is Script {
         console.log("token sender proxy upgraded on %s: %s", network, address(sender));
     }
 
-
     function upgradeTokenHandlerProxy() public {
-
         string memory network = vm.envString("DEST_NETWORK");
         uint256 privateKey = vm.envUint(string.concat(network, "__PRIVATE_KEY"));
 
@@ -64,11 +63,9 @@ contract Upgrade is Script {
         address handlerAddr = vm.parseJsonAddress(readJson, ".dest.token_handler");
         console.log("handler proxy address: %s", handlerAddr);
 
-
-
-        address axelarIts= vm.envAddress(string.concat(network, "__AXELAR_ITS_ADDRESS"));
-        address ipcGateway= vm.envAddress(string.concat(network, "__IPC_GATEWAY_ADDRESS"));
-        address handlerAdmin= vm.envAddress(string.concat(network, "__HANDLER_ADMIN_ADDRESS"));
+        address axelarIts = vm.envAddress(string.concat(network, "__AXELAR_ITS_ADDRESS"));
+        address ipcGateway = vm.envAddress(string.concat(network, "__IPC_GATEWAY_ADDRESS"));
+        address handlerAdmin = vm.envAddress(string.concat(network, "__HANDLER_ADMIN_ADDRESS"));
 
         bytes memory initCall = abi.encodeCall(IpcTokenHandler.reinitialize, (axelarIts, ipcGateway, handlerAdmin));
 
@@ -80,19 +77,17 @@ contract Upgrade is Script {
     }
 
     function getPath() public returns (string memory path) {
-            path = string.concat(vm.projectRoot(), "/out/addresses.json");
-            if (!vm.exists(path)) {
-                vm.writeJson("{\"dest\":{\"token_handler\":{}, \"token_handler_implementation\":{} },\"src\":{\"token_sender\":{}, \"token_sender_implementation\":{}}}", path);
-            }
+        path = string.concat(vm.projectRoot(), "/out/addresses.json");
+        if (!vm.exists(path)) {
+            vm.writeJson(
+                '{"dest":{"token_handler":{}, "token_handler_implementation":{} },"src":{"token_sender":{}, "token_sender_implementation":{}}}',
+                path
+            );
+        }
     }
 
     function checkPathExists() public {
         string memory path = string.concat(vm.projectRoot(), "/out/addresses.json");
         require(vm.exists(path), "no addresses.json; please run DeployTokenHandler on the destination chain");
     }
-
-
-
-
 }
-
