@@ -190,7 +190,9 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                     .await
                     .unwrap();
                 all_submit_tasks.push(tokio::task::spawn(async move {
-                    match Self::submit_checkpoint(parent_handler_clone, submitter, bundle, event).await {
+                    match Self::submit_checkpoint(parent_handler_clone, submitter, bundle, event)
+                        .await
+                    {
                         Ok(()) => {
                             log::debug!("Successfully submitted checkpoint");
                         }
