@@ -14,6 +14,7 @@ use async_tempfile::TempFile;
 use bytes::{Buf, Bytes};
 use cid::Cid;
 use futures_util::{Stream, StreamExt};
+use fvm::machine::limiter;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::BLOCK_GAS_LIMIT;
 use ipfs_api_backend_hyper::{IpfsApi, IpfsClient, TryFromUri};
@@ -94,6 +95,7 @@ cmd! {
                     .and(warp::get())
                     .and(with_client(client.clone()))
                     .and(with_args(args.clone()))
+                    .and(warp::query::<ListQuery>())
                     .and(warp::query::<HeightQuery>())
                     .and_then(handle_os_list);
 
@@ -390,18 +392,33 @@ async fn handle_os_get(
     }
 }
 
+#[derive(Serialize, Deserialize)]
+struct ListQuery {
+    pub prefix: Option<String>,
+    pub delimiter: Option<String>,
+    pub limit: Option<u64>,
+}
+
 async fn handle_os_list(
+    options: ListQuery,
     client: FendermintClient,
     args: TransArgs,
     hq: HeightQuery,
 ) -> Result<impl Reply, Rejection> {
-    let res = os_list(client, args, hq.height.unwrap_or(0))
-        .await
-        .map_err(|e| {
-            Rejection::from(BadRequest {
-                message: format!("list error: {}", e),
-            })
-        })?;
+    let res = os_list(
+        client,
+        args,
+        options.prefix.unwrap_or_default(),
+        options.delimiter.unwrap_or_default(),
+        options.limit.unwrap_or(0),
+        hq.height.unwrap_or(0),
+    )
+    .await
+    .map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("list error: {}", e),
+        })
+    })?;
 
     let list = res
         .unwrap_or_default()
@@ -618,6 +635,9 @@ async fn os_get(
 async fn os_list(
     client: FendermintClient,
     args: TransArgs,
+    prefix: String,
+    delimiter: String,
+    limit: u64,
     height: u64,
 ) -> anyhow::Result<Option<Vec<(Vec<u8>, Object)>>> {
     let mut client = TransClient::new(client, &args)?;
@@ -626,7 +646,14 @@ async fn os_list(
 
     let res = client
         .inner
-        .os_list_call(TokenAmount::default(), gas_params, h)
+        .os_list_call(
+            prefix,
+            delimiter,
+            limit,
+            TokenAmount::default(),
+            gas_params,
+            h,
+        )
         .await?;
 
     Ok(res.return_data)

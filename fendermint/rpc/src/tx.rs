@@ -183,11 +183,16 @@ pub trait CallClient: QueryClient + BoundClient {
     /// List objects in an object store without including a transaction on the blockchain.
     async fn os_list_call(
         &mut self,
+        prefix: String,
+        delimiter: String,
+        limit: u64,
         value: TokenAmount,
         gas_params: GasParams,
         height: FvmQueryHeight,
     ) -> anyhow::Result<CallResponse<Vec<(Vec<u8>, Object)>>> {
-        let msg = self.message_factory_mut().os_list(value, gas_params)?;
+        let msg = self
+            .message_factory_mut()
+            .os_list(prefix, delimiter, limit, value, gas_params)?;
 
         let response = self.call(msg, height).await?;
         if response.value.code.is_err() {

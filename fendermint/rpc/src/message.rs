@@ -267,13 +267,22 @@ impl SignedMessageFactory {
     /// List objects in an object store. This will not create a transaction.
     pub fn os_list(
         &mut self,
+        prefix: String,
+        delimiter: String,
+        limit: u64,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<Message> {
+        let input = fendermint_actor_objectstore::ListOptions {
+            prefix,
+            delimiter,
+            limit,
+        };
+        let params = RawBytes::serialize(input)?;
         let message = self.transaction(
             objectstore::OBJECTSTORE_ACTOR_ADDR,
             fendermint_actor_objectstore::Method::ListObjects as u64,
-            RawBytes::default(),
+            params,
             value,
             gas_params,
             None,

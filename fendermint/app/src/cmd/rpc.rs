@@ -66,9 +66,9 @@ cmd! {
                     let height = Height::try_from(height)?;
                     os_get_call(client, args, key, height).await
                 }
-                RpcObjectStoreCommands::List { height } => {
+                RpcObjectStoreCommands::List { height, prefix, delimiter, limit } => {
                     let height = Height::try_from(height)?;
-                    os_list_call(client, args, height).await
+                    os_list_call(client, args, prefix, delimiter, limit, height).await
                 }
             },
             RpcCommands::Acc { args, command } => match command {
@@ -257,6 +257,9 @@ async fn os_get_call(
 async fn os_list_call(
     client: FendermintClient,
     args: TransArgs,
+    prefix: String,
+    delimiter: String,
+    limit: u64,
     height: Height,
 ) -> anyhow::Result<()> {
     let mut client = TransClient::new(client, &args)?;
@@ -264,7 +267,10 @@ async fn os_list_call(
     let value = args.value;
     let height = FvmQueryHeight::from(height.value());
 
-    let res = client.inner.os_list_call(value, gas_params, height).await?;
+    let res = client
+        .inner
+        .os_list_call(prefix, delimiter, limit, value, gas_params, height)
+        .await?;
 
     let json = json!({"response": res.response, "return_data": res.return_data});
 

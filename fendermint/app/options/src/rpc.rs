@@ -133,6 +133,12 @@ pub enum RpcObjectStoreCommands {
     },
     /// List all keys in an object store.
     List {
+        #[arg(long, short, default_value = "")]
+        prefix: String,
+        #[arg(long, short, default_value = "")]
+        delimiter: String,
+        #[arg(long, short, default_value_t = 0)]
+        limit: u64,
         /// Block height to query; 0 means latest.
         #[arg(long, short = 'b', default_value_t = 0)]
         height: u64,
