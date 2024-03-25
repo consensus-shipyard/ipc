@@ -13,7 +13,7 @@ use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_ipld_hamt::BytesKey;
 use fvm_shared::{error::ExitCode, MethodNum};
 
-use crate::{Method, Object, ObjectParams, State, OBJECTSTORE_ACTOR_NAME};
+use crate::{ListOptions, Method, Object, ObjectList, ObjectParams, State, OBJECTSTORE_ACTOR_NAME};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
@@ -95,12 +95,28 @@ impl Actor {
             .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get object"))
     }
 
-    #[allow(clippy::type_complexity)]
-    fn list_objects(rt: &impl Runtime) -> Result<Option<Vec<(Vec<u8>, Object)>>, ActorError> {
+    fn list_objects(
+        rt: &impl Runtime,
+        params: ListOptions,
+    ) -> Result<Option<ObjectList>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-
+        let prefix = if params.prefix.is_empty() {
+            None
+        } else {
+            Some(BytesKey(params.prefix))
+        };
+        let delimiter = if params.delimiter.is_empty() {
+            None
+        } else {
+            Some(BytesKey(params.delimiter))
+        };
+        let limit = if params.limit == 0 {
+            None
+        } else {
+            Some(params.limit)
+        };
         let st: State = rt.state()?;
-        let objects = st.list(rt.store()).map_err(|e| {
+        let objects = st.list(rt.store(), prefix, delimiter, limit).map_err(|e| {
             e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to list objects")
         })?;
         Ok(Some(objects))
