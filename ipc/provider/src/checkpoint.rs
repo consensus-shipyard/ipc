@@ -114,7 +114,6 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
             if let Err(e) = self.submit_next_epoch(submitter.clone()).await {
                 log::error!("cannot submit checkpoint for submitter: {submitter} due to {e}");
             }
-            log::debug!("JIEJIE: Sleeping for {:?}", submission_interval);
             tokio::time::sleep(submission_interval).await;
         }
     }
@@ -142,7 +141,6 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         let start = last_checkpoint_epoch + 1;
         log::debug!("start querying quorum reached events from : {start} to {finalized_height}");
 
-        log::debug!("JIEJIE: Start a round of submission!");
         let mut count = 0;
         let mut all_submit_tasks = vec![];
 
@@ -171,15 +169,12 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                     .await?;
                 log::debug!("bottom up bundle: {bundle:?}");
 
-                log::debug!("JIEJIE: Trying to acquire a permit for submission");
-                log::debug!("JIEJIE: ... available permits: {:}", self.submission_semaphore.available_permits());
                 // We support parallel checkpoint submission using FIFO order with a limited parallelism (controlled by
                 // the size of submission_semaphore).
                 // We need to acquire a permit (from a limited permit pool) before submitting a checkpoint.
                 // We may wait here until a permit is available.
                 let parent_handler_clone = Arc::clone(&self.parent_handler);
                 let submission_permit = self.submission_semaphore.clone().acquire_owned().await.unwrap();
-                log::debug!("JIEJIE: GOT A PERMIT. GOING TO SUBMIT A CHECKPOINT NOW!");
                 all_submit_tasks.push(tokio::task::spawn(async move {
                     Self::submit_checkpoint(
                         parent_handler_clone,
@@ -193,18 +188,14 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
 
                 count += 1;
                 log::debug!(
-                    "JIEJIE: This round has asynchronously submitted {:} checkpoints!",
+                    "This round has asynchronously submitted {:} checkpoints",
                     count
                 );
             }
         }
 
-        log::debug!("JIEJIE: Waiting for all submissions to finish theirs execution");
+        log::debug!("Waiting for all submissions to finish");
         join_all(all_submit_tasks).await;
-        log::debug!(
-            "JIEJIE: End a round of submission, {:} submit tasks finished!",
-            count
-        );
 
         Ok(())
     }
