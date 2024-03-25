@@ -111,7 +111,7 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         log::info!("launching {self} for {submitter}");
 
         loop {
-            if let Err(e) = self.submit_next_epoch(submitter.clone()).await {
+            if let Err(e) = self.submit_next_epoch(submitter).await {
                 log::error!("cannot submit checkpoint for submitter: {submitter} due to {e}");
             }
             tokio::time::sleep(submission_interval).await;
@@ -174,15 +174,14 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                 // We need to acquire a permit (from a limited permit pool) before submitting a checkpoint.
                 // We may wait here until a permit is available.
                 let parent_handler_clone = Arc::clone(&self.parent_handler);
-                let submission_permit = self.submission_semaphore.clone().acquire_owned().await.unwrap();
+                let submission_permit = self
+                    .submission_semaphore
+                    .clone()
+                    .acquire_owned()
+                    .await
+                    .unwrap();
                 all_submit_tasks.push(tokio::task::spawn(async move {
-                    Self::submit_checkpoint(
-                        parent_handler_clone,
-                        submitter.clone(),
-                        bundle,
-                        event,
-                    )
-                    .await;
+                    Self::submit_checkpoint(parent_handler_clone, submitter, bundle, event).await;
                     drop(submission_permit);
                 }));
 
@@ -201,10 +200,10 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
     }
 
     async fn submit_checkpoint(
-        parent_handler: Arc<T>,  // Can't clone. Use Arc
-        submitter: Address,  // Just clone
-        bundle: BottomUpCheckpointBundle,  // Moved here
-        event: QuorumReachedEvent,  // Moved here
+        parent_handler: Arc<T>,
+        submitter: Address,
+        bundle: BottomUpCheckpointBundle,
+        event: QuorumReachedEvent,
     ) {
         let epoch = parent_handler
             .submit_checkpoint(
