@@ -159,7 +159,14 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                 let bundle = self
                     .child_handler
                     .checkpoint_bundle_at(event.height)
-                    .await?;
+                    .await?
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "expected checkpoint at height {} but none found",
+                            event.height
+                        )
+                    })?;
+
                 log::debug!("bottom up bundle: {bundle:?}");
 
                 let epoch = self

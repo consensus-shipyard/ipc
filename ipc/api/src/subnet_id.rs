@@ -9,6 +9,8 @@ use std::fmt::Write;
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 
+use crate::as_human_readable_str;
+
 use crate::error::Error;
 
 /// MaxChainID is the maximum chain ID value
@@ -25,6 +27,8 @@ pub struct SubnetID {
     root: u64,
     children: Vec<Address>,
 }
+
+as_human_readable_str!(SubnetID);
 
 lazy_static! {
     pub static ref UNDEF: SubnetID = SubnetID {
