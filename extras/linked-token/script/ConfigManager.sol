@@ -5,24 +5,26 @@ pragma solidity 0.8.23;
 import {Script} from "forge-std/Script.sol";
 
 contract ConfigManager is Script {
-
     string private configPath = "config.json"; // Path to your JSON config file
 
     // Reads a value from the JSON config
-    function readConfig(string memory key) internal returns (bytes memory value) {
+    function readConfig(
+        string memory key
+    ) internal returns (bytes memory value) {
         string memory path = string.concat(vm.projectRoot(), "/", configPath);
         require(vm.exists(path), "Config file does not exist.");
         string memory jsonData = vm.readFile(path);
         value = vm.parseJson(jsonData, key);
     }
 
-    function readConfigAddress(string memory key) internal returns (address value) {
+    function readConfigAddress(
+        string memory key
+    ) internal returns (address value) {
         string memory path = string.concat(vm.projectRoot(), "/", configPath);
         require(vm.exists(path), "Config file does not exist.");
         string memory json = vm.readFile(path);
         value = vm.parseJsonAddress(json, key);
     }
-
 
     // Writes a value to the JSON config
     function writeConfig(string memory key, string memory value) internal {
@@ -33,11 +35,11 @@ contract ConfigManager is Script {
             jsonData = vm.readFile(path);
         } else {
             // If the file doesn't exist, initialize an empty JSON object
-            jsonData = "{\"LinkedToken\":{\"USDCTest\":{}, \"LinkedTokenReplica\":{}, \"LinkedTokenController\":{}}}";
+            jsonData = '{"LinkedToken":{"USDCTest":{}, "LinkedTokenReplica":{}, "LinkedTokenController":{},"Glif":{}, "Stfil":{}, "CollectifDao": {}, "Repl": {}, "SftProtocol": {}, "FiletFinance": {}}';
             vm.writeJson(jsonData, path);
         }
 
-        vm.writeJson( value, path, string.concat(".LinkedToken.", key));
+        vm.writeJson(value, path, string.concat(".LinkedToken.", key));
     }
 
     // Example usage within a script
@@ -51,4 +53,3 @@ contract ConfigManager is Script {
         bytes memory retrievedValue = readConfig(exampleKey);
     }
 }
-
