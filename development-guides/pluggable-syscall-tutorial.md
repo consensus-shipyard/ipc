@@ -214,7 +214,7 @@ executor: DefaultExecutor<CustomKernelImpl<DefaultCallManager<DefaultMachine<DB,
 *   Now, we are all set to use the custom syscall in the IPC subnet. The custom syscall can be called in IPC actors to utilize the extended feature. For this tutorial, we can create a simple actor to demonstrate how to import and call the custom syscall and then confirm that its working correctly.
 
 
-* Let’s create a `customsyscall` folder in `ipc/fendermint/actors/` and then create a file called `[actor.rs](<http://actor.rs>)` in that new folder. Here we want to create a very simple actor, which when invoked (received a message on its Invoke method) will call the new syscall and return its value:
+* Let’s create a `customsyscall` folder in `ipc/fendermint/actors/` and then create a file called [actor.rs](https://github.com/consensus-shipyard/ipc/blob/98497363a10e08236325e6d5c52755b9fcd52958/fendermint/actors/customsyscall/src/actor.rs) in that new folder. Here we want to create a very simple actor, which when invoked (received a message on its Invoke method) will call the new syscall and return its value:
 
 ```rust
 fvm_sdk::sys::fvm_syscalls! {
