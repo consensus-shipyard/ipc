@@ -129,7 +129,7 @@ impl State {
         &self,
         store: &BS,
         prefix: Option<&BytesKey>,
-        delimiter: Option<&'static str>,
+        delimiter: Option<&BytesKey>,
         limit: Option<usize>,
     ) -> anyhow::Result<ObjectList> {
         let hamt = Hamt::<_, Object>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
@@ -147,7 +147,8 @@ impl State {
                 }
                 if let Some(delimiter) = delimiter {
                     let utf8_key = String::from_utf8(key.clone()).unwrap();
-                    if let Some(index) = utf8_key.find(delimiter) {
+                    let utf8_delimiter = String::from_utf8(delimiter.0.clone()).unwrap();
+                    if let Some(index) = utf8_key.find(&utf8_delimiter) {
                         let subset = utf8_key[..index].as_bytes().to_owned();
                         common_prefixes.insert(subset);
                         continue 'pairs;
@@ -329,7 +330,8 @@ mod tests {
         };
 
         let foo_key = BytesKey("foo".as_bytes().to_vec());
-        let result = state.list(&store, Some(&foo_key), Some(&"/"), Some(3));
+        let delimiter_key = BytesKey("/".as_bytes().to_vec());
+        let result = state.list(&store, Some(&foo_key), Some(&delimiter_key), Some(3));
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.objects.len(), 1);

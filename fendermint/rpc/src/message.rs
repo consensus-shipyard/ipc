@@ -274,8 +274,8 @@ impl SignedMessageFactory {
         gas_params: GasParams,
     ) -> anyhow::Result<Message> {
         let input = fendermint_actor_objectstore::ListOptions {
-            prefix,
-            delimiter,
+            prefix: prefix.into(),
+            delimiter: delimiter.into(),
             limit,
         };
         let params = RawBytes::serialize(input)?;

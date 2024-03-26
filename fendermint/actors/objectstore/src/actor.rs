@@ -113,12 +113,14 @@ impl Actor {
         let limit = if params.limit == 0 {
             None
         } else {
-            Some(params.limit)
+            Some(params.limit as usize)
         };
         let st: State = rt.state()?;
-        let objects = st.list(rt.store(), prefix, delimiter, limit).map_err(|e| {
-            e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to list objects")
-        })?;
+        let objects = st
+            .list(rt.store(), prefix.as_ref(), delimiter.as_ref(), limit)
+            .map_err(|e| {
+                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to list objects")
+            })?;
         Ok(Some(objects))
     }
 

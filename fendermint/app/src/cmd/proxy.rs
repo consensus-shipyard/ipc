@@ -400,9 +400,9 @@ struct ListQuery {
 }
 
 async fn handle_os_list(
-    options: ListQuery,
     client: FendermintClient,
     args: TransArgs,
+    options: ListQuery,
     hq: HeightQuery,
 ) -> Result<impl Reply, Rejection> {
     let res = os_list(
