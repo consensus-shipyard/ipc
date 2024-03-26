@@ -51,9 +51,8 @@ pub struct ChainEnv {
     pub parent_finality_votes: VoteTally,
     /// IPFS pin resolution pool.
     pub object_pool: ObjectPool,
-    /// Whether the node is running in devnet mode.
-    /// In devnet mode, the node is the IPC root && Topdown Checkpoint is disabled.
-    pub is_devnet: bool,
+    /// Whether topdown checkpointing is enabled.    
+    pub topdown_enabled: bool,
 }
 
 #[derive(Clone, Hash, PartialEq, Eq)]
@@ -195,7 +194,7 @@ where
         // No need for voting.
         let mut objects: Vec<ChainMessage> = vec![];
         for item in local_resolved_objects.iter() {
-            let (is_finalized, is_globally_resolved) = if state.is_devnet {
+            let (is_finalized, is_globally_resolved) = if !state.topdown_enabled {
                 (false, true)
             } else {
                 let obj = item.obj.value.to_bytes();
@@ -277,7 +276,7 @@ where
                     let item = ObjectPoolItem { obj };
                     let obj = item.obj.value.to_bytes();
 
-                    let (is_finalized, is_globally_resolved) = if env.is_devnet {
+                    let (is_finalized, is_globally_resolved) = if !env.topdown_enabled {
                         (false, true)
                     } else {
                         atomically(|| {

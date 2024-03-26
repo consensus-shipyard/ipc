@@ -25,6 +25,7 @@ pub struct IpfsResolver<V> {
     key: Keypair,
     subnet_id: SubnetID,
     to_vote: fn(Cid) -> V,
+    topdown_enabled: bool,
 }
 
 impl<V> IpfsResolver<V>
@@ -39,6 +40,7 @@ where
         key: Keypair,
         subnet_id: SubnetID,
         to_vote: fn(Cid) -> V,
+        topdown_enabled: bool,
     ) -> Self {
         Self {
             client,
@@ -48,6 +50,7 @@ where
             key,
             subnet_id,
             to_vote,
+            topdown_enabled,
         }
     }
 
@@ -69,6 +72,7 @@ where
                 self.key.clone(),
                 self.subnet_id.clone(),
                 self.to_vote,
+                self.topdown_enabled,
             );
         }
     }
@@ -86,6 +90,7 @@ fn start_resolve<V>(
     key: Keypair,
     subnet_id: SubnetID,
     to_vote: fn(Cid) -> V,
+    topdown_enabled: bool,
 ) where
     V: Clone + Send + Sync + Serialize + DeserializeOwned + 'static,
 {
@@ -114,10 +119,8 @@ fn start_resolve<V>(
                 // Mark task as resolved
                 atomically(|| task.set_resolved()).await;
 
-                // Skip voting if this this validator is the IPC root. `is_root` == true
-                // implies that we are running in dev mode with a single node.
-                // we don't need a quorum to reach consensus on ipfs resolution.
-                if !subnet_id.is_root() {
+                // Skip voting if topdown checkpointing is disabled.
+                if topdown_enabled {
                     let vote = to_vote(task.cid());
                     match VoteRecord::signed(&key, subnet_id, vote) {
                         Ok(vote) => {
