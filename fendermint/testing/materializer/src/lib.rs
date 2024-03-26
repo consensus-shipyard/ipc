@@ -65,6 +65,12 @@ impl From<&ResourceId> for ResourceId {
     }
 }
 
+impl AsRef<str> for ResourceId {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
 /// A human readable name for a testnet.
 pub type TestnetId = ResourceId;
 
@@ -103,6 +109,20 @@ impl ResourceName {
     pub fn path_string(&self) -> String {
         self.0.to_string_lossy().to_string()
     }
+
+    pub fn path(&self) -> &Path {
+        self.0.as_path()
+    }
+
+    pub fn id(&self) -> ResourceId {
+        ResourceId(
+            self.0
+                .file_name()
+                .expect("resource name has file segment")
+                .to_string_lossy()
+                .to_string(),
+        )
+    }
 }
 
 impl From<&str> for ResourceName {
@@ -121,6 +141,10 @@ impl Debug for ResourceName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self)
     }
+}
+
+pub trait TestnetResource {
+    fn testnet(&self) -> TestnetName;
 }
 
 macro_rules! resource_name {
@@ -167,13 +191,24 @@ macro_rules! resource_name {
             }
         }
     };
+
+    ($name:ident: Testnet) => {
+        resource_name!($name);
+
+        impl TestnetResource for $name {
+            fn testnet(&self) -> TestnetName {
+                TestnetName::from_prefix(&self.0)
+            }
+        }
+    };
 }
 
 resource_name!(TestnetName);
-resource_name!(AccountName);
-resource_name!(SubnetName);
-resource_name!(NodeName);
-resource_name!(RelayerName);
+resource_name!(AccountName: Testnet);
+resource_name!(SubnetName: Testnet);
+resource_name!(NodeName: Testnet);
+resource_name!(RelayerName: Testnet);
+resource_name!(CliName: Testnet);
 
 impl TestnetName {
     pub fn new<T: Into<TestnetId>>(id: T) -> Self {
@@ -205,16 +240,6 @@ impl TestnetName {
     }
 }
 
-impl NodeName {
-    pub fn is_in_subnet(&self, subnet_name: &SubnetName) -> bool {
-        subnet_name.0.is_prefix_of(&self.0)
-    }
-
-    pub fn testnet(&self) -> TestnetName {
-        TestnetName::from_prefix(&self.0)
-    }
-}
-
 impl SubnetName {
     pub fn subnet<T: Into<SubnetId>>(&self, id: T) -> Self {
         Self(self.0.join("subnets").join_id(&id.into()))
@@ -226,6 +251,10 @@ impl SubnetName {
 
     pub fn relayer<T: Into<RelayerId>>(&self, id: T) -> RelayerName {
         RelayerName(self.0.join("relayers").join_id(&id.into()))
+    }
+
+    pub fn cli(&self, id: &str) -> CliName {
+        CliName(self.0.join("cli").join(id))
     }
 
     /// Check if this is the root subnet, ie. it ends with `root` and it parent is a `testnet`
@@ -286,8 +315,9 @@ impl SubnetName {
         hops
     }
 
-    pub fn testnet(&self) -> TestnetName {
-        TestnetName::from_prefix(&self.0)
+    /// Check that the subnet contains a certain resource name, ie. it's a prefix of it.
+    pub fn contains<T: AsRef<ResourceName>>(&self, name: T) -> bool {
+        self.0.is_prefix_of(name.as_ref())
     }
 }
 
@@ -312,19 +342,19 @@ impl ToString for ResourceHash {
 }
 
 pub trait HasEthApi {
-    /// URL of the HTTP endpoint, if it's enabled.
-    fn ethapi_http_endpoint(&self) -> Option<String>;
+    /// URL of the HTTP endpoint *on the host*, if it's enabled.
+    fn ethapi_http_endpoint(&self) -> Option<url::Url>;
 
     fn ethapi_http_provider(&self) -> anyhow::Result<Option<Provider<Http>>> {
         match self.ethapi_http_endpoint() {
-            Some(url) => Ok(Some(Provider::<Http>::try_from(url)?)),
+            Some(url) => Ok(Some(Provider::<Http>::try_from(url.to_string())?)),
             None => Ok(None),
         }
     }
 }
 
 pub trait HasCometBftApi {
-    /// URL of the HTTP endpoint.
+    /// URL of the HTTP endpoint *on the host*.
     fn cometbft_http_endpoint(&self) -> tendermint_rpc::Url;
 
     fn cometbft_http_provider(&self) -> anyhow::Result<tendermint_rpc::HttpClient> {
@@ -338,7 +368,7 @@ pub trait HasCometBftApi {
 mod tests {
     use std::path::PathBuf;
 
-    use crate::TestnetName;
+    use crate::{TestnetName, TestnetResource};
 
     #[test]
     fn test_path_join() {
@@ -375,7 +405,7 @@ mod tests {
 
         let hops0 = bar.ancestor_hops(false);
         let hops1 = bar.ancestor_hops(true);
-        let hops = vec![(rn, foo.clone()), (foo, bar)];
+        let hops = [(rn, foo.clone()), (foo, bar)];
 
         assert_eq!(hops0[..], hops[..1]);
         assert_eq!(hops1[..], hops[..]);
@@ -387,7 +417,7 @@ mod tests {
         let sn = tn.root().subnet("foo");
         let node = sn.node("node-1");
 
-        assert!(node.is_in_subnet(&sn));
+        assert!(sn.contains(&node));
         assert_eq!(node.testnet(), tn, "testnet is the prefix");
     }
 

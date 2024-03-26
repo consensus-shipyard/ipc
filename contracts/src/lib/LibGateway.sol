@@ -26,7 +26,7 @@ library LibGateway {
     /// @dev subnet refers to the next "down" subnet that the `envelope.message.to` should be forwarded to.
     event NewTopDownMessage(address indexed subnet, IpcEnvelope message);
     /// @dev event emitted when there is a new bottom-up message batch to be signed.
-    event NewBottomUpMsgBatch(uint256 indexed epoch, BottomUpMsgBatch batch);
+    event NewBottomUpMsgBatch(uint256 indexed epoch);
 
     /// @notice returns the current bottom-up checkpoint
     /// @return exists - whether the checkpoint exists
@@ -287,7 +287,7 @@ library LibGateway {
             }
 
             // emit event with the next batch ready to sign quorum over.
-            emit NewBottomUpMsgBatch(epochCut, newBatch);
+            emit NewBottomUpMsgBatch(epochCut);
 
             // Empty the messages of existing batch with epoch and start populating with the new message.
             delete batch.msgs;

@@ -9,7 +9,7 @@ then
     exit 1
 fi
 
-NETWORK=$1
+NETWORK="$1"
 
 if [ "$NETWORK" = "auto" ]; then
   echo "[*] Automatically getting chainID for network"
@@ -17,4 +17,4 @@ if [ "$NETWORK" = "auto" ]; then
 fi
 
 
-npx hardhat upgrade-sr-diamond --network ${NETWORK}
+npx hardhat upgrade-sr-diamond --network "${NETWORK}"
