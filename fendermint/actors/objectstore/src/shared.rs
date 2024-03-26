@@ -11,7 +11,7 @@ pub use crate::state::*;
 
 pub const OBJECTSTORE_ACTOR_NAME: &str = "objectstore";
 
-#[derive(Default, Debug, Serialize_tuple, Deserialize_tuple)]
+#[derive(Clone, Default, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ObjectParams {
     #[serde(with = "strict_bytes")]
     pub key: Vec<u8>,

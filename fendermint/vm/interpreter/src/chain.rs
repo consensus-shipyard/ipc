@@ -211,11 +211,15 @@ where
             // Add to messages
             if is_globally_resolved {
                 tracing::debug!(cid = ?item.obj.value, "object has quorum; adding tx to chain");
-                objects.push(ChainMessage::Ipc(IpcMessage::ObjectResolved(
+                objects.push(ChainMessage::Ipc(IpcMessage::ObjectResolved((
                     item.obj.clone(),
-                )));
+                    objects.len() as u64,
+                ))));
             }
         }
+
+        let pending_objects = atomically(|| state.object_pool.count()).await;
+        tracing::info!(size = pending_objects, "ipfs pool status");
 
         // Append at the end - if we run out of block space, these are going to be reproposed in the next block.
         msgs.extend(objects);
@@ -260,7 +264,7 @@ where
                         return Ok(false);
                     }
                 }
-                ChainMessage::Ipc(IpcMessage::ObjectResolved(obj)) => {
+                ChainMessage::Ipc(IpcMessage::ObjectResolved((obj, _))) => {
                     // Ensure that the object is ready to be included on chain. We can accept the
                     // proposal if the object has reached a global quorum and is not yet finalized.
                     let item = ObjectPoolItem { obj };
@@ -480,11 +484,11 @@ where
 
                     Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
                 }
-                IpcMessage::ObjectResolved(obj) => {
+                IpcMessage::ObjectResolved((obj, index)) => {
                     let from = system::SYSTEM_ACTOR_ADDR;
                     let to = objectstore::OBJECTSTORE_ACTOR_ADDR;
                     let method_num = fendermint_actor_objectstore::Method::ResolveObject as u64;
-                    let gas_limit = 10_000_000_000; // max
+                    let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
 
                     let input = fendermint_actor_objectstore::ObjectParams {
                         key: obj.key,
@@ -495,13 +499,13 @@ where
                         version: Default::default(),
                         from,
                         to,
-                        sequence: 0, // TODO(sander): This works but is it okay?
-                        value: TokenAmount::zero(),
+                        sequence: index,
+                        value: Default::default(),
                         method_num,
                         params,
                         gas_limit,
-                        gas_fee_cap: TokenAmount::zero(),
-                        gas_premium: TokenAmount::zero(),
+                        gas_fee_cap: Default::default(),
+                        gas_premium: Default::default(),
                     };
 
                     let (apply_ret, emitters) = state.execute_implicit(msg)?;
@@ -512,6 +516,7 @@ where
                         .map(|i| i.to_string())
                         .filter(|s| !s.is_empty());
                     tracing::info!(
+                        index = index,
                         exit_code = apply_ret.msg_receipt.exit_code.value(),
                         from = from.to_string(),
                         to = to.to_string(),
@@ -519,7 +524,7 @@ where
                         gas_limit = gas_limit,
                         gas_used = apply_ret.msg_receipt.gas_used,
                         info = info.unwrap_or_default(),
-                        "implicit transaction"
+                        "implicit tx delivered"
                     );
 
                     atomically(|| {

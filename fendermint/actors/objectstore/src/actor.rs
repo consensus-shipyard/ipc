@@ -50,17 +50,17 @@ impl Actor {
         Ok(root)
     }
 
-    fn resolve_object(rt: &impl Runtime, params: ObjectParams) -> Result<Cid, ActorError> {
+    fn resolve_object(rt: &impl Runtime, params: ObjectParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
-        let root = rt.transaction(|st: &mut State, rt| {
+        rt.transaction(|st: &mut State, rt| {
             st.resolve(rt.store(), BytesKey(params.key), params.value)
                 .map_err(|e| {
                     e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to resolve object")
                 })
         })?;
 
-        Ok(root)
+        Ok(())
     }
 
     fn delete_object(rt: &impl Runtime, key: Vec<u8>) -> Result<Cid, ActorError> {

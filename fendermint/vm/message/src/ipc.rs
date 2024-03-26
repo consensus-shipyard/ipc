@@ -31,7 +31,7 @@ pub enum IpcMessage {
     TopDownExec(ParentFinality),
 
     /// Proposed by validators when an object accompanying a message has been resolved and is ready to be executed.
-    ObjectResolved(Object),
+    ObjectResolved((Object, u64)),
 }
 
 /// A message relayed by a user on the current subnet.
