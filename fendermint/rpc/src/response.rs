@@ -4,7 +4,7 @@ use anyhow::{anyhow, Context};
 use base64::Engine;
 use bytes::Bytes;
 use cid::Cid;
-use fendermint_actor_objectstore::Object;
+use fendermint_actor_objectstore::{Object, ObjectList};
 use fendermint_vm_actor_interface::eam::{self, CreateReturn};
 use fvm_ipld_encoding::{BytesDe, RawBytes};
 use tendermint::abci::response::DeliverTx;
@@ -77,8 +77,8 @@ pub fn decode_os_get(deliver_tx: &DeliverTx) -> anyhow::Result<Option<Object>> {
 
 /// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as a list of bytes.
 #[allow(clippy::type_complexity)]
-pub fn decode_os_list(deliver_tx: &DeliverTx) -> anyhow::Result<Option<Vec<(Vec<u8>, Object)>>> {
+pub fn decode_os_list(deliver_tx: &DeliverTx) -> anyhow::Result<Option<ObjectList>> {
     let data = decode_data(&deliver_tx.data)?;
-    fvm_ipld_encoding::from_slice::<Option<Vec<(Vec<u8>, Object)>>>(&data)
-        .map_err(|e| anyhow!("error parsing as Option<Vec<(Vec<u8>, Object)>>: {e}"))
+    fvm_ipld_encoding::from_slice::<Option<ObjectList>>(&data)
+        .map_err(|e| anyhow!("error parsing as Option<ObjectList>: {e}"))
 }
