@@ -38,6 +38,7 @@ impl<S> MetricsLayer<S> {
 macro_rules! check_field {
     ($event_ty:ident :: $field:ident) => {{
         if false {
+            #[allow(clippy::needless_update)]
             let _event = $event_ty {
                 $field: Default::default(),
                 ..Default::default()
