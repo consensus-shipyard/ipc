@@ -31,7 +31,7 @@ where
         .await
         .context("failed to get chain ID")?;
 
-    let wallet: Wallet<SigningKey> = Wallet::from_bytes(&sender.secret_key().serialize().as_ref())?
+    let wallet: Wallet<SigningKey> = Wallet::from_bytes(sender.secret_key().serialize().as_ref())?
         .with_chain_id(chain_id.as_u64());
 
     Ok(SignerMiddleware::new(provider, wallet))

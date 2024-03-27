@@ -30,7 +30,7 @@ use tendermint_rpc::{Order, Subscription, SubscriptionClient};
 use tokio::sync::mpsc::{Sender, UnboundedSender};
 use tokio::sync::RwLock;
 
-use crate::cache::AddressCache;
+use crate::cache::{AddressCache, Cache};
 use crate::conv::from_tm;
 use crate::filters::{
     run_subscription, BlockHash, FilterCommand, FilterDriver, FilterId, FilterKind, FilterMap,
@@ -53,6 +53,7 @@ pub type WebSocketSender = UnboundedSender<MethodNotification>;
 pub struct JsonRpcState<C> {
     pub client: FendermintClient<C>,
     pub addr_cache: AddressCache<C>,
+    pub tx_cache: Cache<et::TxHash, et::Transaction>,
     filter_timeout: Duration,
     filters: FilterMap,
     next_web_socket_id: AtomicUsize,
@@ -72,9 +73,11 @@ where
     ) -> Self {
         let client = FendermintClient::new(client);
         let addr_cache = AddressCache::new(client.clone(), cache_capacity);
+        let tx_cache = Cache::new(cache_capacity);
         Self {
             client,
             addr_cache,
+            tx_cache,
             filter_timeout,
             filters: Default::default(),
             next_web_socket_id: Default::default(),
