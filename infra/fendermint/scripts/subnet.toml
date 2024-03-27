@@ -102,6 +102,7 @@ dependencies = [
 [tasks.subnet-config]
 dependencies = [
     "subnet-fetch-genesis",
+    "subnet-genesis-set-eam-permissions",
     "genesis-write",
     "fendermint-new-network-key",
 ]
@@ -121,6 +122,17 @@ script.pre = "mkdir -p ${BASE_DIR}/${NODE_NAME}/${KEYS_SUBDIR}; cp ${PRIVATE_KEY
 [tasks.subnet-fetch-genesis]
 extend = "fendermint-tool"
 env = { "CMD" = "genesis --genesis-file /data/genesis.json ipc from-parent --subnet-id ${SUBNET_ID} -p ${PARENT_ENDPOINT}  --parent-gateway ${PARENT_GATEWAY}  --parent-registry ${PARENT_REGISTRY} --base-fee ${BASE_FEE} --power-scale ${POWER_SCALE}" }
+
+[tasks.subnet-genesis-set-eam-permissions]
+extend = "fendermint-tool"
+script.pre = """
+if [[ ! -z ${ALLOWED_ADDR_LIST} ]]; then
+  echo "ALLOWED_ADDR_LIST=${ALLOWED_ADDR_LIST}"
+  CMD="genesis --genesis-file /data/genesis.json set-eam-permissions --mode allowlist --addresses ${ALLOWED_ADDR_LIST}"
+else
+  CMD="genesis --genesis-file /data/genesis.json set-eam-permissions --mode unrestricted"
+fi
+"""
 
 [tasks.node-report]
 script = """cat << EOF
