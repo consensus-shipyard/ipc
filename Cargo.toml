@@ -30,6 +30,9 @@ members = [
   "fendermint/vm/*",
   "fendermint/actors",
   "fendermint/actors/chainmetadata",
+
+  "fendermint/upgrade_examples",
+  "fendermint/upgrade_examples/actors/chainmetadata_v2",
 ]
 
 [workspace.package]

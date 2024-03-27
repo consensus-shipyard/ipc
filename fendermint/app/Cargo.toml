@@ -39,6 +39,8 @@ tracing-appender = { workspace = true }
 tracing-subscriber = { workspace = true }
 literally = { workspace = true }
 
+fendermint_upgrade_examples = { path = "../upgrade_examples" }
+
 fendermint_abci = { path = "../abci" }
 fendermint_app_options = { path = "./options" }
 fendermint_app_settings = { path = "./settings" }
