@@ -32,6 +32,7 @@ impl<V> IpfsResolver<V>
 where
     V: Clone + Send + Sync + Serialize + DeserializeOwned + 'static,
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         client: Client<V>,
         queue: ResolveQueue,
