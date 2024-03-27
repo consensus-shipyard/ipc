@@ -37,6 +37,7 @@ use crate::filters::{
     FilterRecords,
 };
 use crate::handlers::ws::MethodNotification;
+use crate::mpool::TransactionCache;
 use crate::GasOpt;
 use crate::{
     conv::from_tm::{map_rpc_block_txs, to_chain_message, to_eth_block, to_eth_transaction},
@@ -53,7 +54,8 @@ pub type WebSocketSender = UnboundedSender<MethodNotification>;
 pub struct JsonRpcState<C> {
     pub client: FendermintClient<C>,
     pub addr_cache: AddressCache<C>,
-    pub tx_cache: Cache<et::TxHash, et::Transaction>,
+    /// Cache submitted transactions until they are added to a block.
+    pub tx_cache: TransactionCache,
     filter_timeout: Duration,
     filters: FilterMap,
     next_web_socket_id: AtomicUsize,

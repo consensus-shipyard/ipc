@@ -50,6 +50,16 @@ where
         let mut guard = self.cache.lock().expect("cache poisoned");
         guard.remove(key);
     }
+
+    pub fn remove_many(&self, keys: &[K]) {
+        if keys.is_empty() {
+            return;
+        }
+        let mut guard = self.cache.lock().expect("cache poisoned");
+        for key in keys {
+            guard.remove(key);
+        }
+    }
 }
 
 /// Facilitate Ethereum address <-> Actor ID lookups.
