@@ -50,8 +50,33 @@ library SupplySourceHelper {
         if (supplySource.kind == SupplyKind.ERC20) {
             IERC20 token = IERC20(supplySource.tokenAddress);
             token.safeTransferFrom({from: msg.sender, to: address(this), value: value});
+        } else if (msg.value != value) {
+            revert NotEnoughBalance();
         }
-        // Do nothing for native.
+    }
+
+    /// @notice Transfers the specified amount out of our treasury to the recipient address, ensure
+    /// the operation is successful.
+    function safeTransferFunds(SupplySource memory supplySource,
+        address payable recipient,
+        uint256 value
+    ) internal returns (bool success, bytes memory ret) {
+        if (supplySource.kind == SupplyKind.Native) {
+            success = sendValue(payable(recipient), value);
+            ret = EMPTY_BYTES;
+        } else if (supplySource.kind == SupplyKind.ERC20) {
+            (success, ret) = ierc20Transfer(supplySource, recipient, value);
+        }
+
+        if (success) {
+            return (success, ret);
+        }
+
+        if (ret.length == 0) revert();
+        assembly {
+            // add 32 to calculate the pointer where the ret byte array starts.
+            revert(add(32, ret), mload(ret))
+        }
     }
 
     /// @notice Transfers the specified amount out of our treasury to the recipient address.

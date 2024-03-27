@@ -6,7 +6,7 @@ import {LibSubnetActorStorage, SubnetActorStorage} from "./LibSubnetActorStorage
 import {LibMaxPQ, MaxPQ} from "./priority/LibMaxPQ.sol";
 import {LibMinPQ, MinPQ} from "./priority/LibMinPQ.sol";
 import {LibStakingChangeLog} from "./LibStakingChangeLog.sol";
-import {PermissionMode, StakingReleaseQueue, StakingChangeLog, StakingChange, StakingChangeRequest, StakingOperation, StakingRelease, ValidatorSet, AddressStakingReleases, ParentValidatorsTracker, Validator} from "../structs/Subnet.sol";
+import {PermissionMode, StakingReleaseQueue, StakingChangeLog, StakingChange, StakingChangeRequest, StakingOperation, StakingRelease, ValidatorSet, AddressStakingReleases, ParentValidatorsTracker, SupplyKind, Validator} from "../structs/Subnet.sol";
 import {WithdrawExceedingCollateral, NotValidator, CannotConfirmFutureChanges, NoCollateralToWithdraw, AddressShouldBeValidator, InvalidConfigurationNumber} from "../errors/IPCErrors.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
 
@@ -585,7 +585,12 @@ library LibStaking {
                     IGateway(s.ipcGatewayAddr).releaseStake(amount);
                 } else {
                     s.validatorSet.confirmDeposit(validator, amount);
-                    IGateway(s.ipcGatewayAddr).addStake{value: amount}();
+
+                    if (s.supplySource.kind == SupplyKind.ERC20) {
+                        IGateway(s.ipcGatewayAddr).addStake(amount);
+                    } else {
+                        IGateway(s.ipcGatewayAddr).addStake{value: amount}(amount);
+                    }
                 }
             }
 
