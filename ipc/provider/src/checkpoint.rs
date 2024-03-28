@@ -205,9 +205,7 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                 }));
 
                 count += 1;
-                log::debug!(
-                    "This round has asynchronously submitted {count} checkpoints",
-                );
+                log::debug!("This round has asynchronously submitted {count} checkpoints",);
             }
         }
 
