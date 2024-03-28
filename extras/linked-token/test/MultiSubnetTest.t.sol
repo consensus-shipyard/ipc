@@ -1,14 +1,29 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
-import {IntegrationTestBase, RootSubnetDefinition, TestSubnetDefinition} from "@ipc/test/IntegrationTestBase.sol";
-import {ERC20PresetFixedSupply} from "@ipc/test/helpers/ERC20PresetFixedSupply.sol";
+import {
+    IERC20Upgradeable
+} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+
+import {
+    IntegrationTestBase,
+    RootSubnetDefinition,
+    TestSubnetDefinition
+} from "@ipc/test/IntegrationTestBase.sol";
+import {
+    ERC20PresetFixedSupply
+} from "@ipc/test/helpers/ERC20PresetFixedSupply.sol";
 import {TestUtils} from "@ipc/test/helpers/TestUtils.sol";
 import {MerkleTreeHelper} from "@ipc/test/helpers/MerkleTreeHelper.sol";
 import {GatewayFacetsHelper} from "@ipc/test/helpers/GatewayFacetsHelper.sol";
-import {SubnetActorFacetsHelper} from "@ipc/test/helpers/SubnetActorFacetsHelper.sol";
+import {
+    SubnetActorFacetsHelper
+} from "@ipc/test/helpers/SubnetActorFacetsHelper.sol";
 import {LinkedTokenController} from "../src/LinkedTokenController.sol";
 import {LinkedTokenReplica} from "../src/LinkedTokenReplica.sol";
+
+import {LinkedTokenControllerV2} from "./LinkedTokenControllerV2.sol";
+import {LinkedTokenReplicaV2} from "./LinkedTokenReplicaV2.sol";
 import {USDCTest} from "../src/USDCTest.sol";
 
 import {
@@ -19,12 +34,22 @@ import {
 } from "@ipc/src/structs/Subnet.sol";
 import {SubnetActorDiamond} from "@ipc/src/SubnetActorDiamond.sol";
 import {GatewayDiamond} from "@ipc/src/GatewayDiamond.sol";
-import {TopDownFinalityFacet} from "@ipc/src/gateway/router/TopDownFinalityFacet.sol";
-import {XnetMessagingFacet} from "@ipc/src/gateway/router/XnetMessagingFacet.sol";
-import {SubnetActorManagerFacet} from "@ipc/src/subnet/SubnetActorManagerFacet.sol";
+import {
+    TopDownFinalityFacet
+} from "@ipc/src/gateway/router/TopDownFinalityFacet.sol";
+import {
+    XnetMessagingFacet
+} from "@ipc/src/gateway/router/XnetMessagingFacet.sol";
+import {
+    SubnetActorManagerFacet
+} from "@ipc/src/subnet/SubnetActorManagerFacet.sol";
 import {GatewayGetterFacet} from "@ipc/src/gateway/GatewayGetterFacet.sol";
-import {SubnetActorCheckpointingFacet} from "@ipc/src/subnet/SubnetActorCheckpointingFacet.sol";
-import {CheckpointingFacet} from "@ipc/src/gateway/router/CheckpointingFacet.sol";
+import {
+    SubnetActorCheckpointingFacet
+} from "@ipc/src/subnet/SubnetActorCheckpointingFacet.sol";
+import {
+    CheckpointingFacet
+} from "@ipc/src/gateway/router/CheckpointingFacet.sol";
 import {FvmAddressHelper} from "@ipc/src/lib/FvmAddressHelper.sol";
 import {
     IpcEnvelope,
@@ -41,6 +66,12 @@ import {CrossMsgHelper} from "@ipc/src/lib/CrossMsgHelper.sol";
 import {IpcHandler} from "@ipc/sdk/IpcContract.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import "forge-std/console.sol";
+
+import "openzeppelin-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+
+string constant REPLICA_TOKEN_NAME = "USDCTestReplica";
+string constant REPLICA_TOKEN_SYMBOL = "USDCtR";
+uint8 constant REPLICA_TOKEN_DECIMALS = 6;
 
 contract MultiSubnetTest is IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
@@ -65,11 +96,34 @@ contract MultiSubnetTest is IntegrationTestBase {
     SubnetID nativeSubnetName;
 
     IERC20 public token;
+    USDCTest testUSDC;
+
+    IpcEnvelope expected;
+
+    address holder;
+    address recipient;
+    address owner;
+    uint256 transferAmount;
+    uint256 holderTotalAmount;
 
     function setUp() public override {
-        token = new ERC20PresetFixedSupply("TestToken", "TEST", 1_000_000, address(this));
+        holder = vm.addr(100);
+        recipient = vm.addr(200);
+        owner = address(this);
+        transferAmount = 300;
+        holderTotalAmount = 1000;
 
-        rootSubnetName = SubnetID({root: ROOTNET_CHAINID, route: new address[](0)});
+        token = new ERC20PresetFixedSupply(
+            "TestToken",
+            "TEST",
+            1_000_000,
+            address(this)
+        );
+
+        rootSubnetName = SubnetID({
+            root: ROOTNET_CHAINID,
+            route: new address[](0)
+        });
         require(rootSubnetName.isRoot(), "not root");
 
         rootGateway = createGatewayDiamond(gatewayParams(rootSubnetName));
@@ -79,18 +133,29 @@ contract MultiSubnetTest is IntegrationTestBase {
         );
 
         rootTokenSubnetActor = createSubnetActor(
-            defaultSubnetActorParamsWith(address(rootGateway), rootSubnetName, address(token))
+            defaultSubnetActorParamsWith(
+                address(rootGateway),
+                rootSubnetName,
+                address(token)
+            )
         );
 
         address[] memory tokenSubnetPath = new address[](1);
         tokenSubnetPath[0] = address(rootTokenSubnetActor);
-        SubnetID memory tokenSubnetName = SubnetID({root: ROOTNET_CHAINID, route: tokenSubnetPath});
-        GatewayDiamond tokenSubnetGateway = createGatewayDiamond(gatewayParams(tokenSubnetName));
+        SubnetID memory tokenSubnetName =
+            SubnetID({root: ROOTNET_CHAINID, route: tokenSubnetPath});
+        GatewayDiamond tokenSubnetGateway =
+            createGatewayDiamond(gatewayParams(tokenSubnetName));
 
         address[] memory nativeSubnetPath = new address[](1);
         nativeSubnetPath[0] = address(rootNativeSubnetActor);
-        nativeSubnetName = SubnetID({root: ROOTNET_CHAINID, route: nativeSubnetPath});
-        nativeSubnetGateway = createGatewayDiamond(gatewayParams(nativeSubnetName));
+        nativeSubnetName = SubnetID({
+            root: ROOTNET_CHAINID,
+            route: nativeSubnetPath
+        });
+        nativeSubnetGateway = createGatewayDiamond(
+            gatewayParams(nativeSubnetName)
+        );
 
         rootSubnet = RootSubnetDefinition({
             gateway: rootGateway,
@@ -115,17 +180,6 @@ contract MultiSubnetTest is IntegrationTestBase {
             subnetActorAddr: address(rootTokenSubnetActor),
             path: tokenSubnetPath
         });
-    }
-
-    function testMultiSubnet_Native_FundFromParentToChild_USDCBridge() public {
-        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
-        IpcEnvelope memory expected;
-
-        address holder = vm.addr(100);
-        address recipient = vm.addr(200);
-        address owner = address(this);
-        uint256 transferAmount = 300;
-        uint256 holderTotalAmount = 1000;
 
         vm.deal(address(rootTokenSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
         vm.prank(address(rootTokenSubnetActor));
@@ -143,11 +197,146 @@ contract MultiSubnetTest is IntegrationTestBase {
             rootGateway
         );
 
+        testUSDC = new USDCTest();
+
+        //set up controller with proxy
+        LinkedTokenController initialControllerImplementation =
+            new LinkedTokenController();
+
+        bytes memory initCallController =
+            abi.encodeCall(
+                LinkedTokenController.initialize,
+                (
+                    address(rootGateway),
+                    address(testUSDC),
+                    nativeSubnetName,
+                    0x0000000000000000000000000000000000000000
+                )
+            );
+        TransparentUpgradeableProxy transparentProxyController =
+            new TransparentUpgradeableProxy(
+                address(initialControllerImplementation),
+                address(this),
+                initCallController
+            );
+
+        ipcTokenController = LinkedTokenController(
+            address(transparentProxyController)
+        );
+
+        //set up replica with proxy
+        LinkedTokenReplica initialReplicaImplementation =
+            new LinkedTokenReplica();
+
+        bytes memory initCallReplica =
+            abi.encodeCall(
+                LinkedTokenReplica.initialize,
+                (
+                    address(nativeSubnetGateway),
+                    address(testUSDC),
+                    rootSubnetName,
+                    0x0000000000000000000000000000000000000000,
+                    REPLICA_TOKEN_NAME,
+                    REPLICA_TOKEN_SYMBOL,
+                    REPLICA_TOKEN_DECIMALS
+                )
+            );
+        TransparentUpgradeableProxy transparentProxyReplica =
+            new TransparentUpgradeableProxy(
+                address(initialReplicaImplementation),
+                address(this),
+                initCallReplica
+            );
+
+        ipcTokenReplica = LinkedTokenReplica(address(transparentProxyReplica));
+
+        // set linked contract controller & replica
+        ipcTokenController.setLinkedContract(address(ipcTokenReplica));
+        ipcTokenReplica.setLinkedContract(address(ipcTokenController));
+    }
+
+    function testMultiSubnet_Native_FundFromParentToChild_USDCBridge() public {
+        _testLinkedTokenBridge();
+    }
+
+    function testMultiSubnet_Native_FundFromParentToChild_USDCBridge_UpgradeFirst()
+        public
+    {
+        upgradeController();
+        upgradeReplica();
+        _testLinkedTokenBridge();
+    }
+
+    function testMultiSubnet_Native_FundFromParentToChild_USDCBridge_UpgradeReplica()
+        public
+    {
+        _testTransferTopDown();
+        upgradeController();
+        upgradeReplica();
+        _testTransferBottomUp();
+    }
+
+    function upgradeController() public {
+        bytes memory initCallController =
+            abi.encodeCall(
+                LinkedTokenController.reinitialize,
+                (
+                    address(rootGateway),
+                    address(testUSDC),
+                    nativeSubnetName,
+                    address(ipcTokenReplica)
+                )
+            );
+        LinkedTokenControllerV2 newControllerImplementation =
+            new LinkedTokenControllerV2();
+        ipcTokenController.upgradeToAndCall(
+            address(newControllerImplementation),
+            initCallController
+        );
+
+        require(
+            LinkedTokenControllerV2(address(ipcTokenController))
+                .newFunctionReturns7() == 7,
+            "controller upgrade failed"
+        );
+    }
+
+    function upgradeReplica() public {
+        bytes memory initCallReplica =
+            abi.encodeCall(
+                LinkedTokenReplica.reinitialize,
+                (
+                    address(nativeSubnetGateway),
+                    address(testUSDC),
+                    rootSubnetName,
+                    address(ipcTokenController),
+                    REPLICA_TOKEN_NAME,
+                    REPLICA_TOKEN_SYMBOL,
+                    REPLICA_TOKEN_DECIMALS
+                )
+            );
+        LinkedTokenReplicaV2 newReplicaImplementation =
+            new LinkedTokenReplicaV2();
+        ipcTokenReplica.upgradeToAndCall(
+            address(newReplicaImplementation),
+            initCallReplica
+        );
+        require(
+            LinkedTokenReplicaV2(address(ipcTokenReplica))
+                .newFunctionReturns8() == 8,
+            "replica upgrade failed"
+        );
+    }
+
+    function _testLinkedTokenBridge() public {
+        _testTransferTopDown();
+        _testTransferBottomUp();
+    }
+
+    function _testTransferTopDown() public {
         console.log(
             "--------------- transfer and mint (top-down) ---------------"
         );
-
-        USDCTest testUSDC = new USDCTest();
 
         testUSDC.mint(100_000);
         testUSDC.transfer(holder, holderTotalAmount);
@@ -157,22 +346,6 @@ contract MultiSubnetTest is IntegrationTestBase {
             testUSDC.balanceOf(holder) == holderTotalAmount,
             "unexpected balance"
         );
-
-        // the token replica sits in a native supply child subnet.
-        ipcTokenReplica = new LinkedTokenReplica({
-            gateway: address(nativeSubnetGateway),
-            underlyingToken: address(testUSDC),
-            linkedSubnet: rootSubnetName
-        });
-
-        // the token controller sits in the root network.
-        ipcTokenController = new LinkedTokenController({
-            gateway: address(rootGateway),
-            underlyingToken: address(testUSDC),
-            linkedSubnet: nativeSubnetName
-        });
-        ipcTokenReplica.initialize(address(ipcTokenController));
-        ipcTokenController.initialize(address(ipcTokenReplica));
 
         vm.prank(holder);
         testUSDC.approve(address(ipcTokenController), transferAmount);
@@ -226,23 +399,19 @@ contract MultiSubnetTest is IntegrationTestBase {
             nonce: 0 // nonce will be updated by LibGateway.commitCrossMessage
         });
 
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = expected;
-        executeTopDownMsgs(
-            msgs,
-            nativeSubnetName,
-            nativeSubnetGateway
-        );
-
-        console.log("fail:");
-        console.log(IERC20(ipcTokenReplica).balanceOf(recipient));
-        console.log(transferAmount);
+        executeTopDownMsgs(msgs, nativeSubnetName, nativeSubnetGateway);
 
         //ensure that tokens are delivered on subnet
         require(
-            IERC20(ipcTokenReplica).balanceOf(recipient) == transferAmount,
+            IERC20Upgradeable(ipcTokenReplica).balanceOf(recipient) ==
+                transferAmount,
             "incorrect proxy token balance"
         );
+    }
 
+    function _testTransferBottomUp() public {
         console.log(
             "--------------- withdraw token (bottom-up)---------------"
         );
@@ -257,9 +426,8 @@ contract MultiSubnetTest is IntegrationTestBase {
         expected = ipcTokenReplica.linkedTransfer(holder, transferAmount);
 
         // check that the message is in unconfirmedTransfers
-        (receiptSender, receiptValue) = ipcTokenReplica.getUnconfirmedTransfer(
-            expected.toHash()
-        );
+        (address receiptSender, uint256 receiptValue) =
+            ipcTokenReplica.getUnconfirmedTransfer(expected.toHash());
         require(
             receiptSender == recipient,
             "Transfer sender incorrect in unconfirmedTransfers"
@@ -294,7 +462,11 @@ contract MultiSubnetTest is IntegrationTestBase {
         );
     }
 
-    function executeTopDownMsgs(IpcEnvelope[] memory msgs, SubnetID memory _subnet, GatewayDiamond gw) internal {
+    function executeTopDownMsgs(
+        IpcEnvelope[] memory msgs,
+        SubnetID memory _subnet,
+        GatewayDiamond gw
+    ) internal {
         XnetMessagingFacet messenger = gw.xnetMessenger();
 
         uint256 minted_tokens;
@@ -330,9 +502,11 @@ contract MultiSubnetTest is IntegrationTestBase {
 
         BottomUpMsgBatch memory batch = getter.bottomUpMsgBatch(e);
 
-        (, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
+        (, address[] memory addrs, uint256[] memory weights) =
+            TestUtils.getFourValidators(vm);
 
-        (bytes32 membershipRoot, ) = MerkleTreeHelper.createMerkleProofsForValidators(addrs, weights);
+        (bytes32 membershipRoot, ) =
+            MerkleTreeHelper.createMerkleProofsForValidators(addrs, weights);
 
         checkpoint = BottomUpCheckpoint({
             subnetID: subnet,
@@ -343,14 +517,22 @@ contract MultiSubnetTest is IntegrationTestBase {
         });
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        checkpointer.createBottomUpCheckpoint(checkpoint, membershipRoot, weights[0] + weights[1] + weights[2]);
+        checkpointer.createBottomUpCheckpoint(
+            checkpoint,
+            membershipRoot,
+            weights[0] + weights[1] + weights[2]
+        );
         vm.stopPrank();
 
         return checkpoint;
     }
 
-    function submitBottomUpCheckpoint(BottomUpCheckpoint memory checkpoint, SubnetActorDiamond sa) internal {
-        (uint256[] memory parentKeys, address[] memory parentValidators, ) = TestUtils.getThreeValidators(vm);
+    function submitBottomUpCheckpoint(
+        BottomUpCheckpoint memory checkpoint,
+        SubnetActorDiamond sa
+    ) internal {
+        (uint256[] memory parentKeys, address[] memory parentValidators, ) =
+            TestUtils.getThreeValidators(vm);
         bytes[] memory parentPubKeys = new bytes[](3);
         bytes[] memory parentSignatures = new bytes[](3);
 
@@ -358,7 +540,9 @@ contract MultiSubnetTest is IntegrationTestBase {
 
         for (uint256 i = 0; i < 3; i++) {
             vm.deal(parentValidators[i], 10 gwei);
-            parentPubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(parentKeys[i]);
+            parentPubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(
+                parentKeys[i]
+            );
             vm.prank(parentValidators[i]);
             manager.join{value: 10}(parentPubKeys[i]);
         }
@@ -373,11 +557,19 @@ contract MultiSubnetTest is IntegrationTestBase {
         SubnetActorCheckpointingFacet checkpointer = sa.checkpointer();
 
         vm.startPrank(address(sa));
-        checkpointer.submitCheckpoint(checkpoint, parentValidators, parentSignatures);
+        checkpointer.submitCheckpoint(
+            checkpoint,
+            parentValidators,
+            parentSignatures
+        );
         vm.stopPrank();
     }
 
-    function getNextEpoch(uint256 blockNumber, uint256 checkPeriod) internal pure returns (uint256) {
+    function getNextEpoch(uint256 blockNumber, uint256 checkPeriod)
+        internal
+        pure
+        returns (uint256)
+    {
         return ((uint64(blockNumber) / checkPeriod) + 1) * checkPeriod;
     }
 }
