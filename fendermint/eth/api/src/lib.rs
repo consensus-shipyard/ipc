@@ -21,7 +21,7 @@ mod state;
 pub use client::{HybridClient, HybridClientDriver};
 
 use error::{error, JsonRpcError};
-use state::JsonRpcState;
+use state::{JsonRpcState, Nonce};
 
 /// This is passed to every method handler. It's generic in the client type to facilitate testing with mocks.
 type JsonRpcData<C> = Data<JsonRpcState<C>>;
@@ -48,6 +48,7 @@ pub async fn listen<A: ToSocketAddrs>(
     client: HybridClient,
     filter_timeout: Duration,
     cache_capacity: usize,
+    max_nonce_gap: Nonce,
     gas_opt: GasOpt,
 ) -> anyhow::Result<()> {
     if let Some(listen_addr) = listen_addr.to_socket_addrs()?.next() {
@@ -55,6 +56,7 @@ pub async fn listen<A: ToSocketAddrs>(
             client,
             filter_timeout,
             cache_capacity,
+            max_nonce_gap,
             gas_opt,
         ));
 

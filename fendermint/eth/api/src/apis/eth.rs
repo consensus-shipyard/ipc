@@ -633,6 +633,7 @@ where
     };
     let msg = ChainMessage::Signed(msg);
     let bz: Vec<u8> = SignedMessageFactory::serialize(&msg)?;
+    let max_nonce_gap = data.max_nonce_gap;
 
     // Use the broadcast version which waits for basic checks to complete,
     // but not the execution results - those will have to be polled with get_transaction_receipt.
@@ -654,7 +655,12 @@ where
         let exit_code = ExitCode::new(res.code.value());
 
         if let Some(oos) = OutOfSequence::try_parse(exit_code, &res.log) {
-            tracing::info!(expected = oos.expected, got = oos.got, eth_hash = ?msghash, "out-of-sequence transaction received");
+            let is_admissible = oos.is_admissible(max_nonce_gap);
+            tracing::info!(eth_hash = ?msghash, expected = oos.expected, got = oos.got, is_admissible, "out-of-sequence transaction received");
+
+            if is_admissible {
+                // TODO: Add it to the buffer.
+            }
         }
 
         error_with_revert(exit_code, res.log, data)

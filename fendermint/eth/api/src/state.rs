@@ -46,6 +46,7 @@ use crate::{
 
 pub type WebSocketId = usize;
 pub type WebSocketSender = UnboundedSender<MethodNotification>;
+pub type Nonce = u64;
 
 // Made generic in the client type so we can mock it if we want to test API
 // methods without having to spin up a server. In those tests the methods
@@ -60,6 +61,7 @@ pub struct JsonRpcState<C> {
     filters: FilterMap,
     next_web_socket_id: AtomicUsize,
     web_sockets: RwLock<HashMap<WebSocketId, WebSocketSender>>,
+    pub max_nonce_gap: Nonce,
     pub gas_opt: GasOpt,
 }
 
@@ -71,6 +73,7 @@ where
         client: C,
         filter_timeout: Duration,
         cache_capacity: usize,
+        max_nonce_gap: Nonce,
         gas_opt: GasOpt,
     ) -> Self {
         let client = FendermintClient::new(client);
@@ -85,6 +88,7 @@ where
             next_web_socket_id: Default::default(),
             web_sockets: Default::default(),
             gas_opt,
+            max_nonce_gap,
         }
     }
 }
