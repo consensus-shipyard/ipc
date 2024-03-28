@@ -189,6 +189,10 @@ impl DefaultAccount {
     pub fn public_key(&self) -> &PublicKey {
         &self.public_key
     }
+
+    pub fn secret_key(&self) -> &SecretKey {
+        &self.secret_key
+    }
 }
 
 #[cfg(test)]
