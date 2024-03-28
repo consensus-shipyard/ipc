@@ -3040,6 +3040,7 @@ dependencies = [
  "quickcheck",
  "quickcheck_macros",
  "rand",
+ "regex",
  "serde",
  "serde_json",
  "tendermint 0.31.1",

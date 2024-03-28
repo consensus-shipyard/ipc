@@ -40,7 +40,7 @@ use fil_actors_evm_shared::uints;
 
 use crate::conv::from_eth::{self, to_fvm_message};
 use crate::conv::from_tm::{self, msg_hash, to_chain_message, to_cumulative, to_eth_block_zero};
-use crate::error::error_with_revert;
+use crate::error::{error_with_revert, OutOfSequence};
 use crate::filters::{matches_topics, FilterId, FilterKind, FilterRecords};
 use crate::{
     conv::{
@@ -651,7 +651,13 @@ where
             .or_else(|_| decode_data(&res.data).and_then(decode_fevm_return_data))
             .ok();
 
-        error_with_revert(ExitCode::new(res.code.value()), res.log, data)
+        let exit_code = ExitCode::new(res.code.value());
+
+        if let Some(oos) = OutOfSequence::try_parse(exit_code, &res.log) {
+            tracing::info!(expected = oos.expected, got = oos.got, eth_hash = ?msghash, "out-of-sequence transaction received");
+        }
+
+        error_with_revert(exit_code, res.log, data)
     }
 }
 
