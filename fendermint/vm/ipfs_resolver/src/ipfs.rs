@@ -114,7 +114,6 @@ fn start_resolve<V>(
                 // Mark task as resolved
                 atomically(|| task.set_resolved()).await;
 
-                // Skip voting if topdown checkpointing is disabled.
                 let vote = to_vote(task.cid());
                 match VoteRecord::signed(&key, subnet_id, vote) {
                     Ok(vote) => {

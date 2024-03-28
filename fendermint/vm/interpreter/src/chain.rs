@@ -186,10 +186,6 @@ where
         // If the object has already been finalized, i.e., it was proposed in an earlier block with
         // a quorum that did not include _this_ proposer, we can just remove it from the local
         // resolve pool. If we were to propose it, it would be rejected in the process step.
-        //
-        // If the node is running in dev mode where it is the only node in the subnet and is
-        // the IPC root, then directly resolve the object and add it to the chain.
-        // No need for voting.
         let mut objects: Vec<ChainMessage> = vec![];
         for item in local_resolved_objects.iter() {
             let obj = item.obj.value.to_bytes();
@@ -267,7 +263,6 @@ where
                 ChainMessage::Ipc(IpcMessage::ObjectResolved(obj)) => {
                     // Ensure that the object is ready to be included on chain. We can accept the
                     // proposal if the object has reached a global quorum and is not yet finalized.
-                    // In the case of a devnet, we can directly resolve the object and add it to the chain.
                     let item = ObjectPoolItem { obj };
                     let obj = item.obj.value.to_bytes();
 
