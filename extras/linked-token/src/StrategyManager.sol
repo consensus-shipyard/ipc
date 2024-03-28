@@ -34,7 +34,7 @@ contract StrategyManager is Ownable, ReentrancyGuard {
         _;
     }
 
-    constructor() {}
+    constructor() Ownable(msg.sender) {}
 
     function setDelegationManager(
         DelegationManager _delegation
