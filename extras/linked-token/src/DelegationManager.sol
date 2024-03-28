@@ -63,10 +63,6 @@ contract DelegationManager is ReentrancyGuard {
         _delegate(msg.sender, operator);
     }
 
-    function isOperator(address operator) external view returns (bool) {
-        return true;
-    }
-
     function increaseDelegatedShares(
         address staker,
         IStrategy strategy,
