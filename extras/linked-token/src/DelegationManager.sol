@@ -121,7 +121,7 @@ contract DelegationManager is ReentrancyGuard {
         (
             IStrategy[] memory strategies,
             uint256[] memory shares
-        ) = strategyManager.getDelegatableShares(staker);
+        ) = getDelegatableShares(staker);
         for (uint256 i = 0; i < strategies.length; i++) {
             _increaseOperatorShares({
                 operator: operator,
