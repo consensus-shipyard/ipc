@@ -8,6 +8,8 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use serde::Serialize;
 
+use crate::state::Nonce;
+
 #[derive(Debug, Clone)]
 pub struct JsonRpcError {
     pub code: i64,
@@ -114,11 +116,17 @@ impl std::error::Error for JsonRpcError {}
 /// Error representing out-of-order transaction submission.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OutOfSequence {
-    pub expected: u64,
-    pub got: u64,
+    pub expected: Nonce,
+    pub got: Nonce,
 }
 
 impl OutOfSequence {
+    /// Check whether the nonce gap is small enough that we can add this transaction to the buffer.
+    pub fn is_admissible(&self, max_nonce_gap: Nonce) -> bool {
+        self.got >= self.expected && self.got - self.expected <= max_nonce_gap
+    }
+
+    /// Check if the error indicates an out-of-order submission with the nonce expectation in the message.
     pub fn try_parse(code: ExitCode, msg: &str) -> Option<Self> {
         if code != ExitCode::SYS_SENDER_STATE_INVALID {
             return None;
@@ -166,5 +174,31 @@ mod tests {
                 got: 4
             })
         );
+    }
+
+    #[test]
+    fn test_out_of_sequence_admissible() {
+        let examples10 = [
+            (0, 4, true),
+            (0, 10, true),
+            (0, 11, false),
+            (1, 11, true),
+            (11, 1, false),
+            (10, 5, false),
+            (10, 10, true),
+        ];
+
+        for (expected, got, admissible) in examples10 {
+            assert_eq!(
+                OutOfSequence { expected, got }.is_admissible(10),
+                admissible
+            )
+        }
+
+        let examples0 = [(0, 0, true), (10, 10, true), (0, 1, false), (1, 0, false)];
+
+        for (expected, got, admissible) in examples0 {
+            assert_eq!(OutOfSequence { expected, got }.is_admissible(0), admissible)
+        }
     }
 }

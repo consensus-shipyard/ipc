@@ -43,6 +43,7 @@ async fn run(settings: EthSettings, client: HybridClient) -> anyhow::Result<()> 
         client,
         settings.filter_timeout,
         settings.cache_capacity,
+        settings.max_nonce_gap,
         gas,
     )
     .await
