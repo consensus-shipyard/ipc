@@ -21,6 +21,7 @@ lru_time_cache = { workspace = true }
 paste = { workspace = true }
 serde = { workspace = true }
 rand = { workspace = true }
+regex = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
 tendermint = { workspace = true }

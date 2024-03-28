@@ -1,7 +1,10 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use anyhow::Context;
 use cid::Cid;
@@ -36,29 +39,44 @@ where
         }
     }
 
+    pub fn new_with_ttl(capacity: usize, ttl: Duration) -> Self {
+        Self {
+            cache: Arc::new(Mutex::new(LruCache::with_expiry_duration_and_capacity(
+                ttl, capacity,
+            ))),
+        }
+    }
+
     pub fn insert(&self, key: K, value: V) {
-        let mut guard = self.cache.lock().expect("cache poisoned");
-        guard.insert(key, value);
+        self.with(|c| c.insert(key, value));
     }
 
     pub fn get(&self, key: &K) -> Option<V> {
-        let mut guard = self.cache.lock().expect("cache poisoned");
-        guard.get(key).cloned()
+        self.with(|c| c.get(key).cloned())
     }
 
     pub fn remove(&self, key: &K) {
-        let mut guard = self.cache.lock().expect("cache poisoned");
-        guard.remove(key);
+        self.with(|c| c.remove(key));
     }
 
-    pub fn remove_many(&self, keys: &[K]) {
-        if keys.is_empty() {
-            return;
-        }
+    pub fn remove_many<'a, I>(&self, keys: I)
+    where
+        I: Iterator<Item = &'a K>,
+        K: 'a,
+    {
+        self.with(|c| {
+            for key in keys {
+                c.remove(key);
+            }
+        })
+    }
+
+    pub fn with<F, T>(&self, f: F) -> T
+    where
+        F: FnOnce(&mut LruCache<K, V>) -> T,
+    {
         let mut guard = self.cache.lock().expect("cache poisoned");
-        for key in keys {
-            guard.remove(key);
-        }
+        f(&mut guard)
     }
 }
 

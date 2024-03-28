@@ -40,7 +40,7 @@ use fil_actors_evm_shared::uints;
 
 use crate::conv::from_eth::{self, to_fvm_message};
 use crate::conv::from_tm::{self, msg_hash, to_chain_message, to_cumulative, to_eth_block_zero};
-use crate::error::error_with_revert;
+use crate::error::{error_with_revert, OutOfSequence};
 use crate::filters::{matches_topics, FilterId, FilterKind, FilterRecords};
 use crate::{
     conv::{
@@ -614,7 +614,7 @@ where
     C: Client + Sync + Send,
 {
     let rlp = rlp::Rlp::new(tx.as_ref());
-    let (tx, sig) = TypedTransaction::decode_signed(&rlp)
+    let (tx, sig): (TypedTransaction, et::Signature) = TypedTransaction::decode_signed(&rlp)
         .context("failed to decode RLP as signed TypedTransaction")?;
 
     let sighash = tx.sighash();
@@ -627,6 +627,9 @@ where
     }
 
     let msg = to_fvm_message(tx, false)?;
+    let sender = msg.from;
+    let nonce = msg.sequence;
+
     let msg = SignedMessage {
         message: msg,
         signature: Signature::new_secp256k1(sig.to_vec()),
@@ -644,14 +647,29 @@ where
         Ok(msghash)
     } else {
         // Try to decode any errors returned in the data.
-        let data = RawBytes::from(res.data.to_vec());
+        let bz = RawBytes::from(res.data.to_vec());
         // Might have to first call `decode_fevm_data` here in case CometBFT
         // wraps the data into Base64 encoding like it does for `DeliverTx`.
-        let data = decode_fevm_return_data(data)
+        let bz = decode_fevm_return_data(bz)
             .or_else(|_| decode_data(&res.data).and_then(decode_fevm_return_data))
             .ok();
 
-        error_with_revert(ExitCode::new(res.code.value()), res.log, data)
+        let exit_code = ExitCode::new(res.code.value());
+
+        // NOTE: We could have checked up front if we have buffered transactions already waiting,
+        // in which case this have just been appended to the list.
+        if let Some(oos) = OutOfSequence::try_parse(exit_code, &res.log) {
+            let is_admissible = oos.is_admissible(data.max_nonce_gap);
+
+            tracing::debug!(eth_hash = ?msghash, expected = oos.expected, got = oos.got, is_admissible, "out-of-sequence transaction received");
+
+            if is_admissible {
+                data.tx_buffer.insert(sender, nonce, msg);
+                return Ok(msghash);
+            }
+        }
+
+        error_with_revert(exit_code, res.log, bz)
     }
 }
 

@@ -17,6 +17,7 @@ pub struct EthSettings {
     pub filter_timeout: Duration,
     pub cache_capacity: usize,
     pub gas: GasOpt,
+    pub max_nonce_gap: u64,
 }
 
 #[serde_as]
