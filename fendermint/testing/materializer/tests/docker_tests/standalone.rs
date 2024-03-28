@@ -1,6 +1,8 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::time::{Duration, Instant};
+
 use anyhow::{bail, Context};
 use ethers::{
     core::k256::ecdsa::SigningKey,
@@ -100,6 +102,9 @@ async fn test_sent_tx_found_in_mempool() {
 #[serial_test::serial]
 #[tokio::test]
 async fn test_out_of_order_mempool() {
+    const MAX_WAIT_TIME: Duration = Duration::from_secs(10);
+    const SLEEP_TIME: Duration = Duration::from_secs(1);
+
     with_testnet(
         MANIFEST,
         |_| {},
@@ -138,6 +143,8 @@ async fn test_out_of_order_mempool() {
                     txs.push(tx)
                 }
 
+                let mut pending_txs = Vec::new();
+
                 for (i, tx) in txs.iter().enumerate() {
                     let sig = middleware
                         .signer()
@@ -147,10 +154,34 @@ async fn test_out_of_order_mempool() {
 
                     let rlp = tx.rlp_signed(&sig);
 
-                    let _pending: PendingTransaction<_> = middleware
+                    let pending_tx: PendingTransaction<_> = middleware
                         .send_raw_transaction(rlp)
                         .await
                         .with_context(|| format!("failed to send tx {i}"))?;
+
+                    pending_txs.push(pending_tx)
+                }
+
+                // Check that they eventually get included.
+                let start = Instant::now();
+                loop {
+                    for tx in pending_txs.iter() {
+                        let receipt = middleware
+                            .get_transaction_receipt(tx.tx_hash())
+                            .await
+                            .context("failed to get receipt")?;
+
+                        if receipt.is_none() {
+                            if start.elapsed() > MAX_WAIT_TIME {
+                                bail!("some transactions are still not executed")
+                            } else {
+                                tokio::time::sleep(SLEEP_TIME).await;
+                                continue;
+                            }
+                        }
+                    }
+                    // All of them have receipt.
+                    break;
                 }
 
                 Ok(())
