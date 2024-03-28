@@ -176,12 +176,6 @@ contract DelegationManager is ReentrancyGuard {
         return _operatorDetails[operator].delegationApprover;
     }
 
-    function stakerOptOutWindowBlocks(
-        address operator
-    ) external view returns (uint256) {
-        return _operatorDetails[operator].stakerOptOutWindowBlocks;
-    }
-
     function getOperatorShares(
         address operator,
         IStrategy[] memory strategies
