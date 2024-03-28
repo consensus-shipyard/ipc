@@ -165,7 +165,7 @@ async fn test_out_of_order_mempool() {
 
                 // Check that they eventually get included.
                 let start = Instant::now();
-                loop {
+                'pending: loop {
                     for tx in pending_txs.iter() {
                         let receipt = middleware
                             .get_transaction_receipt(tx.tx_hash())
@@ -177,12 +177,12 @@ async fn test_out_of_order_mempool() {
                                 bail!("some transactions are still not executed")
                             } else {
                                 tokio::time::sleep(SLEEP_TIME).await;
-                                continue;
+                                continue 'pending;
                             }
                         }
                     }
                     // All of them have receipt.
-                    break;
+                    break 'pending;
                 }
 
                 Ok(())
