@@ -11,13 +11,18 @@ script = """
 unixtime=$(date +%s)
 echo "Starting promtail with promtailrunid: $unixtime"
 
-echo "promtail client url: ${PROMTAIL_CLIENT_URL}"
+if [[ -z $PROMTAIL_ABSOLUTE_PATH ]]; then
+    echo "Please set env var PROMTAIL_ABSOLUTE_PATH which contains promtail-config.yaml"
+    exit 1
+fi
+
+echo "promtail absolute path: ${PROMTAIL_ABSOLUTE_PATH}"
 
 docker run \
   ${FLAGS} \
   --name ${PROMTAIL_CONTAINER_NAME} \
   --volume /var/run/docker.sock:/var/run/docker.sock \
-  --volume "$(readlink -f ../../../infra/promtail)/:/etc/promtail" \
+  --volume "${PROMTAIL_ABSOLUTE_PATH}/:/etc/promtail" \
   --volume fendermint-logs:/var/log/fendermint/ \
   ${PROMTAIL_DOCKER_IMAGE} \
   --client.external-labels=hostname=$(hostname),promtailrunid=$unixtime \
