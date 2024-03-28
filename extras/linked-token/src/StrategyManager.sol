@@ -3,6 +3,7 @@ pragma solidity 0.8.23;
 
 import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/utils/ReentrancyGuard.sol";
 import {DelegationManager} from "./DelegationManager.sol";
 import {Slasher} from "./Slasher.sol";
@@ -66,7 +67,7 @@ contract StrategyManager is Ownable, ReentrancyGuard {
         IERC20 token,
         IStrategy strategy,
         uint256 shares
-    ) {
+    ) external onlyDelegationManager {
         _addShares(staker, token, strategy, shares);
     }
 
