@@ -4,7 +4,9 @@
 use std::{collections::BTreeMap, time::Duration};
 
 use ethers_core::types as et;
-use fendermint_rpc::{client::TendermintClient, FendermintClient, QueryClient};
+use fendermint_rpc::{
+    client::TendermintClient, message::SignedMessageFactory, FendermintClient, QueryClient,
+};
 use fendermint_vm_message::{chain::ChainMessage, query::FvmQueryHeight, signed::DomainHash};
 use futures::StreamExt;
 use fvm_shared::{address::Address, chainid::ChainID};
@@ -12,7 +14,7 @@ use tendermint::Block;
 use tendermint_rpc::{
     event::EventData,
     query::{EventType, Query},
-    SubscriptionClient,
+    Client, SubscriptionClient,
 };
 
 use crate::{cache::Cache, state::Nonce, HybridClient};
@@ -30,10 +32,17 @@ pub type TransactionCache = Cache<et::TxHash, et::Transaction>;
 pub struct TransactionBuffer(pub Cache<Address, BTreeMap<Nonce, ChainMessage>>);
 
 impl TransactionBuffer {
+    /// Insert a transaction we could not submit straight away into the buffer.
+    pub fn insert(&self, sender: Address, nonce: Nonce, msg: ChainMessage) {
+        self.0.with(|c| {
+            let buffer = c.entry(sender).or_insert_with(BTreeMap::new);
+            // Overwrite any previous entry to protect against DoS attack; it wouldn't make sense to submit them anyway.
+            buffer.insert(nonce, msg);
+        })
+    }
+
     /// Remove all (sender, nonce) pairs which were included in a block.
-    ///
-    /// Also remove and return all transactions that can now be submitted in turn.
-    pub fn remove_many<'a, I>(&self, txs: I)
+    fn remove_many<'a, I>(&self, txs: I)
     where
         I: Iterator<Item = (&'a Address, Nonce)>,
     {
@@ -41,18 +50,30 @@ impl TransactionBuffer {
             for (sender, nonce) in txs {
                 if let Some(buffer) = c.get_mut(sender) {
                     buffer.remove(&nonce);
-                    // TODO: Check if there is a nonce that _follows_ this one which can be submitted now.
                 }
             }
         })
     }
 
-    /// Insert a transaction we could not submit straight away into the buffer.
-    pub fn insert(&self, sender: Address, nonce: Nonce, msg: ChainMessage) {
+    /// Gather any messages that have been enabled by transactions added to a block.
+    ///
+    /// These are removed from the cache, submission is only attempted once.
+    fn remove_enabled<'a, I>(&self, txs: I) -> Vec<(Address, Nonce, ChainMessage)>
+    where
+        I: Iterator<Item = (&'a Address, Nonce)>,
+    {
         self.0.with(|c| {
-            let buffer = c.entry(sender).or_insert_with(BTreeMap::new);
-            // Overwrite any previous entry to protect against DoS attack; it wouldn't make sense to submit them anyway.
-            buffer.insert(nonce, msg);
+            let mut msgs = Vec::new();
+            for (sender, mut nonce) in txs {
+                if let Some(buffer) = c.get_mut(sender) {
+                    nonce += 1;
+                    while let Some(msg) = buffer.remove(&nonce) {
+                        msgs.push((*sender, nonce, msg));
+                        nonce += 1;
+                    }
+                }
+            }
+            msgs
         })
     }
 }
@@ -65,20 +86,22 @@ pub fn start_tx_cache_clearing(
 ) {
     tokio::task::spawn(async move {
         let chain_id = get_chain_id(&client).await;
-        tx_cache_clearing_loop(client, chain_id, tx_cache, tx_buffer).await;
+        tx_cache_clearing_loop(client.into_underlying(), chain_id, tx_cache, tx_buffer).await;
     });
 }
 
-async fn tx_cache_clearing_loop(
-    client: FendermintClient<HybridClient>,
+async fn tx_cache_clearing_loop<C>(
+    client: C,
     chain_id: ChainID,
     tx_cache: TransactionCache,
     tx_buffer: TransactionBuffer,
-) {
+) where
+    C: Client + SubscriptionClient + Send + Sync,
+{
     loop {
         let query = Query::from(EventType::NewBlock);
 
-        match client.underlying().subscribe(query).await {
+        match client.subscribe(query).await {
             Err(e) => {
                 tracing::warn!(error=?e, "failed to subscribe to NewBlocks; retrying later...");
                 tokio::time::sleep(Duration::from_secs(RETRY_SLEEP_SECS)).await;
@@ -101,8 +124,16 @@ async fn tx_cache_clearing_loop(
                                     continue;
                                 }
 
-                                tx_cache.remove_many(txs.iter().map(|(h, _, _)| h));
-                                tx_buffer.remove_many(txs.iter().map(|(_, s, n)| (s, *n)));
+                                let tx_hashes = txs.iter().map(|(h, _, _)| h);
+                                let tx_nonces = || txs.iter().map(|(_, s, n)| (s, *n));
+
+                                tx_cache.remove_many(tx_hashes);
+                                // First remove all transactions which have been in the block (could be multiple from the same sender).
+                                tx_buffer.remove_many(tx_nonces());
+                                // Then collect whatever is enabled on top of those, ie. anything that hasn't been included, but now can.
+                                let enabled = tx_buffer.remove_enabled(tx_nonces());
+                                // Send them all with best-effort.
+                                send_msgs(&client, enabled).await;
                             }
                         }
                     }
@@ -134,6 +165,31 @@ async fn get_chain_id(client: &FendermintClient<HybridClient>) -> ChainID {
             Err(e) => {
                 tracing::warn!(error=?e, "failed to get chain ID; retrying later...");
                 tokio::time::sleep(Duration::from_secs(RETRY_SLEEP_SECS)).await;
+            }
+        }
+    }
+}
+
+async fn send_msgs<C>(client: &C, msgs: Vec<(Address, Nonce, ChainMessage)>)
+where
+    C: Client + Send + Sync,
+{
+    for (sender, nonce, msg) in msgs {
+        let Ok(bz) = SignedMessageFactory::serialize(&msg) else {
+            continue;
+        };
+
+        // Use the broadcast version which waits for basic checks to complete.
+        match client.broadcast_tx_sync(bz).await {
+            Ok(_) => {
+                tracing::info!(
+                    sender = sender.to_string(),
+                    nonce,
+                    "submitted out-of-order transaction"
+                );
+            }
+            Err(e) => {
+                tracing::error!(error=?e, sender = sender.to_string(), nonce, "failed to submit out-of-order transaction");
             }
         }
     }
