@@ -1,13 +1,13 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! Utilities related to caching and buffering Ethereum transactions.
-use std::time::Duration;
+use std::{collections::BTreeMap, time::Duration};
 
 use ethers_core::types as et;
 use fendermint_rpc::{client::TendermintClient, FendermintClient, QueryClient};
 use fendermint_vm_message::{chain::ChainMessage, query::FvmQueryHeight, signed::DomainHash};
 use futures::StreamExt;
-use fvm_shared::chainid::ChainID;
+use fvm_shared::{address::Address, chainid::ChainID};
 use tendermint::Block;
 use tendermint_rpc::{
     event::EventData,
@@ -15,7 +15,7 @@ use tendermint_rpc::{
     SubscriptionClient,
 };
 
-use crate::{cache::Cache, HybridClient};
+use crate::{cache::Cache, state::Nonce, HybridClient};
 
 const RETRY_SLEEP_SECS: u64 = 5;
 
@@ -25,17 +25,26 @@ const RETRY_SLEEP_SECS: u64 = 5;
 /// being dropped from the mempool.
 pub type TransactionCache = Cache<et::TxHash, et::Transaction>;
 
-pub fn start_tx_cache_clearing(client: FendermintClient<HybridClient>, cache: TransactionCache) {
+/// Buffer out-of-order messages until they can be sent to the chain.
+pub type TransactionBuffer = Cache<Address, BTreeMap<Nonce, ChainMessage>>;
+
+/// Subscribe to `NewBlock  notifications and clear transactions from the caches.`
+pub fn start_tx_cache_clearing(
+    client: FendermintClient<HybridClient>,
+    tx_cache: TransactionCache,
+    tx_buffer: TransactionBuffer,
+) {
     tokio::task::spawn(async move {
         let chain_id = get_chain_id(&client).await;
-        tx_cache_clearing_loop(client, cache, chain_id).await;
+        tx_cache_clearing_loop(client, chain_id, tx_cache, tx_buffer).await;
     });
 }
 
 async fn tx_cache_clearing_loop(
     client: FendermintClient<HybridClient>,
-    tx_cache: TransactionCache,
     chain_id: ChainID,
+    tx_cache: TransactionCache,
+    tx_buffer: TransactionBuffer,
 ) {
     loop {
         let query = Query::from(EventType::NewBlock);
@@ -57,8 +66,23 @@ async fn tx_cache_clearing_loop(
                                 block: Some(block), ..
                             } = event.data
                             {
-                                let tx_hashes = collect_tx_hashes(&block, &chain_id);
+                                let txs = collect_txs(&block, &chain_id);
+
+                                if txs.is_empty() {
+                                    continue;
+                                }
+
+                                let tx_hashes = txs.iter().map(|(h, _, _)| h).collect::<Vec<_>>();
                                 tx_cache.remove_many(&tx_hashes);
+
+                                tx_buffer.with(|c| {
+                                    for (_, sender, nonce) in txs {
+                                        if let Some(buffer) = c.get_mut(&sender) {
+                                            buffer.remove(&nonce);
+                                            // TODO: Check if there is a nonce that _follows_ this one which can be submitted now.
+                                        }
+                                    }
+                                })
                             }
                         }
                     }
@@ -68,16 +92,17 @@ async fn tx_cache_clearing_loop(
     }
 }
 
-fn collect_tx_hashes(block: &Block, chain_id: &ChainID) -> Vec<et::TxHash> {
-    let mut tx_hashes = Vec::new();
+/// Collect the identifiers of the transactions in the block.
+fn collect_txs(block: &Block, chain_id: &ChainID) -> Vec<(et::TxHash, Address, Nonce)> {
+    let mut txs = Vec::new();
     for tx in &block.data {
         if let Ok(ChainMessage::Signed(msg)) = fvm_ipld_encoding::from_slice(tx) {
             if let Ok(Some(DomainHash::Eth(h))) = msg.domain_hash(chain_id) {
-                tx_hashes.push(et::TxHash::from(h))
+                txs.push((et::TxHash::from(h), msg.message.from, msg.message.sequence))
             }
         }
     }
-    tx_hashes
+    txs
 }
 
 async fn get_chain_id(client: &FendermintClient<HybridClient>) -> ChainID {

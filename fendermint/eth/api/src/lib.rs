@@ -61,7 +61,11 @@ pub async fn listen<A: ToSocketAddrs>(
         ));
 
         // Start the transaction cache pruning subscription.
-        mpool::start_tx_cache_clearing(rpc_state.client.clone(), rpc_state.tx_cache.clone());
+        mpool::start_tx_cache_clearing(
+            rpc_state.client.clone(),
+            rpc_state.tx_cache.clone(),
+            rpc_state.tx_buffer.clone(),
+        );
 
         let rpc_server = make_server(rpc_state.clone());
         let app_state = AppState {
