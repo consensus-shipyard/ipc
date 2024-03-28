@@ -5,7 +5,7 @@
 use crate::config::Subnet;
 use crate::manager::{BottomUpCheckpointRelayer, EthSubnetManager};
 use anyhow::{anyhow, Result};
-use futures_util::future::join_all;
+use futures_util::future::try_join_all;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use ipc_api::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
@@ -190,29 +190,30 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                     .await
                     .unwrap();
                 all_submit_tasks.push(tokio::task::spawn(async move {
-                    match Self::submit_checkpoint(parent_handler_clone, submitter, bundle, event)
-                        .await
+                    let height = event.height;
+                    if let Err(e) =
+                        Self::submit_checkpoint(parent_handler_clone, submitter, bundle, event)
+                            .await
                     {
-                        Ok(()) => {
-                            log::debug!("Successfully submitted checkpoint");
-                        }
-                        Err(_err) => {
-                            log::debug!("Failed to submit checkpoint");
-                        }
+                        log::error!("Fail to submit checkpoint at height {height}: {e}");
+                        drop(submission_permit);
+                        Err(e)
+                    } else {
+                        drop(submission_permit);
+                        Ok(())
                     }
-                    drop(submission_permit);
                 }));
 
                 count += 1;
                 log::debug!(
-                    "This round has asynchronously submitted {:} checkpoints",
-                    count
+                    "This round has asynchronously submitted {count} checkpoints",
                 );
             }
         }
 
         log::debug!("Waiting for all submissions to finish");
-        join_all(all_submit_tasks).await;
+        // Return error if any of the submit task failed.
+        try_join_all(all_submit_tasks).await?;
 
         Ok(())
     }
@@ -233,7 +234,7 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
             .await
             .map_err(|e| {
                 anyhow!(
-                    "cannot submit bottom up checkpoint at height {} due to: {e:}",
+                    "cannot submit bottom up checkpoint at height {} due to: {e}",
                     event.height
                 )
             })?;
