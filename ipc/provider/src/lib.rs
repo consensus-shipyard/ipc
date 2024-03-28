@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 //! Ipc agent sdk, contains the json rpc client to interact with the IPC agent rpc server.
 
+use crate::manager::evm::dryrun::EvmSubnetDryRun;
 use crate::manager::{GetBlockHashResult, TopDownQueryPayload};
 use anyhow::anyhow;
 use base64::Engine;
@@ -11,12 +12,7 @@ use fvm_shared::{
 };
 use ipc_api::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
 use ipc_api::staking::{StakingChangeRequest, ValidatorInfo};
-use ipc_api::subnet::{PermissionMode, SupplySource};
-use ipc_api::{
-    cross::IpcEnvelope,
-    subnet::{ConsensusType, ConstructParams},
-    subnet_id::SubnetID,
-};
+use ipc_api::{cross::IpcEnvelope, subnet::ConstructParams, subnet_id::SubnetID};
 use ipc_wallet::{
     EthKeyAddress, EvmKeyStore, KeyStore, KeyStoreConfig, PersistentKeyStore, Wallet,
 };
@@ -40,6 +36,15 @@ pub mod manager;
 
 const DEFAULT_REPO_PATH: &str = ".ipc";
 const DEFAULT_CONFIG_NAME: &str = "config.toml";
+
+/// The vm type the dry run performs in
+#[derive(Debug, Clone, Copy, strum::EnumString)]
+pub enum VMType {
+    #[strum(serialize = "Evm", serialize = "evm")]
+    Evm,
+    #[strum(serialize = "Fvm", serialize = "fvm")]
+    Fvm,
+}
 
 /// The subnet manager connection that holds the subnet config and the manager instance.
 pub struct Connection {
@@ -65,6 +70,8 @@ pub struct IpcProvider {
     config: Arc<Config>,
     fvm_wallet: Option<Arc<RwLock<Wallet>>>,
     evm_keystore: Option<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>>,
+
+    dry_run: Option<VMType>,
 }
 
 impl IpcProvider {
@@ -78,6 +85,7 @@ impl IpcProvider {
             config,
             fvm_wallet: Some(fvm_wallet),
             evm_keystore: Some(evm_keystore),
+            dry_run: None,
         }
     }
 
@@ -114,6 +122,7 @@ impl IpcProvider {
                 config,
                 fvm_wallet: None,
                 evm_keystore: None,
+                dry_run: None,
             })
         }
     }
@@ -136,16 +145,16 @@ impl IpcProvider {
                             None
                         }
                     };
-                    let manager =
-                        match EthSubnetManager::from_subnet_with_wallet_store(subnet, wallet) {
-                            Ok(w) => Some(w),
-                            Err(e) => {
-                                log::warn!("error initializing evm wallet: {e}");
-                                return None;
-                            }
-                        };
+
+                    let evm =
+                        EthSubnetManager::from_subnet_with_wallet_store(subnet, wallet).ok()?;
+                    let manager: Box<dyn SubnetManager> = match self.dry_run {
+                        Some(v) => Box::new(EvmSubnetDryRun::new(v, evm)),
+                        None => Box::new(evm),
+                    };
+
                     Some(Connection {
-                        manager: Box::new(manager.unwrap()),
+                        manager,
                         subnet: subnet.clone(),
                     })
                 }
@@ -161,7 +170,9 @@ impl IpcProvider {
 
     /// Returns the evm wallet if it is configured, and throws an error if no wallet configured.
     ///
-    /// This method should be used when we want the wallet retrieval to throw an error
+    /// This method should be used when:
+    /// 1. Signing txns
+    /// 2. Get the default wallet used for operations
     /// if it is not configured (i.e. when the provider needs to sign transactions).
     pub fn evm_wallet(&self) -> anyhow::Result<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>> {
         if let Some(wallet) = &self.evm_keystore {
@@ -227,46 +238,27 @@ impl IpcProvider {
 /// with the subnet configuration. This has been inherited by the daemon
 /// configuration and will be slowly deprecated.
 impl IpcProvider {
-    // FIXME: Once the arguments for subnet creation are stabilized,
-    // use a SubnetOpts struct to provide the creation arguments and
-    // remove this allow
-    #[allow(clippy::too_many_arguments)]
+    pub fn dry_run(&mut self, vm: VMType) -> &mut Self {
+        self.dry_run = Some(vm);
+        self
+    }
+
     pub async fn create_subnet(
         &mut self,
         from: Option<Address>,
-        parent: SubnetID,
-        min_validators: u64,
-        min_validator_stake: TokenAmount,
-        bottomup_check_period: ChainEpoch,
-        active_validators_limit: u16,
-        min_cross_msg_fee: TokenAmount,
-        permission_mode: PermissionMode,
-        supply_source: SupplySource,
+        mut params: ConstructParams,
     ) -> anyhow::Result<Address> {
-        let conn = match self.connection(&parent) {
+        let conn = match self.connection(&params.parent) {
             None => return Err(anyhow!("target parent subnet not found")),
             Some(conn) => conn,
         };
 
         let subnet_config = conn.subnet();
+
         let sender = self.check_sender(subnet_config, from)?;
+        params.ipc_gateway_addr = Some(subnet_config.gateway_addr());
 
-        let constructor_params = ConstructParams {
-            parent,
-            ipc_gateway_addr: subnet_config.gateway_addr(),
-            consensus: ConsensusType::Fendermint,
-            min_validators,
-            min_validator_stake,
-            bottomup_check_period,
-            active_validators_limit,
-            min_cross_msg_fee,
-            permission_mode,
-            supply_source,
-        };
-
-        conn.manager()
-            .create_subnet(sender, constructor_params)
-            .await
+        conn.manager().create_subnet(sender, params).await
     }
 
     pub async fn join_subnet(
