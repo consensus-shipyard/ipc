@@ -25,14 +25,12 @@ pub struct IpfsResolver<V> {
     key: Keypair,
     subnet_id: SubnetID,
     to_vote: fn(Cid) -> V,
-    topdown_enabled: bool,
 }
 
 impl<V> IpfsResolver<V>
 where
     V: Clone + Send + Sync + Serialize + DeserializeOwned + 'static,
 {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         client: Client<V>,
         queue: ResolveQueue,
@@ -41,7 +39,6 @@ where
         key: Keypair,
         subnet_id: SubnetID,
         to_vote: fn(Cid) -> V,
-        topdown_enabled: bool,
     ) -> Self {
         Self {
             client,
@@ -51,7 +48,6 @@ where
             key,
             subnet_id,
             to_vote,
-            topdown_enabled,
         }
     }
 
@@ -73,7 +69,6 @@ where
                 self.key.clone(),
                 self.subnet_id.clone(),
                 self.to_vote,
-                self.topdown_enabled,
             );
         }
     }
@@ -91,7 +86,6 @@ fn start_resolve<V>(
     key: Keypair,
     subnet_id: SubnetID,
     to_vote: fn(Cid) -> V,
-    topdown_enabled: bool,
 ) where
     V: Clone + Send + Sync + Serialize + DeserializeOwned + 'static,
 {
@@ -121,44 +115,36 @@ fn start_resolve<V>(
                 atomically(|| task.set_resolved()).await;
 
                 // Skip voting if topdown checkpointing is disabled.
-                if topdown_enabled {
-                    let vote = to_vote(task.cid());
-                    match VoteRecord::signed(&key, subnet_id, vote) {
-                        Ok(vote) => {
-                            // Add our own vote
-                            let validator_key = ValidatorKey::from(key.public());
-                            let res = atomically_or_err(|| {
-                                vote_tally
-                                    .add_object_vote(validator_key.clone(), task.cid().to_bytes())
-                            })
-                            .await;
+                let vote = to_vote(task.cid());
+                match VoteRecord::signed(&key, subnet_id, vote) {
+                    Ok(vote) => {
+                        // Add our own vote
+                        let validator_key = ValidatorKey::from(key.public());
+                        let res = atomically_or_err(|| {
+                            vote_tally.add_object_vote(validator_key.clone(), task.cid().to_bytes())
+                        })
+                        .await;
 
-                            match res {
-                                Ok(added) => {
-                                    if added {
-                                        // Send own vote to peers
-                                        if let Err(e) = client.publish_vote(vote) {
-                                            tracing::error!(
-                                                error = e.to_string(),
-                                                "failed to publish vote"
-                                            );
-                                        }
+                        match res {
+                            Ok(added) => {
+                                if added {
+                                    // Send own vote to peers
+                                    if let Err(e) = client.publish_vote(vote) {
+                                        tracing::error!(
+                                            error = e.to_string(),
+                                            "failed to publish vote"
+                                        );
                                     }
                                 }
-                                Err(e) => {
-                                    tracing::error!(
-                                        error = e.to_string(),
-                                        "failed to handle own vote"
-                                    );
-                                }
+                            }
+                            Err(e) => {
+                                tracing::error!(error = e.to_string(), "failed to handle own vote");
                             }
                         }
-                        Err(e) => {
-                            tracing::error!(error = e.to_string(), "failed to sign vote");
-                        }
                     }
-                } else {
-                    tracing::debug!("skipped publishing vote");
+                    Err(e) => {
+                        tracing::error!(error = e.to_string(), "failed to sign vote");
+                    }
                 }
             }
             Some(e) => {

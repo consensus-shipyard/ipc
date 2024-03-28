@@ -51,8 +51,6 @@ pub struct ChainEnv {
     pub parent_finality_votes: VoteTally,
     /// IPFS pin resolution pool.
     pub object_pool: ObjectPool,
-    /// Whether topdown checkpointing is enabled.    
-    pub topdown_enabled: bool,
 }
 
 #[derive(Clone, Hash, PartialEq, Eq)]
@@ -194,10 +192,8 @@ where
         // No need for voting.
         let mut objects: Vec<ChainMessage> = vec![];
         for item in local_resolved_objects.iter() {
-            let (is_finalized, is_globally_resolved) = if !state.topdown_enabled {
-                (false, true)
-            } else {
-                let obj = item.obj.value.to_bytes();
+            let obj = item.obj.value.to_bytes();
+            let (is_finalized, is_globally_resolved) =
                 atomically(
                     || match state.parent_finality_votes.is_object_finalized(&obj)? {
                         true => Ok((true, false)),
@@ -207,8 +203,7 @@ where
                         },
                     },
                 )
-                .await
-            };
+                .await;
 
             // Remove here otherwise proposal will be rejected
             if is_finalized {
@@ -276,22 +271,16 @@ where
                     let item = ObjectPoolItem { obj };
                     let obj = item.obj.value.to_bytes();
 
-                    let (is_finalized, is_globally_resolved) = if !env.topdown_enabled {
-                        (false, true)
-                    } else {
-                        atomically(|| {
-                            match env.parent_finality_votes.is_object_finalized(&obj)? {
-                                true => Ok((true, true)),
-                                false => {
-                                    match env.parent_finality_votes.find_object_quorum(&obj)? {
-                                        true => Ok((false, true)),
-                                        false => Ok((false, false)),
-                                    }
-                                }
-                            }
-                        })
-                        .await
-                    };
+                    let (is_finalized, is_globally_resolved) = atomically(|| {
+                        match env.parent_finality_votes.is_object_finalized(&obj)? {
+                            true => Ok((true, true)),
+                            false => match env.parent_finality_votes.find_object_quorum(&obj)? {
+                                true => Ok((false, true)),
+                                false => Ok((false, false)),
+                            },
+                        }
+                    })
+                    .await;
 
                     // If already finalized, reject this proposal
                     if is_finalized {

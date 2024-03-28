@@ -195,7 +195,6 @@ async fn run(ipfs_addr: String, settings: Settings) -> anyhow::Result<()> {
                 key,
                 own_subnet_id,
                 |value| AppVote::ObjectFinality(IPCObjectFinality { object: value }),
-                topdown_enabled,
             );
 
             tracing::info!("starting the IPFS Resolver...");
@@ -286,7 +285,6 @@ async fn run(ipfs_addr: String, settings: Settings) -> anyhow::Result<()> {
             parent_finality_provider: parent_finality_provider.clone(),
             parent_finality_votes: parent_finality_votes.clone(),
             object_pool: ipfs_pin_pool,
-            topdown_enabled: settings.topdown_enabled(),
         },
         snapshots,
     )?;
@@ -517,10 +515,6 @@ async fn dispatch_vote(
             }
         }
         AppVote::ObjectFinality(f) => {
-            if !topdown_enabled {
-                tracing::debug!("ignoring vote; topdown disabled");
-                return;
-            }
             tracing::debug!(cid = ?f.object, "received vote for object finality");
 
             let res = atomically_or_err(|| {
