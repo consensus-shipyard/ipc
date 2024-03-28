@@ -4,6 +4,8 @@
 use ethers_contract::{ContractRevert, EthError};
 use fendermint_vm_actor_interface::ipc::subnet::SubnetActorErrors;
 use fvm_shared::error::ExitCode;
+use lazy_static::lazy_static;
+use regex::Regex;
 use serde::Serialize;
 
 #[derive(Debug, Clone)]
@@ -108,3 +110,61 @@ impl std::fmt::Display for JsonRpcError {
 }
 
 impl std::error::Error for JsonRpcError {}
+
+/// Error representing out-of-order transaction submission.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OutOfSequence {
+    pub expected: u64,
+    pub got: u64,
+}
+
+impl OutOfSequence {
+    pub fn try_parse(code: ExitCode, msg: &str) -> Option<Self> {
+        if code != ExitCode::SYS_SENDER_STATE_INVALID {
+            return None;
+        }
+
+        lazy_static! {
+            static ref OOS_RE: Regex =
+                Regex::new(r"expected sequence (\d+), got (\d+)").expect("regex parses");
+        }
+
+        if let Some((e, g)) = OOS_RE
+            .captures_iter(msg)
+            .map(|c| c.extract())
+            .map(|(_, [e, g])| (e, g))
+            .filter_map(|(e, g)| {
+                let e = e.parse().ok()?;
+                let g = g.parse().ok()?;
+                Some((e, g))
+            })
+            .next()
+        {
+            return Some(Self {
+                expected: e,
+                got: g,
+            });
+        }
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::error::OutOfSequence;
+    use fvm_shared::error::ExitCode;
+
+    #[test]
+    fn test_out_of_sequence_parse() {
+        assert_eq!(
+            OutOfSequence::try_parse(
+                ExitCode::SYS_SENDER_STATE_INVALID,
+                "... expected sequence 0, got 4 ..."
+            ),
+            Some(OutOfSequence {
+                expected: 0,
+                got: 4
+            })
+        );
+    }
+}
