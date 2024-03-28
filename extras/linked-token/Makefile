@@ -11,6 +11,7 @@ help:
 	@echo "  install                - Install dependencies."
 	@echo "  deploy-usdctest        - Deploy the USDCTest contract on the Calibration Network."
 	@echo "  deploy-lst             - Deploy all the LST share tokens on the Calibration Network."
+	@echo "  deploy-wfil            - Deploy wrapped FIL test token on the Calibration Network"
 	@echo "  mint-usdc              - Mint 1000 USDCTest tokens to the wallet specified in the .env file."
 	@echo "  check-balance          - Check the balance of USDCTest tokens in the wallet."
 	@echo "  deploy-replica         - Deploy the token replica contract on the subnet."
@@ -37,6 +38,10 @@ deploy-usdctest:
 deploy-lst:
 	@echo "Deploying LST share tokens..."
 	forge script script/DeployLSTTokens.s.sol:DeployLSTTokens --broadcast --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --skip-simulation -vvv
+
+deploy-wfil:
+	@echo "Deploying WFil contract..."
+	forge script script/DeployWFil.s.sol:DeployWFil --broadcast --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --skip-simulation -vvv
 
 mint-usdc:
 	@echo "Minting 1000 USDCTest tokens..."
