@@ -145,7 +145,8 @@ async fn test_out_of_order_mempool() {
 
                 let mut pending_txs = Vec::new();
 
-                for (i, tx) in txs.iter().enumerate() {
+                // Submit transactions in opposite order.
+                for (i, tx) in txs.iter().enumerate().rev() {
                     let sig = middleware
                         .signer()
                         .sign_transaction(tx)
