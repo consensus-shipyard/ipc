@@ -26,7 +26,36 @@ const RETRY_SLEEP_SECS: u64 = 5;
 pub type TransactionCache = Cache<et::TxHash, et::Transaction>;
 
 /// Buffer out-of-order messages until they can be sent to the chain.
-pub type TransactionBuffer = Cache<Address, BTreeMap<Nonce, ChainMessage>>;
+#[derive(Clone)]
+pub struct TransactionBuffer(pub Cache<Address, BTreeMap<Nonce, ChainMessage>>);
+
+impl TransactionBuffer {
+    /// Remove all (sender, nonce) pairs which were included in a block.
+    ///
+    /// Also remove and return all transactions that can now be submitted in turn.
+    pub fn remove_many<'a, I>(&self, txs: I)
+    where
+        I: Iterator<Item = (&'a Address, Nonce)>,
+    {
+        self.0.with(|c| {
+            for (sender, nonce) in txs {
+                if let Some(buffer) = c.get_mut(sender) {
+                    buffer.remove(&nonce);
+                    // TODO: Check if there is a nonce that _follows_ this one which can be submitted now.
+                }
+            }
+        })
+    }
+
+    /// Insert a transaction we could not submit straight away into the buffer.
+    pub fn insert(&self, sender: Address, nonce: Nonce, msg: ChainMessage) {
+        self.0.with(|c| {
+            let buffer = c.entry(sender).or_insert_with(BTreeMap::new);
+            // Overwrite any previous entry to protect against DoS attack; it wouldn't make sense to submit them anyway.
+            buffer.insert(nonce, msg);
+        })
+    }
+}
 
 /// Subscribe to `NewBlock  notifications and clear transactions from the caches.`
 pub fn start_tx_cache_clearing(
@@ -72,17 +101,8 @@ async fn tx_cache_clearing_loop(
                                     continue;
                                 }
 
-                                let tx_hashes = txs.iter().map(|(h, _, _)| h).collect::<Vec<_>>();
-                                tx_cache.remove_many(&tx_hashes);
-
-                                tx_buffer.with(|c| {
-                                    for (_, sender, nonce) in txs {
-                                        if let Some(buffer) = c.get_mut(&sender) {
-                                            buffer.remove(&nonce);
-                                            // TODO: Check if there is a nonce that _follows_ this one which can be submitted now.
-                                        }
-                                    }
-                                })
+                                tx_cache.remove_many(txs.iter().map(|(h, _, _)| h));
+                                tx_buffer.remove_many(txs.iter().map(|(_, s, n)| (s, *n)));
                             }
                         }
                     }

@@ -59,10 +59,11 @@ where
         self.with(|c| c.remove(key));
     }
 
-    pub fn remove_many(&self, keys: &[&K]) {
-        if keys.is_empty() {
-            return;
-        }
+    pub fn remove_many<'a, I>(&self, keys: I)
+    where
+        I: Iterator<Item = &'a K>,
+        K: 'a,
+    {
         self.with(|c| {
             for key in keys {
                 c.remove(key);

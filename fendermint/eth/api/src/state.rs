@@ -84,7 +84,10 @@ where
         let client = FendermintClient::new(client);
         let addr_cache = AddressCache::new(client.clone(), cache_capacity);
         let tx_cache = Cache::new_with_ttl(cache_capacity, Duration::from_secs(TX_CACHE_TTL_SECS));
-        let tx_buffer = Cache::new_with_ttl(cache_capacity, Duration::from_secs(TX_CACHE_TTL_SECS));
+        let tx_buffer = TransactionBuffer(Cache::new_with_ttl(
+            cache_capacity,
+            Duration::from_secs(TX_CACHE_TTL_SECS),
+        ));
         Self {
             client,
             addr_cache,
