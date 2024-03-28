@@ -331,11 +331,14 @@ impl Settings {
     }
 }
 
+// Run these tests serially because some of them modify the environment.
+#[serial_test::serial]
 #[cfg(test)]
 mod tests {
+    use multiaddr::multiaddr;
     use std::path::PathBuf;
 
-    use serial_test::serial;
+    use crate::utils::tests::with_env_vars;
 
     use super::Settings;
 
@@ -346,6 +349,8 @@ mod tests {
         // Trying to debug the following sporadic error on CI:
         // thread 'tests::parse_test_config' panicked at fendermint/app/settings/src/lib.rs:315:36:
         // failed to parse Settings: failed to parse: invalid digit found in string
+        // This turned out to be due to the environment variable manipulation below mixing with another test,
+        // which is why `#[serial]` was moved to the top.
         eprintln!("CONFIG = {:?}", c.cache);
         Settings::parse(c)
     }
@@ -366,47 +371,39 @@ mod tests {
         assert!(settings.resolver_enabled());
     }
 
-    // Run these tests serially because they modify the environment.
-    #[serial]
-    mod env {
-        use multiaddr::multiaddr;
-
-        use crate::tests::try_parse_config;
-        use crate::utils::tests::with_env_vars;
-
-        #[test]
-        fn parse_comma_separated() {
-            let settings = with_env_vars(vec![
+    #[test]
+    fn parse_comma_separated() {
+        let settings = with_env_vars(vec![
                 ("FM_RESOLVER__CONNECTION__EXTERNAL_ADDRESSES", "/ip4/198.51.100.0/tcp/4242/p2p/QmYyQSo1c1Ym7orWxLYvCrM2EmxFTANf8wXmmE7DWjhx5N,/ip6/2604:1380:2000:7a00::1/udp/4001/quic/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb"),
                 ("FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES", "/ip4/198.51.100.1/tcp/4242/p2p/QmYyQSo1c1Ym7orWxLYvCrM2EmxFTANf8wXmmE7DWjhx5N,/ip6/2604:1380:2000:7a00::2/udp/4001/quic/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb"),
                 // Set a normal string key as well to make sure we have configured the library correctly and it doesn't try to parse everything as a list.
                 ("FM_RESOLVER__NETWORK__NETWORK_NAME", "test"),
             ], || try_parse_config("")).unwrap();
 
-            assert_eq!(settings.resolver.discovery.static_addresses.len(), 2);
-            assert_eq!(settings.resolver.connection.external_addresses.len(), 2);
-        }
+        assert_eq!(settings.resolver.discovery.static_addresses.len(), 2);
+        assert_eq!(settings.resolver.connection.external_addresses.len(), 2);
+    }
 
-        #[test]
-        fn parse_empty_comma_separated() {
-            let settings = with_env_vars(
-                vec![
-                    ("FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES", ""),
-                    ("FM_RESOLVER__CONNECTION__EXTERNAL_ADDRESSES", ""),
-                    ("FM_RESOLVER__MEMBERSHIP__STATIC_SUBNETS", ""),
-                ],
-                || try_parse_config(""),
-            )
-            .unwrap();
+    #[test]
+    fn parse_empty_comma_separated() {
+        let settings = with_env_vars(
+            vec![
+                ("FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES", ""),
+                ("FM_RESOLVER__CONNECTION__EXTERNAL_ADDRESSES", ""),
+                ("FM_RESOLVER__MEMBERSHIP__STATIC_SUBNETS", ""),
+            ],
+            || try_parse_config(""),
+        )
+        .unwrap();
 
-            assert_eq!(settings.resolver.connection.external_addresses.len(), 0);
-            assert_eq!(settings.resolver.discovery.static_addresses.len(), 0);
-            assert_eq!(settings.resolver.membership.static_subnets.len(), 0);
-        }
+        assert_eq!(settings.resolver.connection.external_addresses.len(), 0);
+        assert_eq!(settings.resolver.discovery.static_addresses.len(), 0);
+        assert_eq!(settings.resolver.membership.static_subnets.len(), 0);
+    }
 
-        #[test]
-        fn parse_with_interpolation() {
-            let settings = with_env_vars(
+    #[test]
+    fn parse_with_interpolation() {
+        let settings = with_env_vars(
                 vec![
                     ("FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES", "/dns4/${SEED_1_HOST}/tcp/${SEED_1_PORT},/dns4/${SEED_2_HOST}/tcp/${SEED_2_PORT}"),
                     ("SEED_1_HOST", "foo.io"),
@@ -418,15 +415,14 @@ mod tests {
             )
             .unwrap();
 
-            assert_eq!(settings.resolver.discovery.static_addresses.len(), 2);
-            assert_eq!(
-                settings.resolver.discovery.static_addresses[0],
-                multiaddr!(Dns4("foo.io"), Tcp(1234u16))
-            );
-            assert_eq!(
-                settings.resolver.discovery.static_addresses[1],
-                multiaddr!(Dns4("bar.ai"), Tcp(5678u16))
-            );
-        }
+        assert_eq!(settings.resolver.discovery.static_addresses.len(), 2);
+        assert_eq!(
+            settings.resolver.discovery.static_addresses[0],
+            multiaddr!(Dns4("foo.io"), Tcp(1234u16))
+        );
+        assert_eq!(
+            settings.resolver.discovery.static_addresses[1],
+            multiaddr!(Dns4("bar.ai"), Tcp(5678u16))
+        );
     }
 }
