@@ -10,31 +10,72 @@ deps:
 	forge install --no-commit \
 		axelarnetwork/axelar-gmp-sdk-solidity@v5.6.4 \
 		axelarnetwork/interchain-token-service@v1.2.1 \
-		openzeppelin/openzeppelin-contracts@v5.0.1
+		openzeppelin/openzeppelin-contracts@v5.0.1 \
+		openzeppelin/openzeppelin-contracts-upgradeable@v4.9.6
 
 .PHONY: help
 help:
 	@echo "\033[0;32mAvailable targets:\033[0m"
-	@echo "deps               - Install Foundry dependencies"
-	@echo "deploy-sender      - Deploy the token sender contract on Polygon Mumbai"
-	@echo "deploy-handler     - Deploy the token handler contract on Filecoin Calibrationnet"
-	@echo "deposit            - Deposit tokens into the subnet"
+	@echo "deps                              - Install Foundry dependencies"
+	@echo "deploy-sender-implementation      - Deploy the token sender contract implementation on Polygon Mumbai"
+	@echo "deploy-sender-proxy               - Deploy the token sender contract proxy on Polygon Mumbai"
+	@echo "upgrade-sender-proxy              - Upgrade the token sender contract proxy on Polygon Mumbai"
+	@echo "deploy-handler-implementation     - Deploy the token handler implementation contract on Filecoin Calibrationnet"
+	@echo "deploy-handler-proxy              - Deploy the token handler proxy contract on Filecoin Calibrationnet"
+	@echo "upgrade-handler-proxy             - Upgrade the token handler proxy contract on Filecoin Calibrationnet"
+	@echo "deposit                           - Deposit tokens into the subnet"
 
-.PHONY: deploy-handler
-deploy-handler:
+.PHONY: deploy-handler-implementation
+deploy-handler-implementation:
 	forge script ./script/Deploy.s.sol \
-		--sig "deployTokenHandler()" \
+		--sig "deployTokenHandlerImplementation()" \
 		--rpc-url "${$(DEST_NETWORK)__RPC_URL}" \
 		--broadcast \
 		--skip-simulation
 
-.PHONY: deploy-sender
-deploy-sender:
+
+.PHONY: deploy-handler-proxy
+deploy-handler-proxy:
 	forge script ./script/Deploy.s.sol \
-		--sig "deployTokenSender()" \
+		--sig "deployTokenHandlerProxy()" \
+		--rpc-url "${$(DEST_NETWORK)__RPC_URL}" \
+		--broadcast \
+		--skip-simulation
+
+.PHONY: upgrade-handler-proxy
+upgrade-handler-proxy:
+	forge script ./script/Upgrade.s.sol \
+		--sig "upgradeTokenHandlerProxy()" \
+		--rpc-url "${$(DEST_NETWORK)__RPC_URL}" \
+		--broadcast \
+		--skip-simulation
+
+
+.PHONY: deploy-sender-implementation
+deploy-sender-implementation:
+	forge script ./script/Deploy.s.sol \
+		--sig "deployTokenSenderImplementation()" \
 		--rpc-url "${$(ORIGIN_NETWORK)__RPC_URL}" \
 		--broadcast \
 		--skip-simulation
+
+.PHONY: deploy-sender-proxy
+deploy-sender-proxy:
+	forge script ./script/Deploy.s.sol \
+		--sig "deployTokenSenderProxy()" \
+		--rpc-url "${$(ORIGIN_NETWORK)__RPC_URL}" \
+		--broadcast \
+		--skip-simulation
+
+.PHONY: upgrade-sender-proxy
+upgrade-sender-proxy:
+	forge script ./script/Upgrade.s.sol \
+		--sig "upgradeTokenSenderProxy()" \
+		--rpc-url "${$(ORIGIN_NETWORK)__RPC_URL}" \
+		--broadcast \
+		--skip-simulation
+
+
 
 .PHONY: deposit
 deposit:
