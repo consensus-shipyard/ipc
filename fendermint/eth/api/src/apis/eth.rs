@@ -614,7 +614,7 @@ where
     C: Client + Sync + Send,
 {
     let rlp = rlp::Rlp::new(tx.as_ref());
-    let (tx, sig) = TypedTransaction::decode_signed(&rlp)
+    let (tx, sig): (TypedTransaction, et::Signature) = TypedTransaction::decode_signed(&rlp)
         .context("failed to decode RLP as signed TypedTransaction")?;
 
     let sighash = tx.sighash();
@@ -656,7 +656,7 @@ where
 
         if let Some(oos) = OutOfSequence::try_parse(exit_code, &res.log) {
             let is_admissible = oos.is_admissible(max_nonce_gap);
-            tracing::info!(eth_hash = ?msghash, expected = oos.expected, got = oos.got, is_admissible, "out-of-sequence transaction received");
+            tracing::debug!(eth_hash = ?msghash, expected = oos.expected, got = oos.got, is_admissible, "out-of-sequence transaction received");
 
             if is_admissible {
                 // TODO: Add it to the buffer.
