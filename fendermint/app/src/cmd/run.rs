@@ -64,12 +64,17 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         tendermint_rpc::HttpClient::new(tendermint_rpc_url)
             .context("failed to create Tendermint client")?;
 
-    // Register metrics
-    let metrics_registry = prometheus::Registry::new();
-    // TODO: Serve metrics over HTTP
+    // Prometheus metrics
+    let metrics_registry = if settings.metrics.enabled {
+        let registry = prometheus::Registry::new();
 
-    fendermint_app::metrics::register_app_metrics(&metrics_registry)
-        .context("failed to register metrics")?;
+        fendermint_app::metrics::register_app_metrics(&registry)
+            .context("failed to register metrics")?;
+
+        Some(registry)
+    } else {
+        None
+    };
 
     let validator = match settings.validator_key {
         Some(ref key) => {
@@ -145,10 +150,12 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         let mut service =
             make_resolver_service(&settings, db.clone(), state_store.clone(), ns.bit_store)?;
 
-        // Register all metrics from the IPLD resolver stack;
-        service
-            .register_metrics(&metrics_registry)
-            .context("failed to register IPLD resolver metrics")?;
+        // Register all metrics from the IPLD resolver stack
+        if let Some(ref registry) = metrics_registry {
+            service
+                .register_metrics(registry)
+                .context("failed to register IPLD resolver metrics")?;
+        }
 
         let client = service.client();
 
@@ -293,6 +300,19 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
                 Err(e) => tracing::error!("cannot launch polling syncer: {e}"),
             }
         });
+    }
+
+    // Start the metrics on a background thread.
+    if let Some(registry) = metrics_registry {
+        info!(
+            listen_addr = settings.metrics.listen.to_string(),
+            "serving metrics"
+        );
+        let mut builder = prometheus_exporter::Builder::new(settings.metrics.listen.try_into()?);
+        builder.with_registry(registry);
+        let _ = builder.start().context("failed to start metrics server")?;
+    } else {
+        info!("metrics disabled");
     }
 
     let service = ApplicationService(app);

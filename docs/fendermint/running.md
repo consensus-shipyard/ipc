@@ -524,6 +524,10 @@ We can try query the chain id by:
 curl -X POST -i   -H 'Content-Type: application/json'   -d '{"jsonrpc":"2.0","id":0,"method":"eth_chainId","params":[]}'   http://localhost:8545
 ```
 
+### Access Metrics
+
+By default `fendermint` has Prometheus metrics enabled (with more to be added) and available at http://localhost:9184/metrics.
+
 ## Query the state
 
 The Fendermint binary has some commands to support querying state. Behind the scenes it uses the `tendermint_rpc` crate to talk

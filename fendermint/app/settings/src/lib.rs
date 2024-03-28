@@ -8,6 +8,7 @@ use fvm_shared::econ::TokenAmount;
 use ipc_api::subnet_id::SubnetID;
 use serde::Deserialize;
 use serde_with::{serde_as, DurationSeconds};
+use std::net::{SocketAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tendermint_rpc::Url;
@@ -41,7 +42,6 @@ pub struct SocketAddress {
     pub host: String,
     pub port: u32,
 }
-
 impl ToString for SocketAddress {
     fn to_string(&self) -> String {
         format!("{}:{}", self.host, self.port)
@@ -53,6 +53,16 @@ impl std::net::ToSocketAddrs for SocketAddress {
 
     fn to_socket_addrs(&self) -> std::io::Result<Self::Iter> {
         self.to_string().to_socket_addrs()
+    }
+}
+
+impl TryInto<std::net::SocketAddr> for SocketAddress {
+    type Error = std::io::Error;
+
+    fn try_into(self) -> Result<SocketAddr, Self::Error> {
+        self.to_socket_addrs()?
+            .next()
+            .ok_or_else(|| std::io::Error::from(std::io::ErrorKind::AddrNotAvailable))
     }
 }
 
@@ -195,6 +205,14 @@ impl SnapshotSettings {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+pub struct MetricsSettings {
+    /// Enable the export of metrics over HTTP.
+    pub enabled: bool,
+    /// HTTP listen address where Prometheus metrics are hosted.
+    pub listen: SocketAddress,
+}
+
+#[derive(Debug, Deserialize, Clone)]
 pub struct Settings {
     /// Home directory configured on the CLI, to which all paths in settings can be set relative.
     home_dir: PathBuf,
@@ -220,6 +238,7 @@ pub struct Settings {
 
     pub abci: AbciSettings,
     pub db: DbSettings,
+    pub metrics: MetricsSettings,
     pub snapshots: SnapshotSettings,
     pub eth: EthSettings,
     pub fvm: FvmSettings,
