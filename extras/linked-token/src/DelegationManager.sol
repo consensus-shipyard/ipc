@@ -4,7 +4,7 @@ pragma solidity 0.8.23;
 import {StrategyManager} from "./StrategyManager.sol";
 import {ISlasher} from "./ISlasher.sol";
 import {IStrategy} from "./IStrategy.sol";
-import {ReentrancyGuard} from "openzeppelin-contracts/utils/ERC20/utils/ReentrancyGuard.sol";
+import {ReentrancyGuard} from "openzeppelin-contracts/utils/ReentrancyGuard.sol";
 
 contract DelegationManager is ReentrancyGuard {
     StrategyManager public strategyManager;
