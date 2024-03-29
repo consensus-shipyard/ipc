@@ -119,6 +119,11 @@ where
     /// Check that a validator key is currently part of the power table.
     pub fn has_power(&self, validator_key: &K) -> Stm<bool> {
         let pt = self.power_table.read()?;
+        // If the power table is empty, we're in a parentless subnet without a topdown view.
+        // This kind of setup is only useful for local dev / testing.
+        if pt.is_empty() {
+            return Ok(true);
+        }
         // For consistency consider validators without power unknown.
         match pt.get(validator_key) {
             None => Ok(false),
@@ -366,6 +371,15 @@ where
                 // New voter, get their current weight; it might be 0 if they have been removed.
                 weight += power_table.get(vk).cloned().unwrap_or_default();
             }
+        }
+
+        // If the power table is empty, we're in a parentless subnet without a topdown view.
+        // This kind of setup is only useful for local dev / testing.
+        //
+        // There's no way to know how many validators are voting, and therefore no way to calculate quorum threshold.
+        // The best we can do is return true if there's at least one vote.
+        if power_table.is_empty() && !voters.is_empty() {
+            return Ok(true);
         }
 
         Ok(weight >= quorum_threshold)

@@ -515,10 +515,6 @@ async fn dispatch_vote(
             }
         }
         AppVote::ObjectFinality(f) => {
-            if !topdown_enabled {
-                tracing::debug!("ignoring vote; topdown disabled");
-                return;
-            }
             tracing::debug!(cid = ?f.object, "received vote for object finality");
 
             let res = atomically_or_err(|| {
