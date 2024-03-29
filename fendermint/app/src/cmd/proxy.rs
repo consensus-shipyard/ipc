@@ -81,7 +81,9 @@ cmd! {
                     .and(warp::header::optional::<u64>("X-DataRepo-GasLimit"))
                     .and_then(handle_os_delete);
                 let get_route = warp::path!("v1" / "os" / String)
-                    .and(warp::get())
+                    .and(
+                        warp::get().or(warp::head()).unify()
+                    )
                     .and(with_client(client.clone()))
                     .and(with_ipfs(ipfs.clone()))
                     .and(with_args(args.clone()))
@@ -121,7 +123,7 @@ cmd! {
                     .or(root_route)
                     .with(warp::cors().allow_any_origin()
                         .allow_headers(vec!["Content-Type"])
-                        .allow_methods(vec!["PUT", "DEL", "GET"]))
+                        .allow_methods(vec!["PUT", "DEL", "GET", "HEAD"]))
                     .recover(handle_rejection);
 
                 if let Some(listen_addr) = settings.listen.to_socket_addrs()?.next() {
@@ -365,16 +367,18 @@ async fn handle_os_get(
             let body = warp::hyper::Body::wrap_stream(stream);
             let mut response = warp::reply::Response::new(body);
 
+            let mut header_map = HeaderMap::new();
             if len < size {
                 *response.status_mut() = StatusCode::PARTIAL_CONTENT;
+
+                header_map.insert(
+                    "Content-Range",
+                    HeaderValue::from_str(&format!("bytes {}-{}/{}", start, end, len)).unwrap(),
+                );
+            } else {
+                header_map.insert("Accept-Ranges", HeaderValue::from_str("bytes").unwrap());
             }
 
-            let mut header_map = HeaderMap::new();
-            header_map.insert("Accept-Ranges", HeaderValue::from_str("bytes").unwrap());
-            header_map.insert(
-                "Content-Range",
-                HeaderValue::from_str(&format!("bytes {}-{}/{}", start, end, len)).unwrap(),
-            );
             header_map.insert("Content-Length", HeaderValue::from(len));
 
             let headers = response.headers_mut();
