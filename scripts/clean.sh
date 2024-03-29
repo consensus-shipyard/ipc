@@ -1,8 +1,9 @@
+#!/bin/sh
+
 echo "setup clean"
-echo "  rm -rf test-network"
+set -xeu
+
 rm -rf test-network
-echo "  rm -rf ~/.cometbft"
 rm -rf ~/.cometbft
-echo "  rm -rf ~/.fendermint"
 rm -rf ~/.fendermint
 (cd fendermint && make clean)
