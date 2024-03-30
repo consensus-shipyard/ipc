@@ -9,6 +9,7 @@ use anyhow::Context;
 use async_trait::async_trait;
 use bytes::Bytes;
 use cid::Cid;
+use fendermint_actor_objectstore::ListOptions;
 use fendermint_app_options::genesis::AccountKind;
 use fendermint_crypto::{to_b64, SecretKey};
 use fendermint_rpc::client::BoundFendermintClient;
@@ -66,9 +67,15 @@ cmd! {
                     let height = Height::try_from(height)?;
                     os_get_call(client, args, key, height).await
                 }
-                RpcObjectStoreCommands::List { height, prefix, delimiter, limit } => {
+                RpcObjectStoreCommands::List { height, prefix, delimiter, offset, limit } => {
+                    let options = ListOptions {
+                        prefix: prefix.into(),
+                        delimiter: delimiter.into(),
+                        offset,
+                        limit,
+                    };
                     let height = Height::try_from(height)?;
-                    os_list_call(client, args, prefix, delimiter, limit, height).await
+                    os_list_call(client, args, options, height).await
                 }
             },
             RpcCommands::Acc { args, command } => match command {
@@ -257,9 +264,7 @@ async fn os_get_call(
 async fn os_list_call(
     client: FendermintClient,
     args: TransArgs,
-    prefix: String,
-    delimiter: String,
-    limit: u64,
+    options: ListOptions,
     height: Height,
 ) -> anyhow::Result<()> {
     let mut client = TransClient::new(client, &args)?;
@@ -269,7 +274,7 @@ async fn os_list_call(
 
     let res = client
         .inner
-        .os_list_call(prefix, delimiter, limit, value, gas_params, height)
+        .os_list_call(options, value, gas_params, height)
         .await?;
 
     let json = json!({"response": res.response, "return_data": res.return_data});

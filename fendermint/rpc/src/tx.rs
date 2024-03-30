@@ -11,7 +11,7 @@ use fendermint_vm_message::query::{FvmQueryHeight, GasEstimate};
 use tendermint::abci::response::DeliverTx;
 use tendermint_rpc::endpoint::broadcast::{tx_async, tx_commit, tx_sync};
 
-use fendermint_actor_objectstore::{Object, ObjectList};
+use fendermint_actor_objectstore::{ListOptions, Object, ObjectList};
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
@@ -183,16 +183,14 @@ pub trait CallClient: QueryClient + BoundClient {
     /// List objects in an object store without including a transaction on the blockchain.
     async fn os_list_call(
         &mut self,
-        prefix: String,
-        delimiter: String,
-        limit: u64,
+        options: ListOptions,
         value: TokenAmount,
         gas_params: GasParams,
         height: FvmQueryHeight,
     ) -> anyhow::Result<CallResponse<ObjectList>> {
         let msg = self
             .message_factory_mut()
-            .os_list(prefix, delimiter, limit, value, gas_params)?;
+            .os_list(options, value, gas_params)?;
 
         let response = self.call(msg, height).await?;
         if response.value.code.is_err() {

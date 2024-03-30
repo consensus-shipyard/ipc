@@ -7,10 +7,11 @@ use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::{strict_bytes, tuple::*};
 use fvm_ipld_hamt::{BytesKey, Hamt};
 
+use crate::ListOptions;
+
 pub const BIT_WIDTH: u32 = 8;
 
-const DEFAULT_LIST_LIMIT: usize = 100;
-const MAX_LIST_LIMIT: usize = 500;
+const MAX_LIST_LIMIT: usize = 10000;
 
 /// The state represents an object store backed by a Hamt
 #[derive(Serialize_tuple, Deserialize_tuple)]
@@ -128,36 +129,40 @@ impl State {
     pub fn list<BS: Blockstore>(
         &self,
         store: &BS,
-        prefix: Option<&BytesKey>,
-        delimiter: Option<&BytesKey>,
-        limit: Option<usize>,
+        options: ListOptions,
     ) -> anyhow::Result<ObjectList> {
         let hamt = Hamt::<_, Object>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
-        let iter = hamt.iter();
         let mut objects = Vec::new();
         let mut common_prefixes = std::collections::BTreeSet::<Vec<u8>>::new();
-        let limit = limit.unwrap_or(DEFAULT_LIST_LIMIT).min(MAX_LIST_LIMIT);
-        'pairs: for pair in iter {
-            if let Ok((k, v)) = pair {
-                let key = k.0.to_owned();
-                if let Some(prefix) = prefix {
-                    if !key.starts_with(prefix) {
-                        continue 'pairs;
-                    }
+        let limit = if options.limit == 0 {
+            MAX_LIST_LIMIT
+        } else {
+            (options.limit as usize).min(MAX_LIST_LIMIT)
+        };
+        let offset = options.offset;
+        let mut count = 0;
+        for pair in &hamt {
+            let (k, v) = pair?;
+            let key = k.0.clone();
+            if !options.prefix.is_empty() && !key.starts_with(&options.prefix) {
+                continue;
+            }
+            if !options.delimiter.is_empty() {
+                let utf8_key = String::from_utf8(key.clone()).unwrap();
+                let utf8_delimiter = String::from_utf8(options.delimiter.clone()).unwrap();
+                if let Some(index) = utf8_key.find(&utf8_delimiter) {
+                    let subset = utf8_key[..index].as_bytes().to_owned();
+                    common_prefixes.insert(subset);
+                    continue;
                 }
-                if let Some(delimiter) = delimiter {
-                    let utf8_key = String::from_utf8(key.clone()).unwrap();
-                    let utf8_delimiter = String::from_utf8(delimiter.0.clone()).unwrap();
-                    if let Some(index) = utf8_key.find(&utf8_delimiter) {
-                        let subset = utf8_key[..index].as_bytes().to_owned();
-                        common_prefixes.insert(subset);
-                        continue 'pairs;
-                    }
-                }
-                objects.push((key, v.clone()));
-                if objects.len() >= limit as usize {
-                    break 'pairs;
-                }
+            }
+            count += 1;
+            if count < offset {
+                continue;
+            }
+            objects.push((key, v.clone()));
+            if limit > 0 && objects.len() >= limit {
+                break;
             }
         }
         let common_prefixes = common_prefixes.into_iter().collect();
@@ -289,10 +294,13 @@ mod tests {
         };
 
         // List all keys with a limit
-        let result = state.list(&store, None, None, Some(1));
+        let options = ListOptions {
+            ..Default::default()
+        };
+        let result = state.list(&store, options);
         assert!(result.is_ok());
         let result = result.unwrap();
-        assert_eq!(result.objects.len(), 1);
+        assert_eq!(result.objects.len(), 4);
         assert_eq!(result.objects.first(), Some(&(baz_key.0, default_object)));
     }
 
@@ -309,7 +317,11 @@ mod tests {
         };
 
         let foo_key = BytesKey("foo".as_bytes().to_vec());
-        let result = state.list(&store, Some(&foo_key), None, None);
+        let options = ListOptions {
+            prefix: foo_key.0.clone(),
+            ..Default::default()
+        };
+        let result = state.list(&store, options);
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.objects.len(), 3);
@@ -331,11 +343,42 @@ mod tests {
 
         let foo_key = BytesKey("foo".as_bytes().to_vec());
         let delimiter_key = BytesKey("/".as_bytes().to_vec());
-        let result = state.list(&store, Some(&foo_key), Some(&delimiter_key), Some(3));
+        let options = ListOptions {
+            prefix: foo_key.0.clone(),
+            delimiter: delimiter_key.0.clone(),
+            limit: 3,
+            offset: 0,
+        };
+        let result = state.list(&store, options);
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.objects.len(), 1);
         assert_eq!(result.objects[0], (jpeg_key.0, default_object));
         assert_eq!(result.common_prefixes[0], foo_key.0);
+    }
+
+    #[test]
+    fn test_list_with_offset_and_limit() {
+        let store = fvm_ipld_blockstore::MemoryBlockstore::default();
+        let mut state = State::new(&store).unwrap();
+
+        let (_, _, baz_key) = create_and_put_objects(&mut state, &store).unwrap();
+
+        let default_object = Object {
+            value: Cid::default().to_bytes(),
+            resolved: false,
+        };
+
+        // List all keys with a limit and offset
+        let options = ListOptions {
+            limit: 1,
+            offset: 1,
+            ..Default::default()
+        };
+        let result = state.list(&store, options);
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert_eq!(result.objects.len(), 1);
+        assert_eq!(result.objects.first(), Some(&(baz_key.0, default_object)));
     }
 }

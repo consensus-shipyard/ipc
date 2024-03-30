@@ -97,30 +97,13 @@ impl Actor {
 
     fn list_objects(
         rt: &impl Runtime,
-        params: ListOptions,
+        options: ListOptions,
     ) -> Result<Option<ObjectList>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let prefix = if params.prefix.is_empty() {
-            None
-        } else {
-            Some(BytesKey(params.prefix))
-        };
-        let delimiter = if params.delimiter.is_empty() {
-            None
-        } else {
-            Some(BytesKey(params.delimiter))
-        };
-        let limit = if params.limit == 0 {
-            None
-        } else {
-            Some(params.limit as usize)
-        };
         let st: State = rt.state()?;
-        let objects = st
-            .list(rt.store(), prefix.as_ref(), delimiter.as_ref(), limit)
-            .map_err(|e| {
-                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to list objects")
-            })?;
+        let objects = st.list(rt.store(), options).map_err(|e| {
+            e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to list objects")
+        })?;
         Ok(Some(objects))
     }
 

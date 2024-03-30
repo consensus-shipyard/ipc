@@ -29,7 +29,7 @@ use tokio_util::compat::TokioAsyncReadCompatExt;
 use warp::http::{HeaderMap, HeaderValue};
 use warp::{http::StatusCode, Filter, Rejection, Reply};
 
-use fendermint_actor_objectstore::{Object, ObjectList};
+use fendermint_actor_objectstore::{ListOptions, Object, ObjectList};
 use fendermint_app_settings::proxy::ProxySettings;
 use fendermint_rpc::client::FendermintClient;
 use fendermint_rpc::message::GasParams;
@@ -395,6 +395,7 @@ async fn handle_os_get(
 struct ListQuery {
     pub prefix: Option<String>,
     pub delimiter: Option<String>,
+    pub offset: Option<u64>,
     pub limit: Option<u64>,
 }
 
@@ -404,20 +405,19 @@ async fn handle_os_list(
     options: ListQuery,
     hq: HeightQuery,
 ) -> Result<impl Reply, Rejection> {
-    let res = os_list(
-        client,
-        args,
-        options.prefix.unwrap_or_default(),
-        options.delimiter.unwrap_or_default(),
-        options.limit.unwrap_or(0),
-        hq.height.unwrap_or(0),
-    )
-    .await
-    .map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("list error: {}", e),
-        })
-    })?;
+    let opts = ListOptions {
+        prefix: options.prefix.unwrap_or_default().into(),
+        delimiter: options.delimiter.unwrap_or_default().into(),
+        offset: options.offset.unwrap_or(0),
+        limit: options.limit.unwrap_or(0),
+    };
+    let res = os_list(client, args, opts, hq.height.unwrap_or(0))
+        .await
+        .map_err(|e| {
+            Rejection::from(BadRequest {
+                message: format!("list error: {}", e),
+            })
+        })?;
 
     let list = res.unwrap_or_default();
     let objects = list
@@ -645,9 +645,7 @@ async fn os_get(
 async fn os_list(
     client: FendermintClient,
     args: TransArgs,
-    prefix: String,
-    delimiter: String,
-    limit: u64,
+    options: ListOptions,
     height: u64,
 ) -> anyhow::Result<Option<ObjectList>> {
     let mut client = TransClient::new(client, &args)?;
@@ -656,14 +654,7 @@ async fn os_list(
 
     let res = client
         .inner
-        .os_list_call(
-            prefix,
-            delimiter,
-            limit,
-            TokenAmount::default(),
-            gas_params,
-            h,
-        )
+        .os_list_call(options, TokenAmount::default(), gas_params, h)
         .await?;
 
     Ok(res.return_data)

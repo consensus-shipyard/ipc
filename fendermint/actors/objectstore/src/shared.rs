@@ -18,12 +18,18 @@ pub struct ObjectParams {
     pub value: Cid,
 }
 
+/// Options for listing objects.
 #[derive(Default, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ListOptions {
+    /// The prefix to filter objects by.
     #[serde(with = "strict_bytes")]
     pub prefix: Vec<u8>,
+    /// The delimiter used to define object hierarchy.
     #[serde(with = "strict_bytes")]
     pub delimiter: Vec<u8>,
+    /// The offset to start listing objects from.
+    pub offset: u64,
+    /// The maximum number of objects to list.
     pub limit: u64,
 }
 

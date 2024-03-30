@@ -138,6 +138,8 @@ pub enum RpcObjectStoreCommands {
         #[arg(long, short, default_value = "")]
         delimiter: String,
         #[arg(long, short, default_value_t = 0)]
+        offset: u64,
+        #[arg(long, short, default_value_t = 0)]
         limit: u64,
         /// Block height to query; 0 means latest.
         #[arg(long, short = 'b', default_value_t = 0)]
