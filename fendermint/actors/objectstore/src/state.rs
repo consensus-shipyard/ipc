@@ -148,10 +148,12 @@ impl State {
                 continue;
             }
             if !options.delimiter.is_empty() {
-                let utf8_key = String::from_utf8(key.clone()).unwrap();
-                let utf8_delimiter = String::from_utf8(options.delimiter.clone()).unwrap();
-                if let Some(index) = utf8_key.find(&utf8_delimiter) {
-                    let subset = utf8_key[..index].as_bytes().to_owned();
+                let utf8_prefix = String::from_utf8(options.prefix.clone())?;
+                let prefix_length = utf8_prefix.len();
+                let utf8_key = String::from_utf8(key.clone())?;
+                let utf8_delimiter = String::from_utf8(options.delimiter.clone())?;
+                if let Some(index) = utf8_key[prefix_length..].find(&utf8_delimiter) {
+                    let subset = utf8_key[..=(index + prefix_length)].as_bytes().to_owned();
                     common_prefixes.insert(subset);
                     continue;
                 }
@@ -275,7 +277,7 @@ mod tests {
         let baz_key = BytesKey("foo/baz.png".as_bytes().to_vec());
         state.put(store, baz_key.clone(), Cid::default(), false)?;
 
-        // We'll ignore this one entirely
+        // We'll mostly ignore this one
         let other_key = BytesKey("zzzz/image.png".as_bytes().to_vec());
         state.put(&store, other_key.clone(), Cid::default(), false)?;
         Ok((jpeg_key, bar_key, baz_key))
@@ -343,6 +345,7 @@ mod tests {
 
         let foo_key = BytesKey("foo".as_bytes().to_vec());
         let delimiter_key = BytesKey("/".as_bytes().to_vec());
+        let full_key = [foo_key.clone(), delimiter_key.clone()].concat();
         let options = ListOptions {
             prefix: foo_key.0.clone(),
             delimiter: delimiter_key.0.clone(),
@@ -354,7 +357,41 @@ mod tests {
         let result = result.unwrap();
         assert_eq!(result.objects.len(), 1);
         assert_eq!(result.objects[0], (jpeg_key.0, default_object));
-        assert_eq!(result.common_prefixes[0], foo_key.0);
+        assert_eq!(result.common_prefixes[0], full_key);
+    }
+
+    #[test]
+    fn test_list_keys_with_nested_delimiter() {
+        let store = fvm_ipld_blockstore::MemoryBlockstore::default();
+        let mut state = State::new(&store).unwrap();
+
+        let jpeg_key = BytesKey("foo.jpeg".as_bytes().to_vec());
+        state
+            .put(&store, jpeg_key.clone(), Cid::default(), false)
+            .unwrap();
+        let bar_key = BytesKey("bin/foo/bar.png".as_bytes().to_vec());
+        state
+            .put(&store, bar_key.clone(), Cid::default(), false)
+            .unwrap();
+        let baz_key = BytesKey("bin/foo/baz.png".as_bytes().to_vec());
+        state
+            .put(&store, baz_key.clone(), Cid::default(), false)
+            .unwrap();
+
+        let bin_key = BytesKey("bin/".as_bytes().to_vec());
+        let full_key = BytesKey("bin/foo/".as_bytes().to_vec());
+        let delimiter_key = BytesKey("/".as_bytes().to_vec());
+        let options = ListOptions {
+            prefix: bin_key.0.clone(),
+            delimiter: delimiter_key.0.clone(),
+            ..Default::default()
+        };
+        let result = state.list(&store, options);
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert_eq!(result.objects.len(), 0);
+        assert_eq!(result.common_prefixes.len(), 1);
+        assert_eq!(result.common_prefixes[0], full_key.0);
     }
 
     #[test]
