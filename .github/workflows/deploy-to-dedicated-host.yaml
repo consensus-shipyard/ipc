@@ -38,7 +38,7 @@ jobs:
           host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
           username: textile
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
-          script: rm -rf /home/textile/.ipc && cp -r /home/textile/scripts/deploy_subnet_under_calibration_net/.ipc /home/textile/
+          script: sudo rm -rf /home/textile/.ipc && cp -r /home/textile/scripts/deploy_subnet_under_calibration_net/.ipc /home/textile/
       - name: Create wallet file locally
         run: |
           echo '${{ secrets.CI_TEST_WALLET_JSON }}' > evm_keystore.json

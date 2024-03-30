@@ -85,7 +85,7 @@ impl State {
         store: &BS,
         key: BytesKey,
         value: Cid,
-    ) -> anyhow::Result<Cid> {
+    ) -> anyhow::Result<()> {
         let mut hamt = Hamt::<_, Object>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
         match hamt.get(&key).map(|v| v.cloned())? {
             Some(mut obj) => {
@@ -95,10 +95,10 @@ impl State {
                     hamt.set(key, obj)?;
                     self.root = hamt.flush()?;
                 }
-                Ok(self.root)
+                Ok(())
             }
             // Don't error here in case key was deleted before value was resolved.
-            None => Ok(self.root),
+            None => Ok(()),
         }
     }
 
@@ -185,7 +185,7 @@ mod tests {
 
     #[test]
     fn test_constructor() {
-        let store = fvm_ipld_blockstore::MemoryBlockstore::default();
+        let store = MemoryBlockstore::default();
         let state = State::new(&store);
         assert!(state.is_ok());
         assert_eq!(
@@ -197,7 +197,7 @@ mod tests {
 
     #[test]
     fn test_put() {
-        let store = fvm_ipld_blockstore::MemoryBlockstore::default();
+        let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         assert!(state
             .put(&store, BytesKey(vec![1, 2, 3]), Cid::default(), true)
@@ -212,7 +212,7 @@ mod tests {
 
     #[test]
     fn test_resolve() {
-        let store = fvm_ipld_blockstore::MemoryBlockstore::default();
+        let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let key = BytesKey(vec![1, 2, 3]);
         state
@@ -233,7 +233,7 @@ mod tests {
 
     #[test]
     fn test_delete() {
-        let store = fvm_ipld_blockstore::MemoryBlockstore::default();
+        let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let key = BytesKey(vec![1, 2, 3]);
         state
@@ -248,7 +248,7 @@ mod tests {
 
     #[test]
     fn test_get() {
-        let store = fvm_ipld_blockstore::MemoryBlockstore::default();
+        let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let key = BytesKey(vec![1, 2, 3]);
         state
@@ -285,7 +285,7 @@ mod tests {
 
     #[test]
     fn test_list_all_keys() {
-        let store = fvm_ipld_blockstore::MemoryBlockstore::default();
+        let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
 
         let (_, _, baz_key) = create_and_put_objects(&mut state, &store).unwrap();
@@ -308,7 +308,7 @@ mod tests {
 
     #[test]
     fn test_list_keys_with_prefix() {
-        let store = fvm_ipld_blockstore::MemoryBlockstore::default();
+        let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
 
         let (_, bar_key, baz_key) = create_and_put_objects(&mut state, &store).unwrap();
@@ -333,7 +333,7 @@ mod tests {
 
     #[test]
     fn test_list_keys_with_delimiter() {
-        let store = fvm_ipld_blockstore::MemoryBlockstore::default();
+        let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
 
         let (jpeg_key, _, _) = create_and_put_objects(&mut state, &store).unwrap();
@@ -362,7 +362,7 @@ mod tests {
 
     #[test]
     fn test_list_keys_with_nested_delimiter() {
-        let store = fvm_ipld_blockstore::MemoryBlockstore::default();
+        let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
 
         let jpeg_key = BytesKey("foo.jpeg".as_bytes().to_vec());
@@ -396,7 +396,7 @@ mod tests {
 
     #[test]
     fn test_list_with_offset_and_limit() {
-        let store = fvm_ipld_blockstore::MemoryBlockstore::default();
+        let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
 
         let (_, _, baz_key) = create_and_put_objects(&mut state, &store).unwrap();

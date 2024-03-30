@@ -211,10 +211,9 @@ where
             // Add to messages
             if is_globally_resolved {
                 tracing::debug!(cid = ?item.obj.value, "object has quorum; adding tx to chain");
-                objects.push(ChainMessage::Ipc(IpcMessage::ObjectResolved((
+                objects.push(ChainMessage::Ipc(IpcMessage::ObjectResolved(
                     item.obj.clone(),
-                    objects.len() as u64,
-                ))));
+                )));
             }
         }
 
@@ -264,7 +263,7 @@ where
                         return Ok(false);
                     }
                 }
-                ChainMessage::Ipc(IpcMessage::ObjectResolved((obj, _))) => {
+                ChainMessage::Ipc(IpcMessage::ObjectResolved(obj)) => {
                     // Ensure that the object is ready to be included on chain. We can accept the
                     // proposal if the object has reached a global quorum and is not yet finalized.
                     let item = ObjectPoolItem { obj };
@@ -484,7 +483,7 @@ where
 
                     Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
                 }
-                IpcMessage::ObjectResolved((obj, index)) => {
+                IpcMessage::ObjectResolved(obj) => {
                     let from = system::SYSTEM_ACTOR_ADDR;
                     let to = objectstore::OBJECTSTORE_ACTOR_ADDR;
                     let method_num = fendermint_actor_objectstore::Method::ResolveObject as u64;
@@ -499,7 +498,7 @@ where
                         version: Default::default(),
                         from,
                         to,
-                        sequence: index,
+                        sequence: 0, // We will use implicit execution which doesn't check or modify this.
                         value: Default::default(),
                         method_num,
                         params,
@@ -516,7 +515,6 @@ where
                         .map(|i| i.to_string())
                         .filter(|s| !s.is_empty());
                     tracing::info!(
-                        index = index,
                         exit_code = apply_ret.msg_receipt.exit_code.value(),
                         from = from.to_string(),
                         to = to.to_string(),

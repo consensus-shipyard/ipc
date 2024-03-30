@@ -437,7 +437,7 @@ async fn handle_os_list(
         .common_prefixes
         .iter()
         .map(|v| -> Result<Value, Rejection> {
-            Ok(serde_json::Value::String(
+            Ok(Value::String(
                 core::str::from_utf8(v).unwrap_or_default().to_string(),
             ))
         })

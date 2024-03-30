@@ -128,7 +128,7 @@ set -u
 if ! $local_deploy ; then
   echo "$DASHES Preparing ipc repo..."
   if ! ls $IPC_FOLDER ; then
-    git clone --recurse-submodules -j8 git@github.com:28657/ipc.git ${IPC_FOLDER}
+    git clone --recurse-submodules -j8 git@github.com:amazingdatamachine/ipc.git ${IPC_FOLDER}
   fi
   cd ${IPC_FOLDER}
   git fetch
