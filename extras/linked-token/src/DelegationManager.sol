@@ -44,9 +44,7 @@ contract DelegationManager is Ownable, ReentrancyGuard {
         _;
     }
 
-    constructor(
-        StrategyManager _strategyManager,
-    ) Ownable(msg.sender) {
+    constructor(StrategyManager _strategyManager) Ownable(msg.sender) {
         strategyManager = _strategyManager;
     }
 
