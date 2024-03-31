@@ -56,8 +56,7 @@ contract DelegationManager is Ownable, ReentrancyGuard {
     }
 
     function registerAsOperator(
-        OperatorDetails calldata registeringOperatorDetails,
-        string calldata metadataURI
+        OperatorDetails calldata registeringOperatorDetails
     ) external {
         require(
             _operatorDetails[msg.sender].earningsReceiver == address(0),
