@@ -116,7 +116,6 @@ contract StrategyManager is Ownable, ReentrancyGuard {
         token.safeTransferFrom(msg.sender, address(strategy), amount);
         shares = strategy.deposit(token, amount);
         _addShares(staker, token, strategy, shares);
-        // TODO
         delegation.increaseDelegatedShares(staker, strategy, shares);
         return shares;
     }
