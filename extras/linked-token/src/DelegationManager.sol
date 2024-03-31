@@ -2,19 +2,29 @@
 pragma solidity 0.8.23;
 
 import {StrategyManager} from "./StrategyManager.sol";
-import {ISlasher} from "./ISlasher.sol";
 import {IStrategy} from "./IStrategy.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/utils/ReentrancyGuard.sol";
+import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
 
-contract DelegationManager is ReentrancyGuard {
+contract DelegationManager is Ownable, ReentrancyGuard {
     StrategyManager public strategyManager;
-    ISlasher public slasher;
+
+    enum OperatorType {
+        IPC,
+        MINER,
+        RETRIEVAL
+    }
 
     struct OperatorDetails {
         address earningsReceiver;
         address delegationApprover;
         uint32 stakerOptOutDelayBlocks;
+        bytes32 name;
+        OperatorType operatorType;
+        uint256 slashes;
     }
+
+    mapping(OperatorType => address) public slashers;
 
     uint256 public constant MAX_WITHDRAWAL_DELAY_BLOCKS = 60;
 
@@ -24,6 +34,8 @@ contract DelegationManager is ReentrancyGuard {
 
     mapping(address => address) public delegatedTo;
 
+    address[] public operators;
+
     modifier onlyStrategyManager() {
         require(
             msg.sender == address(strategyManager),
@@ -32,9 +44,17 @@ contract DelegationManager is ReentrancyGuard {
         _;
     }
 
-    constructor(StrategyManager _strategyManager, ISlasher _slasher) {
+    constructor(
+        StrategyManager _strategyManager,
+    ) Ownable(msg.sender) {
         strategyManager = _strategyManager;
-        slasher = _slasher;
+    }
+
+    function setSlasher(
+        OperatorType operatorType,
+        address _slasher
+    ) external onlyOwner {
+        slashers[operatorType] = _slasher;
     }
 
     function registerAsOperator(
@@ -46,6 +66,7 @@ contract DelegationManager is ReentrancyGuard {
             "DelegationManager.registerAsOperator: operator has already registered"
         );
         _setOperatorDetails(msg.sender, registeringOperatorDetails);
+        operators.push(msg.sender);
         _delegate(msg.sender, msg.sender);
     }
 
@@ -93,6 +114,19 @@ contract DelegationManager is ReentrancyGuard {
                 shares: shares
             });
         }
+    }
+
+    function slashOperator(address operator) external {
+        require(
+            isOperator(operator),
+            "DelegationManager.slashOperator: operator is not registered"
+        );
+        OperatorType operatorType = _operatorDetails[operator].operatorType;
+        require(
+            msg.sender == slashers[operatorType],
+            "DelegationManager.slashOperator: caller is not the slasher for this operator type"
+        );
+        _operatorDetails[operator].slashes++;
     }
 
     function _setOperatorDetails(
@@ -195,5 +229,19 @@ contract DelegationManager is ReentrancyGuard {
             uint256[] memory strategyManagerShares
         ) = strategyManager.getDeposits(staker);
         return (strategyManagerStrats, strategyManagerShares);
+    }
+
+    function getAllOperators()
+        external
+        view
+        returns (OperatorDetails[] memory)
+    {
+        OperatorDetails[] memory details = new OperatorDetails[](
+            operators.length
+        );
+        for (uint256 i = 0; i < operators.length; ++i) {
+            details[i] = _operatorDetails[operators[i]];
+        }
+        return details;
     }
 }
