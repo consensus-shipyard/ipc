@@ -43,6 +43,18 @@ deploy-wfil:
 	@echo "Deploying WFil contract..."
 	forge script script/DeployWFil.s.sol:DeployWFil --broadcast --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --skip-simulation -vvv
 
+deploy-strategymanager:
+	@echo "Deploying StrategyManager contract..."
+	forge script script/DeployStrategyManager.s.sol:DeployStrategyManager --broadcast --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --skip-simulation -vvv --slow
+
+deploy-strategies:
+	@echo "Deploying Strategies contract..."
+	forge script script/DeployStrategies.s.sol:DeployStrategies --broadcast --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --skip-simulation -vvv --slow
+
+deploy-lststrategies:
+	@echo "Deploying LST Strategies contract..."
+	forge script script/DeployLSTStrategies.s.sol:DeployLSTStrategies --broadcast --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --skip-simulation -vvv --slow
+
 mint-usdc:
 	@echo "Minting 1000 USDCTest tokens..."
 	@USDCTEST_ADDR=$$(cat config.json | jq -r '.LinkedToken.USDCTest'); \
