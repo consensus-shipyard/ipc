@@ -145,7 +145,7 @@ contract DelegationManager is Ownable, ReentrancyGuard {
         );
         require(
             isOperator(operator),
-            "DelegationManager._delegate: operator is not registered in EigenLayer"
+            "DelegationManager._delegate: operator is not registered"
         );
         address _delegationApprover = _operatorDetails[operator]
             .delegationApprover;
@@ -187,7 +187,7 @@ contract DelegationManager is Ownable, ReentrancyGuard {
     }
 
     function isOperator(address operator) public view returns (bool) {
-        return _operatorDetails[msg.sender].earningsReceiver == address(0);
+        return _operatorDetails[operator].earningsReceiver != address(0);
     }
 
     function operatorDetails(
