@@ -296,7 +296,7 @@ do
   proxy_key=$(cat ${IPC_CONFIG_FOLDER}/evm_keystore_proxy.json | jq .[$i].private_key | tr -d '"' | tr -d '\n')
   proxy_address=$(cat ${IPC_CONFIG_FOLDER}/evm_keystore_proxy.json | jq .[$i].address | tr -d '"' | tr -d '\n')
   $IPC_CLI wallet import --wallet-type evm --private-key ${proxy_key}
-  $IPC_CLI cross-msg fund --from ${proxy_address} --subnet ${subnet_id} 2
+  $IPC_CLI cross-msg fund --from ${proxy_address} --subnet ${subnet_id} 10
   out=${subnet_folder}/validator-${i}/validator-${i}/keys/proxy_key.sk
   $IPC_CLI wallet export --wallet-type evm --address ${proxy_address} --fendermint | tr -d '\n' > ${out}
   chmod 600 ${subnet_folder}/validator-${i}/validator-${i}/keys/proxy_key.sk
