@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
-import {StrategyManager} from "./StrategyManager.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
+import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
+import {StrategyManager} from "./StrategyManager.sol";
 import {IStrategy} from "./IStrategy.sol";
 
-contract StrategyBase is IStrategy {
+contract StrategyBase is IStrategy, Ownable {
     using SafeERC20 for IERC20;
     StrategyManager public strategyManager;
     IERC20 public underlyingToken;
@@ -15,13 +16,17 @@ contract StrategyBase is IStrategy {
     uint256 internal constant BALANCE_OFFSET = 1e3;
     modifier onlyStrategyManager() {
         require(
-            msg.sender == address(strategyManager),
+            msg.sender == address(strategyManager) || msg.sender == owner(),
             "StrategyBase: caller is not the strategy manager"
         );
         _;
     }
 
-    constructor(IERC20 _underlyingToken) {
+    constructor(
+        StrategyManager _strategyManager,
+        IERC20 _underlyingToken
+    ) Ownable(msg.sender) {
+        strategyManager = _strategyManager;
         underlyingToken = _underlyingToken;
     }
 
