@@ -1,15 +1,8 @@
-extend = [
-  { path = "scripts/docker.toml" },
-]
-
-[config]
-default_to_workspace = false
-
 [tasks.prometheus-pull]
 script = "docker pull prom/prometheus"
 
 [tasks.prometheus-run]
-
+script = "docker run -p 9090:9090 -v ./prometheus.yml:/etc/prometheus/prometheus.yml prom/prometheus"
 
 [tasks.default]
 clear = true
