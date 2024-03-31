@@ -29,7 +29,7 @@ use tokio_util::compat::TokioAsyncReadCompatExt;
 use warp::http::{HeaderMap, HeaderValue};
 use warp::{http::StatusCode, Filter, Rejection, Reply};
 
-use fendermint_actor_objectstore::Object;
+use fendermint_actor_objectstore::{ListOptions, Object, ObjectList};
 use fendermint_app_settings::proxy::ProxySettings;
 use fendermint_rpc::client::FendermintClient;
 use fendermint_rpc::message::GasParams;
@@ -94,6 +94,7 @@ cmd! {
                     .and(warp::get())
                     .and(with_client(client.clone()))
                     .and(with_args(args.clone()))
+                    .and(warp::query::<ListQuery>())
                     .and(warp::query::<HeightQuery>())
                     .and_then(handle_os_list);
 
@@ -390,12 +391,27 @@ async fn handle_os_get(
     }
 }
 
+#[derive(Serialize, Deserialize)]
+struct ListQuery {
+    pub prefix: Option<String>,
+    pub delimiter: Option<String>,
+    pub offset: Option<u64>,
+    pub limit: Option<u64>,
+}
+
 async fn handle_os_list(
     client: FendermintClient,
     args: TransArgs,
+    options: ListQuery,
     hq: HeightQuery,
 ) -> Result<impl Reply, Rejection> {
-    let res = os_list(client, args, hq.height.unwrap_or(0))
+    let opts = ListOptions {
+        prefix: options.prefix.unwrap_or_default().into(),
+        delimiter: options.delimiter.unwrap_or_default().into(),
+        offset: options.offset.unwrap_or(0),
+        limit: options.limit.unwrap_or(0),
+    };
+    let res = os_list(client, args, opts, hq.height.unwrap_or(0))
         .await
         .map_err(|e| {
             Rejection::from(BadRequest {
@@ -403,8 +419,9 @@ async fn handle_os_list(
             })
         })?;
 
-    let list = res
-        .unwrap_or_default()
+    let list = res.unwrap_or_default();
+    let objects = list
+        .objects
         .iter()
         .map(|v| -> Result<Value, Rejection> {
             let key = core::str::from_utf8(&v.0).unwrap_or_default().to_string();
@@ -416,8 +433,18 @@ async fn handle_os_list(
             Ok(json!({"key": key, "value": value.to_string(), "resolved": v.1.resolved}))
         })
         .collect::<Result<Vec<Value>, Rejection>>()?;
+    let common_prefixes = list
+        .common_prefixes
+        .iter()
+        .map(|v| -> Result<Value, Rejection> {
+            Ok(serde_json::Value::String(
+                core::str::from_utf8(v).unwrap_or_default().to_string(),
+            ))
+        })
+        .collect::<Result<Vec<Value>, Rejection>>()?;
 
-    Ok(warp::reply::json(&list))
+    let json = json!({"objects": objects, "common_prefixes": common_prefixes});
+    Ok(warp::reply::json(&json))
 }
 
 async fn handle_acc_push(
@@ -618,15 +645,16 @@ async fn os_get(
 async fn os_list(
     client: FendermintClient,
     args: TransArgs,
+    options: ListOptions,
     height: u64,
-) -> anyhow::Result<Option<Vec<(Vec<u8>, Object)>>> {
+) -> anyhow::Result<Option<ObjectList>> {
     let mut client = TransClient::new(client, &args)?;
     let gas_params = gas_params(&args);
     let h = FvmQueryHeight::from(height);
 
     let res = client
         .inner
-        .os_list_call(TokenAmount::default(), gas_params, h)
+        .os_list_call(options, TokenAmount::default(), gas_params, h)
         .await?;
 
     Ok(res.return_data)

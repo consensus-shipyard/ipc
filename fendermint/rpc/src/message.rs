@@ -7,6 +7,7 @@ use anyhow::Context;
 use base64::Engine;
 use bytes::Bytes;
 use cid::Cid;
+use fendermint_actor_objectstore::ListOptions;
 use fendermint_crypto::SecretKey;
 use fendermint_vm_actor_interface::{accumulator, eam, evm, objectstore};
 use fendermint_vm_message::signed::Object;
@@ -267,13 +268,15 @@ impl SignedMessageFactory {
     /// List objects in an object store. This will not create a transaction.
     pub fn os_list(
         &mut self,
+        options: ListOptions,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<Message> {
+        let params = RawBytes::serialize(options)?;
         let message = self.transaction(
             objectstore::OBJECTSTORE_ACTOR_ADDR,
             fendermint_actor_objectstore::Method::ListObjects as u64,
-            RawBytes::default(),
+            params,
             value,
             gas_params,
             None,
