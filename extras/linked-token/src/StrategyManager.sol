@@ -6,13 +6,11 @@ import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol"
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/utils/ReentrancyGuard.sol";
 import {DelegationManager} from "./DelegationManager.sol";
-import {Slasher} from "./Slasher.sol";
 import {IStrategy} from "./IStrategy.sol";
 
 contract StrategyManager is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
     DelegationManager public delegation;
-    Slasher public slasher;
     mapping(address => mapping(IStrategy => uint256))
         public stakerStrategyShares;
     mapping(address => IStrategy[]) public stakerStrategyList;
@@ -40,10 +38,6 @@ contract StrategyManager is Ownable, ReentrancyGuard {
         DelegationManager _delegation
     ) external onlyOwner {
         delegation = _delegation;
-    }
-
-    function setSlasher(Slasher _slasher) external onlyOwner {
-        slasher = _slasher;
     }
 
     function depositIntoStrategy(
