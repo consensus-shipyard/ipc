@@ -10,20 +10,10 @@ script_runner = "@duckscript"
 script = [
   '''
     echo
-    echo Main tasks:
-    echo - testnet: run 4-nodes testnet
-    echo - testnet-down: stop the testnet
-    echo - testnode: run a test node
-    echo - testnode-down: stop the test node
-    echo - info: Print the setup information
+    echo How to use:
     echo
-    echo Most tasks use these environment variables:
-    echo - SUBNET_ID (default '${SUBNET_ID}'): the target IPC subnet
-    echo
-    echo Run 'cargo make -e SUBNET_ID=chain -e BALANCE=100 -e BASE_FEE=200 ... COMMAND' to populate the variables from CLI or
-    echo Run 'cargo make --env-file=/PATH/.env COMMAND' to populate the variables from the file before running the command.
-    echo
-    echo Run 'cargo make --list-all-steps' for a complete list of available tasks.
+    echo Run 'cargo make prometheus-pull' to pull the latest Prometheus docker image.
+    echo Run 'cargo make prometheus-run' to start Prometheus. You can then visit http://localhost:9090 for Prometheus web UI. Press Ctrl-C to stop running.
     echo
 ''',
 ]

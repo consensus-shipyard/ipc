@@ -32,9 +32,10 @@ scrape_configs:
     enable_http2: true
     static_configs:
       - targets: [ 'localhost:9090' ]
-  - job_name: ipc-relayer
+  - job_name: relayer
     static_configs:
-      - targets: [ 'host.docker.internal:9184' ]
+      - targets: [ 'host.docker.internal:9185' ]
         labels:
           group: 'relayer'
+  # TODO: Add config for scraping fendermint exporter
 
