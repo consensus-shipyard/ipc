@@ -55,6 +55,10 @@ deploy-lststrategies:
 	@echo "Deploying LST Strategies contract..."
 	forge script script/DeployLSTStrategies.s.sol:DeployLSTStrategies --broadcast --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --skip-simulation -vvv --slow
 
+deploy-glifstrategy:
+	@echo "Deploying Glif Strategies contract..."
+	forge script script/DeployGlifStrategy.s.sol:DeployGlifStrategy --broadcast --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --skip-simulation -vvv --slow
+
 mint-usdc:
 	@echo "Minting 1000 USDCTest tokens..."
 	@USDCTEST_ADDR=$$(cat config.json | jq -r '.LinkedToken.USDCTest'); \
