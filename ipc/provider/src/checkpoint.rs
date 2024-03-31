@@ -9,12 +9,18 @@ use futures_util::future::try_join_all;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use ipc_api::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
+use ipc_event::{
+    BlockHeight, GetLatestAcceptedCheckpoint, SubmitBottomUpCheckpoint,
+    SubmitBottomUpCheckpointFail,
+};
 use ipc_wallet::{EthKeyAddress, PersistentKeyStore};
+use rand::Rng;
 use std::cmp::max;
 use std::fmt::{Display, Formatter};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::sync::Semaphore;
+use tracing_utils::emit;
 
 /// Tracks the config required for bottom up checkpoint submissions
 /// parent/child subnet and checkpoint period.
@@ -123,6 +129,21 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
             if let Err(e) = self.submit_next_epoch(submitter).await {
                 log::error!("cannot submit checkpoint for submitter: {submitter} due to {e}");
             }
+
+            let num = rand::thread_rng().gen_range(0..100);
+            log::info!("jiejie: New random number {num}");
+            emit!(GetLatestAcceptedCheckpoint { block_height: num });
+            emit!(SubmitBottomUpCheckpoint {
+                block_height: num,
+                checkpoint_count: 1,
+            });
+            emit!(SubmitBottomUpCheckpointFail {
+                block_height: num,
+                checkpoint_count: 1,
+            });
+
+            log::info!("Sleep for {:?} seconds", submission_interval);
+
             tokio::time::sleep(submission_interval).await;
         }
     }
@@ -137,6 +158,9 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                 anyhow!("cannot obtain the last bottom up checkpoint height due to: {e:}")
             })?;
         log::info!("last submission height: {last_checkpoint_epoch}");
+        emit!(GetLatestAcceptedCheckpoint {
+            block_height: last_checkpoint_epoch as BlockHeight,
+        });
 
         let current_height = self.child_handler.current_epoch().await?;
         let finalized_height = max(1, current_height - self.finalization_blocks);
@@ -219,7 +243,11 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         bundle: BottomUpCheckpointBundle,
         event: QuorumReachedEvent,
     ) -> Result<(), anyhow::Error> {
-        let epoch = parent_handler
+        emit!(SubmitBottomUpCheckpoint {
+            block_height: event.height as BlockHeight,
+            checkpoint_count: 1,
+        });
+        match parent_handler
             .submit_checkpoint(
                 &submitter,
                 bundle.checkpoint,
@@ -232,13 +260,22 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                     "cannot submit bottom up checkpoint at height {} due to: {e}",
                     event.height
                 )
-            })?;
-
-        log::info!(
-            "submitted bottom up checkpoint({}) in parent at height {}",
-            event.height,
-            epoch
-        );
-        Ok(())
+            }) {
+            Ok(epoch) => {
+                log::info!(
+                    "submitted bottom up checkpoint({}) in parent at height {}",
+                    event.height,
+                    epoch
+                );
+                Ok(())
+            }
+            Err(err) => {
+                emit!(SubmitBottomUpCheckpointFail {
+                    block_height: event.height as BlockHeight,
+                    checkpoint_count: 1,
+                });
+                return Err(err);
+            }
+        }
     }
 }

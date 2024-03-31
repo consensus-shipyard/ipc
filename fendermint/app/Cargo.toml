@@ -49,7 +49,6 @@ fendermint_materializer = { path = "../testing/materializer" }
 fendermint_rocksdb = { path = "../rocksdb" }
 fendermint_rpc = { path = "../rpc" }
 fendermint_storage = { path = "../storage" }
-fendermint_tracing = { path = "../tracing" }
 fendermint_vm_actor_interface = { path = "../vm/actor_interface" }
 fendermint_vm_core = { path = "../vm/core" }
 fendermint_vm_encoding = { path = "../vm/encoding" }
@@ -62,6 +61,9 @@ fendermint_vm_message = { path = "../vm/message" }
 fendermint_vm_resolver = { path = "../vm/resolver" }
 fendermint_vm_snapshot = { path = "../vm/snapshot" }
 fendermint_vm_topdown = { path = "../vm/topdown" }
+
+metrics_utils = { path = "../../common/metrics" }
+tracing_utils = { path = "../../common/tracing" }
 
 fvm = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }

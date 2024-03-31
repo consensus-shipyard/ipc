@@ -3,7 +3,7 @@
 
 use crate::commands::get_subnet_config;
 use crate::{require_fil_addr_from_str, CommandLineHandler, GlobalArguments};
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use clap::Args;
 use fvm_shared::address::Address;
@@ -13,9 +13,11 @@ use ipc_provider::checkpoint::BottomUpCheckpointManager;
 use ipc_provider::config::Config;
 use ipc_provider::new_evm_keystore_from_config;
 use ipc_wallet::EvmKeyStore;
+use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+use tracing_subscriber::layer::SubscriberExt;
 
 const DEFAULT_POLLING_INTERVAL: u64 = 15;
 
@@ -68,6 +70,23 @@ impl CommandLineHandler for BottomUpRelayer {
                 .checkpoint_interval_sec
                 .unwrap_or(DEFAULT_POLLING_INTERVAL),
         );
+
+        if arguments.enable_metrics {
+            // Register ipc metrics.
+            let metrics_layer = ipc_metrics::layer();
+            let registry = tracing_subscriber::registry().with(metrics_layer);
+            tracing::subscriber::set_global_default(registry)
+                .expect("Unable to set a global collector");
+            let registry = prometheus::Registry::new();
+            ipc_metrics::register_app_metrics(&registry).context("failed to register metrics")?;
+
+            // Start metrics export HTTP server.
+            let addr: SocketAddr = arguments.metric_export_bind_address.parse().unwrap();
+            let mut builder = prometheus_exporter::Builder::new(addr);
+            builder.with_registry(registry);
+            let _ = builder.start().context("failed to start metrics server")?;
+        }
+
         manager.run(submitter, interval).await;
 
         Ok(())
@@ -95,4 +114,15 @@ pub(crate) struct BottomUpRelayerArgs {
         help = "The max parallelism for submitting checkpoints"
     )]
     pub max_parallelism: usize,
+    #[arg(
+        default_value = "true",
+        help = "Flag to turn on/off Prometheus metrics reporting."
+    )]
+    pub enable_metrics: bool,
+    #[arg(
+        long,
+        default_value = "0.0.0.0:9185",
+        help = "Local port for exporting Prometheus metrics."
+    )]
+    pub metric_export_bind_address: String,
 }

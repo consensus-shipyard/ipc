@@ -8,11 +8,17 @@ license-file.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+metrics_utils = { path = "../../common/metrics" }
+tracing_utils = { path = "../../common/tracing" }
+ipc_event = { path = "../event" }
+ipc_metrics = { path = "../metrics" }
+
 anyhow = { workspace = true }
 async-channel = { workspace = true }
 async-trait = { workspace = true }
 futures-util = { workspace = true }
 reqwest = { workspace = true }
+tracing = { workspace = true }
 
 log = { workspace = true }
 serde = { workspace = true }
@@ -45,6 +51,9 @@ ipc-types = { workspace = true }
 ipc-wallet = { workspace = true, features = ["with-ethers"] }
 ipc-api = { workspace = true }
 ipc_actors_abis = { workspace = true }
+prometheus = "0.13"
+prometheus_exporter = "0.8"
+rand = "0.8.5"
 
 [dev-dependencies]
 tempfile = { workspace = true }

@@ -9,6 +9,8 @@ members = [
   "ipc/provider",
   "ipc/api",
   "ipc/types",
+  "ipc/event",
+  "ipc/metrics",
 
   # ipld
   "ipld/resolver",
@@ -26,10 +28,13 @@ members = [
   "fendermint/testing",
   "fendermint/testing/materializer",
   "fendermint/testing/*-test",
-  "fendermint/tracing",
   "fendermint/vm/*",
   "fendermint/actors",
   "fendermint/actors/chainmetadata",
+
+  # metrics
+  "common/metrics",
+  "common/tracing",
 ]
 
 [workspace.package]

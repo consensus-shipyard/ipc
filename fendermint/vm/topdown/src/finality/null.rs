@@ -10,7 +10,7 @@ use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
 use std::cmp::min;
 
-use fendermint_tracing::emit;
+use tracing_utils::emit;
 use fendermint_vm_event::ParentFinalityCommitted;
 
 /// Finality provider that can handle null blocks

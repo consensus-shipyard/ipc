@@ -1,0 +1,19 @@
+[package]
+name = "ipc_metrics"
+description = "Define metrics used in ipc"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+prometheus = { workspace = true }
+paste = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+lazy_static = { workspace = true }
+
+metrics_utils = { path = "../../common/metrics" }
+tracing_utils = { path = "../../common/tracing" }
+ipc_event = { path = "../event" }

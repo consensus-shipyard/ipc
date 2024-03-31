@@ -1,11 +1,10 @@
 [package]
-name = "fendermint_tracing"
+name = "tracing_utils"
 description = "Abstractions for emitting traces"
 version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
-
 
 [dependencies]
 tracing = { workspace = true }

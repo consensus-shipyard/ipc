@@ -2868,7 +2868,6 @@ dependencies = [
  "fendermint_rocksdb",
  "fendermint_rpc",
  "fendermint_storage",
- "fendermint_tracing",
  "fendermint_vm_actor_interface",
  "fendermint_vm_core",
  "fendermint_vm_encoding",
@@ -2894,6 +2893,7 @@ dependencies = [
  "libp2p",
  "libp2p-bitswap",
  "literally",
+ "metrics_utils",
  "multiaddr",
  "num-traits",
  "openssl",
@@ -2917,6 +2917,7 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "tracing_utils",
 ]
 
 [[package]]
@@ -3201,13 +3202,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fendermint_tracing"
-version = "0.1.0"
-dependencies = [
- "tracing",
-]
-
-[[package]]
 name = "fendermint_vm_actor_interface"
 version = "0.1.0"
 dependencies = [
@@ -3317,7 +3311,6 @@ dependencies = [
  "fendermint_eth_hardhat",
  "fendermint_rpc",
  "fendermint_testing",
- "fendermint_tracing",
  "fendermint_vm_actor_interface",
  "fendermint_vm_core",
  "fendermint_vm_encoding",
@@ -3355,6 +3348,7 @@ dependencies = [
  "tokio-stream",
  "tokio-util 0.7.10",
  "tracing",
+ "tracing_utils",
 ]
 
 [[package]]
@@ -3450,7 +3444,6 @@ dependencies = [
  "ethers",
  "fendermint_crypto",
  "fendermint_testing",
- "fendermint_tracing",
  "fendermint_vm_event",
  "fendermint_vm_genesis",
  "fvm_ipld_encoding",
@@ -3471,6 +3464,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "tracing_utils",
 ]
 
 [[package]]
@@ -5017,12 +5011,15 @@ dependencies = [
  "ipc-provider",
  "ipc-types",
  "ipc-wallet",
+ "ipc_metrics",
  "libsecp256k1",
  "log",
  "num-bigint",
  "num-derive 0.3.3",
  "num-traits",
  "openssl",
+ "prometheus",
+ "prometheus_exporter",
  "reqwest",
  "serde",
  "serde_bytes",
@@ -5033,6 +5030,8 @@ dependencies = [
  "tokio",
  "tokio-tungstenite 0.18.0",
  "toml 0.7.8",
+ "tracing",
+ "tracing-subscriber",
  "url",
  "zeroize",
 ]
@@ -5060,9 +5059,15 @@ dependencies = [
  "ipc-types",
  "ipc-wallet",
  "ipc_actors_abis",
+ "ipc_event",
+ "ipc_metrics",
  "log",
+ "metrics_utils",
  "num-derive 0.3.3",
  "num-traits",
+ "prometheus",
+ "prometheus_exporter",
+ "rand",
  "reqwest",
  "serde",
  "serde_bytes",
@@ -5075,6 +5080,8 @@ dependencies = [
  "tokio",
  "tokio-tungstenite 0.18.0",
  "toml 0.8.10",
+ "tracing",
+ "tracing_utils",
  "url",
  "zeroize",
 ]
@@ -5142,6 +5149,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "ipc_event"
+version = "0.1.0"
+
+[[package]]
 name = "ipc_ipld_resolver"
 version = "0.1.0"
 dependencies = [
@@ -5176,6 +5187,21 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tokio",
+]
+
+[[package]]
+name = "ipc_metrics"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ipc_event",
+ "lazy_static",
+ "metrics_utils",
+ "paste",
+ "prometheus",
+ "tracing",
+ "tracing-subscriber",
+ "tracing_utils",
 ]
 
 [[package]]
@@ -6231,6 +6257,20 @@ dependencies = [
  "serde",
  "tempfile",
  "typenum",
+]
+
+[[package]]
+name = "metrics_utils"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "lazy_static",
+ "log",
+ "paste",
+ "prometheus",
+ "tracing",
+ "tracing-subscriber",
+ "tracing_utils",
 ]
 
 [[package]]
@@ -9819,6 +9859,13 @@ dependencies = [
  "tracing-core",
  "tracing-log",
  "tracing-serde",
+]
+
+[[package]]
+name = "tracing_utils"
+version = "0.1.0"
+dependencies = [
+ "tracing",
 ]
 
 [[package]]

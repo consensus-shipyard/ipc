@@ -7,6 +7,8 @@ license-file.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+ipc_metrics = { path = "../metrics" }
+
 anyhow = { workspace = true }
 async-channel = { workspace = true }
 async-trait = { workspace = true }
@@ -41,8 +43,11 @@ tokio-tungstenite = { workspace = true }
 toml = "0.7.2"
 url = { workspace = true }
 zeroize = "1.6.0"
-
 ipc-wallet = { workspace = true }
 ipc-provider = { workspace = true }
 ipc-api = { workspace = true }
 ipc-types = { workspace = true }
+prometheus = { workspace = true }
+prometheus_exporter = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing = { workspace = true }

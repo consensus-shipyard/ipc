@@ -15,7 +15,7 @@ use fvm_shared::{address::Address, chainid::ChainID};
 
 use fendermint_crypto::PublicKey;
 use fendermint_crypto::SecretKey;
-use fendermint_tracing::emit;
+use tracing_utils::emit;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::BottomUpCheckpoint;
 use fendermint_vm_event::NewBottomUpCheckpoint;
