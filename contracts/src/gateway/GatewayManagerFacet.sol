@@ -37,12 +37,8 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
             revert MethodNotAllowed(ERR_CHILD_SUBNET_NOT_ALLOWED);
         }
 
-        if (genesisCircSupply < stake) {
-            revert NotEnoughFunds();
-        }
-
         SupplySource memory supplySource = SubnetActorGetterFacet(msg.sender).supplySource();
-        supplySource.lock(genesisCircSupply);
+        supplySource.lock(genesisCircSupply + stake);
 
         SubnetID memory subnetId = s.networkName.createSubnetId(msg.sender);
 
@@ -105,6 +101,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     /// @dev The subnet's balance must be empty.
     function kill() external {
         (bool registered, Subnet storage subnet) = LibGateway.getSubnet(msg.sender);
+        address actor = subnet.id.getActor();
 
         if (!registered) {
             revert NotRegisteredSubnet();
@@ -122,7 +119,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
 
         s.subnetKeys.remove(id);
 
-        SupplySource memory supplySource = SubnetActorGetterFacet(subnet.id.getActor()).supplySource();
+        SupplySource memory supplySource = SubnetActorGetterFacet(actor).supplySource();
         supplySource.safeTransferFunds(payable(msg.sender), stake);
     }
 

@@ -5,14 +5,16 @@ import {VALIDATOR_SECP256K1_PUBLIC_KEY_LENGTH} from "../constants/Constants.sol"
 import {ERR_PERMISSIONED_AND_BOOTSTRAPPED} from "../errors/IPCErrors.sol";
 import {NotEnoughGenesisValidators, DuplicatedGenesisValidator, NotOwnerOfPublicKey, MethodNotAllowed} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
-import {Validator, ValidatorSet, PermissionMode, SupplyKind} from "../structs/Subnet.sol";
+import {Validator, ValidatorSet, PermissionMode, SupplyKind, SupplySource} from "../structs/Subnet.sol";
 import {SubnetActorModifiers} from "../lib/LibSubnetActorStorage.sol";
 import {LibValidatorSet, LibStaking} from "../lib/LibStaking.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 import {LibSubnetActorStorage, SubnetActorStorage} from "./LibSubnetActorStorage.sol";
+import {SupplySourceHelper} from "../lib/SupplySourceHelper.sol";
 
 library LibSubnetActor {
     using EnumerableSet for EnumerableSet.AddressSet;
+    using SupplySourceHelper for SupplySource;
 
     event SubnetBootstrapped(Validator[]);
 
@@ -54,6 +56,7 @@ library LibSubnetActor {
                 if (s.supplySource.kind == SupplyKind.Native) {
                     IGateway(s.ipcGatewayAddr).register{value: totalCollateral + s.genesisCircSupply}(s.genesisCircSupply, totalCollateral);
                 } else {
+                    s.supplySource.approve(s.ipcGatewayAddr, s.genesisCircSupply + totalCollateral);
                     IGateway(s.ipcGatewayAddr).register(s.genesisCircSupply, totalCollateral);
                 }
             }

@@ -779,7 +779,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     function join(address validatorAddress, bytes memory pubkey) public {
         vm.prank(validatorAddress);
         vm.deal(validatorAddress, DEFAULT_COLLATERAL_AMOUNT + 1);
-        saDiamond.manager().join{value: DEFAULT_COLLATERAL_AMOUNT}(pubkey);
+
+        saDiamond.manager().join{value: DEFAULT_COLLATERAL_AMOUNT}(pubkey, DEFAULT_COLLATERAL_AMOUNT);
     }
 
     function confirmChange(address validator, uint256 privKey) internal {
@@ -866,7 +867,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
 
         (, uint256 stakedBefore, , , ) = getSubnet(subnetAddress);
 
-        gatewayDiamond.manager().addStake{value: stakeAmount}();
+        gatewayDiamond.manager().addStake{value: stakeAmount}(stakeAmount);
 
         uint256 balanceAfter = subnetAddress.balance;
         (, uint256 stakedAfter, , , ) = getSubnet(subnetAddress);
@@ -879,7 +880,29 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         GatewayManagerFacet manager = gw.manager();
         GatewayGetterFacet getter = gw.getter();
 
-        manager.register{value: collateral}(0);
+        manager.register{value: collateral}(0, collateral);
+
+        (SubnetID memory id, uint256 stake, uint256 topDownNonce, , uint256 circSupply) = getSubnetGW(
+            subnetAddress,
+            gw
+        );
+
+        SubnetID memory parentNetwork = getter.getNetworkName();
+
+        require(
+            id.toHash() == parentNetwork.createSubnetId(subnetAddress).toHash(),
+            "id.toHash() == parentNetwork.createSubnetId(subnetAddress).toHash()"
+        );
+        require(stake == collateral, "unexpected stake");
+        require(topDownNonce == 0, "unexpected nonce");
+        require(circSupply == 0, "unexpected circSupply");
+    }
+
+    function registerSubnetGWERC20(uint256 collateral, address subnetAddress, GatewayDiamond gw) public {
+        GatewayManagerFacet manager = gw.manager();
+        GatewayGetterFacet getter = gw.getter();
+
+        manager.register(0, collateral);
 
         (SubnetID memory id, uint256 stake, uint256 topDownNonce, , uint256 circSupply) = getSubnetGW(
             subnetAddress,

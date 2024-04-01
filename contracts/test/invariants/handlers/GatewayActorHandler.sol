@@ -8,6 +8,7 @@ import {GatewayDiamond} from "../../../src/GatewayDiamond.sol";
 import {GatewayManagerFacet} from "../../../src/gateway/GatewayManagerFacet.sol";
 import {GatewayFacetsHelper} from "../../helpers/GatewayFacetsHelper.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
+import {SupplySource, SupplyKind} from "../../../src/structs/Subnet.sol";
 
 uint256 constant ETH_SUPPLY = 129_590_000 ether;
 
@@ -24,12 +25,16 @@ contract GatewayActorHandler is CommonBase, StdCheats, StdUtils {
 
     function register(uint256 amount) public {
         amount = bound(amount, 0, 3 * DEFAULT_MIN_VALIDATOR_STAKE);
-        managerFacet.register(amount);
+        managerFacet.register(amount, amount);
     }
 
     function stake(uint256 amount) public {
         amount = bound(amount, 0, 3 * DEFAULT_MIN_VALIDATOR_STAKE);
-        managerFacet.addStake{value: amount}();
+        managerFacet.addStake{value: amount}(amount);
+    }
+
+    function supplySource() public returns (SupplySource memory source) {
+        source = SupplySource({kind: SupplyKind.Native, tokenAddress: address(0)});
     }
 
     function _pay(address to, uint256 amount) internal {

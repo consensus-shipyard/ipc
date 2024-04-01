@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 import "elliptic-curve-solidity/contracts/EllipticCurve.sol";
-import {IPCAddress} from "../../src/structs/Subnet.sol";
+import {IPCAddress, SupplySource, SupplyKind} from "../../src/structs/Subnet.sol";
 import {CallMsg, IpcMsgKind, IpcEnvelope} from "../../src/structs/CrossNet.sol";
 import {IpcHandler} from "../../sdk/IpcContract.sol";
 import {METHOD_SEND, EMPTY_BYTES} from "../../src/constants/Constants.sol";
@@ -176,6 +176,10 @@ contract MockIpcContract is IpcHandler {
     /* solhint-disable-next-line unused-vars */
     function handleIpcMessage(IpcEnvelope calldata) external payable returns (bytes memory ret) {
         return EMPTY_BYTES;
+    }
+
+    function supplySource() external pure returns (SupplySource memory) {
+        return SupplySource({kind: SupplyKind.Native, tokenAddress: address(0)});
     }
 }
 

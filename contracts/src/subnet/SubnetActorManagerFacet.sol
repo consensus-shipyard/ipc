@@ -118,47 +118,26 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
     ///         If the total confirmed collateral of the subnet is greater
     ///         or equal to minimum activation collateral as a result of this operation,
     ///         then  subnet will be registered.
+    /// @notice This method might be deprecated as it does not support supply source
     /// @param publicKey The off-chain 65 byte public key that should be associated with the validator
     function join(bytes calldata publicKey) external payable nonReentrant whenNotPaused notKilled {
-        // Adding this check to prevent new validators from joining
-        // after the subnet has been bootstrapped, if the subnet mode is not Collateral.
-        // We will increase the functionality in the future to support explicit permissioning.
-        if (s.bootstrapped) {
-            LibSubnetActor.enforceCollateralValidation();
-        }
         if (msg.value == 0) {
             revert CollateralIsZero();
         }
+        joinInner(publicKey, msg.value);
+    }
 
-        if (LibStaking.isValidator(msg.sender)) {
-            revert MethodNotAllowed(ERR_VALIDATOR_JOINED);
+    function join(bytes calldata publicKey, uint256 amount) external payable nonReentrant whenNotPaused notKilled {
+        if (amount == 0) {
+            revert CollateralIsZero();
         }
 
-        if (publicKey.length != VALIDATOR_SECP256K1_PUBLIC_KEY_LENGTH) {
-            // Taking 65 bytes because the FVM libraries have some assertions checking it, it's more convenient.
-            revert InvalidPublicKeyLength();
-        }
+        SupplySource memory supplySource = s.supplySource;
 
-        address convertedAddress = LibSubnetActor.publicKeyToAddress(publicKey);
-        if (convertedAddress != msg.sender) {
-            revert NotOwnerOfPublicKey();
-        }
+        // Lock the specified amount into custody.
+        supplySource.lock({value: amount});
 
-        if (!s.bootstrapped) {
-            // if the subnet has not been bootstrapped, join directly
-            // without delays, and collect collateral to register
-            // in the gateway
-
-            // confirm validators deposit immediately
-            LibStaking.setMetadataWithConfirm(msg.sender, publicKey);
-            LibStaking.depositWithConfirm(msg.sender, msg.value);
-
-            LibSubnetActor.bootstrapSubnetIfNeeded();
-        } else {
-            // if the subnet has been bootstrapped, join with postponed confirmation.
-            LibStaking.setValidatorMetadata(msg.sender, publicKey);
-            LibStaking.deposit(msg.sender, msg.value);
-        }
+        joinInner(publicKey, amount);
     }
 
     /// @notice method that allows a validator to increase its stake.
@@ -294,5 +273,46 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
 
         s.genesisBalance[msg.sender] += amount;
         s.genesisCircSupply += amount;
+    }
+
+    /// @param publicKey The off-chain 65 byte public key that should be associated with the validator
+    /// @param amount The amount of stake
+    function joinInner(bytes calldata publicKey, uint256 amount) internal {
+        // Adding this check to prevent new validators from joining
+        // after the subnet has been bootstrapped, if the subnet mode is not Collateral.
+        // We will increase the functionality in the future to support explicit permissioning.
+        if (s.bootstrapped) {
+            LibSubnetActor.enforceCollateralValidation();
+        }
+
+        if (LibStaking.isValidator(msg.sender)) {
+            revert MethodNotAllowed(ERR_VALIDATOR_JOINED);
+        }
+
+        if (publicKey.length != VALIDATOR_SECP256K1_PUBLIC_KEY_LENGTH) {
+            // Taking 65 bytes because the FVM libraries have some assertions checking it, it's more convenient.
+            revert InvalidPublicKeyLength();
+        }
+
+        address convertedAddress = LibSubnetActor.publicKeyToAddress(publicKey);
+        if (convertedAddress != msg.sender) {
+            revert NotOwnerOfPublicKey();
+        }
+
+        if (!s.bootstrapped) {
+            // if the subnet has not been bootstrapped, join directly
+            // without delays, and collect collateral to register
+            // in the gateway
+
+            // confirm validators deposit immediately
+            LibStaking.setMetadataWithConfirm(msg.sender, publicKey);
+            LibStaking.depositWithConfirm(msg.sender, amount);
+
+            LibSubnetActor.bootstrapSubnetIfNeeded();
+        } else {
+            // if the subnet has been bootstrapped, join with postponed confirmation.
+            LibStaking.setValidatorMetadata(msg.sender, publicKey);
+            LibStaking.deposit(msg.sender, amount);
+        }
     }
 }

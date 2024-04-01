@@ -44,7 +44,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
     function setUp() public override {
         super.setUp();
 
-        token = new ERC20PresetFixedSupply("TestToken", "TEST", 1_000_000, address(this));
+        token = new ERC20PresetFixedSupply("TestToken", "TEST", 1_000_000 ether, address(this));
     }
 
     function test_fundWithToken_NativeSupply_Reverts() public {
@@ -190,11 +190,13 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
     // Call a smart contract in the parent through a smart contract and with
     // an ERC20 token supply.
     function test_childToParentCall() public {
-        Subnet memory subnet = createTokenSubnet(address(token));
-
         // Fund an account in the subnet.
         address caller = vm.addr(1);
         token.transfer(caller, 100);
+
+        Subnet memory subnet = createTokenSubnet(address(token));
+        console.log("here");
+
         vm.prank(caller);
         token.approve(address(gatewayDiamond), 15);
         vm.prank(caller);
@@ -254,9 +256,21 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         // incrementing the block number, test won't pass
         vm.roll(5);
 
-        addValidator(TOPDOWN_VALIDATOR_1, 100);
-
         (address validatorAddress, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
+
+        token.transfer(validatorAddress, 2 * DEFAULT_COLLATERAL_AMOUNT);
+        token.transfer(TOPDOWN_VALIDATOR_1, 2 * DEFAULT_COLLATERAL_AMOUNT);
+
+        vm.prank(TOPDOWN_VALIDATOR_1);
+        token.approve(address(gatewayDiamond), 2 * DEFAULT_COLLATERAL_AMOUNT);
+        addValidator(TOPDOWN_VALIDATOR_1, DEFAULT_COLLATERAL_AMOUNT);
+
+        vm.prank(validatorAddress);
+        token.approve(address(gatewayDiamond), 2 * DEFAULT_COLLATERAL_AMOUNT);
+
+        vm.prank(validatorAddress);
+        token.approve(address(SubnetActorManagerFacet(address(saDiamond))), 100000 ether);
+
         join(validatorAddress, publicKey);
 
         SubnetID memory subnetId = gatewayDiamond.getter().getNetworkName().createSubnetId(address(saDiamond));

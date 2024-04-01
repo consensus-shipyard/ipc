@@ -703,9 +703,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         vm.deal(address(saDiamond), 100 ether);
         vm.prank(address(saDiamond));
-        gatewayDiamond.manager().register{value: DEFAULT_MIN_VALIDATOR_STAKE + 3 * DEFAULT_CROSS_MSG_FEE}(
-            3 * DEFAULT_CROSS_MSG_FEE
-        );
+        registerSubnet(3 * DEFAULT_CROSS_MSG_FEE, DEFAULT_MIN_VALIDATOR_STAKE);
 
         bytes32 hash = keccak256(abi.encode(checkpoint));
 
@@ -746,6 +744,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             saDiamond.getter().lastBottomUpCheckpointHeight() == saDiamond.getter().bottomUpCheckPeriod(),
             " checkpoint height correct"
         );
+        console.log("5");
 
         (bool exists, BottomUpCheckpoint memory recvCheckpoint) = saDiamond.getter().bottomUpCheckpointAtEpoch(
             saDiamond.getter().bottomUpCheckPeriod()
@@ -810,9 +809,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         vm.deal(address(saDiamond), 100 ether);
         vm.prank(address(saDiamond));
-        gatewayDiamond.manager().register{value: DEFAULT_MIN_VALIDATOR_STAKE + 3 * DEFAULT_CROSS_MSG_FEE}(
-            3 * DEFAULT_CROSS_MSG_FEE
-        );
+        registerSubnet(3 * DEFAULT_CROSS_MSG_FEE, DEFAULT_MIN_VALIDATOR_STAKE);
 
         bytes32 hash = keccak256(abi.encode(checkpoint));
 
@@ -859,9 +856,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         vm.deal(address(saDiamond), 100 ether);
         vm.prank(address(saDiamond));
-        gatewayDiamond.manager().register{value: DEFAULT_MIN_VALIDATOR_STAKE + 3 * DEFAULT_CROSS_MSG_FEE}(
-            3 * DEFAULT_CROSS_MSG_FEE
-        );
+        registerSubnet(3 * DEFAULT_CROSS_MSG_FEE, DEFAULT_MIN_VALIDATOR_STAKE);
 
         SubnetID memory localSubnetID = saDiamond.getter().getParent().createSubnetId(address(saDiamond));
 
@@ -1039,9 +1034,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         vm.deal(address(saDiamond), 100 ether);
         vm.prank(address(saDiamond));
-        gatewayDiamond.manager().register{value: DEFAULT_MIN_VALIDATOR_STAKE + 6 * DEFAULT_CROSS_MSG_FEE}(
-            6 * DEFAULT_CROSS_MSG_FEE
-        );
+        registerSubnet(6 * DEFAULT_CROSS_MSG_FEE, DEFAULT_MIN_VALIDATOR_STAKE);
 
         bytes32 hash = keccak256(abi.encode(checkpoint));
 
@@ -1357,11 +1350,11 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         (address validator1, bytes memory publicKey1) = TestUtils.deriveValidatorAddress(100);
         vm.deal(validator1, 1 ether); // no need to worry about gas
 
-        token.transfer(validator1, 1 ether);
+        token.transfer(validator1, 100 ether);
 
         vm.startPrank(validator1);
-        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey1);
-        token.approve(address(saDiamond.manager()), 1 ether); // aprove once and for all
+        token.approve(address(saDiamond.manager()), 1000 ether); // aprove once and for all
+        saDiamond.manager().join(publicKey1, DEFAULT_MIN_VALIDATOR_STAKE);
 
         vm.expectRevert(SubnetAlreadyBootstrapped.selector);
         saDiamond.manager().preFundWithToken(1000);
@@ -1952,5 +1945,21 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         }
 
         saDiamond.checkpointer().submitCheckpoint(checkpoint, validators, signatures);
+    }
+
+    function registerSubnet(uint256 circulation, uint256 collateral) internal {
+        SubnetActorGetterFacet g = SubnetActorGetterFacet(address(saDiamond));
+        SupplySource memory supplySource = g.supplySource();
+
+        vm.prank(address(saDiamond));
+        if (supplySource.kind == SupplyKind.Native) {
+            gatewayDiamond.manager().register{value: circulation + collateral}(circulation, collateral);
+        } else {
+            gatewayDiamond.manager().register(circulation, collateral);
+        }
+    }
+
+    function supplySource() external pure returns (SupplySource memory) {
+        return SupplySource({kind: SupplyKind.Native, tokenAddress: address(0)});
     }
 }

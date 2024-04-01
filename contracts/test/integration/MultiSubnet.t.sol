@@ -6,7 +6,7 @@ import "../../src/errors/IPCErrors.sol";
 import {EMPTY_BYTES, METHOD_SEND} from "../../src/constants/Constants.sol";
 import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMsgKind, OutcomeType} from "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
-import {SubnetID, Subnet, IPCAddress, Validator} from "../../src/structs/Subnet.sol";
+import {SubnetID, Subnet, IPCAddress, Validator, SupplySource, SupplyKind} from "../../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
@@ -53,7 +53,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
     IERC20 public token;
 
     function setUp() public override {
-        token = new ERC20PresetFixedSupply("TestToken", "TEST", 1_000_000, address(this));
+        token = new ERC20PresetFixedSupply("TestToken", "TEST", 1_000_000 ether, address(this));
 
         SubnetID memory rootSubnetName = SubnetID({root: ROOTNET_CHAINID, route: new address[](0)});
         require(rootSubnetName.isRoot(), "not root");
@@ -277,14 +277,16 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         uint256 amount = 3;
 
         token.transfer(caller, 100);
+        token.transfer(tokenSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT * 10);
+
         vm.prank(caller);
         token.approve(rootSubnet.gatewayAddr, 100);
 
-        vm.deal(tokenSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT);
-        vm.deal(caller, amount);
+        vm.prank(tokenSubnet.subnetActorAddr);
+        token.approve(address(rootSubnet.gateway), DEFAULT_COLLATERAL_AMOUNT);
 
         vm.prank(tokenSubnet.subnetActorAddr);
-        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, tokenSubnet.subnetActorAddr, rootSubnet.gateway);
+        registerSubnetGWERC20(DEFAULT_COLLATERAL_AMOUNT, tokenSubnet.subnetActorAddr, rootSubnet.gateway);
 
         IpcEnvelope memory expected = CrossMsgHelper.createFundMsg(
             tokenSubnet.id,
@@ -314,14 +316,19 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         uint256 amount = 3;
 
         token.transfer(caller, 100);
+        token.transfer(tokenSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT * 10);
+
         vm.prank(caller);
         token.approve(rootSubnet.gatewayAddr, 100);
 
-        vm.deal(tokenSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT);
-        vm.deal(caller, amount);
+        vm.prank(tokenSubnet.subnetActorAddr);
+        token.approve(address(rootSubnet.gateway), DEFAULT_COLLATERAL_AMOUNT);
 
         vm.prank(tokenSubnet.subnetActorAddr);
-        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, tokenSubnet.subnetActorAddr, rootSubnet.gateway);
+        registerSubnetGWERC20(DEFAULT_COLLATERAL_AMOUNT, tokenSubnet.subnetActorAddr, rootSubnet.gateway);
+
+        uint256 nativeBalance = caller.balance;
+        uint256 erc20Balance = token.balanceOf(caller);
 
         IpcEnvelope memory crossMsg = CrossMsgHelper.createReleaseMsg(
             tokenSubnet.id,
@@ -336,7 +343,8 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         executeTopDownMsgs(msgs, tokenSubnet.id, tokenSubnet.gateway);
 
-        assertEq(caller.balance, amount);
+        assertEq(caller.balance, nativeBalance);
+        assertEq(token.balanceOf(caller), erc20Balance);
     }
 
     function testMultiSubnet_Erc20_ReleaseActorErrFromParentToChild() public {
@@ -345,14 +353,16 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         uint256 amount = 3;
 
         token.transfer(caller, 100);
+        token.transfer(tokenSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT * 10);
+
         vm.prank(caller);
         token.approve(rootSubnet.gatewayAddr, 100);
 
-        vm.deal(tokenSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT);
-        vm.deal(caller, 0);
+        vm.prank(tokenSubnet.subnetActorAddr);
+        token.approve(address(rootSubnet.gateway), DEFAULT_COLLATERAL_AMOUNT);
 
         vm.prank(tokenSubnet.subnetActorAddr);
-        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, tokenSubnet.subnetActorAddr, rootSubnet.gateway);
+        registerSubnetGWERC20(DEFAULT_COLLATERAL_AMOUNT, tokenSubnet.subnetActorAddr, rootSubnet.gateway);
 
         IpcEnvelope memory crossMsg = CrossMsgHelper.createReleaseMsg(
             tokenSubnet.id,
@@ -375,14 +385,16 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         uint256 amount = 3;
 
         token.transfer(caller, 100);
+        token.transfer(tokenSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT * 10);
+
         vm.prank(caller);
         token.approve(rootSubnet.gatewayAddr, 100);
 
-        vm.deal(tokenSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT);
-        vm.deal(caller, 0);
+        vm.prank(tokenSubnet.subnetActorAddr);
+        token.approve(address(rootSubnet.gateway), DEFAULT_COLLATERAL_AMOUNT);
 
         vm.prank(tokenSubnet.subnetActorAddr);
-        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, tokenSubnet.subnetActorAddr, rootSubnet.gateway);
+        registerSubnetGWERC20(DEFAULT_COLLATERAL_AMOUNT, tokenSubnet.subnetActorAddr, rootSubnet.gateway);
 
         IpcEnvelope memory crossMsg = CrossMsgHelper.createReleaseMsg(
             tokenSubnet.id,
@@ -405,14 +417,16 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         uint256 amount = 3;
 
         token.transfer(caller, 100);
+        token.transfer(tokenSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT * 10);
+
         vm.prank(caller);
         token.approve(rootSubnet.gatewayAddr, 100);
 
-        vm.deal(tokenSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT);
-        vm.deal(caller, amount);
+        vm.prank(tokenSubnet.subnetActorAddr);
+        token.approve(address(rootSubnet.gateway), DEFAULT_COLLATERAL_AMOUNT);
 
         vm.prank(tokenSubnet.subnetActorAddr);
-        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, tokenSubnet.subnetActorAddr, rootSubnet.gateway);
+        registerSubnetGWERC20(DEFAULT_COLLATERAL_AMOUNT, tokenSubnet.subnetActorAddr, rootSubnet.gateway);
 
         IpcEnvelope memory expected = CrossMsgHelper.createFundMsg(
             tokenSubnet.id,
@@ -656,6 +670,8 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         uint256 amount = 3;
 
         token.transfer(caller, amount);
+        token.transfer(tokenSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT * 10);
+
         vm.prank(caller);
         token.approve(rootSubnet.gatewayAddr, amount);
 
@@ -663,7 +679,10 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         vm.deal(caller, 1 ether);
 
         vm.prank(tokenSubnet.subnetActorAddr);
-        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, tokenSubnet.subnetActorAddr, rootSubnet.gateway);
+        token.approve(address(rootSubnet.gateway), DEFAULT_COLLATERAL_AMOUNT);
+
+        vm.prank(tokenSubnet.subnetActorAddr);
+        registerSubnetGWERC20(DEFAULT_COLLATERAL_AMOUNT, tokenSubnet.subnetActorAddr, rootSubnet.gateway);
 
         vm.prank(caller);
         rootSubnet.gateway.manager().fundWithToken(tokenSubnet.id, FvmAddressHelper.from(address(caller)), amount);
@@ -702,6 +721,8 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         uint256 amount = 3;
 
         token.transfer(caller, amount);
+        token.transfer(tokenSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT * 10);
+
         vm.prank(caller);
         token.approve(rootSubnet.gatewayAddr, amount);
 
@@ -709,7 +730,10 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         vm.deal(caller, 1 ether);
 
         vm.prank(tokenSubnet.subnetActorAddr);
-        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, tokenSubnet.subnetActorAddr, rootSubnet.gateway);
+        token.approve(address(rootSubnet.gateway), DEFAULT_COLLATERAL_AMOUNT);
+
+        vm.prank(tokenSubnet.subnetActorAddr);
+        registerSubnetGWERC20(DEFAULT_COLLATERAL_AMOUNT, tokenSubnet.subnetActorAddr, rootSubnet.gateway);
 
         vm.prank(caller);
         rootSubnet.gateway.manager().fundWithToken(tokenSubnet.id, FvmAddressHelper.from(address(caller)), amount);
@@ -748,6 +772,8 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         uint256 amount = 3;
 
         token.transfer(caller, amount);
+        token.transfer(tokenSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT * 10);
+
         vm.prank(caller);
         token.approve(rootSubnet.gatewayAddr, amount);
 
@@ -755,7 +781,10 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         vm.deal(caller, 1 ether);
 
         vm.prank(tokenSubnet.subnetActorAddr);
-        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, tokenSubnet.subnetActorAddr, rootSubnet.gateway);
+        token.approve(address(rootSubnet.gateway), DEFAULT_COLLATERAL_AMOUNT);
+
+        vm.prank(tokenSubnet.subnetActorAddr);
+        registerSubnetGWERC20(DEFAULT_COLLATERAL_AMOUNT, tokenSubnet.subnetActorAddr, rootSubnet.gateway);
 
         vm.prank(caller);
         rootSubnet.gateway.manager().fundWithToken(tokenSubnet.id, FvmAddressHelper.from(address(caller)), amount);
@@ -794,20 +823,25 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         uint256 amount = 3;
 
         token.transfer(caller, amount);
+        token.transfer(tokenSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT * 10);
+
         vm.prank(caller);
         token.approve(rootSubnet.gatewayAddr, amount);
 
-        vm.deal(tokenSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT);
-        vm.deal(caller, 1 ether);
+        vm.prank(tokenSubnet.subnetActorAddr);
+        token.approve(address(rootSubnet.gateway), DEFAULT_COLLATERAL_AMOUNT);
 
         vm.prank(tokenSubnet.subnetActorAddr);
-        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, tokenSubnet.subnetActorAddr, rootSubnet.gateway);
+        registerSubnetGWERC20(DEFAULT_COLLATERAL_AMOUNT, tokenSubnet.subnetActorAddr, rootSubnet.gateway);
 
         vm.prank(caller);
         rootSubnet.gateway.manager().fundWithToken(tokenSubnet.id, FvmAddressHelper.from(address(caller)), amount);
 
+        // now in the child subnet
         GatewayManagerFacet manager = tokenSubnet.gateway.manager();
         vm.prank(caller);
+        // simulate the `amount` sent from parent
+        vm.deal(caller, amount);
         manager.release{value: amount}(FvmAddressHelper.from(address(recipient)));
 
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
@@ -826,6 +860,8 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         uint256 amount = 3;
 
         token.transfer(caller, amount);
+        token.transfer(tokenSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT * 10);
+
         vm.prank(caller);
         token.approve(rootSubnet.gatewayAddr, amount);
 
@@ -833,7 +869,10 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         vm.deal(caller, 1 ether);
 
         vm.prank(tokenSubnet.subnetActorAddr);
-        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, tokenSubnet.subnetActorAddr, rootSubnet.gateway);
+        token.approve(address(rootSubnet.gateway), DEFAULT_COLLATERAL_AMOUNT);
+
+        vm.prank(tokenSubnet.subnetActorAddr);
+        registerSubnetGWERC20(DEFAULT_COLLATERAL_AMOUNT, tokenSubnet.subnetActorAddr, rootSubnet.gateway);
 
         vm.prank(caller);
         rootSubnet.gateway.manager().fundWithToken(tokenSubnet.id, FvmAddressHelper.from(address(caller)), amount);
@@ -1002,6 +1041,8 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         vm.deal(tokenSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT);
         vm.deal(caller, 1 ether);
 
+        token.transfer(tokenSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT * 10);
+
         uint256 balance = 100;
 
         // Fund an account in the subnet.
@@ -1010,14 +1051,18 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         token.approve(rootSubnet.gatewayAddr, balance);
 
         vm.prank(tokenSubnet.subnetActorAddr);
-        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, tokenSubnet.subnetActorAddr, rootSubnet.gateway);
+        token.approve(address(rootSubnet.gateway), DEFAULT_COLLATERAL_AMOUNT);
+        vm.prank(tokenSubnet.subnetActorAddr);
+        registerSubnetGWERC20(DEFAULT_COLLATERAL_AMOUNT, tokenSubnet.subnetActorAddr, rootSubnet.gateway);
 
         uint256 fundToSend = 10;
+        uint256 prevBalance = token.balanceOf(address(rootSubnet.gateway.manager()));
 
         vm.prank(caller);
         rootSubnet.gateway.manager().fundWithToken(tokenSubnet.id, FvmAddressHelper.from(address(caller)), fundToSend);
 
-        require(token.balanceOf(address(rootSubnet.gateway.manager())) == fundToSend, "initial balance not correct");
+        uint256 newBalance = token.balanceOf(address(rootSubnet.gateway.manager()));
+        require(newBalance - prevBalance == fundToSend, "initial balance not correct");
 
         // a cross network message from parent caller to child recipient
         IpcEnvelope memory crossMsg = TestUtils.newXnetCallMsg(
@@ -1048,10 +1093,13 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         submitBottomUpCheckpoint(checkpoint, tokenSubnet.subnetActor);
 
         require(
-            token.balanceOf(address(rootSubnet.gateway.manager())) == fundToSend,
+            token.balanceOf(address(rootSubnet.gateway.manager())) == newBalance,
             "fund should still be locked in gateway"
         );
-        require(token.balanceOf(caller) == balance - fundToSend, "fund should still be locked in gateway");
+        require(
+            token.balanceOf(caller) == balance - fundToSend,
+            "fund should still be locked in gateway, not released"
+        );
     }
 
     function testMultiSubnet_Token_CallFromChildToParent() public {
@@ -1063,13 +1111,16 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         vm.deal(address(token), DEFAULT_COLLATERAL_AMOUNT);
         vm.deal(caller, 1 ether);
 
-        // Fund an account in the subnet.
+        token.transfer(tokenSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT * 10);
         token.transfer(caller, 100);
         vm.prank(caller);
         token.approve(rootSubnet.gatewayAddr, 100);
 
         vm.prank(tokenSubnet.subnetActorAddr);
-        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, tokenSubnet.subnetActorAddr, rootSubnet.gateway);
+        token.approve(address(rootSubnet.gateway), DEFAULT_COLLATERAL_AMOUNT);
+
+        vm.prank(tokenSubnet.subnetActorAddr);
+        registerSubnetGWERC20(DEFAULT_COLLATERAL_AMOUNT, tokenSubnet.subnetActorAddr, rootSubnet.gateway);
 
         vm.prank(caller);
         rootSubnet.gateway.manager().fundWithToken(tokenSubnet.id, FvmAddressHelper.from(address(caller)), 15);
@@ -1100,17 +1151,22 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         uint256 amount = 3;
 
         token.transfer(caller, 100);
+        token.transfer(tokenSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT * 10);
+        vm.deal(caller, 3);
+
         vm.prank(caller);
         token.approve(rootSubnet.gatewayAddr, 100);
 
-        vm.deal(tokenSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT);
-        vm.deal(caller, 3);
+        vm.prank(tokenSubnet.subnetActorAddr);
+        token.approve(address(rootSubnet.gateway), DEFAULT_COLLATERAL_AMOUNT);
 
         vm.prank(tokenSubnet.subnetActorAddr);
-        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, tokenSubnet.subnetActorAddr, rootSubnet.gateway);
+        registerSubnetGWERC20(DEFAULT_COLLATERAL_AMOUNT, tokenSubnet.subnetActorAddr, rootSubnet.gateway);
 
         vm.prank(caller);
         rootSubnet.gateway.manager().fundWithToken(tokenSubnet.id, FvmAddressHelper.from(address(caller)), 15);
+
+        uint256 balanceBefore = address(recipient).balance;
 
         IpcEnvelope memory xnetCallMsg = TestUtils.newXnetCallMsg(
             IPCAddress({subnetId: rootSubnet.id, rawAddress: FvmAddressHelper.from(caller)}),

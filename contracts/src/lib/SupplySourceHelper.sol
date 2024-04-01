@@ -207,10 +207,21 @@ library SupplySourceHelper {
 
     /// @notice Gets the balance in our treasury.
     function balance(SupplySource memory supplySource) internal view returns (uint256 ret) {
+        ret = balanceOf(supplySource, address(this));
+    }
+
+    /// @notice Gets the balance of the address.
+    function balanceOf(SupplySource memory supplySource, address addr) internal view returns (uint256 ret) {
         if (supplySource.kind == SupplyKind.Native) {
-            ret = address(this).balance;
+            ret = addr.balance;
         } else if (supplySource.kind == SupplyKind.ERC20) {
-            ret = IERC20(supplySource.tokenAddress).balanceOf(address(this));
+            ret = IERC20(supplySource.tokenAddress).balanceOf(addr);
+        }
+    }
+
+    function approve(SupplySource storage supplySource, address spender, uint256 amount) internal {
+        if (supplySource.kind == SupplyKind.ERC20) {
+            IERC20(supplySource.tokenAddress).approve(spender, amount);
         }
     }
 

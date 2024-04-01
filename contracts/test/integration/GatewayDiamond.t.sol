@@ -14,7 +14,7 @@ import {IDiamondCut} from "../../src/interfaces/IDiamondCut.sol";
 import {QuorumInfo} from "../../src/structs/Quorum.sol";
 import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../../src/structs/CrossNet.sol";
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
-import {SubnetID, Subnet, IPCAddress, Validator, StakingChange, StakingChangeRequest, StakingOperation} from "../../src/structs/Subnet.sol";
+import {SubnetID, Subnet, IPCAddress, Validator, StakingChange, StakingChangeRequest, StakingOperation, SupplySource, SupplyKind} from "../../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
@@ -22,6 +22,7 @@ import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {GatewayDiamond, FunctionNotFound} from "../../src/GatewayDiamond.sol";
 import {GatewayGetterFacet} from "../../src/gateway/GatewayGetterFacet.sol";
 import {GatewayManagerFacet} from "../../src/gateway/GatewayManagerFacet.sol";
+import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
 
 import {CheckpointingFacet} from "../../src/gateway/router/CheckpointingFacet.sol";
 import {XnetMessagingFacet} from "../../src/gateway/router/XnetMessagingFacet.sol";
@@ -262,7 +263,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
     function testGatewayDiamond_Register_Works_SingleSubnet(uint256 subnetCollateral) public {
         vm.assume(subnetCollateral < type(uint64).max);
-        address subnetAddress = vm.addr(100);
+        address subnetAddress = address(new MockedSubnet());
         vm.prank(subnetAddress);
         vm.deal(subnetAddress, subnetCollateral);
 
@@ -288,7 +289,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         vm.assume(numberOfSubnets > 0);
 
         for (uint256 i = 1; i <= numberOfSubnets; i++) {
-            address subnetAddress = vm.addr(i);
+            address subnetAddress = address(new MockedSubnet());
             vm.prank(subnetAddress);
             vm.deal(subnetAddress, DEFAULT_COLLATERAL_AMOUNT);
 
@@ -305,11 +306,14 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
 
         vm.expectRevert(AlreadyRegisteredSubnet.selector);
 
-        gatewayDiamond.manager().register{value: DEFAULT_COLLATERAL_AMOUNT}(0);
+        gatewayDiamond.manager().register{value: DEFAULT_COLLATERAL_AMOUNT * 2}(
+            DEFAULT_COLLATERAL_AMOUNT,
+            DEFAULT_COLLATERAL_AMOUNT
+        );
     }
 
     function testGatewayDiamond_AddStake_Works_SingleStaking(uint256 stakeAmount, uint256 registerAmount) public {
-        address subnetAddress = vm.addr(100);
+        address subnetAddress = address(new MockedSubnet());
         vm.assume(registerAmount < type(uint64).max);
         vm.assume(stakeAmount > 0 && stakeAmount < type(uint256).max - registerAmount);
 
@@ -327,7 +331,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testGatewayDiamond_AddStake_Works_Reactivate() public {
-        address subnetAddress = vm.addr(100);
+        address subnetAddress = address(new MockedSubnet());
         uint256 registerAmount = DEFAULT_COLLATERAL_AMOUNT;
         uint256 stakeAmount = DEFAULT_COLLATERAL_AMOUNT;
 
@@ -346,7 +350,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testGatewayDiamond_AddStake_Works_NotEnoughFundsToReactivate() public {
-        address subnetAddress = vm.addr(100);
+        address subnetAddress = address(new MockedSubnet());
         uint256 registerAmount = DEFAULT_COLLATERAL_AMOUNT;
         uint256 stakeAmount = DEFAULT_COLLATERAL_AMOUNT - 1;
 
@@ -367,7 +371,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     function testGatewayDiamond_AddStake_Works_MultipleStakings(uint8 numberOfStakes) public {
         vm.assume(numberOfStakes > 0);
 
-        address subnetAddress = vm.addr(100);
+        address subnetAddress = address(new MockedSubnet());
         uint256 singleStakeAmount = 1 ether;
         uint256 registerAmount = DEFAULT_COLLATERAL_AMOUNT;
         uint256 expectedStakedAmount = registerAmount;
@@ -392,18 +396,16 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, address(this));
 
         vm.expectRevert(NotEnoughFunds.selector);
-
-        gatewayDiamond.manager().addStake{value: 0}();
+        gatewayDiamond.manager().addStake{value: 0}(0);
     }
 
     function testGatewayDiamond_AddStake_Fail_SubnetNotExists() public {
         vm.expectRevert(NotRegisteredSubnet.selector);
-
-        gatewayDiamond.manager().addStake{value: 1}();
+        gatewayDiamond.manager().addStake{value: 1}(1);
     }
 
     function testGatewayDiamond_ReleaseStake_Works_FullAmount(uint256 stakeAmount) public {
-        address subnetAddress = CHILD_NETWORK_ADDRESS;
+        address subnetAddress = address(new MockedSubnet());
         uint256 registerAmount = DEFAULT_COLLATERAL_AMOUNT;
 
         vm.assume(stakeAmount > 0 && stakeAmount < type(uint256).max - registerAmount);
@@ -425,7 +427,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testGatewayDiamond_ReleaseStake_Works_SubnetInactive() public {
-        address subnetAddress = vm.addr(100);
+        address subnetAddress = address(new MockedSubnet());
         vm.startPrank(subnetAddress);
         vm.deal(subnetAddress, DEFAULT_COLLATERAL_AMOUNT);
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, subnetAddress);
@@ -437,7 +439,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testGatewayDiamond_ReleaseStake_Works_PartialAmount(uint256 partialAmount) public {
-        address subnetAddress = CHILD_NETWORK_ADDRESS;
+        address subnetAddress = address(new MockedSubnet());
         uint256 registerAmount = DEFAULT_COLLATERAL_AMOUNT;
 
         vm.assume(partialAmount > registerAmount && partialAmount < type(uint256).max - registerAmount);
@@ -473,7 +475,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         vm.assume(subnetBalance > DEFAULT_COLLATERAL_AMOUNT);
         vm.assume(releaseAmount > subnetBalance && releaseAmount < type(uint256).max - subnetBalance);
 
-        address subnetAddress = vm.addr(100);
+        address subnetAddress = address(new MockedSubnet());
         vm.startPrank(subnetAddress);
         vm.deal(subnetAddress, releaseAmount);
 
@@ -491,7 +493,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testGatewayDiamond_ReleaseStake_Works_TransitionToInactive() public {
-        address subnetAddress = vm.addr(100);
+        address subnetAddress = address(new MockedSubnet());
 
         vm.startPrank(subnetAddress);
         vm.deal(subnetAddress, DEFAULT_COLLATERAL_AMOUNT);
@@ -506,7 +508,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testGatewayDiamond_Kill_Works() public {
-        address subnetAddress = CHILD_NETWORK_ADDRESS;
+        address subnetAddress = address(new MockedSubnet());
 
         vm.startPrank(subnetAddress);
         vm.deal(subnetAddress, DEFAULT_COLLATERAL_AMOUNT);
@@ -560,7 +562,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     function testGatewayDiamond_SendCrossMessage_Fails_Fuzz(uint256 fee) public {
         vm.assume(fee < DEFAULT_CROSS_MSG_FEE);
 
-        address caller = vm.addr(100);
+        address caller = address(new MockedSubnet());
         vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE + 2);
         vm.prank(caller);
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
@@ -897,11 +899,9 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testGatewayDiamond_SendCrossMessage_Fails_EoACaller() public {
-        address caller = vm.addr(100);
+        address caller = address(10);
         vm.startPrank(caller);
         vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE + 2);
-
-        registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
 
         SubnetID memory destinationSubnet = SubnetID(0, new address[](0));
         vm.expectRevert(abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Sender));
@@ -910,7 +910,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
             TestUtils.newXnetCallMsg(
                 IPCAddress({
                     subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-                    rawAddress: FvmAddressHelper.from(caller)
+                    rawAddress: FvmAddressHelper.from(address(10))
                 }),
                 IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(caller)}),
                 1,
@@ -1706,5 +1706,19 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase {
         }
     }
 
+    function supplySource() public pure returns (SupplySource memory) {
+        return SupplySource({kind: SupplyKind.Native, tokenAddress: address(0)});
+    }
+
     function callback() public view {}
+}
+
+contract MockedSubnet {
+    function supplySource() external pure returns (SupplySource memory) {
+        return SupplySource({kind: SupplyKind.Native, tokenAddress: address(0)});
+    }
+
+    receive() external payable {}
+
+    fallback() external payable {}
 }
