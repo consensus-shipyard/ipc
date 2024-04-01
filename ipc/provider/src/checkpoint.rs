@@ -42,7 +42,7 @@ impl<T: BottomUpCheckpointRelayer> BottomUpCheckpointManager<T> {
         child: Subnet,
         parent_handler: T,
         child_handler: T,
-        max_parallel_submission: usize,
+        max_parallelism: usize,
     ) -> Result<Self> {
         let period = parent_handler
             .checkpoint_period(&child.id)
@@ -57,7 +57,7 @@ impl<T: BottomUpCheckpointRelayer> BottomUpCheckpointManager<T> {
             parent_handler: Arc::new(parent_handler),
             child_handler,
             finalization_blocks: 0,
-            submission_semaphore: Arc::new(Semaphore::new(max_parallel_submission)),
+            submission_semaphore: Arc::new(Semaphore::new(max_parallelism)),
         })
     }
 
@@ -72,7 +72,7 @@ impl BottomUpCheckpointManager<EthSubnetManager> {
         parent: Subnet,
         child: Subnet,
         keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
-        max_parallel_submission: usize,
+        max_parallelism: usize,
     ) -> Result<Self> {
         let parent_handler =
             EthSubnetManager::from_subnet_with_wallet_store(&parent, Some(keystore.clone()))?;
@@ -83,7 +83,7 @@ impl BottomUpCheckpointManager<EthSubnetManager> {
             child,
             parent_handler,
             child_handler,
-            max_parallel_submission,
+            max_parallelism,
         )
         .await
     }

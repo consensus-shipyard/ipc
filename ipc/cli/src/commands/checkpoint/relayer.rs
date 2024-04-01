@@ -55,7 +55,7 @@ impl CommandLineHandler for BottomUpRelayer {
             parent.clone(),
             child.clone(),
             Arc::new(RwLock::new(keystore)),
-            arguments.max_parallel_submission,
+            arguments.max_parallelism,
         )
         .await?;
 
@@ -92,7 +92,7 @@ pub(crate) struct BottomUpRelayerArgs {
     #[arg(
         long,
         default_value = "4",
-        help = "The max parallelism for submitting checkpoint"
+        help = "The max parallelism for submitting checkpoints"
     )]
-    pub max_parallel_submission: usize,
+    pub max_parallelism: usize,
 }
