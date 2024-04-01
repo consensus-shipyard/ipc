@@ -1,8 +1,17 @@
+extend = [
+  { path = "../fendermint/scripts/docker.toml" },
+]
+
 [tasks.prometheus-pull]
 script = "docker pull prom/prometheus"
 
-[tasks.prometheus-run]
-script = "docker run -p 9090:9090 -v ./prometheus.yml:/etc/prometheus/prometheus.yml prom/prometheus"
+[tasks.prometheus-start]
+env = { "CONTAINER_NAME" = "Prometheus" }
+script = "docker run --name ${CONTAINER_NAME} -d -p 9090:9090 -v ./prometheus.yml:/etc/prometheus/prometheus.yml prom/prometheus"
+
+[tasks.prometheus-destroy]
+env = { "CONTAINER_NAME" = "Prometheus" }
+run_task = "docker-destroy"
 
 [tasks.default]
 clear = true
@@ -13,7 +22,8 @@ script = [
     echo How to use:
     echo
     echo Run 'cargo make prometheus-pull' to pull the latest Prometheus docker image.
-    echo Run 'cargo make prometheus-run' to start Prometheus. You can then visit http://localhost:9090 for Prometheus web UI. Press Ctrl-C to stop running.
+    echo Run 'cargo make prometheus-start' to start Prometheus. You can then visit http://localhost:9090 for Prometheus web UI.
+    echo Run 'cargo make prometheus-destroy' to stop Prometheus.
     echo
 ''',
 ]
