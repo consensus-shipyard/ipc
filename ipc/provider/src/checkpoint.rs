@@ -191,17 +191,14 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                     .unwrap();
                 all_submit_tasks.push(tokio::task::spawn(async move {
                     let height = event.height;
-                    if let Err(e) =
+                    let result =
                         Self::submit_checkpoint(parent_handler_clone, submitter, bundle, event)
                             .await
-                    {
-                        log::error!("Fail to submit checkpoint at height {height}: {e}");
-                        drop(submission_permit);
-                        Err(e)
-                    } else {
-                        drop(submission_permit);
-                        Ok(())
-                    }
+                            .inspect_err(|err| {
+                                log::error!("Fail to submit checkpoint at height {height}: {err}");
+                            });
+                    drop(submission_permit);
+                    result
                 }));
 
                 count += 1;
