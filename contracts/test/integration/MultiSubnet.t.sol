@@ -53,8 +53,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
     IERC20 public token;
 
     function setUp() public override {
-        token = new ERC20PresetFixedSupply("TestToken", "TEST", 1_000_000, address(this));
-
         SubnetID memory rootSubnetName = SubnetID({root: ROOTNET_CHAINID, route: new address[](0)});
         require(rootSubnetName.isRoot(), "not root");
 
@@ -63,15 +61,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         SubnetActorDiamond rootNativeSubnetActor = createSubnetActor(
             defaultSubnetActorParamsWith(address(rootGateway), rootSubnetName)
         );
-
-        SubnetActorDiamond rootTokenSubnetActor = createSubnetActor(
-            defaultSubnetActorParamsWith(address(rootGateway), rootSubnetName, address(token))
-        );
-
-        address[] memory tokenSubnetPath = new address[](1);
-        tokenSubnetPath[0] = address(rootTokenSubnetActor);
-        SubnetID memory tokenSubnetName = SubnetID({root: ROOTNET_CHAINID, route: tokenSubnetPath});
-        GatewayDiamond tokenSubnetGateway = createGatewayDiamond(gatewayParams(tokenSubnetName));
 
         address[] memory nativeSubnetPath = new address[](1);
         nativeSubnetPath[0] = address(rootNativeSubnetActor);
@@ -93,6 +82,25 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             path: nativeSubnetPath
         });
 
+        token = new ERC20PresetFixedSupply("TestToken", "TEST", 1_000_000, address(this));
+        tokenSubnet = createTokenSubnet(address(token), address(rootGateway), rootSubnetName);
+
+        printActors();
+    }
+
+    function createTokenSubnet(
+        address tokenAddress,
+        address rootGatewayAddress,
+        SubnetID memory rootSubnetName
+    ) internal returns (TestSubnetDefinition memory tokenSubnet) {
+        SubnetActorDiamond rootTokenSubnetActor = createSubnetActor(
+            defaultSubnetActorParamsWith(rootGatewayAddress, rootSubnetName, tokenAddress)
+        );
+        address[] memory tokenSubnetPath = new address[](1);
+        tokenSubnetPath[0] = address(rootTokenSubnetActor);
+        SubnetID memory tokenSubnetName = SubnetID({root: ROOTNET_CHAINID, route: tokenSubnetPath});
+        GatewayDiamond tokenSubnetGateway = createGatewayDiamond(gatewayParams(tokenSubnetName));
+
         tokenSubnet = TestSubnetDefinition({
             gateway: tokenSubnetGateway,
             gatewayAddr: address(tokenSubnetGateway),
@@ -101,8 +109,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             subnetActorAddr: address(rootTokenSubnetActor),
             path: tokenSubnetPath
         });
-
-        printActors();
     }
 
     //--------------------
