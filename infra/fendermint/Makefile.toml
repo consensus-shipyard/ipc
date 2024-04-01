@@ -55,7 +55,7 @@ TOPDOWN_MAX_PROPOSAL_RANGE = { value = "100", condition = { env_not_set = [
 BOOTSTRAPS = { value = "", condition = { env_not_set = ["BOOTSTRAPS"] } }
 # Comma-separate list of addresses that's allowed to deploy contracts to this subnet.
 # No restrictions to deploy contracts if not set or empty.
-ALLOWED_ADDR_LIST = { value = "", condition = { env_not_set = ["ALLOWED_ADDR_LIST"] } }
+EAM_ALLOWED_ADDR_LIST = { value = "", condition = { env_not_set = ["EAM_ALLOWED_ADDR_LIST"] } }
 
 # Comma-separated list of multiaddresses for the IPLD resolver to connect to.
 # This should have the form of "/ip4/198.51.100.2/tcp/26655/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb"
