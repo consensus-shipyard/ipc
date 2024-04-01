@@ -67,7 +67,7 @@ contract MultiSubnetTest is IntegrationTestBase {
     IERC20 public token;
 
     function setUp() public override {
-        token = new ERC20PresetFixedSupply("TestToken", "TEST", 1_000_000, address(this));
+        token = new ERC20PresetFixedSupply("TestToken", "TEST", 1_000_000 ether, address(this));
 
         rootSubnetName = SubnetID({root: ROOTNET_CHAINID, route: new address[](0)});
         require(rootSubnetName.isRoot(), "not root");
@@ -121,6 +121,10 @@ contract MultiSubnetTest is IntegrationTestBase {
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         IpcEnvelope memory expected;
 
+        // initial funding to the subnet, simulate join/prefund.
+        IERC20(token).transfer(address(rootTokenSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
+        IERC20(token).transfer(address(rootNativeSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
+
         address holder = vm.addr(100);
         address recipient = vm.addr(200);
         address owner = address(this);
@@ -128,6 +132,11 @@ contract MultiSubnetTest is IntegrationTestBase {
         uint256 holderTotalAmount = 1000;
 
         vm.deal(address(rootTokenSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
+
+        // increase allowance so that we can register the subnet, i.e. transfer funds
+        vm.prank(address(rootTokenSubnetActor));
+        IERC20(token).approve(address(rootGateway), DEFAULT_COLLATERAL_AMOUNT);
+
         vm.prank(address(rootTokenSubnetActor));
         registerSubnetGW(
             DEFAULT_COLLATERAL_AMOUNT,
@@ -136,6 +145,10 @@ contract MultiSubnetTest is IntegrationTestBase {
         );
 
         vm.deal(address(rootNativeSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
+
+        vm.prank(address(rootNativeSubnetActor));
+        IERC20(token).approve(address(rootGateway), DEFAULT_COLLATERAL_AMOUNT);
+
         vm.prank(address(rootNativeSubnetActor));
         registerSubnetGW(
             DEFAULT_COLLATERAL_AMOUNT,

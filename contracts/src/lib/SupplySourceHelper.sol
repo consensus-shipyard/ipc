@@ -72,7 +72,11 @@ library SupplySourceHelper {
             return (success, ret);
         }
 
-        if (ret.length == 0) revert();
+        if (ret.length == 0) {
+            // disable solhint as the failing call does not have return data as well.
+            /* solhint-disable reason-string */
+            revert();
+        }
         assembly {
             // add 32 to calculate the pointer where the ret byte array starts.
             revert(add(32, ret), mload(ret))
