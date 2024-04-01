@@ -52,6 +52,7 @@ const COMETBFT_P2P_PORT: u32 = 26656;
 const COMETBFT_RPC_PORT: u32 = 26657;
 const FENDERMINT_ABCI_PORT: u32 = 26658;
 const ETHAPI_RPC_PORT: u32 = 8445;
+const METRICS_RPC_PORT: u32 = 9184;
 
 lazy_static! {
     static ref STATIC_ENV_PATH: String = format!("/opt/docker/{STATIC_ENV}");
@@ -277,8 +278,9 @@ impl DockerNode {
                 "FM_TENDERMINT_RPC_URL" => format!("http://{cometbft_name}:{COMETBFT_RPC_PORT}"),
                 "TENDERMINT_RPC_URL"    => format!("http://{cometbft_name}:{COMETBFT_RPC_PORT}"),
                 "TENDERMINT_WS_URL"     => format!("ws://{cometbft_name}:{COMETBFT_RPC_PORT}/websocket"),
-                "FM_ABCI__LISTEN__PORT" => FENDERMINT_ABCI_PORT,
-                "FM_ETH__LISTEN__PORT"  => ETHAPI_RPC_PORT,
+                "FM_ABCI__LISTEN__PORT"    => FENDERMINT_ABCI_PORT,
+                "FM_ETH__LISTEN__PORT"     => ETHAPI_RPC_PORT,
+                "FM_METRICS__LISTEN__PORT" => METRICS_RPC_PORT,
             ]);
 
             if node_config.validator.is_some() {
@@ -394,7 +396,10 @@ impl DockerNode {
                 creator
                     .create(
                         fendermint_name,
-                        vec![(port_range.resolver_p2p_host_port(), RESOLVER_P2P_PORT)],
+                        vec![
+                            (port_range.resolver_p2p_host_port(), RESOLVER_P2P_PORT),
+                            (port_range.fendermint_metrics_host_port(), METRICS_RPC_PORT),
+                        ],
                         entrypoint("fendermint run"),
                     )
                     .await
