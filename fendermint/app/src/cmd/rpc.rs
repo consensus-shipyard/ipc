@@ -9,7 +9,9 @@ use anyhow::Context;
 use async_trait::async_trait;
 use bytes::Bytes;
 use cid::Cid;
-use fendermint_actor_objectstore::ListOptions;
+use fendermint_actor_objectstore::{
+    ObjectDeleteParams, ObjectGetParams, ObjectKind, ObjectListParams, ObjectPutParams,
+};
 use fendermint_app_options::genesis::AccountKind;
 use fendermint_crypto::{to_b64, SecretKey};
 use fendermint_rpc::client::BoundFendermintClient;
@@ -58,24 +60,24 @@ cmd! {
             },
             RpcCommands::Os { args, command } => match command {
                 RpcObjectStoreCommands::Put { key, value } => {
-                    os_put(client, args, key, value).await
+                    os_put(client, args, ObjectPutParams{key: key.into_bytes(), kind: ObjectKind::External(value), overwrite: true}).await
                 }
                 RpcObjectStoreCommands::Delete { key } => {
-                    os_delete(client, args, key).await
+                    os_delete(client, args, ObjectDeleteParams{key: key.into_bytes()}).await
                 }
                 RpcObjectStoreCommands::Get { key, height } => {
                     let height = Height::try_from(height)?;
-                    os_get_call(client, args, key, height).await
+                    os_get_call(client, args, ObjectGetParams{key: key.into_bytes()}, height).await
                 }
                 RpcObjectStoreCommands::List { height, prefix, delimiter, offset, limit } => {
-                    let options = ListOptions {
+                    let params = ObjectListParams {
                         prefix: prefix.into(),
                         delimiter: delimiter.into(),
                         offset,
                         limit,
                     };
                     let height = Height::try_from(height)?;
-                    os_list_call(client, args, options, height).await
+                    os_list_call(client, args, params, height).await
                 }
             },
             RpcCommands::Acc { args, command } => match command {
@@ -214,26 +216,29 @@ async fn transaction(
 async fn os_put(
     client: FendermintClient,
     args: TransArgs,
-    key: String,
-    content: Cid,
+    params: ObjectPutParams,
 ) -> anyhow::Result<()> {
     broadcast_and_print(
         client,
         args,
         |mut client, value, gas_params| {
-            Box::pin(async move { client.os_put(key, content, value, gas_params).await })
+            Box::pin(async move { client.os_put(params, value, gas_params).await })
         },
         cid_to_json,
     )
     .await
 }
 
-async fn os_delete(client: FendermintClient, args: TransArgs, key: String) -> anyhow::Result<()> {
+async fn os_delete(
+    client: FendermintClient,
+    args: TransArgs,
+    params: ObjectDeleteParams,
+) -> anyhow::Result<()> {
     broadcast_and_print(
         client,
         args,
         |mut client, value, gas_params| {
-            Box::pin(async move { client.os_delete(key, value, gas_params).await })
+            Box::pin(async move { client.os_delete(params, value, gas_params).await })
         },
         cid_to_json,
     )
@@ -243,7 +248,7 @@ async fn os_delete(client: FendermintClient, args: TransArgs, key: String) -> an
 async fn os_get_call(
     client: FendermintClient,
     args: TransArgs,
-    key: String,
+    params: ObjectGetParams,
     height: Height,
 ) -> anyhow::Result<()> {
     let mut client = TransClient::new(client, &args)?;
@@ -253,7 +258,7 @@ async fn os_get_call(
 
     let res = client
         .inner
-        .os_get_call(key, value, gas_params, height)
+        .os_get_call(params, value, gas_params, height)
         .await?;
 
     let json = json!({"response": res.response, "return_data": res.return_data});
@@ -264,7 +269,7 @@ async fn os_get_call(
 async fn os_list_call(
     client: FendermintClient,
     args: TransArgs,
-    options: ListOptions,
+    params: ObjectListParams,
     height: Height,
 ) -> anyhow::Result<()> {
     let mut client = TransClient::new(client, &args)?;
@@ -274,7 +279,7 @@ async fn os_list_call(
 
     let res = client
         .inner
-        .os_list_call(options, value, gas_params, height)
+        .os_list_call(params, value, gas_params, height)
         .await?;
 
     let json = json!({"response": res.response, "return_data": res.return_data});

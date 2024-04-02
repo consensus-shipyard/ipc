@@ -13,7 +13,10 @@ use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_ipld_hamt::BytesKey;
 use fvm_shared::{error::ExitCode, MethodNum};
 
-use crate::{ListOptions, Method, Object, ObjectList, ObjectParams, State, OBJECTSTORE_ACTOR_NAME};
+use crate::{
+    Method, Object, ObjectDeleteParams, ObjectGetParams, ObjectList, ObjectListParams,
+    ObjectPutParams, ObjectResolveParams, State, OBJECTSTORE_ACTOR_NAME,
+};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
@@ -36,12 +39,12 @@ impl Actor {
         rt.create(&state)
     }
 
-    fn put_object(rt: &impl Runtime, params: ObjectParams) -> Result<Cid, ActorError> {
+    fn put_object(rt: &impl Runtime, params: ObjectPutParams) -> Result<Cid, ActorError> {
         // FIXME:(carsonfarmer) We'll want to validate the caller is the owner of the repo.
         rt.validate_immediate_caller_accept_any()?;
 
         let root = rt.transaction(|st: &mut State, rt| {
-            st.put(rt.store(), BytesKey(params.key), params.value, true)
+            st.put(rt.store(), BytesKey(params.key), params.kind, true)
                 .map_err(|e| {
                     e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to put object")
                 })
@@ -50,11 +53,14 @@ impl Actor {
         Ok(root)
     }
 
-    fn resolve_object(rt: &impl Runtime, params: ObjectParams) -> Result<(), ActorError> {
+    fn resolve_external_object(
+        rt: &impl Runtime,
+        params: ObjectResolveParams,
+    ) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
         rt.transaction(|st: &mut State, rt| {
-            st.resolve(rt.store(), BytesKey(params.key), params.value)
+            st.resolve_external(rt.store(), BytesKey(params.key), params.value)
                 .map_err(|e| {
                     e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to resolve object")
                 })
@@ -63,47 +69,60 @@ impl Actor {
         Ok(())
     }
 
-    fn delete_object(rt: &impl Runtime, key: Vec<u8>) -> Result<Cid, ActorError> {
+    fn delete_object(rt: &impl Runtime, params: ObjectDeleteParams) -> Result<Cid, ActorError> {
         // FIXME:(carsonfarmer) We'll want to validate the caller is the owner of the repo.
         rt.validate_immediate_caller_accept_any()?;
 
         let res = rt.transaction(|st: &mut State, rt| {
-            st.delete(rt.store(), &BytesKey(key)).map_err(|e| {
+            st.delete(rt.store(), &BytesKey(params.key)).map_err(|e| {
                 e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to delete object")
             })
         })?;
 
-        // Clean up external storage of this key it existed.
-        if let Some(o) = res.0 {
-            objectstore_actor_sdk::cid_rm(o.value).map_err(|en| {
-                ActorError::checked(
-                    ExitCode::USR_ILLEGAL_STATE,
-                    format!("cid_rm syscall failed with {en}"),
-                    None,
-                )
-            })?;
+        // Clean up external object storage if it existed.
+        if let Some(object) = res.0 {
+            if let Object::External((v, _)) = object {
+                objectstore_actor_sdk::cid_rm(v.0).map_err(|en| {
+                    ActorError::checked(
+                        ExitCode::USR_ILLEGAL_STATE,
+                        format!("cid_rm syscall failed with {en}"),
+                        None,
+                    )
+                })?;
+            }
         }
 
         Ok(res.1)
     }
 
-    fn get_object(rt: &impl Runtime, key: Vec<u8>) -> Result<Option<Object>, ActorError> {
+    fn get_object(
+        rt: &impl Runtime,
+        params: ObjectGetParams,
+    ) -> Result<Option<Object>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
         let st: State = rt.state()?;
-        st.get(rt.store(), &BytesKey(key))
+        st.get(rt.store(), &BytesKey(params.key))
             .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get object"))
     }
 
     fn list_objects(
         rt: &impl Runtime,
-        options: ListOptions,
+        params: ObjectListParams,
     ) -> Result<Option<ObjectList>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let st: State = rt.state()?;
-        let objects = st.list(rt.store(), options).map_err(|e| {
-            e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to list objects")
-        })?;
+        let objects = st
+            .list(
+                rt.store(),
+                params.prefix,
+                params.delimiter,
+                params.offset,
+                params.limit,
+            )
+            .map_err(|e| {
+                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to list objects")
+            })?;
         Ok(Some(objects))
     }
 
@@ -132,7 +151,7 @@ impl ActorCode for Actor {
     actor_dispatch! {
         Constructor => constructor,
         PutObject => put_object,
-        ResolveObject => resolve_object,
+        ResolveExternalObject => resolve_external_object,
         DeleteObject => delete_object,
         GetObject => get_object,
         ListObjects => list_objects,

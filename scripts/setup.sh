@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-GOPATH="${GOPATH:-~/}"
+GOPATH="${GOPATH:-$HOME/go}"
 export FM_NETWORK=test
 
 # Create a new Genesis file
@@ -29,7 +29,7 @@ fendermint genesis --genesis-file test-network/genesis.json ipc gateway --subnet
 
 # Configure Tendermint
 rm -rf ~/.cometbft
-$GOPATH/bin/cometbft init
+"$GOPATH"/bin/cometbft init
 
 ## Convert the Genesis file
 mv ~/.cometbft/config/genesis.json ~/.cometbft/config/genesis.json.orig
@@ -46,6 +46,10 @@ cp -r ./fendermint/app/config ~/.fendermint/config
 ## Generate a network key for the IPLD resolver
 mkdir -p ~/.fendermint/keys
 fendermint key gen --out-dir ~/.fendermint/keys --name network
+
+## Copy validator keys
+cp test-network/keys/bob.pk ~/.fendermint/keys/validator.pk
+cp test-network/keys/bob.sk ~/.fendermint/keys/validator.sk
 
 ## Copy IPC contracts
 mkdir -p ~/.fendermint/contracts

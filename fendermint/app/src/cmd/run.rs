@@ -29,11 +29,8 @@ use fvm_shared::address::Address;
 use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
-use libp2p::identity::secp256k1;
-use libp2p::identity::Keypair;
 use std::sync::Arc;
 use tokio::sync::broadcast::error::RecvError;
-use tracing::info;
 
 use crate::cmd::key::read_secret_key;
 use crate::{cmd, options::run::RunArgs, settings::Settings};
@@ -78,7 +75,7 @@ async fn run(ipfs_addr: String, settings: Settings) -> anyhow::Result<()> {
             }
         }
         None => {
-            tracing::debug!("validator key not configured");
+            tracing::info!("validator key not configured");
             None
         }
     };
@@ -181,6 +178,8 @@ async fn run(ipfs_addr: String, settings: Settings) -> anyhow::Result<()> {
                     )
                     .await
                 });
+            } else {
+                tracing::info!("parent finality vote gossip disabled");
             }
         } else {
             tracing::info!("parent finality vote gossip disabled");
@@ -199,6 +198,8 @@ async fn run(ipfs_addr: String, settings: Settings) -> anyhow::Result<()> {
 
             tracing::info!("starting the IPFS Resolver...");
             tokio::spawn(async move { ipfs_resolver.run().await });
+        } else {
+            tracing::info!("IPFS Resolver disabled.")
         }
 
         tracing::info!("subscribing to gossip...");
@@ -222,7 +223,7 @@ async fn run(ipfs_addr: String, settings: Settings) -> anyhow::Result<()> {
     }
 
     let (parent_finality_provider, ipc_tuple) = if topdown_enabled {
-        info!("topdown finality enabled");
+        tracing::info!("topdown finality enabled");
         let topdown_config = settings.ipc.topdown_config()?;
         let config = fendermint_vm_topdown::Config::new(
             topdown_config.chain_head_delay,
@@ -238,7 +239,7 @@ async fn run(ipfs_addr: String, settings: Settings) -> anyhow::Result<()> {
         let p = Arc::new(Toggle::enabled(finality_provider));
         (p, Some((ipc_provider, config)))
     } else {
-        info!("topdown finality disabled");
+        tracing::info!("topdown finality disabled");
         (Arc::new(Toggle::disabled()), None)
     };
 
@@ -264,7 +265,7 @@ async fn run(ipfs_addr: String, settings: Settings) -> anyhow::Result<()> {
 
         Some(client)
     } else {
-        info!("snapshots disabled");
+        tracing::info!("snapshots disabled");
         None
     };
 
@@ -335,7 +336,7 @@ async fn run(ipfs_addr: String, settings: Settings) -> anyhow::Result<()> {
 /// Open database with all
 fn open_db(settings: &Settings, ns: &Namespaces) -> anyhow::Result<RocksDb> {
     let path = settings.data_dir().join("rocksdb");
-    info!(
+    tracing::info!(
         path = path.to_string_lossy().into_owned(),
         "opening database"
     );
@@ -385,7 +386,7 @@ fn make_ipc_provider_proxy(settings: &Settings) -> anyhow::Result<IPCProviderPro
             gateway_addr: topdown_config.parent_gateway,
         }),
     };
-    info!("init ipc provider with subnet: {}", subnet.id);
+    tracing::info!("init ipc provider with subnet: {}", subnet.id);
 
     let ipc_provider = IpcProvider::new_with_subnet(None, subnet)?;
     IPCProviderProxy::new(ipc_provider, settings.ipc.subnet_id.clone())
@@ -401,11 +402,11 @@ fn to_resolver_config(
 
     let r = &settings.resolver;
 
-    let local_key: Keypair = {
+    let local_key: libp2p::identity::Keypair = {
         let path = r.network.local_key(settings.home_dir());
         let sk = read_secret_key(&path)?;
-        let sk = secp256k1::SecretKey::try_from_bytes(sk.serialize())?;
-        secp256k1::Keypair::from(sk).into()
+        let sk = libp2p::identity::secp256k1::SecretKey::try_from_bytes(sk.serialize())?;
+        libp2p::identity::secp256k1::Keypair::from(sk).into()
     };
 
     let network_name = format!(

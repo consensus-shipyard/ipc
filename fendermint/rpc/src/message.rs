@@ -6,8 +6,9 @@ use std::path::Path;
 use anyhow::Context;
 use base64::Engine;
 use bytes::Bytes;
-use cid::Cid;
-use fendermint_actor_objectstore::ListOptions;
+use fendermint_actor_objectstore::{
+    ObjectDeleteParams, ObjectGetParams, ObjectKind, ObjectListParams, ObjectPutParams,
+};
 use fendermint_crypto::SecretKey;
 use fendermint_vm_actor_interface::{accumulator, eam, evm, objectstore};
 use fendermint_vm_message::signed::Object;
@@ -196,23 +197,22 @@ impl SignedMessageFactory {
     /// Put an object into an object store.
     pub fn os_put(
         &mut self,
-        key: String,
-        object_value: Cid,
+        params: ObjectPutParams,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
-        let input = fendermint_actor_objectstore::ObjectParams {
-            key: key.clone().into_bytes(),
-            value: object_value,
+        let object = match &params.kind {
+            ObjectKind::Internal(_) => None,
+            ObjectKind::External(cid) => Some(Object::new(params.key.clone(), cid.clone())),
         };
-        let params = RawBytes::serialize(input)?;
+        let params = RawBytes::serialize(params)?;
         let message = self.transaction(
             objectstore::OBJECTSTORE_ACTOR_ADDR,
             fendermint_actor_objectstore::Method::PutObject as u64,
             params,
             value,
             gas_params,
-            Some(Object::new(key.into_bytes(), object_value)),
+            object,
         )?;
         Ok(message)
     }
@@ -220,11 +220,11 @@ impl SignedMessageFactory {
     /// Delete an object from an object store.
     pub fn os_delete(
         &mut self,
-        key: String,
+        params: ObjectDeleteParams,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
-        let params = RawBytes::serialize(key.into_bytes())?;
+        let params = RawBytes::serialize(params)?;
         let message = self.transaction(
             objectstore::OBJECTSTORE_ACTOR_ADDR,
             fendermint_actor_objectstore::Method::DeleteObject as u64,
@@ -239,11 +239,11 @@ impl SignedMessageFactory {
     /// Get an object from an object store. This will not create a transaction.
     pub fn os_get(
         &mut self,
-        key: String,
+        params: ObjectGetParams,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<Message> {
-        let params = RawBytes::serialize(key.into_bytes())?;
+        let params = RawBytes::serialize(params)?;
         let message = self.transaction(
             objectstore::OBJECTSTORE_ACTOR_ADDR,
             fendermint_actor_objectstore::Method::GetObject as u64,
@@ -268,11 +268,11 @@ impl SignedMessageFactory {
     /// List objects in an object store. This will not create a transaction.
     pub fn os_list(
         &mut self,
-        options: ListOptions,
+        params: ObjectListParams,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<Message> {
-        let params = RawBytes::serialize(options)?;
+        let params = RawBytes::serialize(params)?;
         let message = self.transaction(
             objectstore::OBJECTSTORE_ACTOR_ADDR,
             fendermint_actor_objectstore::Method::ListObjects as u64,

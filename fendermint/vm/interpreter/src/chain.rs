@@ -486,10 +486,11 @@ where
                 IpcMessage::ObjectResolved(obj) => {
                     let from = system::SYSTEM_ACTOR_ADDR;
                     let to = objectstore::OBJECTSTORE_ACTOR_ADDR;
-                    let method_num = fendermint_actor_objectstore::Method::ResolveObject as u64;
+                    let method_num =
+                        fendermint_actor_objectstore::Method::ResolveExternalObject as u64;
                     let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
 
-                    let input = fendermint_actor_objectstore::ObjectParams {
+                    let input = fendermint_actor_objectstore::ObjectResolveParams {
                         key: obj.key,
                         value: obj.value,
                     };

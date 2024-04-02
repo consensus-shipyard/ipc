@@ -2,49 +2,57 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
 use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding::{strict_bytes, tuple::*};
+use fvm_ipld_encoding::{strict_bytes::ByteBuf, tuple::*, DAG_CBOR};
 use fvm_ipld_hamt::{BytesKey, Hamt};
-
-use crate::ListOptions;
+use serde::{Deserialize, Serialize};
 
 pub const BIT_WIDTH: u32 = 8;
 
 const MAX_LIST_LIMIT: usize = 10000;
 
-/// The state represents an object store backed by a Hamt
+/// The state represents an object store backed by a Hamt.
 #[derive(Serialize_tuple, Deserialize_tuple)]
 pub struct State {
-    /// The root cid of the Hamt
+    /// The root cid of the Hamt.
     pub root: Cid,
 }
 
-/// An object in the object store
-#[derive(Clone, Debug, PartialEq, Serialize_tuple, Deserialize_tuple)]
-pub struct Object {
-    /// Cid in bytes representation
-    ///
-    /// We can't use Cid type because FVM will reject it as unreachable.
-    #[serde(with = "strict_bytes")]
-    pub value: Vec<u8>,
-    /// Whether the object has been resolved.
-    pub resolved: bool,
+/// The stored representation of an object in the object store.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum Object {
+    /// Internal objects are stored on-chain.
+    Internal(ByteBuf),
+    /// External objects reference an off-chain object by Cid.
+    /// The bool indicates whether the object has been resolved.
+    External((ByteBuf, bool)),
 }
 
+/// The kind of object. This is used during object creation.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum ObjectKind {
+    /// Internal objects are stored on-chain.
+    Internal(ByteBuf),
+    /// External objects reference an off-chain object by Cid.
+    External(Cid),
+}
+
+/// A list of objects and their common prefixes.
 #[derive(Default, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ObjectList {
-    pub objects: Vec<(Vec<u8>, Object)>,
+    pub objects: Vec<(Vec<u8>, ObjectListItem)>,
     pub common_prefixes: Vec<Vec<u8>>,
 }
 
-impl Object {
-    fn new(value: Cid) -> Self {
-        Object {
-            value: value.to_bytes(),
-            resolved: false,
-        }
-    }
+/// The kind of object. This is used during object creation.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum ObjectListItem {
+    /// Internal objects are stored on-chain.
+    Internal((Cid, u64)),
+    /// External objects reference an off-chain object by Cid.
+    External((Cid, bool)),
 }
 
 impl State {
@@ -58,7 +66,6 @@ impl State {
                 ));
             }
         };
-
         Ok(Self { root })
     }
 
@@ -66,21 +73,24 @@ impl State {
         &mut self,
         store: &BS,
         key: BytesKey,
-        value: Cid,
+        kind: ObjectKind,
         overwrite: bool,
     ) -> anyhow::Result<Cid> {
         let mut hamt = Hamt::<_, Object>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
-
+        let object = match kind {
+            ObjectKind::Internal(buf) => Object::Internal(buf),
+            ObjectKind::External(cid) => Object::External((ByteBuf(cid.to_bytes()), false)),
+        };
         if overwrite {
-            hamt.set(key, Object::new(value))?;
+            hamt.set(key, object)?;
         } else {
-            hamt.set_if_absent(key, Object::new(value))?;
+            hamt.set_if_absent(key, object)?;
         }
         self.root = hamt.flush()?;
         Ok(self.root)
     }
 
-    pub fn resolve<BS: Blockstore>(
+    pub fn resolve_external<BS: Blockstore>(
         &mut self,
         store: &BS,
         key: BytesKey,
@@ -88,14 +98,18 @@ impl State {
     ) -> anyhow::Result<()> {
         let mut hamt = Hamt::<_, Object>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
         match hamt.get(&key).map(|v| v.cloned())? {
-            Some(mut obj) => {
-                // Ignore if value changed before it was resolved.
-                if obj.value == value.to_bytes() {
-                    obj.resolved = true;
-                    hamt.set(key, obj)?;
-                    self.root = hamt.flush()?;
+            Some(object) => {
+                match object {
+                    Object::Internal(_) => Ok(()),
+                    Object::External((v, _)) => {
+                        // Ignore if value changed before it was resolved.
+                        if v.0 == value.to_bytes() {
+                            hamt.set(key, Object::External((v, true)))?;
+                            self.root = hamt.flush()?;
+                        }
+                        Ok(())
+                    }
                 }
-                Ok(())
             }
             // Don't error here in case key was deleted before value was resolved.
             None => Ok(()),
@@ -109,9 +123,9 @@ impl State {
     ) -> anyhow::Result<(Option<Object>, Cid)> {
         let mut hamt = Hamt::<_, Object>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
         if hamt.contains_key(key)? {
-            let value = hamt.delete(key)?.map(|o| o.1);
+            let object = hamt.delete(key)?.map(|o| o.1);
             self.root = hamt.flush()?;
-            return Ok((value, self.root));
+            return Ok((object, self.root));
         }
         Err(anyhow::anyhow!("key not found"))
     }
@@ -122,36 +136,38 @@ impl State {
         key: &BytesKey,
     ) -> anyhow::Result<Option<Object>> {
         let hamt = Hamt::<_, Object>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
-        let value = hamt.get(key).map(|v| v.cloned())?;
-        Ok(value)
+        let object = hamt.get(key).map(|v| v.cloned())?;
+        Ok(object)
     }
 
     pub fn list<BS: Blockstore>(
         &self,
         store: &BS,
-        options: ListOptions,
+        prefix: Vec<u8>,
+        delimiter: Vec<u8>,
+        offset: u64,
+        limit: u64,
     ) -> anyhow::Result<ObjectList> {
         let hamt = Hamt::<_, Object>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
         let mut objects = Vec::new();
         let mut common_prefixes = std::collections::BTreeSet::<Vec<u8>>::new();
-        let limit = if options.limit == 0 {
+        let limit = if limit == 0 {
             MAX_LIST_LIMIT
         } else {
-            (options.limit as usize).min(MAX_LIST_LIMIT)
+            (limit as usize).min(MAX_LIST_LIMIT)
         };
-        let offset = options.offset;
         let mut count = 0;
         for pair in &hamt {
             let (k, v) = pair?;
             let key = k.0.clone();
-            if !options.prefix.is_empty() && !key.starts_with(&options.prefix) {
+            if !prefix.is_empty() && !key.starts_with(&prefix) {
                 continue;
             }
-            if !options.delimiter.is_empty() {
-                let utf8_prefix = String::from_utf8(options.prefix.clone())?;
+            if !delimiter.is_empty() {
+                let utf8_prefix = String::from_utf8(prefix.clone())?;
                 let prefix_length = utf8_prefix.len();
                 let utf8_key = String::from_utf8(key.clone())?;
-                let utf8_delimiter = String::from_utf8(options.delimiter.clone())?;
+                let utf8_delimiter = String::from_utf8(delimiter.clone())?;
                 if let Some(index) = utf8_key[prefix_length..].find(&utf8_delimiter) {
                     let subset = utf8_key[..=(index + prefix_length)].as_bytes().to_owned();
                     common_prefixes.insert(subset);
@@ -162,7 +178,18 @@ impl State {
             if count < offset {
                 continue;
             }
-            objects.push((key, v.clone()));
+            let item = match v {
+                Object::Internal(b) => {
+                    let mh_code = Code::Blake2b256;
+                    let mh = mh_code.digest(&b.0);
+                    let cid = Cid::new_v1(DAG_CBOR, mh);
+                    ObjectListItem::Internal((cid, b.0.len() as u64))
+                }
+                Object::External((b, resolved)) => {
+                    ObjectListItem::External((Cid::try_from(b.0.as_slice())?, *resolved))
+                }
+            };
+            objects.push((key, item));
             if limit > 0 && objects.len() >= limit {
                 break;
             }
@@ -196,48 +223,82 @@ mod tests {
     }
 
     #[test]
-    fn test_put() {
+    fn test_put_internal() {
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         assert!(state
-            .put(&store, BytesKey(vec![1, 2, 3]), Cid::default(), true)
+            .put(
+                &store,
+                BytesKey(vec![1, 2, 3]),
+                ObjectKind::Internal(ByteBuf(vec![4, 5, 6])),
+                true
+            )
             .is_ok());
 
         assert_eq!(
             state.root,
-            Cid::from_str("bafy2bzaced7xmsrlxozd2kac6vfmp6gw3ynz666vfdgsde2uh2iumbk3hgxcg")
+            Cid::from_str("bafy2bzacecyfqn52y34p5fu2yxne263thvwc2pitaec36ul3l7ghocmwjli5k")
                 .unwrap()
         );
     }
 
     #[test]
-    fn test_resolve() {
+    fn test_put_external() {
+        let store = MemoryBlockstore::default();
+        let mut state = State::new(&store).unwrap();
+        assert!(state
+            .put(
+                &store,
+                BytesKey(vec![1, 2, 3]),
+                ObjectKind::External(Cid::default()),
+                true
+            )
+            .is_ok());
+
+        assert_eq!(
+            state.root,
+            Cid::from_str("bafy2bzaceaq7b4t24dmwbnkztaib3jlv7bcajecsqobshg6juoitave2rxws2")
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_resolve_external() {
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let key = BytesKey(vec![1, 2, 3]);
         state
-            .put(&store, key.clone(), Cid::default(), true)
+            .put(
+                &store,
+                key.clone(),
+                ObjectKind::External(Cid::default()),
+                true,
+            )
             .unwrap();
-        assert!(state.resolve(&store, key.clone(), Cid::default()).is_ok());
+        assert!(state
+            .resolve_external(&store, key.clone(), Cid::default())
+            .is_ok());
 
         let result = state.get(&store, &key);
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
-            Some(Object {
-                value: Cid::default().to_bytes(),
-                resolved: true,
-            })
+            Some(Object::External((ByteBuf(Cid::default().to_bytes()), true)))
         );
     }
 
     #[test]
-    fn test_delete() {
+    fn test_delete_internal() {
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let key = BytesKey(vec![1, 2, 3]);
         state
-            .put(&store, key.clone(), Cid::default(), true)
+            .put(
+                &store,
+                key.clone(),
+                ObjectKind::Internal(ByteBuf(vec![4, 5, 6])),
+                true,
+            )
             .unwrap();
         assert!(state.delete(&store, &key).is_ok());
 
@@ -247,22 +308,69 @@ mod tests {
     }
 
     #[test]
-    fn test_get() {
+    fn test_delete_external() {
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let key = BytesKey(vec![1, 2, 3]);
         state
-            .put(&store, key.clone(), Cid::default(), true)
+            .put(
+                &store,
+                key.clone(),
+                ObjectKind::External(Cid::default()),
+                true,
+            )
+            .unwrap();
+        assert!(state.delete(&store, &key).is_ok());
+
+        let result = state.get(&store, &key);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), None);
+    }
+
+    #[test]
+    fn test_get_internal() {
+        let store = MemoryBlockstore::default();
+        let mut state = State::new(&store).unwrap();
+        let key = BytesKey(vec![1, 2, 3]);
+        state
+            .put(
+                &store,
+                key.clone(),
+                ObjectKind::Internal(ByteBuf(vec![4, 5, 6])),
+                true,
+            )
             .unwrap();
         let result = state.get(&store, &key);
 
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
-            Some(Object {
-                value: Cid::default().to_bytes(),
-                resolved: false,
-            })
+            Some(Object::Internal(ByteBuf(vec![4, 5, 6]))),
+        );
+    }
+
+    #[test]
+    fn test_get_external() {
+        let store = MemoryBlockstore::default();
+        let mut state = State::new(&store).unwrap();
+        let key = BytesKey(vec![1, 2, 3]);
+        state
+            .put(
+                &store,
+                key.clone(),
+                ObjectKind::External(Cid::default()),
+                true,
+            )
+            .unwrap();
+        let result = state.get(&store, &key);
+
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            Some(Object::External((
+                ByteBuf(Cid::default().to_bytes()),
+                false
+            )))
         );
     }
 
@@ -271,15 +379,35 @@ mod tests {
         store: &MemoryBlockstore,
     ) -> anyhow::Result<(BytesKey, BytesKey, BytesKey)> {
         let jpeg_key = BytesKey("foo.jpeg".as_bytes().to_vec());
-        state.put(store, jpeg_key.clone(), Cid::default(), false)?;
+        state.put(
+            store,
+            jpeg_key.clone(),
+            ObjectKind::Internal(ByteBuf(vec![4, 5, 6])),
+            false,
+        )?;
         let bar_key = BytesKey("foo/bar.png".as_bytes().to_vec());
-        state.put(store, bar_key.clone(), Cid::default(), false)?;
+        state.put(
+            store,
+            bar_key.clone(),
+            ObjectKind::External(Cid::default()),
+            false,
+        )?;
         let baz_key = BytesKey("foo/baz.png".as_bytes().to_vec());
-        state.put(store, baz_key.clone(), Cid::default(), false)?;
+        state.put(
+            store,
+            baz_key.clone(),
+            ObjectKind::External(Cid::default()),
+            false,
+        )?;
 
         // We'll mostly ignore this one
         let other_key = BytesKey("zzzz/image.png".as_bytes().to_vec());
-        state.put(&store, other_key.clone(), Cid::default(), false)?;
+        state.put(
+            &store,
+            other_key.clone(),
+            ObjectKind::External(Cid::default()),
+            false,
+        )?;
         Ok((jpeg_key, bar_key, baz_key))
     }
 
@@ -290,20 +418,14 @@ mod tests {
 
         let (_, _, baz_key) = create_and_put_objects(&mut state, &store).unwrap();
 
-        let default_object = Object {
-            value: Cid::default().to_bytes(),
-            resolved: false,
-        };
+        let default_item = ObjectListItem::External((Cid::default(), false));
 
         // List all keys with a limit
-        let options = ListOptions {
-            ..Default::default()
-        };
-        let result = state.list(&store, options);
+        let result = state.list(&store, vec![], vec![], 0, 0);
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.objects.len(), 4);
-        assert_eq!(result.objects.first(), Some(&(baz_key.0, default_object)));
+        assert_eq!(result.objects.first(), Some(&(baz_key.0, default_item)));
     }
 
     #[test]
@@ -313,22 +435,15 @@ mod tests {
 
         let (_, bar_key, baz_key) = create_and_put_objects(&mut state, &store).unwrap();
 
-        let default_object = Object {
-            value: Cid::default().to_bytes(),
-            resolved: false,
-        };
+        let default_item = ObjectListItem::External((Cid::default(), false));
 
         let foo_key = BytesKey("foo".as_bytes().to_vec());
-        let options = ListOptions {
-            prefix: foo_key.0.clone(),
-            ..Default::default()
-        };
-        let result = state.list(&store, options);
+        let result = state.list(&store, foo_key.0.clone(), vec![], 0, 0);
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.objects.len(), 3);
-        assert_eq!(result.objects[0], (baz_key.0, default_object.clone()));
-        assert_eq!(result.objects[1], (bar_key.0, default_object.clone()));
+        assert_eq!(result.objects[0], (baz_key.0, default_item.clone()));
+        assert_eq!(result.objects[1], (bar_key.0, default_item.clone()));
     }
 
     #[test]
@@ -338,25 +453,19 @@ mod tests {
 
         let (jpeg_key, _, _) = create_and_put_objects(&mut state, &store).unwrap();
 
-        let default_object = Object {
-            value: Cid::default().to_bytes(),
-            resolved: false,
-        };
+        let mh_code = Code::Blake2b256;
+        let mh = mh_code.digest(&vec![4, 5, 6]);
+        let cid = Cid::new_v1(DAG_CBOR, mh);
+        let default_item = ObjectListItem::Internal((cid, 3));
 
         let foo_key = BytesKey("foo".as_bytes().to_vec());
         let delimiter_key = BytesKey("/".as_bytes().to_vec());
         let full_key = [foo_key.clone(), delimiter_key.clone()].concat();
-        let options = ListOptions {
-            prefix: foo_key.0.clone(),
-            delimiter: delimiter_key.0.clone(),
-            limit: 3,
-            offset: 0,
-        };
-        let result = state.list(&store, options);
+        let result = state.list(&store, foo_key.0.clone(), delimiter_key.0.clone(), 0, 3);
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.objects.len(), 1);
-        assert_eq!(result.objects[0], (jpeg_key.0, default_object));
+        assert_eq!(result.objects[0], (jpeg_key.0, default_item));
         assert_eq!(result.common_prefixes[0], full_key);
     }
 
@@ -367,26 +476,36 @@ mod tests {
 
         let jpeg_key = BytesKey("foo.jpeg".as_bytes().to_vec());
         state
-            .put(&store, jpeg_key.clone(), Cid::default(), false)
+            .put(
+                &store,
+                jpeg_key.clone(),
+                ObjectKind::External(Cid::default()),
+                false,
+            )
             .unwrap();
         let bar_key = BytesKey("bin/foo/bar.png".as_bytes().to_vec());
         state
-            .put(&store, bar_key.clone(), Cid::default(), false)
+            .put(
+                &store,
+                bar_key.clone(),
+                ObjectKind::External(Cid::default()),
+                false,
+            )
             .unwrap();
         let baz_key = BytesKey("bin/foo/baz.png".as_bytes().to_vec());
         state
-            .put(&store, baz_key.clone(), Cid::default(), false)
+            .put(
+                &store,
+                baz_key.clone(),
+                ObjectKind::External(Cid::default()),
+                false,
+            )
             .unwrap();
 
         let bin_key = BytesKey("bin/".as_bytes().to_vec());
         let full_key = BytesKey("bin/foo/".as_bytes().to_vec());
         let delimiter_key = BytesKey("/".as_bytes().to_vec());
-        let options = ListOptions {
-            prefix: bin_key.0.clone(),
-            delimiter: delimiter_key.0.clone(),
-            ..Default::default()
-        };
-        let result = state.list(&store, options);
+        let result = state.list(&store, bin_key.0.clone(), delimiter_key.0.clone(), 0, 0);
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.objects.len(), 0);
@@ -401,21 +520,13 @@ mod tests {
 
         let (_, _, baz_key) = create_and_put_objects(&mut state, &store).unwrap();
 
-        let default_object = Object {
-            value: Cid::default().to_bytes(),
-            resolved: false,
-        };
+        let default_item = ObjectListItem::External((Cid::default(), false));
 
         // List all keys with a limit and offset
-        let options = ListOptions {
-            limit: 1,
-            offset: 1,
-            ..Default::default()
-        };
-        let result = state.list(&store, options);
+        let result = state.list(&store, vec![], vec![], 1, 1);
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.objects.len(), 1);
-        assert_eq!(result.objects.first(), Some(&(baz_key.0, default_object)));
+        assert_eq!(result.objects.first(), Some(&(baz_key.0, default_item)));
     }
 }
