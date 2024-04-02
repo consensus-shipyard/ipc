@@ -107,20 +107,31 @@ do
   fi
 done
 
-# Step 8: Deploy token replica contract to subnet
-echo "$DASHES Deploying token replica contract to subnet..."
+# Step 8a: Deploy token replica implementation contract to subnet
+echo "$DASHES Deploying token replica implementation contract to subnet..."
 sleep 30
-make deploy-replica
+make deploy-replica-implementation
 
-# Step 9: Deploy token controller contract to calibration net
-echo "$DASHES Deploying token controller contract to calibration net..."
-make deploy-controller || true
+# Step 8b: Deploy token controller implementation contract to calibration net
+echo "$DASHES Deploying token controller implementation contract to calibration net..."
+make deploy-controller-implementation || true
+
+
+# Step 9a: Deploy token replica proxy contract to subnet
+echo "$DASHES Deploying token replica proxy contract to subnet..."
+sleep 30
+make deploy-replica-proxy
+
+# Step 9b: Deploy token controller proxy contract to calibration net
+echo "$DASHES Deploying token controller proxy contract to calibration net..."
+sleep 30
+make deploy-controller-proxy
 
 # Step 10: Initialize contracts
-echo "$DASHES Initializing replicat contract on subnet..."
-make initialize-replica
-echo "$DASHES Initializing controller contract on calibration net..."
-make initialize-controller || true
+echo "$DASHES Linking replicat contract on subnet..."
+make link-replica
+echo "$DASHES Linking controller contract on calibration net..."
+make link-controller || true
 
 # Now all contracts have been deployed and initialized. We will now start testing
 # the interaction with the contracts.
