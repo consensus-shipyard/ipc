@@ -64,7 +64,7 @@ contract DeployIpcTokenController is ConfigManager {
     ) external {
         SubnetID memory destinationSubnet = SubnetID({root: _rootNetChainId, route: _route});
         bytes memory initCall = abi.encodeCall(
-            LinkedTokenController.reinitialize,
+            LinkedTokenControllerV2.reinitialize,
             (gateway, tokenContractAddress, destinationSubnet, replicaProxy)
         );
 

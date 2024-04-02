@@ -210,14 +210,11 @@ contract MultiSubnetTest is IntegrationTestBase {
                     address(ipcTokenReplica)
                 )
             );
-        LinkedTokenControllerV2Extension newControllerImplementation =
-            new LinkedTokenControllerV2Extension();
+        LinkedTokenControllerV2Extension newControllerImplementation = new LinkedTokenControllerV2Extension();
         ipcTokenController.upgradeToAndCall(
             address(newControllerImplementation),
             initCallController
         );
-        LinkedTokenControllerV2 newControllerImplementation = new LinkedTokenControllerV2();
-        ipcTokenController.upgradeToAndCall(address(newControllerImplementation), initCallController);
 
         require(
             LinkedTokenControllerV2Extension(address(ipcTokenController))
