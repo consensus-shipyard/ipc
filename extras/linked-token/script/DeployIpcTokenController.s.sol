@@ -32,7 +32,7 @@ contract DeployIpcTokenController is ConfigManager {
 
         bytes memory initCall = abi.encodeCall(
             LinkedTokenController.initialize,
-            (gateway, tokenContractAddress, destinationSubnet, 0x0000000000000000000000000000000000000000)
+            (gateway, tokenContractAddress, destinationSubnet, address(0))
         );
         TransparentUpgradeableProxy transparentProxy = new TransparentUpgradeableProxy(
             initialImplementation,

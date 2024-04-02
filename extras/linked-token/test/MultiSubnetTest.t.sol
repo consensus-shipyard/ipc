@@ -144,7 +144,7 @@ contract MultiSubnetTest is IntegrationTestBase {
 
         bytes memory initCallController = abi.encodeCall(
             LinkedTokenController.initialize,
-            (address(rootGateway), address(testUSDC), nativeSubnetName, 0x0000000000000000000000000000000000000000)
+            (address(rootGateway), address(testUSDC), nativeSubnetName, address(0))
         );
         TransparentUpgradeableProxy transparentProxyController = new TransparentUpgradeableProxy(
             address(initialControllerImplementation),
@@ -163,7 +163,7 @@ contract MultiSubnetTest is IntegrationTestBase {
                 address(nativeSubnetGateway),
                 address(testUSDC),
                 rootSubnetName,
-                0x0000000000000000000000000000000000000000,
+                address(0),
                 REPLICA_TOKEN_NAME,
                 REPLICA_TOKEN_SYMBOL,
                 REPLICA_TOKEN_DECIMALS

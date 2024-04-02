@@ -37,7 +37,7 @@ contract DeployIpcTokenReplica is ConfigManager {
                 gateway,
                 tokenContractAddress,
                 destinationSubnet,
-                0x0000000000000000000000000000000000000000,
+                address(0),
                 token_name,
                 token_symbol,
                 token_decimals
