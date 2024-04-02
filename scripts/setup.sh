@@ -28,34 +28,34 @@ fendermint genesis --genesis-file test-network/genesis.json add-validator --publ
 fendermint genesis --genesis-file test-network/genesis.json ipc gateway --subnet-id /r31415926 --bottom-up-check-period 10 --msg-fee 1 --majority-percentage 65
 
 # Configure Tendermint
-rm -rf ~/.cometbft
-"$GOPATH"/bin/cometbft init
+rm -rf "$HOME/.cometbft"
+"$GOPATH/bin/cometbft" init
 
 ## Convert the Genesis file
-mv ~/.cometbft/config/genesis.json ~/.cometbft/config/genesis.json.orig
-fendermint genesis --genesis-file test-network/genesis.json into-tendermint --out ~/.cometbft/config/genesis.json
+mv "$HOME/.cometbft/config/genesis.json" "$HOME/.cometbft/config/genesis.json.orig"
+fendermint genesis --genesis-file test-network/genesis.json into-tendermint --out "$HOME/.cometbft/config/genesis.json"
 ## Convert the private key
-mv ~/.cometbft/config/priv_validator_key.json ~/.cometbft/config/priv_validator_key.json.orig
-fendermint key into-tendermint --secret-key test-network/keys/bob.sk --out ~/.cometbft/config/priv_validator_key.json
+mv "$HOME/.cometbft/config/priv_validator_key.json" "$HOME/.cometbft/config/priv_validator_key.json.orig"
+fendermint key into-tendermint --secret-key test-network/keys/bob.sk --out "$HOME/.cometbft/config/priv_validator_key.json"
 
 ## Setup data directory and copy default app config
-rm -rf ~/.fendermint
-mkdir -p ~/.fendermint/data
-cp -r ./fendermint/app/config ~/.fendermint/config
+rm -rf "$HOME/.fendermint"
+mkdir -p "$HOME/.fendermint/data"
+cp -r ./fendermint/app/config "$HOME/.fendermint/config"
 
 ## Generate a network key for the IPLD resolver
-mkdir -p ~/.fendermint/keys
-fendermint key gen --out-dir ~/.fendermint/keys --name network
+mkdir -p "$HOME/.fendermint/keys"
+fendermint key gen --out-dir "$HOME/.fendermint/keys" --name network
 
 ## Copy validator keys
-cp test-network/keys/bob.pk ~/.fendermint/keys/validator.pk
-cp test-network/keys/bob.sk ~/.fendermint/keys/validator.sk
+cp test-network/keys/bob.pk "$HOME/.fendermint/keys/validator.pk"
+cp test-network/keys/bob.sk "$HOME/.fendermint/keys/validator.sk"
 
 ## Copy IPC contracts
-mkdir -p ~/.fendermint/contracts
-cp -r ./contracts/out/* ~/.fendermint/contracts
+mkdir -p "$HOME/.fendermint/contracts"
+cp -r ./contracts/out/* "$HOME/.fendermint/contracts"
 
 # Build actors
 (cd fendermint && make actor-bundle)
-cp fendermint/builtin-actors/output/bundle.car ~/.fendermint/bundle.car
-cp fendermint/actors/output/custom_actors_bundle.car ~/.fendermint/custom_actors_bundle.car
+cp fendermint/builtin-actors/output/bundle.car "$HOME/.fendermint/bundle.car"
+cp fendermint/actors/output/custom_actors_bundle.car "$HOME/.fendermint/custom_actors_bundle.car"
