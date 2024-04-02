@@ -13,7 +13,6 @@ import {SubnetIDHelper} from "@ipc/src/lib/SubnetIDHelper.sol";
 error InvalidOriginContract();
 error InvalidOriginSubnet();
 
-
 /**
  * @title LinkedToken
  * @notice Contract to handle token transfer from L1, lock them and mint on L2.
@@ -64,11 +63,7 @@ abstract contract LinkedToken is IpcExchange {
      * @param underlyingToken Address of the destination contract for minting
      * @param linkedSubnet SubnetID of the destination network
      */
-    constructor(
-        address gateway,
-        address underlyingToken,
-        SubnetID memory linkedSubnet
-    ) IpcExchange(gateway) {
+    constructor(address gateway, address underlyingToken, SubnetID memory linkedSubnet) IpcExchange(gateway) {
         _underlying = IERC20(underlyingToken);
         _linkedSubnet = linkedSubnet;
     }
@@ -76,7 +71,6 @@ abstract contract LinkedToken is IpcExchange {
     function getLinkedSubnet() public view returns (SubnetID memory) {
         return _linkedSubnet;
     }
-
 
     function _captureTokens(address holder, uint256 amount) internal virtual;
 
@@ -91,10 +85,7 @@ abstract contract LinkedToken is IpcExchange {
         return _linkedTransfer(receiver, amount);
     }
 
-    function _linkedTransfer(
-        address recipient,
-        uint256 amount
-    ) internal returns (IpcEnvelope memory committed) {
+    function _linkedTransfer(address recipient, uint256 amount) internal returns (IpcEnvelope memory committed) {
         _validateInitialized();
 
         // Validate that the transfer parameters are acceptable.
@@ -184,7 +175,7 @@ abstract contract LinkedToken is IpcExchange {
         OutcomeType outcome = resultMsg.outcome;
         bool refund = outcome == OutcomeType.SystemErr || outcome == OutcomeType.ActorErr;
 
-        _removeUnconfirmedTransfer({ id: resultMsg.id, refund: refund });
+        _removeUnconfirmedTransfer({id: resultMsg.id, refund: refund});
     }
 
     function _receiveLinked(address recipient, uint256 amount) private {
@@ -267,5 +258,4 @@ abstract contract LinkedToken is IpcExchange {
             _releaseTokens(sender, value);
         }
     }
-
 }

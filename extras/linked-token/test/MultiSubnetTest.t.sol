@@ -11,12 +11,7 @@ import {LinkedTokenController} from "../src/LinkedTokenController.sol";
 import {LinkedTokenReplica} from "../src/LinkedTokenReplica.sol";
 import {USDCTest} from "../src/USDCTest.sol";
 
-import {
-    SubnetID,
-    Subnet,
-    IPCAddress,
-    Validator
-} from "@ipc/src/structs/Subnet.sol";
+import {SubnetID, Subnet, IPCAddress, Validator} from "@ipc/src/structs/Subnet.sol";
 import {SubnetActorDiamond} from "@ipc/src/SubnetActorDiamond.sol";
 import {GatewayDiamond} from "@ipc/src/GatewayDiamond.sol";
 import {TopDownFinalityFacet} from "@ipc/src/gateway/router/TopDownFinalityFacet.sol";
@@ -26,15 +21,7 @@ import {GatewayGetterFacet} from "@ipc/src/gateway/GatewayGetterFacet.sol";
 import {SubnetActorCheckpointingFacet} from "@ipc/src/subnet/SubnetActorCheckpointingFacet.sol";
 import {CheckpointingFacet} from "@ipc/src/gateway/router/CheckpointingFacet.sol";
 import {FvmAddressHelper} from "@ipc/src/lib/FvmAddressHelper.sol";
-import {
-    IpcEnvelope,
-    BottomUpMsgBatch,
-    BottomUpCheckpoint,
-    ParentFinality,
-    IpcMsgKind,
-    ResultMsg,
-    CallMsg
-} from "@ipc/src/structs/CrossNet.sol";
+import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMsgKind, ResultMsg, CallMsg} from "@ipc/src/structs/CrossNet.sol";
 import {SubnetIDHelper} from "@ipc/src/lib/SubnetIDHelper.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {CrossMsgHelper} from "@ipc/src/lib/CrossMsgHelper.sol";
@@ -74,9 +61,7 @@ contract MultiSubnetTest is IntegrationTestBase {
 
         rootGateway = createGatewayDiamond(gatewayParams(rootSubnetName));
 
-        rootNativeSubnetActor = createSubnetActor(
-            defaultSubnetActorParamsWith(address(rootGateway), rootSubnetName)
-        );
+        rootNativeSubnetActor = createSubnetActor(defaultSubnetActorParamsWith(address(rootGateway), rootSubnetName));
 
         rootTokenSubnetActor = createSubnetActor(
             defaultSubnetActorParamsWith(address(rootGateway), rootSubnetName, address(token))
@@ -129,23 +114,13 @@ contract MultiSubnetTest is IntegrationTestBase {
 
         vm.deal(address(rootTokenSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
         vm.prank(address(rootTokenSubnetActor));
-        registerSubnetGW(
-            DEFAULT_COLLATERAL_AMOUNT,
-            address(rootTokenSubnetActor),
-            rootGateway
-        );
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootTokenSubnetActor), rootGateway);
 
         vm.deal(address(rootNativeSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
         vm.prank(address(rootNativeSubnetActor));
-        registerSubnetGW(
-            DEFAULT_COLLATERAL_AMOUNT,
-            address(rootNativeSubnetActor),
-            rootGateway
-        );
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootNativeSubnetActor), rootGateway);
 
-        console.log(
-            "--------------- transfer and mint (top-down) ---------------"
-        );
+        console.log("--------------- transfer and mint (top-down) ---------------");
 
         USDCTest testUSDC = new USDCTest();
 
@@ -153,10 +128,7 @@ contract MultiSubnetTest is IntegrationTestBase {
         testUSDC.transfer(holder, holderTotalAmount);
 
         require(testUSDC.owner() == owner, "unexpected owner");
-        require(
-            testUSDC.balanceOf(holder) == holderTotalAmount,
-            "unexpected balance"
-        );
+        require(testUSDC.balanceOf(holder) == holderTotalAmount, "unexpected balance");
 
         // the token replica sits in a native supply child subnet.
         ipcTokenReplica = new LinkedTokenReplica({
@@ -187,25 +159,17 @@ contract MultiSubnetTest is IntegrationTestBase {
         );
 
         vm.prank(address(holder));
-        IpcEnvelope memory lockAndTransferEnvelope =
-            ipcTokenController.lockAndTransferWithReturn(
-                recipient,
-                transferAmount
-            );
+        IpcEnvelope memory lockAndTransferEnvelope = ipcTokenController.lockAndTransferWithReturn(
+            recipient,
+            transferAmount
+        );
 
         // Check that the message is in unconfirmedTransfers
-        (address receiptSender, uint256 receiptValue) =
-            ipcTokenController.getUnconfirmedTransfer(
-                lockAndTransferEnvelope.toHash()
-            );
-        require(
-            receiptSender == address(holder),
-            "Transfer sender incorrect in unconfirmedTransfers"
+        (address receiptSender, uint256 receiptValue) = ipcTokenController.getUnconfirmedTransfer(
+            lockAndTransferEnvelope.toHash()
         );
-        require(
-            receiptValue == transferAmount,
-            "Transfer amount incorrect in unconfirmedTransfers"
-        );
+        require(receiptSender == address(holder), "Transfer sender incorrect in unconfirmedTransfers");
+        require(receiptValue == transferAmount, "Transfer amount incorrect in unconfirmedTransfers");
 
         //confirm that token replica only accept calls to Ipc from the gateway
         vm.prank(owner);
@@ -227,25 +191,16 @@ contract MultiSubnetTest is IntegrationTestBase {
         });
 
         msgs[0] = expected;
-        executeTopDownMsgs(
-            msgs,
-            nativeSubnetName,
-            nativeSubnetGateway
-        );
+        executeTopDownMsgs(msgs, nativeSubnetName, nativeSubnetGateway);
 
         console.log("fail:");
         console.log(IERC20(ipcTokenReplica).balanceOf(recipient));
         console.log(transferAmount);
 
         //ensure that tokens are delivered on subnet
-        require(
-            IERC20(ipcTokenReplica).balanceOf(recipient) == transferAmount,
-            "incorrect proxy token balance"
-        );
+        require(IERC20(ipcTokenReplica).balanceOf(recipient) == transferAmount, "incorrect proxy token balance");
 
-        console.log(
-            "--------------- withdraw token (bottom-up)---------------"
-        );
+        console.log("--------------- withdraw token (bottom-up)---------------");
 
         // ensure that USDC holder has initial balance minus tokens previously sent amount of tokens in the root chain
         require(
@@ -257,37 +212,22 @@ contract MultiSubnetTest is IntegrationTestBase {
         expected = ipcTokenReplica.linkedTransfer(holder, transferAmount);
 
         // check that the message is in unconfirmedTransfers
-        (receiptSender, receiptValue) = ipcTokenReplica.getUnconfirmedTransfer(
-            expected.toHash()
-        );
-        require(
-            receiptSender == recipient,
-            "Transfer sender incorrect in unconfirmedTransfers"
-        );
-        require(
-            receiptValue == transferAmount,
-            "Transfer amount incorrect in unconfirmedTransfers"
-        );
+        (receiptSender, receiptValue) = ipcTokenReplica.getUnconfirmedTransfer(expected.toHash());
+        require(receiptSender == recipient, "Transfer sender incorrect in unconfirmedTransfers");
+        require(receiptValue == transferAmount, "Transfer amount incorrect in unconfirmedTransfers");
 
         console.log("Begin bottom up checkpoint");
 
-        BottomUpCheckpoint memory checkpoint =
-            callCreateBottomUpCheckpointFromChildSubnet(
-                nativeSubnetName,
-                nativeSubnetGateway
-            );
+        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+            nativeSubnetName,
+            nativeSubnetGateway
+        );
         submitBottomUpCheckpoint(checkpoint, rootNativeSubnetActor);
 
         //ensure that usdc tokens are returned on root net
-        require(
-            holderTotalAmount == testUSDC.balanceOf(holder),
-            "unexpected holder balance after withdrawal"
-        );
+        require(holderTotalAmount == testUSDC.balanceOf(holder), "unexpected holder balance after withdrawal");
         //ensure that the tokens in the subnet are minted and the token bridge and the usdc holder does not own any
-        require(
-            0 == ipcTokenReplica.balanceOf(holder),
-            "unexpected holder balance in ipcTokenReplica"
-        );
+        require(0 == ipcTokenReplica.balanceOf(holder), "unexpected holder balance in ipcTokenReplica");
         require(
             0 == ipcTokenReplica.balanceOf(address(ipcTokenReplica)),
             "unexpected ipcTokenReplica balance in ipcTokenReplica"
