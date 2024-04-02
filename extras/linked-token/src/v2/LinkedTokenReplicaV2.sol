@@ -58,8 +58,8 @@ contract LinkedTokenReplicaV2 is
             linkedSubnet,
             linkedContract
         );
-        __UUPSUpgradeable_init();
         __ERC20_init(_token_name, _token_symbol);
+        __UUPSUpgradeable_init();
     }
 
     function decimals() public view override returns (uint8) {

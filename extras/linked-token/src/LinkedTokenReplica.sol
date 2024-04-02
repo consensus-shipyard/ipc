@@ -38,8 +38,8 @@ contract LinkedTokenReplica is Initializable, LinkedToken, ERC20Upgradeable, UUP
         _token_decimals = token_decimals;
 
         __LinkedToken_init(gateway, underlyingToken, linkedSubnet, linkedContract);
-        __UUPSUpgradeable_init();
         __ERC20_init(_token_name, _token_symbol);
+        __UUPSUpgradeable_init();
     }
 
     function decimals() public view override returns (uint8) {
