@@ -3,6 +3,7 @@ pragma solidity ^0.8.23;
 
 import "./ConfigManager.sol";
 import "../src/LinkedTokenController.sol";
+import "../src/v2/LinkedTokenControllerV2.sol";
 import "@ipc/src/structs/Subnet.sol";
 import "openzeppelin-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
@@ -40,6 +41,16 @@ contract DeployIpcTokenController is ConfigManager {
         );
         vm.stopBroadcast();
         writeConfig("LinkedTokenController", vm.toString(address(transparentProxy)));
+    }
+
+    function deployIpcTokenControllerV2() external {
+
+        vm.startBroadcast();
+        LinkedTokenControllerV2 initialImplementation = new LinkedTokenControllerV2();
+        vm.stopBroadcast();
+
+        // Log the address of the deployed contract implementation
+        writeConfig("LinkedTokenControllerImplementation", vm.toString(address(initialImplementation)));
     }
 
     function upgradeIpcTokenController(

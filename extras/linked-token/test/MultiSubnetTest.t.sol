@@ -12,8 +12,10 @@ import {SubnetActorFacetsHelper} from "@ipc/test/helpers/SubnetActorFacetsHelper
 import {LinkedTokenController} from "../src/LinkedTokenController.sol";
 import {LinkedTokenReplica} from "../src/LinkedTokenReplica.sol";
 
-import {LinkedTokenControllerV2} from "./LinkedTokenControllerV2.sol";
-import {LinkedTokenReplicaV2} from "./LinkedTokenReplicaV2.sol";
+import {LinkedTokenControllerV2} from "../src/v2/LinkedTokenControllerV2.sol";
+import {LinkedTokenControllerV2Extension} from "./LinkedTokenControllerV2Extension.sol";
+import {LinkedTokenReplicaV2Extension} from "./LinkedTokenReplicaV2Extension.sol";
+import {LinkedTokenReplicaV2} from "../src/v2/LinkedTokenReplicaV2.sol";
 import {USDCTest} from "../src/USDCTest.sol";
 
 import {SubnetID, Subnet, IPCAddress, Validator} from "@ipc/src/structs/Subnet.sol";
@@ -198,35 +200,57 @@ contract MultiSubnetTest is IntegrationTestBase {
     }
 
     function upgradeController() public {
-        bytes memory initCallController = abi.encodeCall(
-            LinkedTokenController.reinitialize,
-            (address(rootGateway), address(testUSDC), nativeSubnetName, address(ipcTokenReplica))
+        bytes memory initCallController =
+            abi.encodeCall(
+                LinkedTokenControllerV2.reinitialize,
+                (
+                    address(rootGateway),
+                    address(testUSDC),
+                    nativeSubnetName,
+                    address(ipcTokenReplica)
+                )
+            );
+        LinkedTokenControllerV2Extension newControllerImplementation =
+            new LinkedTokenControllerV2Extension();
+        ipcTokenController.upgradeToAndCall(
+            address(newControllerImplementation),
+            initCallController
         );
         LinkedTokenControllerV2 newControllerImplementation = new LinkedTokenControllerV2();
         ipcTokenController.upgradeToAndCall(address(newControllerImplementation), initCallController);
 
         require(
-            LinkedTokenControllerV2(address(ipcTokenController)).newFunctionReturns7() == 7,
+            LinkedTokenControllerV2Extension(address(ipcTokenController))
+                .newFunctionReturns7() == 7,
             "controller upgrade failed"
         );
     }
 
     function upgradeReplica() public {
-        bytes memory initCallReplica = abi.encodeCall(
-            LinkedTokenReplica.reinitialize,
-            (
-                address(nativeSubnetGateway),
-                address(testUSDC),
-                rootSubnetName,
-                address(ipcTokenController),
-                REPLICA_TOKEN_NAME,
-                REPLICA_TOKEN_SYMBOL,
-                REPLICA_TOKEN_DECIMALS
-            )
+        bytes memory initCallReplica =
+            abi.encodeCall(
+                LinkedTokenReplicaV2.reinitialize,
+                (
+                    address(nativeSubnetGateway),
+                    address(testUSDC),
+                    rootSubnetName,
+                    address(ipcTokenController),
+                    REPLICA_TOKEN_NAME,
+                    REPLICA_TOKEN_SYMBOL,
+                    REPLICA_TOKEN_DECIMALS
+                )
+            );
+        LinkedTokenReplicaV2Extension newReplicaImplementation =
+            new LinkedTokenReplicaV2Extension();
+        ipcTokenReplica.upgradeToAndCall(
+            address(newReplicaImplementation),
+            initCallReplica
         );
-        LinkedTokenReplicaV2 newReplicaImplementation = new LinkedTokenReplicaV2();
-        ipcTokenReplica.upgradeToAndCall(address(newReplicaImplementation), initCallReplica);
-        require(LinkedTokenReplicaV2(address(ipcTokenReplica)).newFunctionReturns8() == 8, "replica upgrade failed");
+        require(
+            LinkedTokenReplicaV2Extension(address(ipcTokenReplica))
+                .newFunctionReturns8() == 8,
+            "replica upgrade failed"
+        );
     }
 
     function _testLinkedTokenBridge() public {
