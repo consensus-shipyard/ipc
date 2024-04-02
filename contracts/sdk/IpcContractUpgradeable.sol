@@ -9,8 +9,6 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/se
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-
-
 import {CrossMsgHelper} from "../src/lib/CrossMsgHelper.sol";
 
 // Interface that needs to be implemented by IPC-aware contracts.
@@ -40,14 +38,11 @@ abstract contract IpcExchangeUpgradeable is Initializable, IpcHandler, OwnableUp
         _disableInitializers();
     }
 
-
-     function __IpcExchangeUpgradeable_init(address gatewayAddr_) public onlyInitializing {
-         gatewayAddr = gatewayAddr_;
-         __Ownable_init();
-         __ReentrancyGuard_init();
-     }
-
-
+    function __IpcExchangeUpgradeable_init(address gatewayAddr_) public onlyInitializing {
+        gatewayAddr = gatewayAddr_;
+        __Ownable_init();
+        __ReentrancyGuard_init();
+    }
 
     /// @notice Entrypoint for IPC-enabled contracts. This function is always called by
     /// the gateway when a `Call` or `Receipt` cross-net messages is targeted to
