@@ -15,8 +15,6 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 contract LinkedTokenReplica is Initializable, LinkedToken, ERC20Upgradeable, UUPSUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
-    string _token_name;
-    string _token_symbol;
     uint8 _token_decimals;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -33,12 +31,10 @@ contract LinkedTokenReplica is Initializable, LinkedToken, ERC20Upgradeable, UUP
         string memory token_symbol,
         uint8 token_decimals
     ) public initializer {
-        _token_name = token_name;
-        _token_symbol = token_symbol;
         _token_decimals = token_decimals;
 
         __LinkedToken_init(gateway, underlyingToken, linkedSubnet, linkedContract);
-        __ERC20_init(_token_name, _token_symbol);
+        __ERC20_init(token_name, token_symbol);
         __UUPSUpgradeable_init();
     }
 
