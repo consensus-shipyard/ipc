@@ -171,14 +171,15 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         supplySource.expect(SupplyKind.ERC20);
 
         // Lock the specified amount into custody.
-        supplySource.lock({value: amount});
+        // Account for tokens with Transfer Fees
+        uint256 transferAmount = supplySource.lock({value: amount});
 
         // Create the top-down message to mint the supply in the subnet.
         IpcEnvelope memory crossMsg = CrossMsgHelper.createFundMsg({
             subnet: subnetId,
             signer: msg.sender,
             to: to,
-            value: amount
+            value: transferAmount
         });
 
         // Commit top-down message.
