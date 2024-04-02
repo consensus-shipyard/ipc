@@ -8,26 +8,28 @@ export
 
 help:
 	@echo "Available targets:"
-	@echo "  install                            - Install dependencies."
-	@echo "  deploy-usdctest                    - Deploy the USDCTest contract on Calibration Network."
-	@echo "  mint-usdc                          - Mint 1000 USDCTest tokens to the specified wallet in .env file."
-	@echo "  check-balance                      - Check the USDCTest token balance in the wallet."
-	@echo "  deploy-replica-implementation      - Deploy the token replica contract implementation."
-	@echo "  deploy-replica-proxy               - Deploy the token replica proxy."
-	@echo "  deploy-controller-implementation   - Deploy the token controller contract implementation."
-	@echo "  deploy-controller-proxy            - Deploy the token controller proxy."
-	@echo "  link-replica                       - Link the replica with the token controller address."
-	@echo "  link-controller                    - Link the controller with the token replica address."
-	@echo "  approve-usdc                       - Approve USDC for transfer."
-	@echo "  deposit-usdc                       - Deposit USDC to the subnet."
-	@echo "  check-replica-balance              - Check the token replica balance."
-	@echo "  withdraw-usdc                      - Withdraw USDC from the subnet."
-	@echo "  upgrade-replica-proxy              - Upgrade the token replica proxy to a new implementation."
-	@echo "  upgrade-controller-proxy           - Upgrade the token controller proxy to a new implementation."
+	@echo "  install                                - Install dependencies."
+	@echo "  deploy-usdctest                        - Deploy the USDCTest contract on Calibration Network."
+	@echo "  mint-usdc                              - Mint 1000 USDCTest tokens to the specified wallet in .env file."
+	@echo "  check-balance                          - Check the USDCTest token balance in the wallet."
+	@echo "  deploy-replica-implementation          - Deploy the token replica contract implementation."
+	@echo "  deploy-replica-proxy                   - Deploy the token replica proxy."
+	@echo "  deploy-controller-implementation       - Deploy the token controller contract implementation."
+	@echo "  deploy-controller-proxy                - Deploy the token controller proxy."
+	@echo "  link-replica                           - Link the replica with the token controller address."
+	@echo "  link-controller                        - Link the controller with the token replica address."
+	@echo "  approve-usdc                           - Approve USDC for transfer."
+	@echo "  deposit-usdc                           - Deposit USDC to the subnet."
+	@echo "  check-replica-balance                  - Check the token replica balance."
+	@echo "  withdraw-usdc                          - Withdraw USDC from the subnet."
+	@echo "  deploy-replica-implementation-v2       - Deploy the token replica contract implementation v2 for upgrading. Overwrites the config file with the new implementation address."
+	@echo "  deploy-controller-implementation-v2    - Deploy the token controller contract implementation v2 for upgrading. Overwrites the config file with the new implementation address."
+	@echo "  upgrade-replica-proxy                  - Upgrade the token replica proxy to a new implementation."
+	@echo "  upgrade-controller-proxy               - Upgrade the token controller proxy to a new implementation."
 	@echo ""
 	@echo "Usage:"
-	@echo "  make <target>                      - Run a specific make target."
-	@echo "  make help                          - Display this help message."
+	@echo "  make <target>                          - Run a specific make target."
+	@echo "  make help                              - Display this help message."
 
 
 install:
@@ -107,8 +109,17 @@ withdraw-usdc:
 	REPLICA_ADDR=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenReplica'); \
 	cast send $$REPLICA_ADDR "linkedTransfer(address,uint256)" $$WALLET_ADDRESS $$AMOUNT --rpc-url $$SUBNET_RPC_URL --private-key $$SUBNET_PRIVATE_KEY
 
+deploy-replica-implementation:
+	@echo "Deploying token replica contract v2 on subnet..."
+	forge script script/DeployIpcTokenReplica.s.sol:DeployIpcTokenReplica --skip-simulation --rpc-url $$SUBNET_RPC_URL --private-key $$SUBNET_PRIVATE_KEY --broadcast -vvvv --ffi --sig "deployIpcTokenReplicaV2()"
+
+deploy-controller-implementation:
+	@echo "Deploying token controller v2 implementation contract on Calibnet..."
+	forge script script/DeployIpcTokenController.s.sol:DeployIpcTokenController --skip-simulation --rpc-url $$CALIBNET_RPC_URL --private-key $$CALIBNET_PRIVATE_KEY --broadcast -vvvv --ffi --sig "deployIpcTokenControllerV2()"
+
+
 upgrade-replica-proxy:
-	@echo "Upgrading token replica proxy contract on IPC... Please run make deploy-replica-implementation to deploy a new implementation and upgrade config.json before running this command."
+	@echo "Upgrading token replica proxy contract on IPC... Please run make deploy-replica-implementation-v2 to deploy a new implementation and upgrade config.json before running this command."
 	@LinkedTokenReplicaImplementation=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenReplicaImplementation'); \
 	USDCTEST_ADDR=$$(cat config.json | jq -r '.LinkedToken.USDCTest'); \
 	LinkedTokenReplicaProxy=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenReplica'); \
@@ -116,7 +127,7 @@ upgrade-replica-proxy:
 	forge script script/DeployIpcTokenReplica.s.sol:DeployIpcTokenReplica --skip-simulation --rpc-url $$SUBNET_RPC_URL --private-key $$SUBNET_PRIVATE_KEY --broadcast -vvvv --ffi --sig "upgradeIpcTokenReplica(address,address,address,address,uint64,address[],address,string,string,uint8)" -- $$LinkedTokenReplicaProxy $$LinkedTokenReplicaImplementation $$SUBNET_GATEWAY $$USDCTEST_ADDR $$CALIBNET_CHAIN_ID '[]' $$LinkedTokenControllerProxy $$REPLICA_TOKEN_NAME $$REPLICA_TOKEN_SYMBOL $$REPLICA_TOKEN_DECIMALS
 
 upgrade-controller-proxy:
-	@echo "Upgrading token replica proxy contract on IPC... Please run make deploy-replica-implementation to deploy a new implementation and upgrade config.json before running this command."
+	@echo "Upgrading token replica proxy contract on IPC... Please run make deploy-replica-implementation-v2 to deploy a new implementation and upgrade config.json before running this command."
 	@LinkedTokenControllerImplementation=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenControllerImplementation'); \
 	USDCTEST_ADDR=$$(cat config.json | jq -r '.LinkedToken.USDCTest'); \
 	LinkedTokenReplicaProxy=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenReplica'); \

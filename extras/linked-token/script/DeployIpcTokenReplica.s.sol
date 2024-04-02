@@ -2,6 +2,7 @@
 pragma solidity ^0.8.23;
 
 import "../src/LinkedTokenReplica.sol";
+import "../src/v2/LinkedTokenReplicaV2.sol";
 import "./ConfigManager.sol";
 import "@ipc/src/structs/Subnet.sol";
 import "openzeppelin-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -28,6 +29,17 @@ contract DeployIpcTokenReplica is ConfigManager {
         vm.stopBroadcast();
         writeConfig("LinkedTokenReplica", vm.toString(address(transparentProxy)));
     }
+
+    function deployIpcTokenReplicaV2() external {
+
+        vm.startBroadcast();
+        LinkedTokenReplicaV2 initialImplementation = new LinkedTokenReplicaV2();
+        vm.stopBroadcast();
+
+        // Log the address of the deployed contract implementation
+        writeConfig("LinkedTokenReplicaImplementation", vm.toString(address(initialImplementation)));
+    }
+
 
     function upgradeIpcTokenReplica(address replicaProxy, address newReplicaImplementation, address gateway, address tokenContractAddress, uint64 _rootNetChainId, address[] memory _route, address controllerProxy, string memory token_name, string memory token_symbol, uint8 token_decimals) external {
         SubnetID memory destinationSubnet = SubnetID({root: _rootNetChainId, route: _route});

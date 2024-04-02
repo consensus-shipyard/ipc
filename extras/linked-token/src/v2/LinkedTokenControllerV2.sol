@@ -14,7 +14,7 @@ import {
     UUPSUpgradeable
 } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract LinkedTokenController is Initializable, LinkedToken, UUPSUpgradeable {
+contract LinkedTokenControllerV2 is Initializable, LinkedToken, UUPSUpgradeable {
     using SafeERC20 for IERC20;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -22,12 +22,12 @@ contract LinkedTokenController is Initializable, LinkedToken, UUPSUpgradeable {
         _disableInitializers();
     }
 
-    function initialize(
+    function reinitialize(
         address gateway,
         address underlyingToken,
         SubnetID memory linkedSubnet,
         address linkedContract
-    ) public initializer {
+    ) public reinitializer(2) {
         __LinkedToken_init(
             gateway,
             underlyingToken,

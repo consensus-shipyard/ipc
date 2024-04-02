@@ -62,29 +62,6 @@ contract LinkedTokenReplica is
         __ERC20_init(_token_name, _token_symbol);
     }
 
-    function reinitialize(
-        address gateway,
-        address underlyingToken,
-        SubnetID memory linkedSubnet,
-        address linkedContract,
-        string memory token_name,
-        string memory token_symbol,
-        uint8 token_decimals
-    ) public reinitializer(2) {
-        _token_name = token_name;
-        _token_symbol = token_symbol;
-        _token_decimals = token_decimals;
-
-        __LinkedToken_init(
-            gateway,
-            underlyingToken,
-            linkedSubnet,
-            linkedContract
-        );
-        __UUPSUpgradeable_init();
-        __ERC20_init(_token_name, _token_symbol);
-    }
-
     function decimals() public view override returns (uint8) {
         return _token_decimals;
     }
