@@ -80,16 +80,14 @@ impl Actor {
         })?;
 
         // Clean up external object storage if it existed.
-        if let Some(object) = res.0 {
-            if let Object::External((v, _)) = object {
-                objectstore_actor_sdk::cid_rm(v.0).map_err(|en| {
-                    ActorError::checked(
-                        ExitCode::USR_ILLEGAL_STATE,
-                        format!("cid_rm syscall failed with {en}"),
-                        None,
-                    )
-                })?;
-            }
+        if let Some(Object::External((v, _))) = res.0 {
+            objectstore_actor_sdk::cid_rm(v.0).map_err(|en| {
+                ActorError::checked(
+                    ExitCode::USR_ILLEGAL_STATE,
+                    format!("cid_rm syscall failed with {en}"),
+                    None,
+                )
+            })?;
         }
 
         Ok(res.1)

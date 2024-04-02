@@ -175,6 +175,7 @@ async fn health() -> Result<impl Reply, Rejection> {
     Ok(warp::reply::reply())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn handle_os_upload(
     key: String,
     client: FendermintClient,
@@ -188,6 +189,12 @@ async fn handle_os_upload(
     let mut nonce_lck = nonce.lock().await;
     args.sequence = *nonce_lck;
     args.gas_limit = gas_limit.unwrap_or(BLOCK_GAS_LIMIT);
+
+    if size == 0 {
+        return Err(Rejection::from(BadRequest {
+            message: "empty body".into(),
+        }));
+    }
 
     let params = if size > MAX_INTERNAL_OBJECT_LENGTH {
         let mut tmp = TempFile::new().await.map_err(|e| {
@@ -362,111 +369,102 @@ async fn handle_os_get(
         })?;
 
     match res {
-        Some(obj) => match obj {
-            Object::Internal(buf) => {
-                let size = buf.0.len() as u64;
-                let (body, start, end, len) = match range {
-                    Some(range) => {
-                        let (start, end) = get_range_params(range, size).map_err(|e| {
-                            Rejection::from(BadRequest {
-                                message: format!("failed to get range params: {}", e),
-                            })
-                        })?;
-                        let len = end - start + 1;
-                        (
-                            buf.0[start as usize..end as usize].to_vec(),
-                            start,
-                            end,
-                            len,
-                        )
+        Some(obj) => {
+            let (body, start, end, len, size) = match obj {
+                Object::Internal(buf) => {
+                    let size = buf.0.len() as u64;
+                    match range {
+                        Some(range) => {
+                            let (start, end) = get_range_params(range, size).map_err(|e| {
+                                Rejection::from(BadRequest {
+                                    message: format!("failed to get range params: {}", e),
+                                })
+                            })?;
+                            let len = end - start + 1;
+                            (
+                                warp::hyper::Body::from(
+                                    buf.0[start as usize..=end as usize].to_vec(),
+                                ),
+                                start,
+                                end,
+                                len,
+                                size,
+                            )
+                        }
+                        None => (warp::hyper::Body::from(buf.0), 0, size - 1, size, size),
                     }
-                    None => (buf.0, 0, size - 1, size),
-                };
-                let body = warp::hyper::Body::from(body);
-                let mut response = warp::reply::Response::new(body);
-
-                let mut header_map = HeaderMap::new();
-                if len < size {
-                    *response.status_mut() = StatusCode::PARTIAL_CONTENT;
-
-                    header_map.insert(
-                        "Content-Range",
-                        HeaderValue::from_str(&format!("bytes {}-{}/{}", start, end, len)).unwrap(),
-                    );
-                } else {
-                    header_map.insert("Accept-Ranges", HeaderValue::from_str("bytes").unwrap());
                 }
-
-                header_map.insert("Content-Length", HeaderValue::from(len));
-
-                let headers = response.headers_mut();
-                headers.extend(header_map);
-
-                Ok(response)
-            }
-            Object::External((buf, resolved)) => {
-                let cid = Cid::try_from(buf.0).map_err(|e| {
-                    Rejection::from(BadRequest {
-                        message: format!("failed to decode cid: {}", e),
-                    })
-                })?;
-                let cid = cid.to_string();
-                if !resolved {
-                    return Err(Rejection::from(BadRequest {
-                        message: "object is not resolved".to_string(),
-                    }));
-                }
-
-                let stat = ipfs
-                    .files_stat(format!("/ipfs/{cid}").as_str())
-                    .await
-                    .map_err(|e| {
+                Object::External((buf, resolved)) => {
+                    let cid = Cid::try_from(buf.0).map_err(|e| {
                         Rejection::from(BadRequest {
-                            message: format!("failed to stat object: {}", e),
+                            message: format!("failed to decode cid: {}", e),
                         })
                     })?;
-                let size = stat.size;
+                    let cid = cid.to_string();
+                    if !resolved {
+                        return Err(Rejection::from(BadRequest {
+                            message: "object is not resolved".to_string(),
+                        }));
+                    }
 
-                let (stream, start, end, len) = match range {
-                    Some(range) => {
-                        let (start, end) = get_range_params(range, size).map_err(|e| {
+                    let stat = ipfs
+                        .files_stat(format!("/ipfs/{cid}").as_str())
+                        .await
+                        .map_err(|e| {
                             Rejection::from(BadRequest {
-                                message: format!("failed to get range params: {}", e),
+                                message: format!("failed to stat object: {}", e),
                             })
                         })?;
-                        let len = end - start + 1;
-                        (
-                            ipfs.cat_range(&cid, start as usize, len as usize),
-                            start,
-                            end,
-                            len,
-                        )
+                    let size = stat.size;
+
+                    match range {
+                        Some(range) => {
+                            let (start, end) = get_range_params(range, size).map_err(|e| {
+                                Rejection::from(BadRequest {
+                                    message: format!("failed to get range params: {}", e),
+                                })
+                            })?;
+                            let len = end - start + 1;
+                            (
+                                warp::hyper::Body::wrap_stream(ipfs.cat_range(
+                                    &cid,
+                                    start as usize,
+                                    len as usize,
+                                )),
+                                start,
+                                end,
+                                len,
+                                size,
+                            )
+                        }
+                        None => (
+                            warp::hyper::Body::wrap_stream(ipfs.cat(&cid)),
+                            0,
+                            size - 1,
+                            size,
+                            size,
+                        ),
                     }
-                    None => (ipfs.cat(&cid), 0, size - 1, size),
-                };
-                let body = warp::hyper::Body::wrap_stream(stream);
-                let mut response = warp::reply::Response::new(body);
-
-                let mut header_map = HeaderMap::new();
-                if len < size {
-                    *response.status_mut() = StatusCode::PARTIAL_CONTENT;
-
-                    header_map.insert(
-                        "Content-Range",
-                        HeaderValue::from_str(&format!("bytes {}-{}/{}", start, end, len)).unwrap(),
-                    );
-                } else {
-                    header_map.insert("Accept-Ranges", HeaderValue::from_str("bytes").unwrap());
                 }
+            };
 
-                header_map.insert("Content-Length", HeaderValue::from(len));
-
-                let headers = response.headers_mut();
-                headers.extend(header_map);
-
-                Ok(response)
+            let mut response = warp::reply::Response::new(body);
+            let mut header_map = HeaderMap::new();
+            if len < size {
+                *response.status_mut() = StatusCode::PARTIAL_CONTENT;
+                header_map.insert(
+                    "Content-Range",
+                    HeaderValue::from_str(&format!("bytes {}-{}/{}", start, end, len)).unwrap(),
+                );
+            } else {
+                header_map.insert("Accept-Ranges", HeaderValue::from_str("bytes").unwrap());
             }
-        },
+            header_map.insert("Content-Length", HeaderValue::from(len));
+            let headers = response.headers_mut();
+            headers.extend(header_map);
+
+            Ok(response)
+        }
         None => Err(Rejection::from(NotFound)),
     }
 }

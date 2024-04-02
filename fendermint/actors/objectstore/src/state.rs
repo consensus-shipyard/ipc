@@ -454,7 +454,7 @@ mod tests {
         let (jpeg_key, _, _) = create_and_put_objects(&mut state, &store).unwrap();
 
         let mh_code = Code::Blake2b256;
-        let mh = mh_code.digest(&vec![4, 5, 6]);
+        let mh = mh_code.digest(&[4, 5, 6]);
         let cid = Cid::new_v1(DAG_CBOR, mh);
         let default_item = ObjectListItem::Internal((cid, 3));
 

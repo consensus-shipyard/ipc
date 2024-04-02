@@ -203,7 +203,7 @@ impl SignedMessageFactory {
     ) -> anyhow::Result<ChainMessage> {
         let object = match &params.kind {
             ObjectKind::Internal(_) => None,
-            ObjectKind::External(cid) => Some(Object::new(params.key.clone(), cid.clone())),
+            ObjectKind::External(cid) => Some(Object::new(params.key.clone(), *cid)),
         };
         let params = RawBytes::serialize(params)?;
         let message = self.transaction(

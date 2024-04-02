@@ -23,12 +23,12 @@ halt_height = 0
 # or if it's not needed to sign and broadcast transactions as a validator.
 # Leaving empty by default so single node deployments don't fail to start because
 # this key is not copied into place.
-[validator_key]
-# Path to the secret key file in base64 format.
-path = "keys/validator.sk"
+# [validator_key]
+# # Path to the secret key file in base64 format.
+# path =
 
-# The on-chain account kind (regular|ethereum)
-kind = "regular"
+# # The on-chain account kind (regular|ethereum)
+# kind =
 
 [abci]
 # Number of concurrent requests allowed to reach the application.
