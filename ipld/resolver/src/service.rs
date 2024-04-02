@@ -64,6 +64,8 @@ pub struct NoKnownPeers(SubnetID);
 pub struct ConnectionConfig {
     /// The address where we will listen to incoming connections.
     pub listen_addr: Multiaddr,
+    /// A list of known external addresses this node is reachable on.
+    pub external_addresses: Vec<Multiaddr>,
     /// Maximum number of incoming connections.
     pub max_incoming: u32,
     /// Expected number of peers, for sizing the Bloom filter.
@@ -181,12 +183,16 @@ where
         //.connection_event_buffer_size(64)
         //.build();
 
-        let swarm = Swarm::new(
+        let mut swarm = Swarm::new(
             transport,
             behaviour,
             peer_id,
             libp2p::swarm::Config::with_tokio_executor(),
         );
+
+        for addr in config.connection.external_addresses {
+            swarm.add_external_address(addr)
+        }
 
         let (request_tx, request_rx) = mpsc::unbounded_channel();
         let (event_tx, _) = broadcast::channel(config.connection.event_buffer_capacity as usize);

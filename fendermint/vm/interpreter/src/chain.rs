@@ -140,6 +140,8 @@ where
                     };
                     return Ok(Some(finality));
                 }
+            } else {
+                tracing::debug!("no quorum found for parent finality votes")
             }
             Ok(None)
         })
