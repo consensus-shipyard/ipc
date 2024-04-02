@@ -45,7 +45,7 @@ contract DeployIpcTokenController is ConfigManager {
 
     function upgradeIpcTokenController(address controllerProxy, address newControllerImplementation, address gateway, address tokenContractAddress, uint64 _rootNetChainId, address[] memory _route, address replicaProxy) external {
         SubnetID memory destinationSubnet = SubnetID({root: _rootNetChainId, route: _route});
-        bytes memory initCall = abi.encodeCall(LinkedTokenController.reinitialize, (gateway, tokenContractAddress, destinationSubnet, replicaProxy));
+        bytes memory initCall = abi.encodeCall(LinkedTokenControllerV2.reinitialize, (gateway, tokenContractAddress, destinationSubnet, replicaProxy));
 
         vm.startBroadcast();
         LinkedTokenController controller = LinkedTokenController(controllerProxy);

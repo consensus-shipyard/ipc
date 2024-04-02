@@ -6,7 +6,7 @@ import {
 import {
     IERC20Upgradeable
 } from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
-import {LinkedToken} from "./LinkedToken.sol";
+import {LinkedToken} from "../LinkedToken.sol";
 import {SubnetID} from "@ipc/src/structs/Subnet.sol";
 import {
     Initializable
