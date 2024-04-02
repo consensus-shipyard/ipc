@@ -7,7 +7,7 @@ import "@ipc/src/structs/Subnet.sol";
 
 contract DeployIpcTokenReplica is ConfigManager {
     function run(address gateway, address USDCTest, uint64 _rootNetChainId, address[] memory _route) external {
-        SubnetID memory controllerSubnet = SubnetID({root: _rootNetChainId , route: _route});
+        SubnetID memory controllerSubnet = SubnetID({root: _rootNetChainId, route: _route});
 
         vm.startBroadcast();
         LinkedTokenReplica replica = new LinkedTokenReplica(gateway, USDCTest, controllerSubnet);
@@ -16,4 +16,3 @@ contract DeployIpcTokenReplica is ConfigManager {
         writeConfig("LinkedTokenReplica", vm.toString(address(replica)));
     }
 }
-
