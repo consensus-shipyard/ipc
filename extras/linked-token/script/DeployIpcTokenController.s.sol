@@ -8,7 +8,6 @@ import "openzeppelin-contracts/proxy/transparent/TransparentUpgradeableProxy.sol
 
 contract DeployIpcTokenController is ConfigManager {
     function deployIpcTokenController() external {
-
         vm.startBroadcast();
         LinkedTokenController initialImplementation = new LinkedTokenController();
         vm.stopBroadcast();
@@ -17,24 +16,46 @@ contract DeployIpcTokenController is ConfigManager {
         writeConfig("LinkedTokenControllerImplementation", vm.toString(address(initialImplementation)));
     }
 
-
-	//address,address,address,uint64,address[])" -- $$LinkedTokenReplicaImplementation $$SUBNET_GATEWAY $$USDCTEST_ADDR $$CALIBNET_CHAIN_ID '[]' 
-    function deployIpcTokenControllerProxy(address initialImplementation, address gateway, address tokenContractAddress, uint64 _rootNetChainId, address[] memory _route) external {
-
+    //address,address,address,uint64,address[])" -- $$LinkedTokenReplicaImplementation $$SUBNET_GATEWAY $$USDCTEST_ADDR $$CALIBNET_CHAIN_ID '[]'
+    function deployIpcTokenControllerProxy(
+        address initialImplementation,
+        address gateway,
+        address tokenContractAddress,
+        uint64 _rootNetChainId,
+        address[] memory _route
+    ) external {
         vm.startBroadcast();
 
         // Example for setting up the SubnetID, adjust according to your actual setup
         SubnetID memory destinationSubnet = SubnetID({root: _rootNetChainId, route: _route});
 
-        bytes memory initCall = abi.encodeCall(LinkedTokenController.initialize, (gateway, tokenContractAddress, destinationSubnet, 0x0000000000000000000000000000000000000000));
-        TransparentUpgradeableProxy transparentProxy = new TransparentUpgradeableProxy(initialImplementation, address(msg.sender), initCall);
+        bytes memory initCall = abi.encodeCall(
+            LinkedTokenController.initialize,
+            (gateway, tokenContractAddress, destinationSubnet, 0x0000000000000000000000000000000000000000)
+        );
+        TransparentUpgradeableProxy transparentProxy = new TransparentUpgradeableProxy(
+            initialImplementation,
+            address(msg.sender),
+            initCall
+        );
         vm.stopBroadcast();
         writeConfig("LinkedTokenController", vm.toString(address(transparentProxy)));
     }
 
-    function upgradeIpcTokenController(address controllerProxy, address newControllerImplementation, address gateway, address tokenContractAddress, uint64 _rootNetChainId, address[] memory _route, address replicaProxy) external {
+    function upgradeIpcTokenController(
+        address controllerProxy,
+        address newControllerImplementation,
+        address gateway,
+        address tokenContractAddress,
+        uint64 _rootNetChainId,
+        address[] memory _route,
+        address replicaProxy
+    ) external {
         SubnetID memory destinationSubnet = SubnetID({root: _rootNetChainId, route: _route});
-        bytes memory initCall = abi.encodeCall(LinkedTokenController.reinitialize, (gateway, tokenContractAddress, destinationSubnet, replicaProxy));
+        bytes memory initCall = abi.encodeCall(
+            LinkedTokenController.reinitialize,
+            (gateway, tokenContractAddress, destinationSubnet, replicaProxy)
+        );
 
         vm.startBroadcast();
         LinkedTokenController controller = LinkedTokenController(controllerProxy);
@@ -42,4 +63,3 @@ contract DeployIpcTokenController is ConfigManager {
         vm.stopBroadcast();
     }
 }
-
