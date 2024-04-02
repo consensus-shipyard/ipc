@@ -10,10 +10,7 @@ import {SubnetID, IPCAddress} from "@ipc/src/structs/Subnet.sol";
 import {FvmAddressHelper} from "@ipc/src/lib/FvmAddressHelper.sol";
 import {FvmAddress} from "@ipc/src/structs/FvmAddress.sol";
 
-import {
-    InvalidOriginContract,
-    InvalidOriginSubnet
-} from "../src/LinkedToken.sol";
+import {InvalidOriginContract, InvalidOriginSubnet} from "../src/LinkedToken.sol";
 import {IpcEnvelope, CallMsg, IpcMsgKind} from "@ipc/src/structs/CrossNet.sol";
 
 import {SubnetActorDiamond} from "@ipc/src/SubnetActorDiamond.sol";
@@ -50,62 +47,41 @@ contract IpcTokenControllerTest is Test, IntegrationTestBase {
         testUSDC.mint(transferAmount);
         controllerSubnetUSDC = address(testUSDC);
 
-        controllerSubnet = SubnetID({
-            root: ROOTNET_CHAINID,
-            route: new address[](0)
-        });
+        controllerSubnet = SubnetID({root: ROOTNET_CHAINID, route: new address[](0)});
         require(controllerSubnet.isRoot(), "not root");
         rootGateway = createGatewayDiamond(gatewayParams(controllerSubnet));
         gateway = address(rootGateway);
 
-        rootNativeSubnetActor = createSubnetActor(
-            defaultSubnetActorParamsWith(address(rootGateway), controllerSubnet)
-        );
+        rootNativeSubnetActor = createSubnetActor(defaultSubnetActorParamsWith(address(rootGateway), controllerSubnet));
         nativeSubnetPath = new address[](1);
         nativeSubnetPath[0] = address(rootNativeSubnetActor);
-        replicaSubnetName = SubnetID({
-            root: ROOTNET_CHAINID,
-            route: nativeSubnetPath
-        });
+        replicaSubnetName = SubnetID({root: ROOTNET_CHAINID, route: nativeSubnetPath});
 
         vm.deal(address(rootNativeSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
         vm.prank(address(rootNativeSubnetActor));
-        registerSubnetGW(
-            DEFAULT_COLLATERAL_AMOUNT,
-            address(rootNativeSubnetActor),
-            rootGateway
-        );
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootNativeSubnetActor), rootGateway);
 
         //set up controller with proxy
-        LinkedTokenController initialControllerImplementation =
-            new LinkedTokenController();
-        TransparentUpgradeableProxy transparentProxyController =
-            new TransparentUpgradeableProxy(
-                address(initialControllerImplementation),
-                address(this),
-                ""
-            );
+        LinkedTokenController initialControllerImplementation = new LinkedTokenController();
+        TransparentUpgradeableProxy transparentProxyController = new TransparentUpgradeableProxy(
+            address(initialControllerImplementation),
+            address(this),
+            ""
+        );
         controller = LinkedTokenController(address(transparentProxyController));
 
         //set up replica with proxy
-        LinkedTokenReplica initialReplicaImplementation =
-            new LinkedTokenReplica();
-        TransparentUpgradeableProxy transparentProxyReplica =
-            new TransparentUpgradeableProxy(
-                address(initialReplicaImplementation),
-                address(this),
-                ""
-            );
+        LinkedTokenReplica initialReplicaImplementation = new LinkedTokenReplica();
+        TransparentUpgradeableProxy transparentProxyReplica = new TransparentUpgradeableProxy(
+            address(initialReplicaImplementation),
+            address(this),
+            ""
+        );
         replica = LinkedTokenReplica(address(transparentProxyReplica));
 
         // initialize controller & replica
 
-        controller.initialize(
-            gateway,
-            controllerSubnetUSDC,
-            replicaSubnetName,
-            address(replica)
-        );
+        controller.initialize(gateway, controllerSubnetUSDC, replicaSubnetName, address(replica));
 
         replica.initialize(
             gateway,
@@ -122,61 +98,43 @@ contract IpcTokenControllerTest is Test, IntegrationTestBase {
         testUSDC.approve(address(controller), transferAmount);
         vm.deal(address(this), DEFAULT_CROSS_MSG_FEE);
 
-        CallMsg memory message =
-            CallMsg({
-                method: abi.encodePacked(
-                    bytes4(keccak256("receiveAndUnlock(address,uint256)"))
-                ),
-                params: abi.encode(address(this), transferAmount)
-            });
+        CallMsg memory message = CallMsg({
+            method: abi.encodePacked(bytes4(keccak256("receiveAndUnlock(address,uint256)"))),
+            params: abi.encode(address(this), transferAmount)
+        });
 
-        IpcEnvelope memory validMsg =
-            IpcEnvelope({
-                kind: IpcMsgKind.Call,
-                from: IPCAddress({
-                    subnetId: replicaSubnetName,
-                    rawAddress: FvmAddressHelper.from(address(controller))
-                }),
-                to: IPCAddress({
-                    subnetId: controllerSubnet,
-                    rawAddress: FvmAddressHelper.from(address(replica))
-                }),
-                value: DEFAULT_CROSS_MSG_FEE,
-                nonce: 0,
-                message: abi.encode(message)
-            });
+        IpcEnvelope memory validMsg = IpcEnvelope({
+            kind: IpcMsgKind.Call,
+            from: IPCAddress({subnetId: replicaSubnetName, rawAddress: FvmAddressHelper.from(address(controller))}),
+            to: IPCAddress({subnetId: controllerSubnet, rawAddress: FvmAddressHelper.from(address(replica))}),
+            value: DEFAULT_CROSS_MSG_FEE,
+            nonce: 0,
+            message: abi.encode(message)
+        });
 
-        IpcEnvelope memory invalidContract =
-            IpcEnvelope({
-                kind: IpcMsgKind.Call,
-                from: IPCAddress({
-                    subnetId: replicaSubnetName,
-                    rawAddress: FvmAddressHelper.from(address(this)) /* invalid */
-                }),
-                to: IPCAddress({
-                    subnetId: controllerSubnet,
-                    rawAddress: FvmAddressHelper.from(address(replica))
-                }),
-                value: DEFAULT_CROSS_MSG_FEE,
-                nonce: 0,
-                message: abi.encode(message)
-            });
+        IpcEnvelope memory invalidContract = IpcEnvelope({
+            kind: IpcMsgKind.Call,
+            from: IPCAddress({
+                subnetId: replicaSubnetName,
+                rawAddress: FvmAddressHelper.from(address(this)) /* invalid */
+            }),
+            to: IPCAddress({subnetId: controllerSubnet, rawAddress: FvmAddressHelper.from(address(replica))}),
+            value: DEFAULT_CROSS_MSG_FEE,
+            nonce: 0,
+            message: abi.encode(message)
+        });
 
-        IpcEnvelope memory invalidSubnet =
-            IpcEnvelope({
-                kind: IpcMsgKind.Call,
-                from: IPCAddress({
-                    subnetId: controllerSubnet, /* invalid */
-                    rawAddress: FvmAddressHelper.from(address(controller))
-                }),
-                to: IPCAddress({
-                    subnetId: controllerSubnet,
-                    rawAddress: FvmAddressHelper.from(address(replica))
-                }),
-                value: DEFAULT_CROSS_MSG_FEE,
-                nonce: 0,
-                message: abi.encode(message)
-            });
+        IpcEnvelope memory invalidSubnet = IpcEnvelope({
+            kind: IpcMsgKind.Call,
+            from: IPCAddress({
+                subnetId: controllerSubnet /* invalid */,
+                rawAddress: FvmAddressHelper.from(address(controller))
+            }),
+            to: IPCAddress({subnetId: controllerSubnet, rawAddress: FvmAddressHelper.from(address(replica))}),
+            value: DEFAULT_CROSS_MSG_FEE,
+            nonce: 0,
+            message: abi.encode(message)
+        });
 
         vm.expectRevert(InvalidOriginContract.selector);
         controller._validateEnvelope(invalidContract);
@@ -187,22 +145,12 @@ contract IpcTokenControllerTest is Test, IntegrationTestBase {
 
     function testParentSubnetUSDCAddress() public {
         // Test to check if controllerSubnetUSDC address is correctly set
-        assertEq(
-            controller._linkedContract(),
-            address(replica),
-            "controllerSubnetUSDC address does not match"
-        );
+        assertEq(controller._linkedContract(), address(replica), "controllerSubnetUSDC address does not match");
     }
 
     function testParentSubnet() public {
-        assertTrue(
-            controllerSubnet.equals(replica.getLinkedSubnet()),
-            "replica Subnetdoes not match"
-        );
-        assertTrue(
-            replicaSubnetName.equals(controller.getLinkedSubnet()),
-            "controller Subnetdoes not match"
-        );
+        assertTrue(controllerSubnet.equals(replica.getLinkedSubnet()), "replica Subnetdoes not match");
+        assertTrue(replicaSubnetName.equals(controller.getLinkedSubnet()), "controller Subnetdoes not match");
     }
 
     function testDepositTokens() public {

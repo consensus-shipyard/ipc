@@ -14,7 +14,6 @@ import {SubnetIDHelper} from "@ipc/src/lib/SubnetIDHelper.sol";
 error InvalidOriginContract();
 error InvalidOriginSubnet();
 
-
 /**
  * @title LinkedToken
  * @notice Contract to handle token transfer from L1, lock them and mint on L2.
@@ -65,7 +64,6 @@ abstract contract LinkedToken is Initializable, IpcExchangeUpgradeable {
         _disableInitializers();
     }
 
-
     /**
      * @dev Initialize function for IpcTokenController
      * @param gateway Address of the gateway for cross-network communication
@@ -99,7 +97,6 @@ abstract contract LinkedToken is Initializable, IpcExchangeUpgradeable {
         return _linkedSubnet;
     }
 
-
     function _captureTokens(address holder, uint256 amount) internal virtual;
 
     function _releaseTokens(address beneficiary, uint256 amount) internal virtual;
@@ -113,10 +110,7 @@ abstract contract LinkedToken is Initializable, IpcExchangeUpgradeable {
         return _linkedTransfer(receiver, amount);
     }
 
-    function _linkedTransfer(
-        address recipient,
-        uint256 amount
-    ) internal returns (IpcEnvelope memory committed) {
+    function _linkedTransfer(address recipient, uint256 amount) internal returns (IpcEnvelope memory committed) {
         _validateInitialized();
 
         // Validate that the transfer parameters are acceptable.
@@ -193,7 +187,7 @@ abstract contract LinkedToken is Initializable, IpcExchangeUpgradeable {
         OutcomeType outcome = resultMsg.outcome;
         bool refund = outcome == OutcomeType.SystemErr || outcome == OutcomeType.ActorErr;
 
-        _removeUnconfirmedTransfer({ id: resultMsg.id, refund: refund });
+        _removeUnconfirmedTransfer({id: resultMsg.id, refund: refund});
     }
 
     function _receiveLinked(address recipient, uint256 amount) private {
@@ -276,5 +270,4 @@ abstract contract LinkedToken is Initializable, IpcExchangeUpgradeable {
             _releaseTokens(sender, value);
         }
     }
-
 }
