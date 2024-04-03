@@ -292,7 +292,11 @@ where
         self.chain.update(|chain| {
             let (_, mut chain) = chain.split(&block_height);
             chain.insert(block_height, Some(block_hash.clone()));
-            tracing::debug!(block_height, block_hash = hex::encode(block_hash), "inserted into vote tally chain");
+            tracing::debug!(
+                block_height,
+                block_hash = hex::encode(block_hash),
+                "inserted into vote tally chain"
+            );
             chain
         })?;
 

@@ -176,7 +176,7 @@ where
                             None => {
                                 tracing::debug!("no status found");
                                 Ok(false)
-                            },
+                            }
                             Some(status) => status.is_resolved(),
                         })
                         .await;
