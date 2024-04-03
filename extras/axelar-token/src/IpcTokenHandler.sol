@@ -6,7 +6,7 @@ import { IERC20 } from "openzeppelin-contracts/interfaces/IERC20.sol";
 import { Ownable } from "openzeppelin-contracts/access/Ownable.sol";
 import { SubnetID, SupplySource, SupplyKind } from "@ipc/src/structs/Subnet.sol";
 import { FvmAddress } from "@ipc/src/structs/FvmAddress.sol";
-import { IIpcHandler } from "@ipc/sdk/interfaces/IIpcContract.sol";
+import { IIpcHandler } from "@ipc/sdk/interfaces/IIpcHandler.sol";
 import { IpcMsgKind, ResultMsg, OutcomeType, IpcEnvelope } from "@ipc/src/structs/CrossNet.sol";
 import { FvmAddressHelper } from "@ipc/src/lib/FvmAddressHelper.sol";
 import { SubnetIDHelper } from "@ipc/src/lib/SubnetIDHelper.sol";
