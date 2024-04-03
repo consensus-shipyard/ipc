@@ -61,8 +61,9 @@ base_subnet_id=$(basename $subnet_id)
 cd $IPC_FOLDER/extras/tools/fvm-eth-address-converter
 subnet_id_as_eth_addr=$(npx ts-node fvm-addr-to-eth-addr.ts $base_subnet_id)
 # Write config to dot env file
-echo "export PRIVATE_KEY=$default_private_key" >> $DOT_ENV_FILE
-echo "export CALIBNET_GATEWAY=$calib_net_gateway_address" >> $DOT_ENV_FILE
+echo "export SUBNET_PRIVATE_KEY=$default_private_key" >> $DOT_ENV_FILE
+echo "export ORIGIN_NET_PRIVATE_KEY=$default_private_key" >> $DOT_ENV_FILE
+echo "export ORIGIN_NET_GATEWAY=$calib_net_gateway_address" >> $DOT_ENV_FILE
 echo "export SUBNET_ROUTE_IN_ETH_FORMAT=$subnet_id_as_eth_addr" >> $DOT_ENV_FILE
 # Preview the dot env file
 echo "Final .env file:"
