@@ -80,6 +80,11 @@ impl Config {
         self
     }
 
+    pub fn with_max_cache_blocks(mut self, max_cache_blocks: BlockHeight) -> Self {
+        self.max_cache_blocks = Some(max_cache_blocks);
+        self
+    }
+
     pub fn with_proposal_delay(mut self, proposal_delay: BlockHeight) -> Self {
         self.proposal_delay = Some(proposal_delay);
         self

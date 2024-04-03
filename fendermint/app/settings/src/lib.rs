@@ -130,6 +130,8 @@ pub struct TopDownSettings {
     pub proposal_delay: BlockHeight,
     /// The max number of blocks one should make the topdown proposal
     pub max_proposal_range: BlockHeight,
+    /// The max number of blocks to hold in memory for parent syncer
+    pub max_cache_blocks: Option<BlockHeight>,
     /// Parent syncing cron period, in seconds
     #[serde_as(as = "DurationSeconds<u64>")]
     pub polling_interval: Duration,
