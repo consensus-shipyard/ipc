@@ -17,7 +17,6 @@ contract DeployIpcTokenController is ConfigManager {
         writeConfig("LinkedTokenControllerImplementation", vm.toString(address(initialImplementation)));
     }
 
-    //address,address,address,uint64,address[])" -- $$LinkedTokenReplicaImplementation $$SUBNET_GATEWAY $$USDCTEST_ADDR $$CALIBNET_CHAIN_ID '[]'
     function deployIpcTokenControllerProxy(
         address initialImplementation,
         address gateway,

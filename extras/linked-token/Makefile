@@ -1,4 +1,4 @@
-# Makefile for USDC Token Bridge on Calibration Network
+# Makefile for IPC Token Replica Bridge
 
 # Include environment variables from .env file
 -include .env
@@ -41,45 +41,45 @@ install:
 
 deploy-usdctest:
 	@echo "Deploying USDCTest contract..."
-	forge script script/DeployUSDCTest.s.sol:DeployUSDCTest --broadcast --rpc-url $$CALIBNET_RPC_URL --private-key $$CALIBNET_PRIVATE_KEY --skip-simulation -vvv
+	forge script script/DeployUSDCTest.s.sol:DeployUSDCTest --broadcast --rpc-url $$ORIGIN_NET_RPC_URL --private-key $$ORIGIN_NET_PRIVATE_KEY --skip-simulation -vvv
 
 mint-usdc:
 	@echo "Minting 1000 USDCTest tokens..."
 	@USDCTEST_ADDR=$$(cat config.json | jq -r '.LinkedToken.OriginalToken'); \
-    cast send $$USDCTEST_ADDR "$$(cast calldata "mint(uint256)" $$AMOUNT)" --rpc-url $$CALIBNET_RPC_URL --private-key $$CALIBNET_PRIVATE_KEY
+    cast send $$USDCTEST_ADDR "$$(cast calldata "mint(uint256)" $$AMOUNT)" --rpc-url $$ORIGIN_NET_RPC_URL --private-key $$ORIGIN_NET_PRIVATE_KEY
 
 check-balance:
 	@echo "Checking wallet balance..."
-	@WALLET_ADDRESS=$$(cast wallet address --private-key $$CALIBNET_PRIVATE_KEY); \
+	@WALLET_ADDRESS=$$(cast wallet address --private-key $$ORIGIN_NET_PRIVATE_KEY); \
 	USDCTEST_ADDR=$$(cat config.json | jq -r '.LinkedToken.OriginalToken'); \
-	cast call $$USDCTEST_ADDR "$$(cast calldata 'balanceOf(address)' $$WALLET_ADDRESS)" --rpc-url $$CALIBNET_RPC_URL
+	cast call $$USDCTEST_ADDR "$$(cast calldata 'balanceOf(address)' $$WALLET_ADDRESS)" --rpc-url $$ORIGIN_NET_RPC_URL
 
 deploy-replica-implementation:
 	@echo "Deploying token replica contract on subnet..."
 	forge script script/DeployIpcTokenReplica.s.sol:DeployIpcTokenReplica --skip-simulation --rpc-url $$SUBNET_RPC_URL --private-key $$SUBNET_PRIVATE_KEY --broadcast -vvvv --ffi --sig "deployIpcTokenReplica()"
 
 deploy-replica-proxy:
-	@echo "Deploying token replica proxy contract on Calibnet..."
+	@echo "Deploying token replica proxy contract on Origin Net..."
 	@LinkedTokenReplicaImplementation=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenReplicaImplementation'); \
 	USDCTEST_ADDR=$$(cat config.json | jq -r '.LinkedToken.OriginalToken'); \
-	forge script script/DeployIpcTokenReplica.s.sol:DeployIpcTokenReplica --skip-simulation --rpc-url $$SUBNET_RPC_URL --private-key $$SUBNET_PRIVATE_KEY --broadcast -vvvv --ffi --sig "deployIpcTokenReplicaProxy(address,address,address,uint64,address[],string,string,uint8)" -- $$LinkedTokenReplicaImplementation $$SUBNET_GATEWAY $$USDCTEST_ADDR $$CALIBNET_CHAIN_ID '[]' $$REPLICA_TOKEN_NAME $$REPLICA_TOKEN_SYMBOL $$REPLICA_TOKEN_DECIMALS
+	forge script script/DeployIpcTokenReplica.s.sol:DeployIpcTokenReplica --skip-simulation --rpc-url $$SUBNET_RPC_URL --private-key $$SUBNET_PRIVATE_KEY --broadcast -vvvv --ffi --sig "deployIpcTokenReplicaProxy(address,address,address,uint64,address[],string,string,uint8)" -- $$LinkedTokenReplicaImplementation $$SUBNET_GATEWAY $$USDCTEST_ADDR $$ORIGIN_NET_CHAIN_ID '[]' $$REPLICA_TOKEN_NAME $$REPLICA_TOKEN_SYMBOL $$REPLICA_TOKEN_DECIMALS
 
 
 deploy-controller-implementation:
-	@echo "Deploying token controller implementation contract on Calibnet..."
-	forge script script/DeployIpcTokenController.s.sol:DeployIpcTokenController --skip-simulation --rpc-url $$CALIBNET_RPC_URL --private-key $$CALIBNET_PRIVATE_KEY --broadcast -vvvv --ffi --sig "deployIpcTokenController()"
+	@echo "Deploying token controller implementation contract on Origin Net..."
+	forge script script/DeployIpcTokenController.s.sol:DeployIpcTokenController --skip-simulation --rpc-url $$ORIGIN_NET_RPC_URL --private-key $$ORIGIN_NET_PRIVATE_KEY --broadcast -vvvv --ffi --sig "deployIpcTokenController()"
 
 deploy-controller-proxy:
-	@echo "Deploying token controller proxy contract on Calibnet..."
+	@echo "Deploying token controller proxy contract on Origin Net..."
 	@LinkedTokenControllerImplementation=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenControllerImplementation'); \
 	USDCTEST_ADDR=$$(cat config.json | jq -r '.LinkedToken.OriginalToken'); \
-	forge script script/DeployIpcTokenController.s.sol:DeployIpcTokenController --skip-simulation --rpc-url $$CALIBNET_RPC_URL --private-key $$CALIBNET_PRIVATE_KEY --broadcast -vvvv --ffi --sig "deployIpcTokenControllerProxy(address,address,address,uint64,address[])" -- $$LinkedTokenControllerImplementation $$CALIBNET_GATEWAY $$USDCTEST_ADDR $$CALIBNET_CHAIN_ID "[$$SUBNET_ROUTE_IN_ETH_FORMAT]"
+	forge script script/DeployIpcTokenController.s.sol:DeployIpcTokenController --skip-simulation --rpc-url $$ORIGIN_NET_RPC_URL --private-key $$ORIGIN_NET_PRIVATE_KEY --broadcast -vvvv --ffi --sig "deployIpcTokenControllerProxy(address,address,address,uint64,address[])" -- $$LinkedTokenControllerImplementation $$ORIGIN_NET_GATEWAY $$USDCTEST_ADDR $$ORIGIN_NET_CHAIN_ID "[$$SUBNET_ROUTE_IN_ETH_FORMAT]"
 
 link-controller:
 	@echo "Updating controller with replica's address..."
 	@CONTROLLER_ADDR=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenController'); \
 	REPLICA_ADDR=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenReplica'); \
-	cast send $$CONTROLLER_ADDR "setLinkedContract(address)" --rpc-url $$CALIBNET_RPC_URL --private-key $$CALIBNET_PRIVATE_KEY --  $$REPLICA_ADDR
+	cast send $$CONTROLLER_ADDR "setLinkedContract(address)" --rpc-url $$ORIGIN_NET_RPC_URL --private-key $$ORIGIN_NET_PRIVATE_KEY --  $$REPLICA_ADDR
 
 link-replica:
 	@echo "Updating controller with replica's address..."
@@ -92,13 +92,13 @@ approve-usdc:
 	@echo "Approving USDC for Controller Contract..."
 	@CONTROLLER_ADDR=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenController'); \
 	USDCTEST_ADDR=$$(cat config.json | jq -r '.LinkedToken.OriginalToken'); \
-	cast send $$USDCTEST_ADDR "approve(address,uint256)" --rpc-url $$CALIBNET_RPC_URL --private-key $$CALIBNET_PRIVATE_KEY -- $$CONTROLLER_ADDR $$AMOUNT
+	cast send $$USDCTEST_ADDR "approve(address,uint256)" --rpc-url $$ORIGIN_NET_RPC_URL --private-key $$ORIGIN_NET_PRIVATE_KEY -- $$CONTROLLER_ADDR $$AMOUNT
 
 deposit-usdc:
 	@echo "Depositing USDC to subnet..."
-	@WALLET_ADDRESS=$$(cast wallet address --private-key $$CALIBNET_PRIVATE_KEY); \
+	@WALLET_ADDRESS=$$(cast wallet address --private-key $$ORIGIN_NET_PRIVATE_KEY); \
 	CONTROLLER_ADDR=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenController'); \
-	cast send $$CONTROLLER_ADDR "linkedTransfer(address,uint256)" $$WALLET_ADDRESS $$AMOUNT --rpc-url $$CALIBNET_RPC_URL --private-key $$CALIBNET_PRIVATE_KEY
+	cast send $$CONTROLLER_ADDR "linkedTransfer(address,uint256)" $$WALLET_ADDRESS $$AMOUNT --rpc-url $$ORIGIN_NET_RPC_URL --private-key $$ORIGIN_NET_PRIVATE_KEY
 
 check-replica-balance:
 	@echo "Checking Replica Token balance..."
@@ -117,8 +117,8 @@ deploy-replica-implementation:
 	forge script script/DeployIpcTokenReplica.s.sol:DeployIpcTokenReplica --skip-simulation --rpc-url $$SUBNET_RPC_URL --private-key $$SUBNET_PRIVATE_KEY --broadcast -vvvv --ffi --sig "deployIpcTokenReplicaV2()"
 
 deploy-controller-implementation:
-	@echo "Deploying token controller v2 implementation contract on Calibnet..."
-	forge script script/DeployIpcTokenController.s.sol:DeployIpcTokenController --skip-simulation --rpc-url $$CALIBNET_RPC_URL --private-key $$CALIBNET_PRIVATE_KEY --broadcast -vvvv --ffi --sig "deployIpcTokenControllerV2()"
+	@echo "Deploying token controller v2 implementation contract on Origin Net..."
+	forge script script/DeployIpcTokenController.s.sol:DeployIpcTokenController --skip-simulation --rpc-url $$ORIGIN_NET_RPC_URL --private-key $$ORIGIN_NET_PRIVATE_KEY --broadcast -vvvv --ffi --sig "deployIpcTokenControllerV2()"
 
 
 upgrade-replica-proxy:
@@ -127,7 +127,7 @@ upgrade-replica-proxy:
 	USDCTEST_ADDR=$$(cat config.json | jq -r '.LinkedToken.OriginalToken'); \
 	LinkedTokenReplicaProxy=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenReplica'); \
 	LinkedTokenControllerProxy=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenController'); \
-	forge script script/DeployIpcTokenReplica.s.sol:DeployIpcTokenReplica --skip-simulation --rpc-url $$SUBNET_RPC_URL --private-key $$SUBNET_PRIVATE_KEY --broadcast -vvvv --ffi --sig "upgradeIpcTokenReplica(address,address,address,address,uint64,address[],address,string,string,uint8)" -- $$LinkedTokenReplicaProxy $$LinkedTokenReplicaImplementation $$SUBNET_GATEWAY $$USDCTEST_ADDR $$CALIBNET_CHAIN_ID '[]' $$LinkedTokenControllerProxy $$REPLICA_TOKEN_NAME $$REPLICA_TOKEN_SYMBOL $$REPLICA_TOKEN_DECIMALS
+	forge script script/DeployIpcTokenReplica.s.sol:DeployIpcTokenReplica --skip-simulation --rpc-url $$SUBNET_RPC_URL --private-key $$SUBNET_PRIVATE_KEY --broadcast -vvvv --ffi --sig "upgradeIpcTokenReplica(address,address,address,address,uint64,address[],address,string,string,uint8)" -- $$LinkedTokenReplicaProxy $$LinkedTokenReplicaImplementation $$SUBNET_GATEWAY $$USDCTEST_ADDR $$ORIGIN_NET_CHAIN_ID '[]' $$LinkedTokenControllerProxy $$REPLICA_TOKEN_NAME $$REPLICA_TOKEN_SYMBOL $$REPLICA_TOKEN_DECIMALS
 
 upgrade-controller-proxy:
 	@echo "Upgrading token replica proxy contract on IPC... Please run make deploy-replica-implementation-v2 to deploy a new implementation and upgrade config.json before running this command."
@@ -135,4 +135,4 @@ upgrade-controller-proxy:
 	USDCTEST_ADDR=$$(cat config.json | jq -r '.LinkedToken.OriginalToken'); \
 	LinkedTokenReplicaProxy=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenReplica'); \
 	LinkedTokenControllerProxy=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenController'); \
-	forge script script/DeployIpcTokenController.s.sol:DeployIpcTokenController --skip-simulation --rpc-url $$CALIBNET_RPC_URL --private-key $$CALIBNET_PRIVATE_KEY --broadcast -vvvv --ffi --sig "upgradeIpcTokenController(address,address,address,address,uint64,address[],address)" -- $$LinkedTokenControllerProxy $$LinkedTokenControllerImplementation $$CALIBNET_GATEWAY $$USDCTEST_ADDR $$CALIBNET_CHAIN_ID "[$$SUBNET_ROUTE_IN_ETH_FORMAT]" $$LinkedTokenReplicaProxy
+	forge script script/DeployIpcTokenController.s.sol:DeployIpcTokenController --skip-simulation --rpc-url $$ORIGIN_NET_RPC_URL --private-key $$ORIGIN_NET_PRIVATE_KEY --broadcast -vvvv --ffi --sig "upgradeIpcTokenController(address,address,address,address,uint64,address[],address)" -- $$LinkedTokenControllerProxy $$LinkedTokenControllerImplementation $$ORIGIN_NET_GATEWAY $$USDCTEST_ADDR $$ORIGIN_NET_CHAIN_ID "[$$SUBNET_ROUTE_IN_ETH_FORMAT]" $$LinkedTokenReplicaProxy
