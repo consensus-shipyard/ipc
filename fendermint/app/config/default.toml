@@ -183,6 +183,11 @@ max_provider_age = 300
 # Leaving it empty disables the IPLD Resolver.
 listen_addr = ""
 
+# A list of known external addresses this node is reachable on.
+# If left empty we rely on the `libp2p::Swarm` and the `Identity` protocol to discover it
+# automatically as it's reported back to us from peers, although this might not work sufficiently.
+external_addresses = []
+
 # Maximum number of incoming connections.
 max_incoming = 30
 

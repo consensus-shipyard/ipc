@@ -419,6 +419,7 @@ fn to_resolver_config(settings: &Settings) -> anyhow::Result<ipc_ipld_resolver::
     let config = Config {
         connection: ConnectionConfig {
             listen_addr: r.connection.listen_addr.clone(),
+            external_addresses: r.connection.external_addresses.clone(),
             expected_peer_count: r.connection.expected_peer_count,
             max_incoming: r.connection.max_incoming,
             max_peers_per_query: r.connection.max_peers_per_query,
