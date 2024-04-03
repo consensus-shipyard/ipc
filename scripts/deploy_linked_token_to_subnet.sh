@@ -138,12 +138,12 @@ make link-controller || true
 
 # Step 11: Approve the USDCTest token to be transferred.
 echo "$DASHES Approving token (on calibration net) to be transferred..."
-make approve-usdc || true
+make approve-token || true
 
 # Step 12: Transfer the USDCTest token from calibration to subnet.
 echo "$DASHES Depositing token from calibration net to subnet..."
 sleep 30
-make deposit-usdc || true
+make deposit-token || true
 
 # Step 13: Verify that token balance has been moved.
 echo "$DASHES Checking token balance after deposit..."
