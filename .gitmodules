@@ -31,3 +31,6 @@
 [submodule "extras/linked-token/lib/openzeppelin-contracts"]
 	path = extras/linked-token/lib/openzeppelin-contracts
 	url = https://github.com/openzeppelin/openzeppelin-contracts
+[submodule "extras/linked-token/lib/filecoin-solidity"]
+	path = extras/linked-token/lib/filecoin-solidity
+	url = https://github.com/filecoin-project/filecoin-solidity
