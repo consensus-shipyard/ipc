@@ -46,7 +46,9 @@ library SupplySourceHelper {
         }
     }
 
-    /// @notice Locks the specified amount sent by the msg.sender into custody.
+    /// @notice Locks the specified amount from msg.sender into custody.
+    ///         Reverts with NoBalanceIncrease if the token balance does not increase.
+    ///         May return more than requested for inflationary tokens due to balance rise.
     function lock(SupplySource memory supplySource, uint256 value) internal returns (uint256) {
         if (supplySource.kind == SupplyKind.ERC20) {
             IERC20 token = IERC20(supplySource.tokenAddress);
