@@ -52,6 +52,10 @@ else
   source ${HOME}/.bashrc
 fi
 
+echo rustc --version
+rustc --version
+rustup update
+echo rustc --version
 rustc --version
 
 # Step 1.3: Install cargo-make and toml-cli
