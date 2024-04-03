@@ -6,7 +6,7 @@ PACKAGE := $(patsubst %, --package %, $(CRATE))
 all: test build
 
 build:
-	cargo build --release -Z unstable-options
+	cargo build --release
 
 test:
 	cargo test --release $(PACKAGE)
