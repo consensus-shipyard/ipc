@@ -38,6 +38,8 @@ use ethers::prelude::{Signer, SignerMiddleware};
 use ethers::providers::{Authorization, Http, Middleware, Provider};
 use ethers::signers::{LocalWallet, Wallet};
 use ethers::types::{BlockId, Eip1559TransactionRequest, ValueOrArray, I256, U256};
+use ethers::{contract::abigen};
+
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_api::checkpoint::{
@@ -81,6 +83,17 @@ struct IPCContractInfo {
     chain_id: u64,
     provider: Provider<Http>,
 }
+
+//TODO receive clarity on this implementation
+abigen!(
+    IERC20,
+    r#"[
+        function approve(address spender, uint256 amount) external returns (bool)
+        event Transfer(address indexed from, address indexed to, uint256 value)
+        event Approval(address indexed owner, address indexed spender, uint256 value)
+    ]"#,
+);
+
 
 #[async_trait]
 impl TopDownFinalityQuery for EthSubnetManager {
@@ -547,6 +560,42 @@ impl SubnetManager for EthSubnetManager {
             gateway_manager_facet::FvmAddress::try_from(to)?,
         );
         txn.tx.set_value(value);
+        let txn = call_with_premium_estimation(signer, txn).await?;
+
+        let pending_tx = txn.send().await?;
+        let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
+        block_number_from_receipt(receipt)
+    }
+
+    /// Approves the `from` address to use up to `amount` tokens from `token_address`.
+    async fn approve_token(
+        &self,
+        subnet: SubnetID,
+        from: Address,
+        amount: TokenAmount,
+    ) -> Result<ChainEpoch> {
+
+        log::debug!("approve token, subnet: {subnet}, amount: {amount}, from: {from}");
+
+        let value = fil_amount_to_eth_amount(&amount)?;
+
+        let signer = Arc::new(self.get_signer(&from)?);
+
+
+        // TODO get token_address from SubnetActorGetterFacet::supplySource.tokenAddress
+        // SupplySource memory supplySource = SubnetActorGetterFacet(subnetId.getActor()).supplySource();
+        // and validate: supplySource.expect(SupplyKind.ERC20);
+
+        let evm_token_address = payload_to_evm_address(from.payload())?; /* TODO change from to the token address */
+        let token_contract = IERC20::new(
+            evm_token_address,
+            signer.clone(),
+        );
+
+        let txn = token_contract.approve(
+            self.ipc_contract_info.gateway_addr,
+            value,
+        );
         let txn = call_with_premium_estimation(signer, txn).await?;
 
         let pending_tx = txn.send().await?;

@@ -142,6 +142,15 @@ impl CommandLineHandler for FundWithToken {
             .map_err(|e| anyhow::anyhow!("not a token amount: {e}"))
             .map(TokenAmount::from_atto)?;
 
+        //todo create the approve here following the fund_with_token
+        //  Erc20(address).approve(address, amount)
+        //	cast send $$USDCTEST_ADDR "approve(address,uint256)" --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY -- $$CONTROLLER_ADDR $$AMOUNT
+
+        println!(
+            "approve token performed in epoch: {:?}",
+            provider.approve_token(subnet.clone(), from, amount.clone()).await?,
+        );
+
         println!(
             "fund with token performed in epoch: {:?}",
             provider.fund_with_token(subnet, from, to, amount).await?,
