@@ -16,10 +16,11 @@ contract DelegationManager is Ownable, ReentrancyGuard {
     }
 
     struct OperatorDetails {
+        address operatorAddress;
         address earningsReceiver;
         address delegationApprover;
         uint32 stakerOptOutDelayBlocks;
-        bytes32 name;
+        string name;
         OperatorType operatorType;
         uint256 slashes;
     }
@@ -37,10 +38,7 @@ contract DelegationManager is Ownable, ReentrancyGuard {
     address[] public operators;
 
     modifier onlyStrategyManager() {
-        require(
-            msg.sender == address(strategyManager),
-            "DelegationManager: caller is not the StrategyManager"
-        );
+        require(msg.sender == address(strategyManager), "DelegationManager: caller is not the StrategyManager");
         _;
     }
 
@@ -48,16 +46,11 @@ contract DelegationManager is Ownable, ReentrancyGuard {
         strategyManager = _strategyManager;
     }
 
-    function setSlasher(
-        OperatorType operatorType,
-        address _slasher
-    ) external onlyOwner {
+    function setSlasher(OperatorType operatorType, address _slasher) external onlyOwner {
         slashers[operatorType] = _slasher;
     }
 
-    function registerAsOperator(
-        OperatorDetails calldata registeringOperatorDetails
-    ) external {
+    function registerAsOperator(OperatorDetails calldata registeringOperatorDetails) external {
         require(
             _operatorDetails[msg.sender].earningsReceiver == address(0),
             "DelegationManager.registerAsOperator: operator has already registered"
@@ -67,13 +60,8 @@ contract DelegationManager is Ownable, ReentrancyGuard {
         _delegate(msg.sender, msg.sender);
     }
 
-    function modifyOperatorDetails(
-        OperatorDetails calldata newOperatorDetails
-    ) external {
-        require(
-            isOperator(msg.sender),
-            "DelegationManager.modifyOperatorDetails: caller is not an operator"
-        );
+    function modifyOperatorDetails(OperatorDetails calldata newOperatorDetails) external {
+        require(isOperator(msg.sender), "DelegationManager.modifyOperatorDetails: caller is not an operator");
         _setOperatorDetails(msg.sender, newOperatorDetails);
     }
 
@@ -81,43 +69,22 @@ contract DelegationManager is Ownable, ReentrancyGuard {
         _delegate(msg.sender, operator);
     }
 
-    function increaseDelegatedShares(
-        address staker,
-        IStrategy strategy,
-        uint256 shares
-    ) external onlyStrategyManager {
+    function increaseDelegatedShares(address staker, IStrategy strategy, uint256 shares) external onlyStrategyManager {
         if (isDelegated(staker)) {
             address operator = delegatedTo[staker];
-            _increaseOperatorShares({
-                operator: operator,
-                staker: staker,
-                strategy: strategy,
-                shares: shares
-            });
+            _increaseOperatorShares({operator: operator, staker: staker, strategy: strategy, shares: shares});
         }
     }
 
-    function decreaseDelegatedShares(
-        address staker,
-        IStrategy strategy,
-        uint256 shares
-    ) external onlyStrategyManager {
+    function decreaseDelegatedShares(address staker, IStrategy strategy, uint256 shares) external onlyStrategyManager {
         if (isDelegated(staker)) {
             address operator = delegatedTo[staker];
-            _decreaseOperatorShares({
-                operator: operator,
-                staker: staker,
-                strategy: strategy,
-                shares: shares
-            });
+            _decreaseOperatorShares({operator: operator, staker: staker, strategy: strategy, shares: shares});
         }
     }
 
     function slashOperator(address operator) external {
-        require(
-            isOperator(operator),
-            "DelegationManager.slashOperator: operator is not registered"
-        );
+        require(isOperator(operator), "DelegationManager.slashOperator: operator is not registered");
         OperatorType operatorType = _operatorDetails[operator].operatorType;
         require(
             msg.sender == slashers[operatorType],
@@ -126,58 +93,31 @@ contract DelegationManager is Ownable, ReentrancyGuard {
         _operatorDetails[operator].slashes++;
     }
 
-    function _setOperatorDetails(
-        address operator,
-        OperatorDetails calldata newOperatorDetails
-    ) internal {
+    function _setOperatorDetails(address operator, OperatorDetails calldata newOperatorDetails) internal {
         require(
             newOperatorDetails.earningsReceiver != address(0),
             "DelegationManager._setOperatorDetails: earningsReceiver cannot be 0"
         );
         _operatorDetails[operator] = newOperatorDetails;
+        _operatorDetails[operator].operatorAddress = msg.sender;
     }
 
     function _delegate(address staker, address operator) internal {
-        require(
-            !isDelegated(staker),
-            "DelegationManager._delegate: staker is already actively delegated"
-        );
-        require(
-            isOperator(operator),
-            "DelegationManager._delegate: operator is not registered"
-        );
-        address _delegationApprover = _operatorDetails[operator]
-            .delegationApprover;
+        require(!isDelegated(staker), "DelegationManager._delegate: staker is already actively delegated");
+        require(isOperator(operator), "DelegationManager._delegate: operator is not registered");
+        address _delegationApprover = _operatorDetails[operator].delegationApprover;
         delegatedTo[staker] = operator;
-        (
-            IStrategy[] memory strategies,
-            uint256[] memory shares
-        ) = getDelegatableShares(staker);
+        (IStrategy[] memory strategies, uint256[] memory shares) = getDelegatableShares(staker);
         for (uint256 i = 0; i < strategies.length; i++) {
-            _increaseOperatorShares({
-                operator: operator,
-                staker: staker,
-                strategy: strategies[i],
-                shares: shares[i]
-            });
+            _increaseOperatorShares({operator: operator, staker: staker, strategy: strategies[i], shares: shares[i]});
         }
     }
 
-    function _increaseOperatorShares(
-        address operator,
-        address staker,
-        IStrategy strategy,
-        uint256 shares
-    ) internal {
+    function _increaseOperatorShares(address operator, address staker, IStrategy strategy, uint256 shares) internal {
         operatorShares[operator][strategy] += shares;
     }
 
-    function _decreaseOperatorShares(
-        address operator,
-        address staker,
-        IStrategy strategy,
-        uint256 shares
-    ) internal {
+    function _decreaseOperatorShares(address operator, address staker, IStrategy strategy, uint256 shares) internal {
         operatorShares[operator][strategy] -= shares;
     }
 
@@ -189,28 +129,19 @@ contract DelegationManager is Ownable, ReentrancyGuard {
         return _operatorDetails[operator].earningsReceiver != address(0);
     }
 
-    function operatorDetails(
-        address operator
-    ) external view returns (OperatorDetails memory) {
+    function operatorDetails(address operator) external view returns (OperatorDetails memory) {
         return _operatorDetails[operator];
     }
 
-    function earningsReceiver(
-        address operator
-    ) external view returns (address) {
+    function earningsReceiver(address operator) external view returns (address) {
         return _operatorDetails[operator].earningsReceiver;
     }
 
-    function delegationApprover(
-        address operator
-    ) external view returns (address) {
+    function delegationApprover(address operator) external view returns (address) {
         return _operatorDetails[operator].delegationApprover;
     }
 
-    function getOperatorShares(
-        address operator,
-        IStrategy[] memory strategies
-    ) public view returns (uint256[] memory) {
+    function getOperatorShares(address operator, IStrategy[] memory strategies) public view returns (uint256[] memory) {
         uint256[] memory shares = new uint256[](strategies.length);
         for (uint256 i = 0; i < strategies.length; ++i) {
             shares[i] = operatorShares[operator][strategies[i]];
@@ -218,24 +149,14 @@ contract DelegationManager is Ownable, ReentrancyGuard {
         return shares;
     }
 
-    function getDelegatableShares(
-        address staker
-    ) public view returns (IStrategy[] memory, uint256[] memory) {
-        (
-            IStrategy[] memory strategyManagerStrats,
-            uint256[] memory strategyManagerShares
-        ) = strategyManager.getDeposits(staker);
+    function getDelegatableShares(address staker) public view returns (IStrategy[] memory, uint256[] memory) {
+        (IStrategy[] memory strategyManagerStrats, uint256[] memory strategyManagerShares) = strategyManager
+            .getDeposits(staker);
         return (strategyManagerStrats, strategyManagerShares);
     }
 
-    function getAllOperators()
-        external
-        view
-        returns (OperatorDetails[] memory)
-    {
-        OperatorDetails[] memory details = new OperatorDetails[](
-            operators.length
-        );
+    function getAllOperators() external view returns (OperatorDetails[] memory) {
+        OperatorDetails[] memory details = new OperatorDetails[](operators.length);
         for (uint256 i = 0; i < operators.length; ++i) {
             details[i] = _operatorDetails[operators[i]];
         }
