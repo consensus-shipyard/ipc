@@ -67,7 +67,7 @@ pub struct VoteTally<K = ValidatorKey, V = BlockHash> {
 
 impl<K, V> VoteTally<K, V>
 where
-    K: Clone + Hash + Eq + Sync + Send + 'static,
+    K: Clone + Hash + Eq + Sync + Send + 'static + Debug,
     V: AsRef<[u8]> + Clone + Hash + Eq + Sync + Send + 'static,
 {
     /// Create an uninitialized instance. Before blocks can be added to it
@@ -235,6 +235,7 @@ where
         let chain = self.chain.read()?;
 
         let Some((finalized_height, _)) = chain.get_min() else {
+            tracing::debug!("finalized height not found");
             return Ok(None);
         };
 
@@ -246,15 +247,23 @@ where
 
         for (block_height, block_hash) in chain.iter().rev() {
             if block_height == finalized_height {
+                tracing::debug!(
+                    block_height,
+                    finalized_height,
+                    "finalized height and block height equal, no new proposals"
+                );
                 break; // This block is already finalized in the ledger, no need to propose it again.
             }
             let Some(block_hash) = block_hash else {
+                tracing::debug!(block_height, "null block found in vote proposal");
                 continue; // Skip null blocks
             };
             let Some(votes_at_height) = votes.get(block_height) else {
+                tracing::debug!(block_height, "no votes");
                 continue;
             };
             let Some(votes_for_block) = votes_at_height.get(block_hash) else {
+                tracing::debug!(block_height, "no votes for block");
                 continue; // We could detect equovicating voters here.
             };
 
@@ -262,8 +271,11 @@ where
                 if voters.insert(vk.clone()).is_none() {
                     // New voter, get their current weight; it might be 0 if they have been removed.
                     weight += power_table.get(vk).cloned().unwrap_or_default();
+                    tracing::debug!(weight, key = ?vk, "new voter");
                 }
             }
+
+            tracing::debug!(weight, quorum_threshold, "showdown");
 
             if weight >= quorum_threshold {
                 return Ok(Some((*block_height, block_hash.clone())));

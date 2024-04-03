@@ -9,24 +9,11 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/se
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-
-
 import {CrossMsgHelper} from "../src/lib/CrossMsgHelper.sol";
 
-// Interface that needs to be implemented by IPC-aware contracts.
-//
-// TODO: extract to a shared module, so that both the IPC contracts and the SDK can depend on this.
-//  (IPC contracts reaching into the SDK is wrong).
-interface IpcHandler {
-    error CallerIsNotGateway();
-    error UnsupportedMsgKind();
-    error UnrecognizedResult();
+import {IIpcHandler} from "./interfaces/IIpcHandler.sol";
 
-    /// @notice Entrypoint for handling xnet messages in IPC-aware contracts.
-    function handleIpcMessage(IpcEnvelope calldata envelope) external payable returns (bytes memory ret);
-}
-
-abstract contract IpcExchangeUpgradeable is Initializable, IpcHandler, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+abstract contract IpcExchangeUpgradeable is Initializable, IIpcHandler, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     using CrossMsgHelper for IpcEnvelope;
 
     // The address of the gateway in the network.
@@ -40,14 +27,11 @@ abstract contract IpcExchangeUpgradeable is Initializable, IpcHandler, OwnableUp
         _disableInitializers();
     }
 
-
-     function __IpcExchangeUpgradeable_init(address gatewayAddr_) public onlyInitializing {
-         gatewayAddr = gatewayAddr_;
-         __Ownable_init();
-         __ReentrancyGuard_init();
-     }
-
-
+    function __IpcExchangeUpgradeable_init(address gatewayAddr_) public onlyInitializing {
+        gatewayAddr = gatewayAddr_;
+        __Ownable_init();
+        __ReentrancyGuard_init();
+    }
 
     /// @notice Entrypoint for IPC-enabled contracts. This function is always called by
     /// the gateway when a `Call` or `Receipt` cross-net messages is targeted to
@@ -64,7 +48,7 @@ abstract contract IpcExchangeUpgradeable is Initializable, IpcHandler, OwnableUp
             // If we were not tracking it, or if some details don't match, refuse to handle the receipt.
             IpcEnvelope storage orig = inflightMsgs[result.id];
             if (orig.message.length == 0 || keccak256(abi.encode(envelope.from)) != keccak256(abi.encode(orig.to))) {
-                revert IpcHandler.UnrecognizedResult();
+                revert IIpcHandler.UnrecognizedResult();
             }
 
             /// Note: if the result handler reverts, we will
@@ -128,7 +112,7 @@ abstract contract IpcExchangeUpgradeable is Initializable, IpcHandler, OwnableUp
     function _onlyGateway() private view {
         // only the gateway address is allowed to deliver xnet messages.
         if (msg.sender != gatewayAddr) {
-            revert IpcHandler.CallerIsNotGateway();
+            revert IIpcHandler.CallerIsNotGateway();
         }
     }
 

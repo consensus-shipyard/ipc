@@ -3,12 +3,12 @@ pragma solidity 0.8.23;
 
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
-import {LinkedToken} from "./LinkedToken.sol";
+import {LinkedToken} from "../LinkedToken.sol";
 import {SubnetID} from "@ipc/src/structs/Subnet.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract LinkedTokenController is Initializable, LinkedToken, UUPSUpgradeable {
+contract LinkedTokenControllerV2 is Initializable, LinkedToken, UUPSUpgradeable {
     using SafeERC20 for IERC20;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -16,12 +16,12 @@ contract LinkedTokenController is Initializable, LinkedToken, UUPSUpgradeable {
         _disableInitializers();
     }
 
-    function initialize(
+    function reinitialize(
         address gateway,
         address underlyingToken,
         SubnetID memory linkedSubnet,
         address linkedContract
-    ) public initializer {
+    ) public reinitializer(2) {
         __LinkedToken_init(gateway, underlyingToken, linkedSubnet, linkedContract);
         __UUPSUpgradeable_init();
     }
