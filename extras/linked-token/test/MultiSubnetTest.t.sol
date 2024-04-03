@@ -32,7 +32,7 @@ import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMs
 import {SubnetIDHelper} from "@ipc/src/lib/SubnetIDHelper.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {CrossMsgHelper} from "@ipc/src/lib/CrossMsgHelper.sol";
-import {IpcHandler} from "@ipc/sdk/IpcContract.sol";
+import {IIpcHandler} from "@ipc/sdk/interfaces/IIpcHandler.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import "forge-std/console.sol";
 
@@ -291,7 +291,7 @@ contract MultiSubnetTest is IntegrationTestBase {
 
         //confirm that token replica only accept calls to Ipc from the gateway
         vm.prank(owner);
-        vm.expectRevert(IpcHandler.CallerIsNotGateway.selector);
+        vm.expectRevert(IIpcHandler.CallerIsNotGateway.selector);
         ipcTokenReplica.handleIpcMessage(expected);
 
         // the message the root gateway's postbox is being executed in the token subnet's gateway
