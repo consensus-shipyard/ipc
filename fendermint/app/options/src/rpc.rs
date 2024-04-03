@@ -1,7 +1,9 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use anyhow::anyhow;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use bytes::Bytes;
 use cid::Cid;
@@ -185,4 +187,17 @@ pub enum BroadcastMode {
     Sync,
     /// Wait for the result of `deliver_tx`.
     Commit,
+}
+
+impl FromStr for BroadcastMode {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "async" => Self::Async,
+            "sync" => Self::Sync,
+            "commit" => Self::Commit,
+            _ => return Err(anyhow!("invalid broadcast mode")),
+        })
+    }
 }

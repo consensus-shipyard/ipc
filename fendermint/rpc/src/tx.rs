@@ -25,7 +25,7 @@ use crate::message::{GasParams, SignedMessageFactory};
 use crate::query::{QueryClient, QueryResponse};
 use crate::response::{
     decode_bytes, decode_cid_string, decode_fevm_create, decode_fevm_invoke, decode_machine_create,
-    decode_os_get, decode_os_list,
+    decode_machine_list, decode_os_get, decode_os_list,
 };
 
 /// Abstracting away what the return value is based on whether
@@ -185,6 +185,33 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
 /// Convenience trait to call FEVM methods in read-only mode, without doing a transaction.
 #[async_trait]
 pub trait CallClient: QueryClient + BoundClient {
+    /// List machines by owner.
+    async fn list_machines_call(
+        &mut self,
+        owner: Address,
+        value: TokenAmount,
+        gas_params: GasParams,
+        height: FvmQueryHeight,
+    ) -> anyhow::Result<CallResponse<adm::ListByOwnerReturn>> {
+        let msg = self
+            .message_factory_mut()
+            .list_machines(owner, value, gas_params)?;
+
+        let response = self.call(msg, height).await?;
+        if response.value.code.is_err() {
+            return Err(anyhow!("{}", response.value.info));
+        }
+        let return_data = decode_machine_list(&response.value)
+            .context("error decoding data from deliver_tx in call")?;
+
+        let response = CallResponse {
+            response,
+            return_data: Some(return_data),
+        };
+
+        Ok(response)
+    }
+
     /// Get an object in an object store without including a transaction on the blockchain.
     async fn os_get_call(
         &mut self,

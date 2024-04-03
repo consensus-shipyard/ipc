@@ -4,10 +4,10 @@
 
 use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
-use fil_actors_evm_shared::address::EthAddress;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::{strict_bytes::ByteBuf, tuple::*, DAG_CBOR};
 use fvm_ipld_hamt::{BytesKey, Hamt};
+use fvm_shared::ActorID;
 use serde::{Deserialize, Serialize};
 
 pub const BIT_WIDTH: u32 = 8;
@@ -18,7 +18,7 @@ const MAX_LIST_LIMIT: usize = 10000;
 #[derive(Serialize_tuple, Deserialize_tuple)]
 pub struct State {
     /// The machine creator
-    pub creator: EthAddress,
+    pub creator: ActorID,
     /// The root cid of the Hamt.
     pub root: Cid,
 }
@@ -59,7 +59,7 @@ pub enum ObjectListItem {
 }
 
 impl State {
-    pub fn new<BS: Blockstore>(store: &BS, creator: EthAddress) -> anyhow::Result<Self> {
+    pub fn new<BS: Blockstore>(store: &BS, creator: ActorID) -> anyhow::Result<Self> {
         let root = match Hamt::<_, Object>::new_with_bit_width(store, BIT_WIDTH).flush() {
             Ok(cid) => cid,
             Err(e) => {
@@ -216,7 +216,7 @@ mod tests {
     #[test]
     fn test_constructor() {
         let store = MemoryBlockstore::default();
-        let state = State::new(&store, EthAddress::from_id(100));
+        let state = State::new(&store, 100);
         assert!(state.is_ok());
         assert_eq!(
             state.unwrap().root,
@@ -228,7 +228,7 @@ mod tests {
     #[test]
     fn test_put_internal() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(&store, EthAddress::from_id(100)).unwrap();
+        let mut state = State::new(&store, 100).unwrap();
         assert!(state
             .put(
                 &store,
@@ -248,7 +248,7 @@ mod tests {
     #[test]
     fn test_put_external() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(&store, EthAddress::from_id(100)).unwrap();
+        let mut state = State::new(&store, 100).unwrap();
         assert!(state
             .put(
                 &store,
@@ -268,7 +268,7 @@ mod tests {
     #[test]
     fn test_resolve_external() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(&store, EthAddress::from_id(100)).unwrap();
+        let mut state = State::new(&store, 100).unwrap();
         let key = BytesKey(vec![1, 2, 3]);
         state
             .put(
@@ -293,7 +293,7 @@ mod tests {
     #[test]
     fn test_delete_internal() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(&store, EthAddress::from_id(100)).unwrap();
+        let mut state = State::new(&store, 100).unwrap();
         let key = BytesKey(vec![1, 2, 3]);
         state
             .put(
@@ -313,7 +313,7 @@ mod tests {
     #[test]
     fn test_delete_external() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(&store, EthAddress::from_id(100)).unwrap();
+        let mut state = State::new(&store, 100).unwrap();
         let key = BytesKey(vec![1, 2, 3]);
         state
             .put(
@@ -333,7 +333,7 @@ mod tests {
     #[test]
     fn test_get_internal() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(&store, EthAddress::from_id(100)).unwrap();
+        let mut state = State::new(&store, 100).unwrap();
         let key = BytesKey(vec![1, 2, 3]);
         state
             .put(
@@ -355,7 +355,7 @@ mod tests {
     #[test]
     fn test_get_external() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(&store, EthAddress::from_id(100)).unwrap();
+        let mut state = State::new(&store, 100).unwrap();
         let key = BytesKey(vec![1, 2, 3]);
         state
             .put(
@@ -417,7 +417,7 @@ mod tests {
     #[test]
     fn test_list_all_keys() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(&store, EthAddress::from_id(100)).unwrap();
+        let mut state = State::new(&store, 100).unwrap();
 
         let (_, _, baz_key) = create_and_put_objects(&mut state, &store).unwrap();
 
@@ -434,7 +434,7 @@ mod tests {
     #[test]
     fn test_list_keys_with_prefix() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(&store, EthAddress::from_id(100)).unwrap();
+        let mut state = State::new(&store, 100).unwrap();
 
         let (_, bar_key, baz_key) = create_and_put_objects(&mut state, &store).unwrap();
 
@@ -452,7 +452,7 @@ mod tests {
     #[test]
     fn test_list_keys_with_delimiter() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(&store, EthAddress::from_id(100)).unwrap();
+        let mut state = State::new(&store, 100).unwrap();
 
         let (jpeg_key, _, _) = create_and_put_objects(&mut state, &store).unwrap();
 
@@ -475,7 +475,7 @@ mod tests {
     #[test]
     fn test_list_keys_with_nested_delimiter() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(&store, EthAddress::from_id(100)).unwrap();
+        let mut state = State::new(&store, 100).unwrap();
 
         let jpeg_key = BytesKey("foo.jpeg".as_bytes().to_vec());
         state
@@ -519,7 +519,7 @@ mod tests {
     #[test]
     fn test_list_with_offset_and_limit() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(&store, EthAddress::from_id(100)).unwrap();
+        let mut state = State::new(&store, 100).unwrap();
 
         let (_, _, baz_key) = create_and_put_objects(&mut state, &store).unwrap();
 

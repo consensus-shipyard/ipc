@@ -17,6 +17,7 @@ pub enum Method {
     Constructor = METHOD_CONSTRUCTOR,
     CreateExternal = 2,
     UpdateDeployers = 3,
+    ListByOwner = 4,
 }
 
 /// Helper for machine creation.
@@ -30,4 +31,16 @@ pub struct CreateParams {
 pub struct CreateReturn {
     pub actor_id: ActorID,
     pub robust_address: Option<Address>,
+}
+
+/// Helper for listing machines by owner.
+#[derive(Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct ListByOwnerParams {
+    pub owner: Address,
+}
+
+/// Helper to read return value from machine list.
+#[derive(Debug, Default, Clone, Serialize_tuple, Deserialize_tuple)]
+pub struct ListByOwnerReturn {
+    pub machines: Vec<Address>,
 }

@@ -194,6 +194,36 @@ impl SignedMessageFactory {
         Ok(chain)
     }
 
+    /// List machines by owner.
+    pub fn list_machines(
+        &mut self,
+        owner: Address,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<Message> {
+        let input = adm::ListByOwnerParams { owner };
+        let params = RawBytes::serialize(input)?;
+        let message = self.transaction(
+            adm::ADM_ACTOR_ADDR,
+            adm::Method::ListByOwner as u64,
+            params,
+            value,
+            gas_params,
+            None,
+        )?;
+
+        let message = if let ChainMessage::Signed(signed) = message {
+            signed.into_message()
+        } else {
+            panic!("unexpected message type: {message:?}");
+        };
+
+        // Roll back the sequence, we don't really want to invoke anything.
+        self.inner.set_sequence(message.sequence);
+
+        Ok(message)
+    }
+
     /// Create an object store.
     pub fn os_create(
         &mut self,

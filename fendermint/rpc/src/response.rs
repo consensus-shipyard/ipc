@@ -76,6 +76,13 @@ pub fn decode_machine_create(deliver_tx: &DeliverTx) -> anyhow::Result<adm::Crea
         .map_err(|e| anyhow!("error parsing as CreateReturn: {e}"))
 }
 
+/// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as [`ListByOwnerReturn`].
+pub fn decode_machine_list(deliver_tx: &DeliverTx) -> anyhow::Result<adm::ListByOwnerReturn> {
+    let data = decode_data(&deliver_tx.data)?;
+    fvm_ipld_encoding::from_slice::<adm::ListByOwnerReturn>(&data)
+        .map_err(|e| anyhow!("error parsing as ListByOwnerReturn: {e}"))
+}
+
 /// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as an [`Object`].
 pub fn decode_os_get(deliver_tx: &DeliverTx) -> anyhow::Result<Option<Object>> {
     let data = decode_data(&deliver_tx.data)?;

@@ -1,7 +1,6 @@
 .PHONY: all build test lint license check-fmt check-clippy actor-bundle
 
 BUILTIN_ACTORS_FOLDER ?= $(PWD)/../../builtin-actors
-BUILTIN_ACTORS_BRANCH ?= v12.0.0+adm
 BUILTIN_ACTORS_BUNDLE := $(PWD)/builtin-actors/output/bundle.car
 CUSTOM_ACTORS_BUNDLE  := $(PWD)/actors/output/custom_actors_bundle.car
 
@@ -90,8 +89,8 @@ e2e: docker-build | cargo-make
 
 clean:
 	cargo clean
-	rm $(BUILTIN_ACTORS_BUNDLE)
-	rm $(CUSTOM_ACTORS_BUNDLE)
+	rm -f $(BUILTIN_ACTORS_BUNDLE)
+	rm -f $(CUSTOM_ACTORS_BUNDLE)
 	rm -rf testing/materializer/tests/docker-materializer
 
 lint: \
@@ -145,7 +144,7 @@ compile-abi: $(IPC_ACTORS_GEN)
 # Download a released builtin-actors bundle CAR file.
 $(BUILTIN_ACTORS_BUNDLE):
 	mkdir -p $(dir $@)
-	(cd $(BUILTIN_ACTORS_FOLDER) && git checkout $(BUILTIN_ACTORS_BRANCH) && make bundle-mainnet)
+	(cd $(BUILTIN_ACTORS_FOLDER) && make bundle-mainnet)
 	cp $(BUILTIN_ACTORS_FOLDER)/output/builtin-actors-mainnet.car $@
 
 # Build a bundle CAR for the custom actors in this repo.

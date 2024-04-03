@@ -8,7 +8,11 @@
 # 2. You may need to rerun the script after docker installation for the first time
 # 2. You may need to manually install nodejs and npm on the host
 
-set -euxo pipefail
+set -euo pipefail
+
+eval `ssh-agent -s`
+ssh-add
+ssh-add ${HOME}/.ssh/id_rsa.ipc
 
 DASHES='------'
 if [[ ! -v IPC_FOLDER ]]; then
@@ -16,7 +20,6 @@ if [[ ! -v IPC_FOLDER ]]; then
 else
     IPC_FOLDER=${IPC_FOLDER}
 fi
-IPC_CLI=${IPC_FOLDER}/target/release/ipc-cli
 IPC_CONFIG_FOLDER=${HOME}/.ipc
 
 wallet_addresses=()
@@ -140,6 +143,11 @@ if ! $local_deploy ; then
   if ! ls $IPC_FOLDER/../builtin-actors ; then
     git clone -j8 git@github.com:amazingdatamachine/builtin-actors.git ${IPC_FOLDER}/../builtin-actors
   fi
+  cd ${IPC_FOLDER}/../builtin-actors
+  git fetch
+  git stash
+  git checkout v12.0.0+adm
+  git pull --rebase origin v12.0.0+adm
 fi
 
 echo "$DASHES Building ipc contracts..."
@@ -148,7 +156,7 @@ make build
 
 echo "$DASHES Building ipc-cli..."
 cd ${IPC_FOLDER}/ipc
-make build
+make install
 
 # Step 3: Prepare wallet by using existing wallet json file
 echo "$DASHES Using 3 address in wallet..."
@@ -166,7 +174,7 @@ echo "Default wallet address: $default_wallet_address"
 # Step 4.1: Export validator private keys into files
 for i in {0..2}
 do
-  $IPC_CLI wallet export --wallet-type evm --address ${wallet_addresses[i]} --hex > ${IPC_CONFIG_FOLDER}/validator_${i}.sk
+  ipc-cli wallet export --wallet-type evm --address ${wallet_addresses[i]} --hex > ${IPC_CONFIG_FOLDER}/validator_${i}.sk
   echo "Export private key for ${wallet_addresses[i]} to ${IPC_CONFIG_FOLDER}/validator_${i}.sk"
 done
 
@@ -189,7 +197,7 @@ cp /tmp/config.toml.2 ${IPC_CONFIG_FOLDER}/config.toml
 
 # Step 5: Create a subnet
 echo "$DASHES Creating a child subnet..."
-create_subnet_output=$($IPC_CLI subnet create --parent /r314159 --min-validators 3 --min-validator-stake 1 --bottomup-check-period 30 --from $default_wallet_address --permission-mode collateral --supply-source-kind native 2>&1)
+create_subnet_output=$(ipc-cli subnet create --parent /r314159 --min-validators 3 --min-validator-stake 1 --bottomup-check-period 30 --from $default_wallet_address --permission-mode collateral --supply-source-kind native 2>&1)
 echo $create_subnet_output
 subnet_id=$(echo $create_subnet_output | sed 's/.*with id: \([^ ]*\).*/\1/')
 
@@ -207,7 +215,7 @@ cp /tmp/config.toml.3 ${IPC_CONFIG_FOLDER}/config.toml
 echo "$DASHES Generating pubkey for wallet addresses... $default_wallet_address"
 for i in {0..2}
 do
-  pubkey=$($IPC_CLI wallet pub-key --wallet-type evm --address ${wallet_addresses[i]})
+  pubkey=$(ipc-cli wallet pub-key --wallet-type evm --address ${wallet_addresses[i]})
   echo "Wallet $i address's pubkey: $pubkey"
   address_pubkeys+=($pubkey)
 done
@@ -217,13 +225,14 @@ echo "$DASHES Join subnet for addresses in wallet..."
 for i in {0..2}
 do
   echo "Joining subnet ${subnet_id} for address ${wallet_addresses[i]}"
-  $IPC_CLI subnet join --from ${wallet_addresses[i]} --subnet $subnet_id --public-key ${address_pubkeys[i]} --initial-balance 1 --collateral 10
+  ipc-cli subnet join --from ${wallet_addresses[i]} --subnet $subnet_id --public-key ${address_pubkeys[i]} --initial-balance 1 --collateral 10
 done
 
 # Step 8: Start validators
 
 # Step 8.1 (optional): Rebuild fendermint docker
 cd ${IPC_FOLDER}/fendermint
+make clean
 make docker-build
 
 # Step 8.2: Start the bootstrap validator node
@@ -298,12 +307,12 @@ for i in {0..2}
 do
   proxy_key=$(cat ${IPC_CONFIG_FOLDER}/evm_keystore_proxy.json | jq .[$i].private_key | tr -d '"' | tr -d '\n')
   proxy_address=$(cat ${IPC_CONFIG_FOLDER}/evm_keystore_proxy.json | jq .[$i].address | tr -d '"' | tr -d '\n')
-  $IPC_CLI wallet import --wallet-type evm --private-key ${proxy_key}
-  $IPC_CLI cross-msg fund --from ${proxy_address} --subnet ${subnet_id} 10
+  ipc-cli wallet import --wallet-type evm --private-key ${proxy_key}
+  ipc-cli cross-msg fund --from ${proxy_address} --subnet ${subnet_id} 10
   out=${subnet_folder}/validator-${i}/validator-${i}/keys/proxy_key.sk
-  $IPC_CLI wallet export --wallet-type evm --address ${proxy_address} --fendermint | tr -d '\n' > ${out}
+  ipc-cli wallet export --wallet-type evm --address ${proxy_address} --fendermint | tr -d '\n' > ${out}
   chmod 600 ${subnet_folder}/validator-${i}/validator-${i}/keys/proxy_key.sk
-  $IPC_CLI wallet remove --wallet-type evm --address ${proxy_address}
+  ipc-cli wallet remove --wallet-type evm --address ${proxy_address}
 done
 
 # Step 9a: Test ETH API endpoint
@@ -332,7 +341,7 @@ done
 pkill -f "relayer" || true
 # Start relayer
 echo "$DASHES Start relayer process (in the background)"
-nohup $IPC_CLI checkpoint relayer --subnet $subnet_id > nohup.out 2> nohup.err < /dev/null &
+nohup ipc-cli checkpoint relayer --subnet $subnet_id --submitter $default_wallet_address > nohup.out 2> nohup.err < /dev/null &
 
 # Step 11: Print a summary of the deployment
 cat << EOF

@@ -3,9 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use cid::Cid;
-use fil_actors_evm_shared::address::EthAddress;
 use fvm_ipld_encoding::{strict_bytes, tuple::*};
-use fvm_shared::METHOD_CONSTRUCTOR;
+use fvm_shared::{ActorID, METHOD_CONSTRUCTOR};
 use num_derive::FromPrimitive;
 
 pub use crate::state::{Object, ObjectKind, ObjectList, ObjectListItem, State};
@@ -16,7 +15,7 @@ pub const OBJECTSTORE_ACTOR_NAME: &str = "objectstore";
 #[derive(Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ConstructorParams {
     /// The machine creator
-    pub creator: EthAddress,
+    pub creator: ActorID,
 }
 
 /// Params for putting an object.

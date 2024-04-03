@@ -34,12 +34,15 @@ use fendermint_actor_objectstore::{
     Object, ObjectDeleteParams, ObjectGetParams, ObjectKind, ObjectList, ObjectListItem,
     ObjectListParams, ObjectPutParams,
 };
+use fendermint_app_options::rpc::BroadcastMode;
 use fendermint_app_settings::proxy::ProxySettings;
+use fendermint_rpc::tx::BoundClient;
 use fendermint_rpc::{
     client::FendermintClient,
     message::GasParams,
     tx::{CallClient, TxClient},
 };
+use fendermint_vm_actor_interface::adm::ListByOwnerReturn;
 use fendermint_vm_message::query::FvmQueryHeight;
 
 use crate::cmd;
@@ -67,6 +70,12 @@ cmd! {
                 // Admin routes
                 let health_route = warp::path!("health")
                     .and(warp::get()).and_then(health);
+                let list_machines_route = warp::path!("v1" / "machines")
+                    .and(warp::get())
+                    .and(with_client(client.clone()))
+                    .and(with_args(args.clone()))
+                    .and(warp::query::<HeightQuery>())
+                    .and_then(handle_list_machines);
 
                 // Object Store routes
                 let os_create_route = warp::path!("v1" / "os")
@@ -75,6 +84,7 @@ cmd! {
                     .and(with_args(args.clone()))
                     .and(with_nonce(nonce.clone()))
                     .and(warp::header::optional::<u64>("X-ADM-GasLimit"))
+                    .and(warp::header::optional::<BroadcastMode>("X-ADM-BroadcastMode"))
                     .and_then(handle_os_create);
                 let os_upload_route = warp::path!("v1" / "os" / Address / String)
                     .and(warp::put())
@@ -85,6 +95,7 @@ cmd! {
                     .and(with_nonce(nonce.clone()))
                     .and(warp::header::<u64>("Content-Length"))
                     .and(warp::header::optional::<u64>("X-ADM-GasLimit"))
+                    .and(warp::header::optional::<BroadcastMode>("X-ADM-BroadcastMode"))
                     .and(warp::body::stream())
                     .and_then(handle_os_upload);
                 let os_delete_route = warp::path!("v1" / "os" / Address / String)
@@ -93,6 +104,7 @@ cmd! {
                     .and(with_args(args.clone()))
                     .and(with_nonce(nonce.clone()))
                     .and(warp::header::optional::<u64>("X-ADM-GasLimit"))
+                    .and(warp::header::optional::<BroadcastMode>("X-ADM-BroadcastMode"))
                     .and_then(handle_os_delete);
                 let os_get_route = warp::path!("v1" / "os" / Address / String)
                     .and(
@@ -119,6 +131,7 @@ cmd! {
                     .and(with_args(args.clone()))
                     .and(with_nonce(nonce.clone()))
                     .and(warp::header::optional::<u64>("X-ADM-GasLimit"))
+                    .and(warp::header::optional::<BroadcastMode>("X-ADM-BroadcastMode"))
                     .and_then(handle_acc_create);
                 let acc_push_route = warp::path!("v1" / "acc" / Address)
                     .and(warp::put())
@@ -127,6 +140,7 @@ cmd! {
                     .and(with_args(args.clone()))
                     .and(with_nonce(nonce))
                     .and(warp::header::optional::<u64>("X-ADM-GasLimit"))
+                    .and(warp::header::optional::<BroadcastMode>("X-ADM-BroadcastMode"))
                     .and(warp::body::bytes())
                     .and_then(handle_acc_push);
                 let acc_root_route = warp::path!("v1" / "acc" / Address)
@@ -137,6 +151,7 @@ cmd! {
                     .and_then(handle_acc_root);
 
                 let router = health_route
+                    .or(list_machines_route)
                     .or(os_create_route)
                     .or(os_upload_route)
                     .or(os_delete_route)
@@ -192,15 +207,41 @@ async fn health() -> Result<impl Reply, Rejection> {
     Ok(warp::reply::reply())
 }
 
+async fn handle_list_machines(
+    client: FendermintClient,
+    args: TransArgs,
+    hq: HeightQuery,
+) -> Result<impl Reply, Rejection> {
+    let res = list_machines(client, args, None, hq.height.unwrap_or(0))
+        .await
+        .map_err(|e| {
+            Rejection::from(BadRequest {
+                message: format!("list error: {}", e),
+            })
+        })?;
+
+    let list = res.unwrap_or_default();
+    let machines = list
+        .machines
+        .iter()
+        .map(|a| a.to_string())
+        .collect::<Vec<String>>();
+
+    let json = json!({"machines": machines});
+    Ok(warp::reply::json(&json))
+}
+
 async fn handle_os_create(
     client: FendermintClient,
     mut args: TransArgs,
     nonce: Arc<Mutex<u64>>,
     gas_limit: Option<u64>,
+    broadcast_mode: Option<BroadcastMode>,
 ) -> Result<impl Reply, Rejection> {
     let mut nonce_lck = nonce.lock().await;
     args.sequence = *nonce_lck;
     args.gas_limit = gas_limit.unwrap_or(BLOCK_GAS_LIMIT);
+    args.broadcast_mode = broadcast_mode.unwrap_or(args.broadcast_mode);
 
     let res = os_create(client, args).await.map_err(|e| {
         Rejection::from(BadRequest {
@@ -222,11 +263,13 @@ async fn handle_os_upload(
     nonce: Arc<Mutex<u64>>,
     size: u64,
     gas_limit: Option<u64>,
+    broadcast_mode: Option<BroadcastMode>,
     mut body: impl Stream<Item = Result<impl Buf, warp::Error>> + Unpin + Send + Sync,
 ) -> Result<impl Reply, Rejection> {
     let mut nonce_lck = nonce.lock().await;
     args.sequence = *nonce_lck;
     args.gas_limit = gas_limit.unwrap_or(BLOCK_GAS_LIMIT);
+    args.broadcast_mode = broadcast_mode.unwrap_or(args.broadcast_mode);
 
     if size == 0 {
         return Err(Rejection::from(BadRequest {
@@ -328,10 +371,12 @@ async fn handle_os_delete(
     mut args: TransArgs,
     nonce: Arc<Mutex<u64>>,
     gas_limit: Option<u64>,
+    broadcast_mode: Option<BroadcastMode>,
 ) -> Result<impl Reply, Rejection> {
     let mut nonce_lck = nonce.lock().await;
     args.sequence = *nonce_lck;
     args.gas_limit = gas_limit.unwrap_or(BLOCK_GAS_LIMIT);
+    args.broadcast_mode = broadcast_mode.unwrap_or(args.broadcast_mode);
 
     let params = ObjectDeleteParams {
         key: key.into_bytes(),
@@ -544,27 +589,23 @@ async fn handle_os_list(
     let objects = list
         .objects
         .iter()
-        .map(|v| -> Result<Value, Rejection> {
+        .map(|v| {
             let key = core::str::from_utf8(&v.0).unwrap_or_default().to_string();
             match &v.1 {
                 ObjectListItem::Internal((cid, size)) => {
-                    Ok(json!({"key": key, "value": json!({"kind": "internal", "content": cid.to_string(), "size": size})}))
+                    json!({"key": key, "value": json!({"kind": "internal", "content": cid.to_string(), "size": size})})
                 }
                 ObjectListItem::External((cid, resolved)) => {
-                    Ok(json!({"key": key, "value": json!({"kind": "external", "content": cid.to_string(), "resolved": resolved})}))
+                    json!({"key": key, "value": json!({"kind": "external", "content": cid.to_string(), "resolved": resolved})})
                 }
             }
         })
-        .collect::<Result<Vec<Value>, Rejection>>()?;
+        .collect::<Vec<Value>>();
     let common_prefixes = list
         .common_prefixes
         .iter()
-        .map(|v| -> Result<Value, Rejection> {
-            Ok(Value::String(
-                core::str::from_utf8(v).unwrap_or_default().to_string(),
-            ))
-        })
-        .collect::<Result<Vec<Value>, Rejection>>()?;
+        .map(|v| Value::String(core::str::from_utf8(v).unwrap_or_default().to_string()))
+        .collect::<Vec<Value>>();
 
     let json = json!({"objects": objects, "common_prefixes": common_prefixes});
     Ok(warp::reply::json(&json))
@@ -575,10 +616,12 @@ async fn handle_acc_create(
     mut args: TransArgs,
     nonce: Arc<Mutex<u64>>,
     gas_limit: Option<u64>,
+    broadcast_mode: Option<BroadcastMode>,
 ) -> Result<impl Reply, Rejection> {
     let mut nonce_lck = nonce.lock().await;
     args.sequence = *nonce_lck;
     args.gas_limit = gas_limit.unwrap_or(BLOCK_GAS_LIMIT);
+    args.broadcast_mode = broadcast_mode.unwrap_or(args.broadcast_mode);
 
     let res = acc_create(client, args).await.map_err(|e| {
         Rejection::from(BadRequest {
@@ -596,11 +639,13 @@ async fn handle_acc_push(
     mut args: TransArgs,
     nonce: Arc<Mutex<u64>>,
     gas_limit: Option<u64>,
+    broadcast_mode: Option<BroadcastMode>,
     body: Bytes,
 ) -> Result<impl Reply, Rejection> {
     let mut nonce_lck = nonce.lock().await;
     args.sequence = *nonce_lck;
     args.gas_limit = gas_limit.unwrap_or(BLOCK_GAS_LIMIT);
+    args.broadcast_mode = broadcast_mode.unwrap_or(args.broadcast_mode);
 
     let res = acc_push(client.clone(), args.clone(), address, body)
         .await
@@ -776,6 +821,25 @@ async fn os_create(
         data,
     };
     Ok(tx_pretty)
+}
+
+async fn list_machines(
+    client: FendermintClient,
+    args: TransArgs,
+    owner: Option<Address>,
+    height: u64,
+) -> anyhow::Result<Option<ListByOwnerReturn>> {
+    let mut client = TransClient::new(client, &args)?;
+    let gas_params = gas_params(&args);
+    let h = FvmQueryHeight::from(height);
+    let owner = owner.unwrap_or(client.address());
+
+    let res = client
+        .inner
+        .list_machines_call(owner, TokenAmount::default(), gas_params, h)
+        .await?;
+
+    Ok(res.return_data)
 }
 
 async fn os_put(
