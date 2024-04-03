@@ -200,52 +200,36 @@ contract MultiSubnetTest is IntegrationTestBase {
     }
 
     function upgradeController() public {
-        bytes memory initCallController =
-            abi.encodeCall(
-                LinkedTokenControllerV2.reinitialize,
-                (
-                    address(rootGateway),
-                    address(testUSDC),
-                    nativeSubnetName,
-                    address(ipcTokenReplica)
-                )
-            );
-        LinkedTokenControllerV2Extension newControllerImplementation = new LinkedTokenControllerV2Extension();
-        ipcTokenController.upgradeToAndCall(
-            address(newControllerImplementation),
-            initCallController
+        bytes memory initCallController = abi.encodeCall(
+            LinkedTokenControllerV2.reinitialize,
+            (address(rootGateway), address(testUSDC), nativeSubnetName, address(ipcTokenReplica))
         );
+        LinkedTokenControllerV2Extension newControllerImplementation = new LinkedTokenControllerV2Extension();
+        ipcTokenController.upgradeToAndCall(address(newControllerImplementation), initCallController);
 
         require(
-            LinkedTokenControllerV2Extension(address(ipcTokenController))
-                .newFunctionReturns7() == 7,
+            LinkedTokenControllerV2Extension(address(ipcTokenController)).newFunctionReturns7() == 7,
             "controller upgrade failed"
         );
     }
 
     function upgradeReplica() public {
-        bytes memory initCallReplica =
-            abi.encodeCall(
-                LinkedTokenReplicaV2.reinitialize,
-                (
-                    address(nativeSubnetGateway),
-                    address(testUSDC),
-                    rootSubnetName,
-                    address(ipcTokenController),
-                    REPLICA_TOKEN_NAME,
-                    REPLICA_TOKEN_SYMBOL,
-                    REPLICA_TOKEN_DECIMALS
-                )
-            );
-        LinkedTokenReplicaV2Extension newReplicaImplementation =
-            new LinkedTokenReplicaV2Extension();
-        ipcTokenReplica.upgradeToAndCall(
-            address(newReplicaImplementation),
-            initCallReplica
+        bytes memory initCallReplica = abi.encodeCall(
+            LinkedTokenReplicaV2.reinitialize,
+            (
+                address(nativeSubnetGateway),
+                address(testUSDC),
+                rootSubnetName,
+                address(ipcTokenController),
+                REPLICA_TOKEN_NAME,
+                REPLICA_TOKEN_SYMBOL,
+                REPLICA_TOKEN_DECIMALS
+            )
         );
+        LinkedTokenReplicaV2Extension newReplicaImplementation = new LinkedTokenReplicaV2Extension();
+        ipcTokenReplica.upgradeToAndCall(address(newReplicaImplementation), initCallReplica);
         require(
-            LinkedTokenReplicaV2Extension(address(ipcTokenReplica))
-                .newFunctionReturns8() == 8,
+            LinkedTokenReplicaV2Extension(address(ipcTokenReplica)).newFunctionReturns8() == 8,
             "replica upgrade failed"
         );
     }
