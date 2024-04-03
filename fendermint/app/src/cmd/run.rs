@@ -229,6 +229,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         .with_max_proposal_range(topdown_config.max_proposal_range);
 
         if let Some(v) = topdown_config.max_cache_blocks {
+            info!(value = v, "setting max cache blocks");
             config = config.with_max_cache_blocks(v);
         }
         let ipc_provider = Arc::new(make_ipc_provider_proxy(&settings)?);
