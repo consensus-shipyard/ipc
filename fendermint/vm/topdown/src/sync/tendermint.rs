@@ -5,6 +5,7 @@
 use crate::proxy::ParentQueryProxy;
 use crate::sync::syncer::LotusParentSyncer;
 use crate::sync::ParentFinalityStateQuery;
+use crate::BlockHeight;
 use anyhow::Context;
 
 /// Tendermint aware syncer
@@ -24,6 +25,10 @@ where
             inner,
             tendermint_client,
         }
+    }
+
+    pub async fn init(&mut self, cached_blocks: BlockHeight) -> anyhow::Result<()> {
+        self.inner.init(cached_blocks).await
     }
 
     /// Sync with the parent, unless CometBFT is still catching up with the network,

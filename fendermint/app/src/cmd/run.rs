@@ -289,8 +289,11 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         snapshots,
     )?;
 
-    if let Some((agent_proxy, config)) = ipc_tuple {
+    let syncer_init_rx = if let Some((agent_proxy, config)) = ipc_tuple {
         let app_parent_finality_query = AppParentFinalityQuery::new(app.clone());
+
+        let (tx, rx) = tokio::sync::oneshot::channel();
+
         tokio::spawn(async move {
             match launch_polling_syncer(
                 app_parent_finality_query,
@@ -299,6 +302,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
                 parent_finality_votes,
                 agent_proxy,
                 tendermint_client,
+                tx,
             )
             .await
             {
@@ -306,7 +310,11 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
                 Err(e) => tracing::error!("cannot launch polling syncer: {e}"),
             }
         });
-    }
+
+        Some(rx)
+    } else {
+        None
+    };
 
     // Start the metrics on a background thread.
     if let Some(registry) = metrics_registry {
@@ -335,6 +343,15 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         .info(info)
         .finish()
         .context("error creating ABCI server")?;
+
+    if let Some(rx) = syncer_init_rx {
+        let init_ok = rx.await?;
+        if !init_ok {
+            return Err(anyhow!("syncer init failed"));
+        } else {
+            tracing::info!("syncer init done");
+        }
+    }
 
     // Run the ABCI server.
     server

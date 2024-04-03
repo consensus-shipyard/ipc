@@ -13,6 +13,7 @@ use anyhow::anyhow;
 use async_stm::{atomically, atomically_or_err, StmError};
 use ethers::utils::hex;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tracing::instrument;
 
 use fendermint_tracing::emit;
@@ -56,6 +57,51 @@ where
             query,
             sync_many: true,
         })
+    }
+
+    /// Performs initialization on the syncer. Requires a minimum of `cached_blocks` to be filled
+    /// in cache first before syncing can be performed.
+    pub async fn init(&mut self, cached_blocks: BlockHeight) -> anyhow::Result<()> {
+        let start = Instant::now();
+
+        let (mut latest_height, mut non_null_parent_hash) = self.latest_cached_data().await;
+        let target_height = cached_blocks + latest_height + 1;
+        tracing::debug!(
+            target_height,
+            latest_height,
+            "syncer init with last committed finality"
+        );
+
+        loop {
+            // obtain the finalized chain head first
+            let chain_head = loop {
+                if let Some(h) = self.finalized_chain_head().await? {
+                    break h;
+                }
+
+                tracing::debug!(
+                    "syncer not initialized yet as chain head not obtained, sleep 5 sec"
+                );
+                tokio::time::sleep(Duration::from_secs(5)).await;
+            };
+
+            tracing::debug!(chain_head, latest_height, "syncer init with chain head");
+
+            // start a loop that pull as much as possible
+            while latest_height <= chain_head.min(target_height) {
+                non_null_parent_hash = self
+                    .poll_next(latest_height + 1, non_null_parent_hash)
+                    .await?;
+
+                latest_height += 1;
+                tracing::debug!(latest_height, "init, ready to pull next height");
+            }
+
+            if latest_height > target_height {
+                tracing::info!(time = start.elapsed().as_secs(), "init done");
+                return Ok(());
+            }
+        }
     }
 
     /// Insert the height into cache when we see a new non null block
