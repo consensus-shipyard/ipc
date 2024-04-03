@@ -56,6 +56,7 @@ library SupplySourceHelper {
             if (finalBalance <= initialBalance) {
                 revert NoBalanceIncrease();
             }
+            // Safe arithmetic is not necessary because underflow is not possible due to the check above
             return finalBalance - initialBalance;
         }
         // Do nothing for native.
