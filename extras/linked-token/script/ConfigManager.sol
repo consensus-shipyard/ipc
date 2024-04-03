@@ -12,7 +12,6 @@ contract ConfigManager is Script {
         writeConfig("OriginalToken", vm.toString(originalToken));
     }
 
-
     // Reads a value from the JSON config
     function readConfig(string memory key) internal returns (bytes memory value) {
         string memory path = string.concat(vm.projectRoot(), "/", configPath);
