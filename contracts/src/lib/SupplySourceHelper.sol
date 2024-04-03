@@ -53,7 +53,7 @@ library SupplySourceHelper {
             uint256 initialBalance = token.balanceOf(address(this));
             token.safeTransferFrom({from: msg.sender, to: address(this), value: value});
             uint256 finalBalance = token.balanceOf(address(this));
-            if (!(finalBalance > initialBalance)) {
+            if (finalBalance <= initialBalance) {
                 revert NoBalanceIncrease();
             }
             return finalBalance - initialBalance;
