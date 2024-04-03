@@ -52,6 +52,8 @@ else
   source ${HOME}/.bashrc
 fi
 
+rustc --version
+
 # Step 1.3: Install cargo-make and toml-cli
 # Install cargo make
 echo "$DASHES Installing cargo-make"
