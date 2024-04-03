@@ -39,7 +39,7 @@ jobs:
           host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
           username: ubuntu
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
-          script: rm -rf /home/ubuntu/.ipc && cp -r /home/ubuntu/scripts/deploy_subnet_under_calibration_net/.ipc /home/ubuntu/
+          script: rm -vrf /home/ubuntu/.ipc && cp -r /home/ubuntu/scripts/deploy_subnet_under_calibration_net/.ipc /home/ubuntu/
       - name: Create wallet file locally
         run: |
           echo '${{ secrets.CI_TEST_WALLET_JSON }}' > evm_keystore.json
