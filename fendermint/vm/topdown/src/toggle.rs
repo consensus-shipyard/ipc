@@ -36,7 +36,10 @@ impl<P> Toggle<P> {
     {
         match &self.inner {
             Some(p) => f(p),
-            None => Ok(other),
+            None => {
+                tracing::debug!("not enabled, returning other");
+                Ok(other)
+            }
         }
     }
 }

@@ -291,11 +291,13 @@ where
     pub fn set_finalized(&self, block_height: BlockHeight, block_hash: V) -> Stm<()> {
         self.chain.update(|chain| {
             let (_, mut chain) = chain.split(&block_height);
-            chain.insert(block_height, Some(block_hash));
+            chain.insert(block_height, Some(block_hash.clone()));
+            tracing::debug!(block_height, block_hash = hex::encode(block_hash), "inserted into vote tally chain");
             chain
         })?;
 
         self.votes.update(|votes| votes.split(&block_height).1)?;
+        tracing::debug!(block_height, "votes set finalized");
 
         Ok(())
     }

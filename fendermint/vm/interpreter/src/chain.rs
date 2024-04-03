@@ -173,12 +173,16 @@ where
                     // 2) if a validator proposes something invalid, we can make them pay during execution.
                     let is_resolved =
                         atomically(|| match env.checkpoint_pool.get_status(&item)? {
-                            None => Ok(false),
+                            None => {
+                                tracing::debug!("no status found");
+                                Ok(false)
+                            },
                             Some(status) => status.is_resolved(),
                         })
                         .await;
 
                     if !is_resolved {
+                        tracing::debug!("proposal rejected by checkpoint pool");
                         return Ok(false);
                     }
                 }
@@ -193,6 +197,10 @@ where
                     let is_final =
                         atomically(|| env.parent_finality_provider.check_proposal(&prop)).await;
                     if !is_final {
+                        tracing::debug!(
+                            prop = prop.to_string(),
+                            "proposal rejected by top down finality"
+                        );
                         return Ok(false);
                     }
                 }

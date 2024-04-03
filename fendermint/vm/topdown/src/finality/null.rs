@@ -98,6 +98,10 @@ impl FinalityWithNull {
 
     pub fn check_proposal(&self, proposal: &IPCParentFinality) -> Stm<bool> {
         if !self.check_height(proposal)? {
+            tracing::debug!(
+                proposal = proposal.to_string(),
+                "proposal height is not valid"
+            );
             return Ok(false);
         }
         self.check_block_hash(proposal)
@@ -319,6 +323,10 @@ impl FinalityWithNull {
         let last_committed_finality = if let Some(f) = binding.as_ref() {
             f
         } else {
+            tracing::debug!(
+                proposal = proposal.to_string(),
+                "last committed finality is not ready, reject"
+            );
             return Ok(false);
         };
 
