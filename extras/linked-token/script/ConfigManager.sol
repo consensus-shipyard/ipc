@@ -7,6 +7,11 @@ import {Script} from "forge-std/Script.sol";
 contract ConfigManager is Script {
     string private configPath = "config.json"; // Path to your JSON config file
 
+    function setOriginalToken(address originalToken) external {
+        // Log the address of the deployed contract implementation
+        writeConfig("OriginalToken", vm.toString(originalToken));
+    }
+
     // Reads a value from the JSON config
     function readConfig(string memory key) internal returns (bytes memory value) {
         string memory path = string.concat(vm.projectRoot(), "/", configPath);
