@@ -49,7 +49,7 @@ contract DeployIpcTokenReplica is ConfigManager {
             initCall
         );
         vm.stopBroadcast();
-        writeConfig("LinkedTokenReplica", vm.toString(address(transparentProxy)));
+        writeConfig("LinkedTokenReplicaProxy", vm.toString(address(transparentProxy)));
     }
 
     function deployIpcTokenReplicaV2() external {

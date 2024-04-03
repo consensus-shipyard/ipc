@@ -39,7 +39,7 @@ contract DeployIpcTokenController is ConfigManager {
             initCall
         );
         vm.stopBroadcast();
-        writeConfig("LinkedTokenController", vm.toString(address(transparentProxy)));
+        writeConfig("LinkedTokenControllerProxy", vm.toString(address(transparentProxy)));
     }
 
     function deployIpcTokenControllerV2() external {
