@@ -14,6 +14,7 @@ use async_tempfile::TempFile;
 use bytes::{Buf, Bytes};
 use cid::Cid;
 use futures_util::{Stream, StreamExt};
+use fvm_ipld_encoding::strict_bytes::ByteBuf;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::BLOCK_GAS_LIMIT;
 use ipfs_api_backend_hyper::{IpfsApi, IpfsClient, TryFromUri};
@@ -29,7 +30,10 @@ use tokio_util::compat::TokioAsyncReadCompatExt;
 use warp::http::{HeaderMap, HeaderValue};
 use warp::{http::StatusCode, Filter, Rejection, Reply};
 
-use fendermint_actor_objectstore::{ListOptions, Object, ObjectList};
+use fendermint_actor_objectstore::{
+    Object, ObjectDeleteParams, ObjectGetParams, ObjectKind, ObjectList, ObjectListItem,
+    ObjectListParams, ObjectPutParams,
+};
 use fendermint_app_settings::proxy::ProxySettings;
 use fendermint_rpc::client::FendermintClient;
 use fendermint_rpc::message::GasParams;
@@ -46,6 +50,7 @@ use crate::options::{
 use super::rpc::{gas_params, BroadcastResponse, TransClient};
 
 const MAX_OBJECT_LENGTH: u64 = 1024 * 1024 * 1024;
+const MAX_INTERNAL_OBJECT_LENGTH: u64 = 1024;
 const MAX_EVENT_LENGTH: u64 = 1024 * 500; // Limit to 500KiB for now
 
 cmd! {
@@ -70,6 +75,7 @@ cmd! {
                     .and(with_ipfs(ipfs.clone()))
                     .and(with_args(args.clone()))
                     .and(with_nonce(nonce.clone()))
+                    .and(warp::header::<u64>("Content-Length"))
                     .and(warp::header::optional::<u64>("X-DataRepo-GasLimit"))
                     .and(warp::body::stream())
                     .and_then(handle_os_upload);
@@ -169,12 +175,14 @@ async fn health() -> Result<impl Reply, Rejection> {
     Ok(warp::reply::reply())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn handle_os_upload(
     key: String,
     client: FendermintClient,
     ipfs: IpfsClient,
     mut args: TransArgs,
     nonce: Arc<Mutex<u64>>,
+    size: u64,
     gas_limit: Option<u64>,
     mut body: impl Stream<Item = Result<impl Buf, warp::Error>> + Unpin + Send + Sync,
 ) -> Result<impl Reply, Rejection> {
@@ -182,59 +190,90 @@ async fn handle_os_upload(
     args.sequence = *nonce_lck;
     args.gas_limit = gas_limit.unwrap_or(BLOCK_GAS_LIMIT);
 
-    let mut tmp = TempFile::new().await.map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("failed to create tmp file: {}", e),
-        })
-    })?;
-    while let Some(buf) = body.next().await {
-        let mut buf = buf.unwrap();
-        while buf.remaining() > 0 {
-            let chunk = buf.chunk().to_owned();
-            let chunk_len = chunk.len();
-            tmp.write_all(&chunk).await.map_err(|e| {
-                Rejection::from(BadRequest {
-                    message: format!("failed to write chunk: {}", e),
-                })
-            })?;
-            tmp.flush().await.map_err(|e| {
-                Rejection::from(BadRequest {
-                    message: format!("failed to flush chunk: {}", e),
-                })
-            })?;
-            buf.advance(chunk_len);
-        }
+    if size == 0 {
+        return Err(Rejection::from(BadRequest {
+            message: "empty body".into(),
+        }));
     }
-    tmp.rewind().await.map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("failed to rewind: {}", e),
-        })
-    })?;
 
-    let add = ipfs_api_backend_hyper::request::Add {
-        chunker: Some("size-1048576"),
-        pin: Some(false),
-        raw_leaves: Some(true),
-        cid_version: Some(1),
-        hash: Some("blake2b-256"),
-        ..Default::default()
-    };
-
-    let res = ipfs
-        .add_async_with_options(tmp.compat(), add)
-        .await
-        .map_err(|e| {
+    let params = if size > MAX_INTERNAL_OBJECT_LENGTH {
+        let mut tmp = TempFile::new().await.map_err(|e| {
             Rejection::from(BadRequest {
-                message: format!("failed to add file: {}", e),
+                message: format!("failed to create tmp file: {}", e),
             })
         })?;
-    let cid = Cid::try_from(res.hash).map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("failed to parse cid: {}", e),
-        })
-    })?;
+        while let Some(buf) = body.next().await {
+            let mut buf = buf.unwrap();
+            while buf.remaining() > 0 {
+                let chunk = buf.chunk().to_owned();
+                let chunk_len = chunk.len();
+                tmp.write_all(&chunk).await.map_err(|e| {
+                    Rejection::from(BadRequest {
+                        message: format!("failed to write chunk: {}", e),
+                    })
+                })?;
+                tmp.flush().await.map_err(|e| {
+                    Rejection::from(BadRequest {
+                        message: format!("failed to flush chunk: {}", e),
+                    })
+                })?;
+                buf.advance(chunk_len);
+            }
+        }
+        tmp.rewind().await.map_err(|e| {
+            Rejection::from(BadRequest {
+                message: format!("failed to rewind: {}", e),
+            })
+        })?;
 
-    let res = os_put(client, args, key, cid).await.map_err(|e| {
+        let add = ipfs_api_backend_hyper::request::Add {
+            chunker: Some("size-1048576"),
+            pin: Some(false),
+            raw_leaves: Some(true),
+            cid_version: Some(1),
+            hash: Some("blake2b-256"),
+            ..Default::default()
+        };
+
+        let res = ipfs
+            .add_async_with_options(tmp.compat(), add)
+            .await
+            .map_err(|e| {
+                Rejection::from(BadRequest {
+                    message: format!("failed to add file: {}", e),
+                })
+            })?;
+        let cid = Cid::try_from(res.hash).map_err(|e| {
+            Rejection::from(BadRequest {
+                message: format!("failed to parse cid: {}", e),
+            })
+        })?;
+
+        ObjectPutParams {
+            key: key.into_bytes(),
+            kind: ObjectKind::External(cid),
+            overwrite: true,
+        }
+    } else {
+        let mut collected: Vec<u8> = vec![];
+        while let Some(buf) = body.next().await {
+            let mut buf = buf.unwrap();
+            while buf.remaining() > 0 {
+                let chunk = buf.chunk();
+                let chunk_len = chunk.len();
+                collected.extend_from_slice(chunk);
+                buf.advance(chunk_len);
+            }
+        }
+
+        ObjectPutParams {
+            key: key.into_bytes(),
+            kind: ObjectKind::Internal(ByteBuf(collected)),
+            overwrite: true,
+        }
+    };
+
+    let res = os_put(client, args, params).await.map_err(|e| {
         Rejection::from(BadRequest {
             message: format!("put error: {}", e),
         })
@@ -255,7 +294,10 @@ async fn handle_os_delete(
     args.sequence = *nonce_lck;
     args.gas_limit = gas_limit.unwrap_or(BLOCK_GAS_LIMIT);
 
-    let res = os_delete(client, args, key).await.map_err(|e| {
+    let params = ObjectDeleteParams {
+        key: key.into_bytes(),
+    };
+    let res = os_delete(client, args, params).await.map_err(|e| {
         Rejection::from(BadRequest {
             message: format!("delete error: {}", e),
         })
@@ -315,7 +357,10 @@ async fn handle_os_get(
     hq: HeightQuery,
     range: Option<String>,
 ) -> Result<impl Reply, Rejection> {
-    let res = os_get(client, args, key, hq.height.unwrap_or(0))
+    let params = ObjectGetParams {
+        key: key.into_bytes(),
+    };
+    let res = os_get(client, args, params, hq.height.unwrap_or(0))
         .await
         .map_err(|e| {
             Rejection::from(BadRequest {
@@ -325,53 +370,88 @@ async fn handle_os_get(
 
     match res {
         Some(obj) => {
-            let value = Cid::try_from(obj.value).map_err(|e| {
-                Rejection::from(BadRequest {
-                    message: format!("failed to decode value: {}", e),
-                })
-            })?;
-            // TODO: Uncomment this check when object voting is implemented.
-            // if !obj.resolved {
-            //     return Err(Rejection::from(BadRequest {
-            //         message: "object is not resolved".to_string(),
-            //     }));
-            // }
-            let val = value.to_string();
-
-            let stat = ipfs
-                .files_stat(format!("/ipfs/{val}").as_str())
-                .await
-                .map_err(|e| {
-                    Rejection::from(BadRequest {
-                        message: format!("failed to stat object: {}", e),
-                    })
-                })?;
-            let size = stat.size;
-
-            let (stream, start, end, len) = match range {
-                Some(range) => {
-                    let (start, end) = get_range_params(range, size).map_err(|e| {
+            let (body, start, end, len, size) = match obj {
+                Object::Internal(buf) => {
+                    let size = buf.0.len() as u64;
+                    match range {
+                        Some(range) => {
+                            let (start, end) = get_range_params(range, size).map_err(|e| {
+                                Rejection::from(BadRequest {
+                                    message: format!("failed to get range params: {}", e),
+                                })
+                            })?;
+                            let len = end - start + 1;
+                            (
+                                warp::hyper::Body::from(
+                                    buf.0[start as usize..=end as usize].to_vec(),
+                                ),
+                                start,
+                                end,
+                                len,
+                                size,
+                            )
+                        }
+                        None => (warp::hyper::Body::from(buf.0), 0, size - 1, size, size),
+                    }
+                }
+                Object::External((buf, resolved)) => {
+                    let cid = Cid::try_from(buf.0).map_err(|e| {
                         Rejection::from(BadRequest {
-                            message: format!("failed to get range params: {}", e),
+                            message: format!("failed to decode cid: {}", e),
                         })
                     })?;
-                    let len = end - start + 1;
-                    (
-                        ipfs.cat_range(&val, start as usize, len as usize),
-                        start,
-                        end,
-                        len,
-                    )
-                }
-                None => (ipfs.cat(&val), 0, size - 1, size),
-            };
-            let body = warp::hyper::Body::wrap_stream(stream);
-            let mut response = warp::reply::Response::new(body);
+                    let cid = cid.to_string();
+                    if !resolved {
+                        return Err(Rejection::from(BadRequest {
+                            message: "object is not resolved".to_string(),
+                        }));
+                    }
 
+                    let stat = ipfs
+                        .files_stat(format!("/ipfs/{cid}").as_str())
+                        .await
+                        .map_err(|e| {
+                            Rejection::from(BadRequest {
+                                message: format!("failed to stat object: {}", e),
+                            })
+                        })?;
+                    let size = stat.size;
+
+                    match range {
+                        Some(range) => {
+                            let (start, end) = get_range_params(range, size).map_err(|e| {
+                                Rejection::from(BadRequest {
+                                    message: format!("failed to get range params: {}", e),
+                                })
+                            })?;
+                            let len = end - start + 1;
+                            (
+                                warp::hyper::Body::wrap_stream(ipfs.cat_range(
+                                    &cid,
+                                    start as usize,
+                                    len as usize,
+                                )),
+                                start,
+                                end,
+                                len,
+                                size,
+                            )
+                        }
+                        None => (
+                            warp::hyper::Body::wrap_stream(ipfs.cat(&cid)),
+                            0,
+                            size - 1,
+                            size,
+                            size,
+                        ),
+                    }
+                }
+            };
+
+            let mut response = warp::reply::Response::new(body);
             let mut header_map = HeaderMap::new();
             if len < size {
                 *response.status_mut() = StatusCode::PARTIAL_CONTENT;
-
                 header_map.insert(
                     "Content-Range",
                     HeaderValue::from_str(&format!("bytes {}-{}/{}", start, end, len)).unwrap(),
@@ -379,9 +459,7 @@ async fn handle_os_get(
             } else {
                 header_map.insert("Accept-Ranges", HeaderValue::from_str("bytes").unwrap());
             }
-
             header_map.insert("Content-Length", HeaderValue::from(len));
-
             let headers = response.headers_mut();
             headers.extend(header_map);
 
@@ -405,13 +483,13 @@ async fn handle_os_list(
     options: ListQuery,
     hq: HeightQuery,
 ) -> Result<impl Reply, Rejection> {
-    let opts = ListOptions {
+    let params = ObjectListParams {
         prefix: options.prefix.unwrap_or_default().into(),
         delimiter: options.delimiter.unwrap_or_default().into(),
         offset: options.offset.unwrap_or(0),
         limit: options.limit.unwrap_or(0),
     };
-    let res = os_list(client, args, opts, hq.height.unwrap_or(0))
+    let res = os_list(client, args, params, hq.height.unwrap_or(0))
         .await
         .map_err(|e| {
             Rejection::from(BadRequest {
@@ -425,19 +503,21 @@ async fn handle_os_list(
         .iter()
         .map(|v| -> Result<Value, Rejection> {
             let key = core::str::from_utf8(&v.0).unwrap_or_default().to_string();
-            let value = Cid::try_from(v.1.value.clone()).map_err(|e| {
-                Rejection::from(BadRequest {
-                    message: format!("failed to decode value: {}", e),
-                })
-            })?;
-            Ok(json!({"key": key, "value": value.to_string(), "resolved": v.1.resolved}))
+            match &v.1 {
+                ObjectListItem::Internal((cid, size)) => {
+                    Ok(json!({"key": key, "value": json!({"kind": "internal", "content": cid.to_string(), "size": size})}))
+                }
+                ObjectListItem::External((cid, resolved)) => {
+                    Ok(json!({"key": key, "value": json!({"kind": "external", "content": cid.to_string(), "resolved": resolved})}))
+                }
+            }
         })
         .collect::<Result<Vec<Value>, Rejection>>()?;
     let common_prefixes = list
         .common_prefixes
         .iter()
         .map(|v| -> Result<Value, Rejection> {
-            Ok(serde_json::Value::String(
+            Ok(Value::String(
                 core::str::from_utf8(v).unwrap_or_default().to_string(),
             ))
         })
@@ -608,18 +688,21 @@ where
 async fn os_put(
     client: FendermintClient,
     args: TransArgs,
-    key: String,
-    content: Cid,
+    params: ObjectPutParams,
 ) -> anyhow::Result<Txn> {
     broadcast(client, args, |mut client, value, gas_params| {
-        Box::pin(async move { client.os_put(key, content, value, gas_params).await })
+        Box::pin(async move { client.os_put(params, value, gas_params).await })
     })
     .await
 }
 
-async fn os_delete(client: FendermintClient, args: TransArgs, key: String) -> anyhow::Result<Txn> {
+async fn os_delete(
+    client: FendermintClient,
+    args: TransArgs,
+    params: ObjectDeleteParams,
+) -> anyhow::Result<Txn> {
     broadcast(client, args, |mut client, value, gas_params| {
-        Box::pin(async move { client.os_delete(key, value, gas_params).await })
+        Box::pin(async move { client.os_delete(params, value, gas_params).await })
     })
     .await
 }
@@ -627,7 +710,7 @@ async fn os_delete(client: FendermintClient, args: TransArgs, key: String) -> an
 async fn os_get(
     client: FendermintClient,
     args: TransArgs,
-    key: String,
+    params: ObjectGetParams,
     height: u64,
 ) -> anyhow::Result<Option<Object>> {
     let mut client = TransClient::new(client, &args)?;
@@ -636,7 +719,7 @@ async fn os_get(
 
     let res = client
         .inner
-        .os_get_call(key, TokenAmount::default(), gas_params, h)
+        .os_get_call(params, TokenAmount::default(), gas_params, h)
         .await?;
 
     Ok(res.return_data)
@@ -645,7 +728,7 @@ async fn os_get(
 async fn os_list(
     client: FendermintClient,
     args: TransArgs,
-    options: ListOptions,
+    params: ObjectListParams,
     height: u64,
 ) -> anyhow::Result<Option<ObjectList>> {
     let mut client = TransClient::new(client, &args)?;
@@ -654,7 +737,7 @@ async fn os_list(
 
     let res = client
         .inner
-        .os_list_call(options, TokenAmount::default(), gas_params, h)
+        .os_list_call(params, TokenAmount::default(), gas_params, h)
         .await?;
 
     Ok(res.return_data)

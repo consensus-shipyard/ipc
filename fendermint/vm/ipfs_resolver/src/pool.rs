@@ -135,6 +135,11 @@ where
         }
     }
 
+    /// Return item count.
+    pub fn count(&self) -> Stm<usize> {
+        Ok(self.items.read()?.len())
+    }
+
     /// Return the status of an item. It can be queried for completion.
     pub fn get_status(&self, item: &T) -> Stm<Option<ResolveStatus<T>>> {
         let key = ResolveKey::from(item);
@@ -156,7 +161,12 @@ where
         Ok(resolved)
     }
 
-    /// Return the status of an item. It can be queried for completion.
+    /// Await the next item to be resolved.
+    pub fn next(&self) -> Stm<ResolveTask> {
+        self.queue.read()
+    }
+
+    /// Remove an item from the resolution targets.
     pub fn remove(&self, item: &T) -> Stm<Option<ResolveStatus<T>>> {
         let key = ResolveKey::from(item);
         let mut items = self.items.read_clone()?;
@@ -164,13 +174,6 @@ where
         self.items.write(items)?;
         Ok(removed)
     }
-
-    /// Await the next item to be resolved.
-    pub fn next(&self) -> Stm<ResolveTask> {
-        self.queue.read()
-    }
-
-    // TODO #197: Implement methods to remove executed items.
 }
 
 #[cfg(test)]

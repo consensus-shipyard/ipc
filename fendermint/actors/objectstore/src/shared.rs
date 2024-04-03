@@ -7,20 +7,44 @@ use fvm_ipld_encoding::{strict_bytes, tuple::*};
 use fvm_shared::METHOD_CONSTRUCTOR;
 use num_derive::FromPrimitive;
 
-pub use crate::state::*;
+pub use crate::state::{Object, ObjectKind, ObjectList, ObjectListItem, State};
 
 pub const OBJECTSTORE_ACTOR_NAME: &str = "objectstore";
 
-#[derive(Default, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct ObjectParams {
+/// Params for putting an object.
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct ObjectPutParams {
+    #[serde(with = "strict_bytes")]
+    pub key: Vec<u8>,
+    pub kind: ObjectKind,
+    pub overwrite: bool,
+}
+
+/// Params for resolving an object.
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct ObjectResolveParams {
     #[serde(with = "strict_bytes")]
     pub key: Vec<u8>,
     pub value: Cid,
 }
 
-/// Options for listing objects.
+/// Params for getting an object.
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct ObjectGetParams {
+    #[serde(with = "strict_bytes")]
+    pub key: Vec<u8>,
+}
+
+/// Params for deleting an object.
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct ObjectDeleteParams {
+    #[serde(with = "strict_bytes")]
+    pub key: Vec<u8>,
+}
+
+/// Params for listing objects.
 #[derive(Default, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct ListOptions {
+pub struct ObjectListParams {
     /// The prefix to filter objects by.
     #[serde(with = "strict_bytes")]
     pub prefix: Vec<u8>,
@@ -38,7 +62,7 @@ pub struct ListOptions {
 pub enum Method {
     Constructor = METHOD_CONSTRUCTOR,
     PutObject = frc42_dispatch::method_hash!("PutObject"),
-    ResolveObject = frc42_dispatch::method_hash!("ResolveObject"),
+    ResolveExternalObject = frc42_dispatch::method_hash!("ResolveExternalObject"),
     DeleteObject = frc42_dispatch::method_hash!("DeleteObject"),
     GetObject = frc42_dispatch::method_hash!("GetObject"),
     ListObjects = frc42_dispatch::method_hash!("ListObjects"),

@@ -217,6 +217,9 @@ where
             }
         }
 
+        let pending_objects = atomically(|| state.object_pool.count()).await;
+        tracing::info!(size = pending_objects, "ipfs pool status");
+
         // Append at the end - if we run out of block space, these are going to be reproposed in the next block.
         msgs.extend(objects);
 
@@ -483,10 +486,11 @@ where
                 IpcMessage::ObjectResolved(obj) => {
                     let from = system::SYSTEM_ACTOR_ADDR;
                     let to = objectstore::OBJECTSTORE_ACTOR_ADDR;
-                    let method_num = fendermint_actor_objectstore::Method::ResolveObject as u64;
-                    let gas_limit = 10_000_000_000; // max
+                    let method_num =
+                        fendermint_actor_objectstore::Method::ResolveExternalObject as u64;
+                    let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
 
-                    let input = fendermint_actor_objectstore::ObjectParams {
+                    let input = fendermint_actor_objectstore::ObjectResolveParams {
                         key: obj.key,
                         value: obj.value,
                     };
@@ -495,13 +499,13 @@ where
                         version: Default::default(),
                         from,
                         to,
-                        sequence: 0, // TODO(sander): This works but is it okay?
-                        value: TokenAmount::zero(),
+                        sequence: 0, // We will use implicit execution which doesn't check or modify this.
+                        value: Default::default(),
                         method_num,
                         params,
                         gas_limit,
-                        gas_fee_cap: TokenAmount::zero(),
-                        gas_premium: TokenAmount::zero(),
+                        gas_fee_cap: Default::default(),
+                        gas_premium: Default::default(),
                     };
 
                     let (apply_ret, emitters) = state.execute_implicit(msg)?;
@@ -519,7 +523,7 @@ where
                         gas_limit = gas_limit,
                         gas_used = apply_ret.msg_receipt.gas_used,
                         info = info.unwrap_or_default(),
-                        "implicit transaction"
+                        "implicit tx delivered"
                     );
 
                     atomically(|| {

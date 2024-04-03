@@ -128,7 +128,7 @@ set -u
 if ! $local_deploy ; then
   echo "$DASHES Preparing ipc repo..."
   if ! ls $IPC_FOLDER ; then
-    git clone --recurse-submodules -j8 git@github.com:28657/ipc.git ${IPC_FOLDER}
+    git clone --recurse-submodules -j8 git@github.com:amazingdatamachine/ipc.git ${IPC_FOLDER}
   fi
   cd ${IPC_FOLDER}
   git fetch
@@ -247,6 +247,7 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e PARENT_REGISTRY=${parent_registry_address} \
     -e PARENT_GATEWAY=${parent_gateway_address} \
     -e FM_PULL_SKIP=1 \
+    -e FM_LOG_LEVEL="info" \
     child-validator 2>&1)
 echo "$bootstrap_output"
 bootstrap_node_id=$(echo "$bootstrap_output" | sed -n '/CometBFT node ID:/ {n;p;}' | tr -d "[:blank:]")
@@ -281,6 +282,7 @@ do
       -e PARENT_REGISTRY=${parent_registry_address} \
       -e PARENT_GATEWAY=${parent_gateway_address} \
       -e FM_PULL_SKIP=1 \
+      -e FM_LOG_LEVEL="info" \
       child-validator
 done
 
@@ -294,7 +296,7 @@ do
   proxy_key=$(cat ${IPC_CONFIG_FOLDER}/evm_keystore_proxy.json | jq .[$i].private_key | tr -d '"' | tr -d '\n')
   proxy_address=$(cat ${IPC_CONFIG_FOLDER}/evm_keystore_proxy.json | jq .[$i].address | tr -d '"' | tr -d '\n')
   $IPC_CLI wallet import --wallet-type evm --private-key ${proxy_key}
-  $IPC_CLI cross-msg fund --from ${proxy_address} --subnet ${subnet_id} 2
+  $IPC_CLI cross-msg fund --from ${proxy_address} --subnet ${subnet_id} 10
   out=${subnet_folder}/validator-${i}/validator-${i}/keys/proxy_key.sk
   $IPC_CLI wallet export --wallet-type evm --address ${proxy_address} --fendermint | tr -d '\n' > ${out}
   chmod 600 ${subnet_folder}/validator-${i}/validator-${i}/keys/proxy_key.sk
