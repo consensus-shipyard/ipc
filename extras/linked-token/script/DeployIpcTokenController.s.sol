@@ -43,7 +43,6 @@ contract DeployIpcTokenController is ConfigManager {
     }
 
     function deployIpcTokenControllerV2() external {
-
         vm.startBroadcast();
         LinkedTokenControllerV2 initialImplementation = new LinkedTokenControllerV2();
         vm.stopBroadcast();

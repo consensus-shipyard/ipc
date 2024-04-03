@@ -33,15 +33,7 @@ contract DeployIpcTokenReplica is ConfigManager {
 
         bytes memory initCall = abi.encodeCall(
             LinkedTokenReplica.initialize,
-            (
-                gateway,
-                tokenContractAddress,
-                destinationSubnet,
-                address(0),
-                token_name,
-                token_symbol,
-                token_decimals
-            )
+            (gateway, tokenContractAddress, destinationSubnet, address(0), token_name, token_symbol, token_decimals)
         );
         TransparentUpgradeableProxy transparentProxy = new TransparentUpgradeableProxy(
             initialImplementation,
@@ -53,7 +45,6 @@ contract DeployIpcTokenReplica is ConfigManager {
     }
 
     function deployIpcTokenReplicaV2() external {
-
         vm.startBroadcast();
         LinkedTokenReplicaV2 initialImplementation = new LinkedTokenReplicaV2();
         vm.stopBroadcast();
@@ -61,7 +52,6 @@ contract DeployIpcTokenReplica is ConfigManager {
         // Log the address of the deployed contract implementation
         writeConfig("LinkedTokenReplicaImplementation", vm.toString(address(initialImplementation)));
     }
-
 
     function upgradeIpcTokenReplica(
         address replicaProxy,
