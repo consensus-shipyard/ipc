@@ -345,7 +345,10 @@ impl FinalityWithNull {
         } else {
             // latest height is not found, meaning we dont have any prefetched cache, we just be
             // strict and vote no simply because we don't know.
-            tracing::debug!(latest_height, "reject proposal, no data in cache");
+            tracing::debug!(
+                proposal = proposal.height.to_string(),
+                "reject proposal, no data in cache"
+            );
             Ok(false)
         }
     }
