@@ -26,7 +26,7 @@ contract AVSDirectory {
         );
         require(
             delegation.isOperator(operator),
-            "AVSDirectory.registerOperatorToAVS: operator not registered to EigenLayer yet"
+            "AVSDirectory.registerOperatorToAVS: operator not registered yet"
         );
         avsOperatorStatus[msg.sender][operator] = OperatorAVSRegistrationStatus
             .REGISTERED;
