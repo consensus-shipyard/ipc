@@ -6,7 +6,12 @@ import "../src/LinkedTokenController.sol";
 import "@ipc/src/structs/Subnet.sol";
 
 contract DeployIpcTokenController is ConfigManager {
-    function run(address gateway, address tokenContractAddress, uint64 _rootNetChainId, address[] memory _route) external {
+    function run(
+        address gateway,
+        address tokenContractAddress,
+        uint64 _rootNetChainId,
+        address[] memory _route
+    ) external {
         // Example for setting up the SubnetID, adjust according to your actual setup
         SubnetID memory destinationSubnet = SubnetID({root: _rootNetChainId, route: _route});
 
@@ -18,4 +23,3 @@ contract DeployIpcTokenController is ConfigManager {
         writeConfig("LinkedTokenController", vm.toString(address(controller)));
     }
 }
-

@@ -23,6 +23,7 @@ num-traits = { workspace = true }
 openssl = { workspace = true }
 paste = { workspace = true }
 prometheus = { workspace = true }
+prometheus_exporter = { workspace = true }
 prost = { workspace = true }
 rand_chacha = { workspace = true }
 serde = { workspace = true }

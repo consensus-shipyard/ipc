@@ -172,7 +172,7 @@ impl Options {
 
     /// Check if metrics are supposed to be collected.
     pub fn metrics_enabled(&self) -> bool {
-        matches!(self.command, Commands::Rpc(_) | Commands::Eth(_))
+        matches!(self.command, Commands::Run(_) | Commands::Eth(_))
     }
 }
 

@@ -1,10 +1,10 @@
 # Makefile for USDC Token Bridge on Calibration Network
 
 # Include environment variables from .env file
-include .env
+-include .env
 export
 
-.PHONY: help deploy-usdctest mint-usdc check-balance deploy-replica deploy-controller initialize-replica initialize-controller deposit-usdc withdraw-usdc check-replica-balance
+.PHONY: help fmt deploy-usdctest mint-usdc check-balance deploy-replica deploy-controller initialize-replica initialize-controller deposit-usdc withdraw-usdc check-replica-balance
 
 help:
 	@echo "Available targets:"
@@ -26,6 +26,10 @@ help:
 	@echo "Usage:"
 	@echo "  make <target>          - Run a specific target."
 	@echo "  make help              - Display this help message."
+
+fmt:
+	npm install --silent --no-save
+	npx prettier --check -w 'src/**/**/*.sol' 'script/**/**/*.sol' 'test/**/**/*.sol' 'test/**/**/*.t.sol' '**/*.{js,jsx,ts,tsx,json,css}'
 
 install:
 	@echo "Installing dependencies..."

@@ -8,6 +8,7 @@ use fvm_shared::econ::TokenAmount;
 use ipc_api::subnet_id::SubnetID;
 use serde::Deserialize;
 use serde_with::{serde_as, DurationSeconds};
+use std::net::{SocketAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tendermint_rpc::Url;
@@ -41,7 +42,6 @@ pub struct SocketAddress {
     pub host: String,
     pub port: u32,
 }
-
 impl ToString for SocketAddress {
     fn to_string(&self) -> String {
         format!("{}:{}", self.host, self.port)
@@ -53,6 +53,16 @@ impl std::net::ToSocketAddrs for SocketAddress {
 
     fn to_socket_addrs(&self) -> std::io::Result<Self::Iter> {
         self.to_string().to_socket_addrs()
+    }
+}
+
+impl TryInto<std::net::SocketAddr> for SocketAddress {
+    type Error = std::io::Error;
+
+    fn try_into(self) -> Result<SocketAddr, Self::Error> {
+        self.to_socket_addrs()?
+            .next()
+            .ok_or_else(|| std::io::Error::from(std::io::ErrorKind::AddrNotAvailable))
     }
 }
 
@@ -195,6 +205,14 @@ impl SnapshotSettings {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+pub struct MetricsSettings {
+    /// Enable the export of metrics over HTTP.
+    pub enabled: bool,
+    /// HTTP listen address where Prometheus metrics are hosted.
+    pub listen: SocketAddress,
+}
+
+#[derive(Debug, Deserialize, Clone)]
 pub struct Settings {
     /// Home directory configured on the CLI, to which all paths in settings can be set relative.
     home_dir: PathBuf,
@@ -220,6 +238,7 @@ pub struct Settings {
 
     pub abci: AbciSettings,
     pub db: DbSettings,
+    pub metrics: MetricsSettings,
     pub snapshots: SnapshotSettings,
     pub eth: EthSettings,
     pub fvm: FvmSettings,
@@ -266,6 +285,7 @@ impl Settings {
                     .ignore_empty(true) // otherwise "" will be parsed as a list item
                     .try_parsing(true) // required for list separator
                     .list_separator(",") // need to list keys explicitly below otherwise it can't pase simple `String` type
+                    .with_list_parse_key("resolver.connection.external_addresses")
                     .with_list_parse_key("resolver.discovery.static_addresses")
                     .with_list_parse_key("resolver.membership.static_subnets"),
             ))
@@ -355,12 +375,14 @@ mod tests {
         #[test]
         fn parse_comma_separated() {
             let settings = with_env_vars(vec![
-            ("FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES", "/ip4/198.51.100.0/tcp/4242/p2p/QmYyQSo1c1Ym7orWxLYvCrM2EmxFTANf8wXmmE7DWjhx5N,/ip6/2604:1380:2000:7a00::1/udp/4001/quic/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb"),
-            // Set a normal string key as well to make sure we have configured the library correctly and it doesn't try to parse everything as a list.
-            ("FM_RESOLVER__NETWORK__NETWORK_NAME", "test"),
-        ], || try_parse_config("")).unwrap();
+                ("FM_RESOLVER__CONNECTION__EXTERNAL_ADDRESSES", "/ip4/198.51.100.0/tcp/4242/p2p/QmYyQSo1c1Ym7orWxLYvCrM2EmxFTANf8wXmmE7DWjhx5N,/ip6/2604:1380:2000:7a00::1/udp/4001/quic/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb"),
+                ("FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES", "/ip4/198.51.100.1/tcp/4242/p2p/QmYyQSo1c1Ym7orWxLYvCrM2EmxFTANf8wXmmE7DWjhx5N,/ip6/2604:1380:2000:7a00::2/udp/4001/quic/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb"),
+                // Set a normal string key as well to make sure we have configured the library correctly and it doesn't try to parse everything as a list.
+                ("FM_RESOLVER__NETWORK__NETWORK_NAME", "test"),
+            ], || try_parse_config("")).unwrap();
 
             assert_eq!(settings.resolver.discovery.static_addresses.len(), 2);
+            assert_eq!(settings.resolver.connection.external_addresses.len(), 2);
         }
 
         #[test]
@@ -368,12 +390,14 @@ mod tests {
             let settings = with_env_vars(
                 vec![
                     ("FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES", ""),
+                    ("FM_RESOLVER__CONNECTION__EXTERNAL_ADDRESSES", ""),
                     ("FM_RESOLVER__MEMBERSHIP__STATIC_SUBNETS", ""),
                 ],
                 || try_parse_config(""),
             )
             .unwrap();
 
+            assert_eq!(settings.resolver.connection.external_addresses.len(), 0);
             assert_eq!(settings.resolver.discovery.static_addresses.len(), 0);
             assert_eq!(settings.resolver.membership.static_subnets.len(), 0);
         }

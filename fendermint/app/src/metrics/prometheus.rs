@@ -34,6 +34,10 @@ pub mod app {
         BOTTOMUP_CKPT_BLOCK_HEIGHT: IntGauge = "Highest bottom-up checkpoint created";
         BOTTOMUP_CKPT_CONFIG_NUM: IntGauge = "Highest configuration number checkpointed";
         BOTTOMUP_CKPT_NUM_MSGS: IntCounter = "Number of bottom-up messages observed since start";
+
+        // This metrics is available in CometBFT as well, but it's something that should increase even without subnets,
+        // which can be a useful way to check if metrics work at all.
+        ABCI_COMMITTED_BLOCK_HEIGHT: IntGauge = "Highest committed block";
     }
 }
 
