@@ -3,16 +3,18 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use std::str::FromStr;
-use std::{
-    convert::Infallible, future::Future, net::ToSocketAddrs, num::ParseIntError, pin::Pin,
-    sync::Arc,
-};
+use std::{convert::Infallible, future::Future, num::ParseIntError, pin::Pin, sync::Arc};
 
 use anyhow::anyhow;
 use async_tempfile::TempFile;
 use bytes::{Buf, Bytes};
 use cid::Cid;
+use ethers::core::types::{self as et};
 use fendermint_actor_machine::{Metadata, WriteAccess};
+use fendermint_actor_objectstore::{Object, ObjectKind, ObjectList, ObjectListItem};
+use fendermint_rpc::QueryClient;
+use fendermint_vm_actor_interface::eam::EthAddress;
+use fendermint_vm_message::conv::from_fvm::to_eth_tokens;
 use futures_util::{Stream, StreamExt};
 use fvm_ipld_encoding::strict_bytes::ByteBuf;
 use fvm_shared::{address::Address, econ::TokenAmount, ActorID, BLOCK_GAS_LIMIT};
@@ -20,23 +22,19 @@ use ipfs_api_backend_hyper::{IpfsApi, IpfsClient, TryFromUri};
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::net::ToSocketAddrs;
+use std::sync::Mutex;
 use tendermint::{block::Height, Hash};
 use thiserror::Error;
-use tokio::{
-    io::{AsyncSeekExt, AsyncWriteExt},
-    sync::Mutex,
-};
+use tiny_keccak::{Hasher, Keccak};
+use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 use tokio_util::compat::TokioAsyncReadCompatExt;
-use warp::{
-    http::{HeaderMap, HeaderValue, StatusCode},
-    path::Tail,
-    Filter, Rejection, Reply,
-};
+use warp::http::{HeaderMap, HeaderValue};
+use warp::path::Tail;
+use warp::{http::StatusCode, Filter, Rejection, Reply};
 
 use fendermint_actor_accumulator::PushReturn;
-use fendermint_actor_objectstore::{
-    DeleteParams, GetParams, ListParams, Object, ObjectKind, ObjectList, ObjectListItem, PutParams,
-};
+use fendermint_actor_objectstore::{DeleteParams, GetParams, ListParams, PutParams};
 use fendermint_app_options::rpc::BroadcastMode;
 use fendermint_app_settings::proxy::ProxySettings;
 use fendermint_rpc::tx::BoundClient;
@@ -48,13 +46,12 @@ use fendermint_rpc::{
 use fendermint_vm_actor_interface::adm;
 use fendermint_vm_message::query::FvmQueryHeight;
 
+use super::rpc::{gas_params, BroadcastResponse, TransClient};
 use crate::cmd;
 use crate::options::{
     proxy::{ProxyArgs, ProxyCommands},
     rpc::TransArgs,
 };
-
-use super::rpc::{gas_params, BroadcastResponse, TransClient};
 
 const MAX_OBJECT_LENGTH: u64 = 1024 * 1024 * 1024;
 const MAX_INTERNAL_OBJECT_LENGTH: u64 = 1024;
@@ -108,6 +105,16 @@ cmd! {
                     .and(with_args(args.clone()))
                     .and_then(handle_accounts_get_machines);
 
+                // Object Store routes
+                let object_route = warp::path!("v1" / "object" )
+                    .and(warp::put())
+                    .and(warp::body::content_length_limit(MAX_OBJECT_LENGTH))
+                    .and(with_client(client.clone()))
+                    .and(with_ipfs(ipfs.clone()))
+                    .and(warp::query::<UploadQuery>())
+                    .and(warp::body::stream())
+                    .and_then(handle_object_upload);
+
                 // Objectstore routes
                 let os_upload_route = warp::path!("v1" / "objectstores" / Address / ..)
                     .and(warp::put())
@@ -122,6 +129,7 @@ cmd! {
                     .and(warp::header::optional::<u64>("X-ADM-GasLimit"))
                     .and(warp::header::optional::<BroadcastMode>("X-ADM-BroadcastMode"))
                     .and_then(handle_os_upload);
+
                 let os_delete_route = warp::path!("v1" / "objectstores" / Address / ..)
                     .and(warp::delete())
                     .and(warp::path::tail())
@@ -263,8 +271,120 @@ impl From<ParseIntError> for ProxyError {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct UploadQuery {
+    pub signature: String,
+}
+
 async fn health() -> Result<impl Reply, Rejection> {
     Ok(warp::reply::reply())
+}
+
+async fn handle_object_upload(
+    client: FendermintClient,
+    ipfs: IpfsClient,
+    query: UploadQuery,
+    mut body: impl Stream<Item = Result<impl Buf, warp::Error>> + Unpin + Send + Sync,
+) -> Result<impl Reply, Rejection> {
+    let mut hasher = Keccak::v256();
+    let mut hash = [0u8; 32];
+    let mut tmp = TempFile::new().await.map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("failed to create tmp file: {}", e),
+        })
+    })?;
+    let mut total_bytes = 0;
+
+    while let Some(buf) = body.next().await {
+        let mut buf = buf.unwrap();
+        while buf.remaining() > 0 {
+            let chunk = buf.chunk().to_owned();
+            let chunk_len = chunk.len();
+
+            // update the hasher
+            hasher.update(&chunk);
+
+            tmp.write_all(&chunk).await.map_err(|e| {
+                Rejection::from(BadRequest {
+                    message: format!("failed to write chunk: {}", e),
+                })
+            })?;
+            tmp.flush().await.map_err(|e| {
+                Rejection::from(BadRequest {
+                    message: format!("failed to flush chunk: {}", e),
+                })
+            })?;
+            buf.advance(chunk_len);
+            total_bytes += chunk_len;
+        }
+    }
+    tmp.rewind().await.map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("failed to rewind: {}", e),
+        })
+    })?;
+
+    hasher.finalize(&mut hash);
+    let signature = hex::decode(query.signature).unwrap();
+
+    println!("final hash: {:?}", hash);
+    println!("signature: {:?}", signature);
+
+    let owner = fendermint_crypto::recover_address(&hash, &signature[..64], signature[64])
+        .map_err(|e| {
+            Rejection::from(BadRequest {
+                message: format!("failed to recover owner: {}", e),
+            })
+        })?;
+
+    println!("owner: {:?}", owner);
+
+    let height = FvmQueryHeight::Committed;
+    let addr = fvm_shared::address::Address::from(EthAddress(owner.0));
+    let actor_state = client.actor_state(&addr, height).await.map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("failed to get actor state: {}", e),
+        })
+    })?;
+
+    let balance = match actor_state.value {
+        Some((_, state)) => to_eth_tokens(&state.balance).unwrap(),
+        None => et::U256::zero(),
+    };
+
+    println!("balance: {:?}", balance);
+    let cost_per_byte = et::U256::from(1_000_000_000u128);
+    let required_balance = cost_per_byte * total_bytes;
+    if balance < required_balance {
+        return Err(Rejection::from(BadRequest {
+            message: "insufficient balance".to_string(),
+        }));
+    }
+
+    let add = ipfs_api_backend_hyper::request::Add {
+        chunker: Some("size-1048576"),
+        pin: Some(false),
+        raw_leaves: Some(true),
+        cid_version: Some(1),
+        hash: Some("blake2b-256"),
+        ..Default::default()
+    };
+
+    let res = ipfs
+        .add_async_with_options(tmp.compat(), add)
+        .await
+        .map_err(|e| {
+            Rejection::from(BadRequest {
+                message: format!("failed to add file: {}", e),
+            })
+        })?;
+    let cid = Cid::try_from(res.hash).map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("failed to parse cid: {}", e),
+        })
+    })?;
+
+    Ok(cid.to_string())
 }
 
 async fn handle_machines_create_os(

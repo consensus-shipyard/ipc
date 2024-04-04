@@ -2955,6 +2955,7 @@ dependencies = [
  "async-trait",
  "bytes",
  "cid",
+ "ethers",
  "fendermint_abci",
  "fendermint_actor_accumulator",
  "fendermint_actor_machine",
@@ -3011,6 +3012,7 @@ dependencies = [
  "tendermint-proto 0.31.1",
  "tendermint-rpc",
  "thiserror",
+ "tiny-keccak",
  "tokio",
  "tokio-util 0.7.10",
  "tower-abci",
@@ -3106,8 +3108,11 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
+ "ethers",
  "libsecp256k1",
+ "once_cell",
  "rand",
+ "thiserror",
  "zeroize",
 ]
 
