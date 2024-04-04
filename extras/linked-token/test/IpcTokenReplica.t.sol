@@ -80,7 +80,6 @@ contract IpcTokenReplicaTest is Test, IntegrationTestBase {
         // initialize controller & replica
 
         controller.initialize(gateway, controllerSubnetUSDC, replicaSubnetName, address(replica));
-
         replica.initialize(
             gateway,
             controllerSubnetUSDC,
@@ -90,6 +89,9 @@ contract IpcTokenReplicaTest is Test, IntegrationTestBase {
             REPLICA_TOKEN_SYMBOL,
             REPLICA_TOKEN_DECIMALS
         );
+
+        replica.setLinkedContract(address(controller));
+        controller.setLinkedContract(address(replica));
     }
 
     function testHandleIpcMessageOrigin() public {
@@ -100,8 +102,8 @@ contract IpcTokenReplicaTest is Test, IntegrationTestBase {
 
         IpcEnvelope memory validMsg = IpcEnvelope({
             kind: IpcMsgKind.Call,
-            from: IPCAddress({subnetId: controllerSubnet, rawAddress: FvmAddressHelper.from(address(replica))}),
-            to: IPCAddress({subnetId: replicaSubnetName, rawAddress: FvmAddressHelper.from(address(controller))}),
+            from: IPCAddress({subnetId: controllerSubnet, rawAddress: FvmAddressHelper.from(address(controller))}),
+            to: IPCAddress({subnetId: replicaSubnetName, rawAddress: FvmAddressHelper.from(address(replica))}),
             value: DEFAULT_CROSS_MSG_FEE,
             nonce: 0,
             message: abi.encode(message)
@@ -130,5 +132,7 @@ contract IpcTokenReplicaTest is Test, IntegrationTestBase {
 
         vm.expectRevert(InvalidOriginSubnet.selector);
         replica._validateEnvelope(invalidSubnet);
+
+        replica._validateEnvelope(validMsg);
     }
 }
