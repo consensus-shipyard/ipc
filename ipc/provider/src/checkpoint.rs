@@ -258,7 +258,7 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                     block_height: event.height as BlockHeight,
                     checkpoint_count: 1,
                 });
-                return Err(err);
+                Err(err)
             }
         }
     }
