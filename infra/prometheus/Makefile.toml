@@ -2,11 +2,8 @@ extend = [
   { path = "../fendermint/scripts/docker.toml" },
 ]
 
-[tasks.prometheus-pull]
-script = "docker pull prom/prometheus"
-
 [tasks.prometheus-start]
-env = { "CONTAINER_NAME" = "Prometheus" }
+env = { "CONTAINER_NAME" = "ipc-prometheus" }
 script = "docker run --name ${CONTAINER_NAME} -d -p 9090:9090 -v ./prometheus.yml:/etc/prometheus/prometheus.yml prom/prometheus"
 
 [tasks.prometheus-destroy]
