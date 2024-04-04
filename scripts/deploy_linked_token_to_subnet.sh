@@ -74,7 +74,7 @@ echo "$DASHES Funding address in subnet..."
 $IPC_CLI cross-msg fund \
 --subnet $subnet_id \
 --from $default_wallet_address \
-10
+50
 
 
 # Step 5: Reset Linked Token Config
