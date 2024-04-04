@@ -126,9 +126,9 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         log::info!("launching {self} for {submitter}");
 
         loop {
-            if let Err(e) = self.submit_next_epoch(submitter).await {
-                log::error!("cannot submit checkpoint for submitter: {submitter} due to {e}");
-            }
+            // if let Err(e) = self.submit_next_epoch(submitter).await {
+            //     log::error!("cannot submit checkpoint for submitter: {submitter} due to {e}");
+            // }
 
             let num = rand::thread_rng().gen_range(0..100);
             log::info!("jiejie: New random number {num}");

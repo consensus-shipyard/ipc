@@ -115,6 +115,7 @@ pub(crate) struct BottomUpRelayerArgs {
     )]
     pub max_parallelism: usize,
     #[arg(
+        long,
         default_value = "true",
         help = "Flag to turn on/off Prometheus metrics reporting."
     )]
