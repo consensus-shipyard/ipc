@@ -16,6 +16,7 @@ help:
 	@echo "  deploy-strategies      - Deploy the Strategies contract on the Calibration Network."
 	@echo "  deploy-lststrategies   - Deploy the LST Strategies contract on the Calibration Network."
 	@echo "  deploy-glifstrategy    - Deploy the Glif Strategies contract on the Calibration Network."
+	@echo "  deploy-minerslasher    - Deploy the MinerSlasher contract on the Calibration Network."
 	@echo "  mint-usdc              - Mint 1000 USDCTest tokens to the wallet specified in the .env file."
 	@echo "  check-balance          - Check the balance of USDCTest tokens in the wallet."
 	@echo "  deploy-replica         - Deploy the token replica contract on the subnet."
@@ -66,6 +67,10 @@ deploy-lststrategies:
 deploy-glifstrategy:
 	@echo "Deploying Glif Strategies contract..."
 	forge script script/DeployGlifStrategy.s.sol:DeployGlifStrategy --broadcast --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --skip-simulation -vvv --slow
+
+deploy-minerslasher:
+	@echo "Deploying MinerSlasher contract..."
+	forge script script/DeployMinerSlasher.s.sol:DeployMinerSlasher --broadcast --rpc-url $$CALIBNET_RPC_URL --private-key $$PRIVATE_KEY --skip-simulation -vvv --slow
 
 mint-usdc:
 	@echo "Minting 1000 USDCTest tokens..."
