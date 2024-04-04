@@ -24,7 +24,7 @@ string constant REPLICA_TOKEN_NAME = "USDCTestReplica";
 string constant REPLICA_TOKEN_SYMBOL = "USDCtR";
 uint8 constant REPLICA_TOKEN_DECIMALS = 6;
 
-contract IpcTokenReplicaTest is Test, IntegrationTestBase {
+contract LinkedTokenReplicaTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
 
     LinkedTokenController controller;
