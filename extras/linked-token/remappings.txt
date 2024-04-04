@@ -5,3 +5,4 @@ fevmate/=../../contracts/lib/fevmate/contracts/
 @ipc/=../../contracts/
 elliptic-curve-solidity/=../../contracts/lib/elliptic-curve-solidity/
 murky/=../../contracts/lib/murky/src
+filecoin-solidity/=lib/filecoin-solidity/
