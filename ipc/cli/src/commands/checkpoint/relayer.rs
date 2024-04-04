@@ -79,7 +79,8 @@ impl CommandLineHandler for BottomUpRelayer {
                 .expect("Unable to set a global collector");
 
             let prometheus_registry = prometheus::Registry::new();
-            ipc_metrics::register_app_metrics(&prometheus_registry).context("failed to register metrics")?;
+            ipc_metrics::register_app_metrics(&prometheus_registry)
+                .context("failed to register metrics")?;
 
             // Start metrics export HTTP server.
             let addr: SocketAddr = arguments.metric_export_bind_address.parse().unwrap();
