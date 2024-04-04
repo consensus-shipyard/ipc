@@ -23,6 +23,7 @@ contract DelegationManager is Ownable, ReentrancyGuard {
         string name;
         OperatorType operatorType;
         uint256 slashes;
+        uint64 minerId;
     }
 
     mapping(OperatorType => address) public slashers;
@@ -161,5 +162,9 @@ contract DelegationManager is Ownable, ReentrancyGuard {
             details[i] = _operatorDetails[operators[i]];
         }
         return details;
+    }
+
+    function getMinerId(address operator) public view returns (uint64) {
+        return _operatorDetails[operator].minerId;
     }
 }
