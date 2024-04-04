@@ -450,6 +450,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         vm.prank(caller);
         vm.expectRevert(SupplySourceHelper.NoBalanceIncrease.selector);
         rootSubnet.gateway.manager().fundWithToken(nilTokenSubnet.id, FvmAddressHelper.from(address(caller)), amount);
+        assertEq(getSubnetCircSupplyGW(nilTokenSubnet.id, rootSubnet.gateway), 0);
     }
 
     function testMultiSubnet_Erc20_ReleaseResultOkFromParentToChild() public {
