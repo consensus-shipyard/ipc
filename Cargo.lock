@@ -5067,7 +5067,6 @@ dependencies = [
  "num-traits",
  "prometheus",
  "prometheus_exporter",
- "rand",
  "reqwest",
  "serde",
  "serde_bytes",

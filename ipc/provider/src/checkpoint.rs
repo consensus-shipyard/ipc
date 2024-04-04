@@ -14,7 +14,6 @@ use ipc_event::{
     SubmitBottomUpCheckpointFail,
 };
 use ipc_wallet::{EthKeyAddress, PersistentKeyStore};
-use rand::Rng;
 use std::cmp::max;
 use std::fmt::{Display, Formatter};
 use std::sync::{Arc, RwLock};
@@ -126,24 +125,9 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         log::info!("launching {self} for {submitter}");
 
         loop {
-            // if let Err(e) = self.submit_next_epoch(submitter).await {
-            //     log::error!("cannot submit checkpoint for submitter: {submitter} due to {e}");
-            // }
-
-            let num = rand::thread_rng().gen_range(0..100);
-            log::info!("jiejie: New random number {num}");
-            emit!(GetLatestAcceptedCheckpoint { block_height: num });
-            emit!(SubmitBottomUpCheckpoint {
-                block_height: num,
-                checkpoint_count: 1,
-            });
-            emit!(SubmitBottomUpCheckpointFail {
-                block_height: num,
-                checkpoint_count: 1,
-            });
-
-            log::info!("Sleep for {:?} seconds", submission_interval);
-
+            if let Err(e) = self.submit_next_epoch(submitter).await {
+                log::error!("cannot submit checkpoint for submitter: {submitter} due to {e}");
+            }
             tokio::time::sleep(submission_interval).await;
         }
     }
