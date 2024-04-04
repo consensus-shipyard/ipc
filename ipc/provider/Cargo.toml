@@ -51,8 +51,8 @@ ipc-types = { workspace = true }
 ipc-wallet = { workspace = true, features = ["with-ethers"] }
 ipc-api = { workspace = true }
 ipc_actors_abis = { workspace = true }
-prometheus = "0.13"
-prometheus_exporter = "0.8"
+prometheus =  { workspace = true }
+prometheus_exporter =  { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

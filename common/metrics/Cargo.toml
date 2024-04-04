@@ -12,6 +12,6 @@ lazy_static = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 log = { workspace = true }
-prometheus = "0.13"
+prometheus = { workspace = true }
 
 tracing_utils = { path = "../tracing" }
