@@ -53,6 +53,7 @@ ipc-api = { workspace = true }
 ipc_actors_abis = { workspace = true }
 prometheus =  { workspace = true }
 prometheus_exporter =  { workspace = true }
+rand = "0.8.5"
 
 [dev-dependencies]
 tempfile = { workspace = true }
