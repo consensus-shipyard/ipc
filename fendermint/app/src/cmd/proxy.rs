@@ -17,7 +17,9 @@ use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_message::conv::from_fvm::to_eth_tokens;
 use futures_util::{Stream, StreamExt};
 use fvm_ipld_encoding::strict_bytes::ByteBuf;
-use fvm_shared::{address::Address, econ::TokenAmount, ActorID, BLOCK_GAS_LIMIT};
+use fvm_shared::econ::TokenAmount;
+use fvm_shared::BLOCK_GAS_LIMIT;
+use fvm_shared::{address::Address, ActorID};
 use ipfs_api_backend_hyper::{IpfsApi, IpfsClient, TryFromUri};
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
@@ -54,8 +56,8 @@ use crate::options::{
 };
 
 const MAX_OBJECT_LENGTH: u64 = 1024 * 1024 * 1024;
-const MAX_INTERNAL_OBJECT_LENGTH: u64 = 1024;
 const MAX_EVENT_LENGTH: u64 = 1024 * 500; // Limit to 500KiB for now
+const MAX_INTERNAL_OBJECT_LENGTH: u64 = 1024;
 
 cmd! {
     ProxyArgs(self, settings: ProxySettings) {
@@ -111,6 +113,7 @@ cmd! {
                     .and(warp::body::content_length_limit(MAX_OBJECT_LENGTH))
                     .and(with_client(client.clone()))
                     .and(with_ipfs(ipfs.clone()))
+                    .and(warp::header::<u64>("Content-Length"))
                     .and(warp::query::<UploadQuery>())
                     .and(warp::body::stream())
                     .and_then(handle_object_upload);
@@ -283,9 +286,16 @@ async fn health() -> Result<impl Reply, Rejection> {
 async fn handle_object_upload(
     client: FendermintClient,
     ipfs: IpfsClient,
+    size: u64,
     query: UploadQuery,
     mut body: impl Stream<Item = Result<impl Buf, warp::Error>> + Unpin + Send + Sync,
 ) -> Result<impl Reply, Rejection> {
+    if size == 0 {
+        return Err(Rejection::from(BadRequest {
+            message: "empty body".into(),
+        }));
+    }
+
     let mut hasher = Keccak::v256();
     let mut hash = [0u8; 32];
     let mut tmp = TempFile::new().await.map_err(|e| {
@@ -315,6 +325,8 @@ async fn handle_object_upload(
                 })
             })?;
             buf.advance(chunk_len);
+
+            // update the total bytes
             total_bytes += chunk_len;
         }
     }
@@ -327,17 +339,13 @@ async fn handle_object_upload(
     hasher.finalize(&mut hash);
     let signature = hex::decode(query.signature).unwrap();
 
-    println!("final hash: {:?}", hash);
-    println!("signature: {:?}", signature);
-
+    // Recover the uploader's address from the signature
     let owner = fendermint_crypto::recover_address(&hash, &signature[..64], signature[64])
         .map_err(|e| {
             Rejection::from(BadRequest {
                 message: format!("failed to recover owner: {}", e),
             })
         })?;
-
-    println!("owner: {:?}", owner);
 
     let height = FvmQueryHeight::Committed;
     let addr = fvm_shared::address::Address::from(EthAddress(owner.0));
@@ -352,7 +360,7 @@ async fn handle_object_upload(
         None => et::U256::zero(),
     };
 
-    println!("balance: {:?}", balance);
+    // (todo): make cost_per_byte a configurable constant
     let cost_per_byte = et::U256::from(1_000_000_000u128);
     let required_balance = cost_per_byte * total_bytes;
     if balance < required_balance {
