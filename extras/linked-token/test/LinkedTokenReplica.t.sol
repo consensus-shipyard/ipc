@@ -14,7 +14,6 @@ import {IpcEnvelope, CallMsg, IpcMsgKind} from "@ipc/src/structs/CrossNet.sol";
 
 import {SubnetActorDiamond} from "@ipc/src/SubnetActorDiamond.sol";
 import {LinkedTokenController} from "../src/LinkedTokenController.sol";
-//import {InvalidOriginContract, InvalidOriginSubnet} from "@ipc/src/examples/cross-token/IpcCrossTokenErrors.sol";
 import {USDCTest} from "../src/USDCTest.sol";
 import {InvalidOriginContract, InvalidOriginSubnet} from "../src/LinkedToken.sol";
 
@@ -24,7 +23,7 @@ string constant REPLICA_TOKEN_NAME = "USDCTestReplica";
 string constant REPLICA_TOKEN_SYMBOL = "USDCtR";
 uint8 constant REPLICA_TOKEN_DECIMALS = 6;
 
-contract IpcTokenReplicaTest is Test, IntegrationTestBase {
+contract LinkedTokenReplicaTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
 
     LinkedTokenController controller;
@@ -80,7 +79,6 @@ contract IpcTokenReplicaTest is Test, IntegrationTestBase {
         // initialize controller & replica
 
         controller.initialize(gateway, controllerSubnetUSDC, replicaSubnetName, address(replica));
-
         replica.initialize(
             gateway,
             controllerSubnetUSDC,
@@ -90,6 +88,9 @@ contract IpcTokenReplicaTest is Test, IntegrationTestBase {
             REPLICA_TOKEN_SYMBOL,
             REPLICA_TOKEN_DECIMALS
         );
+
+        replica.setLinkedContract(address(controller));
+        controller.setLinkedContract(address(replica));
     }
 
     function testHandleIpcMessageOrigin() public {
@@ -100,8 +101,8 @@ contract IpcTokenReplicaTest is Test, IntegrationTestBase {
 
         IpcEnvelope memory validMsg = IpcEnvelope({
             kind: IpcMsgKind.Call,
-            from: IPCAddress({subnetId: controllerSubnet, rawAddress: FvmAddressHelper.from(address(replica))}),
-            to: IPCAddress({subnetId: replicaSubnetName, rawAddress: FvmAddressHelper.from(address(controller))}),
+            from: IPCAddress({subnetId: controllerSubnet, rawAddress: FvmAddressHelper.from(address(controller))}),
+            to: IPCAddress({subnetId: replicaSubnetName, rawAddress: FvmAddressHelper.from(address(replica))}),
             value: DEFAULT_CROSS_MSG_FEE,
             nonce: 0,
             message: abi.encode(message)
@@ -130,5 +131,7 @@ contract IpcTokenReplicaTest is Test, IntegrationTestBase {
 
         vm.expectRevert(InvalidOriginSubnet.selector);
         replica._validateEnvelope(invalidSubnet);
+
+        replica._validateEnvelope(validMsg);
     }
 }

@@ -15,7 +15,6 @@ import {IpcEnvelope, CallMsg, IpcMsgKind} from "@ipc/src/structs/CrossNet.sol";
 
 import {SubnetActorDiamond} from "@ipc/src/SubnetActorDiamond.sol";
 import {LinkedTokenController} from "../src/LinkedTokenController.sol";
-//import {InvalidOriginContract, InvalidOriginSubnet} from "../src/@ipc/src/examples/cross-token/IpcCrossTokenErrors.sol";
 import {USDCTest} from "../src/USDCTest.sol";
 
 import "openzeppelin-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -24,7 +23,7 @@ string constant REPLICA_TOKEN_NAME = "USDCTestReplica";
 string constant REPLICA_TOKEN_SYMBOL = "USDCtR";
 uint8 constant REPLICA_TOKEN_DECIMALS = 6;
 
-contract IpcTokenControllerTest is Test, IntegrationTestBase {
+contract LinkedTokenControllerTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
 
     LinkedTokenController controller;

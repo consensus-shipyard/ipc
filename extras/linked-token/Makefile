@@ -12,7 +12,7 @@ help:
 	@echo "Setup and Configuration:"
 	@echo "  install                                - Install dependencies."
 	@echo "  fmt                                    - Format the Solidity files."
-	@echo "  set-original-token                     - Set the original token address."
+	@echo "  set-original-token                     - Set the original token address in the configuration."
 	@echo ""
 	@echo "Deployment and Contract Setup:"
 	@echo "  deploy-replica-implementation          - Deploy the token replica contract implementation."
@@ -105,7 +105,7 @@ link-controller:
 	cast send $$CONTROLLER_ADDR "setLinkedContract(address)" --rpc-url $$ORIGIN_NET_RPC_URL --private-key $$ORIGIN_NET_PRIVATE_KEY --  $$REPLICA_ADDR
 
 link-replica:
-	@echo "Updating controller with replica's address..."
+	@echo "Updating replica with controller's address..."
 	@CONTROLLER_ADDR=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenControllerProxy'); \
 	REPLICA_ADDR=$$(cat config.json | jq -r '.LinkedToken.LinkedTokenReplicaProxy'); \
 	cast send $$REPLICA_ADDR "setLinkedContract(address)" --rpc-url $$SUBNET_RPC_URL --private-key $$SUBNET_PRIVATE_KEY -- $$CONTROLLER_ADDR
