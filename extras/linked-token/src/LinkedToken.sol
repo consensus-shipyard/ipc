@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity 0.8.23;
 
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {FvmAddressHelper} from "@ipc/src/lib/FvmAddressHelper.sol";
 import {FvmAddress} from "@ipc/src/structs/FvmAddress.sol";
-import {IpcExchange} from "@ipc/sdk/IpcContract.sol";
+import {IpcExchangeUpgradeable} from "@ipc/sdk/IpcContractUpgradeable.sol";
 import {IpcEnvelope, ResultMsg, CallMsg, OutcomeType, IpcMsgKind} from "@ipc/src/structs/CrossNet.sol";
 import {IPCAddress, SubnetID} from "@ipc/src/structs/Subnet.sol";
 import {CrossMsgHelper} from "@ipc/src/lib/CrossMsgHelper.sol";
@@ -17,13 +18,13 @@ error InvalidOriginSubnet();
  * @title LinkedToken
  * @notice Contract to handle token transfer from L1, lock them and mint on L2.
  */
-abstract contract LinkedToken is IpcExchange {
+abstract contract LinkedToken is Initializable, IpcExchangeUpgradeable {
     using SafeERC20 for IERC20;
     using CrossMsgHelper for IpcEnvelope;
     using SubnetIDHelper for SubnetID;
     using FvmAddressHelper for FvmAddress;
 
-    IERC20 public immutable _underlying;
+    IERC20 public _underlying;
     address public _linkedContract;
     SubnetID public _linkedSubnet;
 
@@ -41,6 +42,7 @@ abstract contract LinkedToken is IpcExchange {
     }
 
     event LinkedTokenInitialized(
+        address gateway,
         address indexed underlying,
         SubnetID indexed linkedSubnet,
         address indexed linkedContract
@@ -57,15 +59,38 @@ abstract contract LinkedToken is IpcExchange {
 
     event LinkedTokenReceived(address indexed recipient, uint256 amount);
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     /**
-     * @dev Constructor for IpcTokenController
+     * @dev Initialize function for IpcTokenController
      * @param gateway Address of the gateway for cross-network communication
      * @param underlyingToken Address of the destination contract for minting
      * @param linkedSubnet SubnetID of the destination network
      */
-    constructor(address gateway, address underlyingToken, SubnetID memory linkedSubnet) IpcExchange(gateway) {
+    function __LinkedToken_init(
+        address gateway,
+        address underlyingToken,
+        SubnetID memory linkedSubnet,
+        address linkedContract
+    ) public onlyInitializing {
+        __IpcExchangeUpgradeable_init(gateway);
         _underlying = IERC20(underlyingToken);
         _linkedSubnet = linkedSubnet;
+        _linkedContract = linkedContract;
+
+        emit LinkedTokenInitialized({
+            gateway: gateway,
+            underlying: address(_underlying),
+            linkedSubnet: _linkedSubnet,
+            linkedContract: _linkedContract
+        });
+    }
+
+    function setLinkedContract(address linkedContract) external onlyOwner {
+        _linkedContract = linkedContract;
     }
 
     function getLinkedSubnet() public view returns (SubnetID memory) {
@@ -132,19 +157,6 @@ abstract contract LinkedToken is IpcExchange {
     // ----------------------------
     // Linked contract management.
     // ----------------------------
-
-    function initialize(address linkedContract) external onlyOwner {
-        // Note: for now, this allows changing the linked contract for upgradeability purposes.
-        // Consider disallowing this if we anyway switch to something like https://docs.openzeppelin.com/upgrades.
-
-        _linkedContract = linkedContract;
-
-        emit LinkedTokenInitialized({
-            underlying: address(_underlying),
-            linkedSubnet: _linkedSubnet,
-            linkedContract: _linkedContract
-        });
-    }
 
     // ----------------------------
     // IPC GMP entrypoints.

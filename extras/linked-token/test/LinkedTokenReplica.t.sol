@@ -18,7 +18,13 @@ import {LinkedTokenController} from "../src/LinkedTokenController.sol";
 import {USDCTest} from "../src/USDCTest.sol";
 import {InvalidOriginContract, InvalidOriginSubnet} from "../src/LinkedToken.sol";
 
-contract IpcTokenReplicaTest is Test, IntegrationTestBase {
+import "openzeppelin-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+
+string constant REPLICA_TOKEN_NAME = "USDCTestReplica";
+string constant REPLICA_TOKEN_SYMBOL = "USDCtR";
+uint8 constant REPLICA_TOKEN_DECIMALS = 6;
+
+contract LinkedTokenReplicaTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
 
     LinkedTokenController controller;
@@ -44,7 +50,6 @@ contract IpcTokenReplicaTest is Test, IntegrationTestBase {
         require(controllerSubnet.isRoot(), "not root");
         rootGateway = createGatewayDiamond(gatewayParams(controllerSubnet));
         gateway = address(rootGateway);
-        replica = new LinkedTokenReplica(gateway, controllerSubnetUSDC, controllerSubnet);
         rootNativeSubnetActor = createSubnetActor(defaultSubnetActorParamsWith(address(rootGateway), controllerSubnet));
         nativeSubnetPath = new address[](1);
         nativeSubnetPath[0] = address(rootNativeSubnetActor);
@@ -54,9 +59,39 @@ contract IpcTokenReplicaTest is Test, IntegrationTestBase {
         vm.prank(address(rootNativeSubnetActor));
         registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootNativeSubnetActor), rootGateway);
 
-        controller = new LinkedTokenController(gateway, controllerSubnetUSDC, replicaSubnetName);
-        replica.initialize(address(controller));
-        controller.initialize(address(replica));
+        //set up controller with proxy
+        LinkedTokenController initialControllerImplementation = new LinkedTokenController();
+        TransparentUpgradeableProxy transparentProxyController = new TransparentUpgradeableProxy(
+            address(initialControllerImplementation),
+            address(this),
+            ""
+        );
+        controller = LinkedTokenController(address(transparentProxyController));
+
+        //set up replica with proxy
+        LinkedTokenReplica initialReplicaImplementation = new LinkedTokenReplica();
+        TransparentUpgradeableProxy transparentProxyReplica = new TransparentUpgradeableProxy(
+            address(initialReplicaImplementation),
+            address(this),
+            ""
+        );
+        replica = LinkedTokenReplica(address(transparentProxyReplica));
+
+        // initialize controller & replica
+
+        controller.initialize(gateway, controllerSubnetUSDC, replicaSubnetName, address(replica));
+        replica.initialize(
+            gateway,
+            controllerSubnetUSDC,
+            controllerSubnet,
+            address(controller),
+            REPLICA_TOKEN_NAME,
+            REPLICA_TOKEN_SYMBOL,
+            REPLICA_TOKEN_DECIMALS
+        );
+
+        replica.setLinkedContract(address(controller));
+        controller.setLinkedContract(address(replica));
     }
 
     function testHandleIpcMessageOrigin() public {
@@ -67,8 +102,8 @@ contract IpcTokenReplicaTest is Test, IntegrationTestBase {
 
         IpcEnvelope memory validMsg = IpcEnvelope({
             kind: IpcMsgKind.Call,
-            from: IPCAddress({subnetId: controllerSubnet, rawAddress: FvmAddressHelper.from(address(replica))}),
-            to: IPCAddress({subnetId: replicaSubnetName, rawAddress: FvmAddressHelper.from(address(controller))}),
+            from: IPCAddress({subnetId: controllerSubnet, rawAddress: FvmAddressHelper.from(address(controller))}),
+            to: IPCAddress({subnetId: replicaSubnetName, rawAddress: FvmAddressHelper.from(address(replica))}),
             value: DEFAULT_CROSS_MSG_FEE,
             nonce: 0,
             message: abi.encode(message)
@@ -97,5 +132,7 @@ contract IpcTokenReplicaTest is Test, IntegrationTestBase {
 
         vm.expectRevert(InvalidOriginSubnet.selector);
         replica._validateEnvelope(invalidSubnet);
+
+        replica._validateEnvelope(validMsg);
     }
 }
