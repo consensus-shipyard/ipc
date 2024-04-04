@@ -337,9 +337,11 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
     function testMultiSubnet_DeflationaryErc20_ReleaseFromChildToParent() public {
         address caller = address(new MockIpcContract());
         address recipient = address(new MockIpcContractPayable());
-        uint256 amount = 4098;
+        uint256 amount = 4096;
 
         deflationaryToken.transfer(caller, amount);
+        assertEq(deflationaryToken.balanceOf(caller), amount / 2);
+
         vm.prank(caller);
         deflationaryToken.approve(rootSubnet.gatewayAddr, amount);
 
@@ -364,6 +366,10 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             amount / 2
         );
 
+        assertEq(deflationaryToken.balanceOf(caller), 0);
+        assertEq(deflationaryToken.balanceOf(rootSubnet.gatewayAddr), amount / 4);
+        assertEq(getSubnetCircSupplyGW(deflationaryTokenSubnet.id, rootSubnet.gateway), amount / 4);
+
         GatewayManagerFacet manager = deflationaryTokenSubnet.gateway.manager();
         uint256 releaseAmount = amount / 2 / 2;
 
@@ -378,12 +384,14 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         submitBottomUpCheckpoint(checkpoint, deflationaryTokenSubnet.subnetActor);
 
         assertEq(deflationaryToken.balanceOf(recipient), releaseAmount / 2);
+        assertEq(deflationaryToken.balanceOf(rootSubnet.gatewayAddr), 0);
+        assertEq(getSubnetCircSupplyGW(deflationaryTokenSubnet.id, rootSubnet.gateway), 0);
     }
 
     function testMultiSubnet_InflationaryErc20_ReleaseFromChildToParent() public {
         address caller = address(new MockIpcContract());
         address recipient = address(new MockIpcContractPayable());
-        uint256 amount = 4098;
+        uint256 amount = 4096;
 
         inflationaryToken.transfer(caller, amount);
         vm.prank(caller);
@@ -402,6 +410,10 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             amount * 2
         );
 
+        assertEq(inflationaryToken.balanceOf(caller), 0);
+        assertEq(inflationaryToken.balanceOf(rootSubnet.gatewayAddr), amount * 4);
+        assertEq(getSubnetCircSupplyGW(inflationaryTokenSubnet.id, rootSubnet.gateway), amount * 4);
+
         GatewayManagerFacet manager = inflationaryTokenSubnet.gateway.manager();
         uint256 releaseAmount = amount * 2 * 2;
 
@@ -416,12 +428,14 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         submitBottomUpCheckpoint(checkpoint, inflationaryTokenSubnet.subnetActor);
 
         assertEq(inflationaryToken.balanceOf(recipient), releaseAmount * 2);
+        assertEq(inflationaryToken.balanceOf(rootSubnet.gatewayAddr), 0);
+        assertEq(getSubnetCircSupplyGW(inflationaryTokenSubnet.id, rootSubnet.gateway), 0);
     }
 
     function testMultiSubnet_NilErc20_ReleaseFromChildToParent() public {
         address caller = address(new MockIpcContract());
         address recipient = address(new MockIpcContractPayable());
-        uint256 amount = 4098;
+        uint256 amount = 4096;
 
         nilToken.transfer(caller, amount);
         vm.prank(caller);
