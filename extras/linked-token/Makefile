@@ -12,7 +12,7 @@ help:
 	@echo "Setup and Configuration:"
 	@echo "  install                                - Install dependencies."
 	@echo "  fmt                                    - Format the Solidity files."
-	@echo "  set-original-token                     - Set the original token address."
+	@echo "  set-original-token                     - Set the original token address in the configuration."
 	@echo ""
 	@echo "Deployment and Contract Setup:"
 	@echo "  deploy-replica-implementation          - Deploy the token replica contract implementation."
