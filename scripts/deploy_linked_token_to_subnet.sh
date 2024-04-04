@@ -78,6 +78,7 @@ $IPC_CLI cross-msg fund \
 
 
 # Step 5: Reset Linked Token Config
+cd $LINKED_TOKEN_FOLDER
 cat config.json || true
 rm -vrf config.json
 
@@ -86,6 +87,8 @@ rm -vrf config.json
 echo "$DASHES Deploying USDCTest contract to calibration net..."
 cd $LINKED_TOKEN_FOLDER
 make deploy-usdctest || true
+
+cat config.json
 
 # Step 6b: Mint USDCTest tokens on calibration net
 echo "$DASHES Minting USDCTest tokens on calibration net..."
