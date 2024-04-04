@@ -15,11 +15,11 @@ use fvm_shared::{address::Address, chainid::ChainID};
 
 use fendermint_crypto::PublicKey;
 use fendermint_crypto::SecretKey;
-use tracing_utils::emit;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::BottomUpCheckpoint;
 use fendermint_vm_event::NewBottomUpCheckpoint;
 use fendermint_vm_genesis::{Power, Validator, ValidatorKey};
+use tracing_utils::emit;
 
 use ipc_actors_abis::checkpointing_facet as checkpoint;
 use ipc_actors_abis::gateway_getter_facet as getter;

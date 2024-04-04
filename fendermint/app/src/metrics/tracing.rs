@@ -9,8 +9,8 @@ use tracing_subscriber::{filter, layer, registry::LookupSpan, Layer};
 
 use super::prometheus::app as am;
 use crate::events::*;
-use metrics_utils::{event_match, event_name, event_mapping, set_gauge, inc_counter, check_field};
 use metrics_utils::tracing::visitors;
+use metrics_utils::{check_field, event_mapping, event_match, event_name, inc_counter, set_gauge};
 
 /// Create a layer that handles events by incrementing metrics.
 pub fn layer<S>() -> impl Layer<S>
@@ -60,10 +60,10 @@ impl<S: Subscriber> Layer<S> for MetricsLayer<S> {
 
 #[cfg(test)]
 mod tests {
-    use tracing_utils::emit;
     use fendermint_vm_event::ParentFinalityCommitted;
     use prometheus::IntGauge;
     use tracing_subscriber::layer::SubscriberExt;
+    use tracing_utils::emit;
 
     #[test]
     fn test_metrics_layer() {

@@ -15,8 +15,8 @@ use ethers::utils::hex;
 use std::sync::Arc;
 use tracing::instrument;
 
-use tracing_utils::emit;
 use fendermint_vm_event::{BlockHashHex, NewParentView};
+use tracing_utils::emit;
 
 /// Parent syncer that constantly poll parent. This struct handles lotus null blocks and deferred
 /// execution. For ETH based parent, it should work out of the box as well.
