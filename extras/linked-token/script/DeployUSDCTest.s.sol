@@ -12,6 +12,6 @@ contract DeployUSDCTest is ConfigManager {
 
         vm.stopBroadcast();
 
-        writeConfig("USDCTest", vm.toString(address(erc20Token)));
+        writeConfig("OriginalToken", vm.toString(address(erc20Token)));
     }
 }

@@ -67,7 +67,7 @@ lint: fmt
 
 fmt:
 	npm install --silent --no-save
-	npx prettier --check -w 'src/**/**/*.sol' 'test/**/**/*.sol' 'test/**/**/*.t.sol' '**/*.{js,jsx,ts,tsx,json,css,md}'
+	npx prettier --check -w 'src/**/**/*.sol' 'sdk/**/**/*.sol' 'test/**/**/*.sol' 'test/**/**/*.t.sol' '**/*.{js,jsx,ts,tsx,json,css,md}'
 
 build: | forge
 	forge build

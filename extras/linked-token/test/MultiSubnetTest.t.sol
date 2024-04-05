@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
+import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+
 import {IntegrationTestBase, RootSubnetDefinition, TestSubnetDefinition} from "@ipc/test/IntegrationTestBase.sol";
 import {ERC20PresetFixedSupply} from "@ipc/test/helpers/ERC20PresetFixedSupply.sol";
 import {TestUtils} from "@ipc/test/helpers/TestUtils.sol";
@@ -9,6 +11,11 @@ import {GatewayFacetsHelper} from "@ipc/test/helpers/GatewayFacetsHelper.sol";
 import {SubnetActorFacetsHelper} from "@ipc/test/helpers/SubnetActorFacetsHelper.sol";
 import {LinkedTokenController} from "../src/LinkedTokenController.sol";
 import {LinkedTokenReplica} from "../src/LinkedTokenReplica.sol";
+
+import {LinkedTokenControllerV2} from "../src/v2/LinkedTokenControllerV2.sol";
+import {LinkedTokenControllerV2Extension} from "./LinkedTokenControllerV2Extension.sol";
+import {LinkedTokenReplicaV2Extension} from "./LinkedTokenReplicaV2Extension.sol";
+import {LinkedTokenReplicaV2} from "../src/v2/LinkedTokenReplicaV2.sol";
 import {USDCTest} from "../src/USDCTest.sol";
 
 import {SubnetID, Subnet, IPCAddress, Validator} from "@ipc/src/structs/Subnet.sol";
@@ -25,9 +32,15 @@ import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMs
 import {SubnetIDHelper} from "@ipc/src/lib/SubnetIDHelper.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {CrossMsgHelper} from "@ipc/src/lib/CrossMsgHelper.sol";
-import {IpcHandler} from "@ipc/sdk/IpcContract.sol";
+import {IIpcHandler} from "@ipc/sdk/interfaces/IIpcHandler.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import "forge-std/console.sol";
+
+import "openzeppelin-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+
+string constant REPLICA_TOKEN_NAME = "USDCTestReplica";
+string constant REPLICA_TOKEN_SYMBOL = "USDCtR";
+uint8 constant REPLICA_TOKEN_DECIMALS = 6;
 
 contract MultiSubnetTest is IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
@@ -52,8 +65,23 @@ contract MultiSubnetTest is IntegrationTestBase {
     SubnetID nativeSubnetName;
 
     IERC20 public token;
+    USDCTest testUSDC;
+
+    IpcEnvelope expected;
+
+    address holder;
+    address recipient;
+    address owner;
+    uint256 transferAmount;
+    uint256 holderTotalAmount;
 
     function setUp() public override {
+        holder = vm.addr(100);
+        recipient = vm.addr(200);
+        owner = address(this);
+        transferAmount = 300;
+        holderTotalAmount = 1000;
+
         token = new ERC20PresetFixedSupply("TestToken", "TEST", 1_000_000, address(this));
 
         rootSubnetName = SubnetID({root: ROOTNET_CHAINID, route: new address[](0)});
@@ -100,17 +128,6 @@ contract MultiSubnetTest is IntegrationTestBase {
             subnetActorAddr: address(rootTokenSubnetActor),
             path: tokenSubnetPath
         });
-    }
-
-    function testMultiSubnet_Native_FundFromParentToChild_USDCBridge() public {
-        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
-        IpcEnvelope memory expected;
-
-        address holder = vm.addr(100);
-        address recipient = vm.addr(200);
-        address owner = address(this);
-        uint256 transferAmount = 300;
-        uint256 holderTotalAmount = 1000;
 
         vm.deal(address(rootTokenSubnetActor), DEFAULT_COLLATERAL_AMOUNT);
         vm.prank(address(rootTokenSubnetActor));
@@ -120,31 +137,116 @@ contract MultiSubnetTest is IntegrationTestBase {
         vm.prank(address(rootNativeSubnetActor));
         registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, address(rootNativeSubnetActor), rootGateway);
 
-        console.log("--------------- transfer and mint (top-down) ---------------");
+        testUSDC = new USDCTest();
 
-        USDCTest testUSDC = new USDCTest();
+        //set up controller with proxy
+        LinkedTokenController initialControllerImplementation = new LinkedTokenController();
+
+        bytes memory initCallController = abi.encodeCall(
+            LinkedTokenController.initialize,
+            (address(rootGateway), address(testUSDC), nativeSubnetName, address(0))
+        );
+        TransparentUpgradeableProxy transparentProxyController = new TransparentUpgradeableProxy(
+            address(initialControllerImplementation),
+            address(this),
+            initCallController
+        );
+
+        ipcTokenController = LinkedTokenController(address(transparentProxyController));
+
+        //set up replica with proxy
+        LinkedTokenReplica initialReplicaImplementation = new LinkedTokenReplica();
+
+        bytes memory initCallReplica = abi.encodeCall(
+            LinkedTokenReplica.initialize,
+            (
+                address(nativeSubnetGateway),
+                address(testUSDC),
+                rootSubnetName,
+                address(0),
+                REPLICA_TOKEN_NAME,
+                REPLICA_TOKEN_SYMBOL,
+                REPLICA_TOKEN_DECIMALS
+            )
+        );
+        TransparentUpgradeableProxy transparentProxyReplica = new TransparentUpgradeableProxy(
+            address(initialReplicaImplementation),
+            address(this),
+            initCallReplica
+        );
+
+        ipcTokenReplica = LinkedTokenReplica(address(transparentProxyReplica));
+
+        // set linked contract controller & replica
+        ipcTokenController.setLinkedContract(address(ipcTokenReplica));
+        ipcTokenReplica.setLinkedContract(address(ipcTokenController));
+    }
+
+    function testMultiSubnet_Native_FundFromParentToChild_USDCBridge() public {
+        _testLinkedTokenBridge();
+    }
+
+    function testMultiSubnet_Native_FundFromParentToChild_USDCBridge_UpgradeFirst() public {
+        upgradeController();
+        upgradeReplica();
+        _testLinkedTokenBridge();
+    }
+
+    function testMultiSubnet_Native_FundFromParentToChild_USDCBridge_UpgradeReplica() public {
+        _testTransferTopDown();
+        upgradeController();
+        upgradeReplica();
+        _testTransferBottomUp();
+    }
+
+    function upgradeController() public {
+        bytes memory initCallController = abi.encodeCall(
+            LinkedTokenControllerV2.reinitialize,
+            (address(rootGateway), address(testUSDC), nativeSubnetName, address(ipcTokenReplica))
+        );
+        LinkedTokenControllerV2Extension newControllerImplementation = new LinkedTokenControllerV2Extension();
+        ipcTokenController.upgradeToAndCall(address(newControllerImplementation), initCallController);
+
+        require(
+            LinkedTokenControllerV2Extension(address(ipcTokenController)).newFunctionReturns7() == 7,
+            "controller upgrade failed"
+        );
+    }
+
+    function upgradeReplica() public {
+        bytes memory initCallReplica = abi.encodeCall(
+            LinkedTokenReplicaV2.reinitialize,
+            (
+                address(nativeSubnetGateway),
+                address(testUSDC),
+                rootSubnetName,
+                address(ipcTokenController),
+                REPLICA_TOKEN_NAME,
+                REPLICA_TOKEN_SYMBOL,
+                REPLICA_TOKEN_DECIMALS
+            )
+        );
+        LinkedTokenReplicaV2Extension newReplicaImplementation = new LinkedTokenReplicaV2Extension();
+        ipcTokenReplica.upgradeToAndCall(address(newReplicaImplementation), initCallReplica);
+        require(
+            LinkedTokenReplicaV2Extension(address(ipcTokenReplica)).newFunctionReturns8() == 8,
+            "replica upgrade failed"
+        );
+    }
+
+    function _testLinkedTokenBridge() public {
+        _testTransferTopDown();
+        _testTransferBottomUp();
+    }
+
+    function _testTransferTopDown() public {
+        console.log("--------------- transfer and mint (top-down) ---------------");
 
         testUSDC.mint(100_000);
         testUSDC.transfer(holder, holderTotalAmount);
 
         require(testUSDC.owner() == owner, "unexpected owner");
         require(testUSDC.balanceOf(holder) == holderTotalAmount, "unexpected balance");
-
-        // the token replica sits in a native supply child subnet.
-        ipcTokenReplica = new LinkedTokenReplica({
-            gateway: address(nativeSubnetGateway),
-            underlyingToken: address(testUSDC),
-            linkedSubnet: rootSubnetName
-        });
-
-        // the token controller sits in the root network.
-        ipcTokenController = new LinkedTokenController({
-            gateway: address(rootGateway),
-            underlyingToken: address(testUSDC),
-            linkedSubnet: nativeSubnetName
-        });
-        ipcTokenReplica.initialize(address(ipcTokenController));
-        ipcTokenController.initialize(address(ipcTokenReplica));
 
         vm.prank(holder);
         testUSDC.approve(address(ipcTokenController), transferAmount);
@@ -173,7 +275,7 @@ contract MultiSubnetTest is IntegrationTestBase {
 
         //confirm that token replica only accept calls to Ipc from the gateway
         vm.prank(owner);
-        vm.expectRevert(IpcHandler.CallerIsNotGateway.selector);
+        vm.expectRevert(IIpcHandler.CallerIsNotGateway.selector);
         ipcTokenReplica.handleIpcMessage(expected);
 
         // the message the root gateway's postbox is being executed in the token subnet's gateway
@@ -190,16 +292,18 @@ contract MultiSubnetTest is IntegrationTestBase {
             nonce: 0 // nonce will be updated by LibGateway.commitCrossMessage
         });
 
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = expected;
         executeTopDownMsgs(msgs, nativeSubnetName, nativeSubnetGateway);
 
-        console.log("fail:");
-        console.log(IERC20(ipcTokenReplica).balanceOf(recipient));
-        console.log(transferAmount);
-
         //ensure that tokens are delivered on subnet
-        require(IERC20(ipcTokenReplica).balanceOf(recipient) == transferAmount, "incorrect proxy token balance");
+        require(
+            IERC20Upgradeable(ipcTokenReplica).balanceOf(recipient) == transferAmount,
+            "incorrect proxy token balance"
+        );
+    }
 
+    function _testTransferBottomUp() public {
         console.log("--------------- withdraw token (bottom-up)---------------");
 
         // ensure that USDC holder has initial balance minus tokens previously sent amount of tokens in the root chain
@@ -212,7 +316,7 @@ contract MultiSubnetTest is IntegrationTestBase {
         expected = ipcTokenReplica.linkedTransfer(holder, transferAmount);
 
         // check that the message is in unconfirmedTransfers
-        (receiptSender, receiptValue) = ipcTokenReplica.getUnconfirmedTransfer(expected.toHash());
+        (address receiptSender, uint256 receiptValue) = ipcTokenReplica.getUnconfirmedTransfer(expected.toHash());
         require(receiptSender == recipient, "Transfer sender incorrect in unconfirmedTransfers");
         require(receiptValue == transferAmount, "Transfer amount incorrect in unconfirmedTransfers");
 
