@@ -22,3 +22,7 @@ static_addresses = [
 
 [resolver.connection]
 listen_addr = "/ip4/198.51.100.2/tcp/1234"
+external_addresses = [
+  "/ip4/198.51.100.2/tcp/1234",
+  "/dns4/my.node.com/tcp/1234",
+]

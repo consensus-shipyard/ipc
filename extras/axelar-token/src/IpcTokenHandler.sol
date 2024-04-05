@@ -6,7 +6,6 @@ import {IERC20} from "openzeppelin-contracts/interfaces/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {SubnetID, SupplySource, SupplyKind} from "@ipc/src/structs/Subnet.sol";
 import {FvmAddress} from "@ipc/src/structs/FvmAddress.sol";
-import {IpcHandler} from "@ipc/sdk/IpcContract.sol";
 import {IpcMsgKind, ResultMsg, OutcomeType, IpcEnvelope} from "@ipc/src/structs/CrossNet.sol";
 import {FvmAddressHelper} from "@ipc/src/lib/FvmAddressHelper.sol";
 import {SubnetIDHelper} from "@ipc/src/lib/SubnetIDHelper.sol";
@@ -16,6 +15,7 @@ import {InterchainTokenExecutableUpgradeable} from "./InterchainTokenExecutableU
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import { IIpcHandler } from "@ipc/sdk/interfaces/IIpcHandler.sol";
 
 interface TokenFundedGateway {
     function fundWithToken(SubnetID calldata subnetId, FvmAddress calldata to, uint256 amount) external;
@@ -32,7 +32,7 @@ interface SubnetActor {
 contract IpcTokenHandler is
     Initializable,
     InterchainTokenExecutableUpgradeable,
-    IpcHandler,
+    IIpcHandler,
     OwnableUpgradeable,
     UUPSUpgradeable
 {
@@ -107,10 +107,10 @@ contract IpcTokenHandler is
     // @notice Handles result messages for funding operations.
     function handleIpcMessage(IpcEnvelope calldata envelope) external payable returns (bytes memory ret) {
         if (msg.sender != address(_ipcGateway)) {
-            revert IpcHandler.CallerIsNotGateway();
+            revert IIpcHandler.CallerIsNotGateway();
         }
         if (envelope.kind != IpcMsgKind.Result) {
-            revert IpcHandler.UnsupportedMsgKind();
+            revert IIpcHandler.UnsupportedMsgKind();
         }
 
         ResultMsg memory result = abi.decode(envelope.message, (ResultMsg));

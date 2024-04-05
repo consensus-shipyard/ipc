@@ -783,10 +783,6 @@ where
 
         let r = to_end_block(ret)?;
 
-        emit!(NewBlock {
-            block_height: request.height as BlockHeight
-        });
-
         Ok(r)
     }
 
@@ -869,6 +865,8 @@ where
 
         // Commit app state to the datastore.
         self.set_committed_state(state)?;
+
+        emit!(NewBlock { block_height });
 
         // Reset check state.
         let mut guard = self.check_state.lock().await;
