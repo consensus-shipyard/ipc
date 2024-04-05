@@ -12,7 +12,8 @@ import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
-import {IpcHandler, IpcExchange} from "../../sdk/IpcContract.sol";
+import {IpcExchange} from "../../sdk/IpcContract.sol";
+import {IIpcHandler} from "../../sdk/interfaces/IIpcHandler.sol";
 import {IGateway} from "../../src/interfaces/IGateway.sol";
 import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
 
@@ -138,14 +139,14 @@ contract IpcExchangeTest is Test {
         callEnvelope.kind = IpcMsgKind.Transfer;
 
         // a transfer; fails because cannot handle.
-        vm.expectRevert(IpcHandler.UnsupportedMsgKind.selector);
+        vm.expectRevert(IIpcHandler.UnsupportedMsgKind.selector);
         vm.prank(gateway);
         exch.handleIpcMessage(callEnvelope);
     }
 
     function test_IpcExchange_testGatewayOnlyFails() public {
         // a call; fails when the caller is not the gateway.
-        vm.expectRevert(IpcHandler.CallerIsNotGateway.selector);
+        vm.expectRevert(IIpcHandler.CallerIsNotGateway.selector);
         exch.handleIpcMessage(callEnvelope);
     }
 
@@ -179,7 +180,7 @@ contract IpcExchangeTest is Test {
         callEnvelope.from = callEnvelope.to;
         callEnvelope.to = from;
 
-        vm.expectRevert(IpcHandler.UnrecognizedResult.selector);
+        vm.expectRevert(IIpcHandler.UnrecognizedResult.selector);
         exch.handleIpcMessage(callEnvelope);
     }
 
@@ -243,7 +244,7 @@ contract IpcExchangeTest is Test {
         vm.startPrank(gateway);
 
         // unrecognized correlation id
-        vm.expectRevert(IpcHandler.UnrecognizedResult.selector);
+        vm.expectRevert(IIpcHandler.UnrecognizedResult.selector);
         exch.handleIpcMessage(resultEnvelope);
 
         // only remaining one

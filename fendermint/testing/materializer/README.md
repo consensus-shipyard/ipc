@@ -98,10 +98,15 @@ curl -X POST \
            http://localhost:30345
 ```
 
+Probe Fendermint Prometheus metrics:
+```bash
+curl http://localhost:30384/metrics
+```
 
 The ports get allocated from 30000 onward, 100 range to each node, so the last two digits resemble to internal ports:
-* 8045 -> 30?45
-* 26657 -> 30?57
+* 8045 -> 30x45
+* 26657 -> 30x57
+* 9184 -> 30x84
 
 #### Logs
 

@@ -5,22 +5,32 @@ import {IpcEnvelope, ResultMsg, CallMsg, IpcMsgKind} from "../src/structs/CrossN
 import {IPCAddress} from "../src/structs/Subnet.sol";
 import {EMPTY_BYTES} from "../src/constants/Constants.sol";
 import {IGateway} from "../src/interfaces/IGateway.sol";
-import {ReentrancyGuard} from "openzeppelin-contracts/utils/ReentrancyGuard.sol";
-import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+
 import {CrossMsgHelper} from "../src/lib/CrossMsgHelper.sol";
+
 import {IIpcHandler} from "./interfaces/IIpcHandler.sol";
 
-abstract contract IpcExchange is IIpcHandler, Ownable, ReentrancyGuard {
+abstract contract IpcExchangeUpgradeable is Initializable, IIpcHandler, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     using CrossMsgHelper for IpcEnvelope;
 
     // The address of the gateway in the network.
-    address public immutable gatewayAddr;
+    address public gatewayAddr;
 
     // List of messages in-flight for which the contract hasn't received a receipt yet.
     mapping(bytes32 => IpcEnvelope) public inflightMsgs;
 
-    constructor(address gatewayAddr_) Ownable(msg.sender) {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function __IpcExchangeUpgradeable_init(address gatewayAddr_) public onlyInitializing {
         gatewayAddr = gatewayAddr_;
+        __Ownable_init();
+        __ReentrancyGuard_init();
     }
 
     /// @notice Entrypoint for IPC-enabled contracts. This function is always called by

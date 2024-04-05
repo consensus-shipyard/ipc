@@ -64,12 +64,17 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         tendermint_rpc::HttpClient::new(tendermint_rpc_url)
             .context("failed to create Tendermint client")?;
 
-    // Register metrics
-    let metrics_registry = prometheus::Registry::new();
-    // TODO: Serve metrics over HTTP
+    // Prometheus metrics
+    let metrics_registry = if settings.metrics.enabled {
+        let registry = prometheus::Registry::new();
 
-    fendermint_app::metrics::register_app_metrics(&metrics_registry)
-        .context("failed to register metrics")?;
+        fendermint_app::metrics::register_app_metrics(&registry)
+            .context("failed to register metrics")?;
+
+        Some(registry)
+    } else {
+        None
+    };
 
     let validator = match settings.validator_key {
         Some(ref key) => {
@@ -145,10 +150,12 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         let mut service =
             make_resolver_service(&settings, db.clone(), state_store.clone(), ns.bit_store)?;
 
-        // Register all metrics from the IPLD resolver stack;
-        service
-            .register_metrics(&metrics_registry)
-            .context("failed to register IPLD resolver metrics")?;
+        // Register all metrics from the IPLD resolver stack
+        if let Some(ref registry) = metrics_registry {
+            service
+                .register_metrics(registry)
+                .context("failed to register IPLD resolver metrics")?;
+        }
 
         let client = service.client();
 
@@ -212,7 +219,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     let (parent_finality_provider, ipc_tuple) = if topdown_enabled {
         info!("topdown finality enabled");
         let topdown_config = settings.ipc.topdown_config()?;
-        let config = fendermint_vm_topdown::Config::new(
+        let mut config = fendermint_vm_topdown::Config::new(
             topdown_config.chain_head_delay,
             topdown_config.polling_interval,
             topdown_config.exponential_back_off,
@@ -220,6 +227,12 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         )
         .with_proposal_delay(topdown_config.proposal_delay)
         .with_max_proposal_range(topdown_config.max_proposal_range);
+
+        if let Some(v) = topdown_config.max_cache_blocks {
+            info!(value = v, "setting max cache blocks");
+            config = config.with_max_cache_blocks(v);
+        }
+
         let ipc_provider = Arc::new(make_ipc_provider_proxy(&settings)?);
         let finality_provider =
             CachedFinalityProvider::uninitialized(config.clone(), ipc_provider.clone()).await?;
@@ -293,6 +306,19 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
                 Err(e) => tracing::error!("cannot launch polling syncer: {e}"),
             }
         });
+    }
+
+    // Start the metrics on a background thread.
+    if let Some(registry) = metrics_registry {
+        info!(
+            listen_addr = settings.metrics.listen.to_string(),
+            "serving metrics"
+        );
+        let mut builder = prometheus_exporter::Builder::new(settings.metrics.listen.try_into()?);
+        builder.with_registry(registry);
+        let _ = builder.start().context("failed to start metrics server")?;
+    } else {
+        info!("metrics disabled");
     }
 
     let service = ApplicationService(app);
@@ -399,6 +425,7 @@ fn to_resolver_config(settings: &Settings) -> anyhow::Result<ipc_ipld_resolver::
     let config = Config {
         connection: ConnectionConfig {
             listen_addr: r.connection.listen_addr.clone(),
+            external_addresses: r.connection.external_addresses.clone(),
             expected_peer_count: r.connection.expected_peer_count,
             max_incoming: r.connection.max_incoming,
             max_peers_per_query: r.connection.max_peers_per_query,

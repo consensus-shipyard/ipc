@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import "elliptic-curve-solidity/contracts/EllipticCurve.sol";
 import {IPCAddress} from "../../src/structs/Subnet.sol";
 import {CallMsg, IpcMsgKind, IpcEnvelope} from "../../src/structs/CrossNet.sol";
-import {IpcHandler} from "../../sdk/IpcContract.sol";
+import {IIpcHandler} from "../../sdk/interfaces/IIpcHandler.sol";
 import {METHOD_SEND, EMPTY_BYTES} from "../../src/constants/Constants.sol";
 
 library TestUtils {
@@ -172,14 +172,14 @@ library TestUtils {
     }
 }
 
-contract MockIpcContract is IpcHandler {
+contract MockIpcContract is IIpcHandler {
     /* solhint-disable-next-line unused-vars */
     function handleIpcMessage(IpcEnvelope calldata) external payable returns (bytes memory ret) {
         return EMPTY_BYTES;
     }
 }
 
-contract MockIpcContractFallback is IpcHandler {
+contract MockIpcContractFallback is IIpcHandler {
     /* solhint-disable-next-line unused-vars */
     function handleIpcMessage(IpcEnvelope calldata) external payable returns (bytes memory ret) {
         return EMPTY_BYTES;
@@ -190,7 +190,7 @@ contract MockIpcContractFallback is IpcHandler {
     }
 }
 
-contract MockIpcContractRevert is IpcHandler {
+contract MockIpcContractRevert is IIpcHandler {
     bool public reverted = true;
 
     /* solhint-disable-next-line unused-vars */
@@ -208,7 +208,7 @@ contract MockIpcContractRevert is IpcHandler {
     }
 }
 
-contract MockIpcContractPayable is IpcHandler {
+contract MockIpcContractPayable is IIpcHandler {
     /* solhint-disable-next-line unused-vars */
     function handleIpcMessage(IpcEnvelope calldata) external payable returns (bytes memory ret) {
         return EMPTY_BYTES;

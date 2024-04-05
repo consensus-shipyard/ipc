@@ -95,7 +95,7 @@ script = """
 set -x
 cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint/testing/graph-test/test-data/subgraph/graph-node
 echo "Tearing down subgraph..."
-docker-compose down -v
+docker compose down -v
 cd ..
 rm -rf node_modules
 rm -rf config abis generated

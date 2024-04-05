@@ -19,3 +19,6 @@ pub struct ProposalProcessed<'a> {
 pub struct NewBlock {
     pub block_height: BlockHeight,
 }
+
+// TODO: Add new events for:
+// * snapshots

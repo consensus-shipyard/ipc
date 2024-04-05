@@ -318,6 +318,7 @@ fn make_config(rng: &mut StdRng, cluster_size: u32, bootstrap_addr: Option<Multi
     let config = Config {
         connection: ConnectionConfig {
             listen_addr: Multiaddr::from(Protocol::Memory(rng.gen::<u64>())),
+            external_addresses: vec![],
             expected_peer_count: cluster_size,
             max_incoming: cluster_size,
             max_peers_per_query: cluster_size,
