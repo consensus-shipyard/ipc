@@ -35,10 +35,12 @@ contract TopDownFinalityFacet is GatewayActorModifiers {
         s.validatorsTracker.batchStoreChange(changeRequests);
     }
 
+    /// @notice Get the configuration numbers in the validatorTracker struct that shadows the configuration changes
+    /// from the parent in the child gateway
     function getTrackerConfigurationNumbers() external view returns (uint64, uint64) {
         return (
-            s.validatorsTracker.changes.startConfigurationNumber,
-            s.validatorsTracker.changes.nextConfigurationNumber
+            s.validatorsTracker.changes.nextConfigurationNumber,
+            s.validatorsTracker.changes.startConfigurationNumber
         );
     }
 
