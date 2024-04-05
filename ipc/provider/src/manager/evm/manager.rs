@@ -38,7 +38,7 @@ use ethers::prelude::{Signer, SignerMiddleware};
 use ethers::providers::{Authorization, Http, Middleware, Provider};
 use ethers::signers::{LocalWallet, Wallet};
 use ethers::types::{BlockId, Eip1559TransactionRequest, ValueOrArray, I256, U256};
-use ethers::{contract::abigen};
+use ethers::contract::abigen;
 
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
@@ -581,14 +581,13 @@ impl SubnetManager for EthSubnetManager {
 
         let signer = Arc::new(self.get_signer(&from)?);
 
+        let subnet_supply_source = self.get_subnet_supply_source(&subnet).await?;
+        if subnet_supply_source.kind != SupplyKind::ERC20 as u8{
+            return Err(anyhow!("Invalid operation: Expected the subnet's supply source to be ERC20, but found a different kind."));
+        }
 
-        // TODO get token_address from SubnetActorGetterFacet::supplySource.tokenAddress
-        // SupplySource memory supplySource = SubnetActorGetterFacet(subnetId.getActor()).supplySource();
-        // and validate: supplySource.expect(SupplyKind.ERC20);
-
-        let evm_token_address = payload_to_evm_address(from.payload())?; /* TODO change from to the token address */
         let token_contract = IERC20::new(
-            evm_token_address,
+            subnet_supply_source.token_address,
             signer.clone(),
         );
 
@@ -759,6 +758,15 @@ impl SubnetManager for EthSubnetManager {
             .map_err(|e| anyhow!("cannot get commit sha due to: {e:}"))?;
 
         Ok(commit_sha)
+    }
+
+    async fn get_subnet_supply_source(&self, subnet: &SubnetID) -> Result<ipc_actors_abis::subnet_actor_getter_facet::SupplySource> {
+        let address = contract_address_from_subnet(subnet)?;
+        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+        Ok(contract.supply_source().call().await?)
     }
 
     async fn get_genesis_info(&self, subnet: &SubnetID) -> Result<SubnetGenesisInfo> {
