@@ -26,8 +26,8 @@ contract IPCSlasherController is IpcExchange, ISlasher {
         uint256 proof;
     }
 
-    address public _linkedContract;
-    SubnetID public _linkedSubnet;
+    // address public _linkedContract;
+    // SubnetID public _linkedSubnet;
 
     mapping(bytes32 => UnconfirmedTransfer) public _unconfirmedTransfers;
 
