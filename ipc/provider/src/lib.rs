@@ -486,7 +486,9 @@ impl IpcProvider {
             .await
     }
 
-    /// TODO
+    /// Approve an erc20 token for transfer by the gateway. Can be used in preparation for fund_with_token.
+    /// If `from` is None, it will use the default address config in `ipc.toml`.
+    /// If `to` is `None`, the `from` account will be funded.
     pub async fn approve_token(
         &mut self,
         subnet: SubnetID,
@@ -502,11 +504,8 @@ impl IpcProvider {
         let subnet_config = conn.subnet();
         let sender = self.check_sender(subnet_config, from)?;
 
-        conn.manager()
-            .approve_token(subnet, sender, amount)
-            .await
+        conn.manager().approve_token(subnet, sender, amount).await
     }
-
 
     /// Release to an account in a child subnet, if `to` is `None`, the self account
     /// is funded.

@@ -120,7 +120,12 @@ pub trait SubnetManager: Send + Sync + TopDownFinalityQuery + BottomUpCheckpoint
     /// # Returns
     ///
     /// * `Result<()>`   - An empty result indicating success or an error on failure, encapsulating any issues encountered during the approval process.
-    async fn approve_token(&self,  subnet: SubnetID, from: Address, amount: TokenAmount) -> Result<ChainEpoch>;
+    async fn approve_token(
+        &self,
+        subnet: SubnetID,
+        from: Address,
+        amount: TokenAmount,
+    ) -> Result<ChainEpoch>;
 
     /// Release creates a new check message to release funds in parent chain
     /// Returns the epoch that the released is executed in the child.
@@ -158,8 +163,10 @@ pub trait SubnetManager: Send + Sync + TopDownFinalityQuery + BottomUpCheckpoint
     async fn get_commit_sha(&self) -> Result<[u8; 32]>;
 
     /// Gets the subnet token address
-    async fn get_subnet_supply_source(&self, subnet: &SubnetID) -> Result<ipc_actors_abis::subnet_actor_getter_facet::SupplySource>;
-
+    async fn get_subnet_supply_source(
+        &self,
+        subnet: &SubnetID,
+    ) -> Result<ipc_actors_abis::subnet_actor_getter_facet::SupplySource>;
 
     /// Gets the genesis information required to bootstrap a child subnet
     async fn get_genesis_info(&self, subnet: &SubnetID) -> Result<SubnetGenesisInfo>;

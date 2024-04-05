@@ -145,7 +145,9 @@ impl CommandLineHandler for FundWithToken {
         if arguments.approve {
             println!(
                 "approve token performed in epoch: {:?}",
-                provider.approve_token(subnet.clone(), from, amount.clone()).await?,
+                provider
+                    .approve_token(subnet.clone(), from, amount.clone())
+                    .await?,
             );
         }
 

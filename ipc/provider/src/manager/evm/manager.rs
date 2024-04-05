@@ -33,12 +33,12 @@ use crate::manager::{EthManager, SubnetManager};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use ethers::abi::Tokenizable;
+use ethers::contract::abigen;
 use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::{Signer, SignerMiddleware};
 use ethers::providers::{Authorization, Http, Middleware, Provider};
 use ethers::signers::{LocalWallet, Wallet};
 use ethers::types::{BlockId, Eip1559TransactionRequest, ValueOrArray, I256, U256};
-use ethers::contract::abigen;
 
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
@@ -93,7 +93,6 @@ abigen!(
         event Approval(address indexed owner, address indexed spender, uint256 value)
     ]"#,
 );
-
 
 #[async_trait]
 impl TopDownFinalityQuery for EthSubnetManager {
@@ -574,7 +573,6 @@ impl SubnetManager for EthSubnetManager {
         from: Address,
         amount: TokenAmount,
     ) -> Result<ChainEpoch> {
-
         log::debug!("approve token, subnet: {subnet}, amount: {amount}, from: {from}");
 
         let value = fil_amount_to_eth_amount(&amount)?;
@@ -582,19 +580,13 @@ impl SubnetManager for EthSubnetManager {
         let signer = Arc::new(self.get_signer(&from)?);
 
         let subnet_supply_source = self.get_subnet_supply_source(&subnet).await?;
-        if subnet_supply_source.kind != SupplyKind::ERC20 as u8{
+        if subnet_supply_source.kind != SupplyKind::ERC20 as u8 {
             return Err(anyhow!("Invalid operation: Expected the subnet's supply source to be ERC20, but found a different kind."));
         }
 
-        let token_contract = IERC20::new(
-            subnet_supply_source.token_address,
-            signer.clone(),
-        );
+        let token_contract = IERC20::new(subnet_supply_source.token_address, signer.clone());
 
-        let txn = token_contract.approve(
-            self.ipc_contract_info.gateway_addr,
-            value,
-        );
+        let txn = token_contract.approve(self.ipc_contract_info.gateway_addr, value);
         let txn = call_with_premium_estimation(signer, txn).await?;
 
         let pending_tx = txn.send().await?;
@@ -760,7 +752,10 @@ impl SubnetManager for EthSubnetManager {
         Ok(commit_sha)
     }
 
-    async fn get_subnet_supply_source(&self, subnet: &SubnetID) -> Result<ipc_actors_abis::subnet_actor_getter_facet::SupplySource> {
+    async fn get_subnet_supply_source(
+        &self,
+        subnet: &SubnetID,
+    ) -> Result<ipc_actors_abis::subnet_actor_getter_facet::SupplySource> {
         let address = contract_address_from_subnet(subnet)?;
         let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
             address,
