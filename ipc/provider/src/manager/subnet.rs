@@ -162,7 +162,7 @@ pub trait SubnetManager: Send + Sync + TopDownFinalityQuery + BottomUpCheckpoint
     /// Get commit sha for deployed contracts
     async fn get_commit_sha(&self) -> Result<[u8; 32]>;
 
-    /// Gets the subnet token address
+    /// Gets the subnet supply source
     async fn get_subnet_supply_source(
         &self,
         subnet: &SubnetID,
