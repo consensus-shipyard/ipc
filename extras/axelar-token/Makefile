@@ -15,15 +15,20 @@ deps:
 
 .PHONY: help
 help:
-	@echo "\033[0;32mAvailable targets:\033[0m"
+	@echo "\033[0;32mGeneral Commands:\033[0m"
 	@echo "deps                              - Install Foundry dependencies"
-	@echo "deploy-sender-implementation      - Deploy the token sender contract implementation on Polygon Mumbai"
-	@echo "deploy-sender-proxy               - Deploy the token sender contract proxy on Polygon Mumbai"
-	@echo "upgrade-sender-proxy              - Upgrade the token sender contract proxy on Polygon Mumbai"
-	@echo "deploy-handler-implementation     - Deploy the token handler implementation contract on Filecoin Calibrationnet"
-	@echo "deploy-handler-proxy              - Deploy the token handler proxy contract on Filecoin Calibrationnet"
-	@echo "upgrade-handler-proxy             - Upgrade the token handler proxy contract on Filecoin Calibrationnet"
 	@echo "deposit                           - Deposit tokens into the subnet"
+	@echo "\033[0;32mDeployment Commands:\033[0m"
+	@echo "deploy-sender-implementation      - Deploy the token sender contract implementation on the Origin Network"
+	@echo "deploy-sender-proxy               - Deploy the token sender contract proxy on the Origin Network"
+	@echo "deploy-handler-implementation     - Deploy the token handler implementation contract on the Destination Network"
+	@echo "deploy-handler-proxy              - Deploy the token handler proxy contract on the Destination Network"
+	@echo "\033[0;32mUpgrade Commands:\033[0m"
+	@echo "deploy-handler-v2-implementation  - Deploy the token handler V2 implementation contract"
+	@echo "deploy-sender-v2-implementation   - Deploy the token sender V2 implementation contract"
+	@echo "upgrade-sender-proxy              - Upgrade the token sender contract proxy to the V2 implementation on the Origin Network"
+	@echo "upgrade-handler-proxy             - Upgrade the token handler proxy contract to the V2 implementation on the Destination Network"
+
 
 .PHONY: deploy-handler-implementation
 deploy-handler-implementation:
@@ -66,6 +71,23 @@ deploy-sender-proxy:
 		--rpc-url "${$(ORIGIN_NETWORK)__RPC_URL}" \
 		--broadcast \
 		--skip-simulation
+
+.PHONY: deploy-handler-v2-implementation
+deploy-handler-v2-implementation:
+	forge script ./script/Upgrade.s.sol \
+		--sig "deployTokenHandlerV2Implementation()" \
+		--rpc-url "${$(DEST_NETWORK)__RPC_URL}" \
+		--broadcast \
+		--skip-simulation
+
+.PHONY: deploy-sender-v2-implementation
+deploy-sender-v2-implementation:
+	forge script ./script/Upgrade.s.sol \
+		--sig "deployTokenSenderV2Implementation()" \
+		--rpc-url "${$(ORIGIN_NETWORK)__RPC_URL}" \
+		--broadcast \
+		--skip-simulation
+
 
 .PHONY: upgrade-sender-proxy
 upgrade-sender-proxy:

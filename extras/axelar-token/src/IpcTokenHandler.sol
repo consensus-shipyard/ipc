@@ -60,13 +60,6 @@ contract IpcTokenHandler is
         __Ownable_init(admin);
     }
 
-    function reinitialize(address axelarIts, address ipcGateway, address admin) public reinitializer(2) {
-        __InterchainTokenExecutable_init(axelarIts);
-        _ipcGateway = TokenFundedGateway(ipcGateway);
-        __UUPSUpgradeable_init();
-        __Ownable_init(admin);
-    }
-
     // upgrade proxy - onlyOwner can upgrade
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
