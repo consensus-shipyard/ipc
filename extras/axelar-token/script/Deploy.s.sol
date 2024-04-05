@@ -61,7 +61,7 @@ contract Deploy is Script {
         string memory key = "out";
         vm.serializeString(key, "network", network);
 
-        string memory json = vm.serializeAddress(key, "token_handler", address(handler));
+        string memory json = vm.serializeAddress(key, "token_handler_proxy", address(handler));
         json = vm.serializeAddress(key, "token_handler_implementation", handlerAddrImplementation);
         vm.writeJson(json, path, ".dest");
     }
@@ -70,7 +70,7 @@ contract Deploy is Script {
         path = string.concat(vm.projectRoot(), "/out/addresses.json");
         if (!vm.exists(path)) {
             vm.writeJson(
-                '{"dest":{"token_handler":{}, "token_handler_implementation":{} },"src":{"token_sender":{}, "token_sender_implementation":{}}}',
+                '{"dest":{"token_handler_proxy":{}, "token_handler_implementation":{}, "token_handler_implementation_v2":{} },"src":{"token_sender_proxy":{}, "token_sender_implementation":{}, "token_handler_implementation_v2":{}}}',
                 path
             );
         }
@@ -110,7 +110,7 @@ contract Deploy is Script {
 
         console.log("loading handler proxy address...");
         string memory json = vm.readFile(path);
-        address handlerAddr = vm.parseJsonAddress(json, ".dest.token_handler");
+        address handlerAddr = vm.parseJsonAddress(json, ".dest.token_handler_proxy");
         console.log("handler proxy address: %s", handlerAddr);
 
         console.log("loading sender implementation address...");
@@ -143,7 +143,7 @@ contract Deploy is Script {
 
         string memory key = "out";
         vm.serializeString(key, "network", originNetwork);
-        json = vm.serializeAddress(key, "token_sender", address(sender));
+        json = vm.serializeAddress(key, "token_sender_proxy", address(sender));
         json = vm.serializeAddress(key, "token_sender_implementation", senderImplementationAddr);
         vm.writeJson(json, path, ".src");
     }

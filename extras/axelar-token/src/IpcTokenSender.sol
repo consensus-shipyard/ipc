@@ -38,19 +38,6 @@ contract IpcTokenSender is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         __Ownable_init(admin);
     }
 
-    function reinitialize(
-        address axelarIts,
-        string memory destinationChain,
-        address destinationTokenHandler,
-        address admin
-    ) public reinitializer(2) {
-        _axelarIts = IInterchainTokenService(axelarIts);
-        _destinationChain = destinationChain;
-        _destinationTokenHandler = AddressBytes.toBytes(destinationTokenHandler);
-        __UUPSUpgradeable_init();
-        __Ownable_init(admin);
-    }
-
     // upgrade proxy - onlyOwner can upgrade
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
