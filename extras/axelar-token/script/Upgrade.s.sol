@@ -17,6 +17,7 @@ contract Upgrade is Script {
         uint256 privateKey = vm.envUint(string.concat(originNetwork, "__PRIVATE_KEY"));
         checkPathExists();
         string memory path = getPath();
+        string memory readJson = vm.readFile(path);
 
         console.log("deploying token sender v2 implementation to %s...", originNetwork);
 
@@ -24,11 +25,14 @@ contract Upgrade is Script {
         IpcTokenSenderV2 v2Implementation = new IpcTokenSenderV2();
         vm.stopBroadcast();
 
+
         console.log("token sender v2 implementation deployed on %s: %s", originNetwork, address(v2Implementation));
         string memory key = "out";
         vm.serializeString(key, "network", originNetwork);
 
         string memory json = vm.serializeAddress(key, "token_sender_implementation_v2", address(v2Implementation));
+        json = vm.serializeAddress(key, "token_sender_proxy", vm.parseJsonAddress(readJson, ".src.token_sender_proxy"));
+        json = vm.serializeAddress(key, "token_sender_implementation", vm.parseJsonAddress(readJson, ".src.token_sender_implementation"));
         vm.writeJson(json, path, ".src");
     }
 
@@ -73,6 +77,8 @@ contract Upgrade is Script {
     function deployTokenHandlerV2Implementation() public {
         string memory network = vm.envString("DEST_NETWORK");
         uint256 privateKey = vm.envUint(string.concat(network, "__PRIVATE_KEY"));
+        string memory path = getPath();
+        string memory readJson = vm.readFile(path);
 
         console.log("deploying token handler v2 implementation to %s...", network);
 
@@ -84,10 +90,9 @@ contract Upgrade is Script {
         string memory key = "out";
         vm.serializeString(key, "network", network);
 
-        string memory path = getPath();
-        //TODO this probably deletes data from json
-        // NEED TO READ fields and then write all fields in util function
         string memory json = vm.serializeAddress(key, "token_handler_implementation_v2", address(v2Implementation));
+        json = vm.serializeAddress(key, "token_handler_proxy", vm.parseJsonAddress(readJson, ".dest.token_handler_proxy"));
+        json = vm.serializeAddress(key, "token_handler_implementation", vm.parseJsonAddress(readJson, ".dest.token_handler_implementation"));
         vm.writeJson(json, path, ".dest");
     }
 
