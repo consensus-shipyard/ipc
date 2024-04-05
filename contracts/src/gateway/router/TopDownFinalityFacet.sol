@@ -5,6 +5,7 @@ import {GatewayActorModifiers} from "../../lib/LibGatewayActorStorage.sol";
 import {ParentFinality} from "../../structs/CrossNet.sol";
 import {PermissionMode, Validator, ValidatorInfo, StakingChangeRequest, Membership} from "../../structs/Subnet.sol";
 import {LibGateway} from "../../lib/LibGateway.sol";
+import {LibDiamond} from "../../lib/LibDiamond.sol";
 
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 
@@ -79,4 +80,14 @@ contract TopDownFinalityFacet is GatewayActorModifiers {
         LibGateway.updateMembership(Membership({configurationNumber: configurationNumber, validators: vs}));
         return configurationNumber;
     }
+
+    function setConfigurationNumbers(uint64 startConfig, uint64 nextConfig) external {
+        LibDiamond.enforceIsContractOwner();
+
+        require(startConfig <= nextConfig, "invalid params");
+
+        s.validatorsTracker.changes.startConfigurationNumber = startConfig;
+        s.validatorsTracker.changes.nextConfigurationNumber = nextConfig;
+    }
+
 }
