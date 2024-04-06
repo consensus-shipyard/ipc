@@ -233,7 +233,7 @@ impl SignedMessageFactory {
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
         let input = adm::CreateExternalParams {
-            machine_name: "objectstore".into(),
+            kind: adm::Kind::ObjectStore,
             write_access,
         };
         let params = RawBytes::serialize(input)?;
@@ -360,7 +360,7 @@ impl SignedMessageFactory {
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
         let input = adm::CreateExternalParams {
-            machine_name: "accumulator".into(),
+            kind: adm::Kind::Accumulator,
             write_access,
         };
         let params = RawBytes::serialize(input)?;

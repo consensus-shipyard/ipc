@@ -7,7 +7,6 @@ use cid::Cid;
 use fendermint_actor_objectstore::{Object, ObjectList};
 use fendermint_vm_actor_interface::{adm, eam};
 use fvm_ipld_encoding::{BytesDe, RawBytes};
-use fvm_shared::address::Address;
 use tendermint::abci::response::DeliverTx;
 
 /// Parse what Tendermint returns in the `data` field of [`DeliverTx`] into bytes.
@@ -78,10 +77,10 @@ pub fn decode_machine_create(deliver_tx: &DeliverTx) -> anyhow::Result<adm::Crea
 }
 
 /// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as a vector of [`Address`].
-pub fn decode_machine_list(deliver_tx: &DeliverTx) -> anyhow::Result<Vec<Address>> {
+pub fn decode_machine_list(deliver_tx: &DeliverTx) -> anyhow::Result<Vec<adm::Metadata>> {
     let data = decode_data(&deliver_tx.data)?;
-    fvm_ipld_encoding::from_slice::<Vec<Address>>(&data)
-        .map_err(|e| anyhow!("error parsing as ListByOwnerReturn: {e}"))
+    fvm_ipld_encoding::from_slice::<Vec<adm::Metadata>>(&data)
+        .map_err(|e| anyhow!("error parsing as Metadata: {e}"))
 }
 
 /// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as an [`Object`].

@@ -195,7 +195,7 @@ pub trait CallClient: QueryClient + BoundClient {
         value: TokenAmount,
         gas_params: GasParams,
         height: FvmQueryHeight,
-    ) -> anyhow::Result<CallResponse<Vec<Address>>> {
+    ) -> anyhow::Result<CallResponse<Vec<adm::Metadata>>> {
         let msg = self
             .message_factory_mut()
             .list_machines(owner, value, gas_params)?;

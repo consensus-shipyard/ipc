@@ -44,6 +44,7 @@ use fendermint_rpc::{
     message::GasParams,
     tx::{CallClient, TxClient},
 };
+use fendermint_vm_actor_interface::adm;
 use fendermint_vm_message::query::FvmQueryHeight;
 
 use crate::cmd;
@@ -225,7 +226,10 @@ async fn handle_list_machines(
         })?;
 
     let list = res.unwrap_or_default();
-    let machines = list.iter().map(|a| a.to_string()).collect::<Vec<String>>();
+    let machines = list
+        .iter()
+        .map(|m| json!({"address": m.address.to_string(), "kind": m.kind.to_string()}))
+        .collect::<Vec<Value>>();
 
     let json = json!({"machines": machines});
     Ok(warp::reply::json(&json))
@@ -855,7 +859,7 @@ async fn list_machines(
     args: TransArgs,
     owner: Option<Address>,
     height: u64,
-) -> anyhow::Result<Option<Vec<Address>>> {
+) -> anyhow::Result<Option<Vec<adm::Metadata>>> {
     let mut client = TransClient::new(client, &args)?;
     let gas_params = gas_params(&args);
     let h = FvmQueryHeight::from(height);

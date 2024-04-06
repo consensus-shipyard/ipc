@@ -4,6 +4,7 @@
 use std::collections::{BTreeSet, HashMap};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
@@ -232,7 +233,15 @@ where
         // ADM Address Manager (ADM) actor
         let machine_codes = state
             .custom_actor_manifest
-            .get_subset(vec!["accumulator", "objectstore"]);
+            .get_subset(vec!["accumulator", "objectstore"])
+            .iter()
+            .map(|(name, cid)| {
+                (
+                    fil_actor_adm::Kind::from_str(name).expect("failed to parse adm machine name"),
+                    cid.to_owned(),
+                )
+            })
+            .collect();
         let adm_state = fil_actor_adm::State::new(
             &state.store(),
             machine_codes,
