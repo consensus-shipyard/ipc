@@ -2835,6 +2835,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid",
+ "fendermint_actor_machine",
  "fil_actors_runtime",
  "frc42_dispatch",
  "fvm_ipld_amt",
@@ -2887,11 +2888,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_actor_machine"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fil_actors_runtime",
+ "fvm_ipld_encoding",
+ "fvm_shared",
+ "serde",
+ "serde_tuple",
+]
+
+[[package]]
 name = "fendermint_actor_objectstore"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid",
+ "fendermint_actor_machine",
  "fil_actors_runtime",
  "frc42_dispatch",
  "fvm_ipld_blockstore",
@@ -2933,6 +2947,7 @@ dependencies = [
  "bytes",
  "cid",
  "fendermint_abci",
+ "fendermint_actor_machine",
  "fendermint_actor_objectstore",
  "fendermint_app_options",
  "fendermint_app_settings",
@@ -3215,6 +3230,7 @@ dependencies = [
  "clap 4.5.1",
  "ethers",
  "fendermint_actor_accumulator",
+ "fendermint_actor_machine",
  "fendermint_actor_objectstore",
  "fendermint_crypto",
  "fendermint_vm_actor_interface",
@@ -3293,6 +3309,7 @@ dependencies = [
  "cid",
  "ethers",
  "ethers-core",
+ "fendermint_actor_machine",
  "fendermint_crypto",
  "fendermint_vm_genesis",
  "fil_actors_evm_shared",
@@ -3603,7 +3620,7 @@ checksum = "1676f435fc1dadde4d03e43f5d62b259e1ce5f40bd4ffb21db2b42ebe59c1382"
 [[package]]
 name = "fil_actor_adm"
 version = "12.0.0"
-source = "git+ssh://git@github.com/amazingdatamachine/builtin-actors.git?branch=v12.0.0+adm#9dea37d03d762256f3493fd239af389c2bda488c"
+source = "git+ssh://git@github.com/amazingdatamachine/builtin-actors.git?branch=v12.0.0+adm#1895203e509cf190b2c557e09e060475c0447fa6"
 dependencies = [
  "anyhow",
  "cid",
@@ -3641,7 +3658,7 @@ dependencies = [
 [[package]]
 name = "fil_actor_eam"
 version = "12.0.0"
-source = "git+ssh://git@github.com/amazingdatamachine/builtin-actors.git?branch=v12.0.0+adm#9dea37d03d762256f3493fd239af389c2bda488c"
+source = "git+ssh://git@github.com/amazingdatamachine/builtin-actors.git?branch=v12.0.0+adm#1895203e509cf190b2c557e09e060475c0447fa6"
 dependencies = [
  "anyhow",
  "cid",
@@ -3662,7 +3679,7 @@ dependencies = [
 [[package]]
 name = "fil_actors_evm_shared"
 version = "12.0.0"
-source = "git+ssh://git@github.com/amazingdatamachine/builtin-actors.git?branch=v12.0.0+adm#9dea37d03d762256f3493fd239af389c2bda488c"
+source = "git+ssh://git@github.com/amazingdatamachine/builtin-actors.git?branch=v12.0.0+adm#1895203e509cf190b2c557e09e060475c0447fa6"
 dependencies = [
  "fil_actors_runtime",
  "fvm_ipld_encoding",
@@ -3675,7 +3692,7 @@ dependencies = [
 [[package]]
 name = "fil_actors_runtime"
 version = "12.0.0"
-source = "git+ssh://git@github.com/amazingdatamachine/builtin-actors.git?branch=v12.0.0+adm#9dea37d03d762256f3493fd239af389c2bda488c"
+source = "git+ssh://git@github.com/amazingdatamachine/builtin-actors.git?branch=v12.0.0+adm#1895203e509cf190b2c557e09e060475c0447fa6"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
@@ -10313,7 +10330,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "vm_api"
 version = "1.0.0"
-source = "git+ssh://git@github.com/amazingdatamachine/builtin-actors.git?branch=v12.0.0+adm#9dea37d03d762256f3493fd239af389c2bda488c"
+source = "git+ssh://git@github.com/amazingdatamachine/builtin-actors.git?branch=v12.0.0+adm#1895203e509cf190b2c557e09e060475c0447fa6"
 dependencies = [
  "anyhow",
  "cid",

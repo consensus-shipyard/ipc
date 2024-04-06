@@ -10,6 +10,7 @@ use fendermint_vm_message::query::{FvmQueryHeight, GasEstimate};
 use tendermint::abci::response::DeliverTx;
 use tendermint_rpc::endpoint::broadcast::{tx_async, tx_commit, tx_sync};
 
+use fendermint_actor_machine::WriteAccess;
 use fendermint_actor_objectstore::{
     Object, ObjectDeleteParams, ObjectGetParams, ObjectList, ObjectListParams, ObjectPutParams,
 };
@@ -78,11 +79,12 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
     /// Create an object store.
     async fn os_create(
         &mut self,
+        write_access: WriteAccess,
         value: TokenAmount,
         gas_params: GasParams,
-    ) -> anyhow::Result<M::Response<adm::CreateReturn>> {
+    ) -> anyhow::Result<M::Response<adm::CreateExternalReturn>> {
         let mf = self.message_factory_mut();
-        let msg = mf.os_create(value, gas_params)?;
+        let msg = mf.os_create(write_access, value, gas_params)?;
         let fut = self.perform(msg, decode_machine_create);
         let res = fut.await?;
         Ok(res)
@@ -121,11 +123,12 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
     /// Create an accumulator.
     async fn acc_create(
         &mut self,
+        write_access: WriteAccess,
         value: TokenAmount,
         gas_params: GasParams,
-    ) -> anyhow::Result<M::Response<adm::CreateReturn>> {
+    ) -> anyhow::Result<M::Response<adm::CreateExternalReturn>> {
         let mf = self.message_factory_mut();
-        let msg = mf.acc_create(value, gas_params)?;
+        let msg = mf.acc_create(write_access, value, gas_params)?;
         let fut = self.perform(msg, decode_machine_create);
         let res = fut.await?;
         Ok(res)
@@ -192,7 +195,7 @@ pub trait CallClient: QueryClient + BoundClient {
         value: TokenAmount,
         gas_params: GasParams,
         height: FvmQueryHeight,
-    ) -> anyhow::Result<CallResponse<adm::ListByOwnerReturn>> {
+    ) -> anyhow::Result<CallResponse<Vec<Address>>> {
         let msg = self
             .message_factory_mut()
             .list_machines(owner, value, gas_params)?;

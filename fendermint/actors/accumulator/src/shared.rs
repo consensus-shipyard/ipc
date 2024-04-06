@@ -4,6 +4,7 @@
 
 use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
+use fendermint_actor_machine::{MachineState, WriteAccess};
 use fvm_ipld_amt::Amt;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::{
@@ -18,13 +19,6 @@ use num_derive::FromPrimitive;
 
 pub const ACCUMULATOR_ACTOR_NAME: &str = "accumulator";
 const BIT_WIDTH: u32 = 3;
-
-/// Params for creating an accumulator machine.
-#[derive(Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct ConstructorParams {
-    /// The machine creator
-    pub creator: ActorID,
-}
 
 #[derive(FromPrimitive)]
 #[repr(u64)]
@@ -118,13 +112,32 @@ fn bag_peaks<BS: Blockstore>(peaks: &Amt<Cid, &BS>) -> anyhow::Result<Cid> {
 // The state represents an mmr with peaks stored in an Amt
 #[derive(Serialize_tuple, Deserialize_tuple)]
 pub struct State {
-    pub creator: ActorID,
+    /// The machine owner.
+    pub owner: ActorID,
+    /// Write access dictates who can write to the machine.
+    pub write_access: WriteAccess,
+    /// The root Cid of the Amt.
     pub peaks: Cid,
+    /// Number of leaves in the MMR.
     pub leaf_count: u64,
 }
 
+impl MachineState for State {
+    fn owner(&self) -> ActorID {
+        self.owner
+    }
+
+    fn write_access(&self) -> WriteAccess {
+        self.write_access.clone()
+    }
+}
+
 impl State {
-    pub fn new<BS: Blockstore>(store: &BS, creator: ActorID) -> anyhow::Result<Self> {
+    pub fn new<BS: Blockstore>(
+        store: &BS,
+        creator: ActorID,
+        write_access: WriteAccess,
+    ) -> anyhow::Result<Self> {
         let peaks = match Amt::<(), _>::new_with_bit_width(store, BIT_WIDTH).flush() {
             Ok(cid) => cid,
             Err(e) => {
@@ -135,7 +148,8 @@ impl State {
             }
         };
         Ok(Self {
-            creator,
+            owner: creator,
+            write_access,
             peaks,
             leaf_count: 0,
         })
@@ -177,7 +191,7 @@ mod tests {
     #[test]
     fn test_constructor() {
         let store = fvm_ipld_blockstore::MemoryBlockstore::default();
-        let state = State::new(&store, 100);
+        let state = State::new(&store, 100, WriteAccess::OnlyOwner);
         assert!(state.is_ok());
         let state = state.unwrap();
         assert_eq!(
@@ -228,7 +242,7 @@ mod tests {
     #[test]
     fn test_push_simple() {
         let store = fvm_ipld_blockstore::MemoryBlockstore::default();
-        let mut state = State::new(&store, 100).unwrap();
+        let mut state = State::new(&store, 100, WriteAccess::OnlyOwner).unwrap();
         let obj = vec![1, 2, 3];
         assert_eq!(
             state.push(&store, obj).expect("push failed"),
@@ -240,7 +254,7 @@ mod tests {
     #[test]
     fn test_get_peaks() {
         let store = fvm_ipld_blockstore::MemoryBlockstore::default();
-        let mut state = State::new(&store, 100).unwrap();
+        let mut state = State::new(&store, 100, WriteAccess::OnlyOwner).unwrap();
         let obj = vec![1, 2, 3];
         assert!(state.push(&store, obj).is_ok());
         assert_eq!(state.leaf_count, 1);
@@ -258,7 +272,7 @@ mod tests {
     #[test]
     fn test_bag_peaks() {
         let store = fvm_ipld_blockstore::MemoryBlockstore::default();
-        let mut state = State::new(&store, 100).unwrap();
+        let mut state = State::new(&store, 100, WriteAccess::OnlyOwner).unwrap();
         state.push(&store, vec![1]).unwrap();
         state.push(&store, vec![2]).unwrap();
         state.push(&store, vec![3]).unwrap();

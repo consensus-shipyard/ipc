@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use cid::Cid;
+use fendermint_actor_machine::{ensure_write_allowed, ConstructorParams};
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
     runtime::{ActorCode, Runtime},
@@ -11,7 +12,7 @@ use fil_actors_runtime::{
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::{error::ExitCode, MethodNum};
 
-use crate::{ConstructorParams, Method, State, ACCUMULATOR_ACTOR_NAME};
+use crate::{Method, State, ACCUMULATOR_ACTOR_NAME};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
@@ -22,7 +23,7 @@ impl Actor {
     fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&INIT_ACTOR_ADDR))?;
 
-        let state = State::new(rt.store(), params.creator).map_err(|e| {
+        let state = State::new(rt.store(), params.creator, params.write_access).map_err(|e| {
             e.downcast_default(
                 ExitCode::USR_ILLEGAL_STATE,
                 "failed to construct empty store",
@@ -32,7 +33,7 @@ impl Actor {
     }
 
     fn push(rt: &impl Runtime, obj: Vec<u8>) -> Result<Cid, ActorError> {
-        rt.validate_immediate_caller_accept_any()?;
+        ensure_write_allowed::<State>(rt)?;
 
         rt.transaction(|st: &mut State, rt| {
             st.push(rt.store(), obj).map_err(|e| {

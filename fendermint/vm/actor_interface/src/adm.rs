@@ -1,6 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use fendermint_actor_machine::WriteAccess;
 use fvm_ipld_encoding::tuple::{Deserialize_tuple, Serialize_tuple};
 use fvm_shared::{address::Address, ActorID, METHOD_CONSTRUCTOR};
 
@@ -22,13 +23,14 @@ pub enum Method {
 
 /// Helper for machine creation.
 #[derive(Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct CreateParams {
+pub struct CreateExternalParams {
     pub machine_name: String,
+    pub write_access: WriteAccess,
 }
 
 /// Helper to read return value from machine creation.
 #[derive(Debug, Clone, Serialize_tuple, Deserialize_tuple)]
-pub struct CreateReturn {
+pub struct CreateExternalReturn {
     pub actor_id: ActorID,
     pub robust_address: Option<Address>,
 }
@@ -37,10 +39,4 @@ pub struct CreateReturn {
 #[derive(Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ListByOwnerParams {
     pub owner: Address,
-}
-
-/// Helper to read return value from machine list.
-#[derive(Debug, Default, Clone, Serialize_tuple, Deserialize_tuple)]
-pub struct ListByOwnerReturn {
-    pub machines: Vec<Address>,
 }

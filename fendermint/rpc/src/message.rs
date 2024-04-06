@@ -6,6 +6,7 @@ use std::path::Path;
 use anyhow::Context;
 use base64::Engine;
 use bytes::Bytes;
+use fendermint_actor_machine::WriteAccess;
 use fendermint_actor_objectstore::{
     ObjectDeleteParams, ObjectGetParams, ObjectKind, ObjectListParams, ObjectPutParams,
 };
@@ -227,11 +228,13 @@ impl SignedMessageFactory {
     /// Create an object store.
     pub fn os_create(
         &mut self,
+        write_access: WriteAccess,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
-        let input = adm::CreateParams {
+        let input = adm::CreateExternalParams {
             machine_name: "objectstore".into(),
+            write_access,
         };
         let params = RawBytes::serialize(input)?;
         let message = self.transaction(
@@ -352,11 +355,13 @@ impl SignedMessageFactory {
     /// Create an accumulator.
     pub fn acc_create(
         &mut self,
+        write_access: WriteAccess,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
-        let input = adm::CreateParams {
+        let input = adm::CreateExternalParams {
             machine_name: "accumulator".into(),
+            write_access,
         };
         let params = RawBytes::serialize(input)?;
         let message = self.transaction(

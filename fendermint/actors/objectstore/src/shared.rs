@@ -4,40 +4,39 @@
 
 use cid::Cid;
 use fvm_ipld_encoding::{strict_bytes, tuple::*};
-use fvm_shared::{ActorID, METHOD_CONSTRUCTOR};
+use fvm_shared::METHOD_CONSTRUCTOR;
 use num_derive::FromPrimitive;
 
 pub use crate::state::{Object, ObjectKind, ObjectList, ObjectListItem, State};
 
 pub const OBJECTSTORE_ACTOR_NAME: &str = "objectstore";
 
-/// Params for creating an object store machine.
-#[derive(Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct ConstructorParams {
-    /// The machine creator
-    pub creator: ActorID,
-}
-
 /// Params for putting an object.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ObjectPutParams {
+    /// Object key.
     #[serde(with = "strict_bytes")]
     pub key: Vec<u8>,
+    /// Kind of object.
     pub kind: ObjectKind,
+    /// Whether to overwrite a key if it already exists.
     pub overwrite: bool,
 }
 
-/// Params for resolving an object.
+/// Params for resolving an external object.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ObjectResolveExternalParams {
+    /// Object key.
     #[serde(with = "strict_bytes")]
     pub key: Vec<u8>,
+    /// External object value.
     pub value: Cid,
 }
 
 /// Params for deleting an object.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ObjectDeleteParams {
+    /// Object key.
     #[serde(with = "strict_bytes")]
     pub key: Vec<u8>,
 }
@@ -45,6 +44,7 @@ pub struct ObjectDeleteParams {
 /// Params for getting an object.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ObjectGetParams {
+    /// Object key.
     #[serde(with = "strict_bytes")]
     pub key: Vec<u8>,
 }

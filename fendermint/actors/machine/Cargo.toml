@@ -1,0 +1,18 @@
+[package]
+name = "fendermint_actor_machine"
+description = "Shared types for ADM machine actors"
+license.workspace = true
+edition.workspace = true
+authors.workspace = true
+version = "0.1.0"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+anyhow = { workspace = true }
+fil_actors_runtime = { workspace = true }
+fvm_shared = { workspace = true }
+fvm_ipld_encoding = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_tuple = { workspace = true }

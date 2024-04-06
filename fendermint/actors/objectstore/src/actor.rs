@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use cid::Cid;
+use fendermint_actor_machine::{ensure_write_allowed, ConstructorParams};
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
     runtime::{ActorCode, Runtime},
@@ -13,8 +14,8 @@ use fvm_ipld_hamt::BytesKey;
 use fvm_shared::{error::ExitCode, MethodNum};
 
 use crate::{
-    ConstructorParams, Method, Object, ObjectDeleteParams, ObjectGetParams, ObjectList,
-    ObjectListParams, ObjectPutParams, ObjectResolveExternalParams, State, OBJECTSTORE_ACTOR_NAME,
+    Method, Object, ObjectDeleteParams, ObjectGetParams, ObjectList, ObjectListParams,
+    ObjectPutParams, ObjectResolveExternalParams, State, OBJECTSTORE_ACTOR_NAME,
 };
 
 #[cfg(feature = "fil-actor")]
@@ -26,18 +27,17 @@ impl Actor {
     fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&INIT_ACTOR_ADDR))?;
 
-        let state = State::new(rt.store(), params.creator).map_err(|e| {
+        let state = State::new(rt.store(), params.creator, params.write_access).map_err(|e| {
             e.downcast_default(
                 ExitCode::USR_ILLEGAL_STATE,
                 "failed to construct empty store",
             )
         })?;
-
         rt.create(&state)
     }
 
     fn put_object(rt: &impl Runtime, params: ObjectPutParams) -> Result<Cid, ActorError> {
-        rt.validate_immediate_caller_accept_any()?;
+        ensure_write_allowed::<State>(rt)?;
 
         let root = rt.transaction(|st: &mut State, rt| {
             st.put(rt.store(), BytesKey(params.key), params.kind, true)
@@ -45,7 +45,6 @@ impl Actor {
                     e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to put object")
                 })
         })?;
-
         Ok(root)
     }
 
@@ -61,12 +60,11 @@ impl Actor {
                     e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to resolve object")
                 })
         })?;
-
         Ok(())
     }
 
     fn delete_object(rt: &impl Runtime, params: ObjectDeleteParams) -> Result<Cid, ActorError> {
-        rt.validate_immediate_caller_accept_any()?;
+        ensure_write_allowed::<State>(rt)?;
 
         let res = rt.transaction(|st: &mut State, rt| {
             st.delete(rt.store(), &BytesKey(params.key)).map_err(|e| {
@@ -84,7 +82,6 @@ impl Actor {
                 )
             })?;
         }
-
         Ok(res.1)
     }
 

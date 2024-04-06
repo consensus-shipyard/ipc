@@ -4,6 +4,7 @@
 
 use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
+use fendermint_actor_machine::{MachineState, WriteAccess};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::{strict_bytes::ByteBuf, tuple::*, DAG_CBOR};
 use fvm_ipld_hamt::{BytesKey, Hamt};
@@ -17,10 +18,22 @@ const MAX_LIST_LIMIT: usize = 10000;
 /// The state represents an object store backed by a Hamt.
 #[derive(Serialize_tuple, Deserialize_tuple)]
 pub struct State {
-    /// The machine creator
-    pub creator: ActorID,
+    /// The machine owner.
+    pub owner: ActorID,
+    /// Write access dictates who can write to the machine.
+    pub write_access: WriteAccess,
     /// The root cid of the Hamt.
     pub root: Cid,
+}
+
+impl MachineState for State {
+    fn owner(&self) -> ActorID {
+        self.owner
+    }
+
+    fn write_access(&self) -> WriteAccess {
+        self.write_access.clone()
+    }
 }
 
 /// The stored representation of an object in the object store.
@@ -45,7 +58,9 @@ pub enum ObjectKind {
 /// A list of objects and their common prefixes.
 #[derive(Default, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ObjectList {
+    /// List of key-values matching the list query.
     pub objects: Vec<(Vec<u8>, ObjectListItem)>,
+    /// When a delimiter is used in the list query, this contains common key prefixes.
     pub common_prefixes: Vec<Vec<u8>>,
 }
 
@@ -53,13 +68,19 @@ pub struct ObjectList {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum ObjectListItem {
     /// Internal objects are stored on-chain.
+    /// The u64 is the size of the object.
     Internal((Cid, u64)),
     /// External objects reference an off-chain object by Cid.
+    /// The bool indicates whether the object has been resolved.
     External((Cid, bool)),
 }
 
 impl State {
-    pub fn new<BS: Blockstore>(store: &BS, creator: ActorID) -> anyhow::Result<Self> {
+    pub fn new<BS: Blockstore>(
+        store: &BS,
+        creator: ActorID,
+        write_access: WriteAccess,
+    ) -> anyhow::Result<Self> {
         let root = match Hamt::<_, Object>::new_with_bit_width(store, BIT_WIDTH).flush() {
             Ok(cid) => cid,
             Err(e) => {
@@ -69,7 +90,11 @@ impl State {
                 ));
             }
         };
-        Ok(Self { creator, root })
+        Ok(Self {
+            owner: creator,
+            write_access,
+            root,
+        })
     }
 
     pub fn put<BS: Blockstore>(
@@ -216,7 +241,7 @@ mod tests {
     #[test]
     fn test_constructor() {
         let store = MemoryBlockstore::default();
-        let state = State::new(&store, 100);
+        let state = State::new(&store, 100, WriteAccess::OnlyOwner);
         assert!(state.is_ok());
         assert_eq!(
             state.unwrap().root,
@@ -228,7 +253,7 @@ mod tests {
     #[test]
     fn test_put_internal() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(&store, 100).unwrap();
+        let mut state = State::new(&store, 100, WriteAccess::OnlyOwner).unwrap();
         assert!(state
             .put(
                 &store,
@@ -248,7 +273,7 @@ mod tests {
     #[test]
     fn test_put_external() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(&store, 100).unwrap();
+        let mut state = State::new(&store, 100, WriteAccess::OnlyOwner).unwrap();
         assert!(state
             .put(
                 &store,
@@ -268,7 +293,7 @@ mod tests {
     #[test]
     fn test_resolve_external() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(&store, 100).unwrap();
+        let mut state = State::new(&store, 100, WriteAccess::OnlyOwner).unwrap();
         let key = BytesKey(vec![1, 2, 3]);
         state
             .put(
@@ -293,7 +318,7 @@ mod tests {
     #[test]
     fn test_delete_internal() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(&store, 100).unwrap();
+        let mut state = State::new(&store, 100, WriteAccess::OnlyOwner).unwrap();
         let key = BytesKey(vec![1, 2, 3]);
         state
             .put(
@@ -313,7 +338,7 @@ mod tests {
     #[test]
     fn test_delete_external() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(&store, 100).unwrap();
+        let mut state = State::new(&store, 100, WriteAccess::OnlyOwner).unwrap();
         let key = BytesKey(vec![1, 2, 3]);
         state
             .put(
@@ -333,7 +358,7 @@ mod tests {
     #[test]
     fn test_get_internal() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(&store, 100).unwrap();
+        let mut state = State::new(&store, 100, WriteAccess::OnlyOwner).unwrap();
         let key = BytesKey(vec![1, 2, 3]);
         state
             .put(
@@ -355,7 +380,7 @@ mod tests {
     #[test]
     fn test_get_external() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(&store, 100).unwrap();
+        let mut state = State::new(&store, 100, WriteAccess::OnlyOwner).unwrap();
         let key = BytesKey(vec![1, 2, 3]);
         state
             .put(
@@ -417,7 +442,7 @@ mod tests {
     #[test]
     fn test_list_all_keys() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(&store, 100).unwrap();
+        let mut state = State::new(&store, 100, WriteAccess::OnlyOwner).unwrap();
 
         let (_, _, baz_key) = create_and_put_objects(&mut state, &store).unwrap();
 
@@ -434,7 +459,7 @@ mod tests {
     #[test]
     fn test_list_keys_with_prefix() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(&store, 100).unwrap();
+        let mut state = State::new(&store, 100, WriteAccess::OnlyOwner).unwrap();
 
         let (_, bar_key, baz_key) = create_and_put_objects(&mut state, &store).unwrap();
 
@@ -452,7 +477,7 @@ mod tests {
     #[test]
     fn test_list_keys_with_delimiter() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(&store, 100).unwrap();
+        let mut state = State::new(&store, 100, WriteAccess::OnlyOwner).unwrap();
 
         let (jpeg_key, _, _) = create_and_put_objects(&mut state, &store).unwrap();
 
@@ -475,7 +500,7 @@ mod tests {
     #[test]
     fn test_list_keys_with_nested_delimiter() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(&store, 100).unwrap();
+        let mut state = State::new(&store, 100, WriteAccess::OnlyOwner).unwrap();
 
         let jpeg_key = BytesKey("foo.jpeg".as_bytes().to_vec());
         state
@@ -519,7 +544,7 @@ mod tests {
     #[test]
     fn test_list_with_offset_and_limit() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(&store, 100).unwrap();
+        let mut state = State::new(&store, 100, WriteAccess::OnlyOwner).unwrap();
 
         let (_, _, baz_key) = create_and_put_objects(&mut state, &store).unwrap();
 
