@@ -1,3 +1,95 @@
+# anik
+
+Anik is the Filecoin Ecosystem Trust Layer. Built on and for FVM and IPC.
+
+This repository contains anik contracts. The contracts are added in in `extras/linked-token` folder.
+
+## Deployment
+
+Steps for deployment are as follows,
+
+- Deploy Strategy Manager `/extras/linked-token/src/StrategyManager.sol`
+- Deploy test tokens
+  - Wrapped FIL
+  - GLIF Infinity Pool
+  - STFIL
+  - CollectifDAO
+  - Repl
+  - SFT Protocol
+  - Filet Finance
+- Deploy Strategies
+  - Wrapped FIL strategy
+  - GLIF Infinity Pool strategy
+  - STFIL strategy
+  - CollectifDAO strategy
+  - Repl strategy
+  - SFT Protocol strategy
+  - Filet Finance strategy
+- Whitelist strategies in Strategy Manager
+- Deploy Delegation Manager
+- Deploy Miner Slasher
+- Deploy IPC Slasher Controller
+- Deploy IPC Slasher Replica On Subnet
+- Setup Slashers On Delegation Manager
+
+## Subnet Details
+
+```
+#################################
+#                               #
+# Subnet node ready! 🚀         #
+#                               #
+#################################
+
+Subnet ID:
+        /r314159/t410fcjgrtheochar3kfv2ppqlysm2rz36cachzsnbkq
+
+Eth API:
+        http://0.0.0.0:8545
+
+Chain ID:
+        1123184071217486
+
+Fendermint API:
+        http://localhost:26658
+
+CometBFT API:
+        http://0.0.0.0:26657
+
+CometBFT node ID:
+        69636ba177b1b7f91ac30f63e8c3b6ce206ff3e6
+
+CometBFT P2P:
+        http://0.0.0.0:26656
+
+IPLD Resolver Multiaddress:
+        /ip4/0.0.0.0/tcp/26655/p2p/16Uiu2HAmQqiDktwUpXcUXxGDUi8cPqySpy3Nd6bXcNBysZ997SZ9
+```
+
+Subnet ETH Address `0x124d199c8E11c11Da8b5D3DF05E24Cd473bF0802`
+
+## Contract Addresses
+
+Due to issues with forge `tx dropped from mempool` error, deployment was done manually for some of the contracts via Remix.
+
+| Contract                      | Network     | Address                                    |
+| ----------------------------- | ----------- | ------------------------------------------ |
+| Strategy Manager              | Calibration | 0x884C79f4e4419728B394251B9b6Ab2dcA3292B21 |
+| Wrapped FIL Test Token        | Calibration | 0x2D0ffc1292287e4C1aCfC8B56aA126a44B2BCf3b |
+| Glif Infinity Pool Test Token | Calibration | 0xb1310985d8D8a42f6667E8d811f332CDC33449F4 |
+| STFIL Test Token              | Calibration | 0xBb56DD788f039710D2EC4ca26Dc1d1Fb7Da07D93 |
+| CollectifDAO Test Token       | Calibration | 0x208E40E914b03EF655c7a6534671272470929EaC |
+| Repl Test Token               | Calibration | 0xFC7199237A3e8Ce54e348404d4da65cEE63E255C |
+| SFT Protocol Test Token       | Calibration | 0x68008f099F6f627647C51544d80b101E189082bd |
+| Filet Finance Test Token      | Calibration | 0xA0f8257D299fEc379DF25c1504E95A1A977039ab |
+| Wrapped FIL Strategy          | Calibration | 0x004e0D099976385C779fEb668448bF807B4B9F51 |
+| Glif Infinity Pool Strategy   | Calibration | 0x307e4FD0e0f6a38b4Bc7d48b406c4e9633ff4E9D |
+| STFIL Strategy                | Calibration | 0x3bf65cA7523abe4FA3749037886fB014E3573D78 |
+| CollectifDAO Strategy         | Calibration | 0xd2786E7914cB61Ec72DC4092A3426f5AbFa7A319 |
+| Repl Strategy                 | Calibration | 0xDc1463243DC91F32d8FE1bEC690ff05bDB8F122D |
+| SFT Protocol Strategy         | Calibration | 0xd2Ccf8A859a83B45D25A0e36ecd1849173C22E40 |
+| Filet Finance Strategy        | Calibration | 0xd1A1E4d91213bc300e0b9975e07810835bDce617 |
+
 # InterPlanetary Consensus (IPC)
 
 **‼️ All the modules in the IPC stack (including the contracts) haven't been audited, tested in depth, or otherwise verified. Moreover, the system is missing critical recovery functionality in case of crashes. There are multiple ways in which you may lose funds moved into an IPC subnet, and we strongly advise against deploying IPC on mainnet and/or using it with tokens with real value.**
