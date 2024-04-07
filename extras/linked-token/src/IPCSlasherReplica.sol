@@ -42,7 +42,7 @@ contract IPCSlasherReplica is IpcExchange {
         _linkedSubnet = linkedSubnet;
     }
 
-    function setLinkedSubnet(address linkedContract) external onlyOwner {
+    function setLinkedContract(address linkedContract) external onlyOwner {
         _linkedContract = linkedContract;
     }
 
