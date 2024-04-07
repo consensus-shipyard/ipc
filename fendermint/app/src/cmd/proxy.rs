@@ -29,6 +29,7 @@ use tokio::{
 use tokio_util::compat::TokioAsyncReadCompatExt;
 use warp::{
     http::{HeaderMap, HeaderValue, StatusCode},
+    path::Tail,
     Filter, Rejection, Reply,
 };
 
@@ -73,85 +74,82 @@ cmd! {
                 let health_route = warp::path!("health")
                     .and(warp::get()).and_then(health);
                 let list_machines_route = warp::path!("v1" / "machines")
+                    .and(warp::query::<HeightQuery>())
                     .and(warp::get())
                     .and(with_client(client.clone()))
                     .and(with_args(args.clone()))
-                    .and(warp::query::<HeightQuery>())
                     .and_then(handle_list_machines);
 
                 // Object Store routes
                 let os_create_route = warp::path!("v1" / "os")
                     .and(warp::post())
+                    .and(warp::query::<WriteAccessQuery>())
                     .and(with_client(client.clone()))
                     .and(with_args(args.clone()))
                     .and(with_nonce(nonce.clone()))
-                    .and(warp::query::<WriteAccessQuery>())
                     .and(warp::header::optional::<u64>("X-ADM-GasLimit"))
                     .and(warp::header::optional::<BroadcastMode>("X-ADM-BroadcastMode"))
                     .and_then(handle_os_create);
-                let os_upload_route = warp::path!("v1" / "os" / Address / String)
+                let os_upload_route = warp::path!("v1" / "os" / Address / ..)
                     .and(warp::put())
+                    .and(warp::path::tail())
+                    .and(warp::body::stream())
                     .and(warp::body::content_length_limit(MAX_OBJECT_LENGTH))
+                    .and(warp::header::<u64>("Content-Length"))
                     .and(with_client(client.clone()))
                     .and(with_ipfs(ipfs.clone()))
                     .and(with_args(args.clone()))
                     .and(with_nonce(nonce.clone()))
-                    .and(warp::header::<u64>("Content-Length"))
                     .and(warp::header::optional::<u64>("X-ADM-GasLimit"))
                     .and(warp::header::optional::<BroadcastMode>("X-ADM-BroadcastMode"))
-                    .and(warp::body::stream())
                     .and_then(handle_os_upload);
-                let os_delete_route = warp::path!("v1" / "os" / Address / String)
+                let os_delete_route = warp::path!("v1" / "os" / Address / ..)
                     .and(warp::delete())
+                    .and(warp::path::tail())
                     .and(with_client(client.clone()))
                     .and(with_args(args.clone()))
                     .and(with_nonce(nonce.clone()))
                     .and(warp::header::optional::<u64>("X-ADM-GasLimit"))
                     .and(warp::header::optional::<BroadcastMode>("X-ADM-BroadcastMode"))
                     .and_then(handle_os_delete);
-                let os_get_route = warp::path!("v1" / "os" / Address / String)
+                let os_get_or_list_route = warp::path!("v1" / "os" / Address / ..)
                     .and(
                         warp::get().or(warp::head()).unify()
                     )
+                    .and(warp::path::tail())
+                    .and(warp::query::<HeightQuery>())
+                    .and(warp::query::<ListQuery>())
+                    .and(warp::header::optional::<String>("Range"))
                     .and(with_client(client.clone()))
                     .and(with_ipfs(ipfs.clone()))
                     .and(with_args(args.clone()))
-                    .and(warp::query::<HeightQuery>())
-                    .and(warp::header::optional::<String>("Range"))
-                    .and_then(handle_os_get);
-                let os_list_route = warp::path!("v1" / "os" / Address)
-                    .and(warp::get())
-                    .and(with_client(client.clone()))
-                    .and(with_args(args.clone()))
-                    .and(warp::query::<ListQuery>())
-                    .and(warp::query::<HeightQuery>())
-                    .and_then(handle_os_list);
+                    .and_then(handle_os_get_or_list);
 
                 // Accumulator routes
                 let acc_create_route = warp::path!("v1" / "acc")
                     .and(warp::post())
+                    .and(warp::query::<WriteAccessQuery>())
                     .and(with_client(client.clone()))
                     .and(with_args(args.clone()))
                     .and(with_nonce(nonce.clone()))
-                    .and(warp::query::<WriteAccessQuery>())
                     .and(warp::header::optional::<u64>("X-ADM-GasLimit"))
                     .and(warp::header::optional::<BroadcastMode>("X-ADM-BroadcastMode"))
                     .and_then(handle_acc_create);
                 let acc_push_route = warp::path!("v1" / "acc" / Address)
                     .and(warp::put())
                     .and(warp::body::content_length_limit(MAX_EVENT_LENGTH))
+                    .and(warp::body::bytes())
                     .and(with_client(client.clone()))
                     .and(with_args(args.clone()))
                     .and(with_nonce(nonce))
                     .and(warp::header::optional::<u64>("X-ADM-GasLimit"))
                     .and(warp::header::optional::<BroadcastMode>("X-ADM-BroadcastMode"))
-                    .and(warp::body::bytes())
                     .and_then(handle_acc_push);
                 let acc_root_route = warp::path!("v1" / "acc" / Address)
                     .and(warp::get())
+                    .and(warp::query::<HeightQuery>())
                     .and(with_client(client))
                     .and(with_args(args))
-                    .and(warp::query::<HeightQuery>())
                     .and_then(handle_acc_root);
 
                 let router = health_route
@@ -159,8 +157,7 @@ cmd! {
                     .or(os_create_route)
                     .or(os_upload_route)
                     .or(os_delete_route)
-                    .or(os_get_route)
-                    .or(os_list_route)
+                    .or(os_get_or_list_route)
                     .or(acc_create_route)
                     .or(acc_push_route)
                     .or(acc_root_route)
@@ -202,6 +199,16 @@ fn with_nonce(
     warp::any().map(move || nonce.clone())
 }
 
+fn get_os_key(tail: Tail) -> Result<Vec<u8>, Rejection> {
+    let key = tail.as_str();
+    return match key.is_empty() {
+        true => Err(Rejection::from(BadRequest {
+            message: "empty key".into(),
+        })),
+        false => Ok(key.into()),
+    };
+}
+
 #[derive(Serialize, Deserialize)]
 struct HeightQuery {
     pub height: Option<u64>,
@@ -212,11 +219,12 @@ async fn health() -> Result<impl Reply, Rejection> {
 }
 
 async fn handle_list_machines(
+    height_query: HeightQuery,
     client: FendermintClient,
     args: TransArgs,
-    height_query: HeightQuery,
 ) -> Result<impl Reply, Rejection> {
     let height = height_query.height.unwrap_or(0);
+
     let res = list_machines(client, args, None, height)
         .await
         .map_err(|e| {
@@ -241,10 +249,10 @@ struct WriteAccessQuery {
 }
 
 async fn handle_os_create(
+    write_access_query: WriteAccessQuery,
     client: FendermintClient,
     mut args: TransArgs,
     nonce: Arc<Mutex<u64>>,
-    write_access_query: WriteAccessQuery,
     gas_limit: Option<u64>,
     broadcast_mode: Option<BroadcastMode>,
 ) -> Result<impl Reply, Rejection> {
@@ -275,15 +283,15 @@ async fn handle_os_create(
 #[allow(clippy::too_many_arguments)]
 async fn handle_os_upload(
     address: Address,
-    key: String,
+    path: Tail,
+    mut body: impl Stream<Item = Result<impl Buf, warp::Error>> + Unpin + Send + Sync,
+    size: u64,
     client: FendermintClient,
     ipfs: IpfsClient,
     mut args: TransArgs,
     nonce: Arc<Mutex<u64>>,
-    size: u64,
     gas_limit: Option<u64>,
     broadcast_mode: Option<BroadcastMode>,
-    mut body: impl Stream<Item = Result<impl Buf, warp::Error>> + Unpin + Send + Sync,
 ) -> Result<impl Reply, Rejection> {
     let mut nonce_lck = nonce.lock().await;
     args.sequence = *nonce_lck;
@@ -295,6 +303,8 @@ async fn handle_os_upload(
             message: "empty body".into(),
         }));
     }
+
+    let key = get_os_key(path)?;
 
     let params = if size > MAX_INTERNAL_OBJECT_LENGTH {
         let mut tmp = TempFile::new().await.map_err(|e| {
@@ -350,7 +360,7 @@ async fn handle_os_upload(
         })?;
 
         ObjectPutParams {
-            key: key.into_bytes(),
+            key,
             kind: ObjectKind::External(cid),
             overwrite: true,
         }
@@ -367,7 +377,7 @@ async fn handle_os_upload(
         }
 
         ObjectPutParams {
-            key: key.into_bytes(),
+            key,
             kind: ObjectKind::Internal(ByteBuf(collected)),
             overwrite: true,
         }
@@ -385,7 +395,7 @@ async fn handle_os_upload(
 
 async fn handle_os_delete(
     address: Address,
-    key: String,
+    path: Tail,
     client: FendermintClient,
     mut args: TransArgs,
     nonce: Arc<Mutex<u64>>,
@@ -397,10 +407,9 @@ async fn handle_os_delete(
     args.gas_limit = gas_limit.unwrap_or(BLOCK_GAS_LIMIT);
     args.broadcast_mode = broadcast_mode.unwrap_or(args.broadcast_mode);
 
-    let params = ObjectDeleteParams {
-        key: key.into_bytes(),
-    };
-    let res = os_delete(client, args, address, params)
+    let key = get_os_key(path)?;
+
+    let res = os_delete(client, args, address, ObjectDeleteParams { key })
         .await
         .map_err(|e| {
             Rejection::from(BadRequest {
@@ -454,20 +463,25 @@ impl From<ParseIntError> for ProxyError {
     }
 }
 
-async fn handle_os_get(
+async fn handle_os_get_or_list(
     address: Address,
-    key: String,
+    tail: Tail,
+    height_query: HeightQuery,
+    list_query: ListQuery,
+    range: Option<String>,
     client: FendermintClient,
     ipfs: IpfsClient,
     args: TransArgs,
-    height_query: HeightQuery,
-    range: Option<String>,
 ) -> Result<impl Reply, Rejection> {
-    let params = ObjectGetParams {
-        key: key.into_bytes(),
-    };
+    let path = tail.as_str();
+    if path.is_empty() || path.ends_with("/") {
+        return handle_os_list(address, path, height_query, list_query, client, args).await;
+    }
+
+    let key: Vec<u8> = path.into();
     let height = height_query.height.unwrap_or(0);
-    let res = os_get(client, args, address, params, height)
+
+    let res = os_get(client, args, address, ObjectGetParams { key }, height)
         .await
         .map_err(|e| {
             Rejection::from(BadRequest {
@@ -578,26 +592,29 @@ async fn handle_os_get(
 
 #[derive(Serialize, Deserialize)]
 struct ListQuery {
-    pub prefix: Option<String>,
-    pub delimiter: Option<String>,
     pub offset: Option<u64>,
     pub limit: Option<u64>,
 }
 
 async fn handle_os_list(
     address: Address,
+    mut prefix: &str,
+    height_query: HeightQuery,
+    list_query: ListQuery,
     client: FendermintClient,
     args: TransArgs,
-    list_query: ListQuery,
-    height_query: HeightQuery,
-) -> Result<impl Reply, Rejection> {
+) -> Result<warp::reply::Response, Rejection> {
+    if prefix == "/" {
+        prefix = "";
+    }
     let params = ObjectListParams {
-        prefix: list_query.prefix.unwrap_or_default().into(),
-        delimiter: list_query.delimiter.unwrap_or_default().into(),
+        prefix: prefix.into(),
+        delimiter: "/".into(),
         offset: list_query.offset.unwrap_or(0),
         limit: list_query.limit.unwrap_or(0),
     };
     let height = height_query.height.unwrap_or(0);
+
     let res = os_list(client, args, address, params, height)
         .await
         .map_err(|e| {
@@ -628,15 +645,24 @@ async fn handle_os_list(
         .map(|v| Value::String(core::str::from_utf8(v).unwrap_or_default().to_string()))
         .collect::<Vec<Value>>();
 
-    let json = json!({"objects": objects, "common_prefixes": common_prefixes});
-    Ok(warp::reply::json(&json))
+    let list = json!({"objects": objects, "common_prefixes": common_prefixes});
+    let list = serde_json::to_vec(&list).unwrap();
+    let mut header_map = HeaderMap::new();
+    header_map.insert("Content-Length", HeaderValue::from(list.len()));
+    header_map.insert("Content-Type", HeaderValue::from_static("application/json"));
+    let body = warp::hyper::Body::from(list);
+    let mut response = warp::reply::Response::new(body);
+    let headers = response.headers_mut();
+    headers.extend(header_map);
+
+    Ok(response)
 }
 
 async fn handle_acc_create(
+    write_access_query: WriteAccessQuery,
     client: FendermintClient,
     mut args: TransArgs,
     nonce: Arc<Mutex<u64>>,
-    write_access_query: WriteAccessQuery,
     gas_limit: Option<u64>,
     broadcast_mode: Option<BroadcastMode>,
 ) -> Result<impl Reply, Rejection> {
@@ -666,12 +692,12 @@ async fn handle_acc_create(
 
 async fn handle_acc_push(
     address: Address,
+    body: Bytes,
     client: FendermintClient,
     mut args: TransArgs,
     nonce: Arc<Mutex<u64>>,
     gas_limit: Option<u64>,
     broadcast_mode: Option<BroadcastMode>,
-    body: Bytes,
 ) -> Result<impl Reply, Rejection> {
     let mut nonce_lck = nonce.lock().await;
     args.sequence = *nonce_lck;
@@ -692,9 +718,9 @@ async fn handle_acc_push(
 
 async fn handle_acc_root(
     address: Address,
+    height_query: HeightQuery,
     client: FendermintClient,
     args: TransArgs,
-    height_query: HeightQuery,
 ) -> Result<impl Reply, Rejection> {
     let height = height_query.height.unwrap_or(0);
     let res = acc_root(client, args, address, height).await.map_err(|e| {
