@@ -10,14 +10,14 @@ Steps for deployment are as follows,
 
 - Deploy Strategy Manager `/extras/linked-token/src/StrategyManager.sol`
 - Deploy test tokens
-  - Wrapped FIL
-  - GLIF Infinity Pool
-  - STFIL
-  - CollectifDAO
-  - Repl
-  - SFT Protocol
-  - Filet Finance
-- Deploy Strategies
+  - Wrapped FIL `/extras/linked-token/src/StrategyManager.sol`
+  - GLIF Infinity Pool `/extras/linked-token/src/StrategyManager.sol`
+  - STFIL `/extras/linked-token/src/StrategyManager.sol`
+  - CollectifDAO `/extras/linked-token/src/StrategyManager.sol`
+  - Repl `/extras/linked-token/src/StrategyManager.sol`
+  - SFT Protocol `/extras/linked-token/src/StrategyManager.sol`
+  - Filet Finance `/extras/linked-token/src/StrategyManager.sol`
+- Deploy Strategies `/extras/linked-token/src/StrategyBase.sol`
   - Wrapped FIL strategy
   - GLIF Infinity Pool strategy
   - STFIL strategy
@@ -26,10 +26,12 @@ Steps for deployment are as follows,
   - SFT Protocol strategy
   - Filet Finance strategy
 - Whitelist strategies in Strategy Manager
-- Deploy Delegation Manager
-- Deploy Miner Slasher
-- Deploy IPC Slasher Controller
-- Deploy IPC Slasher Replica On Subnet
+- Deploy Delegation Manager `/extras/linked-token/src/DelegationManager.sol`
+- Deploy Miner Slasher `/extras/linked-token/src/MinerSlasher.sol`
+- Deploy IPC Slasher Controller `/extras/linked-token/IPCSlasherController.sol`
+  - Set delegation manager for IPC Slasher Controller
+- Deploy IPC Slasher Replica On Subnet `/extras/linked-token/IPCSlasherReplica.sol`
+  - Set Controller as linked contract
 - Setup Slashers On Delegation Manager
 
 ## Subnet Details
@@ -89,6 +91,10 @@ Due to issues with forge `tx dropped from mempool` error, deployment was done ma
 | Repl Strategy                 | Calibration | 0xDc1463243DC91F32d8FE1bEC690ff05bDB8F122D |
 | SFT Protocol Strategy         | Calibration | 0xd2Ccf8A859a83B45D25A0e36ecd1849173C22E40 |
 | Filet Finance Strategy        | Calibration | 0xd1A1E4d91213bc300e0b9975e07810835bDce617 |
+| Delegation Manager            | Calibration | 0x3aBA6030358288b8C893F51348684ADC36DeC768 |
+| Miner Slasher                 | Calibration | 0x3f87989d9FAcEe469Bb4D51cf1c6A9cc844Fd15e |
+| IPC Slasher Controller        | Calibration | 0x44b9FE73A2FC99Df85f365D4AC08111a6eb52EAC |
+| IPC Slasher Replica           | Subnet      | 0x31C231AcCBa071d53253Afaf9c8d239254f64D17 |
 
 # InterPlanetary Consensus (IPC)
 
