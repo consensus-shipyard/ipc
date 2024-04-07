@@ -901,6 +901,12 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         registerSubnetGW(collateral, subnetAddress, gatewayDiamond);
     }
 
+    function getSubnetCircSupplyGW(SubnetID memory subnetId, GatewayDiamond gw) public view returns (uint256) {
+        GatewayGetterFacet getter = gw.getter();
+        Subnet memory subnet = getter.subnets(subnetId.toHash());
+        return subnet.circSupply;
+    }
+
     function getSubnetGW(
         address subnetAddress,
         GatewayDiamond gw
