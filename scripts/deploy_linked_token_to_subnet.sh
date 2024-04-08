@@ -53,7 +53,7 @@ do
 done
 
 echo "wallet address for linkd token test is:"
-echo $wallet_addresses[3]
+echo ${wallet_addresses[3]}
 
 # Step 3: Configure the dot env file
 echo "$DASHES Configuring .env file for linked token deployment..."
@@ -64,8 +64,8 @@ base_subnet_id=$(basename $subnet_id)
 cd $IPC_FOLDER/extras/tools/fvm-eth-address-converter
 subnet_id_as_eth_addr=$(npx ts-node fvm-addr-to-eth-addr.ts $base_subnet_id)
 # Write config to dot env file
-echo "export SUBNET_PRIVATE_KEY=$private_keys[3]" >> $DOT_ENV_FILE
-echo "export ORIGIN_NET_PRIVATE_KEY=$private_keys[3]" >> $DOT_ENV_FILE
+echo "export SUBNET_PRIVATE_KEY=${private_keys[3]}" >> $DOT_ENV_FILE
+echo "export ORIGIN_NET_PRIVATE_KEY=${private_keys[3]}" >> $DOT_ENV_FILE
 echo "export ORIGIN_NET_GATEWAY=$calib_net_gateway_address" >> $DOT_ENV_FILE
 echo "export SUBNET_ROUTE_IN_ETH_FORMAT=$subnet_id_as_eth_addr" >> $DOT_ENV_FILE
 # Preview the dot env file
@@ -77,7 +77,7 @@ echo "$DASHES Funding address in subnet..."
 $IPC_CLI cross-msg fund \
 --subnet $subnet_id \
 --from $default_wallet_address \
---to $wallet_addresses[3] \
+--to ${wallet_addresses[3]} \
 50
 
 
