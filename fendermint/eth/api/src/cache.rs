@@ -19,7 +19,7 @@ use fendermint_vm_message::query::FvmQueryHeight;
 
 use crate::state::ActorType;
 
-// The `LruCache` is wrapped in `Mutex` beause even reading requiers mutation.
+// The `LruCache` is wrapped in `Mutex` beause even reading requires mutation.
 #[derive(Clone)]
 pub struct Cache<K, V> {
     cache: Arc<Mutex<LruCache<K, V>>>,
