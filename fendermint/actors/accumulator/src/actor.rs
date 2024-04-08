@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use cid::Cid;
-use fendermint_actor_machine::{ensure_write_allowed, ConstructorParams};
+use fendermint_actor_machine::{ConstructorParams, MachineActor};
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
     runtime::{ActorCode, Runtime},
@@ -33,7 +33,7 @@ impl Actor {
     }
 
     fn push(rt: &impl Runtime, obj: Vec<u8>) -> Result<Cid, ActorError> {
-        ensure_write_allowed::<State>(rt)?;
+        Self::ensure_write_allowed(rt)?;
 
         rt.transaction(|st: &mut State, rt| {
             st.push(rt.store(), obj).map_err(|e| {
@@ -77,6 +77,10 @@ impl Actor {
     }
 }
 
+impl MachineActor for Actor {
+    type State = State;
+}
+
 impl ActorCode for Actor {
     type Methods = Method;
 
@@ -86,6 +90,7 @@ impl ActorCode for Actor {
 
     actor_dispatch! {
         Constructor => constructor,
+        GetMetadata => get_metadata,
         Push => push,
         Root => get_root,
         Peaks => get_peaks,

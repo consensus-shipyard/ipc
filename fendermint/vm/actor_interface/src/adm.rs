@@ -20,7 +20,7 @@ pub enum Method {
     Constructor = METHOD_CONSTRUCTOR,
     CreateExternal = 2,
     UpdateDeployers = 3,
-    ListByOwner = 4,
+    ListMetadata = 4,
 }
 
 /// The kinds of machines available.
@@ -45,10 +45,10 @@ impl Display for Kind {
 /// Machine metadata.
 #[derive(Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct Metadata {
-    /// Machine robust address.
-    pub address: Address,
     /// Machine kind.
     pub kind: Kind,
+    /// Machine robust address.
+    pub address: Address,
 }
 
 /// Helper for machine creation.
@@ -65,8 +65,8 @@ pub struct CreateExternalReturn {
     pub robust_address: Option<Address>,
 }
 
-/// Helper for listing machines by owner.
+/// Helper for listing machine metadata by owner.
 #[derive(Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct ListByOwnerParams {
+pub struct ListMetadataParams {
     pub owner: Address,
 }

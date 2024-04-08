@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use cid::Cid;
-use fendermint_actor_machine::{ensure_write_allowed, ConstructorParams};
+use fendermint_actor_machine::{ConstructorParams, MachineActor};
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
     runtime::{ActorCode, Runtime},
@@ -14,8 +14,8 @@ use fvm_ipld_hamt::BytesKey;
 use fvm_shared::{error::ExitCode, MethodNum};
 
 use crate::{
-    Method, Object, ObjectDeleteParams, ObjectGetParams, ObjectList, ObjectListParams,
-    ObjectPutParams, ObjectResolveExternalParams, State, OBJECTSTORE_ACTOR_NAME,
+    DeleteParams, GetParams, ListParams, Method, Object, ObjectList, PutParams,
+    ResolveExternalParams, State, OBJECTSTORE_ACTOR_NAME,
 };
 
 #[cfg(feature = "fil-actor")]
@@ -36,8 +36,8 @@ impl Actor {
         rt.create(&state)
     }
 
-    fn put_object(rt: &impl Runtime, params: ObjectPutParams) -> Result<Cid, ActorError> {
-        ensure_write_allowed::<State>(rt)?;
+    fn put_object(rt: &impl Runtime, params: PutParams) -> Result<Cid, ActorError> {
+        Self::ensure_write_allowed(rt)?;
 
         let root = rt.transaction(|st: &mut State, rt| {
             st.put(rt.store(), BytesKey(params.key), params.kind, true)
@@ -50,7 +50,7 @@ impl Actor {
 
     fn resolve_external_object(
         rt: &impl Runtime,
-        params: ObjectResolveExternalParams,
+        params: ResolveExternalParams,
     ) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
@@ -63,8 +63,8 @@ impl Actor {
         Ok(())
     }
 
-    fn delete_object(rt: &impl Runtime, params: ObjectDeleteParams) -> Result<Cid, ActorError> {
-        ensure_write_allowed::<State>(rt)?;
+    fn delete_object(rt: &impl Runtime, params: DeleteParams) -> Result<Cid, ActorError> {
+        Self::ensure_write_allowed(rt)?;
 
         let res = rt.transaction(|st: &mut State, rt| {
             st.delete(rt.store(), &BytesKey(params.key)).map_err(|e| {
@@ -85,10 +85,7 @@ impl Actor {
         Ok(res.1)
     }
 
-    fn get_object(
-        rt: &impl Runtime,
-        params: ObjectGetParams,
-    ) -> Result<Option<Object>, ActorError> {
+    fn get_object(rt: &impl Runtime, params: GetParams) -> Result<Option<Object>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
         let st: State = rt.state()?;
@@ -98,7 +95,7 @@ impl Actor {
 
     fn list_objects(
         rt: &impl Runtime,
-        params: ObjectListParams,
+        params: ListParams,
     ) -> Result<Option<ObjectList>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let st: State = rt.state()?;
@@ -131,6 +128,10 @@ impl Actor {
     }
 }
 
+impl MachineActor for Actor {
+    type State = State;
+}
+
 impl ActorCode for Actor {
     type Methods = Method;
 
@@ -140,6 +141,7 @@ impl ActorCode for Actor {
 
     actor_dispatch! {
         Constructor => constructor,
+        GetMetadata => get_metadata,
         PutObject => put_object,
         ResolveExternalObject => resolve_external_object,
         DeleteObject => delete_object,

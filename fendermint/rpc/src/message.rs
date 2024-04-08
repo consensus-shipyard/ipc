@@ -6,10 +6,8 @@ use std::path::Path;
 use anyhow::Context;
 use base64::Engine;
 use bytes::Bytes;
-use fendermint_actor_machine::WriteAccess;
-use fendermint_actor_objectstore::{
-    ObjectDeleteParams, ObjectGetParams, ObjectKind, ObjectListParams, ObjectPutParams,
-};
+use fendermint_actor_machine::{WriteAccess, GET_METADATA_METHOD};
+use fendermint_actor_objectstore::{DeleteParams, GetParams, ListParams, ObjectKind, PutParams};
 use fendermint_crypto::SecretKey;
 use fendermint_vm_actor_interface::{adm, eam, evm};
 use fendermint_vm_message::signed::Object;
@@ -195,19 +193,47 @@ impl SignedMessageFactory {
         Ok(chain)
     }
 
-    /// List machines by owner.
+    /// List machine metadata by owner.
     pub fn list_machines(
         &mut self,
         owner: Address,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<Message> {
-        let input = adm::ListByOwnerParams { owner };
+        let input = adm::ListMetadataParams { owner };
         let params = RawBytes::serialize(input)?;
         let message = self.transaction(
             adm::ADM_ACTOR_ADDR,
-            adm::Method::ListByOwner as u64,
+            adm::Method::ListMetadata as u64,
             params,
+            value,
+            gas_params,
+            None,
+        )?;
+
+        let message = if let ChainMessage::Signed(signed) = message {
+            signed.into_message()
+        } else {
+            panic!("unexpected message type: {message:?}");
+        };
+
+        // Roll back the sequence, we don't really want to invoke anything.
+        self.inner.set_sequence(message.sequence);
+
+        Ok(message)
+    }
+
+    /// Get machine metadata.
+    pub fn get_machine(
+        &mut self,
+        address: Address,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<Message> {
+        let message = self.transaction(
+            address,
+            GET_METADATA_METHOD,
+            RawBytes::default(),
             value,
             gas_params,
             None,
@@ -252,7 +278,7 @@ impl SignedMessageFactory {
     pub fn os_put(
         &mut self,
         address: Address,
-        params: ObjectPutParams,
+        params: PutParams,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
@@ -276,7 +302,7 @@ impl SignedMessageFactory {
     pub fn os_delete(
         &mut self,
         address: Address,
-        params: ObjectDeleteParams,
+        params: DeleteParams,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
@@ -296,7 +322,7 @@ impl SignedMessageFactory {
     pub fn os_get(
         &mut self,
         address: Address,
-        params: ObjectGetParams,
+        params: GetParams,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<Message> {
@@ -326,7 +352,7 @@ impl SignedMessageFactory {
     pub fn os_list(
         &mut self,
         address: Address,
-        params: ObjectListParams,
+        params: ListParams,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<Message> {

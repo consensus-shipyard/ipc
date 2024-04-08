@@ -4,6 +4,7 @@ use anyhow::{anyhow, Context};
 use base64::Engine;
 use bytes::Bytes;
 use cid::Cid;
+use fendermint_actor_machine::Metadata;
 use fendermint_actor_objectstore::{Object, ObjectList};
 use fendermint_vm_actor_interface::{adm, eam};
 use fvm_ipld_encoding::{BytesDe, RawBytes};
@@ -76,10 +77,17 @@ pub fn decode_machine_create(deliver_tx: &DeliverTx) -> anyhow::Result<adm::Crea
         .map_err(|e| anyhow!("error parsing as CreateReturn: {e}"))
 }
 
-/// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as a vector of [`Address`].
+/// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as a vector of [`adm::Metadata`].
 pub fn decode_machine_list(deliver_tx: &DeliverTx) -> anyhow::Result<Vec<adm::Metadata>> {
     let data = decode_data(&deliver_tx.data)?;
     fvm_ipld_encoding::from_slice::<Vec<adm::Metadata>>(&data)
+        .map_err(|e| anyhow!("error parsing as Vec<adm::Metadata>: {e}"))
+}
+
+/// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as a vector of [`Metadata`].
+pub fn decode_machine_get(deliver_tx: &DeliverTx) -> anyhow::Result<Metadata> {
+    let data = decode_data(&deliver_tx.data)?;
+    fvm_ipld_encoding::from_slice::<Metadata>(&data)
         .map_err(|e| anyhow!("error parsing as Metadata: {e}"))
 }
 

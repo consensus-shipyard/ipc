@@ -245,6 +245,7 @@ where
         let adm_state = fil_actor_adm::State::new(
             &state.store(),
             machine_codes,
+            // TODO: Wire this into the genesis file so it can be set and updated
             fil_actor_adm::PermissionModeParams::Unrestricted,
         )?;
         state

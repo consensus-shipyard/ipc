@@ -2892,7 +2892,9 @@ name = "fendermint_actor_machine"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "fil_actor_adm",
  "fil_actors_runtime",
+ "frc42_dispatch",
  "fvm_ipld_encoding",
  "fvm_shared",
  "serde",
@@ -3620,7 +3622,7 @@ checksum = "1676f435fc1dadde4d03e43f5d62b259e1ce5f40bd4ffb21db2b42ebe59c1382"
 [[package]]
 name = "fil_actor_adm"
 version = "12.0.0"
-source = "git+ssh://git@github.com/amazingdatamachine/builtin-actors.git?branch=v12.0.0+adm#930dc0e188fa1f2f258fe0dbffc10dfaa613c77d"
+source = "git+ssh://git@github.com/amazingdatamachine/builtin-actors.git?branch=v12.0.0+adm#1a06db8cdcd7f3a4c1ab9ce9bc3ba305ef775533"
 dependencies = [
  "anyhow",
  "cid",
@@ -3659,7 +3661,7 @@ dependencies = [
 [[package]]
 name = "fil_actor_eam"
 version = "12.0.0"
-source = "git+ssh://git@github.com/amazingdatamachine/builtin-actors.git?branch=v12.0.0+adm#930dc0e188fa1f2f258fe0dbffc10dfaa613c77d"
+source = "git+ssh://git@github.com/amazingdatamachine/builtin-actors.git?branch=v12.0.0+adm#1a06db8cdcd7f3a4c1ab9ce9bc3ba305ef775533"
 dependencies = [
  "anyhow",
  "cid",
@@ -3680,7 +3682,7 @@ dependencies = [
 [[package]]
 name = "fil_actors_evm_shared"
 version = "12.0.0"
-source = "git+ssh://git@github.com/amazingdatamachine/builtin-actors.git?branch=v12.0.0+adm#930dc0e188fa1f2f258fe0dbffc10dfaa613c77d"
+source = "git+ssh://git@github.com/amazingdatamachine/builtin-actors.git?branch=v12.0.0+adm#1a06db8cdcd7f3a4c1ab9ce9bc3ba305ef775533"
 dependencies = [
  "fil_actors_runtime",
  "fvm_ipld_encoding",
@@ -3693,7 +3695,7 @@ dependencies = [
 [[package]]
 name = "fil_actors_runtime"
 version = "12.0.0"
-source = "git+ssh://git@github.com/amazingdatamachine/builtin-actors.git?branch=v12.0.0+adm#930dc0e188fa1f2f258fe0dbffc10dfaa613c77d"
+source = "git+ssh://git@github.com/amazingdatamachine/builtin-actors.git?branch=v12.0.0+adm#1a06db8cdcd7f3a4c1ab9ce9bc3ba305ef775533"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
@@ -10331,7 +10333,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "vm_api"
 version = "1.0.0"
-source = "git+ssh://git@github.com/amazingdatamachine/builtin-actors.git?branch=v12.0.0+adm#930dc0e188fa1f2f258fe0dbffc10dfaa613c77d"
+source = "git+ssh://git@github.com/amazingdatamachine/builtin-actors.git?branch=v12.0.0+adm#1a06db8cdcd7f3a4c1ab9ce9bc3ba305ef775533"
 dependencies = [
  "anyhow",
  "cid",

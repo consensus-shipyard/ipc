@@ -490,7 +490,7 @@ where
                         fendermint_actor_objectstore::Method::ResolveExternalObject as u64;
                     let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
 
-                    let input = fendermint_actor_objectstore::ObjectResolveExternalParams {
+                    let input = fendermint_actor_objectstore::ResolveExternalParams {
                         key: obj.key,
                         value: obj.value,
                     };
