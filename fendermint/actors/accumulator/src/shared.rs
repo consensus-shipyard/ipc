@@ -211,7 +211,7 @@ mod tests {
     #[test]
     fn test_hash_and_put_pair() {
         let store = fvm_ipld_blockstore::MemoryBlockstore::default();
-        let mut state = State::new(&store).unwrap();
+        let mut state = State::new(&store, Address::new_id(100), WriteAccess::OnlyOwner).unwrap();
 
         let obj1 = vec![1, 2, 3];
         let obj2 = vec![1, 2, 3];
@@ -231,7 +231,7 @@ mod tests {
     #[test]
     fn test_hash_pair() {
         let store = fvm_ipld_blockstore::MemoryBlockstore::default();
-        let mut state = State::new(&store).unwrap();
+        let mut state = State::new(&store, Address::new_id(100), WriteAccess::OnlyOwner).unwrap();
 
         let obj1 = vec![1, 2, 3];
         let obj2 = vec![1, 2, 3];

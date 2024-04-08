@@ -29,7 +29,7 @@ use tokio::{
 use tokio_util::compat::TokioAsyncReadCompatExt;
 use warp::{
     http::{HeaderMap, HeaderValue, StatusCode},
-    path::{FullPath, Tail},
+    path::Tail,
     Filter, Rejection, Reply,
 };
 
@@ -72,15 +72,9 @@ cmd! {
                 // Admin routes
                 let health_route = warp::path!("health")
                     .and(warp::get()).and_then(health);
-                let list_machines_route = warp::path!("v1" / "machines")
-                    .and(warp::query::<HeightQuery>())
-                    .and(warp::get())
-                    .and(with_client(client.clone()))
-                    .and(with_args(args.clone()))
-                    .and_then(handle_list_machines);
 
-                // Object Store routes
-                let os_create_route = warp::path!("v1" / "os")
+                // Machines
+                let machines_create_os_route = warp::path!("v1" / "machines" / "objectstores")
                     .and(warp::post())
                     .and(warp::query::<WriteAccessQuery>())
                     .and(with_client(client.clone()))
@@ -88,8 +82,33 @@ cmd! {
                     .and(with_nonce(nonce.clone()))
                     .and(warp::header::optional::<u64>("X-ADM-GasLimit"))
                     .and(warp::header::optional::<BroadcastMode>("X-ADM-BroadcastMode"))
-                    .and_then(handle_os_create);
-                let os_upload_route = warp::path!("v1" / "os" / Address / ..)
+                    .and_then(handle_machines_create_os);
+                let machines_create_acc_route = warp::path!("v1" / "machines" / "accumulators")
+                    .and(warp::post())
+                    .and(warp::query::<WriteAccessQuery>())
+                    .and(with_client(client.clone()))
+                    .and(with_args(args.clone()))
+                    .and(with_nonce(nonce.clone()))
+                    .and(warp::header::optional::<u64>("X-ADM-GasLimit"))
+                    .and(warp::header::optional::<BroadcastMode>("X-ADM-BroadcastMode"))
+                    .and_then(handle_machines_create_acc);
+                let machines_get_route = warp::path!("v1" / "machines" / Address)
+                    .and(warp::query::<HeightQuery>())
+                    .and(warp::get())
+                    .and(with_client(client.clone()))
+                    .and(with_args(args.clone()))
+                    .and_then(handle_machines_get);
+
+                // Accounts
+                let accounts_get_machines_route = warp::path!("v1" / "accounts" / Address / "machines")
+                    .and(warp::query::<HeightQuery>())
+                    .and(warp::get())
+                    .and(with_client(client.clone()))
+                    .and(with_args(args.clone()))
+                    .and_then(handle_accounts_get_machines);
+
+                // Objectstore routes
+                let os_upload_route = warp::path!("v1" / "objectstores" / Address / ..)
                     .and(warp::put())
                     .and(warp::path::tail())
                     .and(warp::body::stream())
@@ -102,7 +121,7 @@ cmd! {
                     .and(warp::header::optional::<u64>("X-ADM-GasLimit"))
                     .and(warp::header::optional::<BroadcastMode>("X-ADM-BroadcastMode"))
                     .and_then(handle_os_upload);
-                let os_delete_route = warp::path!("v1" / "os" / Address / ..)
+                let os_delete_route = warp::path!("v1" / "objectstores" / Address / ..)
                     .and(warp::delete())
                     .and(warp::path::tail())
                     .and(with_client(client.clone()))
@@ -111,11 +130,11 @@ cmd! {
                     .and(warp::header::optional::<u64>("X-ADM-GasLimit"))
                     .and(warp::header::optional::<BroadcastMode>("X-ADM-BroadcastMode"))
                     .and_then(handle_os_delete);
-                let os_get_or_list_route = warp::path!("v1" / "os" / Address / ..)
+                let os_get_or_list_route = warp::path!("v1" / "objectstores" / Address / ..)
                     .and(
                         warp::get().or(warp::head()).unify()
                     )
-                    .and(warp::path::full())
+                    .and(warp::path::tail())
                     .and(warp::query::<HeightQuery>())
                     .and(warp::query::<ListQuery>())
                     .and(warp::header::optional::<String>("Range"))
@@ -125,22 +144,7 @@ cmd! {
                     .and_then(handle_os_get_or_list);
 
                 // Accumulator routes
-                let acc_create_route = warp::path!("v1" / "acc")
-                    .and(warp::post())
-                    .and(warp::query::<WriteAccessQuery>())
-                    .and(with_client(client.clone()))
-                    .and(with_args(args.clone()))
-                    .and(with_nonce(nonce.clone()))
-                    .and(warp::header::optional::<u64>("X-ADM-GasLimit"))
-                    .and(warp::header::optional::<BroadcastMode>("X-ADM-BroadcastMode"))
-                    .and_then(handle_acc_create);
-                let acc_get_route = warp::path!("v1" / "acc" / Address)
-                    .and(warp::get())
-                    .and(warp::query::<HeightQuery>())
-                    .and(with_client(client.clone()))
-                    .and(with_args(args.clone()))
-                    .and_then(handle_acc_get);
-                let acc_push_route = warp::path!("v1" / "acc" / Address)
+                let acc_push_route = warp::path!("v1" / "accumulators" / Address)
                     .and(warp::put())
                     .and(warp::body::content_length_limit(MAX_EVENT_LENGTH))
                     .and(warp::body::bytes())
@@ -150,7 +154,7 @@ cmd! {
                     .and(warp::header::optional::<u64>("X-ADM-GasLimit"))
                     .and(warp::header::optional::<BroadcastMode>("X-ADM-BroadcastMode"))
                     .and_then(handle_acc_push);
-                let acc_root_route = warp::path!("v1" / "acc" / Address / "root")
+                let acc_root_route = warp::path!("v1" / "accumulators" / Address)
                     .and(warp::get())
                     .and(warp::query::<HeightQuery>())
                     .and(with_client(client))
@@ -158,13 +162,13 @@ cmd! {
                     .and_then(handle_acc_root);
 
                 let router = health_route
-                    .or(list_machines_route)
-                    .or(os_create_route)
+                    .or(machines_create_os_route)
+                    .or(machines_create_acc_route)
+                    .or(machines_get_route)
+                    .or(accounts_get_machines_route)
                     .or(os_upload_route)
                     .or(os_delete_route)
                     .or(os_get_or_list_route)
-                    .or(acc_create_route)
-                    .or(acc_get_route)
                     .or(acc_push_route)
                     .or(acc_root_route)
                     .with(warp::cors().allow_any_origin()
@@ -216,74 +220,40 @@ fn get_os_key(tail: Tail) -> Result<Vec<u8>, Rejection> {
 }
 
 #[derive(Serialize, Deserialize)]
+struct WriteAccessQuery {
+    pub write_access: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
 struct HeightQuery {
     pub height: Option<u64>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct ListQuery {
+    pub offset: Option<u64>,
+    pub limit: Option<u64>,
+}
+
+#[derive(Debug, Error)]
+enum ProxyError {
+    #[error("error parsing range header: `{0}`")]
+    RangeHeaderParseError(ParseIntError),
+    #[error("invalid range header")]
+    RangeHeaderInvalid,
+}
+
+impl From<ParseIntError> for ProxyError {
+    fn from(err: ParseIntError) -> Self {
+        ProxyError::RangeHeaderParseError(err)
+    }
 }
 
 async fn health() -> Result<impl Reply, Rejection> {
     Ok(warp::reply::reply())
 }
 
-async fn handle_list_machines(
-    height_query: HeightQuery,
-    client: FendermintClient,
-    args: TransArgs,
-) -> Result<impl Reply, Rejection> {
-    let height = height_query.height.unwrap_or(0);
-
-    let res = list_machines(client, args, None, height)
-        .await
-        .map_err(|e| {
-            Rejection::from(BadRequest {
-                message: format!("list metadata error: {}", e),
-            })
-        })?;
-
-    let list = res.unwrap_or_default();
-    let machines = list
-        .iter()
-        .map(|m| json!({"address": m.address.to_string(), "kind": m.kind.to_string()}))
-        .collect::<Vec<Value>>();
-
-    let json = json!({"machines": machines});
-    Ok(warp::reply::json(&json))
-}
-
-async fn handle_get_machine(
-    address: Address,
-    height_query: HeightQuery,
-    client: FendermintClient,
-    args: TransArgs,
-) -> Result<warp::reply::Response, Rejection> {
-    let height = height_query.height.unwrap_or(0);
-
-    let res = get_machine(client, args, address, height)
-        .await
-        .map_err(|e| {
-            Rejection::from(BadRequest {
-                message: format!("get metadata error: {}", e),
-            })
-        })?;
-
-    let metadata = json!({"kind": res.kind.to_string(), "owner": res.owner.to_string()});
-    let metadata = serde_json::to_vec(&metadata).unwrap();
-    let mut header_map = HeaderMap::new();
-    header_map.insert("Content-Length", HeaderValue::from(metadata.len()));
-    header_map.insert("Content-Type", HeaderValue::from_static("application/json"));
-    let body = warp::hyper::Body::from(metadata);
-    let mut response = warp::reply::Response::new(body);
-    let headers = response.headers_mut();
-    headers.extend(header_map);
-
-    Ok(response)
-}
-
-#[derive(Serialize, Deserialize)]
-struct WriteAccessQuery {
-    pub write_access: Option<String>,
-}
-
-async fn handle_os_create(
+async fn handle_machines_create_os(
     write_access_query: WriteAccessQuery,
     client: FendermintClient,
     mut args: TransArgs,
@@ -301,19 +271,99 @@ async fn handle_os_create(
         .unwrap_or("onlyowner".into());
     let write_access = WriteAccess::from_str(&write_access).map_err(|e| {
         Rejection::from(BadRequest {
-            message: format!("create error: {}", e),
+            message: format!("machines create os error: {}", e),
         })
     })?;
 
     let res = os_create(client, args, write_access).await.map_err(|e| {
         Rejection::from(BadRequest {
-            message: format!("create error: {}", e),
+            message: format!("machines create os error: {}", e),
         })
     })?;
 
     *nonce_lck += 1;
     Ok(warp::reply::json(&res))
 }
+
+async fn handle_machines_create_acc(
+    write_access_query: WriteAccessQuery,
+    client: FendermintClient,
+    mut args: TransArgs,
+    nonce: Arc<Mutex<u64>>,
+    gas_limit: Option<u64>,
+    broadcast_mode: Option<BroadcastMode>,
+) -> Result<impl Reply, Rejection> {
+    let mut nonce_lck = nonce.lock().await;
+    args.sequence = *nonce_lck;
+    args.gas_limit = gas_limit.unwrap_or(BLOCK_GAS_LIMIT);
+    args.broadcast_mode = broadcast_mode.unwrap_or(args.broadcast_mode);
+
+    let write_access = write_access_query
+        .write_access
+        .unwrap_or("onlyowner".into());
+    let write_access = WriteAccess::from_str(&write_access).map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("machines create acc error: {}", e),
+        })
+    })?;
+
+    let res = acc_create(client, args, write_access).await.map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("machines create acc error: {}", e),
+        })
+    })?;
+
+    *nonce_lck += 1;
+    Ok(warp::reply::json(&res))
+}
+
+async fn handle_accounts_get_machines(
+    owner: Address,
+    height_query: HeightQuery,
+    client: FendermintClient,
+    args: TransArgs,
+) -> Result<impl Reply, Rejection> {
+    let height = height_query.height.unwrap_or(0);
+
+    let res = list_machines(client, args, Some(owner), height)
+        .await
+        .map_err(|e| {
+            Rejection::from(BadRequest {
+                message: format!("accounts get machines error: {}", e),
+            })
+        })?;
+
+    let list = res.unwrap_or_default();
+    let machines = list
+        .iter()
+        .map(|m| json!({"address": m.address.to_string(), "kind": m.kind.to_string()}))
+        .collect::<Vec<Value>>();
+
+    let json = json!({"machines": machines});
+    Ok(warp::reply::json(&json))
+}
+
+async fn handle_machines_get(
+    address: Address,
+    height_query: HeightQuery,
+    client: FendermintClient,
+    args: TransArgs,
+) -> Result<impl Reply, Rejection> {
+    let height = height_query.height.unwrap_or(0);
+
+    let res = get_machine(client, args, address, height)
+        .await
+        .map_err(|e| {
+            Rejection::from(BadRequest {
+                message: format!("machines get error: {}", e),
+            })
+        })?;
+
+    let json = json!({"kind": res.kind.to_string(), "owner": res.owner.to_string()});
+    Ok(warp::reply::json(&json))
+}
+
+// Objectstore handlers
 
 #[allow(clippy::too_many_arguments)]
 async fn handle_os_upload(
@@ -420,7 +470,7 @@ async fn handle_os_upload(
 
     let res = os_put(client, args, address, params).await.map_err(|e| {
         Rejection::from(BadRequest {
-            message: format!("put error: {}", e),
+            message: format!("objectstore upload error: {}", e),
         })
     })?;
 
@@ -448,7 +498,7 @@ async fn handle_os_delete(
         .await
         .map_err(|e| {
             Rejection::from(BadRequest {
-                message: format!("delete error: {}", e),
+                message: format!("objectstore delete error: {}", e),
             })
         })?;
 
@@ -484,24 +534,10 @@ fn get_range_params(range: String, size: u64) -> Result<(u64, u64), ProxyError> 
     Ok((start, end))
 }
 
-#[derive(Debug, Error)]
-enum ProxyError {
-    #[error("error parsing range header: `{0}`")]
-    RangeHeaderParseError(ParseIntError),
-    #[error("invalid range header")]
-    RangeHeaderInvalid,
-}
-
-impl From<ParseIntError> for ProxyError {
-    fn from(err: ParseIntError) -> Self {
-        ProxyError::RangeHeaderParseError(err)
-    }
-}
-
 #[allow(clippy::too_many_arguments)]
 async fn handle_os_get_or_list(
     address: Address,
-    path: FullPath,
+    tail: Tail,
     height_query: HeightQuery,
     list_query: ListQuery,
     range: Option<String>,
@@ -509,16 +545,8 @@ async fn handle_os_get_or_list(
     ipfs: IpfsClient,
     args: TransArgs,
 ) -> Result<impl Reply, Rejection> {
-    let mut path = path
-        .as_str()
-        .trim_start_matches(&format!("/v1/os/{}", address));
-    if path.is_empty() {
-        return handle_get_machine(address, height_query, client, args).await;
-    }
-    if path != "/" {
-        path = path.trim_start_matches('/');
-    }
-    if path.ends_with('/') {
+    let path = tail.as_str();
+    if path.is_empty() || path.ends_with('/') {
         return handle_os_list(address, path, height_query, list_query, client, args).await;
     }
 
@@ -529,7 +557,7 @@ async fn handle_os_get_or_list(
         .await
         .map_err(|e| {
             Rejection::from(BadRequest {
-                message: format!("get error: {}", e),
+                message: format!("objectstore get error: {}", e),
             })
         })?;
 
@@ -634,12 +662,6 @@ async fn handle_os_get_or_list(
     }
 }
 
-#[derive(Serialize, Deserialize)]
-struct ListQuery {
-    pub offset: Option<u64>,
-    pub limit: Option<u64>,
-}
-
 async fn handle_os_list(
     address: Address,
     mut prefix: &str,
@@ -663,7 +685,7 @@ async fn handle_os_list(
         .await
         .map_err(|e| {
             Rejection::from(BadRequest {
-                message: format!("list error: {}", e),
+                message: format!("objectstore list error: {}", e),
             })
         })?;
 
@@ -702,46 +724,7 @@ async fn handle_os_list(
     Ok(response)
 }
 
-async fn handle_acc_create(
-    write_access_query: WriteAccessQuery,
-    client: FendermintClient,
-    mut args: TransArgs,
-    nonce: Arc<Mutex<u64>>,
-    gas_limit: Option<u64>,
-    broadcast_mode: Option<BroadcastMode>,
-) -> Result<impl Reply, Rejection> {
-    let mut nonce_lck = nonce.lock().await;
-    args.sequence = *nonce_lck;
-    args.gas_limit = gas_limit.unwrap_or(BLOCK_GAS_LIMIT);
-    args.broadcast_mode = broadcast_mode.unwrap_or(args.broadcast_mode);
-
-    let write_access = write_access_query
-        .write_access
-        .unwrap_or("onlyowner".into());
-    let write_access = WriteAccess::from_str(&write_access).map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("create error: {}", e),
-        })
-    })?;
-
-    let res = acc_create(client, args, write_access).await.map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("create error: {}", e),
-        })
-    })?;
-
-    *nonce_lck += 1;
-    Ok(warp::reply::json(&res))
-}
-
-async fn handle_acc_get(
-    address: Address,
-    height_query: HeightQuery,
-    client: FendermintClient,
-    args: TransArgs,
-) -> Result<impl Reply, Rejection> {
-    handle_get_machine(address, height_query, client, args).await
-}
+// Accumulator handlers
 
 async fn handle_acc_push(
     address: Address,
@@ -761,7 +744,7 @@ async fn handle_acc_push(
         .await
         .map_err(|e| {
             Rejection::from(BadRequest {
-                message: format!("push error: {}", e),
+                message: format!("accumulator push error: {}", e),
             })
         })?;
 
@@ -778,13 +761,15 @@ async fn handle_acc_root(
     let height = height_query.height.unwrap_or(0);
     let res = acc_root(client, args, address, height).await.map_err(|e| {
         Rejection::from(BadRequest {
-            message: format!("root error: {}", e),
+            message: format!("accumulator root error: {}", e),
         })
     })?;
 
     let json = json!({"root": res.unwrap_or_default().to_string()});
     Ok(warp::reply::json(&json))
 }
+
+// Rejection handlers
 
 #[derive(Clone, Debug)]
 struct BadRequest {
@@ -826,6 +811,8 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
     let reply = warp::reply::with_header(reply, "Access-Control-Allow-Origin", "*");
     Ok(warp::reply::with_status(reply, code))
 }
+
+// Transaction handling
 
 #[derive(Clone, Debug, Serialize)]
 enum TxnStatus {
@@ -901,6 +888,8 @@ where
         }
     })
 }
+
+// RPC methods
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateReturnPretty {
