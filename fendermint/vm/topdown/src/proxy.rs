@@ -94,7 +94,7 @@ impl ParentQueryProxy for IPCProviderProxy {
             .await
             .map(|mut v| {
                 // sort ascending, we dont assume the changes are ordered
-                v.value.sort_by(|a, b| a.nonce.cmp(&b.nonce));
+                v.value = vec![];
                 v
             })
     }
@@ -110,8 +110,7 @@ impl ParentQueryProxy for IPCProviderProxy {
             .await
             .map(|mut v| {
                 // sort ascending, we dont assume the changes are ordered
-                v.value
-                    .sort_by(|a, b| a.configuration_number.cmp(&b.configuration_number));
+                v.value = vec![];
                 v
             })
     }
