@@ -58,7 +58,7 @@ impl TransactionBuffer {
     /// Gather any messages that have been enabled by transactions added to a block.
     ///
     /// These are removed from the cache, submission is only attempted once.
-    fn remove_enabled<'a, I>(&self, txs: I) -> Vec<(Address, Nonce, ChainMessage)>
+    fn remove_unblocked<'a, I>(&self, txs: I) -> Vec<(Address, Nonce, ChainMessage)>
     where
         I: Iterator<Item = (&'a Address, Nonce)>,
     {
@@ -78,7 +78,7 @@ impl TransactionBuffer {
     }
 }
 
-/// Subscribe to `NewBlock  notifications and clear transactions from the caches.`
+/// Subscribe to `NewBlock`  notifications and clear transactions from the caches.`
 pub fn start_tx_cache_clearing(
     client: FendermintClient<HybridClient>,
     tx_cache: TransactionCache,
@@ -90,6 +90,11 @@ pub fn start_tx_cache_clearing(
     });
 }
 
+/// Subscribe to notifications about new blocks and
+/// 1) remove all included transactions from the caches
+/// 2) broadcast buffered out-of-order transactions when they are unblocked
+///
+/// Re-subscribe in the event of a subscription failure.
 async fn tx_cache_clearing_loop<C>(
     client: C,
     chain_id: ChainID,
@@ -130,10 +135,10 @@ async fn tx_cache_clearing_loop<C>(
                                 tx_cache.remove_many(tx_hashes);
                                 // First remove all transactions which have been in the block (could be multiple from the same sender).
                                 tx_buffer.remove_many(tx_nonces());
-                                // Then collect whatever is enabled on top of those, ie. anything that hasn't been included, but now can.
-                                let enabled = tx_buffer.remove_enabled(tx_nonces());
+                                // Then collect whatever is unblocked on top of those, ie. anything that hasn't been included, but now can.
+                                let unblocked_msgs = tx_buffer.remove_unblocked(tx_nonces());
                                 // Send them all with best-effort.
-                                send_msgs(&client, enabled).await;
+                                send_msgs(&client, unblocked_msgs).await;
                             }
                         }
                     }
@@ -156,6 +161,7 @@ fn collect_txs(block: &Block, chain_id: &ChainID) -> Vec<(et::TxHash, Address, N
     txs
 }
 
+/// Fetch the chain ID from the API; do it in a loop until it succeeds.
 async fn get_chain_id(client: &FendermintClient<HybridClient>) -> ChainID {
     loop {
         match client.state_params(FvmQueryHeight::default()).await {
@@ -170,6 +176,7 @@ async fn get_chain_id(client: &FendermintClient<HybridClient>) -> ChainID {
     }
 }
 
+/// Best effort attempt to broadcast previously out-of-order transactions which have been unblocked.
 async fn send_msgs<C>(client: &C, msgs: Vec<(Address, Nonce, ChainMessage)>)
 where
     C: Client + Send + Sync,
