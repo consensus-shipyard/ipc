@@ -546,7 +546,7 @@ fn create_upgrade_scheduler<DB: Blockstore + 'static + Clone>() -> UpgradeSchedu
 
             // confirm the existing owner is this address
             let cur_owner = ethers::types::Address::from_str(
-                "0x000000000000000000000000ff00000000000000000000000000000000000000",
+                "0xfF00000000000000000000000000000000000000",
             )
             .expect("invalid address");
 
