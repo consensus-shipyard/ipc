@@ -7,17 +7,20 @@ use std::{convert::Infallible, future::Future, num::ParseIntError, pin::Pin, syn
 
 use anyhow::anyhow;
 use async_tempfile::TempFile;
+use base64::{engine::general_purpose, Engine};
 use bytes::{Buf, Bytes};
+use cid::multihash::{Blake2bHasher, Code, Hasher, MultihashDigest};
 use cid::Cid;
 use ethers::core::types::{self as et};
 use fendermint_actor_machine::{Metadata, WriteAccess};
 use fendermint_actor_objectstore::{Object, ObjectKind, ObjectList, ObjectListItem};
 use fendermint_rpc::QueryClient;
-use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_message::conv::from_fvm::to_eth_tokens;
+use fendermint_vm_message::signed::SignedMessage;
 use futures_util::{Stream, StreamExt};
 use fvm_ipld_encoding::strict_bytes::ByteBuf;
 use fvm_shared::econ::TokenAmount;
+use fvm_shared::message::Message;
 use fvm_shared::BLOCK_GAS_LIMIT;
 use fvm_shared::{address::Address, ActorID};
 use ipfs_api_backend_hyper::{IpfsApi, IpfsClient, TryFromUri};
@@ -28,7 +31,6 @@ use std::net::ToSocketAddrs;
 use std::sync::Mutex;
 use tendermint::{block::Height, Hash};
 use thiserror::Error;
-use tiny_keccak::{Hasher, Keccak};
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 use tokio_util::compat::TokioAsyncReadCompatExt;
 use warp::http::{HeaderMap, HeaderValue};
@@ -47,6 +49,8 @@ use fendermint_rpc::{
 };
 use fendermint_vm_actor_interface::adm;
 use fendermint_vm_message::query::FvmQueryHeight;
+use fvm_ipld_encoding::IPLD_RAW;
+use fvm_shared::chainid::ChainID;
 
 use super::rpc::{gas_params, BroadcastResponse, TransClient};
 use crate::cmd;
@@ -113,7 +117,7 @@ cmd! {
                     .and(warp::body::content_length_limit(MAX_OBJECT_LENGTH))
                     .and(with_client(client.clone()))
                     .and(with_ipfs(ipfs.clone()))
-                    .and(warp::header::<u64>("Content-Length"))
+                    .and(warp::header::<usize>("Content-Length"))
                     .and(warp::query::<UploadQuery>())
                     .and(warp::body::stream())
                     .and_then(handle_object_upload);
@@ -276,17 +280,63 @@ impl From<ParseIntError> for ProxyError {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct UploadQuery {
-    pub signature: String,
+    pub msg: String,
+    pub chain_id: u64,
 }
 
 async fn health() -> Result<impl Reply, Rejection> {
     Ok(warp::reply::reply())
 }
 
+fn verify_cid(hasher: &mut Blake2bHasher<32>, signed_msg: &SignedMessage) -> anyhow::Result<()> {
+    let digest = Code::Blake2b256.wrap(hasher.finalize())?;
+    let cid_computed = Cid::new_v1(IPLD_RAW, digest);
+    let cid_from_msg = match &signed_msg.object {
+        Some(object) => object.value,
+        None => return Err(anyhow!("missing cid in signed message")),
+    };
+
+    if cid_computed != cid_from_msg {
+        return Err(anyhow!(
+            "computed cid {:?} does not match {:?}",
+            cid_computed,
+            cid_from_msg
+        ));
+    }
+
+    Ok(())
+}
+
+async fn ensure_balance(
+    client: &FendermintClient,
+    msg: &Message,
+    size: usize,
+) -> anyhow::Result<()> {
+    let from = msg.from;
+    let height = FvmQueryHeight::Committed;
+    let actor_state = client.actor_state(&from, height).await?;
+
+    let balance = match actor_state.value {
+        Some((_, state)) => to_eth_tokens(&state.balance).unwrap(),
+        None => et::U256::zero(),
+    };
+
+    // (todo): make cost_per_byte a configurable constant
+    let cost_per_byte = et::U256::from(1_000_000_000u128);
+
+    let required_balance = cost_per_byte * size;
+
+    if balance < required_balance {
+        return Err(anyhow!("insufficient balance"));
+    }
+
+    Ok(())
+}
+
 async fn handle_object_upload(
     client: FendermintClient,
     ipfs: IpfsClient,
-    size: u64,
+    size: usize,
     query: UploadQuery,
     mut body: impl Stream<Item = Result<impl Buf, warp::Error>> + Unpin + Send + Sync,
 ) -> Result<impl Reply, Rejection> {
@@ -296,8 +346,11 @@ async fn handle_object_upload(
         }));
     }
 
-    let mut hasher = Keccak::v256();
-    let mut hash = [0u8; 32];
+    let UploadQuery {
+        msg: msg_b64,
+        chain_id,
+    } = query;
+    let mut hasher: Blake2bHasher<32> = Blake2bHasher::default();
     let mut tmp = TempFile::new().await.map_err(|e| {
         Rejection::from(BadRequest {
             message: format!("failed to create tmp file: {}", e),
@@ -311,9 +364,6 @@ async fn handle_object_upload(
             let chunk = buf.chunk().to_owned();
             let chunk_len = chunk.len();
 
-            // update the hasher
-            hasher.update(&chunk);
-
             tmp.write_all(&chunk).await.map_err(|e| {
                 Rejection::from(BadRequest {
                     message: format!("failed to write chunk: {}", e),
@@ -326,6 +376,9 @@ async fn handle_object_upload(
             })?;
             buf.advance(chunk_len);
 
+            // update the hash
+            hasher.update(&chunk);
+
             // update the total bytes
             total_bytes += chunk_len;
         }
@@ -336,39 +389,42 @@ async fn handle_object_upload(
         })
     })?;
 
-    hasher.finalize(&mut hash);
-    let signature = hex::decode(query.signature).unwrap();
-
-    // Recover the uploader's address from the signature
-    let owner = fendermint_crypto::recover_address(&hash, &signature[..64], signature[64])
-        .map_err(|e| {
-            Rejection::from(BadRequest {
-                message: format!("failed to recover owner: {}", e),
-            })
-        })?;
-
-    let height = FvmQueryHeight::Committed;
-    let addr = fvm_shared::address::Address::from(EthAddress(owner.0));
-    let actor_state = client.actor_state(&addr, height).await.map_err(|e| {
+    let b64_decoded = general_purpose::URL_SAFE.decode(&msg_b64).map_err(|e| {
         Rejection::from(BadRequest {
-            message: format!("failed to get actor state: {}", e),
+            message: format!("failed to decode base64 encoded signed message: {}", e),
         })
     })?;
 
-    let balance = match actor_state.value {
-        Some((_, state)) => to_eth_tokens(&state.balance).unwrap(),
-        None => et::U256::zero(),
-    };
+    let signed_msg = fvm_ipld_encoding::from_slice::<SignedMessage>(&b64_decoded).map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("failed to deserialize signed message: {}", e),
+        })
+    })?;
 
-    // (todo): make cost_per_byte a configurable constant
-    let cost_per_byte = et::U256::from(1_000_000_000u128);
-    let required_balance = cost_per_byte * total_bytes;
-    if balance < required_balance {
-        return Err(Rejection::from(BadRequest {
-            message: "insufficient balance".to_string(),
-        }));
-    }
+    // Verify CID
+    // It is important to verify the CID separately from the signature
+    // because the signature is over the CID, it is unaware of the actual data
+    // hence, we should verify that the CID matches the one in the signed message
+    verify_cid(&mut hasher, &signed_msg).map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("failed to verify cid: {}", e),
+        })
+    })?;
 
+    // Verify the signature
+    let chain_id = ChainID::from(chain_id);
+    signed_msg.verify(&chain_id).unwrap();
+
+    // Ensure the sender has enough balance
+    ensure_balance(&client, &signed_msg.message, total_bytes)
+        .await
+        .map_err(|e| {
+            Rejection::from(BadRequest {
+                message: format!("failed to ensure balance: {}", e),
+            })
+        })?;
+
+    // Add the data to IPFS
     let add = ipfs_api_backend_hyper::request::Add {
         chunker: Some("size-1048576"),
         pin: Some(false),
