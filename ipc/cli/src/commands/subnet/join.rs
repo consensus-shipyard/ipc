@@ -7,6 +7,11 @@ use clap::Args;
 use ipc_api::subnet_id::SubnetID;
 use num_traits::Zero;
 use std::{fmt::Debug, str::FromStr};
+use ipc_wallet::EvmKeyStore;
+use anyhow::{Error};
+use crate::commands::anyhow;
+
+
 
 use crate::{
     f64_to_token_amount, get_ipc_provider, require_fil_addr_from_str, CommandLineHandler,
@@ -29,7 +34,18 @@ impl CommandLineHandler for JoinSubnet {
             Some(address) => Some(require_fil_addr_from_str(address)?),
             None => None,
         };
-        let public_key = hex::decode(&arguments.public_key)?;
+        let keystore = provider.evm_wallet()?;
+        let address_str = arguments.from
+            .as_deref()
+            .ok_or_else(|| Error::msg("Address is required"))?;
+        let address = ethers::types::Address::from_str(address_str)?;
+        let key_info = keystore
+            .read()
+            .unwrap()
+            .get(&address.into())?
+            .ok_or_else(|| anyhow!("key does not exists"))?;
+        let sk = libsecp256k1::SecretKey::parse_slice(key_info.private_key())?;
+        let public_key = hex::encode(libsecp256k1::PublicKey::from_secret_key(&sk).serialize()).to_string();
         if let Some(initial_balance) = arguments.initial_balance.filter(|x| !x.is_zero()) {
             log::info!("pre-funding address with {initial_balance}");
             provider
@@ -41,7 +57,7 @@ impl CommandLineHandler for JoinSubnet {
                 subnet,
                 from,
                 f64_to_token_amount(arguments.collateral)?,
-                public_key,
+                public_key.into(),
             )
             .await?;
         println!("joined at epoch: {epoch}");
