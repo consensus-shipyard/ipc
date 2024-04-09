@@ -20,7 +20,6 @@ use fendermint_vm_message::signed::SignedMessage;
 use futures_util::{Stream, StreamExt};
 use fvm_ipld_encoding::strict_bytes::ByteBuf;
 use fvm_shared::econ::TokenAmount;
-use fvm_shared::message::Message;
 use fvm_shared::BLOCK_GAS_LIMIT;
 use fvm_shared::{address::Address, ActorID};
 use ipfs_api_backend_hyper::{IpfsApi, IpfsClient, TryFromUri};
@@ -33,6 +32,7 @@ use tendermint::{block::Height, Hash};
 use thiserror::Error;
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 use tokio_util::compat::TokioAsyncReadCompatExt;
+use warp::filters::multipart::Part;
 use warp::http::{HeaderMap, HeaderValue};
 use warp::path::Tail;
 use warp::{http::StatusCode, Filter, Rejection, Reply};
@@ -117,9 +117,7 @@ cmd! {
                     .and(warp::body::content_length_limit(MAX_OBJECT_LENGTH))
                     .and(with_client(client.clone()))
                     .and(with_ipfs(ipfs.clone()))
-                    .and(warp::header::<usize>("Content-Length"))
-                    .and(warp::query::<UploadQuery>())
-                    .and(warp::body::stream())
+                    .and(warp::multipart::form())
                     .and_then(handle_object_upload);
 
                 // Objectstore routes
@@ -284,145 +282,211 @@ struct UploadQuery {
     pub chain_id: u64,
 }
 
+struct ObjectVerifier {
+    hasher: Blake2bHasher<32>,
+    total_bytes: usize,
+    signed_msg: Option<SignedMessage>,
+    chain_id: ChainID,
+    temp_file: TempFile,
+}
+
+impl ObjectVerifier {
+    async fn read_chain_id(form_part: Part) -> anyhow::Result<ChainID> {
+        // Process as a text field
+        let value = form_part
+            .stream()
+            .fold(Vec::new(), |mut vec, data| async move {
+                let data = data.unwrap();
+                vec.extend_from_slice(&data.chunk());
+                vec
+            })
+            .await;
+        let text =
+            String::from_utf8(value.clone()).map_err(|_| anyhow!("cannot parse chain id"))?;
+        let int: u64 = text.parse().map_err(|_| anyhow!("cannot parse chain_id"))?;
+
+        Ok(ChainID::from(int))
+    }
+
+    async fn read_msg(form_part: Part) -> anyhow::Result<SignedMessage> {
+        // Process as a text field
+        let value = form_part
+            .stream()
+            .fold(Vec::new(), |mut vec, data| async move {
+                let data = data.unwrap();
+                vec.extend_from_slice(&data.chunk());
+                vec
+            })
+            .await;
+        let b64_decoded = general_purpose::URL_SAFE
+            .decode(value)
+            .map_err(|e| anyhow!("failed to decode base64 encoded signed message: {}", e))?;
+
+        fvm_ipld_encoding::from_slice::<SignedMessage>(&b64_decoded)
+            .map_err(|e| anyhow!("failed to deserialize signed message: {}", e))
+    }
+
+    async fn read_object(&mut self, form_part: Part) -> anyhow::Result<()> {
+        let mut part_stream = form_part.stream();
+
+        while let Some(data) = part_stream.next().await {
+            let mut data = data.unwrap();
+            while data.remaining() > 0 {
+                let chunk = data.chunk().to_owned();
+                let chunk_len = chunk.len();
+                self.temp_file.write_all(&chunk).await.unwrap();
+                self.temp_file.flush().await.unwrap();
+                data.advance(chunk_len);
+                self.hasher.update(&chunk);
+                self.total_bytes += chunk_len;
+            }
+        }
+        self.temp_file
+            .rewind()
+            .await
+            .map_err(|e| anyhow!("failed to rewind temporary file: {}", e))?;
+
+        Ok(())
+    }
+
+    async fn read_form(mut form_parts: warp::multipart::FormData) -> anyhow::Result<Self> {
+        let temp_file = TempFile::new()
+            .await
+            .map_err(|e| anyhow!("failed to create temporary file: {}", e))?;
+
+        let mut verifier = ObjectVerifier {
+            hasher: Blake2bHasher::default(),
+            total_bytes: 0,
+            signed_msg: None,
+            chain_id: ChainID::from(0),
+            temp_file,
+        };
+
+        while let Some(part) = form_parts.next().await {
+            let part = part.map_err(|_| anyhow!("missing cid in signed message"))?;
+            match part.name() {
+                "chain_id" => {
+                    verifier.chain_id = Self::read_chain_id(part).await?;
+                }
+                "msg" => {
+                    let signed_msg = Self::read_msg(part).await?;
+                    verifier.signed_msg = Some(signed_msg);
+                }
+                "upload" => {
+                    verifier.read_object(part).await?;
+                }
+                _ => {
+                    return Err(anyhow!("unknown form field"));
+                }
+            }
+        }
+
+        Ok(verifier)
+    }
+}
+
+impl ObjectVerifier {
+    fn verify_cid(&mut self) -> anyhow::Result<()> {
+        let digest = Code::Blake2b256.wrap(self.hasher.finalize())?;
+        let cid_computed = Cid::new_v1(IPLD_RAW, digest);
+        match &self.signed_msg {
+            Some(signed_msg) => {
+                let cid_from_msg = match &signed_msg.object {
+                    Some(object) => object.value,
+                    None => return Err(anyhow!("missing cid in signed message")),
+                };
+
+                if cid_computed != cid_from_msg {
+                    return Err(anyhow!(
+                        "computed cid {:?} does not match {:?}",
+                        cid_computed,
+                        cid_from_msg
+                    ));
+                }
+            }
+            None => return Err(anyhow!("missing signed message")),
+        }
+
+        Ok(())
+    }
+
+    fn verify_signature(&self) -> anyhow::Result<()> {
+        match &self.signed_msg {
+            Some(signed_msg) => {
+                signed_msg.verify(&self.chain_id)?;
+            }
+            None => return Err(anyhow!("missing signed message")),
+        }
+
+        Ok(())
+    }
+
+    async fn ensure_balance(&mut self, client: &FendermintClient) -> anyhow::Result<()> {
+        match &self.signed_msg {
+            Some(signed_msg) => {
+                let from = signed_msg.message.from;
+                let height = FvmQueryHeight::Committed;
+                let actor_state = client.actor_state(&from, height).await?;
+
+                let balance = match actor_state.value {
+                    Some((_, state)) => to_eth_tokens(&state.balance).unwrap(),
+                    None => et::U256::zero(),
+                };
+
+                // (todo): make cost_per_byte a configurable constant
+                let cost_per_byte = et::U256::from(1_000_000_000u128);
+
+                let required_balance = cost_per_byte * self.total_bytes;
+
+                if balance < required_balance {
+                    return Err(anyhow!("insufficient balance"));
+                }
+            }
+            None => return Err(anyhow!("missing signed message")),
+        }
+
+        Ok(())
+    }
+}
+
 async fn health() -> Result<impl Reply, Rejection> {
     Ok(warp::reply::reply())
-}
-
-fn verify_cid(hasher: &mut Blake2bHasher<32>, signed_msg: &SignedMessage) -> anyhow::Result<()> {
-    let digest = Code::Blake2b256.wrap(hasher.finalize())?;
-    let cid_computed = Cid::new_v1(IPLD_RAW, digest);
-    let cid_from_msg = match &signed_msg.object {
-        Some(object) => object.value,
-        None => return Err(anyhow!("missing cid in signed message")),
-    };
-
-    if cid_computed != cid_from_msg {
-        return Err(anyhow!(
-            "computed cid {:?} does not match {:?}",
-            cid_computed,
-            cid_from_msg
-        ));
-    }
-
-    Ok(())
-}
-
-async fn ensure_balance(
-    client: &FendermintClient,
-    msg: &Message,
-    size: usize,
-) -> anyhow::Result<()> {
-    let from = msg.from;
-    let height = FvmQueryHeight::Committed;
-    let actor_state = client.actor_state(&from, height).await?;
-
-    let balance = match actor_state.value {
-        Some((_, state)) => to_eth_tokens(&state.balance).unwrap(),
-        None => et::U256::zero(),
-    };
-
-    // (todo): make cost_per_byte a configurable constant
-    let cost_per_byte = et::U256::from(1_000_000_000u128);
-
-    let required_balance = cost_per_byte * size;
-
-    if balance < required_balance {
-        return Err(anyhow!("insufficient balance"));
-    }
-
-    Ok(())
 }
 
 async fn handle_object_upload(
     client: FendermintClient,
     ipfs: IpfsClient,
-    size: usize,
-    query: UploadQuery,
-    mut body: impl Stream<Item = Result<impl Buf, warp::Error>> + Unpin + Send + Sync,
+    form_parts: warp::multipart::FormData,
 ) -> Result<impl Reply, Rejection> {
-    if size == 0 {
-        return Err(Rejection::from(BadRequest {
-            message: "empty body".into(),
-        }));
-    }
-
-    let UploadQuery {
-        msg: msg_b64,
-        chain_id,
-    } = query;
-    let mut hasher: Blake2bHasher<32> = Blake2bHasher::default();
-    let mut tmp = TempFile::new().await.map_err(|e| {
+    let mut verifier = ObjectVerifier::read_form(form_parts).await.map_err(|e| {
         Rejection::from(BadRequest {
-            message: format!("failed to create tmp file: {}", e),
-        })
-    })?;
-    let mut total_bytes = 0;
-
-    while let Some(buf) = body.next().await {
-        let mut buf = buf.unwrap();
-        while buf.remaining() > 0 {
-            let chunk = buf.chunk().to_owned();
-            let chunk_len = chunk.len();
-
-            tmp.write_all(&chunk).await.map_err(|e| {
-                Rejection::from(BadRequest {
-                    message: format!("failed to write chunk: {}", e),
-                })
-            })?;
-            tmp.flush().await.map_err(|e| {
-                Rejection::from(BadRequest {
-                    message: format!("failed to flush chunk: {}", e),
-                })
-            })?;
-            buf.advance(chunk_len);
-
-            // update the hash
-            hasher.update(&chunk);
-
-            // update the total bytes
-            total_bytes += chunk_len;
-        }
-    }
-    tmp.rewind().await.map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("failed to rewind: {}", e),
-        })
-    })?;
-
-    let b64_decoded = general_purpose::URL_SAFE.decode(&msg_b64).map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("failed to decode base64 encoded signed message: {}", e),
-        })
-    })?;
-
-    let signed_msg = fvm_ipld_encoding::from_slice::<SignedMessage>(&b64_decoded).map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("failed to deserialize signed message: {}", e),
+            message: format!("failed to read form: {}", e),
         })
     })?;
 
     // Verify CID
     // It is important to verify the CID separately from the signature
     // because the signature is over the CID, it is unaware of the actual data
-    // hence, we should verify that the CID matches the one in the signed message
-    verify_cid(&mut hasher, &signed_msg).map_err(|e| {
+    // hence, we should verify that the data CID matches the one in the signed message
+    verifier.verify_cid().map_err(|e| {
         Rejection::from(BadRequest {
-            message: format!("failed to verify cid: {}", e),
+            message: e.to_string(),
         })
     })?;
 
     // Verify the signature
-    let chain_id = ChainID::from(chain_id);
-    signed_msg.verify(&chain_id).unwrap();
+    verifier.verify_signature().map_err(|e| {
+        Rejection::from(BadRequest {
+            message: e.to_string(),
+        })
+    })?;
 
     // Ensure the sender has enough balance
-    ensure_balance(&client, &signed_msg.message, total_bytes)
-        .await
-        .map_err(|e| {
-            Rejection::from(BadRequest {
-                message: format!("failed to ensure balance: {}", e),
-            })
-        })?;
+    verifier.ensure_balance(&client).await.map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("failed to ensure balance: {}", e),
+        })
+    })?;
 
     // Add the data to IPFS
     let add = ipfs_api_backend_hyper::request::Add {
@@ -435,7 +499,7 @@ async fn handle_object_upload(
     };
 
     let res = ipfs
-        .add_async_with_options(tmp.compat(), add)
+        .add_async_with_options(verifier.temp_file.compat(), add)
         .await
         .map_err(|e| {
             Rejection::from(BadRequest {
