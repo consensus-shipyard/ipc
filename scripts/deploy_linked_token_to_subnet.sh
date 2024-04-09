@@ -30,8 +30,8 @@ npm install
 
 # Step 2: Prepare wallet address
 echo "$DASHES Preparing wallet address..."
-linked_token_addr=$(cat ${IPC_CONFIG_FOLDER}/evm_keystore.json | jq -er .[3].address)
 linked_token_private_key=$(cat ${IPC_CONFIG_FOLDER}/evm_keystore.json | jq -er .[3].private_key)
+linked_token_addr=$(cast wallet address --private-key=$linked_token_private_key)
 echo "wallet address for linked token test is:"
 echo $linked_token_addr
 default_wallet_address=$(cat ${IPC_CONFIG_FOLDER}/evm_keystore.json | jq -er .[0].address)
