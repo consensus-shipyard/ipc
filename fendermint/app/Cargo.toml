@@ -73,6 +73,7 @@ ipc-provider = { workspace = true }
 ipc_ipld_resolver = { workspace = true }
 ipc_actors_abis = { workspace = true }
 ethers = { workspace = true }
+ethers-contract = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

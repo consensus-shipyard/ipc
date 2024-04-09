@@ -2860,6 +2860,7 @@ dependencies = [
  "bytes",
  "cid",
  "ethers",
+ "ethers-contract",
  "fendermint_abci",
  "fendermint_app_options",
  "fendermint_app_settings",
