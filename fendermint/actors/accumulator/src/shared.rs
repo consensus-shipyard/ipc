@@ -55,10 +55,8 @@ fn hash_and_put_pair<BS: Blockstore>(
     right: Option<&Cid>,
 ) -> anyhow::Result<Cid> {
     if let (Some(left), Some(right)) = (left, right) {
-        // Encode the CIDs into a binary format
-        let data = to_vec(&[left, right])?;
         // Compute the CID for the block
-        store.put_cbor(&data, Code::Blake2b256)
+        store.put_cbor(&[left, right], Code::Blake2b256)
     } else {
         Err(anyhow::anyhow!("hash_pair requires two CIDs"))
     }
@@ -179,6 +177,43 @@ mod tests {
                 .unwrap()
         );
         assert_eq!(state.leaf_count, 0);
+    }
+
+    #[test]
+    fn test_hash_and_put_pair() {
+        let store = fvm_ipld_blockstore::MemoryBlockstore::default();
+        let mut state = State::new(&store).unwrap();
+
+        let obj1 = vec![1, 2, 3];
+        let obj2 = vec![1, 2, 3];
+        let cid1 = state.push(&store, obj1).expect("push1 failed");
+        let cid2 = state.push(&store, obj2).expect("push2 failed");
+
+        let pair_cid =
+            hash_and_put_pair(&store, Some(&cid1), Some(&cid2)).expect("hash_and_put_pair failed");
+        let merkle_node = store
+            .get_cbor::<[Cid; 2]>(&pair_cid)
+            .expect("get_cbor failed")
+            .expect("get_cbor returned None");
+        let expected = [cid1, cid2];
+        assert_eq!(merkle_node, expected);
+    }
+
+    #[test]
+    fn test_hash_pair() {
+        let store = fvm_ipld_blockstore::MemoryBlockstore::default();
+        let mut state = State::new(&store).unwrap();
+
+        let obj1 = vec![1, 2, 3];
+        let obj2 = vec![1, 2, 3];
+        let cid1 = state.push(&store, obj1).expect("push1 failed");
+        let cid2 = state.push(&store, obj2).expect("push2 failed");
+
+        // Compare hash_pair and hash_and_put_pair and make sure they result in the same CID.
+        let hash1 = hash_pair(Some(&cid1), Some(&cid2)).expect("hash_pair failed");
+        let hash2 =
+            hash_and_put_pair(&store, Some(&cid1), Some(&cid2)).expect("hash_and_put_pair failed");
+        assert_eq!(hash1, hash2);
     }
 
     #[test]
