@@ -12,6 +12,7 @@ use crate::{
 use anyhow::anyhow;
 use async_stm::{atomically, atomically_or_err, StmError};
 use ethers::utils::hex;
+use libp2p::futures::TryFutureExt;
 use std::sync::Arc;
 use tracing::instrument;
 
@@ -275,8 +276,15 @@ where
         let changes_res = self
             .parent_proxy
             .get_validator_changes(height)
-            .await
-            .map_err(|e| Error::CannotQueryParent(format!("get_validator_changes: {e}"), height))?;
+            .map_err(|e| Error::CannotQueryParent(format!("get_validator_changes: {e}"), height));
+
+        let topdown_msgs_res = self
+            .parent_proxy
+            .get_top_down_msgs(height)
+            .map_err(|e| Error::CannotQueryParent(format!("get_top_down_msgs: {e}"), height));
+
+        let (changes_res, topdown_msgs_res) = tokio::join!(changes_res, topdown_msgs_res);
+        let (changes_res, topdown_msgs_res) = (changes_res?, topdown_msgs_res?);
 
         if changes_res.block_hash != block_hash {
             tracing::warn!(
@@ -287,12 +295,6 @@ where
             );
             return Err(Error::ParentChainReorgDetected);
         }
-
-        let topdown_msgs_res = self
-            .parent_proxy
-            .get_top_down_msgs(height)
-            .await
-            .map_err(|e| Error::CannotQueryParent(format!("get_top_down_msgs: {e}"), height))?;
 
         if topdown_msgs_res.block_hash != block_hash {
             tracing::warn!(
