@@ -147,10 +147,6 @@ pub enum GenesisIpcCommands {
     Gateway(GenesisIpcGatewayArgs),
     /// Fetch the genesis parameters of a subnet from the parent.
     FromParent(Box<GenesisFromParentArgs>),
-    /// Fetch topdown events from the parent and export them to JSON.
-    ///
-    /// This can be used to construct an upgrade to impute missing events.
-    ExportTopDownEvents(Box<GenesisExportTopDownEventsArgs>),
 }
 
 #[derive(Args, Debug, Clone)]
@@ -208,39 +204,4 @@ pub struct GenesisFromParentArgs {
     /// Number of decimals to use during converting FIL to Power.
     #[arg(long, default_value = "3")]
     pub power_scale: i8,
-}
-
-#[derive(Args, Debug, Clone)]
-pub struct GenesisExportTopDownEventsArgs {
-    /// Child subnet for with the events will be fetched
-    #[arg(long, short)]
-    pub subnet_id: SubnetID,
-
-    /// Endpoint to the RPC of the child subnet's parent
-    #[arg(long, short)]
-    pub parent_endpoint: url::Url,
-
-    /// HTTP basic authentication token.
-    #[arg(long)]
-    pub parent_auth_token: Option<String>,
-
-    /// IPC gateway of the parent; 20 byte Ethereum address in 0x prefixed hex format
-    #[arg(long, value_parser = parse_eth_address, default_value = "0xff00000000000000000000000000000000000064")]
-    pub parent_gateway: Address,
-
-    /// IPC registry of the parent; 20 byte Ethereum address in 0x prefixed hex format
-    #[arg(long, value_parser = parse_eth_address, default_value = "0xff00000000000000000000000000000000000065")]
-    pub parent_registry: Address,
-
-    /// The first block to query for events.
-    #[arg(long)]
-    pub start_block_height: u64,
-
-    /// The last block to query for events.
-    #[arg(long)]
-    pub end_block_height: u64,
-
-    /// Location of the JSON file to write events to.
-    #[arg(long)]
-    pub events_file: PathBuf,
 }
