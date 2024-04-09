@@ -11,8 +11,6 @@ use fendermint_crypto::SecretKey;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::chain::ChainEnv;
-use fendermint_vm_interpreter::fvm::state::fevm::ContractCaller;
-use fendermint_vm_interpreter::fvm::upgrades::{Upgrade, UpgradeScheduler};
 use fendermint_vm_interpreter::{
     bytes::{BytesMessageInterpreter, ProposalPrepareMode},
     chain::{ChainMessageInterpreter, CheckpointPool},
@@ -25,20 +23,18 @@ use fendermint_vm_topdown::proxy::IPCProviderProxy;
 use fendermint_vm_topdown::sync::launch_polling_syncer;
 use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
 use fendermint_vm_topdown::{CachedFinalityProvider, IPCParentFinality, Toggle};
-use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::address::Address;
-use ipc_actors_abis::ownership_facet::{OwnershipFacet, OwnershipFacetErrors};
 use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
 use libp2p::identity::secp256k1;
 use libp2p::identity::Keypair;
-use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::broadcast::error::RecvError;
 use tracing::info;
 
 use crate::cmd::key::read_secret_key;
+use crate::cmd::upgrades;
 use crate::{cmd, options::run::RunArgs, settings::Settings};
 
 cmd! {
@@ -123,7 +119,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         ValidatorContext::new(sk, broadcaster)
     });
 
-    let upgrade_scheduler = create_upgrade_scheduler();
+    let upgrade_scheduler = upgrades::create_upgrade_scheduler();
     let interpreter = FvmMessageInterpreter::<NamespaceBlockstore, _>::new(
         tendermint_client.clone(),
         validator_ctx,
@@ -528,53 +524,4 @@ async fn dispatch_vote(
             }
         }
     }
-}
-
-fn create_upgrade_scheduler<DB: Blockstore + 'static + Clone>() -> UpgradeScheduler<DB> {
-    let mut upgrade_scheduler = UpgradeScheduler::new();
-
-    // update the to actual chain id
-    let chain_id = 123.into();
-
-    // transfer ownership of the gateway to target address
-    upgrade_scheduler
-        .add(Upgrade::new_by_id(chain_id, 1u64, None, |state| {
-            // update to the actual new owner address
-            let new_owner =
-                ethers::types::Address::from_str("0x1A79385eAd0e873FE0C441C034636D3Edf7014cC")
-                    .expect("invalid new owner address");
-
-            // confirm the existing owner is this address
-            let cur_owner = ethers::types::Address::from_str(
-                "0xfF00000000000000000000000000000000000000",
-            )
-            .expect("invalid address");
-
-            let gateway_addr = EthAddress::from(
-                ethers::types::Address::from_str("0x77aa40b105843728088c0132e43fc44348881da8")
-                    .expect("invalid gateway addr"),
-            );
-
-            info!(
-                "[Upgrade at height {}] Change gateway ownership",
-                state.block_height()
-            );
-
-            let ownership = ContractCaller::<_, _, OwnershipFacetErrors>::new(
-                gateway_addr,
-                OwnershipFacet::new,
-            );
-            ownership.call_with_return(state, |c| {
-                let mut call = c.transfer_ownership(new_owner);
-                call = call.from(cur_owner);
-                call
-            })?;
-            let owner = ownership.call(state, |c| c.owner())?;
-            info!(owner = owner.to_string(), "updated gateway ownership");
-
-            Ok(())
-        }))
-        .expect("cannot add gateway ownership upgrade");
-
-    upgrade_scheduler
 }

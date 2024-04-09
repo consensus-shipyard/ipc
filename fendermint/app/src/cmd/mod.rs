@@ -17,6 +17,7 @@ pub mod key;
 pub mod materializer;
 pub mod rpc;
 pub mod run;
+mod upgrades;
 
 #[async_trait]
 pub trait Cmd {
