@@ -30,30 +30,10 @@ npm install
 
 # Step 2: Prepare wallet address
 echo "$DASHES Preparing wallet address..."
-for i in {0..3}
-do
-  addr=$(cat ${IPC_CONFIG_FOLDER}/evm_keystore.json | jq .[$i].address | tr -d '"')
-  private_key=$(cat ${IPC_CONFIG_FOLDER}/evm_keystore.json | jq .[$i].private_key | tr -d '"')
-  if [ $addr = 'default-key' ]; then
-    default_private_key=$private_key
-    echo "Default private key: $default_private_key"
-  else
-    wallet_addresses+=($addr)
-    private_keys+=($private_key)
-    echo "Wallet $i address: $addr, private key: $private_key"
-  fi
-done
-
-for i in {0..2}
-do
-  if [ ${private_keys[i]} = $default_private_key ]; then
-    default_wallet_address=${wallet_addresses[i]}
-    echo "Default wallet address: $default_wallet_address}"
-  fi
-done
-
-echo "wallet address for linkd token test is:"
-echo ${wallet_addresses[3]}
+linked_token_addr=$(cat ${IPC_CONFIG_FOLDER}/evm_keystore.json | jq -er .[3].address)
+linked_token_private_key=$(cat ${IPC_CONFIG_FOLDER}/evm_keystore.json | jq -er .[3].private_key)
+echo "wallet address for linked token test is:"
+echo $linked_token_addr
 
 # Step 3: Configure the dot env file
 echo "$DASHES Configuring .env file for linked token deployment..."
@@ -64,8 +44,8 @@ base_subnet_id=$(basename $subnet_id)
 cd $IPC_FOLDER/extras/tools/fvm-eth-address-converter
 subnet_id_as_eth_addr=$(npx ts-node fvm-addr-to-eth-addr.ts $base_subnet_id)
 # Write config to dot env file
-echo "export SUBNET_PRIVATE_KEY=${private_keys[3]}" >> $DOT_ENV_FILE
-echo "export ORIGIN_NET_PRIVATE_KEY=${private_keys[3]}" >> $DOT_ENV_FILE
+echo "export SUBNET_PRIVATE_KEY=$linked_token_private_key" >> $DOT_ENV_FILE
+echo "export ORIGIN_NET_PRIVATE_KEY=$linked_token_private_key" >> $DOT_ENV_FILE
 echo "export ORIGIN_NET_GATEWAY=$calib_net_gateway_address" >> $DOT_ENV_FILE
 echo "export SUBNET_ROUTE_IN_ETH_FORMAT=$subnet_id_as_eth_addr" >> $DOT_ENV_FILE
 # Preview the dot env file
@@ -77,7 +57,7 @@ echo "$DASHES Funding address in subnet..."
 $IPC_CLI cross-msg fund \
 --subnet $subnet_id \
 --from $default_wallet_address \
---to ${wallet_addresses[3]} \
+--to $linked_token_addr \
 50
 
 
