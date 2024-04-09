@@ -3,6 +3,7 @@
 
 use anyhow::{anyhow, Context};
 use fendermint_crypto::PublicKey;
+use fendermint_vm_topdown::proxy::IPCProviderProxy;
 use fvm_shared::address::Address;
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
@@ -92,7 +93,9 @@ cmd! {
         GenesisIpcCommands::Gateway(args) =>
             set_ipc_gateway(&genesis_file, args),
         GenesisIpcCommands::FromParent(args) =>
-            new_genesis_from_parent(&genesis_file, args).await
+            new_genesis_from_parent(&genesis_file, args).await,
+        GenesisIpcCommands::ExportTopDownEvents(args) =>
+            export_topdown_events(args).await
     }
   }
 }
@@ -294,7 +297,7 @@ async fn new_genesis_from_parent(
             config: SubnetConfig::Fevm(EVMSubnet {
                 provider_http: args.parent_endpoint.clone(),
                 provider_timeout: None,
-                auth_token: None,
+                auth_token: args.parent_auth_token.clone(),
                 registry_addr: args.parent_registry,
                 gateway_addr: args.parent_gateway,
             }),
@@ -349,6 +352,43 @@ async fn new_genesis_from_parent(
 
     let json = serde_json::to_string_pretty(&genesis)?;
     std::fs::write(genesis_file, json)?;
+
+    Ok(())
+}
+
+async fn export_topdown_events(args: &GenesisExportTopDownEventsArgs) -> anyhow::Result<()> {
+    // Configuration for the child subnet on the parent network,
+    // based on how it's done in `run.rs` and above.
+    let parent_provider = IpcProvider::new_with_subnet(
+        None,
+        ipc_provider::config::Subnet {
+            id: args
+                .subnet_id
+                .parent()
+                .ok_or_else(|| anyhow!("subnet is not a child"))?,
+            config: SubnetConfig::Fevm(EVMSubnet {
+                provider_http: args.parent_endpoint.clone(),
+                provider_timeout: None,
+                auth_token: args.parent_auth_token.clone(),
+                registry_addr: args.parent_registry,
+                gateway_addr: args.parent_gateway,
+            }),
+        },
+    )?;
+
+    let parent_proxy = IPCProviderProxy::new(parent_provider, args.subnet_id.clone())
+        .context("failed to create provider proxy")?;
+
+    let events = fendermint_vm_topdown::sync::fetch_topdown_events(
+        &parent_proxy,
+        args.start_block_height,
+        args.end_block_height,
+    )
+    .await
+    .context("failed to fetch topdown events")?;
+
+    let json = serde_json::to_string_pretty(&events)?;
+    std::fs::write(&args.events_file, json)?;
 
     Ok(())
 }

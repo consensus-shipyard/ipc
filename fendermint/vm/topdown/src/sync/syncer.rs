@@ -311,7 +311,7 @@ fn map_voting_err(e: StmError<voting::Error>) -> StmError<Error> {
 }
 
 #[instrument(skip(parent_proxy))]
-pub async fn fetch_data<P>(
+async fn fetch_data<P>(
     parent_proxy: &P,
     height: BlockHeight,
     block_hash: BlockHash,
@@ -351,6 +351,40 @@ where
     }
 
     Ok((block_hash, changes_res.value, topdown_msgs_res.value))
+}
+
+pub async fn fetch_topdown_events<P>(
+    parent_proxy: &P,
+    start_height: BlockHeight,
+    end_height: BlockHeight,
+) -> Result<Vec<(BlockHeight, ParentViewPayload)>, Error>
+where
+    P: ParentQueryProxy + Send + Sync + 'static,
+{
+    let mut events = Vec::new();
+    for height in start_height..=end_height {
+        match parent_proxy.get_block_hash(height).await {
+            Ok(res) => {
+                let (block_hash, changes, msgs) =
+                    fetch_data(parent_proxy, height, res.block_hash).await?;
+
+                if !(changes.is_empty() && msgs.is_empty()) {
+                    events.push((height, (block_hash, changes, msgs)));
+                }
+            }
+            Err(e) => {
+                if is_null_round_str(&e.to_string()) {
+                    continue;
+                } else {
+                    return Err(Error::CannotQueryParent(
+                        format!("get_block_hash: {e}"),
+                        height,
+                    ));
+                }
+            }
+        }
+    }
+    Ok(events)
 }
 
 #[cfg(test)]
