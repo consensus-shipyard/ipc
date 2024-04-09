@@ -35,6 +35,7 @@ members = [
     "textile/objectstore_actor_sdk",
     "textile/objectstore_syscall",
 ]
+exclude = ["builtin-actors"]
 
 [workspace.package]
 authors = ["Protocol Labs"]
@@ -245,11 +246,13 @@ merkle-tree-rs = { git = "https://github.com/consensus-shipyard/merkle-tree-rs.g
 #fvm_ipld_hamt = { path = "../ref-fvm/ipld/hamt" }
 #fvm_ipld_amt = { path = "../ref-fvm/ipld/amt" }
 
+# The original IPC build fetches a pre-built builtin-actors CAR bundle from a GH release.
+# For ADM, we can do the same at some point, but for now I've included the repo as a submodule.
 [patch."https://github.com/filecoin-project/builtin-actors"]
-fil_actors_evm_shared = { git = "ssh://git@github.com/amazingdatamachine/builtin-actors.git", branch = "v12.0.0+adm" }
-fil_actor_eam = { git = "ssh://git@github.com/amazingdatamachine/builtin-actors.git", branch = "v12.0.0+adm" }
-fil_actor_adm = { git = "ssh://git@github.com/amazingdatamachine/builtin-actors.git", branch = "v12.0.0+adm" }
-fil_actors_runtime = { git = "ssh://git@github.com/amazingdatamachine/builtin-actors.git", branch = "v12.0.0+adm" }
+fil_actors_evm_shared = { path = "builtin-actors/actors/evm/shared" }
+fil_actor_eam = { path = "builtin-actors/actors/eam" }
+fil_actor_adm = { path = "builtin-actors/actors/adm" }
+fil_actors_runtime = { path = "builtin-actors/runtime" }
 
 ## Uncomment entries below when working locally on builtin-actors and this repo simultaneously.
 ## Assumes the builtin-actors checkout is in a sibling directory with the same name.

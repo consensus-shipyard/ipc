@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the project
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
@@ -35,14 +35,14 @@ jobs:
   tests:
     # Skip tests on draft PRs, they take a long time, and drafts are for visibility.
     if: ${{ !github.event.pull_request.draft }}
-    needs: [pre-compile-checks]
+    needs: [ pre-compile-checks ]
     name: ${{ matrix.make.name }} (${{ matrix.os }}, ${{ matrix.rust }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
-        rust: [stable]
+        os: [ ubuntu-latest ]
+        rust: [ stable ]
         make:
           - name: Clippy
             task: check-clippy
@@ -81,8 +81,12 @@ jobs:
           dotnet: true
           haskell: true
 
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.BUILTIN_ACTORS_DEPLOY_KEY }}
+
       - name: Check out the project
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
 

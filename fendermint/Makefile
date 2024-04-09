@@ -1,6 +1,6 @@
 .PHONY: all build test lint license check-fmt check-clippy actor-bundle
 
-BUILTIN_ACTORS_FOLDER ?= $(PWD)/../../builtin-actors
+BUILTIN_ACTORS_FOLDER ?= $(PWD)/../builtin-actors
 BUILTIN_ACTORS_BUNDLE := $(PWD)/builtin-actors/output/bundle.car
 CUSTOM_ACTORS_BUNDLE  := $(PWD)/actors/output/custom_actors_bundle.car
 

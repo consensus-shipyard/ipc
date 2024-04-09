@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ !github.event.pull_request.draft }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
 
@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ !github.event.pull_request.draft }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
 
@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ !github.event.pull_request.draft }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Setup Node 16
         uses: actions/setup-node@v3
         with:
@@ -73,7 +73,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ !github.event.pull_request.draft }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: CodeSpell check
         uses: codespell-project/actions-codespell@v2.0
         with:

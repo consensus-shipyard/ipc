@@ -25,7 +25,7 @@ jobs:
 
     steps:
       - name: Check out the project
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install Tools
         uses: ./.github/actions/install-tools
@@ -107,8 +107,8 @@ jobs:
       - name: Delete all containers from package without tags
         uses: Chizkiyahu/delete-untagged-ghcr-action@v3
         with:
-            token: ${{ secrets.GITHUB_TOKEN }}
-            owner_type: org
-            package_name: fendermint
-            untagged_only: true
-            except_untagged_multiplatform: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          owner_type: org
+          package_name: fendermint
+          untagged_only: true
+          except_untagged_multiplatform: true

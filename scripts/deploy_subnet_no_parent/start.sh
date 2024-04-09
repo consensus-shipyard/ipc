@@ -127,14 +127,6 @@ if ! $local_deploy ; then
   git pull --rebase origin $head_ref
   git submodule sync
   git submodule update --init --recursive
-  if ! ls $IPC_FOLDER/../builtin-actors ; then
-    git clone -j8 git@github.com:amazingdatamachine/builtin-actors.git ${IPC_FOLDER}/../builtin-actors
-  fi
-  cd ${IPC_FOLDER}/../builtin-actors
-  git fetch
-  git stash
-  git checkout v12.0.0+adm
-  git pull --rebase origin v12.0.0+adm
 fi
 
 echo "$DASHES Building ipc contracts..."
