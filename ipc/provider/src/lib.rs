@@ -130,18 +130,12 @@ impl IpcProvider {
         match subnets.get(subnet) {
             Some(subnet) => match &subnet.config {
                 config::subnet::SubnetConfig::Fevm(_) => {
-                    let wallet = match self.evm_wallet() {
-                        Ok(w) => Some(w),
-                        Err(e) => {
-                            log::warn!("error initializing evm wallet: {e}");
-                            None
-                        }
-                    };
+                    let wallet = self.evm_keystore.as_ref().map(|ks| ks.clone());
                     let manager =
                         match EthSubnetManager::from_subnet_with_wallet_store(subnet, wallet) {
                             Ok(w) => Some(w),
                             Err(e) => {
-                                log::warn!("error initializing evm wallet: {e}");
+                                tracing::warn!("error initializing evm manager: {e}");
                                 return None;
                             }
                         };

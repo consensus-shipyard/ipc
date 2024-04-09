@@ -5060,7 +5060,6 @@ dependencies = [
  "ipc-types",
  "ipc-wallet",
  "ipc_actors_abis",
- "log",
  "num-derive 0.3.3",
  "num-traits",
  "reqwest",
@@ -5075,6 +5074,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite 0.18.0",
  "toml 0.8.10",
+ "tracing",
  "url",
  "zeroize",
 ]
