@@ -46,11 +46,11 @@ pub struct DebugExportTopDownEventsArgs {
     pub parent_auth_token: Option<String>,
 
     /// IPC gateway of the parent; 20 byte Ethereum address in 0x prefixed hex format
-    #[arg(long, value_parser = parse_eth_address, default_value = "0xff00000000000000000000000000000000000064")]
+    #[arg(long, value_parser = parse_eth_address)]
     pub parent_gateway: Address,
 
     /// IPC registry of the parent; 20 byte Ethereum address in 0x prefixed hex format
-    #[arg(long, value_parser = parse_eth_address, default_value = "0xff00000000000000000000000000000000000065")]
+    #[arg(long, value_parser = parse_eth_address)]
     pub parent_registry: Address,
 
     /// The first block to query for events.
