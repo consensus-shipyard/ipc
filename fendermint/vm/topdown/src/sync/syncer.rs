@@ -267,46 +267,12 @@ where
         Ok(data.0)
     }
 
-    #[instrument(skip(self))]
     async fn fetch_data(
         &self,
         height: BlockHeight,
         block_hash: BlockHash,
     ) -> Result<ParentViewPayload, Error> {
-        let changes_res = self
-            .parent_proxy
-            .get_validator_changes(height)
-            .map_err(|e| Error::CannotQueryParent(format!("get_validator_changes: {e}"), height));
-
-        let topdown_msgs_res = self
-            .parent_proxy
-            .get_top_down_msgs(height)
-            .map_err(|e| Error::CannotQueryParent(format!("get_top_down_msgs: {e}"), height));
-
-        let (changes_res, topdown_msgs_res) = tokio::join!(changes_res, topdown_msgs_res);
-        let (changes_res, topdown_msgs_res) = (changes_res?, topdown_msgs_res?);
-
-        if changes_res.block_hash != block_hash {
-            tracing::warn!(
-                height,
-                change_set_hash = hex::encode(&changes_res.block_hash),
-                block_hash = hex::encode(&block_hash),
-                "change set block hash does not equal block hash",
-            );
-            return Err(Error::ParentChainReorgDetected);
-        }
-
-        if topdown_msgs_res.block_hash != block_hash {
-            tracing::warn!(
-                height,
-                topdown_msgs_hash = hex::encode(&topdown_msgs_res.block_hash),
-                block_hash = hex::encode(&block_hash),
-                "topdown messages block hash does not equal block hash",
-            );
-            return Err(Error::ParentChainReorgDetected);
-        }
-
-        Ok((block_hash, changes_res.value, topdown_msgs_res.value))
+        fetch_data(self.parent_proxy.as_ref(), height, block_hash).await
     }
 
     async fn finalized_chain_head(&self) -> anyhow::Result<Option<BlockHeight>> {
@@ -342,6 +308,49 @@ fn map_voting_err(e: StmError<voting::Error>) -> StmError<Error> {
         }
         StmError::Control(c) => StmError::Control(c),
     }
+}
+
+#[instrument(skip(parent_proxy))]
+pub async fn fetch_data<P>(
+    parent_proxy: &P,
+    height: BlockHeight,
+    block_hash: BlockHash,
+) -> Result<ParentViewPayload, Error>
+where
+    P: ParentQueryProxy + Send + Sync + 'static,
+{
+    let changes_res = parent_proxy
+        .get_validator_changes(height)
+        .map_err(|e| Error::CannotQueryParent(format!("get_validator_changes: {e}"), height));
+
+    let topdown_msgs_res = parent_proxy
+        .get_top_down_msgs(height)
+        .map_err(|e| Error::CannotQueryParent(format!("get_top_down_msgs: {e}"), height));
+
+    let (changes_res, topdown_msgs_res) = tokio::join!(changes_res, topdown_msgs_res);
+    let (changes_res, topdown_msgs_res) = (changes_res?, topdown_msgs_res?);
+
+    if changes_res.block_hash != block_hash {
+        tracing::warn!(
+            height,
+            change_set_hash = hex::encode(&changes_res.block_hash),
+            block_hash = hex::encode(&block_hash),
+            "change set block hash does not equal block hash",
+        );
+        return Err(Error::ParentChainReorgDetected);
+    }
+
+    if topdown_msgs_res.block_hash != block_hash {
+        tracing::warn!(
+            height,
+            topdown_msgs_hash = hex::encode(&topdown_msgs_res.block_hash),
+            block_hash = hex::encode(&block_hash),
+            "topdown messages block hash does not equal block hash",
+        );
+        return Err(Error::ParentChainReorgDetected);
+    }
+
+    Ok((block_hash, changes_res.value, topdown_msgs_res.value))
 }
 
 #[cfg(test)]
