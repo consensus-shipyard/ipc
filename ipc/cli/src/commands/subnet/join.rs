@@ -45,7 +45,7 @@ impl CommandLineHandler for JoinSubnet {
             .get(&address.into())?
             .ok_or_else(|| anyhow!("key does not exists"))?;
         let sk = libsecp256k1::SecretKey::parse_slice(key_info.private_key())?;
-        let public_key = hex::encode(libsecp256k1::PublicKey::from_secret_key(&sk).serialize()).to_string();
+        let public_key = libsecp256k1::PublicKey::from_secret_key(&sk).serialize();
         if let Some(initial_balance) = arguments.initial_balance.filter(|x| !x.is_zero()) {
             log::info!("pre-funding address with {initial_balance}");
             provider
@@ -78,8 +78,6 @@ pub struct JoinSubnetArgs {
         help = "The collateral to stake in the subnet (in whole FIL units)"
     )]
     pub collateral: f64,
-    #[arg(long, help = "The validator's metadata, hex encoded")]
-    pub public_key: String,
     #[arg(
         long,
         help = "Optionally add an initial balance to the validator in genesis in the subnet"
