@@ -8,11 +8,12 @@ use ethers::utils::hex;
 use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
 use ipc_actors_abis::{lib_staking_change_log, subnet_actor_getter_facet};
+use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
 pub type ConfigurationNumber = u64;
 
-#[derive(Clone, Debug, num_enum::TryFromPrimitive)]
+#[derive(Clone, Debug, num_enum::TryFromPrimitive, Deserialize, Serialize)]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum StakingOperation {
@@ -22,14 +23,14 @@ pub enum StakingOperation {
     SetFederatedPower = 3,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StakingChangeRequest {
     pub configuration_number: ConfigurationNumber,
     pub change: StakingChange,
 }
 
 /// The change request to validator staking
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StakingChange {
     pub op: StakingOperation,
     pub payload: Vec<u8>,

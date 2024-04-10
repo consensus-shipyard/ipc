@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand};
 use config::ConfigArgs;
+use debug::DebugArgs;
 use fvm_shared::address::Network;
 use lazy_static::lazy_static;
 use tracing_subscriber::EnvFilter;
@@ -15,6 +16,7 @@ use self::{
 };
 
 pub mod config;
+pub mod debug;
 pub mod eth;
 pub mod genesis;
 pub mod key;
@@ -181,6 +183,8 @@ impl Options {
 pub enum Commands {
     /// Parse the configuration file and print it to the console.
     Config(ConfigArgs),
+    /// Arbitrary commands that aid in debugging.
+    Debug(DebugArgs),
     /// Run the `App`, listening to ABCI requests from Tendermint.
     Run(RunArgs),
     /// Subcommands related to the construction of signing keys.

@@ -52,7 +52,7 @@ impl Receipt {
         let r = base64::engine::general_purpose::STANDARD
             .decode(self.result.unwrap())
             .map_err(|e| {
-                log::error!("cannot base64 decode due to {e:?}");
+                tracing::error!("cannot base64 decode due to {e:?}");
                 anyhow!("cannot decode return string")
             })?;
 
@@ -61,7 +61,7 @@ impl Receipt {
             "deserialize create subnet return response",
         )
         .map_err(|e| {
-            log::error!("cannot decode bytes due to {e:?}");
+            tracing::error!("cannot decode bytes due to {e:?}");
             anyhow!("cannot cbor deserialize return data")
         })
     }

@@ -157,7 +157,7 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
             .client
             .request::<MpoolPushMessageResponse>(methods::MPOOL_PUSH_MESSAGE, params)
             .await?;
-        log::debug!("received mpool_push_message response: {r:?}");
+        tracing::debug!("received mpool_push_message response: {r:?}");
 
         Ok(r.message)
     }
@@ -165,7 +165,7 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
     async fn mpool_push(&self, mut msg: MpoolPushMessage) -> Result<Cid> {
         if msg.nonce.is_none() {
             let nonce = self.mpool_nonce(&msg.from).await?;
-            log::info!(
+            tracing::info!(
                 "sender: {:} with nonce: {nonce:} in subnet: {:}",
                 msg.from,
                 self.subnet
@@ -178,12 +178,12 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
         }
 
         self.estimate_message_gas(&mut msg).await?;
-        log::debug!("estimated gas for message: {msg:?}");
+        tracing::debug!("estimated gas for message: {msg:?}");
 
         let signature = self.sign_mpool_message(&msg)?;
 
         let params = create_signed_message_params(msg, signature);
-        log::debug!(
+        tracing::debug!(
             "message to push to mpool: {params:?} in subnet: {:?}",
             self.subnet
         );
@@ -192,7 +192,7 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
             .client
             .request::<CIDMap>(methods::MPOOL_PUSH, params)
             .await?;
-        log::debug!("received mpool_push_message response: {r:?}");
+        tracing::debug!("received mpool_push_message response: {r:?}");
 
         Cid::try_from(r)
     }
@@ -210,7 +210,7 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
             .client
             .request::<StateWaitMsgResponse>(methods::STATE_WAIT_MSG, params)
             .await?;
-        log::debug!("received state_wait_msg response: {r:?}");
+        tracing::debug!("received state_wait_msg response: {r:?}");
         Ok(r)
     }
 
@@ -220,7 +220,7 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
             .client
             .request::<String>(methods::STATE_NETWORK_NAME, serde_json::Value::Null)
             .await?;
-        log::debug!("received state_network_name response: {r:?}");
+        tracing::debug!("received state_network_name response: {r:?}");
         Ok(r)
     }
 
@@ -233,7 +233,7 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
             .request::<NetworkVersion>(methods::STATE_NETWORK_VERSION, params)
             .await?;
 
-        log::debug!("received state_network_version response: {r:?}");
+        tracing::debug!("received state_network_version response: {r:?}");
         Ok(r)
     }
 
@@ -254,7 +254,7 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
             cids.insert(key, Cid::try_from(cid_map)?);
         }
 
-        log::debug!("received state_actor_manifest_cid response: {cids:?}");
+        tracing::debug!("received state_actor_manifest_cid response: {cids:?}");
         Ok(cids)
     }
 
@@ -264,7 +264,7 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
             .client
             .request::<String>(methods::WALLET_DEFAULT_ADDRESS, json!({}))
             .await?;
-        log::debug!("received wallet_default response: {r:?}");
+        tracing::debug!("received wallet_default response: {r:?}");
 
         let addr = Address::from_str(&r)?;
         Ok(addr)
@@ -276,7 +276,7 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
             .client
             .request::<WalletListResponse>(methods::WALLET_LIST, json!({}))
             .await?;
-        log::debug!("received wallet_list response: {r:?}");
+        tracing::debug!("received wallet_list response: {r:?}");
         Ok(r)
     }
 
@@ -287,7 +287,7 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
             .client
             .request::<String>(methods::WALLET_NEW, json!([key_type_str]))
             .await?;
-        log::debug!("received wallet_new response: {r:?}");
+        tracing::debug!("received wallet_new response: {r:?}");
         Ok(r)
     }
 
@@ -297,7 +297,7 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
             .client
             .request::<String>(methods::WALLET_BALANCE, json!([address.to_string()]))
             .await?;
-        log::debug!("received wallet_balance response: {r:?}");
+        tracing::debug!("received wallet_balance response: {r:?}");
 
         let v = BigInt::from_str(&r)?;
         Ok(TokenAmount::from_atto(v))
@@ -316,7 +316,7 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
                 json!([address.to_string(), [CIDMap::from(tipset)]]),
             )
             .await?;
-        log::debug!("received read_state response: {r:?}");
+        tracing::debug!("received read_state response: {r:?}");
         Ok(r)
     }
 
@@ -325,7 +325,7 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
             .client
             .request::<ChainHeadResponse>(methods::CHAIN_HEAD, NO_PARAMS)
             .await?;
-        log::debug!("received chain_head response: {r:?}");
+        tracing::debug!("received chain_head response: {r:?}");
         Ok(r)
     }
 
@@ -345,7 +345,7 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
                 json!([epoch, [CIDMap::from(tip_set)]]),
             )
             .await?;
-        log::debug!("received get_tipset_by_height response: {r:?}");
+        tracing::debug!("received get_tipset_by_height response: {r:?}");
         Ok(r)
     }
 }
