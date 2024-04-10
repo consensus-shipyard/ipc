@@ -27,6 +27,7 @@
 * [Upgrading a subnet](developer-guides/upgrades/README.md)
   * [Example: Patching actor state](developer-guides/upgrades/patch-state.md)
   * [Example: Upgrading Wasm actor](developer-guides/upgrades/upgrade-wasm-actor.md)
+* [Deploying an explorer](developer-guides/deploy-blockscout.md)
 
 ## Reference
 

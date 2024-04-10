@@ -1,2 +1,0 @@
-# ⚫ Setting up infrastructure
-
