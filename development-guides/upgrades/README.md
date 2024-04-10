@@ -78,9 +78,7 @@ let interpreter = FvmMessageInterpreter::<DB, _>::new(
 );
 ```
 
-We have written guides showing several examples of using the UpgradeScheduler API which demonstrates how we can:
-- [Patch actor state](examples/upgrade-wasm-actor.md)
-- [Upgrade WASM actor](examples/upgrade-wasm-actor.md)
+We have written guides showing several examples of using the UpgradeScheduler API, which you'll find on the sidebar.
 
 ## Halting at predetermined height
 
@@ -96,11 +94,11 @@ This ensures that all nodes run the same Fendermint version for every block heig
 
 These instructions detail the steps for utilizing the halting mechanism to synchronize Fendermint application switching with newer versions.
 
-#### **1. Determine the future halt_height**
+#### 1. Determine the future halt_height
 
 Node operators collaborate on which future block height should be used as `halt_height`. Selecting the halting height is totally up to the operators, but let say for example purposes that the halt_height was agreed to be set to `10000`.
 
-#### **2. Update the halt_height config**
+#### 2. Update the halt_height config
 
 Now, each operator needs to edit the Fendermint config (`.fendermint/config/default.toml`) and make sure it contains the following line
 
@@ -111,7 +109,7 @@ halt_height = 10000
 
 Note that Fendermint needs to be restarted before the config changes take effect.
 
-#### **3. Wait until halt_height**
+#### 3. Wait until halt_height
 
 Once Fendermint reaches the `halt_height`, it will exit and log it reached the halting height.
 
@@ -130,7 +128,7 @@ The node operator can check if Fendermint exited due to reaching halting height 
 2
 ```
 
-#### **4. Reset the halt_height**
+#### 4. Reset the halt_height
 
 We must change the Fendermint `halt_height` to 0 (or some future block height if there is another upgrade planned).
 
@@ -139,7 +137,7 @@ We must change the Fendermint `halt_height` to 0 (or some future block height if
 halt_height = 0
 ```
 
-#### ** 5. Start the new Fendermint version**
+#### 5. Start the new Fendermint version
 
 We can now start the new version of Fendermint which contains the upgrade we need.
 
