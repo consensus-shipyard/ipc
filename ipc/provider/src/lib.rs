@@ -130,7 +130,7 @@ impl IpcProvider {
         match subnets.get(subnet) {
             Some(subnet) => match &subnet.config {
                 config::subnet::SubnetConfig::Fevm(_) => {
-                    let wallet = self.evm_keystore.as_ref().map(|ks| ks.clone());
+                    let wallet = self.evm_keystore.clone();
                     let manager =
                         match EthSubnetManager::from_subnet_with_wallet_store(subnet, wallet) {
                             Ok(w) => Some(w),
