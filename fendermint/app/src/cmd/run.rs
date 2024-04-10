@@ -119,7 +119,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         ValidatorContext::new(sk, broadcaster)
     });
 
-    let upgrade_scheduler = upgrades::create_upgrade_scheduler();
+    let upgrade_scheduler = upgrades::create_upgrade_scheduler()?;
     let interpreter = FvmMessageInterpreter::<NamespaceBlockstore, _>::new(
         tendermint_client.clone(),
         validator_ctx,
