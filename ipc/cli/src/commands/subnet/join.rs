@@ -2,16 +2,14 @@
 // SPDX-License-Identifier: MIT
 //! Join subnet cli command handler.
 
+use crate::commands::anyhow;
+use anyhow::Error;
 use async_trait::async_trait;
 use clap::Args;
 use ipc_api::subnet_id::SubnetID;
+use ipc_wallet::EvmKeyStore;
 use num_traits::Zero;
 use std::{fmt::Debug, str::FromStr};
-use ipc_wallet::EvmKeyStore;
-use anyhow::{Error};
-use crate::commands::anyhow;
-
-
 
 use crate::{
     f64_to_token_amount, get_ipc_provider, require_fil_addr_from_str, CommandLineHandler,
@@ -35,7 +33,8 @@ impl CommandLineHandler for JoinSubnet {
             None => None,
         };
         let keystore = provider.evm_wallet()?;
-        let address_str = arguments.from
+        let address_str = arguments
+            .from
             .as_deref()
             .ok_or_else(|| Error::msg("Address is required"))?;
         let address = ethers::types::Address::from_str(address_str)?;
