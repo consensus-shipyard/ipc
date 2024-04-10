@@ -147,10 +147,13 @@ where
                 quorum
             }),
             (Some(parent), None) => {
-                emit!(ParentFinalityMissingQuorum {
-                    block_height: parent.height,
-                    block_hash: &hex::encode(&parent.block_hash),
-                });
+                emit!(
+                    DEBUG,
+                    ParentFinalityMissingQuorum {
+                        block_height: parent.height,
+                        block_hash: &hex::encode(&parent.block_hash),
+                    }
+                );
                 None
             }
             (None, _) => {

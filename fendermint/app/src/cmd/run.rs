@@ -533,17 +533,23 @@ async fn dispatch_vote(
             let validator = &format!("{:?}", vote.public_key);
 
             if added {
-                emit!(ParentFinalityVoteAdded {
-                    block_height,
-                    block_hash,
-                    validator,
-                })
+                emit!(
+                    DEBUG,
+                    ParentFinalityVoteAdded {
+                        block_height,
+                        block_hash,
+                        validator,
+                    }
+                )
             } else {
-                emit!(ParentFinalityVoteIgnored {
-                    block_height,
-                    block_hash,
-                    validator,
-                })
+                emit!(
+                    DEBUG,
+                    ParentFinalityVoteIgnored {
+                        block_height,
+                        block_hash,
+                        validator,
+                    }
+                )
             }
         }
     }

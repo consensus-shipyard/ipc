@@ -4,7 +4,7 @@
 
 use std::marker::PhantomData;
 
-use tracing::{Event, Level, Subscriber};
+use tracing::{Event, Subscriber};
 use tracing_subscriber::{filter, layer, registry::LookupSpan, Layer};
 
 use super::prometheus::app as am;
@@ -16,9 +16,7 @@ where
     S: Subscriber,
     for<'a> S: LookupSpan<'a>,
 {
-    MetricsLayer::new().with_filter(filter::filter_fn(|md| {
-        md.level() == &Level::INFO && md.name().starts_with("event::")
-    }))
+    MetricsLayer::new().with_filter(filter::filter_fn(|md| md.name().starts_with("event::")))
 }
 
 struct MetricsLayer<S> {
