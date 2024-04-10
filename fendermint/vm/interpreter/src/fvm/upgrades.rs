@@ -143,12 +143,7 @@ where
 
     // check if there is an upgrade scheduled for the given chain_id at a given height
     pub fn get(&self, chain_id: ChainID, height: BlockHeight) -> Option<&Upgrade<DB>> {
-        let r = self.upgrades.get(&UpgradeKey(chain_id, height));
-        if height == 300 && r.is_none() {
-            panic!("expected upgrade")
-        }
-
-        r
+        self.upgrades.get(&UpgradeKey(chain_id, height))
     }
 }
 
