@@ -33,6 +33,7 @@ pub mod app {
         TOPDOWN_FINALITY_VOTE_BLOCK_HEIGHT: IntGauge = "Highest block for which a finality vote has been received and added";
         TOPDOWN_FINALITY_VOTE_ADDED: IntCounter = "Number of finality votes received and added since start";
         TOPDOWN_FINALITY_VOTE_IGNORED: IntCounter = "Number of finality votes received and ignored since start";
+        TOPDOWN_FINALITY_MISSING_QUORUM: IntCounter = "Number of times we could have proposed but didn't because the quorum was missing";
 
         BOTTOMUP_CKPT_BLOCK_HEIGHT: IntGauge = "Highest bottom-up checkpoint created";
         BOTTOMUP_CKPT_CONFIG_NUM: IntGauge = "Highest configuration number checkpointed";

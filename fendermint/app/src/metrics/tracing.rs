@@ -136,6 +136,9 @@ impl<S: Subscriber> Layer<S> for MetricsLayer<S> {
             ParentFinalityVoteIgnored {
                 validator                 => inc1_counter ! &am::TOPDOWN_FINALITY_VOTE_IGNORED,
             },
+            ParentFinalityMissingQuorum {
+                block_hash                => inc1_counter ! &am::TOPDOWN_FINALITY_MISSING_QUORUM,
+            },
             NewBottomUpCheckpoint {
                 block_height              => set_gauge   ! &am::BOTTOMUP_CKPT_BLOCK_HEIGHT,
                 next_configuration_number => set_gauge   ! &am::BOTTOMUP_CKPT_CONFIG_NUM,
