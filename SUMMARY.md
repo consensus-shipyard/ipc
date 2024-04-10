@@ -23,7 +23,10 @@
 
 ## Development Guides
 
-* [Advanced subnet customization](development-guides/pluggable-syscall-tutorial.md)
+* [Customizing a subnet](development-guides/pluggable-syscall-tutorial.md)
+* [Upgrading a subnet](development-guides/upgrades/README.md)
+  * [Example: Patching actor state](development-guides/upgrades/patch-state.md)
+  * [Example: Upgrading Wasm actor](development-guides/upgrades/upgrade-wasm-actor.md)
 
 ## Reference
 
