@@ -21,12 +21,12 @@
 
 * [Performing transactions in a subnet](user-guides/performing-transactions-in-a-subnet.md)
 
-## Development Guides
+## Developer Guides
 
-* [Customizing a subnet](development-guides/pluggable-syscall-tutorial.md)
-* [Upgrading a subnet](development-guides/upgrades/README.md)
-  * [Example: Patching actor state](development-guides/upgrades/patch-state.md)
-  * [Example: Upgrading Wasm actor](development-guides/upgrades/upgrade-wasm-actor.md)
+* [Customizing a subnet](developer-guides/pluggable-syscall-tutorial.md)
+* [Upgrading a subnet](developer-guides/upgrades/README.md)
+  * [Example: Patching actor state](developer-guides/upgrades/patch-state.md)
+  * [Example: Upgrading Wasm actor](developer-guides/upgrades/upgrade-wasm-actor.md)
 
 ## Reference
 
