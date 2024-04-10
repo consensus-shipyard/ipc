@@ -163,6 +163,11 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
             // prevent spamming if there's no value to fund.
             revert InvalidXnetMessage(InvalidXnetMessageReason.Value);
         }
+        // slither-disable-next-line unused-return
+        (bool registered, ) = LibGateway.getSubnet(subnetId);
+        if (!registered) {
+            revert NotRegisteredSubnet();
+        }
 
         // Check that the supply strategy is ERC20.
         // There is no need to check whether the subnet exists. If it doesn't exist, the call to getter will revert.
