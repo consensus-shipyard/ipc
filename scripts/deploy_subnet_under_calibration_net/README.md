@@ -4,13 +4,13 @@
 We currently have a [Github workflow](https://github.com/consensus-shipyard/ipc/actions/workflows/deploy-to-dedicated-host.yaml) to deploy IPC infra to a dedicated host. You can go to the workflow page and click `Run workflow` button on the top right corner to initiate a deployment.
 
 ## Deploy to local machine
-The same `deploy.sh` script can also be used to deploy locally. This is more or less equivalent to following [quickstart-calibration.md](https://github.com/consensus-shipyard/ipc/blob/main/docs/ipc/quickstart-calibration.md), but much more automated.
+The same `deploy.sh` script can also be used to deploy locally. This is more or less equivalent to following [Deploy a subnet](https://docs.ipc.space/quickstarts/deploy-a-subnet), but much more automated.
 
 To run this script locally, you need to first manually prepare the environment and files.
 
-1. Make sure you have your ipc repo located at $HOME/ipc.
-2. Follow Step 2 and Step 3 in [Github workflow](https://github.com/consensus-shipyard/ipc/actions/workflows/deploy-to-dedicated-host.yaml) to prepare ipc config file and wallets. Remember to go to [Calibration faucet](https://faucet.calibration.fildev.network/funds.html) to fund all of your addresses.
-3. Run `bash deploy.sh local` to deploy IPC locally.
+1. Run `prepare_local.sh` to generate a local ipc repo
+2. Go to [Calibration faucet](https://faucet.calibration.fildev.network/funds.html) to fund all of your addresses.
+3. Run  `deploy.sh local` to deploy IPC locally.
 
 Please also notice that
 1. The `deploy.sh` is only for running on Linux. If you are using a Mac, you need to disable all `apt` based dependency installation. You may also need to install bash (version >= 5) to run this script since the script isn't fully compatible with zsh (default shell on Mac).

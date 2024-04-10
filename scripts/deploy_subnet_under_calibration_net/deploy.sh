@@ -1,12 +1,14 @@
 #!/bin/bash
 
 # IPC Quick Start Script
-# See also https://github.com/consensus-shipyard/ipc/blob/main/docs/ipc/quickstart-calibration.md
+# See also https://docs.ipc.space/quickstarts/deploy-a-subnet
 
 # Known issues:
 # 1. Need to previously manual enable sudo without password on the host
 # 2. You may need to rerun the script after docker installation for the first time
-# 2. You may need to manually install nodejs and npm on the host
+# 3. You may need to manually install nodejs and npm on the host
+# 4. If you get failures related to "deserializing fvm address", check if your
+#    FM_NETWORK env variable is set correctly (e.g it should either be testnet or mainnet)
 
 set -euxo pipefail
 
@@ -32,6 +34,13 @@ else
     local_deploy=false
     head_ref=$1
   fi
+fi
+
+# the script assumes there is no default-key, so lets check that early on.
+# TODO: Update this script to handle having default-key set
+if grep -q default-key ${IPC_CONFIG_FOLDER}/evm_keystore.json; then
+  echo "Please remove default-key from ${IPC_CONFIG_FOLDER}/evm_keystore.json before running this script"
+  exit 1
 fi
 
 # Step 1: Prepare system for building and running IPC
@@ -272,7 +281,7 @@ done
 pkill -f "relayer" || true
 # Start relayer
 echo "$DASHES Start relayer process (in the background)"
-nohup $IPC_CLI checkpoint relayer --subnet $subnet_id > nohup.out 2> nohup.err < /dev/null &
+nohup $IPC_CLI checkpoint relayer --subnet $subnet_id --submitter $default_wallet_address > nohup.out 2> nohup.err < /dev/null &
 
 # Step 11: Print a summary of the deployment
 # Remove leading '/' and change middle '/' into '-'

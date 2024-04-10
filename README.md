@@ -107,4 +107,4 @@ To be able to interact with Calibration and run new subnets, some FIL should be 
 
 ## Help
 
-If you meet any obstacles join us in **#ipc-help** in the [Filecoin Slack workspace](https://filecoin.io/slack).
+If you meet any obstacles join us in **#ipc** in the [Filecoin Slack workspace](https://filecoin.io/slack).
