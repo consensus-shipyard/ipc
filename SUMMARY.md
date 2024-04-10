@@ -17,9 +17,12 @@
   * [Parent-child interactions](concepts/subnets/parent-child-interactions.md)
 * [Circulating supply](concepts/circulating-supply.md)
 
+## User guides
+
+* [Performing transactions in a subnet](user-guides/performing-transactions-in-a-subnet.md)
+
 ## Development Guides
 
-* [Performing transactions in a subnet](development-guides/performing-transactions-in-a-subnet.md)
 * [Advanced subnet customization](development-guides/pluggable-syscall-tutorial.md)
 
 ## Reference
