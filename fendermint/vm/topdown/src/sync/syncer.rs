@@ -234,6 +234,8 @@ where
         }
 
         let data = self.fetch_data(height, block_hash_res.block_hash).await?;
+        self.check_data(height, &data, &block_hash_res.parent_block_hash)
+            .await?;
 
         tracing::debug!(
             height,
@@ -264,6 +266,44 @@ where
         });
 
         Ok(data.0)
+    }
+
+    #[instrument(skip(self))]
+    async fn check_data(
+        &self,
+        height: BlockHeight,
+        current_view: &ParentViewPayload,
+        parent_block_hash: &[u8],
+    ) -> Result<(), Error> {
+        let prev_nonce = self.top_down_nonce(parent_block_hash).await?;
+        let curr_nonce = self.top_down_nonce(&current_view.0).await?;
+
+        let num_msgs = curr_nonce - prev_nonce;
+        let msgs = &current_view.2;
+        if num_msgs != msgs.len() as u64 {
+            return Err(Error::TopDownMsgsLengthIncorrect(
+                height,
+                num_msgs,
+                current_view.2.len() as u64,
+            ));
+        }
+
+        Ok(())
+    }
+
+    #[inline]
+    async fn top_down_nonce(&self, block_hash: &[u8]) -> Result<u64, Error> {
+        Ok(self
+            .parent_proxy
+            .get_top_down_nonce(block_hash)
+            .await
+            .map_err(|e| {
+                Error::CannotQueryParentHash(
+                    format!("top down nonce: {e}"),
+                    hex::encode(block_hash),
+                )
+            })?
+            .value)
     }
 
     #[instrument(skip(self))]
@@ -428,6 +468,13 @@ mod tests {
                 value: vec![],
                 block_hash: self.blocks.get_value(height).cloned().unwrap().unwrap(),
             })
+        }
+
+        async fn get_top_down_nonce(
+            &self,
+            _block_hash: &[u8],
+        ) -> anyhow::Result<TopDownQueryPayload<u64>> {
+            todo!()
         }
     }
 

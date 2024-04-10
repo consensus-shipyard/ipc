@@ -166,6 +166,12 @@ pub trait SubnetManager: Send + Sync + TopDownFinalityQuery + BottomUpCheckpoint
         public_keys: &[Vec<u8>],
         federated_power: &[u128],
     ) -> Result<ChainEpoch>;
+
+    async fn get_top_down_nonce(
+        &self,
+        subnet: &SubnetID,
+        block_hash: &[u8],
+    ) -> Result<TopDownQueryPayload<u64>>;
 }
 
 #[derive(Debug)]

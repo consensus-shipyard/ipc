@@ -15,4 +15,8 @@ pub enum Error {
     ParentChainReorgDetected,
     #[error("Cannot query parent at height {1}: {0}")]
     CannotQueryParent(String, BlockHeight),
+    #[error("Cannot query parent with hash {1}: {0}")]
+    CannotQueryParentHash(String, String),
+    #[error("Number of topdown messages incorrect at height {0}, expected: {1}, found: {2}")]
+    TopDownMsgsLengthIncorrect(BlockHeight, u64, u64),
 }

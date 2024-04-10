@@ -334,6 +334,13 @@ mod tests {
                 block_hash: r.0,
             })
         }
+
+        async fn get_top_down_nonce(
+            &self,
+            _block_hash: &[u8],
+        ) -> anyhow::Result<TopDownQueryPayload<u64>> {
+            todo!()
+        }
     }
 
     fn new_provider(

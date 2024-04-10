@@ -778,14 +778,25 @@ impl IpcProvider {
         public_keys: &[Vec<u8>],
         federated_power: &[u128],
     ) -> anyhow::Result<ChainEpoch> {
-        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
-        let conn = match self.connection(&parent) {
-            None => return Err(anyhow!("target parent subnet not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.parent_connection(subnet)?;
         conn.manager()
             .set_federated_power(from, subnet, validators, public_keys, federated_power)
             .await
+    }
+
+    pub async fn get_top_down_nonce(
+        &self,
+        subnet: &SubnetID,
+        block_hash: &[u8],
+    ) -> anyhow::Result<TopDownQueryPayload<u64>> {
+        let conn = self.parent_connection(subnet)?;
+        conn.manager().get_top_down_nonce(subnet, block_hash).await
+    }
+
+    fn parent_connection(&self, subnet: &SubnetID) -> anyhow::Result<Connection> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        self.connection(&parent)
+            .ok_or_else(|| anyhow!("parent subnet does not exist"))
     }
 }
 
