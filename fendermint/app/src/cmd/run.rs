@@ -4,11 +4,13 @@
 use anyhow::{anyhow, bail, Context};
 use async_stm::atomically_or_err;
 use fendermint_abci::ApplicationService;
+use fendermint_app::events::ParentFinalityVoteReceived;
 use fendermint_app::ipc::{AppParentFinalityQuery, AppVote};
 use fendermint_app::{App, AppConfig, AppStore, BitswapBlockstore};
 use fendermint_app_settings::AccountKind;
 use fendermint_crypto::SecretKey;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
+use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::chain::ChainEnv;
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
@@ -509,7 +511,14 @@ async fn dispatch_vote(
             .await;
 
             match res {
-                Ok(_) => {}
+                Ok(added) => {
+                    emit!(ParentFinalityVoteReceived {
+                        block_height: f.height,
+                        block_hash: &hex::encode(&f.block_hash),
+                        validator: &format!("{:?}", vote.public_key),
+                        added,
+                    })
+                }
                 Err(e @ VoteError::Equivocation(_, _, _, _)) => {
                     tracing::warn!(error = e.to_string(), "failed to handle vote");
                 }
