@@ -1,67 +1,25 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use ethers::types::{H256};
+use crate::cmd::upgrades::CHAIN_ID;
+use ethers::abi::RawLog;
+use ethers::prelude::H256;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::fvm::state::fevm::ContractCaller;
 use fendermint_vm_interpreter::fvm::upgrades::{Upgrade, UpgradeScheduler};
 use fvm_ipld_blockstore::Blockstore;
-use ipc_actors_abis::ownership_facet::{OwnershipFacet, OwnershipFacetErrors};
-use ipc_actors_abis::top_down_finality_facet::{StakingChange, StakingChangeRequest};
-use ipc_actors_abis::top_down_finality_facet::{TopDownFinalityFacet, TopDownFinalityFacetErrors};
+use ipc_actors_abis::lib_staking_change_log::NewStakingChangeRequestFilter;
+use ipc_actors_abis::top_down_finality_facet::{
+    StakingChange, StakingChangeRequest, TopDownFinalityFacet, TopDownFinalityFacetErrors,
+};
 use std::str::FromStr;
-use ethers_contract::core::abi::RawLog;
 use tracing::info;
-use ipc_actors_abis::lib_staking_change_log::{NewStakingChangeRequestFilter};
 
-pub fn create_upgrade_scheduler<DB: Blockstore + 'static + Clone>() -> UpgradeScheduler<DB> {
-    let mut upgrade_scheduler = UpgradeScheduler::new();
-
-    // update the to actual chain id
-    let chain_id = 901861227013395.into();
-
-    // transfer ownership of the gateway to target address
+pub(crate) fn new_upgrade<DB: Blockstore + 'static + Clone>(
+    upgrade_scheduler: &mut UpgradeScheduler<DB>,
+) {
     upgrade_scheduler
-        .add(Upgrade::new_by_id(chain_id, 50u64, None, |state| {
-            // update to the actual new owner address
-            let new_owner =
-                ethers::types::Address::from_str("0x1A79385eAd0e873FE0C441C034636D3Edf7014cC")
-                    .expect("invalid new owner address");
-
-            // confirm the existing owner is this address
-            let cur_owner =
-                ethers::types::Address::from_str("0xfF00000000000000000000000000000000000000")
-                    .expect("invalid address");
-
-            let gateway_addr = EthAddress::from(
-                ethers::types::Address::from_str("0x77aa40b105843728088c0132e43fc44348881da8")
-                    .expect("invalid gateway addr"),
-            );
-
-            info!(
-                "[Upgrade at height {}] Change gateway ownership",
-                state.block_height()
-            );
-
-            let ownership = ContractCaller::<_, _, OwnershipFacetErrors>::new(
-                gateway_addr,
-                OwnershipFacet::new,
-            );
-            ownership.call_with_return(state, |c| {
-                let mut call = c.transfer_ownership(new_owner);
-                call = call.from(cur_owner);
-                call
-            })?;
-            let owner = ownership.call(state, |c| c.owner())?;
-            info!(owner = owner.to_string(), "updated gateway ownership");
-            
-            Ok(())
-        }))
-        .expect("cannot add gateway ownership upgrade");
-
-    // applied missing validator changes
-    upgrade_scheduler
-        .add(Upgrade::new_by_id(chain_id, 60u64, None, |state| {
+        .add(Upgrade::new_by_id(CHAIN_ID.into(), 60u64, None, |state| {
 
             let raw_configuration_changes = vec![
                 "0x00000000000000000000000000000000000000000000000000000000000000030000000000000000000000007e6bcac9b600394ea1c7c38ea72cc56f57374c870000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000041045197627a4a7f89458469255afb8711ab4c7bc4a76281376cb361c29bd0d9626758d47feadf43d77f843725cbad419e655d8689369c1ce59ccdaa67d47bd0ddf700000000000000000000000000000000000000000000000000000000000000",
@@ -152,11 +110,9 @@ pub fn create_upgrade_scheduler<DB: Blockstore + 'static + Clone>() -> UpgradeSc
             Ok(())
         }))
         .expect("cannot add gateway ownership upgrade");
-
-    upgrade_scheduler
 }
 
-fn parse_logs(logs: Vec<&str>) -> anyhow::Result<Vec<RawLog>> {
+pub fn parse_logs(logs: Vec<&str>) -> anyhow::Result<Vec<RawLog>> {
     let mut res = vec![];
 
     for hex_str in logs {
@@ -168,7 +124,9 @@ fn parse_logs(logs: Vec<&str>) -> anyhow::Result<Vec<RawLog>> {
 
         res.push(RawLog {
             data,
-            topics: vec![H256::from_str("1c593a2b803c3f9038e8b6743ba79fbc4276d2770979a01d2768ed12bea3243f")?]
+            topics: vec![H256::from_str(
+                "1c593a2b803c3f9038e8b6743ba79fbc4276d2770979a01d2768ed12bea3243f",
+            )?],
         })
     }
     Ok(res)
@@ -176,9 +134,9 @@ fn parse_logs(logs: Vec<&str>) -> anyhow::Result<Vec<RawLog>> {
 
 #[cfg(test)]
 mod tests {
+    use crate::cmd::upgrades::upgrade02::parse_logs;
     use ipc_actors_abis::lib_staking_change_log::NewStakingChangeRequestFilter;
     use ipc_actors_abis::top_down_finality_facet::{StakingChange, StakingChangeRequest};
-    use crate::cmd::upgrades::parse_logs;
 
     #[test]
     fn test() {
@@ -236,19 +194,19 @@ mod tests {
 
         let logs = parse_logs(raw_configuration_changes).unwrap();
 
-        let validator_changes: Vec<_> = ethers_contract::decode_logs::<NewStakingChangeRequestFilter>(&logs).unwrap()
-            .into_iter()
-            .map(|p| {
-                StakingChangeRequest{
+        let validator_changes: Vec<_> =
+            ethers_contract::decode_logs::<NewStakingChangeRequestFilter>(&logs)
+                .unwrap()
+                .into_iter()
+                .map(|p| StakingChangeRequest {
                     configuration_number: p.configuration_number,
                     change: StakingChange {
                         op: p.op,
                         payload: p.payload,
-                        validator: p.validator
-                    }
-                }
-            })
-            .collect();
+                        validator: p.validator,
+                    },
+                })
+                .collect();
 
         // assist validation
         for change in validator_changes {
