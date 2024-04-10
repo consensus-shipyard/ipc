@@ -30,6 +30,9 @@ pub mod app {
         TOPDOWN_VIEW_NUM_MSGS: IntCounter = "Number of top-down messages observed since start";
         TOPDOWN_VIEW_NUM_VAL_CHNGS: IntCounter = "Number of top-down validator changes observed since start";
         TOPDOWN_FINALIZED_BLOCK_HEIGHT: IntGauge = "Highest parent subnet block finalized";
+        TOPDOWN_FINALITY_VOTE_BLOCK_HEIGHT: IntGauge = "Highest block for which a finality vote has been received and added";
+        TOPDOWN_FINALITY_VOTE_ADDED: IntCounter = "Number of finality votes received and added since start";
+        TOPDOWN_FINALITY_VOTE_IGNORED: IntCounter = "Number of finality votes received and ignored since start";
 
         BOTTOMUP_CKPT_BLOCK_HEIGHT: IntGauge = "Highest bottom-up checkpoint created";
         BOTTOMUP_CKPT_CONFIG_NUM: IntGauge = "Highest configuration number checkpointed";

@@ -57,6 +57,17 @@ macro_rules! set_gauge {
     };
 }
 
+/// Set a gague to the maximum of its value and a field in an event.
+macro_rules! max_gauge {
+    ($event:ident, $event_ty:ident :: $field:ident, $gauge:expr) => {
+        check_field!($event_ty::$field);
+        let mut fld = visitors::FindU64::new(stringify!($field));
+        $event.record(&mut fld);
+        let curr = $gauge.get();
+        $gauge.set(std::cmp::max(fld.value as i64, curr));
+    };
+}
+
 /// Increment a counter by the value of a field in the event.
 macro_rules! inc_counter {
     ($event:ident, $event_ty:ident :: $field:ident, $counter:expr) => {
@@ -64,6 +75,16 @@ macro_rules! inc_counter {
         let mut fld = visitors::FindU64::new(stringify!($field));
         $event.record(&mut fld);
         $counter.inc_by(fld.value);
+    };
+}
+
+/// Increment a counter by 1.
+///
+/// The field is ignored, it's only here because of how the macros look like.
+macro_rules! inc1_counter {
+    ($event:ident, $event_ty:ident :: $field:ident, $counter:expr) => {
+        check_field!($event_ty::$field);
+        $counter.inc();
     };
 }
 
@@ -107,6 +128,13 @@ impl<S: Subscriber> Layer<S> for MetricsLayer<S> {
             },
             ParentFinalityCommitted {
                 block_height              => set_gauge   ! &am::TOPDOWN_FINALIZED_BLOCK_HEIGHT,
+            },
+            ParentFinalityVoteAdded {
+                block_height              => max_gauge    ! &am::TOPDOWN_FINALITY_VOTE_BLOCK_HEIGHT,
+                validator                 => inc1_counter ! &am::TOPDOWN_FINALITY_VOTE_ADDED,
+            },
+            ParentFinalityVoteIgnored {
+                validator                 => inc1_counter ! &am::TOPDOWN_FINALITY_VOTE_IGNORED,
             },
             NewBottomUpCheckpoint {
                 block_height              => set_gauge   ! &am::BOTTOMUP_CKPT_BLOCK_HEIGHT,

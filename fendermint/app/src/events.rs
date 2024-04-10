@@ -4,7 +4,9 @@
 use crate::BlockHeight;
 
 /// Re-export other events, just to provide the visibility of where they are.
-pub use fendermint_vm_event::{NewBottomUpCheckpoint, NewParentView, ParentFinalityCommitted};
+pub use fendermint_vm_event::{
+    NewBottomUpCheckpoint, NewParentView, ParentFinalityCommitted, ParentFinalityMissingQuorum,
+};
 
 /// Hex encoded block hash.
 pub type BlockHashHex<'a> = &'a str;
@@ -24,11 +26,17 @@ pub struct NewBlock {
 }
 
 #[derive(Debug, Default)]
-pub struct ParentFinalityVoteReceived<'a> {
+pub struct ParentFinalityVoteAdded<'a> {
     pub block_height: BlockHeight,
     pub block_hash: BlockHashHex<'a>,
     pub validator: &'a str,
-    pub added: bool,
+}
+
+#[derive(Debug, Default)]
+pub struct ParentFinalityVoteIgnored<'a> {
+    pub block_height: BlockHeight,
+    pub block_hash: BlockHashHex<'a>,
+    pub validator: &'a str,
 }
 
 // TODO: Add new events for:

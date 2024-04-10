@@ -4,7 +4,7 @@
 use anyhow::{anyhow, bail, Context};
 use async_stm::atomically_or_err;
 use fendermint_abci::ApplicationService;
-use fendermint_app::events::ParentFinalityVoteReceived;
+use fendermint_app::events::{ParentFinalityVoteAdded, ParentFinalityVoteIgnored};
 use fendermint_app::ipc::{AppParentFinalityQuery, AppVote};
 use fendermint_app::{App, AppConfig, AppStore, BitswapBlockstore};
 use fendermint_app_settings::AccountKind;
@@ -510,25 +510,40 @@ async fn dispatch_vote(
             })
             .await;
 
-            match res {
+            let added = match res {
                 Ok(added) => {
-                    emit!(ParentFinalityVoteReceived {
-                        block_height: f.height,
-                        block_hash: &hex::encode(&f.block_hash),
-                        validator: &format!("{:?}", vote.public_key),
-                        added,
-                    })
+                    added
                 }
                 Err(e @ VoteError::Equivocation(_, _, _, _)) => {
                     tracing::warn!(error = e.to_string(), "failed to handle vote");
+                    false
                 }
                 Err(e @ (
                       VoteError::Uninitialized // early vote, we're not ready yet
                     | VoteError::UnpoweredValidator(_) // maybe arrived too early or too late, or spam
                     | VoteError::UnexpectedBlock(_, _) // won't happen here
                 )) => {
-                    tracing::debug!(error = e.to_string(), "failed to handle vote")
+                    tracing::debug!(error = e.to_string(), "failed to handle vote");
+                    false
                 }
+            };
+
+            let block_height = f.height;
+            let block_hash = &hex::encode(&f.block_hash);
+            let validator = &format!("{:?}", vote.public_key);
+
+            if added {
+                emit!(ParentFinalityVoteAdded {
+                    block_height,
+                    block_hash,
+                    validator,
+                })
+            } else {
+                emit!(ParentFinalityVoteIgnored {
+                    block_height,
+                    block_hash,
+                    validator,
+                })
             }
         }
     }
