@@ -360,14 +360,8 @@ impl SubnetManager for EthSubnetManager {
         txn.tx.set_value(balance);
         let txn = call_with_premium_estimation(signer, txn).await?;
 
-        let result = txn.send().await;
-        match result {
-            Ok(_) => Ok(()),
-            Err(e) => {
-                tracing::debug!("Failed to send pre_fund transaction: {:?}", e);
-                Err(anyhow!("Failed to send pre_fund transaction: {:?}", e))
-            }
-        }
+        txn.send().await?;
+        Ok(())
     }
 
     async fn pre_release(
