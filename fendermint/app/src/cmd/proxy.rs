@@ -69,6 +69,7 @@ cmd! {
             ProxyCommands::Run { tendermint_url, ipfs_addr, args} => {
                 let client = FendermintClient::new_http(tendermint_url, None)?;
                 let ipfs = IpfsClient::from_multiaddr_str(&ipfs_addr)?;
+                let ipfs_adapter = Ipfs { inner: ipfs.clone() };
 
                 let seq = args.sequence;
                 let nonce = Arc::new(Mutex::new(seq));
@@ -116,7 +117,7 @@ cmd! {
                     .and(warp::put())
                     .and(warp::body::content_length_limit(MAX_OBJECT_LENGTH))
                     .and(with_client(client.clone()))
-                    .and(with_ipfs(ipfs.clone()))
+                    .and(with_ipfs_adapter(ipfs_adapter.clone()))
                     .and(warp::multipart::form())
                     .and_then(handle_object_upload);
 
@@ -221,6 +222,12 @@ fn with_ipfs(
     warp::any().map(move || client.clone())
 }
 
+fn with_ipfs_adapter<I: IpfsApiAdapter + Clone + Send>(
+    client: I,
+) -> impl Filter<Extract = (I,), Error = Infallible> + Clone {
+    warp::any().map(move || client.clone())
+}
+
 fn with_args(args: TransArgs) -> impl Filter<Extract = (TransArgs,), Error = Infallible> + Clone {
     warp::any().map(move || args.clone())
 }
@@ -282,17 +289,45 @@ struct UploadQuery {
     pub chain_id: u64,
 }
 
+pub trait IpfsApiAdapter {
+    async fn add_file(&self, temp_file: TempFile) -> anyhow::Result<String>;
+}
+
+#[derive(Clone)]
+pub struct Ipfs {
+    inner: IpfsClient,
+}
+
+impl IpfsApiAdapter for Ipfs {
+    async fn add_file(&self, temp_file: TempFile) -> anyhow::Result<String> {
+        let add = ipfs_api_backend_hyper::request::Add {
+            chunker: Some("size-1048576"),
+            pin: Some(false),
+            raw_leaves: Some(true),
+            cid_version: Some(1),
+            hash: Some("blake2b-256"),
+            ..Default::default()
+        };
+
+        let res = self
+            .inner
+            .add_async_with_options(temp_file.compat(), add)
+            .await?;
+        let cid = Cid::try_from(res.hash)?;
+        Ok(cid.to_string())
+    }
+}
+
 struct ObjectVerifier {
     hasher: Blake2bHasher<32>,
-    total_bytes: usize,
+    size: usize,
     signed_msg: Option<SignedMessage>,
     chain_id: ChainID,
     temp_file: TempFile,
 }
 
 impl ObjectVerifier {
-    async fn read_chain_id(form_part: Part) -> anyhow::Result<ChainID> {
-        // Process as a text field
+    async fn read_chain_id(&mut self, form_part: Part) -> anyhow::Result<()> {
         let value = form_part
             .stream()
             .fold(Vec::new(), |mut vec, data| async move {
@@ -304,12 +339,12 @@ impl ObjectVerifier {
         let text =
             String::from_utf8(value.clone()).map_err(|_| anyhow!("cannot parse chain id"))?;
         let int: u64 = text.parse().map_err(|_| anyhow!("cannot parse chain_id"))?;
+        self.chain_id = ChainID::from(int);
 
-        Ok(ChainID::from(int))
+        Ok(())
     }
 
-    async fn read_msg(form_part: Part) -> anyhow::Result<SignedMessage> {
-        // Process as a text field
+    async fn read_msg(&mut self, form_part: Part) -> anyhow::Result<()> {
         let value = form_part
             .stream()
             .fold(Vec::new(), |mut vec, data| async move {
@@ -322,8 +357,11 @@ impl ObjectVerifier {
             .decode(value)
             .map_err(|e| anyhow!("failed to decode base64 encoded signed message: {}", e))?;
 
-        fvm_ipld_encoding::from_slice::<SignedMessage>(&b64_decoded)
-            .map_err(|e| anyhow!("failed to deserialize signed message: {}", e))
+        let singed_msg = fvm_ipld_encoding::from_slice::<SignedMessage>(&b64_decoded)
+            .map_err(|e| anyhow!("failed to deserialize signed message: {}", e))?;
+        self.signed_msg = Some(singed_msg);
+
+        Ok(())
     }
 
     async fn read_object(&mut self, form_part: Part) -> anyhow::Result<()> {
@@ -338,7 +376,7 @@ impl ObjectVerifier {
                 self.temp_file.flush().await.unwrap();
                 data.advance(chunk_len);
                 self.hasher.update(&chunk);
-                self.total_bytes += chunk_len;
+                self.size += chunk_len;
             }
         }
         self.temp_file
@@ -356,7 +394,7 @@ impl ObjectVerifier {
 
         let mut verifier = ObjectVerifier {
             hasher: Blake2bHasher::default(),
-            total_bytes: 0,
+            size: 0,
             signed_msg: None,
             chain_id: ChainID::from(0),
             temp_file,
@@ -366,11 +404,10 @@ impl ObjectVerifier {
             let part = part.map_err(|_| anyhow!("missing cid in signed message"))?;
             match part.name() {
                 "chain_id" => {
-                    verifier.chain_id = Self::read_chain_id(part).await?;
+                    verifier.read_chain_id(part).await?;
                 }
                 "msg" => {
-                    let signed_msg = Self::read_msg(part).await?;
-                    verifier.signed_msg = Some(signed_msg);
+                    verifier.read_msg(part).await?;
                 }
                 "upload" => {
                     verifier.read_object(part).await?;
@@ -395,7 +432,6 @@ impl ObjectVerifier {
                     Some(object) => object.value,
                     None => return Err(anyhow!("missing cid in signed message")),
                 };
-
                 if cid_computed != cid_from_msg {
                     return Err(anyhow!(
                         "computed cid {:?} does not match {:?}",
@@ -421,13 +457,12 @@ impl ObjectVerifier {
         Ok(())
     }
 
-    async fn ensure_balance(&mut self, client: &FendermintClient) -> anyhow::Result<()> {
+    async fn ensure_balance<F: QueryClient>(&mut self, client: &F) -> anyhow::Result<()> {
         match &self.signed_msg {
             Some(signed_msg) => {
                 let from = signed_msg.message.from;
                 let height = FvmQueryHeight::Committed;
                 let actor_state = client.actor_state(&from, height).await?;
-
                 let balance = match actor_state.value {
                     Some((_, state)) => to_eth_tokens(&state.balance).unwrap(),
                     None => et::U256::zero(),
@@ -435,9 +470,7 @@ impl ObjectVerifier {
 
                 // (todo): make cost_per_byte a configurable constant
                 let cost_per_byte = et::U256::from(1_000_000_000u128);
-
-                let required_balance = cost_per_byte * self.total_bytes;
-
+                let required_balance = cost_per_byte * self.size;
                 if balance < required_balance {
                     return Err(anyhow!("insufficient balance"));
                 }
@@ -453,9 +486,9 @@ async fn health() -> Result<impl Reply, Rejection> {
     Ok(warp::reply::reply())
 }
 
-async fn handle_object_upload(
-    client: FendermintClient,
-    ipfs: IpfsClient,
+async fn handle_object_upload<F: QueryClient, I: IpfsApiAdapter>(
+    client: F,
+    ipfs: I,
     form_parts: warp::multipart::FormData,
 ) -> Result<impl Reply, Rejection> {
     let mut verifier = ObjectVerifier::read_form(form_parts).await.map_err(|e| {
@@ -489,26 +522,9 @@ async fn handle_object_upload(
     })?;
 
     // Add the data to IPFS
-    let add = ipfs_api_backend_hyper::request::Add {
-        chunker: Some("size-1048576"),
-        pin: Some(false),
-        raw_leaves: Some(true),
-        cid_version: Some(1),
-        hash: Some("blake2b-256"),
-        ..Default::default()
-    };
-
-    let res = ipfs
-        .add_async_with_options(verifier.temp_file.compat(), add)
-        .await
-        .map_err(|e| {
-            Rejection::from(BadRequest {
-                message: format!("failed to add file: {}", e),
-            })
-        })?;
-    let cid = Cid::try_from(res.hash).map_err(|e| {
+    let cid = ipfs.add_file(verifier.temp_file).await.map_err(|e| {
         Rejection::from(BadRequest {
-            message: format!("failed to parse cid: {}", e),
+            message: format!("failed to add file: {}", e),
         })
     })?;
 
@@ -1394,4 +1410,154 @@ async fn acc_root(
         .await?;
 
     Ok(res.return_data)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ethers::core::k256::ecdsa::SigningKey;
+    use ethers::core::rand::{rngs::StdRng, SeedableRng};
+    //use fendermint_actor_objectstore::{ObjectKind, ObjectPutParams};
+    use fendermint_rpc::FendermintClient;
+    use fendermint_vm_message::conv::from_eth::to_fvm_address;
+    use fvm_ipld_encoding::RawBytes;
+    use tendermint_rpc::{Method, MockClient, MockRequestMethodMatcher};
+
+    pub struct IpfsMocked {
+        _inner: IpfsClient,
+    }
+
+    impl IpfsApiAdapter for IpfsMocked {
+        async fn add_file(&self, _temp_file: TempFile) -> anyhow::Result<String> {
+            Ok("Qm123".to_string())
+        }
+    }
+
+    // Used to mocking Actor State
+    const ABCI_QUERY_RESPONSE: &str = r#"{
+        "jsonrpc": "2.0",
+        "id": "",
+        "result": {
+         "response": {
+             "code": 0,
+             "log": "",
+             "info": "",
+             "index": "0",
+             "key": "GGQ=",
+             "value": "pWRjb2Rl2CpYJwABVaDkAiB4ZQKaqaSEiu8tIb2Ef7bIWOoxPeNkAEljZabMaAMlaGVzdGF0ZdgqWCcAAXGg5AIgRbDPwiDO7Ft8HGLE1Bk9OOTrpI6IFXKc51+cCrDkwcBoc2VxdWVuY2UAZ2JhbGFuY2VKADY1ya3F3qAAAHFkZWxlZ2F0ZWRfYWRkcmVzc1YECqf8cO8ArRpoWzmcqFtkasWDXCqx",
+             "proof": null,
+             "height": "8",
+             "codespace": ""
+           }
+        }
+     }"#;
+
+    fn form_body(
+        boundary: &str,
+        serialized_signed_message_b64: &str,
+        external_object: &[u8],
+    ) -> Vec<u8> {
+        let mut body = Vec::new();
+        body.extend_from_slice(
+            format!(
+                "\
+            --{0}\r\n\
+            content-disposition: form-data; name=\"chain_id\"\r\n\r\n\
+            314159\r\n\
+            --{0}\r\n\
+            content-disposition: form-data; name=\"msg\"\r\n\r\n\
+            {1}\r\n\
+            --{0}\r\n\
+            ",
+                boundary, serialized_signed_message_b64
+            )
+            .as_bytes(),
+        );
+        body.extend_from_slice(
+            format!(
+                "Content-Disposition: form-data; name=\"upload\"; filename=\"example.bin\"\r\n\
+                Content-Type: application/octet-stream\r\n\r\n",
+            )
+            .as_bytes(),
+        );
+        body.extend_from_slice(&external_object);
+        body.extend_from_slice(format!("\r\n--{0}--\r\n", boundary).as_bytes());
+        body
+    }
+
+    async fn multipart_form(
+        serialized_signed_message_b64: &str,
+        external_object: &[u8],
+    ) -> warp::multipart::FormData {
+        let boundary = "--abcdef1234--";
+        let body = form_body(boundary, serialized_signed_message_b64, external_object);
+        warp::test::request()
+            .method("PUT")
+            .header("content-length", body.len())
+            .header(
+                "content-type",
+                format!("multipart/form-data; boundary={}", boundary),
+            )
+            .body(body)
+            .filter(&warp::multipart::form())
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_handle_object_upload() {
+        /*     let matcher = MockRequestMethodMatcher::default()
+            .map(Method::AbciQuery, Ok(ABCI_QUERY_RESPONSE.to_string()));
+        let client = FendermintClient::new(MockClient::new(matcher).0);
+        let ipfs = IpfsMocked {
+            _inner: IpfsClient::default(),
+        };
+
+        let key = b"key";
+        let external_object = b"hello world".as_ref();
+        let digest = Code::Blake2b256.digest(external_object);
+        let object_cid = Cid::new_v1(IPLD_RAW, digest);
+        let params = ObjectPutParams {
+            key: key.to_vec(),
+            kind: ObjectKind::External(object_cid),
+            overwrite: true,
+        };
+        let params = RawBytes::serialize(params).unwrap();
+        let object = fendermint_vm_message::signed::Object::new(key.to_vec(), object_cid);
+
+        let sk = fendermint_crypto::SecretKey::random(&mut StdRng::from_entropy());
+        let signing_key = SigningKey::from_slice(sk.serialize().as_ref()).unwrap();
+        let from_address = ethers::core::utils::secret_key_to_address(&signing_key);
+        let message = fvm_shared::message::Message {
+            version: Default::default(),
+            from: to_fvm_address(from_address),
+            to: fendermint_vm_actor_interface::objectstore::OBJECTSTORE_ACTOR_ADDR,
+            sequence: 0,
+            value: TokenAmount::from_atto(0),
+            method_num: fendermint_actor_objectstore::Method::PutObject as u64,
+            params,
+            gas_limit: 3000000,
+            gas_fee_cap: TokenAmount::from_atto(0),
+            gas_premium: TokenAmount::from_atto(0),
+        };
+        let chain_id = fvm_shared::chainid::ChainID::from(314159);
+        let signed = fendermint_vm_message::signed::SignedMessage::new_secp256k1(
+            message,
+            Some(object),
+            &sk,
+            &chain_id,
+        )
+        .unwrap();
+
+        let serialized_signed_message = fvm_ipld_encoding::to_vec(&signed).unwrap();
+        let serialized_signed_message_b64 =
+            general_purpose::URL_SAFE.encode(&serialized_signed_message);
+
+        let multipart_form = multipart_form(&serialized_signed_message_b64, external_object).await;
+        let reply = handle_object_upload(client, ipfs, multipart_form)
+            .await
+            .unwrap();
+        let response = reply.into_response();
+        assert_eq!(response.status(), StatusCode::OK); */
+    }
 }
