@@ -19,6 +19,7 @@ MEASUREMENTS_PERIOD_SECS := 60
 
 MEASUREMENTS_JSON        = $(shell find $(MEASUREMENTS_DIR) -type f -name "*.jsonline")
 MEASUREMENTS_PNG         = $(MEASUREMENTS_JSON:.jsonline=.png)
+MEASUREMENTS_STATS       = $(MEASUREMENTS_JSON:.jsonline=.stats)
 
 
 # Export all the above variables as env vars, so they are available to scripts.
@@ -59,12 +60,17 @@ measurements:
 plot-measurements: $(MEASUREMENTS_PNG)
 
 .PHONY: stats
-stats: $(MEASUREMENTS_FILE) | jq
-	@$(SCRIPTS_DIR)/stats.sh $(MEASUREMENTS_FILE)
+stats: $(MEASUREMENTS_STATS)
+	@for f in $(MEASUREMENTS_DIR)/*.stats; do \
+		echo $$f; cat $$f; \
+	done
 
 # Render a specfic plot if the data changed.
 $(MEASUREMENTS_DIR)/%.png: $(MEASUREMENTS_DIR)/%.jsonline $(SCRIPTS_DIR)/growth-plot.plt | jq gnuplot
 	$(SCRIPTS_DIR)/growth-plot.sh $@ $<
+
+$(MEASUREMENTS_DIR)/%.stats: $(MEASUREMENTS_DIR)/%.jsonline | jq
+	$(SCRIPTS_DIR)/stats.sh $< > $@
 
 # Requirements checks.
 
