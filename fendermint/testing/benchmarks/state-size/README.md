@@ -33,8 +33,12 @@ make plot-measurements
 ### Print statistics
 
 ```console
-❯ make stats STATE_HIST_SIZE=0
-{"block_height":1863,"db_size_kb":17276,"avg_growth_kb":9.273215244229737}
+❯ make stats
+{
+  "block_height": 4055,
+  "db_size_kb": 28444,
+  "avg_growth_kb": 5.042747714356313
+}
 ```
 
 ### Stop the node
