@@ -26,8 +26,8 @@ use fendermint_vm_message::chain::ChainMessage;
 use crate::message::{GasParams, SignedMessageFactory};
 use crate::query::{QueryClient, QueryResponse};
 use crate::response::{
-    decode_acc_push_results, decode_bytes, decode_cid, decode_fevm_create, decode_fevm_invoke,
-    decode_os_get, decode_os_list,
+    decode_acc_get_at, decode_acc_push_results, decode_bytes, decode_cid, decode_fevm_create,
+    decode_fevm_invoke, decode_os_get, decode_os_list,
 };
 
 /// Abstracting away what the return value is based on whether
@@ -207,6 +207,35 @@ pub trait CallClient: QueryClient + BoundClient {
         let response = CallResponse {
             response,
             return_data,
+        };
+
+        Ok(response)
+    }
+
+    /// Get object at the given index in an accumulator without including a transaction on the
+    /// blockchain.
+    async fn acc_get_at_call(
+        &mut self,
+        value: TokenAmount,
+        gas_params: GasParams,
+        height: FvmQueryHeight,
+        index: u64,
+    ) -> anyhow::Result<CallResponse<Vec<u8>>> {
+        let msg = self
+            .message_factory_mut()
+            .acc_get_at(value, gas_params, index)?;
+
+        let response = self.call(msg, height).await?;
+        if response.value.code.is_err() {
+            return Err(anyhow!("{}", response.value.info));
+        }
+
+        let res = decode_acc_get_at(&response.value)
+            .context("error decoding data from deliver_tx in call")?;
+
+        let response = CallResponse {
+            response,
+            return_data: Some(res),
         };
 
         Ok(response)

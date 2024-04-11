@@ -75,6 +75,12 @@ pub fn decode_acc_push_results(deliver_tx: &DeliverTx) -> anyhow::Result<PushRet
         .map_err(|e| anyhow!("error parsing as accumulator push response: {e}"))
 }
 
+pub fn decode_acc_get_at(deliver_tx: &DeliverTx) -> anyhow::Result<Vec<u8>> {
+    let data = decode_data(&deliver_tx.data)?;
+    fvm_ipld_encoding::from_slice(data.as_slice())
+        .map_err(|e| anyhow!("error parsing as Vec<u8>: {e}"))
+}
+
 /// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as bytes.
 pub fn decode_os_get(deliver_tx: &DeliverTx) -> anyhow::Result<Option<Object>> {
     let data = decode_data(&deliver_tx.data)?;
