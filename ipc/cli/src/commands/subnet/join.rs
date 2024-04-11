@@ -2,12 +2,10 @@
 // SPDX-License-Identifier: MIT
 //! Join subnet cli command handler.
 
-use crate::commands::anyhow;
-use anyhow::Error;
 use async_trait::async_trait;
 use clap::Args;
 use ipc_api::subnet_id::SubnetID;
-use ipc_wallet::EvmKeyStore;
+
 use num_traits::Zero;
 use std::{fmt::Debug, str::FromStr};
 
@@ -32,19 +30,6 @@ impl CommandLineHandler for JoinSubnet {
             Some(address) => Some(require_fil_addr_from_str(address)?),
             None => None,
         };
-        let keystore = provider.evm_wallet()?;
-        let address_str = arguments
-            .from
-            .as_deref()
-            .ok_or_else(|| Error::msg("Address is required"))?;
-        let address = ethers::types::Address::from_str(address_str)?;
-        let key_info = keystore
-            .read()
-            .unwrap()
-            .get(&address.into())?
-            .ok_or_else(|| anyhow!("key does not exists"))?;
-        let sk = libsecp256k1::SecretKey::parse_slice(key_info.private_key())?;
-        let public_key = libsecp256k1::PublicKey::from_secret_key(&sk).serialize();
         if let Some(initial_balance) = arguments.initial_balance.filter(|x| !x.is_zero()) {
             log::info!("pre-funding address with {initial_balance}");
             provider
@@ -52,12 +37,7 @@ impl CommandLineHandler for JoinSubnet {
                 .await?;
         }
         let epoch = provider
-            .join_subnet(
-                subnet,
-                from,
-                f64_to_token_amount(arguments.collateral)?,
-                public_key.into(),
-            )
+            .join_subnet(subnet, from, f64_to_token_amount(arguments.collateral)?)
             .await?;
         println!("joined at epoch: {epoch}");
 
