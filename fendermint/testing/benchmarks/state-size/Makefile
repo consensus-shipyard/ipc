@@ -58,6 +58,10 @@ measurements:
 .PHONY: plot-measurements
 plot-measurements: $(MEASUREMENTS_PNG)
 
+.PHONY: stats
+stats: $(MEASUREMENTS_FILE) | jq
+	@cat $< | tail -n 1 | jq -c "{block_height: .block_height, db_size_kb: .db_size_kb, avg_growth_kb: (.db_size_kb / .block_height), }"
+
 # Render a specfic plot if the data changed.
 $(MEASUREMENTS_DIR)/%.png: $(MEASUREMENTS_DIR)/%.jsonline $(SCRIPTS_DIR)/growth-plot.plt | jq gnuplot
 	$(SCRIPTS_DIR)/growth-plot.sh $@ $<

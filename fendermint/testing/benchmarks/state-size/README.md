@@ -30,6 +30,13 @@ make measurements STATE_HIST_SIZE=0 MEASUREMENTS_PERIOD_SECS=15
 make plot-measurements
 ```
 
+### Print statistics
+
+```console
+❯ make stats STATE_HIST_SIZE=0
+{"block_height":1863,"db_size_kb":17276,"avg_growth_kb":9.273215244229737}
+```
+
 ### Stop the node
 
 ```bash
