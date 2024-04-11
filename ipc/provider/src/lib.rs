@@ -295,7 +295,7 @@ impl IpcProvider {
         let public_key = libsecp256k1::PublicKey::from_secret_key(&sk).serialize();
 
         conn.manager()
-            .join_subnet(subnet, sender, collateral, public_key.to_vec())
+            .join_subnet(subnet, sender, collateral, public_key.into())
             .await
     }
 
