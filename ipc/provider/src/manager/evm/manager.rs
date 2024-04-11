@@ -338,9 +338,23 @@ impl SubnetManager for EthSubnetManager {
         // Use the pending state to get the nonce because there could have been a pre-fund. Best would be to use this for everything.
         let txn = txn.block(BlockId::Number(ethers::types::BlockNumber::Pending));
 
-        let pending_tx = txn.send().await?;
-        let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
-        block_number_from_receipt(receipt)
+        let result = txn.send().await;
+        match result {
+            Ok(pending_tx) => {
+                let receipt_result = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await;
+                match receipt_result {
+                    Ok(receipt) => block_number_from_receipt(receipt),
+                    Err(e) => {
+                        tracing::debug!("Failed to get transaction receipt: {:?}", e);
+                        Err(anyhow!("Failed to get transaction receipt: {:?}", e))
+                    }
+                }
+            },
+            Err(e) => {
+                tracing::debug!("Failed to send transaction: {:?}", e);
+                Err(anyhow!("Failed to send transaction: {:?}", e))
+            }
+        }
     }
 
     async fn pre_fund(&self, subnet: SubnetID, from: Address, balance: TokenAmount) -> Result<()> {
