@@ -45,6 +45,13 @@ impl Actor {
         })
     }
 
+    fn get_leaf_at(rt: &impl Runtime, index: u64) -> Result<Vec<u8>, ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+        let st: State = rt.state()?;
+        st.get_obj(rt.store(), index)
+            .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get leaf"))
+    }
+
     fn get_root(rt: &impl Runtime) -> Result<Cid, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let st: State = rt.state()?;
@@ -90,6 +97,7 @@ impl ActorCode for Actor {
     actor_dispatch! {
         Constructor => constructor,
         Push => push,
+        Get => get_leaf_at,
         Root => get_root,
         Peaks => get_peaks,
         Count => get_count,
