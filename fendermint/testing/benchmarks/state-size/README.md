@@ -21,16 +21,14 @@ make setup STATE_HIST_SIZE=0
 ### Measure the database size
 
 ```bash
-make measurements MEASUREMENTS_PERIOD_SECS=15
+make measurements STATE_HIST_SIZE=0 MEASUREMENTS_PERIOD_SECS=15
 ```
 
-
-### Check the block height
+### Visualize
 
 ```bash
-PORT_FROM=$(cat $MATERIALIZER_DIR/materializer-state.json | jq ".port_ranges.\"testnets/$TESTNET_ID/root/nodes/$NODE_ID\".from")
+make plot-measurements
 ```
-
 
 ### Stop the node
 

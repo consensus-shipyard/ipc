@@ -1,2 +1,2 @@
 state-size.yaml
-measurements.jsonline
+measurements/*.jsonline
