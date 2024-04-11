@@ -274,7 +274,6 @@ impl IpcProvider {
         subnet: SubnetID,
         from: Option<Address>,
         collateral: TokenAmount,
-        public_key: Vec<u8>,
     ) -> anyhow::Result<ChainEpoch> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
         let conn = match self.connection(&parent) {
@@ -285,8 +284,17 @@ impl IpcProvider {
         let subnet_config = conn.subnet();
         let sender = self.check_sender(subnet_config, from)?;
 
+        let keystore = self.evm_wallet()?;
+        let key_info = keystore
+            .read()
+            .unwrap()
+            .get(&ipc_wallet::EthKeyAddress::from_str(&sender.to_string())?)?
+            .ok_or_else(|| anyhow!("key does not exists"))?;
+        let sk = libsecp256k1::SecretKey::parse_slice(key_info.private_key())?;
+        let public_key = libsecp256k1::PublicKey::from_secret_key(&sk).serialize();
+
         conn.manager()
-            .join_subnet(subnet, sender, collateral, public_key)
+            .join_subnet(subnet, sender, collateral, public_key.to_vec())
             .await
     }
 
