@@ -12,6 +12,11 @@
 
 set -eo pipefail
 
+read -p "Warning, this will erase your ~/.ipc folder, continue (y/n)?"
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    exit 1
+fi
+
 SCRIPT_DIR=$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )
 echo "SCRIPT_DIR: $SCRIPT_DIR"
 
@@ -25,19 +30,20 @@ echo "Copying new .ipc folder"
 cp -r $SCRIPT_DIR/.ipc ~/.ipc
 
 echo "Fetching info about newest current deployment contracts"
-hash=$(curl -s https://raw.githubusercontent.com/consensus-shipyard/ipc/cd/contracts/deployments/r314159.json)
-echo $hash | jq
+deployment=$(curl -s https://raw.githubusercontent.com/consensus-shipyard/ipc/cd/contracts/deployments/r314159.json)
+echo $deployment | jq
 
 echo "Parsing gateway and registry address..."
-gateway_addr=$(echo $hash | jq -r '.gateway_addr')
+gateway_addr=$(echo $deployment | jq -r '.gateway_addr')
 echo "- Gateway address: $gateway_addr"
-registry_addr=$(echo $hash | jq -r '.registry_addr')
+registry_addr=$(echo $deployment | jq -r '.registry_addr')
 echo "- Registry address: $registry_addr"
 
 echo "Updating config with new gateway and registry address"
 toml set ~/.ipc/config.toml subnets[0].config.gateway_addr $gateway_addr > ~/.ipc/config.toml.tmp
 toml set ~/.ipc/config.toml.tmp subnets[0].config.registry_addr $registry_addr > ~/.ipc/config.toml.tmp2
 cp ~/.ipc/config.toml.tmp2 ~/.ipc/config.toml
+rm  ~/.ipc/config.toml.tmp*
 
 echo "Setting up wallets"
 wallet1=$(cargo run -q -p ipc-cli --release -- wallet new --wallet-type evm | tr -d '"')
