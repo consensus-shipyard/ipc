@@ -17,6 +17,7 @@ rootnet:
   env:
     CMT_CONSENSUS_TIMEOUT_COMMIT: 1s
     FM_DB__STATE_HIST_SIZE: "$STATE_HIST_SIZE"
+    FM_FVM__PUSH_CHAIN_META: "$PUSH_CHAIN_META"
 
   nodes:
     bench:

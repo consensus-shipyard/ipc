@@ -11,10 +11,12 @@ ROCKSDB_DIR      := $(MATERIALIZER_DIR)/testnets/$(TESTNET_ID)/root/nodes/$(NODE
 
 # By default test with keeping all state.
 STATE_HIST_SIZE  ?= 0
+# By default add the blockhash to the ledger.
+PUSH_CHAIN_META  ?= true
 
 # Measurement settings
 MEASUREMENTS_DIR         := $(PWD)/measurements
-MEASUREMENTS_FILE        := $(MEASUREMENTS_DIR)/state-size-$(STATE_HIST_SIZE).jsonline
+MEASUREMENTS_FILE        := $(MEASUREMENTS_DIR)/state-size-$(STATE_HIST_SIZE)-$(PUSH_CHAIN_META).jsonline
 MEASUREMENTS_PERIOD_SECS := 60
 
 MEASUREMENTS_JSON        = $(shell find $(MEASUREMENTS_DIR) -type f -name "*.jsonline")
@@ -56,8 +58,8 @@ measurements:
 	$(SCRIPTS_DIR)/make-measurements.sh
 
 # Render measurement charts.
-.PHONY: plot-measurements
-plot-measurements: $(MEASUREMENTS_PNG)
+.PHONY: plots
+plots: $(MEASUREMENTS_PNG)
 
 .PHONY: stats
 stats: $(MEASUREMENTS_STATS)
