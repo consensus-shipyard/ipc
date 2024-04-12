@@ -353,8 +353,10 @@ fn open_db(settings: &Settings, ns: &Namespaces) -> anyhow::Result<RocksDb> {
         path = path.to_string_lossy().into_owned(),
         "opening database"
     );
-    let mut config = RocksDbConfig::default();
-    config.compaction_style = settings.db.compaction_style.to_string();
+    let config = RocksDbConfig {
+        compaction_style: settings.db.compaction_style.to_string(),
+        ..Default::default()
+    };
     let db = RocksDb::open_cf(path, &config, ns.values().iter())?;
     Ok(db)
 }
