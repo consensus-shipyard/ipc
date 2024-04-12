@@ -11,6 +11,7 @@ use fendermint_vm_message::query::{FvmQueryHeight, GasEstimate};
 use tendermint::abci::response::DeliverTx;
 use tendermint_rpc::endpoint::broadcast::{tx_async, tx_commit, tx_sync};
 
+use fendermint_actor_accumulator::PushReturn;
 use fendermint_actor_objectstore::{
     Object, ObjectDeleteParams, ObjectGetParams, ObjectList, ObjectListParams, ObjectPutParams,
 };
@@ -25,7 +26,8 @@ use fendermint_vm_message::chain::ChainMessage;
 use crate::message::{GasParams, SignedMessageFactory};
 use crate::query::{QueryClient, QueryResponse};
 use crate::response::{
-    decode_bytes, decode_cid, decode_fevm_create, decode_fevm_invoke, decode_os_get, decode_os_list,
+    decode_acc_push_results, decode_bytes, decode_cid, decode_fevm_create, decode_fevm_invoke,
+    decode_os_get, decode_os_list,
 };
 
 /// Abstracting away what the return value is based on whether
@@ -109,10 +111,10 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
         event: Bytes,
         value: TokenAmount,
         gas_params: GasParams,
-    ) -> anyhow::Result<M::Response<Cid>> {
+    ) -> anyhow::Result<M::Response<PushReturn>> {
         let mf = self.message_factory_mut();
         let msg = mf.acc_push(event, value, gas_params)?;
-        let fut = self.perform(msg, decode_cid);
+        let fut = self.perform(msg, decode_acc_push_results);
         let res = fut.await?;
         Ok(res)
     }

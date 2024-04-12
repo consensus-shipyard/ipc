@@ -9,6 +9,7 @@ use anyhow::Context;
 use async_trait::async_trait;
 use bytes::Bytes;
 use cid::Cid;
+use fendermint_actor_accumulator::PushReturn;
 use fendermint_actor_objectstore::{
     ObjectDeleteParams, ObjectGetParams, ObjectKind, ObjectListParams, ObjectPutParams,
 };
@@ -82,11 +83,11 @@ cmd! {
             },
             RpcCommands::Acc { args, command } => match command {
                 RpcAccumulatorCommands::Push { event } => {
-                    os_push(client, args, event).await
+                    acc_push(client, args, event).await
                 }
                 RpcAccumulatorCommands::Root { height } => {
                     let height = Height::try_from(height)?;
-                    os_root_call(client, args, height).await
+                    acc_root_call(client, args, height).await
                 }
             },
             RpcCommands::Fevm { args, command } => match command {
@@ -287,19 +288,19 @@ async fn os_list_call(
     print_json(&json)
 }
 
-async fn os_push(client: FendermintClient, args: TransArgs, event: Bytes) -> anyhow::Result<()> {
+async fn acc_push(client: FendermintClient, args: TransArgs, event: Bytes) -> anyhow::Result<()> {
     broadcast_and_print(
         client,
         args,
         |mut client, value, gas_params| {
             Box::pin(async move { client.acc_push(event, value, gas_params).await })
         },
-        cid_to_json,
+        push_response_to_json,
     )
     .await
 }
 
-async fn os_root_call(
+async fn acc_root_call(
     client: FendermintClient,
     args: TransArgs,
     height: Height,
@@ -454,6 +455,13 @@ fn create_return_to_json(ret: CreateReturn) -> serde_json::Value {
 /// Print a Cid.
 pub fn cid_to_json(ret: Cid) -> serde_json::Value {
     json!(ret)
+}
+
+pub fn push_response_to_json(pr: PushReturn) -> serde_json::Value {
+    json!({
+        "root": pr.root.to_string(),
+        "index": pr.index,
+    })
 }
 
 pub enum BroadcastResponse<T> {

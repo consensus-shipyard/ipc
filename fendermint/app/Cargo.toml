@@ -69,6 +69,7 @@ ipc-api = { workspace = true }
 ipc-provider = { workspace = true }
 ipc_ipld_resolver = { workspace = true }
 
+fendermint_actor_accumulator = { path = "../actors/accumulator" }
 fendermint_actor_objectstore = { path = "../actors/objectstore" }
 
 warp = "0.3.6"

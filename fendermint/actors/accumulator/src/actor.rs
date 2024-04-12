@@ -12,7 +12,7 @@ use fil_actors_runtime::{
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::{error::ExitCode, MethodNum};
 
-use crate::{Method, State, ACCUMULATOR_ACTOR_NAME};
+use crate::{Method, PushReturn, State, ACCUMULATOR_ACTOR_NAME};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
@@ -34,7 +34,7 @@ impl Actor {
         rt.create(&state)
     }
 
-    fn push(rt: &impl Runtime, obj: Vec<u8>) -> Result<Cid, ActorError> {
+    fn push(rt: &impl Runtime, obj: Vec<u8>) -> Result<PushReturn, ActorError> {
         // FIXME:(carsonfarmer) We'll want to validate the caller is the owner of the repo.
         rt.validate_immediate_caller_accept_any()?;
 

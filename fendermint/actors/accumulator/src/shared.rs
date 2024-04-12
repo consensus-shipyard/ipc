@@ -201,11 +201,21 @@ fn get_at<BS: Blockstore, S: DeserializeOwned + Serialize>(
     Ok(leaf)
 }
 
-// The state represents an mmr with peaks stored in an Amt
+/// The state represents an MMR with peaks stored in an AMT
 #[derive(Serialize_tuple, Deserialize_tuple)]
 pub struct State {
+    /// Root of the AMT that is storing the peaks of the MMR
     pub peaks: Cid,
+    /// Number of leaf nodes in the accumulator MMR.
     pub leaf_count: u64,
+}
+
+#[derive(Serialize_tuple, Deserialize_tuple)]
+pub struct PushReturn {
+    /// The new root of the accumulator MMR after the object was pushed into it.
+    pub root: Cid,
+    /// The index of the object that was just pushed into the accumulator.
+    pub index: u64,
 }
 
 impl State {
@@ -237,12 +247,16 @@ impl State {
         &mut self,
         store: &BS,
         obj: S,
-    ) -> anyhow::Result<Cid> {
+    ) -> anyhow::Result<PushReturn> {
         let mut amt = Amt::<Cid, &BS>::load(&self.peaks, store)?;
         self.peaks = push(store, self.leaf_count, &mut amt, obj)?;
         self.leaf_count += 1;
-        // TODO:(carsonfarmer) Maybe we just want to return the root of the Amt?
-        bag_peaks(&amt)
+
+        let root = bag_peaks(&amt)?;
+        Ok(PushReturn {
+            root,
+            index: self.leaf_count - 1,
+        })
     }
 
     pub fn get_root<BS: Blockstore>(&self, store: &BS) -> anyhow::Result<Cid> {
@@ -296,8 +310,8 @@ mod tests {
 
         let obj1 = vec![1, 2, 3];
         let obj2 = vec![1, 2, 3];
-        let cid1 = state.push(&store, obj1).expect("push1 failed");
-        let cid2 = state.push(&store, obj2).expect("push2 failed");
+        let cid1 = state.push(&store, obj1).expect("push1 failed").root;
+        let cid2 = state.push(&store, obj2).expect("push2 failed").root;
 
         let pair_cid =
             hash_and_put_pair(&store, Some(&cid1), Some(&cid2)).expect("hash_and_put_pair failed");
@@ -316,8 +330,8 @@ mod tests {
 
         let obj1 = vec![1, 2, 3];
         let obj2 = vec![1, 2, 3];
-        let cid1 = state.push(&store, obj1).expect("push1 failed");
-        let cid2 = state.push(&store, obj2).expect("push2 failed");
+        let cid1 = state.push(&store, obj1).expect("push1 failed").root;
+        let cid2 = state.push(&store, obj2).expect("push2 failed").root;
 
         // Compare hash_pair and hash_and_put_pair and make sure they result in the same CID.
         let hash1 = hash_pair(Some(&cid1), Some(&cid2)).expect("hash_pair failed");
@@ -331,10 +345,9 @@ mod tests {
         let store = fvm_ipld_blockstore::MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let obj = vec![1, 2, 3];
-        assert_eq!(
-            state.push(&store, obj).expect("push failed"),
-            state.get_root(&store).expect("get_root failed")
-        );
+        let res = state.push(&store, obj).expect("push failed");
+        assert_eq!(res.root, state.get_root(&store).expect("get_root failed"));
+        assert_eq!(res.index, 0);
         assert_eq!(state.leaf_count(), 1);
     }
 
@@ -362,7 +375,9 @@ mod tests {
         let mut state = State::new(&store).unwrap();
         let mut root = Cid::default();
         for i in 1..=11 {
-            root = state.push(&store, vec![i]).unwrap();
+            let res = state.push(&store, vec![i]).unwrap();
+            root = res.root;
+            assert_eq!(res.index, i - 1);
         }
         let peaks = state.get_peaks(&store).unwrap();
         assert_eq!(peaks.len(), 3);

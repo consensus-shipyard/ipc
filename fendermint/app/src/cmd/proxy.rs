@@ -30,6 +30,7 @@ use tokio_util::compat::TokioAsyncReadCompatExt;
 use warp::http::{HeaderMap, HeaderValue};
 use warp::{http::StatusCode, Filter, Rejection, Reply};
 
+use fendermint_actor_accumulator::PushReturn;
 use fendermint_actor_objectstore::{
     Object, ObjectDeleteParams, ObjectGetParams, ObjectKind, ObjectList, ObjectListItem,
     ObjectListParams, ObjectPutParams,
@@ -547,7 +548,21 @@ async fn handle_acc_push(
         })?;
 
     *nonce_lck += 1;
-    Ok(warp::reply::json(&res))
+
+    let data = res.data.map(|pr| {
+        json!( {
+            "root": pr.root.to_string(),
+            "index": pr.index,
+        })
+    });
+    let res_human_readable = Txn {
+        status: res.status,
+        hash: res.hash,
+        height: res.height,
+        gas_used: res.gas_used,
+        data,
+    };
+    Ok(warp::reply::json(&res_human_readable))
 }
 
 async fn handle_acc_root(
@@ -615,7 +630,7 @@ enum TxnStatus {
 }
 
 #[derive(Clone, Debug, Serialize)]
-struct Txn {
+struct Txn<D> {
     pub status: TxnStatus,
     pub hash: Hash,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -623,40 +638,40 @@ struct Txn {
     #[serde(skip_serializing_if = "i64::is_zero")]
     pub gas_used: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub state: Option<String>,
+    pub data: Option<D>,
 }
 
-impl Txn {
+impl<D> Txn<D> {
     fn pending(hash: Hash) -> Self {
         Txn {
             status: TxnStatus::Pending,
             hash,
             height: None,
             gas_used: 0,
-            state: None,
+            data: None,
         }
     }
 
-    fn committed(hash: Hash, height: Height, gas_used: i64, state: Cid) -> Self {
+    fn committed(hash: Hash, height: Height, gas_used: i64, data: Option<D>) -> Self {
         Txn {
             status: TxnStatus::Committed,
             hash,
             height: Some(height),
             gas_used,
-            state: Some(state.to_string()),
+            data,
         }
     }
 }
 
 /// Create a client, make a call to Tendermint with a closure, then maybe extract some JSON
 /// depending on the return value, finally return the result in JSON.
-async fn broadcast<F>(client: FendermintClient, args: TransArgs, f: F) -> anyhow::Result<Txn>
+async fn broadcast<F, D>(client: FendermintClient, args: TransArgs, f: F) -> anyhow::Result<Txn<D>>
 where
     F: FnOnce(
         TransClient,
         TokenAmount,
         GasParams,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<BroadcastResponse<Cid>>> + Send>>,
+    ) -> Pin<Box<dyn Future<Output = anyhow::Result<BroadcastResponse<D>>> + Send>>,
 {
     let client = TransClient::new(client, &args)?;
     let gas_params = gas_params(&args);
@@ -679,7 +694,7 @@ where
                 res.response.hash,
                 res.response.height,
                 res.response.deliver_tx.gas_used,
-                res.return_data.unwrap_or_default(),
+                res.return_data,
             )
         }
     })
@@ -689,7 +704,7 @@ async fn os_put(
     client: FendermintClient,
     args: TransArgs,
     params: ObjectPutParams,
-) -> anyhow::Result<Txn> {
+) -> anyhow::Result<Txn<Cid>> {
     broadcast(client, args, |mut client, value, gas_params| {
         Box::pin(async move { client.os_put(params, value, gas_params).await })
     })
@@ -700,7 +715,7 @@ async fn os_delete(
     client: FendermintClient,
     args: TransArgs,
     params: ObjectDeleteParams,
-) -> anyhow::Result<Txn> {
+) -> anyhow::Result<Txn<Cid>> {
     broadcast(client, args, |mut client, value, gas_params| {
         Box::pin(async move { client.os_delete(params, value, gas_params).await })
     })
@@ -743,7 +758,11 @@ async fn os_list(
     Ok(res.return_data)
 }
 
-async fn acc_push(client: FendermintClient, args: TransArgs, event: Bytes) -> anyhow::Result<Txn> {
+async fn acc_push(
+    client: FendermintClient,
+    args: TransArgs,
+    event: Bytes,
+) -> anyhow::Result<Txn<PushReturn>> {
     broadcast(client, args, |mut client, value, gas_params| {
         Box::pin(async move { client.acc_push(event, value, gas_params).await })
     })
