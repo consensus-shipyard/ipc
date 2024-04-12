@@ -2913,6 +2913,7 @@ dependencies = [
  "tendermint-proto 0.31.1",
  "tendermint-rpc",
  "tokio",
+ "tower",
  "tower-abci",
  "tracing",
  "tracing-appender",

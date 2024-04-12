@@ -32,6 +32,7 @@ use libp2p::identity::secp256k1;
 use libp2p::identity::Keypair;
 use std::sync::Arc;
 use tokio::sync::broadcast::error::RecvError;
+use tower::ServiceBuilder;
 use tracing::info;
 
 use crate::cmd::key::read_secret_key;
@@ -329,7 +330,15 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
 
     // Hand those components to the ABCI server. This is where tower layers could be added.
     let server = tower_abci::v037::Server::builder()
-        .consensus(consensus)
+        .consensus(
+            // Limiting the concurrency to 1 here because the `AplicationService::poll_ready` always
+            // reports `Ready`, because it doesn't know which request it's going to get.
+            // Not limiting the concurrency to 1 can lead to transactions being applied
+            // in different order across nodes.
+            ServiceBuilder::new()
+                .concurrency_limit(1)
+                .service(consensus),
+        )
         .snapshot(snapshot)
         .mempool(mempool)
         .info(info)
