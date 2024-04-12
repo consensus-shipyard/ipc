@@ -33,6 +33,8 @@ halt_height = 0
 [abci]
 # Number of concurrent requests allowed to reach the application.
 bound = 1
+# Buffer size for consensus messages.
+consensus_buffer = 1000
 
 [abci.listen]
 # Only accept connections from Tendermint, assumed to be running locally.

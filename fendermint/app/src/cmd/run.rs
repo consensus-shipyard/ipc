@@ -336,6 +336,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             // Not limiting the concurrency to 1 can lead to transactions being applied
             // in different order across nodes.
             ServiceBuilder::new()
+                .buffer(settings.abci.consensus_buffer)
                 .concurrency_limit(1)
                 .service(consensus),
         )

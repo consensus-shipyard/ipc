@@ -91,6 +91,8 @@ pub struct AbciSettings {
     pub listen: SocketAddress,
     /// Queue size for each ABCI component.
     pub bound: usize,
+    /// Buffer size for consensus messages.
+    pub consensus_buffer: usize,
 }
 
 #[derive(Debug, Deserialize, Clone)]
