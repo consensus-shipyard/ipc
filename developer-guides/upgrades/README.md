@@ -4,6 +4,81 @@ As IPC evolves, upgrades are necessary to introduce new features, enhance securi
 
 In this document, we describe how IPC achieves full upgradability of all its components and ensures seamless progression of the blockchain network without compromising consensus.
 
+# IPC Actor upgrades
+
+The on-chain logic for IPC is implemented in two contracts, the IPC gateway and the subnet actor, as well as an auxiliary contract use for UX purposes, the registry.
+- The gateway is a singleton actor that lives in every IPC subnet and implements the common logic for IPC. It is responsible for managing the collateral of subnet, enforcing the firewall requirement, and the cross-net interactions.
+- The subnet actor is a user-defined actor that implements the specific logic of a subnet. This contract is deployed in the parent from which the child subnet wants to be deployed. There is one subnet-actor for each child subnet in the parent.
+- The subnet registry behaves as a subnet actor factory that offers users a convenient way of deploying instances of the reference implementation of the subnet actor in a network.
+
+The IPC actors are implemented using the diamond pattern to make it easier to upgrade them. The following sections describes how to upgrade each of these actors
+
+## Upgrading the Subnet actor
+
+Once you have you [deployed your own subnet](https://docs.ipc.space/quickstarts/deploy-a-subnet) you might want to make changes to the subnet actor, for example make custom logic changes, add new functionality, fix bugs, etc.
+
+The code for the subnet actor is located in `contracts/src/subnet` which you can directly edit to make your changes. Once ready, you run the following steps to upgrade your already deployed subnet actor:
+
+1. First, you must know your subnet ID which was returned when you created a child subnet (using `ipc-cli subnet create`). Lets say when you created your subnet that your subnet ID was:
+`/r314159/t410fkp4r67rks3ok4bvbn2rjojhkbig2rwvp4nmor5q`
+
+2. We must convert the subnet ID to an ETH address. To do this, go to https://beryx.zondax.ch/address_converter and input the `t410` address in the Filecoin address input, in this example this would be `t410fkp4r67rks3ok4bvbn2rjojhkbig2rwvp4nmor5q`. Click `Convert to ETH` and it will compute the Ethereum address as `0x53f91f7e2a96dcae06a16ea29724ea0a0da8daaf`.
+
+3. You must set the `RPC_URL` and `PRIVATE_KEY` environmental variables to point to your network provider and the private key of the address you want to use for the deployment, respectively
+
+4. Now you should be able to upgrade the subnet actor by running the following command (change NETWORK if you have deployed your subnet on another network)
+
+```
+> cd contracts/
+> make upgrade-sa-diamond SUBNET_ACTOR_ADDRESS=0x53f91f7e2a96dcae06a16ea29724ea0a0da8daaf NETWORK=calibrationnet
+```
+
+A successfull output looks like:
+
+```
+Successfully generated 84 typings!
+Compiled 14 Solidity files successfully (evm target: paris).
+
+Facet Bytecode Not Found:
+---------------------------------
+Facet Name: SubnetActorGetterFacet
+Libraries:
+  - SubnetIDHelper: 0x1CaA8B5a18d0401f2089aC82063AaecA08142744
+Address: 0xcb4EE21d081e0cBdd3D82D94114bEAa497f11C4a
+
+
+Diamond Facet Upgrade:
+-----------------------------------
+Diamond Address: 0x53f91f7e2a96dcae06a16ea29724ea0a0da8daaf
+Replacement Facet Name: SubnetActorGetterFacet
+
+
+Deployment Status:
+-------------------------
+New replacement facet (SubnetActorGetterFacet) deployed.
+
+
+Facet Bytecode Not Found:
+---------------------------------
+Facet Name: SubnetActorCheckpointingFacet
+Libraries:
+
+Address: 0xd5C97F52030DFE7595b6cD92868EcE5dC175C224
+
+
+Diamond Facet Upgrade:
+-----------------------------------
+Diamond Address: 0x53f91f7e2a96dcae06a16ea29724ea0a0da8daaf
+Replacement Facet Name: SubnetActorCheckpointingFacet
+
+
+Deployment Status:
+-------------------------
+New replacement facet (SubnetActorCheckpointingFacet) deployed.
+```
+
+If you run the `make upgrade-sa-diamond` command again, you should see no output which would also confirm that the upgrade has succeeded.
+
 # Fendermint upgrades
 
 Fendermint incorporates a builtin `UpgradeScheduler`, enabling the execution of hardcoded `Upgrade` migrations at predetermined block heights to advance the on-chain state. Fendermint also supports functionality to halt at predetermined `halt_height` in order to switch binary versions.
