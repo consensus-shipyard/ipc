@@ -43,6 +43,8 @@ port = 26658
 [db]
 # Keep unlimited history by default.
 state_hist_size = 0
+# RocksDB compaction style - 'level' is supposed to be good when most keys don't get updated.
+compaction_style = "level"
 
 [metrics]
 # Enable the export of metrics over HTTP.
