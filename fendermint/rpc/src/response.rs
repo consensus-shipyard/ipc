@@ -69,7 +69,7 @@ pub fn decode_cid(deliver_tx: &DeliverTx) -> anyhow::Result<Cid> {
 }
 
 /// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as bytes.
-pub fn decode_acc_push_results(deliver_tx: &DeliverTx) -> anyhow::Result<PushReturn> {
+pub fn decode_acc_push_return(deliver_tx: &DeliverTx) -> anyhow::Result<PushReturn> {
     let data = decode_data(&deliver_tx.data)?;
     fvm_ipld_encoding::from_slice::<PushReturn>(&data)
         .map_err(|e| anyhow!("error parsing as accumulator push response: {e}"))

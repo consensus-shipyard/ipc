@@ -26,7 +26,7 @@ use fendermint_vm_message::chain::ChainMessage;
 use crate::message::{GasParams, SignedMessageFactory};
 use crate::query::{QueryClient, QueryResponse};
 use crate::response::{
-    decode_acc_get_at, decode_acc_push_results, decode_bytes, decode_cid, decode_fevm_create,
+    decode_acc_get_at, decode_acc_push_return, decode_bytes, decode_cid, decode_fevm_create,
     decode_fevm_invoke, decode_os_get, decode_os_list,
 };
 
@@ -114,7 +114,7 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
     ) -> anyhow::Result<M::Response<PushReturn>> {
         let mf = self.message_factory_mut();
         let msg = mf.acc_push(event, value, gas_params)?;
-        let fut = self.perform(msg, decode_acc_push_results);
+        let fut = self.perform(msg, decode_acc_push_return);
         let res = fut.await?;
         Ok(res)
     }
