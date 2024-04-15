@@ -313,6 +313,35 @@ impl SignedMessageFactory {
         Ok(message)
     }
 
+    /// Get the object stored at a given index in an accumulator. This will not create a transaction.
+    pub fn acc_get_at(
+        &mut self,
+        value: TokenAmount,
+        gas_params: GasParams,
+        index: u64,
+    ) -> anyhow::Result<Message> {
+        let params = RawBytes::serialize(index)?;
+        let message = self.transaction(
+            accumulator::ACCUMULATOR_ACTOR_ADDR,
+            fendermint_actor_accumulator::Method::Get as u64,
+            params,
+            value,
+            gas_params,
+            None,
+        )?;
+
+        let message = if let ChainMessage::Signed(signed) = message {
+            signed.into_message()
+        } else {
+            panic!("unexpected message type: {message:?}");
+        };
+
+        // Roll back the sequence, we don't really want to invoke anything.
+        self.inner.set_sequence(message.sequence);
+
+        Ok(message)
+    }
+
     /// Get the root commitment in an accumulator. This will not create a transaction.
     pub fn acc_root(
         &mut self,

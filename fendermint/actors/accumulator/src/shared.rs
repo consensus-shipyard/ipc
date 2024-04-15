@@ -112,7 +112,10 @@ fn bag_peaks<BS: Blockstore>(peaks: &Amt<Cid, &BS>) -> anyhow::Result<Cid> {
     Ok(root)
 }
 
-fn path_for_eigen_root(leaf_index: u64, leaf_count: u64) -> (u64, u32) {
+/// Given the size of the MMR and an index into the MMR, returns a tuple where the first element
+/// represents the path through the subtree that the leaf node lives in, and the second element
+/// represents the index of the peak containing the subtree that the leaf node lives in.
+fn path_for_eigen_root(leaf_index: u64, leaf_count: u64) -> (u64, u64) {
     // Ensure `leaf_index` is within bounds.
     assert!(
         leaf_index < leaf_count,
@@ -132,12 +135,12 @@ fn path_for_eigen_root(leaf_index: u64, leaf_count: u64) -> (u64, u32) {
     // This is essentially the offset to the eigentree containing leaf_index
     let offset = (leaf_count & bitmask).count_ones();
     // The index is simply the total eigentree count minus the offset (minus one)
-    let index = eigentree_count - offset - 1;
+    let eigen_index = eigentree_count - offset - 1;
     // Now that we have the offset, we need to determine the path within the local eigentree
     let local_offset = leaf_index & bitmask;
     // The local_index is the local_offset plus the merge_height for the local eigentree
-    let local_index = local_offset + merge_height;
-    (local_index, index)
+    let local_path = local_offset + merge_height;
+    (local_path, eigen_index as u64)
 }
 
 fn get_at<BS: Blockstore, S: DeserializeOwned + Serialize>(
@@ -147,7 +150,7 @@ fn get_at<BS: Blockstore, S: DeserializeOwned + Serialize>(
     peaks: &Amt<Cid, &BS>,
 ) -> anyhow::Result<S> {
     let (path, eigen_index) = path_for_eigen_root(leaf_index, leaf_count);
-    let cid = match peaks.get(eigen_index as u64)? {
+    let cid = match peaks.get(eigen_index)? {
         Some(cid) => cid,
         None => {
             return Err(anyhow::anyhow!(
