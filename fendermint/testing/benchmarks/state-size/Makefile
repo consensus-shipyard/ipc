@@ -9,6 +9,9 @@ NODE_ID          := bench
 MATERIALIZER_DIR := $(FENDERMINT_DIR)/testing/materializer/tests/docker-materializer-data/
 ROCKSDB_DIR      := $(MATERIALIZER_DIR)/testnets/$(TESTNET_ID)/root/nodes/$(NODE_ID)/fendermint/data/rocksdb
 
+# Create the materializer as testnet, so we can disable chain metadata.
+FM_NETWORK := testnet
+
 # By default test with keeping all state.
 STATE_HIST_SIZE  ?= 0
 # By default add the blockhash to the ledger.
@@ -16,8 +19,9 @@ PUSH_CHAIN_META  ?= true
 COMPACTION_STYLE ?= level
 
 # Measurement settings
+MEASUREMENTS_SUFFIX      ?= ""
 MEASUREMENTS_DIR         := $(PWD)/measurements
-MEASUREMENTS_FILE        := $(MEASUREMENTS_DIR)/state-size-$(STATE_HIST_SIZE)-$(PUSH_CHAIN_META)-$(COMPACTION_STYLE).jsonline
+MEASUREMENTS_FILE        := $(MEASUREMENTS_DIR)/state-size-$(STATE_HIST_SIZE)-$(PUSH_CHAIN_META)-$(COMPACTION_STYLE)$(MEASUREMENTS_SUFFIX).jsonline
 MEASUREMENTS_PERIOD_SECS := 60
 
 MEASUREMENTS_JSON        = $(shell find $(MEASUREMENTS_DIR) -type f -name "*.jsonline")
