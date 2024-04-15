@@ -21,7 +21,7 @@ contract GatewayGetterFacet {
     using EnumerableSet for EnumerableSet.AddressSet;
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
-    /// @notice Returns the next and start configuration numbers in the validator changes. 
+    /// @notice Returns the next and start configuration numbers in the validator changes.
     /// The configuration numbers are from changes made in the parent.
     function getValidatorConfigurationNumbers() external view returns (uint64, uint64) {
         return LibStaking.getConfigurationNumbers();
