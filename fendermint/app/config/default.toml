@@ -97,21 +97,6 @@ gas_search_step = 1.25
 # otherwise only the nonces and balances are projected into a partial state.
 exec_in_check = true
 
-# Indicate whether the chain metadata should be pushed into the ledger.
-#
-# Doing so causes the ledger to chain even on empty blocks, which will
-# cause another empty block to be created by CometBFT, perpetuating
-# it even if we don't want them.
-#
-# This is here for testing purposes only, it should be `true` by default to allow
-# the `evm` actor to execute the `BLOCKHASH` function. If you want to disable
-# empty blocks created by CometBFT, for a less frenetic testing experience,
-# then you need to disable this as well, with the side effect that `BLOCKHASH`
-# will always return an empty value.
-#
-# See https://docs.cometbft.com/v0.37/core/configuration#empty-blocks-vs-no-empty-blocks
-push_chain_meta = true
-
 # Gas fee used when broadcasting transactions.
 # TODO: Configure a value once validators are charged for the "miner penalty".
 gas_fee_cap = 0
@@ -240,3 +225,22 @@ vote_interval = 1
 # potential stalling because peers missed an important vote and the cache is full,
 # pausing the syncer, preventing new events to trigger votes.
 vote_timeout = 60
+
+
+# # Setting which are only allowed if the `--network` CLI parameter is `testnet`.
+# [testing]
+
+# # Indicate whether the chain metadata should be pushed into the ledger.
+# #
+# # Doing so causes the ledger to chain even on empty blocks, which will
+# # cause another empty block to be created by CometBFT, perpetuating
+# # it even if we don't want them.
+# #
+# # This is here for testing purposes only, it should be `true` by default to allow
+# # the `evm` actor to execute the `BLOCKHASH` function. If you want to disable
+# # empty blocks created by CometBFT, for a less frenetic testing experience,
+# # then you need to disable this as well, with the side effect that `BLOCKHASH`
+# # will always return an empty value.
+# #
+# # See https://docs.cometbft.com/v0.37/core/configuration#empty-blocks-vs-no-empty-blocks
+# push_chain_meta = true

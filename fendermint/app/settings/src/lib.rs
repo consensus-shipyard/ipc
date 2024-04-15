@@ -12,6 +12,7 @@ use std::net::{SocketAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tendermint_rpc::Url;
+use testing::TestingSettings;
 use utils::EnvInterpol;
 
 use fendermint_vm_encoding::{human_readable_delegate, human_readable_str};
@@ -25,6 +26,7 @@ use ipc_provider::config::deserialize::deserialize_eth_address_from_str;
 pub mod eth;
 pub mod fvm;
 pub mod resolver;
+pub mod testing;
 pub mod utils;
 
 /// Marker to be used with the `#[serde_as(as = "IsHumanReadable")]` annotations.
@@ -273,6 +275,7 @@ pub struct Settings {
     pub resolver: ResolverSettings,
     pub broadcast: BroadcastSettings,
     pub ipc: IpcSettings,
+    pub testing: Option<TestingSettings>,
 }
 
 impl Settings {
