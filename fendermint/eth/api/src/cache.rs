@@ -3,27 +3,73 @@
 
 use std::sync::{Arc, Mutex};
 
-use crate::state::ActorType;
 use anyhow::Context;
 use cid::Cid;
-use fendermint_rpc::client::FendermintClient;
-use fendermint_rpc::query::QueryClient;
-use fendermint_vm_message::query::FvmQueryHeight;
+use lru_time_cache::LruCache;
+use tendermint_rpc::Client;
+
 use fvm_shared::{
     address::{Address, Payload},
     ActorID,
 };
-use lru_time_cache::LruCache;
-use tendermint_rpc::Client;
+
+use fendermint_rpc::client::FendermintClient;
+use fendermint_rpc::query::QueryClient;
+use fendermint_vm_message::query::FvmQueryHeight;
+
+use crate::state::ActorType;
+
+// The `LruCache` is wrapped in `Mutex` beause even reading requires mutation.
+#[derive(Clone)]
+pub struct Cache<K, V> {
+    cache: Arc<Mutex<LruCache<K, V>>>,
+}
+
+impl<K, V> Cache<K, V>
+where
+    K: Ord + Clone,
+    V: Clone,
+{
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            cache: Arc::new(Mutex::new(LruCache::with_capacity(capacity))),
+        }
+    }
+
+    pub fn insert(&self, key: K, value: V) {
+        let mut guard = self.cache.lock().expect("cache poisoned");
+        guard.insert(key, value);
+    }
+
+    pub fn get(&self, key: &K) -> Option<V> {
+        let mut guard = self.cache.lock().expect("cache poisoned");
+        guard.get(key).cloned()
+    }
+
+    pub fn remove(&self, key: &K) {
+        let mut guard = self.cache.lock().expect("cache poisoned");
+        guard.remove(key);
+    }
+
+    pub fn remove_many(&self, keys: &[K]) {
+        if keys.is_empty() {
+            return;
+        }
+        let mut guard = self.cache.lock().expect("cache poisoned");
+        for key in keys {
+            guard.remove(key);
+        }
+    }
+}
 
 /// Facilitate Ethereum address <-> Actor ID lookups.
 #[derive(Clone)]
 pub struct AddressCache<C> {
     client: FendermintClient<C>,
-    addr_to_id: Arc<Mutex<LruCache<Address, ActorID>>>,
-    id_to_addr: Arc<Mutex<LruCache<ActorID, Address>>>,
-    addr_to_actor_type: Arc<Mutex<LruCache<Address, ActorType>>>,
-    cid_to_actor_type: Arc<Mutex<LruCache<Cid, ActorType>>>,
+    addr_to_id: Cache<Address, ActorID>,
+    id_to_addr: Cache<ActorID, Address>,
+    addr_to_actor_type: Cache<Address, ActorType>,
+    cid_to_actor_type: Cache<Cid, ActorType>,
 }
 
 impl<C> AddressCache<C>
@@ -33,10 +79,10 @@ where
     pub fn new(client: FendermintClient<C>, capacity: usize) -> Self {
         Self {
             client,
-            addr_to_id: Arc::new(Mutex::new(LruCache::with_capacity(capacity))),
-            id_to_addr: Arc::new(Mutex::new(LruCache::with_capacity(capacity))),
-            addr_to_actor_type: Arc::new(Mutex::new(LruCache::with_capacity(capacity))),
-            cid_to_actor_type: Arc::new(Mutex::new(LruCache::with_capacity(capacity))),
+            addr_to_id: Cache::new(capacity),
+            id_to_addr: Cache::new(capacity),
+            addr_to_actor_type: Cache::new(capacity),
+            cid_to_actor_type: Cache::new(capacity),
         }
     }
 
@@ -95,43 +141,35 @@ where
     }
 
     fn get_id(&self, addr: &Address) -> Option<ActorID> {
-        let mut c = self.addr_to_id.lock().unwrap();
-        c.get(addr).cloned()
+        self.addr_to_id.get(addr)
     }
 
     fn set_id(&self, addr: Address, id: ActorID) {
-        let mut c = self.addr_to_id.lock().unwrap();
-        c.insert(addr, id);
+        self.addr_to_id.insert(addr, id)
     }
 
     fn get_addr(&self, id: &ActorID) -> Option<Address> {
-        let mut c = self.id_to_addr.lock().unwrap();
-        c.get(id).cloned()
+        self.id_to_addr.get(id)
     }
 
     fn set_addr(&self, id: ActorID, addr: Address) {
-        let mut c = self.id_to_addr.lock().unwrap();
-        c.insert(id, addr);
+        self.id_to_addr.insert(id, addr)
     }
 
     pub fn set_actor_type_for_addr(&self, addr: Address, actor_type: ActorType) {
-        let mut c = self.addr_to_actor_type.lock().unwrap();
-        c.insert(addr, actor_type);
+        self.addr_to_actor_type.insert(addr, actor_type)
     }
 
     pub fn get_actor_type_from_addr(&self, addr: &Address) -> Option<ActorType> {
-        let mut c = self.addr_to_actor_type.lock().unwrap();
-        c.get(addr).cloned()
+        self.addr_to_actor_type.get(addr)
     }
 
     pub fn set_actor_type_for_cid(&self, cid: Cid, actor_type: ActorType) {
-        let mut c = self.cid_to_actor_type.lock().unwrap();
-        c.insert(cid, actor_type);
+        self.cid_to_actor_type.insert(cid, actor_type);
     }
 
     pub fn get_actor_type_from_cid(&self, cid: &Cid) -> Option<ActorType> {
-        let mut c = self.cid_to_actor_type.lock().unwrap();
-        c.get(cid).cloned()
+        self.cid_to_actor_type.get(cid)
     }
 }
 

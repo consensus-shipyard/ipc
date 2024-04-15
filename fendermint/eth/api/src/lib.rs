@@ -15,6 +15,7 @@ mod error;
 mod filters;
 mod gas;
 mod handlers;
+mod mpool;
 mod state;
 
 pub use client::{HybridClient, HybridClientDriver};
@@ -56,6 +57,10 @@ pub async fn listen<A: ToSocketAddrs>(
             cache_capacity,
             gas_opt,
         ));
+
+        // Start the transaction cache pruning subscription.
+        mpool::start_tx_cache_clearing(rpc_state.client.clone(), rpc_state.tx_cache.clone());
+
         let rpc_server = make_server(rpc_state.clone());
         let app_state = AppState {
             rpc_server,
@@ -63,7 +68,6 @@ pub async fn listen<A: ToSocketAddrs>(
         };
         let router = make_router(app_state);
         let server = axum::Server::try_bind(&listen_addr)?.serve(router.into_make_service());
-
         tracing::info!(?listen_addr, "bound Ethereum API");
         server.await?;
         Ok(())

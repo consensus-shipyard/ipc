@@ -92,7 +92,7 @@ cmd! {
         GenesisIpcCommands::Gateway(args) =>
             set_ipc_gateway(&genesis_file, args),
         GenesisIpcCommands::FromParent(args) =>
-            new_genesis_from_parent(&genesis_file, args).await
+            new_genesis_from_parent(&genesis_file, args).await,
     }
   }
 }
@@ -294,7 +294,7 @@ async fn new_genesis_from_parent(
             config: SubnetConfig::Fevm(EVMSubnet {
                 provider_http: args.parent_endpoint.clone(),
                 provider_timeout: None,
-                auth_token: None,
+                auth_token: args.parent_auth_token.clone(),
                 registry_addr: args.parent_registry,
                 gateway_addr: args.parent_gateway,
             }),

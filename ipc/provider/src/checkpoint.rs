@@ -117,11 +117,11 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
 
     /// Run the bottom up checkpoint submission daemon in the foreground
     pub async fn run(self, submitter: Address, submission_interval: Duration) {
-        log::info!("launching {self} for {submitter}");
+        tracing::info!("launching {self} for {submitter}");
 
         loop {
             if let Err(e) = self.submit_next_epoch(submitter).await {
-                log::error!("cannot submit checkpoint for submitter: {submitter} due to {e}");
+                tracing::error!("cannot submit checkpoint for submitter: {submitter} due to {e}");
             }
             tokio::time::sleep(submission_interval).await;
         }
@@ -136,19 +136,21 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
             .map_err(|e| {
                 anyhow!("cannot obtain the last bottom up checkpoint height due to: {e:}")
             })?;
-        log::info!("last submission height: {last_checkpoint_epoch}");
+        tracing::info!("last submission height: {last_checkpoint_epoch}");
 
         let current_height = self.child_handler.current_epoch().await?;
         let finalized_height = max(1, current_height - self.finalization_blocks);
 
-        log::debug!("last submission height: {last_checkpoint_epoch}, current height: {current_height}, finalized_height: {finalized_height}");
+        tracing::debug!("last submission height: {last_checkpoint_epoch}, current height: {current_height}, finalized_height: {finalized_height}");
 
         if finalized_height <= last_checkpoint_epoch {
             return Ok(());
         }
 
         let start = last_checkpoint_epoch + 1;
-        log::debug!("start querying quorum reached events from : {start} to {finalized_height}");
+        tracing::debug!(
+            "start querying quorum reached events from : {start} to {finalized_height}"
+        );
 
         let mut count = 0;
         let mut all_submit_tasks = vec![];
@@ -156,11 +158,11 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         for h in start..=finalized_height {
             let events = self.child_handler.quorum_reached_events(h).await?;
             if events.is_empty() {
-                log::debug!("no reached events at height : {h}");
+                tracing::debug!("no reached events at height : {h}");
                 continue;
             }
 
-            log::debug!("found reached events at height : {h}");
+            tracing::debug!("found reached events at height : {h}");
 
             for event in events {
                 // Note that the event will be emitted later than the checkpoint height.
@@ -168,7 +170,7 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                 // in fendermint at height 403. This means the event.height == 400 which is
                 // already committed.
                 if event.height <= last_checkpoint_epoch {
-                    log::debug!("event height already committed: {}", event.height);
+                    tracing::debug!("event height already committed: {}", event.height);
                     continue;
                 }
 
@@ -176,7 +178,7 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                     .child_handler
                     .checkpoint_bundle_at(event.height)
                     .await?;
-                log::debug!("bottom up bundle: {bundle:?}");
+                tracing::debug!("bottom up bundle: {bundle:?}");
 
                 // We support parallel checkpoint submission using FIFO order with a limited parallelism (controlled by
                 // the size of submission_semaphore).
@@ -195,18 +197,20 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                         Self::submit_checkpoint(parent_handler_clone, submitter, bundle, event)
                             .await
                             .inspect_err(|err| {
-                                log::error!("Fail to submit checkpoint at height {height}: {err}");
+                                tracing::error!(
+                                    "Fail to submit checkpoint at height {height}: {err}"
+                                );
                             });
                     drop(submission_permit);
                     result
                 }));
 
                 count += 1;
-                log::debug!("This round has asynchronously submitted {count} checkpoints",);
+                tracing::debug!("This round has asynchronously submitted {count} checkpoints",);
             }
         }
 
-        log::debug!("Waiting for all submissions to finish");
+        tracing::debug!("Waiting for all submissions to finish");
         // Return error if any of the submit task failed.
         try_join_all(all_submit_tasks).await?;
 
@@ -234,7 +238,7 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                 )
             })?;
 
-        log::info!(
+        tracing::info!(
             "submitted bottom up checkpoint({}) in parent at height {}",
             event.height,
             epoch

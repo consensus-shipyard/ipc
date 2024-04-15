@@ -78,11 +78,11 @@ impl JsonRpcClient for JsonRpcClientImpl {
         let response = builder.send().await?;
 
         let response_body = response.text().await?;
-        log::debug!("received raw response body: {:?}", response_body);
+        tracing::debug!("received raw response body: {:?}", response_body);
 
         let value =
             serde_json::from_str::<JsonRpcResponse<T>>(response_body.as_ref()).map_err(|e| {
-                log::error!("cannot parse json rpc client response: {:?}", response_body);
+                tracing::error!("cannot parse json rpc client response: {:?}", response_body);
                 anyhow!(
                     "cannot parse json rpc response: {:} due to {:}",
                     response_body,
@@ -157,18 +157,18 @@ async fn handle_stream(
     loop {
         match ws_stream.next().await {
             None => {
-                log::trace!("No message in websocket stream. The stream was closed.");
+                tracing::trace!("No message in websocket stream. The stream was closed.");
                 break;
             }
             Some(result) => match result {
                 Ok(msg) => {
                     println!("{}", msg);
-                    log::trace!("Read message from websocket stream: {}", msg);
+                    tracing::trace!("Read message from websocket stream: {}", msg);
                     let value = serde_json::from_str(msg.to_text().unwrap()).unwrap();
                     chan.send(value).await.unwrap();
                 }
                 Err(err) => {
-                    log::error!("Error reading message from websocket stream: {:?}", err);
+                    tracing::error!("Error reading message from websocket stream: {:?}", err);
                     break;
                 }
             },
