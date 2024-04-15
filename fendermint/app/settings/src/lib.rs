@@ -91,6 +91,8 @@ pub struct AbciSettings {
     pub listen: SocketAddress,
     /// Queue size for each ABCI component.
     pub bound: usize,
+    /// Maximum number of messages allowed in a block.
+    pub block_max_msgs: usize,
 }
 
 #[derive(Debug, Deserialize, Clone)]
