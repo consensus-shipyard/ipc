@@ -444,6 +444,10 @@ where
             tx.transaction_index = Some(et::U64::from(res.index));
             tx.block_hash = Some(et::H256::from_slice(header.header.hash().as_bytes()));
             tx.block_number = Some(et::U64::from(res.height.value()));
+
+            // Fendermint does not actually send premiums to miners at this time
+            // The value of max_priority_fee_per_gas is set to zero to reflect that
+            tx.max_priority_fee_per_gas = 0;
             Ok(Some(tx))
         } else {
             error(ExitCode::USR_ILLEGAL_ARGUMENT, "incompatible transaction")
