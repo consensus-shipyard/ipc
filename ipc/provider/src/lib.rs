@@ -126,21 +126,16 @@ impl IpcProvider {
     /// Get the connection instance for the subnet.
     pub fn connection(&self, subnet: &SubnetID) -> Option<Connection> {
         let subnets = &self.config.subnets;
+
         match subnets.get(subnet) {
             Some(subnet) => match &subnet.config {
                 config::subnet::SubnetConfig::Fevm(_) => {
-                    let wallet = match self.evm_wallet() {
-                        Ok(w) => Some(w),
-                        Err(e) => {
-                            log::warn!("error initializing evm wallet: {e}");
-                            None
-                        }
-                    };
+                    let wallet = self.evm_keystore.clone();
                     let manager =
                         match EthSubnetManager::from_subnet_with_wallet_store(subnet, wallet) {
                             Ok(w) => Some(w),
                             Err(e) => {
-                                log::warn!("error initializing evm wallet: {e}");
+                                tracing::warn!("error initializing evm manager: {e}");
                                 return None;
                             }
                         };
@@ -151,6 +146,21 @@ impl IpcProvider {
                 }
             },
             None => None,
+        }
+    }
+
+    /// Get the connection of a subnet, or return an error.
+    fn get_connection(&self, subnet: &SubnetID) -> anyhow::Result<Connection> {
+        match self.connection(subnet) {
+            None => Err(anyhow!(
+                "subnet not found: {subnet}; known subnets: {:?}",
+                self.config
+                    .subnets
+                    .keys()
+                    .map(|id| id.to_string())
+                    .collect::<Vec<_>>()
+            )),
+            Some(conn) => Ok(conn),
         }
     }
 
@@ -243,10 +253,7 @@ impl IpcProvider {
         permission_mode: PermissionMode,
         supply_source: SupplySource,
     ) -> anyhow::Result<Address> {
-        let conn = match self.connection(&parent) {
-            None => return Err(anyhow!("target parent subnet not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(&parent)?;
 
         let subnet_config = conn.subnet();
         let sender = self.check_sender(subnet_config, from)?;
@@ -277,10 +284,7 @@ impl IpcProvider {
         public_key: Vec<u8>,
     ) -> anyhow::Result<ChainEpoch> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
-        let conn = match self.connection(&parent) {
-            None => return Err(anyhow!("target parent subnet not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(&parent)?;
 
         let subnet_config = conn.subnet();
         let sender = self.check_sender(subnet_config, from)?;
@@ -297,11 +301,7 @@ impl IpcProvider {
         balance: TokenAmount,
     ) -> anyhow::Result<()> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
-        let conn = match self.connection(&parent) {
-            None => return Err(anyhow!("target parent subnet not found")),
-            Some(conn) => conn,
-        };
-
+        let conn = self.get_connection(&parent)?;
         let subnet_config = conn.subnet();
         let sender = self.check_sender(subnet_config, from)?;
 
@@ -315,10 +315,7 @@ impl IpcProvider {
         amount: TokenAmount,
     ) -> anyhow::Result<()> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
-        let conn = match self.connection(&parent) {
-            None => return Err(anyhow!("target parent subnet not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(&parent)?;
 
         let subnet_config = conn.subnet();
         let sender = self.check_sender(subnet_config, from)?;
@@ -333,10 +330,7 @@ impl IpcProvider {
         collateral: TokenAmount,
     ) -> anyhow::Result<()> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
-        let conn = match self.connection(&parent) {
-            None => return Err(anyhow!("target parent subnet not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(&parent)?;
 
         let subnet_config = conn.subnet();
         let sender = self.check_sender(subnet_config, from)?;
@@ -351,10 +345,7 @@ impl IpcProvider {
         collateral: TokenAmount,
     ) -> anyhow::Result<()> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
-        let conn = match self.connection(&parent) {
-            None => return Err(anyhow!("target parent subnet not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(&parent)?;
 
         let subnet_config = conn.subnet();
         let sender = self.check_sender(subnet_config, from)?;
@@ -368,10 +359,7 @@ impl IpcProvider {
         from: Option<Address>,
     ) -> anyhow::Result<()> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
-        let conn = match self.connection(&parent) {
-            None => return Err(anyhow!("target parent subnet not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(&parent)?;
 
         let subnet_config = conn.subnet();
         let sender = self.check_sender(subnet_config, from)?;
@@ -385,10 +373,7 @@ impl IpcProvider {
         from: Option<Address>,
     ) -> anyhow::Result<()> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
-        let conn = match self.connection(&parent) {
-            None => return Err(anyhow!("target parent subnet not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(&parent)?;
 
         let subnet_config = conn.subnet();
         let sender = self.check_sender(subnet_config, from)?;
@@ -402,10 +387,7 @@ impl IpcProvider {
         from: Option<Address>,
     ) -> anyhow::Result<()> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
-        let conn = match self.connection(&parent) {
-            None => return Err(anyhow!("target parent subnet not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(&parent)?;
 
         let subnet_config = conn.subnet();
         let sender = self.check_sender(subnet_config, from)?;
@@ -418,10 +400,7 @@ impl IpcProvider {
         gateway_addr: Option<Address>,
         subnet: &SubnetID,
     ) -> anyhow::Result<HashMap<SubnetID, SubnetInfo>> {
-        let conn = match self.connection(subnet) {
-            None => return Err(anyhow!("target subnet not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(subnet)?;
 
         let subnet_config = conn.subnet();
 
@@ -444,10 +423,7 @@ impl IpcProvider {
         amount: TokenAmount,
     ) -> anyhow::Result<ChainEpoch> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
-        let conn = match self.connection(&parent) {
-            None => return Err(anyhow!("target parent subnet not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(&parent)?;
 
         let subnet_config = conn.subnet();
         let sender = self.check_sender(subnet_config, from)?;
@@ -473,10 +449,7 @@ impl IpcProvider {
         amount: TokenAmount,
     ) -> anyhow::Result<ChainEpoch> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
-        let conn = match self.connection(&parent) {
-            None => return Err(anyhow!("target parent subnet not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(&parent)?;
 
         let subnet_config = conn.subnet();
         let sender = self.check_sender(subnet_config, from)?;
@@ -497,7 +470,7 @@ impl IpcProvider {
         amount: TokenAmount,
     ) -> anyhow::Result<ChainEpoch> {
         let conn = match self.connection(&subnet) {
-            None => return Err(anyhow!("target subnet not found")),
+            None => return Err(anyhow!("target subnet not found: {subnet}")),
             Some(conn) => conn,
         };
 
@@ -535,10 +508,7 @@ impl IpcProvider {
         to: Address,
         amount: TokenAmount,
     ) -> anyhow::Result<()> {
-        let conn = match self.connection(subnet) {
-            None => return Err(anyhow!("target subnet not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(subnet)?;
 
         let subnet_config = conn.subnet();
         let sender = self.check_sender(subnet_config, from)?;
@@ -565,19 +535,13 @@ impl IpcProvider {
         subnet: &SubnetID,
         address: &Address,
     ) -> anyhow::Result<TokenAmount> {
-        let conn = match self.connection(subnet) {
-            None => return Err(anyhow!("target subnet not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(subnet)?;
 
         conn.manager().wallet_balance(address).await
     }
 
     pub async fn chain_head(&self, subnet: &SubnetID) -> anyhow::Result<ChainEpoch> {
-        let conn = match self.connection(subnet) {
-            None => return Err(anyhow!("target subnet not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(subnet)?;
 
         conn.manager().chain_head_height().await
     }
@@ -585,10 +549,7 @@ impl IpcProvider {
     /// Obtain the genesis epoch of the input subnet.
     pub async fn genesis_epoch(&self, subnet: &SubnetID) -> anyhow::Result<ChainEpoch> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
-        let conn = match self.connection(&parent) {
-            None => return Err(anyhow!("parent subnet config not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(&parent)?;
         conn.manager().genesis_epoch(subnet).await
     }
 
@@ -599,10 +560,7 @@ impl IpcProvider {
         validator: &Address,
     ) -> anyhow::Result<ValidatorInfo> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
-        let conn = match self.connection(&parent) {
-            None => return Err(anyhow!("target subnet parent not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(&parent)?;
 
         conn.manager().get_validator_info(subnet, validator).await
     }
@@ -614,10 +572,7 @@ impl IpcProvider {
         epoch: ChainEpoch,
     ) -> anyhow::Result<TopDownQueryPayload<Vec<StakingChangeRequest>>> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
-        let conn = match self.connection(&parent) {
-            None => return Err(anyhow!("target subnet parent not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(&parent)?;
 
         conn.manager().get_validator_changeset(subnet, epoch).await
     }
@@ -626,10 +581,7 @@ impl IpcProvider {
     /// generate the genesis of the subnet
     pub async fn get_genesis_info(&self, subnet: &SubnetID) -> anyhow::Result<SubnetGenesisInfo> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
-        let conn = match self.connection(&parent) {
-            None => return Err(anyhow!("parent subnet config not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(&parent)?;
         conn.manager().get_genesis_info(subnet).await
     }
 
@@ -639,10 +591,7 @@ impl IpcProvider {
         epoch: ChainEpoch,
     ) -> anyhow::Result<TopDownQueryPayload<Vec<IpcEnvelope>>> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
-        let conn = match self.connection(&parent) {
-            None => return Err(anyhow!("target parent subnet not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(&parent)?;
 
         conn.manager().get_top_down_msgs(subnet, epoch).await
     }
@@ -652,37 +601,25 @@ impl IpcProvider {
         subnet: &SubnetID,
         height: ChainEpoch,
     ) -> anyhow::Result<GetBlockHashResult> {
-        let conn = match self.connection(subnet) {
-            None => return Err(anyhow!("target subnet not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(subnet)?;
 
         conn.manager().get_block_hash(height).await
     }
 
     pub async fn get_chain_id(&self, subnet: &SubnetID) -> anyhow::Result<String> {
-        let conn = match self.connection(subnet) {
-            None => return Err(anyhow!("target subnet not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(subnet)?;
 
         conn.manager().get_chain_id().await
     }
 
     pub async fn get_commit_sha(&self, subnet: &SubnetID) -> anyhow::Result<[u8; 32]> {
-        let conn = match self.connection(subnet) {
-            None => return Err(anyhow!("target subnet not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(subnet)?;
 
         conn.manager().get_commit_sha().await
     }
 
     pub async fn get_chain_head_height(&self, subnet: &SubnetID) -> anyhow::Result<ChainEpoch> {
-        let conn = match self.connection(subnet) {
-            None => return Err(anyhow!("target subnet not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(subnet)?;
 
         conn.manager().chain_head_height().await
     }
@@ -692,10 +629,7 @@ impl IpcProvider {
         subnet: &SubnetID,
         height: ChainEpoch,
     ) -> anyhow::Result<BottomUpCheckpointBundle> {
-        let conn = match self.connection(subnet) {
-            None => return Err(anyhow!("target subnet not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(subnet)?;
 
         conn.manager().checkpoint_bundle_at(height).await
     }
@@ -705,10 +639,7 @@ impl IpcProvider {
         subnet: &SubnetID,
     ) -> anyhow::Result<ChainEpoch> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
-        let conn = match self.connection(&parent) {
-            None => return Err(anyhow!("parent subnet not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(&parent)?;
 
         conn.manager()
             .last_bottom_up_checkpoint_height(subnet)
@@ -720,10 +651,7 @@ impl IpcProvider {
         subnet: &SubnetID,
         height: ChainEpoch,
     ) -> anyhow::Result<Vec<QuorumReachedEvent>> {
-        let conn = match self.connection(subnet) {
-            None => return Err(anyhow!("target subnet not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(subnet)?;
 
         conn.manager().quorum_reached_events(height).await
     }
@@ -736,10 +664,7 @@ impl IpcProvider {
         endpoint: String,
     ) -> anyhow::Result<()> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
-        let conn = match self.connection(&parent) {
-            None => return Err(anyhow!("target parent subnet not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(&parent)?;
 
         let subnet_config = conn.subnet();
         let sender = self.check_sender(subnet_config, from)?;
@@ -752,20 +677,14 @@ impl IpcProvider {
     /// Lists the bootstrap nodes of a subnet
     pub async fn list_bootstrap_nodes(&self, subnet: &SubnetID) -> anyhow::Result<Vec<String>> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
-        let conn = match self.connection(&parent) {
-            None => return Err(anyhow!("target parent subnet not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(&parent)?;
 
         conn.manager().list_bootstrap_nodes(subnet).await
     }
 
     /// Returns the latest finality from the parent committed in a child subnet.
     pub async fn latest_parent_finality(&self, subnet: &SubnetID) -> anyhow::Result<ChainEpoch> {
-        let conn = match self.connection(subnet) {
-            None => return Err(anyhow!("target subnet not found")),
-            Some(conn) => conn,
-        };
+        let conn = self.get_connection(subnet)?;
 
         conn.manager().latest_parent_finality().await
     }

@@ -7,11 +7,12 @@ use crate::proxy::ParentQueryProxy;
 use crate::sync::{query_starting_finality, ParentFinalityStateQuery};
 use crate::voting::{self, VoteTally};
 use crate::{
-    is_null_round_str, BlockHash, BlockHeight, CachedFinalityProvider, Config, Error, Toggle,
+    is_null_round_str, BlockHash, BlockHeight, CachedFinalityProvider, Config, Error, Nonce, Toggle,
 };
 use anyhow::anyhow;
 use async_stm::{atomically, atomically_or_err, StmError};
 use ethers::utils::hex;
+use libp2p::futures::TryFutureExt;
 use std::sync::Arc;
 use tracing::instrument;
 
@@ -88,14 +89,19 @@ where
             return Ok(());
         }
 
+        let mut parent_block_nonce = None;
         loop {
             if self.exceed_cache_size_limit().await {
                 tracing::debug!("exceeded cache size limit");
                 break;
             }
 
-            first_non_null_parent_hash = match self
-                .poll_next(latest_height_fetched + 1, first_non_null_parent_hash)
+            (first_non_null_parent_hash, parent_block_nonce) = match self
+                .poll_next(
+                    latest_height_fetched + 1,
+                    first_non_null_parent_hash,
+                    parent_block_nonce,
+                )
                 .await
             {
                 Ok(h) => h,
@@ -178,7 +184,8 @@ where
         &mut self,
         height: BlockHeight,
         parent_block_hash: BlockHash,
-    ) -> Result<BlockHash, Error> {
+        parent_block_nonce: Option<Nonce>,
+    ) -> Result<(BlockHash, Option<Nonce>), Error> {
         tracing::debug!(
             height,
             parent_block_hash = hex::encode(&parent_block_hash),
@@ -214,7 +221,7 @@ where
 
                     // Null block received, no block hash for the current height being polled.
                     // Return the previous parent hash as the non-null block hash.
-                    return Ok(parent_block_hash);
+                    return Ok((parent_block_hash, None));
                 }
                 return Err(Error::CannotQueryParent(
                     format!("get_block_hash: {e}"),
@@ -234,7 +241,13 @@ where
         }
 
         let data = self.fetch_data(height, block_hash_res.block_hash).await?;
-        self.check_data(height, &data, &block_hash_res.parent_block_hash)
+        let nonce = self
+            .check_data(
+                height,
+                &data,
+                &block_hash_res.parent_block_hash,
+                parent_block_nonce,
+            )
             .await?;
 
         tracing::debug!(
@@ -265,7 +278,7 @@ where
             num_validator_changes: data.1.len(),
         });
 
-        Ok(data.0)
+        Ok((data.0, Some(nonce)))
     }
 
     #[instrument(skip(self))]
@@ -273,13 +286,33 @@ where
         &self,
         height: BlockHeight,
         current_view: &ParentViewPayload,
-        parent_block_hash: &[u8],
-    ) -> Result<(), Error> {
-        let prev_nonce = self.top_down_nonce(parent_block_hash).await?;
+        parent_block_hash: &BlockHash,
+        parent_block_nonce: Option<Nonce>,
+    ) -> Result<Nonce, Error> {
+        let prev_nonce = if let Some(v) = parent_block_nonce {
+            v
+        } else {
+            self.top_down_nonce(parent_block_hash).await?
+        };
         let curr_nonce = self.top_down_nonce(&current_view.0).await?;
+
+        tracing::debug!(
+            prev_block = hex::encode(parent_block_hash),
+            prev_nonce,
+            curr_block = hex::encode(&current_view.0),
+            curr_nonce,
+            "consecutive height nonces"
+        );
 
         let num_msgs = curr_nonce - prev_nonce;
         let msgs = &current_view.2;
+
+        tracing::debug!(
+            expected = num_msgs,
+            actual = msgs.len(),
+            "expected topdown messages"
+        );
+
         if num_msgs != msgs.len() as u64 {
             return Err(Error::TopDownMsgsLengthIncorrect(
                 height,
@@ -288,7 +321,7 @@ where
             ));
         }
 
-        Ok(())
+        Ok(curr_nonce)
     }
 
     #[inline]
@@ -312,39 +345,7 @@ where
         height: BlockHeight,
         block_hash: BlockHash,
     ) -> Result<ParentViewPayload, Error> {
-        let changes_res = self
-            .parent_proxy
-            .get_validator_changes(height)
-            .await
-            .map_err(|e| Error::CannotQueryParent(format!("get_validator_changes: {e}"), height))?;
-
-        if changes_res.block_hash != block_hash {
-            tracing::warn!(
-                height,
-                change_set_hash = hex::encode(&changes_res.block_hash),
-                block_hash = hex::encode(&block_hash),
-                "change set block hash does not equal block hash",
-            );
-            return Err(Error::ParentChainReorgDetected);
-        }
-
-        let topdown_msgs_res = self
-            .parent_proxy
-            .get_top_down_msgs(height)
-            .await
-            .map_err(|e| Error::CannotQueryParent(format!("get_top_down_msgs: {e}"), height))?;
-
-        if topdown_msgs_res.block_hash != block_hash {
-            tracing::warn!(
-                height,
-                topdown_msgs_hash = hex::encode(&topdown_msgs_res.block_hash),
-                block_hash = hex::encode(&block_hash),
-                "topdown messages block hash does not equal block hash",
-            );
-            return Err(Error::ParentChainReorgDetected);
-        }
-
-        Ok((block_hash, changes_res.value, topdown_msgs_res.value))
+        fetch_data(self.parent_proxy.as_ref(), height, block_hash).await
     }
 
     async fn finalized_chain_head(&self) -> anyhow::Result<Option<BlockHeight>> {
@@ -380,6 +381,83 @@ fn map_voting_err(e: StmError<voting::Error>) -> StmError<Error> {
         }
         StmError::Control(c) => StmError::Control(c),
     }
+}
+
+#[instrument(skip(parent_proxy))]
+async fn fetch_data<P>(
+    parent_proxy: &P,
+    height: BlockHeight,
+    block_hash: BlockHash,
+) -> Result<ParentViewPayload, Error>
+where
+    P: ParentQueryProxy + Send + Sync + 'static,
+{
+    let changes_res = parent_proxy
+        .get_validator_changes(height)
+        .map_err(|e| Error::CannotQueryParent(format!("get_validator_changes: {e}"), height));
+
+    let topdown_msgs_res = parent_proxy
+        .get_top_down_msgs(height)
+        .map_err(|e| Error::CannotQueryParent(format!("get_top_down_msgs: {e}"), height));
+
+    let (changes_res, topdown_msgs_res) = tokio::join!(changes_res, topdown_msgs_res);
+    let (changes_res, topdown_msgs_res) = (changes_res?, topdown_msgs_res?);
+
+    if changes_res.block_hash != block_hash {
+        tracing::warn!(
+            height,
+            change_set_hash = hex::encode(&changes_res.block_hash),
+            block_hash = hex::encode(&block_hash),
+            "change set block hash does not equal block hash",
+        );
+        return Err(Error::ParentChainReorgDetected);
+    }
+
+    if topdown_msgs_res.block_hash != block_hash {
+        tracing::warn!(
+            height,
+            topdown_msgs_hash = hex::encode(&topdown_msgs_res.block_hash),
+            block_hash = hex::encode(&block_hash),
+            "topdown messages block hash does not equal block hash",
+        );
+        return Err(Error::ParentChainReorgDetected);
+    }
+
+    Ok((block_hash, changes_res.value, topdown_msgs_res.value))
+}
+
+pub async fn fetch_topdown_events<P>(
+    parent_proxy: &P,
+    start_height: BlockHeight,
+    end_height: BlockHeight,
+) -> Result<Vec<(BlockHeight, ParentViewPayload)>, Error>
+where
+    P: ParentQueryProxy + Send + Sync + 'static,
+{
+    let mut events = Vec::new();
+    for height in start_height..=end_height {
+        match parent_proxy.get_block_hash(height).await {
+            Ok(res) => {
+                let (block_hash, changes, msgs) =
+                    fetch_data(parent_proxy, height, res.block_hash).await?;
+
+                if !(changes.is_empty() && msgs.is_empty()) {
+                    events.push((height, (block_hash, changes, msgs)));
+                }
+            }
+            Err(e) => {
+                if is_null_round_str(&e.to_string()) {
+                    continue;
+                } else {
+                    return Err(Error::CannotQueryParent(
+                        format!("get_block_hash: {e}"),
+                        height,
+                    ));
+                }
+            }
+        }
+    }
+    Ok(events)
 }
 
 #[cfg(test)]
@@ -472,9 +550,12 @@ mod tests {
 
         async fn get_top_down_nonce(
             &self,
-            _block_hash: &[u8],
+            block_hash: &[u8],
         ) -> anyhow::Result<TopDownQueryPayload<u64>> {
-            todo!()
+            Ok(TopDownQueryPayload {
+                value: 0,
+                block_hash: block_hash.to_vec(),
+            })
         }
     }
 

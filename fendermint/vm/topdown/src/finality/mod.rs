@@ -91,9 +91,12 @@ mod tests {
 
         async fn get_top_down_nonce(
             &self,
-            _block_hash: &[u8],
+            block_hash: &[u8],
         ) -> anyhow::Result<TopDownQueryPayload<u64>> {
-            todo!()
+            Ok(TopDownQueryPayload {
+                value: 0,
+                block_hash: block_hash.to_vec(),
+            })
         }
     }
 

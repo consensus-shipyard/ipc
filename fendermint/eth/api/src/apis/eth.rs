@@ -38,7 +38,7 @@ use tendermint_rpc::{
 
 use fil_actors_evm_shared::uints;
 
-use crate::conv::from_eth::to_fvm_message;
+use crate::conv::from_eth::{self, to_fvm_message};
 use crate::conv::from_tm::{self, msg_hash, to_chain_message, to_cumulative, to_eth_block_zero};
 use crate::error::error_with_revert;
 use crate::filters::{matches_topics, FilterId, FilterKind, FilterRecords};
@@ -426,7 +426,10 @@ pub async fn get_transaction_by_hash<C>(
 where
     C: Client + Sync + Send,
 {
-    if let Some(res) = data.tx_by_hash(tx_hash).await? {
+    // Check in the pending cache first.
+    if let Some(tx) = data.tx_cache.get(&tx_hash) {
+        Ok(Some(tx))
+    } else if let Some(res) = data.tx_by_hash(tx_hash).await? {
         let msg = to_chain_message(&res.tx)?;
 
         if let ChainMessage::Signed(msg) = msg {
@@ -617,6 +620,11 @@ where
     let sighash = tx.sighash();
     let msghash = et::TxHash::from(ethers_core::utils::keccak256(rlp.as_raw()));
     tracing::debug!(?sighash, eth_hash = ?msghash, ?tx, "received raw transaction");
+
+    if let Some(tx) = tx.as_eip1559_ref() {
+        let tx = from_eth::to_eth_transaction(tx.clone(), sig, msghash);
+        data.tx_cache.insert(msghash, tx);
+    }
 
     let msg = to_fvm_message(tx, false)?;
     let msg = SignedMessage {

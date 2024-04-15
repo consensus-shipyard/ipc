@@ -13,6 +13,7 @@ library SupplySourceHelper {
     using SafeERC20 for IERC20;
 
     error InvalidERC20Address();
+    error NoBalanceIncrease();
     error UnexpectedSupplySource();
     error UnknownSupplySource();
 
@@ -45,13 +46,23 @@ library SupplySourceHelper {
         }
     }
 
-    /// @notice Locks the specified amount sent by the msg.sender into custody.
-    function lock(SupplySource memory supplySource, uint256 value) internal {
+    /// @notice Locks the specified amount from msg.sender into custody.
+    ///         Reverts with NoBalanceIncrease if the token balance does not increase.
+    ///         May return more than requested for inflationary tokens due to balance rise.
+    function lock(SupplySource memory supplySource, uint256 value) internal returns (uint256) {
         if (supplySource.kind == SupplyKind.ERC20) {
             IERC20 token = IERC20(supplySource.tokenAddress);
+            uint256 initialBalance = token.balanceOf(address(this));
             token.safeTransferFrom({from: msg.sender, to: address(this), value: value});
+            uint256 finalBalance = token.balanceOf(address(this));
+            if (finalBalance <= initialBalance) {
+                revert NoBalanceIncrease();
+            }
+            // Safe arithmetic is not necessary because underflow is not possible due to the check above
+            return finalBalance - initialBalance;
         }
         // Do nothing for native.
+        return value;
     }
 
     /// @notice Transfers the specified amount out of our treasury to the recipient address.
