@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use fendermint_abci::{AbciResult as Result, Application, ApplicationService};
 use structopt::StructOpt;
 use tendermint::abci::{request, response, Event, EventAttributeIndexExt};
+use tower::ServiceBuilder;
 use tower_abci::{split, v037::Server};
 use tracing::{info, Level};
 
@@ -155,7 +156,14 @@ async fn main() {
 
     // Hand those components to the ABCI server. This is where tower layers could be added.
     let server = Server::builder()
-        .consensus(consensus)
+        .consensus(
+            // Because message handling is asynchronous, we must limit the concurrency of `consensus` to 1,
+            // otherwise transactions can be executed in an arbitrary order.
+            ServiceBuilder::new()
+                .buffer(100)
+                .concurrency_limit(1)
+                .service(consensus),
+        )
         .snapshot(snapshot)
         .mempool(mempool)
         .info(info)
