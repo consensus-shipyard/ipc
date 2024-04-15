@@ -178,7 +178,11 @@ where
         F: FnOnce(&DeliverTx) -> anyhow::Result<T> + Sync + Send,
     {
         let data = SignedMessageFactory::serialize(&msg)?;
-        let response = self.inner.broadcast_tx_async(data).await?;
+        let response = self
+            .inner
+            .broadcast_tx_async(data)
+            .await
+            .context("broadcast_tx_async failed")?;
         let response = AsyncResponse {
             response,
             return_data: PhantomData,
@@ -201,7 +205,11 @@ where
         F: FnOnce(&DeliverTx) -> anyhow::Result<T> + Sync + Send,
     {
         let data = SignedMessageFactory::serialize(&msg)?;
-        let response = self.inner.broadcast_tx_sync(data).await?;
+        let response = self
+            .inner
+            .broadcast_tx_sync(data)
+            .await
+            .context("broadcast_tx_sync failed")?;
         let response = SyncResponse {
             response,
             return_data: PhantomData,
@@ -224,7 +232,11 @@ where
         F: FnOnce(&DeliverTx) -> anyhow::Result<T> + Sync + Send,
     {
         let data = SignedMessageFactory::serialize(&msg)?;
-        let response = self.inner.broadcast_tx_commit(data).await?;
+        let response = self
+            .inner
+            .broadcast_tx_commit(data)
+            .await
+            .context("broadcast_tx_commit failed")?;
         // We have a fully `DeliverTx` with default fields even if `CheckTx` indicates failure.
         let return_data = if response.check_tx.code.is_err() || response.deliver_tx.code.is_err() {
             None
@@ -254,7 +266,10 @@ where
     let height: u64 = height.into();
     let height = Height::try_from(height).context("failed to conver to Height")?;
 
-    let res = client.abci_query(None, data, Some(height), false).await?;
+    let res = client
+        .abci_query(None, data, Some(height), false)
+        .await
+        .context("abci query failed")?;
 
     Ok(res)
 }
