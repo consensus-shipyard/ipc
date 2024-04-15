@@ -5,10 +5,12 @@ use anyhow::Context;
 use async_trait::async_trait;
 use std::collections::HashMap;
 
-use fendermint_vm_actor_interface::{chainmetadata, cron, system};
+use fendermint_vm_actor_interface::{burntfunds, chainmetadata, cron, eam::EthAddress, system};
 use fvm::executor::ApplyRet;
 use fvm_ipld_blockstore::Blockstore;
-use fvm_shared::{address::Address, ActorID, MethodNum, BLOCK_GAS_LIMIT};
+use fvm_shared::{
+    address::Address, econ::TokenAmount, ActorID, MethodNum, BLOCK_GAS_LIMIT, METHOD_SEND,
+};
 use tendermint_rpc::Client;
 
 use crate::ExecInterpreter;
@@ -128,6 +130,46 @@ where
 
                 if let Some(err) = apply_ret.failure_info {
                     anyhow::bail!("failed to apply chainmetadata message: {}", err);
+                }
+            }
+        }
+
+        // Here we could give some funds to the validator.
+        if let Some(validator_id) = state.validator_id() {
+            // TODO: Make it more efficient to turn an ID into a PublicKey.
+            let (_, power_table) = self
+                .gateway
+                .current_power_table(&mut state)
+                .context("failed to get the power table")?;
+
+            let validator = power_table.iter().find(|v| {
+                if let Ok(pk) = tendermint::PublicKey::try_from(v.public_key.clone()) {
+                    let id = tendermint::account::Id::from(pk);
+                    id == validator_id
+                } else {
+                    false
+                }
+            });
+
+            if let Some(v) = validator {
+                // Burn some funds from the validator.
+                let msg = FvmMessage {
+                    from: Address::from(EthAddress::from(v.public_key.0)),
+                    to: burntfunds::BURNT_FUNDS_ACTOR_ADDR,
+                    sequence: height as u64,
+                    gas_limit,
+                    method_num: METHOD_SEND,
+                    params: Default::default(),
+                    value: TokenAmount::from_atto(1),
+                    version: Default::default(),
+                    gas_fee_cap: Default::default(),
+                    gas_premium: Default::default(),
+                };
+
+                let (apply_ret, _) = state.execute_implicit(msg)?;
+
+                if let Some(err) = apply_ret.failure_info {
+                    anyhow::bail!("failed to give reward to block creator: {}", err);
                 }
             }
         }
