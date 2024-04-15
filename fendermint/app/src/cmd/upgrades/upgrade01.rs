@@ -126,6 +126,10 @@ pub(crate) fn store_missing_validator_changes<DB: Blockstore + 'static + Clone>(
             topdown.call_with_return(
                 state, |c| c.commit_parent_finality(finality.clone())
             )?;
+            info!(
+                "[Upgrade at height {}] Updated parent finality",
+                state.block_height()
+            );
 
             Ok(())
         }))
