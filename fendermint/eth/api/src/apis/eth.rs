@@ -400,7 +400,13 @@ where
     C: Client + Sync + Send,
 {
     if let Some(block) = data.block_by_hash_opt(block_hash).await? {
-        data.transaction_by_index(block, index).await
+        let mut transaction = data.transaction_by_index(block, index).await?;
+        if let Some(tx) = &mut transaction {
+            // Fendermint does not actually send premiums to miners at this time
+            // The value of max_priority_fee_per_gas is set to zero to reflect that
+            tx.max_priority_fee_per_gas = Some(et::U256::from(0));
+        }
+        Ok(transaction)
     } else {
         Ok(None)
     }
@@ -415,9 +421,16 @@ where
     C: Client + Sync + Send,
 {
     let block = data.block_by_height(block_number).await?;
-    data.transaction_by_index(block, index).await
-}
+    let mut transaction = data.transaction_by_index(block, index).await?;
 
+    if let Some(tx) = &mut transaction {
+        // Fendermint does not actually send premiums to miners at this time
+        // The value of max_priority_fee_per_gas is set to zero to reflect that
+        tx.max_priority_fee_per_gas = Some(et::U256::from(0));
+    }
+
+    Ok(transaction)
+}
 /// Returns the information about a transaction requested by transaction hash.
 pub async fn get_transaction_by_hash<C>(
     data: JsonRpcData<C>,
@@ -447,7 +460,7 @@ where
 
             // Fendermint does not actually send premiums to miners at this time
             // The value of max_priority_fee_per_gas is set to zero to reflect that
-            tx.max_priority_fee_per_gas = 0;
+            tx.max_priority_fee_per_gas = Some(et::U256::from(0));
             Ok(Some(tx))
         } else {
             error(ExitCode::USR_ILLEGAL_ARGUMENT, "incompatible transaction")
