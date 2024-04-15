@@ -10,13 +10,15 @@ use fendermint_vm_interpreter::fvm::upgrades::{Upgrade, UpgradeScheduler};
 use fvm_ipld_blockstore::Blockstore;
 use ipc_actors_abis::lib_staking_change_log::NewStakingChangeRequestFilter;
 use ipc_actors_abis::top_down_finality_facet::{
-    StakingChange, StakingChangeRequest, TopDownFinalityFacet, TopDownFinalityFacetErrors,
+    ParentFinality, StakingChange, StakingChangeRequest, TopDownFinalityFacet,
+    TopDownFinalityFacetErrors,
 };
 use std::str::FromStr;
 use tracing::info;
 
 /// The topic id for the configuration change request. It's derived from keccak('NewStakingChangeRequest(uint8,address,bytes,uint64)').
-const CONFIGURATION_CHANGE_TOPIC: &str = "1c593a2b803c3f9038e8b6743ba79fbc4276d2770979a01d2768ed12bea3243f";
+const CONFIGURATION_CHANGE_TOPIC: &str =
+    "1c593a2b803c3f9038e8b6743ba79fbc4276d2770979a01d2768ed12bea3243f";
 
 pub(crate) fn store_missing_validator_changes<DB: Blockstore + 'static + Clone>(
     upgrade_scheduler: &mut UpgradeScheduler<DB>,
@@ -24,6 +26,10 @@ pub(crate) fn store_missing_validator_changes<DB: Blockstore + 'static + Clone>(
 ) -> anyhow::Result<()> {
     upgrade_scheduler
         .add(Upgrade::new_by_id(CHAIN_ID.into(), block_height, None, |state| {
+
+            // TODO: update height and hash
+            let topdown_height = ethers::types::U256::from(1000u64);
+            let topdown_hash = [0; 32];
 
             // these changes were obtained by querying the filfox events api using:
             // https://filfox.info/api/v1/address/f410fqpww4v74jydq25jncdbletyqd42oxyeoapzaz4a/events?pageSize=100
@@ -112,6 +118,14 @@ pub(crate) fn store_missing_validator_changes<DB: Blockstore + 'static + Clone>(
             );
 
             topdown.call_with_return(state, |c| c.store_validator_changes(validator_changes))?;
+
+            let finality = ParentFinality {
+                height: topdown_height,
+                block_hash: topdown_hash
+            };
+            topdown.call_with_return(
+                state, |c| c.commit_parent_finality(finality.clone())
+            )?;
 
             Ok(())
         }))

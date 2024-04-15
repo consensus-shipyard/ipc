@@ -10,7 +10,8 @@ use fvm_ipld_blockstore::Blockstore;
 // TODO: Update the chain id to your respective chain id
 const CHAIN_ID: u64 = 901861227013395;
 
-pub fn create_upgrade_scheduler<DB: Blockstore + 'static + Clone>() -> anyhow::Result<UpgradeScheduler<DB>> {
+pub fn create_upgrade_scheduler<DB: Blockstore + 'static + Clone>(
+) -> anyhow::Result<UpgradeScheduler<DB>> {
     let mut upgrade_scheduler = UpgradeScheduler::new();
 
     // applied missing validator changes

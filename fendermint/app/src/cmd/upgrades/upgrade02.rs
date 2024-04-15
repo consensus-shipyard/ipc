@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use crate::cmd::upgrades::CHAIN_ID;
+use ethers::abi::Address;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::fvm::state::fevm::ContractCaller;
 use fendermint_vm_interpreter::fvm::upgrades::{Upgrade, UpgradeScheduler};
 use fvm_ipld_blockstore::Blockstore;
 use ipc_actors_abis::ownership_facet::{OwnershipFacet, OwnershipFacetErrors};
 use std::str::FromStr;
-use ethers::abi::Address;
 use tracing::info;
 
 pub(crate) fn transfer_ownership<DB: Blockstore + 'static + Clone>(
@@ -16,8 +16,11 @@ pub(crate) fn transfer_ownership<DB: Blockstore + 'static + Clone>(
     block_height: u64,
 ) -> anyhow::Result<()> {
     // transfer ownership of the gateway to target address
-    upgrade_scheduler
-        .add(Upgrade::new_by_id(CHAIN_ID.into(), block_height, None, |state| {
+    upgrade_scheduler.add(Upgrade::new_by_id(
+        CHAIN_ID.into(),
+        block_height,
+        None,
+        |state| {
             // TODO: update to the actual new owner address
             let new_owner = Address::from_str("0x1A79385eAd0e873FE0C441C034636D3Edf7014cC")?;
             let cur_owner = Address::from_str("0xfF00000000000000000000000000000000000000")?;
@@ -41,5 +44,6 @@ pub(crate) fn transfer_ownership<DB: Blockstore + 'static + Clone>(
             info!(owner = owner.to_string(), "updated gateway ownership");
 
             Ok(())
-        }))
+        },
+    ))
 }
