@@ -24,7 +24,7 @@ use fendermint_vm_topdown::proxy::IPCProviderProxy;
 use fendermint_vm_topdown::sync::launch_polling_syncer;
 use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
 use fendermint_vm_topdown::{CachedFinalityProvider, IPCParentFinality, Toggle};
-use fvm_shared::address::Address;
+use fvm_shared::address::{current_network, Address, Network};
 use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
@@ -120,6 +120,13 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         ValidatorContext::new(sk, broadcaster)
     });
 
+    let testing_settings = match settings.testing.as_ref() {
+        Some(_) if current_network() == Network::Mainnet => {
+            bail!("testing settings are not allowed on Mainnet");
+        }
+        other => other,
+    };
+
     let interpreter = FvmMessageInterpreter::<NamespaceBlockstore, _>::new(
         tendermint_client.clone(),
         validator_ctx,
@@ -128,7 +135,9 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         settings.fvm.gas_search_step,
         settings.fvm.exec_in_check,
         UpgradeScheduler::new(),
-    );
+    )
+    .with_push_chain_meta(testing_settings.map_or(true, |t| t.push_chain_meta));
+
     let interpreter = SignedMessageInterpreter::new(interpreter);
     let interpreter = ChainMessageInterpreter::<_, NamespaceBlockstore>::new(interpreter);
     let interpreter = BytesMessageInterpreter::new(
@@ -371,7 +380,11 @@ fn open_db(settings: &Settings, ns: &Namespaces) -> anyhow::Result<RocksDb> {
         path = path.to_string_lossy().into_owned(),
         "opening database"
     );
-    let db = RocksDb::open_cf(path, &RocksDbConfig::default(), ns.values().iter())?;
+    let config = RocksDbConfig {
+        compaction_style: settings.db.compaction_style.to_string(),
+        ..Default::default()
+    };
+    let db = RocksDb::open_cf(path, &config, ns.values().iter())?;
     Ok(db)
 }
 

@@ -76,6 +76,8 @@ where
     /// Indicate whether transactions should be fully executed during the checks performed
     /// when they are added to the mempool, or just the most basic ones are performed.
     exec_in_check: bool,
+    /// Indicate whether the chain metadata should be pushed into the ledger.
+    push_chain_meta: bool,
     gateway: GatewayCaller<DB>,
     /// Upgrade scheduler stores all the upgrades to be executed at given heights.
     upgrade_scheduler: UpgradeScheduler<DB>,
@@ -101,9 +103,15 @@ where
             gas_overestimation_rate,
             gas_search_step,
             exec_in_check,
+            push_chain_meta: true,
             gateway: GatewayCaller::default(),
             upgrade_scheduler,
         }
+    }
+
+    pub fn with_push_chain_meta(mut self, push_chain_meta: bool) -> Self {
+        self.push_chain_meta = push_chain_meta;
+        self
     }
 }
 
