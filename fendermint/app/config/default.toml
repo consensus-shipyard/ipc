@@ -31,10 +31,15 @@ halt_height = 0
 # kind =
 
 [abci]
-# Number of concurrent requests allowed to reach the application.
+# Number of concurrent requests allowed to be _submitted_ to the application.
+# Because message handling is asynhronous, this doesn't make any difference
+# in practice, because they will be executed concurrently, unless affected
+# by Tower layers applied in the application root.
 bound = 1
-# Buffer size for consensus messages.
-consensus_buffer = 1000
+# Maximum number of messages allowed in a block, which also affects the
+# buffer size applied on the consensus service. It is important to keep
+# those in-sync to avoid potential deadlocks with message handling in Tower.
+block_max_msgs = 1000
 
 [abci.listen]
 # Only accept connections from Tendermint, assumed to be running locally.

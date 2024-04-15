@@ -131,8 +131,12 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     );
     let interpreter = SignedMessageInterpreter::new(interpreter);
     let interpreter = ChainMessageInterpreter::<_, NamespaceBlockstore>::new(interpreter);
-    let interpreter =
-        BytesMessageInterpreter::new(interpreter, ProposalPrepareMode::AppendOnly, false);
+    let interpreter = BytesMessageInterpreter::new(
+        interpreter,
+        ProposalPrepareMode::PrependOnly,
+        false,
+        settings.abci.block_max_msgs,
+    );
 
     let ns = Namespaces::default();
     let db = open_db(&settings, &ns).context("error opening DB")?;
@@ -329,14 +333,19 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         tower_abci::split::service(service, settings.abci.bound);
 
     // Hand those components to the ABCI server. This is where tower layers could be added.
+    // TODO: Check out the examples about load shedding in `info` requests.
     let server = tower_abci::v037::Server::builder()
         .consensus(
             // Limiting the concurrency to 1 here because the `AplicationService::poll_ready` always
             // reports `Ready`, because it doesn't know which request it's going to get.
             // Not limiting the concurrency to 1 can lead to transactions being applied
-            // in different order across nodes.
+            // in different order across nodes. The buffer size has to be large enough
+            // to allow all in-flight requests to not block message handling in
+            // `tower_abci::Connection::run`, which could lead to deadlocks.
+            // With ABCI++ we need to be able to handle all block transactions plus the begin/end/commit
+            // around it. With ABCI 2.0 we'll get the block as a whole, which makes this easier.
             ServiceBuilder::new()
-                .buffer(settings.abci.consensus_buffer)
+                .buffer(settings.abci.block_max_msgs + 3)
                 .concurrency_limit(1)
                 .service(consensus),
         )
