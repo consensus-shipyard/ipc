@@ -13,6 +13,7 @@ use fund::FundArgs;
 use propagate::PropagateArgs;
 use release::ReleaseArgs;
 
+use crate::commands::crossmsg::topdown_cross::{GetTopDownMsgNonce, GetTopDownMsgNonceArgs};
 use clap::{Args, Subcommand};
 
 pub mod fund;
@@ -38,6 +39,7 @@ impl CrossMsgsCommandsArgs {
             Commands::PreRelease(args) => PreRelease::handle(global, args).await,
             Commands::Propagate(args) => Propagate::handle(global, args).await,
             Commands::ListTopdownMsgs(args) => ListTopdownMsgs::handle(global, args).await,
+            Commands::ListTopdownNonce(args) => GetTopDownMsgNonce::handle(global, args).await,
             Commands::ParentFinality(args) => LatestParentFinality::handle(global, args).await,
         }
     }
@@ -52,5 +54,6 @@ pub(crate) enum Commands {
     PreRelease(PreReleaseArgs),
     Propagate(PropagateArgs),
     ListTopdownMsgs(ListTopdownMsgsArgs),
+    ListTopdownNonce(GetTopDownMsgNonceArgs),
     ParentFinality(LatestParentFinalityArgs),
 }

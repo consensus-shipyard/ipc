@@ -83,3 +83,33 @@ pub(crate) struct LatestParentFinalityArgs {
     #[arg(long, help = "The subnet id to check parent finality")]
     pub subnet: String,
 }
+
+#[derive(Debug, Args)]
+#[command(about = "Get the top down message nonce at block")]
+pub(crate) struct GetTopDownMsgNonceArgs {
+    #[arg(long, help = "The subnet id to check")]
+    pub subnet: String,
+    #[arg(long, help = "The block hash")]
+    pub block_hash: String,
+}
+
+/// The command to get top down message nonce
+pub(crate) struct GetTopDownMsgNonce;
+
+#[async_trait]
+impl CommandLineHandler for GetTopDownMsgNonce {
+    type Arguments = GetTopDownMsgNonceArgs;
+
+    async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
+        log::debug!("get top down message nonce: {:?}", arguments);
+
+        let provider = get_ipc_provider(global)?;
+        let subnet = SubnetID::from_str(&arguments.subnet)?;
+        let block_hash = hex::decode(&arguments.block_hash)?;
+
+        let nonce = provider.get_top_down_nonce(&subnet, &block_hash).await?;
+        println!("{}", nonce.value);
+
+        Ok(())
+    }
+}
