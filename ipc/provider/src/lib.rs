@@ -10,6 +10,7 @@ use fvm_shared::{
     address::Address, clock::ChainEpoch, crypto::signature::SignatureType, econ::TokenAmount,
 };
 use ipc_api::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
+use ipc_api::evm::payload_to_evm_address;
 use ipc_api::staking::{StakingChangeRequest, ValidatorInfo};
 use ipc_api::subnet::{PermissionMode, SupplySource};
 use ipc_api::{
@@ -281,16 +282,26 @@ impl IpcProvider {
         subnet: SubnetID,
         from: Option<Address>,
         collateral: TokenAmount,
-        public_key: Vec<u8>,
     ) -> anyhow::Result<ChainEpoch> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
         let conn = self.get_connection(&parent)?;
 
         let subnet_config = conn.subnet();
         let sender = self.check_sender(subnet_config, from)?;
+        let addr = payload_to_evm_address(sender.payload())?;
+        let keystore = self.evm_wallet()?;
+        let key_info = keystore
+            .read()
+            .unwrap()
+            .get(&addr.into())?
+            .ok_or_else(|| anyhow!("key does not exists"))?;
+        let sk = libsecp256k1::SecretKey::parse_slice(key_info.private_key())?;
+        let public_key = libsecp256k1::PublicKey::from_secret_key(&sk).serialize();
+        let hex_public_key = hex::encode(public_key);
+        log::info!("joining subnet with public key: {hex_public_key:?}");
 
         conn.manager()
-            .join_subnet(subnet, sender, collateral, public_key)
+            .join_subnet(subnet, sender, collateral, public_key.into())
             .await
     }
 

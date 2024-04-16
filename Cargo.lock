@@ -5062,6 +5062,8 @@ dependencies = [
  "ipc-types",
  "ipc-wallet",
  "ipc_actors_abis",
+ "libsecp256k1",
+ "log",
  "num-derive 0.3.3",
  "num-traits",
  "reqwest",
