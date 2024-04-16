@@ -901,7 +901,6 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             "ipc-cli subnet join \
                 --subnet {} \
                 --from {:?} \
-                --public-key {} \
                 --collateral {} \
                 --initial-balance {} \
             ",
