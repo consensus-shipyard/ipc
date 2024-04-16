@@ -297,6 +297,10 @@ impl IpcProvider {
             .ok_or_else(|| anyhow!("key does not exists"))?;
         let sk = libsecp256k1::SecretKey::parse_slice(key_info.private_key())?;
         let public_key = libsecp256k1::PublicKey::from_secret_key(&sk).serialize();
+        let hex_public_key = hex::encode(public_key);
+        log::info!(
+            "joining subnet with public key: {hex_public_key:?}"
+        );
 
         conn.manager()
             .join_subnet(subnet, sender, collateral, public_key.into())
