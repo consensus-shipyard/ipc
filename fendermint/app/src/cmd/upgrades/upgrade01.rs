@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use crate::cmd::upgrades::CHAIN_ID;
+use anyhow::anyhow;
 use ethers::abi::RawLog;
 use ethers::prelude::H256;
 use fendermint_vm_actor_interface::eam::EthAddress;
@@ -28,8 +29,16 @@ pub(crate) fn store_missing_validator_changes<DB: Blockstore + 'static + Clone>(
         .add(Upgrade::new_by_id(CHAIN_ID.into(), block_height, None, |state| {
 
             // TODO: update height and hash
-            let topdown_height = ethers::types::U256::from(1000u64);
-            let topdown_hash = [0; 32];
+            let topdown_height = ethers::types::U256::from(1531770u64);
+            let topdown_hash_hex = "768c3521bf3b9003f3bca8c5aad59ee15639843677eed3278954179bfb4d9907";
+
+            let topdown_hash: [u8; 32] = hex::decode(topdown_hash_hex)?
+                .try_into()
+                .map_err(|_| anyhow!("cannot convert vec to bytes32"))?;
+
+            if hex::encode(topdown_hash) != topdown_hash_hex {
+                return Err(anyhow!("hash not equal"));
+            }
 
             // these changes were obtained by querying the filfox events api using:
             // https://filfox.info/api/v1/address/f410fqpww4v74jydq25jncdbletyqd42oxyeoapzaz4a/events?pageSize=100

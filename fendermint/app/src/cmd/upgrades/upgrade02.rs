@@ -11,6 +11,7 @@ use ipc_actors_abis::ownership_facet::{OwnershipFacet, OwnershipFacetErrors};
 use std::str::FromStr;
 use tracing::info;
 
+#[allow(dead_code)]
 pub(crate) fn transfer_ownership<DB: Blockstore + 'static + Clone>(
     upgrade_scheduler: &mut UpgradeScheduler<DB>,
     block_height: u64,

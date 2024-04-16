@@ -19,10 +19,10 @@ pub fn create_upgrade_scheduler<DB: Blockstore + 'static + Clone>(
     let target_height = 50;
     upgrade01::store_missing_validator_changes(&mut upgrade_scheduler, target_height)?;
 
-    // upgrade ownership, optional
-    // TODO: update target height
-    let target_height = 60;
-    upgrade02::transfer_ownership(&mut upgrade_scheduler, target_height)?;
+    // // upgrade ownership, optional
+    // // TODO: update target height
+    // let target_height = 60;
+    // upgrade02::transfer_ownership(&mut upgrade_scheduler, target_height)?;
 
     Ok(upgrade_scheduler)
 }
