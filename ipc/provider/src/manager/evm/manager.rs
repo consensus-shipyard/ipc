@@ -50,6 +50,7 @@ use ipc_api::subnet_id::SubnetID;
 use ipc_wallet::{EthKeyAddress, EvmKeyStore, PersistentKeyStore};
 use num_traits::ToPrimitive;
 use std::result;
+use tracing::log;
 
 pub type DefaultSignerMiddleware = SignerMiddleware<Provider<Http>, Wallet<SigningKey>>;
 
@@ -863,9 +864,12 @@ impl SubnetManager for EthSubnetManager {
             .call()
             .await?;
 
-        if !exists {
-            return Err(anyhow!("subnet does not exists"));
-        }
+        let nonce = if !exists {
+            log::warn!("subnet does not exists at block hash, return 0 nonce");
+            0
+        } else {
+            nonce
+        };
 
         Ok(TopDownQueryPayload {
             value: nonce,
