@@ -459,6 +459,27 @@ impl IpcProvider {
             .await
     }
 
+    /// Approve an erc20 token for transfer by the gateway. Can be used in preparation for fund_with_token.
+    /// If `from` is None, it will use the default address config in `ipc.toml`.
+    /// If `to` is `None`, the `from` account will be funded.
+    pub async fn approve_token(
+        &mut self,
+        subnet: SubnetID,
+        from: Option<Address>,
+        amount: TokenAmount,
+    ) -> anyhow::Result<ChainEpoch> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = match self.connection(&parent) {
+            None => return Err(anyhow!("target parent subnet not found")),
+            Some(conn) => conn,
+        };
+
+        let subnet_config = conn.subnet();
+        let sender = self.check_sender(subnet_config, from)?;
+
+        conn.manager().approve_token(subnet, sender, amount).await
+    }
+
     /// Release to an account in a child subnet, if `to` is `None`, the self account
     /// is funded.
     pub async fn release(
