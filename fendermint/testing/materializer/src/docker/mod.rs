@@ -906,7 +906,6 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             ",
             subnet.subnet_id,
             account.eth_addr(),
-            hex::encode(account.public_key().serialize()),
             collateral.0,
             balance.0
         );
