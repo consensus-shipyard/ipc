@@ -94,6 +94,10 @@ This ensures that all nodes run the same Fendermint version for every block heig
 
 These instructions detail the steps for utilizing the halting mechanism to synchronize Fendermint application switching with newer versions.
 
+{% hint style="info" %}
+NOTE: Node operators should always check the fendermint exit code. If fendermint exits with code 2, which indicates reaching the halting height, disable automatic restarts. Instead, follow steps 4 and 5 in this section.
+{% endhint %}
+
 #### 1. Determine the future halt_height
 
 Node operators collaborate on which future block height should be used as `halt_height`. Selecting the halting height is totally up to the operators, but let say for example purposes that the halt_height was agreed to be set to `10000`.
