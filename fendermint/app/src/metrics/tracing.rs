@@ -4,7 +4,7 @@
 
 use std::marker::PhantomData;
 
-use tracing::{Event, Level, Subscriber};
+use tracing::{Event, Subscriber};
 use tracing_subscriber::{filter, layer, registry::LookupSpan, Layer};
 
 use super::prometheus::app as am;
@@ -16,9 +16,7 @@ where
     S: Subscriber,
     for<'a> S: LookupSpan<'a>,
 {
-    MetricsLayer::new().with_filter(filter::filter_fn(|md| {
-        md.level() == &Level::INFO && md.name().starts_with("event::")
-    }))
+    MetricsLayer::new().with_filter(filter::filter_fn(|md| md.name().starts_with("event::")))
 }
 
 struct MetricsLayer<S> {
@@ -57,6 +55,17 @@ macro_rules! set_gauge {
     };
 }
 
+/// Set a gauge to the maximum of its value and a field in an event.
+macro_rules! max_gauge {
+    ($event:ident, $event_ty:ident :: $field:ident, $gauge:expr) => {
+        check_field!($event_ty::$field);
+        let mut fld = visitors::FindU64::new(stringify!($field));
+        $event.record(&mut fld);
+        let curr = $gauge.get();
+        $gauge.set(std::cmp::max(fld.value as i64, curr));
+    };
+}
+
 /// Increment a counter by the value of a field in the event.
 macro_rules! inc_counter {
     ($event:ident, $event_ty:ident :: $field:ident, $counter:expr) => {
@@ -64,6 +73,16 @@ macro_rules! inc_counter {
         let mut fld = visitors::FindU64::new(stringify!($field));
         $event.record(&mut fld);
         $counter.inc_by(fld.value);
+    };
+}
+
+/// Increment a counter by 1.
+///
+/// The field is ignored, it's only here because of how the macros look like.
+macro_rules! inc1_counter {
+    ($event:ident, $event_ty:ident :: $field:ident, $counter:expr) => {
+        check_field!($event_ty::$field);
+        $counter.inc();
     };
 }
 
@@ -107,6 +126,21 @@ impl<S: Subscriber> Layer<S> for MetricsLayer<S> {
             },
             ParentFinalityCommitted {
                 block_height              => set_gauge   ! &am::TOPDOWN_FINALIZED_BLOCK_HEIGHT,
+            },
+            ParentFinalityVoteAdded {
+                // This one can move up and down randomly as votes come in, but statistically should
+                // be less likely to be affected by Byzantine validators casting nonsense votes.
+                block_height              => set_gauge    ! &am::TOPDOWN_FINALITY_VOTE_BLOCK_HEIGHT,
+                // This one should only move up, showing the highest vote in the tally.
+                // It should be easy to produce this on Grafana as well from the one above.
+                block_height              => max_gauge    ! &am::TOPDOWN_FINALITY_VOTE_MAX_BLOCK_HEIGHT,
+                validator                 => inc1_counter ! &am::TOPDOWN_FINALITY_VOTE_ADDED,
+            },
+            ParentFinalityVoteIgnored {
+                validator                 => inc1_counter ! &am::TOPDOWN_FINALITY_VOTE_IGNORED,
+            },
+            ParentFinalityMissingQuorum {
+                block_hash                => inc1_counter ! &am::TOPDOWN_FINALITY_MISSING_QUORUM,
             },
             NewBottomUpCheckpoint {
                 block_height              => set_gauge   ! &am::BOTTOMUP_CKPT_BLOCK_HEIGHT,
