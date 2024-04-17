@@ -6,17 +6,19 @@ mod upgrade02;
 
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
 use fvm_ipld_blockstore::Blockstore;
+use std::env;
 
-// TODO: Update the chain id to your respective chain id
-const CHAIN_ID: u64 = 901861227013395;
+const CHAIN_ID: u64 = 1622562509754216;
 
 pub fn create_upgrade_scheduler<DB: Blockstore + 'static + Clone>(
 ) -> anyhow::Result<UpgradeScheduler<DB>> {
     let mut upgrade_scheduler = UpgradeScheduler::new();
 
     // applied missing validator changes
-    // TODO: update target height
-    let target_height = 50;
+    let target_height = {
+        let h = env::var("FLUENCE_UPGRADE_01_HEIGHT").unwrap_or(String::from("219500"));
+        h.parse().expect("unable to parse upgrade height")
+    };
     upgrade01::store_missing_validator_changes(&mut upgrade_scheduler, target_height)?;
 
     // // upgrade ownership, optional
