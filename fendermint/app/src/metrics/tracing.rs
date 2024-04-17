@@ -128,7 +128,8 @@ impl<S: Subscriber> Layer<S> for MetricsLayer<S> {
                 block_height              => set_gauge   ! &am::TOPDOWN_FINALIZED_BLOCK_HEIGHT,
             },
             ParentFinalityVoteAdded {
-                block_height              => max_gauge    ! &am::TOPDOWN_FINALITY_VOTE_BLOCK_HEIGHT,
+                block_height              => max_gauge    ! &am::TOPDOWN_FINALITY_VOTE_MAX_BLOCK_HEIGHT,
+                block_height              => set_gauge    ! &am::TOPDOWN_FINALITY_VOTE_LAST_BLOCK_HEIGHT,
                 validator                 => inc1_counter ! &am::TOPDOWN_FINALITY_VOTE_ADDED,
             },
             ParentFinalityVoteIgnored {
