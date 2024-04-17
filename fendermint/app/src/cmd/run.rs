@@ -4,11 +4,13 @@
 use anyhow::{anyhow, bail, Context};
 use async_stm::atomically_or_err;
 use fendermint_abci::ApplicationService;
+use fendermint_app::events::{ParentFinalityVoteAdded, ParentFinalityVoteIgnored};
 use fendermint_app::ipc::{AppParentFinalityQuery, AppVote};
 use fendermint_app::{App, AppConfig, AppStore, BitswapBlockstore};
 use fendermint_app_settings::AccountKind;
 use fendermint_crypto::SecretKey;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
+use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::chain::ChainEnv;
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
@@ -24,7 +26,7 @@ use fendermint_vm_topdown::proxy::IPCProviderProxy;
 use fendermint_vm_topdown::sync::launch_polling_syncer;
 use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
 use fendermint_vm_topdown::{CachedFinalityProvider, IPCParentFinality, Toggle};
-use fvm_shared::address::Address;
+use fvm_shared::address::{current_network, Address, Network};
 use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
@@ -32,6 +34,7 @@ use libp2p::identity::secp256k1;
 use libp2p::identity::Keypair;
 use std::sync::Arc;
 use tokio::sync::broadcast::error::RecvError;
+use tower::ServiceBuilder;
 use tracing::info;
 
 use crate::cmd::key::read_secret_key;
@@ -119,6 +122,13 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         ValidatorContext::new(sk, broadcaster)
     });
 
+    let testing_settings = match settings.testing.as_ref() {
+        Some(_) if current_network() == Network::Mainnet => {
+            bail!("testing settings are not allowed on Mainnet");
+        }
+        other => other,
+    };
+
     let interpreter = FvmMessageInterpreter::<NamespaceBlockstore, _>::new(
         tendermint_client.clone(),
         validator_ctx,
@@ -127,11 +137,17 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         settings.fvm.gas_search_step,
         settings.fvm.exec_in_check,
         UpgradeScheduler::new(),
-    );
+    )
+    .with_push_chain_meta(testing_settings.map_or(true, |t| t.push_chain_meta));
+
     let interpreter = SignedMessageInterpreter::new(interpreter);
     let interpreter = ChainMessageInterpreter::<_, NamespaceBlockstore>::new(interpreter);
-    let interpreter =
-        BytesMessageInterpreter::new(interpreter, ProposalPrepareMode::AppendOnly, false);
+    let interpreter = BytesMessageInterpreter::new(
+        interpreter,
+        ProposalPrepareMode::PrependOnly,
+        false,
+        settings.abci.block_max_msgs,
+    );
 
     let ns = Namespaces::default();
     let db = open_db(&settings, &ns).context("error opening DB")?;
@@ -328,8 +344,22 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         tower_abci::split::service(service, settings.abci.bound);
 
     // Hand those components to the ABCI server. This is where tower layers could be added.
+    // TODO: Check out the examples about load shedding in `info` requests.
     let server = tower_abci::v037::Server::builder()
-        .consensus(consensus)
+        .consensus(
+            // Limiting the concurrency to 1 here because the `AplicationService::poll_ready` always
+            // reports `Ready`, because it doesn't know which request it's going to get.
+            // Not limiting the concurrency to 1 can lead to transactions being applied
+            // in different order across nodes. The buffer size has to be large enough
+            // to allow all in-flight requests to not block message handling in
+            // `tower_abci::Connection::run`, which could lead to deadlocks.
+            // With ABCI++ we need to be able to handle all block transactions plus the begin/end/commit
+            // around it. With ABCI 2.0 we'll get the block as a whole, which makes this easier.
+            ServiceBuilder::new()
+                .buffer(settings.abci.block_max_msgs + 3)
+                .concurrency_limit(1)
+                .service(consensus),
+        )
         .snapshot(snapshot)
         .mempool(mempool)
         .info(info)
@@ -352,7 +382,11 @@ fn open_db(settings: &Settings, ns: &Namespaces) -> anyhow::Result<RocksDb> {
         path = path.to_string_lossy().into_owned(),
         "opening database"
     );
-    let db = RocksDb::open_cf(path, &RocksDbConfig::default(), ns.values().iter())?;
+    let config = RocksDbConfig {
+        compaction_style: settings.db.compaction_style.to_string(),
+        ..Default::default()
+    };
+    let db = RocksDb::open_cf(path, &config, ns.values().iter())?;
     Ok(db)
 }
 
@@ -508,18 +542,46 @@ async fn dispatch_vote(
             })
             .await;
 
-            match res {
-                Ok(_) => {}
+            let added = match res {
+                Ok(added) => {
+                    added
+                }
                 Err(e @ VoteError::Equivocation(_, _, _, _)) => {
                     tracing::warn!(error = e.to_string(), "failed to handle vote");
+                    false
                 }
                 Err(e @ (
                       VoteError::Uninitialized // early vote, we're not ready yet
                     | VoteError::UnpoweredValidator(_) // maybe arrived too early or too late, or spam
                     | VoteError::UnexpectedBlock(_, _) // won't happen here
                 )) => {
-                    tracing::debug!(error = e.to_string(), "failed to handle vote")
+                    tracing::debug!(error = e.to_string(), "failed to handle vote");
+                    false
                 }
+            };
+
+            let block_height = f.height;
+            let block_hash = &hex::encode(&f.block_hash);
+            let validator = &format!("{:?}", vote.public_key);
+
+            if added {
+                emit!(
+                    DEBUG,
+                    ParentFinalityVoteAdded {
+                        block_height,
+                        block_hash,
+                        validator,
+                    }
+                )
+            } else {
+                emit!(
+                    DEBUG,
+                    ParentFinalityVoteIgnored {
+                        block_height,
+                        block_hash,
+                        validator,
+                    }
+                )
             }
         }
     }

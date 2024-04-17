@@ -41,6 +41,8 @@ pub struct BytesMessageInterpreter<I> {
     prepare_mode: ProposalPrepareMode,
     /// Should we reject proposals with transactions we cannot parse.
     reject_malformed_proposal: bool,
+    /// Maximum number of messages to allow in a block.
+    max_msgs: usize,
 }
 
 impl<I> BytesMessageInterpreter<I> {
@@ -48,11 +50,13 @@ impl<I> BytesMessageInterpreter<I> {
         inner: I,
         prepare_mode: ProposalPrepareMode,
         reject_malformed_proposal: bool,
+        max_msgs: usize,
     ) -> Self {
         Self {
             inner,
             prepare_mode,
             reject_malformed_proposal,
+            max_msgs,
         }
     }
 }
@@ -102,17 +106,35 @@ where
             })
             .collect::<anyhow::Result<Vec<Self::Message>>>()?;
 
-        match self.prepare_mode {
-            ProposalPrepareMode::PassThrough => Ok(chain_msgs),
-            ProposalPrepareMode::AppendOnly => Ok([msgs, chain_msgs].concat()),
-            ProposalPrepareMode::PrependOnly => Ok([chain_msgs, msgs].concat()),
+        let mut all_msgs = match self.prepare_mode {
+            ProposalPrepareMode::PassThrough => chain_msgs,
+            ProposalPrepareMode::AppendOnly => [msgs, chain_msgs].concat(),
+            ProposalPrepareMode::PrependOnly => [chain_msgs, msgs].concat(),
+        };
+
+        if all_msgs.len() > self.max_msgs {
+            tracing::warn!(
+                max_msgs = self.max_msgs,
+                all_msgs = all_msgs.len(),
+                "truncating proposal"
+            );
+            all_msgs.truncate(self.max_msgs);
         }
+
+        Ok(all_msgs)
     }
 
     /// Parse messages in the block, reject if unknown format. Pass the rest to the inner `ChainMessage` interpreter.
     async fn process(&self, state: Self::State, msgs: Vec<Self::Message>) -> anyhow::Result<bool> {
-        let mut chain_msgs = Vec::new();
+        if msgs.len() > self.max_msgs {
+            tracing::warn!(
+                block_msgs = msgs.len(),
+                "rejecting block: too many messages"
+            );
+            return Ok(false);
+        }
 
+        let mut chain_msgs = Vec::new();
         for msg in msgs {
             match fvm_ipld_encoding::from_slice::<ChainMessage>(&msg) {
                 Err(e) => {

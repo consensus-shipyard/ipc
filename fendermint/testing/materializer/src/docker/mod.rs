@@ -901,13 +901,11 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             "ipc-cli subnet join \
                 --subnet {} \
                 --from {:?} \
-                --public-key {} \
                 --collateral {} \
                 --initial-balance {} \
             ",
             subnet.subnet_id,
             account.eth_addr(),
-            hex::encode(account.public_key().serialize()),
             collateral.0,
             balance.0
         );

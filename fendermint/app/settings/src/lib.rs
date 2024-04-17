@@ -6,12 +6,13 @@ use config::{Config, ConfigError, Environment, File};
 use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
 use ipc_api::subnet_id::SubnetID;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tendermint_rpc::Url;
+use testing::TestingSettings;
 use utils::EnvInterpol;
 
 use fendermint_vm_encoding::{human_readable_delegate, human_readable_str};
@@ -25,6 +26,7 @@ use ipc_provider::config::deserialize::deserialize_eth_address_from_str;
 pub mod eth;
 pub mod fvm;
 pub mod resolver;
+pub mod testing;
 pub mod utils;
 
 /// Marker to be used with the `#[serde_as(as = "IsHumanReadable")]` annotations.
@@ -91,6 +93,32 @@ pub struct AbciSettings {
     pub listen: SocketAddress,
     /// Queue size for each ABCI component.
     pub bound: usize,
+    /// Maximum number of messages allowed in a block.
+    pub block_max_msgs: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "lowercase")]
+/// Indicate the FVM account kind for generating addresses from a key.
+///
+/// See https://github.com/facebook/rocksdb/wiki/Compaction
+pub enum DbCompaction {
+    /// Good when most keys don't change.
+    Level,
+    Universal,
+    Fifo,
+    /// Auto-compaction disabled, has to be called manually.
+    None,
+}
+
+impl ToString for DbCompaction {
+    fn to_string(&self) -> String {
+        serde_json::to_value(self)
+            .expect("compaction serializes to JSON")
+            .as_str()
+            .expect("compaction is a string")
+            .to_string()
+    }
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -99,6 +127,8 @@ pub struct DbSettings {
     ///
     /// This affects how long we can go back in state queries.
     pub state_hist_size: u64,
+    /// How to compact the datastore.
+    pub compaction_style: DbCompaction,
 }
 
 /// Settings affecting how we deal with failures in trying to send transactions to the local CometBFT node.
@@ -247,6 +277,7 @@ pub struct Settings {
     pub resolver: ResolverSettings,
     pub broadcast: BroadcastSettings,
     pub ipc: IpcSettings,
+    pub testing: Option<TestingSettings>,
 }
 
 impl Settings {
@@ -340,6 +371,8 @@ mod tests {
 
     use crate::utils::tests::with_env_vars;
 
+    use crate::DbCompaction;
+
     use super::Settings;
 
     fn try_parse_config(run_mode: &str) -> Result<Settings, config::ConfigError> {
@@ -369,6 +402,11 @@ mod tests {
     fn parse_test_config() {
         let settings = parse_config("test");
         assert!(settings.resolver_enabled());
+    }
+
+    #[test]
+    fn compaction_to_string() {
+        assert_eq!(DbCompaction::Level.to_string(), "level");
     }
 
     #[test]
