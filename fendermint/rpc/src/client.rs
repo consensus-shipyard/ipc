@@ -178,7 +178,11 @@ where
         F: FnOnce(&DeliverTx) -> anyhow::Result<T> + Sync + Send,
     {
         let data = SignedMessageFactory::serialize(&msg)?;
-        let response = self.inner.broadcast_tx_async(data).await?;
+        let response = self
+            .inner
+            .broadcast_tx_async(data)
+            .await
+            .context("broadcast_tx_async failed")?;
         let response = AsyncResponse {
             response,
             return_data: PhantomData,
@@ -201,7 +205,11 @@ where
         F: FnOnce(&DeliverTx) -> anyhow::Result<T> + Sync + Send,
     {
         let data = SignedMessageFactory::serialize(&msg)?;
-        let response = self.inner.broadcast_tx_sync(data).await?;
+        let response = self
+            .inner
+            .broadcast_tx_sync(data)
+            .await
+            .context("broadcast_tx_sync failed")?;
         let response = SyncResponse {
             response,
             return_data: PhantomData,
@@ -224,7 +232,11 @@ where
         F: FnOnce(&DeliverTx) -> anyhow::Result<T> + Sync + Send,
     {
         let data = SignedMessageFactory::serialize(&msg)?;
-        let response = self.inner.broadcast_tx_commit(data).await?;
+        let response = self
+            .inner
+            .broadcast_tx_commit(data)
+            .await
+            .context("broadcast_tx_commit failed")?;
         // We have a fully `DeliverTx` with default fields even if `CheckTx` indicates failure.
         let return_data = if response.check_tx.code.is_err() || response.deliver_tx.code.is_err() {
             None
@@ -254,7 +266,97 @@ where
     let height: u64 = height.into();
     let height = Height::try_from(height).context("failed to conver to Height")?;
 
-    let res = client.abci_query(None, data, Some(height), false).await?;
+    // This is how we'd call it, but here we're trying to debug what's going on using
+    // the `perform` method below with a request that prints the response if it fails
+    // to deserialize for any reason.
+    // let res = client
+    //     .abci_query(None, data, Some(height), false)
+    //     .await
+    //     .context("abci query failed")?;
+
+    let req = tendermint_rpc::endpoint::abci_query::Request::new(None, data, Some(height), false);
+
+    let res = client
+        .perform(debug::DebugRequest(req))
+        .await
+        .context("abci query failed")?
+        .0
+        .response;
 
     Ok(res)
+}
+
+mod debug {
+    use serde::{Deserialize, Serialize};
+    use tendermint_rpc as trpc;
+
+    #[derive(Serialize, Deserialize)]
+    #[serde(transparent)]
+    pub struct DebugRequest<R>(pub R);
+
+    #[derive(Serialize, Deserialize)]
+    pub struct DebugResponse<R>(pub R);
+
+    impl<R> trpc::Request for DebugRequest<R>
+    where
+        R: trpc::Request,
+    {
+        type Response = DebugResponse<R::Response>;
+    }
+
+    impl<R> trpc::request::RequestMessage for DebugRequest<R>
+    where
+        R: trpc::request::RequestMessage,
+    {
+        fn method(&self) -> trpc::Method {
+            self.0.method()
+        }
+    }
+
+    impl<R> trpc::SimpleRequest for DebugRequest<R>
+    where
+        R: trpc::SimpleRequest,
+    {
+        type Output = Self::Response;
+    }
+
+    impl<R> trpc::Response for DebugResponse<R>
+    where
+        R: trpc::Response,
+    {
+        fn from_string(response: impl AsRef<[u8]>) -> Result<Self, trpc::Error> {
+            let wrapper: Result<trpc::response::Wrapper<Self>, trpc::Error> =
+                serde_json::from_slice(response.as_ref()).map_err(trpc::Error::serde);
+
+            let response_body = || String::from_utf8_lossy(response.as_ref()).to_string();
+
+            match wrapper {
+                Err(e) => {
+                    tracing::error!(
+                        error = e.to_string(),
+                        response = response_body(),
+                        "failed to parse JSON-RPC response"
+                    );
+                    Err(e)
+                }
+                Ok(wrapper) => match wrapper.into_result() {
+                    Err(e) => {
+                        tracing::error!(
+                            error = e.to_string(),
+                            response = response_body(),
+                            "error from JSON-RPC"
+                        );
+                        Err(e)
+                    }
+                    Ok(response) => Ok(response),
+                },
+            }
+        }
+
+        fn from_reader(reader: impl std::io::prelude::Read) -> Result<Self, trpc::Error> {
+            let wrapper: trpc::response::Wrapper<Self> =
+                serde_json::from_reader(reader).map_err(trpc::Error::serde)?;
+            wrapper.into_result()
+        }
+    }
 }
