@@ -55,7 +55,7 @@ macro_rules! set_gauge {
     };
 }
 
-/// Set a gague to the maximum of its value and a field in an event.
+/// Set a gauge to the maximum of its value and a field in an event.
 macro_rules! max_gauge {
     ($event:ident, $event_ty:ident :: $field:ident, $gauge:expr) => {
         check_field!($event_ty::$field);
