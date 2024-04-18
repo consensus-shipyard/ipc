@@ -8,11 +8,6 @@ use std::pin::Pin;
 use anyhow::Context;
 use async_trait::async_trait;
 use bytes::Bytes;
-use cid::Cid;
-use fendermint_actor_accumulator::PushReturn;
-use fendermint_actor_objectstore::{
-    ObjectDeleteParams, ObjectGetParams, ObjectKind, ObjectListParams, ObjectPutParams,
-};
 use fendermint_app_options::genesis::AccountKind;
 use fendermint_crypto::{to_b64, SecretKey};
 use fendermint_rpc::client::BoundFendermintClient;
@@ -39,9 +34,7 @@ use fendermint_vm_actor_interface::eam::{self, CreateReturn, EthAddress};
 
 use crate::cmd;
 use crate::options::rpc::{BroadcastMode, FevmArgs, RpcFevmCommands, TransArgs};
-use crate::options::rpc::{
-    RpcAccumulatorCommands, RpcArgs, RpcCommands, RpcObjectStoreCommands, RpcQueryCommands,
-};
+use crate::options::rpc::{RpcArgs, RpcCommands, RpcQueryCommands};
 
 use super::key::read_secret_key;
 
@@ -58,37 +51,6 @@ cmd! {
             },
             RpcCommands::Transaction { args, to, method_number, params } => {
                 transaction(client, args, to, method_number, params.clone()).await
-            },
-            RpcCommands::Os { args, command } => match command {
-                RpcObjectStoreCommands::Put { key, value } => {
-                    os_put(client, args, ObjectPutParams{key: key.into_bytes(), kind: ObjectKind::External(value), overwrite: true}).await
-                }
-                RpcObjectStoreCommands::Delete { key } => {
-                    os_delete(client, args, ObjectDeleteParams{key: key.into_bytes()}).await
-                }
-                RpcObjectStoreCommands::Get { key, height } => {
-                    let height = Height::try_from(height)?;
-                    os_get_call(client, args, ObjectGetParams{key: key.into_bytes()}, height).await
-                }
-                RpcObjectStoreCommands::List { height, prefix, delimiter, offset, limit } => {
-                    let params = ObjectListParams {
-                        prefix: prefix.into(),
-                        delimiter: delimiter.into(),
-                        offset,
-                        limit,
-                    };
-                    let height = Height::try_from(height)?;
-                    os_list_call(client, args, params, height).await
-                }
-            },
-            RpcCommands::Acc { args, command } => match command {
-                RpcAccumulatorCommands::Push { event } => {
-                    acc_push(client, args, event).await
-                }
-                RpcAccumulatorCommands::Root { height } => {
-                    let height = Height::try_from(height)?;
-                    acc_root_call(client, args, height).await
-                }
             },
             RpcCommands::Fevm { args, command } => match command {
                 RpcFevmCommands::Create { contract, constructor_args } => {
@@ -212,112 +174,6 @@ async fn transaction(
         |data| serde_json::Value::String(hex::encode(data.bytes())),
     )
     .await
-}
-
-async fn os_put(
-    client: FendermintClient,
-    args: TransArgs,
-    params: ObjectPutParams,
-) -> anyhow::Result<()> {
-    broadcast_and_print(
-        client,
-        args,
-        |mut client, value, gas_params| {
-            Box::pin(async move { client.os_put(params, value, gas_params).await })
-        },
-        cid_to_json,
-    )
-    .await
-}
-
-async fn os_delete(
-    client: FendermintClient,
-    args: TransArgs,
-    params: ObjectDeleteParams,
-) -> anyhow::Result<()> {
-    broadcast_and_print(
-        client,
-        args,
-        |mut client, value, gas_params| {
-            Box::pin(async move { client.os_delete(params, value, gas_params).await })
-        },
-        cid_to_json,
-    )
-    .await
-}
-
-async fn os_get_call(
-    client: FendermintClient,
-    args: TransArgs,
-    params: ObjectGetParams,
-    height: Height,
-) -> anyhow::Result<()> {
-    let mut client = TransClient::new(client, &args)?;
-    let gas_params = gas_params(&args);
-    let value = args.value;
-    let height = FvmQueryHeight::from(height.value());
-
-    let res = client
-        .inner
-        .os_get_call(params, value, gas_params, height)
-        .await?;
-
-    let json = json!({"response": res.response, "return_data": res.return_data});
-
-    print_json(&json)
-}
-
-async fn os_list_call(
-    client: FendermintClient,
-    args: TransArgs,
-    params: ObjectListParams,
-    height: Height,
-) -> anyhow::Result<()> {
-    let mut client = TransClient::new(client, &args)?;
-    let gas_params = gas_params(&args);
-    let value = args.value;
-    let height = FvmQueryHeight::from(height.value());
-
-    let res = client
-        .inner
-        .os_list_call(params, value, gas_params, height)
-        .await?;
-
-    let json = json!({"response": res.response, "return_data": res.return_data});
-
-    print_json(&json)
-}
-
-async fn acc_push(client: FendermintClient, args: TransArgs, event: Bytes) -> anyhow::Result<()> {
-    broadcast_and_print(
-        client,
-        args,
-        |mut client, value, gas_params| {
-            Box::pin(async move { client.acc_push(event, value, gas_params).await })
-        },
-        push_response_to_json,
-    )
-    .await
-}
-
-async fn acc_root_call(
-    client: FendermintClient,
-    args: TransArgs,
-    height: Height,
-) -> anyhow::Result<()> {
-    let mut client = TransClient::new(client, &args)?;
-    let gas_params = gas_params(&args);
-    let value = args.value;
-    let height = FvmQueryHeight::from(height.value());
-
-    let res = client
-        .inner
-        .acc_root_call(value, gas_params, height)
-        .await?;
-
-    let json = json!({"response": res.response, "return_data": res.return_data});
-
-    print_json(&json)
 }
 
 /// Deploy an EVM contract through RPC and print the response to STDOUT as JSON.
@@ -449,18 +305,6 @@ fn create_return_to_json(ret: CreateReturn) -> serde_json::Value {
         "eth_address": hex::encode(ret.eth_address.0),
         "delegated_address": ret.delegated_address().to_string(),
         "robust_address": ret.robust_address.map(|a| a.to_string())
-    })
-}
-
-/// Print a Cid.
-pub fn cid_to_json(ret: Cid) -> serde_json::Value {
-    json!(ret)
-}
-
-pub fn push_response_to_json(pr: PushReturn) -> serde_json::Value {
-    json!({
-        "root": pr.root.to_string(),
-        "index": pr.index,
     })
 }
 

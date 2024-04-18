@@ -6,11 +6,10 @@ use std::path::Path;
 use anyhow::Context;
 use base64::Engine;
 use bytes::Bytes;
-use fendermint_actor_objectstore::{
-    ObjectDeleteParams, ObjectGetParams, ObjectKind, ObjectListParams, ObjectPutParams,
-};
+use fendermint_actor_machine::{WriteAccess, GET_METADATA_METHOD};
+use fendermint_actor_objectstore::{DeleteParams, GetParams, ListParams, ObjectKind, PutParams};
 use fendermint_crypto::SecretKey;
-use fendermint_vm_actor_interface::{accumulator, eam, evm, objectstore};
+use fendermint_vm_actor_interface::{adm, eam, evm};
 use fendermint_vm_message::signed::Object;
 use fendermint_vm_message::{chain::ChainMessage, signed::SignedMessage};
 use fvm_ipld_encoding::{BytesSer, RawBytes};
@@ -194,20 +193,102 @@ impl SignedMessageFactory {
         Ok(chain)
     }
 
+    /// List machine metadata by owner.
+    pub fn list_machines(
+        &mut self,
+        owner: Address,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<Message> {
+        let input = adm::ListMetadataParams { owner };
+        let params = RawBytes::serialize(input)?;
+        let message = self.transaction(
+            adm::ADM_ACTOR_ADDR,
+            adm::Method::ListMetadata as u64,
+            params,
+            value,
+            gas_params,
+            None,
+        )?;
+
+        let message = if let ChainMessage::Signed(signed) = message {
+            signed.into_message()
+        } else {
+            panic!("unexpected message type: {message:?}");
+        };
+
+        // Roll back the sequence, we don't really want to invoke anything.
+        self.inner.set_sequence(message.sequence);
+
+        Ok(message)
+    }
+
+    /// Get machine metadata.
+    pub fn get_machine(
+        &mut self,
+        address: Address,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<Message> {
+        let message = self.transaction(
+            address,
+            GET_METADATA_METHOD,
+            RawBytes::default(),
+            value,
+            gas_params,
+            None,
+        )?;
+
+        let message = if let ChainMessage::Signed(signed) = message {
+            signed.into_message()
+        } else {
+            panic!("unexpected message type: {message:?}");
+        };
+
+        // Roll back the sequence, we don't really want to invoke anything.
+        self.inner.set_sequence(message.sequence);
+
+        Ok(message)
+    }
+
+    /// Create an object store.
+    pub fn os_create(
+        &mut self,
+        write_access: WriteAccess,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<ChainMessage> {
+        let input = adm::CreateExternalParams {
+            kind: adm::Kind::ObjectStore,
+            write_access,
+        };
+        let params = RawBytes::serialize(input)?;
+        let message = self.transaction(
+            adm::ADM_ACTOR_ADDR,
+            adm::Method::CreateExternal as u64,
+            params,
+            value,
+            gas_params,
+            None,
+        )?;
+        Ok(message)
+    }
+
     /// Put an object into an object store.
     pub fn os_put(
         &mut self,
-        params: ObjectPutParams,
+        address: Address,
+        params: PutParams,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
         let object = match &params.kind {
             ObjectKind::Internal(_) => None,
-            ObjectKind::External(cid) => Some(Object::new(params.key.clone(), *cid)),
+            ObjectKind::External(cid) => Some(Object::new(params.key.clone(), *cid, address)),
         };
         let params = RawBytes::serialize(params)?;
         let message = self.transaction(
-            objectstore::OBJECTSTORE_ACTOR_ADDR,
+            address,
             fendermint_actor_objectstore::Method::PutObject as u64,
             params,
             value,
@@ -220,13 +301,14 @@ impl SignedMessageFactory {
     /// Delete an object from an object store.
     pub fn os_delete(
         &mut self,
-        params: ObjectDeleteParams,
+        address: Address,
+        params: DeleteParams,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
         let params = RawBytes::serialize(params)?;
         let message = self.transaction(
-            objectstore::OBJECTSTORE_ACTOR_ADDR,
+            address,
             fendermint_actor_objectstore::Method::DeleteObject as u64,
             params,
             value,
@@ -239,13 +321,14 @@ impl SignedMessageFactory {
     /// Get an object from an object store. This will not create a transaction.
     pub fn os_get(
         &mut self,
-        params: ObjectGetParams,
+        address: Address,
+        params: GetParams,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<Message> {
         let params = RawBytes::serialize(params)?;
         let message = self.transaction(
-            objectstore::OBJECTSTORE_ACTOR_ADDR,
+            address,
             fendermint_actor_objectstore::Method::GetObject as u64,
             params,
             value,
@@ -268,13 +351,14 @@ impl SignedMessageFactory {
     /// List objects in an object store. This will not create a transaction.
     pub fn os_list(
         &mut self,
-        params: ObjectListParams,
+        address: Address,
+        params: ListParams,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<Message> {
         let params = RawBytes::serialize(params)?;
         let message = self.transaction(
-            objectstore::OBJECTSTORE_ACTOR_ADDR,
+            address,
             fendermint_actor_objectstore::Method::ListObjects as u64,
             params,
             value,
@@ -294,16 +378,40 @@ impl SignedMessageFactory {
         Ok(message)
     }
 
+    /// Create an accumulator.
+    pub fn acc_create(
+        &mut self,
+        write_access: WriteAccess,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<ChainMessage> {
+        let input = adm::CreateExternalParams {
+            kind: adm::Kind::Accumulator,
+            write_access,
+        };
+        let params = RawBytes::serialize(input)?;
+        let message = self.transaction(
+            adm::ADM_ACTOR_ADDR,
+            adm::Method::CreateExternal as u64,
+            params,
+            value,
+            gas_params,
+            None,
+        )?;
+        Ok(message)
+    }
+
     /// Push an event to an accumulator.
     pub fn acc_push(
         &mut self,
+        address: Address,
         event: Bytes,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
-        let params = RawBytes::serialize(event.to_vec())?;
+        let params = RawBytes::serialize(BytesSer(&event))?;
         let message = self.transaction(
-            accumulator::ACCUMULATOR_ACTOR_ADDR,
+            address,
             fendermint_actor_accumulator::Method::Push as u64,
             params,
             value,
@@ -316,13 +424,14 @@ impl SignedMessageFactory {
     /// Get the object stored at a given index in an accumulator. This will not create a transaction.
     pub fn acc_get_at(
         &mut self,
+        address: Address,
         value: TokenAmount,
         gas_params: GasParams,
         index: u64,
     ) -> anyhow::Result<Message> {
         let params = RawBytes::serialize(index)?;
         let message = self.transaction(
-            accumulator::ACCUMULATOR_ACTOR_ADDR,
+            address,
             fendermint_actor_accumulator::Method::Get as u64,
             params,
             value,
@@ -345,11 +454,12 @@ impl SignedMessageFactory {
     /// Get the root commitment in an accumulator. This will not create a transaction.
     pub fn acc_root(
         &mut self,
+        address: Address,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<Message> {
         let message = self.transaction(
-            accumulator::ACCUMULATOR_ACTOR_ADDR,
+            address,
             fendermint_actor_accumulator::Method::Root as u64,
             RawBytes::default(),
             value,

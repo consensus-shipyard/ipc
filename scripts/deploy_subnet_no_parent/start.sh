@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -euxo pipefail
+set -euo pipefail
 
 DASHES='------'
 if [[ ! -v IPC_FOLDER ]]; then
@@ -8,7 +8,6 @@ if [[ ! -v IPC_FOLDER ]]; then
 else
     IPC_FOLDER=${IPC_FOLDER}
 fi
-IPC_CLI=${IPC_FOLDER}/target/release/ipc-cli
 IPC_CONFIG_FOLDER=${HOME}/.ipc
 
 wallet_addresses=()
@@ -136,7 +135,7 @@ make build
 
 echo "$DASHES Building ipc-cli..."
 cd ${IPC_FOLDER}/ipc
-make build
+make install
 
 # Step 3: Prepare wallet by using existing wallet json file
 echo "$DASHES Using 3 address in wallet..."
@@ -154,7 +153,7 @@ echo "Default wallet address: $default_wallet_address"
 # Step 4.1: Export validator private keys into files
 for i in {0..2}
 do
-  $IPC_CLI wallet export --wallet-type evm --address ${wallet_addresses[i]} --hex > ${IPC_CONFIG_FOLDER}/validator_${i}.sk
+  ipc-cli wallet export --wallet-type evm --address ${wallet_addresses[i]} --hex > ${IPC_CONFIG_FOLDER}/validator_${i}.sk
   echo "Export private key for ${wallet_addresses[i]} to ${IPC_CONFIG_FOLDER}/validator_${i}.sk"
 done
 
@@ -184,20 +183,20 @@ do
   # Import wallet
   proxy_key=$(cat ${IPC_CONFIG_FOLDER}/evm_keystore_proxy.json | jq .[$i].private_key | tr -d '"' | tr -d '\n')
   proxy_address=$(cat ${IPC_CONFIG_FOLDER}/evm_keystore_proxy.json | jq .[$i].address | tr -d '"' | tr -d '\n')
-  $IPC_CLI wallet import --wallet-type evm --private-key ${proxy_key}
+  ipc-cli wallet import --wallet-type evm --private-key ${proxy_key}
 
   # Export private key to proxy
   out=${subnet_folder}/validator-${i}/validator-${i}/keys/proxy_key.sk
-  $IPC_CLI wallet export --wallet-type evm --address ${proxy_address} --fendermint | tr -d '\n' > ${out}
+  ipc-cli wallet export --wallet-type evm --address ${proxy_address} --fendermint | tr -d '\n' > ${out}
   chmod 600 ${subnet_folder}/validator-${i}/validator-${i}/keys/proxy_key.sk
 
   # Export public key to proxy
-  pubkey=$($IPC_CLI wallet pub-key --wallet-type evm --address ${proxy_address})
+  pubkey=$(ipc-cli wallet pub-key --wallet-type evm --address ${proxy_address})
   echo "Proxy wallet $i address's pubkey: $pubkey"
   echo $pubkey | tr -d '\n' > ${subnet_folder}/validator-${i}/validator-${i}/keys/proxy_key.pk
 
   # Remove wallet
-  $IPC_CLI wallet remove --wallet-type evm --address ${proxy_address}
+  ipc-cli wallet remove --wallet-type evm --address ${proxy_address}
 done
 
 # Copy genesis file into each validator
@@ -209,6 +208,7 @@ done
 # Step 5: Start validators
 # Step 5.1 (optional): Rebuild fendermint docker
 cd ${IPC_FOLDER}/fendermint
+make clean
 make docker-build
 
 # Step 5.2: Start the bootstrap validator node

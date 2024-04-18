@@ -59,6 +59,9 @@ fendermint_vm_resolver = { path = "../vm/resolver" }
 fendermint_vm_ipfs_resolver = { path = "../vm/ipfs_resolver" }
 fendermint_vm_snapshot = { path = "../vm/snapshot" }
 fendermint_vm_topdown = { path = "../vm/topdown" }
+fendermint_actor_machine = { path = "../actors/machine" }
+fendermint_actor_accumulator = { path = "../actors/accumulator" }
+fendermint_actor_objectstore = { path = "../actors/objectstore" }
 
 fvm = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }
@@ -68,9 +71,6 @@ fvm_shared = { workspace = true }
 ipc-api = { workspace = true }
 ipc-provider = { workspace = true }
 ipc_ipld_resolver = { workspace = true }
-
-fendermint_actor_accumulator = { path = "../actors/accumulator" }
-fendermint_actor_objectstore = { path = "../actors/objectstore" }
 
 warp = "0.3.6"
 futures-util = { workspace = true }

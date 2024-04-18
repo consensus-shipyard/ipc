@@ -3,19 +3,19 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use cid::Cid;
+use fendermint_actor_machine::{ConstructorParams, MachineActor};
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
-    builtin::singletons::SYSTEM_ACTOR_ADDR,
     runtime::{ActorCode, Runtime},
-    ActorDowncast, ActorError, FIRST_EXPORTED_METHOD_NUMBER,
+    ActorDowncast, ActorError, FIRST_EXPORTED_METHOD_NUMBER, INIT_ACTOR_ADDR, SYSTEM_ACTOR_ADDR,
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_ipld_hamt::BytesKey;
 use fvm_shared::{error::ExitCode, MethodNum};
 
 use crate::{
-    Method, Object, ObjectDeleteParams, ObjectGetParams, ObjectList, ObjectListParams,
-    ObjectPutParams, ObjectResolveParams, State, OBJECTSTORE_ACTOR_NAME,
+    DeleteParams, GetParams, ListParams, Method, Object, ObjectList, PutParams,
+    ResolveExternalParams, State, OBJECTSTORE_ACTOR_NAME,
 };
 
 #[cfg(feature = "fil-actor")]
@@ -24,24 +24,20 @@ fil_actors_runtime::wasm_trampoline!(Actor);
 pub struct Actor;
 
 impl Actor {
-    fn constructor(rt: &impl Runtime) -> Result<(), ActorError> {
-        // FIXME:(sander) We're setting this up to be a subnet-wide actor for a single repo.
-        // FIXME:(sander) In the future, this could be deployed dynamically for multi repo subnets.
-        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
+    fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
+        rt.validate_immediate_caller_is(std::iter::once(&INIT_ACTOR_ADDR))?;
 
-        let state = State::new(rt.store()).map_err(|e| {
+        let state = State::new(rt.store(), params.creator, params.write_access).map_err(|e| {
             e.downcast_default(
                 ExitCode::USR_ILLEGAL_STATE,
                 "failed to construct empty store",
             )
         })?;
-
         rt.create(&state)
     }
 
-    fn put_object(rt: &impl Runtime, params: ObjectPutParams) -> Result<Cid, ActorError> {
-        // FIXME:(carsonfarmer) We'll want to validate the caller is the owner of the repo.
-        rt.validate_immediate_caller_accept_any()?;
+    fn put_object(rt: &impl Runtime, params: PutParams) -> Result<Cid, ActorError> {
+        Self::ensure_write_allowed(rt)?;
 
         let root = rt.transaction(|st: &mut State, rt| {
             st.put(rt.store(), BytesKey(params.key), params.kind, true)
@@ -49,13 +45,12 @@ impl Actor {
                     e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to put object")
                 })
         })?;
-
         Ok(root)
     }
 
     fn resolve_external_object(
         rt: &impl Runtime,
-        params: ObjectResolveParams,
+        params: ResolveExternalParams,
     ) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
@@ -65,13 +60,11 @@ impl Actor {
                     e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to resolve object")
                 })
         })?;
-
         Ok(())
     }
 
-    fn delete_object(rt: &impl Runtime, params: ObjectDeleteParams) -> Result<Cid, ActorError> {
-        // FIXME:(carsonfarmer) We'll want to validate the caller is the owner of the repo.
-        rt.validate_immediate_caller_accept_any()?;
+    fn delete_object(rt: &impl Runtime, params: DeleteParams) -> Result<Cid, ActorError> {
+        Self::ensure_write_allowed(rt)?;
 
         let res = rt.transaction(|st: &mut State, rt| {
             st.delete(rt.store(), &BytesKey(params.key)).map_err(|e| {
@@ -89,14 +82,10 @@ impl Actor {
                 )
             })?;
         }
-
         Ok(res.1)
     }
 
-    fn get_object(
-        rt: &impl Runtime,
-        params: ObjectGetParams,
-    ) -> Result<Option<Object>, ActorError> {
+    fn get_object(rt: &impl Runtime, params: GetParams) -> Result<Option<Object>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
         let st: State = rt.state()?;
@@ -106,7 +95,7 @@ impl Actor {
 
     fn list_objects(
         rt: &impl Runtime,
-        params: ObjectListParams,
+        params: ListParams,
     ) -> Result<Option<ObjectList>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let st: State = rt.state()?;
@@ -139,6 +128,10 @@ impl Actor {
     }
 }
 
+impl MachineActor for Actor {
+    type State = State;
+}
+
 impl ActorCode for Actor {
     type Methods = Method;
 
@@ -148,6 +141,7 @@ impl ActorCode for Actor {
 
     actor_dispatch! {
         Constructor => constructor,
+        GetMetadata => get_metadata,
         PutObject => put_object,
         ResolveExternalObject => resolve_external_object,
         DeleteObject => delete_object,

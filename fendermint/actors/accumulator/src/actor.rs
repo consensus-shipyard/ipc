@@ -3,16 +3,16 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use cid::Cid;
+use fendermint_actor_machine::{ConstructorParams, MachineActor};
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
-    builtin::singletons::SYSTEM_ACTOR_ADDR,
     runtime::{ActorCode, Runtime},
-    ActorDowncast, ActorError, FIRST_EXPORTED_METHOD_NUMBER,
+    ActorDowncast, ActorError, FIRST_EXPORTED_METHOD_NUMBER, INIT_ACTOR_ADDR,
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::{error::ExitCode, MethodNum};
 
-use crate::{Method, PushReturn, State, ACCUMULATOR_ACTOR_NAME};
+use crate::{Method, PushParams, PushReturn, State, ACCUMULATOR_ACTOR_NAME};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
@@ -20,12 +20,10 @@ fil_actors_runtime::wasm_trampoline!(Actor);
 pub struct Actor;
 
 impl Actor {
-    fn constructor(rt: &impl Runtime) -> Result<(), ActorError> {
-        // FIXME:(carsonfarmer) We're setting this up to be a subnet-wide actor for a single repo.
-        // FIXME:(carsonfarmer) In the future, this could be deployed dynamically for multi repo subnets.
-        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
+    fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
+        rt.validate_immediate_caller_is(std::iter::once(&INIT_ACTOR_ADDR))?;
 
-        let state = State::new(rt.store()).map_err(|e| {
+        let state = State::new(rt.store(), params.creator, params.write_access).map_err(|e| {
             e.downcast_default(
                 ExitCode::USR_ILLEGAL_STATE,
                 "failed to construct empty store",
@@ -34,12 +32,11 @@ impl Actor {
         rt.create(&state)
     }
 
-    fn push(rt: &impl Runtime, obj: Vec<u8>) -> Result<PushReturn, ActorError> {
-        // FIXME:(carsonfarmer) We'll want to validate the caller is the owner of the repo.
-        rt.validate_immediate_caller_accept_any()?;
+    fn push(rt: &impl Runtime, params: PushParams) -> Result<PushReturn, ActorError> {
+        Self::ensure_write_allowed(rt)?;
 
         rt.transaction(|st: &mut State, rt| {
-            st.push(rt.store(), obj).map_err(|e| {
+            st.push(rt.store(), params.0).map_err(|e| {
                 e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to push object")
             })
         })
@@ -87,6 +84,10 @@ impl Actor {
     }
 }
 
+impl MachineActor for Actor {
+    type State = State;
+}
+
 impl ActorCode for Actor {
     type Methods = Method;
 
@@ -96,6 +97,7 @@ impl ActorCode for Actor {
 
     actor_dispatch! {
         Constructor => constructor,
+        GetMetadata => get_metadata,
         Push => push,
         Get => get_leaf_at,
         Root => get_root,

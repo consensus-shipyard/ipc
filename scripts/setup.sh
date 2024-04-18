@@ -11,9 +11,14 @@ fendermint genesis --genesis-file test-network/genesis.json new --chain-name tes
 
 # Create some keys
 mkdir test-network/keys
-for NAME in alice bob charlie dave; do
+for NAME in bob charlie dave; do
   fendermint key gen --out-dir test-network/keys --name $NAME;
 done
+
+## Use fixed address for alice to make dev w/ ADM cli less painful
+echo "HDI9SU0dBp/kyJE1Ch7GkcQhbBdBigyzx1M7FDvSuBI=" | tr -d '\n' > test-network/keys/alice.sk
+echo "Ayh506Z/KRZnDgtarffTZQympqQ8A4hfwse1gK9t0NJi" | tr -d '\n' > test-network/keys/alice.pk
+
 
 # Add accounts to the Genesis file
 ## A stand-alone account
@@ -56,6 +61,9 @@ mkdir -p "$HOME/.fendermint/contracts"
 cp -r ./contracts/out/* "$HOME/.fendermint/contracts"
 
 # Build actors
-(cd fendermint && make actor-bundle)
+(cd builtin-actors && make bundle-mainnet)
+mkdir -p fendermint/builtin-actors/output
+cp builtin-actors/output/builtin-actors-mainnet.car fendermint/builtin-actors/output/bundle.car
 cp fendermint/builtin-actors/output/bundle.car "$HOME/.fendermint/bundle.car"
+cargo build --release -p fendermint_actors
 cp fendermint/actors/output/custom_actors_bundle.car "$HOME/.fendermint/custom_actors_bundle.car"

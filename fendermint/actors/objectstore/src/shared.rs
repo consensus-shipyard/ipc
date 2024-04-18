@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use cid::Cid;
+use fendermint_actor_machine::GET_METADATA_METHOD;
 use fvm_ipld_encoding::{strict_bytes, tuple::*};
 use fvm_shared::METHOD_CONSTRUCTOR;
 use num_derive::FromPrimitive;
@@ -13,38 +14,45 @@ pub const OBJECTSTORE_ACTOR_NAME: &str = "objectstore";
 
 /// Params for putting an object.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct ObjectPutParams {
+pub struct PutParams {
+    /// Object key.
     #[serde(with = "strict_bytes")]
     pub key: Vec<u8>,
+    /// Kind of object.
     pub kind: ObjectKind,
+    /// Whether to overwrite a key if it already exists.
     pub overwrite: bool,
 }
 
-/// Params for resolving an object.
+/// Params for resolving an external object.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct ObjectResolveParams {
+pub struct ResolveExternalParams {
+    /// Object key.
     #[serde(with = "strict_bytes")]
     pub key: Vec<u8>,
+    /// External object value.
     pub value: Cid,
-}
-
-/// Params for getting an object.
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct ObjectGetParams {
-    #[serde(with = "strict_bytes")]
-    pub key: Vec<u8>,
 }
 
 /// Params for deleting an object.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct ObjectDeleteParams {
+pub struct DeleteParams {
+    /// Object key.
+    #[serde(with = "strict_bytes")]
+    pub key: Vec<u8>,
+}
+
+/// Params for getting an object.
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct GetParams {
+    /// Object key.
     #[serde(with = "strict_bytes")]
     pub key: Vec<u8>,
 }
 
 /// Params for listing objects.
 #[derive(Default, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct ObjectListParams {
+pub struct ListParams {
     /// The prefix to filter objects by.
     #[serde(with = "strict_bytes")]
     pub prefix: Vec<u8>,
@@ -61,6 +69,7 @@ pub struct ObjectListParams {
 #[repr(u64)]
 pub enum Method {
     Constructor = METHOD_CONSTRUCTOR,
+    GetMetadata = GET_METADATA_METHOD,
     PutObject = frc42_dispatch::method_hash!("PutObject"),
     ResolveExternalObject = frc42_dispatch::method_hash!("ResolveExternalObject"),
     DeleteObject = frc42_dispatch::method_hash!("DeleteObject"),

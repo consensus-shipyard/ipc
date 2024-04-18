@@ -4,6 +4,7 @@
 use std::collections::{BTreeSet, HashMap};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
@@ -15,8 +16,7 @@ use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
 use fendermint_vm_actor_interface::{
-    account, accumulator, burntfunds, chainmetadata, cron, eam, init, ipc, objectstore, reward,
-    system, EMPTY_ARR,
+    account, adm, burntfunds, chainmetadata, cron, eam, init, ipc, reward, system, EMPTY_ARR,
 };
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Genesis, Power, PowerScale, Validator};
@@ -230,6 +230,34 @@ where
             )
             .context("failed to create reward actor")?;
 
+        // ADM Address Manager (ADM) actor
+        let machine_codes = state
+            .custom_actor_manifest
+            .get_subset(vec!["accumulator", "objectstore"])
+            .iter()
+            .map(|(name, cid)| {
+                (
+                    fil_actor_adm::Kind::from_str(name).expect("failed to parse adm machine name"),
+                    cid.to_owned(),
+                )
+            })
+            .collect();
+        let adm_state = fil_actor_adm::State::new(
+            &state.store(),
+            machine_codes,
+            // TODO: Wire this into the genesis file so it can be set and updated
+            fil_actor_adm::PermissionModeParams::Unrestricted,
+        )?;
+        state
+            .create_builtin_actor(
+                adm::ADM_ACTOR_CODE_ID,
+                adm::ADM_ACTOR_ID,
+                &adm_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create adm actor")?;
+
         // STAGE 1b: Then we initialize the in-repo custom actors.
 
         // Initialize the chain metadata actor which handles saving metadata about the chain
@@ -262,30 +290,6 @@ where
                 None,
             )
             .context("failed to replace built in eam actor")?;
-
-        // Initialize the object store actor.
-        let objectstore_state = fendermint_actor_objectstore::State::new(&state.store())?;
-        state
-            .create_custom_actor(
-                fendermint_actor_objectstore::OBJECTSTORE_ACTOR_NAME,
-                objectstore::OBJECTSTORE_ACTOR_ID,
-                &objectstore_state,
-                TokenAmount::zero(),
-                None,
-            )
-            .context("failed to create objectstore actor")?;
-
-        // Initialize the accumulator actor.
-        let accumulator_state = fendermint_actor_accumulator::State::new(&state.store())?;
-        state
-            .create_custom_actor(
-                fendermint_actor_accumulator::ACCUMULATOR_ACTOR_NAME,
-                accumulator::ACCUMULATOR_ACTOR_ID,
-                &accumulator_state,
-                TokenAmount::zero(),
-                None,
-            )
-            .context("failed to create accumulator actor")?;
 
         // STAGE 2: Create non-builtin accounts which do not have a fixed ID.
 

@@ -57,6 +57,18 @@ impl Manifest {
         Ok(Self { code_by_name })
     }
 
+    /// Return a manifest subset from actor names.
+    pub fn get_subset(&self, names: Vec<&str>) -> HashMap<String, Cid> {
+        let mut code_by_name: HashMap<String, Cid> = HashMap::new();
+        for name in names {
+            let code_cid = self
+                .code_by_name(name)
+                .unwrap_or_else(|| panic!("actor {} not in manifest", name));
+            code_by_name.insert(name.into(), *code_cid);
+        }
+        code_by_name
+    }
+
     pub fn code_by_name(&self, str: &str) -> Option<&Cid> {
         self.code_by_name.get(str)
     }

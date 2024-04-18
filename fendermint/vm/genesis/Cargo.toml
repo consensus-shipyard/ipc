@@ -44,11 +44,11 @@ multihash = { workspace = true }
 [features]
 default = []
 arb = [
-  "arbitrary",
-  "quickcheck",
-  "fvm_shared/arb",
-  "fendermint_testing/arb",
-  "rand",
-  "cid",
-  "multihash",
+    "arbitrary",
+    "quickcheck",
+    "fvm_shared/arb",
+    "fendermint_testing/arb",
+    "rand",
+    "cid",
+    "multihash",
 ]

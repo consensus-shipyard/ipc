@@ -1,4 +1,4 @@
-.PHONY: all build test lint license check-fmt check-clippy diagrams
+.PHONY: all build install test lint license check-fmt check-clippy diagrams
 
 CRATE   := ipc-cli ipc-wallet ipc-provider ipc-api ipc-types
 PACKAGE := $(patsubst %, --package %, $(CRATE))
@@ -7,6 +7,9 @@ all: test build
 
 build:
 	cargo build --release
+
+install:
+	cargo install --path cli
 
 test:
 	cargo test --release $(PACKAGE)

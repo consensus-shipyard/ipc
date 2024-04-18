@@ -40,9 +40,9 @@ jobs:
     steps:
       # For pull requests it's not necessary to checkout the code,
       # but the workflow is also triggered on pushes to `main`.
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: dorny/paths-filter@v2
+      - uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
@@ -62,6 +62,7 @@ jobs:
 
   contracts-prettier:
     uses: ./.github/workflows/contracts-prettier.yaml
+    secrets: inherit
     needs: [ changes ]
     if: >-
       needs.changes.outputs.contracts == 'true' ||
@@ -70,30 +71,37 @@ jobs:
 
   contracts-deployment-test:
     uses: ./.github/workflows/contracts-deployment-test.yaml
+    secrets: inherit
     needs: [ contracts-prettier ]
 
   contracts-test:
     uses: ./.github/workflows/contracts-test.yaml
+    secrets: inherit
     needs: [ contracts-prettier ]
 
   contracts-storage:
     uses: ./.github/workflows/contracts-storage.yaml
+    secrets: inherit
     needs: [ contracts-prettier ]
 
   contracts-npm-audit:
     uses: ./.github/workflows/contracts-npm-audit.yaml
+    secrets: inherit
     needs: [ contracts-prettier ]
 
   contracts-sast:
     uses: ./.github/workflows/contracts-sast.yaml
+    secrets: inherit
     needs: [ contracts-prettier ]
 
   extras:
     uses: ./.github/workflows/extras.yaml
+    secrets: inherit
     needs: [ contracts-prettier ]
 
   ipc:
     uses: ./.github/workflows/ipc.yaml
+    secrets: inherit
     needs: [ changes, license ]
     if: >-
       needs.changes.outputs.workspace == 'true' ||
@@ -104,6 +112,7 @@ jobs:
 
   ipld-resolver:
     uses: ./.github/workflows/ipld-resolver.yaml
+    secrets: inherit
     needs: [ changes, license ]
     if: >-
       needs.changes.outputs.workspace == 'true' ||

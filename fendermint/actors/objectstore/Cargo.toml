@@ -24,6 +24,7 @@ serde_tuple = { workspace = true }
 num-traits = { workspace = true }
 frc42_dispatch = { workspace = true }
 anyhow = { workspace = true }
+fendermint_actor_machine = { path = "../machine" }
 objectstore_actor_sdk = { path = "../../../textile/objectstore_actor_sdk" }
 
 [dev-dependencies]

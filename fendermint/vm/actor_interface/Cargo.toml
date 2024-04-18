@@ -37,6 +37,7 @@ ipc-api = { workspace = true }
 
 fendermint_vm_genesis = { path = "../genesis" }
 fendermint_crypto = { path = "../../crypto" }
+fendermint_actor_machine = { path = "../../actors/machine" }
 
 [dev-dependencies]
 ethers-core = { workspace = true }

@@ -2842,6 +2842,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid",
+ "fendermint_actor_machine",
  "fil_actors_runtime",
  "frc42_dispatch",
  "fvm_ipld_amt",
@@ -2894,11 +2895,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_actor_machine"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fil_actor_adm",
+ "fil_actors_runtime",
+ "frc42_dispatch",
+ "fvm_ipld_encoding",
+ "fvm_shared",
+ "serde",
+ "serde_tuple",
+]
+
+[[package]]
 name = "fendermint_actor_objectstore"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid",
+ "fendermint_actor_machine",
  "fil_actors_runtime",
  "frc42_dispatch",
  "fvm_ipld_blockstore",
@@ -2941,6 +2957,7 @@ dependencies = [
  "cid",
  "fendermint_abci",
  "fendermint_actor_accumulator",
+ "fendermint_actor_machine",
  "fendermint_actor_objectstore",
  "fendermint_app_options",
  "fendermint_app_settings",
@@ -3223,6 +3240,7 @@ dependencies = [
  "clap 4.5.4",
  "ethers",
  "fendermint_actor_accumulator",
+ "fendermint_actor_machine",
  "fendermint_actor_objectstore",
  "fendermint_crypto",
  "fendermint_vm_actor_interface",
@@ -3301,6 +3319,7 @@ dependencies = [
  "cid",
  "ethers",
  "ethers-core",
+ "fendermint_actor_machine",
  "fendermint_crypto",
  "fendermint_vm_genesis",
  "fil_actors_evm_shared",
@@ -3416,6 +3435,7 @@ dependencies = [
  "fendermint_vm_message",
  "fendermint_vm_resolver",
  "fendermint_vm_topdown",
+ "fil_actor_adm",
  "futures-core",
  "futures-util",
  "fvm",
@@ -3608,6 +3628,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c007b1ae3abe1cb6f85a16305acd418b7ca6343b953633fee2b76d8f108b830f"
 
 [[package]]
+name = "fil_actor_adm"
+version = "12.0.0"
+dependencies = [
+ "anyhow",
+ "cid",
+ "fil_actors_runtime",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
+ "fvm_shared",
+ "hex-literal 0.3.4",
+ "integer-encoding",
+ "log",
+ "multihash 0.18.1",
+ "num-derive 0.3.3",
+ "num-traits",
+ "serde",
+]
+
+[[package]]
 name = "fil_actor_bundler"
 version = "6.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3629,7 +3668,6 @@ dependencies = [
 [[package]]
 name = "fil_actor_eam"
 version = "12.0.0"
-source = "git+https://github.com/filecoin-project/builtin-actors?tag=v12.0.0#b86938e410daebf27f9397fd622370a16b24f58b"
 dependencies = [
  "anyhow",
  "cid",
@@ -3650,7 +3688,6 @@ dependencies = [
 [[package]]
 name = "fil_actors_evm_shared"
 version = "12.0.0"
-source = "git+https://github.com/filecoin-project/builtin-actors?tag=v12.0.0#b86938e410daebf27f9397fd622370a16b24f58b"
 dependencies = [
  "fil_actors_runtime",
  "fvm_ipld_encoding",
@@ -3663,7 +3700,6 @@ dependencies = [
 [[package]]
 name = "fil_actors_runtime"
 version = "12.0.0"
-source = "git+https://github.com/filecoin-project/builtin-actors?tag=v12.0.0#b86938e410daebf27f9397fd622370a16b24f58b"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
@@ -10332,7 +10368,6 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "vm_api"
 version = "1.0.0"
-source = "git+https://github.com/filecoin-project/builtin-actors?tag=v12.0.0#b86938e410daebf27f9397fd622370a16b24f58b"
 dependencies = [
  "anyhow",
  "cid",
