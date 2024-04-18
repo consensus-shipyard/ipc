@@ -42,7 +42,7 @@ library SubnetIDHelper {
     }
 
     function toString(SubnetID calldata subnet) public pure returns (string memory) {
-        string memory route = string(abi.encodePacked("/r", Strings.toString(subnet.root)));
+        string memory route = string.concat("/r",Strings.toString(subnet.root));
         uint256 subnetLength = subnet.route.length;
         for (uint256 i; i < subnetLength; ) {
             route = string.concat(route, "/");
