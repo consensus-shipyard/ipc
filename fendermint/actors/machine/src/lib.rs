@@ -20,7 +20,7 @@ pub struct ConstructorParams {
 }
 
 /// The different types of machine write access.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum WriteAccess {
     /// Only the owner can write to the machine.
     OnlyOwner,

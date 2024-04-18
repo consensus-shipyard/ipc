@@ -10,6 +10,7 @@ use fendermint_vm_message::query::{FvmQueryHeight, GasEstimate};
 use tendermint::abci::response::DeliverTx;
 use tendermint_rpc::endpoint::broadcast::{tx_async, tx_commit, tx_sync};
 
+use fendermint_actor_accumulator::PushReturn;
 use fendermint_actor_machine::{Metadata, WriteAccess};
 use fendermint_actor_objectstore::{
     DeleteParams, GetParams, ListParams, Object, ObjectList, PutParams,
@@ -25,8 +26,9 @@ use fendermint_vm_message::chain::ChainMessage;
 use crate::message::{GasParams, SignedMessageFactory};
 use crate::query::{QueryClient, QueryResponse};
 use crate::response::{
-    decode_bytes, decode_cid_string, decode_fevm_create, decode_fevm_invoke, decode_machine_create,
-    decode_machine_get, decode_machine_list, decode_os_get, decode_os_list,
+    decode_acc_get_at, decode_acc_push_return, decode_bytes, decode_cid_string, decode_fevm_create,
+    decode_fevm_invoke, decode_machine_create, decode_machine_get, decode_machine_list,
+    decode_os_get, decode_os_list,
 };
 
 /// Abstracting away what the return value is based on whether
@@ -141,10 +143,10 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
         event: Bytes,
         value: TokenAmount,
         gas_params: GasParams,
-    ) -> anyhow::Result<M::Response<String>> {
+    ) -> anyhow::Result<M::Response<PushReturn>> {
         let mf = self.message_factory_mut();
         let msg = mf.acc_push(address, event, value, gas_params)?;
-        let fut = self.perform(msg, decode_cid_string);
+        let fut = self.perform(msg, decode_acc_push_return);
         let res = fut.await?;
         Ok(res)
     }
@@ -293,6 +295,36 @@ pub trait CallClient: QueryClient + BoundClient {
         let response = CallResponse {
             response,
             return_data,
+        };
+
+        Ok(response)
+    }
+
+    /// Get object at the given index in an accumulator without including a transaction on the
+    /// blockchain.
+    async fn acc_get_at_call(
+        &mut self,
+        address: Address,
+        value: TokenAmount,
+        gas_params: GasParams,
+        height: FvmQueryHeight,
+        index: u64,
+    ) -> anyhow::Result<CallResponse<Vec<u8>>> {
+        let msg = self
+            .message_factory_mut()
+            .acc_get_at(address, value, gas_params, index)?;
+
+        let response = self.call(msg, height).await?;
+        if response.value.code.is_err() {
+            return Err(anyhow!("{}", response.value.info));
+        }
+
+        let res = decode_acc_get_at(&response.value)
+            .context("error decoding data from deliver_tx in call")?;
+
+        let response = CallResponse {
+            response,
+            return_data: Some(res),
         };
 
         Ok(response)

@@ -12,7 +12,7 @@ use fil_actors_runtime::{
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::{error::ExitCode, MethodNum};
 
-use crate::{Method, State, ACCUMULATOR_ACTOR_NAME};
+use crate::{Method, PushReturn, State, ACCUMULATOR_ACTOR_NAME};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
@@ -32,7 +32,7 @@ impl Actor {
         rt.create(&state)
     }
 
-    fn push(rt: &impl Runtime, obj: Vec<u8>) -> Result<Cid, ActorError> {
+    fn push(rt: &impl Runtime, obj: Vec<u8>) -> Result<PushReturn, ActorError> {
         Self::ensure_write_allowed(rt)?;
 
         rt.transaction(|st: &mut State, rt| {
@@ -40,6 +40,13 @@ impl Actor {
                 e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to push object")
             })
         })
+    }
+
+    fn get_leaf_at(rt: &impl Runtime, index: u64) -> Result<Vec<u8>, ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+        let st: State = rt.state()?;
+        st.get_obj(rt.store(), index)
+            .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get leaf"))
     }
 
     fn get_root(rt: &impl Runtime) -> Result<Cid, ActorError> {
@@ -92,6 +99,7 @@ impl ActorCode for Actor {
         Constructor => constructor,
         GetMetadata => get_metadata,
         Push => push,
+        Get => get_leaf_at,
         Root => get_root,
         Peaks => get_peaks,
         Count => get_count,

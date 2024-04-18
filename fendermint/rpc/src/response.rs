@@ -4,6 +4,7 @@ use anyhow::{anyhow, Context};
 use base64::Engine;
 use bytes::Bytes;
 use cid::Cid;
+use fendermint_actor_accumulator::PushReturn;
 use fendermint_actor_machine::Metadata;
 use fendermint_actor_objectstore::{Object, ObjectList};
 use fendermint_vm_actor_interface::{adm, eam};
@@ -66,8 +67,21 @@ pub fn decode_fevm_return_data(data: RawBytes) -> anyhow::Result<Vec<u8>> {
 pub fn decode_cid_string(deliver_tx: &DeliverTx) -> anyhow::Result<String> {
     let data = decode_data(&deliver_tx.data)?;
     fvm_ipld_encoding::from_slice::<Cid>(&data)
-        .map_err(|e| anyhow!("error parsing as Vec<u8>: {e}"))
+        .map_err(|e| anyhow!("error parsing as String: {e}"))
         .map(|cid| cid.to_string())
+}
+
+/// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as bytes.
+pub fn decode_acc_push_return(deliver_tx: &DeliverTx) -> anyhow::Result<PushReturn> {
+    let data = decode_data(&deliver_tx.data)?;
+    fvm_ipld_encoding::from_slice::<PushReturn>(&data)
+        .map_err(|e| anyhow!("error parsing as PushReturn: {e}"))
+}
+
+pub fn decode_acc_get_at(deliver_tx: &DeliverTx) -> anyhow::Result<Vec<u8>> {
+    let data = decode_data(&deliver_tx.data)?;
+    fvm_ipld_encoding::from_slice(data.as_slice())
+        .map_err(|e| anyhow!("error parsing as Vec<u8>: {e}"))
 }
 
 /// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as [`CreateReturn`].

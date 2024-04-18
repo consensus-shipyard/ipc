@@ -33,6 +33,7 @@ use warp::{
     Filter, Rejection, Reply,
 };
 
+use fendermint_actor_accumulator::PushReturn;
 use fendermint_actor_objectstore::{
     DeleteParams, GetParams, ListParams, Object, ObjectKind, ObjectList, ObjectListItem, PutParams,
 };
@@ -154,6 +155,13 @@ cmd! {
                     .and(warp::header::optional::<u64>("X-ADM-GasLimit"))
                     .and(warp::header::optional::<BroadcastMode>("X-ADM-BroadcastMode"))
                     .and_then(handle_acc_push);
+                let acc_get_at_route = warp::path!("v1" / "accumulators" / Address / "get")
+                    .and(warp::get())
+                    .and(warp::query::<GetQuery>())
+                    .and(warp::query::<HeightQuery>())
+                    .and(with_client(client.clone()))
+                    .and(with_args(args.clone()))
+                    .and_then(handle_acc_get_at);
                 let acc_root_route = warp::path!("v1" / "accumulators" / Address)
                     .and(warp::get())
                     .and(warp::query::<HeightQuery>())
@@ -170,6 +178,7 @@ cmd! {
                     .or(os_delete_route)
                     .or(os_get_or_list_route)
                     .or(acc_push_route)
+                    .or(acc_get_at_route)
                     .or(acc_root_route)
                     .with(warp::cors().allow_any_origin()
                         .allow_headers(vec!["Content-Type"])
@@ -233,6 +242,11 @@ struct HeightQuery {
 struct ListQuery {
     pub offset: Option<u64>,
     pub limit: Option<u64>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct GetQuery {
+    pub index: u64,
 }
 
 #[derive(Debug, Error)]
@@ -749,7 +763,47 @@ async fn handle_acc_push(
         })?;
 
     *nonce_lck += 1;
-    Ok(warp::reply::json(&res))
+
+    let data = res.data.map(|pr| {
+        json!( {
+            "root": pr.root.to_string(),
+            "index": pr.index,
+        })
+    });
+    let res_human_readable = Txn {
+        status: res.status,
+        hash: res.hash,
+        height: res.height,
+        gas_used: res.gas_used,
+        data,
+    };
+    Ok(warp::reply::json(&res_human_readable))
+}
+
+async fn handle_acc_get_at(
+    address: Address,
+    get_query: GetQuery,
+    height_query: HeightQuery,
+    client: FendermintClient,
+    args: TransArgs,
+) -> Result<impl Reply, Rejection> {
+    let res = acc_get_at(
+        client,
+        args,
+        address,
+        get_query.index,
+        height_query.height.unwrap_or(0),
+    )
+    .await
+    .map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("root error: {}", e),
+        })
+    })?;
+
+    let str = String::from_utf8(res.unwrap_or_default()).unwrap();
+    let json = json!({"value": str});
+    Ok(warp::reply::json(&json))
 }
 
 async fn handle_acc_root(
@@ -1050,11 +1104,30 @@ async fn acc_push(
     args: TransArgs,
     address: Address,
     event: Bytes,
-) -> anyhow::Result<Txn<String>> {
+) -> anyhow::Result<Txn<PushReturn>> {
     broadcast(client, args, |mut client, value, gas_params| {
         Box::pin(async move { client.acc_push(address, event, value, gas_params).await })
     })
     .await
+}
+
+async fn acc_get_at(
+    client: FendermintClient,
+    args: TransArgs,
+    address: Address,
+    index: u64,
+    height: u64,
+) -> anyhow::Result<Option<Vec<u8>>> {
+    let mut client = TransClient::new(client, &args)?;
+    let gas_params = gas_params(&args);
+    let h = FvmQueryHeight::from(height);
+
+    let res = client
+        .inner
+        .acc_get_at_call(address, TokenAmount::default(), gas_params, h, index)
+        .await?;
+
+    Ok(res.return_data)
 }
 
 async fn acc_root(

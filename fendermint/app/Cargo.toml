@@ -60,6 +60,7 @@ fendermint_vm_ipfs_resolver = { path = "../vm/ipfs_resolver" }
 fendermint_vm_snapshot = { path = "../vm/snapshot" }
 fendermint_vm_topdown = { path = "../vm/topdown" }
 fendermint_actor_machine = { path = "../actors/machine" }
+fendermint_actor_accumulator = { path = "../actors/accumulator" }
 fendermint_actor_objectstore = { path = "../actors/objectstore" }
 
 fvm = { workspace = true }
