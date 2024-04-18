@@ -7,16 +7,11 @@ use cid::Cid;
 use fendermint_actor_machine::{Kind, MachineState, WriteAccess, GET_METADATA_METHOD};
 use fvm_ipld_amt::Amt;
 use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding::{
-    de::DeserializeOwned,
-    ser::Serialize,
-    to_vec,
-    tuple::{Deserialize_tuple, Serialize_tuple},
-    CborStore, DAG_CBOR,
-};
+use fvm_ipld_encoding::{strict_bytes, to_vec, tuple::*, CborStore, DAG_CBOR};
 use fvm_shared::address::Address;
 use fvm_shared::METHOD_CONSTRUCTOR;
 use num_derive::FromPrimitive;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 pub const ACCUMULATOR_ACTOR_NAME: &str = "accumulator";
 const BIT_WIDTH: u32 = 3;
@@ -31,6 +26,18 @@ pub enum Method {
     Root = frc42_dispatch::method_hash!("Root"),
     Peaks = frc42_dispatch::method_hash!("Peaks"),
     Count = frc42_dispatch::method_hash!("Count"),
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct PushParams(#[serde(with = "strict_bytes")] pub Vec<u8>);
+
+#[derive(Serialize_tuple, Deserialize_tuple)]
+pub struct PushReturn {
+    /// The new root of the accumulator MMR after the object was pushed into it.
+    pub root: Cid,
+    /// The index of the object that was just pushed into the accumulator.
+    pub index: u64,
 }
 
 /// Compute the hash of a pair of CIDs.
@@ -232,14 +239,6 @@ impl MachineState for State {
     fn write_access(&self) -> WriteAccess {
         self.write_access
     }
-}
-
-#[derive(Serialize_tuple, Deserialize_tuple)]
-pub struct PushReturn {
-    /// The new root of the accumulator MMR after the object was pushed into it.
-    pub root: Cid,
-    /// The index of the object that was just pushed into the accumulator.
-    pub index: u64,
 }
 
 impl State {

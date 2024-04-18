@@ -8,6 +8,7 @@ use fil_actors_runtime::{runtime::Runtime, ActorError};
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::{address::Address, MethodNum};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::fmt::Display;
 use std::str::FromStr;
 
 /// Params for creating an object store machine.
@@ -37,6 +38,16 @@ impl FromStr for WriteAccess {
             "public" => Self::Public,
             _ => return Err(anyhow!("invalid write access")),
         })
+    }
+}
+
+impl Display for WriteAccess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            Self::OnlyOwner => "onlyowner",
+            Self::Public => "public",
+        };
+        write!(f, "{}", str)
     }
 }
 

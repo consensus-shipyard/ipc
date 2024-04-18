@@ -36,7 +36,7 @@ impl MachineState for State {
     }
 
     fn write_access(&self) -> WriteAccess {
-        self.write_access.clone()
+        self.write_access
     }
 }
 

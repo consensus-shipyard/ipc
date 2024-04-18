@@ -12,7 +12,7 @@ use fil_actors_runtime::{
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::{error::ExitCode, MethodNum};
 
-use crate::{Method, PushReturn, State, ACCUMULATOR_ACTOR_NAME};
+use crate::{Method, PushParams, PushReturn, State, ACCUMULATOR_ACTOR_NAME};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
@@ -32,11 +32,11 @@ impl Actor {
         rt.create(&state)
     }
 
-    fn push(rt: &impl Runtime, obj: Vec<u8>) -> Result<PushReturn, ActorError> {
+    fn push(rt: &impl Runtime, params: PushParams) -> Result<PushReturn, ActorError> {
         Self::ensure_write_allowed(rt)?;
 
         rt.transaction(|st: &mut State, rt| {
-            st.push(rt.store(), obj).map_err(|e| {
+            st.push(rt.store(), params.0).map_err(|e| {
                 e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to push object")
             })
         })

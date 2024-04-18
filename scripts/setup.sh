@@ -11,9 +11,14 @@ fendermint genesis --genesis-file test-network/genesis.json new --chain-name tes
 
 # Create some keys
 mkdir test-network/keys
-for NAME in alice bob charlie dave; do
+for NAME in bob charlie dave; do
   fendermint key gen --out-dir test-network/keys --name $NAME;
 done
+
+## Use fixed address for alice to make dev w/ ADM cli less painful
+echo "HDI9SU0dBp/kyJE1Ch7GkcQhbBdBigyzx1M7FDvSuBI=" | tr -d '\n' > test-network/keys/alice.sk
+echo "Ayh506Z/KRZnDgtarffTZQympqQ8A4hfwse1gK9t0NJi" | tr -d '\n' > test-network/keys/alice.pk
+
 
 # Add accounts to the Genesis file
 ## A stand-alone account

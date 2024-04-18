@@ -409,7 +409,7 @@ impl SignedMessageFactory {
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
-        let params = RawBytes::serialize(event.to_vec())?;
+        let params = RawBytes::serialize(BytesSer(&event))?;
         let message = self.transaction(
             address,
             fendermint_actor_accumulator::Method::Push as u64,
