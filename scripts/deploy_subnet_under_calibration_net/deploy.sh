@@ -109,9 +109,11 @@ else
 fi
 
 # Make sure we re-read the latest env before finishing dependency installation.
-set +u
-source ${HOME}/.bashrc
-set -u
+if test -f ${HOME}/.bashrc; then
+  set +u
+  source ${HOME}/.bashrc
+  set -u
+fi
 
 # Step 2: Prepare code repo and build ipc-cli
 if ! $local_deploy ; then
