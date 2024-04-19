@@ -22,7 +22,7 @@ The code for the subnet actor is located in `contracts/src/subnet` which you can
 1. First, you must know your subnet ID which was returned when you created a child subnet (using `ipc-cli subnet create`). Lets say when you created your subnet that your subnet ID was:
 `/r314159/t410fkp4r67rks3ok4bvbn2rjojhkbig2rwvp4nmor5q`
 
-2. We must convert the subnet ID to an ETH address. To do this, go to https://beryx.zondax.ch/address_converter and input the `t410` address in the Filecoin address input, in this example this would be `t410fkp4r67rks3ok4bvbn2rjojhkbig2rwvp4nmor5q`. Click `Convert to ETH` and it will compute the Ethereum address as `0x53f91f7e2a96dcae06a16ea29724ea0a0da8daaf`.
+2. We must convert the subnet ID to an ETH address. To do this, visit the [Beryx address converter](https://beryx.zondax.ch/address_converter) and input the `t410` address in the Filecoin address input, in this example this would be `t410fkp4r67rks3ok4bvbn2rjojhkbig2rwvp4nmor5q`. Click `Convert to ETH` and it will compute the Ethereum address as `0x53f91f7e2a96dcae06a16ea29724ea0a0da8daaf`.
 
 3. You must set the `RPC_URL` and `PRIVATE_KEY` environmental variables to point to your network provider and the private key of the address you want to use for the deployment, respectively
 
