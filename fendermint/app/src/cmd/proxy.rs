@@ -3,7 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use std::str::FromStr;
-use std::{convert::Infallible, future::Future, num::ParseIntError, pin::Pin, sync::Arc};
+use std::{
+    convert::Infallible, future::Future, net::ToSocketAddrs, num::ParseIntError, pin::Pin,
+    sync::Arc,
+};
 
 use anyhow::anyhow;
 use async_tempfile::TempFile;
@@ -19,23 +22,24 @@ use fendermint_vm_message::conv::from_fvm::to_eth_tokens;
 use fendermint_vm_message::signed::SignedMessage;
 use futures_util::{Stream, StreamExt};
 use fvm_ipld_encoding::strict_bytes::ByteBuf;
-use fvm_shared::econ::TokenAmount;
-use fvm_shared::BLOCK_GAS_LIMIT;
-use fvm_shared::{address::Address, ActorID};
+use fvm_shared::{address::Address, econ::TokenAmount, ActorID, BLOCK_GAS_LIMIT};
 use ipfs_api_backend_hyper::{IpfsApi, IpfsClient, TryFromUri};
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::net::ToSocketAddrs;
 use tendermint::{block::Height, Hash};
 use thiserror::Error;
-use tokio::io::{AsyncSeekExt, AsyncWriteExt};
-use tokio::sync::Mutex;
+use tokio::{
+    io::{AsyncSeekExt, AsyncWriteExt},
+    sync::Mutex,
+};
 use tokio_util::compat::TokioAsyncReadCompatExt;
-use warp::filters::multipart::Part;
-use warp::http::{HeaderMap, HeaderValue};
-use warp::path::Tail;
-use warp::{http::StatusCode, Filter, Rejection, Reply};
+use warp::{
+    filters::multipart::Part,
+    http::{HeaderMap, HeaderValue, StatusCode},
+    path::Tail,
+    Filter, Rejection, Reply,
+};
 
 use fendermint_actor_accumulator::PushReturn;
 use fendermint_actor_objectstore::{DeleteParams, GetParams, ListParams, PutParams};
@@ -60,8 +64,8 @@ use crate::options::{
 };
 
 const MAX_OBJECT_LENGTH: u64 = 1024 * 1024 * 1024;
-const MAX_EVENT_LENGTH: u64 = 1024 * 500; // Limit to 500KiB for now
 const MAX_INTERNAL_OBJECT_LENGTH: u64 = 1024;
+const MAX_EVENT_LENGTH: u64 = 1024 * 500; // Limit to 500KiB for now
 
 cmd! {
     ProxyArgs(self, settings: ProxySettings) {
