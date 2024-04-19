@@ -27,10 +27,10 @@ use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::net::ToSocketAddrs;
-use std::sync::Mutex;
 use tendermint::{block::Height, Hash};
 use thiserror::Error;
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
+use tokio::sync::Mutex;
 use tokio_util::compat::TokioAsyncReadCompatExt;
 use warp::filters::multipart::Part;
 use warp::http::{HeaderMap, HeaderValue};
@@ -112,16 +112,15 @@ cmd! {
                     .and(with_args(args.clone()))
                     .and_then(handle_accounts_get_machines);
 
-                // Object Store routes
-                let object_route = warp::path!("v1" / "object" )
-                    .and(warp::put())
-                    .and(warp::body::content_length_limit(MAX_OBJECT_LENGTH))
-                    .and(with_client(client.clone()))
-                    .and(with_ipfs_adapter(ipfs_adapter.clone()))
-                    .and(warp::multipart::form())
-                    .and_then(handle_object_upload);
-
                 // Objectstore routes
+                let os_object_route = warp::path!("v1" / "object" )
+                .and(warp::put())
+                .and(warp::body::content_length_limit(MAX_OBJECT_LENGTH))
+                .and(with_client(client.clone()))
+                .and(with_ipfs_adapter(ipfs_adapter.clone()))
+                .and(warp::multipart::form())
+                .and_then(handle_object_upload);
+
                 let os_upload_route = warp::path!("v1" / "objectstores" / Address / ..)
                     .and(warp::put())
                     .and(warp::path::tail())
@@ -189,6 +188,7 @@ cmd! {
                     .or(machines_get_route)
                     .or(accounts_get_machines_route)
                     .or(os_upload_route)
+                    .or(os_object_route)
                     .or(os_delete_route)
                     .or(os_get_or_list_route)
                     .or(acc_push_route)
@@ -1417,7 +1417,7 @@ mod tests {
     use super::*;
     use ethers::core::k256::ecdsa::SigningKey;
     use ethers::core::rand::{rngs::StdRng, SeedableRng};
-    //use fendermint_actor_objectstore::{ObjectKind, ObjectPutParams};
+    use fendermint_actor_objectstore::{ObjectKind, PutParams};
     use fendermint_rpc::FendermintClient;
     use fendermint_vm_message::conv::from_eth::to_fvm_address;
     use fvm_ipld_encoding::RawBytes;
@@ -1506,7 +1506,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_handle_object_upload() {
-        /*     let matcher = MockRequestMethodMatcher::default()
+        let matcher = MockRequestMethodMatcher::default()
             .map(Method::AbciQuery, Ok(ABCI_QUERY_RESPONSE.to_string()));
         let client = FendermintClient::new(MockClient::new(matcher).0);
         let ipfs = IpfsMocked {
@@ -1517,13 +1517,14 @@ mod tests {
         let external_object = b"hello world".as_ref();
         let digest = Code::Blake2b256.digest(external_object);
         let object_cid = Cid::new_v1(IPLD_RAW, digest);
-        let params = ObjectPutParams {
+        let params = PutParams {
             key: key.to_vec(),
             kind: ObjectKind::External(object_cid),
             overwrite: true,
         };
         let params = RawBytes::serialize(params).unwrap();
-        let object = fendermint_vm_message::signed::Object::new(key.to_vec(), object_cid);
+        let to = Address::new_id(90);
+        let object = fendermint_vm_message::signed::Object::new(key.to_vec(), object_cid, to);
 
         let sk = fendermint_crypto::SecretKey::random(&mut StdRng::from_entropy());
         let signing_key = SigningKey::from_slice(sk.serialize().as_ref()).unwrap();
@@ -1531,7 +1532,7 @@ mod tests {
         let message = fvm_shared::message::Message {
             version: Default::default(),
             from: to_fvm_address(from_address),
-            to: fendermint_vm_actor_interface::objectstore::OBJECTSTORE_ACTOR_ADDR,
+            to,
             sequence: 0,
             value: TokenAmount::from_atto(0),
             method_num: fendermint_actor_objectstore::Method::PutObject as u64,
@@ -1558,6 +1559,6 @@ mod tests {
             .await
             .unwrap();
         let response = reply.into_response();
-        assert_eq!(response.status(), StatusCode::OK); */
+        assert_eq!(response.status(), StatusCode::OK);
     }
 }
