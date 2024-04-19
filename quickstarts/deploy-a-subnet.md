@@ -173,24 +173,13 @@ Make a note of the address of the subnet you created because you will use it bel
 
 ### Step 5: Join the subnet
 
-Before we deploy the infrastructure for the subnet, we will have to bootstrap the subnet and join from our validators, putting some initial collateral into the subnet and giving our validator address some initial balance in the subnet. For this, we need to send a `join` command from each of our validators from their validator owner addresses providing their corresponding public key.
-
-* Get the public key for all of your wallets and note it down. This is the public key that each of your validators will use to sign blocks in the subnet.
+Before we deploy the infrastructure for the subnet, we will have to bootstrap the subnet and join from our validators, putting some initial collateral into the subnet and giving our validator address some initial balance in the subnet. For this, we need to send a `join` command from each of our validators from their validator owner addresses.
 
 ```
-ipc-cli wallet pub-key --wallet-type evm --address <PLEASE PUT ADDRESS 1>
-ipc-cli wallet pub-key --wallet-type evm --address <PLEASE PUT ADDRESS 2>
-ipc-cli wallet pub-key --wallet-type evm --address <PLEASE PUT ADDRESS 3>
-ipc-cli wallet pub-key --wallet-type evm --address <PLEASE PUT ADDRESS 4>
-```
-
-* Join the subnet with each validator.
-
-```
-ipc-cli subnet join --from=<PLEASE PUT ADDRESS 1> --subnet=<PLEASE PUT SUBNET ID> --collateral=10 --public-key=<PLEASE PUT PUBLIC KEY RELATED TO ADDRESS 1> --initial-balance 1
-ipc-cli subnet join --from=<PLEASE PUT ADDRESS 2> --subnet=<PLEASE PUT SUBNET ID> --collateral=10 --public-key=<PLEASE PUT PUBLIC KEY RELATED TO ADDRESS 2> --initial-balance 1
-ipc-cli subnet join --from=<PLEASE PUT ADDRESS 3> --subnet=<PLEASE PUT SUBNET ID> --collateral=10 --public-key=<PLEASE PUT PUBLIC KEY RELATED TO ADDRESS 3> --initial-balance 1
-ipc-cli subnet join --from=<PLEASE PUT ADDRESS 3> --subnet=<PLEASE PUT SUBNET ID> --collateral=10 --public-key=<PLEASE PUT PUBLIC KEY RELATED TO ADDRESS 4> --initial-balance 1
+ipc-cli subnet join --from=<PLEASE PUT ADDRESS 1> --subnet=<PLEASE PUT SUBNET ID> --collateral=10 --initial-balance 1
+ipc-cli subnet join --from=<PLEASE PUT ADDRESS 2> --subnet=<PLEASE PUT SUBNET ID> --collateral=10 --initial-balance 1
+ipc-cli subnet join --from=<PLEASE PUT ADDRESS 3> --subnet=<PLEASE PUT SUBNET ID> --collateral=10 --initial-balance 1
+ipc-cli subnet join --from=<PLEASE PUT ADDRESS 3> --subnet=<PLEASE PUT SUBNET ID> --collateral=10 --initial-balance 1
 ```
 
 ### Step 6: Deploy the infrastructure
