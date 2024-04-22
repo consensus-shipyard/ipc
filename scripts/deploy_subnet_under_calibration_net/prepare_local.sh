@@ -12,9 +12,11 @@
 
 set -eo pipefail
 
-read -p "Warning, this will erase your ~/.ipc folder, continue (y/n)?"
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    exit 1
+if [ -d ~/.ipc ]; then
+  TIMESTAMP=$(date +%s)
+  echo "Warning: an existing ~/.ipc folder already exists!"
+  echo "Renaming ~/.ipc to ~/.ipc.$TIMESTAMP for backup"
+  mv ~/.ipc ~/.ipc.$TIMESTAMP
 fi
 
 SCRIPT_DIR=$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )
@@ -22,9 +24,6 @@ echo "SCRIPT_DIR: $SCRIPT_DIR"
 
 echo "Installing dependencies..."
 cargo install toml-cli
-
-echo "Removing existing .ipc folder"
-rm -rf ~/.ipc
 
 echo "Copying new .ipc folder"
 cp -r $SCRIPT_DIR/.ipc ~/.ipc
