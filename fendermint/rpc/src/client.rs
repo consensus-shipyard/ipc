@@ -113,11 +113,16 @@ impl FendermintClient<HttpClient> {
 pub trait TendermintClient<C> {
     /// The underlying Tendermint client.
     fn underlying(&self) -> &C;
+    fn into_underlying(self) -> C;
 }
 
 impl<C> TendermintClient<C> for FendermintClient<C> {
     fn underlying(&self) -> &C {
         &self.inner
+    }
+
+    fn into_underlying(self) -> C {
+        self.inner
     }
 }
 
@@ -155,6 +160,9 @@ impl<C> BoundClient for BoundFendermintClient<C> {
 impl<C> TendermintClient<C> for BoundFendermintClient<C> {
     fn underlying(&self) -> &C {
         &self.inner
+    }
+    fn into_underlying(self) -> C {
+        self.inner
     }
 }
 

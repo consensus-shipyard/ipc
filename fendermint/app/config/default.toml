@@ -116,6 +116,10 @@ gas_premium = 0
 filter_timeout = 300
 # Maximum number of entries in the LRU caches.
 cache_capacity = 1000000
+# How far ahead the nonce of submitted transactions can be for the API facade to buffer them
+# and re-submit when they become unblocked by another transaction included on the chain.
+# 0 means the buffering in the facade is disabled.
+max_nonce_gap = 10
 
 [eth.gas]
 # Minimum gas premium returned by the API in `eth_maxPriorityFeePerGas`, in atto.
