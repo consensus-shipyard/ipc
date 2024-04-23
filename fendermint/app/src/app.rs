@@ -721,7 +721,8 @@ where
 
         let state = FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
             .context("error creating new state")?
-            .with_block_hash(block_hash);
+            .with_block_hash(block_hash)
+            .with_validator_id(request.header.proposer_address);
 
         tracing::debug!("initialized exec state");
 

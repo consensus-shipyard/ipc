@@ -29,6 +29,9 @@ use fendermint_vm_encoding::IsHumanReadable;
 
 pub type BlockHash = [u8; 32];
 
+/// First 20 bytes of SHA256(PublicKey)
+pub type ValidatorId = tendermint::account::Id;
+
 pub type ActorAddressMap = HashMap<ActorID, Address>;
 
 /// The result of the message application bundled with any delegated addresses of event emitters.
@@ -103,6 +106,8 @@ where
     /// execution interpreter without having to add yet another piece to track at the app level.
     block_hash: Option<BlockHash>,
 
+    /// ID of the validator who created this block. For queries and checks this is empty.
+    validator_id: Option<ValidatorId>,
     /// State of parameters that are outside the control of the FVM but can change and need to be persisted.
     params: FvmUpdatableParams,
 
@@ -146,6 +151,7 @@ where
         Ok(Self {
             executor,
             block_hash: None,
+            validator_id: None,
             params: FvmUpdatableParams {
                 app_version: params.app_version,
                 base_fee: params.base_fee,
@@ -159,6 +165,12 @@ where
     /// Set the block hash during execution.
     pub fn with_block_hash(mut self, block_hash: BlockHash) -> Self {
         self.block_hash = Some(block_hash);
+        self
+    }
+
+    /// Set the validator during execution.
+    pub fn with_validator_id(mut self, validator_id: ValidatorId) -> Self {
+        self.validator_id = Some(validator_id);
         self
     }
 
@@ -204,6 +216,11 @@ where
     /// Identity of the block being executed, if we are indeed executing any blocks.
     pub fn block_hash(&self) -> Option<BlockHash> {
         self.block_hash
+    }
+
+    /// Identity of the block creator, if we are indeed executing any blocks.
+    pub fn validator_id(&self) -> Option<ValidatorId> {
+        self.validator_id
     }
 
     /// The timestamp of the currently executing block.

@@ -31,8 +31,15 @@ halt_height = 0
 # kind =
 
 [abci]
-# Number of concurrent requests allowed to reach the application.
+# Number of concurrent requests allowed to be _submitted_ to the application.
+# Because message handling is asynhronous, this doesn't make any difference
+# in practice, because they will be executed concurrently, unless affected
+# by Tower layers applied in the application root.
 bound = 1
+# Maximum number of messages allowed in a block, which also affects the
+# buffer size applied on the consensus service. It is important to keep
+# those in-sync to avoid potential deadlocks with message handling in Tower.
+block_max_msgs = 1000
 
 [abci.listen]
 # Only accept connections from Tendermint, assumed to be running locally.
@@ -43,6 +50,8 @@ port = 26658
 [db]
 # Keep unlimited history by default.
 state_hist_size = 0
+# RocksDB compaction style - 'level' is supposed to be good when most keys don't get updated.
+compaction_style = "level"
 
 [metrics]
 # Enable the export of metrics over HTTP.
@@ -107,6 +116,10 @@ gas_premium = 0
 filter_timeout = 300
 # Maximum number of entries in the LRU caches.
 cache_capacity = 1000000
+# How far ahead the nonce of submitted transactions can be for the API facade to buffer them
+# and re-submit when they become unblocked by another transaction included on the chain.
+# 0 means the buffering in the facade is disabled.
+max_nonce_gap = 10
 
 [eth.gas]
 # Minimum gas premium returned by the API in `eth_maxPriorityFeePerGas`, in atto.
@@ -223,3 +236,22 @@ vote_interval = 1
 # potential stalling because peers missed an important vote and the cache is full,
 # pausing the syncer, preventing new events to trigger votes.
 vote_timeout = 60
+
+
+# # Setting which are only allowed if the `--network` CLI parameter is `testnet`.
+# [testing]
+
+# # Indicate whether the chain metadata should be pushed into the ledger.
+# #
+# # Doing so causes the ledger to chain even on empty blocks, which will
+# # cause another empty block to be created by CometBFT, perpetuating
+# # it even if we don't want them.
+# #
+# # This is here for testing purposes only, it should be `true` by default to allow
+# # the `evm` actor to execute the `BLOCKHASH` function. If you want to disable
+# # empty blocks created by CometBFT, for a less frenetic testing experience,
+# # then you need to disable this as well, with the side effect that `BLOCKHASH`
+# # will always return an empty value.
+# #
+# # See https://docs.cometbft.com/v0.37/core/configuration#empty-blocks-vs-no-empty-blocks
+# push_chain_meta = true

@@ -33,11 +33,13 @@ use crate::manager::{EthManager, SubnetManager};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use ethers::abi::Tokenizable;
+use ethers::contract::abigen;
 use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::{Signer, SignerMiddleware};
 use ethers::providers::{Authorization, Http, Middleware, Provider};
 use ethers::signers::{LocalWallet, Wallet};
 use ethers::types::{BlockId, Eip1559TransactionRequest, ValueOrArray, I256, U256};
+
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_api::checkpoint::{
@@ -81,6 +83,16 @@ struct IPCContractInfo {
     chain_id: u64,
     provider: Provider<Http>,
 }
+
+//TODO receive clarity on this implementation
+abigen!(
+    IERC20,
+    r#"[
+        function approve(address spender, uint256 amount) external returns (bool)
+        event Transfer(address indexed from, address indexed to, uint256 value)
+        event Approval(address indexed owner, address indexed spender, uint256 value)
+    ]"#,
+);
 
 #[async_trait]
 impl TopDownFinalityQuery for EthSubnetManager {
@@ -554,6 +566,34 @@ impl SubnetManager for EthSubnetManager {
         block_number_from_receipt(receipt)
     }
 
+    /// Approves the `from` address to use up to `amount` tokens from `token_address`.
+    async fn approve_token(
+        &self,
+        subnet: SubnetID,
+        from: Address,
+        amount: TokenAmount,
+    ) -> Result<ChainEpoch> {
+        log::debug!("approve token, subnet: {subnet}, amount: {amount}, from: {from}");
+
+        let value = fil_amount_to_eth_amount(&amount)?;
+
+        let signer = Arc::new(self.get_signer(&from)?);
+
+        let subnet_supply_source = self.get_subnet_supply_source(&subnet).await?;
+        if subnet_supply_source.kind != SupplyKind::ERC20 as u8 {
+            return Err(anyhow!("Invalid operation: Expected the subnet's supply source to be ERC20, but found a different kind."));
+        }
+
+        let token_contract = IERC20::new(subnet_supply_source.token_address, signer.clone());
+
+        let txn = token_contract.approve(self.ipc_contract_info.gateway_addr, value);
+        let txn = call_with_premium_estimation(signer, txn).await?;
+
+        let pending_tx = txn.send().await?;
+        let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
+        block_number_from_receipt(receipt)
+    }
+
     async fn fund_with_token(
         &self,
         subnet: SubnetID,
@@ -712,6 +752,18 @@ impl SubnetManager for EthSubnetManager {
             .map_err(|e| anyhow!("cannot get commit sha due to: {e:}"))?;
 
         Ok(commit_sha)
+    }
+
+    async fn get_subnet_supply_source(
+        &self,
+        subnet: &SubnetID,
+    ) -> Result<ipc_actors_abis::subnet_actor_getter_facet::SupplySource> {
+        let address = contract_address_from_subnet(subnet)?;
+        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+        Ok(contract.supply_source().call().await?)
     }
 
     async fn get_genesis_info(&self, subnet: &SubnetID) -> Result<SubnetGenesisInfo> {
