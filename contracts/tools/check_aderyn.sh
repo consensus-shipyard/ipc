@@ -14,6 +14,7 @@ IGNORE_TITLES=("Centralization Risk for trusted owners")
 # Specific vulnerabilities to ignore with path and line number
 declare -A IGNORE_SPECIFIC
 IGNORE_SPECIFIC["src/lib/LibDiamond.sol:204:Unprotected initializer"]=1
+IGNORE_SPECIFIC["src/lib/LibDiamond.sol:203:Unprotected initializer"]=1
 
 containsElement() {
   local e match="$1"
