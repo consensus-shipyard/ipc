@@ -12,7 +12,7 @@ use anyhow::anyhow;
 use async_tempfile::TempFile;
 use base64::{engine::general_purpose, Engine};
 use bytes::{Buf, Bytes};
-use cid::multihash::{Blake2bHasher, Code, Hasher, MultihashDigest};
+use cid::multihash::{Blake2bHasher, Hasher};
 use cid::Cid;
 use ethers::core::types::{self as et};
 use fendermint_actor_machine::{Metadata, WriteAccess};
@@ -23,6 +23,7 @@ use fendermint_vm_message::signed::SignedMessage;
 use futures_util::{Stream, StreamExt};
 use fvm_ipld_encoding::strict_bytes::ByteBuf;
 use fvm_shared::{address::Address, econ::TokenAmount, ActorID, BLOCK_GAS_LIMIT};
+use ipfs_api_backend_hyper::request::Add;
 use ipfs_api_backend_hyper::{IpfsApi, IpfsClient, TryFromUri};
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
@@ -53,7 +54,6 @@ use fendermint_rpc::{
 };
 use fendermint_vm_actor_interface::adm;
 use fendermint_vm_message::query::FvmQueryHeight;
-use fvm_ipld_encoding::IPLD_RAW;
 use fvm_shared::chainid::ChainID;
 
 use super::rpc::{gas_params, BroadcastResponse, TransClient};
@@ -119,10 +119,9 @@ cmd! {
                 // Objectstore routes
                 let os_object_route = warp::path!("v1" / "object" )
                 .and(warp::put())
-                .and(warp::body::content_length_limit(MAX_OBJECT_LENGTH))
                 .and(with_client(client.clone()))
                 .and(with_ipfs_adapter(ipfs_adapter.clone()))
-                .and(warp::multipart::form())
+                .and(warp::multipart::form().max_length(MAX_OBJECT_LENGTH))
                 .and_then(handle_object_upload);
 
                 let os_upload_route = warp::path!("v1" / "objectstores" / Address / ..)
@@ -294,7 +293,11 @@ struct UploadQuery {
 }
 
 pub trait IpfsApiAdapter {
-    async fn add_file(&self, temp_file: TempFile) -> anyhow::Result<String>;
+    async fn add_file(
+        &self,
+        temp_file: TempFile,
+        signed_msg: &SignedMessage,
+    ) -> anyhow::Result<String>;
 }
 
 #[derive(Clone)]
@@ -303,19 +306,57 @@ pub struct Ipfs {
 }
 
 impl IpfsApiAdapter for Ipfs {
-    async fn add_file(&self, temp_file: TempFile) -> anyhow::Result<String> {
-        let add = ipfs_api_backend_hyper::request::Add {
-            chunker: Some("size-1048576"),
-            pin: Some(false),
-            raw_leaves: Some(true),
-            cid_version: Some(1),
-            hash: Some("blake2b-256"),
-            ..Default::default()
+    async fn add_file(
+        &self,
+        mut temp_file: TempFile,
+        signed_msg: &SignedMessage,
+    ) -> anyhow::Result<String> {
+        let temp_file_clone = temp_file.try_clone().await?;
+        let cid_from_msg = match &signed_msg.object {
+            Some(object) => object.value,
+            None => return Err(anyhow!("missing cid in signed message")),
         };
 
+        // Only chunk and hash - do not write to disk
         let res = self
             .inner
-            .add_async_with_options(temp_file.compat(), add)
+            .add_async_with_options(
+                temp_file_clone.compat(),
+                Add {
+                    chunker: Some("size-1048576"),
+                    only_hash: Some(true),
+                    pin: Some(false),
+                    ..Default::default()
+                },
+            )
+            .await?;
+
+        // Check if the computed CID matches the one in the signed message
+        // It is important to verify the CID separately from the signature
+        // because the signature is over the CID, it is unaware of the actual
+        // data. Hence, we should verify that the CID of the underlying data
+        // matches the one in the signed message
+        let ipfs_cid = Cid::try_from(res.hash)?;
+        if ipfs_cid != cid_from_msg {
+            return Err(anyhow!(
+                "computed cid {:?} does not match {:?}",
+                ipfs_cid,
+                cid_from_msg
+            ));
+        }
+
+        // Actually add the file to IPFS
+        temp_file.rewind().await?;
+        let res = self
+            .inner
+            .add_async_with_options(
+                temp_file.compat(),
+                Add {
+                    chunker: Some("size-1048576"),
+                    pin: Some(false),
+                    ..Default::default()
+                },
+            )
             .await?;
         let cid = Cid::try_from(res.hash)?;
         Ok(cid.to_string())
@@ -357,13 +398,16 @@ impl ObjectVerifier {
                 vec
             })
             .await;
-        let b64_decoded = general_purpose::URL_SAFE
-            .decode(value)
-            .map_err(|e| anyhow!("failed to decode base64 encoded signed message: {}", e))?;
 
-        let singed_msg = fvm_ipld_encoding::from_slice::<SignedMessage>(&b64_decoded)
-            .map_err(|e| anyhow!("failed to deserialize signed message: {}", e))?;
-        self.signed_msg = Some(singed_msg);
+        let signed_msg = general_purpose::URL_SAFE
+            .decode(value)
+            .map_err(|e| anyhow!("Failed to decode b64 encoded message: {}", e))
+            .and_then(|b64_decoded| {
+                fvm_ipld_encoding::from_slice::<SignedMessage>(&b64_decoded)
+                    .map_err(|e| anyhow!("Failed to deserialize signed message: {}", e))
+            })?;
+
+        self.signed_msg = Some(signed_msg);
 
         Ok(())
     }
@@ -405,7 +449,7 @@ impl ObjectVerifier {
         };
 
         while let Some(part) = form_parts.next().await {
-            let part = part.map_err(|_| anyhow!("missing cid in signed message"))?;
+            let part = part.map_err(|_| anyhow!("cannot read form data"))?;
             match part.name() {
                 "chain_id" => {
                     verifier.read_chain_id(part).await?;
@@ -427,29 +471,6 @@ impl ObjectVerifier {
 }
 
 impl ObjectVerifier {
-    fn verify_cid(&mut self) -> anyhow::Result<()> {
-        let digest = Code::Blake2b256.wrap(self.hasher.finalize())?;
-        let cid_computed = Cid::new_v1(IPLD_RAW, digest);
-        match &self.signed_msg {
-            Some(signed_msg) => {
-                let cid_from_msg = match &signed_msg.object {
-                    Some(object) => object.value,
-                    None => return Err(anyhow!("missing cid in signed message")),
-                };
-                if cid_computed != cid_from_msg {
-                    return Err(anyhow!(
-                        "computed cid {:?} does not match {:?}",
-                        cid_computed,
-                        cid_from_msg
-                    ));
-                }
-            }
-            None => return Err(anyhow!("missing signed message")),
-        }
-
-        Ok(())
-    }
-
     fn verify_signature(&self) -> anyhow::Result<()> {
         match &self.signed_msg {
             Some(signed_msg) => {
@@ -501,16 +522,6 @@ async fn handle_object_upload<F: QueryClient, I: IpfsApiAdapter>(
         })
     })?;
 
-    // Verify CID
-    // It is important to verify the CID separately from the signature
-    // because the signature is over the CID, it is unaware of the actual data
-    // hence, we should verify that the data CID matches the one in the signed message
-    verifier.verify_cid().map_err(|e| {
-        Rejection::from(BadRequest {
-            message: e.to_string(),
-        })
-    })?;
-
     // Verify the signature
     verifier.verify_signature().map_err(|e| {
         Rejection::from(BadRequest {
@@ -526,11 +537,16 @@ async fn handle_object_upload<F: QueryClient, I: IpfsApiAdapter>(
     })?;
 
     // Add the data to IPFS
-    let cid = ipfs.add_file(verifier.temp_file).await.map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("failed to add file: {}", e),
-        })
-    })?;
+
+    let signed_msg = verifier.signed_msg.as_ref().unwrap();
+    let cid = ipfs
+        .add_file(verifier.temp_file, signed_msg)
+        .await
+        .map_err(|e| {
+            Rejection::from(BadRequest {
+                message: format!("failed to add file: {}", e),
+            })
+        })?;
 
     Ok(cid.to_string())
 }
@@ -679,6 +695,7 @@ async fn handle_os_upload(
                 message: format!("failed to create tmp file: {}", e),
             })
         })?;
+
         while let Some(buf) = body.next().await {
             let mut buf = buf.unwrap();
             while buf.remaining() > 0 {
@@ -706,9 +723,6 @@ async fn handle_os_upload(
         let add = ipfs_api_backend_hyper::request::Add {
             chunker: Some("size-1048576"),
             pin: Some(false),
-            raw_leaves: Some(true),
-            cid_version: Some(1),
-            hash: Some("blake2b-256"),
             ..Default::default()
         };
 
@@ -1419,6 +1433,7 @@ async fn acc_root(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cid::multihash::{Code, MultihashDigest};
     use ethers::core::k256::ecdsa::SigningKey;
     use ethers::core::rand::{rngs::StdRng, SeedableRng};
     use fendermint_actor_objectstore::{ObjectKind, PutParams};
@@ -1432,7 +1447,11 @@ mod tests {
     }
 
     impl IpfsApiAdapter for IpfsMocked {
-        async fn add_file(&self, _temp_file: TempFile) -> anyhow::Result<String> {
+        async fn add_file(
+            &self,
+            _temp_file: TempFile,
+            _signed_msg: &SignedMessage,
+        ) -> anyhow::Result<String> {
             Ok("Qm123".to_string())
         }
     }
@@ -1520,7 +1539,7 @@ mod tests {
         let key = b"key";
         let external_object = b"hello world".as_ref();
         let digest = Code::Blake2b256.digest(external_object);
-        let object_cid = Cid::new_v1(IPLD_RAW, digest);
+        let object_cid = Cid::new_v1(fvm_ipld_encoding::IPLD_RAW, digest);
         let params = PutParams {
             key: key.to_vec(),
             kind: ObjectKind::External(object_cid),
