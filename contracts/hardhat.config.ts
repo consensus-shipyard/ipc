@@ -7,6 +7,7 @@ import 'hardhat-deploy'
 import 'hardhat-storage-layout-changes'
 import { HardhatUserConfig, task } from 'hardhat/config'
 import { HardhatRuntimeEnvironment } from 'hardhat/types'
+import 'solidity-docgen';
 
 const lazyImport = async (module: any) => {
     return await import(module)
@@ -360,6 +361,7 @@ const config: HardhatUserConfig = {
         ],
         fullPath: false,
     },
+    docgen: {pages:"files"},
 }
 
 export default config

@@ -45,7 +45,8 @@
         "diamond-util": "^1.1.1",
         "ganache": "^7.9.2",
         "hardhat": "^2.19.4",
-        "hardhat-storage-layout-changes": "^0.1.2"
+        "hardhat-storage-layout-changes": "^0.1.2",
+        "solidity-docgen": "^0.6.0-beta.36"
     },
     "lint-staged": {
         "*.{js,jsx,ts,tsx,json,css,md,sol}": "prettier --write"

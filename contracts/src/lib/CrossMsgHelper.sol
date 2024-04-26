@@ -12,7 +12,7 @@ import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
 import {SupplySource} from "../structs/Subnet.sol";
 import {SupplySourceHelper} from "./SupplySourceHelper.sol";
-import {IIpcHandler} from "../../sdk/interfaces/IIpcHandler.sol";
+import {IIpcHandler} from "../sdk/interfaces/IIpcHandler.sol";
 
 /// @title Helper library for manipulating IpcEnvelope-related structs
 library CrossMsgHelper {

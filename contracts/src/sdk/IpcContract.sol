@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {IpcEnvelope, ResultMsg, CallMsg, IpcMsgKind} from "../src/structs/CrossNet.sol";
-import {IPCAddress} from "../src/structs/Subnet.sol";
-import {EMPTY_BYTES} from "../src/constants/Constants.sol";
-import {IGateway} from "../src/interfaces/IGateway.sol";
+import {IpcEnvelope, ResultMsg, CallMsg, IpcMsgKind} from "../structs/CrossNet.sol";
+import {IPCAddress} from "../structs/Subnet.sol";
+import {EMPTY_BYTES} from "../constants/Constants.sol";
+import {IGateway} from "../interfaces/IGateway.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/utils/ReentrancyGuard.sol";
 import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
-import {CrossMsgHelper} from "../src/lib/CrossMsgHelper.sol";
+import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {IIpcHandler} from "./interfaces/IIpcHandler.sol";
 
 abstract contract IpcExchange is IIpcHandler, Ownable, ReentrancyGuard {
