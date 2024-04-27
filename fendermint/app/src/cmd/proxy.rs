@@ -324,8 +324,10 @@ impl IpfsApiAdapter for Ipfs {
                 temp_file_clone.compat(),
                 Add {
                     chunker: Some("size-1048576"),
-                    only_hash: Some(true),
+                    raw_leaves: Some(false),
                     pin: Some(false),
+                    cid_version: Some(1),
+                    only_hash: Some(true),
                     ..Default::default()
                 },
             )
@@ -353,7 +355,9 @@ impl IpfsApiAdapter for Ipfs {
                 temp_file.compat(),
                 Add {
                     chunker: Some("size-1048576"),
+                    raw_leaves: Some(false),
                     pin: Some(false),
+                    cid_version: Some(1),
                     ..Default::default()
                 },
             )
