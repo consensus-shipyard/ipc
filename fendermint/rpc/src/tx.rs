@@ -13,8 +13,7 @@ use tendermint_rpc::endpoint::broadcast::{tx_async, tx_commit, tx_sync};
 use fendermint_actor_accumulator::PushReturn;
 use fendermint_actor_machine::{Metadata, WriteAccess};
 use fendermint_actor_objectstore::{
-    DeleteParams, GetParams, ListParams,
-    Object, ObjectList, PutParams,
+    DeleteParams, GetParams, ListParams, Object, ObjectList, PutParams,
 };
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::Address;
