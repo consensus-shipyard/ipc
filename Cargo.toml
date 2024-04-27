@@ -151,8 +151,6 @@ serial_test = "3.0"
 strum = { version = "0.26.1", features = ["derive"] }
 tempfile = "3.7"
 thiserror = "1"
-tiny-keccak = { version = "2.0.0", features = ["keccak"] }
-secp256k1 = { version = "0.29.0", features = ["recovery"] }
 tokio = { version = "1", features = [
     "rt-multi-thread",
     "macros",

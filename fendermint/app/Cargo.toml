@@ -80,7 +80,6 @@ tokio-util = { workspace = true }
 async-tempfile = "0.5.0"
 ipfs-api-backend-hyper = { version = "0.6.0", features = ["with-send-sync"] }
 thiserror = { workspace = true }
-tiny-keccak = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

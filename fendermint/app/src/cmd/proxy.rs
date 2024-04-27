@@ -116,8 +116,8 @@ cmd! {
                     .and_then(handle_accounts_get_machines);
 
                 // Objectstore routes
-                let os_object_route = warp::path!("v1" / "object" )
-                .and(warp::put())
+                let objects_route = warp::path!("v1" / "objects" )
+                .and(warp::post())
                 .and(with_client(client.clone()))
                 .and(with_ipfs_adapter(ipfs_adapter.clone()))
                 .and(warp::multipart::form().max_length(MAX_OBJECT_LENGTH))
@@ -190,7 +190,7 @@ cmd! {
                     .or(machines_get_route)
                     .or(accounts_get_machines_route)
                     .or(os_upload_route)
-                    .or(os_object_route)
+                    .or(objects_route)
                     .or(os_delete_route)
                     .or(os_get_or_list_route)
                     .or(acc_push_route)
@@ -363,32 +363,29 @@ impl Default for ObjectParser {
 }
 
 impl ObjectParser {
-    async fn read_chain_id(&mut self, form_part: Part) -> anyhow::Result<()> {
-        let value = form_part
+    async fn read_part(&mut self, part: Part) -> anyhow::Result<Vec<u8>> {
+        let value = part
             .stream()
             .fold(Vec::new(), |mut vec, data| async move {
-                let data = data.unwrap();
-                vec.extend_from_slice(&data.chunk());
+                if data.is_ok() {
+                    vec.extend_from_slice(&data.unwrap().chunk());
+                }
                 vec
             })
             .await;
-        let text =
-            String::from_utf8(value.clone()).map_err(|_| anyhow!("cannot parse chain id"))?;
+        Ok(value)
+    }
+
+    async fn read_chain_id(&mut self, form_part: Part) -> anyhow::Result<()> {
+        let value = self.read_part(form_part).await?;
+        let text = String::from_utf8(value).map_err(|_| anyhow!("cannot parse chain id"))?;
         let int: u64 = text.parse().map_err(|_| anyhow!("cannot parse chain_id"))?;
         self.chain_id = ChainID::from(int);
         Ok(())
     }
 
     async fn read_msg(&mut self, form_part: Part) -> anyhow::Result<()> {
-        let value = form_part
-            .stream()
-            .fold(Vec::new(), |mut vec, data| async move {
-                let data = data.unwrap();
-                vec.extend_from_slice(&data.chunk());
-                vec
-            })
-            .await;
-
+        let value = self.read_part(form_part).await?;
         let signed_msg = general_purpose::URL_SAFE
             .decode(value)
             .map_err(|e| anyhow!("Failed to decode b64 encoded message: {}", e))
@@ -396,9 +393,7 @@ impl ObjectParser {
                 fvm_ipld_encoding::from_slice::<SignedMessage>(&b64_decoded)
                     .map_err(|e| anyhow!("Failed to deserialize signed message: {}", e))
             })?;
-
         self.signed_msg = Some(signed_msg);
-
         Ok(())
     }
 
@@ -422,8 +417,8 @@ impl ObjectParser {
             .rewind()
             .await
             .map_err(|e| anyhow!("failed to rewind temporary file: {}", e))?;
-        self.temp_file = Some(temp_file);
 
+        self.temp_file = Some(temp_file);
         Ok(())
     }
 
@@ -438,7 +433,7 @@ impl ObjectParser {
                 "msg" => {
                     object_parser.read_msg(part).await?;
                 }
-                "upload" => {
+                "object" => {
                     object_parser.read_object(part).await?;
                 }
                 _ => {
@@ -461,7 +456,7 @@ async fn ensure_balance<F: QueryClient>(client: &F, from: Address) -> anyhow::Re
     // TODO: uncomment it when we decide the pricing logic
     // let cost_per_byte = et::U256::from(1_000_000_000u128);
     // let required_balance = cost_per_byte * self.size;
-    if balance <= ethers::types::U256::zero() {
+    if balance <= et::U256::zero() {
         return Err(anyhow!("insufficient balance"));
     }
 
@@ -477,14 +472,14 @@ async fn handle_object_upload<F: QueryClient, I: IpfsApiAdapter>(
     ipfs: I,
     form_parts: warp::multipart::FormData,
 ) -> Result<impl Reply, Rejection> {
-    let verifier = ObjectParser::read_form(form_parts).await.map_err(|e| {
+    let parser = ObjectParser::read_form(form_parts).await.map_err(|e| {
         Rejection::from(BadRequest {
             message: format!("failed to read form: {}", e),
         })
     })?;
 
     // Verify the signature
-    let signed_msg = match verifier.signed_msg {
+    let signed_msg = match parser.signed_msg {
         Some(signed_msg) => signed_msg,
         None => {
             return Err(Rejection::from(BadRequest {
@@ -492,7 +487,7 @@ async fn handle_object_upload<F: QueryClient, I: IpfsApiAdapter>(
             }))
         }
     };
-    signed_msg.verify(&verifier.chain_id).map_err(|e| {
+    signed_msg.verify(&parser.chain_id).map_err(|e| {
         Rejection::from(BadRequest {
             message: e.to_string(),
         })
@@ -515,7 +510,7 @@ async fn handle_object_upload<F: QueryClient, I: IpfsApiAdapter>(
             }))
         }
     };
-    let file = match verifier.temp_file {
+    let file = match parser.temp_file {
         Some(file) => file,
         None => {
             return Err(Rejection::from(BadRequest {
@@ -1475,7 +1470,7 @@ mod tests {
         );
         body.extend_from_slice(
             format!(
-                "Content-Disposition: form-data; name=\"upload\"; filename=\"example.bin\"\r\n\
+                "Content-Disposition: form-data; name=\"object\"; filename=\"example.bin\"\r\n\
                 Content-Type: application/octet-stream\r\n\r\n",
             )
             .as_bytes(),
@@ -1492,7 +1487,7 @@ mod tests {
         let boundary = "--abcdef1234--";
         let body = form_body(boundary, serialized_signed_message_b64, external_object);
         warp::test::request()
-            .method("PUT")
+            .method("POST")
             .header("content-length", body.len())
             .header(
                 "content-type",
