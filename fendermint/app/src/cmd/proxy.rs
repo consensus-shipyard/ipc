@@ -12,7 +12,6 @@ use anyhow::anyhow;
 use async_tempfile::TempFile;
 use base64::{engine::general_purpose, Engine};
 use bytes::{Buf, Bytes};
-use cid::multihash::{Blake2bHasher, Hasher};
 use cid::Cid;
 use ethers::core::types::{self as et};
 use fendermint_actor_machine::{Metadata, WriteAccess};
@@ -286,18 +285,8 @@ impl From<ParseIntError> for ProxyError {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-struct UploadQuery {
-    pub msg: String,
-    pub chain_id: u64,
-}
-
 pub trait IpfsApiAdapter {
-    async fn add_file(
-        &self,
-        temp_file: TempFile,
-        signed_msg: &SignedMessage,
-    ) -> anyhow::Result<String>;
+    async fn add_file(&self, temp_file: TempFile, cid: Cid) -> anyhow::Result<String>;
 }
 
 #[derive(Clone)]
@@ -306,17 +295,8 @@ pub struct Ipfs {
 }
 
 impl IpfsApiAdapter for Ipfs {
-    async fn add_file(
-        &self,
-        mut temp_file: TempFile,
-        signed_msg: &SignedMessage,
-    ) -> anyhow::Result<String> {
+    async fn add_file(&self, mut temp_file: TempFile, cid_from_msg: Cid) -> anyhow::Result<String> {
         let temp_file_clone = temp_file.try_clone().await?;
-        let cid_from_msg = match &signed_msg.object {
-            Some(object) => object.value,
-            None => return Err(anyhow!("missing cid in signed message")),
-        };
-
         // Only chunk and hash - do not write to disk
         let res = self
             .inner
@@ -334,10 +314,9 @@ impl IpfsApiAdapter for Ipfs {
             .await?;
 
         // Check if the computed CID matches the one in the signed message
-        // It is important to verify the CID separately from the signature
-        // because the signature is over the CID, it is unaware of the actual
-        // data. Hence, we should verify that the CID of the underlying data
-        // matches the one in the signed message
+        // It is important to verify that CID represents the data correctly
+        // separately from signature because the signature is over the CID,
+        // it is unaware of the actual data.
         let ipfs_cid = Cid::try_from(res.hash)?;
         if ipfs_cid != cid_from_msg {
             return Err(anyhow!(
@@ -367,15 +346,23 @@ impl IpfsApiAdapter for Ipfs {
     }
 }
 
-struct ObjectVerifier {
-    hasher: Blake2bHasher<32>,
-    size: usize,
+struct ObjectParser {
     signed_msg: Option<SignedMessage>,
     chain_id: ChainID,
-    temp_file: TempFile,
+    temp_file: Option<TempFile>,
 }
 
-impl ObjectVerifier {
+impl Default for ObjectParser {
+    fn default() -> Self {
+        ObjectParser {
+            signed_msg: None,
+            chain_id: ChainID::from(0),
+            temp_file: None,
+        }
+    }
+}
+
+impl ObjectParser {
     async fn read_chain_id(&mut self, form_part: Part) -> anyhow::Result<()> {
         let value = form_part
             .stream()
@@ -389,7 +376,6 @@ impl ObjectVerifier {
             String::from_utf8(value.clone()).map_err(|_| anyhow!("cannot parse chain id"))?;
         let int: u64 = text.parse().map_err(|_| anyhow!("cannot parse chain_id"))?;
         self.chain_id = ChainID::from(int);
-
         Ok(())
     }
 
@@ -417,98 +403,69 @@ impl ObjectVerifier {
     }
 
     async fn read_object(&mut self, form_part: Part) -> anyhow::Result<()> {
+        let mut temp_file = TempFile::new()
+            .await
+            .map_err(|e| anyhow!("failed to create temporary file: {}", e))?;
         let mut part_stream = form_part.stream();
 
         while let Some(data) = part_stream.next().await {
-            let mut data = data.unwrap();
+            let mut data = data?;
             while data.remaining() > 0 {
                 let chunk = data.chunk().to_owned();
                 let chunk_len = chunk.len();
-                self.temp_file.write_all(&chunk).await.unwrap();
-                self.temp_file.flush().await.unwrap();
+                temp_file.write_all(&chunk).await?;
+                temp_file.flush().await?;
                 data.advance(chunk_len);
-                self.hasher.update(&chunk);
-                self.size += chunk_len;
             }
         }
-        self.temp_file
+        temp_file
             .rewind()
             .await
             .map_err(|e| anyhow!("failed to rewind temporary file: {}", e))?;
+        self.temp_file = Some(temp_file);
 
         Ok(())
     }
 
     async fn read_form(mut form_parts: warp::multipart::FormData) -> anyhow::Result<Self> {
-        let temp_file = TempFile::new()
-            .await
-            .map_err(|e| anyhow!("failed to create temporary file: {}", e))?;
-
-        let mut verifier = ObjectVerifier {
-            hasher: Blake2bHasher::default(),
-            size: 0,
-            signed_msg: None,
-            chain_id: ChainID::from(0),
-            temp_file,
-        };
-
+        let mut object_parser = ObjectParser::default();
         while let Some(part) = form_parts.next().await {
             let part = part.map_err(|_| anyhow!("cannot read form data"))?;
             match part.name() {
                 "chain_id" => {
-                    verifier.read_chain_id(part).await?;
+                    object_parser.read_chain_id(part).await?;
                 }
                 "msg" => {
-                    verifier.read_msg(part).await?;
+                    object_parser.read_msg(part).await?;
                 }
                 "upload" => {
-                    verifier.read_object(part).await?;
+                    object_parser.read_object(part).await?;
                 }
                 _ => {
                     return Err(anyhow!("unknown form field"));
                 }
             }
         }
-
-        Ok(verifier)
+        Ok(object_parser)
     }
 }
 
-impl ObjectVerifier {
-    fn verify_signature(&self) -> anyhow::Result<()> {
-        match &self.signed_msg {
-            Some(signed_msg) => {
-                signed_msg.verify(&self.chain_id)?;
-            }
-            None => return Err(anyhow!("missing signed message")),
-        }
+async fn ensure_balance<F: QueryClient>(client: &F, from: Address) -> anyhow::Result<()> {
+    let actor_state = client.actor_state(&from, FvmQueryHeight::Committed).await?;
+    let balance = match actor_state.value {
+        Some((_, state)) => to_eth_tokens(&state.balance)?,
+        None => et::U256::zero(),
+    };
 
-        Ok(())
+    // TODO: make cost_per_byte a configurable constant
+    // TODO: uncomment it when we decide the pricing logic
+    // let cost_per_byte = et::U256::from(1_000_000_000u128);
+    // let required_balance = cost_per_byte * self.size;
+    if balance <= ethers::types::U256::zero() {
+        return Err(anyhow!("insufficient balance"));
     }
 
-    async fn ensure_balance<F: QueryClient>(&mut self, client: &F) -> anyhow::Result<()> {
-        match &self.signed_msg {
-            Some(signed_msg) => {
-                let from = signed_msg.message.from;
-                let height = FvmQueryHeight::Committed;
-                let actor_state = client.actor_state(&from, height).await?;
-                let balance = match actor_state.value {
-                    Some((_, state)) => to_eth_tokens(&state.balance).unwrap(),
-                    None => et::U256::zero(),
-                };
-
-                // (todo): make cost_per_byte a configurable constant
-                let cost_per_byte = et::U256::from(1_000_000_000u128);
-                let required_balance = cost_per_byte * self.size;
-                if balance < required_balance {
-                    return Err(anyhow!("insufficient balance"));
-                }
-            }
-            None => return Err(anyhow!("missing signed message")),
-        }
-
-        Ok(())
-    }
+    Ok(())
 }
 
 async fn health() -> Result<impl Reply, Rejection> {
@@ -520,37 +477,57 @@ async fn handle_object_upload<F: QueryClient, I: IpfsApiAdapter>(
     ipfs: I,
     form_parts: warp::multipart::FormData,
 ) -> Result<impl Reply, Rejection> {
-    let mut verifier = ObjectVerifier::read_form(form_parts).await.map_err(|e| {
+    let verifier = ObjectParser::read_form(form_parts).await.map_err(|e| {
         Rejection::from(BadRequest {
             message: format!("failed to read form: {}", e),
         })
     })?;
 
     // Verify the signature
-    verifier.verify_signature().map_err(|e| {
+    let signed_msg = match verifier.signed_msg {
+        Some(signed_msg) => signed_msg,
+        None => {
+            return Err(Rejection::from(BadRequest {
+                message: "missing signed message".to_string(),
+            }))
+        }
+    };
+    signed_msg.verify(&verifier.chain_id).map_err(|e| {
         Rejection::from(BadRequest {
             message: e.to_string(),
         })
     })?;
 
-    // Ensure the sender has enough balance
-    verifier.ensure_balance(&client).await.map_err(|e| {
+    // Ensure the sender has enough balance, and add the data to IPFS
+    let SignedMessage {
+        object, message, ..
+    } = signed_msg;
+    ensure_balance(&client, message.from).await.map_err(|e| {
         Rejection::from(BadRequest {
             message: format!("failed to ensure balance: {}", e),
         })
     })?;
-
-    // Add the data to IPFS
-
-    let signed_msg = verifier.signed_msg.as_ref().unwrap();
-    let cid = ipfs
-        .add_file(verifier.temp_file, signed_msg)
-        .await
-        .map_err(|e| {
-            Rejection::from(BadRequest {
-                message: format!("failed to add file: {}", e),
-            })
-        })?;
+    let client_cid = match object {
+        Some(object) => object.value,
+        None => {
+            return Err(Rejection::from(BadRequest {
+                message: "missing CID in signed message".to_string(),
+            }))
+        }
+    };
+    let file = match verifier.temp_file {
+        Some(file) => file,
+        None => {
+            return Err(Rejection::from(BadRequest {
+                message: "missing file in form".to_string(),
+            }))
+        }
+    };
+    let cid = ipfs.add_file(file, client_cid).await.map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("failed to add file: {}", e),
+        })
+    })?;
 
     Ok(cid.to_string())
 }
@@ -1451,11 +1428,7 @@ mod tests {
     }
 
     impl IpfsApiAdapter for IpfsMocked {
-        async fn add_file(
-            &self,
-            _temp_file: TempFile,
-            _signed_msg: &SignedMessage,
-        ) -> anyhow::Result<String> {
+        async fn add_file(&self, _temp_file: TempFile, _cid: Cid) -> anyhow::Result<String> {
             Ok("Qm123".to_string())
         }
     }
