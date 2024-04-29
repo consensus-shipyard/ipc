@@ -367,8 +367,8 @@ impl ObjectParser {
         let value = part
             .stream()
             .fold(Vec::new(), |mut vec, data| async move {
-                if data.is_ok() {
-                    vec.extend_from_slice(&data.unwrap().chunk());
+                if let Ok(data) = data {
+                    vec.extend_from_slice(&data.chunk());
                 }
                 vec
             })
@@ -1469,13 +1469,12 @@ mod tests {
             .as_bytes(),
         );
         body.extend_from_slice(
-            format!(
-                "Content-Disposition: form-data; name=\"object\"; filename=\"example.bin\"\r\n\
-                Content-Type: application/octet-stream\r\n\r\n",
-            )
-            .as_bytes(),
+            "Content-Disposition: form-data; name=\"object\"; filename=\"example.bin\"\r\n\
+                Content-Type: application/octet-stream\r\n\r\n"
+                .to_string()
+                .as_bytes(),
         );
-        body.extend_from_slice(&external_object);
+        body.extend_from_slice(external_object);
         body.extend_from_slice(format!("\r\n--{0}--\r\n", boundary).as_bytes());
         body
     }
