@@ -368,7 +368,7 @@ impl ObjectParser {
             .stream()
             .fold(Vec::new(), |mut vec, data| async move {
                 if let Ok(data) = data {
-                    vec.extend_from_slice(&data.chunk());
+                    vec.extend_from_slice(data.chunk());
                 }
                 vec
             })
