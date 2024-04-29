@@ -1,0 +1,33 @@
+accounts:
+  fridrik: {}
+
+rootnet:
+  type: External
+  chain_id: 314159
+  deployment:
+    type: Existing
+    gateway: 0x6d25fbFac9e6215E03C687E54F7c74f489949EaF
+    registry: 0xc938B2B862d4Ef9896E641b3f1269DabFB2D2103
+  urls:
+    - https://filecoin-calibration.chainup.net/rpc/v1
+
+subnets:
+  iceland:
+    creator: fridrik
+    validators:
+      fridrik: '1000000000'
+    balances:
+      fridrik: '20000000000000000000'
+    bottom_up_checkpoint:
+      period: 100
+    env:
+      FM_LOG_LEVEL: info,fendermint=debug
+    relayers:
+    nodes:
+      moso:
+        mode:
+          type: Validator
+          validator: fridrik
+        parent_node: "https://filecoin-calibration.chainup.net/rpc/v1"
+        seed_nodes: []
+        ethapi: true

@@ -52,4 +52,6 @@ echo "- Wallet2: $wallet2"
 wallet3=$(cargo run -q -p ipc-cli --release -- wallet new --wallet-type evm | tr -d '"')
 echo "- Wallet3: $wallet3"
 
+cargo run -q -p ipc-cli --release -- wallet set-default --wallet-type evm --address $wallet1
+
 echo "--- GO TO Calibration faucet (https://faucet.calibnet.chainsafe-fil.io/) and get some tokens for the wallets ---"
