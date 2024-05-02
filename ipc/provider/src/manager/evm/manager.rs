@@ -33,11 +33,13 @@ use crate::manager::{EthManager, SubnetManager};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use ethers::abi::Tokenizable;
+use ethers::contract::abigen;
 use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::{Signer, SignerMiddleware};
 use ethers::providers::{Authorization, Http, Middleware, Provider};
 use ethers::signers::{LocalWallet, Wallet};
 use ethers::types::{BlockId, Eip1559TransactionRequest, ValueOrArray, I256, U256};
+
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_api::checkpoint::{
@@ -82,11 +84,21 @@ struct IPCContractInfo {
     provider: Provider<Http>,
 }
 
+//TODO receive clarity on this implementation
+abigen!(
+    IERC20,
+    r#"[
+        function approve(address spender, uint256 amount) external returns (bool)
+        event Transfer(address indexed from, address indexed to, uint256 value)
+        event Approval(address indexed owner, address indexed spender, uint256 value)
+    ]"#,
+);
+
 #[async_trait]
 impl TopDownFinalityQuery for EthSubnetManager {
     async fn genesis_epoch(&self, subnet_id: &SubnetID) -> Result<ChainEpoch> {
         let address = contract_address_from_subnet(subnet_id)?;
-        log::info!("querying genesis epoch in evm subnet contract: {address:}");
+        tracing::info!("querying genesis epoch in evm subnet contract: {address:}");
 
         let evm_subnet_id = gateway_getter_facet::SubnetID::try_from(subnet_id)?;
 
@@ -122,7 +134,7 @@ impl TopDownFinalityQuery for EthSubnetManager {
         );
 
         let topic1 = contract_address_from_subnet(subnet_id)?;
-        log::debug!(
+        tracing::debug!(
             "getting top down messages for subnet: {:?} with topic 1: {}",
             subnet_id,
             topic1,
@@ -184,7 +196,7 @@ impl TopDownFinalityQuery for EthSubnetManager {
         epoch: ChainEpoch,
     ) -> Result<TopDownQueryPayload<Vec<StakingChangeRequest>>> {
         let address = contract_address_from_subnet(subnet_id)?;
-        log::info!("querying validator changes in evm subnet contract: {address:}");
+        tracing::info!("querying validator changes in evm subnet contract: {address:}");
 
         let contract = subnet_actor_manager_facet::SubnetActorManagerFacet::new(
             address,
@@ -222,7 +234,7 @@ impl TopDownFinalityQuery for EthSubnetManager {
     }
 
     async fn latest_parent_finality(&self) -> Result<ChainEpoch> {
-        log::info!("querying latest parent finality ");
+        tracing::info!("querying latest parent finality ");
 
         let contract = gateway_getter_facet::GatewayGetterFacet::new(
             self.ipc_contract_info.gateway_addr,
@@ -244,10 +256,10 @@ impl SubnetManager for EthSubnetManager {
             .to_u128()
             .ok_or_else(|| anyhow!("invalid min validator stake"))?;
 
-        log::debug!("calling create subnet for EVM manager");
+        tracing::debug!("calling create subnet for EVM manager");
 
         let route = subnet_id_to_evm_addresses(&params.parent)?;
-        log::debug!("root SubnetID as Ethereum type: {route:?}");
+        tracing::debug!("root SubnetID as Ethereum type: {route:?}");
 
         let params = register_subnet_facet::ConstructorParams {
             parent_id: register_subnet_facet::SubnetID {
@@ -266,7 +278,7 @@ impl SubnetManager for EthSubnetManager {
             supply_source: register_subnet_facet::SupplySource::try_from(params.supply_source)?,
         };
 
-        log::info!("creating subnet on evm with params: {params:?}");
+        tracing::info!("creating subnet on evm with params: {params:?}");
 
         let signer = self.get_signer(&from)?;
         let signer = Arc::new(signer);
@@ -286,7 +298,7 @@ impl SubnetManager for EthSubnetManager {
         match receipt {
             Some(r) => {
                 for log in r.logs {
-                    log::debug!("log: {log:?}");
+                    tracing::debug!("log: {log:?}");
 
                     match ethers_contract::parse_log::<register_subnet_facet::SubnetDeployedFilter>(
                         log,
@@ -295,11 +307,11 @@ impl SubnetManager for EthSubnetManager {
                             let register_subnet_facet::SubnetDeployedFilter { subnet_addr } =
                                 subnet_deploy;
 
-                            log::debug!("subnet deployed at {subnet_addr:?}");
+                            tracing::debug!("subnet deployed at {subnet_addr:?}");
                             return ethers_address_to_fil_address(&subnet_addr);
                         }
                         Err(_) => {
-                            log::debug!("no event for subnet actor published yet, continue");
+                            tracing::debug!("no event for subnet actor published yet, continue");
                             continue;
                         }
                     }
@@ -323,7 +335,7 @@ impl SubnetManager for EthSubnetManager {
             .ok_or_else(|| anyhow!("invalid min validator stake"))?;
 
         let address = contract_address_from_subnet(&subnet)?;
-        log::info!(
+        tracing::info!(
             "interacting with evm subnet contract: {address:} with collateral: {collateral:}"
         );
 
@@ -350,7 +362,7 @@ impl SubnetManager for EthSubnetManager {
             .ok_or_else(|| anyhow!("invalid initial balance"))?;
 
         let address = contract_address_from_subnet(&subnet)?;
-        log::info!("interacting with evm subnet contract: {address:} with balance: {balance:}");
+        tracing::info!("interacting with evm subnet contract: {address:} with balance: {balance:}");
 
         let signer = Arc::new(self.get_signer(&from)?);
         let contract =
@@ -371,7 +383,7 @@ impl SubnetManager for EthSubnetManager {
         amount: TokenAmount,
     ) -> Result<()> {
         let address = contract_address_from_subnet(&subnet)?;
-        log::info!("pre-release funds from {subnet:} at contract: {address:}");
+        tracing::info!("pre-release funds from {subnet:} at contract: {address:}");
 
         let amount = amount
             .atto()
@@ -398,7 +410,7 @@ impl SubnetManager for EthSubnetManager {
             .ok_or_else(|| anyhow!("invalid collateral amount"))?;
 
         let address = contract_address_from_subnet(&subnet)?;
-        log::info!(
+        tracing::info!(
             "interacting with evm subnet contract: {address:} with collateral: {collateral:}"
         );
 
@@ -427,7 +439,7 @@ impl SubnetManager for EthSubnetManager {
             .ok_or_else(|| anyhow!("invalid collateral amount"))?;
 
         let address = contract_address_from_subnet(&subnet)?;
-        log::info!(
+        tracing::info!(
             "interacting with evm subnet contract: {address:} with collateral: {collateral:}"
         );
 
@@ -443,7 +455,7 @@ impl SubnetManager for EthSubnetManager {
 
     async fn leave_subnet(&self, subnet: SubnetID, from: Address) -> Result<()> {
         let address = contract_address_from_subnet(&subnet)?;
-        log::info!("leaving evm subnet: {subnet:} at contract: {address:}");
+        tracing::info!("leaving evm subnet: {subnet:} at contract: {address:}");
 
         let signer = Arc::new(self.get_signer(&from)?);
         let contract =
@@ -460,7 +472,7 @@ impl SubnetManager for EthSubnetManager {
 
     async fn kill_subnet(&self, subnet: SubnetID, from: Address) -> Result<()> {
         let address = contract_address_from_subnet(&subnet)?;
-        log::info!("kill evm subnet: {subnet:} at contract: {address:}");
+        tracing::info!("kill evm subnet: {subnet:} at contract: {address:}");
 
         let signer = Arc::new(self.get_signer(&from)?);
         let contract =
@@ -489,7 +501,7 @@ impl SubnetManager for EthSubnetManager {
         let mut s = HashMap::new();
 
         let evm_subnets = gateway_contract.list_subnets().call().await?;
-        log::debug!("raw subnet: {evm_subnets:?}");
+        tracing::debug!("raw subnet: {evm_subnets:?}");
 
         for subnet in evm_subnets {
             let info = SubnetInfo::try_from(subnet)?;
@@ -501,7 +513,7 @@ impl SubnetManager for EthSubnetManager {
 
     async fn claim_collateral(&self, subnet: SubnetID, from: Address) -> Result<()> {
         let address = contract_address_from_subnet(&subnet)?;
-        log::info!("claim collateral evm subnet: {subnet:} at contract: {address:}");
+        tracing::info!("claim collateral evm subnet: {subnet:} at contract: {address:}");
 
         let signer = Arc::new(self.get_signer(&from)?);
         let contract =
@@ -531,10 +543,10 @@ impl SubnetManager for EthSubnetManager {
             .to_u128()
             .ok_or_else(|| anyhow!("invalid value to fund"))?;
 
-        log::info!("fund with evm gateway contract: {gateway_addr:} with value: {value:}, original: {amount:?}");
+        tracing::info!("fund with evm gateway contract: {gateway_addr:} with value: {value:}, original: {amount:?}");
 
         let evm_subnet_id = gateway_manager_facet::SubnetID::try_from(&subnet)?;
-        log::debug!("evm subnet id to fund: {evm_subnet_id:?}");
+        tracing::debug!("evm subnet id to fund: {evm_subnet_id:?}");
 
         let signer = Arc::new(self.get_signer(&from)?);
         let gateway_contract = gateway_manager_facet::GatewayManagerFacet::new(
@@ -554,6 +566,34 @@ impl SubnetManager for EthSubnetManager {
         block_number_from_receipt(receipt)
     }
 
+    /// Approves the `from` address to use up to `amount` tokens from `token_address`.
+    async fn approve_token(
+        &self,
+        subnet: SubnetID,
+        from: Address,
+        amount: TokenAmount,
+    ) -> Result<ChainEpoch> {
+        log::debug!("approve token, subnet: {subnet}, amount: {amount}, from: {from}");
+
+        let value = fil_amount_to_eth_amount(&amount)?;
+
+        let signer = Arc::new(self.get_signer(&from)?);
+
+        let subnet_supply_source = self.get_subnet_supply_source(&subnet).await?;
+        if subnet_supply_source.kind != SupplyKind::ERC20 as u8 {
+            return Err(anyhow!("Invalid operation: Expected the subnet's supply source to be ERC20, but found a different kind."));
+        }
+
+        let token_contract = IERC20::new(subnet_supply_source.token_address, signer.clone());
+
+        let txn = token_contract.approve(self.ipc_contract_info.gateway_addr, value);
+        let txn = call_with_premium_estimation(signer, txn).await?;
+
+        let pending_tx = txn.send().await?;
+        let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
+        block_number_from_receipt(receipt)
+    }
+
     async fn fund_with_token(
         &self,
         subnet: SubnetID,
@@ -561,7 +601,9 @@ impl SubnetManager for EthSubnetManager {
         to: Address,
         amount: TokenAmount,
     ) -> Result<ChainEpoch> {
-        log::debug!("fund with token, subnet: {subnet}, amount: {amount}, from: {from}, to: {to}");
+        tracing::debug!(
+            "fund with token, subnet: {subnet}, amount: {amount}, from: {from}, to: {to}"
+        );
 
         let value = fil_amount_to_eth_amount(&amount)?;
         let evm_subnet_id = gateway_manager_facet::SubnetID::try_from(&subnet)?;
@@ -598,7 +640,7 @@ impl SubnetManager for EthSubnetManager {
             .to_u128()
             .ok_or_else(|| anyhow!("invalid value to fund"))?;
 
-        log::info!("release with evm gateway contract: {gateway_addr:} with value: {value:}");
+        tracing::info!("release with evm gateway contract: {gateway_addr:} with value: {value:}");
 
         let signer = Arc::new(self.get_signer(&from)?);
         let gateway_contract = gateway_manager_facet::GatewayManagerFacet::new(
@@ -631,7 +673,7 @@ impl SubnetManager for EthSubnetManager {
 
         self.ensure_same_gateway(&gateway_addr)?;
 
-        log::info!("propagate postbox evm gateway contract: {gateway_addr:} with message key: {postbox_msg_key:?}");
+        tracing::info!("propagate postbox evm gateway contract: {gateway_addr:} with message key: {postbox_msg_key:?}");
 
         let signer = Arc::new(self.get_signer(&from)?);
         let gateway_contract = gateway_messenger_facet::GatewayMessengerFacet::new(
@@ -662,7 +704,7 @@ impl SubnetManager for EthSubnetManager {
 
         let tx_pending = signer.send_transaction(tx, None).await?;
 
-        log::info!(
+        tracing::info!(
             "sending FIL from {from:} to {to:} in tx {:?}",
             tx_pending.tx_hash()
         );
@@ -694,11 +736,11 @@ impl SubnetManager for EthSubnetManager {
             self.ipc_contract_info.gateway_addr,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
-        log::debug!(
+        tracing::debug!(
             "gateway_contract address : {:?}",
             self.ipc_contract_info.gateway_addr
         );
-        log::debug!(
+        tracing::debug!(
             "gateway_contract_getter_facet address : {:?}",
             gateway_contract.address()
         );
@@ -710,6 +752,18 @@ impl SubnetManager for EthSubnetManager {
             .map_err(|e| anyhow!("cannot get commit sha due to: {e:}"))?;
 
         Ok(commit_sha)
+    }
+
+    async fn get_subnet_supply_source(
+        &self,
+        subnet: &SubnetID,
+    ) -> Result<ipc_actors_abis::subnet_actor_getter_facet::SupplySource> {
+        let address = contract_address_from_subnet(subnet)?;
+        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+        Ok(contract.supply_source().call().await?)
     }
 
     async fn get_genesis_info(&self, subnet: &SubnetID) -> Result<SubnetGenesisInfo> {
@@ -811,7 +865,7 @@ impl SubnetManager for EthSubnetManager {
         federated_power: &[u128],
     ) -> Result<ChainEpoch> {
         let address = contract_address_from_subnet(subnet)?;
-        log::info!("interacting with evm subnet contract: {address:}");
+        tracing::info!("interacting with evm subnet contract: {address:}");
 
         let signer = Arc::new(self.get_signer(from)?);
         let contract =
@@ -821,21 +875,21 @@ impl SubnetManager for EthSubnetManager {
             .iter()
             .map(|validator_address| payload_to_evm_address(validator_address.payload()).unwrap())
             .collect();
-        log::debug!("converted addresses: {:?}", addresses);
+        tracing::debug!("converted addresses: {:?}", addresses);
 
         let pubkeys: Vec<ethers::core::types::Bytes> = public_keys
             .iter()
             .map(|key| ethers::core::types::Bytes::from(key.clone()))
             .collect();
-        log::debug!("converted pubkeys: {:?}", pubkeys);
+        tracing::debug!("converted pubkeys: {:?}", pubkeys);
 
         let power_u256: Vec<ethers::core::types::U256> = federated_power
             .iter()
             .map(|power| ethers::core::types::U256::from(*power))
             .collect();
-        log::debug!("converted power: {:?}", power_u256);
+        tracing::debug!("converted power: {:?}", power_u256);
 
-        log::debug!("from address: {:?}", from);
+        tracing::debug!("from address: {:?}", from);
 
         let call = contract.set_federated_power(addresses, pubkeys, power_u256);
         let txn = call_with_premium_estimation(signer, call).await?;
@@ -869,7 +923,7 @@ impl EthManager for EthSubnetManager {
             .bottom_up_checkpoint(ethers::types::U256::from(epoch as u64))
             .call()
             .await?;
-        log::debug!("raw bottom up checkpoint from gateway: {checkpoint:?}");
+        tracing::debug!("raw bottom up checkpoint from gateway: {checkpoint:?}");
         let token = checkpoint.into_token();
         let c = subnet_actor_checkpointing_facet::BottomUpCheckpoint::from_token(token)?;
         Ok(c)
@@ -877,7 +931,7 @@ impl EthManager for EthSubnetManager {
 
     async fn get_applied_top_down_nonce(&self, subnet_id: &SubnetID) -> Result<u64> {
         let route = subnet_id_to_evm_addresses(subnet_id)?;
-        log::debug!("getting applied top down nonce for route: {route:?}");
+        tracing::debug!("getting applied top down nonce for route: {route:?}");
 
         let evm_subnet_id = gateway_getter_facet::SubnetID {
             root: subnet_id.root_id(),
@@ -1058,7 +1112,7 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
         signatories: Vec<Address>,
     ) -> anyhow::Result<ChainEpoch> {
         let address = contract_address_from_subnet(&checkpoint.subnet_id)?;
-        log::debug!(
+        tracing::debug!(
             "submit bottom up checkpoint: {checkpoint:?} in evm subnet contract: {address:}"
         );
 

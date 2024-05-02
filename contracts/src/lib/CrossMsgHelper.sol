@@ -12,7 +12,7 @@ import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
 import {SupplySource} from "../structs/Subnet.sol";
 import {SupplySourceHelper} from "./SupplySourceHelper.sol";
-import {IpcHandler} from "../../sdk/IpcContract.sol";
+import {IIpcHandler} from "../../sdk/interfaces/IIpcHandler.sol";
 
 /// @title Helper library for manipulating IpcEnvelope-related structs
 library CrossMsgHelper {
@@ -170,7 +170,7 @@ library CrossMsgHelper {
             return
                 supplySource.performCall(
                     payable(recipient),
-                    abi.encodeCall(IpcHandler.handleIpcMessage, (crossMsg)),
+                    abi.encodeCall(IIpcHandler.handleIpcMessage, (crossMsg)),
                     crossMsg.value
                 );
         }

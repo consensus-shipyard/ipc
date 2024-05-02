@@ -29,7 +29,6 @@ impl CommandLineHandler for JoinSubnet {
             Some(address) => Some(require_fil_addr_from_str(address)?),
             None => None,
         };
-        let public_key = hex::decode(&arguments.public_key)?;
         if let Some(initial_balance) = arguments.initial_balance.filter(|x| !x.is_zero()) {
             log::info!("pre-funding address with {initial_balance}");
             provider
@@ -37,12 +36,7 @@ impl CommandLineHandler for JoinSubnet {
                 .await?;
         }
         let epoch = provider
-            .join_subnet(
-                subnet,
-                from,
-                f64_to_token_amount(arguments.collateral)?,
-                public_key,
-            )
+            .join_subnet(subnet, from, f64_to_token_amount(arguments.collateral)?)
             .await?;
         println!("joined at epoch: {epoch}");
 
@@ -62,8 +56,6 @@ pub struct JoinSubnetArgs {
         help = "The collateral to stake in the subnet (in whole FIL units)"
     )]
     pub collateral: f64,
-    #[arg(long, help = "The validator's metadata, hex encoded")]
-    pub public_key: String,
     #[arg(
         long,
         help = "Optionally add an initial balance to the validator in genesis in the subnet"

@@ -142,6 +142,15 @@ impl CommandLineHandler for FundWithToken {
             .map_err(|e| anyhow::anyhow!("not a token amount: {e}"))
             .map(TokenAmount::from_atto)?;
 
+        if arguments.approve {
+            println!(
+                "approve token performed in epoch: {:?}",
+                provider
+                    .approve_token(subnet.clone(), from, amount.clone())
+                    .await?,
+            );
+        }
+
         println!(
             "fund with token performed in epoch: {:?}",
             provider.fund_with_token(subnet, from, to, amount).await?,
@@ -165,4 +174,6 @@ pub(crate) struct FundWithTokenArgs {
     pub subnet: String,
     #[arg(help = "The amount to fund in erc20, in the token's precision unit")]
     pub amount: String,
+    #[arg(long, help = "Approve gateway before funding")]
+    pub approve: bool,
 }

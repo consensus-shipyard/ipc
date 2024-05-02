@@ -37,7 +37,7 @@
 /// ```
 #[macro_export]
 macro_rules! emit {
-    ($event:ident { $($field:ident $(: $value:expr)?),* $(,)? } ) => {{
+    ($lvl:ident, $event:ident { $($field:ident $(: $value:expr)?),* $(,)? } ) => {{
         // Make sure the emitted fields match the schema of the event.
         if false {
             let _event = $event {
@@ -46,9 +46,13 @@ macro_rules! emit {
         }
         tracing::event!(
             name: concat!("event::", stringify!($event)),
-            tracing::Level::INFO,
+            tracing::Level::$lvl,
             { event = tracing::field::display(stringify!($event)), $($field $(= $value)?),* }
         )
+    }};
+
+    ($event:ident { $($field:ident $(: $value:expr)?),* $(,)? } ) => {{
+        emit!(INFO, $event { $($field $(: $value)? ),* })
     }};
 }
 

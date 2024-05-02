@@ -145,6 +145,7 @@ pub struct GenesisIntoTendermintArgs {
 pub enum GenesisIpcCommands {
     /// Set all gateway parameters.
     Gateway(GenesisIpcGatewayArgs),
+    /// Fetch the genesis parameters of a subnet from the parent.
     FromParent(Box<GenesisFromParentArgs>),
 }
 
@@ -180,11 +181,15 @@ pub struct GenesisFromParentArgs {
     #[arg(long, short)]
     pub parent_endpoint: url::Url,
 
+    /// HTTP basic authentication token.
+    #[arg(long)]
+    pub parent_auth_token: Option<String>,
+
     /// IPC gateway of the parent; 20 byte Ethereum address in 0x prefixed hex format
     #[arg(long, value_parser = parse_eth_address, default_value = "0xff00000000000000000000000000000000000064")]
     pub parent_gateway: Address,
 
-    /// IPC registry of the parent;  20 byte Ethereum address in 0x prefixed hex format
+    /// IPC registry of the parent; 20 byte Ethereum address in 0x prefixed hex format
     #[arg(long, value_parser = parse_eth_address, default_value = "0xff00000000000000000000000000000000000065")]
     pub parent_registry: Address,
 

@@ -5,7 +5,7 @@
 COPYRIGHT_TXT=$(dirname $0)/copyright.txt
 
 # Any year is fine. We can update the year as a single PR in all files that have it up to last year.
-PAT_PL=".*// Copyright 202(1|2)-202\d Protocol Labs.*"
+PAT_PL=".*// Copyright 202(1|2)-202[0-9] Protocol Labs.*"
 PAT_SPDX="/*// SPDX-License-Identifier: .*"
 
 # Look at enough lines so that we can include multiple copyright holders.
@@ -40,7 +40,7 @@ for file in $(git grep --cached -Il '' -- '*.rs'); do
 		continue
 	fi
   header=$(head -$LINES "$file")
-	if ! echo "$header" | grep -q -P "$PAT_SPDX"; then
+	if ! echo "$header" | grep -q -E "$PAT_SPDX"; then
 		echo "$file was missing header"
 		cat $COPYRIGHT_TXT "$file" > temp
 		mv temp "$file"
@@ -56,7 +56,7 @@ for file in $(git diff --diff-filter=d --name-only origin/main -- '*.rs'); do
 		continue
 	fi
   header=$(head -$LINES "$file")
-	if ! echo "$header" | grep -q -P "$PAT_PL"; then
+	if ! echo "$header" | grep -q -E "$PAT_PL"; then
 		echo "$file was missing Protocol Labs"
 		head -1 $COPYRIGHT_TXT > temp
 		cat "$file" >> temp
