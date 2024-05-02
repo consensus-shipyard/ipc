@@ -4,11 +4,13 @@
 use anyhow::{anyhow, bail, Context};
 use async_stm::atomically_or_err;
 use fendermint_abci::ApplicationService;
+use fendermint_app::events::{ParentFinalityVoteAdded, ParentFinalityVoteIgnored};
 use fendermint_app::ipc::{AppParentFinalityQuery, AppVote};
 use fendermint_app::{App, AppConfig, AppStore, BitswapBlockstore};
 use fendermint_app_settings::AccountKind;
 use fendermint_crypto::SecretKey;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
+use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::chain::ChainEnv;
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
@@ -24,7 +26,7 @@ use fendermint_vm_topdown::proxy::IPCProviderProxy;
 use fendermint_vm_topdown::sync::launch_polling_syncer;
 use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
 use fendermint_vm_topdown::{CachedFinalityProvider, IPCParentFinality, Toggle};
-use fvm_shared::address::Address;
+use fvm_shared::address::{current_network, Address, Network};
 use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
@@ -32,6 +34,7 @@ use libp2p::identity::secp256k1;
 use libp2p::identity::Keypair;
 use std::sync::Arc;
 use tokio::sync::broadcast::error::RecvError;
+use tower::ServiceBuilder;
 use tracing::info;
 
 use crate::cmd::key::read_secret_key;
@@ -64,12 +67,17 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         tendermint_rpc::HttpClient::new(tendermint_rpc_url)
             .context("failed to create Tendermint client")?;
 
-    // Register metrics
-    let metrics_registry = prometheus::Registry::new();
-    // TODO: Serve metrics over HTTP
+    // Prometheus metrics
+    let metrics_registry = if settings.metrics.enabled {
+        let registry = prometheus::Registry::new();
 
-    fendermint_app::metrics::register_app_metrics(&metrics_registry)
-        .context("failed to register metrics")?;
+        fendermint_app::metrics::register_app_metrics(&registry)
+            .context("failed to register metrics")?;
+
+        Some(registry)
+    } else {
+        None
+    };
 
     let validator = match settings.validator_key {
         Some(ref key) => {
@@ -114,6 +122,13 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         ValidatorContext::new(sk, broadcaster)
     });
 
+    let testing_settings = match settings.testing.as_ref() {
+        Some(_) if current_network() == Network::Mainnet => {
+            bail!("testing settings are not allowed on Mainnet");
+        }
+        other => other,
+    };
+
     let interpreter = FvmMessageInterpreter::<NamespaceBlockstore, _>::new(
         tendermint_client.clone(),
         validator_ctx,
@@ -122,11 +137,17 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         settings.fvm.gas_search_step,
         settings.fvm.exec_in_check,
         UpgradeScheduler::new(),
-    );
+    )
+    .with_push_chain_meta(testing_settings.map_or(true, |t| t.push_chain_meta));
+
     let interpreter = SignedMessageInterpreter::new(interpreter);
     let interpreter = ChainMessageInterpreter::<_, NamespaceBlockstore>::new(interpreter);
-    let interpreter =
-        BytesMessageInterpreter::new(interpreter, ProposalPrepareMode::AppendOnly, false);
+    let interpreter = BytesMessageInterpreter::new(
+        interpreter,
+        ProposalPrepareMode::PrependOnly,
+        false,
+        settings.abci.block_max_msgs,
+    );
 
     let ns = Namespaces::default();
     let db = open_db(&settings, &ns).context("error opening DB")?;
@@ -145,10 +166,12 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         let mut service =
             make_resolver_service(&settings, db.clone(), state_store.clone(), ns.bit_store)?;
 
-        // Register all metrics from the IPLD resolver stack;
-        service
-            .register_metrics(&metrics_registry)
-            .context("failed to register IPLD resolver metrics")?;
+        // Register all metrics from the IPLD resolver stack
+        if let Some(ref registry) = metrics_registry {
+            service
+                .register_metrics(registry)
+                .context("failed to register IPLD resolver metrics")?;
+        }
 
         let client = service.client();
 
@@ -212,7 +235,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     let (parent_finality_provider, ipc_tuple) = if topdown_enabled {
         info!("topdown finality enabled");
         let topdown_config = settings.ipc.topdown_config()?;
-        let config = fendermint_vm_topdown::Config::new(
+        let mut config = fendermint_vm_topdown::Config::new(
             topdown_config.chain_head_delay,
             topdown_config.polling_interval,
             topdown_config.exponential_back_off,
@@ -220,6 +243,12 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         )
         .with_proposal_delay(topdown_config.proposal_delay)
         .with_max_proposal_range(topdown_config.max_proposal_range);
+
+        if let Some(v) = topdown_config.max_cache_blocks {
+            info!(value = v, "setting max cache blocks");
+            config = config.with_max_cache_blocks(v);
+        }
+
         let ipc_provider = Arc::new(make_ipc_provider_proxy(&settings)?);
         let finality_provider =
             CachedFinalityProvider::uninitialized(config.clone(), ipc_provider.clone()).await?;
@@ -295,6 +324,19 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         });
     }
 
+    // Start the metrics on a background thread.
+    if let Some(registry) = metrics_registry {
+        info!(
+            listen_addr = settings.metrics.listen.to_string(),
+            "serving metrics"
+        );
+        let mut builder = prometheus_exporter::Builder::new(settings.metrics.listen.try_into()?);
+        builder.with_registry(registry);
+        let _ = builder.start().context("failed to start metrics server")?;
+    } else {
+        info!("metrics disabled");
+    }
+
     let service = ApplicationService(app);
 
     // Split it into components.
@@ -302,8 +344,22 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         tower_abci::split::service(service, settings.abci.bound);
 
     // Hand those components to the ABCI server. This is where tower layers could be added.
+    // TODO: Check out the examples about load shedding in `info` requests.
     let server = tower_abci::v037::Server::builder()
-        .consensus(consensus)
+        .consensus(
+            // Limiting the concurrency to 1 here because the `AplicationService::poll_ready` always
+            // reports `Ready`, because it doesn't know which request it's going to get.
+            // Not limiting the concurrency to 1 can lead to transactions being applied
+            // in different order across nodes. The buffer size has to be large enough
+            // to allow all in-flight requests to not block message handling in
+            // `tower_abci::Connection::run`, which could lead to deadlocks.
+            // With ABCI++ we need to be able to handle all block transactions plus the begin/end/commit
+            // around it. With ABCI 2.0 we'll get the block as a whole, which makes this easier.
+            ServiceBuilder::new()
+                .buffer(settings.abci.block_max_msgs + 3)
+                .concurrency_limit(1)
+                .service(consensus),
+        )
         .snapshot(snapshot)
         .mempool(mempool)
         .info(info)
@@ -326,7 +382,11 @@ fn open_db(settings: &Settings, ns: &Namespaces) -> anyhow::Result<RocksDb> {
         path = path.to_string_lossy().into_owned(),
         "opening database"
     );
-    let db = RocksDb::open_cf(path, &RocksDbConfig::default(), ns.values().iter())?;
+    let config = RocksDbConfig {
+        compaction_style: settings.db.compaction_style.to_string(),
+        ..Default::default()
+    };
+    let db = RocksDb::open_cf(path, &config, ns.values().iter())?;
     Ok(db)
 }
 
@@ -399,6 +459,7 @@ fn to_resolver_config(settings: &Settings) -> anyhow::Result<ipc_ipld_resolver::
     let config = Config {
         connection: ConnectionConfig {
             listen_addr: r.connection.listen_addr.clone(),
+            external_addresses: r.connection.external_addresses.clone(),
             expected_peer_count: r.connection.expected_peer_count,
             max_incoming: r.connection.max_incoming,
             max_peers_per_query: r.connection.max_peers_per_query,
@@ -481,18 +542,46 @@ async fn dispatch_vote(
             })
             .await;
 
-            match res {
-                Ok(_) => {}
+            let added = match res {
+                Ok(added) => {
+                    added
+                }
                 Err(e @ VoteError::Equivocation(_, _, _, _)) => {
                     tracing::warn!(error = e.to_string(), "failed to handle vote");
+                    false
                 }
                 Err(e @ (
                       VoteError::Uninitialized // early vote, we're not ready yet
                     | VoteError::UnpoweredValidator(_) // maybe arrived too early or too late, or spam
                     | VoteError::UnexpectedBlock(_, _) // won't happen here
                 )) => {
-                    tracing::debug!(error = e.to_string(), "failed to handle vote")
+                    tracing::debug!(error = e.to_string(), "failed to handle vote");
+                    false
                 }
+            };
+
+            let block_height = f.height;
+            let block_hash = &hex::encode(&f.block_hash);
+            let validator = &format!("{:?}", vote.public_key);
+
+            if added {
+                emit!(
+                    DEBUG,
+                    ParentFinalityVoteAdded {
+                        block_height,
+                        block_hash,
+                        validator,
+                    }
+                )
+            } else {
+                emit!(
+                    DEBUG,
+                    ParentFinalityVoteIgnored {
+                        block_height,
+                        block_hash,
+                        validator,
+                    }
+                )
             }
         }
     }

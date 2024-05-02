@@ -24,6 +24,9 @@ pub struct ResolverSettings {
     pub content: ContentSettings,
 }
 
+/// Settings describing the subnet hierarchy, not the physical network.
+///
+/// For physical network settings see [ConnectionSettings].
 #[derive(Clone, Debug, Deserialize)]
 pub struct NetworkSettings {
     /// Cryptographic key used to sign messages.
@@ -78,6 +81,8 @@ pub struct MembershipSettings {
 pub struct ConnectionSettings {
     /// The address where we will listen to incoming connections.
     pub listen_addr: Multiaddr,
+    /// A list of known external addresses this node is reachable on.
+    pub external_addresses: Vec<Multiaddr>,
     /// Maximum number of incoming connections.
     pub max_incoming: u32,
     /// Expected number of peers, for sizing the Bloom filter.

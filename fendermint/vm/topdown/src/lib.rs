@@ -85,6 +85,11 @@ impl Config {
         self
     }
 
+    pub fn with_max_cache_blocks(mut self, max_cache_blocks: BlockHeight) -> Self {
+        self.max_cache_blocks = Some(max_cache_blocks);
+        self
+    }
+
     pub fn max_proposal_range(&self) -> BlockHeight {
         self.max_proposal_range
             .unwrap_or(DEFAULT_MAX_PROPOSAL_RANGE)

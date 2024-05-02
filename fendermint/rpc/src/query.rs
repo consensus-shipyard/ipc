@@ -33,7 +33,10 @@ pub struct QueryResponse<T> {
 pub trait QueryClient: Sync {
     /// Query the contents of a CID from the IPLD store.
     async fn ipld(&self, cid: &Cid, height: FvmQueryHeight) -> anyhow::Result<Option<Vec<u8>>> {
-        let res = self.perform(FvmQuery::Ipld(*cid), height).await?;
+        let res = self
+            .perform(FvmQuery::Ipld(*cid), height)
+            .await
+            .context("ipld query failed")?;
         extract_opt(res, |res| Ok(res.value))
     }
 
@@ -43,7 +46,10 @@ pub trait QueryClient: Sync {
         address: &Address,
         height: FvmQueryHeight,
     ) -> anyhow::Result<QueryResponse<Option<(ActorID, ActorState)>>> {
-        let res = self.perform(FvmQuery::ActorState(*address), height).await?;
+        let res = self
+            .perform(FvmQuery::ActorState(*address), height)
+            .await
+            .context("actor state query failed")?;
         let height = res.height;
         let value = extract_actor_state(res)?;
         Ok(QueryResponse { height, value })
@@ -57,7 +63,8 @@ pub trait QueryClient: Sync {
     ) -> anyhow::Result<QueryResponse<response::DeliverTx>> {
         let res = self
             .perform(FvmQuery::Call(Box::new(message)), height)
-            .await?;
+            .await
+            .context("call query failed")?;
         let height = res.height;
         let value = extract(res, parse_deliver_tx)?;
         Ok(QueryResponse { height, value })
@@ -74,7 +81,8 @@ pub trait QueryClient: Sync {
 
         let res = self
             .perform(FvmQuery::EstimateGas(Box::new(message)), height)
-            .await?;
+            .await
+            .context("estimate gas query failed")?;
         let height = res.height;
         let value = extract(res, |res| {
             fvm_ipld_encoding::from_slice(&res.value)
@@ -88,7 +96,10 @@ pub trait QueryClient: Sync {
         &self,
         height: FvmQueryHeight,
     ) -> anyhow::Result<QueryResponse<StateParams>> {
-        let res = self.perform(FvmQuery::StateParams, height).await?;
+        let res = self
+            .perform(FvmQuery::StateParams, height)
+            .await
+            .context("state params query failed")?;
         let height = res.height;
         let value = extract(res, |res| {
             fvm_ipld_encoding::from_slice(&res.value)
@@ -102,7 +113,10 @@ pub trait QueryClient: Sync {
         &self,
         height: FvmQueryHeight,
     ) -> anyhow::Result<QueryResponse<BuiltinActors>> {
-        let res = self.perform(FvmQuery::BuiltinActors, height).await?;
+        let res = self
+            .perform(FvmQuery::BuiltinActors, height)
+            .await
+            .context("builtin actors query failed")?;
         let height = res.height;
         let value = {
             let registry: Vec<(String, Cid)> = extract(res, |res| {

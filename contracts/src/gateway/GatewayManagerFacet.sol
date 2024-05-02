@@ -163,6 +163,11 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
             // prevent spamming if there's no value to fund.
             revert InvalidXnetMessage(InvalidXnetMessageReason.Value);
         }
+        // slither-disable-next-line unused-return
+        (bool registered, ) = LibGateway.getSubnet(subnetId);
+        if (!registered) {
+            revert NotRegisteredSubnet();
+        }
 
         // Check that the supply strategy is ERC20.
         // There is no need to check whether the subnet exists. If it doesn't exist, the call to getter will revert.
@@ -170,15 +175,17 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         SupplySource memory supplySource = SubnetActorGetterFacet(subnetId.getActor()).supplySource();
         supplySource.expect(SupplyKind.ERC20);
 
-        // Lock the specified amount into custody.
-        supplySource.lock({value: amount});
+        // Locks a specified amount into custody, adjusting for tokens with transfer fees. This operation
+        // accommodates inflationary tokens, potentially reflecting a higher effective locked amount.
+        // Operation reverts if the effective transferred amount is zero.
+        uint256 transferAmount = supplySource.lock({value: amount});
 
         // Create the top-down message to mint the supply in the subnet.
         IpcEnvelope memory crossMsg = CrossMsgHelper.createFundMsg({
             subnet: subnetId,
             signer: msg.sender,
             to: to,
-            value: amount
+            value: transferAmount
         });
 
         // Commit top-down message.

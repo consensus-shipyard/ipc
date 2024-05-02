@@ -31,9 +31,6 @@ pub(crate) struct CheckpointCommandsArgs {
 impl CheckpointCommandsArgs {
     pub async fn handle(&self, global: &GlobalArguments) -> anyhow::Result<()> {
         match &self.command {
-            Commands::ListBottomup(args) => {
-                LastBottomUpCheckpointHeight::handle(global, args).await
-            }
             Commands::Relayer(args) => BottomUpRelayer::handle(global, args).await,
             Commands::ListValidatorChanges(args) => {
                 ListValidatorChanges::handle(global, args).await
@@ -51,7 +48,6 @@ impl CheckpointCommandsArgs {
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum Commands {
-    ListBottomup(LastBottomUpCheckpointHeightArgs),
     Relayer(BottomUpRelayerArgs),
     ListValidatorChanges(ListValidatorChangesArgs),
     ListBottomupBundle(GetBottomUpBundlesArgs),
