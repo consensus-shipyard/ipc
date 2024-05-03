@@ -7,7 +7,7 @@ mod memory;
 mod persistent;
 
 use anyhow::Result;
-use std::{hash::Hash, str::FromStr};
+use std::hash::Hash;
 use zeroize::Zeroize;
 
 pub use crate::evm::persistent::{PersistentKeyInfo, PersistentKeyStore};
@@ -103,6 +103,7 @@ impl From<ethers::types::Address> for EthKeyAddress {
     }
 }
 
+#[cfg(feature = "with-ethers")]
 impl TryFrom<EthKeyAddress> for fvm_shared::address::Address {
     type Error = hex::FromHexError;
 
