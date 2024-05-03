@@ -3,11 +3,11 @@ use ethers::providers::{Http, Provider};
 // SPDX-License-Identifier: Apache-2.0, MIT
 use multihash::MultihashDigest;
 use serde::{Deserialize, Serialize};
+use std::fmt::Formatter;
 use std::{
     fmt::{Debug, Display},
     path::{Path, PathBuf},
 };
-use std::fmt::Formatter;
 
 #[allow(unused_variables, dead_code)] // TODO: Remove once implemented
 pub mod docker;

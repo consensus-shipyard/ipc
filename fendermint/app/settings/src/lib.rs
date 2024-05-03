@@ -1,7 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::fmt::{Display, Formatter};
 use anyhow::{anyhow, Context};
 use config::{Config, ConfigError, Environment, File};
 use fvm_shared::address::Address;
@@ -9,6 +8,7 @@ use fvm_shared::econ::TokenAmount;
 use ipc_api::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
+use std::fmt::{Display, Formatter};
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -115,10 +115,14 @@ pub enum DbCompaction {
 
 impl Display for DbCompaction {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", serde_json::to_value(self)
-            .expect("compaction serializes to JSON")
-            .as_str()
-            .expect("compaction is a string"))
+        write!(
+            f,
+            "{}",
+            serde_json::to_value(self)
+                .expect("compaction serializes to JSON")
+                .as_str()
+                .expect("compaction is a string")
+        )
     }
 }
 

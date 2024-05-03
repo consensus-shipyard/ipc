@@ -192,9 +192,9 @@ impl<T: Clone + Eq + Hash + TryFrom<KeyInfo> + Default + ToString> PersistentKey
 
 #[cfg(test)]
 mod tests {
-    use std::fmt::{Display, Formatter};
     use crate::evm::KeyInfo;
     use crate::{EvmKeyStore, PersistentKeyStore};
+    use std::fmt::{Display, Formatter};
 
     #[derive(Clone, Eq, PartialEq, Hash, Debug)]
     struct Key {
