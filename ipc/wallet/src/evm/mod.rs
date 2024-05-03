@@ -7,6 +7,7 @@ mod memory;
 mod persistent;
 
 use anyhow::Result;
+use std::fmt::{Display, Formatter};
 use std::hash::Hash;
 use zeroize::Zeroize;
 
@@ -58,12 +59,6 @@ impl Drop for KeyInfo {
     fn drop(&mut self) {
         self.private_key.zeroize();
     }
-}
-
-/// This trait is use to determine the key chosen for a specific
-/// key in a general way.
-pub trait WithDefaultKey {
-    fn default() -> Self;
 }
 
 #[cfg(feature = "with-ethers")]
@@ -125,12 +120,13 @@ impl From<EthKeyAddress> for ethers::types::Address {
 }
 
 #[cfg(feature = "with-ethers")]
-impl ToString for EthKeyAddress {
-    fn to_string(&self) -> String {
+impl Display for EthKeyAddress {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if self == &Self::default() {
-            return String::from("default-key");
+            write!(f, "default-key")
+        } else {
+            write!(f, "{:?}", self.inner)
         }
-        format!("{:?}", self.inner)
     }
 }
 

@@ -56,7 +56,7 @@ impl CommandLineHandler for WalletBalances {
                         Ok(i) => {
                             let (balance, addr) = i;
                             if addr.to_string() != "default-key" {
-                                println!("{} - Balance: {}", addr.to_string(), balance);
+                                println!("{} - Balance: {}", addr, balance);
                             }
                         }
                         Err(e) => {
