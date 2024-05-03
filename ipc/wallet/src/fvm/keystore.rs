@@ -16,7 +16,7 @@ use argon2::{
 };
 use base64::{prelude::BASE64_STANDARD, Engine};
 use fvm_shared::crypto::signature::SignatureType;
-use log::{debug, error};
+use log::error;
 use rand::{rngs::OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -221,10 +221,6 @@ impl KeyStore {
                     }
                     Err(e) => {
                         if e.kind() == ErrorKind::NotFound {
-                            debug!(
-                                "Keystore does not exist, initializing new keystore at: {:?}",
-                                file_path
-                            );
                             Ok(Self {
                                 key_info: HashMap::new(),
                                 persistence: Some(PersistentKeyStore { file_path }),
@@ -254,12 +250,6 @@ impl KeyStore {
                         let read_bytes = reader.read_to_end(&mut buf)?;
 
                         if read_bytes == 0 {
-                            // New encrypted keystore if file exists but is zero bytes (i.e., touch)
-                            debug!(
-                                "Keystore does not exist, initializing new keystore at {:?}",
-                                file_path
-                            );
-
                             let (salt, encryption_key) =
                                 EncryptedKeyStore::derive_key(&passphrase, None).map_err(
                                     |error| {
@@ -309,8 +299,6 @@ impl KeyStore {
                         }
                     }
                     Err(_) => {
-                        debug!("Encrypted keystore does not exist, initializing new keystore");
-
                         let (salt, encryption_key) =
                             EncryptedKeyStore::derive_key(&passphrase, None).map_err(|error| {
                                 error!("Failed to create key from passphrase");
