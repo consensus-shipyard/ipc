@@ -1,6 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::fmt::{Display, Formatter};
 use anyhow::{anyhow, Context};
 use config::{Config, ConfigError, Environment, File};
 use fvm_shared::address::Address;
@@ -44,9 +45,10 @@ pub struct SocketAddress {
     pub host: String,
     pub port: u32,
 }
-impl ToString for SocketAddress {
-    fn to_string(&self) -> String {
-        format!("{}:{}", self.host, self.port)
+
+impl Display for SocketAddress {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.host, self.port)
     }
 }
 
@@ -111,13 +113,12 @@ pub enum DbCompaction {
     None,
 }
 
-impl ToString for DbCompaction {
-    fn to_string(&self) -> String {
-        serde_json::to_value(self)
+impl Display for DbCompaction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", serde_json::to_value(self)
             .expect("compaction serializes to JSON")
             .as_str()
-            .expect("compaction is a string")
-            .to_string()
+            .expect("compaction is a string"))
     }
 }
 

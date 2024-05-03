@@ -7,6 +7,7 @@ use std::{
     fmt::{Debug, Display},
     path::{Path, PathBuf},
 };
+use std::fmt::Formatter;
 
 #[allow(unused_variables, dead_code)] // TODO: Remove once implemented
 pub mod docker;
@@ -335,9 +336,9 @@ impl ResourceHash {
     }
 }
 
-impl ToString for ResourceHash {
-    fn to_string(&self) -> String {
-        hex::encode(self.0)
+impl Display for ResourceHash {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", hex::encode(self.0))
     }
 }
 
