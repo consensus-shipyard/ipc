@@ -10,6 +10,9 @@ use anyhow::Result;
 use std::hash::Hash;
 use zeroize::Zeroize;
 
+#[cfg(feature = "with-ethers")]
+use std::str::FromStr;
+
 pub use crate::evm::persistent::{PersistentKeyInfo, PersistentKeyStore};
 
 pub const DEFAULT_KEYSTORE_NAME: &str = "evm_keystore.json";
