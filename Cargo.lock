@@ -2965,6 +2965,7 @@ dependencies = [
  "serde_with 2.3.3",
  "serial_test",
  "tendermint-rpc",
+ "tracing",
 ]
 
 [[package]]
