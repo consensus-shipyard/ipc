@@ -119,9 +119,10 @@ impl Display for DbCompaction {
             f,
             "{}",
             serde_json::to_value(self)
-                .expect("compaction serializes to JSON")
-                .as_str()
-                .expect("compaction is a string")
+                .map_err(|e| {
+                    tracing::error!("cannot format DB compaction to json: {e}");
+                    std::fmt::Error
+                })?
         )
     }
 }
