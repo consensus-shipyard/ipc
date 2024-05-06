@@ -118,10 +118,13 @@ impl Display for DbCompaction {
         write!(
             f,
             "{}",
-            serde_json::to_value(self).map_err(|e| {
-                tracing::error!("cannot format DB compaction to json: {e}");
-                std::fmt::Error
-            })?
+            serde_json::to_value(self)
+                .map_err(|e| {
+                    tracing::error!("cannot format DB compaction to json: {e}");
+                    std::fmt::Error
+                })?
+                .as_str()
+                .ok_or(std::fmt::Error)?
         )
     }
 }
