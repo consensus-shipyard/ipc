@@ -25,7 +25,7 @@ use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::proxy::IPCProviderProxy;
 use fendermint_vm_topdown::sync::launch_polling_syncer;
 use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
-use fendermint_vm_topdown::{CachedFinalityProvider, IPCParentFinality, Toggle};
+use fendermint_vm_topdown::{CacheStore, CachedFinalityProvider, IPCParentFinality, Toggle};
 use fvm_shared::address::{current_network, Address, Network};
 use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
@@ -52,7 +52,8 @@ namespaces! {
         app,
         state_hist,
         state_store,
-        bit_store
+        bit_store,
+        finality_cache
     }
 }
 
@@ -152,6 +153,9 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     let ns = Namespaces::default();
     let db = open_db(&settings, &ns).context("error opening DB")?;
 
+    let finality_store =
+        CacheStore::new(db.clone(), ns.finality_cache).context("error creating cache store DB")?;
+
     // Blockstore for actors.
     let state_store =
         NamespaceBlockstore::new(db.clone(), ns.state_store).context("error creating state DB")?;
@@ -250,8 +254,12 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         }
 
         let ipc_provider = Arc::new(make_ipc_provider_proxy(&settings)?);
-        let finality_provider =
-            CachedFinalityProvider::uninitialized(config.clone(), ipc_provider.clone()).await?;
+        let finality_provider = CachedFinalityProvider::uninitialized(
+            config.clone(),
+            ipc_provider.clone(),
+            finality_store.clone(),
+        )
+        .await?;
         let p = Arc::new(Toggle::enabled(finality_provider));
         (p, Some((ipc_provider, config)))
     } else {

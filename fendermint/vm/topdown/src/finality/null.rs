@@ -4,7 +4,9 @@
 use crate::finality::{
     ensure_sequential, topdown_cross_msgs, validator_changes, ParentViewPayload,
 };
-use crate::{BlockHash, BlockHeight, Config, Error, IPCParentFinality, SequentialKeyCache};
+use crate::{
+    BlockHash, BlockHeight, CacheStore, Config, Error, IPCParentFinality, SequentialKeyCache,
+};
 use async_stm::{abort, atomically, Stm, StmResult, TVar};
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
@@ -23,6 +25,7 @@ pub struct FinalityWithNull {
     /// This is a in memory view of the committed parent finality. We need this as a starting point
     /// for populating the cache
     last_committed_finality: TVar<Option<IPCParentFinality>>,
+    cache_store: CacheStore,
 }
 
 impl FinalityWithNull {
@@ -30,12 +33,14 @@ impl FinalityWithNull {
         config: Config,
         genesis_epoch: BlockHeight,
         committed_finality: Option<IPCParentFinality>,
+        cache_store: CacheStore,
     ) -> Self {
         Self {
             config,
             genesis_epoch,
             cached_data: TVar::new(SequentialKeyCache::sequential()),
             last_committed_finality: TVar::new(committed_finality),
+            cache_store,
         }
     }
 
@@ -66,6 +71,7 @@ impl FinalityWithNull {
     /// Clear the cache and set the committed finality to the provided value
     pub fn reset(&self, finality: IPCParentFinality) -> Stm<()> {
         self.cached_data.write(SequentialKeyCache::sequential())?;
+        self.cache_store.delete_all().unwrap();
         self.last_committed_finality.write(Some(finality))
     }
 
@@ -118,6 +124,7 @@ impl FinalityWithNull {
             cache.remove_key_below(height);
             cache
         })?;
+        self.cache_store.delete_below(height).unwrap();
 
         let hash = hex::encode(&finality.block_hash);
 
@@ -137,6 +144,12 @@ impl FinalityWithNull {
     /// Returns the number of blocks cached.
     pub(crate) fn cached_blocks(&self) -> Stm<BlockHeight> {
         let cache = self.cached_data.read()?;
+        let store_count = self.cache_store.count().unwrap();
+        tracing::info!(
+            cache_count = cache.size(),
+            store_count,
+            "COMPARE cached_blocks"
+        );
         Ok(cache.size() as BlockHeight)
     }
 
@@ -152,6 +165,12 @@ impl FinalityWithNull {
 
     pub(crate) fn latest_height_in_cache(&self) -> Stm<Option<BlockHeight>> {
         let cache = self.cached_data.read()?;
+        let store_upper_bound = self.cache_store.upper_bound().unwrap();
+        tracing::info!(
+            cache_upper_bound = cache.upper_bound(),
+            store_upper_bound,
+            "COMPARE  latest_height_in_cache"
+        );
         Ok(cache.upper_bound())
     }
 
@@ -170,14 +189,38 @@ impl FinalityWithNull {
     /// Get the first non-null block in the range of earliest cache block till the height specified, inclusive.
     pub(crate) fn first_non_null_block(&self, height: BlockHeight) -> Stm<Option<BlockHeight>> {
         let cache = self.cached_data.read()?;
-        Ok(cache.lower_bound().and_then(|lower_bound| {
+
+        let mut cached_height = 0;
+
+        let res = Ok(cache.lower_bound().and_then(|lower_bound| {
             for h in (lower_bound..=height).rev() {
                 if let Some(Some(_)) = cache.get_value(h) {
+                    cached_height = h;
                     return Some(h);
                 }
             }
             None
-        }))
+        }));
+
+        let mut stored_height = 0;
+
+        let _res2: std::result::Result<std::option::Option<u64>, Vec<u8>> = Ok(self
+            .cache_store
+            .lower_bound()
+            .unwrap()
+            .and_then(|lower_bound| {
+                for h in (lower_bound..=height).rev() {
+                    if let Some(Some(_)) = self.cache_store.get_value(h).unwrap() {
+                        stored_height = h;
+                        return Some(h);
+                    }
+                }
+                None
+            }));
+
+        tracing::info!(cached_height, stored_height, "COMPARE first_non_null_block");
+
+        res
     }
 }
 
@@ -243,14 +286,33 @@ impl FinalityWithNull {
         d: D,
     ) -> Stm<Option<T>> {
         let cache = self.cached_data.read()?;
-        Ok(cache.get_value(height).map(|v| {
+
+        let mut cache_value = None;
+
+        let res = Ok(cache.get_value(height).map(|v| {
             if let Some(i) = v.as_ref() {
+                cache_value = Some(i.clone());
                 f(i)
             } else {
                 tracing::debug!(height, "a null round detected, return default");
                 d()
             }
-        }))
+        }));
+
+        let mut stored_value = None;
+        let _ = self.cache_store.get_value(height).unwrap().map(|v| {
+            if let Some(i) = v.as_ref() {
+                stored_value = Some(i.clone());
+                f(i)
+            } else {
+                tracing::debug!(height, "a null round detected, return default");
+                d()
+            }
+        });
+
+        tracing::info!(?cache_value, ?stored_value, "COMPARE handle_null_block");
+
+        res
     }
 
     fn get_at_height<T, F: Fn(&ParentViewPayload) -> T>(
@@ -259,11 +321,23 @@ impl FinalityWithNull {
         f: F,
     ) -> Stm<Option<T>> {
         let cache = self.cached_data.read()?;
-        Ok(if let Some(Some(v)) = cache.get_value(height) {
+
+        let mut cache_value = None;
+        let res = Ok(if let Some(Some(v)) = cache.get_value(height) {
+            cache_value = Some(v.clone());
             Some(f(v))
         } else {
             None
-        })
+        });
+
+        let mut stored_value = None;
+        if let Some(Some(v)) = self.cache_store.get_value(height).unwrap() {
+            stored_value = Some(v.clone());
+        }
+
+        tracing::info!(?cache_value, ?stored_value, "COMPARE get_at_height");
+
+        res
     }
 
     fn parent_block_filled(
@@ -308,6 +382,11 @@ impl FinalityWithNull {
 
         if let Err(e) = r {
             return abort(e);
+        }
+
+        let r2 = self.cache_store.append(height, None);
+        if let Err(e) = r2 {
+            panic!("cache store failed to append: {:?}", e);
         }
 
         Ok(())

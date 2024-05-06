@@ -5,7 +5,7 @@ use crate::finality::null::FinalityWithNull;
 use crate::finality::ParentViewPayload;
 use crate::proxy::ParentQueryProxy;
 use crate::{
-    handle_null_round, BlockHash, BlockHeight, Config, Error, IPCParentFinality,
+    handle_null_round, BlockHash, BlockHeight, CacheStore, Config, Error, IPCParentFinality,
     ParentFinalityProvider, ParentViewProvider,
 };
 use async_stm::{Stm, StmResult};
@@ -133,9 +133,13 @@ impl<T: ParentQueryProxy + Send + Sync + 'static> CachedFinalityProvider<T> {
     /// We need this because `fendermint` has yet to be initialized and might
     /// not be able to provide an existing finality from the storage. This provider requires an
     /// existing committed finality. Providing the finality will enable other functionalities.
-    pub async fn uninitialized(config: Config, parent_client: Arc<T>) -> anyhow::Result<Self> {
+    pub async fn uninitialized(
+        config: Config,
+        parent_client: Arc<T>,
+        cache_store: CacheStore,
+    ) -> anyhow::Result<Self> {
         let genesis = parent_client.get_genesis_epoch().await?;
-        Ok(Self::new(config, genesis, None, parent_client))
+        Ok(Self::new(config, genesis, None, parent_client, cache_store))
     }
 
     /// Should always return the top down messages, only when ipc parent_client is down after exponential
@@ -190,8 +194,14 @@ impl<T> CachedFinalityProvider<T> {
         genesis_epoch: BlockHeight,
         committed_finality: Option<IPCParentFinality>,
         parent_client: Arc<T>,
+        cache_store: CacheStore,
     ) -> Self {
-        let inner = FinalityWithNull::new(config.clone(), genesis_epoch, committed_finality);
+        let inner = FinalityWithNull::new(
+            config.clone(),
+            genesis_epoch,
+            committed_finality,
+            cache_store.clone(),
+        );
         Self {
             inner,
             config,
