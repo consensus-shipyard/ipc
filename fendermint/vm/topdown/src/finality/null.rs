@@ -4,9 +4,7 @@
 use crate::finality::{
     ensure_sequential, topdown_cross_msgs, validator_changes, ParentViewPayload,
 };
-use crate::{
-    BlockHash, BlockHeight, CacheStore, Config, Error, IPCParentFinality, SequentialKeyCache,
-};
+use crate::{BlockHash, BlockHeight, CacheStore, Config, Error, IPCParentFinality};
 use async_stm::{abort, atomically_or_err, Stm, StmError, StmResult, TVar};
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
@@ -21,11 +19,10 @@ pub struct FinalityWithNull {
     config: Config,
     genesis_epoch: BlockHeight,
     /// Cached data that always syncs with the latest parent chain proactively
-    cached_data: TVar<SequentialKeyCache<BlockHeight, Option<ParentViewPayload>>>,
+    cache_store: CacheStore,
     /// This is a in memory view of the committed parent finality. We need this as a starting point
     /// for populating the cache
     last_committed_finality: TVar<Option<IPCParentFinality>>,
-    cache_store: CacheStore,
 }
 
 impl FinalityWithNull {
@@ -38,9 +35,8 @@ impl FinalityWithNull {
         Self {
             config,
             genesis_epoch,
-            cached_data: TVar::new(SequentialKeyCache::sequential()),
-            last_committed_finality: TVar::new(committed_finality),
             cache_store,
+            last_committed_finality: TVar::new(committed_finality),
         }
     }
 
@@ -72,11 +68,9 @@ impl FinalityWithNull {
 
     /// Clear the cache and set the committed finality to the provided value
     pub fn reset(&self, finality: IPCParentFinality) -> StmResult<(), Error> {
-        self.cached_data.write(SequentialKeyCache::sequential())?;
         self.cache_store
             .delete_all()
             .map_err(|e| StmError::Abort(Error::CacheStoreError(e.to_string())))?;
-        tracing::info!("cache cleared");
         Ok(self.last_committed_finality.write(Some(finality))?)
     }
 
@@ -124,15 +118,10 @@ impl FinalityWithNull {
         // the height to clear
         let height = finality.height;
 
-        self.cached_data.update(|mut cache| {
-            // only remove cache below height, but not at height, as we have delayed execution
-            cache.remove_key_below(height);
-            cache
-        })?;
+        // only remove cache below height, but not at height, as we have delayed execution
         self.cache_store
             .delete_key_below(height)
             .map_err(|e| StmError::Abort(Error::CacheStoreError(e.to_string())))?;
-        tracing::info!(height, "cache cleared below height");
 
         let hash = hex::encode(&finality.block_hash);
 
@@ -151,18 +140,12 @@ impl FinalityWithNull {
 impl FinalityWithNull {
     /// Returns the number of blocks cached.
     pub(crate) fn cached_blocks(&self) -> StmResult<BlockHeight, Error> {
-        let cache_size = self.cached_data.read()?.size();
         let store_size = self
             .cache_store
             .size()
             .map_err(|e| StmError::Abort(Error::CacheStoreError(e.to_string())))?;
-        tracing::info!(cache_size, store_size, "COMPARE cached_blocks");
 
-        if cache_size != store_size {
-            panic!("cached_blocks mismatch: {} !=  {}", cache_size, store_size);
-        }
-
-        Ok(cache_size as BlockHeight)
+        Ok(store_size as BlockHeight)
     }
 
     pub(crate) fn block_hash_at_height(
@@ -179,23 +162,12 @@ impl FinalityWithNull {
     }
 
     pub(crate) fn latest_height_in_cache(&self) -> StmResult<Option<BlockHeight>, Error> {
-        let cache_upper_bound = self.cached_data.read()?.upper_bound();
         let store_upper_bound = self
             .cache_store
             .upper_bound()
             .map_err(|e| StmError::Abort(Error::CacheStoreError(e.to_string())))?;
-        tracing::info!(
-            cache_upper_bound,
-            store_upper_bound,
-            "COMPARE  latest_height_in_cache"
-        );
-        if cache_upper_bound != store_upper_bound {
-            panic!(
-                "latest_height_in_cache mismatch: {:?} !=  {:?}",
-                cache_upper_bound, store_upper_bound
-            );
-        }
-        Ok(cache_upper_bound)
+
+        Ok(store_upper_bound)
     }
 
     /// Get the latest height tracked in the provider, includes both cache and last committed finality
@@ -215,23 +187,7 @@ impl FinalityWithNull {
         &self,
         height: BlockHeight,
     ) -> StmResult<Option<BlockHeight>, Error> {
-        let cache = self.cached_data.read()?;
-
-        let mut cached_height = 0;
-
-        let res = Ok(cache.lower_bound().and_then(|lower_bound| {
-            for h in (lower_bound..=height).rev() {
-                if let Some(Some(_)) = cache.get_value(h) {
-                    cached_height = h;
-                    return Some(h);
-                }
-            }
-            None
-        }));
-
-        let mut stored_height = 0;
-
-        let _res2: std::result::Result<std::option::Option<u64>, Vec<u8>> = Ok(self
+        Ok(self
             .cache_store
             .lower_bound()
             .map_err(|e| StmError::Abort(Error::CacheStoreError(e.to_string())))?
@@ -242,23 +198,11 @@ impl FinalityWithNull {
                         .get_value(h)
                         .map_err(|e| StmError::Abort(Error::CacheStoreError(e.to_string())))
                     {
-                        stored_height = h;
                         return Some(h);
                     }
                 }
                 None
-            }));
-
-        tracing::info!(cached_height, stored_height, "COMPARE first_non_null_block");
-
-        if cached_height != stored_height {
-            panic!(
-                "first_non_null_block mismatch: {} !=  {}",
-                cached_height, stored_height
-            );
-        }
-
-        res
+            }))
     }
 }
 
@@ -323,44 +267,18 @@ impl FinalityWithNull {
         f: F,
         d: D,
     ) -> StmResult<Option<T>, Error> {
-        let cache = self.cached_data.read()?;
-
-        let mut cache_value = None;
-
-        let res = Ok(cache.get_value(height).map(|v| {
-            if let Some(i) = v.as_ref() {
-                cache_value = Some(i.clone());
-                f(i)
-            } else {
-                tracing::debug!(height, "a null round detected, return default");
-                d()
-            }
-        }));
-
-        let mut stored_value = None;
-        let _ = self
+        Ok(self
             .cache_store
             .get_value(height)
             .map_err(|e| StmError::Abort(Error::CacheStoreError(e.to_string())))?
             .map(|v| {
                 if let Some(i) = v.as_ref() {
-                    stored_value = Some(i.clone());
                     f(i)
                 } else {
                     tracing::debug!(height, "a null round detected, return default");
                     d()
                 }
-            });
-
-        tracing::info!(?cache_value, ?stored_value, "COMPARE handle_null_block");
-
-        if cache_value.is_some() || stored_value.is_some() {
-            if cache_value.unwrap().2 != stored_value.unwrap().2 {
-                panic!("handle_null_block mismatch");
-            }
-        }
-
-        res
+            }))
     }
 
     fn get_at_height<T, F: Fn(&ParentViewPayload) -> T>(
@@ -368,28 +286,17 @@ impl FinalityWithNull {
         height: BlockHeight,
         f: F,
     ) -> StmResult<Option<T>, Error> {
-        let cache = self.cached_data.read()?;
-
-        let mut cache_value = None;
-        let res = Ok(if let Some(Some(v)) = cache.get_value(height) {
-            cache_value = Some(v.clone());
-            Some(f(v))
-        } else {
-            None
-        });
-
-        let mut stored_value = None;
-        if let Some(Some(v)) = self
-            .cache_store
-            .get_value(height)
-            .map_err(|e| StmError::Abort(Error::CacheStoreError(e.to_string())))?
-        {
-            stored_value = Some(v.clone());
-        }
-
-        tracing::info!(?cache_value, ?stored_value, "COMPARE get_at_height");
-
-        res
+        Ok(
+            if let Some(Some(v)) = self
+                .cache_store
+                .get_value(height)
+                .map_err(|e| StmError::Abort(Error::CacheStoreError(e.to_string())))?
+            {
+                Some(f(&v))
+            } else {
+                None
+            },
+        )
     }
 
     fn parent_block_filled(
@@ -409,29 +316,11 @@ impl FinalityWithNull {
             ensure_sequential(&validator_changes, |change| change.configuration_number)?;
         }
 
-        let r = self.cached_data.modify(|mut cache| {
-            let r = cache
-                .append(
-                    height,
-                    Some((
-                        block_hash.clone(),
-                        validator_changes.clone(),
-                        top_down_msgs.clone(),
-                    )),
-                )
-                .map_err(Error::NonSequentialParentViewInsert);
-            (cache, r)
-        })?;
-
-        if let Err(e) = r {
-            return abort(e);
-        }
-
-        let r2 = self
+        let r = self
             .cache_store
             .append(height, Some((block_hash, validator_changes, top_down_msgs)))
             .map_err(|e| Error::CacheStoreError(e.to_string()));
-        if let Err(e) = r2 {
+        if let Err(e) = r {
             return abort(e);
         }
 
@@ -440,22 +329,11 @@ impl FinalityWithNull {
 
     /// When there is a new parent view, but it is actually a null round, call this function.
     fn parent_null_round(&self, height: BlockHeight) -> StmResult<(), Error> {
-        let r = self.cached_data.modify(|mut cache| {
-            let r = cache
-                .append(height, None)
-                .map_err(Error::NonSequentialParentViewInsert);
-            (cache, r)
-        })?;
-
-        if let Err(e) = r {
-            return abort(e);
-        }
-
-        let r2 = self
+        let r = self
             .cache_store
             .append(height, None)
             .map_err(|e| Error::CacheStoreError(e.to_string()));
-        if let Err(e) = r2 {
+        if let Err(e) = r {
             return abort(e);
         }
 

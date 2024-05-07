@@ -19,10 +19,7 @@ impl CacheStore {
         if !db.has_cf_handle(&ns) {
             Err(anyhow!("namespace {ns} does not exist!"))
         } else {
-            let store = Self { db: db.db, ns };
-            store.delete_all()?;
-            Ok(store)
-            //Ok(Self { db: db.db, ns })
+            Ok(Self { db: db.db, ns })
         }
     }
 
