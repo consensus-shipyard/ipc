@@ -158,6 +158,8 @@ impl<K: PrimInt + Debug, V> SequentialKeyCache<K, V> {
 
     /// Insert the key and value pair only if the key is upper_bound + 1
     pub fn append(&mut self, key: K, val: V) -> Result<(), SequentialAppendError> {
+        tracing::info!("CACHE appending block at height {:?}", key);
+
         let expected_next_key = if let Some(upper) = self.upper_bound() {
             upper.add(self.increment)
         } else {

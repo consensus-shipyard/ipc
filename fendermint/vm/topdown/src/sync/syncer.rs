@@ -394,7 +394,7 @@ mod tests {
     use crate::sync::ParentFinalityStateQuery;
     use crate::voting::VoteTally;
     use crate::{
-        BlockHash, BlockHeight, CachedFinalityProvider, Config, IPCParentFinality,
+        BlockHash, BlockHeight, CacheStore, CachedFinalityProvider, Config, IPCParentFinality,
         SequentialKeyCache, Toggle, NULL_ROUND_ERR_MSG,
     };
     use anyhow::anyhow;
@@ -504,11 +504,13 @@ mod tests {
             ),
         );
 
+        let cache_store = CacheStore::new_test("test".to_string()).unwrap();
         let provider = CachedFinalityProvider::new(
             config.clone(),
             genesis_epoch,
             Some(committed_finality.clone()),
             proxy.clone(),
+            cache_store,
         );
         let mut syncer = LotusParentSyncer::new(
             config,

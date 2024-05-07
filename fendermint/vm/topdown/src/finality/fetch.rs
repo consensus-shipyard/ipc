@@ -254,8 +254,8 @@ mod tests {
     use crate::finality::ParentViewPayload;
     use crate::proxy::ParentQueryProxy;
     use crate::{
-        BlockHeight, CachedFinalityProvider, Config, IPCParentFinality, ParentViewProvider,
-        SequentialKeyCache, NULL_ROUND_ERR_MSG,
+        BlockHeight, CacheStore, CachedFinalityProvider, Config, IPCParentFinality,
+        ParentViewProvider, SequentialKeyCache, NULL_ROUND_ERR_MSG,
     };
     use anyhow::anyhow;
     use async_trait::async_trait;
@@ -365,7 +365,14 @@ mod tests {
             block_hash: vec![0; 32],
         };
 
-        CachedFinalityProvider::new(config, genesis_epoch, Some(committed_finality), proxy)
+        let cache_store = CacheStore::new_test("test".to_string()).unwrap();
+        CachedFinalityProvider::new(
+            config,
+            genesis_epoch,
+            Some(committed_finality),
+            proxy,
+            cache_store,
+        )
     }
 
     fn new_cross_msg(nonce: u64) -> IpcEnvelope {

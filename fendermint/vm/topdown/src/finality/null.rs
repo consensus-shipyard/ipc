@@ -72,6 +72,7 @@ impl FinalityWithNull {
     pub fn reset(&self, finality: IPCParentFinality) -> Stm<()> {
         self.cached_data.write(SequentialKeyCache::sequential())?;
         self.cache_store.delete_all().unwrap();
+        tracing::info!("cache cleared");
         self.last_committed_finality.write(Some(finality))
     }
 
@@ -124,7 +125,8 @@ impl FinalityWithNull {
             cache.remove_key_below(height);
             cache
         })?;
-        self.cache_store.delete_below(height).unwrap();
+        self.cache_store.delete_key_below(height).unwrap();
+        tracing::info!(height, "cache cleared below height");
 
         let hash = hex::encode(&finality.block_hash);
 
@@ -143,14 +145,15 @@ impl FinalityWithNull {
 impl FinalityWithNull {
     /// Returns the number of blocks cached.
     pub(crate) fn cached_blocks(&self) -> Stm<BlockHeight> {
-        let cache = self.cached_data.read()?;
-        let store_count = self.cache_store.count().unwrap();
-        tracing::info!(
-            cache_count = cache.size(),
-            store_count,
-            "COMPARE cached_blocks"
-        );
-        Ok(cache.size() as BlockHeight)
+        let cache_size = self.cached_data.read()?.size();
+        let store_size = self.cache_store.size().unwrap();
+        tracing::info!(cache_size, store_size, "COMPARE cached_blocks");
+
+        if cache_size != store_size {
+            panic!("cached_blocks mismatch: {} !=  {}", cache_size, store_size);
+        }
+
+        Ok(cache_size as BlockHeight)
     }
 
     pub(crate) fn block_hash_at_height(&self, height: BlockHeight) -> Stm<Option<BlockHash>> {
@@ -164,14 +167,20 @@ impl FinalityWithNull {
     }
 
     pub(crate) fn latest_height_in_cache(&self) -> Stm<Option<BlockHeight>> {
-        let cache = self.cached_data.read()?;
+        let cache_upper_bound = self.cached_data.read()?.upper_bound();
         let store_upper_bound = self.cache_store.upper_bound().unwrap();
         tracing::info!(
-            cache_upper_bound = cache.upper_bound(),
+            cache_upper_bound,
             store_upper_bound,
             "COMPARE  latest_height_in_cache"
         );
-        Ok(cache.upper_bound())
+        if cache_upper_bound != store_upper_bound {
+            panic!(
+                "latest_height_in_cache mismatch: {:?} !=  {:?}",
+                cache_upper_bound, store_upper_bound
+            );
+        }
+        Ok(cache_upper_bound)
     }
 
     /// Get the latest height tracked in the provider, includes both cache and last committed finality
@@ -219,6 +228,13 @@ impl FinalityWithNull {
             }));
 
         tracing::info!(cached_height, stored_height, "COMPARE first_non_null_block");
+
+        if cached_height != stored_height {
+            panic!(
+                "first_non_null_block mismatch: {} !=  {}",
+                cached_height, stored_height
+            );
+        }
 
         res
     }
@@ -312,6 +328,12 @@ impl FinalityWithNull {
 
         tracing::info!(?cache_value, ?stored_value, "COMPARE handle_null_block");
 
+        if cache_value.is_some() || stored_value.is_some() {
+            if cache_value.unwrap().2 != stored_value.unwrap().2 {
+                panic!("handle_null_block mismatch");
+            }
+        }
+
         res
     }
 
@@ -359,13 +381,27 @@ impl FinalityWithNull {
 
         let r = self.cached_data.modify(|mut cache| {
             let r = cache
-                .append(height, Some((block_hash, validator_changes, top_down_msgs)))
+                .append(
+                    height,
+                    Some((
+                        block_hash.clone(),
+                        validator_changes.clone(),
+                        top_down_msgs.clone(),
+                    )),
+                )
                 .map_err(Error::NonSequentialParentViewInsert);
             (cache, r)
         })?;
 
         if let Err(e) = r {
             return abort(e);
+        }
+
+        let r2 = self
+            .cache_store
+            .append(height, Some((block_hash, validator_changes, top_down_msgs)));
+        if let Err(e) = r2 {
+            panic!("cache store failed to append: {:?}", e);
         }
 
         Ok(())
@@ -450,7 +486,7 @@ impl FinalityWithNull {
 mod tests {
     use super::FinalityWithNull;
     use crate::finality::ParentViewPayload;
-    use crate::{BlockHeight, Config, IPCParentFinality};
+    use crate::{BlockHeight, CacheStore, Config, IPCParentFinality};
     use async_stm::{atomically, atomically_or_err};
 
     async fn new_provider(
@@ -472,7 +508,8 @@ mod tests {
 
         blocks.remove(0);
 
-        let f = FinalityWithNull::new(config, 1, Some(committed_finality));
+        let cache_store = CacheStore::new_test("test".to_string()).unwrap();
+        let f = FinalityWithNull::new(config, 1, Some(committed_finality), cache_store);
         for (h, p) in blocks {
             atomically_or_err(|| f.new_parent_view(h, p.clone()))
                 .await

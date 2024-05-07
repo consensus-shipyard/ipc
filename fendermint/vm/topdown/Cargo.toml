@@ -33,12 +33,15 @@ tracing = { workspace = true }
 fendermint_vm_genesis = { path = "../genesis" }
 fendermint_vm_event = { path = "../event" }
 fendermint_tracing = { path = "../../tracing" }
+fendermint_rocksdb = { path = "../../rocksdb" }
+rocksdb = { version = "0.21", features = ["multi-threaded-cf"] }
 
 [dev-dependencies]
 arbitrary = { workspace = true }
 clap = { workspace = true }
 rand = { workspace = true }
 tracing-subscriber = { workspace = true }
+tempfile = { workspace = true }
 
 fendermint_crypto = { path = "../../crypto" }
 fendermint_testing = { path = "../../testing", features = ["smt"] }

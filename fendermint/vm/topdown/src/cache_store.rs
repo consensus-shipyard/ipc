@@ -5,7 +5,8 @@ use std::sync::Arc;
 
 use crate::{BlockHeight, ParentViewPayload};
 
-/// A [`Blockstore`] implementation that writes to a specific namespace, not the default like above.
+/// A cache k/v implementation for storing ParentViewPayload for a specific height
+/// in rocksdb with a specific namespace.
 #[derive(Clone)]
 pub struct CacheStore {
     db: Arc<OptimisticTransactionDB>,
@@ -18,8 +19,21 @@ impl CacheStore {
         if !db.has_cf_handle(&ns) {
             Err(anyhow!("namespace {ns} does not exist!"))
         } else {
-            Ok(Self { db: db.db, ns })
+            let store = Self { db: db.db, ns };
+            store.delete_all()?;
+            Ok(store)
+            //Ok(Self { db: db.db, ns })
         }
+    }
+
+    // creates a new instance of the cache store for testing purposes
+    #[cfg(test)]
+    pub fn new_test(ns: String) -> anyhow::Result<Self> {
+        use fendermint_rocksdb::RocksDbConfig;
+        let dir = tempfile::Builder::new().prefix(&ns).tempdir()?;
+        let db = RocksDb::open(dir.path().join("rocksdb"), &RocksDbConfig::default())?;
+        let _ = db.new_cf_handle(&ns)?;
+        Ok(Self { db: db.db, ns })
     }
 
     // Unfortunately there doesn't seem to be a way to avoid having to
@@ -32,11 +46,7 @@ impl CacheStore {
 }
 
 impl CacheStore {
-    /*pub fn get(&self, height: BlockHeight) -> anyhow::Result<Option<Vec<u8>>> {
-        Ok(self.db.get_cf(&self.cf()?, height.to_be_bytes())?)
-    } */
-
-    pub fn put(
+    fn put(
         &self,
         height: BlockHeight,
         value: Option<Option<ParentViewPayload>>,
@@ -60,7 +70,7 @@ impl CacheStore {
         Ok(())
     }
 
-    pub fn delete_below(&self, height: BlockHeight) -> anyhow::Result<()> {
+    pub fn delete_key_below(&self, height: BlockHeight) -> anyhow::Result<()> {
         let iter = self.db.iterator_cf(&self.cf()?, IteratorMode::Start);
         for item in iter {
             let (key, _) = item?;
@@ -73,7 +83,7 @@ impl CacheStore {
         Ok(())
     }
 
-    pub fn count(&self) -> anyhow::Result<usize> {
+    pub fn size(&self) -> anyhow::Result<usize> {
         let mut count = 0;
         let iter = self.db.iterator_cf(&self.cf()?, IteratorMode::Start);
         for _ in iter {
@@ -84,8 +94,8 @@ impl CacheStore {
     }
 
     pub fn upper_bound(&self) -> anyhow::Result<Option<BlockHeight>> {
-        let iter = self.db.iterator_cf(&self.cf()?, IteratorMode::End);
-        if let Some(item) = iter.last() {
+        let mut iter = self.db.iterator_cf(&self.cf()?, IteratorMode::End);
+        if let Some(item) = iter.next() {
             let (key, _) = item?;
             Ok(Some(BlockHeight::from_be_bytes(
                 key[0..8].try_into().unwrap(),
@@ -123,10 +133,13 @@ impl CacheStore {
         height: BlockHeight,
         block: Option<ParentViewPayload>,
     ) -> anyhow::Result<()> {
+        tracing::info!("STORE appending block at height {}", height);
+
         let expected_next_key = if let Some(upper) = self.upper_bound()? {
             upper + 1
         } else {
-            0
+            self.put(height, Some(block))?;
+            return Ok(());
         };
 
         if height != expected_next_key {
@@ -138,5 +151,57 @@ impl CacheStore {
         }
 
         self.put(height, Some(block))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::BlockHeight;
+    use crate::CacheStore;
+    use crate::ParentViewPayload;
+
+    fn build_payload(height: BlockHeight) -> ParentViewPayload {
+        let mut p = ParentViewPayload::default();
+        p.0 = height.to_be_bytes().to_vec();
+        p
+    }
+
+    #[test]
+    fn insert_works() {
+        let cache_store = CacheStore::new_test("test".to_string()).unwrap();
+        for height in 9..100 {
+            cache_store
+                .append(height, Some(build_payload(height)))
+                .unwrap();
+        }
+
+        for height in 9..100 {
+            let value = cache_store.get_value(height).unwrap().unwrap().unwrap();
+            let cache_height = BlockHeight::from_be_bytes(value.0[0..8].try_into().unwrap());
+            assert_eq!(height, cache_height);
+        }
+
+        assert!(cache_store.get_value(100).unwrap().is_none());
+        assert_eq!(cache_store.lower_bound().unwrap(), Some(9));
+        assert_eq!(cache_store.upper_bound().unwrap(), Some(99));
+    }
+
+    #[test]
+    fn delete_works() {
+        let cache_store = CacheStore::new_test("test".to_string()).unwrap();
+
+        for height in 0..100 {
+            cache_store
+                .append(height, Some(build_payload(height)))
+                .unwrap();
+        }
+
+        cache_store.delete_key_below(10).unwrap();
+        assert!(cache_store.size().unwrap() == 90);
+        assert_eq!(cache_store.lower_bound().unwrap(), Some(10));
+
+        cache_store.delete_all().unwrap();
+        assert!(cache_store.size().unwrap() == 0);
+        assert_eq!(cache_store.lower_bound().unwrap(), None);
     }
 }
