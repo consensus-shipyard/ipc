@@ -1,3 +1,6 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: Apache-2.0, MIT
+
 use anyhow::{anyhow, Ok};
 use fendermint_rocksdb::RocksDb;
 use rocksdb::{BoundColumnFamily, IteratorMode, OptimisticTransactionDB};
@@ -130,8 +133,6 @@ impl CacheStore {
         height: BlockHeight,
         block: Option<ParentViewPayload>,
     ) -> anyhow::Result<()> {
-        tracing::info!("STORE appending block at height {}", height);
-
         let expected_next_key = if let Some(upper) = self.upper_bound()? {
             upper + 1
         } else {
