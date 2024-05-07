@@ -3,9 +3,10 @@
 
 use anyhow::{anyhow, Context};
 use fendermint_app_options::debug::{
-    DebugArgs, DebugCommands, DebugExportTopDownEventsArgs, DebugIpcCommands,
+    DebugArgs, DebugCommands, DebugDeleteCacheStoreArgs, DebugExportTopDownEventsArgs,
+    DebugIpcCommands,
 };
-use fendermint_vm_topdown::proxy::IPCProviderProxy;
+use fendermint_vm_topdown::{proxy::IPCProviderProxy, CacheStore};
 use ipc_provider::{
     config::subnet::{EVMSubnet, SubnetConfig},
     IpcProvider,
@@ -17,6 +18,7 @@ cmd! {
   DebugArgs(self) {
     match &self.command {
         DebugCommands::Ipc { command } => command.exec(()).await,
+        DebugCommands::DeleteCacheStore(args) => delete_cache_store(args)
     }
   }
 }
@@ -28,6 +30,15 @@ cmd! {
             export_topdown_events(args).await
     }
   }
+}
+
+fn delete_cache_store(args: &DebugDeleteCacheStoreArgs) -> anyhow::Result<()> {
+    let db = fendermint_rocksdb::RocksDb::open(
+        args.data_dir.join("rocksdb"),
+        &fendermint_rocksdb::RocksDbConfig::default(),
+    )?;
+
+    CacheStore::new(db, "finality_cache".to_owned())?.delete_all()
 }
 
 async fn export_topdown_events(args: &DebugExportTopDownEventsArgs) -> anyhow::Result<()> {
