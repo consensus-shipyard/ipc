@@ -412,7 +412,7 @@ where
 
                 self.subnets.insert(root_name.clone(), subnet);
                 self.deployments.insert(root_name.clone(), deployment);
-                self.externals = urls.clone();
+                self.externals.clone_from(urls);
             }
             Rootnet::New {
                 validators,
