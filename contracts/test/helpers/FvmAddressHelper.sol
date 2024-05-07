@@ -21,6 +21,6 @@ contract FvmAddressHelperTest is Test {
             converted[i * 2 + 1] = _base[uint8(buffer[i]) % _base.length];
         }
 
-        return string(abi.encodePacked("0x", converted));
+        return string.concat("0x", string(converted));
     }
 }
