@@ -194,6 +194,7 @@ impl<T: Clone + Eq + Hash + TryFrom<KeyInfo> + Default + ToString> PersistentKey
 mod tests {
     use crate::evm::KeyInfo;
     use crate::{EvmKeyStore, PersistentKeyStore};
+    use std::fmt::{Display, Formatter};
 
     #[derive(Clone, Eq, PartialEq, Hash, Debug)]
     struct Key {
@@ -218,9 +219,9 @@ mod tests {
         }
     }
 
-    impl ToString for Key {
-        fn to_string(&self) -> String {
-            self.data.clone()
+    impl Display for Key {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{}", self.data)
         }
     }
 

@@ -8,6 +8,7 @@ use fvm_shared::econ::TokenAmount;
 use ipc_api::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
+use std::fmt::{Display, Formatter};
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -44,9 +45,10 @@ pub struct SocketAddress {
     pub host: String,
     pub port: u32,
 }
-impl ToString for SocketAddress {
-    fn to_string(&self) -> String {
-        format!("{}:{}", self.host, self.port)
+
+impl Display for SocketAddress {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.host, self.port)
     }
 }
 
@@ -111,13 +113,19 @@ pub enum DbCompaction {
     None,
 }
 
-impl ToString for DbCompaction {
-    fn to_string(&self) -> String {
-        serde_json::to_value(self)
-            .expect("compaction serializes to JSON")
-            .as_str()
-            .expect("compaction is a string")
-            .to_string()
+impl Display for DbCompaction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            serde_json::to_value(self)
+                .map_err(|e| {
+                    tracing::error!("cannot format DB compaction to json: {e}");
+                    std::fmt::Error
+                })?
+                .as_str()
+                .ok_or(std::fmt::Error)?
+        )
     }
 }
 
