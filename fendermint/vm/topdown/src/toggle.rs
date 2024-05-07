@@ -74,11 +74,11 @@ impl<P: ParentViewProvider + Send + Sync + 'static> ParentViewProvider for Toggl
 }
 
 impl<P: ParentFinalityProvider + Send + Sync + 'static> ParentFinalityProvider for Toggle<P> {
-    fn next_proposal(&self) -> Stm<Option<IPCParentFinality>> {
+    fn next_proposal(&self) -> StmResult<Option<IPCParentFinality>, Error> {
         self.perform_or_else(|p| p.next_proposal(), None)
     }
 
-    fn check_proposal(&self, proposal: &IPCParentFinality) -> Stm<bool> {
+    fn check_proposal(&self, proposal: &IPCParentFinality) -> StmResult<bool, Error> {
         self.perform_or_else(|p| p.check_proposal(proposal), false)
     }
 
@@ -86,21 +86,21 @@ impl<P: ParentFinalityProvider + Send + Sync + 'static> ParentFinalityProvider f
         &self,
         finality: IPCParentFinality,
         previous_finality: Option<IPCParentFinality>,
-    ) -> Stm<()> {
+    ) -> StmResult<(), Error> {
         self.perform_or_else(|p| p.set_new_finality(finality, previous_finality), ())
     }
 }
 
 impl<P> Toggle<CachedFinalityProvider<P>> {
-    pub fn block_hash(&self, height: BlockHeight) -> Stm<Option<BlockHash>> {
+    pub fn block_hash(&self, height: BlockHeight) -> StmResult<Option<BlockHash>, Error> {
         self.perform_or_else(|p| p.block_hash(height), None)
     }
 
-    pub fn latest_height_in_cache(&self) -> Stm<Option<BlockHeight>> {
+    pub fn latest_height_in_cache(&self) -> StmResult<Option<BlockHeight>, Error> {
         self.perform_or_else(|p| p.latest_height_in_cache(), None)
     }
 
-    pub fn latest_height(&self) -> Stm<Option<BlockHeight>> {
+    pub fn latest_height(&self) -> StmResult<Option<BlockHeight>, Error> {
         self.perform_or_else(|p| p.latest_height(), None)
     }
 
@@ -116,15 +116,18 @@ impl<P> Toggle<CachedFinalityProvider<P>> {
         self.perform_or_else(|p| p.new_parent_view(height, maybe_payload), ())
     }
 
-    pub fn reset(&self, finality: IPCParentFinality) -> Stm<()> {
+    pub fn reset(&self, finality: IPCParentFinality) -> StmResult<(), Error> {
         self.perform_or_else(|p| p.reset(finality), ())
     }
 
-    pub fn cached_blocks(&self) -> Stm<BlockHeight> {
+    pub fn cached_blocks(&self) -> StmResult<BlockHeight, Error> {
         self.perform_or_else(|p| p.cached_blocks(), BlockHeight::MAX)
     }
 
-    pub fn first_non_null_block(&self, height: BlockHeight) -> Stm<Option<BlockHeight>> {
+    pub fn first_non_null_block(
+        &self,
+        height: BlockHeight,
+    ) -> StmResult<Option<BlockHeight>, Error> {
         self.perform_or_else(|p| p.first_non_null_block(height), None)
     }
 }

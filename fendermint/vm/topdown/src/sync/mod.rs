@@ -11,7 +11,7 @@ use crate::sync::tendermint::TendermintAwareSyncer;
 use crate::voting::VoteTally;
 use crate::{CachedFinalityProvider, Config, IPCParentFinality, ParentFinalityProvider, Toggle};
 use anyhow::anyhow;
-use async_stm::atomically;
+use async_stm::atomically_or_err;
 use ethers::utils::hex;
 use ipc_ipld_resolver::ValidatorKey;
 use std::sync::Arc;
@@ -136,13 +136,13 @@ where
         })
         .collect::<Vec<_>>();
 
-    atomically(|| {
+    atomically_or_err(|| {
         view_provider.set_new_finality(finality.clone(), None)?;
         vote_tally.set_finalized(finality.height, finality.block_hash.clone())?;
         vote_tally.set_power_table(power_table.clone())?;
         Ok(())
     })
-    .await;
+    .await?;
 
     tracing::info!(
         finality = finality.to_string(),

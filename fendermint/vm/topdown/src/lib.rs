@@ -12,7 +12,7 @@ pub mod proxy;
 mod toggle;
 pub mod voting;
 
-use async_stm::Stm;
+use async_stm::StmResult;
 use async_trait::async_trait;
 use ethers::utils::hex;
 use fvm_shared::clock::ChainEpoch;
@@ -156,15 +156,15 @@ pub trait ParentViewProvider {
 
 pub trait ParentFinalityProvider: ParentViewProvider {
     /// Latest proposal for parent finality
-    fn next_proposal(&self) -> Stm<Option<IPCParentFinality>>;
+    fn next_proposal(&self) -> StmResult<Option<IPCParentFinality>, Error>;
     /// Check if the target proposal is valid
-    fn check_proposal(&self, proposal: &IPCParentFinality) -> Stm<bool>;
+    fn check_proposal(&self, proposal: &IPCParentFinality) -> StmResult<bool, Error>;
     /// Called when finality is committed
     fn set_new_finality(
         &self,
         finality: IPCParentFinality,
         previous_finality: Option<IPCParentFinality>,
-    ) -> Stm<()>;
+    ) -> StmResult<(), Error>;
 }
 
 /// If res is null round error, returns the default value from f()

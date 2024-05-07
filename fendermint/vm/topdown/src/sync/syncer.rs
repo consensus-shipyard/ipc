@@ -10,7 +10,7 @@ use crate::{
     is_null_round_str, BlockHash, BlockHeight, CachedFinalityProvider, Config, Error, Toggle,
 };
 use anyhow::anyhow;
-use async_stm::{atomically, atomically_or_err, StmError};
+use async_stm::{atomically_or_err, StmError};
 use ethers::utils::hex;
 use libp2p::futures::TryFutureExt;
 use std::sync::Arc;
@@ -68,7 +68,7 @@ where
         };
 
         let (mut latest_height_fetched, mut first_non_null_parent_hash) =
-            self.latest_cached_data().await;
+            self.latest_cached_data().await?;
         tracing::debug!(chain_head, latest_height_fetched, "syncing heights");
 
         if latest_height_fetched > chain_head {
@@ -90,7 +90,7 @@ where
         }
 
         loop {
-            if self.exceed_cache_size_limit().await {
+            if self.exceed_cache_size_limit().await? {
                 tracing::debug!("exceeded cache size limit");
                 break;
             }
@@ -127,18 +127,18 @@ where
     T: ParentFinalityStateQuery + Send + Sync + 'static,
     P: ParentQueryProxy + Send + Sync + 'static,
 {
-    async fn exceed_cache_size_limit(&self) -> bool {
+    async fn exceed_cache_size_limit(&self) -> Result<bool, Error> {
         let max_cache_blocks = self.config.max_cache_blocks();
-        atomically(|| self.provider.cached_blocks()).await > max_cache_blocks
+        Ok(atomically_or_err(|| self.provider.cached_blocks()).await? > max_cache_blocks)
     }
 
     /// Get the latest data stored in the cache to pull the next block
-    async fn latest_cached_data(&self) -> (BlockHeight, BlockHash) {
+    async fn latest_cached_data(&self) -> Result<(BlockHeight, BlockHash), Error> {
         // we are getting the latest height fetched in cache along with the first non null block
         // that is stored in cache.
         // we are doing two fetches in one `atomically` as if we get the data in two `atomically`,
         // the cache might be updated in between the two calls. `atomically` should guarantee atomicity.
-        atomically(|| {
+        atomically_or_err(|| {
             let latest_height = if let Some(h) = self.provider.latest_height()? {
                 h
             } else {
@@ -292,7 +292,7 @@ where
     /// Reset the cache in the face of a reorg
     async fn reset(&self) -> anyhow::Result<()> {
         let finality = query_starting_finality(&self.query, &self.parent_proxy).await?;
-        atomically(|| self.provider.reset(finality.clone())).await;
+        atomically_or_err::<_, Error, _>(|| self.provider.reset(finality.clone())).await?;
         Ok(())
     }
 }
@@ -398,7 +398,7 @@ mod tests {
         SequentialKeyCache, Toggle, NULL_ROUND_ERR_MSG,
     };
     use anyhow::anyhow;
-    use async_stm::atomically;
+    use async_stm::atomically_or_err;
     use async_trait::async_trait;
     use fendermint_vm_genesis::{Power, Validator};
     use ipc_api::cross::IpcEnvelope;
@@ -558,7 +558,9 @@ mod tests {
 
         for h in 101..=104 {
             syncer.sync().await.unwrap();
-            let p = atomically(|| syncer.provider.latest_height()).await;
+            let p = atomically_or_err(|| syncer.provider.latest_height())
+                .await
+                .unwrap();
             assert_eq!(p, Some(h));
         }
     }
@@ -585,7 +587,9 @@ mod tests {
         for h in 101..=109 {
             syncer.sync().await.unwrap();
             assert_eq!(
-                atomically(|| syncer.provider.latest_height()).await,
+                atomically_or_err(|| syncer.provider.latest_height())
+                    .await
+                    .unwrap(),
                 Some(h)
             );
         }

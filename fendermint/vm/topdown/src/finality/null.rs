@@ -7,7 +7,7 @@ use crate::finality::{
 use crate::{
     BlockHash, BlockHeight, CacheStore, Config, Error, IPCParentFinality, SequentialKeyCache,
 };
-use async_stm::{abort, atomically, Stm, StmResult, TVar};
+use async_stm::{abort, atomically_or_err, Stm, StmError, StmResult, TVar};
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
 use std::cmp::min;
@@ -52,7 +52,8 @@ impl FinalityWithNull {
         &self,
         height: BlockHeight,
     ) -> anyhow::Result<Option<Vec<StakingChangeRequest>>> {
-        let r = atomically(|| self.handle_null_block(height, validator_changes, Vec::new)).await;
+        let r = atomically_or_err(|| self.handle_null_block(height, validator_changes, Vec::new))
+            .await?;
         Ok(r)
     }
 
@@ -60,7 +61,8 @@ impl FinalityWithNull {
         &self,
         height: BlockHeight,
     ) -> anyhow::Result<Option<Vec<IpcEnvelope>>> {
-        let r = atomically(|| self.handle_null_block(height, topdown_cross_msgs, Vec::new)).await;
+        let r = atomically_or_err(|| self.handle_null_block(height, topdown_cross_msgs, Vec::new))
+            .await?;
         Ok(r)
     }
 
@@ -69,11 +71,13 @@ impl FinalityWithNull {
     }
 
     /// Clear the cache and set the committed finality to the provided value
-    pub fn reset(&self, finality: IPCParentFinality) -> Stm<()> {
+    pub fn reset(&self, finality: IPCParentFinality) -> StmResult<(), Error> {
         self.cached_data.write(SequentialKeyCache::sequential())?;
-        self.cache_store.delete_all().unwrap();
+        self.cache_store
+            .delete_all()
+            .map_err(|e| StmError::Abort(Error::CacheStoreError(e.to_string())))?;
         tracing::info!("cache cleared");
-        self.last_committed_finality.write(Some(finality))
+        Ok(self.last_committed_finality.write(Some(finality))?)
     }
 
     pub fn new_parent_view(
@@ -88,7 +92,7 @@ impl FinalityWithNull {
         }
     }
 
-    pub fn next_proposal(&self) -> Stm<Option<IPCParentFinality>> {
+    pub fn next_proposal(&self) -> StmResult<Option<IPCParentFinality>, Error> {
         let height = if let Some(h) = self.propose_next_height()? {
             h
         } else {
@@ -103,7 +107,7 @@ impl FinalityWithNull {
         Ok(Some(proposal))
     }
 
-    pub fn check_proposal(&self, proposal: &IPCParentFinality) -> Stm<bool> {
+    pub fn check_proposal(&self, proposal: &IPCParentFinality) -> StmResult<bool, Error> {
         if !self.check_height(proposal)? {
             return Ok(false);
         }
@@ -114,7 +118,7 @@ impl FinalityWithNull {
         &self,
         finality: IPCParentFinality,
         previous_finality: Option<IPCParentFinality>,
-    ) -> Stm<()> {
+    ) -> StmResult<(), Error> {
         debug_assert!(previous_finality == self.last_committed_finality.read_clone()?);
 
         // the height to clear
@@ -125,7 +129,9 @@ impl FinalityWithNull {
             cache.remove_key_below(height);
             cache
         })?;
-        self.cache_store.delete_key_below(height).unwrap();
+        self.cache_store
+            .delete_key_below(height)
+            .map_err(|e| StmError::Abort(Error::CacheStoreError(e.to_string())))?;
         tracing::info!(height, "cache cleared below height");
 
         let hash = hex::encode(&finality.block_hash);
@@ -144,9 +150,12 @@ impl FinalityWithNull {
 
 impl FinalityWithNull {
     /// Returns the number of blocks cached.
-    pub(crate) fn cached_blocks(&self) -> Stm<BlockHeight> {
+    pub(crate) fn cached_blocks(&self) -> StmResult<BlockHeight, Error> {
         let cache_size = self.cached_data.read()?.size();
-        let store_size = self.cache_store.size().unwrap();
+        let store_size = self
+            .cache_store
+            .size()
+            .map_err(|e| StmError::Abort(Error::CacheStoreError(e.to_string())))?;
         tracing::info!(cache_size, store_size, "COMPARE cached_blocks");
 
         if cache_size != store_size {
@@ -156,7 +165,10 @@ impl FinalityWithNull {
         Ok(cache_size as BlockHeight)
     }
 
-    pub(crate) fn block_hash_at_height(&self, height: BlockHeight) -> Stm<Option<BlockHash>> {
+    pub(crate) fn block_hash_at_height(
+        &self,
+        height: BlockHeight,
+    ) -> StmResult<Option<BlockHash>, Error> {
         if let Some(f) = self.last_committed_finality.read()?.as_ref() {
             if f.height == height {
                 return Ok(Some(f.block_hash.clone()));
@@ -166,9 +178,12 @@ impl FinalityWithNull {
         self.get_at_height(height, |i| i.0.clone())
     }
 
-    pub(crate) fn latest_height_in_cache(&self) -> Stm<Option<BlockHeight>> {
+    pub(crate) fn latest_height_in_cache(&self) -> StmResult<Option<BlockHeight>, Error> {
         let cache_upper_bound = self.cached_data.read()?.upper_bound();
-        let store_upper_bound = self.cache_store.upper_bound().unwrap();
+        let store_upper_bound = self
+            .cache_store
+            .upper_bound()
+            .map_err(|e| StmError::Abort(Error::CacheStoreError(e.to_string())))?;
         tracing::info!(
             cache_upper_bound,
             store_upper_bound,
@@ -184,7 +199,7 @@ impl FinalityWithNull {
     }
 
     /// Get the latest height tracked in the provider, includes both cache and last committed finality
-    pub(crate) fn latest_height(&self) -> Stm<Option<BlockHeight>> {
+    pub(crate) fn latest_height(&self) -> StmResult<Option<BlockHeight>, Error> {
         let h = if let Some(h) = self.latest_height_in_cache()? {
             h
         } else if let Some(p) = self.last_committed_finality()? {
@@ -196,7 +211,10 @@ impl FinalityWithNull {
     }
 
     /// Get the first non-null block in the range of earliest cache block till the height specified, inclusive.
-    pub(crate) fn first_non_null_block(&self, height: BlockHeight) -> Stm<Option<BlockHeight>> {
+    pub(crate) fn first_non_null_block(
+        &self,
+        height: BlockHeight,
+    ) -> StmResult<Option<BlockHeight>, Error> {
         let cache = self.cached_data.read()?;
 
         let mut cached_height = 0;
@@ -216,10 +234,14 @@ impl FinalityWithNull {
         let _res2: std::result::Result<std::option::Option<u64>, Vec<u8>> = Ok(self
             .cache_store
             .lower_bound()
-            .unwrap()
+            .map_err(|e| StmError::Abort(Error::CacheStoreError(e.to_string())))?
             .and_then(|lower_bound| {
                 for h in (lower_bound..=height).rev() {
-                    if let Some(Some(_)) = self.cache_store.get_value(h).unwrap() {
+                    if let Ok(Some(Some(_))) = self
+                        .cache_store
+                        .get_value(h)
+                        .map_err(|e| StmError::Abort(Error::CacheStoreError(e.to_string())))
+                    {
                         stored_height = h;
                         return Some(h);
                     }
@@ -242,7 +264,7 @@ impl FinalityWithNull {
 
 /// All the private functions
 impl FinalityWithNull {
-    fn propose_next_height(&self) -> Stm<Option<BlockHeight>> {
+    fn propose_next_height(&self) -> StmResult<Option<BlockHeight>, Error> {
         let latest_height = if let Some(h) = self.latest_height_in_cache()? {
             h
         } else {
@@ -300,7 +322,7 @@ impl FinalityWithNull {
         height: BlockHeight,
         f: F,
         d: D,
-    ) -> Stm<Option<T>> {
+    ) -> StmResult<Option<T>, Error> {
         let cache = self.cached_data.read()?;
 
         let mut cache_value = None;
@@ -316,15 +338,19 @@ impl FinalityWithNull {
         }));
 
         let mut stored_value = None;
-        let _ = self.cache_store.get_value(height).unwrap().map(|v| {
-            if let Some(i) = v.as_ref() {
-                stored_value = Some(i.clone());
-                f(i)
-            } else {
-                tracing::debug!(height, "a null round detected, return default");
-                d()
-            }
-        });
+        let _ = self
+            .cache_store
+            .get_value(height)
+            .map_err(|e| StmError::Abort(Error::CacheStoreError(e.to_string())))?
+            .map(|v| {
+                if let Some(i) = v.as_ref() {
+                    stored_value = Some(i.clone());
+                    f(i)
+                } else {
+                    tracing::debug!(height, "a null round detected, return default");
+                    d()
+                }
+            });
 
         tracing::info!(?cache_value, ?stored_value, "COMPARE handle_null_block");
 
@@ -341,7 +367,7 @@ impl FinalityWithNull {
         &self,
         height: BlockHeight,
         f: F,
-    ) -> Stm<Option<T>> {
+    ) -> StmResult<Option<T>, Error> {
         let cache = self.cached_data.read()?;
 
         let mut cache_value = None;
@@ -353,7 +379,11 @@ impl FinalityWithNull {
         });
 
         let mut stored_value = None;
-        if let Some(Some(v)) = self.cache_store.get_value(height).unwrap() {
+        if let Some(Some(v)) = self
+            .cache_store
+            .get_value(height)
+            .map_err(|e| StmError::Abort(Error::CacheStoreError(e.to_string())))?
+        {
             stored_value = Some(v.clone());
         }
 
@@ -399,9 +429,10 @@ impl FinalityWithNull {
 
         let r2 = self
             .cache_store
-            .append(height, Some((block_hash, validator_changes, top_down_msgs)));
+            .append(height, Some((block_hash, validator_changes, top_down_msgs)))
+            .map_err(|e| Error::CacheStoreError(e.to_string()));
         if let Err(e) = r2 {
-            panic!("cache store failed to append: {:?}", e);
+            return abort(e);
         }
 
         Ok(())
@@ -420,15 +451,18 @@ impl FinalityWithNull {
             return abort(e);
         }
 
-        let r2 = self.cache_store.append(height, None);
+        let r2 = self
+            .cache_store
+            .append(height, None)
+            .map_err(|e| Error::CacheStoreError(e.to_string()));
         if let Err(e) = r2 {
-            panic!("cache store failed to append: {:?}", e);
+            return abort(e);
         }
 
         Ok(())
     }
 
-    fn check_height(&self, proposal: &IPCParentFinality) -> Stm<bool> {
+    fn check_height(&self, proposal: &IPCParentFinality) -> StmResult<bool, Error> {
         let binding = self.last_committed_finality.read()?;
         // last committed finality is not ready yet, we don't vote, just reject
         let last_committed_finality = if let Some(f) = binding.as_ref() {
@@ -468,7 +502,7 @@ impl FinalityWithNull {
         }
     }
 
-    fn check_block_hash(&self, proposal: &IPCParentFinality) -> Stm<bool> {
+    fn check_block_hash(&self, proposal: &IPCParentFinality) -> StmResult<bool, Error> {
         Ok(
             if let Some(block_hash) = self.block_hash_at_height(proposal.height)? {
                 let r = block_hash == proposal.block_hash;
@@ -538,16 +572,19 @@ mod tests {
             block_hash: vec![4; 32],
         };
         assert_eq!(
-            atomically(|| provider.next_proposal()).await,
+            atomically_or_err(|| provider.next_proposal())
+                .await
+                .unwrap(),
             Some(f.clone())
         );
 
         // Test set new finality
-        atomically(|| {
+        atomically_or_err(|| {
             let last = provider.last_committed_finality.read_clone()?;
             provider.set_new_finality(f.clone(), last)
         })
-        .await;
+        .await
+        .unwrap();
 
         assert_eq!(
             atomically(|| provider.last_committed_finality()).await,
@@ -575,7 +612,9 @@ mod tests {
         let provider = new_provider(parent_blocks).await;
 
         assert_eq!(
-            atomically(|| provider.next_proposal()).await,
+            atomically_or_err(|| provider.next_proposal())
+                .await
+                .unwrap(),
             Some(IPCParentFinality {
                 height: 103,
                 block_hash: vec![3; 32]
@@ -601,7 +640,12 @@ mod tests {
         let mut provider = new_provider(parent_blocks).await;
         provider.config.max_proposal_range = Some(8);
 
-        assert_eq!(atomically(|| provider.next_proposal()).await, None);
+        assert_eq!(
+            atomically_or_err(|| provider.next_proposal())
+                .await
+                .unwrap(),
+            None
+        );
     }
 
     #[tokio::test]
@@ -622,7 +666,12 @@ mod tests {
         let mut provider = new_provider(parent_blocks).await;
         provider.config.max_proposal_range = Some(10);
 
-        assert_eq!(atomically(|| provider.next_proposal()).await, None);
+        assert_eq!(
+            atomically_or_err(|| provider.next_proposal())
+                .await
+                .unwrap(),
+            None
+        );
     }
 
     #[tokio::test]
@@ -644,7 +693,9 @@ mod tests {
         provider.config.max_proposal_range = Some(10);
 
         assert_eq!(
-            atomically(|| provider.next_proposal()).await,
+            atomically_or_err(|| provider.next_proposal())
+                .await
+                .unwrap(),
             Some(IPCParentFinality {
                 height: 107,
                 block_hash: vec![7; 32]
@@ -672,7 +723,9 @@ mod tests {
         provider.config.max_proposal_range = Some(20);
 
         assert_eq!(
-            atomically(|| provider.next_proposal()).await,
+            atomically_or_err(|| provider.next_proposal())
+                .await
+                .unwrap(),
             Some(IPCParentFinality {
                 height: 107,
                 block_hash: vec![7; 32]
