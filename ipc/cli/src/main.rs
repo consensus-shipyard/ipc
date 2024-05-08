@@ -8,7 +8,7 @@ use tracing_subscriber::{fmt, EnvFilter};
 async fn main() {
     tracing_subscriber::registry()
         .with(fmt::layer())
-        .with(EnvFilter::from_default_env())
+        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
         .init();
 
     if let Err(e) = ipc_cli::cli().await {
