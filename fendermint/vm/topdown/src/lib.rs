@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 mod cache;
+mod cache_store;
 mod error;
 mod finality;
 pub mod sync;
@@ -11,7 +12,7 @@ pub mod proxy;
 mod toggle;
 pub mod voting;
 
-use async_stm::Stm;
+use async_stm::StmResult;
 use async_trait::async_trait;
 use ethers::utils::hex;
 use fvm_shared::clock::ChainEpoch;
@@ -22,8 +23,9 @@ use std::fmt::{Display, Formatter};
 use std::time::Duration;
 
 pub use crate::cache::{SequentialAppendError, SequentialKeyCache, ValueIter};
+pub use crate::cache_store::*;
 pub use crate::error::Error;
-pub use crate::finality::CachedFinalityProvider;
+pub use crate::finality::{CachedFinalityProvider, ParentViewPayload};
 pub use crate::toggle::Toggle;
 
 pub type BlockHeight = u64;
@@ -154,15 +156,15 @@ pub trait ParentViewProvider {
 
 pub trait ParentFinalityProvider: ParentViewProvider {
     /// Latest proposal for parent finality
-    fn next_proposal(&self) -> Stm<Option<IPCParentFinality>>;
+    fn next_proposal(&self) -> StmResult<Option<IPCParentFinality>, Error>;
     /// Check if the target proposal is valid
-    fn check_proposal(&self, proposal: &IPCParentFinality) -> Stm<bool>;
+    fn check_proposal(&self, proposal: &IPCParentFinality) -> StmResult<bool, Error>;
     /// Called when finality is committed
     fn set_new_finality(
         &self,
         finality: IPCParentFinality,
         previous_finality: Option<IPCParentFinality>,
-    ) -> Stm<()>;
+    ) -> StmResult<(), Error>;
 }
 
 /// If res is null round error, returns the default value from f()

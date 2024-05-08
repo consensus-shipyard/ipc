@@ -12,7 +12,7 @@ use ipc_api::staking::StakingChangeRequest;
 
 pub use fetch::CachedFinalityProvider;
 
-pub(crate) type ParentViewPayload = (BlockHash, Vec<StakingChangeRequest>, Vec<IpcEnvelope>);
+pub type ParentViewPayload = (BlockHash, Vec<StakingChangeRequest>, Vec<IpcEnvelope>);
 
 fn ensure_sequential<T, F: Fn(&T) -> u64>(msgs: &[T], f: F) -> StmResult<(), Error> {
     if msgs.is_empty() {
@@ -43,7 +43,8 @@ pub(crate) fn topdown_cross_msgs(p: &ParentViewPayload) -> Vec<IpcEnvelope> {
 mod tests {
     use crate::proxy::ParentQueryProxy;
     use crate::{
-        BlockHeight, CachedFinalityProvider, Config, IPCParentFinality, ParentFinalityProvider,
+        BlockHeight, CacheStore, CachedFinalityProvider, Config, IPCParentFinality,
+        ParentFinalityProvider,
     };
     use async_stm::atomically_or_err;
     use async_trait::async_trait;
@@ -112,7 +113,15 @@ mod tests {
             proposal_delay: None,
         };
 
-        CachedFinalityProvider::new(config, 10, Some(genesis_finality()), mocked_agent_proxy())
+        let cache_store =
+            CacheStore::new_test("test".to_string()).expect("error creating cache store");
+        CachedFinalityProvider::new(
+            config,
+            10,
+            Some(genesis_finality()),
+            mocked_agent_proxy(),
+            cache_store,
+        )
     }
 
     #[tokio::test]

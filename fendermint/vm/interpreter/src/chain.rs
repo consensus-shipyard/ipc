@@ -9,7 +9,7 @@ use crate::{
     CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
 };
 use anyhow::{bail, Context};
-use async_stm::atomically;
+use async_stm::{atomically, atomically_or_err};
 use async_trait::async_trait;
 use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::ipc;
@@ -129,7 +129,7 @@ where
         // The pre-requisite for proposal is that there is a quorum of gossiped votes at that height.
         // The final proposal can be at most as high as the quorum, but can be less if we have already,
         // hit some limits such as how many blocks we can propose in a single step.
-        let finalities = atomically(|| {
+        let finalities = atomically_or_err(|| {
             let parent = state.parent_finality_provider.next_proposal()?;
             let quorum = state
                 .parent_finality_votes
@@ -138,7 +138,7 @@ where
 
             Ok((parent, quorum))
         })
-        .await;
+        .await?;
 
         let maybe_finality = match finalities {
             (Some(parent), Some(quorum)) => Some(if parent.height <= quorum.height {
@@ -206,7 +206,8 @@ where
                         block_hash,
                     };
                     let is_final =
-                        atomically(|| env.parent_finality_provider.check_proposal(&prop)).await;
+                        atomically_or_err(|| env.parent_finality_provider.check_proposal(&prop))
+                            .await?;
                     if !is_final {
                         return Ok(false);
                     }
@@ -362,7 +363,7 @@ where
 
                     tracing::debug!("chain interpreter applied topdown msgs");
 
-                    atomically(|| {
+                    atomically_or_err(|| {
                         env.parent_finality_provider
                             .set_new_finality(finality.clone(), prev_finality.clone())?;
 
@@ -371,7 +372,7 @@ where
 
                         Ok(())
                     })
-                    .await;
+                    .await?;
 
                     tracing::debug!(
                         finality = finality.to_string(),

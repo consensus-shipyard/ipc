@@ -21,6 +21,15 @@ pub enum DebugCommands {
         #[command(subcommand)]
         command: DebugIpcCommands,
     },
+
+    /// Deletes all the key/values in the finality cache store.
+    DeleteCacheStore(DebugDeleteCacheStoreArgs),
+}
+
+#[derive(Args, Debug)]
+pub struct DebugDeleteCacheStoreArgs {
+    #[arg(long, default_value = "~/.fendermint/data", env = "FM_DATA_DIR")]
+    pub data_dir: PathBuf,
 }
 
 #[derive(Subcommand, Debug, Clone)]
