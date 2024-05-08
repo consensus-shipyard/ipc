@@ -4,12 +4,15 @@
 
 use crate::address::IPCAddress;
 use crate::subnet_id::SubnetID;
+use crate::HumanReadable;
 use anyhow::anyhow;
 use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
 use serde::{Deserialize, Serialize};
 use serde_tuple::{Deserialize_tuple, Serialize_tuple};
+use serde_with::serde_as;
 
+#[serde_as]
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
 pub struct IpcEnvelope {
     /// Type of message being propagated.
@@ -18,12 +21,14 @@ pub struct IpcEnvelope {
     /// It makes sense to extract from the encoded message
     /// all shared fields required by all message, so they
     /// can be inspected without having to decode the message.
+    #[serde_as(as = "HumanReadable")]
     pub to: IPCAddress,
     /// Value included in the envelope
     pub value: TokenAmount,
     /// address sending the message
     pub from: IPCAddress,
     /// abi.encoded message
+    #[serde_as(as = "HumanReadable")]
     pub message: Vec<u8>,
     /// outgoing nonce for the envelope.
     /// This nonce is set by the gateway when committing the message for propagation
@@ -104,7 +109,7 @@ impl IpcEnvelope {
 }
 
 /// Type of cross-net messages currently supported
-#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize, strum::Display)]
 #[repr(u8)]
 pub enum IpcMsgKind {
     /// for cross-net messages that move native token, i.e. fund/release.
