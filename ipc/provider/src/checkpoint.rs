@@ -177,8 +177,15 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                 let bundle = self
                     .child_handler
                     .checkpoint_bundle_at(event.height)
-                    .await?;
-                tracing::debug!("bottom up bundle: {bundle:?}");
+                    .await?
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "expected checkpoint at height {} but none found",
+                            event.height
+                        )
+                    })?;
+
+                log::debug!("bottom up bundle: {bundle:?}");
 
                 // We support parallel checkpoint submission using FIFO order with a limited parallelism (controlled by
                 // the size of submission_semaphore).
