@@ -11,10 +11,10 @@ use std::fmt::{Display, Formatter};
 use std::hash::Hash;
 use zeroize::Zeroize;
 
-pub use crate::evm::persistent::{PersistentKeyInfo, PersistentKeyStore};
-
 #[cfg(feature = "with-ethers")]
-pub use std::str::FromStr;
+use std::str::FromStr;
+
+pub use crate::evm::persistent::{PersistentKeyInfo, PersistentKeyStore};
 
 pub const DEFAULT_KEYSTORE_NAME: &str = "evm_keystore.json";
 
@@ -101,6 +101,7 @@ impl From<ethers::types::Address> for EthKeyAddress {
     }
 }
 
+#[cfg(feature = "with-ethers")]
 impl TryFrom<EthKeyAddress> for fvm_shared::address::Address {
     type Error = hex::FromHexError;
 
