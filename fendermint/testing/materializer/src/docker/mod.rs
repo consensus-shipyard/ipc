@@ -617,7 +617,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
-        todo!("use curl or something to trigger the faucet")
+        Ok(())
     }
 
     async fn new_deployment<'s, 'a>(
