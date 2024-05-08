@@ -16,9 +16,6 @@ use std::str::FromStr;
 
 pub use crate::evm::persistent::{PersistentKeyInfo, PersistentKeyStore};
 
-#[cfg(feature = "with-ethers")]
-pub use std::str::FromStr;
-
 pub const DEFAULT_KEYSTORE_NAME: &str = "evm_keystore.json";
 
 /// The key store trait for different evm key store
