@@ -41,23 +41,22 @@ rm -rf ~/.fendermint && cp -r out/fendermint ~/.fendermint
 rm -rf ~/.cometbft && cp -r out/cometbft ~/.cometbft
 
 echo "Data exported successfully"
-
+echo
 echo "start fendermint eth api"
 echo source ~/workspace/ipc/fendermint/testing/materializer/scripts/fendermint.env
 echo ~/workspace/ipc/target/release/fendermint eth run
 echo
-echo "start fendermint"
+echo "start fendermint (remember to edit the fendermint.env appropriately)"
 echo source ~/workspace/ipc/fendermint/testing/materializer/scripts/fendermint.env
 echo ~/workspace/ipc/target/release/fendermint run
 echo
-echo "start cometbft"
+echo "start cometbft (remember to edit the cometbft.env appropriately)"
 echo cd ~/.cometbft
 echo source ~/workspace/ipc/fendermint/testing/materializer/scripts/cometbft.env
 echo cometbft start
-
-
-# query cometbft
-# curl http://localhost:26657/status
-#
-# query fendermint eth api
-# curl -X POST  -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":0,"method":"eth_chainId","params":[]}' http://localhost:8445
+echo
+echo "Once started, you can run the following commands"
+echo "Query cometbft:"
+echo "  curl http://localhost:26657/status"
+echo "Query fendermint eth api:"
+echo "  curl -X POST  -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":0,"method":"eth_chainId","params":[]}' http://localhost:8445"
