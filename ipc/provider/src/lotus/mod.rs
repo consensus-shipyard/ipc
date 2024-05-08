@@ -19,7 +19,6 @@ use message::state::{ReadStateResponse, StateWaitMsgResponse};
 use message::wallet::{WalletKeyType, WalletListResponse};
 
 pub mod client;
-mod json;
 pub mod message;
 
 /// The network version of lotus network.
