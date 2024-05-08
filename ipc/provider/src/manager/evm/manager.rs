@@ -1167,7 +1167,7 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
     async fn checkpoint_bundle_at(
         &self,
         height: ChainEpoch,
-    ) -> anyhow::Result<BottomUpCheckpointBundle> {
+    ) -> anyhow::Result<Option<BottomUpCheckpointBundle>> {
         let contract = gateway_getter_facet::GatewayGetterFacet::new(
             self.ipc_contract_info.gateway_addr,
             Arc::new(self.ipc_contract_info.provider.clone()),
@@ -1177,6 +1177,11 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
             .get_checkpoint_signature_bundle(U256::from(height))
             .call()
             .await?;
+
+        if checkpoint.block_height.as_u64() == 0 {
+            return Ok(None);
+        }
+
         let checkpoint = BottomUpCheckpoint::try_from(checkpoint)?;
         let signatories = signatories
             .into_iter()
@@ -1187,11 +1192,11 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
             .map(|s| s.to_vec())
             .collect::<Vec<_>>();
 
-        Ok(BottomUpCheckpointBundle {
+        Ok(Some(BottomUpCheckpointBundle {
             checkpoint,
             signatures,
             signatories,
-        })
+        }))
     }
 
     async fn quorum_reached_events(&self, height: ChainEpoch) -> Result<Vec<QuorumReachedEvent>> {
