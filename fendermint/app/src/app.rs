@@ -10,9 +10,7 @@ use async_trait::async_trait;
 use cid::Cid;
 use fendermint_abci::util::take_until_max_size;
 use fendermint_abci::{AbciResult, Application};
-use fendermint_storage::{
-    Codec, Encode, KVCollection, KVRead, KVReadable, KVStore, KVWritable, KVWrite,
-};
+use fendermint_storage::{KVCollection, KVRead, KVReadable, KVStore, KVWritable, KVWrite};
 use fendermint_tracing::emit;
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_interpreter::bytes::{
@@ -44,9 +42,9 @@ use tendermint::abci::{request, response};
 use tracing::instrument;
 
 use crate::events::{NewBlock, ProposalProcessed};
-use crate::AppExitCode;
 use crate::BlockHeight;
 use crate::{tmconv::*, VERSION};
+use crate::{AppExitCode, AppStore};
 
 #[derive(Serialize)]
 #[repr(u8)]
@@ -99,11 +97,11 @@ impl AppState {
     }
 }
 
-pub struct AppConfig<S: KVStore> {
+pub struct AppConfig {
     /// Namespace to store the current app state.
-    pub app_namespace: S::Namespace,
+    pub app_namespace: <AppStore as KVStore>::Namespace,
     /// Namespace to store the app state history.
-    pub state_hist_namespace: S::Namespace,
+    pub state_hist_namespace: <AppStore as KVStore>::Namespace,
     /// Size of state history to keep; 0 means unlimited.
     pub state_hist_size: u64,
     /// Path to the Wasm bundle.
@@ -118,10 +116,9 @@ pub struct AppConfig<S: KVStore> {
 
 /// Handle ABCI requests.
 #[derive(Clone)]
-pub struct App<DB, BS, S, I>
+pub struct App<DB, BS, I>
 where
     BS: Blockstore + Clone + 'static,
-    S: KVStore,
 {
     /// Database backing all key-value operations.
     db: Arc<DB>,
@@ -142,7 +139,7 @@ where
     /// Block height where we should gracefully stop the node
     halt_height: i64,
     /// Namespace to store app state.
-    namespace: S::Namespace,
+    namespace: <AppStore as KVStore>::Namespace,
     /// Collection of past state parameters.
     ///
     /// We store the state hash for the height of the block where it was committed,
@@ -153,11 +150,11 @@ where
     /// The state also contains things like timestamp and the network version,
     /// so that we can retrospectively execute FVM messages at past block heights
     /// in read-only mode.
-    state_hist: KVCollection<S, BlockHeight, FvmStateParams>,
+    state_hist: KVCollection<AppStore, BlockHeight, FvmStateParams>,
     /// Interpreter for block lifecycle events.
     interpreter: Arc<I>,
     /// Environment-like dependencies for the interpreter.
-    chain_env: ChainEnv<S>,
+    chain_env: ChainEnv<AppStore>,
     /// Interface to the snapshotter, if enabled.
     snapshots: Option<SnapshotClient>,
     /// State accumulating changes during block execution.
@@ -170,23 +167,17 @@ where
     state_hist_size: u64,
 }
 
-impl<DB, BS, S, I> App<DB, BS, S, I>
+impl<DB, BS, I> App<DB, BS, I>
 where
-    S: KVStore
-        + Codec<AppState>
-        + Encode<AppStoreKey>
-        + Encode<BlockHeight>
-        + Codec<FvmStateParams>
-        + Clone,
-    DB: KVWritable<S> + KVReadable<S> + Clone + 'static,
+    DB: KVWritable<AppStore> + KVReadable<AppStore> + Clone + 'static,
     BS: Blockstore + Clone + 'static,
 {
     pub fn new(
-        config: AppConfig<S>,
+        config: AppConfig,
         db: DB,
         state_store: BS,
         interpreter: I,
-        chain_env: ChainEnv<S>,
+        chain_env: ChainEnv<AppStore>,
         snapshots: Option<SnapshotClient>,
     ) -> Result<Self> {
         let app = Self {
@@ -210,15 +201,9 @@ where
     }
 }
 
-impl<DB, BS, S, I> App<DB, BS, S, I>
+impl<DB, BS, I> App<DB, BS, I>
 where
-    S: KVStore
-        + Codec<AppState>
-        + Encode<AppStoreKey>
-        + Encode<BlockHeight>
-        + Codec<FvmStateParams>
-        + Clone,
-    DB: KVWritable<S> + KVReadable<S> + 'static + Clone,
+    DB: KVWritable<AppStore> + KVReadable<AppStore> + 'static + Clone,
     BS: Blockstore + 'static + Clone,
 {
     /// Get an owned clone of the state store.
@@ -311,8 +296,8 @@ where
     /// Take the execution state, update it, put it back, return the output.
     async fn modify_exec_state<T, F, R>(&self, f: F) -> Result<T>
     where
-        F: FnOnce((ChainEnv<S>, FvmExecState<BS>)) -> R,
-        R: Future<Output = Result<((ChainEnv<S>, FvmExecState<BS>), T)>>,
+        F: FnOnce((ChainEnv<AppStore>, FvmExecState<BS>)) -> R,
+        R: Future<Output = Result<((ChainEnv<AppStore>, FvmExecState<BS>), T)>>,
     {
         let mut guard = self.exec_state.lock().await;
         let state = guard.take().expect("exec state empty");
@@ -397,25 +382,18 @@ where
 // the `tower-abci` library would throw an exception when it tried to convert a
 // `Response::Exception` into a `ConsensusResponse` for example.
 #[async_trait]
-impl<DB, BS, S, I> Application for App<DB, BS, S, I>
+impl<DB, BS, I> Application for App<DB, BS, I>
 where
-    S: KVStore
-        + Codec<AppState>
-        + Encode<AppStoreKey>
-        + Encode<BlockHeight>
-        + Codec<FvmStateParams>
-        + Clone,
-    S::Namespace: Sync + Send,
-    DB: KVWritable<S> + KVReadable<S> + Clone + Send + Sync + 'static,
+    DB: KVWritable<AppStore> + KVReadable<AppStore> + Clone + Send + Sync + 'static,
     BS: Blockstore + Clone + Send + Sync + 'static,
     I: GenesisInterpreter<
         State = FvmGenesisState<BS>,
         Genesis = Vec<u8>,
         Output = FvmGenesisOutput,
     >,
-    I: ProposalInterpreter<State = ChainEnv<S>, Message = Vec<u8>>,
+    I: ProposalInterpreter<State = ChainEnv<AppStore>, Message = Vec<u8>>,
     I: ExecInterpreter<
-        State = (ChainEnv<S>, FvmExecState<BS>),
+        State = (ChainEnv<AppStore>, FvmExecState<BS>),
         Message = Vec<u8>,
         BeginOutput = FvmApplyRet,
         DeliverOutput = BytesMessageApplyRes,

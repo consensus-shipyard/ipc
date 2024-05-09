@@ -293,7 +293,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         None
     };
 
-    let app: App<_, _, AppStore, _> = App::new(
+    let app = App::new(
         AppConfig {
             app_namespace: ns.app,
             state_hist_namespace: ns.state_hist,

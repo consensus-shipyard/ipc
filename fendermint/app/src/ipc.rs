@@ -2,12 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! IPC related execution
 
-use crate::app::{AppState, AppStoreKey};
-use crate::{App, BlockHeight};
-use fendermint_storage::{Codec, Encode, KVReadable, KVStore, KVWritable};
+use crate::{App, AppStore};
+use fendermint_storage::{KVReadable, KVWritable};
 use fendermint_vm_genesis::{Power, Validator};
 use fendermint_vm_interpreter::fvm::state::ipc::GatewayCaller;
-use fendermint_vm_interpreter::fvm::state::{FvmExecState, FvmStateParams};
+use fendermint_vm_interpreter::fvm::state::FvmExecState;
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
 use fendermint_vm_topdown::sync::ParentFinalityStateQuery;
 use fendermint_vm_topdown::IPCParentFinality;
@@ -24,28 +23,21 @@ pub enum AppVote {
 }
 
 /// Queries the LATEST COMMITTED parent finality from the storage
-pub struct AppParentFinalityQuery<DB, SS, S, I>
+pub struct AppParentFinalityQuery<DB, BS, I>
 where
-    SS: Blockstore + Clone + 'static,
-    S: KVStore,
+    BS: Blockstore + Clone + 'static,
 {
     /// The app to get state
-    app: App<DB, SS, S, I>,
-    gateway_caller: GatewayCaller<ReadOnlyBlockstore<Arc<SS>>>,
+    app: App<DB, BS, I>,
+    gateway_caller: GatewayCaller<ReadOnlyBlockstore<Arc<BS>>>,
 }
 
-impl<DB, SS, S, I> AppParentFinalityQuery<DB, SS, S, I>
+impl<DB, SS, I> AppParentFinalityQuery<DB, SS, I>
 where
-    S: KVStore
-        + Codec<AppState>
-        + Encode<AppStoreKey>
-        + Encode<BlockHeight>
-        + Codec<FvmStateParams>
-        + Clone,
-    DB: KVWritable<S> + KVReadable<S> + 'static + Clone,
+    DB: KVWritable<AppStore> + KVReadable<AppStore> + 'static + Clone,
     SS: Blockstore + 'static + Clone,
 {
-    pub fn new(app: App<DB, SS, S, I>) -> Self {
+    pub fn new(app: App<DB, SS, I>) -> Self {
         Self {
             app,
             gateway_caller: GatewayCaller::default(),
@@ -63,15 +55,9 @@ where
     }
 }
 
-impl<DB, SS, S, I> ParentFinalityStateQuery for AppParentFinalityQuery<DB, SS, S, I>
+impl<DB, SS, I> ParentFinalityStateQuery for AppParentFinalityQuery<DB, SS, I>
 where
-    S: KVStore
-        + Codec<AppState>
-        + Encode<AppStoreKey>
-        + Encode<BlockHeight>
-        + Codec<FvmStateParams>
-        + Clone,
-    DB: KVWritable<S> + KVReadable<S> + 'static + Clone,
+    DB: KVWritable<AppStore> + KVReadable<AppStore> + 'static + Clone,
     SS: Blockstore + 'static + Clone,
 {
     fn get_latest_committed_finality(&self) -> anyhow::Result<Option<IPCParentFinality>> {
