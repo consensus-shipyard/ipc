@@ -13,7 +13,7 @@ The validators obtain their power from `SubnetActor` , mainly `FederatedPower`, 
 
 Validator membership changes are handled differently depending on the lifecycle stage the subnet is in:
 
-1. If the subnet is yet to be bootstrapped, any chances applied to the parent will be tracked and merged onto the *staged* genesis for the subnet, inside the SubnetActor. The initial powers of the validators are tracked there, and ultimately committed onto a final genesis once the subnet is bootstrapped.
+1. If the subnet is yet to be bootstrapped, any changes applied to the parent will be tracked and merged onto the *staged* genesis for the subnet, inside the SubnetActor. The initial powers of the validators are tracked there, and ultimately committed onto a final genesis once the subnet is bootstrapped.
 2. After the subnet is bootstrapped, the power propagation happens as a combination of topdown finality and bottom up checkpoint confirmation.
 
 The high level flow of the process is as follows:
