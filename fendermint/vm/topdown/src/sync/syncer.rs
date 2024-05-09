@@ -12,6 +12,7 @@ use crate::{
 use anyhow::anyhow;
 use async_stm::{atomically, atomically_or_err, StmError};
 use ethers::utils::hex;
+use fendermint_storage::KVStore;
 use libp2p::futures::TryFutureExt;
 use std::sync::Arc;
 use tracing::instrument;
@@ -21,10 +22,10 @@ use fendermint_vm_event::{BlockHashHex, NewParentView};
 
 /// Parent syncer that constantly poll parent. This struct handles lotus null blocks and deferred
 /// execution. For ETH based parent, it should work out of the box as well.
-pub(crate) struct LotusParentSyncer<T, P> {
+pub(crate) struct LotusParentSyncer<T, P, S: KVStore> {
     config: Config,
     parent_proxy: Arc<P>,
-    provider: Arc<Toggle<CachedFinalityProvider<P>>>,
+    provider: Arc<Toggle<CachedFinalityProvider<P, S>>>,
     vote_tally: VoteTally,
     query: Arc<T>,
 
@@ -37,15 +38,17 @@ pub(crate) struct LotusParentSyncer<T, P> {
     sync_many: bool,
 }
 
-impl<T, P> LotusParentSyncer<T, P>
+impl<T, P, S> LotusParentSyncer<T, P, S>
 where
     T: ParentFinalityStateQuery + Send + Sync + 'static,
     P: ParentQueryProxy + Send + Sync + 'static,
+    S: KVStore + 'static,
+    S::Namespace: Send + Sync + 'static,
 {
     pub fn new(
         config: Config,
         parent_proxy: Arc<P>,
-        provider: Arc<Toggle<CachedFinalityProvider<P>>>,
+        provider: Arc<Toggle<CachedFinalityProvider<P, S>>>,
         vote_tally: VoteTally,
         query: Arc<T>,
     ) -> anyhow::Result<Self> {
@@ -122,10 +125,12 @@ where
     }
 }
 
-impl<T, P> LotusParentSyncer<T, P>
+impl<T, P, S> LotusParentSyncer<T, P, S>
 where
     T: ParentFinalityStateQuery + Send + Sync + 'static,
     P: ParentQueryProxy + Send + Sync + 'static,
+    S: KVStore + 'static,
+    S::Namespace: Send + Sync + 'static,
 {
     async fn exceed_cache_size_limit(&self) -> bool {
         let max_cache_blocks = self.config.max_cache_blocks();

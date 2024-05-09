@@ -118,9 +118,9 @@ pub struct AppConfig<S: KVStore> {
 
 /// Handle ABCI requests.
 #[derive(Clone)]
-pub struct App<DB, SS, S, I>
+pub struct App<DB, BS, S, I>
 where
-    SS: Blockstore + Clone + 'static,
+    BS: Blockstore + Clone + 'static,
     S: KVStore,
 {
     /// Database backing all key-value operations.
@@ -130,7 +130,7 @@ where
     /// Must be kept separate from storage that can be influenced by network operations such as Bitswap;
     /// nodes must be able to run transactions deterministically. By contrast the Bitswap store should
     /// be able to read its own storage area as well as state storage, to serve content from both.
-    state_store: Arc<SS>,
+    state_store: Arc<BS>,
     /// Wasm engine cache.
     multi_engine: Arc<MultiEngine>,
     /// Path to the Wasm bundle.
@@ -157,35 +157,36 @@ where
     /// Interpreter for block lifecycle events.
     interpreter: Arc<I>,
     /// Environment-like dependencies for the interpreter.
-    chain_env: ChainEnv,
+    chain_env: ChainEnv<S>,
     /// Interface to the snapshotter, if enabled.
     snapshots: Option<SnapshotClient>,
     /// State accumulating changes during block execution.
-    exec_state: Arc<tokio::sync::Mutex<Option<FvmExecState<SS>>>>,
+    exec_state: Arc<tokio::sync::Mutex<Option<FvmExecState<BS>>>>,
     /// Projected (partial) state accumulating during transaction checks.
-    check_state: CheckStateRef<SS>,
+    check_state: CheckStateRef<BS>,
     /// How much history to keep.
     ///
     /// Zero means unlimited.
     state_hist_size: u64,
 }
 
-impl<DB, SS, S, I> App<DB, SS, S, I>
+impl<DB, BS, S, I> App<DB, BS, S, I>
 where
     S: KVStore
         + Codec<AppState>
         + Encode<AppStoreKey>
         + Encode<BlockHeight>
-        + Codec<FvmStateParams>,
+        + Codec<FvmStateParams>
+        + Clone,
     DB: KVWritable<S> + KVReadable<S> + Clone + 'static,
-    SS: Blockstore + Clone + 'static,
+    BS: Blockstore + Clone + 'static,
 {
     pub fn new(
         config: AppConfig<S>,
         db: DB,
-        state_store: SS,
+        state_store: BS,
         interpreter: I,
-        chain_env: ChainEnv,
+        chain_env: ChainEnv<S>,
         snapshots: Option<SnapshotClient>,
     ) -> Result<Self> {
         let app = Self {
@@ -209,18 +210,19 @@ where
     }
 }
 
-impl<DB, SS, S, I> App<DB, SS, S, I>
+impl<DB, BS, S, I> App<DB, BS, S, I>
 where
     S: KVStore
         + Codec<AppState>
         + Encode<AppStoreKey>
         + Encode<BlockHeight>
-        + Codec<FvmStateParams>,
+        + Codec<FvmStateParams>
+        + Clone,
     DB: KVWritable<S> + KVReadable<S> + 'static + Clone,
-    SS: Blockstore + 'static + Clone,
+    BS: Blockstore + 'static + Clone,
 {
     /// Get an owned clone of the state store.
-    fn state_store_clone(&self) -> SS {
+    fn state_store_clone(&self) -> BS {
         self.state_store.as_ref().clone()
     }
 
@@ -294,14 +296,14 @@ where
     }
 
     /// Put the execution state during block execution. Has to be empty.
-    async fn put_exec_state(&self, state: FvmExecState<SS>) {
+    async fn put_exec_state(&self, state: FvmExecState<BS>) {
         let mut guard = self.exec_state.lock().await;
         assert!(guard.is_none(), "exec state not empty");
         *guard = Some(state);
     }
 
     /// Take the execution state during block execution. Has to be non-empty.
-    async fn take_exec_state(&self) -> FvmExecState<SS> {
+    async fn take_exec_state(&self) -> FvmExecState<BS> {
         let mut guard = self.exec_state.lock().await;
         guard.take().expect("exec state empty")
     }
@@ -309,8 +311,8 @@ where
     /// Take the execution state, update it, put it back, return the output.
     async fn modify_exec_state<T, F, R>(&self, f: F) -> Result<T>
     where
-        F: FnOnce((ChainEnv, FvmExecState<SS>)) -> R,
-        R: Future<Output = Result<((ChainEnv, FvmExecState<SS>), T)>>,
+        F: FnOnce((ChainEnv<S>, FvmExecState<BS>)) -> R,
+        R: Future<Output = Result<((ChainEnv<S>, FvmExecState<BS>), T)>>,
     {
         let mut guard = self.exec_state.lock().await;
         let state = guard.take().expect("exec state empty");
@@ -327,7 +329,7 @@ where
     /// the latest state.
     pub fn new_read_only_exec_state(
         &self,
-    ) -> Result<Option<FvmExecState<ReadOnlyBlockstore<Arc<SS>>>>> {
+    ) -> Result<Option<FvmExecState<ReadOnlyBlockstore<Arc<BS>>>>> {
         let maybe_app_state = self.get_committed_state()?;
 
         Ok(if let Some(app_state) = maybe_app_state {
@@ -395,36 +397,37 @@ where
 // the `tower-abci` library would throw an exception when it tried to convert a
 // `Response::Exception` into a `ConsensusResponse` for example.
 #[async_trait]
-impl<DB, SS, S, I> Application for App<DB, SS, S, I>
+impl<DB, BS, S, I> Application for App<DB, BS, S, I>
 where
     S: KVStore
         + Codec<AppState>
         + Encode<AppStoreKey>
         + Encode<BlockHeight>
-        + Codec<FvmStateParams>,
+        + Codec<FvmStateParams>
+        + Clone,
     S::Namespace: Sync + Send,
     DB: KVWritable<S> + KVReadable<S> + Clone + Send + Sync + 'static,
-    SS: Blockstore + Clone + Send + Sync + 'static,
+    BS: Blockstore + Clone + Send + Sync + 'static,
     I: GenesisInterpreter<
-        State = FvmGenesisState<SS>,
+        State = FvmGenesisState<BS>,
         Genesis = Vec<u8>,
         Output = FvmGenesisOutput,
     >,
-    I: ProposalInterpreter<State = ChainEnv, Message = Vec<u8>>,
+    I: ProposalInterpreter<State = ChainEnv<S>, Message = Vec<u8>>,
     I: ExecInterpreter<
-        State = (ChainEnv, FvmExecState<SS>),
+        State = (ChainEnv<S>, FvmExecState<BS>),
         Message = Vec<u8>,
         BeginOutput = FvmApplyRet,
         DeliverOutput = BytesMessageApplyRes,
         EndOutput = PowerUpdates,
     >,
     I: CheckInterpreter<
-        State = FvmExecState<ReadOnlyBlockstore<SS>>,
+        State = FvmExecState<ReadOnlyBlockstore<BS>>,
         Message = Vec<u8>,
         Output = BytesMessageCheckRes,
     >,
     I: QueryInterpreter<
-        State = FvmQueryState<SS>,
+        State = FvmQueryState<BS>,
         Query = BytesMessageQuery,
         Output = BytesMessageQueryRes,
     >,
@@ -832,7 +835,7 @@ where
         );
 
         // TODO: We can defer committing changes the resolution pool to this point.
-        // For example if a checkpoint is successfully executed, that's when we want to remove
+        // For example if a checkpoint is succeBSfully executed, that's when we want to remove
         // that checkpoint from the pool, and not propose it to other validators again.
         // However, once Tendermint starts delivering the transactions, the commit will surely
         // follow at the end, so we can also remove these checkpoints from memory at the time
@@ -841,8 +844,8 @@ where
         // commit in case the block execution fails somewhere in the middle for uknown reasons.
         // But if that happened, we will have to restart the application again anyway, and
         // repopulate the in-memory checkpoints based on the last committed ledger.
-        // So, while the pool is theoretically part of the evolving state and we can pass
-        // it in and out, unless we want to defer commit to here (which the interpreters aren't
+        // So, while the pool is theoretically part of the evolving state and we can paBS
+        // it in and out, unleBS we want to defer commit to here (which the interpreters aren't
         // notified about), we could add it to the `ChainMessageInterpreter` as a constructor argument,
         // a sort of "ambient state", and not worry about in in the `App` at all.
 

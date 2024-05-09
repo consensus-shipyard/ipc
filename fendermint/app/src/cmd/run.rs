@@ -10,6 +10,7 @@ use fendermint_app::{App, AppConfig, AppStore, BitswapBlockstore};
 use fendermint_app_settings::AccountKind;
 use fendermint_crypto::SecretKey;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
+use fendermint_storage::KVCollection;
 use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::chain::ChainEnv;
@@ -52,7 +53,8 @@ namespaces! {
         app,
         state_hist,
         state_store,
-        bit_store
+        bit_store,
+        parent_view_store
     }
 }
 
@@ -141,7 +143,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     .with_push_chain_meta(testing_settings.map_or(true, |t| t.push_chain_meta));
 
     let interpreter = SignedMessageInterpreter::new(interpreter);
-    let interpreter = ChainMessageInterpreter::<_, NamespaceBlockstore>::new(interpreter);
+    let interpreter = ChainMessageInterpreter::<_, NamespaceBlockstore, AppStore>::new(interpreter);
     let interpreter = BytesMessageInterpreter::new(
         interpreter,
         ProposalPrepareMode::PrependOnly,
@@ -249,9 +251,15 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             config = config.with_max_cache_blocks(v);
         }
 
+        let parent_view_store = KVCollection::new(ns.parent_view_store);
+
         let ipc_provider = Arc::new(make_ipc_provider_proxy(&settings)?);
-        let finality_provider =
-            CachedFinalityProvider::uninitialized(config.clone(), ipc_provider.clone()).await?;
+        let finality_provider = CachedFinalityProvider::uninitialized(
+            config.clone(),
+            ipc_provider.clone(),
+            parent_view_store,
+        )
+        .await?;
         let p = Arc::new(Toggle::enabled(finality_provider));
         (p, Some((ipc_provider, config)))
     } else {

@@ -40,7 +40,8 @@ where
         + Codec<AppState>
         + Encode<AppStoreKey>
         + Encode<BlockHeight>
-        + Codec<FvmStateParams>,
+        + Codec<FvmStateParams>
+        + Clone,
     DB: KVWritable<S> + KVReadable<S> + 'static + Clone,
     SS: Blockstore + 'static + Clone,
 {
@@ -68,7 +69,8 @@ where
         + Codec<AppState>
         + Encode<AppStoreKey>
         + Encode<BlockHeight>
-        + Codec<FvmStateParams>,
+        + Codec<FvmStateParams>
+        + Clone,
     DB: KVWritable<S> + KVReadable<S> + 'static + Clone,
     SS: Blockstore + 'static + Clone,
 {

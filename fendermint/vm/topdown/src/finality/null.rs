@@ -6,6 +6,7 @@ use crate::finality::{
 };
 use crate::{BlockHash, BlockHeight, Config, Error, IPCParentFinality, SequentialKeyCache};
 use async_stm::{abort, atomically, Stm, StmResult, TVar};
+use fendermint_storage::{KVCollection, KVStore};
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
 use std::cmp::min;
@@ -13,28 +14,38 @@ use std::cmp::min;
 use fendermint_tracing::emit;
 use fendermint_vm_event::ParentFinalityCommitted;
 
+pub type ParentViewStore<S> = KVCollection<S, BlockHeight, Option<ParentViewPayload>>;
+
 /// Finality provider that can handle null blocks
 #[derive(Clone)]
-pub struct FinalityWithNull {
+pub struct FinalityWithNull<S: KVStore> {
     config: Config,
     genesis_epoch: BlockHeight,
     /// Cached data that always syncs with the latest parent chain proactively
     cached_data: TVar<SequentialKeyCache<BlockHeight, Option<ParentViewPayload>>>,
+    stored_data: ParentViewStore<S>,
     /// This is a in memory view of the committed parent finality. We need this as a starting point
     /// for populating the cache
     last_committed_finality: TVar<Option<IPCParentFinality>>,
 }
 
-impl FinalityWithNull {
+impl<S> FinalityWithNull<S>
+where
+    S: KVStore,
+{
     pub fn new(
         config: Config,
         genesis_epoch: BlockHeight,
         committed_finality: Option<IPCParentFinality>,
+        parent_data: ParentViewStore<S>,
     ) -> Self {
+        // TODO: Initialize cache from the store.
+        let cache = SequentialKeyCache::sequential();
         Self {
             config,
             genesis_epoch,
-            cached_data: TVar::new(SequentialKeyCache::sequential()),
+            cached_data: TVar::new(cache),
+            stored_data: parent_data,
             last_committed_finality: TVar::new(committed_finality),
         }
     }
@@ -133,7 +144,10 @@ impl FinalityWithNull {
     }
 }
 
-impl FinalityWithNull {
+impl<S> FinalityWithNull<S>
+where
+    S: KVStore,
+{
     /// Returns the number of blocks cached.
     pub(crate) fn cached_blocks(&self) -> Stm<BlockHeight> {
         let cache = self.cached_data.read()?;
@@ -182,7 +196,10 @@ impl FinalityWithNull {
 }
 
 /// All the private functions
-impl FinalityWithNull {
+impl<S> FinalityWithNull<S>
+where
+    S: KVStore,
+{
     fn propose_next_height(&self) -> Stm<Option<BlockHeight>> {
         let latest_height = if let Some(h) = self.latest_height_in_cache()? {
             h
@@ -373,6 +390,14 @@ mod tests {
     use crate::finality::ParentViewPayload;
     use crate::{BlockHeight, Config, IPCParentFinality};
     use async_stm::{atomically, atomically_or_err};
+    use fendermint_storage::{KVCollection, KVStore};
+
+    struct TestStore;
+
+    impl KVStore for TestStore {
+        type Namespace = String;
+        type Repr = Vec<u8>;
+    }
 
     async fn new_provider(
         mut blocks: Vec<(BlockHeight, Option<ParentViewPayload>)>,
@@ -393,7 +418,12 @@ mod tests {
 
         blocks.remove(0);
 
-        let f = FinalityWithNull::new(config, 1, Some(committed_finality));
+        let f = FinalityWithNull::new(
+            config,
+            1,
+            Some(committed_finality),
+            test_store::new_parent_view_store(),
+        );
         for (h, p) in blocks {
             atomically_or_err(|| f.new_parent_view(h, p.clone()))
                 .await

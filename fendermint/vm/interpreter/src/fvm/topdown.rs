@@ -7,6 +7,7 @@ use crate::fvm::state::ipc::GatewayCaller;
 use crate::fvm::state::FvmExecState;
 use crate::fvm::FvmApplyRet;
 use anyhow::Context;
+use fendermint_storage::KVStore;
 use fendermint_vm_topdown::{BlockHeight, IPCParentFinality, ParentViewProvider};
 use fvm_ipld_blockstore::Blockstore;
 use ipc_api::cross::IpcEnvelope;
@@ -15,14 +16,16 @@ use super::state::ipc::tokens_to_mint;
 
 /// Commit the parent finality. Returns the height that the previous parent finality is committed and
 /// the committed finality itself. If there is no parent finality committed, genesis epoch is returned.
-pub async fn commit_finality<DB>(
+pub async fn commit_finality<DB, S>(
     gateway_caller: &GatewayCaller<DB>,
     state: &mut FvmExecState<DB>,
     finality: IPCParentFinality,
-    provider: &TopDownFinalityProvider,
+    provider: &TopDownFinalityProvider<S>,
 ) -> anyhow::Result<(BlockHeight, Option<IPCParentFinality>)>
 where
     DB: Blockstore + Sync + Send + Clone + 'static,
+    S: KVStore + 'static,
+    S::Namespace: Send + Sync + 'static,
 {
     let (prev_height, prev_finality) =
         if let Some(prev_finality) = gateway_caller.commit_parent_finality(state, finality)? {

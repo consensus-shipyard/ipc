@@ -8,6 +8,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use async_stm::{Stm, StmResult};
+use fendermint_storage::KVStore;
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
 
@@ -91,7 +92,10 @@ impl<P: ParentFinalityProvider + Send + Sync + 'static> ParentFinalityProvider f
     }
 }
 
-impl<P> Toggle<CachedFinalityProvider<P>> {
+impl<P, S> Toggle<CachedFinalityProvider<P, S>>
+where
+    S: KVStore,
+{
     pub fn block_hash(&self, height: BlockHeight) -> Stm<Option<BlockHash>> {
         self.perform_or_else(|p| p.block_hash(height), None)
     }

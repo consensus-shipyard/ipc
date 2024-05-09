@@ -13,6 +13,7 @@ use crate::{CachedFinalityProvider, Config, IPCParentFinality, ParentFinalityPro
 use anyhow::anyhow;
 use async_stm::atomically;
 use ethers::utils::hex;
+use fendermint_storage::KVStore;
 use ipc_ipld_resolver::ValidatorKey;
 use std::sync::Arc;
 use std::time::Duration;
@@ -106,10 +107,10 @@ where
 }
 
 /// Start the polling parent syncer in the background
-pub async fn launch_polling_syncer<T, C, P>(
+pub async fn launch_polling_syncer<T, C, P, S>(
     query: T,
     config: Config,
-    view_provider: Arc<Toggle<CachedFinalityProvider<P>>>,
+    view_provider: Arc<Toggle<CachedFinalityProvider<P, S>>>,
     vote_tally: VoteTally,
     parent_client: Arc<P>,
     tendermint_client: C,
@@ -118,6 +119,8 @@ where
     T: ParentFinalityStateQuery + Send + Sync + 'static,
     C: tendermint_rpc::Client + Send + Sync + 'static,
     P: ParentQueryProxy + Send + Sync + 'static,
+    S: KVStore + 'static,
+    S::Namespace: Send + Sync + 'static,
 {
     if !view_provider.is_enabled() {
         return Err(anyhow!("provider not enabled, enable to run syncer"));
@@ -162,9 +165,9 @@ where
 }
 
 /// Start the parent finality listener in the background
-fn start_syncing<T, C, P>(
+fn start_syncing<T, C, P, S>(
     config: Config,
-    view_provider: Arc<Toggle<CachedFinalityProvider<P>>>,
+    view_provider: Arc<Toggle<CachedFinalityProvider<P, S>>>,
     vote_tally: VoteTally,
     parent_proxy: Arc<P>,
     query: Arc<T>,
@@ -173,6 +176,8 @@ fn start_syncing<T, C, P>(
     T: ParentFinalityStateQuery + Send + Sync + 'static,
     C: tendermint_rpc::Client + Send + Sync + 'static,
     P: ParentQueryProxy + Send + Sync + 'static,
+    S: KVStore + 'static,
+    S::Namespace: Send + Sync + 'static,
 {
     let mut interval = tokio::time::interval(config.polling_interval);
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);

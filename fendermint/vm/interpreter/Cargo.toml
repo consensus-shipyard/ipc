@@ -21,6 +21,7 @@ fendermint_crypto = { path = "../../crypto" }
 fendermint_eth_hardhat = { path = "../../eth/hardhat" }
 fendermint_rpc = { path = "../../rpc" }
 fendermint_tracing = { path = "../../tracing" }
+fendermint_storage = { path = "../../storage" }
 fendermint_actors = { path = "../../actors" }
 fendermint_actor_chainmetadata = { path = "../../actors/chainmetadata" }
 fendermint_actor_eam = { workspace = true }
