@@ -12,6 +12,7 @@ license.workspace = true
 num_cpus = "1.14"
 rocksdb = { version = "0.21", features = ["multi-threaded-cf"] }
 anyhow = { workspace = true }
+async-stm = { workspace = "true" }
 fendermint_storage = { path = "../storage", optional = true, features = ["testing"] }
 serde = { workspace = true }
 thiserror = { workspace = true }

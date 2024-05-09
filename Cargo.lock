@@ -3119,6 +3119,7 @@ name = "fendermint_rocksdb"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-stm",
  "cid",
  "fendermint_storage",
  "fvm_ipld_blockstore",

@@ -209,6 +209,21 @@ impl<'a> KVTransaction for RocksDbWriteTx<'a> {
     }
 }
 
+// TODO: Consider how to make these non-panicky.
+impl<'a> async_stm::auxtx::Aux for RocksDbWriteTx<'a> {
+    fn commit(self) -> bool {
+        match KVTransaction::commit(self) {
+            Ok(()) => true,
+            Err(KVError::Conflict) => false,
+            Err(other) => panic!("failed to commit to RocksDB: {other}"),
+        }
+    }
+
+    fn rollback(self) {
+        KVTransaction::rollback(self).expect("failed to roll back RocksDB")
+    }
+}
+
 impl<'a> Drop for RocksDbWriteTx<'a> {
     fn drop(&mut self) {
         if !thread::panicking() {

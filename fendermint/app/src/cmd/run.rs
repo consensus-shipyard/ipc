@@ -143,7 +143,8 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     .with_push_chain_meta(testing_settings.map_or(true, |t| t.push_chain_meta));
 
     let interpreter = SignedMessageInterpreter::new(interpreter);
-    let interpreter = ChainMessageInterpreter::<_, NamespaceBlockstore, AppStore>::new(interpreter);
+    let interpreter =
+        ChainMessageInterpreter::<_, NamespaceBlockstore, AppStore, RocksDb>::new(interpreter);
     let interpreter = BytesMessageInterpreter::new(
         interpreter,
         ProposalPrepareMode::PrependOnly,
@@ -293,7 +294,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         None
     };
 
-    let app = App::new(
+    let app: App<RocksDb, NamespaceBlockstore, _> = App::new(
         AppConfig {
             app_namespace: ns.app,
             state_hist_namespace: ns.state_hist,
@@ -302,7 +303,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             custom_actors_bundle: settings.custom_actors_bundle(),
             halt_height: settings.halt_height,
         },
-        db,
+        db.clone(),
         state_store,
         interpreter,
         ChainEnv {
@@ -315,8 +316,10 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
 
     if let Some((agent_proxy, config)) = ipc_tuple {
         let app_parent_finality_query = AppParentFinalityQuery::new(app.clone());
+        let db = db.clone();
         tokio::spawn(async move {
             match launch_polling_syncer(
+                db,
                 app_parent_finality_query,
                 config,
                 parent_finality_provider,

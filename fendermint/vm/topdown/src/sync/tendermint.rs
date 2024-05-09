@@ -2,27 +2,30 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! The tendermint aware syncer
 
-use crate::proxy::ParentQueryProxy;
 use crate::sync::syncer::LotusParentSyncer;
 use crate::sync::ParentFinalityStateQuery;
+use crate::{finality::ParentViewPayload, proxy::ParentQueryProxy};
 use anyhow::Context;
-use fendermint_storage::KVStore;
+use async_stm::auxtx::Aux;
+use fendermint_storage::{Codec, Encode, KVStore, KVWritable};
 
 /// Tendermint aware syncer
-pub(crate) struct TendermintAwareSyncer<T, C, P, S: KVStore> {
-    inner: LotusParentSyncer<T, P, S>,
+pub(crate) struct TendermintAwareSyncer<T, C, P, S: KVStore, DB> {
+    inner: LotusParentSyncer<T, P, S, DB>,
     tendermint_client: C,
 }
 
-impl<T, C, P, S> TendermintAwareSyncer<T, C, P, S>
+impl<T, C, P, S, DB> TendermintAwareSyncer<T, C, P, S, DB>
 where
     T: ParentFinalityStateQuery + Send + Sync + 'static,
     C: tendermint_rpc::Client + Send + Sync + 'static,
     P: ParentQueryProxy + Send + Sync + 'static,
-    S: KVStore + 'static,
+    S: KVStore + Encode<u64> + Codec<Option<ParentViewPayload>> + 'static,
     S::Namespace: Send + Sync + 'static,
+    DB: KVWritable<S> + Send + Sync + Clone + 'static,
+    for<'a> DB::Tx<'a>: Aux,
 {
-    pub fn new(inner: LotusParentSyncer<T, P, S>, tendermint_client: C) -> Self {
+    pub fn new(inner: LotusParentSyncer<T, P, S, DB>, tendermint_client: C) -> Self {
         Self {
             inner,
             tendermint_client,

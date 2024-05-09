@@ -7,8 +7,10 @@ use crate::fvm::state::ipc::GatewayCaller;
 use crate::fvm::state::FvmExecState;
 use crate::fvm::FvmApplyRet;
 use anyhow::Context;
-use fendermint_storage::KVStore;
-use fendermint_vm_topdown::{BlockHeight, IPCParentFinality, ParentViewProvider};
+use fendermint_storage::{Codec, Encode, KVStore};
+use fendermint_vm_topdown::{
+    BlockHeight, IPCParentFinality, ParentViewPayload, ParentViewProvider,
+};
 use fvm_ipld_blockstore::Blockstore;
 use ipc_api::cross::IpcEnvelope;
 
@@ -16,16 +18,16 @@ use super::state::ipc::tokens_to_mint;
 
 /// Commit the parent finality. Returns the height that the previous parent finality is committed and
 /// the committed finality itself. If there is no parent finality committed, genesis epoch is returned.
-pub async fn commit_finality<DB, S>(
-    gateway_caller: &GatewayCaller<DB>,
-    state: &mut FvmExecState<DB>,
+pub async fn commit_finality<BS, S>(
+    gateway_caller: &GatewayCaller<BS>,
+    state: &mut FvmExecState<BS>,
     finality: IPCParentFinality,
     provider: &TopDownFinalityProvider<S>,
 ) -> anyhow::Result<(BlockHeight, Option<IPCParentFinality>)>
 where
-    DB: Blockstore + Sync + Send + Clone + 'static,
-    S: KVStore + 'static,
+    S: KVStore + Encode<u64> + Codec<Option<ParentViewPayload>> + 'static,
     S::Namespace: Send + Sync + 'static,
+    BS: Blockstore + Sync + Send + Clone + 'static,
 {
     let (prev_height, prev_finality) =
         if let Some(prev_finality) = gateway_caller.commit_parent_finality(state, finality)? {
@@ -43,13 +45,13 @@ where
 
 /// Execute the top down messages implicitly. Before the execution, mint to the gateway of the funds
 /// transferred in the messages, and increase the circulating supply with the incoming value.
-pub async fn execute_topdown_msgs<DB>(
-    gateway_caller: &GatewayCaller<DB>,
-    state: &mut FvmExecState<DB>,
+pub async fn execute_topdown_msgs<BS>(
+    gateway_caller: &GatewayCaller<BS>,
+    state: &mut FvmExecState<BS>,
     messages: Vec<IpcEnvelope>,
 ) -> anyhow::Result<FvmApplyRet>
 where
-    DB: Blockstore + Sync + Send + Clone + 'static,
+    BS: Blockstore + Sync + Send + Clone + 'static,
 {
     let minted_tokens = tokens_to_mint(&messages);
     tracing::debug!(token = minted_tokens.to_string(), "tokens to mint in child");

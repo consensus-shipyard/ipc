@@ -5,6 +5,7 @@
 mod syncer;
 mod tendermint;
 
+use crate::finality::ParentViewPayload;
 use crate::proxy::ParentQueryProxy;
 use crate::sync::syncer::LotusParentSyncer;
 use crate::sync::tendermint::TendermintAwareSyncer;
@@ -12,8 +13,9 @@ use crate::voting::VoteTally;
 use crate::{CachedFinalityProvider, Config, IPCParentFinality, ParentFinalityProvider, Toggle};
 use anyhow::anyhow;
 use async_stm::atomically;
+use async_stm::auxtx::Aux;
 use ethers::utils::hex;
-use fendermint_storage::KVStore;
+use fendermint_storage::{Codec, Encode, KVStore, KVWritable};
 use ipc_ipld_resolver::ValidatorKey;
 use std::sync::Arc;
 use std::time::Duration;
@@ -107,7 +109,8 @@ where
 }
 
 /// Start the polling parent syncer in the background
-pub async fn launch_polling_syncer<T, C, P, S>(
+pub async fn launch_polling_syncer<T, C, P, S, DB>(
+    db: DB,
     query: T,
     config: Config,
     view_provider: Arc<Toggle<CachedFinalityProvider<P, S>>>,
@@ -119,8 +122,10 @@ where
     T: ParentFinalityStateQuery + Send + Sync + 'static,
     C: tendermint_rpc::Client + Send + Sync + 'static,
     P: ParentQueryProxy + Send + Sync + 'static,
-    S: KVStore + 'static,
+    S: KVStore + Encode<u64> + Codec<Option<ParentViewPayload>> + 'static,
     S::Namespace: Send + Sync + 'static,
+    DB: KVWritable<S> + Send + Sync + Clone + 'static,
+    for<'a> DB::Tx<'a>: Aux,
 {
     if !view_provider.is_enabled() {
         return Err(anyhow!("provider not enabled, enable to run syncer"));
@@ -152,21 +157,24 @@ where
         "launching parent syncer with last committed finality"
     );
 
-    start_syncing(
+    sync_loop(
         config,
+        db,
         view_provider,
         vote_tally,
         parent_client,
         query,
         tendermint_client,
-    );
+    )
+    .await;
 
     Ok(())
 }
 
 /// Start the parent finality listener in the background
-fn start_syncing<T, C, P, S>(
+async fn sync_loop<T, C, P, S, DB>(
     config: Config,
+    db: DB,
     view_provider: Arc<Toggle<CachedFinalityProvider<P, S>>>,
     vote_tally: VoteTally,
     parent_proxy: Arc<P>,
@@ -176,25 +184,25 @@ fn start_syncing<T, C, P, S>(
     T: ParentFinalityStateQuery + Send + Sync + 'static,
     C: tendermint_rpc::Client + Send + Sync + 'static,
     P: ParentQueryProxy + Send + Sync + 'static,
-    S: KVStore + 'static,
+    S: KVStore + Encode<u64> + Codec<Option<ParentViewPayload>> + 'static,
     S::Namespace: Send + Sync + 'static,
+    DB: KVWritable<S> + Send + Sync + Clone + 'static,
+    for<'a> DB::Tx<'a>: Aux,
 {
     let mut interval = tokio::time::interval(config.polling_interval);
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
-    tokio::spawn(async move {
-        let lotus_syncer =
-            LotusParentSyncer::new(config, parent_proxy, view_provider, vote_tally, query)
-                .expect("");
+    let lotus_syncer =
+        LotusParentSyncer::new(config, db, parent_proxy, view_provider, vote_tally, query)
+            .expect("failed to create Lotus syncer");
 
-        let mut tendermint_syncer = TendermintAwareSyncer::new(lotus_syncer, tendermint_client);
+    let mut tendermint_syncer = TendermintAwareSyncer::new(lotus_syncer, tendermint_client);
 
-        loop {
-            interval.tick().await;
+    loop {
+        interval.tick().await;
 
-            if let Err(e) = tendermint_syncer.sync().await {
-                tracing::error!(error = e.to_string(), "sync with parent encountered error");
-            }
+        if let Err(e) = tendermint_syncer.sync().await {
+            tracing::error!(error = e.to_string(), "sync with parent encountered error");
         }
-    });
+    }
 }

@@ -12,7 +12,7 @@ use ipc_api::staking::StakingChangeRequest;
 
 pub use fetch::CachedFinalityProvider;
 
-pub(crate) type ParentViewPayload = (BlockHash, Vec<StakingChangeRequest>, Vec<IpcEnvelope>);
+pub type ParentViewPayload = (BlockHash, Vec<StakingChangeRequest>, Vec<IpcEnvelope>);
 
 fn ensure_sequential<T, F: Fn(&T) -> u64>(msgs: &[T], f: F) -> StmResult<(), Error> {
     if msgs.is_empty() {

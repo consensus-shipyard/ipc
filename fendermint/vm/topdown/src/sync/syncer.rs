@@ -10,9 +10,10 @@ use crate::{
     is_null_round_str, BlockHash, BlockHeight, CachedFinalityProvider, Config, Error, Toggle,
 };
 use anyhow::anyhow;
-use async_stm::{atomically, atomically_or_err, StmError};
+use async_stm::auxtx::Aux;
+use async_stm::{atomically, atomically_or_err_aux, StmError};
 use ethers::utils::hex;
-use fendermint_storage::KVStore;
+use fendermint_storage::{Codec, Encode, KVStore, KVWritable};
 use libp2p::futures::TryFutureExt;
 use std::sync::Arc;
 use tracing::instrument;
@@ -22,7 +23,7 @@ use fendermint_vm_event::{BlockHashHex, NewParentView};
 
 /// Parent syncer that constantly poll parent. This struct handles lotus null blocks and deferred
 /// execution. For ETH based parent, it should work out of the box as well.
-pub(crate) struct LotusParentSyncer<T, P, S: KVStore> {
+pub(crate) struct LotusParentSyncer<T, P, S: KVStore, DB> {
     config: Config,
     parent_proxy: Arc<P>,
     provider: Arc<Toggle<CachedFinalityProvider<P, S>>>,
@@ -36,17 +37,22 @@ pub(crate) struct LotusParentSyncer<T, P, S: KVStore> {
     /// the polling frequence to where it's impractical after
     /// we have caught up.
     sync_many: bool,
+
+    db: DB,
 }
 
-impl<T, P, S> LotusParentSyncer<T, P, S>
+impl<T, P, S, DB> LotusParentSyncer<T, P, S, DB>
 where
     T: ParentFinalityStateQuery + Send + Sync + 'static,
     P: ParentQueryProxy + Send + Sync + 'static,
-    S: KVStore + 'static,
+    S: KVStore + Encode<u64> + Codec<Option<ParentViewPayload>> + 'static,
     S::Namespace: Send + Sync + 'static,
+    DB: KVWritable<S> + Clone,
+    for<'a> DB::Tx<'a>: Aux,
 {
     pub fn new(
         config: Config,
+        db: DB,
         parent_proxy: Arc<P>,
         provider: Arc<Toggle<CachedFinalityProvider<P, S>>>,
         vote_tally: VoteTally,
@@ -59,6 +65,7 @@ where
             vote_tally,
             query,
             sync_many: true,
+            db,
         })
     }
 
@@ -125,12 +132,14 @@ where
     }
 }
 
-impl<T, P, S> LotusParentSyncer<T, P, S>
+impl<T, P, S, DB> LotusParentSyncer<T, P, S, DB>
 where
     T: ParentFinalityStateQuery + Send + Sync + 'static,
     P: ParentQueryProxy + Send + Sync + 'static,
-    S: KVStore + 'static,
+    S: KVStore + Encode<u64> + Codec<Option<ParentViewPayload>> + 'static,
     S::Namespace: Send + Sync + 'static,
+    DB: KVWritable<S> + Clone,
+    for<'a> DB::Tx<'a>: Aux,
 {
     async fn exceed_cache_size_limit(&self) -> bool {
         let max_cache_blocks = self.config.max_cache_blocks();
@@ -190,6 +199,7 @@ where
             parent_block_hash = hex::encode(&parent_block_hash),
             "polling height with parent hash"
         );
+        let db = self.db.clone();
 
         let block_hash_res = match self.parent_proxy.get_block_hash(height).await {
             Ok(res) => res,
@@ -201,13 +211,16 @@ where
                         "detected null round at height, inserted None to cache"
                     );
 
-                    atomically_or_err::<_, Error, _>(|| {
-                        self.provider.new_parent_view(height, None)?;
-                        self.vote_tally
-                            .add_block(height, None)
-                            .map_err(map_voting_err)?;
-                        Ok(())
-                    })
+                    atomically_or_err_aux::<_, Error, _, _, _>(
+                        || db.write(),
+                        |tx| {
+                            self.provider.new_parent_view(tx, height, None)?;
+                            self.vote_tally
+                                .add_block(height, None)
+                                .map_err(map_voting_err)?;
+                            Ok(())
+                        },
+                    )
                     .await?;
 
                     emit!(NewParentView {
@@ -248,17 +261,21 @@ where
             "fetched data"
         );
 
-        atomically_or_err::<_, Error, _>(|| {
-            // This is here so we see if there is abnormal amount of retries for some reason.
-            tracing::debug!(height, "adding data to the cache");
+        atomically_or_err_aux::<_, Error, _, _, _>(
+            || db.write(),
+            |tx| {
+                // This is here so we see if there is abnormal amount of retries for some reason.
+                tracing::debug!(height, "adding data to the cache");
 
-            self.provider.new_parent_view(height, Some(data.clone()))?;
-            self.vote_tally
-                .add_block(height, Some(data.0.clone()))
-                .map_err(map_voting_err)?;
-            tracing::debug!(height, "non-null block pushed to cache");
-            Ok(())
-        })
+                self.provider
+                    .new_parent_view(tx, height, Some(data.clone()))?;
+                self.vote_tally
+                    .add_block(height, Some(data.0.clone()))
+                    .map_err(map_voting_err)?;
+                tracing::debug!(height, "non-null block pushed to cache");
+                Ok(())
+            },
+        )
         .await?;
 
         emit!(NewParentView {
@@ -405,6 +422,7 @@ mod tests {
     use anyhow::anyhow;
     use async_stm::atomically;
     use async_trait::async_trait;
+    use fendermint_storage::im::InMemoryBackend;
     use fendermint_vm_genesis::{Power, Validator};
     use ipc_api::cross::IpcEnvelope;
     use ipc_api::staking::StakingChangeRequest;
@@ -514,9 +532,11 @@ mod tests {
             genesis_epoch,
             Some(committed_finality.clone()),
             proxy.clone(),
+            test_store,
         );
         let mut syncer = LotusParentSyncer::new(
             config,
+            InMemoryBackend::default(),
             proxy,
             Arc::new(Toggle::enabled(provider)),
             vote_tally,

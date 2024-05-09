@@ -11,7 +11,7 @@ use crate::{
 use anyhow::{bail, Context};
 use async_stm::atomically;
 use async_trait::async_trait;
-use fendermint_storage::KVStore;
+use fendermint_storage::{Codec, Encode, KVStore, KVWritable};
 use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::ipc;
 use fendermint_vm_event::ParentFinalityMissingQuorum;
@@ -24,7 +24,8 @@ use fendermint_vm_resolver::pool::{ResolveKey, ResolvePool};
 use fendermint_vm_topdown::proxy::IPCProviderProxy;
 use fendermint_vm_topdown::voting::{ValidatorKey, VoteTally};
 use fendermint_vm_topdown::{
-    CachedFinalityProvider, IPCParentFinality, ParentFinalityProvider, ParentViewProvider, Toggle,
+    CachedFinalityProvider, IPCParentFinality, ParentFinalityProvider, ParentViewPayload,
+    ParentViewProvider, Toggle,
 };
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
@@ -84,29 +85,32 @@ pub type ChainMessageCheckRes = Result<SignedMessageCheckRes, IllegalMessage>;
 /// Interpreter working on chain messages; in the future it will schedule
 /// CID lookups to turn references into self-contained user or cross messages.
 #[derive(Clone)]
-pub struct ChainMessageInterpreter<I, DB, S> {
+pub struct ChainMessageInterpreter<I, BS, S, DB> {
     inner: I,
-    gateway_caller: GatewayCaller<DB>,
-    store: PhantomData<S>,
+    gateway_caller: GatewayCaller<BS>,
+    phantom_store: PhantomData<S>,
+    phantom_db: PhantomData<DB>,
 }
 
-impl<I, DB, S> ChainMessageInterpreter<I, DB, S> {
+impl<I, BS, S, DB> ChainMessageInterpreter<I, BS, S, DB> {
     pub fn new(inner: I) -> Self {
         Self {
             inner,
             gateway_caller: GatewayCaller::default(),
-            store: PhantomData,
+            phantom_db: PhantomData,
+            phantom_store: PhantomData,
         }
     }
 }
 
 #[async_trait]
-impl<I, DB, S> ProposalInterpreter for ChainMessageInterpreter<I, DB, S>
+impl<I, BS, S, DB> ProposalInterpreter for ChainMessageInterpreter<I, BS, S, DB>
 where
-    DB: Blockstore + Clone + 'static + Send + Sync,
     I: Sync + Send,
-    S: KVStore + Send + Sync + 'static,
+    S: KVStore + Encode<u64> + Codec<Option<ParentViewPayload>> + Send + Sync + 'static,
     S::Namespace: Send + Sync + 'static,
+    BS: Blockstore + Clone + 'static + Send + Sync,
+    DB: KVWritable<S> + Clone + 'static + Send + Sync,
 {
     type State = ChainEnv<S>;
     type Message = ChainMessage;
@@ -225,15 +229,16 @@ where
 }
 
 #[async_trait]
-impl<I, DB, S> ExecInterpreter for ChainMessageInterpreter<I, DB, S>
+impl<I, BS, S, DB> ExecInterpreter for ChainMessageInterpreter<I, BS, S, DB>
 where
-    DB: Blockstore + Clone + 'static + Send + Sync + Clone,
-    S: KVStore + Send + Sync + 'static,
+    S: KVStore + Encode<u64> + Codec<Option<ParentViewPayload>> + Send + Sync + 'static,
     S::Namespace: Send + Sync + 'static,
+    BS: Blockstore + Clone + 'static + Send + Sync + Clone,
+    DB: KVWritable<S> + Clone + 'static + Send + Sync + Clone,
     I: ExecInterpreter<
         Message = VerifiableMessage,
         DeliverOutput = SignedMessageApplyRes,
-        State = FvmExecState<DB>,
+        State = FvmExecState<BS>,
         EndOutput = PowerUpdates,
     >,
 {
@@ -430,9 +435,10 @@ where
 }
 
 #[async_trait]
-impl<I, DB, S> CheckInterpreter for ChainMessageInterpreter<I, DB, S>
+impl<I, BS, S, DB> CheckInterpreter for ChainMessageInterpreter<I, BS, S, DB>
 where
-    DB: Blockstore + Clone + 'static + Send + Sync,
+    BS: Blockstore + Clone + 'static + Send + Sync,
+    DB: Clone + 'static + Send + Sync,
     S: KVStore + Send + Sync + 'static,
     S::Namespace: Send + Sync + 'static,
     I: CheckInterpreter<Message = VerifiableMessage, Output = SignedMessageCheckRes>,
@@ -481,9 +487,10 @@ where
 }
 
 #[async_trait]
-impl<I, DB, S> QueryInterpreter for ChainMessageInterpreter<I, DB, S>
+impl<I, BS, S, DB> QueryInterpreter for ChainMessageInterpreter<I, BS, S, DB>
 where
-    DB: Blockstore + Clone + 'static + Send + Sync,
+    BS: Blockstore + Clone + 'static + Send + Sync,
+    DB: Clone + 'static + Send + Sync,
     S: KVStore + Send + Sync + 'static,
     S::Namespace: Send + Sync + 'static,
     I: QueryInterpreter,
@@ -502,9 +509,10 @@ where
 }
 
 #[async_trait]
-impl<I, DB, S> GenesisInterpreter for ChainMessageInterpreter<I, DB, S>
+impl<I, BS, S, DB> GenesisInterpreter for ChainMessageInterpreter<I, BS, S, DB>
 where
-    DB: Blockstore + Clone + 'static + Send + Sync,
+    BS: Blockstore + Clone + 'static + Send + Sync,
+    DB: Clone + 'static + Send + Sync,
     S: KVStore + Send + Sync + 'static,
     S::Namespace: Send + Sync + 'static,
     I: GenesisInterpreter,
