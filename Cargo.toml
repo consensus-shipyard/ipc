@@ -47,7 +47,7 @@ anyhow = "1"
 arbitrary = { version = "1", features = ["derive"] }
 arbtest = "0.2"
 async-recursion = "1"
-async-stm = "0.4"
+async-stm = "0.5"
 async-trait = "0.1"
 async-channel = "1.8.0"
 axum = { version = "0.6", features = ["ws"] }
@@ -229,8 +229,6 @@ tendermint-proto = { version = "0.31" }
 gcra = { git = "https://github.com/consensus-shipyard/gcra-rs.git", branch = "main" }
 # Contains some API changes that the upstream has not merged.
 merkle-tree-rs = { git = "https://github.com/consensus-shipyard/merkle-tree-rs.git", branch = "dev" }
-
-async-stm = { path = "/home/aakoshh/projects/samples/rust/async-stm-rs" }
 
 [profile.wasm]
 inherits = "release"
