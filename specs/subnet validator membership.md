@@ -5,7 +5,7 @@ At the time of this writing, the child subnet blockchain is running on top of [C
 
 - **Validator power assignment**: how each validator obtains its voting power
 - **Validator quorum**: how the validator agree on the child subnet changes
-- **Validator set changes:** how each validator joins and exists the voting validators
+- **Validator set changes:** how each validator joins and exits the voting validators
 
 ## Validator Changes
 
