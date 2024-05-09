@@ -230,6 +230,8 @@ gcra = { git = "https://github.com/consensus-shipyard/gcra-rs.git", branch = "ma
 # Contains some API changes that the upstream has not merged.
 merkle-tree-rs = { git = "https://github.com/consensus-shipyard/merkle-tree-rs.git", branch = "dev" }
 
+async-stm = { path = "/home/aakoshh/projects/samples/rust/async-stm-rs" }
+
 [profile.wasm]
 inherits = "release"
 panic = "abort"

@@ -463,8 +463,6 @@ dependencies = [
 [[package]]
 name = "async-stm"
 version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d329f9e3620d0987cddea11769a8ef3ce6f60d794b891ced477033ecc6c8310e"
 dependencies = [
  "parking_lot",
  "tokio",
