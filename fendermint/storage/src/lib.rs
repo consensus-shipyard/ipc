@@ -66,6 +66,12 @@ pub trait KVRead<S: KVStore> {
     fn get<K, V>(&self, ns: &S::Namespace, k: &K) -> KVResult<Option<V>>
     where
         S: Encode<K> + Decode<V>;
+
+    fn iter<K, V>(&self, ns: &S::Namespace) -> impl Iterator<Item = KVResult<(K, V)>>
+    where
+        S: Decode<K> + Decode<V>,
+        S::Repr: Ord,
+        <S as KVStore>::Repr: 'static;
 }
 
 /// Operations available on a write transaction.
