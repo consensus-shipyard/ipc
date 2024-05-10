@@ -156,7 +156,7 @@ where
         Ok(None)
     }
 
-    fn iter<K, V>(&self, ns: &S::Namespace) -> impl Iterator<Item = KVResult<(K, V)>>
+    fn iterate<K, V>(&self, ns: &S::Namespace) -> impl Iterator<Item = KVResult<(K, V)>>
     where
         S: Decode<K> + Decode<V>,
         <S as KVStore>::Repr: Ord + 'static,

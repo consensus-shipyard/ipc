@@ -67,7 +67,10 @@ pub trait KVRead<S: KVStore> {
     where
         S: Encode<K> + Decode<V>;
 
-    fn iter<K, V>(&self, ns: &S::Namespace) -> impl Iterator<Item = KVResult<(K, V)>>
+    /// Iterate items in the namespace ordered by their representation.
+    ///
+    /// TODO: Add parameters for iteration direction and bounds.
+    fn iterate<K, V>(&self, ns: &S::Namespace) -> impl Iterator<Item = KVResult<(K, V)>>
     where
         K: 'static,
         V: 'static,
@@ -164,7 +167,7 @@ where
         kv.delete(&self.ns, k)
     }
 
-    pub fn iter<'a, 'b>(
+    pub fn iterate<'a, 'b>(
         &'a self,
         kv: &'b impl KVRead<S>,
     ) -> impl Iterator<Item = KVResult<(K, V)>> + 'b
@@ -175,6 +178,6 @@ where
         V: 'static,
         'a: 'b,
     {
-        kv.iter::<K, V>(&self.ns)
+        kv.iterate::<K, V>(&self.ns)
     }
 }
