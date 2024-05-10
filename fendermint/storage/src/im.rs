@@ -160,6 +160,8 @@ where
     where
         S: Decode<K> + Decode<V>,
         <S as KVStore>::Repr: Ord + 'static,
+        K: 'static,
+        V: 'static,
     {
         if let Some(m) = self.data.get(ns) {
             let mut items = m.iter().map(|(k, v)| (k, v.as_ref())).collect::<Vec<_>>();

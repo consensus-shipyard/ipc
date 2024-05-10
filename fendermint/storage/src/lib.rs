@@ -69,9 +69,10 @@ pub trait KVRead<S: KVStore> {
 
     fn iter<K, V>(&self, ns: &S::Namespace) -> impl Iterator<Item = KVResult<(K, V)>>
     where
+        K: 'static,
+        V: 'static,
         S: Decode<K> + Decode<V>,
-        S::Repr: Ord,
-        <S as KVStore>::Repr: 'static;
+        <S as KVStore>::Repr: Ord + 'static;
 }
 
 /// Operations available on a write transaction.
@@ -161,5 +162,19 @@ where
 
     pub fn delete(&self, kv: &mut impl KVWrite<S>, k: &K) -> KVResult<()> {
         kv.delete(&self.ns, k)
+    }
+
+    pub fn iter<'a, 'b>(
+        &'a self,
+        kv: &'b impl KVRead<S>,
+    ) -> impl Iterator<Item = KVResult<(K, V)>> + 'b
+    where
+        S::Repr: Ord + 'static,
+        S: Decode<K>,
+        K: 'static,
+        V: 'static,
+        'a: 'b,
+    {
+        kv.iter::<K, V>(&self.ns)
     }
 }
