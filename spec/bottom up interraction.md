@@ -104,7 +104,7 @@ Once the quorum has been verified, the `next_configuration_id` informs the paren
 
 When the checkpoint is submitted to the Lotus rootnet, it is currently expected to either contain all bottom-up messages or that they accompany the checkpoint in a different way, and only a commitment is in the checkpoint. However in both cases the bottom-up messages would be executed and their gas cost paid for by the relayer.
 
-With a Fendermint parent network, the same thing works if that’s how the smart contracts are implemented. There was another way laid it in the epic above, which involved the IPLD Resolver procuring the checkpoint payload from the subnet based on a CID, and executing the messages implicitly when the validators decide that they all have the data available. In this case the relayer would have only paid for the *validation* of the checkpoint, not its *execution*.
+With a Fendermint parent network, the same thing works if that’s how the smart contracts are implemented. There was another way laid out it in the epic above, which involved the IPLD Resolver procuring the checkpoint payload from the subnet based on a CID, and executing the messages implicitly when the validators decide that they all have the data available. In this case the relayer would have only paid for the *validation* of the checkpoint, not its *execution*.
 
 Both of these schemes suffer from the fact that the gas limit of the messages included in the checkpoint is unknown when the checkpoint is made (and it *cannot* be known, as by definition the gas cost depends on where the message will be executed):
 
