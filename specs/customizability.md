@@ -74,7 +74,7 @@ pub struct CustomKernelImpl<C>(pub DefaultKernel<C>);
 
 ### **2. Implementing all necessary functions for the syscall**
 
-Implement `my_custom_syscall` Here is where we implement our custom syscall:
+Here is where we implement our `my_custom_syscall` custom syscall:
 
 ```rust
 impl<C> CustomKernel for CustomKernelImpl<C>
@@ -255,7 +255,7 @@ impl ActorCode for Actor {
 
 [fendermint/actors/customsyscall/src/actor.rs#L14](https://github.com/consensus-shipyard/ipc/blob/98497363a10e08236325e6d5c52755b9fcd52958/fendermint/actors/customsyscall/src/actor.rs#L14)
 
-Even though this is Rust code, IPC will compile it as a Wasm target and then run the compiled Wasm code inside FVM as an actor. However, we want to share some of the code between Wasm and IPC, such as the actor name `CUSTOMSYSCALL_ACTOR_NAME` and the `Invoke` method enum. We will define these in a separate file called `[shared.rs](http://shared.rs/)` as follows:
+Even though this is Rust code, IPC will compile it as a Wasm target and then run the compiled Wasm code inside FVM as an actor. However, we want to share some of the code between Wasm and IPC, such as the actor name `CUSTOMSYSCALL_ACTOR_NAME` and the `Invoke` method enum. We will define these in a separate file called `[shared.rs](https://github.com/consensus-shipyard/ipc/blob/98497363a10e08236325e6d5c52755b9fcd52958/fendermint/actors/customsyscall/src/shared.rs)` as follows:
 
 ```rust
 use num_derive::FromPrimitive;
@@ -271,7 +271,7 @@ pub enum Method {
 
 [fendermint/actors/customsyscall/src/shared.rs](https://github.com/consensus-shipyard/ipc/blob/98497363a10e08236325e6d5c52755b9fcd52958/fendermint/actors/customsyscall/src/shared.rs#L1)
 
-We next need to write a `[lib.rs](http://lib.rs/)` file which exports the shared code and only compiles `actor.rs` if we are building the Wasm actor:
+We next need to write a `[lib.rs](https://github.com/consensus-shipyard/ipc/blob/98497363a10e08236325e6d5c52755b9fcd52958/fendermint/actors/customsyscall/src/lib.rs)` file which exports the shared code and only compiles `actor.rs` if we are building the Wasm actor:
 
 ```
 #[cfg(feature = "fil-actor")]
@@ -322,7 +322,7 @@ Your actor has now been deployed and we should be able to send it messages!
 The contents of the `genesis.json` file are essentially the `Genesis` structure defined in the [genesis](https://github.com/consensus-shipyard/ipc/tree/specs/fendermint/vm/genesis) crate. It has the following properties:
 
 - `chain_name` is an arbitrary name for the chain, which will be hashed to become the numeric `chain_id`; in the context of IPC subnets the `chain_name` is expected to be the textual representation of the `SubnetID`
-- `timestamp` is the number of seconds since UNIX epoch
+- `timestamp` is the UNIX timestamp of a moment when genesis was created by the first Validator
 - `network_version` is used by the FVM to select gas pricing policy
 - `base_fee` is measured in *atto* and represents the base price for gas
 - `power_scale` is the number of decimals to take into account from the FIL token collateral balance when converting it into voting power expressed as `u64`, which is what CometBFT expects. For example if the scale is 0 then every 1 FIL gives 1 voting power, if it’s 3 then every 0.001 FIL does, and if it’s -1 then every 10 FIL. The power is rounded upwards, so that we don’t end up with 0 power, which would be rejected by CometBFT; for example if the scale is 1, then both 1.1 FIL and 1.9 FIL give 2 power.
@@ -346,5 +346,3 @@ The `genesis.json` file is usually constructed in one of two ways:
 The gas price in the FVM is by default [determined](https://github.com/filecoin-project/ref-fvm/blob/c39d880d086aa2e771c7190163436e02715d80f3/fvm/src/machine/mod.rs#L156) by the network version when the `NetworkConfig` is created, but could further be customised by assigning to the `price_list` field. Should Fendermint have to do that, it would be in the [constructor](https://github.com/consensus-shipyard/ipc/blob/7af25c4c860f5ab828e8177927a0f8b6b7a7cc74/fendermint/vm/interpreter/src/fvm/state/exec.rs#L132) of the `FvmExecState`.
 
 The `base_fee` set in genesis is also part of the gas policy. Currently it’s a static value, but it’s part of the upgradable parts of the `FvmExecState` and `FvmStateParams`, with its history maintained by the `App`. The interpreters could have logic to change its value based on the blocks they process.
-
-Also take a look at the following issue to see another proposal to use the `chainmetadata` actor to track the `base_fee` :
