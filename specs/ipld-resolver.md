@@ -8,10 +8,7 @@ The IPLD Resolver can facilitate IPC in multiple ways:
 - resolving CIDs into content via BitSwap
 - pre-emptively push data to the parent subnet to circulate it via GossipSub, instead of waiting until the request arrives via BitSwap (e.g. the contents of a bottom-up checkpoint)
 
-<aside>
-💡 The resolver used to be a [standalone library](https://github.com/consensus-shipyard/ipc-ipld-resolver) before it was [migrated](https://github.com/consensus-shipyard/ipc/tree/main/ipld/resolver) to the IPC monorepo and upgraded to use a newer version of [`libp2p`](https://github.com/libp2p/rust-libp2p) . Since then the BitSwap unit tests show that there is a [bug](https://github.com/consensus-shipyard/ipc/issues/537) with larger data structures, which we haven’t had time to investigate. This function isn’t used at the moment, but if it were, the problem had to be fixed first.
-
-</aside>
+The resolver used to be a [standalone library](https://github.com/consensus-shipyard/ipc-ipld-resolver) before it was [migrated](https://github.com/consensus-shipyard/ipc/tree/main/ipld/resolver) to the IPC monorepo and upgraded to use a newer version of [`libp2p`](https://github.com/libp2p/rust-libp2p) . Since then the BitSwap unit tests show that there is a [bug](https://github.com/consensus-shipyard/ipc/issues/537) with larger data structures, which we haven’t had time to investigate. This function isn’t used at the moment, but if it were, the problem had to be fixed first.
 
 # Use Cases
 
@@ -50,7 +47,7 @@ The votes are being fed to the tally by the [`dispatch_resolver_events`](https:/
 
 The [`resolver`](https://github.com/consensus-shipyard/ipc/tree/specs/fendermint/vm/resolver) crate under `vm` is a generic component which consists of two parts:
 
-- The `[pool](https://github.com/consensus-shipyard/ipc/blob/specs/fendermint/vm/resolver/src/pool.rs)` module contains the `ResolvePool` which is an [STM](https://crates.io/crates/async-stm) enabled component where we can submit items to be resolved, and monitor their status, collecting. The pool is generic in the items it can resolve, as long as they can be mapped to a `Cid` and a `SubnetId`. The pool is the shared memory which is used by the interpreters to add items and inquire about their status during the block execution.
+- The [`pool`](https://github.com/consensus-shipyard/ipc/blob/specs/fendermint/vm/resolver/src/pool.rs) module contains the `ResolvePool` which is an [STM](https://crates.io/crates/async-stm) enabled component where we can submit items to be resolved, and monitor their status, collecting. The pool is generic in the items it can resolve, as long as they can be mapped to a `Cid` and a `SubnetId`. The pool is the shared memory which is used by the interpreters to add items and inquire about their status during the block execution.
 - The [`ipld`](https://github.com/consensus-shipyard/ipc/blob/specs/fendermint/vm/resolver/src/ipld.rs) module contains the `IpldResolver` which is runs in the background to execute tasks sent to the `ResolvePool` by sending them to actual IPLD `Service`.
 
 Currently the `ChainEnv` requires a pool working with [`CheckpointPoolItem`](https://github.com/consensus-shipyard/ipc/blob/7af25c4c860f5ab828e8177927a0f8b6b7a7cc74/fendermint/vm/interpreter/src/chain.rs#L51).
