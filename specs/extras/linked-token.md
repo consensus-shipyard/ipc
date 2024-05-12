@@ -163,7 +163,7 @@ Setup and instructions for running on calibnet
     make check-balance
     ```
 
-    We hope to see an output of
+    The expected output is
 
     ```jsx
     0x0000000000000000000000000000000000000000000000000000000000000000
