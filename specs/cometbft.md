@@ -52,7 +52,6 @@ CometBFT is written in Go, while Fendermint is written in Rust. Had Fendermint b
 
 In Docker they are two distinct containers, with `cometbft` being one of the official images. This has the advantage that there is no need to audit it, because we haven’t changed anything.
 
-<aside>
 💡 Sometimes the question comes up whether the `fendermint` process should somehow own `cometbft` and try to hide the fact that it even exists to simplify its operation and deployment - in this regard it would make it more similar to the experience of native Cosmos SDK apps written in Go, which are executed in the CometBFT process itself.
 
 It is worth keeping in mind in this context that [securely deploying](https://docs.cometbft.com/v0.37/core/validators#setting-up-a-validator) CometBFT in production is a task left for engineering. Fendermint doesn’t contain any tools or documentation to do this for the user.
@@ -60,5 +59,3 @@ It is worth keeping in mind in this context that [securely deploying](https://do
 For this reason it is worth highlighting the need for operators to familiarise themselves with CometBFT. Trying to hide CometBFT as an implementation detail would risk obscuring it, and making it more difficult for them to find expert advice on operating their blockchain.
 
 When in need for inspiration, one can look at the [Penumbra deployments](https://github.com/penumbra-zone/penumbra/tree/v0.74.0/deployments), which have a similar split between a Rust application and the CometBFT engine.
-
-</aside>
