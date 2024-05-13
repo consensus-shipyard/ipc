@@ -16,9 +16,9 @@
 
 A high-level overview of the process is shown in the following diagrams:
 
-![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/75c9b610-402a-494d-9887-8258d6cc60b5/3e024f7e-8279-4b41-bd16-034bf5f603e1/Untitled.png)
+![Linked Token Bridging](./linked-token-bridging.png)
 
-![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/75c9b610-402a-494d-9887-8258d6cc60b5/75ff1b6d-3576-4754-884f-57b595e8f5ee/Untitled.png)
+![Linked Token Withdrawing](./linked-token-withdrawing.png)
 
 Setup and instructions for running on calibnet
 
