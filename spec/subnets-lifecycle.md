@@ -11,7 +11,7 @@ Subnets within a single hierarchy tree have native communication protocols and a
 
 The lifecycle of a subnet begins when it’s deployed and ends when the subnet is closed.
 
-Before a subnet is created, the subnet creator must specify the validator power allocation mode, which is called the `PermissionMode`. There are three kinds of permission mode at the moment:
+Before a subnet actor is deployed, the subnet creator must specify the validator power allocation mode, which is called the `PermissionMode`. There are three kinds of permission mode at the moment:
 
 - `Collateral`: This means the power of the validator comes from the collateral staked. New validators can `join` the subnet, also `stake` more collateral, `unstake` collateral and finally `leave` the subnet
 - `Federated`: The power of the validator is set by the owner of the subnet
@@ -21,10 +21,10 @@ At the time of subnet creation, a minimum validator count requirement is set by 
 
 Before the minimal requirements are met, the subnet is in a `preBootstrap` state, once those conditions are met, the subnet is in a `postBootstap` state. Any operations performed on the subnet in `preBootstrap` state is recorded in the subnet `genesis`.
 
-For normal users, they can perform:
+Any address can perform:
 
-- Prefund: Provide genesis balance to the subnet
-- Fund: Send fund from the parent to an address in the child subnet. The parent will track the total circulating supply of the subnet.
+- Prefund: Provide genesis balance to the subnet, i.e. providing some initial balance to certain reward account in the child subnet.
+- Fund: Send fund from the parent to an address in the child subnet. The parent will track the total circulating supply of the subnet. For how the mapping of tokens between the parent and the child works, please refer to the `SupplySource` section.
 - Release: Send fund from the child subnet to an address in the parent subnet
 - Cross Message Call: Call another contract in another subnet
 
@@ -40,6 +40,11 @@ For detailed explanation on how `Collateral` and `FederatedPower` affect the val
 ### Deployment
 
 For ipc powered subnet, it’s deployed through `SubnetRegistry`. This contract should be deployed together with the gateway. One can simply call [newSubnetActor](https://github.com/consensus-shipyard/ipc/blob/7af25c4c860f5ab828e8177927a0f8b6b7a7cc74/contracts/src/subnetregistry/RegisterSubnetFacet.sol#L22) method to deploy a new subnet under the gateway contract. But do note that this method requires permission. The creator of this registry could limit the access on who can deploy new subnets or there are no restrictions at all, see [line](https://github.com/consensus-shipyard/ipc/blob/7af25c4c860f5ab828e8177927a0f8b6b7a7cc74/contracts/src/subnetregistry/RegisterSubnetFacet.sol#L95).
+
+The states of a deployed subnet consists of:
+- Prebootstrap: The minimal validator requirements are yet to be met
+- Bootstrapped: The validator requirements are met
+- Killed: All validators have left the subnet and no more circulation, `kill` method is called
 
 ### Genesis
 
