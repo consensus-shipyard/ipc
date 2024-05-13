@@ -106,6 +106,21 @@ run_task = { name = [
     "ipfs-start",
 ] }
 
+[tasks.child-validator-restart-no-parent]
+run_task = { name = [
+    "cometbft-destroy",
+    "fendermint-destroy",
+    "ethapi-destroy",
+    "proxy-destroy",
+    "ipfs-destroy",
+    "fendermint-start-validator-no-parent",
+    "cometbft-start",
+    "cometbft-wait",
+    "ethapi-start",
+    "proxy-start",
+    "ipfs-start",
+] }
+
 [tasks.child-fullnode-down]
 run_task = "testnode-down"
 

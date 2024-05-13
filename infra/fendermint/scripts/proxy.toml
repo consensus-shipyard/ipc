@@ -27,6 +27,10 @@ dependencies = ["docker-network-create"]
 extend = "proxy-run"
 env = { "CMD" = "proxy run", "FLAGS" = "-d" }
 
+[tasks.proxy-stop]
+env = { "CONTAINER_NAME" = "${PROXY_CONTAINER_NAME}" }
+run_task = "docker-stop"
+
 [tasks.proxy-destroy]
 env = { "CONTAINER_NAME" = "${PROXY_CONTAINER_NAME}" }
 run_task = "docker-destroy"

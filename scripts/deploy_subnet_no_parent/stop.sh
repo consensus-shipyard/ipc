@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -euxo pipefail
+set -euo pipefail
 
 if [[ ! -v IPC_FOLDER ]]; then
     IPC_FOLDER=${HOME}/ipc

@@ -280,7 +280,7 @@ do
 done
 
 # Step 6b: Test proxy endpoint
-echo "$DASHES Test proxy endpoints of validator nodes"
+printf "\n$DASHES Test proxy endpoints of validator nodes\n"
 for i in {0..2}
 do
   curl --location http://localhost:${PROXY_HOST_PORTS[i]}/health
