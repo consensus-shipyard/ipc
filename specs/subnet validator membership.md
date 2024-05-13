@@ -9,7 +9,7 @@ At the time of this writing, the child subnet blockchain is running on top of [C
 
 ## Validator Changes
 
-The validators obtain their power from `SubnetActor` , mainly `FederatedPower`, where the power comes from the assignment of the subnet owner, and `Collateral`, where the power comes from the collateral staked in the subnet . This is described in detail in the [lifecycle](https://www.notion.so/b3579d02bd704ce3878c9d0ede23c353?pvs=21) section. Do note that power assignment happens in the parent subnet, the power needs to be propagated down to the child subnet.
+The validators obtain their power from `SubnetActor` , mainly `FederatedPower`, where the power comes from the assignment of the subnet owner, and `Collateral`, where the power comes from the collateral staked in the subnet . This is described in detail in the lifecycle section. Do note that power assignment happens in the parent subnet, the power needs to be propagated down to the child subnet.
 
 Validator membership changes are handled differently depending on the lifecycle stage the subnet is in:
 
