@@ -25,7 +25,7 @@ From a high level point of view, the topdown finality works as follows:
 - Once a quorum is formed on the blocks seen, a topdown finality proposal will be [added](https://github.com/consensus-shipyard/ipc/blob/7af25c4c860f5ab828e8177927a0f8b6b7a7cc74/fendermint/vm/interpreter/src/chain.rs#L132) to the cometbft proposal. The proposal is just the `ParentFinality` struct shown above, i.e. a block height and the corresponding block hash.
 - Once a topdown proposal is received by each node, it will be validated against the topdown syncer cache and the RPC node if there is a cache miss. If the checks do not pass, the proposal will be rejected. The checks include:
     - The height proposed is present in the cache or exists in the RPC node
-    - The hash is matches the corresponding height’s block hash
+    - The hash matches the corresponding height’s block hash
 - Once the proposal is accepted, it will be executed. This means the topdown messages will be executed and validator changes will be stored.
 
 There are some complexity in parent finality process due to each node might have a different RPC endpoint and each RPC might not see exactly the same historical data. Currently topdown parent finality trusts the parent RPC node completely. In this case, one needs a way to detect if the RPC endpoints are serving correct data and all nodes agree on the same parent state. This is why a separate voting process is introduced for parent finality.
