@@ -1,6 +1,6 @@
 # Topdown Finality
 
-The topdown finality propagates the states in the parent subnet to the child blockchain. The following data are passed:
+The topdown finality propagates the states in the parent subnet to the child blockchain. The following data is passed:
 
 - Parent block height + block hash
 - Transactions from the parent to the child subnet
