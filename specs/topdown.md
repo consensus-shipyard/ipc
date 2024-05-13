@@ -81,4 +81,4 @@ The validator changes and topdown messages are first fetched from the parent syn
 
 As topdown finality relies heavily on RPC node for querying, make sure the RPC node is reliable and returns enough historical data.
 
-See also [IPS Spec - Executions](https://www.notion.so/IPS-Spec-Executions-ebf13d833d6845ec9c11b59bd514fcda?pvs=21) for a description of how proposals and and executions are implemented.
+See also [IPS Spec - Executions](https://www.notion.so/IPS-Spec-Executions-ebf13d833d6845ec9c11b59bd514fcda?pvs=21) for a description of how proposals and executions are implemented.
