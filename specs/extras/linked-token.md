@@ -25,13 +25,14 @@ Setup and instructions for running on calibnet
 1. Follow IPC guide for setting up a subnet pinned to the filecoin calibnet network: https://github.com/consensus-shipyard/ipc/blob/main/docs/ipc/quickstart-calibration.md
 2. copy the config file from ipc/contracts/script/examples/cross-token/.env.template to .en a config file for connecting to calibnet and your subnet. Create a new wallet with for executing the USDC test that is not one of the validators. You will need to fund this wallet using the calibnet facuet. Set PRIVATE_KEY in .env for this new wallet.
 3. Deploy or use a pre-deployed gateway on calibnet
-    a. review output of `make deploy-ipc NETWORK=calibrationnet`  in order to get the address of your IPC gateway on the calbnet and add this to your .env file. You should see an output like:
+    
+    a. Review output of `make deploy-ipc NETWORK=calibrationnet`  in order to get the address of your IPC gateway on the calbnet and add this to your .env file. You should see an output like:
 
     ```jsx
     "Gateway": "0x5cF14D2Af9BBd5456Ea532639f1DB355B9BaCBf8",
     ```
 
-    b.  add to your .env file:
+    b.  Add to your .env file:
 
     ```jsx
     export CALIBNET_GATEWAY=0x5cF14D2Af9BBd5456Ea532639f1DB355B9BaCBf8
@@ -44,7 +45,7 @@ Setup and instructions for running on calibnet
     registry_addr = "0x7308C4A503a12521215718cbCa98F951E9aAB9B5"
     ```
 
-4. Use a pre-existing subnet or deploy a new one. You will want to ensure that the config file ~/.ipc/confg.toml has a valid gateway and ipc registry. Your subnet id will look something like:
+5. Use a pre-existing subnet or deploy a new one. You will want to ensure that the config file ~/.ipc/confg.toml has a valid gateway and ipc registry. Your subnet id will look something like:
 
     ```jsx
     ipc-cli subnet create \
@@ -59,15 +60,15 @@ Setup and instructions for running on calibnet
 
     ```
 
-5. Visit [this tool](https://beryx.zondax.ch/address_converter) and convert the t410f2jhadzp7jvo7cuo3r52yoc6fd3q4czxfu5fgbxi filecoin address to an ethereum format like 0xd24e01e5ff4d5df151db8f75870bc51ee1c166e5
-6. Update your .env file to set SUBNET_ROUTE_IN_ETH_FORMAT to be the ethereum format of the subnet address from the previous step
+6. Visit [this tool](https://beryx.zondax.ch/address_converter) and convert the t410f2jhadzp7jvo7cuo3r52yoc6fd3q4czxfu5fgbxi filecoin address to an ethereum format like 0xd24e01e5ff4d5df151db8f75870bc51ee1c166e5
+7. Update your .env file to set SUBNET_ROUTE_IN_ETH_FORMAT to be the ethereum format of the subnet address from the previous step
 
     ```jsx
     export SUBNET_ROUTE_IN_ETH_FORMAT=0x1e0fa8dd65a59399e47cbe6f31766586b41204c3
     ```
 
-7. Set up the validators as specified by the calibration start up guide and ensure we have funded your wallet using a calibnet faucet
-8. Fund your wallet’s address on the subnet
+8. Set up the validators as specified by the calibration start up guide and ensure we have funded your wallet using a calibnet faucet
+9. Fund your wallet’s address on the subnet
 
     ```jsx
     $ ipc-cli cross-msg fund \
@@ -76,7 +77,7 @@ Setup and instructions for running on calibnet
     10
     ```
 
-9. Deploy the USDCTest contract
+10. Deploy the USDCTest contract
 
     ```jsx
     make deploy-usdctest
@@ -91,13 +92,13 @@ Setup and instructions for running on calibnet
 
     You can search for the transaction on filfox and find the correct contract address from the other tab under EthAddress: https://calibration.filfox.info/en/message/0x563e6ca21d46417020accd05cce992e30f4cb7e69e6b76cc249fea53037bdaa8?t=4
 
-10. Mint 1000 USDCTest tokens to your wallet
+11. Mint 1000 USDCTest tokens to your wallet
 
     ```jsx
     make mint-usdc
     ```
 
-11. Check your wallet balance to ensure that the mint was successful
+12. Check your wallet balance to ensure that the mint was successful
 
     ```jsx
     make check-balance
@@ -113,19 +114,19 @@ Setup and instructions for running on calibnet
     0x0000000000000000000000000000000000000000000000000000000000000000
     ```
 
-12. Deploy token replica contract on the subnet. This command should execute fairly quickly because of the subnet’s speed. Use the contract address from the printout indicated below.
+13. Deploy token replica contract on the subnet. This command should execute fairly quickly because of the subnet’s speed. Use the contract address from the printout indicated below.
 
     ```jsx
     make deploy-replica
     ```
 
-13. Deploy token controller contract on Calibnet and update our .env file with the new address.
+14. Deploy token controller contract on Calibnet and update our .env file with the new address.
 
     ```jsx
     make deploy-controller
     ```
 
-14. We must update the replica with the controllers address, and the replica with the controller’s address to complete our setup. Please don’t forget this part!
+15. We must update the replica with the controllers address, and the replica with the controller’s address to complete our setup. Please don’t forget this part!
 
     ```jsx
     make initialize-replica
