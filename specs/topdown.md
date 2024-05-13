@@ -19,9 +19,9 @@ struct ParentFinality {
 
 The validator changes are represented as an array of Changes while topdown messages are an array of [IPCEnvelope](https://github.com/consensus-shipyard/ipc/blob/7af25c4c860f5ab828e8177927a0f8b6b7a7cc74/contracts/src/structs/CrossNet.sol#L63).
 
-From a high level point of view, the topdown finality works as follows:
+Once enabled, the topdown finality runs in the background. From a high level point of view, the topdown finality works as follows:
 
-- Parent finality process will first fetch the last committed `ParentFinality`. If there is no previous committed parent finality, the genesis block is [used](https://github.com/consensus-shipyard/ipc/blob/7af25c4c860f5ab828e8177927a0f8b6b7a7cc74/fendermint/vm/topdown/src/sync/mod.rs#L36).
+- Topdown finality will first fetch the last committed `ParentFinality`. If there is no previous committed parent finality, the genesis block is [used](https://github.com/consensus-shipyard/ipc/blob/7af25c4c860f5ab828e8177927a0f8b6b7a7cc74/fendermint/vm/topdown/src/sync/mod.rs#L36).
 - There is a [ParentSyncer](https://github.com/consensus-shipyard/ipc/blob/7af25c4c860f5ab828e8177927a0f8b6b7a7cc74/fendermint/vm/topdown/src/sync/syncer.rs#L24C19-L24C36) that constantly polls the parent states through RPC calls, either fetching events emitted or through getters. The `ParentSyncer` stores the pulled data in cache and publishes a vote on the latest block seen.
 - Once a quorum is formed on the blocks seen, a topdown finality proposal will be [added](https://github.com/consensus-shipyard/ipc/blob/7af25c4c860f5ab828e8177927a0f8b6b7a7cc74/fendermint/vm/interpreter/src/chain.rs#L132) to the cometbft proposal. The proposal is just the `ParentFinality` struct shown above, i.e. a block height and the corresponding block hash.
 - Once a topdown proposal is received by each node, it will be validated against the topdown syncer cache and the RPC node if there is a cache miss. If the checks do not pass, the proposal will be rejected. The checks include:
@@ -55,7 +55,7 @@ The [`VoteTally`](https://github.com/consensus-shipyard/ipc/blob/specs/fendermin
 
 A quorum detected by the `VoteTally` is used a pre-condition for finality proposals being added to the CometBFT block proposals, to avoid any liveness issues which could arise if the other validators were to reject the proposal. If a premature finality causes the block propsal to fail, it means in that round CometBFT cannot make progress, it cannot finalize a block, potentially causing the subnet blockchain to stall. By requiring a quorum, we avoid this issue by only proposing when we have high confidence that the proposal will be accepted.
 
-See [IPC Spec - IPLD Resolver](https://www.notion.so/IPC-Spec-IPLD-Resolver-7b4290a0d60c40cdba98cd6d3e66648b?pvs=21) for a more detailed discussion of the `VoteTally`.
+See `IPC Spec - IPLD Resolver` for a more detailed discussion of the `VoteTally`.
 
 # Topdown Finality Proposal
 
@@ -82,4 +82,4 @@ The validator changes and topdown messages are first fetched from the parent syn
 
 As topdown finality relies heavily on RPC node for querying, make sure the RPC node is reliable and returns enough historical data.
 
-See also [IPS Spec - Executions](https://www.notion.so/IPS-Spec-Executions-ebf13d833d6845ec9c11b59bd514fcda?pvs=21) for a description of how proposals and executions are implemented.
+See also `IPS Spec - Executions` for a description of how proposals and executions are implemented.
