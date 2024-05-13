@@ -32,8 +32,8 @@ For validators in `Collateral` permission mode, they can:
 
 - Join: Put some stake into the subnet and becomes a validator
 - State: Add more stake into the subnet
-- Unstake: WIthdraw stake from the subnet
-- Leave: WIthdraw all stake from the subnet
+- Unstake: Withdraw stake from the subnet
+- Leave: Withdraw all stake from the subnet
 
 For detailed explanation on how `Collateral` and `FederatedPower` affect the validator’s voting power, see `SubnetValidation`.
 
