@@ -22,11 +22,10 @@ A high-level overview of the process is shown in the following diagrams:
 
 Setup and instructions for running on calibnet
 
-1. Follow IPC guide for setting up a subnet pinned to the filecoin calibnet network
-    1. https://github.com/consensus-shipyard/ipc/blob/main/docs/ipc/quickstart-calibration.md
+1. Follow IPC guide for setting up a subnet pinned to the filecoin calibnet network: https://github.com/consensus-shipyard/ipc/blob/main/docs/ipc/quickstart-calibration.md
 2. copy the config file from ipc/contracts/script/examples/cross-token/.env.template to .en a config file for connecting to calibnet and your subnet. Create a new wallet with for executing the USDC test that is not one of the validators. You will need to fund this wallet using the calibnet facuet. Set PRIVATE_KEY in .env for this new wallet.
 3. Deploy or use a pre-deployed gateway on calibnet
-    1. review output of `make deploy-ipc NETWORK=calibrationnet`  in order to get the address of your IPC gateway on the calbnet and add this to your .env file. You should see an output like:
+    a. review output of `make deploy-ipc NETWORK=calibrationnet`  in order to get the address of your IPC gateway on the calbnet and add this to your .env file. You should see an output like:
 
     ```jsx
     "Gateway": "0x5cF14D2Af9BBd5456Ea532639f1DB355B9BaCBf8",
