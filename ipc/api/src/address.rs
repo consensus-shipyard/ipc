@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: MIT
 use crate::error::Error;
 use crate::subnet_id::SubnetID;
+use crate::{deserialize_human_readable_str, HumanReadable};
 use fvm_shared::address::{Address, Protocol};
+use serde::ser::Error as SerializeError;
 use serde_tuple::{Deserialize_tuple, Serialize_tuple};
 use std::{fmt, str::FromStr};
 
@@ -97,6 +99,26 @@ impl FromStr for IPCAddress {
         }
     }
 }
+
+impl serde_with::SerializeAs<IPCAddress> for HumanReadable {
+    fn serialize_as<S>(address: &IPCAddress, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        if serializer.is_human_readable() {
+            address
+                .to_string()
+                .map_err(|e| {
+                    S::Error::custom(format!("cannot convert ipc address to string: {e}"))
+                })?
+                .serialize(serializer)
+        } else {
+            address.serialize(serializer)
+        }
+    }
+}
+
+deserialize_human_readable_str!(IPCAddress);
 
 #[cfg(test)]
 mod tests {

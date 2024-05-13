@@ -4993,8 +4993,10 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_tuple",
+ "serde_with 2.3.3",
  "strum 0.26.1",
  "thiserror",
+ "tracing",
 ]
 
 [[package]]
