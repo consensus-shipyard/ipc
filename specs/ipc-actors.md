@@ -6,7 +6,7 @@
 - Users are allowed to deploy new subnets from any of the subnets in the hierarchy (as long as the corresponding subnet has the feature enabled).
 - The protocol is recursive. The whole protocol is designed so that it can be explained as a set of simple parent-child interactions.
 
-![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/75c9b610-402a-494d-9887-8258d6cc60b5/2ae2ce34-4a98-48c4-a88d-17dfe8a306d9/Untitled.png)
+![Architecture Design](./ipc-actors-architecture-design.png)
 
 ### High-level architecture
 
@@ -15,8 +15,7 @@
     - The subnet actor is a user-defined actor that implements the specific logic of a subnet. This contract is deployed in the parent from which the child subnet wants to be deployed. There is one subnet-actor for each child subnet in the parent.
     - The subnet registry behaves as a subnet actor factory that offers users a convenient way of deploying instances of the reference implementation of the subnet actor in a network.
 
-![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/75c9b610-402a-494d-9887-8258d6cc60b5/2093f2fe-d420-4a12-86d8-78e7c2e3237e/Untitled.png)
-
+![Subnet Registry](./ipc-actors-subnet-registry.png)
 ### Software stack
 
 The peer implementation of IPC is Fendermint, an IPLD-enabled blockchain based on an ABCI++ application on top of CometBFT and the FVM. All child subnets deploy Fendermint for their nodes. Fendermint implements modules for all the processes described below, and leverages the on-chain logic of IPC for its operation.
@@ -24,7 +23,7 @@ The peer implementation of IPC is Fendermint, an IPLD-enabled blockchain based o
 - All the interactions between modules is performed through an ETH RPC (in the current state).that offers users convenient way to deploy the reference implementation of a subnet actor
 - Relayers are small processes that any user can run to relay bottom-up information.
 
-![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/75c9b610-402a-494d-9887-8258d6cc60b5/a79682db-13a3-4c86-96e6-8a39158739c3/Untitled.png)
+![Software Stack](./ipc-actors-relayers.png)
 
 ### Create a subnet
 
@@ -39,7 +38,7 @@ To create a subnet, users need to:
 - From there on, the subnet infrastructure can be deployed.
     - Every child subnet deploys at genesis its own instance of the IPC gateway and the registry.
 
-![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/75c9b610-402a-494d-9887-8258d6cc60b5/701d7bd2-b88e-4cd0-b8f3-8f5f490f8da1/Untitled.png)
+![Create a Subnet](./ipc-actors-create-subnet.png)
 
 ### Top-down messages and parent finality
 
@@ -49,7 +48,7 @@ To create a subnet, users need to:
 - As part of the execution of the block, validators implicitly commit the finality seen in the parent. This triggers the execution of all top-down messages from the latest finality to the one committed, as well as any changes on the validator set or collateral that may need to be propagated down.
 - When a user performs a top-down message, it is added to a queue in the parent chain. Top-down messages are indexed in the parent by the height where they were committed. This index is used by child subnet validators to determine when a top-down message commitment can be considered as final and their execution can be triggered in the child (when their corresponding finality has been triggered).
 
-![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/75c9b610-402a-494d-9887-8258d6cc60b5/390267a2-8e3e-41ac-b89e-7f5f54f43dd1/Untitled.png)
+![Top Down](ipc-actors-top-down.png)
 
 ### Stake, Leave and membership changes
 
@@ -61,7 +60,7 @@ To create a subnet, users need to:
 - To confirm the changes in the parent, child validators propagate the latest configuration number adopted as part of the membership change in the checkpoint.
     - The commitment of this checkpoint in the parent will trigger the confirmation of collateral/federated power change.
 
-![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/75c9b610-402a-494d-9887-8258d6cc60b5/f67accb3-bb19-4bba-92dc-fd02575e61ac/Untitled.png)
+![Stake](ipc-actors-stake-changes.png)
 
 ### Checkpoint submission
 
@@ -70,7 +69,8 @@ To create a subnet, users need to:
 - Once a quorum is reached, the gateway in the child subnet emits a `QuorumEvent` to notify relayers that there has been an agreement on a new checkpoint, that can be propagated to the parent.
 - The relayers query the `QuorumEvent` and call `submitCheckpoint` in the parent providing the quorum certificate (list of signatures) for that checkpoint, committing it in the parent.
 
-![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/75c9b610-402a-494d-9887-8258d6cc60b5/890d1b5c-ac79-43dd-bd04-7bf45835eeee/Untitled.png)
+![Checkpoint submission](ipc-actors-checkpoint-submission.png)
+
 
 ### Bottom-up messages
 
@@ -82,7 +82,7 @@ To create a subnet, users need to:
     - Validators would reach quorum normally.
     - And the outstanding messages would be queued for the batch coming in the next checkpoint period.
 
-![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/75c9b610-402a-494d-9887-8258d6cc60b5/1869950b-18be-466c-81a6-798dcd0db75f/Untitled.png)
+![Bottom-up Messages](ipc-actors-bottom-up.png)
 
 ## IPC Implementation
 
