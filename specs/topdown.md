@@ -28,7 +28,7 @@ From a high level point of view, the topdown finality works as follows:
     - The hash matches the corresponding height’s block hash
 - Once the proposal is accepted, it will be executed. This means the topdown messages will be executed and validator changes will be stored.
 
-There are some complexity in parent finality process due to each node might have a different RPC endpoint and each RPC might not see exactly the same historical data. Currently topdown parent finality trusts the parent RPC node completely. In this case, one needs a way to detect if the RPC endpoints are serving correct data and all nodes agree on the same parent state. This is why a separate voting process is introduced for parent finality.
+All nodes must agree on the parent state, even though they may be using different RPC endpoints. Those RPC endpoints may have different views of the parent state. At the moment the nodes don't have any way to verify the correctness of `ParentFinality` received from the RPC endpoints. That's why the nodes have to reach consensus on the parent finality through a voting mechanism.
 
 # Parent Syncer
 
