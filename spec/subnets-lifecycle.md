@@ -11,7 +11,7 @@ Subnets within a single hierarchy tree have native communication protocols and a
 
 The lifecycle of a subnet begins when it’s deployed and ends when the subnet is closed.
 
-Before a subnet is created, one must specify the validator power allocation mode, which is called the `PermissionMode`. There are three kinds of permission mode at the moment:
+Before a subnet is created, the subnet creator must specify the validator power allocation mode, which is called the `PermissionMode`. There are three kinds of permission mode at the moment:
 
 - `Collateral`: This means the power of the validator comes from the collateral staked. New validators can `join` the subnet, also `stake` more collateral, `unstake` collateral and finally `leave` the subnet
 - `Federated`: The power of the validator is set by the owner of the subnet
