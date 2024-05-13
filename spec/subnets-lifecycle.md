@@ -17,7 +17,7 @@ Before a subnet is created, the subnet creator must specify the validator power 
 - `Federated`: The power of the validator is set by the owner of the subnet
 - `Static`: The power of the validator is set when the subnet is created. This mode is used mainly for debugging and testing
 
-At the time of subnet creation, a minimum validator count requirement is set by the subnet creator.  If the subnet’s permission mode is collateral, the creator could also set the minimum collateral requirement for the subnet to be bootstrapped. A standard fee for the transaction on the parent network will be paid for the transaction that establishes the subnet.
+At the time of subnet creation, a minimum validator count requirement is set by the subnet creator.  If the subnet’s permission mode is `Collateral`, the creator could also set the minimum collateral requirement for the subnet to be bootstrapped. A standard fee for the transaction on the parent network will be paid for the transaction that establishes the subnet.
 
 Before the minimal requirements are met, the subnet is in a `preBootstrap` state, once those conditions are met, the subnet is in a `postBootstap` state. Any operations performed on the subnet in `preBootstrap` state is recorded in the subnet `genesis`.
 
