@@ -14,7 +14,7 @@
 
 ## USDC propagation flow
 
-A high-level overview of the process is shown in the following diagrams
+A high-level overview of the process is shown in the following diagrams:
 
 ![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/75c9b610-402a-494d-9887-8258d6cc60b5/3e024f7e-8279-4b41-bd16-034bf5f603e1/Untitled.png)
 
@@ -157,7 +157,7 @@ Setup and instructions for running on calibnet
     make check-balance
     ```
 
-    We hope to see an output of
+    The expected output is
 
     ```jsx
     0x0000000000000000000000000000000000000000000000000000000000000000
