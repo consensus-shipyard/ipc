@@ -20,7 +20,7 @@ A high-level overview of the process is shown in the following diagrams:
 
 ![Linked Token Withdrawing](./linked-token-withdrawing.png)
 
-Setup and instructions for running on calibnet
+## Setup and instructions for running on calibnet
 
 1. Follow IPC guide for setting up a subnet pinned to the filecoin calibnet network: https://github.com/consensus-shipyard/ipc/blob/main/docs/ipc/quickstart-calibration.md
 2. copy the config file from ipc/contracts/script/examples/cross-token/.env.template to .en a config file for connecting to calibnet and your subnet. Create a new wallet with for executing the USDC test that is not one of the validators. You will need to fund this wallet using the calibnet facuet. Set PRIVATE_KEY in .env for this new wallet.
