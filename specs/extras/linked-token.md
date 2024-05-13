@@ -1,12 +1,6 @@
 # Linked Token Spec
 
 ## Outline for Linked Token Bridge
-
-<aside>
-💡 Claim: GMP will not be production-ready, and we cannot recommend its usage, until all these problems are solved.
-
-</aside>
-
 - Contracts
     - ERC20 token named USDCTest on Calibration Network
     - Token Controller contract on Calibration Network
