@@ -1,4 +1,4 @@
-# Linked Token Spec
+# Linked Token Readme
 
 ## Outline for Linked Token Bridge
 - Contracts
