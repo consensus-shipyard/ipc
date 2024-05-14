@@ -71,7 +71,7 @@ cargo install cargo-make
 echo "$DASHES Installing toml-cli"
 cargo install toml-cli
 
-# Step 1.3: Install Foundry
+# Step 1.4: Install Foundry
 echo "$DASHES Check foundry..."
 if which foundryup ; then
   echo "$DASHES foundry is already installed."
@@ -81,7 +81,7 @@ else
   foundryup
 fi
 
-# Step 1.3.1: Install node
+# Step 1.5: Install node
 echo "$DASHES Check node..."
 if which node ; then
   echo "$DASHES node is already installed."
@@ -92,7 +92,7 @@ else
   nvm install --default lts/*
 fi
 
-# Step 1.4: Install docker
+# Step 1.6: Install docker
 echo "$DASHES check docker"
 if which docker ; then
   echo "$DASHES docker is already installed."
@@ -192,8 +192,8 @@ echo "$DASHES Creating a child subnet..."
 create_subnet_output=$(ipc-cli subnet create --parent /r314159 --min-validators 3 --min-validator-stake 1 --bottomup-check-period 30 --from $default_wallet_address --permission-mode collateral --supply-source-kind native 2>&1)
 echo $create_subnet_output
 subnet_id=$(echo $create_subnet_output | sed 's/.*with id: \([^ ]*\).*/\1/')
-
 echo "Created new subnet id: $subnet_id"
+subnet_folder=$IPC_CONFIG_FOLDER/$(echo $subnet_id | sed 's|^/||;s|/|-|g')
 
 # Step 5 (alternative): Use an already-created subnet
 #subnet_id=/r314159/t410flp4jf7keqcf5bqogrkx4wpkygiskykcvpaigicq
@@ -221,7 +221,6 @@ do
 done
 
 # Step 8: Start validators
-
 # Step 8.1 (optional): Rebuild fendermint docker
 cd ${IPC_FOLDER}/fendermint
 make clean
@@ -290,10 +289,7 @@ do
       child-validator
 done
 
-# Remove leading '/' and change middle '/' into '-'
-subnet_folder=$IPC_CONFIG_FOLDER/$(echo $subnet_id | sed 's|^/||;s|/|-|g')
-
-# Tableland: Fund proxy wallet in the subnet
+# Step 8.4: Fund proxy wallet in the subnet
 echo "$DASHES Fund proxy wallets in the subnet"
 for i in {0..2}
 do
@@ -307,7 +303,8 @@ do
   ipc-cli wallet remove --wallet-type evm --address ${proxy_address}
 done
 
-# Step 9a: Test ETH API endpoint
+# Step 9: Test
+# Step 9.1: Test ETH API endpoint
 echo "$DASHES Test ETH API endpoints of validator nodes"
 for i in {0..2}
 do
@@ -321,8 +318,8 @@ do
   }'
 done
 
-# Step 9b: Test proxy endpoint
-echo "$DASHES Test proxy endpoints of validator nodes"
+# Step 9.2: Test proxy endpoint
+printf "\n$DASHES Test proxy endpoints of validator nodes\n"
 for i in {0..2}
 do
   curl --location http://localhost:${PROXY_HOST_PORTS[i]}/health

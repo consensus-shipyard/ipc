@@ -20,6 +20,10 @@ dependencies = ["docker-network-create"]
 extend = "ipfs-run"
 env = { "FLAGS" = "-d" }
 
+[tasks.ipfs-stop]
+env = { "CONTAINER_NAME" = "${IPFS_CONTAINER_NAME}" }
+run_task = "docker-stop"
+
 [tasks.ipfs-destroy]
 env = { "CONTAINER_NAME" = "${IPFS_CONTAINER_NAME}" }
 run_task = "docker-destroy"
