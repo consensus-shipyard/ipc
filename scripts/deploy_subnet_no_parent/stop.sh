@@ -10,6 +10,7 @@ fi
 
 # Use "dummy" subnet
 subnet_id="/r314159/t410f726d2jv6uj4mpkcbgg5ndlpp3l7dd5rlcpgzkoi"
+echo "Use existing subnet id: $subnet_id"
 
 # Stop validators
 cd ${IPC_FOLDER}

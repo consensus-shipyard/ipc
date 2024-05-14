@@ -21,17 +21,17 @@ IPFS_GATEWAY_HOST_PORTS=(8080 8081 8082)
 
 # Use "dummy" subnet
 subnet_id="/r314159/t410f726d2jv6uj4mpkcbgg5ndlpp3l7dd5rlcpgzkoi"
-# Remove leading '/' and change middle '/' into '-'
+echo "Use existing subnet id: $subnet_id"
 subnet_folder=$IPC_CONFIG_FOLDER/$(echo $subnet_id | sed 's|^/||;s|/|-|g')
 
 # Step 1: Restart validators
-# Step 5.1: Rebuild fendermint docker
+# Step 1.1: Rebuild fendermint docker
 echo "$DASHES Rebuild fendermint docker"
 cd ${IPC_FOLDER}/fendermint
 make clean
 make docker-build
 
-# Step 5.2: Start other validator node
+# Step 1.2: Start other validator node
 echo "$DASHES Restart validator nodes"
 cd ${IPC_FOLDER}
 for i in {0..2}
@@ -54,7 +54,8 @@ do
       child-validator-restart-no-parent
 done
 
-# Step 6a: Test ETH API endpoint
+# Step 2: Test
+# Step 2.1: Test ETH API endpoint
 echo "$DASHES Test ETH API endpoints of validator nodes"
 for i in {0..2}
 do
@@ -68,14 +69,14 @@ do
   }'
 done
 
-# Step 6b: Test proxy endpoint
+# Step 2.2: Test proxy endpoint
 printf "\n$DASHES Test proxy endpoints of validator nodes\n"
 for i in {0..2}
 do
   curl --location http://localhost:${PROXY_HOST_PORTS[i]}/health
 done
 
-# Step 7: Print a summary of the deployment
+# Step 3: Print a summary of the deployment
 cat << EOF
 ############################
 #                          #

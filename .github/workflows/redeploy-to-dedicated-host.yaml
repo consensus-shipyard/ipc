@@ -1,0 +1,34 @@
+name: Re-deploy to calibration net on a dedicated server
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  # Only allow one run at a time for this workflow
+  group: redeploy-to-dedicated-host
+  cancel-in-progress: true
+
+jobs:
+  deploy_to_dedicated_host:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code repo
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - name: Copy deployment script files to the host
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
+          username: textile
+          key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
+          source: "scripts/deploy_subnet_under_calibration_net/redeploy.sh"
+          target: "/home/textile"
+      - name: Run deploy scripts on the host
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
+          username: textile
+          key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
+          script: bash -il /home/textile/scripts/deploy_subnet_under_calibration_net/redeploy.sh ${{ github.ref_name }}
+          command_timeout: 120m

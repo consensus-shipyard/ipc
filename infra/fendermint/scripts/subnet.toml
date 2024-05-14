@@ -93,11 +93,11 @@ dependencies = [
 
 [tasks.child-validator-restart]
 run_task = { name = [
-    "cometbft-stop",
-    "fendermint-stop",
-    "ethapi-stop",
-    "proxy-stop",
-    "ipfs-stop",
+    "cometbft-destroy",
+    "fendermint-destroy",
+    "ethapi-destroy",
+    "proxy-destroy",
+    "ipfs-destroy",
     "fendermint-start-validator",
     "cometbft-start",
     "cometbft-wait",
