@@ -4,6 +4,7 @@ pragma solidity ^0.8.23;
 error AddressShouldBeValidator();
 error AlreadyRegisteredSubnet();
 error AlreadyInSet();
+error AlreadyInitialized();
 error CannotConfirmFutureChanges();
 error CannotReleaseZero();
 error CannotSendCrossMsgToItself();
@@ -15,6 +16,7 @@ error CheckpointNotCreated();
 error BottomUpCheckpointAlreadySubmitted();
 error BatchNotCreated();
 error CollateralIsZero();
+error DuplicatedGenesisValidator();
 error EmptyAddress();
 error FailedAddIncompleteQuorum();
 error FailedAddSignatory();
@@ -73,11 +75,11 @@ error SubnetAlreadyBootstrapped();
 error SubnetNotBootstrapped();
 error FacetCannotBeZero();
 error WrongGateway();
+error WrongSubnet();
 error CannotFindSubnet();
 error UnknownSubnet();
 error MethodNotAllowed(string reason);
 error InvalidFederationPayload();
-error DuplicatedGenesisValidator();
 error NotEnoughGenesisValidators();
 
 enum InvalidXnetMessageReason {

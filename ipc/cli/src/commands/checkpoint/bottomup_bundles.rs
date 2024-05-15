@@ -32,6 +32,7 @@ impl CommandLineHandler for GetBottomUpBundles {
                 "checkpoint: {:?}, signatures: {:?}, signatories: {:?}",
                 bundle.checkpoint, bundle.signatures, bundle.signatories,
             );
+
             println!("{bundle:?}");
         }
 

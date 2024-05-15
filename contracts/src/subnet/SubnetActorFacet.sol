@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {InvalidXnetMessage, InvalidXnetMessageReason, WrongSubnet} from "../errors/IPCErrors.sol";
+/**
+ * Subnet actor facet that tracks the general state of the subnet. It's required for any subnet actor.
+ */
+
+import {InvalidXnetMessage, InvalidXnetMessageReason, NotGateway, WrongSubnet} from "../errors/IPCErrors.sol";
 // import {IGateway} from "../interfaces/IGateway.sol";
 import {LibDiamond} from "../lib/LibDiamond.sol";
-import {LibGenesis} from "../lib/LibGenesis.sol";
+import {LibSubnetGenesis, SubnetGenesis} from "../lib/LibGenesis.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
-import {SubnetActorModifiersV2, SubnetGenesis} from "../lib/LibSubnetActorStorage.sol";
 import {Pausable} from "../lib/LibPausable.sol";
 import {SupplySource, SubnetID, PowerAllocationMode} from "../structs/Subnet.sol";
 import {SupplySourceHelper} from "../lib/SupplySourceHelper.sol";
@@ -21,6 +24,9 @@ import {ISubnet} from "../interfaces/ISubnet.sol";
 library LibSubnetActor {
     // The subnet actor storage
     struct SubnetActorStorage {
+        /// @notice Address of the IPC gateway for the subnet
+        address ipcGatewayAddr;
+        /// @notice The topdown nonce
         uint64 topDownNonce;
         /// @notice The genesis state tracked by this contract
         SubnetGenesis genesis;
@@ -36,6 +42,13 @@ library LibSubnetActor {
         SubnetID parentId;
     }
 
+    function onlyGateway() internal view {
+        SubnetActorStorage storage s = diamondStorage();
+        if (msg.sender != s.ipcGatewayAddr) {
+            revert NotGateway();
+        }
+    }
+
     function diamondStorage() internal pure returns (SubnetActorStorage storage ds) {
         bytes32 position = keccak256("ipc.subnet.actor.storage");
         assembly {
@@ -44,29 +57,30 @@ library LibSubnetActor {
     }
 }
 
-contract SubnetActorFacet is SubnetActorModifiersV2, ReentrancyGuard, Pausable {
+contract SubnetActorFacet is ReentrancyGuard, Pausable {
     using SupplySourceHelper for SupplySource;
     using FvmAddressHelper for FvmAddress;
-    using LibGenesis for SubnetGenesis;
+    using LibSubnetGenesis for SubnetGenesis;
     using SubnetIDHelper for SubnetID;
 
     event NewTopDownMessage(IpcEnvelope message);
 
     /// @notice The supplying token
     function supplySource() external view returns(SupplySource memory) {
-        return s.supplySource;
+        return LibSubnetActor.diamondStorage().supplySource;
     }
 
     function powerAllocationMode() external view returns(PowerAllocationMode) {
-        return s.powerAllocMode;
+        return LibSubnetActor.diamondStorage().powerAllocMode;
     }
 
     function consensus() external view returns(Consensus) {
-        return s.consensus;
+        return LibSubnetActor.diamondStorage().consensus;
     }
 
     /// @notice Handles a specific cross network messages from the gateway.
-    function handleXnetCall(IpcEnvelope calldata msg) external onlyGateway {
+    function handleXnetCall(IpcEnvelope calldata envelope) external {
+        LibSubnetActor.onlyGateway();
         revert("todo");
     }
 
@@ -83,6 +97,8 @@ contract SubnetActorFacet is SubnetActorModifiersV2, ReentrancyGuard, Pausable {
             revert InvalidXnetMessage(InvalidXnetMessageReason.Value);
         }
 
+        LibSubnetActor.SubnetActorStorage storage s = LibSubnetActor.diamondStorage();
+    
         // Locks a specified amount into custody, adjusting for tokens with transfer fees. This operation
         // accommodates inflationary tokens, potentially reflecting a higher effective locked amount.
         // Operation reverts if the effective transferred amount is zero.
@@ -114,9 +130,9 @@ contract SubnetActorFacet is SubnetActorModifiersV2, ReentrancyGuard, Pausable {
             revert WrongSubnet();
         }
 
-        uint64 topDownNonce = s.topDownNonce;
+        uint64 topDownNonce = LibSubnetActor.diamondStorage().topDownNonce;
         crossMessage.nonce = topDownNonce;
-        s.topDownNonce = topDownNonce + 1;
+        LibSubnetActor.diamondStorage().topDownNonce = topDownNonce + 1;
 
         emit NewTopDownMessage({message: crossMessage});
     }

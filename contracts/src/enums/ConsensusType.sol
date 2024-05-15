@@ -6,3 +6,7 @@ pragma solidity ^0.8.23;
 enum ConsensusType {
     Fendermint
 }
+
+enum Consensus {
+    ProofOfPower
+}

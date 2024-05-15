@@ -1,18 +1,22 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {InvalidXnetMessage, InvalidXnetMessageReason, WrongSubnet, InvalidFederationPayload, NotEnoughGenesisValidators} from "../errors/IPCErrors.sol";
+import {InvalidXnetMessage, InvalidXnetMessageReason, DuplicatedGenesisValidator, WrongSubnet, InvalidFederationPayload, NotEnoughGenesisValidators} from "../errors/IPCErrors.sol";
 import {PowerChangeInitiator, ProofOfPower, LibPowerQuery} from "../lib/power/LibPower.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
 import {Pausable} from "../lib/LibPausable.sol";
 import {LibDiamond} from "../lib/LibDiamond.sol";
 import {ISubnet} from "../interfaces/ISubnet.sol";
+import {LibSubnetActor} from "./SubnetActorFacet.sol";
+import {IGenesisComponent} from "../interfaces/IGenesis.sol";
 
 library LibFederatedPower {
     // The federated power storage
     struct FederatedPowerStorage {
         ProofOfPower power;
         uint64 minValidators;
+        /// @notice If the federated power mode is bootstrapped
+        bool bootstrapped;
     }
 
     function diamondStorage() internal pure returns (FederatedPowerStorage storage ds) {
@@ -23,9 +27,28 @@ library LibFederatedPower {
     }
 }
 
-contract FederatedSubnetFacet is PowerChangeInitiator, ReentrancyGuard, Pausable {
+contract FederatedSubnetFacet is IGenesisComponent, PowerChangeInitiator, ReentrancyGuard, Pausable {
     using LibPowerQuery for ProofOfPower;
 
+    event FederatedPowerBootstrapped();
+
+    // ============== Genesis related =============
+    /// @notice Returns the id of the component
+    function id() external view returns(bytes4) {
+        return bytes4(keccak256("federated-power"));
+    }
+
+    /// @notice Returns the actual bytes of the genesis
+    function genesis() external view returns(bytes memory) {
+        require(false, "todo");
+    }
+
+    /// @notice Checks if the component is bootstrapped
+    function bootstrapped() external view returns(bool) {
+        return LibFederatedPower.diamondStorage().bootstrapped;
+    }
+
+    // ============== Federated power related ===========
     function setPower(
         address[] calldata validators,
         bytes[] calldata publicKeys,
@@ -44,7 +67,8 @@ contract FederatedSubnetFacet is PowerChangeInitiator, ReentrancyGuard, Pausable
         // only subnet owner is allowed to set powers
         LibDiamond.enforceIsContractOwner();
 
-        if (!ISubnet(address(this)).bootstrapped()) {
+        LibFederatedPower.FederatedPowerStorage storage fps = LibFederatedPower.diamondStorage();
+        if (!fps.bootstrapped) {
             preBootstrap(validators, publicKeys, powers);
         } else {
             postBootstrap(validators, publicKeys, powers);
@@ -57,7 +81,7 @@ contract FederatedSubnetFacet is PowerChangeInitiator, ReentrancyGuard, Pausable
         return fps.power.getConfirmedPower(addr);
     }
 
-    function unconfimedPower(address addr) external view returns(uint256) {
+    function unconfirmedPower(address addr) external view returns(uint256) {
         LibFederatedPower.FederatedPowerStorage storage fps = LibFederatedPower.diamondStorage();
         return fps.power.getUnconfirmedPower(addr);
     }
@@ -92,8 +116,8 @@ contract FederatedSubnetFacet is PowerChangeInitiator, ReentrancyGuard, Pausable
             }
         }
 
-        s.bootstrapped = true;
-        emit SubnetBootstrapped(s.genesisValidators);
+        fps.bootstrapped = true;
+        // emit FederatedPowerBootstrapped(s.genesisValidators);
 
         // TODO: register with the gateway
     }

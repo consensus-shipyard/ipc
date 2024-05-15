@@ -86,3 +86,17 @@ pub struct BottomUpCheckpoint {
     /// The list of messages for execution
     pub msgs: Vec<IpcEnvelope>,
 }
+
+impl Display for BottomUpCheckpoint {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "BottomUpCheckpoint(subnet_id = {}, height = {}, hash = {}, next_config_number = {}, msgs = {})",
+            self.subnet_id,
+            self.block_height,
+            hex::encode(&self.block_hash),
+            self.next_configuration_number,
+            self.msgs.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(",")
+        )
+    }
+}

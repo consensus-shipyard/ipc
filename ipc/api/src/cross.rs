@@ -5,10 +5,12 @@
 use crate::address::IPCAddress;
 use crate::subnet_id::SubnetID;
 use anyhow::anyhow;
+use ethers::utils::hex;
 use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
 use serde::{Deserialize, Serialize};
 use serde_tuple::{Deserialize_tuple, Serialize_tuple};
+use std::fmt::{Display, Formatter};
 
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
 pub struct IpcEnvelope {
@@ -104,7 +106,7 @@ impl IpcEnvelope {
 }
 
 /// Type of cross-net messages currently supported
-#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize, strum::Display)]
 #[repr(u8)]
 pub enum IpcMsgKind {
     /// for cross-net messages that move native token, i.e. fund/release.
@@ -187,6 +189,21 @@ impl IpcEnvelope {
             Some(b) => b.data.into(), // FIXME: this assumes cbor serialization. We should maybe return serialized IpldBlock
             None => RawBytes::default(),
         })
+    }
+}
+
+impl Display for IpcEnvelope {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "IpcEnvelope(kind = {}, from = {}, to = {}, value = {}, message = {}, nonce = {})",
+            self.kind,
+            self.from,
+            self.to,
+            self.value,
+            hex::encode(&self.message),
+            self.nonce,
+        )
     }
 }
 

@@ -177,3 +177,13 @@ enum SupplyKind {
     Native,
     ERC20
 }
+
+// ============= Redesign structs ==========
+
+/// @notice Determines the how validators obtain their power.
+enum PowerAllocationMode {
+    /// Validator power is determined by the collateral staked
+    Collateral,
+    /// Validator power is assigned by the owner of the subnet
+    Federated
+}

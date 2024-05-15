@@ -8,4 +8,7 @@ interface IGenesisComponent {
 
     /// @notice Returns the actual bytes of the genesis
     function genesis() external view returns(bytes memory);
+
+    /// @notice Checks if the component is bootstrapped
+    function bootstrapped() external view returns(bool);
 }
