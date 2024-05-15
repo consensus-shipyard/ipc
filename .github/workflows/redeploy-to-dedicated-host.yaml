@@ -9,7 +9,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy_to_dedicated_host:
+  redeploy_to_dedicated_host:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code repo

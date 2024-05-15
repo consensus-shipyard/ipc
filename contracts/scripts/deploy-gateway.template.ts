@@ -13,6 +13,7 @@ function getGitCommitSha(): string {
         .trim()
     return commitSha
 }
+
 export async function deploy(libs: { [key in string]: string }) {
     if (!libs || Object.keys(libs).length === 0)
         throw new Error(`Libraries are missing`)
@@ -114,7 +115,7 @@ export async function deploy(libs: { [key in string]: string }) {
     }
 
     const gatewayConstructorParams = {
-        bottomUpCheckPeriod: 10,
+        bottomUpCheckPeriod: 600,
         activeValidatorsLimit: 100,
         majorityPercentage: 66,
         networkName: {
