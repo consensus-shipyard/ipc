@@ -189,7 +189,7 @@ cp /tmp/config.toml.2 ${IPC_CONFIG_FOLDER}/config.toml
 
 # Step 5: Create a subnet
 echo "$DASHES Creating a child subnet..."
-create_subnet_output=$(ipc-cli subnet create --parent /r314159 --min-validators 3 --min-validator-stake 1 --bottomup-check-period 30 --from $default_wallet_address --permission-mode collateral --supply-source-kind native 2>&1)
+create_subnet_output=$(ipc-cli subnet create --parent /r314159 --min-validators 3 --min-validator-stake 1 --bottomup-check-period 600 --from $default_wallet_address --permission-mode collateral --supply-source-kind native 2>&1)
 echo $create_subnet_output
 subnet_id=$(echo $create_subnet_output | sed 's/.*with id: \([^ ]*\).*/\1/')
 echo "Created new subnet id: $subnet_id"
@@ -296,7 +296,7 @@ do
   proxy_key=$(cat ${IPC_CONFIG_FOLDER}/evm_keystore_proxy.json | jq .[$i].private_key | tr -d '"' | tr -d '\n')
   proxy_address=$(cat ${IPC_CONFIG_FOLDER}/evm_keystore_proxy.json | jq .[$i].address | tr -d '"' | tr -d '\n')
   ipc-cli wallet import --wallet-type evm --private-key ${proxy_key}
-  ipc-cli cross-msg fund --from ${proxy_address} --subnet ${subnet_id} 10
+  ipc-cli cross-msg fund --from ${proxy_address} --subnet ${subnet_id} 1
   out=${subnet_folder}/validator-${i}/validator-${i}/keys/proxy_key.sk
   ipc-cli wallet export --wallet-type evm --address ${proxy_address} --fendermint | tr -d '\n' > ${out}
   chmod 600 ${subnet_folder}/validator-${i}/validator-${i}/keys/proxy_key.sk

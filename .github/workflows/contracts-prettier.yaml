@@ -13,6 +13,9 @@ jobs:
       # added or changed files to the repository.
       contents: write
     steps:
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.BUILTIN_ACTORS_DEPLOY_KEY }}
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.head_ref }}
