@@ -16,6 +16,9 @@ jobs:
       run:
         working-directory: ./extras/axelar-token
     steps:
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.BUILTIN_ACTORS_DEPLOY_KEY }}
       - uses: actions/checkout@v4
         with:
           submodules: recursive
