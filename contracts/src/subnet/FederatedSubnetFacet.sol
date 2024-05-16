@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {InvalidXnetMessage, InvalidXnetMessageReason, DuplicatedGenesisValidator, WrongSubnet, InvalidFederationPayload, NotEnoughGenesisValidators} from "../errors/IPCErrors.sol";
-import {PowerChangeInitiator, ProofOfPower, LibPowerQuery} from "../lib/power/LibPower.sol";
+import {LibPowerChange, ProofOfPowerStorage, ProofOfPower, LibPowerQuery} from "../lib/power/LibPower.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
 import {Pausable} from "../lib/LibPausable.sol";
 import {LibDiamond} from "../lib/LibDiamond.sol";
@@ -13,7 +13,6 @@ import {IGenesisComponent} from "../interfaces/IGenesis.sol";
 library LibFederatedPower {
     // The federated power storage
     struct FederatedPowerStorage {
-        ProofOfPower power;
         uint64 minValidators;
         /// @notice If the federated power mode is bootstrapped
         bool bootstrapped;
@@ -27,8 +26,9 @@ library LibFederatedPower {
     }
 }
 
-contract FederatedSubnetFacet is IGenesisComponent, PowerChangeInitiator, ReentrancyGuard, Pausable {
+contract FederatedSubnetFacet is IGenesisComponent, ReentrancyGuard, Pausable {
     using LibPowerQuery for ProofOfPower;
+    using LibPowerChange for ProofOfPower;
 
     event FederatedPowerBootstrapped();
 
@@ -62,7 +62,7 @@ contract FederatedSubnetFacet is IGenesisComponent, PowerChangeInitiator, Reentr
             revert InvalidFederationPayload();
         }
 
-        validatePublicKeys(validators, publicKeys);
+        LibPowerChange.validatePublicKeys(validators, publicKeys);
 
         // only subnet owner is allowed to set powers
         LibDiamond.enforceIsContractOwner();
@@ -77,13 +77,11 @@ contract FederatedSubnetFacet is IGenesisComponent, PowerChangeInitiator, Reentr
 
     // ===== Getters =====
     function confimedPower(address addr) external view returns(uint256) {
-        LibFederatedPower.FederatedPowerStorage storage fps = LibFederatedPower.diamondStorage();
-        return fps.power.getConfirmedPower(addr);
+        return ProofOfPowerStorage.diamondStorage().getConfirmedPower(addr);
     }
 
     function unconfirmedPower(address addr) external view returns(uint256) {
-        LibFederatedPower.FederatedPowerStorage storage fps = LibFederatedPower.diamondStorage();
-        return fps.power.getUnconfirmedPower(addr);
+        return ProofOfPowerStorage.diamondStorage().getUnconfirmedPower(addr);
     }
 
     // ======= Internal functions ======
@@ -93,7 +91,9 @@ contract FederatedSubnetFacet is IGenesisComponent, PowerChangeInitiator, Reentr
         uint256[] calldata powers
     ) internal {
         uint256 length = validators.length;
+
         LibFederatedPower.FederatedPowerStorage storage fps = LibFederatedPower.diamondStorage();
+        ProofOfPower storage proofS = ProofOfPowerStorage.diamondStorage();
 
         if (length <= fps.minValidators) {
             revert NotEnoughGenesisValidators();
@@ -102,12 +102,12 @@ contract FederatedSubnetFacet is IGenesisComponent, PowerChangeInitiator, Reentr
         for (uint256 i; i < length; ) {
             // performing deduplication
             // validator should have no power when first added
-            if (fps.power.getConfirmedPower(validators[i]) > 0) {
+            if (proofS.getConfirmedPower(validators[i]) > 0) {
                 revert DuplicatedGenesisValidator();
             }
 
-            confirmMetadata(fps.power, validators[i], publicKeys[i]);
-            confirmNewPower(fps.power, validators[i], powers[i]);
+            proofS.confirmMetadata(validators[i], publicKeys[i]);
+            proofS.confirmNewPower(validators[i], powers[i]);
 
             // s.genesisValidators.push(Validator({addr: validators[i], weight: powers[i], metadata: publicKeys[i]}));
 
@@ -128,19 +128,15 @@ contract FederatedSubnetFacet is IGenesisComponent, PowerChangeInitiator, Reentr
         uint256[] calldata powers
     ) internal {
         uint256 length = validators.length;
-        LibFederatedPower.FederatedPowerStorage storage fps = LibFederatedPower.diamondStorage();
-        
+        ProofOfPower storage proofS = ProofOfPowerStorage.diamondStorage();
+
         for (uint256 i; i < length; ) {
-            setValidatorMetadata(fps.power, validators[i], publicKeys[i]);
-            setNewPower(fps.power, validators[i], powers[i]);
+            proofS.setValidatorMetadata(validators[i], publicKeys[i]);
+            proofS.setNewPower(validators[i], powers[i]);
 
             unchecked {
                 ++i;
             }
         }
-    }
-
-    function handlePowerChange(address validator, uint256 oldPower, uint256 newPower) internal override {
-        // no opt required
     }
 }

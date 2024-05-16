@@ -239,9 +239,19 @@ library LibPowerQuery {
     }
 }
 
+library ProofOfPowerStorage {
+    function diamondStorage() internal pure returns (ProofOfPower storage ds) {
+        bytes32 position = keccak256("ipc.lib.power.storage");
+        assembly {
+            ds.slot := position
+        }
+    }
+
+}
+
 /// @notice Handles the proof of power with child subnet.
 /// @dev This is a contract instead of a library so that hooks can be added for downstream use cases.
-abstract contract PowerChangeInitiator {
+library LibPowerChange {
     using LibPowerChangeLog for PowerChangeLog;
     using LibMaxPQ for MaxPQ;
     using LibMinPQ for MinPQ;
@@ -253,13 +263,9 @@ abstract contract PowerChangeInitiator {
     event ActiveValidatorReplaced(address oldValidator, address newValidator);
     event ActiveValidatorLeft(address validator);
     event WaitingValidatorLeft(address validator);
-
-    uint64 internal constant INITIAL_CONFIGURATION_NUMBER = 1;
-
     event ConfigurationNumberConfirmed(uint64 number);
 
-    /// @notice Hook for handling when the power of the validaor has changes
-    function handlePowerChange(address validator, uint256 oldPower, uint256 newPower) internal virtual;
+    uint64 internal constant INITIAL_CONFIGURATION_NUMBER = 1;
 
     /// @notice Set the metadata of a validator
     function setValidatorMetadata(ProofOfPower storage self, address validator, bytes calldata metadata) internal {
@@ -325,8 +331,6 @@ abstract contract PowerChangeInitiator {
         } else {
             reduceReshuffle({self: self, validator: validator, newPower: newPower});
         }
-
-        handlePowerChange(validator, oldPower, newPower);
     }
 
     function validatePublicKeys(
