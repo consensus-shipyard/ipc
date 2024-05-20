@@ -81,6 +81,8 @@ error UnknownSubnet();
 error MethodNotAllowed(string reason);
 error InvalidFederationPayload();
 error NotEnoughGenesisValidators();
+error NotBottomUpMessage();
+error L3NotSupportedYet();
 
 enum InvalidXnetMessageReason {
     Sender,
