@@ -6212,7 +6212,6 @@ dependencies = [
 [[package]]
 name = "merkle-tree-rs"
 version = "0.1.0"
-source = "git+https://github.com/consensus-shipyard/merkle-tree-rs.git?branch=dev#069f1dcb7f29d389c92cac54b1e687d81c4fd639"
 dependencies = [
  "anyhow",
  "ethers",
