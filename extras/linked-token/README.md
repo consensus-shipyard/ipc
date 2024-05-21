@@ -1,18 +1,25 @@
-# Linked Token Readme
+# Linked Token
 
-## Outline for Linked Token Bridge
-- Contracts
-    - ERC20 token named USDCTest on Calibration Network
-    - Token Controller contract on Calibration Network
-    - Token Replica contract on subnet
-- Workflow
-    - Deposit tokens from rootnet to subnet
-        - calling the rootBridge.bridgeToken() to lock up USDC tokens and initiate an IPC cross net message to the subnet token bridge
-        - subnet token bridge receives IPC message and mints USDC proxy tokens
-    - Withdraw tokens from subnet to rootnet
-        - call subnetBridge.withdrawToken() to burn proxy USDC tokens on the subnet and initiate an IPC cross net message to the root network bridge
+Replicate a pre-existing ERC20 token from one network (parent) to another (child), using IPC xnet messages to move token units across.
+All contracts are upgradable via the OpenZeppelin's Upgrade framework, with scripts provided herein.
 
-## USDC propagation flow
+## Components
+
+- Linked Token: an abstract contract that handles the common logic, supply/custody semantics, and movements of funds using IPC xnet APIs.
+- Linked Token Controller: the contract seated at the parent network, bound to a pre-existing ERC20 token, locking units here and sending mint orders to the subnet, and releasing locked units on burn.
+- Linked Token Replica: the contract seated in the child subnet, coupled with the controller on the parent network. It is an ERC20 token in itself, with mint/burn semantics.
+- USDCTest: a token merely for test purposes.
+
+## Usage
+
+To deposit N tokens into the subnet:
+- Approve the controller to spend N tokens on the holder's behalf.
+- Call the `linkedTransfer(address receiver, uint256 amount)` method from an EOA or a contract on the parent.
+
+To withdraw N tokens from the subnet:
+- Call the `linkedTransfer(address receiver, uint256 amount)` method from the holder EOA or a contract on the subnet.
+
+## Design
 
 A high-level overview of the process is shown in the following diagrams:
 
@@ -20,85 +27,40 @@ A high-level overview of the process is shown in the following diagrams:
 
 ![Linked Token Withdrawing](./linked-token-withdrawing.png)
 
-## Setup and instructions for running on calibnet
+## Deploy and run an example on Calibnet
 
-1. Follow IPC guide for setting up a subnet pinned to the filecoin calibnet network: https://github.com/consensus-shipyard/ipc/blob/main/docs/ipc/quickstart-calibration.md
-2. copy the config file from ipc/contracts/script/examples/cross-token/.env.template to .en a config file for connecting to calibnet and your subnet. Create a new wallet with for executing the USDC test that is not one of the validators. You will need to fund this wallet using the calibnet facuet. Set PRIVATE_KEY in .env for this new wallet.
-3. Deploy or use a pre-deployed gateway on calibnet
-    
-    a. Review output of `make deploy-ipc NETWORK=calibrationnet`  in order to get the address of your IPC gateway on the calbnet and add this to your .env file. You should see an output like:
+### Preparation
 
-    ```jsx
-    "Gateway": "0x5cF14D2Af9BBd5456Ea532639f1DB355B9BaCBf8",
-    ```
+1. Follow [this guide](https://docs.ipc.space/quickstarts/deploy-a-subnet) to set up a subnet anchored to the Filecoin Calibration network.
+2. Copy the config file from `.env.template` to `.env`, and:
+    - Set `PRIVATE_KEY` in `.env` for the deployer's address. It needs to have funds both in the parent network and the child subnet. You can use `ipc-cli cross-msg fund` to send funds from the parent to the child subnet.
+    - Set `ORIGIN_NET_GATEWAY` to the address of the parent gateway.
+    - Set `SUBNET_ROUTE_IN_ETH_FORMAT` to be the Eth address of the subnet actor.
 
-    b.  Add to your .env file:
+### Deployment
 
-    ```jsx
-    export CALIBNET_GATEWAY=0x5cF14D2Af9BBd5456Ea532639f1DB355B9BaCBf8
-    ```
-
-    c.  This gateway should match the gateway in your ~/.ipc/config.toml file
-
-    ```jsx
-    gateway_addr = "0x5cF14D2Af9BBd5456Ea532639f1DB355B9BaCBf8"
-    registry_addr = "0x7308C4A503a12521215718cbCa98F951E9aAB9B5"
-    ```
-
-5. Use a pre-existing subnet or deploy a new one. You will want to ensure that the config file ~/.ipc/confg.toml has a valid gateway and ipc registry. Your subnet id will look something like:
-
-    ```jsx
-    ipc-cli subnet create \
-    --parent /r314159 \
-    --min-validator-stake 10 \
-    --min-validators 1 \
-    --bottomup-check-period 30 \
-    --from 0x684a69080fd214af19215f5f7dfbc9704027e3d6 \
-    --permission-mode collateral --supply-source-kind native
-
-    created subnet actor with id: /r314159/t410f2jhadzp7jvo7cuo3r52yoc6fd3q4czxfu5fgbxi
-
-    ```
-
-6. Visit [this tool](https://beryx.zondax.ch/address_converter) and convert the t410f2jhadzp7jvo7cuo3r52yoc6fd3q4czxfu5fgbxi filecoin address to an ethereum format like 0xd24e01e5ff4d5df151db8f75870bc51ee1c166e5
-7. Update your .env file to set SUBNET_ROUTE_IN_ETH_FORMAT to be the ethereum format of the subnet address from the previous step
-
-    ```jsx
-    export SUBNET_ROUTE_IN_ETH_FORMAT=0x1e0fa8dd65a59399e47cbe6f31766586b41204c3
-    ```
-
-8. Set up the validators as specified by the calibration start up guide and ensure we have funded your wallet using a calibnet faucet
-9. Fund your wallet’s address on the subnet
-
-    ```jsx
-    $ ipc-cli cross-msg fund \
-    --subnet /r314159/t410f2jhadzp7jvo7cuo3r52yoc6fd3q4czxfu5fgbxi \
-     --from  0xa0e416c85e0117cdbaa8d29137c97a2f4a3c9b8e \
-    10
-    ```
-
-10. Deploy the USDCTest contract
+1. Deploy the USDCTest token on Calibnet:
 
     ```jsx
     make deploy-usdctest
     ```
 
-    If you see the error
+    Caveat: If you see this error, it's likely that the deployment will have succeeded anyway!
 
     ```jsx
     Error:
     Transaction dropped from the mempool: 0x563e6ca21d46417020accd05cce992e30f4cb7e69e6b76cc249fea53037bdaa8
     ```
 
-    You can search for the transaction on filfox and find the correct contract address from the other tab under EthAddress: https://calibration.filfox.info/en/message/0x563e6ca21d46417020accd05cce992e30f4cb7e69e6b76cc249fea53037bdaa8?t=4
+    You can search for the transaction on a Filecoin explorer (e.g. Filfox) and find the correct contract address from the other tab under EthAddress: https://calibration.filfox.info/en/message/0x563e6ca21d46417020accd05cce992e30f4cb7e69e6b76cc249fea53037bdaa8?t=4
 
-11. Mint 1000 USDCTest tokens to your wallet
+2. Mint 1000 USDCTest tokens to your wallet on the parent.
 
     ```jsx
     make mint-usdc
     ```
 
-12. Check your wallet balance to ensure that the mint was successful
+3. Check your wallet balance to ensure that the mint was successful.
 
     ```jsx
     make check-balance
@@ -108,25 +70,21 @@ A high-level overview of the process is shown in the following diagrams:
     0x00000000000000000000000000000000000000000000000000000000000003e8
     ```
 
-    If an output of the following is seen, wait a few minutes for the contraction to finalize
+    If it's still zero, wait a few more seconds before retrying.
 
-    ```jsx
-    0x0000000000000000000000000000000000000000000000000000000000000000
-    ```
-
-13. Deploy token replica contract on the subnet. This command should execute fairly quickly because of the subnet’s speed. Use the contract address from the printout indicated below.
+4. Deploy the Token Replica contract on the subnet. This command should execute fairly quickly because of the subnet's speed. Use the contract address from the printout indicated below.
 
     ```jsx
     make deploy-replica
     ```
 
-14. Deploy token controller contract on Calibnet and update our .env file with the new address.
+5. Deploy the Token Controller contract on Calibnet and update our `.env` file with the new address.
 
     ```jsx
     make deploy-controller
     ```
 
-15. We must update the replica with the controllers address, and the replica with the controller’s address to complete our setup. Please don’t forget this part!
+6. Now, we must update the Token Replica with the Controller's address, and vice versa ("rendezvous").
 
     ```jsx
     make initialize-replica
@@ -137,7 +95,7 @@ A high-level overview of the process is shown in the following diagrams:
     ```
 
 
-# Bridging USDC To the Subnet
+### Depositing tokens into the subnet
 
 1. Approve the Token Controller contract to handle our funds:
 
@@ -145,31 +103,21 @@ A high-level overview of the process is shown in the following diagrams:
     make approve-usdc
     ```
 
-2. With approval, to deposit 1,000 USDCTest tokens we do the following:
+2. With approval, to deposit 1000 USDCTest tokens we do the following:
 
     ```jsx
     make deposit-usdc
     ```
 
-3. Confirm our balance on calbnet has gone to zero
+3. Confirm our balance on Calibnet has gone to zero:
 
     ```jsx
     make check-balance
     ```
 
-    The expected output is
+    If it's still zero, wait a few more seconds before retrying.
 
-    ```jsx
-    0x0000000000000000000000000000000000000000000000000000000000000000
-    ```
-
-    If an output of the following is seen, wait a few minutes for the contraction to finalize
-
-    ```jsx
-    0x00000000000000000000000000000000000000000000000000000000000003e8
-    ```
-
-4. Validate that our replica token balance is the correct value by running the command
+4. You need to wait until the subnet has imported the finalized parent chain where the deposit was performed. Validate that our Token Replica balance is the correct value by running the command.
 
     ```jsx
     make check-replica-balance
@@ -182,19 +130,14 @@ A high-level overview of the process is shown in the following diagrams:
     ```
 
 
-# Withdrawing USDC from the Subnet
+### Withdraw token from the subnet
 
-In order to withdrawal Replica USDCTest from the subnet we must ensure we have a check point relayer with the command:
+In order to withdraw tokens from the subnet we must ensure we're running a checkpoint relayer with the command. See [this guide](https://docs.ipc.space/quickstarts/deploy-a-subnet) for more info.
 
-```jsx
-ipc-cli checkpoint relayer \
---subnet /r314159/t410fdyh2rxlfuwjztzd4xzxtc5tfq22bebgdvlx2ofy
-```
-
-Then running this command will initiate the withdrawal:
+Then running this command will initiate the withdrawal in the subnet.
 
 ```jsx
 make withdraw-usdc
 ```
 
-We can validate our funds are correctly transfered with make check-replica-balance and make check-balance.
+After the withdrawal has been committed to the parent in the next checkpoint, we can validate our funds are correctly transfered with `make check-replica-balance` and `make check-balance`.
