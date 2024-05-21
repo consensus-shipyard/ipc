@@ -207,7 +207,7 @@ impl State {
                 }
             }
             count += 1;
-            if count < offset {
+            if count <= offset {
                 continue;
             }
             let item = match v {
@@ -550,7 +550,7 @@ mod tests {
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store, Address::new_id(100), WriteAccess::OnlyOwner).unwrap();
 
-        let (_, _, baz_key) = create_and_put_objects(&mut state, &store).unwrap();
+        let (_, bar_key, _) = create_and_put_objects(&mut state, &store).unwrap();
 
         let default_item = ObjectListItem::External((Cid::default(), false));
 
@@ -559,6 +559,44 @@ mod tests {
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.objects.len(), 1);
-        assert_eq!(result.objects.first(), Some(&(baz_key.0, default_item)));
+        // Note that baz is listed first in order, so an offset of 1 will return bar
+        assert_eq!(result.objects.first(), Some(&(bar_key.0, default_item)));
+    }
+
+    #[test]
+    fn test_list_with_prefix_delimiter_and_offset_and_limit() {
+        let store = MemoryBlockstore::default();
+        let mut state = State::new(&store, Address::new_id(100), WriteAccess::OnlyOwner).unwrap();
+
+        let one = BytesKey("hello/world".as_bytes().to_vec());
+        state
+            .put(
+                &store,
+                one.clone(),
+                ObjectKind::Internal(ByteBuf(vec![4, 5, 6])),
+                false,
+            )
+            .unwrap();
+        let two = BytesKey("hello/again".as_bytes().to_vec());
+        state
+            .put(
+                &store,
+                two.clone(),
+                ObjectKind::External(Cid::default()),
+                false,
+            )
+            .unwrap();
+
+        // List all keys with a limit and offset
+        let result = state.list(
+            &store,
+            "hello/".as_bytes().to_vec(),
+            "/".as_bytes().to_vec(),
+            2,
+            0,
+        );
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert_eq!(result.objects.len(), 0);
     }
 }
