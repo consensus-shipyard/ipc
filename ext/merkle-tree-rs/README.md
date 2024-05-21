@@ -1,4 +1,4 @@
-git# `merkle-tree-rs`
+> Forked from [literallymarvellous/merkle-tree-rs](https://github.com/literallymarvellous/merkle-tree-rs) (via [consensus-shipyard/merkle-tree-rs](https://github.com/consensus-shipyard/merkle-tree-rs)) with adaptations, including: type flexibility, perf improvements, ethers dependency upgrade, output formatting, and type safety (using the specialized H256 for hashes, and preserving Bytes for raw bytes). The original upstream was labelled as MIT licensed in its Cargo.toml, so we preserve that license for this crate.
 
 **A Rust library to generate merkle trees and merkle proofs.**
 
