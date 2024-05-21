@@ -138,6 +138,28 @@ where
             }
         })
     }
+
+    fn iterate<K, V>(&self, ns: &S::Namespace) -> impl Iterator<Item = KVResult<(K, V)>>
+    where
+        S: Decode<K> + Decode<V>,
+        <S as KVStore>::Repr: Ord + 'static,
+    {
+        self.cache
+            .with_cf_handle(ns.as_ref(), |cf| {
+                let it = self.snapshot.iterator_cf(cf, rocksdb::IteratorMode::Start);
+
+                let it = it.map(|res| res.map_err(to_kv_error)).map(|res| {
+                    res.and_then(|(k, v)| {
+                        let k: K = S::from_repr(&k.to_vec())?;
+                        let v: V = S::from_repr(&v.to_vec())?;
+                        Ok((k, v))
+                    })
+                });
+
+                Ok(it)
+            })
+            .expect("just wrapped into ok")
+    }
 }
 
 impl<'a, S> KVRead<S> for RocksDbWriteTx<'a>
@@ -159,6 +181,28 @@ where
                 None => Ok(None),
             }
         })
+    }
+
+    fn iterate<K, V>(&self, ns: &S::Namespace) -> impl Iterator<Item = KVResult<(K, V)>>
+    where
+        S: Decode<K> + Decode<V>,
+        <S as KVStore>::Repr: Ord + 'static,
+    {
+        self.cache
+            .with_cf_handle(ns.as_ref(), |cf| {
+                let it = self.tx.iterator_cf(cf, rocksdb::IteratorMode::Start);
+
+                let it = it.map(|res| res.map_err(to_kv_error)).map(|res| {
+                    res.and_then(|(k, v)| {
+                        let k: K = S::from_repr(&k.to_vec())?;
+                        let v: V = S::from_repr(&v.to_vec())?;
+                        Ok((k, v))
+                    })
+                });
+
+                Ok(it)
+            })
+            .expect("just wrapped into ok")
     }
 }
 
