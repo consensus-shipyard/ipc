@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {InvalidXnetMessage, InvalidXnetMessageReason, DuplicatedGenesisValidator, WrongSubnet, InvalidFederationPayload, NotEnoughGenesisValidators} from "../errors/IPCErrors.sol";
-import {LibPowerChange, ProofOfPowerStorage, ProofOfPower, LibPowerQuery} from "../lib/power/LibPower.sol";
+import {LibPowerChange, LibPowerChangeStorage, ProofOfPower, LibPowerQuery} from "../lib/power/LibPower.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
 import {Pausable} from "../lib/LibPausable.sol";
 import {LibDiamond} from "../lib/LibDiamond.sol";
@@ -77,11 +77,11 @@ contract FederatedSubnetFacet is IGenesisComponent, ReentrancyGuard, Pausable {
 
     // ===== Getters =====
     function confimedPower(address addr) external view returns(uint256) {
-        return ProofOfPowerStorage.diamondStorage().getConfirmedPower(addr);
+        return LibPowerChangeStorage.diamondStorage().getConfirmedPower(addr);
     }
 
     function unconfirmedPower(address addr) external view returns(uint256) {
-        return ProofOfPowerStorage.diamondStorage().getUnconfirmedPower(addr);
+        return LibPowerChangeStorage.diamondStorage().getUnconfirmedPower(addr);
     }
 
     // ======= Internal functions ======
@@ -93,7 +93,7 @@ contract FederatedSubnetFacet is IGenesisComponent, ReentrancyGuard, Pausable {
         uint256 length = validators.length;
 
         LibFederatedPower.FederatedPowerStorage storage fps = LibFederatedPower.diamondStorage();
-        ProofOfPower storage proofS = ProofOfPowerStorage.diamondStorage();
+        ProofOfPower storage proofS = LibPowerChangeStorage.diamondStorage();
 
         if (length <= fps.minValidators) {
             revert NotEnoughGenesisValidators();
@@ -128,7 +128,7 @@ contract FederatedSubnetFacet is IGenesisComponent, ReentrancyGuard, Pausable {
         uint256[] calldata powers
     ) internal {
         uint256 length = validators.length;
-        ProofOfPower storage proofS = ProofOfPowerStorage.diamondStorage();
+        ProofOfPower storage proofS = LibPowerChangeStorage.diamondStorage();
 
         for (uint256 i; i < length; ) {
             proofS.setValidatorMetadata(validators[i], publicKeys[i]);

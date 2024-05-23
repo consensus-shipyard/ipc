@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import {MinPQ, LibMinPQ} from "./LibMinPQ.sol";
 import {MaxPQ, LibMaxPQ} from "./LibMaxPQ.sol";
-import {NotValidator, NotOwnerOfPublicKey, WithdrawExceedingCollateral, AddressShouldBeValidator, CannotConfirmFutureChanges} from "../../errors/IPCErrors.sol";
+import {NotValidator, InvalidConfigurationNumber, NotOwnerOfPublicKey, WithdrawExceedingCollateral, AddressShouldBeValidator, CannotConfirmFutureChanges} from "../../errors/IPCErrors.sol";
 import {VALIDATOR_SECP256K1_PUBLIC_KEY_LENGTH} from "../../constants/Constants.sol";
 
 /// @notice Subnet power change operations.
@@ -189,7 +189,7 @@ library LibPowerQuery {
     }
 
     /// @notice Get the total power of *active* validators.
-    function totalConfirmedPowerOfActiveValidators(ProofOfPower storage self) internal view returns (uint256 power) {
+    function confirmedPowerOfAllActiveValidators(ProofOfPower storage self) internal view returns (uint256 power) {
         uint16 size = self.activeValidators.getSize();
         for (uint16 i = 1; i <= size; ) {
             address validator = self.activeValidators.getAddress(i);
@@ -200,9 +200,24 @@ library LibPowerQuery {
         }
     }
 
+    /// @notice Get the total power of *active* validators.
+    function confirmedPowerOfAllActiveValidators() internal view returns (uint256 power) {
+        ProofOfPower storage s = LibPowerChangeStorage.diamondStorage();
+        return confirmedPowerOfAllActiveValidators(s);
+    }
+
     /// @notice Get the total confirmed power of the active validators.
     /// The function reverts if at least one validator is not in the active validator set.
-    function totalConfirmedPowerOfActiveValidators(
+    function confirmedPowerOfActiveValidators(
+        address[] memory addresses
+    ) internal view returns (uint256[] memory) {
+        ProofOfPower storage s = LibPowerChangeStorage.diamondStorage();
+        return confirmedPowerOfActiveValidators(s, addresses);
+    }
+
+    /// @notice Get the total confirmed power of the active validators.
+    /// The function reverts if at least one validator is not in the active validator set.
+    function confirmedPowerOfActiveValidators(
         ProofOfPower storage self,
         address[] memory addresses
     ) internal view returns (uint256[] memory) {
@@ -239,16 +254,6 @@ library LibPowerQuery {
     }
 }
 
-library ProofOfPowerStorage {
-    function diamondStorage() internal pure returns (ProofOfPower storage ds) {
-        bytes32 position = keccak256("ipc.lib.power.storage");
-        assembly {
-            ds.slot := position
-        }
-    }
-
-}
-
 /// @notice Handles the proof of power with child subnet.
 /// @dev This is a contract instead of a library so that hooks can be added for downstream use cases.
 library LibPowerChange {
@@ -276,6 +281,13 @@ library LibPowerChange {
     function setNewPower(ProofOfPower storage self, address validator, uint256 power) internal {
         self.validators[validator].unconfirmedPower = power;
         self.changeSet.setPowerRequest(validator, power);
+    }
+
+    /// @notice Confirm the changes in bottom up checkpoint submission, only call this in bottom up checkpoint execution.
+    /// TODO: take this to an external facing library
+    function confirmChange(uint64 configurationNumber) internal {
+        ProofOfPower storage s = LibPowerChangeStorage.diamondStorage();
+        confirmChange(s, configurationNumber);
     }
 
     /// @notice Confirm the changes in bottom up checkpoint submission, only call this in bottom up checkpoint execution.
@@ -467,5 +479,63 @@ library LibPowerChange {
         }
 
         emit ActiveValidatorPowerUpdated(validator, newPower);
+    }
+}
+
+/// The library for tracking validator power changes coming from the parent.
+/// Should be used in the child gateway to store changes until they can be applied.
+library LibPowerTracking {
+    using LibPowerChangeLog for PowerChangeLog;
+
+    function storeChange(ProofOfPower storage s, PowerChangeRequest calldata changeRequest) internal {
+        uint64 configurationNumber = s.changeSet.recordChange({
+            validator: changeRequest.change.validator,
+            op: changeRequest.change.op,
+            payload: changeRequest.change.payload
+        });
+
+        if (configurationNumber != changeRequest.configurationNumber) {
+            revert InvalidConfigurationNumber();
+        }
+    }
+
+    function batchStoreChange(
+        ProofOfPower storage s,
+        PowerChangeRequest[] calldata changeRequests
+    ) internal {
+        uint256 length = changeRequests.length;
+        if (length == 0) {
+            return;
+        }
+
+        for (uint256 i; i < length; ) {
+            storeChange(s, changeRequests[i]);
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    /// @notice Confirm the changes in for a finality commitment
+    function confirmChange(ProofOfPower storage s, uint64 configurationNumber) internal {
+        LibPowerChange.confirmChange(s, configurationNumber);
+    }
+}
+
+library LibPowerChangeStorage {
+    function diamondStorage() internal pure returns (ProofOfPower storage ds) {
+        bytes32 position = keccak256("ipc.lib.power.change.storage");
+        assembly {
+            ds.slot := position
+        }
+    }
+}
+
+library LibPowerTrackingStorage {
+    function diamondStorage() internal pure returns (ProofOfPower storage ds) {
+        bytes32 position = keccak256("ipc.lib.power.tracking.storage");
+        assembly {
+            ds.slot := position
+        }
     }
 }
