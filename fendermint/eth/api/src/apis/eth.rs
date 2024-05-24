@@ -484,11 +484,11 @@ pub async fn get_transaction_receipt<C>(
 where
     C: Client + Sync + Send,
 {
-    let Some(res) = data.tx_by_hash(tx_hash).await? else {
+    let Some(tx_res) = data.tx_by_hash(tx_hash).await? else {
         return Ok(None);
     };
 
-    let Ok(header) = data.tm().header(res.height).await else {
+    let Ok(header) = data.tm().header(tx_res.height).await else {
         // this means the txn hash is found, but block header is not found, this could happen
         // when the txn is at the chain head and the block not finalized yet. We give the
         // benefit of the doubt and return None for the txn
@@ -496,17 +496,17 @@ where
     };
 
     // Header is found, block results are expected to be present, raise error is not found
-    let block_results: block_results::Response = data.tm().block_results(res.height).await?;
+    let block_results: block_results::Response = data.tm().block_results(tx_res.height).await?;
     let cumulative = to_cumulative(&block_results);
     let state_params = data
         .client
         .state_params(FvmQueryHeight::Height(header.header.height.value()))
         .await?;
-    let msg = to_chain_message(&res.tx)?;
+    let msg = to_chain_message(&tx_res.tx)?;
     if let ChainMessage::Signed(msg) = msg {
         let receipt = to_eth_receipt(
             &msg,
-            &res,
+            &tx_res,
             &cumulative,
             &header.header,
             &state_params.value.base_fee,
