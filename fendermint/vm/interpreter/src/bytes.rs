@@ -298,7 +298,7 @@ where
 }
 
 /// Parse the initial genesis either as JSON or CBOR.
-fn parse_genesis(bytes: &[u8]) -> anyhow::Result<Genesis> {
+pub fn parse_genesis(bytes: &[u8]) -> anyhow::Result<Genesis> {
     try_parse_genesis_json(bytes).or_else(|e1| {
         try_parse_genesis_cbor(bytes)
             .map_err(|e2| anyhow!("failed to deserialize genesis as JSON or CBOR: {e1}; {e2}"))

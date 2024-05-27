@@ -687,6 +687,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
                     })
                     .collect(),
                 eam_permission_mode: fendermint_vm_genesis::PermissionMode::Unrestricted,
+                actors: None,
                 ipc: Some(IpcParams {
                     gateway: GatewayParams {
                         subnet_id: SubnetID::new_root(chain_id.into()),

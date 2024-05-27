@@ -21,6 +21,19 @@ mod arb;
 
 /// Power conversion decimal points, e.g. 3 decimals means 1 power per milliFIL.
 pub type PowerScale = i8;
+pub type RawBytes = Vec<u8>;
+
+/// The genesis actor bundle enum
+#[serde_as]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum GenesisActorBundles {
+    V1 {
+        #[serde_as(as = "IsHumanReadable")]
+        builtin: RawBytes,
+        #[serde_as(as = "IsHumanReadable")]
+        custom: RawBytes,
+    },
+}
 
 /// The genesis data structure we serialize to JSON and start the chain with.
 #[serde_as]
@@ -44,6 +57,9 @@ pub struct Genesis {
     pub accounts: Vec<Actor>,
     /// The custom eam permission mode that controls who can deploy contracts
     pub eam_permission_mode: PermissionMode,
+    /// The genesis built-in and custom actor bundles to be injected into the fvm runtime
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub actors: Option<GenesisActorBundles>,
     /// IPC related configuration, if enabled.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ipc: Option<ipc::IpcParams>,
@@ -219,6 +235,20 @@ impl From<PermissionMode> for PermissionModeParams {
                 let addresses = addresses.into_iter().map(|v| v.0).collect::<Vec<_>>();
                 PermissionModeParams::AllowList(addresses)
             }
+        }
+    }
+}
+
+impl GenesisActorBundles {
+    pub fn builtin(&self) -> &[u8] {
+        match self {
+            GenesisActorBundles::V1 { builtin, .. } => builtin,
+        }
+    }
+
+    pub fn custom(&self) -> &[u8] {
+        match self {
+            GenesisActorBundles::V1 { custom, .. } => custom,
         }
     }
 }

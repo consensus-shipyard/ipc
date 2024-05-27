@@ -15,3 +15,4 @@ num-traits = { workspace = true }
 cid = { workspace = true }
 fvm_shared = { workspace = true }
 ipc-api = { workspace = true }
+hex = { workspace = true }

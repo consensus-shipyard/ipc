@@ -204,4 +204,12 @@ pub struct GenesisFromParentArgs {
     /// Number of decimals to use during converting FIL to Power.
     #[arg(long, default_value = "3")]
     pub power_scale: i8,
+
+    /// The builtin actors bundle CAR file path.
+    #[arg(long)]
+    pub builtin_bundle_path: PathBuf,
+
+    /// The custom actors bundle CAR file path.
+    #[arg(long)]
+    pub custom_bundle_path: PathBuf,
 }

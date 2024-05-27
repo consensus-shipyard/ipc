@@ -220,6 +220,7 @@ async fn test_applying_upgrades() {
             balance: TokenAmount::from_atto(0),
         }],
         eam_permission_mode: PermissionMode::Unrestricted,
+        actors: None,
         ipc: None,
     };
 

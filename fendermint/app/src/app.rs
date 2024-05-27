@@ -16,7 +16,8 @@ use fendermint_storage::{
 use fendermint_tracing::emit;
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_interpreter::bytes::{
-    BytesMessageApplyRes, BytesMessageCheckRes, BytesMessageQuery, BytesMessageQueryRes,
+    parse_genesis, BytesMessageApplyRes, BytesMessageCheckRes, BytesMessageQuery,
+    BytesMessageQueryRes,
 };
 use fendermint_vm_interpreter::chain::{ChainEnv, ChainMessageApplyRet, IllegalMessage};
 use fendermint_vm_interpreter::fvm::state::{
@@ -447,35 +448,43 @@ where
 
     /// Called once upon genesis.
     async fn init_chain(&self, request: request::InitChain) -> AbciResult<response::InitChain> {
-        let bundle = &self.builtin_actors_bundle;
-        let bundle = std::fs::read(bundle)
-            .map_err(|e| anyhow!("failed to load builtin bundle CAR from {bundle:?}: {e}"))?;
-
-        let custom_actors_bundle = &self.custom_actors_bundle;
-        let custom_actors_bundle = std::fs::read(custom_actors_bundle).map_err(|e| {
-            anyhow!("failed to load custom actor bundle CAR from {custom_actors_bundle:?}: {e}")
-        })?;
-
-        let state = FvmGenesisState::new(
-            self.state_store_clone(),
-            self.multi_engine.clone(),
-            &bundle,
-            &custom_actors_bundle,
-        )
-        .await
-        .context("failed to create genesis state")?;
-
-        tracing::info!(
-            manifest_root = format!("{}", state.manifest_data_cid),
-            "pre-genesis state created"
-        );
-
         let genesis_bytes = request.app_state_bytes.to_vec();
         let genesis_hash =
             fendermint_vm_message::cid(&genesis_bytes).context("failed to compute genesis CID")?;
 
         // Make it easy to spot any discrepancies between nodes.
         tracing::info!(genesis_hash = genesis_hash.to_string(), "genesis");
+
+        let state = if let Some(actor_bundle) = parse_genesis(&genesis_bytes)?.actors {
+            FvmGenesisState::new(
+                self.state_store_clone(),
+                self.multi_engine.clone(),
+                actor_bundle.builtin(),
+                actor_bundle.custom(),
+            ).await
+        } else {
+            let bundle = &self.builtin_actors_bundle;
+            let bundle = std::fs::read(bundle)
+                .map_err(|e| anyhow!("failed to load builtin bundle CAR from {bundle:?}: {e}"))?;
+
+            let custom_actors_bundle = &self.custom_actors_bundle;
+            let custom_actors_bundle = std::fs::read(custom_actors_bundle).map_err(|e| {
+                anyhow!("failed to load custom actor bundle CAR from {custom_actors_bundle:?}: {e}")
+            })?;
+
+            FvmGenesisState::new(
+                self.state_store_clone(),
+                self.multi_engine.clone(),
+                &bundle,
+                &custom_actors_bundle,
+            ).await
+        }
+        .context("failed to create genesis state")?;
+
+        tracing::info!(
+            manifest_root = format!("{}", state.manifest_data_cid),
+            "pre-genesis state created"
+        );
 
         let (state, out) = self
             .interpreter

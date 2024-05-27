@@ -11,8 +11,8 @@ use std::path::PathBuf;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{
-    ipc, Account, Actor, ActorMeta, Collateral, Genesis, Multisig, PermissionMode, SignerAddr,
-    Validator, ValidatorKey,
+    ipc, Account, Actor, ActorMeta, Collateral, Genesis, GenesisActorBundles, Multisig,
+    PermissionMode, SignerAddr, Validator, ValidatorKey,
 };
 
 use crate::cmd;
@@ -46,6 +46,7 @@ cmd! {
       validators: Vec::new(),
       accounts: Vec::new(),
       eam_permission_mode: PermissionMode::Unrestricted,
+      actors: None,
       ipc: None,
     };
 
@@ -312,6 +313,12 @@ async fn new_genesis_from_parent(
             active_validators_limit: genesis_info.active_validators_limit,
         },
     };
+
+    let builtin_bundle = std::fs::read(&args.builtin_bundle_path)
+        .map_err(|e| anyhow!("failed to load builtin bundle CAR: {e}"))?;
+    let custom_actors_bundle = std::fs::read(&args.custom_bundle_path)
+        .map_err(|e| anyhow!("failed to load custom actor bundle CAR: {e}"))?;
+
     let mut genesis = Genesis {
         // We set the genesis epoch as the genesis timestamp so it can be
         // generated deterministically by all participants
@@ -325,6 +332,10 @@ async fn new_genesis_from_parent(
         validators: Vec::new(),
         accounts: Vec::new(),
         eam_permission_mode: PermissionMode::Unrestricted,
+        actors: Some(GenesisActorBundles::V1 {
+            builtin: builtin_bundle,
+            custom: custom_actors_bundle,
+        }),
         ipc: Some(ipc_params),
     };
 

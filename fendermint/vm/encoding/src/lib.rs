@@ -169,6 +169,45 @@ human_readable_str!(Address);
 human_readable_str!(Cid);
 human_readable_str!(SubnetID);
 
+impl SerializeAs<Vec<u8>> for IsHumanReadable {
+    fn serialize_as<S>(bytes: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        if serializer.is_human_readable() {
+            hex::encode(bytes).serialize(serializer)
+        } else {
+            bytes.serialize(serializer)
+        }
+    }
+}
+
+impl<'de> DeserializeAs<'de, Vec<u8>> for IsHumanReadable {
+    fn deserialize_as<D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        if deserializer.is_human_readable() {
+            let s = String::deserialize(deserializer)?;
+
+            let to_parse = if let Some(stripped) = s.strip_prefix("0x") {
+                stripped
+            } else {
+                &s
+            };
+            match hex::decode(to_parse) {
+                Ok(a) => Ok(a),
+                Err(e) => Err(D::Error::custom(format!(
+                    "error deserializing hex bytes: {}",
+                    e
+                ))),
+            }
+        } else {
+            Vec::<u8>::deserialize(deserializer)
+        }
+    }
+}
+
 impl SerializeAs<TokenAmount> for IsHumanReadable {
     /// Serialize tokens as human readable decimal string.
     fn serialize_as<S>(tokens: &TokenAmount, serializer: S) -> Result<S::Ok, S::Error>

@@ -3263,6 +3263,7 @@ version = "0.1.0"
 dependencies = [
  "cid",
  "fvm_shared",
+ "hex",
  "ipc-api",
  "num-traits",
  "serde",
