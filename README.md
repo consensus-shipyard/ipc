@@ -1,12 +1,48 @@
 # InterPlanetary Consensus (IPC)
 
-**‼️ All the modules in the IPC stack (including the contracts) haven't been audited, tested in depth, or otherwise verified. Moreover, the system is missing critical recovery functionality in case of crashes. There are multiple ways in which you may lose funds moved into an IPC subnet, and we strongly advise against deploying IPC on mainnet and/or using it with tokens with real value.**
+**IPC is a tech stack of new blockchain architecture design that enhances the scaling capabilities of L2+ protocols**
 
-IPC is a framework that enables on-demand horizontal scalability of networks, by deploying "subnets" running different consensus algorithms depending on the application's requirements. With IPC, dApps can reach planetary scale through recursively scalable subnets, sub-second transactions, robust compute workloads, and highly adaptable WebAssembly runtimes tailored to developer requirements.
+[Website](https://www.ipc.space/)
+| [Docs](https://docs.ipc.space/)
+| [Specs](./specs)
 
-Visit the [IPC project page](https://www.ipc.space/) for news and guides.
+## :warning: Disclaimer
 
-## Prerequisites
+The project is still work in progress.
+
+IPC Contracts have been audited up to [this commit](https://github.com/consensus-shipyard/ipc/commits/d5c7462880399b1d62755e4b93a27b2466e22c8a).
+
+Other parts of the stack ([Fendermint client](./fendermint), [IPC CLI](./ipc/cli) etc) **have not been audited**.
+
+Moreover, **the system is missing critical recovery functionality in case of crashes**. There are multiple ways in which you may lose funds moved into an IPC subnet, and we strongly advise against deploying IPC on mainnet and/or using it with tokens with real value.
+
+## What is IPC?
+
+IPC is framework for scaling blockchains. Users of IPC can dynamically spawn new blockchain subsystems (subnets) as children of any existing network. IPC is based on the design principles of on-demand horizontal scaling. Child subnets leverage the security of their parent subnets by periodically checkpointing their state in the parent’s state. IPC provides native communication across subnets within the IPC framework.
+See [IPC Whitepaper](https://raw.githubusercontent.com/consensus-shipyard/IPC-design-reference-spec/main/main.pdf).
+
+Current implementation of IPC consists of:
+- Fendermint client built on top of [CosmosSDK](https://docs.cosmos.network/) which also exposes Ethereum RPC API
+- A set of [Solidity smart contracts](./contracts)
+- [CLI](./ipc/cli) for interacting with IPC
+
+It's worth noting that Fendermint leverages [Filecoin Virtual Machine (FVM)](https://github.com/filecoin-project/ref-fvm/) as its execution environment. 
+FVM is a runtime for WASM-based actors (think of "actor" as "smart contract") which can be deployed on subnets if high-performance is key.      
+What's more, Fendermint uses FVM extension called FEVM which brings EVM-compatibility. Therefore, the Fendermint-based subnets are able run solidity smart contracts as well. 
+
+## Goals of IPC
+
+The goal of IPC is to enable decentralized apps to reach planetary-scale through recursively scalable subnets, sub-second transactions, robust compute workloads, and highly adaptable WebAssembly runtimes tailored to dev requirements. It aims to enable the creation of flexible, living networks of customizable sidechains or "subnets", which can achieve massive scaling by running parallel chains that interoperate with one another.
+
+Here are some practical examples of how IPC use cases:
+- Distributed Computation: Spawn ephemeral subnets to run distributed computation jobs.
+- Coordination: Assemble into smaller subnets for decentralized orchestration with high throughput and low fees.
+- Localization: Leverage proximity to improve performance and operate with very low latency in geographically constrained settings.
+- Partition tolerance: Deploy blockchain substrates in mobile settings or other environments with limited connectivity.
+
+## For Developers
+
+### Prerequisites
 
 On Linux (links and instructions for Ubuntu):
 
@@ -26,7 +62,7 @@ On MacOS:
 - Install docker: https://docs.docker.com/desktop/install/mac-install/
 - Install foundry: https://book.getfoundry.sh/getting-started/installation
 
-## Building
+### Building
 
 ```
 # make sure that rust has the wasm32 target
@@ -45,13 +81,13 @@ make
 ./target/release/fendermint --version
 ```
 
-## Run tests
+### Run tests
 
 ```
 make test
 ```
 
-## Code organization
+### Code organization
 
 - `ipc/cli`: A Rust binary crate for our client `ipc-cli` application that provides a simple and easy-to-use interface to interact with IPC as a user and run all the processes required for the operation of a subnet.
 - `ipc/provider` A Rust crate that implements the `IpcProvider` library. This provider can be used to interact with IPC from Rust applications (and is what the `ipc-cli` uses under the hood).
@@ -61,7 +97,7 @@ make test
 - `contracts`: A reference implementation of all the actors (i.e. smart contracts) responsible for the operation of the IPC (Inter-Planetary Consensus) protocol.
 - `ipld`: IPLD specific types and libraries
 
-## Documentation and Guides
+### Documentation and Guides
 
 **We've prepared a [quick start guide](https://docs.ipc.space/quickstarts/deploy-a-subnet) that will have you running and validating on your own subnet quickly, at the cost of detailed explanations.**
 
@@ -74,8 +110,9 @@ For further documentation, see:
 If you are a developer, see:
 
 - [docs/developers.md](./docs/ipc/developers.md) for useful tips and guides targeted for IPC developers.
+- [specs](./specs) for in-depth description of all concepts
 
-## Connecting to a rootnet
+### Connecting to a rootnet
 
 You can deploy an IPC hierarchy from any compatible rootnet. The recommended option is to use Filecoin Calibration, but you can also deploy your own.
 
