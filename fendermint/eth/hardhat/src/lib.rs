@@ -3,7 +3,7 @@
 
 use anyhow::{anyhow, bail, Context};
 use ethers_core::types as et;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ord,
     collections::{BTreeMap, HashMap, HashSet, VecDeque},
@@ -105,7 +105,7 @@ impl Hardhat {
         &self,
         root_contracts: &[(impl AsRef<Path>, &str)],
     ) -> anyhow::Result<Vec<ContractSourceAndName>> {
-        let mut deps: DependencyTree<ContractSourceAndName> = Default::default();
+        let mut contract_libs: DependencyTree<ContractSourceAndName> = Default::default();
 
         let mut queue = root_contracts
             .iter()
@@ -113,25 +113,25 @@ impl Hardhat {
             .collect::<VecDeque<_>>();
 
         // Construct dependency tree by recursive traversal.
-        while let Some(sc) = queue.pop_front() {
-            if deps.contains_key(&sc) {
+        while let Some(contract) = queue.pop_front() {
+            if contract_libs.contains_key(&contract) {
                 continue;
             }
 
             let artifact = self
-                .artifact(&sc.0, &sc.1)
-                .with_context(|| format!("failed to load dependency artifact: {}", sc.1))?;
+                .artifact(&contract.0, &contract.1)
+                .with_context(|| format!("failed to load dependency artifact: {}", contract.1))?;
 
-            let cds = deps.entry(sc).or_default();
+            let libs = contract_libs.entry(contract).or_default();
 
-            for (ls, ln) in artifact.libraries_needed() {
-                cds.insert((ls.clone(), ln.clone()));
-                queue.push_back((ls, ln));
+            for (lib_source, lib_name) in artifact.libraries_needed() {
+                libs.insert((lib_source.clone(), lib_name.clone()));
+                queue.push_back((lib_source, lib_name));
             }
         }
 
         // Topo-sort the libraries in the order of deployment.
-        let sorted = topo_sort(deps)?;
+        let sorted = topo_sort(contract_libs)?;
 
         Ok(sorted)
     }
@@ -157,7 +157,7 @@ impl Hardhat {
     }
 
     /// Parse the Hardhat artifact of a contract.
-    fn artifact(&self, contract_src: &Path, contract_name: &str) -> anyhow::Result<Artifact> {
+    pub fn artifact(&self, contract_src: &Path, contract_name: &str) -> anyhow::Result<Artifact> {
         let contract_path = self.contract_path(contract_src, contract_name)?;
 
         let json = std::fs::read_to_string(&contract_path)
@@ -170,9 +170,9 @@ impl Hardhat {
     }
 }
 
-#[derive(Deserialize)]
-struct Artifact {
-    pub bytecode: Bytecode,
+#[derive(Deserialize, Serialize)]
+pub struct Artifact {
+    bytecode: Bytecode,
 }
 
 impl Artifact {
@@ -189,7 +189,7 @@ impl Artifact {
             .collect()
     }
 
-    pub fn library_positions(
+    pub(crate) fn library_positions(
         &self,
         lib_src: &ContractSource,
         lib_name: &ContractName,
@@ -207,7 +207,7 @@ impl Artifact {
 }
 
 /// Match the `"bytecode"` entry in the Hardhat build artifact.
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Bytecode {
     /// Hexadecimal format with placeholders for links.
@@ -216,7 +216,7 @@ struct Bytecode {
 }
 
 /// Indicate where a placeholder appears in the bytecode object.
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 struct Position {
     pub start: usize,
     pub length: usize,

@@ -7,6 +7,7 @@ use anyhow::anyhow;
 use fvm_shared::bigint::{BigInt, Integer};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
+use std::collections::HashMap;
 
 use fendermint_actor_eam::PermissionModeParams;
 use fvm_shared::version::NetworkVersion;
@@ -34,6 +35,8 @@ pub enum GenesisActorBundles {
         custom: RawBytes,
     },
 }
+
+pub type ContractArtifacts = HashMap<String, fendermint_eth_hardhat::Artifact>;
 
 /// The genesis data structure we serialize to JSON and start the chain with.
 #[serde_as]

@@ -28,6 +28,7 @@ fendermint_crypto = { path = "../../crypto" }
 fendermint_testing = { path = "../../testing", optional = true }
 fendermint_vm_core = { path = "../core" }
 fendermint_vm_encoding = { path = "../encoding" }
+fendermint_eth_hardhat = { path = "../../eth/hardhat" }
 
 [dev-dependencies]
 quickcheck = { workspace = true }

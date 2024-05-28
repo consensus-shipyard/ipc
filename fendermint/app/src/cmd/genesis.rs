@@ -3,16 +3,19 @@
 
 use anyhow::{anyhow, Context};
 use fendermint_crypto::PublicKey;
+use fendermint_eth_hardhat::Hardhat;
 use fvm_shared::address::Address;
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use fendermint_vm_actor_interface::eam::EthAddress;
+use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{
-    ipc, Account, Actor, ActorMeta, Collateral, Genesis, GenesisActorBundles, Multisig,
-    PermissionMode, SignerAddr, Validator, ValidatorKey,
+    ipc, Account, Actor, ActorMeta, Collateral, ContractArtifacts, Genesis, GenesisActorBundles,
+    Multisig, PermissionMode, SignerAddr, Validator, ValidatorKey,
 };
 
 use crate::cmd;
@@ -362,4 +365,49 @@ async fn new_genesis_from_parent(
     std::fs::write(genesis_file, json)?;
 
     Ok(())
+}
+
+#[allow(dead_code)] // TODO: will be called in follow up PR
+fn prepare_ipc_solidity_contracts(
+    contract_root_path: PathBuf,
+) -> anyhow::Result<ContractArtifacts> {
+    let hardhat = Hardhat::new(contract_root_path);
+
+    // all ipc contracts, includes gateway/registry and all their facets
+    let mut all_ipc_contracts = Vec::new();
+    all_ipc_contracts.extend(IPC_CONTRACTS.keys());
+    all_ipc_contracts.extend(
+        IPC_CONTRACTS
+            .values()
+            .flat_map(|c| c.facets.iter().map(|f| f.name)),
+    );
+
+    // Collect library dependencies for all the IPC contracts.
+    let eth_libs = hardhat
+        .dependencies(
+            &all_ipc_contracts
+                .iter()
+                .map(|n| (contract_source(n), *n))
+                .collect::<Vec<_>>(),
+        )
+        .context("failed to collect EVM contract dependencies")?;
+
+    // we cannot just store the bytecode in the genesis because we don't really know the addresses
+    // of the libraries/
+    let mut artifacts = HashMap::new();
+
+    for name in all_ipc_contracts {
+        let source = contract_source(name);
+        artifacts.insert(name.to_string(), hardhat.artifact(&source, name)?);
+    }
+
+    for (source, name) in eth_libs {
+        artifacts.insert(name.to_string(), hardhat.artifact(&source, &name)?);
+    }
+
+    Ok(artifacts)
+}
+
+fn contract_source(name: &str) -> PathBuf {
+    PathBuf::from(format!("{name}.sol"))
 }
