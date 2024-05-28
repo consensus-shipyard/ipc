@@ -461,7 +461,8 @@ where
                 self.multi_engine.clone(),
                 actor_bundle.builtin(),
                 actor_bundle.custom(),
-            ).await
+            )
+            .await
         } else {
             let bundle = &self.builtin_actors_bundle;
             let bundle = std::fs::read(bundle)
@@ -477,7 +478,8 @@ where
                 self.multi_engine.clone(),
                 &bundle,
                 &custom_actors_bundle,
-            ).await
+            )
+            .await
         }
         .context("failed to create genesis state")?;
 
