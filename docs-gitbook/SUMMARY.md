@@ -35,3 +35,6 @@
 * [IPC CLI](reference/ipc-cli-usage.md)
 * [Troubleshooting](reference/troubleshooting.md)
 * [FAQ](reference/faq.md)
+
+## Specifications
+* [Addressing](../specs/addressing.md)
