@@ -3,26 +3,29 @@
 
 use std::collections::{BTreeSet, HashMap};
 use std::marker::PhantomData;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use ethers::abi::Tokenize;
 use ethers::core::types as et;
 use fendermint_actor_eam::PermissionModeParams;
-use fendermint_eth_hardhat::{Hardhat, FQN};
-use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
+use fendermint_eth_hardhat::{fqn, FQN};
+use fendermint_vm_actor_interface::diamond::EthContractMap;
 use fendermint_vm_actor_interface::eam::EthAddress;
-use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
+use fendermint_vm_actor_interface::ipc::{
+    GATEWAY_ACTOR_ID, IPC_CONTRACTS, SUBNETREGISTRY_ACTOR_ID,
+};
 use fendermint_vm_actor_interface::{
     account, burntfunds, chainmetadata, cron, eam, init, ipc, reward, system, EMPTY_ARR,
 };
 use fendermint_vm_core::{chainid, Timestamp};
-use fendermint_vm_genesis::{ActorMeta, Genesis, Power, PowerScale, Validator};
+use fendermint_vm_genesis::{ActorMeta, ContractArtifacts, Genesis, Power, PowerScale, Validator};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::chainid::ChainID;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
+use fvm_shared::ActorID;
 use ipc_actors_abis::i_diamond::FacetCut;
 use num_traits::Zero;
 
@@ -299,14 +302,10 @@ where
             )
             .context("failed to init exec state")?;
 
-        let mut deployer = ContractDeployer::<DB>::new(&self.contracts, &eth_contracts);
-
-        // Deploy Ethereum libraries.
-        for (lib_src, lib_name) in eth_libs {
-            deployer.deploy_library(&mut state, &mut next_id, lib_src, &lib_name)?;
-        }
-
         if let Some(ipc_params) = genesis.ipc {
+            let mut deployer = IPCContractDeployer::<DB>::new(&ipc_params.artifacts);
+            deployer.deploy_dependencies(&mut state, &mut next_id)?;
+
             // IPC Gateway actor.
             let gateway_addr = {
                 use ipc::gateway::ConstructorParameters;
@@ -314,14 +313,11 @@ where
                 let params = ConstructorParameters::new(ipc_params.gateway, genesis.validators)
                     .context("failed to create gateway constructor")?;
 
-                let facets = deployer
-                    .facets(ipc::gateway::CONTRACT_NAME)
-                    .context("failed to collect gateway facets")?;
-
                 deployer.deploy_contract(
                     &mut state,
                     ipc::gateway::CONTRACT_NAME,
-                    (facets, params),
+                    GATEWAY_ACTOR_ID,
+                    params,
                 )?
             };
 
@@ -329,8 +325,12 @@ where
             {
                 use ipc::registry::ConstructorParameters;
 
+                let registry_fqn = fqn(
+                    &contract_src(ipc::registry::CONTRACT_NAME),
+                    ipc::registry::CONTRACT_NAME,
+                );
                 let mut facets = deployer
-                    .facets(ipc::registry::CONTRACT_NAME)
+                    .facets(registry_fqn)
                     .context("failed to collect registry facets")?;
 
                 let getter_facet = facets.remove(0);
@@ -368,7 +368,8 @@ where
                 deployer.deploy_contract(
                     &mut state,
                     ipc::registry::CONTRACT_NAME,
-                    (facets, params),
+                    SUBNETREGISTRY_ACTOR_ID,
+                    params,
                 )?;
             };
         }
@@ -381,42 +382,47 @@ fn contract_src(name: &str) -> PathBuf {
     PathBuf::from(format!("{name}.sol"))
 }
 
-struct ContractDeployer<'a, DB> {
-    hardhat: &'a Hardhat,
-    top_contracts: &'a EthContractMap,
+/// Util struct that deploys the ipc genesis contracts
+struct IPCContractDeployer<'a, DB> {
+    artifacts: &'a ContractArtifacts,
     // Assign dynamic ID addresses to libraries, but use fixed addresses for the top level contracts.
-    lib_addrs: HashMap<FQN, et::Address>,
+    deployed_addrs: HashMap<FQN, et::Address>,
     phantom_db: PhantomData<DB>,
 }
 
-impl<'a, DB> ContractDeployer<'a, DB>
+impl<'a, DB> IPCContractDeployer<'a, DB>
 where
     DB: Blockstore + 'static + Send + Sync + Clone,
 {
-    pub fn new(hardhat: &'a Hardhat, top_contracts: &'a EthContractMap) -> Self {
+    pub fn new(artifacts: &'a ContractArtifacts) -> Self {
         Self {
-            hardhat,
-            top_contracts,
-            lib_addrs: Default::default(),
+            artifacts,
+            deployed_addrs: Default::default(),
             phantom_db: PhantomData,
         }
     }
 
-    /// Deploy a library contract with a dynamic ID and no constructor.
-    pub fn deploy_library(
+    /// Deploy all the ipc contract libraries
+    pub fn deploy_dependencies(
         &mut self,
         state: &mut FvmGenesisState<DB>,
         next_id: &mut u64,
-        lib_src: impl AsRef<Path>,
-        lib_name: &str,
     ) -> anyhow::Result<()> {
-        let fqn = self.hardhat.fqn(lib_src.as_ref(), lib_name);
+        for (fqn, artifact) in &self.artifacts.dependencies {
+            let bytecode = artifact.bytecode(&self.deployed_addrs)?;
+            self.deploy_dependency(state, next_id, fqn.clone(), bytecode)?;
+        }
+        Ok(())
+    }
 
-        let bytecode = self
-            .hardhat
-            .bytecode(&lib_src, lib_name, &self.lib_addrs)
-            .with_context(|| format!("failed to load library bytecode {fqn}"))?;
-
+    /// Deploy a library contract with a dynamic ID and no constructor.
+    fn deploy_dependency(
+        &mut self,
+        state: &mut FvmGenesisState<DB>,
+        next_id: &mut u64,
+        fqn: String,
+        bytecode: Vec<u8>,
+    ) -> anyhow::Result<()> {
         let eth_addr = state
             .create_evm_actor(*next_id, bytecode)
             .with_context(|| format!("failed to create library actor {fqn}"))?;
@@ -434,72 +440,31 @@ where
 
         // We can use the masked ID here or the delegated address.
         // Maybe the masked ID is quicker because it doesn't need to be resolved.
-        self.lib_addrs.insert(fqn, id_addr);
+        self.deployed_addrs.insert(fqn, id_addr);
 
         *next_id += 1;
 
         Ok(())
     }
 
-    /// Construct the bytecode of a top-level contract and deploy it with some constructor parameters.
-    pub fn deploy_contract<T>(
-        &self,
-        state: &mut FvmGenesisState<DB>,
-        contract_name: &str,
-        constructor_params: T,
-    ) -> anyhow::Result<et::Address>
-    where
-        T: Tokenize,
-    {
-        let contract = self.top_contract(contract_name)?;
-        let contract_id = contract.actor_id;
-        let contract_src = contract_src(contract_name);
+    /// Collect Facet Cuts for the diamond pattern, where the facet address comes from already
+    /// deployed library facets.
+    fn facets(&self, fqn: String) -> anyhow::Result<Vec<FacetCut>> {
+        let facets = self
+            .artifacts
+            .facets
+            .get(&fqn)
+            .ok_or_else(|| anyhow!("{} not found", fqn))?;
 
-        let bytecode = self
-            .hardhat
-            .bytecode(contract_src, contract_name, &self.lib_addrs)
-            .with_context(|| format!("failed to load {contract_name} bytecode"))?;
+        let mut facet_cuts = vec![];
 
-        let eth_addr = state
-            .create_evm_actor_with_cons(contract_id, &contract.abi, bytecode, constructor_params)
-            .with_context(|| format!("failed to create {contract_name} actor"))?;
-
-        let id_addr = et::Address::from(EthAddress::from_id(contract_id).0);
-        let eth_addr = et::Address::from(eth_addr.0);
-
-        tracing::info!(
-            actor_id = contract_id,
-            ?eth_addr,
-            ?id_addr,
-            contract_name,
-            "deployed Ethereum contract"
-        );
-
-        // The Ethereum address is more usable inside the EVM than the ID address.
-        Ok(eth_addr)
-    }
-
-    /// Collect Facet Cuts for the diamond pattern, where the facet address comes from already deployed library facets.
-    pub fn facets(&self, contract_name: &str) -> anyhow::Result<Vec<FacetCut>> {
-        let contract = self.top_contract(contract_name)?;
-        let mut facet_cuts = Vec::new();
-
-        for facet in contract.facets.iter() {
-            let facet_name = facet.name;
-            let facet_src = contract_src(facet_name);
-            let facet_fqn = self.hardhat.fqn(&facet_src, facet_name);
-
+        for facet in facets.iter() {
             let facet_addr = self
-                .lib_addrs
-                .get(&facet_fqn)
-                .ok_or_else(|| anyhow!("facet {facet_name} has not been deployed"))?;
+                .deployed_addrs
+                .get(&facet.name)
+                .ok_or_else(|| anyhow!("facet {} has not been deployed", facet.name))?;
 
-            let method_sigs = facet
-                .abi
-                .functions()
-                .filter(|f| f.signature() != "init(bytes)")
-                .map(|f| f.short_signature())
-                .collect();
+            let method_sigs = facet.method_sigs.clone();
 
             let facet_cut = FacetCut {
                 facet_address: *facet_addr,
@@ -513,10 +478,51 @@ where
         Ok(facet_cuts)
     }
 
-    fn top_contract(&self, contract_name: &str) -> anyhow::Result<&EthContract> {
-        self.top_contracts
-            .get(contract_name)
-            .ok_or_else(|| anyhow!("unknown top contract name: {contract_name}"))
+    /// Construct the bytecode of a top-level contract and deploy it with some constructor parameters.
+    pub fn deploy_contract<T>(
+        &self,
+        state: &mut FvmGenesisState<DB>,
+        name: &str,
+        contract_id: ActorID,
+        constructor_params: T,
+    ) -> anyhow::Result<et::Address>
+    where
+        T: Tokenize + ethers::abi::Tokenizable,
+    {
+        let fqn = fqn(&contract_src(name), name);
+
+        let artifact = self
+            .artifacts
+            .contracts
+            .get(&fqn)
+            .ok_or_else(|| anyhow!("{name} artifact not found"))?;
+        let bytecode = artifact
+            .bytecode(&self.deployed_addrs)
+            .with_context(|| format!("failed to load {fqn} bytecode"))?;
+
+        let facets = self.facets(fqn)?;
+        let abi = &IPC_CONTRACTS
+            .get(name)
+            .ok_or_else(|| anyhow!("gateway should be found"))?
+            .abi;
+
+        let eth_addr = state
+            .create_evm_actor_with_cons(contract_id, abi, bytecode, (facets, constructor_params))
+            .with_context(|| format!("failed to create {name} actor"))?;
+
+        let id_addr = et::Address::from(EthAddress::from_id(contract_id).0);
+        let eth_addr = et::Address::from(eth_addr.0);
+
+        tracing::info!(
+            actor_id = contract_id,
+            ?eth_addr,
+            ?id_addr,
+            name,
+            "deployed Ethereum contract"
+        );
+
+        // The Ethereum address is more usable inside the EVM than the ID address.
+        Ok(eth_addr)
     }
 }
 

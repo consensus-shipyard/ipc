@@ -3,6 +3,7 @@
 
 use anyhow::{anyhow, bail, Context};
 use ethers_core::types as et;
+use ethers_core::types::Address;
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ord,
@@ -43,7 +44,7 @@ impl Hardhat {
 
     /// Fully qualified name of a source and contract.
     pub fn fqn(&self, contract_source: &Path, contract_name: &str) -> String {
-        format!("{}:{}", contract_source.to_string_lossy(), contract_name)
+        fqn(contract_source, contract_name)
     }
 
     /// Read the bytecode of the contract and replace all links in it with library addresses,
@@ -170,12 +171,53 @@ impl Hardhat {
     }
 }
 
+pub fn fqn(contract_source: &Path, contract_name: &str) -> String {
+    format!("{}:{}", contract_source.to_string_lossy(), contract_name)
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Artifact {
     bytecode: Bytecode,
 }
 
 impl Artifact {
+    pub fn bytecode(&self, libraries: &HashMap<FQN, Address>) -> anyhow::Result<Vec<u8>> {
+        // Get the bytecode which is in hex format with placeholders for library references.
+        let mut bytecode = self.bytecode.object.clone();
+
+        // Replace all library references with their address.
+        // Here we differ slightly from the TypeScript version in that we don't return an error
+        // for entries in the library address map that we end up not needing, so we can afford
+        // to know less about which contract needs which exact references when we call them,
+        for (lib_src, lib_name) in self.libraries_needed() {
+            // References can be given with Fully Qualified Name, or just the contract name,
+            // but they must be unique and unambiguous.
+            let fqn = fqn(&lib_src, &lib_name);
+
+            let lib_addr = match (libraries.get(&fqn), libraries.get(&lib_name)) {
+                (None, None) => {
+                    bail!("failed to resolve library: {fqn}")
+                }
+                (Some(_), Some(_)) => bail!("ambiguous library: {fqn}"),
+                (Some(addr), None) => addr,
+                (None, Some(addr)) => addr,
+            };
+
+            let lib_addr = hex::encode(lib_addr.0);
+
+            for pos in self.library_positions(&lib_src, &lib_name) {
+                let start = 2 + pos.start * 2;
+                let end = start + pos.length * 2;
+                bytecode.replace_range(start..end, &lib_addr);
+            }
+        }
+
+        let bytecode = hex::decode(bytecode.trim_start_matches("0x"))
+            .context("failed to decode contract from hex")?;
+
+        Ok(bytecode)
+    }
+
     // Collect the libraries this contract needs.
     pub fn libraries_needed(&self) -> Vec<(ContractSource, ContractName)> {
         self.bytecode

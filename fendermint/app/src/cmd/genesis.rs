@@ -3,7 +3,7 @@
 
 use anyhow::{anyhow, Context};
 use fendermint_crypto::PublicKey;
-use fendermint_eth_hardhat::Hardhat;
+use fendermint_eth_hardhat::{fqn, Hardhat};
 use fvm_shared::address::Address;
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
@@ -14,8 +14,8 @@ use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{
-    ipc, Account, Actor, ActorMeta, Collateral, ContractArtifacts, Genesis, GenesisActorBundles,
-    Multisig, PermissionMode, SignerAddr, Validator, ValidatorKey,
+    ipc, Account, Actor, ActorMeta, Collateral, ContractArtifacts, Facet, Genesis,
+    GenesisActorBundles, Multisig, PermissionMode, SignerAddr, Validator, ValidatorKey,
 };
 
 use crate::cmd;
@@ -376,12 +376,29 @@ fn prepare_ipc_solidity_contracts(
 
     // all ipc contracts, includes gateway/registry and all their facets
     let mut all_ipc_contracts = Vec::new();
-    all_ipc_contracts.extend(IPC_CONTRACTS.keys());
-    all_ipc_contracts.extend(
-        IPC_CONTRACTS
-            .values()
-            .flat_map(|c| c.facets.iter().map(|f| f.name)),
-    );
+    let mut all_facets = HashMap::new();
+
+    for (name, detail) in IPC_CONTRACTS.iter() {
+        all_ipc_contracts.push(*name);
+
+        let mut facets = vec![];
+        for facet in detail.facets.iter() {
+            all_ipc_contracts.push(facet.name);
+
+            let method_sigs = facet
+                .abi
+                .functions()
+                .filter(|f| f.signature() != "init(bytes)")
+                .map(|f| f.short_signature())
+                .collect::<Vec<_>>();
+            facets.push(Facet {
+                name: fqn(&contract_source(facet.name), facet.name),
+                method_sigs,
+            });
+        }
+
+        all_facets.insert(name.to_string(), facets);
+    }
 
     // Collect library dependencies for all the IPC contracts.
     let eth_libs = hardhat
@@ -399,15 +416,22 @@ fn prepare_ipc_solidity_contracts(
 
     for name in all_ipc_contracts {
         let source = contract_source(name);
-        contracts.insert(name.to_string(), hardhat.artifact(&source, name)?);
+        contracts.insert(hardhat.fqn(&source, name), hardhat.artifact(&source, name)?);
     }
 
-    let mut libraries = HashMap::new();
+    let mut dependencies = vec![];
     for (source, name) in eth_libs {
-        libraries.insert(name.to_string(), hardhat.artifact(&source, &name)?);
+        dependencies.push((
+            hardhat.fqn(&source, &name),
+            hardhat.artifact(&source, &name)?,
+        ));
     }
 
-    Ok(ContractArtifacts { contracts, libraries })
+    Ok(ContractArtifacts {
+        facets: all_facets,
+        contracts,
+        dependencies,
+    })
 }
 
 fn contract_source(name: &str) -> PathBuf {

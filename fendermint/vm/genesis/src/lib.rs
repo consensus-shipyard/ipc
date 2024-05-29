@@ -14,6 +14,7 @@ use fvm_shared::version::NetworkVersion;
 use fvm_shared::{address::Address, econ::TokenAmount};
 
 use fendermint_crypto::{normalize_public_key, PublicKey};
+use fendermint_eth_hardhat::FQN;
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_encoding::IsHumanReadable;
 
@@ -36,12 +37,26 @@ pub enum GenesisActorBundles {
     },
 }
 
+/// Represents the facet information needed for a contract
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct Facet {
+    pub name: FQN,
+    pub method_sigs: Vec<[u8; 4]>,
+}
+pub type ContractFacets = Vec<Facet>;
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct ContractArtifacts {
-    /// The contracts to be deployed, this includes the gateway/register and their facets
-    pub contracts: HashMap<String, fendermint_eth_hardhat::Artifact>,
-    /// The libraries used by the contracts
-    pub libraries: HashMap<String, fendermint_eth_hardhat::Artifact>,
+    /// The external facets contracts, i.e. gateway and registry
+    pub contracts: HashMap<FQN, fendermint_eth_hardhat::Artifact>,
+    /// The mapping of contract address to its facets. For example, the gateway contract might
+    /// have ManagerFacet, GetterFacet and etc... The key to the hashmap is the
+    /// FQN of gateway contract, and the value is [(ManagerFacet, methods), (GetterFacet, methods)]
+    pub facets: HashMap<FQN, ContractFacets>,
+    /// The libraries and facets artifacts used by the contracts.
+    /// Note that the libraries and facets must be topologically sorted,
+    /// i.e such that the libraries with no dependencies are placed at earlier indexes of the vec.
+    pub dependencies: Vec<(FQN, fendermint_eth_hardhat::Artifact)>,
 }
 
 /// The genesis data structure we serialize to JSON and start the chain with.
