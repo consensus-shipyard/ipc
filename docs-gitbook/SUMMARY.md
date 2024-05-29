@@ -29,6 +29,15 @@
   * [Example: Upgrading Wasm actor](developer-guides/upgrades/upgrade-wasm-actor.md)
 * [Deploying an explorer](developer-guides/deploy-blockscout.md)
 
+## Specifications
+
+* [Addressing](../specs/addressing.md)
+* [CometBFT](../specs/cometbft.md)
+* [IPLD Resolver](../specs/ipld-resolver.md)
+* [Materializer](../specs/materializer.md)
+* [Top-down Finality](../specs/topdown.md)
+
+
 ## Reference
 
 * [Networks](reference/networks.md)
