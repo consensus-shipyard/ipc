@@ -129,6 +129,7 @@ where
                 .flat_map(|c| c.facets.iter().map(|f| f.name)),
         );
         // Collect dependencies of the main IPC actors.
+
         let mut eth_libs = self
             .contracts
             .dependencies(

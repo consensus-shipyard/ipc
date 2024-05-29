@@ -395,18 +395,19 @@ fn prepare_ipc_solidity_contracts(
 
     // we cannot just store the bytecode in the genesis because we don't really know the addresses
     // of the libraries/
-    let mut artifacts = HashMap::new();
+    let mut contracts = HashMap::new();
 
     for name in all_ipc_contracts {
         let source = contract_source(name);
-        artifacts.insert(name.to_string(), hardhat.artifact(&source, name)?);
+        contracts.insert(name.to_string(), hardhat.artifact(&source, name)?);
     }
 
+    let mut libraries = HashMap::new();
     for (source, name) in eth_libs {
-        artifacts.insert(name.to_string(), hardhat.artifact(&source, &name)?);
+        libraries.insert(name.to_string(), hardhat.artifact(&source, &name)?);
     }
 
-    Ok(artifacts)
+    Ok(ContractArtifacts { contracts, libraries })
 }
 
 fn contract_source(name: &str) -> PathBuf {

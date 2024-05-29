@@ -36,7 +36,13 @@ pub enum GenesisActorBundles {
     },
 }
 
-pub type ContractArtifacts = HashMap<String, fendermint_eth_hardhat::Artifact>;
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct ContractArtifacts {
+    /// The contracts to be deployed, this includes the gateway/register and their facets
+    pub contracts: HashMap<String, fendermint_eth_hardhat::Artifact>,
+    /// The libraries used by the contracts
+    pub libraries: HashMap<String, fendermint_eth_hardhat::Artifact>,
+}
 
 /// The genesis data structure we serialize to JSON and start the chain with.
 #[serde_as]
