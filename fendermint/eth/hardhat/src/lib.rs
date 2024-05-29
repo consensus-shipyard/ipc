@@ -170,7 +170,7 @@ impl Hardhat {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Artifact {
     bytecode: Bytecode,
 }
@@ -207,7 +207,7 @@ impl Artifact {
 }
 
 /// Match the `"bytecode"` entry in the Hardhat build artifact.
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 struct Bytecode {
     /// Hexadecimal format with placeholders for links.
@@ -216,7 +216,7 @@ struct Bytecode {
 }
 
 /// Indicate where a placeholder appears in the bytecode object.
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 struct Position {
     pub start: usize,
     pub length: usize,

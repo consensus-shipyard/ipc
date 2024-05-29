@@ -696,6 +696,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
                         majority_percentage: 67,
                         active_validators_limit: 100,
                     },
+                    artifacts: Default::default(),
                 }),
             };
             Ok(genesis)

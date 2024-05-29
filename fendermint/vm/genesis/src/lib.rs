@@ -258,6 +258,7 @@ impl GenesisActorBundles {
 
 /// IPC related data structures.
 pub mod ipc {
+    use crate::ContractArtifacts;
     use fendermint_vm_encoding::IsHumanReadable;
     use ipc_api::subnet_id::SubnetID;
     use serde::{Deserialize, Serialize};
@@ -266,6 +267,8 @@ pub mod ipc {
     #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
     pub struct IpcParams {
         pub gateway: GatewayParams,
+        /// ipc solidity contract source code artifacts
+        pub artifacts: ContractArtifacts,
     }
 
     #[serde_as]

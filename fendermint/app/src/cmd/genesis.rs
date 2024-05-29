@@ -274,6 +274,7 @@ fn set_ipc_gateway(genesis_file: &PathBuf, args: &GenesisIpcGatewayArgs) -> anyh
             }
             None => ipc::IpcParams {
                 gateway: gateway_params,
+                artifacts: Default::default(),
             },
         };
 
@@ -315,6 +316,7 @@ async fn new_genesis_from_parent(
             majority_percentage: genesis_info.majority_percentage,
             active_validators_limit: genesis_info.active_validators_limit,
         },
+        artifacts: prepare_ipc_solidity_contracts(args.ipc_contract_path.clone())?,
     };
 
     let builtin_bundle = std::fs::read(&args.builtin_bundle_path)
@@ -367,7 +369,6 @@ async fn new_genesis_from_parent(
     Ok(())
 }
 
-#[allow(dead_code)] // TODO: will be called in follow up PR
 fn prepare_ipc_solidity_contracts(
     contract_root_path: PathBuf,
 ) -> anyhow::Result<ContractArtifacts> {
