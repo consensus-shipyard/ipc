@@ -15,7 +15,7 @@ Assuming the process of launching a custom IPC Subnet with at least one validato
 * A user would begin by launching Metamask, and manually adding the custom IPC Network to their Metamask networks list using “Add a network manually.” &#x20;
 
 \
-![](https://lh7-us.googleusercontent.com/ieHnkmUDN4HDPugxp9u5niCXfbmfYBRS7j7r-ptXaplbltPrH24hbg6juhQkywLfboqMNPykw\_qsfBPOOsTYW0OS8km9JApVd5sIie4oOVPDiEH9J8DM8garYaimT0tikqXDp0ro5Mp12JuHehN4zAw)
+![](https://github.com/consensus-shipyard/docs/blob/main/.gitbook/assets/MM-network.png)
 
 * Name the network, include the local New RPC URL and relevant ChainID (both of which are provided when you successfully launch the validator node), and name the currency symbol (for Filecoin subnets, tFIL is used). &#x20;
 
