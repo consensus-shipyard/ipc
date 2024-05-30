@@ -721,7 +721,8 @@ where
 
         let state = FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
             .context("error creating new state")?
-            .with_block_hash(block_hash);
+            .with_block_hash(block_hash)
+            .with_validator_id(request.header.proposer_address);
 
         tracing::debug!("initialized exec state");
 
@@ -782,10 +783,6 @@ where
             .context("end failed")?;
 
         let r = to_end_block(ret)?;
-
-        emit!(NewBlock {
-            block_height: request.height as BlockHeight
-        });
 
         Ok(r)
     }
@@ -869,6 +866,8 @@ where
 
         // Commit app state to the datastore.
         self.set_committed_state(state)?;
+
+        emit!(NewBlock { block_height });
 
         // Reset check state.
         let mut guard = self.check_state.lock().await;

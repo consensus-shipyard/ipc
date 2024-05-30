@@ -146,6 +146,11 @@ impl DockerPortRange {
     pub fn ethapi_rpc_host_port(&self) -> u32 {
         self.from + 45
     }
+
+    /// Mapping the internal 9184 of fendermint to the host.
+    pub fn fendermint_metrics_host_port(&self) -> u32 {
+        self.from + 84
+    }
 }
 
 /// State of the materializer that it persists, so that it can resume operations.
@@ -896,13 +901,11 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             "ipc-cli subnet join \
                 --subnet {} \
                 --from {:?} \
-                --public-key {} \
                 --collateral {} \
                 --initial-balance {} \
             ",
             subnet.subnet_id,
             account.eth_addr(),
-            hex::encode(account.public_key().serialize()),
             collateral.0,
             balance.0
         );

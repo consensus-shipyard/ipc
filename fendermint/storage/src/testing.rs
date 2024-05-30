@@ -25,11 +25,14 @@ pub enum TestOpKV<K, V> {
     Get(K),
     Put(K, V),
     Del(K),
+    Iter,
 }
 
 #[derive(Clone, Debug)]
 pub enum TestOpNs {
+    /// String-to-Int
     S2I(TestNamespace, TestOpKV<String, u8>),
+    /// Int-to-String
     I2S(TestNamespace, TestOpKV<u8, String>),
     Rollback,
 }
@@ -48,18 +51,20 @@ impl Arbitrary for TestOpNs {
         match u8::arbitrary(g) % 100 {
             i if i < 47 => {
                 let ns = g.choose(&["spam", "eggs"]).unwrap();
-                let k = *g.choose(&["foo", "bar"]).unwrap();
+                let k = *g.choose(&["foo", "bar", "baz"]).unwrap();
                 match u8::arbitrary(g) % 10 {
                     i if i < 3 => S2I(ns, Get(k.to_owned())),
+                    i if i < 4 => S2I(ns, Iter),
                     i if i < 9 => S2I(ns, Put(k.to_owned(), Arbitrary::arbitrary(g))),
                     _ => S2I(ns, Del(k.to_owned())),
                 }
             }
             i if i < 94 => {
                 let ns = g.choose(&["fizz", "buzz"]).unwrap();
-                let k = u8::arbitrary(g) % 2;
+                let k = u8::arbitrary(g) % 3;
                 match u8::arbitrary(g) % 10 {
                     i if i < 3 => I2S(ns, Get(k)),
+                    i if i < 4 => I2S(ns, Iter),
                     i if i < 9 => {
                         let sz = u8::arbitrary(g) % 5;
                         let s = (0..sz).map(|_| char::arbitrary(g)).collect();
@@ -146,6 +151,7 @@ where
 pub fn check_writable<S>(sut: &impl KVWritable<S>, data: TestData) -> bool
 where
     S: KVStore<Namespace = TestNamespace> + Clone + Codec<String> + Codec<u8>,
+    S::Repr: Ord + 'static,
 {
     let mut model = Model::default();
     // Creating a collection doesn't add much to the test but at least we exercise this path.
@@ -186,6 +192,7 @@ where
 pub fn check_write_isolation<S>(sut: &impl KVWritable<S>, data: TestDataMulti<2>) -> bool
 where
     S: KVStore<Namespace = TestNamespace> + Clone + Codec<String> + Codec<u8>,
+    S::Repr: Ord + 'static,
 {
     let mut colls = Collections::<S>::default();
     let mut model1 = Model::default();
@@ -221,6 +228,7 @@ where
 pub fn check_write_isolation_concurrent<S, B>(sut: &B, data1: TestData, data2: TestData) -> bool
 where
     S: KVStore<Namespace = TestNamespace> + Clone + Codec<String> + Codec<u8>,
+    S::Repr: Ord + 'static,
     B: KVWritable<S> + Clone + Send + 'static,
 {
     let sut2 = sut.clone();
@@ -321,6 +329,7 @@ where
 pub fn check_read_isolation<S, B>(sut: &B, data: TestData) -> bool
 where
     S: KVStore<Namespace = TestNamespace> + Clone + Codec<String> + Codec<u8>,
+    S::Repr: Ord + 'static,
     B: KVWritable<S> + KVReadable<S>,
 {
     let mut model = Model::default();
@@ -384,8 +393,9 @@ fn apply_both<S, K, V>(
 ) -> bool
 where
     S: KVStore<Namespace = TestNamespace> + Clone + Codec<K> + Codec<V>,
-    K: Hash + Eq,
-    V: Clone + PartialEq,
+    K: Clone + Hash + Eq + 'static,
+    V: Clone + PartialEq + 'static,
+    S::Repr: Ord + 'static,
 {
     match op {
         TestOpKV::Get(k) => {
@@ -405,6 +415,30 @@ where
             //println!("DEL {:?}/{:?}", ns, k);
             coll.delete(tx, &k).unwrap();
             model.entry(ns).or_default().remove(&k);
+        }
+        TestOpKV::Iter => {
+            let found = coll.iterate(tx).collect::<Result<Vec<_>, _>>().unwrap();
+
+            let expected = if let Some(m) = model.get(ns) {
+                let mut expected = m
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect::<Vec<_>>();
+
+                expected.sort_by(|a, b| {
+                    let ka = S::to_repr(&a.0).unwrap();
+                    let kb = S::to_repr(&b.0).unwrap();
+                    ka.cmp(&kb)
+                });
+
+                expected
+            } else {
+                Vec::new()
+            };
+
+            if found != expected {
+                return false;
+            }
         }
     }
     true

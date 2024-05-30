@@ -252,6 +252,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96d30a06541fbafbc7f82ed10c06164cfbd2c401138f6addd8404629c4b16711"
 
 [[package]]
+name = "ascii"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d92bec98840b8f03a5ff5413de5293bfcd8bf96467cf5452609f939ec6f5de16"
+
+[[package]]
 name = "ascii-canvas"
 version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1232,6 +1238,12 @@ dependencies = [
  "serde",
  "windows-targets 0.52.4",
 ]
+
+[[package]]
+name = "chunked_transfer"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e4de3bc4ea267985becf712dc6d9eed8b04c953b3fcfb339ebc87acd9804901"
 
 [[package]]
 name = "cid"
@@ -2993,6 +3005,7 @@ dependencies = [
  "ipc_ipld_resolver",
  "ipfs-api-backend-hyper",
  "k256 0.11.6",
+ "lazy_static",
  "libipld",
  "libp2p",
  "libp2p-bitswap",
@@ -3000,6 +3013,9 @@ dependencies = [
  "multiaddr 0.18.1",
  "num-traits",
  "openssl",
+ "paste",
+ "prometheus",
+ "prometheus_exporter",
  "prost",
  "quickcheck",
  "quickcheck_macros",
@@ -3015,6 +3031,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-util 0.7.10",
+ "tower",
  "tower-abci",
  "tracing",
  "tracing-appender",
@@ -3063,9 +3080,11 @@ dependencies = [
  "multiaddr 0.18.1",
  "regex",
  "serde",
+ "serde_json",
  "serde_with 2.3.3",
  "serial_test",
  "tendermint-rpc",
+ "tracing",
 ]
 
 [[package]]
@@ -3143,6 +3162,7 @@ dependencies = [
  "quickcheck",
  "quickcheck_macros",
  "rand",
+ "regex",
  "serde",
  "serde_json",
  "tendermint 0.31.1",
@@ -5163,8 +5183,10 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_tuple",
+ "serde_with 2.3.3",
  "strum",
  "thiserror",
+ "tracing",
 ]
 
 [[package]]
@@ -5207,6 +5229,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite 0.18.0",
  "toml 0.7.8",
+ "tracing-subscriber",
  "url",
  "zeroize",
 ]
@@ -5234,6 +5257,7 @@ dependencies = [
  "ipc-types",
  "ipc-wallet",
  "ipc_actors_abis",
+ "libsecp256k1",
  "log",
  "num-derive 0.3.3",
  "num-traits",
@@ -5249,6 +5273,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite 0.18.0",
  "toml 0.8.12",
+ "tracing",
  "url",
  "zeroize",
 ]
@@ -6433,7 +6458,6 @@ dependencies = [
 [[package]]
 name = "merkle-tree-rs"
 version = "0.1.0"
-source = "git+https://github.com/consensus-shipyard/merkle-tree-rs.git?branch=dev#069f1dcb7f29d389c92cac54b1e687d81c4fd639"
 dependencies = [
  "anyhow",
  "ethers",
@@ -7730,6 +7754,20 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.58",
+]
+
+[[package]]
+name = "prometheus_exporter"
+version = "0.8.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "caf17cbebe0bfdf4f279ef84eeefe0d50468b0b7116f078acf41d456e48fe81a"
+dependencies = [
+ "ascii",
+ "lazy_static",
+ "log",
+ "prometheus",
+ "thiserror",
+ "tiny_http",
 ]
 
 [[package]]
@@ -9686,6 +9724,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2c9d3793400a45f954c52e73d068316d76b6f4e36977e3fcebb13a2721e80237"
 dependencies = [
  "crunchy",
+]
+
+[[package]]
+name = "tiny_http"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c5f8734c6d6943ad6df6b588d228a87b4af184998bcffa268ceddf05c2055a8c"
+dependencies = [
+ "ascii",
+ "chunked_transfer",
+ "log",
+ "time",
+ "url",
 ]
 
 [[package]]

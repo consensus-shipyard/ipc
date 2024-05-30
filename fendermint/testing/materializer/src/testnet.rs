@@ -133,9 +133,10 @@ where
     }
 
     /// Get an account by ID.
-    pub fn account(&self, id: &AccountId) -> anyhow::Result<&M::Account> {
+    pub fn account(&self, id: impl Into<AccountId>) -> anyhow::Result<&M::Account> {
+        let id: AccountId = id.into();
         self.accounts
-            .get(id)
+            .get(&id)
             .ok_or_else(|| anyhow!("account {id} does not exist"))
     }
 
@@ -411,7 +412,7 @@ where
 
                 self.subnets.insert(root_name.clone(), subnet);
                 self.deployments.insert(root_name.clone(), deployment);
-                self.externals = urls.clone();
+                self.externals.clone_from(urls);
             }
             Rootnet::New {
                 validators,

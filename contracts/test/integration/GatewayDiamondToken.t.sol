@@ -11,7 +11,7 @@ import {IPCAddress, SubnetID, Subnet, SupplySource, SupplyKind, Validator} from 
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
-import {IpcHandler} from "../../sdk/IpcContract.sol";
+import {IIpcHandler} from "../../sdk/interfaces/IIpcHandler.sol";
 import {SupplySourceHelper} from "../../src/lib/SupplySourceHelper.sol";
 import {FilAddress} from "fevmate/utils/FilAddress.sol";
 import {GatewayDiamond} from "../../src/GatewayDiamond.sol";
@@ -226,7 +226,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
 
         // Verify that we received the call and that the recipient has the tokens.
         vm.prank(address(saDiamond));
-        vm.expectCall(recipient, abi.encodeCall(IpcHandler.handleIpcMessage, (msgs[0])), 1);
+        vm.expectCall(recipient, abi.encodeCall(IIpcHandler.handleIpcMessage, (msgs[0])), 1);
         gatewayDiamond.checkpointer().commitCheckpoint(batch);
         assertEq(token.balanceOf(recipient), 8);
     }

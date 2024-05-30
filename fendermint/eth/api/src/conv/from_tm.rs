@@ -21,6 +21,7 @@ use tendermint::abci::{self, Event, EventAttribute};
 use tendermint::crypto::sha256::Sha256;
 use tendermint_rpc::endpoint;
 
+use super::from_eth;
 use super::from_fvm::{to_eth_address, to_eth_signature, to_eth_tokens};
 
 // Values taken from https://github.com/filecoin-project/lotus/blob/6e7dc9532abdb3171427347710df4c860f1957a2/chain/types/ethtypes/eth_types.go#L199
@@ -217,33 +218,7 @@ pub fn to_eth_transaction(
     let tx = to_eth_transaction_request(&msg.message, &chain_id)
         .context("failed to convert to tx request")?;
 
-    let tx = et::Transaction {
-        hash,
-        nonce: tx.nonce.unwrap_or_default(),
-        block_hash: None,
-        block_number: None,
-        transaction_index: None,
-        from: tx.from.unwrap_or_default(),
-        to: tx.to.and_then(|to| to.as_address().cloned()),
-        value: tx.value.unwrap_or_default(),
-        gas: tx.gas.unwrap_or_default(),
-        max_fee_per_gas: tx.max_fee_per_gas,
-        max_priority_fee_per_gas: tx.max_priority_fee_per_gas,
-        // Strictly speaking a "Type 2" transaction should not need to set this, but we do because Blockscout
-        // has a database constraint that if a transaction is included in a block this can't be null.
-        gas_price: Some(
-            tx.max_fee_per_gas.unwrap_or_default()
-                + tx.max_priority_fee_per_gas.unwrap_or_default(),
-        ),
-        input: tx.data.unwrap_or_default(),
-        chain_id: tx.chain_id.map(|x| et::U256::from(x.as_u64())),
-        v: et::U64::from(sig.v),
-        r: sig.r,
-        s: sig.s,
-        transaction_type: Some(2u64.into()),
-        access_list: Some(tx.access_list),
-        other: Default::default(),
-    };
+    let tx = from_eth::to_eth_transaction(tx, sig, hash);
 
     Ok(tx)
 }

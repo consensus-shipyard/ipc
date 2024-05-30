@@ -17,7 +17,7 @@ fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
     let file_filter = opts.log_file_filter().expect("invalid filter");
 
     // log all traces to stderr (reserving stdout for any actual output such as from the CLI commands)
-    let console_layer = tracing_subscriber::fmt::layer()
+    let console_layer = fmt::layer()
         .with_writer(std::io::stderr)
         .with_target(false)
         .with_file(true)
@@ -42,7 +42,7 @@ fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
 
             let (non_blocking, file_guard) = tracing_appender::non_blocking(appender);
 
-            let file_layer = fmt::Layer::new()
+            let file_layer = fmt::layer()
                 .json()
                 .with_writer(non_blocking)
                 .with_span_events(FmtSpan::CLOSE)
@@ -56,9 +56,16 @@ fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
         None => (None, None),
     };
 
+    let metrics_layer = if opts.metrics_enabled() {
+        Some(fendermint_app::metrics::layer())
+    } else {
+        None
+    };
+
     let registry = tracing_subscriber::registry()
         .with(console_layer)
-        .with(file_layer);
+        .with(file_layer)
+        .with(metrics_layer);
 
     tracing::subscriber::set_global_default(registry).expect("Unable to set a global collector");
 

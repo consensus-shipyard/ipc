@@ -102,6 +102,31 @@ pub trait SubnetManager: Send + Sync + TopDownFinalityQuery + BottomUpCheckpoint
         amount: TokenAmount,
     ) -> Result<ChainEpoch>;
 
+    /// Grants an allowance to the `from` address to withdraw up to `amount` of tokens from the contract at `token_address`.
+    /// This function sets up an approval, allowing the `from` address to later transfer or utilize the tokens from the specified ERC20 token contract.
+    /// The primary use case is to enable subsequent contract interactions that require an upfront allowance,
+    /// such as depositing tokens into a contract that requires an allowance check.
+    ///
+    /// The operation ensures that the caller has the necessary authority and token balance before setting the allowance.
+    /// It is crucial for enabling controlled access to the token funds without transferring the ownership.
+    /// Note that calling this function multiple times can overwrite the existing allowance with the new value.
+    ///
+    /// # Arguments
+    ///
+    /// * `from`         - The address granting the approval.
+    /// * `token_address`- The contract address of the ERC20 token for which the approval is being granted.
+    /// * `amount`       - The maximum amount of tokens `from` is allowing to be used.
+    ///
+    /// # Returns
+    ///
+    /// * `Result<()>`   - An empty result indicating success or an error on failure, encapsulating any issues encountered during the approval process.
+    async fn approve_token(
+        &self,
+        subnet: SubnetID,
+        from: Address,
+        amount: TokenAmount,
+    ) -> Result<ChainEpoch>;
+
     /// Release creates a new check message to release funds in parent chain
     /// Returns the epoch that the released is executed in the child.
     async fn release(
@@ -136,6 +161,12 @@ pub trait SubnetManager: Send + Sync + TopDownFinalityQuery + BottomUpCheckpoint
 
     /// Get commit sha for deployed contracts
     async fn get_commit_sha(&self) -> Result<[u8; 32]>;
+
+    /// Gets the subnet supply source
+    async fn get_subnet_supply_source(
+        &self,
+        subnet: &SubnetID,
+    ) -> Result<ipc_actors_abis::subnet_actor_getter_facet::SupplySource>;
 
     /// Gets the genesis information required to bootstrap a child subnet
     async fn get_genesis_info(&self, subnet: &SubnetID) -> Result<SubnetGenesisInfo>;
@@ -239,7 +270,10 @@ pub trait BottomUpCheckpointRelayer: Send + Sync {
     /// Get the checkpoint period, i.e the number of blocks to submit bottom up checkpoints.
     async fn checkpoint_period(&self, subnet_id: &SubnetID) -> Result<ChainEpoch>;
     /// Get the checkpoint bundle at a specific height. If it does not exist, it will through error.
-    async fn checkpoint_bundle_at(&self, height: ChainEpoch) -> Result<BottomUpCheckpointBundle>;
+    async fn checkpoint_bundle_at(
+        &self,
+        height: ChainEpoch,
+    ) -> Result<Option<BottomUpCheckpointBundle>>;
     /// Queries the signature quorum reached events at target height.
     async fn quorum_reached_events(&self, height: ChainEpoch) -> Result<Vec<QuorumReachedEvent>>;
     /// Get the current epoch in the current subnet

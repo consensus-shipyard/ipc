@@ -4,11 +4,17 @@
 
 use async_stm::{atomically, TVar};
 use async_trait::async_trait;
-use fendermint_abci::{AbciResult as Result, Application, ApplicationService};
+use fendermint_abci::{
+    util::take_until_max_size, AbciResult as Result, Application, ApplicationService,
+};
 use structopt::StructOpt;
 use tendermint::abci::{request, response, Event, EventAttributeIndexExt};
+use tower::ServiceBuilder;
 use tower_abci::{split, v037::Server};
 use tracing::{info, Level};
+
+// For the sake of example, sho the relationship between buffering, concurrency and block size.
+const MAX_TXNS: usize = 100;
 
 /// In-memory, hashmap-backed key-value store ABCI application.
 ///
@@ -63,6 +69,29 @@ impl Application for KVStore {
             value: value.into_bytes().into(),
             ..Default::default()
         })
+    }
+
+    async fn prepare_proposal(
+        &self,
+        request: request::PrepareProposal,
+    ) -> Result<response::PrepareProposal> {
+        let mut txs = take_until_max_size(request.txs, request.max_tx_bytes.try_into().unwrap());
+
+        // Enfore transaciton limit so that we don't have a problem with buffering.
+        txs.truncate(MAX_TXNS);
+
+        Ok(response::PrepareProposal { txs })
+    }
+
+    async fn process_proposal(
+        &self,
+        request: request::ProcessProposal,
+    ) -> Result<response::ProcessProposal> {
+        if request.txs.len() > MAX_TXNS {
+            Ok(response::ProcessProposal::Reject)
+        } else {
+            Ok(response::ProcessProposal::Accept)
+        }
     }
 
     async fn deliver_tx(&self, request: request::DeliverTx) -> Result<response::DeliverTx> {
@@ -155,7 +184,17 @@ async fn main() {
 
     // Hand those components to the ABCI server. This is where tower layers could be added.
     let server = Server::builder()
-        .consensus(consensus)
+        .consensus(
+            // Because message handling is asynchronous, we must limit the concurrency of `consensus` to 1,
+            // otherwise transactions can be executed in an arbitrary order. `buffer` is required to avoid
+            // deadlocks in the connection handler; in ABCI++ (pre 2.0) we need to allow for all potential
+            // messages in the block, plus the surrounding begin/end/commit methods to be pipelined. The
+            // message limit is enforced in proposal preparation and processing.
+            ServiceBuilder::new()
+                .buffer(MAX_TXNS + 3)
+                .concurrency_limit(1)
+                .service(consensus),
+        )
         .snapshot(snapshot)
         .mempool(mempool)
         .info(info)

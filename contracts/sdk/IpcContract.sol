@@ -8,21 +8,9 @@ import {IGateway} from "../src/interfaces/IGateway.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/utils/ReentrancyGuard.sol";
 import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
 import {CrossMsgHelper} from "../src/lib/CrossMsgHelper.sol";
+import {IIpcHandler} from "./interfaces/IIpcHandler.sol";
 
-// Interface that needs to be implemented by IPC-aware contracts.
-//
-// TODO: extract to a shared module, so that both the IPC contracts and the SDK can depend on this.
-//  (IPC contracts reaching into the SDK is wrong).
-interface IpcHandler {
-    error CallerIsNotGateway();
-    error UnsupportedMsgKind();
-    error UnrecognizedResult();
-
-    /// @notice Entrypoint for handling xnet messages in IPC-aware contracts.
-    function handleIpcMessage(IpcEnvelope calldata envelope) external payable returns (bytes memory ret);
-}
-
-abstract contract IpcExchange is IpcHandler, Ownable, ReentrancyGuard {
+abstract contract IpcExchange is IIpcHandler, Ownable, ReentrancyGuard {
     using CrossMsgHelper for IpcEnvelope;
 
     // The address of the gateway in the network.
@@ -50,7 +38,7 @@ abstract contract IpcExchange is IpcHandler, Ownable, ReentrancyGuard {
             // If we were not tracking it, or if some details don't match, refuse to handle the receipt.
             IpcEnvelope storage orig = inflightMsgs[result.id];
             if (orig.message.length == 0 || keccak256(abi.encode(envelope.from)) != keccak256(abi.encode(orig.to))) {
-                revert IpcHandler.UnrecognizedResult();
+                revert IIpcHandler.UnrecognizedResult();
             }
 
             /// Note: if the result handler reverts, we will
@@ -114,7 +102,7 @@ abstract contract IpcExchange is IpcHandler, Ownable, ReentrancyGuard {
     function _onlyGateway() private view {
         // only the gateway address is allowed to deliver xnet messages.
         if (msg.sender != gatewayAddr) {
-            revert IpcHandler.CallerIsNotGateway();
+            revert IIpcHandler.CallerIsNotGateway();
         }
     }
 
