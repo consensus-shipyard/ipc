@@ -42,6 +42,7 @@ use serde::{Deserialize, Serialize};
 use tendermint::abci::request::CheckTxKind;
 use tendermint::abci::{request, response};
 use tracing::instrument;
+use fendermint_vm_interpreter::genesis::read_genesis_car;
 
 use crate::events::{NewBlock, ProposalProcessed};
 use crate::AppExitCode;
@@ -136,8 +137,10 @@ where
     /// Path to the Wasm bundle.
     ///
     /// Only loaded once during genesis; later comes from the [`StateTree`].
+    #[deprecated]
     builtin_actors_bundle: PathBuf,
     /// Path to the custom actor WASM bundle.
+    #[deprecated]
     custom_actors_bundle: PathBuf,
     /// Block height where we should gracefully stop the node
     halt_height: i64,
@@ -447,29 +450,6 @@ where
 
     /// Called once upon genesis.
     async fn init_chain(&self, request: request::InitChain) -> AbciResult<response::InitChain> {
-        let bundle = &self.builtin_actors_bundle;
-        let bundle = std::fs::read(bundle)
-            .map_err(|e| anyhow!("failed to load builtin bundle CAR from {bundle:?}: {e}"))?;
-
-        let custom_actors_bundle = &self.custom_actors_bundle;
-        let custom_actors_bundle = std::fs::read(custom_actors_bundle).map_err(|e| {
-            anyhow!("failed to load custom actor bundle CAR from {custom_actors_bundle:?}: {e}")
-        })?;
-
-        let state = FvmGenesisState::new(
-            self.state_store_clone(),
-            self.multi_engine.clone(),
-            &bundle,
-            &custom_actors_bundle,
-        )
-        .await
-        .context("failed to create genesis state")?;
-
-        tracing::info!(
-            manifest_root = format!("{}", state.manifest_data_cid),
-            "pre-genesis state created"
-        );
-
         let genesis_bytes = request.app_state_bytes.to_vec();
         let genesis_hash =
             fendermint_vm_message::cid(&genesis_bytes).context("failed to compute genesis CID")?;
@@ -477,15 +457,8 @@ where
         // Make it easy to spot any discrepancies between nodes.
         tracing::info!(genesis_hash = genesis_hash.to_string(), "genesis");
 
-        let (state, out) = self
-            .interpreter
-            .init(state, genesis_bytes)
-            .await
-            .context("failed to init from genesis")?;
-
-        let state_root = state.commit().context("failed to commit genesis state")?;
-        let validators =
-            to_validator_updates(out.validators).context("failed to convert validators")?;
+        let (validators, state_params) = read_genesis_car(&genesis_bytes, &self.state_store).await?;
+        let validators = to_validator_updates(validators).context("failed to convert validators")?;
 
         // Let's pretend that the genesis state is that of a fictive block at height 0.
         // The record will be stored under height 1, and the record after the application
@@ -502,16 +475,7 @@ where
         let app_state = AppState {
             block_height: height,
             oldest_state_height: height,
-            state_params: FvmStateParams {
-                state_root,
-                timestamp: out.timestamp,
-                network_version: out.network_version,
-                base_fee: out.base_fee,
-                circ_supply: out.circ_supply,
-                chain_id: out.chain_id.into(),
-                power_scale: out.power_scale,
-                app_version: 0,
-            },
+            state_params,
         };
 
         let response = response::InitChain {

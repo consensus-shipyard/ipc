@@ -147,6 +147,28 @@ pub enum GenesisIpcCommands {
     Gateway(GenesisIpcGatewayArgs),
     /// Fetch the genesis parameters of a subnet from the parent.
     FromParent(Box<GenesisFromParentArgs>),
+    /// Seal the genesis state from the genesis parameter file
+    SealState(SealGenesisArgs),
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct SealGenesisArgs {
+    /// The built in actors bundle path
+    #[arg(long, short)]
+    pub builtin_actors_path: PathBuf,
+
+    /// The custom actors bundle path
+    #[arg(long, short)]
+    pub custom_actors_path: PathBuf,
+
+    /// The ipc artifacts output path. If you are using ipc-monorepo, it should be the `out` folder
+    /// of `make build`
+    #[arg(long, short)]
+    pub ipc_artifacts_path: PathBuf,
+
+    /// The sealed, i.e. finalized genesis state CAR file dump path
+    #[arg(long, short)]
+    pub sealed_genesis_path: PathBuf,
 }
 
 #[derive(Args, Debug, Clone)]
