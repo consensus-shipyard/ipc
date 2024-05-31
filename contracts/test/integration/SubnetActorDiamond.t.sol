@@ -30,7 +30,7 @@ import {SubnetActorPauseFacet} from "../../src/subnet/SubnetActorPauseFacet.sol"
 import {SubnetActorCheckpointingFacet} from "../../src/subnet/SubnetActorCheckpointingFacet.sol";
 import {SubnetActorRewardFacet} from "../../src/subnet/SubnetActorRewardFacet.sol";
 import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
-import {FilAddress} from "fevmate/utils/FilAddress.sol";
+import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {LibStaking} from "../../src/lib/LibStaking.sol";
 import {LibDiamond} from "../../src/lib/LibDiamond.sol";
 import {Pausable} from "../../src/lib/LibPausable.sol";
