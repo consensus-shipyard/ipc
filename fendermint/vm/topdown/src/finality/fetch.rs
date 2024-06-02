@@ -9,14 +9,17 @@ use crate::{
     ParentFinalityProvider, ParentViewProvider,
 };
 use async_stm::{Stm, StmResult};
+use fendermint_storage::{Codec, Encode, KVStore, KVWrite};
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
 use std::sync::Arc;
 
+use super::null::ParentViewStore;
+
 /// The finality provider that performs io to the parent if not found in cache
 #[derive(Clone)]
-pub struct CachedFinalityProvider<T> {
-    inner: FinalityWithNull,
+pub struct CachedFinalityProvider<T, S: KVStore> {
+    inner: FinalityWithNull<S>,
     config: Config,
     /// The ipc client proxy that works as a back up if cache miss
     parent_client: Arc<T>,
@@ -62,7 +65,12 @@ macro_rules! retry {
 }
 
 #[async_trait::async_trait]
-impl<T: ParentQueryProxy + Send + Sync + 'static> ParentViewProvider for CachedFinalityProvider<T> {
+impl<T, S> ParentViewProvider for CachedFinalityProvider<T, S>
+where
+    T: ParentQueryProxy + Send + Sync + 'static,
+    S: KVStore + Encode<u64> + Codec<Option<ParentViewPayload>>,
+    S::Namespace: Send + Sync + 'static,
+{
     fn genesis_epoch(&self) -> anyhow::Result<BlockHeight> {
         self.inner.genesis_epoch()
     }
@@ -108,8 +116,11 @@ impl<T: ParentQueryProxy + Send + Sync + 'static> ParentViewProvider for CachedF
     }
 }
 
-impl<T: ParentQueryProxy + Send + Sync + 'static> ParentFinalityProvider
-    for CachedFinalityProvider<T>
+impl<T, S> ParentFinalityProvider for CachedFinalityProvider<T, S>
+where
+    T: ParentQueryProxy + Send + Sync + 'static,
+    S: KVStore + Encode<u64> + Codec<Option<ParentViewPayload>>,
+    S::Namespace: Send + Sync + 'static,
 {
     fn next_proposal(&self) -> Stm<Option<IPCParentFinality>> {
         self.inner.next_proposal()
@@ -128,14 +139,22 @@ impl<T: ParentQueryProxy + Send + Sync + 'static> ParentFinalityProvider
     }
 }
 
-impl<T: ParentQueryProxy + Send + Sync + 'static> CachedFinalityProvider<T> {
+impl<T, S> CachedFinalityProvider<T, S>
+where
+    T: ParentQueryProxy + Send + Sync + 'static,
+    S: KVStore + Encode<u64> + Codec<Option<ParentViewPayload>>,
+{
     /// Creates an uninitialized provider
     /// We need this because `fendermint` has yet to be initialized and might
     /// not be able to provide an existing finality from the storage. This provider requires an
     /// existing committed finality. Providing the finality will enable other functionalities.
-    pub async fn uninitialized(config: Config, parent_client: Arc<T>) -> anyhow::Result<Self> {
+    pub async fn uninitialized(
+        config: Config,
+        parent_client: Arc<T>,
+        parent_data: ParentViewStore<S>,
+    ) -> anyhow::Result<Self> {
         let genesis = parent_client.get_genesis_epoch().await?;
-        Ok(Self::new(config, genesis, None, parent_client))
+        Ok(Self::new(config, genesis, None, parent_client, parent_data))
     }
 
     /// Should always return the top down messages, only when ipc parent_client is down after exponential
@@ -184,14 +203,23 @@ impl<T: ParentQueryProxy + Send + Sync + 'static> CachedFinalityProvider<T> {
     }
 }
 
-impl<T> CachedFinalityProvider<T> {
+impl<T, S> CachedFinalityProvider<T, S>
+where
+    S: KVStore + Encode<u64> + Codec<Option<ParentViewPayload>>,
+{
     pub(crate) fn new(
         config: Config,
         genesis_epoch: BlockHeight,
         committed_finality: Option<IPCParentFinality>,
         parent_client: Arc<T>,
+        parent_data: ParentViewStore<S>,
     ) -> Self {
-        let inner = FinalityWithNull::new(config.clone(), genesis_epoch, committed_finality);
+        let inner = FinalityWithNull::new(
+            config.clone(),
+            genesis_epoch,
+            committed_finality,
+            parent_data,
+        );
         Self {
             inner,
             config,
@@ -223,10 +251,11 @@ impl<T> CachedFinalityProvider<T> {
 
     pub fn new_parent_view(
         &self,
+        tx: &mut impl KVWrite<S>,
         height: BlockHeight,
         maybe_payload: Option<ParentViewPayload>,
     ) -> StmResult<(), Error> {
-        self.inner.new_parent_view(height, maybe_payload)
+        self.inner.new_parent_view(tx, height, maybe_payload)
     }
 
     /// Returns the number of blocks cached.
@@ -241,7 +270,7 @@ impl<T> CachedFinalityProvider<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::finality::ParentViewPayload;
+    use crate::finality::{test_store, ParentViewPayload};
     use crate::proxy::ParentQueryProxy;
     use crate::{
         BlockHeight, CachedFinalityProvider, Config, IPCParentFinality, ParentViewProvider,
@@ -355,7 +384,13 @@ mod tests {
             block_hash: vec![0; 32],
         };
 
-        CachedFinalityProvider::new(config, genesis_epoch, Some(committed_finality), proxy)
+        CachedFinalityProvider::new(
+            config,
+            genesis_epoch,
+            Some(committed_finality),
+            proxy,
+            test_store::new_parent_view_store(),
+        )
     }
 
     fn new_cross_msg(nonce: u64) -> IpcEnvelope {

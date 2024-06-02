@@ -15,4 +15,6 @@ pub enum Error {
     ParentChainReorgDetected,
     #[error("Cannot query parent at height {1}: {0}")]
     CannotQueryParent(String, BlockHeight),
+    #[error("Database error: {0}")]
+    Database(String),
 }

@@ -8,6 +8,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use async_stm::{Stm, StmResult};
+use fendermint_storage::{Codec, Encode, KVStore, KVWrite};
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
 
@@ -91,7 +92,10 @@ impl<P: ParentFinalityProvider + Send + Sync + 'static> ParentFinalityProvider f
     }
 }
 
-impl<P> Toggle<CachedFinalityProvider<P>> {
+impl<P, S> Toggle<CachedFinalityProvider<P, S>>
+where
+    S: KVStore + Encode<u64> + Codec<Option<ParentViewPayload>>,
+{
     pub fn block_hash(&self, height: BlockHeight) -> Stm<Option<BlockHash>> {
         self.perform_or_else(|p| p.block_hash(height), None)
     }
@@ -110,10 +114,11 @@ impl<P> Toggle<CachedFinalityProvider<P>> {
 
     pub fn new_parent_view(
         &self,
+        tx: &mut impl KVWrite<S>,
         height: BlockHeight,
         maybe_payload: Option<ParentViewPayload>,
     ) -> StmResult<(), Error> {
-        self.perform_or_else(|p| p.new_parent_view(height, maybe_payload), ())
+        self.perform_or_else(|p| p.new_parent_view(tx, height, maybe_payload), ())
     }
 
     pub fn reset(&self, finality: IPCParentFinality) -> Stm<()> {

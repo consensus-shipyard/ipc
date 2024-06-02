@@ -10,6 +10,7 @@ use fendermint_app::{App, AppConfig, AppStore, BitswapBlockstore};
 use fendermint_app_settings::AccountKind;
 use fendermint_crypto::SecretKey;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
+use fendermint_storage::KVCollection;
 use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::chain::ChainEnv;
@@ -52,7 +53,8 @@ namespaces! {
         app,
         state_hist,
         state_store,
-        bit_store
+        bit_store,
+        parent_view_store
     }
 }
 
@@ -141,7 +143,8 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     .with_push_chain_meta(testing_settings.map_or(true, |t| t.push_chain_meta));
 
     let interpreter = SignedMessageInterpreter::new(interpreter);
-    let interpreter = ChainMessageInterpreter::<_, NamespaceBlockstore>::new(interpreter);
+    let interpreter =
+        ChainMessageInterpreter::<_, NamespaceBlockstore, AppStore, RocksDb>::new(interpreter);
     let interpreter = BytesMessageInterpreter::new(
         interpreter,
         ProposalPrepareMode::PrependOnly,
@@ -249,9 +252,15 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             config = config.with_max_cache_blocks(v);
         }
 
+        let parent_view_store = KVCollection::new(ns.parent_view_store);
+
         let ipc_provider = Arc::new(make_ipc_provider_proxy(&settings)?);
-        let finality_provider =
-            CachedFinalityProvider::uninitialized(config.clone(), ipc_provider.clone()).await?;
+        let finality_provider = CachedFinalityProvider::uninitialized(
+            config.clone(),
+            ipc_provider.clone(),
+            parent_view_store,
+        )
+        .await?;
         let p = Arc::new(Toggle::enabled(finality_provider));
         (p, Some((ipc_provider, config)))
     } else {
@@ -285,7 +294,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         None
     };
 
-    let app: App<_, _, AppStore, _> = App::new(
+    let app: App<RocksDb, NamespaceBlockstore, _> = App::new(
         AppConfig {
             app_namespace: ns.app,
             state_hist_namespace: ns.state_hist,
@@ -294,7 +303,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             custom_actors_bundle: settings.custom_actors_bundle(),
             halt_height: settings.halt_height,
         },
-        db,
+        db.clone(),
         state_store,
         interpreter,
         ChainEnv {
@@ -307,8 +316,10 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
 
     if let Some((agent_proxy, config)) = ipc_tuple {
         let app_parent_finality_query = AppParentFinalityQuery::new(app.clone());
+        let db = db.clone();
         tokio::spawn(async move {
             match launch_polling_syncer(
+                db,
                 app_parent_finality_query,
                 config,
                 parent_finality_provider,

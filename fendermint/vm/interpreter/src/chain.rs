@@ -11,6 +11,7 @@ use crate::{
 use anyhow::{bail, Context};
 use async_stm::atomically;
 use async_trait::async_trait;
+use fendermint_storage::{Codec, Encode, KVStore, KVWritable};
 use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::ipc;
 use fendermint_vm_event::ParentFinalityMissingQuorum;
@@ -23,27 +24,29 @@ use fendermint_vm_resolver::pool::{ResolveKey, ResolvePool};
 use fendermint_vm_topdown::proxy::IPCProviderProxy;
 use fendermint_vm_topdown::voting::{ValidatorKey, VoteTally};
 use fendermint_vm_topdown::{
-    CachedFinalityProvider, IPCParentFinality, ParentFinalityProvider, ParentViewProvider, Toggle,
+    CachedFinalityProvider, IPCParentFinality, ParentFinalityProvider, ParentViewPayload,
+    ParentViewProvider, Toggle,
 };
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use num_traits::Zero;
+use std::marker::PhantomData;
 use std::sync::Arc;
 
 /// A resolution pool for bottom-up and top-down checkpoints.
 pub type CheckpointPool = ResolvePool<CheckpointPoolItem>;
-pub type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProviderProxy>>>;
+pub type TopDownFinalityProvider<S> = Arc<Toggle<CachedFinalityProvider<IPCProviderProxy, S>>>;
 
 /// These are the extra state items that the chain interpreter needs,
 /// a sort of "environment" supporting IPC.
 #[derive(Clone)]
-pub struct ChainEnv {
+pub struct ChainEnv<S: KVStore> {
     /// CID resolution pool.
     pub checkpoint_pool: CheckpointPool,
     /// The parent finality provider for top down checkpoint
-    pub parent_finality_provider: TopDownFinalityProvider,
+    pub parent_finality_provider: TopDownFinalityProvider<S>,
     pub parent_finality_votes: VoteTally,
 }
 
@@ -82,27 +85,34 @@ pub type ChainMessageCheckRes = Result<SignedMessageCheckRes, IllegalMessage>;
 /// Interpreter working on chain messages; in the future it will schedule
 /// CID lookups to turn references into self-contained user or cross messages.
 #[derive(Clone)]
-pub struct ChainMessageInterpreter<I, DB> {
+pub struct ChainMessageInterpreter<I, BS, S, DB> {
     inner: I,
-    gateway_caller: GatewayCaller<DB>,
+    gateway_caller: GatewayCaller<BS>,
+    phantom_store: PhantomData<S>,
+    phantom_db: PhantomData<DB>,
 }
 
-impl<I, DB> ChainMessageInterpreter<I, DB> {
+impl<I, BS, S, DB> ChainMessageInterpreter<I, BS, S, DB> {
     pub fn new(inner: I) -> Self {
         Self {
             inner,
             gateway_caller: GatewayCaller::default(),
+            phantom_db: PhantomData,
+            phantom_store: PhantomData,
         }
     }
 }
 
 #[async_trait]
-impl<I, DB> ProposalInterpreter for ChainMessageInterpreter<I, DB>
+impl<I, BS, S, DB> ProposalInterpreter for ChainMessageInterpreter<I, BS, S, DB>
 where
-    DB: Blockstore + Clone + 'static + Send + Sync,
     I: Sync + Send,
+    S: KVStore + Encode<u64> + Codec<Option<ParentViewPayload>> + Send + Sync + 'static,
+    S::Namespace: Send + Sync + 'static,
+    BS: Blockstore + Clone + 'static + Send + Sync,
+    DB: KVWritable<S> + Clone + 'static + Send + Sync,
 {
-    type State = ChainEnv;
+    type State = ChainEnv<S>;
     type Message = ChainMessage;
 
     /// Check whether there are any "ready" messages in the IPLD resolution mempool which can be appended to the proposal.
@@ -219,13 +229,16 @@ where
 }
 
 #[async_trait]
-impl<I, DB> ExecInterpreter for ChainMessageInterpreter<I, DB>
+impl<I, BS, S, DB> ExecInterpreter for ChainMessageInterpreter<I, BS, S, DB>
 where
-    DB: Blockstore + Clone + 'static + Send + Sync + Clone,
+    S: KVStore + Encode<u64> + Codec<Option<ParentViewPayload>> + Send + Sync + 'static,
+    S::Namespace: Send + Sync + 'static,
+    BS: Blockstore + Clone + 'static + Send + Sync + Clone,
+    DB: KVWritable<S> + Clone + 'static + Send + Sync + Clone,
     I: ExecInterpreter<
         Message = VerifiableMessage,
         DeliverOutput = SignedMessageApplyRes,
-        State = FvmExecState<DB>,
+        State = FvmExecState<BS>,
         EndOutput = PowerUpdates,
     >,
 {
@@ -233,7 +246,7 @@ where
     // state which the inner interpreter uses. This is a technical solution because the pool doesn't
     // fit with the state we use for execution messages further down the stack, which depend on block
     // height and are used in queries as well.
-    type State = (ChainEnv, I::State);
+    type State = (ChainEnv<S>, I::State);
     type Message = ChainMessage;
     type BeginOutput = I::BeginOutput;
     type DeliverOutput = ChainMessageApplyRet;
@@ -422,9 +435,12 @@ where
 }
 
 #[async_trait]
-impl<I, DB> CheckInterpreter for ChainMessageInterpreter<I, DB>
+impl<I, BS, S, DB> CheckInterpreter for ChainMessageInterpreter<I, BS, S, DB>
 where
-    DB: Blockstore + Clone + 'static + Send + Sync,
+    BS: Blockstore + Clone + 'static + Send + Sync,
+    DB: Clone + 'static + Send + Sync,
+    S: KVStore + Send + Sync + 'static,
+    S::Namespace: Send + Sync + 'static,
     I: CheckInterpreter<Message = VerifiableMessage, Output = SignedMessageCheckRes>,
 {
     type State = I::State;
@@ -471,9 +487,12 @@ where
 }
 
 #[async_trait]
-impl<I, DB> QueryInterpreter for ChainMessageInterpreter<I, DB>
+impl<I, BS, S, DB> QueryInterpreter for ChainMessageInterpreter<I, BS, S, DB>
 where
-    DB: Blockstore + Clone + 'static + Send + Sync,
+    BS: Blockstore + Clone + 'static + Send + Sync,
+    DB: Clone + 'static + Send + Sync,
+    S: KVStore + Send + Sync + 'static,
+    S::Namespace: Send + Sync + 'static,
     I: QueryInterpreter,
 {
     type State = I::State;
@@ -490,9 +509,12 @@ where
 }
 
 #[async_trait]
-impl<I, DB> GenesisInterpreter for ChainMessageInterpreter<I, DB>
+impl<I, BS, S, DB> GenesisInterpreter for ChainMessageInterpreter<I, BS, S, DB>
 where
-    DB: Blockstore + Clone + 'static + Send + Sync,
+    BS: Blockstore + Clone + 'static + Send + Sync,
+    DB: Clone + 'static + Send + Sync,
+    S: KVStore + Send + Sync + 'static,
+    S::Namespace: Send + Sync + 'static,
     I: GenesisInterpreter,
 {
     type State = I::State;

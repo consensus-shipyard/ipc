@@ -5,7 +5,8 @@ use crate::finality::{
     ensure_sequential, topdown_cross_msgs, validator_changes, ParentViewPayload,
 };
 use crate::{BlockHash, BlockHeight, Config, Error, IPCParentFinality, SequentialKeyCache};
-use async_stm::{abort, atomically, Stm, StmResult, TVar};
+use async_stm::{abort, atomically, Stm, StmError, StmResult, TVar};
+use fendermint_storage::{Codec, Encode, KVCollection, KVError, KVStore, KVWrite};
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
 use std::cmp::min;
@@ -13,28 +14,38 @@ use std::cmp::min;
 use fendermint_tracing::emit;
 use fendermint_vm_event::ParentFinalityCommitted;
 
+pub type ParentViewStore<S> = KVCollection<S, BlockHeight, Option<ParentViewPayload>>;
+
 /// Finality provider that can handle null blocks
 #[derive(Clone)]
-pub struct FinalityWithNull {
+pub struct FinalityWithNull<S: KVStore> {
     config: Config,
     genesis_epoch: BlockHeight,
     /// Cached data that always syncs with the latest parent chain proactively
     cached_data: TVar<SequentialKeyCache<BlockHeight, Option<ParentViewPayload>>>,
+    stored_data: ParentViewStore<S>,
     /// This is a in memory view of the committed parent finality. We need this as a starting point
     /// for populating the cache
     last_committed_finality: TVar<Option<IPCParentFinality>>,
 }
 
-impl FinalityWithNull {
+impl<S> FinalityWithNull<S>
+where
+    S: KVStore + Encode<u64> + Codec<Option<ParentViewPayload>>,
+{
     pub fn new(
         config: Config,
         genesis_epoch: BlockHeight,
         committed_finality: Option<IPCParentFinality>,
+        parent_data: ParentViewStore<S>,
     ) -> Self {
+        // TODO: Initialize cache from the store.
+        let cache = SequentialKeyCache::sequential();
         Self {
             config,
             genesis_epoch,
-            cached_data: TVar::new(SequentialKeyCache::sequential()),
+            cached_data: TVar::new(cache),
+            stored_data: parent_data,
             last_committed_finality: TVar::new(committed_finality),
         }
     }
@@ -65,19 +76,21 @@ impl FinalityWithNull {
 
     /// Clear the cache and set the committed finality to the provided value
     pub fn reset(&self, finality: IPCParentFinality) -> Stm<()> {
+        // TODO: Delete all values from the KVCollection
         self.cached_data.write(SequentialKeyCache::sequential())?;
         self.last_committed_finality.write(Some(finality))
     }
 
     pub fn new_parent_view(
         &self,
+        tx: &mut impl KVWrite<S>,
         height: BlockHeight,
         maybe_payload: Option<ParentViewPayload>,
     ) -> StmResult<(), Error> {
         if let Some((block_hash, validator_changes, top_down_msgs)) = maybe_payload {
-            self.parent_block_filled(height, block_hash, validator_changes, top_down_msgs)
+            self.parent_block_filled(tx, height, block_hash, validator_changes, top_down_msgs)
         } else {
-            self.parent_null_round(height)
+            self.parent_null_round(tx, height)
         }
     }
 
@@ -133,7 +146,10 @@ impl FinalityWithNull {
     }
 }
 
-impl FinalityWithNull {
+impl<S> FinalityWithNull<S>
+where
+    S: KVStore + Encode<u64> + Codec<Option<ParentViewPayload>>,
+{
     /// Returns the number of blocks cached.
     pub(crate) fn cached_blocks(&self) -> Stm<BlockHeight> {
         let cache = self.cached_data.read()?;
@@ -182,7 +198,10 @@ impl FinalityWithNull {
 }
 
 /// All the private functions
-impl FinalityWithNull {
+impl<S> FinalityWithNull<S>
+where
+    S: KVStore + Encode<u64> + Codec<Option<ParentViewPayload>>,
+{
     fn propose_next_height(&self) -> Stm<Option<BlockHeight>> {
         let latest_height = if let Some(h) = self.latest_height_in_cache()? {
             h
@@ -268,6 +287,7 @@ impl FinalityWithNull {
 
     fn parent_block_filled(
         &self,
+        tx: &mut impl KVWrite<S>,
         height: BlockHeight,
         block_hash: BlockHash,
         validator_changes: Vec<StakingChangeRequest>,
@@ -283,9 +303,15 @@ impl FinalityWithNull {
             ensure_sequential(&validator_changes, |change| change.configuration_number)?;
         }
 
+        let payload = Some((block_hash, validator_changes, top_down_msgs));
+
+        self.stored_data
+            .put(tx, &height, &payload)
+            .map_err(to_stm_err)?;
+
         let r = self.cached_data.modify(|mut cache| {
             let r = cache
-                .append(height, Some((block_hash, validator_changes, top_down_msgs)))
+                .append(height, payload)
                 .map_err(Error::NonSequentialParentViewInsert);
             (cache, r)
         })?;
@@ -298,7 +324,11 @@ impl FinalityWithNull {
     }
 
     /// When there is a new parent view, but it is actually a null round, call this function.
-    fn parent_null_round(&self, height: BlockHeight) -> StmResult<(), Error> {
+    fn parent_null_round(
+        &self,
+        tx: &mut impl KVWrite<S>,
+        height: BlockHeight,
+    ) -> StmResult<(), Error> {
         let r = self.cached_data.modify(|mut cache| {
             let r = cache
                 .append(height, None)
@@ -309,6 +339,10 @@ impl FinalityWithNull {
         if let Err(e) = r {
             return abort(e);
         }
+
+        self.stored_data
+            .put(tx, &height, &None)
+            .map_err(to_stm_err)?;
 
         Ok(())
     }
@@ -367,12 +401,28 @@ impl FinalityWithNull {
     }
 }
 
+fn to_stm_err(e: KVError) -> StmError<Error> {
+    match e {
+        KVError::Conflict => StmError::Control(async_stm::StmControl::Failure),
+        KVError::Abort(e) => StmError::Abort(Error::Database(e.to_string())),
+        KVError::Codec(e) => StmError::Abort(Error::Database(e.to_string())),
+        KVError::Unexpected(e) => StmError::Abort(Error::Database(e.to_string())),
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::FinalityWithNull;
     use crate::finality::ParentViewPayload;
     use crate::{BlockHeight, Config, IPCParentFinality};
-    use async_stm::{atomically, atomically_or_err};
+    use async_stm::{atomically, atomically_or_err, atomically_or_err_aux};
+    use fendermint_storage::{KVCollection, KVStore, KVWritable};
+
+    struct TestStore;
+
+    impl KVStore for TestStore {
+        type Namespace = String;
+        type Repr = Vec<u8>;
+    }
 
     async fn new_provider(
         mut blocks: Vec<(BlockHeight, Option<ParentViewPayload>)>,
@@ -393,9 +443,17 @@ mod tests {
 
         blocks.remove(0);
 
-        let f = FinalityWithNull::new(config, 1, Some(committed_finality));
+        // Not using a store in these tests.
+        let ims = fendermint_storage::im::InMemoryBackend::default();
+
+        let f = FinalityWithNull::new(
+            config,
+            1,
+            Some(committed_finality),
+            test_store::new_parent_view_store(),
+        );
         for (h, p) in blocks {
-            atomically_or_err(|| f.new_parent_view(h, p.clone()))
+            atomically_or_err_aux(|| ims.write(), |tx| f.new_parent_view(tx, h, p.clone()))
                 .await
                 .unwrap();
         }

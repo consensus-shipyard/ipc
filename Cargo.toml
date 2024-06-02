@@ -51,7 +51,7 @@ anyhow = "1"
 arbitrary = { version = "1", features = ["derive"] }
 arbtest = "0.2"
 async-recursion = "1"
-async-stm = "0.4"
+async-stm = "0.5"
 async-trait = "0.1"
 async-channel = "1.8.0"
 axum = { version = "0.6", features = ["ws"] }

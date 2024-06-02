@@ -23,7 +23,7 @@ use std::time::Duration;
 
 pub use crate::cache::{SequentialAppendError, SequentialKeyCache, ValueIter};
 pub use crate::error::Error;
-pub use crate::finality::CachedFinalityProvider;
+pub use crate::finality::{CachedFinalityProvider, ParentViewPayload};
 pub use crate::toggle::Toggle;
 
 pub type BlockHeight = u64;

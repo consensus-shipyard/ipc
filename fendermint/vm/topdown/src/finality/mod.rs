@@ -12,7 +12,7 @@ use ipc_api::staking::StakingChangeRequest;
 
 pub use fetch::CachedFinalityProvider;
 
-pub(crate) type ParentViewPayload = (BlockHash, Vec<StakingChangeRequest>, Vec<IpcEnvelope>);
+pub type ParentViewPayload = (BlockHash, Vec<StakingChangeRequest>, Vec<IpcEnvelope>);
 
 fn ensure_sequential<T, F: Fn(&T) -> u64>(msgs: &[T], f: F) -> StmResult<(), Error> {
     if msgs.is_empty() {
@@ -52,6 +52,8 @@ mod tests {
     use ipc_provider::manager::{GetBlockHashResult, TopDownQueryPayload};
     use std::sync::Arc;
     use tokio::time::Duration;
+
+    use super::test_store;
 
     struct MockedParentQuery;
 
@@ -112,7 +114,13 @@ mod tests {
             proposal_delay: None,
         };
 
-        CachedFinalityProvider::new(config, 10, Some(genesis_finality()), mocked_agent_proxy())
+        CachedFinalityProvider::new(
+            config,
+            10,
+            Some(genesis_finality()),
+            mocked_agent_proxy(),
+            test_store::new_parent_view_store(),
+        )
     }
 
     #[tokio::test]
@@ -173,5 +181,28 @@ mod tests {
         })
         .await
         .unwrap();
+    }
+}
+
+#[cfg(test)]
+pub mod test_store {
+    use fendermint_storage::{im::InMemoryBackend, KVCollection};
+    use fendermint_vm_event::BlockHeight;
+
+    use super::ParentViewStore;
+
+    pub struct TestStore;
+
+    impl KVStore for TestStore {
+        type Namespace = String;
+        type Repr = Vec<u8>;
+    }
+
+    pub fn new_backend() -> InMemoryBackend<TestStore> {
+        InMemoryBackend::default()
+    }
+
+    pub fn new_parent_view_store() -> ParentViewStore<TestStore> {
+        KVCollection::new("parent_view_payload")
     }
 }
