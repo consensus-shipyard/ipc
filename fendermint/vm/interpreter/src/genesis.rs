@@ -11,6 +11,7 @@ use anyhow::{anyhow, Context};
 use cid::Cid;
 use ethers::abi::Tokenize;
 use ethers::core::types as et;
+use futures_util::io::Cursor;
 use fendermint_actor_eam::PermissionModeParams;
 use fendermint_eth_hardhat::{Hardhat, FQN};
 use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
@@ -23,7 +24,7 @@ use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Genesis, Power, PowerScale, Validator};
 use fvm::engine::MultiEngine;
 use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_car::{CarHeader, CarReader};
+use fvm_ipld_car::{CarHeader, load_car};
 use fvm_ipld_encoding::CborStore;
 use fvm_shared::chainid::ChainID;
 use fvm_shared::econ::TokenAmount;
@@ -68,12 +69,10 @@ impl GenesisMetadata {
 }
 
 pub async fn read_genesis_car<DB: Blockstore + 'static + Send + Sync>(
-    bytes: &[u8],
+    bytes: Vec<u8>,
     store: &DB,
 ) -> anyhow::Result<(Vec<Validator<Power>>, FvmStateParams)> {
-    let car_reader = CarReader::new(bytes).await?;
-
-    let roots = car_reader.read_into(store).await?;
+    let roots = load_car(store, Cursor::new(&bytes)).await?;
 
     if roots.len() != 1 {
         return Err(anyhow!("invalid genesis car, should have 1 root cid"));

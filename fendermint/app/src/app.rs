@@ -441,7 +441,7 @@ where
         tracing::info!(genesis_hash = genesis_hash.to_string(), "genesis");
 
         let (validators, state_params) =
-            read_genesis_car(&genesis_bytes, &self.state_store).await?;
+            read_genesis_car(genesis_bytes, &self.state_store).await?;
         let validators =
             to_validator_updates(validators).context("failed to convert validators")?;
 
