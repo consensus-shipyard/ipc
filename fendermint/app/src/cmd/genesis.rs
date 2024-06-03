@@ -289,7 +289,7 @@ async fn seal_state(genesis_file: &PathBuf, args: &SealGenesisArgs) -> anyhow::R
         args.builtin_actors_path.clone(),
         args.custom_actors_path.clone(),
         args.ipc_artifacts_path.clone(),
-        args.sealed_genesis_path.clone(),
+        args.output_path.clone(),
     );
 
     genesis_creator.create(genesis).await

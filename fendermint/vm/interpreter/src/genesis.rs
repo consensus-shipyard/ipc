@@ -125,6 +125,7 @@ impl GenesisCreator {
             sealed_out_path,
         }
     }
+
     /// Initialize actor states from the Genesis parameters
     pub async fn create(&self, genesis: Genesis) -> anyhow::Result<()> {
         let mut state = self.init_state().await?;

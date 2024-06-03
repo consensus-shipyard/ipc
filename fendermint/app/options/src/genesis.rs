@@ -169,9 +169,9 @@ pub struct SealGenesisArgs {
     #[arg(long, short)]
     pub ipc_artifacts_path: PathBuf,
 
-    /// The sealed, i.e. finalized genesis state CAR file dump path
+    /// The sealed genesis state output path, i.e. finalized genesis state CAR file dump path
     #[arg(long, short)]
-    pub sealed_genesis_path: PathBuf,
+    pub output_path: PathBuf,
 }
 
 #[derive(Args, Debug, Clone)]
