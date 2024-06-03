@@ -1,7 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use std::future::Future;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Context, Result};
@@ -107,12 +106,6 @@ pub struct AppConfig<S: KVStore> {
     pub state_hist_namespace: S::Namespace,
     /// Size of state history to keep; 0 means unlimited.
     pub state_hist_size: u64,
-    /// Path to the Wasm bundle.
-    ///
-    /// Only loaded once during genesis; later comes from the [`StateTree`].
-    pub builtin_actors_bundle: PathBuf,
-    /// Path to the custom actor WASM bundle.
-    pub custom_actors_bundle: PathBuf,
     /// Block height where we should gracefully stop the node
     pub halt_height: i64,
 }
@@ -134,14 +127,6 @@ where
     state_store: Arc<SS>,
     /// Wasm engine cache.
     multi_engine: Arc<MultiEngine>,
-    /// Path to the Wasm bundle.
-    ///
-    /// Only loaded once during genesis; later comes from the [`StateTree`].
-    #[deprecated]
-    builtin_actors_bundle: PathBuf,
-    /// Path to the custom actor WASM bundle.
-    #[deprecated]
-    custom_actors_bundle: PathBuf,
     /// Block height where we should gracefully stop the node
     halt_height: i64,
     /// Namespace to store app state.
@@ -195,8 +180,6 @@ where
             db: Arc::new(db),
             state_store: Arc::new(state_store),
             multi_engine: Arc::new(MultiEngine::new(1)),
-            builtin_actors_bundle: config.builtin_actors_bundle,
-            custom_actors_bundle: config.custom_actors_bundle,
             halt_height: config.halt_height,
             namespace: config.app_namespace,
             state_hist: KVCollection::new(config.state_hist_namespace),
