@@ -373,6 +373,13 @@ where
         // It's really the empty state tree that would be the best indicator.
         !(height == 0 && params.timestamp.0 == 0 && params.network_version == NetworkVersion::V0)
     }
+
+    fn parse_genesis_app_bytes(bytes: &[u8]) -> Result<Vec<u8>> {
+        match serde_json::from_slice(bytes)? {
+            serde_json::Value::String(s) => Ok(hex::decode(s)?),
+            _ => Err(anyhow!("invalid app state json")),
+        }
+    }
 }
 
 // NOTE: The `Application` interface doesn't allow failures at the moment. The protobuf
@@ -433,15 +440,14 @@ where
 
     /// Called once upon genesis.
     async fn init_chain(&self, request: request::InitChain) -> AbciResult<response::InitChain> {
-        let genesis_bytes = request.app_state_bytes.to_vec();
+        let genesis_bytes = Self::parse_genesis_app_bytes(&request.app_state_bytes)?;
         let genesis_hash =
             fendermint_vm_message::cid(&genesis_bytes).context("failed to compute genesis CID")?;
 
         // Make it easy to spot any discrepancies between nodes.
         tracing::info!(genesis_hash = genesis_hash.to_string(), "genesis");
 
-        let (validators, state_params) =
-            read_genesis_car(genesis_bytes, &self.state_store).await?;
+        let (validators, state_params) = read_genesis_car(genesis_bytes, &self.state_store).await?;
         let validators =
             to_validator_updates(validators).context("failed to convert validators")?;
 
