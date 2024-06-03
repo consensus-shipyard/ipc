@@ -7,7 +7,6 @@ use anyhow::anyhow;
 use fvm_shared::bigint::{BigInt, Integer};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use std::path::PathBuf;
 
 use fendermint_actor_eam::PermissionModeParams;
 use fvm_shared::version::NetworkVersion;

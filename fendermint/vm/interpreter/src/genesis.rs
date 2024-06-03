@@ -42,13 +42,13 @@ use tokio_util::compat::TokioAsyncWriteCompatExt;
 /// The sealed genesis state metadata
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
-pub struct GenesisMetadata {
+struct GenesisMetadata {
     pub state_params: FvmStateParams,
     pub validators: Vec<Validator<Power>>,
 }
 
 impl GenesisMetadata {
-    fn new(state_root: Cid, out: FvmGenesisOutput) -> GenesisMetadata {
+    fn new(state_root: Cid, out: GenesisOutput) -> GenesisMetadata {
         let state_params = FvmStateParams {
             state_root,
             timestamp: out.timestamp,
@@ -67,7 +67,10 @@ impl GenesisMetadata {
     }
 }
 
-pub async fn read_genesis_car<DB: Blockstore + 'static + Send + Sync>(bytes: &[u8], store: &DB) -> anyhow::Result<(Vec<Validator<Power>>, FvmStateParams)> {
+pub async fn read_genesis_car<DB: Blockstore + 'static + Send + Sync>(
+    bytes: &[u8],
+    store: &DB,
+) -> anyhow::Result<(Vec<Validator<Power>>, FvmStateParams)> {
     let car_reader = CarReader::new(bytes).await?;
 
     let roots = car_reader.read_into(store).await?;
@@ -88,7 +91,7 @@ pub async fn read_genesis_car<DB: Blockstore + 'static + Send + Sync>(bytes: &[u
 
 /// The output of genesis creation
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FvmGenesisOutput {
+pub struct GenesisOutput {
     pub chain_id: ChainID,
     pub timestamp: Timestamp,
     pub network_version: NetworkVersion,
@@ -134,7 +137,7 @@ impl GenesisCreator {
     async fn write_car(
         &self,
         state_root: Cid,
-        out: FvmGenesisOutput,
+        out: GenesisOutput,
         store: MemoryBlockstore,
     ) -> anyhow::Result<()> {
         let file = tokio::fs::File::create(&self.sealed_out_path).await?;
@@ -143,6 +146,7 @@ impl GenesisCreator {
 
         let streamer = StateTreeStreamer::new(state_root, store);
         let (metadata_cid, metadata_bytes) = derive_cid(&metadata)?;
+        tracing::info!("generated genesis metadata header cid: {}", metadata_cid);
 
         // create the target car header with the metadata cid as the only root
         let car = CarHeader::new(vec![metadata_cid], 1);
@@ -157,6 +161,8 @@ impl GenesisCreator {
         });
 
         write_task.await??;
+
+        tracing::info!("written sealed genesis state to file");
 
         Ok(())
     }
@@ -192,7 +198,7 @@ impl GenesisCreator {
         &self,
         state: &mut FvmGenesisState<MemoryBlockstore>,
         genesis: Genesis,
-    ) -> anyhow::Result<FvmGenesisOutput> {
+    ) -> anyhow::Result<GenesisOutput> {
         // NOTE: We could consider adding the chain ID to the interpreter
         //       and rejecting genesis if it doesn't match the expectation,
         //       but the Tendermint genesis file also has this field, and
@@ -210,7 +216,7 @@ impl GenesisCreator {
         // Currently we just pass them back as they are, but later we should
         // store them in the IPC actors; or in case of a snapshot restore them
         // from the state.
-        let out = FvmGenesisOutput {
+        let out = GenesisOutput {
             chain_id,
             timestamp: genesis.timestamp,
             network_version: genesis.network_version,

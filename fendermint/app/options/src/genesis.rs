@@ -133,6 +133,9 @@ pub struct GenesisAddValidatorArgs {
 
 #[derive(Args, Debug)]
 pub struct GenesisIntoTendermintArgs {
+    /// Sealed genesis file that is the initial app bytes for cometbft
+    #[arg(long, short)]
+    pub sealed: PathBuf,
     /// Output file name for the Tendermint genesis JSON file.
     #[arg(long, short)]
     pub out: PathBuf,

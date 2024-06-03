@@ -25,6 +25,7 @@ use fendermint_vm_interpreter::fvm::state::{
 };
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
 use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmGenesisOutput, PowerUpdates};
+use fendermint_vm_interpreter::genesis::read_genesis_car;
 use fendermint_vm_interpreter::signed::InvalidSignature;
 use fendermint_vm_interpreter::{
     CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
@@ -42,7 +43,6 @@ use serde::{Deserialize, Serialize};
 use tendermint::abci::request::CheckTxKind;
 use tendermint::abci::{request, response};
 use tracing::instrument;
-use fendermint_vm_interpreter::genesis::read_genesis_car;
 
 use crate::events::{NewBlock, ProposalProcessed};
 use crate::AppExitCode;
@@ -457,8 +457,10 @@ where
         // Make it easy to spot any discrepancies between nodes.
         tracing::info!(genesis_hash = genesis_hash.to_string(), "genesis");
 
-        let (validators, state_params) = read_genesis_car(&genesis_bytes, &self.state_store).await?;
-        let validators = to_validator_updates(validators).context("failed to convert validators")?;
+        let (validators, state_params) =
+            read_genesis_car(&genesis_bytes, &self.state_store).await?;
+        let validators =
+            to_validator_updates(validators).context("failed to convert validators")?;
 
         // Let's pretend that the genesis state is that of a fictive block at height 0.
         // The record will be stored under height 1, and the record after the application
