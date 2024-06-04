@@ -3,11 +3,8 @@
 use anyhow::{anyhow, Context};
 use base64::Engine;
 use bytes::Bytes;
-use cid::Cid;
-use fendermint_actor_accumulator::PushReturn;
-use fendermint_actor_machine::Metadata;
 use fendermint_actor_objectstore::{Object, ObjectList};
-use fendermint_vm_actor_interface::{adm, eam};
+use fendermint_vm_actor_interface::eam;
 use fvm_ipld_encoding::{BytesDe, RawBytes};
 use tendermint::abci::response::DeliverTx;
 
@@ -61,48 +58,6 @@ pub fn decode_fevm_return_data(data: RawBytes) -> anyhow::Result<Vec<u8>> {
     fvm_ipld_encoding::from_slice::<BytesDe>(&data)
         .map(|bz| bz.0)
         .map_err(|e| anyhow!("failed to deserialize bytes returned by FEVM method invocation: {e}"))
-}
-
-/// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as a [`Cid`] string.
-pub fn decode_cid_string(deliver_tx: &DeliverTx) -> anyhow::Result<String> {
-    let data = decode_data(&deliver_tx.data)?;
-    fvm_ipld_encoding::from_slice::<Cid>(&data)
-        .map_err(|e| anyhow!("error parsing as String: {e}"))
-        .map(|cid| cid.to_string())
-}
-
-/// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as bytes.
-pub fn decode_acc_push_return(deliver_tx: &DeliverTx) -> anyhow::Result<PushReturn> {
-    let data = decode_data(&deliver_tx.data)?;
-    fvm_ipld_encoding::from_slice::<PushReturn>(&data)
-        .map_err(|e| anyhow!("error parsing as PushReturn: {e}"))
-}
-
-pub fn decode_acc_get_at(deliver_tx: &DeliverTx) -> anyhow::Result<Option<Vec<u8>>> {
-    let data = decode_data(&deliver_tx.data)?;
-    fvm_ipld_encoding::from_slice::<Option<Vec<u8>>>(&data)
-        .map_err(|e| anyhow!("error parsing as Option<Vec<u8>>: {e}"))
-}
-
-/// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as [`CreateReturn`].
-pub fn decode_machine_create(deliver_tx: &DeliverTx) -> anyhow::Result<adm::CreateExternalReturn> {
-    let data = decode_data(&deliver_tx.data)?;
-    fvm_ipld_encoding::from_slice::<adm::CreateExternalReturn>(&data)
-        .map_err(|e| anyhow!("error parsing as CreateReturn: {e}"))
-}
-
-/// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as a vector of [`adm::Metadata`].
-pub fn decode_machine_list(deliver_tx: &DeliverTx) -> anyhow::Result<Vec<adm::Metadata>> {
-    let data = decode_data(&deliver_tx.data)?;
-    fvm_ipld_encoding::from_slice::<Vec<adm::Metadata>>(&data)
-        .map_err(|e| anyhow!("error parsing as Vec<adm::Metadata>: {e}"))
-}
-
-/// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as a vector of [`Metadata`].
-pub fn decode_machine_get(deliver_tx: &DeliverTx) -> anyhow::Result<Metadata> {
-    let data = decode_data(&deliver_tx.data)?;
-    fvm_ipld_encoding::from_slice::<Metadata>(&data)
-        .map_err(|e| anyhow!("error parsing as Metadata: {e}"))
 }
 
 /// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as an [`Object`].
