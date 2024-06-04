@@ -40,7 +40,7 @@ upgrade-sr-diamond:
 
 gen: compile-abi rust-binding
 
-compile-abi: | forge
+compile-abi: node_modules | forge
 	mkdir -p $(OUTPUT)
 	./ops/compile-abi.sh $(OUTPUT)
 
