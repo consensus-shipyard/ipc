@@ -9,7 +9,7 @@ import {FvmAddress} from "../../src/structs/FvmAddress.sol";
 import {SupplySource} from "../../src/structs/Subnet.sol";
 import {IpcMsgKind, CallMsg} from "../../src/structs/CrossNet.sol";
 
-import "openzeppelin-contracts/utils/Address.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 
 contract CrossMsgHelperTest is Test {
     using SubnetIDHelper for SubnetID;

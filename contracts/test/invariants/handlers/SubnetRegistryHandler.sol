@@ -11,7 +11,7 @@ import {SubnetRegistryDiamond} from "../../../src/SubnetRegistryDiamond.sol";
 import {ConsensusType} from "../../../src/enums/ConsensusType.sol";
 import {SubnetID, PermissionMode} from "../../../src/structs/Subnet.sol";
 import {SupplySourceHelper} from "../../../src/lib/SupplySourceHelper.sol";
-import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {RegistryFacetsHelper} from "../../helpers/RegistryFacetsHelper.sol";
 
 contract SubnetRegistryHandler is CommonBase, StdCheats, StdUtils {

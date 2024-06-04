@@ -7,7 +7,7 @@ import {CommonBase} from "forge-std/Base.sol";
 import {GatewayDiamond} from "../../../src/GatewayDiamond.sol";
 import {GatewayManagerFacet} from "../../../src/gateway/GatewayManagerFacet.sol";
 import {GatewayFacetsHelper} from "../../helpers/GatewayFacetsHelper.sol";
-import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 uint256 constant ETH_SUPPLY = 129_590_000 ether;
 

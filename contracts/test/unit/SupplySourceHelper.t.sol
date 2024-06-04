@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
-import "openzeppelin-contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 import "../../src/lib/SubnetIDHelper.sol";
 
 import {SupplySource, SupplyKind} from "../../src/structs/Subnet.sol";
@@ -10,7 +10,7 @@ import {SupplySourceHelper} from "../../src/lib/SupplySourceHelper.sol";
 
 import {SupplySourceHelperMock} from "../mocks/SupplySourceHelperMock.sol";
 
-import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {ERC20PresetFixedSupply} from "../helpers/ERC20PresetFixedSupply.sol";
 

@@ -7,8 +7,8 @@ import {SubnetID, SupplySource} from "../structs/Subnet.sol";
 import {SubnetID, ValidatorInfo, Validator, PermissionMode} from "../structs/Subnet.sol";
 import {SubnetActorStorage} from "../lib/LibSubnetActorStorage.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
-import {Address} from "openzeppelin-contracts/utils/Address.sol";
-import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {LibStaking} from "../lib/LibStaking.sol";
 
 contract SubnetActorGetterFacet {

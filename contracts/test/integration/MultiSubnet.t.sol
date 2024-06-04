@@ -32,13 +32,13 @@ import {TestUtils, MockIpcContract, MockIpcContractPayable, MockIpcContractRever
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
 
-import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20PresetFixedSupply} from "../helpers/ERC20PresetFixedSupply.sol";
 import {ERC20Deflationary} from "../helpers/ERC20Deflationary.sol";
 import {ERC20Inflationary} from "../helpers/ERC20Inflationary.sol";
 import {ERC20Nil} from "../helpers/ERC20Nil.sol";
 
-import {IERC20Errors} from "openzeppelin-contracts/interfaces/draft-IERC6093.sol";
+import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 
 import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 import {SubnetActorFacetsHelper} from "../helpers/SubnetActorFacetsHelper.sol";

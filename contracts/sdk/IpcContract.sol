@@ -5,8 +5,8 @@ import {IpcEnvelope, ResultMsg, CallMsg, IpcMsgKind} from "../src/structs/CrossN
 import {IPCAddress} from "../src/structs/Subnet.sol";
 import {EMPTY_BYTES} from "../src/constants/Constants.sol";
 import {IGateway} from "../src/interfaces/IGateway.sol";
-import {ReentrancyGuard} from "openzeppelin-contracts/utils/ReentrancyGuard.sol";
-import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {CrossMsgHelper} from "../src/lib/CrossMsgHelper.sol";
 import {IIpcHandler} from "./interfaces/IIpcHandler.sol";
 
