@@ -1,3 +1,8 @@
+.PHONY: deploy-ipc deploy-subnet-registry deploy-subnet upgrade-gw-diamond upgrade-sa-diamond \
+        upgrade-sr-diamond gen compile-abi rust-binding slither lint fmt npmi node_modules build \
+        test install-dev install-npm-package install-eth-abi storage clean coverage coverage-for-mac \
+        prepare build-selector-library forge
+
 # ==============================================================================
 # Deployment
 
@@ -41,17 +46,6 @@ compile-abi: | forge
 
 rust-binding:
 	OUTPUT=$(OUTPUT) cargo build --locked --release --manifest-path ./binding/Cargo.toml -p ipc_actors_abis
-
-# commit-abi:
-# 	./ops/commit-abi.sh $(OUTPUT)
-
-# commit-rust-binding:
-# 	./ops/commit-rust-binding.sh
-
-# check-rust-binding:
-# 	cargo fmt --manifest-path ./binding/Cargo.toml && \
-# 	cargo clippy --manifest-path ./binding/Cargo.toml && \
-# 	./ops/check-rust-binding.sh
 
 # ==============================================================================
 # Running security checks within the local computer
@@ -117,7 +111,6 @@ build-selector-library: | forge
 	npx prettier -w test/helpers/SelectorLibrary.sol
 
 # Forge is used by the ipc-solidity-actors compilation steps.
-.PHONY: forge
 forge:
 	@if [ -z "$(shell which forge)" ]; then \
 		echo "Please install Foundry. See https://book.getfoundry.sh/getting-started/installation"; \
@@ -125,4 +118,3 @@ forge:
 	fi
 
 # ==============================================================================
-.PHONY: deploy-ipc lint fmt check-subnet slither check-gateway test prepare storage build clean
