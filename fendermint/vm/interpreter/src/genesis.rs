@@ -115,11 +115,11 @@ impl GenesisCreator {
     pub fn new(
         builtin_actors_path: PathBuf,
         custom_actors_path: PathBuf,
-        ipc_artifacts_path: PathBuf,
+        artifacts_path: PathBuf,
         sealed_out_path: PathBuf,
     ) -> Self {
         Self {
-            hardhat: Hardhat::new(ipc_artifacts_path),
+            hardhat: Hardhat::new(artifacts_path),
             builtin_actors_path,
             custom_actors_path,
             sealed_out_path,
@@ -229,19 +229,17 @@ impl GenesisCreator {
         // STAGE 0: Declare the built-in EVM contracts we'll have to deploy.
 
         // Pre-defined IDs for top-level Ethereum contracts.
-        let mut eth_builtin_ids = BTreeSet::new();
-        let mut eth_root_contracts = Vec::new();
-        let mut eth_contracts = EthContractMap::default();
+        let mut all_contracts = Vec::new();
+        let mut top_level_contracts = EthContractMap::default();
 
         // Only allocate IDs if the contracts are deployed.
         if genesis.ipc.is_some() {
-            eth_contracts.extend(IPC_CONTRACTS.clone());
+            top_level_contracts.extend(IPC_CONTRACTS.clone());
         }
 
-        eth_builtin_ids.extend(eth_contracts.values().map(|c| c.actor_id));
-        eth_root_contracts.extend(eth_contracts.keys());
-        eth_root_contracts.extend(
-            eth_contracts
+        all_contracts.extend(top_level_contracts.keys());
+        all_contracts.extend(
+            top_level_contracts
                 .values()
                 .flat_map(|c| c.facets.iter().map(|f| f.name)),
         );
@@ -249,7 +247,7 @@ impl GenesisCreator {
         let mut eth_libs = self
             .hardhat
             .dependencies(
-                &eth_root_contracts
+                &all_contracts
                     .iter()
                     .map(|n| (contract_src(n), *n))
                     .collect::<Vec<_>>(),
@@ -257,7 +255,7 @@ impl GenesisCreator {
             .context("failed to collect EVM contract dependencies")?;
 
         // Only keep library dependencies, not contracts with constructors.
-        eth_libs.retain(|(_, d)| !eth_contracts.contains_key(d.as_str()));
+        eth_libs.retain(|(_, d)| !top_level_contracts.contains_key(d.as_str()));
 
         // STAGE 1: First we initialize native built-in actors.
 
@@ -279,7 +277,10 @@ impl GenesisCreator {
             state.store(),
             genesis.chain_name.clone(),
             &genesis.accounts,
-            &eth_builtin_ids,
+            &top_level_contracts
+                .values()
+                .map(|c| c.actor_id)
+                .collect::<BTreeSet<_>>(),
             eth_libs.len() as u64,
         )
         .context("failed to create init state")?;
@@ -415,7 +416,8 @@ impl GenesisCreator {
             )
             .context("failed to init exec state")?;
 
-        let mut deployer = ContractDeployer::<MemoryBlockstore>::new(&self.hardhat, &eth_contracts);
+        let mut deployer =
+            ContractDeployer::<MemoryBlockstore>::new(&self.hardhat, &top_level_contracts);
 
         // Deploy Ethereum libraries.
         for (lib_src, lib_name) in eth_libs {

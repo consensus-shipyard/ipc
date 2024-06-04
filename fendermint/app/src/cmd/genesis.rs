@@ -288,7 +288,7 @@ async fn seal_state(genesis_file: &PathBuf, args: &SealGenesisArgs) -> anyhow::R
     let genesis_creator = GenesisCreator::new(
         args.builtin_actors_path.clone(),
         args.custom_actors_path.clone(),
-        args.ipc_artifacts_path.clone(),
+        args.artifacts_path.clone(),
         args.output_path.clone(),
     );
 
