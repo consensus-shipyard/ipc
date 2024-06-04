@@ -96,7 +96,7 @@ clean:
 
 coverage: node_modules | forge
 	forge coverage --ffi --report lcov -C ./src
-	ifeq ($(shell uname), Darwin)
+	ifeq ($(shell uname), Darwin))
 		genhtml -o coverage_report lcov.info --branch-coverage --ignore-errors category
 	else
 		genhtml -o coverage_report lcov.info --branch-coverage
