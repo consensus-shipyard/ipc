@@ -94,14 +94,13 @@ clean:
 	rm -rf ./cache_hardhat
 	rm -rf ./typechain
 
-coverage: | forge
+coverage: node_modules | forge
 	forge coverage --ffi --report lcov -C ./src
-	genhtml -o coverage_report lcov.info --branch-coverage
-	./tools/check_coverage.sh
-
-coverage-for-mac: | forge
-	forge coverage --ffi --report lcov -C ./src
-	genhtml -o coverage_report lcov.info --branch-coverage --ignore-errors category
+	ifeq ($(shell uname), Darwin)
+		genhtml -o coverage_report lcov.info --branch-coverage --ignore-errors category
+	else
+		genhtml -o coverage_report lcov.info --branch-coverage
+	endif
 	./tools/check_coverage.sh
 
 prepare: build-selector-library fmt lint test slither
