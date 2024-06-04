@@ -41,7 +41,7 @@ jobs:
         run: cd contracts; make coverage || make coverage
 
       - name: Run tests
-        run: cd contracts; forge test -vvv --ffi
+        run: cd contracts; make test
 
       - name: Run axelar-token tests
         run: cd extras/axelar-token; forge test -vvv --ffi
