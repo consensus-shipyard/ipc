@@ -69,10 +69,16 @@ fmt:
 	npm install --silent --no-save
 	npx prettier --check -w 'src/**/**/*.sol' 'sdk/**/**/*.sol' 'test/**/**/*.sol' 'test/**/**/*.t.sol' '**/*.{js,jsx,ts,tsx,json,css,md}'
 
-build: | forge
+npmi: node_modules
+
+node_modules: package.json package-lock.json
+	npm install
+	touch node_modules
+
+build: node_modules | forge
 	forge build
 
-test: | forge
+test: node_modules | forge
 	forge test -vvv --ffi
 
 install-dev: install-npm-package install-eth-abi
