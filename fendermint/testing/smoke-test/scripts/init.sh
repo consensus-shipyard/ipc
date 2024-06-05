@@ -7,6 +7,7 @@ set -e
 KEYS_DIR=/data/keys
 CMT_DIR=/data/${NODE_NAME}/cometbft
 GENESIS_FILE=/data/genesis.json
+SEALED_GENESIS_FILE=/data/keys/sealed.car
 
 # Create a genesis file
 fendermint \
@@ -62,6 +63,16 @@ fendermint \
     --bottom-up-check-period 10 \
     --msg-fee 10 \
     --majority-percentage 66
+
+# Seal the genesis state
+fendermint \
+  genesis --genesis-file $GENESIS_FILE \
+  ipc \
+    seal-state \
+      --builtin-actors-path "${FM_BUILTIN_ACTORS_BUNDLE}" \
+      --custom-actors-path "${FM_CUSTOM_ACTORS_BUNDLE}" \
+      --artifacts-path "${IPC_ACTORS_OUT}" \
+      --output-path "${SEALED_GENESIS_FILE}"
 
 # Convert FM genesis to CMT
 fendermint \
