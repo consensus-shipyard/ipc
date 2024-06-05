@@ -69,15 +69,15 @@ fendermint \
   genesis --genesis-file $GENESIS_FILE \
   ipc \
     seal-state \
-      --builtin-actors-path "${BUILTIN_ACTORS_BUNDLE}" \
-      --custom-actors-path "${CUSTOM_ACTORS_BUNDLE}" \
-      --artifacts-path "${IPC_ACTORS_OUT}" \
+      --builtin-actors-path /fendermint/bundle.car \
+      --custom-actors-path /fendermint/custom_actors_bundle.car \
+      --artifacts-path /fendermint/contracts \
       --output-path "${SEALED_GENESIS_FILE}"
 
 # Convert FM genesis to CMT
 fendermint \
   genesis --genesis-file $GENESIS_FILE \
-  into-tendermint --out $CMT_DIR/config/genesis.json
+  into-tendermint --out $CMT_DIR/config/genesis.json --sealed "${SEALED_GENESIS_FILE}"
 
 # Convert FM validator key to CMT
 fendermint \
