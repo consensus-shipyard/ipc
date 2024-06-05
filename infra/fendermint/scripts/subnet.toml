@@ -31,10 +31,7 @@ run_task = "cometbft-node-id"
 run_task = "fendermint-network-peer-id"
 
 [tasks.bootstrap-down]
-dependencies = [
-    "cometbft-destroy",
-    "fendermint-destroy",
-]
+dependencies = ["cometbft-destroy", "fendermint-destroy"]
 
 [tasks.bootstrap-restart]
 dependencies = [
@@ -62,18 +59,14 @@ dependencies = [
     "cometbft-start",
     "cometbft-wait",
     "ethapi-start",
-    "proxy-start",
+    "object-api-start",
     "ipfs-start",
     "node-report",
 ]
 
 [tasks.child-validator-no-parent-init]
 workspace = false
-dependencies = [
-    "testnode-down",
-    "fendermint-pull",
-    "node-init",
-]
+dependencies = ["testnode-down", "fendermint-pull", "node-init"]
 
 [tasks.child-validator-no-parent]
 workspace = false
@@ -86,7 +79,7 @@ dependencies = [
     "cometbft-start",
     "cometbft-wait",
     "ethapi-start",
-    "proxy-start",
+    "object-api-start",
     "ipfs-start",
     "node-report",
 ]
@@ -96,13 +89,13 @@ run_task = { name = [
     "cometbft-destroy",
     "fendermint-destroy",
     "ethapi-destroy",
-    "proxy-destroy",
+    "object-api-destroy",
     "ipfs-destroy",
     "fendermint-start-validator",
     "cometbft-start",
     "cometbft-wait",
     "ethapi-start",
-    "proxy-start",
+    "object-api-start",
     "ipfs-start",
     "node-report",
 ] }
@@ -112,13 +105,13 @@ run_task = { name = [
     "cometbft-destroy",
     "fendermint-destroy",
     "ethapi-destroy",
-    "proxy-destroy",
+    "object-api-destroy",
     "ipfs-destroy",
     "fendermint-start-validator-no-parent",
     "cometbft-start",
     "cometbft-wait",
     "ethapi-start",
-    "proxy-start",
+    "object-api-start",
     "ipfs-start",
     "node-report",
 ] }
@@ -143,7 +136,7 @@ dependencies = [
     "cometbft-start",
     "cometbft-wait",
     "ethapi-start",
-    "proxy-start",
+    "object-api-start",
     "ipfs-start",
     "node-report",
 ]
@@ -204,8 +197,8 @@ script = """cat << EOF
 Subnet ID:
 \t${SUBNET_ID}
 
-Proxy API:
-\thttp://0.0.0.0:${PROXY_HOST_PORT}
+Object API:
+\thttp://0.0.0.0:${OBJECT_API_HOST_PORT}
 
 IPFS API:
 \thttp://0.0.0.0:${IPFS_RPC_HOST_PORT}

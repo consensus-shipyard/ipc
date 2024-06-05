@@ -14,7 +14,7 @@ CMT_P2P_HOST_PORTS=(26656 26756 26856)
 CMT_RPC_HOST_PORTS=(26657 26757 26857)
 ETHAPI_HOST_PORTS=(8545 8645 8745)
 RESOLVER_HOST_PORTS=(26655 26755 26855)
-PROXY_HOST_PORTS=(8001 8002 8003)
+OBJECT_API_HOST_PORTS=(8001 8002 8003)
 IPFS_SWARM_HOST_PORTS=(4001 4002 4003)
 IPFS_RPC_HOST_PORTS=(5001 5002 5003)
 IPFS_GATEWAY_HOST_PORTS=(8080 8081 8082)
@@ -44,7 +44,7 @@ do
       -e CMT_RPC_HOST_PORT=${CMT_RPC_HOST_PORTS[i]} \
       -e ETHAPI_HOST_PORT=${ETHAPI_HOST_PORTS[i]} \
       -e RESOLVER_HOST_PORT=${RESOLVER_HOST_PORTS[i]} \
-      -e PROXY_HOST_PORT=${PROXY_HOST_PORTS[i]} \
+      -e OBJECT_API_HOST_PORT=${OBJECT_API_HOST_PORTS[i]} \
       -e IPFS_SWARM_HOST_PORT=${IPFS_SWARM_HOST_PORTS[i]} \
       -e IPFS_RPC_HOST_PORT=${IPFS_RPC_HOST_PORTS[i]} \
       -e IPFS_GATEWAY_HOST_PORT=${IPFS_GATEWAY_HOST_PORTS[i]} \
@@ -69,11 +69,11 @@ do
   }'
 done
 
-# Step 2.2: Test proxy endpoint
-printf "\n$DASHES Test proxy endpoints of validator nodes\n"
+# Step 2.2: Test object API endpoint
+printf "\n$DASHES Test object API endpoints of validator nodes\n"
 for i in {0..2}
 do
-  curl --location http://localhost:${PROXY_HOST_PORTS[i]}/health
+  curl --location http://localhost:${OBJECT_API_HOST_PORTS[i]}/health
 done
 
 # Step 3: Print a summary of the deployment
@@ -86,10 +86,10 @@ cat << EOF
 Subnet ID:
 $subnet_id
 
-Proxy API:
-http://localhost:${PROXY_HOST_PORTS[0]}
-http://localhost:${PROXY_HOST_PORTS[1]}
-http://localhost:${PROXY_HOST_PORTS[2]}
+Object API:
+http://localhost:${OBJECT_API_HOST_PORTS[0]}
+http://localhost:${OBJECT_API_HOST_PORTS[1]}
+http://localhost:${OBJECT_API_HOST_PORTS[2]}
 
 IPFS API:
 http://localhost:${IPFS_RPC_HOST_PORTS[0]}
