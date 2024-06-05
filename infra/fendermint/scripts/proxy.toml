@@ -25,7 +25,7 @@ dependencies = ["docker-network-create"]
 
 [tasks.proxy-start]
 extend = "proxy-run"
-env = { "CMD" = "proxy run", "FLAGS" = "-d" }
+env = { "CMD" = "object-api run", "FLAGS" = "-d" }
 
 [tasks.proxy-stop]
 env = { "CONTAINER_NAME" = "${PROXY_CONTAINER_NAME}" }

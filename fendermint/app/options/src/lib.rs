@@ -12,7 +12,7 @@ use tracing_subscriber::EnvFilter;
 
 use self::{
     eth::EthArgs, genesis::GenesisArgs, key::KeyArgs, materializer::MaterializerArgs,
-    proxy::ProxyArgs, rpc::RpcArgs, run::RunArgs,
+    object_api::ObjectAPIArgs, rpc::RpcArgs, run::RunArgs,
 };
 
 pub mod config;
@@ -21,7 +21,7 @@ pub mod eth;
 pub mod genesis;
 pub mod key;
 pub mod materializer;
-pub mod proxy;
+pub mod object_api;
 pub mod rpc;
 pub mod run;
 
@@ -199,8 +199,8 @@ pub enum Commands {
     /// Subcommands related to the Testnet Materializer.
     #[clap(aliases  = &["mat", "matr", "mate"])]
     Materializer(MaterializerArgs),
-    /// Proxy for data repos
-    Proxy(ProxyArgs),
+    /// Object API for data repos
+    ObjectAPI(ObjectAPIArgs),
 }
 
 #[cfg(test)]

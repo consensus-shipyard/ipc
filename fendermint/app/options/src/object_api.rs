@@ -6,13 +6,13 @@ use clap::{Args, Subcommand};
 use tendermint_rpc::Url;
 
 #[derive(Args, Debug)]
-pub struct ProxyArgs {
+pub struct ObjectAPIArgs {
     #[command(subcommand)]
-    pub command: ProxyCommands,
+    pub command: ObjectAPICommands,
 }
 
 #[derive(Subcommand, Debug, Clone)]
-pub enum ProxyCommands {
+pub enum ObjectAPICommands {
     Run {
         /// The URL of the Tendermint node's RPC endpoint.
         #[arg(

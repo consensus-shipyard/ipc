@@ -31,7 +31,7 @@ use warp::{
 };
 
 use fendermint_actor_objectstore::{GetParams, ListParams};
-use fendermint_app_settings::proxy::ProxySettings;
+use fendermint_app_settings::object_api::ObjectAPISettings;
 use fendermint_rpc::{client::FendermintClient, tx::CallClient};
 use fendermint_vm_message::query::FvmQueryHeight;
 use fvm_shared::chainid::ChainID;
@@ -39,16 +39,16 @@ use fvm_shared::chainid::ChainID;
 use super::rpc::{gas_params, TransClient};
 use crate::cmd;
 use crate::options::{
-    proxy::{ProxyArgs, ProxyCommands},
+    object_api::{ObjectAPIArgs, ObjectAPICommands},
     rpc::TransArgs,
 };
 
 const MAX_OBJECT_LENGTH: u64 = 1024 * 1024 * 1024;
 
 cmd! {
-    ProxyArgs(self, settings: ProxySettings) {
+    ObjectAPIArgs(self, settings: ObjectAPISettings) {
         match self.command.clone() {
-            ProxyCommands::Run { tendermint_url, ipfs_addr, args} => {
+            ObjectAPICommands::Run { tendermint_url, ipfs_addr, args} => {
                 let client = FendermintClient::new_http(tendermint_url, None)?;
                 let ipfs = IpfsClient::from_multiaddr_str(&ipfs_addr)?;
                 let ipfs_adapter = Ipfs { inner: ipfs.clone() };
@@ -57,14 +57,24 @@ cmd! {
                 let health_route = warp::path!("health")
                     .and(warp::get()).and_then(health);
 
-                // Objectstore routes
-                let objects_route = warp::path!("v1" / "objects" )
+                // Objects routes
+                let objects_upload = warp::path!("v1" / "objects" )
                 .and(warp::post())
                 .and(with_client(client.clone()))
                 .and(with_ipfs_adapter(ipfs_adapter.clone()))
                 .and(warp::multipart::form().max_length(MAX_OBJECT_LENGTH))
                 .and_then(handle_object_upload);
 
+                let objects_download = warp::path!("v1" / "objects" / Cid)
+                .and(
+                    warp::get().map(|| "GET".to_string()).or(warp::head().map(|| "HEAD".to_string())).unify()
+
+                )
+                .and(warp::header::optional::<String>("Range"))
+                .and(with_ipfs(ipfs.clone()))
+                .and_then(handle_object_download);
+
+                // TODO: Deprecated, remove after SDK migration
                 let os_get_or_list_route = warp::path!("v1" / "objectstores" / Address / ..)
                     .and(
                         warp::get().or(warp::head()).unify()
@@ -76,10 +86,11 @@ cmd! {
                     .and(with_client(client.clone()))
                     .and(with_ipfs(ipfs.clone()))
                     .and(with_args(args.clone()))
-                    .and_then(handle_os_get_or_list);
+                    .and_then(handle_object_download_deprecated);
 
                 let router = health_route
-                    .or(objects_route)
+                    .or(objects_upload)
+                    .or(objects_download)
                     .or(os_get_or_list_route)
                     .with(warp::cors().allow_any_origin()
                         .allow_headers(vec!["Content-Type"])
@@ -131,16 +142,16 @@ struct ListQuery {
 }
 
 #[derive(Debug, Error)]
-enum ProxyError {
+enum ObjectAPIError {
     #[error("error parsing range header: `{0}`")]
     RangeHeaderParseError(ParseIntError),
     #[error("invalid range header")]
     RangeHeaderInvalid,
 }
 
-impl From<ParseIntError> for ProxyError {
+impl From<ParseIntError> for ObjectAPIError {
     fn from(err: ParseIntError) -> Self {
-        ProxyError::RangeHeaderParseError(err)
+        ObjectAPIError::RangeHeaderParseError(err)
     }
 }
 
@@ -386,14 +397,14 @@ async fn handle_object_upload<F: QueryClient, I: IpfsApiAdapter>(
     Ok(cid.to_string())
 }
 
-fn get_range_params(range: String, size: u64) -> Result<(u64, u64), ProxyError> {
+fn get_range_params(range: String, size: u64) -> Result<(u64, u64), ObjectAPIError> {
     let range: Vec<String> = range
         .replace("bytes=", "")
         .split('-')
         .map(|n| n.to_string())
         .collect();
     if range.len() != 2 {
-        return Err(ProxyError::RangeHeaderInvalid);
+        return Err(ObjectAPIError::RangeHeaderInvalid);
     }
     let (start, end): (u64, u64) = match (!range[0].is_empty(), !range[1].is_empty()) {
         (true, true) => (range[0].parse::<u64>()?, range[1].parse::<u64>()?),
@@ -409,13 +420,14 @@ fn get_range_params(range: String, size: u64) -> Result<(u64, u64), ProxyError> 
         (false, false) => (0, size - 1),
     };
     if start > end || end >= size {
-        return Err(ProxyError::RangeHeaderInvalid);
+        return Err(ObjectAPIError::RangeHeaderInvalid);
     }
     Ok((start, end))
 }
 
+// TODO: Deprecated, remove after SDK migration
 #[allow(clippy::too_many_arguments)]
-async fn handle_os_get_or_list(
+async fn handle_object_download_deprecated(
     address: Address,
     tail: Tail,
     height_query: HeightQuery,
@@ -542,6 +554,7 @@ async fn handle_os_get_or_list(
     }
 }
 
+// TODO: Deprecated, remove after SDK migration
 async fn handle_os_list(
     address: Address,
     mut prefix: &str,
@@ -604,6 +617,83 @@ async fn handle_os_list(
     Ok(response)
 }
 
+async fn handle_object_download(
+    cid: Cid,
+    method: String,
+    range: Option<String>,
+    ipfs: IpfsClient,
+) -> Result<impl Reply, Rejection> {
+    let (body, start, end, len, size) = {
+        let cid = cid.to_string();
+        let stat = ipfs
+            .files_stat(format!("/ipfs/{cid}").as_str())
+            .await
+            .map_err(|e| {
+                Rejection::from(BadRequest {
+                    message: format!("failed to stat object: {}", e),
+                })
+            })?;
+        let size = stat.size;
+
+        match range {
+            Some(range) => {
+                let (start, end) = get_range_params(range, size).map_err(|e| {
+                    Rejection::from(BadRequest {
+                        message: format!("failed to get range params: {}", e),
+                    })
+                })?;
+                let len = end - start + 1;
+                (
+                    warp::hyper::Body::wrap_stream(ipfs.cat_range(
+                        &cid,
+                        start as usize,
+                        len as usize,
+                    )),
+                    start,
+                    end,
+                    len,
+                    size,
+                )
+            }
+            None => (
+                warp::hyper::Body::wrap_stream(ipfs.cat(&cid)),
+                0,
+                size - 1,
+                size,
+                size,
+            ),
+        }
+    };
+
+    // If it is a HEAD request, we don't need to send the body
+    // but we still need to send the Content-Length header
+    if method == "HEAD" {
+        let mut response = warp::reply::Response::new(warp::hyper::Body::empty());
+        let mut header_map = HeaderMap::new();
+        header_map.insert("Content-Length", HeaderValue::from(size));
+        let headers = response.headers_mut();
+        headers.extend(header_map);
+        return Ok(response);
+    }
+
+    let mut response = warp::reply::Response::new(body);
+    let mut header_map = HeaderMap::new();
+    if len < size {
+        *response.status_mut() = StatusCode::PARTIAL_CONTENT;
+        header_map.insert(
+            "Content-Range",
+            HeaderValue::from_str(&format!("bytes {}-{}/{}", start, end, len)).unwrap(),
+        );
+    } else {
+        header_map.insert("Accept-Ranges", HeaderValue::from_str("bytes").unwrap());
+    }
+    header_map.insert("Content-Length", HeaderValue::from(len));
+    let headers = response.headers_mut();
+    headers.extend(header_map);
+
+    Ok(response)
+}
+
 // Rejection handlers
 
 #[derive(Clone, Debug)]
@@ -649,6 +739,7 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
 
 // RPC methods
 
+// TODO: Deprecated, remove after SDK migration
 async fn os_get(
     client: FendermintClient,
     args: TransArgs,
@@ -668,6 +759,7 @@ async fn os_get(
     Ok(res.return_data)
 }
 
+// TODO: Deprecated, remove after SDK migration
 async fn os_list(
     client: FendermintClient,
     args: TransArgs,
