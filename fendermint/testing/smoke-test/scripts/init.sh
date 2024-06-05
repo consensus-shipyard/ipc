@@ -69,8 +69,8 @@ fendermint \
   genesis --genesis-file $GENESIS_FILE \
   ipc \
     seal-state \
-      --builtin-actors-path "${FM_BUILTIN_ACTORS_BUNDLE}" \
-      --custom-actors-path "${FM_CUSTOM_ACTORS_BUNDLE}" \
+      --builtin-actors-path "${BUILTIN_ACTORS_BUNDLE}" \
+      --custom-actors-path "${CUSTOM_ACTORS_BUNDLE}" \
       --artifacts-path "${IPC_ACTORS_OUT}" \
       --output-path "${SEALED_GENESIS_FILE}"
 
