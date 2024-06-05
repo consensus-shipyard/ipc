@@ -17,6 +17,7 @@ docker run \
   ${FLAGS} \
   --name ${FM_CONTAINER_NAME} \
   --init \
+  --user $(id -u) \
   --network ${NETWORK_NAME} \
   --volume ${BASE_DIR}:/data \
   --volume fendermint-logs:/fendermint/logs \

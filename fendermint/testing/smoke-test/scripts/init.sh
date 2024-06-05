@@ -7,7 +7,7 @@ set -e
 KEYS_DIR=/data/keys
 CMT_DIR=/data/${NODE_NAME}/cometbft
 GENESIS_FILE=/data/genesis.json
-SEALED_GENESIS_FILE=/data/keys/sealed.car
+SEALED_GENESIS_FILE=/data/sealed.car
 
 # Create a genesis file
 fendermint \
