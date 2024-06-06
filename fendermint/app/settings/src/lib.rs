@@ -6,11 +6,14 @@ use config::{Config, ConfigError, Environment, File};
 use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
 use ipc_api::subnet_id::SubnetID;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
+use std::fmt::{Display, Formatter};
+use std::net::{SocketAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tendermint_rpc::Url;
+use testing::TestingSettings;
 use utils::EnvInterpol;
 
 use fendermint_vm_encoding::{human_readable_delegate, human_readable_str};
@@ -26,6 +29,7 @@ pub mod eth;
 pub mod fvm;
 pub mod proxy;
 pub mod resolver;
+pub mod testing;
 pub mod utils;
 
 /// Marker to be used with the `#[serde_as(as = "IsHumanReadable")]` annotations.
@@ -44,9 +48,9 @@ pub struct SocketAddress {
     pub port: u32,
 }
 
-impl ToString for SocketAddress {
-    fn to_string(&self) -> String {
-        format!("{}:{}", self.host, self.port)
+impl Display for SocketAddress {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.host, self.port)
     }
 }
 
@@ -55,6 +59,16 @@ impl std::net::ToSocketAddrs for SocketAddress {
 
     fn to_socket_addrs(&self) -> std::io::Result<Self::Iter> {
         self.to_string().to_socket_addrs()
+    }
+}
+
+impl TryInto<std::net::SocketAddr> for SocketAddress {
+    type Error = std::io::Error;
+
+    fn try_into(self) -> Result<SocketAddr, Self::Error> {
+        self.to_socket_addrs()?
+            .next()
+            .ok_or_else(|| std::io::Error::from(std::io::ErrorKind::AddrNotAvailable))
     }
 }
 
@@ -83,6 +97,38 @@ pub struct AbciSettings {
     pub listen: SocketAddress,
     /// Queue size for each ABCI component.
     pub bound: usize,
+    /// Maximum number of messages allowed in a block.
+    pub block_max_msgs: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "lowercase")]
+/// Indicate the FVM account kind for generating addresses from a key.
+///
+/// See https://github.com/facebook/rocksdb/wiki/Compaction
+pub enum DbCompaction {
+    /// Good when most keys don't change.
+    Level,
+    Universal,
+    Fifo,
+    /// Auto-compaction disabled, has to be called manually.
+    None,
+}
+
+impl Display for DbCompaction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            serde_json::to_value(self)
+                .map_err(|e| {
+                    tracing::error!("cannot format DB compaction to json: {e}");
+                    std::fmt::Error
+                })?
+                .as_str()
+                .ok_or(std::fmt::Error)?
+        )
+    }
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -91,6 +137,8 @@ pub struct DbSettings {
     ///
     /// This affects how long we can go back in state queries.
     pub state_hist_size: u64,
+    /// How to compact the datastore.
+    pub compaction_style: DbCompaction,
 }
 
 /// Settings affecting how we deal with failures in trying to send transactions to the local CometBFT node.
@@ -122,6 +170,8 @@ pub struct TopDownSettings {
     pub proposal_delay: BlockHeight,
     /// The max number of blocks one should make the topdown proposal
     pub max_proposal_range: BlockHeight,
+    /// The max number of blocks to hold in memory for parent syncer
+    pub max_cache_blocks: Option<BlockHeight>,
     /// Parent syncing cron period, in seconds
     #[serde_as(as = "DurationSeconds<u64>")]
     pub polling_interval: Duration,
@@ -197,6 +247,14 @@ impl SnapshotSettings {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+pub struct MetricsSettings {
+    /// Enable the export of metrics over HTTP.
+    pub enabled: bool,
+    /// HTTP listen address where Prometheus metrics are hosted.
+    pub listen: SocketAddress,
+}
+
+#[derive(Debug, Deserialize, Clone)]
 pub struct Settings {
     /// Home directory configured on the CLI, to which all paths in settings can be set relative.
     home_dir: PathBuf,
@@ -222,12 +280,14 @@ pub struct Settings {
 
     pub abci: AbciSettings,
     pub db: DbSettings,
+    pub metrics: MetricsSettings,
     pub snapshots: SnapshotSettings,
     pub eth: EthSettings,
     pub fvm: FvmSettings,
     pub resolver: ResolverSettings,
     pub broadcast: BroadcastSettings,
     pub ipc: IpcSettings,
+    pub testing: Option<TestingSettings>,
     pub proxy: ProxySettings,
 }
 
@@ -269,6 +329,7 @@ impl Settings {
                     .ignore_empty(true) // otherwise "" will be parsed as a list item
                     .try_parsing(true) // required for list separator
                     .list_separator(",") // need to list keys explicitly below otherwise it can't pase simple `String` type
+                    .with_list_parse_key("resolver.connection.external_addresses")
                     .with_list_parse_key("resolver.discovery.static_addresses")
                     .with_list_parse_key("resolver.membership.static_subnets"),
             ))
@@ -311,11 +372,16 @@ impl Settings {
     }
 }
 
+// Run these tests serially because some of them modify the environment.
+#[serial_test::serial]
 #[cfg(test)]
 mod tests {
+    use multiaddr::multiaddr;
     use std::path::PathBuf;
 
-    use serial_test::serial;
+    use crate::utils::tests::with_env_vars;
+
+    use crate::DbCompaction;
 
     use super::Settings;
 
@@ -326,6 +392,8 @@ mod tests {
         // Trying to debug the following sporadic error on CI:
         // thread 'tests::parse_test_config' panicked at fendermint/app/settings/src/lib.rs:315:36:
         // failed to parse Settings: failed to parse: invalid digit found in string
+        // This turned out to be due to the environment variable manipulation below mixing with another test,
+        // which is why `#[serial]` was moved to the top.
         eprintln!("CONFIG = {:?}", c.cache);
         Settings::parse(c)
     }
@@ -348,46 +416,44 @@ mod tests {
         assert!(settings.resolver_enabled());
     }
 
-    // Run these tests serially because they modify the environment.
-    #[serial]
-    mod env {
-        use multiaddr::multiaddr;
+    #[test]
+    fn compaction_to_string() {
+        assert_eq!(DbCompaction::Level.to_string(), "level");
+    }
 
-        use crate::tests::try_parse_config;
-        use crate::utils::tests::with_env_vars;
+    #[test]
+    fn parse_comma_separated() {
+        let settings = with_env_vars(vec![
+                ("FM_RESOLVER__CONNECTION__EXTERNAL_ADDRESSES", "/ip4/198.51.100.0/tcp/4242/p2p/QmYyQSo1c1Ym7orWxLYvCrM2EmxFTANf8wXmmE7DWjhx5N,/ip6/2604:1380:2000:7a00::1/udp/4001/quic/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb"),
+                ("FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES", "/ip4/198.51.100.1/tcp/4242/p2p/QmYyQSo1c1Ym7orWxLYvCrM2EmxFTANf8wXmmE7DWjhx5N,/ip6/2604:1380:2000:7a00::2/udp/4001/quic/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb"),
+                // Set a normal string key as well to make sure we have configured the library correctly and it doesn't try to parse everything as a list.
+                ("FM_RESOLVER__NETWORK__NETWORK_NAME", "test"),
+            ], || try_parse_config("")).unwrap();
 
-        #[ignore = "ignore until above sporadic error in CI is resolved"]
-        #[test]
-        fn parse_comma_separated() {
-            let settings = with_env_vars(vec![
-            ("FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES", "/ip4/198.51.100.0/tcp/4242/p2p/QmYyQSo1c1Ym7orWxLYvCrM2EmxFTANf8wXmmE7DWjhx5N,/ip6/2604:1380:2000:7a00::1/udp/4001/quic/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb"),
-            // Set a normal string key as well to make sure we have configured the library correctly and it doesn't try to parse everything as a list.
-            ("FM_RESOLVER__NETWORK__NETWORK_NAME", "test"),
-        ], || try_parse_config("")).unwrap();
+        assert_eq!(settings.resolver.discovery.static_addresses.len(), 2);
+        assert_eq!(settings.resolver.connection.external_addresses.len(), 2);
+    }
 
-            assert_eq!(settings.resolver.discovery.static_addresses.len(), 2);
-        }
+    #[test]
+    fn parse_empty_comma_separated() {
+        let settings = with_env_vars(
+            vec![
+                ("FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES", ""),
+                ("FM_RESOLVER__CONNECTION__EXTERNAL_ADDRESSES", ""),
+                ("FM_RESOLVER__MEMBERSHIP__STATIC_SUBNETS", ""),
+            ],
+            || try_parse_config(""),
+        )
+        .unwrap();
 
-        #[ignore = "ignore until above sporadic error in CI is resolved"]
-        #[test]
-        fn parse_empty_comma_separated() {
-            let settings = with_env_vars(
-                vec![
-                    ("FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES", ""),
-                    ("FM_RESOLVER__MEMBERSHIP__STATIC_SUBNETS", ""),
-                ],
-                || try_parse_config(""),
-            )
-            .unwrap();
+        assert_eq!(settings.resolver.connection.external_addresses.len(), 0);
+        assert_eq!(settings.resolver.discovery.static_addresses.len(), 0);
+        assert_eq!(settings.resolver.membership.static_subnets.len(), 0);
+    }
 
-            assert_eq!(settings.resolver.discovery.static_addresses.len(), 0);
-            assert_eq!(settings.resolver.membership.static_subnets.len(), 0);
-        }
-
-        #[ignore = "ignore until above sporadic error in CI is resolved"]
-        #[test]
-        fn parse_with_interpolation() {
-            let settings = with_env_vars(
+    #[test]
+    fn parse_with_interpolation() {
+        let settings = with_env_vars(
                 vec![
                     ("FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES", "/dns4/${SEED_1_HOST}/tcp/${SEED_1_PORT},/dns4/${SEED_2_HOST}/tcp/${SEED_2_PORT}"),
                     ("SEED_1_HOST", "foo.io"),
@@ -399,15 +465,14 @@ mod tests {
             )
             .unwrap();
 
-            assert_eq!(settings.resolver.discovery.static_addresses.len(), 2);
-            assert_eq!(
-                settings.resolver.discovery.static_addresses[0],
-                multiaddr!(Dns4("foo.io"), Tcp(1234u16))
-            );
-            assert_eq!(
-                settings.resolver.discovery.static_addresses[1],
-                multiaddr!(Dns4("bar.ai"), Tcp(5678u16))
-            );
-        }
+        assert_eq!(settings.resolver.discovery.static_addresses.len(), 2);
+        assert_eq!(
+            settings.resolver.discovery.static_addresses[0],
+            multiaddr!(Dns4("foo.io"), Tcp(1234u16))
+        );
+        assert_eq!(
+            settings.resolver.discovery.static_addresses[1],
+            multiaddr!(Dns4("bar.ai"), Tcp(5678u16))
+        );
     }
 }

@@ -6,7 +6,7 @@ import { IERC20 } from "openzeppelin-contracts/interfaces/IERC20.sol";
 import { Ownable } from "openzeppelin-contracts/access/Ownable.sol";
 import { SubnetID, SupplySource, SupplyKind } from "@ipc/src/structs/Subnet.sol";
 import { FvmAddress } from "@ipc/src/structs/FvmAddress.sol";
-import { IpcHandler } from "@ipc/sdk/IpcContract.sol";
+import { IIpcHandler } from "@ipc/sdk/interfaces/IIpcHandler.sol";
 import { IpcMsgKind, ResultMsg, OutcomeType, IpcEnvelope } from "@ipc/src/structs/CrossNet.sol";
 import { FvmAddressHelper } from "@ipc/src/lib/FvmAddressHelper.sol";
 import { SubnetIDHelper } from "@ipc/src/lib/SubnetIDHelper.sol";
@@ -24,7 +24,7 @@ interface SubnetActor {
 //         IpcTokenSender via the Axelar ITS, receiving some token value to deposit into an IPC subnet (specified in the
 //         incoming message). The IpcTokenHandler handles deposit failures by crediting the value back to the original
 //         beneficiary, and making it available from them to withdraw() on the rootnet.
-contract IpcTokenHandler is InterchainTokenExecutable, IpcHandler, Ownable {
+contract IpcTokenHandler is InterchainTokenExecutable, IIpcHandler, Ownable {
     using FvmAddressHelper for address;
     using FvmAddressHelper for FvmAddress;
     using SubnetIDHelper for SubnetID;
@@ -85,10 +85,10 @@ contract IpcTokenHandler is InterchainTokenExecutable, IpcHandler, Ownable {
     // @notice Handles result messages for funding operations.
     function handleIpcMessage(IpcEnvelope calldata envelope) external payable returns (bytes memory ret) {
         if (msg.sender != address(_ipcGateway)) {
-            revert IpcHandler.CallerIsNotGateway();
+            revert IIpcHandler.CallerIsNotGateway();
         }
         if (envelope.kind != IpcMsgKind.Result) {
-            revert IpcHandler.UnsupportedMsgKind();
+            revert IIpcHandler.UnsupportedMsgKind();
         }
 
         ResultMsg memory result = abi.decode(envelope.message, (ResultMsg));

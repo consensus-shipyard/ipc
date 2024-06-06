@@ -284,6 +284,15 @@ async fn single_bootstrap_publish_receive_preemptive() {
     }
 }
 
+#[tokio::test]
+async fn can_register_metrics() {
+    let mut rng = rand::rngs::StdRng::seed_from_u64(0);
+    let config = make_config(&mut rng, 1, None);
+    let (mut service, _) = make_service(config);
+    let registry = prometheus::Registry::new();
+    service.register_metrics(&registry).unwrap();
+}
+
 async fn make_cluster_with_bootstrap(cluster_size: u32, bootstrap_idx: usize) -> Cluster {
     // TODO: Get the seed from QuickCheck
     let mut builder = ClusterBuilder::new(cluster_size);
@@ -309,6 +318,7 @@ fn make_config(rng: &mut StdRng, cluster_size: u32, bootstrap_addr: Option<Multi
     let config = Config {
         connection: ConnectionConfig {
             listen_addr: Multiaddr::from(Protocol::Memory(rng.gen::<u64>())),
+            external_addresses: vec![],
             expected_peer_count: cluster_size,
             max_incoming: cluster_size,
             max_peers_per_query: cluster_size,

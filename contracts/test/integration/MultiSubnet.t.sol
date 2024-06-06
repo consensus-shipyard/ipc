@@ -8,6 +8,7 @@ import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMs
 import {FvmAddress} from "../../src/structs/FvmAddress.sol";
 import {SubnetID, Subnet, IPCAddress, Validator} from "../../src/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
+import {SupplySourceHelper} from "../../src/lib/SupplySourceHelper.sol";
 import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
 import {GatewayDiamond, FEATURE_MULTILEVEL_CROSSMSG} from "../../src/GatewayDiamond.sol";
@@ -33,6 +34,10 @@ import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
 
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {ERC20PresetFixedSupply} from "../helpers/ERC20PresetFixedSupply.sol";
+import {ERC20Deflationary} from "../helpers/ERC20Deflationary.sol";
+import {ERC20Inflationary} from "../helpers/ERC20Inflationary.sol";
+import {ERC20Nil} from "../helpers/ERC20Nil.sol";
+
 import {IERC20Errors} from "openzeppelin-contracts/interfaces/draft-IERC6093.sol";
 
 import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
@@ -49,12 +54,16 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
     RootSubnetDefinition public rootSubnet;
     TestSubnetDefinition public nativeSubnet;
     TestSubnetDefinition public tokenSubnet;
+    TestSubnetDefinition public deflationaryTokenSubnet;
+    TestSubnetDefinition public inflationaryTokenSubnet;
+    TestSubnetDefinition public nilTokenSubnet;
 
     IERC20 public token;
+    IERC20 public deflationaryToken;
+    IERC20 public inflationaryToken;
+    IERC20 public nilToken;
 
     function setUp() public override {
-        token = new ERC20PresetFixedSupply("TestToken", "TEST", 1_000_000, address(this));
-
         SubnetID memory rootSubnetName = SubnetID({root: ROOTNET_CHAINID, route: new address[](0)});
         require(rootSubnetName.isRoot(), "not root");
 
@@ -63,15 +72,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         SubnetActorDiamond rootNativeSubnetActor = createSubnetActor(
             defaultSubnetActorParamsWith(address(rootGateway), rootSubnetName)
         );
-
-        SubnetActorDiamond rootTokenSubnetActor = createSubnetActor(
-            defaultSubnetActorParamsWith(address(rootGateway), rootSubnetName, address(token))
-        );
-
-        address[] memory tokenSubnetPath = new address[](1);
-        tokenSubnetPath[0] = address(rootTokenSubnetActor);
-        SubnetID memory tokenSubnetName = SubnetID({root: ROOTNET_CHAINID, route: tokenSubnetPath});
-        GatewayDiamond tokenSubnetGateway = createGatewayDiamond(gatewayParams(tokenSubnetName));
 
         address[] memory nativeSubnetPath = new address[](1);
         nativeSubnetPath[0] = address(rootNativeSubnetActor);
@@ -93,6 +93,34 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             path: nativeSubnetPath
         });
 
+        token = new ERC20PresetFixedSupply("TestToken", "TEST", 1_000_000, address(this));
+        tokenSubnet = createTokenSubnet(address(token), address(rootGateway), rootSubnetName);
+
+        deflationaryToken = new ERC20Deflationary("DeflationaryToken", "DFT", 1_000_000, address(this), 50);
+        deflationaryTokenSubnet = createTokenSubnet(address(deflationaryToken), address(rootGateway), rootSubnetName);
+
+        inflationaryToken = new ERC20Inflationary("InflationaryToken", "IFT", 1_000_000, address(this), 100);
+        inflationaryTokenSubnet = createTokenSubnet(address(inflationaryToken), address(rootGateway), rootSubnetName);
+
+        nilToken = new ERC20Nil("NilToken", "NFT", 1_000_000, address(this));
+        nilTokenSubnet = createTokenSubnet(address(nilToken), address(rootGateway), rootSubnetName);
+
+        printActors();
+    }
+
+    function createTokenSubnet(
+        address tokenAddress,
+        address rootGatewayAddress,
+        SubnetID memory rootSubnetName
+    ) internal returns (TestSubnetDefinition memory tokenSubnet) {
+        SubnetActorDiamond rootTokenSubnetActor = createSubnetActor(
+            defaultSubnetActorParamsWith(rootGatewayAddress, rootSubnetName, tokenAddress)
+        );
+        address[] memory tokenSubnetPath = new address[](1);
+        tokenSubnetPath[0] = address(rootTokenSubnetActor);
+        SubnetID memory tokenSubnetName = SubnetID({root: ROOTNET_CHAINID, route: tokenSubnetPath});
+        GatewayDiamond tokenSubnetGateway = createGatewayDiamond(gatewayParams(tokenSubnetName));
+
         tokenSubnet = TestSubnetDefinition({
             gateway: tokenSubnetGateway,
             gatewayAddr: address(tokenSubnetGateway),
@@ -101,8 +129,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             subnetActorAddr: address(rootTokenSubnetActor),
             path: tokenSubnetPath
         });
-
-        printActors();
     }
 
     //--------------------
@@ -306,6 +332,125 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         executeTopDownMsgs(msgs, tokenSubnet.id, tokenSubnet.gateway);
 
         assertEq(recipient.balance, amount);
+    }
+
+    function testMultiSubnet_DeflationaryErc20_ReleaseFromChildToParent() public {
+        address caller = address(new MockIpcContract());
+        address recipient = address(new MockIpcContractPayable());
+        uint256 amount = 4096;
+
+        deflationaryToken.transfer(caller, amount);
+        assertEq(deflationaryToken.balanceOf(caller), amount / 2);
+
+        vm.prank(caller);
+        deflationaryToken.approve(rootSubnet.gatewayAddr, amount);
+
+        vm.deal(deflationaryTokenSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT);
+        vm.deal(caller, 1 ether);
+
+        vm.prank(deflationaryTokenSubnet.subnetActorAddr);
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, deflationaryTokenSubnet.subnetActorAddr, rootSubnet.gateway);
+
+        vm.prank(caller);
+        vm.expectRevert(); // half of tokens burned on transfer
+        rootSubnet.gateway.manager().fundWithToken(
+            deflationaryTokenSubnet.id,
+            FvmAddressHelper.from(address(caller)),
+            amount
+        );
+
+        vm.prank(caller);
+        rootSubnet.gateway.manager().fundWithToken(
+            deflationaryTokenSubnet.id,
+            FvmAddressHelper.from(address(caller)),
+            amount / 2
+        );
+
+        assertEq(deflationaryToken.balanceOf(caller), 0);
+        assertEq(deflationaryToken.balanceOf(rootSubnet.gatewayAddr), amount / 4);
+        assertEq(getSubnetCircSupplyGW(deflationaryTokenSubnet.id, rootSubnet.gateway), amount / 4);
+
+        GatewayManagerFacet manager = deflationaryTokenSubnet.gateway.manager();
+        uint256 releaseAmount = amount / 2 / 2;
+
+        vm.prank(caller);
+        manager.release{value: releaseAmount}(FvmAddressHelper.from(address(recipient)));
+
+        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+            deflationaryTokenSubnet.id,
+            deflationaryTokenSubnet.gateway
+        );
+
+        submitBottomUpCheckpoint(checkpoint, deflationaryTokenSubnet.subnetActor);
+
+        assertEq(deflationaryToken.balanceOf(recipient), releaseAmount / 2);
+        assertEq(deflationaryToken.balanceOf(rootSubnet.gatewayAddr), 0);
+        assertEq(getSubnetCircSupplyGW(deflationaryTokenSubnet.id, rootSubnet.gateway), 0);
+    }
+
+    function testMultiSubnet_InflationaryErc20_ReleaseFromChildToParent() public {
+        address caller = address(new MockIpcContract());
+        address recipient = address(new MockIpcContractPayable());
+        uint256 amount = 4096;
+
+        inflationaryToken.transfer(caller, amount);
+        vm.prank(caller);
+        inflationaryToken.approve(rootSubnet.gatewayAddr, amount * 2);
+
+        vm.deal(inflationaryTokenSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT);
+        vm.deal(caller, 1 ether);
+
+        vm.prank(inflationaryTokenSubnet.subnetActorAddr);
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, inflationaryTokenSubnet.subnetActorAddr, rootSubnet.gateway);
+
+        vm.prank(caller);
+        rootSubnet.gateway.manager().fundWithToken(
+            inflationaryTokenSubnet.id,
+            FvmAddressHelper.from(address(caller)),
+            amount * 2
+        );
+
+        assertEq(inflationaryToken.balanceOf(caller), 0);
+        assertEq(inflationaryToken.balanceOf(rootSubnet.gatewayAddr), amount * 4);
+        assertEq(getSubnetCircSupplyGW(inflationaryTokenSubnet.id, rootSubnet.gateway), amount * 4);
+
+        GatewayManagerFacet manager = inflationaryTokenSubnet.gateway.manager();
+        uint256 releaseAmount = amount * 2 * 2;
+
+        vm.prank(caller);
+        manager.release{value: releaseAmount}(FvmAddressHelper.from(address(recipient)));
+
+        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+            inflationaryTokenSubnet.id,
+            inflationaryTokenSubnet.gateway
+        );
+
+        submitBottomUpCheckpoint(checkpoint, inflationaryTokenSubnet.subnetActor);
+
+        assertEq(inflationaryToken.balanceOf(recipient), releaseAmount * 2);
+        assertEq(inflationaryToken.balanceOf(rootSubnet.gatewayAddr), 0);
+        assertEq(getSubnetCircSupplyGW(inflationaryTokenSubnet.id, rootSubnet.gateway), 0);
+    }
+
+    function testMultiSubnet_NilErc20_ReleaseFromChildToParent() public {
+        address caller = address(new MockIpcContract());
+        address recipient = address(new MockIpcContractPayable());
+        uint256 amount = 4096;
+
+        nilToken.transfer(caller, amount);
+        vm.prank(caller);
+        nilToken.approve(rootSubnet.gatewayAddr, amount);
+
+        vm.deal(nilTokenSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT);
+        vm.deal(caller, 1 ether);
+
+        vm.prank(nilTokenSubnet.subnetActorAddr);
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, nilTokenSubnet.subnetActorAddr, rootSubnet.gateway);
+
+        vm.prank(caller);
+        vm.expectRevert(SupplySourceHelper.NoBalanceIncrease.selector);
+        rootSubnet.gateway.manager().fundWithToken(nilTokenSubnet.id, FvmAddressHelper.from(address(caller)), amount);
+        assertEq(getSubnetCircSupplyGW(nilTokenSubnet.id, rootSubnet.gateway), 0);
     }
 
     function testMultiSubnet_Erc20_ReleaseResultOkFromParentToChild() public {

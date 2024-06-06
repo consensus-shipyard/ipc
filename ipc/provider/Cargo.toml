@@ -14,7 +14,9 @@ async-trait = { workspace = true }
 futures-util = { workspace = true }
 reqwest = { workspace = true }
 
+libsecp256k1 = { workspace = true }
 log = { workspace = true }
+tracing = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 cid = { workspace = true }

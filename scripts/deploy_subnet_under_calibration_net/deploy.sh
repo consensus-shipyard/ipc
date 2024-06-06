@@ -23,7 +23,6 @@ fi
 IPC_CONFIG_FOLDER=${HOME}/.ipc
 
 wallet_addresses=()
-address_pubkeys=()
 CMT_P2P_HOST_PORTS=(26656 26756 26856)
 CMT_RPC_HOST_PORTS=(26657 26757 26857)
 ETHAPI_HOST_PORTS=(8545 8645 8745)
@@ -199,25 +198,16 @@ subnet_folder=$IPC_CONFIG_FOLDER/$(echo $subnet_id | sed 's|^/||;s|/|-|g')
 #subnet_id=/r314159/t410flp4jf7keqcf5bqogrkx4wpkygiskykcvpaigicq
 #echo "Use existing subnet id: $subnet_id"
 
-# Step 5.1: Use the new subnet ID to update IPC config file
+# Step 6: Use the new subnet ID to update IPC config file
 toml set ${IPC_CONFIG_FOLDER}/config.toml subnets[1].id $subnet_id > /tmp/config.toml.3
 cp /tmp/config.toml.3 ${IPC_CONFIG_FOLDER}/config.toml
-
-# Step 6: Generate pubkeys from addresses
-echo "$DASHES Generating pubkey for wallet addresses... $default_wallet_address"
-for i in {0..2}
-do
-  pubkey=$(ipc-cli wallet pub-key --wallet-type evm --address ${wallet_addresses[i]})
-  echo "Wallet $i address's pubkey: $pubkey"
-  address_pubkeys+=($pubkey)
-done
 
 # Step 7: Join subnet for addresses in wallet
 echo "$DASHES Join subnet for addresses in wallet..."
 for i in {0..2}
 do
   echo "Joining subnet ${subnet_id} for address ${wallet_addresses[i]}"
-  ipc-cli subnet join --from ${wallet_addresses[i]} --subnet $subnet_id --public-key ${address_pubkeys[i]} --initial-balance 1 --collateral 10
+  ipc-cli subnet join --from ${wallet_addresses[i]} --subnet $subnet_id --initial-balance 1 --collateral 10
 done
 
 # Step 8: Start validators

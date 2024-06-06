@@ -334,13 +334,21 @@ impl FinalityWithNull {
 
         if let Some(latest_height) = self.latest_height_in_cache()? {
             let r = latest_height >= proposal.height;
-            tracing::debug!(is_true = r, "incoming proposal height seen?");
+            tracing::debug!(
+                is_true = r,
+                latest_height,
+                proposal = proposal.height.to_string(),
+                "incoming proposal height seen?"
+            );
             // requires the incoming height cannot be more advanced than our trusted parent node
             Ok(r)
         } else {
             // latest height is not found, meaning we dont have any prefetched cache, we just be
             // strict and vote no simply because we don't know.
-            tracing::debug!("reject proposal, no data in cache");
+            tracing::debug!(
+                proposal = proposal.height.to_string(),
+                "reject proposal, no data in cache"
+            );
             Ok(false)
         }
     }

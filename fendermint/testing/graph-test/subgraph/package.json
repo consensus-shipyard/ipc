@@ -9,8 +9,8 @@
     "remove-local": "npx @graphprotocol/graph-cli remove --node http://localhost:8020/ Greeter",
     "deploy-local": "npx @graphprotocol/graph-cli deploy --node http://localhost:8020/ -l v0.0.1 --ipfs http://localhost:5001 Greeter",
     "test": "npx @graphprotocol/graph-cli test",
-    "graph-node": "docker-compose --file ./graph-node/docker-compose.yaml up -d",
-    "graph-local-clean": "docker-compose down -v && docker-compose rm -v && rm -rf data/ipfs data/postgres"
+    "graph-node": "docker compose --file ./graph-node/docker-compose.yaml up -d",
+    "graph-local-clean": "docker compose down -v && docker-compose rm -v && rm -rf data/ipfs data/postgres"
   },
   "dependencies": {
     "@graphprotocol/graph-cli": "0.45.2",

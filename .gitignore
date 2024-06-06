@@ -4,3 +4,4 @@ test-network
 nohup*
 .vscode
 .DS_Store
+node_modules/

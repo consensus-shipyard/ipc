@@ -19,6 +19,8 @@ use std::time::Duration;
 
 use fendermint_vm_genesis::{Power, Validator};
 
+pub use syncer::fetch_topdown_events;
+
 /// Query the parent finality from the block chain state.
 ///
 /// It returns `None` from queries until the ledger has been initialized.

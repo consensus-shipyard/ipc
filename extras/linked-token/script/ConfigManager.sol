@@ -5,8 +5,12 @@ pragma solidity 0.8.23;
 import {Script} from "forge-std/Script.sol";
 
 contract ConfigManager is Script {
-
     string private configPath = "config.json"; // Path to your JSON config file
+
+    function setOriginalToken(address originalToken) external {
+        // Log the address of the deployed contract implementation
+        writeConfig("OriginalToken", vm.toString(originalToken));
+    }
 
     // Reads a value from the JSON config
     function readConfig(string memory key) internal returns (bytes memory value) {
@@ -23,7 +27,6 @@ contract ConfigManager is Script {
         value = vm.parseJsonAddress(json, key);
     }
 
-
     // Writes a value to the JSON config
     function writeConfig(string memory key, string memory value) internal {
         // First, check if the file exists and read its contents
@@ -33,11 +36,11 @@ contract ConfigManager is Script {
             jsonData = vm.readFile(path);
         } else {
             // If the file doesn't exist, initialize an empty JSON object
-            jsonData = "{\"LinkedToken\":{\"USDCTest\":{}, \"LinkedTokenReplica\":{}, \"LinkedTokenController\":{}}}";
+            jsonData = '{"LinkedToken":{"OriginalToken":{}, "LinkedTokenReplicaProxy":{}, "LinkedTokenControllerProxy":{}, "LinkedTokenControllerImplementation":{}, "LinkedTokenReplicaImplementation":{}}}';
             vm.writeJson(jsonData, path);
         }
 
-        vm.writeJson( value, path, string.concat(".LinkedToken.", key));
+        vm.writeJson(value, path, string.concat(".LinkedToken.", key));
     }
 
     // Example usage within a script
@@ -51,4 +54,3 @@ contract ConfigManager is Script {
         bytes memory retrievedValue = readConfig(exampleKey);
     }
 }
-

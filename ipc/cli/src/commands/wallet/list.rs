@@ -27,7 +27,7 @@ impl CommandLineHandler for WalletList {
                     if *address == EthKeyAddress::default() {
                         continue;
                     }
-                    print!("Address: {}", address.to_string());
+                    print!("Address: {}", address);
 
                     let key_info = wallet.read().unwrap().get(address)?.unwrap();
                     let sk = libsecp256k1::SecretKey::parse_slice(key_info.private_key())?;
