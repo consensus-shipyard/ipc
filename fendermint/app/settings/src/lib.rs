@@ -287,7 +287,7 @@ pub struct Settings {
     pub resolver: ResolverSettings,
     pub broadcast: BroadcastSettings,
     pub ipc: IpcSettings,
-    pub testing: Option<TestingSettings>,    
+    pub testing: Option<TestingSettings>,
     pub object_api: ObjectAPISettings,
 }
 
