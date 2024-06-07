@@ -214,7 +214,7 @@ impl DockerNode {
                         --builtin-actors-path /fendermint/bundle.car \
                         --custom-actors-path /fendermint/custom_actors_bundle.car \
                         --artifacts-path /fendermint/contracts \
-                        --out-path /cometbft/config/sealed.json \
+                        --output-path /cometbft/config/sealed.json \
                     ",
             )
             .await
