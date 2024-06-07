@@ -36,7 +36,6 @@ use std::{
     str::FromStr,
     time::Duration,
 };
-use tempfile::NamedTempFile;
 use url::Url;
 
 use crate::{
@@ -348,15 +347,15 @@ impl DockerMaterializer {
         export_json(self.state_path(), &self.state).context("failed to export state")
     }
 
-    fn seal_genesis(&self, genesis: Genesis, out: PathBuf) -> anyhow::Result<()> {
+    async fn seal_genesis(&self, genesis: Genesis, out: PathBuf) -> anyhow::Result<()> {
         let genesis_creator = GenesisCreator::new(
             builtin_bundle_path(),
             custom_bundle_path(),
             ipc_artifacts_path(),
             out
         );
-        genesis_creator.create(genesis)?;
-        Ok(tmp_file)
+
+        genesis_creator.create(genesis).await
     }
 
     /// Return an existing genesis by parsing it from the `genesis.json` of the subnet,
@@ -982,7 +981,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         self.seal_genesis(
             genesis.clone(),
             PathBuf::from_str("/cometbft/config/sealed.json")?
-        )?;
+        ).await?;
 
         let genesis = DefaultGenesis {
             name: subnet.name.clone(),
