@@ -3088,6 +3088,7 @@ dependencies = [
  "fendermint_vm_core",
  "fendermint_vm_encoding",
  "fendermint_vm_genesis",
+ "fendermint_vm_interpreter",
  "fendermint_vm_message",
  "futures",
  "fvm_shared",

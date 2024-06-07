@@ -36,6 +36,7 @@ use std::{
     str::FromStr,
     time::Duration,
 };
+use tempfile::NamedTempFile;
 use url::Url;
 
 use crate::{
@@ -59,6 +60,7 @@ mod relayer;
 mod runner;
 
 pub use dropper::DropPolicy;
+use fendermint_vm_interpreter::genesis::GenesisCreator;
 pub use network::DockerNetwork;
 pub use node::DockerNode;
 pub use relayer::DockerRelayer;
@@ -344,6 +346,17 @@ impl DockerMaterializer {
     /// Write the state to a JSON file.
     fn save_state(&self) -> anyhow::Result<()> {
         export_json(self.state_path(), &self.state).context("failed to export state")
+    }
+
+    fn seal_genesis(&self, genesis: Genesis, out: PathBuf) -> anyhow::Result<()> {
+        let genesis_creator = GenesisCreator::new(
+            builtin_bundle_path(),
+            custom_bundle_path(),
+            ipc_artifacts_path(),
+            out
+        );
+        genesis_creator.create(genesis)?;
+        Ok(tmp_file)
     }
 
     /// Return an existing genesis by parsing it from the `genesis.json` of the subnet,
@@ -966,6 +979,11 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             .context("failed to read genesis.json")?
             .ok_or_else(|| anyhow!("genesis.json doesn't exist after fetching from parent"))?;
 
+        self.seal_genesis(
+            genesis.clone(),
+            PathBuf::from_str("/cometbft/config/sealed.json")?
+        )?;
+
         let genesis = DefaultGenesis {
             name: subnet.name.clone(),
             genesis,
@@ -1047,6 +1065,33 @@ fn current_network() -> &'static str {
 /// container can be owned by the same user, rather than root.
 fn user_id(path: impl AsRef<Path>) -> anyhow::Result<u32> {
     Ok(path.as_ref().metadata()?.uid())
+}
+
+/// Path to the builtin-actor bundle, indended to be used in tests.
+pub fn builtin_bundle_path() -> PathBuf {
+    let bundle_path = std::env::var("FM_BUILTIN_ACTORS_BUNDLE").unwrap_or_else(|_| {
+        String::from("/fendermint/bundle.car")
+    });
+
+    PathBuf::from_str(&bundle_path).expect("malformed bundle path")
+}
+
+/// Path to the custom actor bundle, intended to be used in tests.
+pub fn custom_bundle_path() -> PathBuf {
+    let custom_actors_bundle_path = std::env::var("FM_CUSTOM_ACTORS_BUNDLE").unwrap_or_else(|_| {
+            String::from("/fendermint/custom_actors_bundle.car")
+    });
+
+    PathBuf::from_str(&custom_actors_bundle_path).expect("malformed custom actors bundle path")
+}
+
+/// Path to the ipc artifacts, intended to be used in tests.
+pub fn ipc_artifacts_path() -> PathBuf {
+    let ipc_artifacts_path = std::env::var("FM_IPC_ARTIFACTS").unwrap_or_else(|_| {
+        String::from("/fendermint/contracts")
+    });
+
+    PathBuf::from_str(&ipc_artifacts_path).expect("malformed ipc artifacts path")
 }
 
 #[cfg(test)]

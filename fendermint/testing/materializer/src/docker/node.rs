@@ -212,6 +212,7 @@ impl DockerNode {
                     --genesis-file /fendermint/genesis.json \
                     into-tendermint \
                     --out /cometbft/config/genesis.json \
+                    --sealed /cometbft/config/sealed.json \
                     ",
             )
             .await
