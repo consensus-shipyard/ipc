@@ -77,6 +77,8 @@ async fn test_sent_tx_found_in_mempool() {
 
                 let tx_hash = pending.tx_hash();
 
+                tracing::info!("sent pending txn {:?}", tx_hash);
+
                 // We expect that the transaction is pending, however it should not return an error.
                 match middleware.get_transaction(tx_hash).await {
                     Ok(Some(_)) => {}
