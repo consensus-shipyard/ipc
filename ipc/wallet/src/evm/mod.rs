@@ -119,7 +119,6 @@ impl From<EthKeyAddress> for ethers::types::Address {
     }
 }
 
-#[allow(clippy::to_string_trait_impl)]
 #[cfg(feature = "with-ethers")]
 impl Display for EthKeyAddress {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
