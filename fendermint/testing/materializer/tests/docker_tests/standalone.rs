@@ -66,6 +66,8 @@ async fn test_sent_tx_found_in_mempool() {
                     .await
                     .context("failed to set up middleware")?;
 
+                tracing::info!("middleware ready, pending tests");
+
                 // Create the simplest transaction possible: send tokens between accounts.
                 let to: H160 = charlie.eth_addr().into();
                 let transfer = Eip1559TransactionRequest::new().to(to).value(1);
