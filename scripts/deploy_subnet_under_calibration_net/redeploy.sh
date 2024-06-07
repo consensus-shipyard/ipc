@@ -31,7 +31,7 @@ CMT_P2P_HOST_PORTS=(26656 26756 26856)
 CMT_RPC_HOST_PORTS=(26657 26757 26857)
 ETHAPI_HOST_PORTS=(8545 8645 8745)
 RESOLVER_HOST_PORTS=(26655 26755 26855)
-OBJECT_API_HOST_PORTS=(8001 8002 8003)
+OBJECTS_HOST_PORTS=(8001 8002 8003)
 IPFS_SWARM_HOST_PORTS=(4001 4002 4003)
 IPFS_RPC_HOST_PORTS=(5001 5002 5003)
 IPFS_GATEWAY_HOST_PORTS=(8080 8081 8082)
@@ -182,7 +182,7 @@ do
       -e CMT_RPC_HOST_PORT=${CMT_RPC_HOST_PORTS[i]} \
       -e ETHAPI_HOST_PORT=${ETHAPI_HOST_PORTS[i]} \
       -e RESOLVER_HOST_PORT=${RESOLVER_HOST_PORTS[i]} \
-      -e OBJECT_API_HOST_PORT=${OBJECT_API_HOST_PORTS[i]} \
+      -e OBJECTS_HOST_PORT=${OBJECTS_HOST_PORTS[i]} \
       -e IPFS_SWARM_HOST_PORT=${IPFS_SWARM_HOST_PORTS[i]} \
       -e IPFS_RPC_HOST_PORT=${IPFS_RPC_HOST_PORTS[i]} \
       -e IPFS_GATEWAY_HOST_PORT=${IPFS_GATEWAY_HOST_PORTS[i]} \
@@ -216,7 +216,7 @@ done
 printf "\n$DASHES Test Object API endpoints of validator nodes\n"
 for i in {0..2}
 do
-  curl --location http://localhost:${OBJECT_API_HOST_PORTS[i]}/health
+  curl --location http://localhost:${OBJECTS_HOST_PORTS[i]}/health
 done
 
 # Step 6: Start a relayer process
@@ -237,9 +237,9 @@ Subnet ID:
 $subnet_id
 
 Object API:
-http://localhost:${OBJECT_API_HOST_PORTS[0]}
-http://localhost:${OBJECT_API_HOST_PORTS[1]}
-http://localhost:${OBJECT_API_HOST_PORTS[2]}
+http://localhost:${OBJECTS_HOST_PORTS[0]}
+http://localhost:${OBJECTS_HOST_PORTS[1]}
+http://localhost:${OBJECTS_HOST_PORTS[2]}
 
 IPFS API:
 http://localhost:${IPFS_RPC_HOST_PORTS[0]}

@@ -59,7 +59,7 @@ dependencies = [
     "cometbft-start",
     "cometbft-wait",
     "ethapi-start",
-    "object-api-start",
+    "objects-start",
     "ipfs-start",
     "node-report",
 ]
@@ -79,7 +79,7 @@ dependencies = [
     "cometbft-start",
     "cometbft-wait",
     "ethapi-start",
-    "object-api-start",
+    "objects-start",
     "ipfs-start",
     "node-report",
 ]
@@ -89,13 +89,13 @@ run_task = { name = [
     "cometbft-destroy",
     "fendermint-destroy",
     "ethapi-destroy",
-    "object-api-destroy",
+    "objects-destroy",
     "ipfs-destroy",
     "fendermint-start-validator",
     "cometbft-start",
     "cometbft-wait",
     "ethapi-start",
-    "object-api-start",
+    "objects-start",
     "ipfs-start",
     "node-report",
 ] }
@@ -105,13 +105,13 @@ run_task = { name = [
     "cometbft-destroy",
     "fendermint-destroy",
     "ethapi-destroy",
-    "object-api-destroy",
+    "objects-destroy",
     "ipfs-destroy",
     "fendermint-start-validator-no-parent",
     "cometbft-start",
     "cometbft-wait",
     "ethapi-start",
-    "object-api-start",
+    "objects-start",
     "ipfs-start",
     "node-report",
 ] }
@@ -136,7 +136,7 @@ dependencies = [
     "cometbft-start",
     "cometbft-wait",
     "ethapi-start",
-    "object-api-start",
+    "objects-start",
     "ipfs-start",
     "node-report",
 ]
@@ -198,7 +198,7 @@ Subnet ID:
 \t${SUBNET_ID}
 
 Object API:
-\thttp://0.0.0.0:${OBJECT_API_HOST_PORT}
+\thttp://0.0.0.0:${OBJECTS_HOST_PORT}
 
 IPFS API:
 \thttp://0.0.0.0:${IPFS_RPC_HOST_PORT}

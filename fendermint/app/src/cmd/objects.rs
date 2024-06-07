@@ -31,7 +31,7 @@ use warp::{
 };
 
 use fendermint_actor_objectstore::{GetParams, ListParams};
-use fendermint_app_settings::object_api::ObjectAPISettings;
+use fendermint_app_settings::objects::ObjectsSettings;
 use fendermint_rpc::{client::FendermintClient, tx::CallClient};
 use fendermint_vm_message::query::FvmQueryHeight;
 use fvm_shared::chainid::ChainID;
@@ -39,16 +39,16 @@ use fvm_shared::chainid::ChainID;
 use super::rpc::{gas_params, TransClient};
 use crate::cmd;
 use crate::options::{
-    object_api::{ObjectAPIArgs, ObjectAPICommands},
+    objects::{ObjectsArgs, ObjectsCommands},
     rpc::TransArgs,
 };
 
 const MAX_OBJECT_LENGTH: u64 = 1024 * 1024 * 1024;
 
 cmd! {
-    ObjectAPIArgs(self, settings: ObjectAPISettings) {
+    ObjectsArgs(self, settings: ObjectsSettings) {
         match self.command.clone() {
-            ObjectAPICommands::Run { tendermint_url, ipfs_addr, args} => {
+            ObjectsCommands::Run { tendermint_url, ipfs_addr, args} => {
                 let client = FendermintClient::new_http(tendermint_url, None)?;
                 let ipfs = IpfsClient::from_multiaddr_str(&ipfs_addr)?;
                 let ipfs_adapter = Ipfs { inner: ipfs.clone() };
@@ -142,16 +142,16 @@ struct ListQuery {
 }
 
 #[derive(Debug, Error)]
-enum ObjectAPIError {
+enum ObjectsError {
     #[error("error parsing range header: `{0}`")]
     RangeHeaderParseError(ParseIntError),
     #[error("invalid range header")]
     RangeHeaderInvalid,
 }
 
-impl From<ParseIntError> for ObjectAPIError {
+impl From<ParseIntError> for ObjectsError {
     fn from(err: ParseIntError) -> Self {
-        ObjectAPIError::RangeHeaderParseError(err)
+        ObjectsError::RangeHeaderParseError(err)
     }
 }
 
@@ -397,14 +397,14 @@ async fn handle_object_upload<F: QueryClient, I: IpfsApiAdapter>(
     Ok(cid.to_string())
 }
 
-fn get_range_params(range: String, size: u64) -> Result<(u64, u64), ObjectAPIError> {
+fn get_range_params(range: String, size: u64) -> Result<(u64, u64), ObjectsError> {
     let range: Vec<String> = range
         .replace("bytes=", "")
         .split('-')
         .map(|n| n.to_string())
         .collect();
     if range.len() != 2 {
-        return Err(ObjectAPIError::RangeHeaderInvalid);
+        return Err(ObjectsError::RangeHeaderInvalid);
     }
     let (start, end): (u64, u64) = match (!range[0].is_empty(), !range[1].is_empty()) {
         (true, true) => (range[0].parse::<u64>()?, range[1].parse::<u64>()?),
@@ -420,7 +420,7 @@ fn get_range_params(range: String, size: u64) -> Result<(u64, u64), ObjectAPIErr
         (false, false) => (0, size - 1),
     };
     if start > end || end >= size {
-        return Err(ObjectAPIError::RangeHeaderInvalid);
+        return Err(ObjectsError::RangeHeaderInvalid);
     }
     Ok((start, end))
 }

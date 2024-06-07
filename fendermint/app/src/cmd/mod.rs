@@ -16,7 +16,7 @@ pub mod eth;
 pub mod genesis;
 pub mod key;
 pub mod materializer;
-pub mod object_api;
+pub mod objects;
 pub mod rpc;
 pub mod run;
 
@@ -71,7 +71,7 @@ pub async fn exec(opts: &Options) -> anyhow::Result<()> {
         Commands::Rpc(args) => args.exec(()).await,
         Commands::Eth(args) => args.exec(settings(opts)?.eth).await,
         Commands::Materializer(args) => args.exec(()).await,
-        Commands::ObjectAPI(args) => args.exec(settings(opts)?.object_api).await,
+        Commands::Objects(args) => args.exec(settings(opts)?.objects).await,
     }
 }
 

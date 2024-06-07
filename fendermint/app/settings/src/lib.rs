@@ -21,13 +21,13 @@ use fendermint_vm_topdown::BlockHeight;
 
 use self::eth::EthSettings;
 use self::fvm::FvmSettings;
-use self::object_api::ObjectAPISettings;
+use self::objects::ObjectsSettings;
 use self::resolver::ResolverSettings;
 use ipc_provider::config::deserialize::deserialize_eth_address_from_str;
 
 pub mod eth;
 pub mod fvm;
-pub mod object_api;
+pub mod objects;
 pub mod resolver;
 pub mod testing;
 pub mod utils;
@@ -288,7 +288,7 @@ pub struct Settings {
     pub broadcast: BroadcastSettings,
     pub ipc: IpcSettings,
     pub testing: Option<TestingSettings>,
-    pub object_api: ObjectAPISettings,
+    pub objects: ObjectsSettings,
 }
 
 impl Settings {

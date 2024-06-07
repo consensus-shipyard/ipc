@@ -12,7 +12,7 @@ use tracing_subscriber::EnvFilter;
 
 use self::{
     eth::EthArgs, genesis::GenesisArgs, key::KeyArgs, materializer::MaterializerArgs,
-    object_api::ObjectAPIArgs, rpc::RpcArgs, run::RunArgs,
+    objects::ObjectsArgs, rpc::RpcArgs, run::RunArgs,
 };
 
 pub mod config;
@@ -21,7 +21,7 @@ pub mod eth;
 pub mod genesis;
 pub mod key;
 pub mod materializer;
-pub mod object_api;
+pub mod objects;
 pub mod rpc;
 pub mod run;
 
@@ -200,7 +200,7 @@ pub enum Commands {
     #[clap(aliases  = &["mat", "matr", "mate"])]
     Materializer(MaterializerArgs),
     /// Object API for data repos
-    ObjectAPI(ObjectAPIArgs),
+    Objects(ObjectsArgs),
 }
 
 #[cfg(test)]

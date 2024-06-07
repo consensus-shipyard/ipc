@@ -151,11 +151,11 @@ allowed_methods = []
 allowed_headers = []
 
 # Object API facade
-[object_api]
+[objects]
 
-[object_api.listen]
+[objects.listen]
 # Only accept local connections by default.
-host = "0.0.0.0"
+host = "127.0.0.1"
 port = 8001
 
 # IPLD Resolver Configuration

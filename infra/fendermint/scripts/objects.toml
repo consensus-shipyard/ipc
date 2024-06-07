@@ -1,13 +1,13 @@
-[tasks.object-api-run]
+[tasks.objects-run]
 script = """
 docker run \
   ${FLAGS} \
-  --name ${OBJECT_API_CONTAINER_NAME} \
+  --name ${OBJECTS_CONTAINER_NAME} \
   --init \
   --user $(id -u) \
   --network ${NETWORK_NAME} \
   --volume ${BASE_DIR}:/data \
-  --publish ${OBJECT_API_HOST_PORT}:8001 \
+  --publish ${OBJECTS_HOST_PORT}:8001 \
   --env FM_CHAIN_NAME=${SUBNET_ID} \
   --env FM_PROXY_SECRET_KEY=/data/${NODE_NAME}/${PROXY_PRIV_KEY_PATH} \
   --env FM_PROXY_ACCOUNT_KIND=ethereum \
@@ -15,7 +15,7 @@ docker run \
   --env FM_PROXY_SEQUENCE=0 \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
   --env IPFS_RPC_ADDR=/dns4/${IPFS_CONTAINER_NAME}/tcp/5001 \
-  --env LOG_LEVEL=${OBJECT_API_LOG_LEVEL} \
+  --env LOG_LEVEL=${OBJECTS_LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
   ${FM_DOCKER_IMAGE} \
   --network=${FM_NETWORK} \
@@ -23,18 +23,18 @@ docker run \
 """
 dependencies = ["docker-network-create"]
 
-[tasks.object-api-start]
-extend = "object-api-run"
-env = { "CMD" = "object-api run", "FLAGS" = "-d" }
+[tasks.objects-start]
+extend = "objects-run"
+env = { "CMD" = "objects run", "FLAGS" = "-d" }
 
-[tasks.object-api-stop]
-env = { "CONTAINER_NAME" = "${OBJECT_API_CONTAINER_NAME}" }
+[tasks.objects-stop]
+env = { "CONTAINER_NAME" = "${OBJECTS_CONTAINER_NAME}" }
 run_task = "docker-stop"
 
-[tasks.object-api-destroy]
-env = { "CONTAINER_NAME" = "${OBJECT_API_CONTAINER_NAME}" }
+[tasks.objects-destroy]
+env = { "CONTAINER_NAME" = "${OBJECTS_CONTAINER_NAME}" }
 run_task = "docker-destroy"
 
-[tasks.object-api-logs]
+[tasks.objects-logs]
 extend = "docker-logs"
-env = { "CONTAINER_NAME" = "${OBJECT_API_CONTAINER_NAME}" }
+env = { "CONTAINER_NAME" = "${OBJECTS_CONTAINER_NAME}" }

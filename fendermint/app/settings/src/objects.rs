@@ -10,6 +10,6 @@ use crate::SocketAddress;
 /// Object API facade settings.
 #[serde_as]
 #[derive(Debug, Deserialize, Clone)]
-pub struct ObjectAPISettings {
+pub struct ObjectsSettings {
     pub listen: SocketAddress,
 }
