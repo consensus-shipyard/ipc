@@ -352,7 +352,7 @@ impl DockerMaterializer {
             builtin_bundle_path(),
             custom_bundle_path(),
             ipc_artifacts_path(),
-            out
+            out,
         );
 
         genesis_creator.create(genesis).await
@@ -978,10 +978,8 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             .context("failed to read genesis.json")?
             .ok_or_else(|| anyhow!("genesis.json doesn't exist after fetching from parent"))?;
 
-        self.seal_genesis(
-            genesis.clone(),
-            PathBuf::from_str("/cometbft/config/sealed.json")?
-        ).await?;
+        self.seal_genesis(genesis.clone(), self.path(&subnet.name).join("sealed.json"))
+            .await?;
 
         let genesis = DefaultGenesis {
             name: subnet.name.clone(),
@@ -1068,27 +1066,24 @@ fn user_id(path: impl AsRef<Path>) -> anyhow::Result<u32> {
 
 /// Path to the builtin-actor bundle, indended to be used in tests.
 pub fn builtin_bundle_path() -> PathBuf {
-    let bundle_path = std::env::var("FM_BUILTIN_ACTORS_BUNDLE").unwrap_or_else(|_| {
-        String::from("/fendermint/bundle.car")
-    });
+    let bundle_path = std::env::var("FM_BUILTIN_ACTORS_BUNDLE")
+        .unwrap_or_else(|_| String::from("/fendermint/bundle.car"));
 
     PathBuf::from_str(&bundle_path).expect("malformed bundle path")
 }
 
 /// Path to the custom actor bundle, intended to be used in tests.
 pub fn custom_bundle_path() -> PathBuf {
-    let custom_actors_bundle_path = std::env::var("FM_CUSTOM_ACTORS_BUNDLE").unwrap_or_else(|_| {
-            String::from("/fendermint/custom_actors_bundle.car")
-    });
+    let custom_actors_bundle_path = std::env::var("FM_CUSTOM_ACTORS_BUNDLE")
+        .unwrap_or_else(|_| String::from("/fendermint/custom_actors_bundle.car"));
 
     PathBuf::from_str(&custom_actors_bundle_path).expect("malformed custom actors bundle path")
 }
 
 /// Path to the ipc artifacts, intended to be used in tests.
 pub fn ipc_artifacts_path() -> PathBuf {
-    let ipc_artifacts_path = std::env::var("FM_IPC_ARTIFACTS").unwrap_or_else(|_| {
-        String::from("/fendermint/contracts")
-    });
+    let ipc_artifacts_path =
+        std::env::var("FM_IPC_ARTIFACTS").unwrap_or_else(|_| String::from("/fendermint/contracts"));
 
     PathBuf::from_str(&ipc_artifacts_path).expect("malformed ipc artifacts path")
 }

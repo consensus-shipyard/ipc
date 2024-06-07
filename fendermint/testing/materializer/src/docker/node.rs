@@ -205,6 +205,21 @@ impl DockerNode {
 
         export_file(keys_dir.join(COMETBFT_NODE_ID), cometbft_node_id)?;
 
+        fendermint_runner
+            .run_cmd(
+                "genesis \
+                    --genesis-file /fendermint/genesis.json \
+                    ipc \
+                        seal-state \
+                        --builtin-actors-path /fendermint/bundle.car \
+                        --custom-actors-path /fendermint/custom_actors_bundle.car \
+                        --ipc-artifacts-path /fendermint/contracts \
+                        --out-path /cometbft/config/sealed.json \
+                    ",
+            )
+            .await
+            .context("failed to seal genesis state")?;
+
         // Convert fendermint genesis to cometbft.
         fendermint_runner
             .run_cmd(
