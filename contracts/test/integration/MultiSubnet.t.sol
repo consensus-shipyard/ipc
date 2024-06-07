@@ -29,7 +29,7 @@ import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 import {IntegrationTestBase, RootSubnetDefinition, TestSubnetDefinition} from "../IntegrationTestBase.sol";
 import {L2GatewayActorDiamond, L1GatewayActorDiamond} from "../IntegrationTestPresets.sol";
 import {TestUtils, MockIpcContract, MockIpcContractPayable, MockIpcContractRevert, MockIpcContractFallback} from "../helpers/TestUtils.sol";
-import {FilAddress} from "fevmate/utils/FilAddress.sol";
+import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
 
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
