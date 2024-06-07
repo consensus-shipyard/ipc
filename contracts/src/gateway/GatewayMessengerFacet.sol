@@ -8,7 +8,7 @@ import {SubnetID, SupplyKind, IPCAddress} from "../structs/Subnet.sol";
 import {InvalidXnetMessage, InvalidXnetMessageReason, CannotSendCrossMsgToItself, MethodNotAllowed} from "../errors/IPCErrors.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
-import {FilAddress} from "fevmate/utils/FilAddress.sol";
+import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {SupplySourceHelper} from "../lib/SupplySourceHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";

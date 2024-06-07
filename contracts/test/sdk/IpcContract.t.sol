@@ -11,7 +11,7 @@ import {SubnetID, Subnet, IPCAddress, Validator} from "../../src/structs/Subnet.
 import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
-import {FilAddress} from "fevmate/utils/FilAddress.sol";
+import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {IpcExchange} from "../../sdk/IpcContract.sol";
 import {IIpcHandler} from "../../sdk/interfaces/IIpcHandler.sol";
 import {IGateway} from "../../src/interfaces/IGateway.sol";

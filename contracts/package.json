@@ -1,32 +1,47 @@
 {
-    "name": "ipc-solidity-actors",
-    "version": "0.0.1",
+    "name": "@consensus-shipyard/ipc-contracts",
+    "version": "1.0.0-alpha.0",
     "description": "This repository includes the reference implementation of all the actors (i.e. smart contracts) responsible for the operation of the IPC (i.e. Inter-Planetary Consensus) protocol. These actors are written in Solidity and target FileCoin’s FEVM.",
-    "main": "index.js",
+    "author": "ConsensusLab, Protocol Labs, Filecoin Core Devs, Limechain",
     "directories": {
         "lib": "lib",
         "test": "test"
     },
+    "files": [
+        "contracts",
+        "sdk",
+        "README.md",
+        "LICENSE-APACHE",
+        "LICENSE-MIT"
+    ],
     "scripts": {
+        "prepack": "node scripts/npm-prepack.js",
+        "postpack": "node scripts/npm-postpack.js",
         "test": "echo \"Error: no test specified\" && exit 1"
     },
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/consensus-shipyard/ipc-solidity-actors.git"
+        "url": "git+https://github.com/consensus-shipyard/ipc.git"
     },
-    "author": "Limechain team, ConsensusLab, Protocol Labs, Filecoin Core Devs",
+    "publishConfig": {
+        "registry": "https://npm.pkg.github.com"
+    },
     "license": "MIT OR Apache-2.0",
     "bugs": {
-        "url": "https://github.com/consensus-shipyard/ipc-solidity-actors/issues"
+        "url": "https://github.com/consensus-shipyard/ipc/issues"
     },
-    "homepage": "https://github.com/consensus-shipyard/ipc-solidity-actors/",
+    "homepage": "https://github.com/consensus-shipyard/ipc/",
     "devDependencies": {
         "@nomicfoundation/hardhat-foundry": "^1.0.1",
         "@nomiclabs/hardhat-ethers": "^2.2.3",
+        "@openzeppelin/contracts": "5.0.1",
         "@typechain/ethers-v5": "^11.1.2",
         "@typechain/hardhat": "^7.0.0",
         "dotenv": "^16.0.1",
+        "elliptic-curve-solidity": "github:witnet/elliptic-curve-solidity#3475478",
         "ethers": "^5.7.0",
+        "fevmate": "github:wadealexc/fevmate#6a80e98",
+        "fs-extra": "^11.2.0",
         "hardhat-contract-sizer": "^2.6.1",
         "hardhat-deploy": "^0.11.14",
         "hardhat-deploy-ethers": "^0.3.0-beta.13",
