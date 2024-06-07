@@ -213,7 +213,7 @@ impl DockerNode {
                         seal-state \
                         --builtin-actors-path /fendermint/bundle.car \
                         --custom-actors-path /fendermint/custom_actors_bundle.car \
-                        --ipc-artifacts-path /fendermint/contracts \
+                        --artifacts-path /fendermint/contracts \
                         --out-path /cometbft/config/sealed.json \
                     ",
             )
