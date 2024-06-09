@@ -3,7 +3,7 @@
 
 default:
 	cd contracts && make gen
-	cargo build --release
+	cargo build --locked --release
 	./target/release/ipc-cli --version
 	./target/release/fendermint --version
 

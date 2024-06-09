@@ -91,15 +91,15 @@
     "validators": [
       {
         "power": "10000000000000000000",
-        "public_key": "FILL IN"
+        "public_key": "BJx8VHF1bKOITlJGnZdadq1xUOuq1h3az/z6VY7S2i3yUBea2gdH6kT66b4/ehatIQ8sT3wFt/f2q9MBg8moBJM="
       },
       {
         "power": "10000000000000000000",
-        "public_key": "FILL IN"
+        "public_key": "BO5yZjN0AsdR1QnkDABVV5cQx6y0LldZj7TwFfAA3ODJPekX1PgK0vB3U2SiM2nqY/sbHwwD7iT2Mi2Xn+zZmXY="
       },
       {
         "power": "10000000000000000000",
-        "public_key": "FILL IN"
+        "public_key": "BCoOpFqMTvFe5BtCj+7kjNxB4fnyWz3Amsg6rhBm10x/xj1yOpIy02SZNk3bm92vs9qA/A+fsu+UL4do1Pt2aRQ="
       }
     ]
   }
