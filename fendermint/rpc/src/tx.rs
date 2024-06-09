@@ -294,7 +294,7 @@ pub trait CallClient: QueryClient + BoundClient {
 
         let response = CallResponse {
             response,
-            return_data,
+            return_data: Some(return_data),
         };
 
         Ok(response)

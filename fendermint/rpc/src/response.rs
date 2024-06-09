@@ -113,8 +113,8 @@ pub fn decode_os_get(deliver_tx: &DeliverTx) -> anyhow::Result<Option<Object>> {
 }
 
 /// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as an [`ObjectList`].
-pub fn decode_os_list(deliver_tx: &DeliverTx) -> anyhow::Result<Option<ObjectList>> {
+pub fn decode_os_list(deliver_tx: &DeliverTx) -> anyhow::Result<ObjectList> {
     let data = decode_data(&deliver_tx.data)?;
-    fvm_ipld_encoding::from_slice::<Option<ObjectList>>(&data)
-        .map_err(|e| anyhow!("error parsing as Option<ObjectList>: {e}"))
+    fvm_ipld_encoding::from_slice::<ObjectList>(&data)
+        .map_err(|e| anyhow!("error parsing as ObjectList: {e}"))
 }
