@@ -410,7 +410,10 @@ where
         Genesis = Vec<u8>,
         Output = FvmGenesisOutput,
     >,
-    I: ProposalInterpreter<State = ChainEnv, Message = Vec<u8>>,
+    I: ProposalInterpreter<
+        State = (ChainEnv, FvmExecState<ReadOnlyBlockstore<SS>>),
+        Message = Vec<u8>,
+    >,
     I: ExecInterpreter<
         State = (ChainEnv, FvmExecState<SS>),
         Message = Vec<u8>,
@@ -641,11 +644,20 @@ where
             time = request.time.to_string(),
             "prepare proposal"
         );
+        let state = self.committed_state()?;
+        let exec_state = FvmExecState::new(
+            ReadOnlyBlockstore::new(self.state_store_clone()),
+            self.multi_engine.as_ref(),
+            state.block_height as ChainEpoch,
+            state.state_params,
+        )
+        .context("error creating execution state")?;
+
         let txs = request.txs.into_iter().map(|tx| tx.to_vec()).collect();
 
         let txs = self
             .interpreter
-            .prepare(self.chain_env.clone(), txs)
+            .prepare((self.chain_env.clone(), exec_state), txs)
             .await
             .context("failed to prepare proposal")?;
 
@@ -665,12 +677,21 @@ where
             time = request.time.to_string(),
             "process proposal"
         );
+        let state = self.committed_state()?;
+        let exec_state = FvmExecState::new(
+            ReadOnlyBlockstore::new(self.state_store_clone()),
+            self.multi_engine.as_ref(),
+            state.block_height as ChainEpoch,
+            state.state_params,
+        )
+        .context("error creating execution state")?;
+
         let txs: Vec<_> = request.txs.into_iter().map(|tx| tx.to_vec()).collect();
         let num_txs = txs.len();
 
         let accept = self
             .interpreter
-            .process(self.chain_env.clone(), txs)
+            .process((self.chain_env.clone(), exec_state), txs)
             .await
             .context("failed to process proposal")?;
 

@@ -63,6 +63,10 @@ impl Actor {
         Ok(())
     }
 
+    // Deleting an object removes the key from the store, but not from the underlying storage.
+    // So, we can't just delete it here via syscall.
+    // Once implemented, the DA mechanism may cause the data to be entangled with other data.
+    // The retention policies will handle deleting / GC.
     fn delete_object(rt: &impl Runtime, params: DeleteParams) -> Result<Cid, ActorError> {
         Self::ensure_write_allowed(rt)?;
 
@@ -71,17 +75,6 @@ impl Actor {
                 e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to delete object")
             })
         })?;
-
-        // Clean up external object storage if it existed.
-        if let Some(Object::External((v, _))) = res.0 {
-            objectstore_actor_sdk::cid_rm(v.0).map_err(|en| {
-                ActorError::checked(
-                    ExitCode::USR_ILLEGAL_STATE,
-                    format!("cid_rm syscall failed with {en}"),
-                    None,
-                )
-            })?;
-        }
         Ok(res.1)
     }
 

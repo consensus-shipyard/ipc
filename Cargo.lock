@@ -2935,7 +2935,6 @@ dependencies = [
  "fvm_shared",
  "num-derive 0.3.3",
  "num-traits",
- "objectstore_actor_sdk",
  "serde",
  "serde_tuple",
 ]
