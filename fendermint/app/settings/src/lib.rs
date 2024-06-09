@@ -332,7 +332,6 @@ impl Settings {
                     .with_list_parse_key("resolver.connection.external_addresses")
                     .with_list_parse_key("resolver.discovery.static_addresses")
                     .with_list_parse_key("resolver.membership.static_subnets")
-                    .with_list_parse_key("resolver.membership.static_subnets")
                     .with_list_parse_key("eth.cors.allowed_origins")
                     .with_list_parse_key("eth.cors.allowed_methods")
                     .with_list_parse_key("eth.cors.allowed_headers"),

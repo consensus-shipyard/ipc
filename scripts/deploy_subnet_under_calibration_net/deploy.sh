@@ -14,6 +14,11 @@ eval `ssh-agent -s`
 ssh-add
 ssh-add ${HOME}/.ssh/id_rsa.ipc
 
+if [[ ! -v PARENT_HTTP_AUTH_TOKEN ]]; then
+    echo "PARENT_HTTP_AUTH_TOKEN is not set"
+    exit 1
+fi
+
 DASHES='------'
 if [[ ! -v IPC_FOLDER ]]; then
     IPC_FOLDER=${HOME}/ipc
@@ -237,10 +242,11 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e IPFS_RPC_HOST_PORT=${IPFS_RPC_HOST_PORTS[0]} \
     -e IPFS_GATEWAY_HOST_PORT=${IPFS_GATEWAY_HOST_PORTS[0]} \
     -e IPFS_PROFILE="local-discovery" \
+    -e PARENT_HTTP_AUTH_TOKEN=${PARENT_HTTP_AUTH_TOKEN} \
     -e PARENT_REGISTRY=${parent_registry_address} \
     -e PARENT_GATEWAY=${parent_gateway_address} \
     -e FM_PULL_SKIP=1 \
-    -e FM_LOG_LEVEL="info" \
+    -e FM_LOG_LEVEL="info,fendermint=debug" \
     child-validator 2>&1)
 echo "$bootstrap_output"
 bootstrap_node_id=$(echo "$bootstrap_output" | sed -n '/CometBFT node ID:/ {n;p;}' | tr -d "[:blank:]")
@@ -272,10 +278,11 @@ do
       -e IPFS_PROFILE="local-discovery" \
       -e RESOLVER_BOOTSTRAPS=${bootstrap_resolver_endpoint} \
       -e BOOTSTRAPS=${bootstrap_node_endpoint} \
+      -e PARENT_HTTP_AUTH_TOKEN=${PARENT_HTTP_AUTH_TOKEN} \
       -e PARENT_REGISTRY=${parent_registry_address} \
       -e PARENT_GATEWAY=${parent_gateway_address} \
       -e FM_PULL_SKIP=1 \
-      -e FM_LOG_LEVEL="info" \
+      -e FM_LOG_LEVEL="info,fendermint=debug" \
       child-validator
 done
 

@@ -104,6 +104,7 @@ run_task = { name = [
     "ethapi-start",
     "proxy-start",
     "ipfs-start",
+    "node-report",
 ] }
 
 [tasks.child-validator-restart-no-parent]
@@ -119,6 +120,7 @@ run_task = { name = [
     "ethapi-start",
     "proxy-start",
     "ipfs-start",
+    "node-report",
 ] }
 
 [tasks.child-fullnode-down]
