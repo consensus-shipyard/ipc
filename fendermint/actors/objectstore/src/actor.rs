@@ -40,10 +40,13 @@ impl Actor {
         Self::ensure_write_allowed(rt)?;
 
         let root = rt.transaction(|st: &mut State, rt| {
-            st.put(rt.store(), BytesKey(params.key), params.kind, true)
-                .map_err(|e| {
-                    e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to put object")
-                })
+            st.put(
+                rt.store(),
+                BytesKey(params.key),
+                params.kind,
+                params.overwrite,
+            )
+            .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to put object"))
         })?;
         Ok(root)
     }
@@ -93,10 +96,7 @@ impl Actor {
             .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get object"))
     }
 
-    fn list_objects(
-        rt: &impl Runtime,
-        params: ListParams,
-    ) -> Result<Option<ObjectList>, ActorError> {
+    fn list_objects(rt: &impl Runtime, params: ListParams) -> Result<ObjectList, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let st: State = rt.state()?;
         let objects = st
@@ -110,7 +110,7 @@ impl Actor {
             .map_err(|e| {
                 e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to list objects")
             })?;
-        Ok(Some(objects))
+        Ok(objects)
     }
 
     /// Fallback method for unimplemented method numbers.
