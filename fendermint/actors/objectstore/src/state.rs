@@ -143,7 +143,7 @@ impl State {
                     }
                 }
             }
-            // Don't error here in case key was deleted before value was resolved.
+            // Don't error here in case the key was deleted before the value was resolved.
             None => Ok(()),
         }
     }

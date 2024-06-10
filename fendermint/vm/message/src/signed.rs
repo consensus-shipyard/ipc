@@ -218,7 +218,7 @@ impl SignedMessage {
                 if rec_addr.0 == from.0 {
                     Ok(())
                 } else {
-                    Err(SignedMessageError::InvalidSignature("the Ethereum delegated address did not match the one recovered from the signature".to_string()))
+                    Err(SignedMessageError::InvalidSignature("the Ethereum delegated address did not match the one recovered from the signature (client chain ID may incorrect)".to_string()))
                 }
             }
         }

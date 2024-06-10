@@ -10,7 +10,14 @@ version = "0.1.0"
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
+anyhow = { workspace = true }
 cid = { workspace = true, default-features = false }
+frc42_dispatch = { workspace = true }
+num-derive = { workspace = true }
+num-traits = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_tuple = { workspace = true }
+
 fil_actors_runtime = { workspace = true, optional = true, features = [
     "fil-actor",
 ] }
@@ -18,14 +25,8 @@ fvm_shared = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }
 fvm_ipld_hamt = { workspace = true }
-num-derive = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
-serde_tuple = { workspace = true }
-num-traits = { workspace = true }
-frc42_dispatch = { workspace = true }
-anyhow = { workspace = true }
+
 fendermint_actor_machine = { path = "../machine" }
-objectstore_actor_sdk = { path = "../../../textile/objectstore_actor_sdk" }
 
 [dev-dependencies]
 fil_actors_runtime = { workspace = true, features = [

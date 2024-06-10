@@ -1,16 +1,13 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-use crate::fvm::state::ipc::GatewayCaller;
-use crate::fvm::{topdown, FvmApplyRet, PowerUpdates};
-use crate::{
-    fvm::state::FvmExecState,
-    fvm::FvmMessage,
-    signed::{SignedMessageApplyRes, SignedMessageCheckRes, SyntheticMessage, VerifiableMessage},
-    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
-};
-use anyhow::{bail, Context};
+
+use anyhow::{anyhow, bail, Context};
 use async_stm::atomically;
 use async_trait::async_trait;
+use fendermint_actor_objectstore::{
+    GetParams,
+    Method::{GetObject, ResolveExternalObject},
+};
 use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::{ipc, system};
 use fendermint_vm_event::ParentFinalityMissingQuorum;
@@ -36,6 +33,17 @@ use fvm_shared::econ::TokenAmount;
 use fvm_shared::message::Message;
 use num_traits::Zero;
 use std::sync::Arc;
+use tokio_util::bytes;
+
+use crate::fvm::state::ipc::GatewayCaller;
+use crate::fvm::{topdown, FvmApplyRet, PowerUpdates};
+use crate::{
+    fvm::state::FvmExecState,
+    fvm::store::ReadOnlyBlockstore,
+    fvm::FvmMessage,
+    signed::{SignedMessageApplyRes, SignedMessageCheckRes, SyntheticMessage, VerifiableMessage},
+    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
+};
 
 /// A resolution pool for bottom-up and top-down checkpoints.
 pub type CheckpointPool = ResolvePool<CheckpointPoolItem>;
@@ -121,7 +129,7 @@ where
     DB: Blockstore + Clone + 'static + Send + Sync,
     I: Sync + Send,
 {
-    type State = ChainEnv;
+    type State = (ChainEnv, FvmExecState<ReadOnlyBlockstore<DB>>);
     type Message = ChainMessage;
 
     /// Check whether there are any "ready" messages in the IPLD resolution mempool which can be appended to the proposal.
@@ -130,11 +138,11 @@ where
     /// account the transactions which are part of top-down or bottom-up checkpoints, to stay within gas limits.
     async fn prepare(
         &self,
-        state: Self::State,
+        (env, mut state): Self::State,
         mut msgs: Vec<Self::Message>,
     ) -> anyhow::Result<Vec<Self::Message>> {
         // Collect resolved CIDs ready to be proposed from the pool.
-        let ckpts = atomically(|| state.checkpoint_pool.collect_resolved()).await;
+        let ckpts = atomically(|| env.checkpoint_pool.collect_resolved()).await;
 
         // Create transactions ready to be included on the chain.
         let ckpts = ckpts.into_iter().map(|ckpt| match ckpt {
@@ -143,14 +151,14 @@ where
 
         // Prepare top down proposals.
         // Before we try to find a quorum, pause incoming votes. This is optional but if there are lots of votes coming in it might hold up proposals.
-        atomically(|| state.parent_finality_votes.pause_votes_until_find_quorum()).await;
+        atomically(|| env.parent_finality_votes.pause_votes_until_find_quorum()).await;
 
         // The pre-requisite for proposal is that there is a quorum of gossiped votes at that height.
         // The final proposal can be at most as high as the quorum, but can be less if we have already,
         // hit some limits such as how many blocks we can propose in a single step.
         let finalities = atomically(|| {
-            let parent = state.parent_finality_provider.next_proposal()?;
-            let quorum = state
+            let parent = env.parent_finality_provider.next_proposal()?;
+            let quorum = env
                 .parent_finality_votes
                 .find_quorum()?
                 .map(|(height, block_hash)| IPCParentFinality { height, block_hash });
@@ -195,7 +203,7 @@ where
         // view of object resolution, rather than considering those that _might_ have a quorum,
         // but have not yet been resolved by _this_ proposer. However, an object like this will get
         // picked up by a different proposer who _does_ consider it resolved.
-        let local_resolved_objects = atomically(|| state.object_pool.collect_resolved()).await;
+        let local_resolved_objects = atomically(|| env.object_pool.collect_resolved()).await;
 
         // Create transactions ready to be included on the chain. These are from locally resolved
         // objects that have reached a global quorum and are not yet finalized.
@@ -203,48 +211,51 @@ where
         // If the object has already been finalized, i.e., it was proposed in an earlier block with
         // a quorum that did not include _this_ proposer, we can just remove it from the local
         // resolve pool. If we were to propose it, it would be rejected in the process step.
-        let mut objects: Vec<ChainMessage> = vec![];
-        for item in local_resolved_objects.iter() {
-            let obj = item.obj.value.to_bytes();
-            let (is_finalized, is_globally_resolved) =
-                atomically(
-                    || match state.parent_finality_votes.is_object_finalized(&obj)? {
-                        true => Ok((true, false)),
-                        false => match state.parent_finality_votes.find_object_quorum(&obj)? {
-                            true => Ok((false, true)),
-                            false => Ok((false, false)),
-                        },
-                    },
-                )
+        if !local_resolved_objects.is_empty() {
+            let mut objects: Vec<ChainMessage> = vec![];
+            // We start a blockstore transaction that can be reverted
+            state.state_tree_mut().begin_transaction();
+            for item in local_resolved_objects.iter() {
+                if is_object_finalized(&mut state, item)? {
+                    tracing::debug!(cid = ?item.obj.value, "object already finalized; removing from pool");
+                    atomically(|| env.object_pool.remove(item)).await;
+                    continue;
+                }
+
+                let is_globally_resolved = atomically(|| {
+                    env.parent_finality_votes
+                        .find_object_quorum(&item.obj.value.to_bytes())
+                })
                 .await;
-
-            // Remove here otherwise proposal will be rejected
-            if is_finalized {
-                tracing::debug!(cid = ?item.obj.value, "object already finalized; removing from pool");
-                atomically(|| state.object_pool.remove(item)).await;
-                continue;
+                if is_globally_resolved {
+                    tracing::debug!(cid = ?item.obj.value, "object has quorum; adding tx to chain");
+                    objects.push(ChainMessage::Ipc(IpcMessage::ObjectResolved(
+                        item.obj.clone(),
+                    )));
+                }
             }
+            state
+                .state_tree_mut()
+                .end_transaction(true)
+                .expect("we just started a transaction");
 
-            // Add to messages
-            if is_globally_resolved {
-                tracing::debug!(cid = ?item.obj.value, "object has quorum; adding tx to chain");
-                objects.push(ChainMessage::Ipc(IpcMessage::ObjectResolved(
-                    item.obj.clone(),
-                )));
-            }
+            let pending_objects = atomically(|| env.object_pool.count()).await;
+            tracing::info!(size = pending_objects, "ipfs pool status");
+
+            // Append at the end - if we run out of block space,
+            // these are going to be reproposed in the next block.
+            msgs.extend(objects);
         }
-
-        let pending_objects = atomically(|| state.object_pool.count()).await;
-        tracing::info!(size = pending_objects, "ipfs pool status");
-
-        // Append at the end - if we run out of block space, these are going to be reproposed in the next block.
-        msgs.extend(objects);
 
         Ok(msgs)
     }
 
     /// Perform finality checks on top-down transactions and availability checks on bottom-up transactions.
-    async fn process(&self, env: Self::State, msgs: Vec<Self::Message>) -> anyhow::Result<bool> {
+    async fn process(
+        &self,
+        (env, mut state): Self::State,
+        msgs: Vec<Self::Message>,
+    ) -> anyhow::Result<bool> {
         for msg in msgs {
             match msg {
                 ChainMessage::Ipc(IpcMessage::BottomUpExec(msg)) => {
@@ -281,35 +292,33 @@ where
                     }
                 }
                 ChainMessage::Ipc(IpcMessage::ObjectResolved(obj)) => {
-                    // Ensure that the object is ready to be included on chain. We can accept the
-                    // proposal if the object has reached a global quorum and is not yet finalized.
                     let item = ObjectPoolItem { obj };
-                    let obj = item.obj.value.to_bytes();
 
-                    let (is_finalized, is_globally_resolved) = atomically(|| {
-                        match env.parent_finality_votes.is_object_finalized(&obj)? {
-                            true => Ok((true, true)),
-                            false => match env.parent_finality_votes.find_object_quorum(&obj)? {
-                                true => Ok((false, true)),
-                                false => Ok((false, false)),
-                            },
-                        }
-                    })
-                    .await;
-
-                    // If already finalized, reject this proposal
-                    if is_finalized {
+                    // Ensure that the object is ready to be included on-chain.
+                    // We can accept the proposal if the object has reached a global quorum and is
+                    // not yet finalized.
+                    // Start a blockstore transaction that can be reverted.
+                    state.state_tree_mut().begin_transaction();
+                    if is_object_finalized(&mut state, &item)? {
                         tracing::debug!(cid = ?item.obj.value, "object is already finalized; rejecting proposal");
                         return Ok(false);
                     }
+                    state
+                        .state_tree_mut()
+                        .end_transaction(true)
+                        .expect("we just started a transaction");
 
-                    // If not globally resolved, reject this proposal
+                    let is_globally_resolved = atomically(|| {
+                        env.parent_finality_votes
+                            .find_object_quorum(&item.obj.value.to_bytes())
+                    })
+                    .await;
                     if !is_globally_resolved {
                         tracing::debug!(cid = ?item.obj.value, "object is not globally resolved; rejecting proposal");
                         return Ok(false);
                     }
 
-                    // If also locally resolved, and we're not going to reject, we can remove it from the pool
+                    // Remove from pool if locally resolved
                     let is_locally_resolved =
                         atomically(|| match env.object_pool.get_status(&item)? {
                             None => Ok(false),
@@ -367,6 +376,7 @@ where
                     if let Some(obj) = msg.object {
                         atomically(|| env.object_pool.add(ObjectPoolItem { obj: obj.clone() }))
                             .await;
+                        tracing::debug!(cid = ?obj.value, store = ?obj.address, "object added to pool");
                     }
                 }
 
@@ -503,15 +513,14 @@ where
                 IpcMessage::ObjectResolved(obj) => {
                     let from = system::SYSTEM_ACTOR_ADDR;
                     let to = obj.address;
-                    let method_num =
-                        fendermint_actor_objectstore::Method::ResolveExternalObject as u64;
+                    let method_num = ResolveExternalObject as u64;
                     let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
 
-                    let input = fendermint_actor_objectstore::ResolveExternalParams {
+                    let params = fendermint_actor_objectstore::ResolveExternalParams {
                         key: obj.key,
                         value: obj.value,
                     };
-                    let params = RawBytes::serialize(input)?;
+                    let params = RawBytes::serialize(params)?;
                     let msg = Message {
                         version: Default::default(),
                         from,
@@ -542,12 +551,6 @@ where
                         info = info.unwrap_or_default(),
                         "implicit tx delivered"
                     );
-
-                    atomically(|| {
-                        env.parent_finality_votes
-                            .finalize_object(obj.value.to_bytes())
-                    })
-                    .await;
 
                     tracing::debug!(
                         cid = ?obj.value,
@@ -723,4 +726,51 @@ fn relayed_bottom_up_ckpt_to_fvm(
         .context("failed to create syntetic message")?;
 
     Ok(msg)
+}
+
+/// Check if an object has been finalized (resolved) by reading its on-chain state.
+/// This approach uses an implicit FVM transaction to query a read-only blockstore.
+fn is_object_finalized<DB>(
+    state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
+    item: &ObjectPoolItem,
+) -> anyhow::Result<bool>
+where
+    DB: Blockstore + Clone + 'static + Send + Sync,
+{
+    let params = GetParams {
+        key: item.obj.key.clone(),
+    };
+    let params = RawBytes::serialize(params)?;
+    let msg = FvmMessage {
+        version: 0,
+        from: system::SYSTEM_ACTOR_ADDR,
+        to: item.obj.address,
+        sequence: 0,
+        value: Default::default(),
+        method_num: GetObject as u64,
+        params,
+        gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
+        gas_fee_cap: Default::default(),
+        gas_premium: Default::default(),
+    };
+    let (apply_ret, _) = state.execute_implicit(msg)?;
+
+    let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
+    let object =
+        fvm_ipld_encoding::from_slice::<Option<fendermint_actor_objectstore::Object>>(&data)
+            .map_err(|e| anyhow!("error parsing as Option<Object>: {e}"))?;
+
+    Ok(match object {
+        Some(object) => match object {
+            fendermint_actor_objectstore::Object::External((_, resolved)) => resolved,
+            fendermint_actor_objectstore::Object::Internal(_) => true, // cannot happen
+        },
+        None => {
+            // The object was deleted before it was resolved.
+            // We can return true here because the objectstore actor will ignore the final implicit
+            // call to resolve an object if it doesn't exist.
+            // Otherwise, we'd have to reject the proposal and do another round of voting.
+            true
+        }
+    })
 }
