@@ -1,8 +1,11 @@
-# IPS Spec - Executions
+# IPC Spec - Executions
 
-This document is a top-down view of the Fendermint application, concentrating on its aspects as a transition function.
+This document explains on how Fendermint works at a high level. Fendermint is a CometBFT application at present (and therefore coupled with Ignite consensus). This document focuses on the implementation details of the state transition mechanics.
+Note that while Fendermint is the current reference IPC client implementation, it is merely a stepping stone towards a modular, dynamic, embeddable, multi-network IPC client with fully customized consensus in the foreseeable future.
 
 # ABCI
+
+> Note: an upgrade to CometBFT v0.38.x and the ABCI v2 interface is underway.
 
 Fendermint implements the ABCI v1 a.k.a. ABCI++ as [defined in CometBFT v0.37](https://github.com/cometbft/cometbft/tree/v0.37.x/abci).
 
