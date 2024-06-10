@@ -152,9 +152,17 @@ impl GenesisCreator {
 
         tracing::info!(state_root = state_root.to_string(), "state root");
 
-        let mut streamer = StateTreeStreamer::new(state_root, store);
+        let metadata = GenesisMetadata::new(state_root, out);
+
+        let streamer = StateTreeStreamer::new(state_root, store);
+        let (metadata_cid, metadata_bytes) = derive_cid(&metadata)?;
+        tracing::info!("generated genesis metadata header cid: {}", metadata_cid);
+
         // create the target car header with the metadata cid as the only root
-        let car = CarHeader::new(vec![state_root], 1);
+        let car = CarHeader::new(vec![metadata_cid], 1);
+
+        // create the stream to stream all the data into the car file
+        let mut streamer = tokio_stream::iter(vec![(metadata_cid, metadata_bytes)]).merge(streamer);
 
         let write_task = tokio::spawn(async move {
             let mut write = file.compat_write();
