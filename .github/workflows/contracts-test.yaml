@@ -12,19 +12,19 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: ${{ github.ref }}
           submodules: recursive
 
       - name: Install python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: "3.10"
 
       - name: Install abi
         run: pip install eth_abi
 
       - name: Install lcov and genhtml
-        run:  sudo apt-get update && sudo apt-get -y install lcov
+        run: sudo apt-get update && sudo apt-get -y install lcov
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1

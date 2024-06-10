@@ -6,7 +6,7 @@ import {ParentFinality} from "../../structs/CrossNet.sol";
 import {PermissionMode, Validator, ValidatorInfo, StakingChangeRequest, Membership} from "../../structs/Subnet.sol";
 import {LibGateway} from "../../lib/LibGateway.sol";
 
-import {FilAddress} from "fevmate/utils/FilAddress.sol";
+import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 
 import {ParentValidatorsTracker, ValidatorSet} from "../../structs/Subnet.sol";
 import {LibValidatorTracking, LibValidatorSet} from "../../lib/LibStaking.sol";

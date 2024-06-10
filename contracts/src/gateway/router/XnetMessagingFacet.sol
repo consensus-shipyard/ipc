@@ -8,7 +8,7 @@ import {IPCMsgType} from "../../enums/IPCMsgType.sol";
 import {SubnetActorGetterFacet} from "../../subnet/SubnetActorGetterFacet.sol";
 import {Subnet} from "../../structs/Subnet.sol";
 
-import {FilAddress} from "fevmate/utils/FilAddress.sol";
+import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
 import {CrossMsgHelper} from "../../lib/CrossMsgHelper.sol";
 import {SupplySourceHelper} from "../../lib/SupplySourceHelper.sol";
