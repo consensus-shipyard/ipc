@@ -44,13 +44,17 @@ help:
 	@echo "  make help                              - Display this help message."
 
 install:
+	@command -v pnpm > /dev/null || { \
+		echo "pnpm is not installed. Installing pnpm..."; \
+		npm install -g pnpm; \
+	}
 	@echo "Installing dependencies..."
-	npm install
+	pnpm install
 	forge install
 
 fmt:
-	npm install --silent --no-save
-	npx prettier --check -w 'src/**/**/*.sol' 'script/**/**/*.sol' 'test/**/**/*.sol' 'test/**/**/*.t.sol' '**/*.{js,jsx,ts,tsx,json,css}'
+	pnpm install --silent --no-save
+	pnpx prettier --check -w 'src/**/**/*.sol' 'script/**/**/*.sol' 'test/**/**/*.sol' 'test/**/**/*.t.sol' '**/*.{js,jsx,ts,tsx,json,css}'
 
 set-original-token:
 	@echo "Please enter the Original Token address:"

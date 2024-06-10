@@ -3,6 +3,7 @@
     "version": "1.0.0-alpha.0",
     "description": "This repository includes the reference implementation of all the actors (i.e. smart contracts) responsible for the operation of the IPC (i.e. Inter-Planetary Consensus) protocol. These actors are written in Solidity and target FileCoin’s FEVM.",
     "author": "ConsensusLab, Protocol Labs, Filecoin Core Devs, Limechain",
+    "packageManager": "pnpm@9.3.0",
     "directories": {
         "lib": "lib",
         "test": "test"
@@ -14,6 +15,9 @@
         "LICENSE-APACHE",
         "LICENSE-MIT"
     ],
+    "scripts": {
+        "preinstall": "git submodule update --init --recursive"
+    },
     "repository": {
         "type": "git",
         "url": "git+https://github.com/consensus-shipyard/ipc.git"
@@ -29,13 +33,10 @@
     "devDependencies": {
         "@nomicfoundation/hardhat-foundry": "^1.0.1",
         "@nomiclabs/hardhat-ethers": "^2.2.3",
-        "@openzeppelin/contracts": "5.0.1",
         "@typechain/ethers-v5": "^11.1.2",
         "@typechain/hardhat": "^7.0.0",
         "dotenv": "^16.0.1",
-        "elliptic-curve-solidity": "github:witnet/elliptic-curve-solidity#3475478",
         "ethers": "^5.7.0",
-        "fevmate": "github:wadealexc/fevmate#6a80e98",
         "fs-extra": "^11.2.0",
         "hardhat-contract-sizer": "^2.6.1",
         "hardhat-deploy": "^0.11.14",
@@ -51,6 +52,10 @@
         "typescript": "^4.8.3"
     },
     "dependencies": {
+        "@openzeppelin/contracts": "5.0.1",
+        "@openzeppelin/contracts-upgradeable": "5.0.1",
+        "fevmate": "github:wadealexc/fevmate#6a80e98",
+        "elliptic-curve-solidity": "github:witnet/elliptic-curve-solidity#3475478",
         "@solidity-parser/parser": "^0.16.2",
         "diamond-util": "^1.1.1",
         "ganache": "^7.9.2",

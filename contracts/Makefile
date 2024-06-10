@@ -1,5 +1,5 @@
 .PHONY: deploy-ipc deploy-subnet-registry deploy-subnet upgrade-gw-diamond upgrade-sa-diamond \
-        upgrade-sr-diamond gen compile-abi rust-binding slither lint fmt npmi node_modules build \
+        upgrade-sr-diamond gen compile-abi rust-binding slither lint fmt deps node_modules build \
         test install-dev install-npm-package install-eth-abi storage clean coverage coverage-for-mac \
         prepare build-selector-library forge
 
@@ -60,25 +60,30 @@ lint: fmt
 	npx solhint 'src/**/*.sol'
 
 fmt:
-	npm install --silent --no-save
-	npx prettier --check -w 'src/**/**/*.sol' 'sdk/**/**/*.sol' 'test/**/**/*.sol' 'test/**/**/*.t.sol' '**/*.{js,jsx,ts,tsx,json,css,md}'
+	pnpm install --silent --no-save
+	pnpx prettier --check -w 'src/**/**/*.sol' 'sdk/**/**/*.sol' 'test/**/**/*.sol' 'test/**/**/*.t.sol' '**/*.{js,jsx,ts,tsx,json,css,md}'
 
-npmi: node_modules
+deps: node_modules
 
-node_modules: package.json package-lock.json
-	npm install
+node_modules: package.json pnpm-lock.yaml
+	@command -v pnpm > /dev/null || { \
+		echo "pnpm is not installed. Installing pnpm..."; \
+		npm install -g pnpm; \
+	}
+	pnpm install
 	touch node_modules
 
 build: node_modules | forge
 	forge build
+	FOUNDRY_SRC=sdk forge build
 
 test: node_modules | forge
 	forge test -vvv --ffi
 
 install-dev: install-npm-package install-eth-abi
 
-install-npm-package:
-	npm install --save-dev
+install-npm-package: node_modules
+	pnpm install --save-dev
 
 install-eth-abi:
 	curl -sSL https://bootstrap.pypa.io/get-pip.py -o get-pip.py && python3 get-pip.py && rm get-pip.py && python3 -m pip install eth_abi
@@ -86,7 +91,7 @@ install-eth-abi:
 storage:
 	rm -rf ./cache
 	rm -rf ./cache_hardhat
-	npx hardhat storage-layout --update
+	pnpx hardhat storage-layout --update
 
 clean:
 	rm -rf ./artifacts
@@ -107,7 +112,7 @@ prepare: build-selector-library fmt lint test slither
 
 build-selector-library: | forge
 	python3 scripts/python/build_selector_library.py
-	npx prettier -w test/helpers/SelectorLibrary.sol
+	pnpx prettier -w test/helpers/SelectorLibrary.sol
 
 # Forge is used by the ipc-solidity-actors compilation steps.
 forge:
