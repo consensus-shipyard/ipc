@@ -26,6 +26,7 @@ use tokio_util::compat::TokioAsyncReadCompatExt;
 use warp::{
     filters::multipart::Part,
     http::{HeaderMap, HeaderValue, StatusCode},
+    hyper::body::Body,
     path::Tail,
     Filter, Rejection, Reply,
 };
@@ -65,13 +66,16 @@ cmd! {
                 .and(warp::multipart::form().max_length(MAX_OBJECT_LENGTH))
                 .and_then(handle_object_upload);
 
-                let objects_download = warp::path!("v1" / "objects" / Cid)
+                let objects_download = warp::path!("v1" / "objects" / Address / String)
                 .and(
                     warp::get().map(|| "GET".to_string()).or(warp::head().map(|| "HEAD".to_string())).unify()
 
                 )
                 .and(warp::header::optional::<String>("Range"))
+                .and(warp::query::<HeightQuery>())
+                .and(with_client(client.clone()))
                 .and(with_ipfs(ipfs.clone()))
+                .and(with_args(args.clone()))
                 .and_then(handle_object_download);
 
                 // TODO: Deprecated, remove after SDK migration
@@ -617,81 +621,126 @@ async fn handle_os_list(
     Ok(response)
 }
 
+struct ObjectRange {
+    start: u64,
+    end: u64,
+    len: u64,
+    size: u64,
+    body: warp::hyper::Body,
+}
+
 async fn handle_object_download(
-    cid: Cid,
+    address: Address,
+    key: String,
     method: String,
     range: Option<String>,
+    height_query: HeightQuery,
+    client: FendermintClient,
     ipfs: IpfsClient,
+    args: TransArgs,
 ) -> Result<impl Reply, Rejection> {
-    let (body, start, end, len, size) = {
-        let cid = cid.to_string();
-        let stat = ipfs
-            .files_stat(format!("/ipfs/{cid}").as_str())
-            .await
-            .map_err(|e| {
-                Rejection::from(BadRequest {
-                    message: format!("failed to stat object: {}", e),
-                })
-            })?;
-        let size = stat.size;
+    let height = height_query
+        .height
+        .unwrap_or(FvmQueryHeight::Committed.into());
+    let maybe_object = os_get(client, args, address, GetParams { key: key.into() }, height)
+        .await
+        .map_err(|e| {
+            Rejection::from(BadRequest {
+                message: format!("objectstore get error: {}", e),
+            })
+        })?;
 
-        match range {
-            Some(range) => {
-                let (start, end) = get_range_params(range, size).map_err(|e| {
-                    Rejection::from(BadRequest {
-                        message: format!("failed to get range params: {}", e),
-                    })
-                })?;
-                let len = end - start + 1;
-                (
-                    warp::hyper::Body::wrap_stream(ipfs.cat_range(
-                        &cid,
-                        start as usize,
-                        len as usize,
-                    )),
-                    start,
-                    end,
-                    len,
-                    size,
-                )
+    match maybe_object {
+        Some(object) => {
+            let object_range = match object {
+                Object::Internal(_) => {
+                    return Err(Rejection::from(BadRequest {
+                        message: "internal objects are not supported".to_string(),
+                    }))
+                }
+                Object::External((buf, resolved)) => {
+                    let cid = Cid::try_from(buf.0).map_err(|e| {
+                        Rejection::from(BadRequest {
+                            message: format!("failed to decode cid: {}", e),
+                        })
+                    })?;
+                    if !resolved {
+                        return Err(Rejection::from(BadRequest {
+                            message: "object is not resolved".to_string(),
+                        }));
+                    }
+                    fetch_object(ipfs, range, cid.into()).await.map_err(|e| {
+                        Rejection::from(BadRequest {
+                            message: format!("failed to fetch detached object {}", e),
+                        })
+                    })?
+                }
+            };
+
+            // If it is a HEAD request, we don't need to send the body
+            // but we still need to send the Content-Length header
+            if method == "HEAD" {
+                let mut response = warp::reply::Response::new(warp::hyper::Body::empty());
+                let mut header_map = HeaderMap::new();
+                header_map.insert("Content-Length", HeaderValue::from(object_range.size));
+                let headers = response.headers_mut();
+                headers.extend(header_map);
+                return Ok(response);
             }
-            None => (
-                warp::hyper::Body::wrap_stream(ipfs.cat(&cid)),
-                0,
-                size - 1,
-                size,
-                size,
-            ),
+
+            let mut response = warp::reply::Response::new(object_range.body);
+            let mut header_map = HeaderMap::new();
+            if object_range.len < object_range.size {
+                *response.status_mut() = StatusCode::PARTIAL_CONTENT;
+                header_map.insert(
+                    "Content-Range",
+                    HeaderValue::from_str(&format!(
+                        "bytes {}-{}/{}",
+                        object_range.start, object_range.end, object_range.len
+                    ))
+                    .unwrap(),
+                );
+            } else {
+                header_map.insert("Accept-Ranges", HeaderValue::from_str("bytes").unwrap());
+            }
+            header_map.insert("Content-Length", HeaderValue::from(object_range.len));
+            let headers = response.headers_mut();
+            headers.extend(header_map);
+
+            Ok(response)
         }
-    };
-
-    // If it is a HEAD request, we don't need to send the body
-    // but we still need to send the Content-Length header
-    if method == "HEAD" {
-        let mut response = warp::reply::Response::new(warp::hyper::Body::empty());
-        let mut header_map = HeaderMap::new();
-        header_map.insert("Content-Length", HeaderValue::from(size));
-        let headers = response.headers_mut();
-        headers.extend(header_map);
-        return Ok(response);
+        None => Err(Rejection::from(NotFound)),
     }
+}
 
-    let mut response = warp::reply::Response::new(body);
-    let mut header_map = HeaderMap::new();
-    if len < size {
-        *response.status_mut() = StatusCode::PARTIAL_CONTENT;
-        header_map.insert(
-            "Content-Range",
-            HeaderValue::from_str(&format!("bytes {}-{}/{}", start, end, len)).unwrap(),
-        );
-    } else {
-        header_map.insert("Accept-Ranges", HeaderValue::from_str("bytes").unwrap());
-    }
-    header_map.insert("Content-Length", HeaderValue::from(len));
-    let headers = response.headers_mut();
-    headers.extend(header_map);
-
-    Ok(response)
+async fn fetch_object(
+    ipfs: IpfsClient,
+    range: Option<String>,
+    cid: String,
+) -> anyhow::Result<ObjectRange> {
+    let stat = ipfs.files_stat(format!("/ipfs/{cid}").as_str()).await?;
+    let size = stat.size;
+    Ok(match range {
+        Some(range) => {
+            let (start, end) = get_range_params(range, size)?;
+            let len = end - start + 1;
+            let body = Body::wrap_stream(ipfs.cat_range(&cid, start as usize, len as usize));
+            ObjectRange {
+                start,
+                end,
+                len,
+                size,
+                body,
+            }
+        }
+        None => ObjectRange {
+            start: 0,
+            end: size - 1,
+            len: size,
+            size,
+            body: Body::wrap_stream(ipfs.cat(&cid)),
+        },
+    })
 }
 
 // Rejection handlers
@@ -739,7 +788,6 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
 
 // RPC methods
 
-// TODO: Deprecated, remove after SDK migration
 async fn os_get(
     client: FendermintClient,
     args: TransArgs,
