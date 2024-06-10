@@ -18,7 +18,7 @@ import {LinkedTokenController} from "../src/LinkedTokenController.sol";
 //import {InvalidOriginContract, InvalidOriginSubnet} from "../src/@ipc/contracts/examples/cross-token/IpcCrossTokenErrors.sol";
 import {USDCTest} from "../src/USDCTest.sol";
 
-import "openzeppelin-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 string constant REPLICA_TOKEN_NAME = "USDCTestReplica";
 string constant REPLICA_TOKEN_SYMBOL = "USDCtR";

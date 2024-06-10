@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
-import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IntegrationTestBase, RootSubnetDefinition, TestSubnetDefinition} from "@ipc/test/IntegrationTestBase.sol";
 import {ERC20PresetFixedSupply} from "@ipc/test/helpers/ERC20PresetFixedSupply.sol";
@@ -30,13 +30,13 @@ import {CheckpointingFacet} from "@ipc/contracts/gateway/router/CheckpointingFac
 import {FvmAddressHelper} from "@ipc/contracts/lib/FvmAddressHelper.sol";
 import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMsgKind, ResultMsg, CallMsg} from "@ipc/contracts/structs/CrossNet.sol";
 import {SubnetIDHelper} from "@ipc/contracts/lib/SubnetIDHelper.sol";
-import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {CrossMsgHelper} from "@ipc/contracts/lib/CrossMsgHelper.sol";
 import {IIpcHandler} from "@ipc/sdk/interfaces/IIpcHandler.sol";
-import {FilAddress} from "fevmate/utils/FilAddress.sol";
+import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import "forge-std/console.sol";
 
-import "openzeppelin-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 string constant REPLICA_TOKEN_NAME = "USDCTestReplica";
 string constant REPLICA_TOKEN_SYMBOL = "USDCtR";
@@ -298,7 +298,7 @@ contract MultiSubnetTest is IntegrationTestBase {
 
         //ensure that tokens are delivered on subnet
         require(
-            IERC20Upgradeable(ipcTokenReplica).balanceOf(recipient) == transferAmount,
+            IERC20(ipcTokenReplica).balanceOf(recipient) == transferAmount,
             "incorrect proxy token balance"
         );
     }

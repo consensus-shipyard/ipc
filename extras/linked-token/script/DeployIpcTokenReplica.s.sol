@@ -5,7 +5,7 @@ import "../src/LinkedTokenReplica.sol";
 import "../src/v2/LinkedTokenReplicaV2.sol";
 import "./ConfigManager.sol";
 import "@ipc/contracts/structs/Subnet.sol";
-import "openzeppelin-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 contract DeployIpcTokenReplica is ConfigManager {
     function deployIpcTokenReplica() external {
