@@ -78,10 +78,10 @@ pub fn decode_acc_push_return(deliver_tx: &DeliverTx) -> anyhow::Result<PushRetu
         .map_err(|e| anyhow!("error parsing as PushReturn: {e}"))
 }
 
-pub fn decode_acc_get_at(deliver_tx: &DeliverTx) -> anyhow::Result<Vec<u8>> {
+pub fn decode_acc_get_at(deliver_tx: &DeliverTx) -> anyhow::Result<Option<Vec<u8>>> {
     let data = decode_data(&deliver_tx.data)?;
-    fvm_ipld_encoding::from_slice(data.as_slice())
-        .map_err(|e| anyhow!("error parsing as Vec<u8>: {e}"))
+    fvm_ipld_encoding::from_slice::<Option<Vec<u8>>>(&data)
+        .map_err(|e| anyhow!("error parsing as Option<Vec<u8>>: {e}"))
 }
 
 /// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as [`CreateReturn`].
