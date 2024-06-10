@@ -980,6 +980,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
 
         self.seal_genesis(genesis.clone(), self.path(&subnet.name).join("sealed.json"))
             .await?;
+        eprintln!("genesis state sealed");
 
         let genesis = DefaultGenesis {
             name: subnet.name.clone(),
