@@ -629,6 +629,7 @@ struct ObjectRange {
     body: warp::hyper::Body,
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn handle_object_download(
     address: Address,
     key: String,
