@@ -169,39 +169,7 @@ pub struct Ipfs {
 }
 
 impl IpfsApiAdapter for Ipfs {
-    async fn add_file(&self, mut temp_file: TempFile, cid_from_msg: Cid) -> anyhow::Result<String> {
-        let temp_file_clone = temp_file.try_clone().await?;
-        // Only chunk and hash - do not write to disk
-        let res = self
-            .inner
-            .add_async_with_options(
-                temp_file_clone.compat(),
-                Add {
-                    chunker: Some("size-1048576"),
-                    raw_leaves: Some(false),
-                    pin: Some(false),
-                    cid_version: Some(1),
-                    only_hash: Some(true),
-                    ..Default::default()
-                },
-            )
-            .await?;
-
-        // Check if the computed CID matches the one in the signed message
-        // It is important to verify that CID represents the data correctly
-        // separately from signature because the signature is over the CID,
-        // it is unaware of the actual data.
-        let ipfs_cid = Cid::try_from(res.hash)?;
-        if ipfs_cid != cid_from_msg {
-            return Err(anyhow!(
-                "computed cid {:?} does not match {:?}",
-                ipfs_cid,
-                cid_from_msg
-            ));
-        }
-
-        // Actually add the file to IPFS
-        temp_file.rewind().await?;
+    async fn add_file(&self, temp_file: TempFile, cid_from_msg: Cid) -> anyhow::Result<String> {
         let res = self
             .inner
             .add_async_with_options(
@@ -215,8 +183,21 @@ impl IpfsApiAdapter for Ipfs {
                 },
             )
             .await?;
-        let cid = Cid::try_from(res.hash)?;
-        Ok(cid.to_string())
+
+        // Check if the computed CID matches the one in the signed message.
+        // It is important to verify that CID represents the data correctly
+        // separately from signature because the signature is over the CID,
+        // it is unaware of the actual data.
+        let ipfs_cid = Cid::try_from(res.hash)?;
+        if ipfs_cid != cid_from_msg {
+            return Err(anyhow!(
+                "computed cid {:?} does not match {:?}",
+                ipfs_cid,
+                cid_from_msg
+            ));
+        }
+
+        Ok(ipfs_cid.to_string())
     }
 }
 
