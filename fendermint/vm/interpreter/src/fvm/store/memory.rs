@@ -21,17 +21,6 @@ impl MemoryBlockstore {
     pub fn new() -> Self {
         Self::default()
     }
-
-    pub fn remove(&self, k: &Cid) -> Result<()> {
-        let mut guard = self.blocks.write().unwrap();
-        guard.remove(k);
-        Ok(())
-    }
-
-    pub fn key_values(self) -> Result<std::collections::hash_map::IntoIter<Cid, Vec<u8>>> {
-        let a = self.blocks.read().unwrap();
-        Ok(a.clone().into_iter())
-    }
 }
 
 impl Blockstore for MemoryBlockstore {
