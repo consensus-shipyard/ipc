@@ -45,6 +45,7 @@ help:
 
 install:
 	@echo "Installing dependencies..."
+	npm install
 	forge install
 
 fmt:
