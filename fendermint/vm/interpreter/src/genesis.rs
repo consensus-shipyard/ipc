@@ -150,6 +150,8 @@ impl GenesisCreator {
     ) -> anyhow::Result<()> {
         let file = tokio::fs::File::create(&self.sealed_out_path).await?;
 
+        tracing::info!(state_root = state_root.to_string(), "state root");
+
         let metadata = GenesisMetadata::new(state_root, out);
 
         let streamer = StateTreeStreamer::new(state_root, store);
