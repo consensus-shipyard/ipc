@@ -1,5 +1,5 @@
 .PHONY: deploy-ipc deploy-subnet-registry deploy-subnet upgrade-gw-diamond upgrade-sa-diamond \
-        upgrade-sr-diamond gen compile-abi rust-binding slither lint fmt deps node_modules build \
+        upgrade-sr-diamond gen compile-abi rust-binding slither lint fmt pnpm deps node_modules build \
         test install-dev install-npm-package install-eth-abi storage clean coverage coverage-for-mac \
         prepare build-selector-library forge
 
@@ -56,20 +56,22 @@ slither:
 # ==============================================================================
 # Development support
 
-lint: fmt
-	npx solhint 'src/**/*.sol'
+pnpm:
+	@command -v pnpm > /dev/null || { \
+		echo "pnpm is not installed. Installing pnpm..."; \
+		npm install -g pnpm; \
+	}
 
-fmt:
+lint: pnpm fmt
+	pnpx solhint 'src/**/*.sol'
+
+fmt: pnpm
 	pnpm install --silent --no-save
 	pnpx prettier --check -w 'src/**/**/*.sol' 'sdk/**/**/*.sol' 'test/**/**/*.sol' 'test/**/**/*.t.sol' '**/*.{js,jsx,ts,tsx,json,css,md}'
 
 deps: node_modules
 
-node_modules: package.json pnpm-lock.yaml
-	@command -v pnpm > /dev/null || { \
-		echo "pnpm is not installed. Installing pnpm..."; \
-		npm install -g pnpm; \
-	}
+node_modules: pnpm package.json pnpm-lock.yaml
 	pnpm install
 	touch node_modules
 
