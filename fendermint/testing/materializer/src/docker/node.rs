@@ -527,7 +527,7 @@ impl DockerNode {
             }
 
             if let Some(client) = self.ethapi_http_provider()? {
-                if let Err(e) = client.get_chainid().await {
+                if let Err(e) = client.get_block(1).await {
                     continue;
                 }
             }
