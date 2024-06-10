@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {SubnetID, Subnet, IPCAddress, Validator} from "../src/structs/Subnet.sol";
-import {DiamondCutFacet} from "../src/diamond/DiamondCutFacet.sol";
-import {DiamondLoupeFacet} from "../src/diamond/DiamondLoupeFacet.sol";
-import {GatewayDiamond} from "../src/GatewayDiamond.sol";
-import {GatewayGetterFacet} from "../src/gateway/GatewayGetterFacet.sol";
-import {GatewayManagerFacet} from "../src/gateway/GatewayManagerFacet.sol";
-import {GatewayMessengerFacet} from "../src/gateway/GatewayMessengerFacet.sol";
-import {XnetMessagingFacet} from "../src/gateway/router/XnetMessagingFacet.sol";
+import {SubnetID, Subnet, IPCAddress, Validator} from "../contracts/structs/Subnet.sol";
+import {DiamondCutFacet} from "../contracts/diamond/DiamondCutFacet.sol";
+import {DiamondLoupeFacet} from "../contracts/diamond/DiamondLoupeFacet.sol";
+import {GatewayDiamond} from "../contracts/GatewayDiamond.sol";
+import {GatewayGetterFacet} from "../contracts/gateway/GatewayGetterFacet.sol";
+import {GatewayManagerFacet} from "../contracts/gateway/GatewayManagerFacet.sol";
+import {GatewayMessengerFacet} from "../contracts/gateway/GatewayMessengerFacet.sol";
+import {XnetMessagingFacet} from "../contracts/gateway/router/XnetMessagingFacet.sol";
 import {GatewayFacetsHelper} from "./helpers/GatewayFacetsHelper.sol";
 import {DiamondFacetsHelper} from "./helpers/DiamondFacetsHelper.sol";
 import {IntegrationTestBase} from "./IntegrationTestBase.sol";

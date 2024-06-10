@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import { Script, console2 as console } from "forge-std/Script.sol";
 import { IERC20 } from "openzeppelin-contracts/interfaces/IERC20.sol";
-import { SubnetID } from "@ipc/src/structs/Subnet.sol";
+import { SubnetID } from "@ipc/contracts/structs/Subnet.sol";
 
 import "../src/IpcTokenSender.sol";
 

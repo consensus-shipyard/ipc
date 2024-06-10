@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import { IInterchainTokenService } from "@axelar-network/interchain-token-service/interfaces/IInterchainTokenService.sol";
 import { AddressBytes } from "@axelar-network/axelar-gmp-sdk-solidity/contracts/libs/AddressBytes.sol";
 import { IERC20 } from "openzeppelin-contracts/interfaces/IERC20.sol";
-import { SubnetID } from "@ipc/src/structs/Subnet.sol";
+import { SubnetID } from "@ipc/contracts/structs/Subnet.sol";
 
 // @notice The IpcTokenSender can be deployed in an Axelar-supported L1 containing the canonical version of some ERC20
 //         token (e.g. Ethereum, Polygon, etc.) we want to transfer to an token-supply IPC subnet anchored on another

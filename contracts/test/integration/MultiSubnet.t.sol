@@ -2,30 +2,30 @@
 pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
-import "../../src/errors/IPCErrors.sol";
-import {EMPTY_BYTES, METHOD_SEND} from "../../src/constants/Constants.sol";
-import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMsgKind, OutcomeType} from "../../src/structs/CrossNet.sol";
-import {FvmAddress} from "../../src/structs/FvmAddress.sol";
-import {SubnetID, Subnet, IPCAddress, Validator} from "../../src/structs/Subnet.sol";
-import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
-import {SupplySourceHelper} from "../../src/lib/SupplySourceHelper.sol";
-import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
-import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
-import {GatewayDiamond, FEATURE_MULTILEVEL_CROSSMSG} from "../../src/GatewayDiamond.sol";
-import {SubnetActorDiamond} from "../../src/SubnetActorDiamond.sol";
-import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
-import {SubnetActorManagerFacet} from "../../src/subnet/SubnetActorManagerFacet.sol";
-import {SubnetActorCheckpointingFacet} from "../../src/subnet/SubnetActorCheckpointingFacet.sol";
-import {GatewayGetterFacet} from "../../src/gateway/GatewayGetterFacet.sol";
-import {GatewayManagerFacet} from "../../src/gateway/GatewayManagerFacet.sol";
-import {LibGateway} from "../../src/lib/LibGateway.sol";
-import {TopDownFinalityFacet} from "../../src/gateway/router/TopDownFinalityFacet.sol";
-import {CheckpointingFacet} from "../../src/gateway/router/CheckpointingFacet.sol";
-import {XnetMessagingFacet} from "../../src/gateway/router/XnetMessagingFacet.sol";
-import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
-import {GatewayMessengerFacet} from "../../src/gateway/GatewayMessengerFacet.sol";
-import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
-import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
+import "../../contracts/errors/IPCErrors.sol";
+import {EMPTY_BYTES, METHOD_SEND} from "../../contracts/constants/Constants.sol";
+import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMsgKind, OutcomeType} from "../../contracts/structs/CrossNet.sol";
+import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
+import {SubnetID, Subnet, IPCAddress, Validator} from "../../contracts/structs/Subnet.sol";
+import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
+import {SupplySourceHelper} from "../../contracts/lib/SupplySourceHelper.sol";
+import {FvmAddressHelper} from "../../contracts/lib/FvmAddressHelper.sol";
+import {CrossMsgHelper} from "../../contracts/lib/CrossMsgHelper.sol";
+import {GatewayDiamond, FEATURE_MULTILEVEL_CROSSMSG} from "../../contracts/GatewayDiamond.sol";
+import {SubnetActorDiamond} from "../../contracts/SubnetActorDiamond.sol";
+import {SubnetActorGetterFacet} from "../../contracts/subnet/SubnetActorGetterFacet.sol";
+import {SubnetActorManagerFacet} from "../../contracts/subnet/SubnetActorManagerFacet.sol";
+import {SubnetActorCheckpointingFacet} from "../../contracts/subnet/SubnetActorCheckpointingFacet.sol";
+import {GatewayGetterFacet} from "../../contracts/gateway/GatewayGetterFacet.sol";
+import {GatewayManagerFacet} from "../../contracts/gateway/GatewayManagerFacet.sol";
+import {LibGateway} from "../../contracts/lib/LibGateway.sol";
+import {TopDownFinalityFacet} from "../../contracts/gateway/router/TopDownFinalityFacet.sol";
+import {CheckpointingFacet} from "../../contracts/gateway/router/CheckpointingFacet.sol";
+import {XnetMessagingFacet} from "../../contracts/gateway/router/XnetMessagingFacet.sol";
+import {DiamondCutFacet} from "../../contracts/diamond/DiamondCutFacet.sol";
+import {GatewayMessengerFacet} from "../../contracts/gateway/GatewayMessengerFacet.sol";
+import {DiamondLoupeFacet} from "../../contracts/diamond/DiamondLoupeFacet.sol";
+import {DiamondCutFacet} from "../../contracts/diamond/DiamondCutFacet.sol";
 import {IntegrationTestBase, RootSubnetDefinition, TestSubnetDefinition} from "../IntegrationTestBase.sol";
 import {L2GatewayActorDiamond, L1GatewayActorDiamond} from "../IntegrationTestPresets.sol";
 import {TestUtils, MockIpcContract, MockIpcContractPayable, MockIpcContractRevert, MockIpcContractFallback} from "../helpers/TestUtils.sol";
@@ -1311,7 +1311,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         console.log("minted tokens in executed top-downs: %d", minted_tokens);
 
         // The implementation of the function in fendermint is in
-        // https://github.com/consensus-shipyard/ipc/blob/main/fendermint/vm/interpreter/src/fvm/topdown.rs#L43
+        // https://github.com/consensus-shipyard/ipc/blob/main/fendermint/vm/interpreter/contracts/fvm/topdown.rs#L43
 
         // This emulates minting tokens.
         vm.deal(address(gw), minted_tokens);

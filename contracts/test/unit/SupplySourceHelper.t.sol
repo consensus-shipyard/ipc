@@ -3,10 +3,10 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
-import "../../src/lib/SubnetIDHelper.sol";
+import "../../contracts/lib/SubnetIDHelper.sol";
 
-import {SupplySource, SupplyKind} from "../../src/structs/Subnet.sol";
-import {SupplySourceHelper} from "../../src/lib/SupplySourceHelper.sol";
+import {SupplySource, SupplyKind} from "../../contracts/structs/Subnet.sol";
+import {SupplySourceHelper} from "../../contracts/lib/SupplySourceHelper.sol";
 
 import {SupplySourceHelperMock} from "../mocks/SupplySourceHelperMock.sol";
 

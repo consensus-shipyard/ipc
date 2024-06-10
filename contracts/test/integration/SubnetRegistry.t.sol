@@ -1,32 +1,32 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import "../../src/errors/IPCErrors.sol";
+import "../../contracts/errors/IPCErrors.sol";
 import "forge-std/Test.sol";
 
-import {ConsensusType} from "../../src/enums/ConsensusType.sol";
+import {ConsensusType} from "../../contracts/enums/ConsensusType.sol";
 import {TestUtils} from "../helpers/TestUtils.sol";
-import {IERC165} from "../../src/interfaces/IERC165.sol";
-import {IDiamond} from "../../src/interfaces/IDiamond.sol";
-import {IDiamondCut} from "../../src/interfaces/IDiamondCut.sol";
-import {IDiamondLoupe} from "../../src/interfaces/IDiamondLoupe.sol";
-import {LibDiamond} from "../../src/lib/LibDiamond.sol";
+import {IERC165} from "../../contracts/interfaces/IERC165.sol";
+import {IDiamond} from "../../contracts/interfaces/IDiamond.sol";
+import {IDiamondCut} from "../../contracts/interfaces/IDiamondCut.sol";
+import {IDiamondLoupe} from "../../contracts/interfaces/IDiamondLoupe.sol";
+import {LibDiamond} from "../../contracts/lib/LibDiamond.sol";
 
-import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
-import {SubnetActorManagerFacet} from "../../src/subnet/SubnetActorManagerFacet.sol";
-import {SubnetActorPauseFacet} from "../../src/subnet/SubnetActorPauseFacet.sol";
-import {SubnetActorCheckpointingFacet} from "../../src/subnet/SubnetActorCheckpointingFacet.sol";
-import {SubnetActorRewardFacet} from "../../src/subnet/SubnetActorRewardFacet.sol";
-import {SubnetActorDiamond} from "../../src/SubnetActorDiamond.sol";
-import {SubnetID, PermissionMode, SubnetCreationPrivileges} from "../../src/structs/Subnet.sol";
-import {SubnetRegistryDiamond} from "../../src/SubnetRegistryDiamond.sol";
+import {SubnetActorGetterFacet} from "../../contracts/subnet/SubnetActorGetterFacet.sol";
+import {SubnetActorManagerFacet} from "../../contracts/subnet/SubnetActorManagerFacet.sol";
+import {SubnetActorPauseFacet} from "../../contracts/subnet/SubnetActorPauseFacet.sol";
+import {SubnetActorCheckpointingFacet} from "../../contracts/subnet/SubnetActorCheckpointingFacet.sol";
+import {SubnetActorRewardFacet} from "../../contracts/subnet/SubnetActorRewardFacet.sol";
+import {SubnetActorDiamond} from "../../contracts/SubnetActorDiamond.sol";
+import {SubnetID, PermissionMode, SubnetCreationPrivileges} from "../../contracts/structs/Subnet.sol";
+import {SubnetRegistryDiamond} from "../../contracts/SubnetRegistryDiamond.sol";
 
-import {RegisterSubnetFacet} from "../../src/subnetregistry/RegisterSubnetFacet.sol";
-import {SubnetGetterFacet} from "../../src/subnetregistry/SubnetGetterFacet.sol";
-import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
-import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
-import {OwnershipFacet} from "../../src/OwnershipFacet.sol";
-import {SupplySourceHelper} from "../../src/lib/SupplySourceHelper.sol";
+import {RegisterSubnetFacet} from "../../contracts/subnetregistry/RegisterSubnetFacet.sol";
+import {SubnetGetterFacet} from "../../contracts/subnetregistry/SubnetGetterFacet.sol";
+import {DiamondLoupeFacet} from "../../contracts/diamond/DiamondLoupeFacet.sol";
+import {DiamondCutFacet} from "../../contracts/diamond/DiamondCutFacet.sol";
+import {OwnershipFacet} from "../../contracts/OwnershipFacet.sol";
+import {SupplySourceHelper} from "../../contracts/lib/SupplySourceHelper.sol";
 import {RegistryFacetsHelper} from "../helpers/RegistryFacetsHelper.sol";
 import {DiamondFacetsHelper} from "../helpers/DiamondFacetsHelper.sol";
 

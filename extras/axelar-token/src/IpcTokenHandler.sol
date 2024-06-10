@@ -4,12 +4,12 @@ pragma solidity ^0.8.20;
 import { InterchainTokenExecutable } from '@axelar-network/interchain-token-service/executable/InterchainTokenExecutable.sol';
 import { IERC20 } from "openzeppelin-contracts/interfaces/IERC20.sol";
 import { Ownable } from "openzeppelin-contracts/access/Ownable.sol";
-import { SubnetID, SupplySource, SupplyKind } from "@ipc/src/structs/Subnet.sol";
-import { FvmAddress } from "@ipc/src/structs/FvmAddress.sol";
+import { SubnetID, SupplySource, SupplyKind } from "@ipc/contracts/structs/Subnet.sol";
+import { FvmAddress } from "@ipc/contracts/structs/FvmAddress.sol";
 import { IIpcHandler } from "@ipc/sdk/interfaces/IIpcHandler.sol";
-import { IpcMsgKind, ResultMsg, OutcomeType, IpcEnvelope } from "@ipc/src/structs/CrossNet.sol";
-import { FvmAddressHelper } from "@ipc/src/lib/FvmAddressHelper.sol";
-import { SubnetIDHelper } from "@ipc/src/lib/SubnetIDHelper.sol";
+import { IpcMsgKind, ResultMsg, OutcomeType, IpcEnvelope } from "@ipc/contracts/structs/CrossNet.sol";
+import { FvmAddressHelper } from "@ipc/contracts/lib/FvmAddressHelper.sol";
+import { SubnetIDHelper } from "@ipc/contracts/lib/SubnetIDHelper.sol";
 import { SafeERC20 } from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 
 interface TokenFundedGateway {

@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
-import "../../src/lib/SubnetIDHelper.sol";
+import "../../contracts/lib/SubnetIDHelper.sol";
 
 contract SubnetIDHelperTest is Test {
     using Strings for *;

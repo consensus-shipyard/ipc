@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import "../src/IpcTokenSender.sol";
 import "./DummyERC20.sol";
-import { FvmAddressHelper } from "@ipc/src/lib/FvmAddressHelper.sol";
+import { FvmAddressHelper } from "@ipc/contracts/lib/FvmAddressHelper.sol";
 
 contract TestSender is Test {
     using FvmAddressHelper for address;
