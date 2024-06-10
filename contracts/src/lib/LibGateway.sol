@@ -10,7 +10,7 @@ import {CallMsg, IpcMsgKind, IpcEnvelope, OutcomeType, BottomUpMsgBatch, BottomU
 import {Membership} from "../structs/Subnet.sol";
 import {CannotSendCrossMsgToItself, MethodNotAllowed, MaxMsgsPerBatchExceeded, InvalidXnetMessage ,OldConfigurationNumber, NotRegisteredSubnet, InvalidActorAddress, ParentFinalityAlreadyCommitted, InvalidXnetMessageReason} from "../errors/IPCErrors.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
-import {FilAddress} from "fevmate/utils/FilAddress.sol";
+import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {SupplySourceHelper} from "../lib/SupplySourceHelper.sol";
 

@@ -21,7 +21,7 @@ import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
 import {IntegrationTestBase} from "../IntegrationTestBase.sol";
 import {L2GatewayActorDiamond} from "../IntegrationTestPresets.sol";
 import {TestUtils} from "../helpers/TestUtils.sol";
-import {FilAddress} from "fevmate/utils/FilAddress.sol";
+import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 
 import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 

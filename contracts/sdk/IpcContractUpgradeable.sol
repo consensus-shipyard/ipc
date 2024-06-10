@@ -29,7 +29,7 @@ abstract contract IpcExchangeUpgradeable is Initializable, IIpcHandler, OwnableU
 
     function __IpcExchangeUpgradeable_init(address gatewayAddr_) public onlyInitializing {
         gatewayAddr = gatewayAddr_;
-        __Ownable_init();
+        __Ownable_init(msg.sender);
         __ReentrancyGuard_init();
     }
 

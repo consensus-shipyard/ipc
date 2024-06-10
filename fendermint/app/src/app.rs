@@ -451,6 +451,8 @@ where
         let validators =
             to_validator_updates(validators).context("failed to convert validators")?;
 
+        tracing::info!(state_params = serde_json::to_string(&state_params)?);
+
         // Let's pretend that the genesis state is that of a fictive block at height 0.
         // The record will be stored under height 1, and the record after the application
         // of the actual block 1 will be at height 2, so they are distinct records.

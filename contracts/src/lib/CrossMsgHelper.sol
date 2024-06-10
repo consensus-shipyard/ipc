@@ -8,7 +8,7 @@ import {SubnetID, IPCAddress} from "../structs/Subnet.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
-import {FilAddress} from "fevmate/utils/FilAddress.sol";
+import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
 import {SupplySource} from "../structs/Subnet.sol";
 import {SupplySourceHelper} from "./SupplySourceHelper.sol";
