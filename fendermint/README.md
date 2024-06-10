@@ -75,7 +75,7 @@ The default configuration is in [default.toml](./app/config/default.toml). This 
 The [Settings::config](./app/settings/src/lib.rs) method expects the following files in a configuration directory:
 * `default.toml` with the settings for the keys that have meaningful default values
 * `<mode>.toml` is an optional file correponding to the `--mode` CLI option (by default `dev`); these are files that could be checked into Github e.g. to have values for production or test environments
-* `local.toml` is also optional with potentia overrides specific to the developer's machine
+* `local.toml` is also optional with potential overrides specific to the developer's machine
 
 An example of this override is the [test.toml](./app/config/test.toml) file which contains keys that do not have meaningful defaults, for the purpose of testing the parsing logic.
 
