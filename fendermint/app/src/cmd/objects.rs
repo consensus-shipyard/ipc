@@ -627,7 +627,7 @@ async fn handle_object_download(
         .unwrap_or(FvmQueryHeight::Committed.into());
     let path = tail.as_str();
     let key: Vec<u8> = path.into();
-    let maybe_object = os_get(client, args, address, GetParams { key: key.into() }, height)
+    let maybe_object = os_get(client, args, address, GetParams { key }, height)
         .await
         .map_err(|e| {
             Rejection::from(BadRequest {
