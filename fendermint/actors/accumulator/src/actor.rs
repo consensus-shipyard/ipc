@@ -42,7 +42,7 @@ impl Actor {
         })
     }
 
-    fn get_leaf_at(rt: &impl Runtime, index: u64) -> Result<Vec<u8>, ActorError> {
+    fn get_leaf_at(rt: &impl Runtime, index: u64) -> Result<Option<Vec<u8>>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let st: State = rt.state()?;
         st.get_obj(rt.store(), index)

@@ -158,7 +158,7 @@ fn get_at<BS: Blockstore, S: DeserializeOwned + Serialize>(
     leaf_index: u64,
     leaf_count: u64,
     peaks: &Amt<Cid, &BS>,
-) -> anyhow::Result<S> {
+) -> anyhow::Result<Option<S>> {
     let (path, eigen_index) = path_for_eigen_root(leaf_index, leaf_count);
     let cid = match peaks.get(eigen_index)? {
         Some(cid) => cid,
@@ -172,8 +172,8 @@ fn get_at<BS: Blockstore, S: DeserializeOwned + Serialize>(
     // Special case where eigentree has height of one
     if path == 1 {
         return match store.get_cbor::<S>(cid)? {
-            Some(value) => Ok(value),
-            None => return Err(anyhow::anyhow!("failed to get leaf for cid {}", cid)),
+            Some(value) => Ok(Some(value)),
+            None => Err(anyhow::anyhow!("failed to get leaf for cid {}", cid)),
         };
     }
 
@@ -207,11 +207,7 @@ fn get_at<BS: Blockstore, S: DeserializeOwned + Serialize>(
 
     let bit = (path & 1) as usize;
     let cid = &pair[bit];
-    let leaf = match store.get_cbor::<S>(cid)? {
-        Some(root) => root,
-        None => return Err(anyhow::anyhow!("failed to get leaf for cid {}", cid)),
-    };
-    Ok(leaf)
+    store.get_cbor::<S>(cid)
 }
 
 /// The state represents an MMR with peaks stored in an AMT
@@ -307,7 +303,7 @@ impl State {
         &self,
         store: &BS,
         index: u64,
-    ) -> anyhow::Result<S> {
+    ) -> anyhow::Result<Option<S>> {
         let amt = Amt::<Cid, &BS>::load(&self.peaks, store)?;
         get_at::<BS, S>(store, index, self.leaf_count, &amt)
     }
@@ -422,23 +418,23 @@ mod tests {
         state.push(&store, vec![0]).unwrap();
         assert_eq!(state.peak_count(), 1);
         assert_eq!(state.leaf_count(), 1);
-        let item0 = state.get_obj::<_, Vec<i32>>(&store, 0u64).unwrap();
+        let item0 = state.get_obj::<_, Vec<i32>>(&store, 0u64).unwrap().unwrap();
         assert_eq!(item0, vec![0]);
 
         state.push(&store, vec![1]).unwrap();
         assert_eq!(state.peak_count(), 1);
         assert_eq!(state.leaf_count(), 2);
-        let item0 = state.get_obj::<_, Vec<i32>>(&store, 0u64).unwrap();
-        let item1 = state.get_obj::<_, Vec<i32>>(&store, 1u64).unwrap();
+        let item0 = state.get_obj::<_, Vec<i32>>(&store, 0u64).unwrap().unwrap();
+        let item1 = state.get_obj::<_, Vec<i32>>(&store, 1u64).unwrap().unwrap();
         assert_eq!(item0, vec![0]);
         assert_eq!(item1, vec![1]);
 
         state.push(&store, vec![2]).unwrap();
         assert_eq!(state.peak_count(), 2);
         assert_eq!(state.leaf_count(), 3);
-        let item0 = state.get_obj::<_, Vec<i32>>(&store, 0u64).unwrap();
-        let item1 = state.get_obj::<_, Vec<i32>>(&store, 1u64).unwrap();
-        let item2 = state.get_obj::<_, Vec<i32>>(&store, 2u64).unwrap();
+        let item0 = state.get_obj::<_, Vec<i32>>(&store, 0u64).unwrap().unwrap();
+        let item1 = state.get_obj::<_, Vec<i32>>(&store, 1u64).unwrap().unwrap();
+        let item2 = state.get_obj::<_, Vec<i32>>(&store, 2u64).unwrap().unwrap();
         assert_eq!(item0, vec![0]);
         assert_eq!(item1, vec![1]);
         assert_eq!(item2, vec![2]);
@@ -455,7 +451,7 @@ mod tests {
             // As more items are added to the accumulator, ensure each item remains gettable at
             // each phase of the growth of the inner tree structures.
             for j in 0..i {
-                let item = state.get_obj::<_, Vec<u64>>(&store, j).unwrap();
+                let item = state.get_obj::<_, Vec<u64>>(&store, j).unwrap().unwrap();
                 assert_eq!(item, vec![j]);
             }
         }

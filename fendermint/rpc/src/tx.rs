@@ -319,12 +319,12 @@ pub trait CallClient: QueryClient + BoundClient {
             return Err(anyhow!("{}", response.value.info));
         }
 
-        let res = decode_acc_get_at(&response.value)
+        let return_data = decode_acc_get_at(&response.value)
             .context("error decoding data from deliver_tx in call")?;
 
         let response = CallResponse {
             response,
-            return_data: Some(res),
+            return_data,
         };
 
         Ok(response)
