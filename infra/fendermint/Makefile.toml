@@ -37,10 +37,21 @@ BASE_FEE = { value = "1000", condition = { env_not_set = ["BASE_FEE"] } }
 TIMESTAMP = { value = "1680101412", condition = { env_not_set = ["TIMESTAMP"] } }
 POWER_SCALE = { value = "3", condition = { env_not_set = ["POWER_SCALE"] } }
 
+# ETH related parameters
+ETHAPI_ALLOWED_ORIGINS = { value = "*", condition = { env_not_set = [
+    "ETHAPI_ALLOWED_ORIGINS",
+] } }
+ETHAPI_ALLOWED_METHODS = { value = "GET,HEAD,OPTIONS,POST", condition = { env_not_set = [
+    "ETHAPI_ALLOWED_METHODS",
+] } }
+ETHAPI_ALLOWED_HEADERS = { value = "Accept,Authorization,Content-Type,Origin", condition = { env_not_set = [
+    "ETHAPI_ALLOWED_HEADERS",
+] } }
+
 # IPC subnet related parameters
 # Use calibration as default value
 NODE_NAME = { value = "ipc-node", condition = { env_not_set = ["NODE_NAME"] } }
-PARENT_ENDPOINT = { value = "https://api.calibration.node.glif.io/rpc/v1", condition = { env_not_set = [
+PARENT_ENDPOINT = { value = "https://calibration.node.glif.io/archive/lotus/rpc/v1", condition = { env_not_set = [
     "PARENT_ENDPOINT",
 ] } }
 PARENT_GATEWAY = { value = "0x56948d2CFaa2EF355B8C08Ac925202db212146D1", condition = { env_not_set = [
@@ -56,6 +67,9 @@ TOPDOWN_CHAIN_HEAD_DELAY = { value = "10", condition = { env_not_set = [
 TOPDOWN_PROPOSAL_DELAY = { value = "2", condition = { env_not_set = ["TOPDOWN_PROPOSAL_DELAY"] } }
 TOPDOWN_MAX_PROPOSAL_RANGE = { value = "100", condition = { env_not_set = [
     "TOPDOWN_MAX_PROPOSAL_RANGE",
+] } }
+TOPDOWN_MAX_CACHE_BLOCKS = { value = "20000", condition = { env_not_set = [
+    "TOPDOWN_MAX_CACHE_BLOCKS",
 ] } }
 # Comma-separated list of bootstrap nodes to be used by the CometBFT node.
 BOOTSTRAPS = { value = "", condition = { env_not_set = ["BOOTSTRAPS"] } }

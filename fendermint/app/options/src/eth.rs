@@ -17,7 +17,6 @@ pub enum EthCommands {
         /// The URL of the Tendermint node's RPC endpoint.
         #[arg(
             long,
-            short,
             default_value = "http://127.0.0.1:26657",
             env = "TENDERMINT_RPC_URL"
         )]
@@ -26,7 +25,6 @@ pub enum EthCommands {
         /// The URL of the Tendermint node's WebSocket endpoint.
         #[arg(
             long,
-            short,
             default_value = "ws://127.0.0.1:26657/websocket",
             env = "TENDERMINT_WS_URL"
         )]

@@ -14,6 +14,11 @@ eval `ssh-agent -s`
 ssh-add
 ssh-add ${HOME}/.ssh/id_rsa.ipc
 
+if [[ ! -v PARENT_HTTP_AUTH_TOKEN ]]; then
+    echo "PARENT_HTTP_AUTH_TOKEN is not set"
+    exit 1
+fi
+
 DASHES='------'
 if [[ ! -v IPC_FOLDER ]]; then
     IPC_FOLDER=${HOME}/ipc
@@ -133,10 +138,41 @@ cd ${IPC_FOLDER}/fendermint
 make clean
 make docker-build
 
-# Step 4.2: Start other validator node
-echo "$DASHES Restart validator nodes"
+# Step 4.2: Start first validator node as bootstrap
+echo "$DASHES Start first validator node as bootstrap"
 cd ${IPC_FOLDER}
-for i in {0..2}
+bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
+    -e NODE_NAME=validator-0 \
+    -e PRIVATE_KEY_PATH=${IPC_CONFIG_FOLDER}/validator_0.sk \
+    -e SUBNET_ID=${subnet_id} \
+    -e CMT_P2P_HOST_PORT=${CMT_P2P_HOST_PORTS[0]} \
+    -e CMT_RPC_HOST_PORT=${CMT_RPC_HOST_PORTS[0]} \
+    -e ETHAPI_HOST_PORT=${ETHAPI_HOST_PORTS[0]} \
+    -e RESOLVER_HOST_PORT=${RESOLVER_HOST_PORTS[0]} \
+    -e PROXY_HOST_PORT=${PROXY_HOST_PORTS[0]} \
+    -e IPFS_SWARM_HOST_PORT=${IPFS_SWARM_HOST_PORTS[0]} \
+    -e IPFS_RPC_HOST_PORT=${IPFS_RPC_HOST_PORTS[0]} \
+    -e IPFS_GATEWAY_HOST_PORT=${IPFS_GATEWAY_HOST_PORTS[0]} \
+    -e IPFS_PROFILE="local-discovery" \
+    -e PARENT_HTTP_AUTH_TOKEN=${PARENT_HTTP_AUTH_TOKEN} \
+    -e PARENT_REGISTRY=${parent_registry_address} \
+    -e PARENT_GATEWAY=${parent_gateway_address} \
+    -e FM_PULL_SKIP=1 \
+    -e FM_LOG_LEVEL="info,fendermint=debug" \
+    child-validator-restart 2>&1)
+echo "$bootstrap_output"
+bootstrap_node_id=$(echo "$bootstrap_output" | sed -n '/CometBFT node ID:/ {n;p;}' | tr -d "[:blank:]")
+bootstrap_peer_id=$(echo "$bootstrap_output" | sed -n '/IPLD Resolver Multiaddress:/ {n;p;}' | tr -d "[:blank:]" | sed 's/.*\/p2p\///')
+echo "Bootstrap node started. Node id ${bootstrap_node_id}, peer id ${bootstrap_peer_id}"
+
+bootstrap_node_endpoint=${bootstrap_node_id}@validator-0-cometbft:${CMT_P2P_HOST_PORTS[0]}
+echo "Bootstrap node endpoint: ${bootstrap_node_endpoint}"
+bootstrap_resolver_endpoint="/dns/validator-0-fendermint/tcp/${RESOLVER_HOST_PORTS[0]}/p2p/${bootstrap_peer_id}"
+echo "Bootstrap resolver endpoint: ${bootstrap_resolver_endpoint}"
+
+# Step 4.3: Start other validator node
+echo "$DASHES Start the other validator nodes"
+for i in {1..2}
 do
   cargo make --makefile infra/fendermint/Makefile.toml \
       -e NODE_NAME=validator-${i} \
@@ -151,10 +187,13 @@ do
       -e IPFS_RPC_HOST_PORT=${IPFS_RPC_HOST_PORTS[i]} \
       -e IPFS_GATEWAY_HOST_PORT=${IPFS_GATEWAY_HOST_PORTS[i]} \
       -e IPFS_PROFILE="local-discovery" \
+      -e RESOLVER_BOOTSTRAPS=${bootstrap_resolver_endpoint} \
+      -e BOOTSTRAPS=${bootstrap_node_endpoint} \
+      -e PARENT_HTTP_AUTH_TOKEN=${PARENT_HTTP_AUTH_TOKEN} \
       -e PARENT_REGISTRY=${parent_registry_address} \
       -e PARENT_GATEWAY=${parent_gateway_address} \
       -e FM_PULL_SKIP=1 \
-      -e FM_LOG_LEVEL="info" \
+      -e FM_LOG_LEVEL="info,fendermint=debug" \
       child-validator-restart
 done
 

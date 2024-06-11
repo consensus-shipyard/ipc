@@ -65,5 +65,5 @@ jobs:
           host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
           username: textile
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
-          script: bash -il /home/textile/scripts/deploy_subnet_under_calibration_net/deploy.sh ${{ github.ref_name }}
+          script: PARENT_HTTP_AUTH_TOKEN=${{ secrets.PARENT_HTTP_AUTH_TOKEN }} bash -il /home/textile/scripts/deploy_subnet_under_calibration_net/deploy.sh ${{ github.ref_name }}
           command_timeout: 120m

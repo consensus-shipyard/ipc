@@ -32,7 +32,7 @@ diagrams:
 	make -C  ../docs/fendermint/diagrams diagrams
 
 build: $(IPC_ACTORS_GEN) | protoc npm
-	cargo build --release
+	cargo build --locked --release
 
 install: $(IPC_ACTORS_GEN)
 	cargo install --locked --path app
@@ -43,7 +43,7 @@ test: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 	FM_BUILTIN_ACTORS_BUNDLE=$(BUILTIN_ACTORS_BUNDLE) \
 	FM_CUSTOM_ACTORS_BUNDLE=$(CUSTOM_ACTORS_BUNDLE) \
 	FM_CONTRACTS_DIR=$(IPC_ACTORS_OUT) \
-	cargo test --release \
+	cargo test --locked --release \
 		-p fendermint_abci \
 		-p fendermint_app \
 		-p fendermint_actor_objectstore \
@@ -74,7 +74,7 @@ test: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 	FM_BUILTIN_ACTORS_BUNDLE=$(BUILTIN_ACTORS_BUNDLE) \
 	FM_CUSTOM_ACTORS_BUNDLE=$(CUSTOM_ACTORS_BUNDLE) \
 	FM_CONTRACTS_DIR=$(IPC_ACTORS_OUT) \
-	cargo test --release \
+	cargo test --locked --release \
 		-p fendermint_actor_eam \
 		-p fendermint_vm_interpreter \
 		-p fendermint_vm_snapshot \
@@ -85,7 +85,7 @@ e2e: docker-build | cargo-make
 	cd testing/smoke-test    && cargo make --profile $(PROFILE)
 	cd testing/snapshot-test && cargo make --profile $(PROFILE)
 	cd testing/graph-test    && cargo make --profile $(PROFILE)
-	PROFILE=$(PROFILE) cargo test --package fendermint_materializer
+	PROFILE=$(PROFILE) cargo test --locked --package fendermint_materializer
 
 clean:
 	cargo clean
@@ -149,7 +149,7 @@ $(BUILTIN_ACTORS_BUNDLE):
 
 # Build a bundle CAR for the custom actors in this repo.
 $(CUSTOM_ACTORS_BUNDLE):
-	cargo build --release -p fendermint_actors
+	cargo build --locked --release -p fendermint_actors
 
 # Regenerate the ABI artifacts if we don't have them already, or they changed.
 $(IPC_ACTORS_GEN): $(IPC_ACTORS_CODE)
