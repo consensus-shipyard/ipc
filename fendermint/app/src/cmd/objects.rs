@@ -66,7 +66,8 @@ cmd! {
                 .and(warp::multipart::form().max_length(MAX_OBJECT_LENGTH))
                 .and_then(handle_object_upload);
 
-                let objects_download = warp::path!("v1" / "objects" / Address / String)
+                let objects_download = warp::path!("v1" / "objects" / Address / ..)
+                .and(warp::path::tail())
                 .and(
                     warp::get().map(|| "GET".to_string()).or(warp::head().map(|| "HEAD".to_string())).unify()
 
@@ -613,7 +614,7 @@ struct ObjectRange {
 #[allow(clippy::too_many_arguments)]
 async fn handle_object_download(
     address: Address,
-    key: String,
+    tail: Tail,
     method: String,
     range: Option<String>,
     height_query: HeightQuery,
@@ -624,6 +625,8 @@ async fn handle_object_download(
     let height = height_query
         .height
         .unwrap_or(FvmQueryHeight::Committed.into());
+    let path = tail.as_str();
+    let key: Vec<u8> = path.into();
     let maybe_object = os_get(client, args, address, GetParams { key: key.into() }, height)
         .await
         .map_err(|e| {
