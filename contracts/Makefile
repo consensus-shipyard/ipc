@@ -63,11 +63,11 @@ pnpm:
 	}
 
 lint: pnpm fmt
-	pnpx solhint 'src/**/*.sol'
+	pnpx solhint 'contracts/**/*.sol' 'sdk/**/**/*.sol'
 
 fmt: pnpm
 	pnpm install --silent --no-save
-	pnpx prettier --check -w 'src/**/**/*.sol' 'sdk/**/**/*.sol' 'test/**/**/*.sol' 'test/**/**/*.t.sol' '**/*.{js,jsx,ts,tsx,json,css,md}'
+	pnpx prettier --check -w 'contracts/**/**/*.sol' 'sdk/**/**/*.sol' 'test/**/**/*.sol' 'test/**/**/*.t.sol' '**/*.{js,jsx,ts,tsx,json,css,md}'
 
 deps: node_modules
 
