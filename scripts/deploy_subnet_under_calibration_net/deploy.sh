@@ -286,20 +286,6 @@ do
       child-validator
 done
 
-# Step 8.4: Fund proxy wallet in the subnet
-echo "$DASHES Fund proxy wallets in the subnet"
-for i in {0..2}
-do
-  proxy_key=$(cat ${IPC_CONFIG_FOLDER}/evm_keystore_proxy.json | jq .[$i].private_key | tr -d '"' | tr -d '\n')
-  proxy_address=$(cat ${IPC_CONFIG_FOLDER}/evm_keystore_proxy.json | jq .[$i].address | tr -d '"' | tr -d '\n')
-  ipc-cli wallet import --wallet-type evm --private-key ${proxy_key}
-  ipc-cli cross-msg fund --from ${proxy_address} --subnet ${subnet_id} 1
-  out=${subnet_folder}/validator-${i}/validator-${i}/keys/proxy_key.sk
-  ipc-cli wallet export --wallet-type evm --address ${proxy_address} --fendermint | tr -d '\n' > ${out}
-  chmod 600 ${subnet_folder}/validator-${i}/validator-${i}/keys/proxy_key.sk
-  ipc-cli wallet remove --wallet-type evm --address ${proxy_address}
-done
-
 # Step 9: Test
 # Step 9.1: Test ETH API endpoint
 echo "$DASHES Test ETH API endpoints of validator nodes"
