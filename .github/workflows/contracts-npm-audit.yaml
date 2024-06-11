@@ -12,8 +12,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+      - uses: pnpm/action-setup@v2
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+          cache: 'pnpm'
       - name: NPM Audit
         run: |
           cd contracts
-          npm install -g npm-audit-resolver
+          pnpm install -g npm-audit-resolver
           check-audit --omit dev --audit-level critical
