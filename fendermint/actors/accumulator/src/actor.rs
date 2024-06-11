@@ -22,7 +22,6 @@ pub struct Actor;
 impl Actor {
     fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&INIT_ACTOR_ADDR))?;
-
         let state = State::new(rt.store(), params.creator, params.write_access).map_err(|e| {
             e.downcast_default(
                 ExitCode::USR_ILLEGAL_STATE,
@@ -34,7 +33,6 @@ impl Actor {
 
     fn push(rt: &impl Runtime, params: PushParams) -> Result<PushReturn, ActorError> {
         Self::ensure_write_allowed(rt)?;
-
         rt.transaction(|st: &mut State, rt| {
             st.push(rt.store(), params.0).map_err(|e| {
                 e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to push object")
@@ -45,7 +43,7 @@ impl Actor {
     fn get_leaf_at(rt: &impl Runtime, index: u64) -> Result<Option<Vec<u8>>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let st: State = rt.state()?;
-        st.get_obj(rt.store(), index)
+        st.get_leaf_at(rt.store(), index)
             .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get leaf"))
     }
 
