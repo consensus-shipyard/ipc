@@ -1,0 +1,5 @@
+{
+  "name": "@consensus-shipyard/ipc-workspace",
+  "private": true,
+  "packageManager": "pnpm@9.3.0"
+}

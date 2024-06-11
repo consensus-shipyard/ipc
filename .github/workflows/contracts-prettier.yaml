@@ -20,14 +20,12 @@ jobs:
       - name: Set up node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "21"
+          node-version: '21'
           cache: 'pnpm'
       - name: Run formatter
         run: cd contracts && make fmt
       - name: Check diff clean
         run: |
-          cd contracts
-          git restore package-lock.json
           git status
           git diff --name-only
           git --no-pager diff --quiet
