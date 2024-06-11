@@ -2,150 +2,84 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::str::FromStr;
-use std::{
-    convert::Infallible, future::Future, net::ToSocketAddrs, num::ParseIntError, pin::Pin,
-    sync::Arc,
-};
+use std::{convert::Infallible, net::ToSocketAddrs, num::ParseIntError};
 
 use anyhow::anyhow;
 use async_tempfile::TempFile;
 use base64::{engine::general_purpose, Engine};
-use bytes::{Buf, Bytes};
+use bytes::Buf;
 use cid::Cid;
 use ethers::core::types::{self as et};
-use fendermint_actor_machine::{Metadata, WriteAccess};
-use fendermint_actor_objectstore::{Object, ObjectKind, ObjectList, ObjectListItem};
+use fendermint_actor_objectstore::{Object, ObjectList, ObjectListItem};
 use fendermint_rpc::QueryClient;
 use fendermint_vm_message::conv::from_fvm::to_eth_tokens;
 use fendermint_vm_message::signed::SignedMessage;
-use futures_util::{Stream, StreamExt};
-use fvm_ipld_encoding::strict_bytes::ByteBuf;
-use fvm_shared::{address::Address, econ::TokenAmount, ActorID, BLOCK_GAS_LIMIT};
+use futures_util::StreamExt;
+use fvm_shared::{address::Address, econ::TokenAmount};
 use ipfs_api_backend_hyper::request::Add;
 use ipfs_api_backend_hyper::{IpfsApi, IpfsClient, TryFromUri};
-use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tendermint::{block::Height, Hash};
 use thiserror::Error;
-use tokio::{
-    io::{AsyncSeekExt, AsyncWriteExt},
-    sync::Mutex,
-};
+use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 use tokio_util::compat::TokioAsyncReadCompatExt;
 use warp::{
     filters::multipart::Part,
     http::{HeaderMap, HeaderValue, StatusCode},
+    hyper::body::Body,
     path::Tail,
     Filter, Rejection, Reply,
 };
 
-use fendermint_actor_accumulator::PushReturn;
-use fendermint_actor_objectstore::{DeleteParams, GetParams, ListParams, PutParams};
-use fendermint_app_options::rpc::BroadcastMode;
-use fendermint_app_settings::proxy::ProxySettings;
-use fendermint_rpc::tx::BoundClient;
-use fendermint_rpc::{
-    client::FendermintClient,
-    message::GasParams,
-    tx::{CallClient, TxClient},
-};
-use fendermint_vm_actor_interface::adm;
+use fendermint_actor_objectstore::{GetParams, ListParams};
+use fendermint_app_settings::objects::ObjectsSettings;
+use fendermint_rpc::{client::FendermintClient, tx::CallClient};
 use fendermint_vm_message::query::FvmQueryHeight;
 use fvm_shared::chainid::ChainID;
 
-use super::rpc::{gas_params, BroadcastResponse, TransClient};
+use super::rpc::{gas_params, TransClient};
 use crate::cmd;
 use crate::options::{
-    proxy::{ProxyArgs, ProxyCommands},
+    objects::{ObjectsArgs, ObjectsCommands},
     rpc::TransArgs,
 };
 
 const MAX_OBJECT_LENGTH: u64 = 1024 * 1024 * 1024;
-const MAX_INTERNAL_OBJECT_LENGTH: u64 = 1024;
-const MAX_EVENT_LENGTH: u64 = 1024 * 500; // Limit to 500KiB for now
 
 cmd! {
-    ProxyArgs(self, settings: ProxySettings) {
+    ObjectsArgs(self, settings: ObjectsSettings) {
         match self.command.clone() {
-            ProxyCommands::Run { tendermint_url, ipfs_addr, args} => {
+            ObjectsCommands::Run { tendermint_url, ipfs_addr, args} => {
                 let client = FendermintClient::new_http(tendermint_url, None)?;
                 let ipfs = IpfsClient::from_multiaddr_str(&ipfs_addr)?;
                 let ipfs_adapter = Ipfs { inner: ipfs.clone() };
-
-                let seq = args.sequence;
-                let nonce = Arc::new(Mutex::new(seq));
 
                 // Admin routes
                 let health_route = warp::path!("health")
                     .and(warp::get()).and_then(health);
 
-                // Machines
-                let machines_create_os_route = warp::path!("v1" / "machines" / "objectstores")
-                    .and(warp::post())
-                    .and(warp::query::<WriteAccessQuery>())
-                    .and(with_client(client.clone()))
-                    .and(with_args(args.clone()))
-                    .and(with_nonce(nonce.clone()))
-                    .and(warp::header::optional::<u64>("X-ADM-GasLimit"))
-                    .and(warp::header::optional::<BroadcastMode>("X-ADM-BroadcastMode"))
-                    .and_then(handle_machines_create_os);
-                let machines_create_acc_route = warp::path!("v1" / "machines" / "accumulators")
-                    .and(warp::post())
-                    .and(warp::query::<WriteAccessQuery>())
-                    .and(with_client(client.clone()))
-                    .and(with_args(args.clone()))
-                    .and(with_nonce(nonce.clone()))
-                    .and(warp::header::optional::<u64>("X-ADM-GasLimit"))
-                    .and(warp::header::optional::<BroadcastMode>("X-ADM-BroadcastMode"))
-                    .and_then(handle_machines_create_acc);
-                let machines_get_route = warp::path!("v1" / "machines" / Address)
-                    .and(warp::query::<HeightQuery>())
-                    .and(warp::get())
-                    .and(with_client(client.clone()))
-                    .and(with_args(args.clone()))
-                    .and_then(handle_machines_get);
-
-                // Accounts
-                let accounts_get_machines_route = warp::path!("v1" / "accounts" / Address / "machines")
-                    .and(warp::query::<HeightQuery>())
-                    .and(warp::get())
-                    .and(with_client(client.clone()))
-                    .and(with_args(args.clone()))
-                    .and_then(handle_accounts_get_machines);
-
-                // Objectstore routes
-                let objects_route = warp::path!("v1" / "objects" )
+                // Objects routes
+                let objects_upload = warp::path!("v1" / "objects" )
                 .and(warp::post())
                 .and(with_client(client.clone()))
                 .and(with_ipfs_adapter(ipfs_adapter.clone()))
                 .and(warp::multipart::form().max_length(MAX_OBJECT_LENGTH))
                 .and_then(handle_object_upload);
 
-                let os_upload_route = warp::path!("v1" / "objectstores" / Address / ..)
-                    .and(warp::put())
-                    .and(warp::path::tail())
-                    .and(warp::body::stream())
-                    .and(warp::body::content_length_limit(MAX_OBJECT_LENGTH))
-                    .and(warp::header::<u64>("Content-Length"))
-                    .and(with_client(client.clone()))
-                    .and(with_ipfs(ipfs.clone()))
-                    .and(with_args(args.clone()))
-                    .and(with_nonce(nonce.clone()))
-                    .and(warp::header::optional::<u64>("X-ADM-GasLimit"))
-                    .and(warp::header::optional::<BroadcastMode>("X-ADM-BroadcastMode"))
-                    .and_then(handle_os_upload);
+                let objects_download = warp::path!("v1" / "objects" / Address / ..)
+                .and(warp::path::tail())
+                .and(
+                    warp::get().map(|| "GET".to_string()).or(warp::head().map(|| "HEAD".to_string())).unify()
 
-                let os_delete_route = warp::path!("v1" / "objectstores" / Address / ..)
-                    .and(warp::delete())
-                    .and(warp::path::tail())
-                    .and(with_client(client.clone()))
-                    .and(with_args(args.clone()))
-                    .and(with_nonce(nonce.clone()))
-                    .and(warp::header::optional::<u64>("X-ADM-GasLimit"))
-                    .and(warp::header::optional::<BroadcastMode>("X-ADM-BroadcastMode"))
-                    .and_then(handle_os_delete);
+                )
+                .and(warp::header::optional::<String>("Range"))
+                .and(warp::query::<HeightQuery>())
+                .and(with_client(client.clone()))
+                .and(with_ipfs(ipfs.clone()))
+                .and(with_args(args.clone()))
+                .and_then(handle_object_download);
+
+                // TODO: Deprecated, remove after SDK migration
                 let os_get_or_list_route = warp::path!("v1" / "objectstores" / Address / ..)
                     .and(
                         warp::get().or(warp::head()).unify()
@@ -157,45 +91,12 @@ cmd! {
                     .and(with_client(client.clone()))
                     .and(with_ipfs(ipfs.clone()))
                     .and(with_args(args.clone()))
-                    .and_then(handle_os_get_or_list);
-
-                // Accumulator routes
-                let acc_push_route = warp::path!("v1" / "accumulators" / Address)
-                    .and(warp::put())
-                    .and(warp::body::content_length_limit(MAX_EVENT_LENGTH))
-                    .and(warp::body::bytes())
-                    .and(with_client(client.clone()))
-                    .and(with_args(args.clone()))
-                    .and(with_nonce(nonce))
-                    .and(warp::header::optional::<u64>("X-ADM-GasLimit"))
-                    .and(warp::header::optional::<BroadcastMode>("X-ADM-BroadcastMode"))
-                    .and_then(handle_acc_push);
-                let acc_get_at_route = warp::path!("v1" / "accumulators" / Address / "get")
-                    .and(warp::get())
-                    .and(warp::query::<GetQuery>())
-                    .and(warp::query::<HeightQuery>())
-                    .and(with_client(client.clone()))
-                    .and(with_args(args.clone()))
-                    .and_then(handle_acc_get_at);
-                let acc_root_route = warp::path!("v1" / "accumulators" / Address)
-                    .and(warp::get())
-                    .and(warp::query::<HeightQuery>())
-                    .and(with_client(client))
-                    .and(with_args(args))
-                    .and_then(handle_acc_root);
+                    .and_then(handle_object_download_deprecated);
 
                 let router = health_route
-                    .or(machines_create_os_route)
-                    .or(machines_create_acc_route)
-                    .or(machines_get_route)
-                    .or(accounts_get_machines_route)
-                    .or(os_upload_route)
-                    .or(objects_route)
-                    .or(os_delete_route)
+                    .or(objects_upload)
+                    .or(objects_download)
                     .or(os_get_or_list_route)
-                    .or(acc_push_route)
-                    .or(acc_get_at_route)
-                    .or(acc_root_route)
                     .with(warp::cors().allow_any_origin()
                         .allow_headers(vec!["Content-Type"])
                         .allow_methods(vec!["PUT", "DEL", "GET", "HEAD"]))
@@ -234,27 +135,6 @@ fn with_args(args: TransArgs) -> impl Filter<Extract = (TransArgs,), Error = Inf
     warp::any().map(move || args.clone())
 }
 
-fn with_nonce(
-    nonce: Arc<Mutex<u64>>,
-) -> impl Filter<Extract = (Arc<Mutex<u64>>,), Error = Infallible> + Clone {
-    warp::any().map(move || nonce.clone())
-}
-
-fn get_os_key(tail: Tail) -> Result<Vec<u8>, Rejection> {
-    let key = tail.as_str();
-    match key.is_empty() {
-        true => Err(Rejection::from(BadRequest {
-            message: "empty key".into(),
-        })),
-        false => Ok(key.into()),
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-struct WriteAccessQuery {
-    pub write_access: Option<String>,
-}
-
 #[derive(Serialize, Deserialize)]
 struct HeightQuery {
     pub height: Option<u64>,
@@ -266,22 +146,17 @@ struct ListQuery {
     pub limit: Option<u64>,
 }
 
-#[derive(Serialize, Deserialize)]
-struct GetQuery {
-    pub index: u64,
-}
-
 #[derive(Debug, Error)]
-enum ProxyError {
+enum ObjectsError {
     #[error("error parsing range header: `{0}`")]
     RangeHeaderParseError(ParseIntError),
     #[error("invalid range header")]
     RangeHeaderInvalid,
 }
 
-impl From<ParseIntError> for ProxyError {
+impl From<ParseIntError> for ObjectsError {
     fn from(err: ParseIntError) -> Self {
-        ProxyError::RangeHeaderParseError(err)
+        ObjectsError::RangeHeaderParseError(err)
     }
 }
 
@@ -295,39 +170,7 @@ pub struct Ipfs {
 }
 
 impl IpfsApiAdapter for Ipfs {
-    async fn add_file(&self, mut temp_file: TempFile, cid_from_msg: Cid) -> anyhow::Result<String> {
-        let temp_file_clone = temp_file.try_clone().await?;
-        // Only chunk and hash - do not write to disk
-        let res = self
-            .inner
-            .add_async_with_options(
-                temp_file_clone.compat(),
-                Add {
-                    chunker: Some("size-1048576"),
-                    raw_leaves: Some(false),
-                    pin: Some(false),
-                    cid_version: Some(1),
-                    only_hash: Some(true),
-                    ..Default::default()
-                },
-            )
-            .await?;
-
-        // Check if the computed CID matches the one in the signed message
-        // It is important to verify that CID represents the data correctly
-        // separately from signature because the signature is over the CID,
-        // it is unaware of the actual data.
-        let ipfs_cid = Cid::try_from(res.hash)?;
-        if ipfs_cid != cid_from_msg {
-            return Err(anyhow!(
-                "computed cid {:?} does not match {:?}",
-                ipfs_cid,
-                cid_from_msg
-            ));
-        }
-
-        // Actually add the file to IPFS
-        temp_file.rewind().await?;
+    async fn add_file(&self, temp_file: TempFile, cid_from_msg: Cid) -> anyhow::Result<String> {
         let res = self
             .inner
             .add_async_with_options(
@@ -341,8 +184,21 @@ impl IpfsApiAdapter for Ipfs {
                 },
             )
             .await?;
-        let cid = Cid::try_from(res.hash)?;
-        Ok(cid.to_string())
+
+        // Check if the computed CID matches the one in the signed message.
+        // It is important to verify that CID represents the data correctly
+        // separately from signature because the signature is over the CID,
+        // it is unaware of the actual data.
+        let ipfs_cid = Cid::try_from(res.hash)?;
+        if ipfs_cid != cid_from_msg {
+            return Err(anyhow!(
+                "computed cid {:?} does not match {:?}",
+                ipfs_cid,
+                cid_from_msg
+            ));
+        }
+
+        Ok(ipfs_cid.to_string())
     }
 }
 
@@ -527,265 +383,14 @@ async fn handle_object_upload<F: QueryClient, I: IpfsApiAdapter>(
     Ok(cid.to_string())
 }
 
-async fn handle_machines_create_os(
-    write_access_query: WriteAccessQuery,
-    client: FendermintClient,
-    mut args: TransArgs,
-    nonce: Arc<Mutex<u64>>,
-    gas_limit: Option<u64>,
-    broadcast_mode: Option<BroadcastMode>,
-) -> Result<impl Reply, Rejection> {
-    let mut nonce_lck = nonce.lock().await;
-    args.sequence = *nonce_lck;
-    args.gas_limit = gas_limit.unwrap_or(BLOCK_GAS_LIMIT);
-    args.broadcast_mode = broadcast_mode.unwrap_or(args.broadcast_mode);
-
-    let write_access = write_access_query
-        .write_access
-        .unwrap_or("onlyowner".into());
-    let write_access = WriteAccess::from_str(&write_access).map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("machines create os error: {}", e),
-        })
-    })?;
-
-    let res = os_create(client, args, write_access).await.map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("machines create os error: {}", e),
-        })
-    })?;
-
-    *nonce_lck += 1;
-    Ok(warp::reply::json(&res))
-}
-
-async fn handle_machines_create_acc(
-    write_access_query: WriteAccessQuery,
-    client: FendermintClient,
-    mut args: TransArgs,
-    nonce: Arc<Mutex<u64>>,
-    gas_limit: Option<u64>,
-    broadcast_mode: Option<BroadcastMode>,
-) -> Result<impl Reply, Rejection> {
-    let mut nonce_lck = nonce.lock().await;
-    args.sequence = *nonce_lck;
-    args.gas_limit = gas_limit.unwrap_or(BLOCK_GAS_LIMIT);
-    args.broadcast_mode = broadcast_mode.unwrap_or(args.broadcast_mode);
-
-    let write_access = write_access_query
-        .write_access
-        .unwrap_or("onlyowner".into());
-    let write_access = WriteAccess::from_str(&write_access).map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("machines create acc error: {}", e),
-        })
-    })?;
-
-    let res = acc_create(client, args, write_access).await.map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("machines create acc error: {}", e),
-        })
-    })?;
-
-    *nonce_lck += 1;
-    Ok(warp::reply::json(&res))
-}
-
-async fn handle_accounts_get_machines(
-    owner: Address,
-    height_query: HeightQuery,
-    client: FendermintClient,
-    args: TransArgs,
-) -> Result<impl Reply, Rejection> {
-    let height = height_query.height.unwrap_or(0);
-
-    let res = list_machines(client, args, Some(owner), height)
-        .await
-        .map_err(|e| {
-            Rejection::from(BadRequest {
-                message: format!("accounts get machines error: {}", e),
-            })
-        })?;
-
-    let list = res.unwrap_or_default();
-    let machines = list
-        .iter()
-        .map(|m| json!({"address": m.address.to_string(), "kind": m.kind.to_string()}))
-        .collect::<Vec<Value>>();
-
-    let json = json!({"machines": machines});
-    Ok(warp::reply::json(&json))
-}
-
-async fn handle_machines_get(
-    address: Address,
-    height_query: HeightQuery,
-    client: FendermintClient,
-    args: TransArgs,
-) -> Result<impl Reply, Rejection> {
-    let height = height_query.height.unwrap_or(0);
-
-    let res = get_machine(client, args, address, height)
-        .await
-        .map_err(|e| {
-            Rejection::from(BadRequest {
-                message: format!("machines get error: {}", e),
-            })
-        })?;
-
-    let json = json!({"kind": res.kind.to_string(), "owner": res.owner.to_string()});
-    Ok(warp::reply::json(&json))
-}
-
-// Objectstore handlers
-
-#[allow(clippy::too_many_arguments)]
-async fn handle_os_upload(
-    address: Address,
-    path: Tail,
-    mut body: impl Stream<Item = Result<impl Buf, warp::Error>> + Unpin + Send + Sync,
-    size: u64,
-    client: FendermintClient,
-    ipfs: IpfsClient,
-    mut args: TransArgs,
-    nonce: Arc<Mutex<u64>>,
-    gas_limit: Option<u64>,
-    broadcast_mode: Option<BroadcastMode>,
-) -> Result<impl Reply, Rejection> {
-    let mut nonce_lck = nonce.lock().await;
-    args.sequence = *nonce_lck;
-    args.gas_limit = gas_limit.unwrap_or(BLOCK_GAS_LIMIT);
-    args.broadcast_mode = broadcast_mode.unwrap_or(args.broadcast_mode);
-
-    if size == 0 {
-        return Err(Rejection::from(BadRequest {
-            message: "empty body".into(),
-        }));
-    }
-
-    let key = get_os_key(path)?;
-
-    let params = if size > MAX_INTERNAL_OBJECT_LENGTH {
-        let mut tmp = TempFile::new().await.map_err(|e| {
-            Rejection::from(BadRequest {
-                message: format!("failed to create tmp file: {}", e),
-            })
-        })?;
-
-        while let Some(buf) = body.next().await {
-            let mut buf = buf.unwrap();
-            while buf.remaining() > 0 {
-                let chunk = buf.chunk().to_owned();
-                let chunk_len = chunk.len();
-                tmp.write_all(&chunk).await.map_err(|e| {
-                    Rejection::from(BadRequest {
-                        message: format!("failed to write chunk: {}", e),
-                    })
-                })?;
-                tmp.flush().await.map_err(|e| {
-                    Rejection::from(BadRequest {
-                        message: format!("failed to flush chunk: {}", e),
-                    })
-                })?;
-                buf.advance(chunk_len);
-            }
-        }
-        tmp.rewind().await.map_err(|e| {
-            Rejection::from(BadRequest {
-                message: format!("failed to rewind: {}", e),
-            })
-        })?;
-
-        let add = ipfs_api_backend_hyper::request::Add {
-            chunker: Some("size-1048576"),
-            pin: Some(false),
-            ..Default::default()
-        };
-
-        let res = ipfs
-            .add_async_with_options(tmp.compat(), add)
-            .await
-            .map_err(|e| {
-                Rejection::from(BadRequest {
-                    message: format!("failed to add file: {}", e),
-                })
-            })?;
-        let cid = Cid::try_from(res.hash).map_err(|e| {
-            Rejection::from(BadRequest {
-                message: format!("failed to parse cid: {}", e),
-            })
-        })?;
-
-        PutParams {
-            key,
-            kind: ObjectKind::External(cid),
-            overwrite: true,
-        }
-    } else {
-        let mut collected: Vec<u8> = vec![];
-        while let Some(buf) = body.next().await {
-            let mut buf = buf.unwrap();
-            while buf.remaining() > 0 {
-                let chunk = buf.chunk();
-                let chunk_len = chunk.len();
-                collected.extend_from_slice(chunk);
-                buf.advance(chunk_len);
-            }
-        }
-
-        PutParams {
-            key,
-            kind: ObjectKind::Internal(ByteBuf(collected)),
-            overwrite: true,
-        }
-    };
-
-    let res = os_put(client, args, address, params).await.map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("objectstore upload error: {}", e),
-        })
-    })?;
-
-    *nonce_lck += 1;
-    Ok(warp::reply::json(&res))
-}
-
-async fn handle_os_delete(
-    address: Address,
-    path: Tail,
-    client: FendermintClient,
-    mut args: TransArgs,
-    nonce: Arc<Mutex<u64>>,
-    gas_limit: Option<u64>,
-    broadcast_mode: Option<BroadcastMode>,
-) -> Result<impl Reply, Rejection> {
-    let mut nonce_lck = nonce.lock().await;
-    args.sequence = *nonce_lck;
-    args.gas_limit = gas_limit.unwrap_or(BLOCK_GAS_LIMIT);
-    args.broadcast_mode = broadcast_mode.unwrap_or(args.broadcast_mode);
-
-    let key = get_os_key(path)?;
-
-    let res = os_delete(client, args, address, DeleteParams { key })
-        .await
-        .map_err(|e| {
-            Rejection::from(BadRequest {
-                message: format!("objectstore delete error: {}", e),
-            })
-        })?;
-
-    *nonce_lck += 1;
-    Ok(warp::reply::json(&res))
-}
-
-fn get_range_params(range: String, size: u64) -> Result<(u64, u64), ProxyError> {
+fn get_range_params(range: String, size: u64) -> Result<(u64, u64), ObjectsError> {
     let range: Vec<String> = range
         .replace("bytes=", "")
         .split('-')
         .map(|n| n.to_string())
         .collect();
     if range.len() != 2 {
-        return Err(ProxyError::RangeHeaderInvalid);
+        return Err(ObjectsError::RangeHeaderInvalid);
     }
     let (start, end): (u64, u64) = match (!range[0].is_empty(), !range[1].is_empty()) {
         (true, true) => (range[0].parse::<u64>()?, range[1].parse::<u64>()?),
@@ -801,13 +406,14 @@ fn get_range_params(range: String, size: u64) -> Result<(u64, u64), ProxyError> 
         (false, false) => (0, size - 1),
     };
     if start > end || end >= size {
-        return Err(ProxyError::RangeHeaderInvalid);
+        return Err(ObjectsError::RangeHeaderInvalid);
     }
     Ok((start, end))
 }
 
+// TODO: Deprecated, remove after SDK migration
 #[allow(clippy::too_many_arguments)]
-async fn handle_os_get_or_list(
+async fn handle_object_download_deprecated(
     address: Address,
     tail: Tail,
     height_query: HeightQuery,
@@ -934,6 +540,7 @@ async fn handle_os_get_or_list(
     }
 }
 
+// TODO: Deprecated, remove after SDK migration
 async fn handle_os_list(
     address: Address,
     mut prefix: &str,
@@ -996,89 +603,129 @@ async fn handle_os_list(
     Ok(response)
 }
 
-// Accumulator handlers
+struct ObjectRange {
+    start: u64,
+    end: u64,
+    len: u64,
+    size: u64,
+    body: warp::hyper::Body,
+}
 
-async fn handle_acc_push(
+#[allow(clippy::too_many_arguments)]
+async fn handle_object_download(
     address: Address,
-    body: Bytes,
+    tail: Tail,
+    method: String,
+    range: Option<String>,
+    height_query: HeightQuery,
     client: FendermintClient,
-    mut args: TransArgs,
-    nonce: Arc<Mutex<u64>>,
-    gas_limit: Option<u64>,
-    broadcast_mode: Option<BroadcastMode>,
+    ipfs: IpfsClient,
+    args: TransArgs,
 ) -> Result<impl Reply, Rejection> {
-    let mut nonce_lck = nonce.lock().await;
-    args.sequence = *nonce_lck;
-    args.gas_limit = gas_limit.unwrap_or(BLOCK_GAS_LIMIT);
-    args.broadcast_mode = broadcast_mode.unwrap_or(args.broadcast_mode);
-
-    let res = acc_push(client.clone(), args.clone(), address, body)
+    let height = height_query
+        .height
+        .unwrap_or(FvmQueryHeight::Committed.into());
+    let path = tail.as_str();
+    let key: Vec<u8> = path.into();
+    let maybe_object = os_get(client, args, address, GetParams { key }, height)
         .await
         .map_err(|e| {
             Rejection::from(BadRequest {
-                message: format!("accumulator push error: {}", e),
+                message: format!("objectstore get error: {}", e),
             })
         })?;
 
-    *nonce_lck += 1;
+    match maybe_object {
+        Some(object) => {
+            let object_range = match object {
+                Object::Internal(_) => {
+                    return Err(Rejection::from(BadRequest {
+                        message: "internal objects are not supported".to_string(),
+                    }))
+                }
+                Object::External((buf, resolved)) => {
+                    let cid = Cid::try_from(buf.0).map_err(|e| {
+                        Rejection::from(BadRequest {
+                            message: format!("failed to decode cid: {}", e),
+                        })
+                    })?;
+                    if !resolved {
+                        return Err(Rejection::from(BadRequest {
+                            message: "object is not resolved".to_string(),
+                        }));
+                    }
+                    fetch_object(ipfs, range, cid.into()).await.map_err(|e| {
+                        Rejection::from(BadRequest {
+                            message: format!("failed to fetch detached object {}", e),
+                        })
+                    })?
+                }
+            };
 
-    let data = res.data.map(|pr| {
-        json!( {
-            "root": pr.root.to_string(),
-            "index": pr.index,
-        })
-    });
-    let res_human_readable = Txn {
-        status: res.status,
-        hash: res.hash,
-        height: res.height,
-        gas_used: res.gas_used,
-        data,
-    };
-    Ok(warp::reply::json(&res_human_readable))
+            // If it is a HEAD request, we don't need to send the body
+            // but we still need to send the Content-Length header
+            if method == "HEAD" {
+                let mut response = warp::reply::Response::new(warp::hyper::Body::empty());
+                let mut header_map = HeaderMap::new();
+                header_map.insert("Content-Length", HeaderValue::from(object_range.size));
+                let headers = response.headers_mut();
+                headers.extend(header_map);
+                return Ok(response);
+            }
+
+            let mut response = warp::reply::Response::new(object_range.body);
+            let mut header_map = HeaderMap::new();
+            if object_range.len < object_range.size {
+                *response.status_mut() = StatusCode::PARTIAL_CONTENT;
+                header_map.insert(
+                    "Content-Range",
+                    HeaderValue::from_str(&format!(
+                        "bytes {}-{}/{}",
+                        object_range.start, object_range.end, object_range.len
+                    ))
+                    .unwrap(),
+                );
+            } else {
+                header_map.insert("Accept-Ranges", HeaderValue::from_str("bytes").unwrap());
+            }
+            header_map.insert("Content-Length", HeaderValue::from(object_range.len));
+            let headers = response.headers_mut();
+            headers.extend(header_map);
+
+            Ok(response)
+        }
+        None => Err(Rejection::from(NotFound)),
+    }
 }
 
-async fn handle_acc_get_at(
-    address: Address,
-    get_query: GetQuery,
-    height_query: HeightQuery,
-    client: FendermintClient,
-    args: TransArgs,
-) -> Result<impl Reply, Rejection> {
-    let res = acc_get_at(
-        client,
-        args,
-        address,
-        get_query.index,
-        height_query.height.unwrap_or(0),
-    )
-    .await
-    .map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("root error: {}", e),
-        })
-    })?;
-
-    let str = String::from_utf8(res.unwrap_or_default()).unwrap();
-    let json = json!({"value": str});
-    Ok(warp::reply::json(&json))
-}
-
-async fn handle_acc_root(
-    address: Address,
-    height_query: HeightQuery,
-    client: FendermintClient,
-    args: TransArgs,
-) -> Result<impl Reply, Rejection> {
-    let height = height_query.height.unwrap_or(0);
-    let res = acc_root(client, args, address, height).await.map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("accumulator root error: {}", e),
-        })
-    })?;
-
-    let json = json!({"root": res.unwrap_or_default().to_string()});
-    Ok(warp::reply::json(&json))
+async fn fetch_object(
+    ipfs: IpfsClient,
+    range: Option<String>,
+    cid: String,
+) -> anyhow::Result<ObjectRange> {
+    let stat = ipfs.files_stat(format!("/ipfs/{cid}").as_str()).await?;
+    let size = stat.size;
+    Ok(match range {
+        Some(range) => {
+            let (start, end) = get_range_params(range, size)?;
+            let len = end - start + 1;
+            let body = Body::wrap_stream(ipfs.cat_range(&cid, start as usize, len as usize));
+            ObjectRange {
+                start,
+                end,
+                len,
+                size,
+                body,
+            }
+        }
+        None => ObjectRange {
+            start: 0,
+            end: size - 1,
+            len: size,
+            size,
+            body: Body::wrap_stream(ipfs.cat(&cid)),
+        },
+    })
 }
 
 // Rejection handlers
@@ -1124,176 +771,7 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
     Ok(warp::reply::with_status(reply, code))
 }
 
-// Transaction handling
-
-#[derive(Clone, Debug, Serialize)]
-enum TxnStatus {
-    Pending,
-    Committed,
-}
-
-#[derive(Clone, Debug, Serialize)]
-struct Txn<D> {
-    pub status: TxnStatus,
-    pub hash: Hash,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub height: Option<Height>,
-    #[serde(skip_serializing_if = "i64::is_zero")]
-    pub gas_used: i64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub data: Option<D>,
-}
-
-impl<D> Txn<D> {
-    fn pending(hash: Hash) -> Self {
-        Txn {
-            status: TxnStatus::Pending,
-            hash,
-            height: None,
-            gas_used: 0,
-            data: None,
-        }
-    }
-
-    fn committed(hash: Hash, height: Height, gas_used: i64, data: Option<D>) -> Self {
-        Txn {
-            status: TxnStatus::Committed,
-            hash,
-            height: Some(height),
-            gas_used,
-            data,
-        }
-    }
-}
-
-async fn broadcast<F, D>(client: FendermintClient, args: TransArgs, f: F) -> anyhow::Result<Txn<D>>
-where
-    F: FnOnce(
-        TransClient,
-        TokenAmount,
-        GasParams,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<BroadcastResponse<D>>> + Send>>,
-{
-    let client = TransClient::new(client, &args)?;
-    let gas_params = gas_params(&args);
-    let res = f(client, TokenAmount::default(), gas_params).await?;
-    Ok(match res {
-        BroadcastResponse::Async(res) => Txn::pending(res.response.hash),
-        BroadcastResponse::Sync(res) => {
-            if res.response.code.is_err() {
-                return Err(anyhow!(res.response.log));
-            }
-            Txn::pending(res.response.hash)
-        }
-        BroadcastResponse::Commit(res) => {
-            if res.response.check_tx.code.is_err() {
-                return Err(anyhow!(res.response.check_tx.log));
-            } else if res.response.deliver_tx.code.is_err() {
-                return Err(anyhow!(res.response.deliver_tx.log));
-            }
-            Txn::committed(
-                res.response.hash,
-                res.response.height,
-                res.response.deliver_tx.gas_used,
-                res.return_data,
-            )
-        }
-    })
-}
-
 // RPC methods
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateReturnPretty {
-    pub actor_id: ActorID,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub robust_address: Option<String>,
-}
-
-async fn os_create(
-    client: FendermintClient,
-    args: TransArgs,
-    write_access: WriteAccess,
-) -> anyhow::Result<Txn<CreateReturnPretty>> {
-    let tx = broadcast(client, args, |mut client, value, gas_params| {
-        Box::pin(async move { client.os_create(write_access, value, gas_params).await })
-    })
-    .await?;
-    let data = tx.data.map(|data| CreateReturnPretty {
-        actor_id: data.actor_id,
-        robust_address: data.robust_address.map(|a| a.to_string()),
-    });
-
-    let tx_pretty: Txn<CreateReturnPretty> = Txn {
-        status: tx.status,
-        hash: tx.hash,
-        height: tx.height,
-        gas_used: tx.gas_used,
-        data,
-    };
-    Ok(tx_pretty)
-}
-
-async fn list_machines(
-    client: FendermintClient,
-    args: TransArgs,
-    owner: Option<Address>,
-    height: u64,
-) -> anyhow::Result<Option<Vec<adm::Metadata>>> {
-    let mut client = TransClient::new(client, &args)?;
-    let gas_params = gas_params(&args);
-    let h = FvmQueryHeight::from(height);
-    let owner = owner.unwrap_or(client.address());
-
-    let res = client
-        .inner
-        .list_machines_call(owner, TokenAmount::default(), gas_params, h)
-        .await?;
-
-    Ok(res.return_data)
-}
-
-async fn get_machine(
-    client: FendermintClient,
-    args: TransArgs,
-    address: Address,
-    height: u64,
-) -> anyhow::Result<Metadata> {
-    let mut client = TransClient::new(client, &args)?;
-    let gas_params = gas_params(&args);
-    let h = FvmQueryHeight::from(height);
-
-    let res = client
-        .inner
-        .get_machine_call(address, TokenAmount::default(), gas_params, h)
-        .await?;
-
-    Ok(res.return_data.expect("metadata exists"))
-}
-
-async fn os_put(
-    client: FendermintClient,
-    args: TransArgs,
-    address: Address,
-    params: PutParams,
-) -> anyhow::Result<Txn<String>> {
-    broadcast(client, args, |mut client, value, gas_params| {
-        Box::pin(async move { client.os_put(address, params, value, gas_params).await })
-    })
-    .await
-}
-
-async fn os_delete(
-    client: FendermintClient,
-    args: TransArgs,
-    address: Address,
-    params: DeleteParams,
-) -> anyhow::Result<Txn<String>> {
-    broadcast(client, args, |mut client, value, gas_params| {
-        Box::pin(async move { client.os_delete(address, params, value, gas_params).await })
-    })
-    .await
-}
 
 async fn os_get(
     client: FendermintClient,
@@ -1314,6 +792,7 @@ async fn os_get(
     Ok(res.return_data)
 }
 
+// TODO: Deprecated, remove after SDK migration
 async fn os_list(
     client: FendermintClient,
     args: TransArgs,
@@ -1328,79 +807,6 @@ async fn os_list(
     let res = client
         .inner
         .os_list_call(address, params, TokenAmount::default(), gas_params, h)
-        .await?;
-
-    Ok(res.return_data)
-}
-
-async fn acc_create(
-    client: FendermintClient,
-    args: TransArgs,
-    write_access: WriteAccess,
-) -> anyhow::Result<Txn<CreateReturnPretty>> {
-    let tx = broadcast(client, args, |mut client, value, gas_params| {
-        Box::pin(async move { client.acc_create(write_access, value, gas_params).await })
-    })
-    .await?;
-    let data = tx.data.map(|data| CreateReturnPretty {
-        actor_id: data.actor_id,
-        robust_address: data.robust_address.map(|a| a.to_string()),
-    });
-
-    let tx_pretty: Txn<CreateReturnPretty> = Txn {
-        status: tx.status,
-        hash: tx.hash,
-        height: tx.height,
-        gas_used: tx.gas_used,
-        data,
-    };
-    Ok(tx_pretty)
-}
-
-async fn acc_push(
-    client: FendermintClient,
-    args: TransArgs,
-    address: Address,
-    event: Bytes,
-) -> anyhow::Result<Txn<PushReturn>> {
-    broadcast(client, args, |mut client, value, gas_params| {
-        Box::pin(async move { client.acc_push(address, event, value, gas_params).await })
-    })
-    .await
-}
-
-async fn acc_get_at(
-    client: FendermintClient,
-    args: TransArgs,
-    address: Address,
-    index: u64,
-    height: u64,
-) -> anyhow::Result<Option<Vec<u8>>> {
-    let mut client = TransClient::new(client, &args)?;
-    let gas_params = gas_params(&args);
-    let h = FvmQueryHeight::from(height);
-
-    let res = client
-        .inner
-        .acc_get_at_call(address, TokenAmount::default(), gas_params, h, index)
-        .await?;
-
-    Ok(res.return_data)
-}
-
-async fn acc_root(
-    client: FendermintClient,
-    args: TransArgs,
-    address: Address,
-    height: u64,
-) -> anyhow::Result<Option<String>> {
-    let mut client = TransClient::new(client, &args)?;
-    let gas_params = gas_params(&args);
-    let h = FvmQueryHeight::from(height);
-
-    let res = client
-        .inner
-        .acc_root_call(address, TokenAmount::default(), gas_params, h)
         .await?;
 
     Ok(res.return_data)

@@ -150,10 +150,10 @@ allowed_methods = []
 # Suggested headers if allowing origins: "Accept", "Authorization", "Content-Type", "Origin"
 allowed_headers = []
 
-# Proxy API facade
-[proxy]
+# Object API facade
+[objects]
 
-[proxy.listen]
+[objects.listen]
 # Only accept local connections by default.
 host = "127.0.0.1"
 port = 8001

@@ -7,9 +7,9 @@ use serde_with::serde_as;
 
 use crate::SocketAddress;
 
-/// Proxy API facade settings.
+/// Object API facade settings.
 #[serde_as]
 #[derive(Debug, Deserialize, Clone)]
-pub struct ProxySettings {
+pub struct ObjectsSettings {
     pub listen: SocketAddress,
 }

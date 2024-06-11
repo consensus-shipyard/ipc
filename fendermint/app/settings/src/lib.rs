@@ -21,13 +21,13 @@ use fendermint_vm_topdown::BlockHeight;
 
 use self::eth::EthSettings;
 use self::fvm::FvmSettings;
-use self::proxy::ProxySettings;
+use self::objects::ObjectsSettings;
 use self::resolver::ResolverSettings;
 use ipc_provider::config::deserialize::deserialize_eth_address_from_str;
 
 pub mod eth;
 pub mod fvm;
-pub mod proxy;
+pub mod objects;
 pub mod resolver;
 pub mod testing;
 pub mod utils;
@@ -288,7 +288,7 @@ pub struct Settings {
     pub broadcast: BroadcastSettings,
     pub ipc: IpcSettings,
     pub testing: Option<TestingSettings>,
-    pub proxy: ProxySettings,
+    pub objects: ObjectsSettings,
 }
 
 impl Settings {

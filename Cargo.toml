@@ -168,7 +168,11 @@ tokio-tungstenite = { version = "0.18.0", features = ["native-tls"] }
 toml = "0.8"
 tower-http = { version = "0.4.0", features = ["cors"] }
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "registry"] }
+tracing-subscriber = { version = "0.3", features = [
+    "env-filter",
+    "json",
+    "registry",
+] }
 tracing-appender = "0.2.3"
 url = { version = "2.4.1", features = ["serde"] }
 zeroize = "1.6"
