@@ -35,4 +35,4 @@ jobs:
         run: cd contracts && pnpm i --unsafe-perm
 
       - name: Storage check
-        run: cd contracts && pnpx hardhat storage-layout --check
+        run: cd contracts && pnpm exec hardhat storage-layout --check

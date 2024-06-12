@@ -64,9 +64,9 @@ jobs:
       - name: Install solidity plugin
         run: cd contracts && pnpm i --unsafe-perm prettier prettier-plugin-solidity
       - name: Prettier check
-        run: cd contracts && pnpx prettier --check 'src/**/*.sol' 'test/*.sol'
+        run: cd contracts && pnpm exec prettier --check 'contracts/**/*.sol' 'test/*.sol'
       - name: Solhint check
-        run: cd contracts && pnpx solhint 'src/**/*.sol'
+        run: cd contracts && pnpm exec solhint 'contracts/**/*.sol'
 
   codespell:
     name: Codespell check
@@ -79,5 +79,5 @@ jobs:
         with:
           check_hidden: true
           check_filenames: true
-          path: contracts/src/*,contracts/script/*,contracts/scripts/*,contracts/test/*
+          path: contracts/contracts/*,contracts/script/*,contracts/scripts/*,contracts/test/*
           ignore_words_file: contracts/.codespellignore

@@ -56,7 +56,7 @@ install: pnpm
 
 fmt: pnpm
 	pnpm install --silent --no-save
-	pnpx prettier --check -w 'src/**/**/*.sol' 'script/**/**/*.sol' 'test/**/**/*.sol' 'test/**/**/*.t.sol' '**/*.{js,jsx,ts,tsx,json,css}'
+	pnpm exec prettier --check -w 'src/**/**/*.sol' 'script/**/**/*.sol' 'test/**/**/*.sol' 'test/**/**/*.t.sol' '**/*.{js,jsx,ts,tsx,json,css}'
 
 set-original-token:
 	@echo "Please enter the Original Token address:"

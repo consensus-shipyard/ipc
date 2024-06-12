@@ -63,11 +63,11 @@ pnpm:
 	}
 
 lint: pnpm fmt
-	pnpx solhint 'contracts/**/*.sol' 'sdk/**/**/*.sol'
+	pnpm exec solhint 'contracts/**/*.sol' 'sdk/**/**/*.sol'
 
 fmt: pnpm
 	pnpm install --silent --no-save
-	pnpx prettier --check -w 'contracts/**/**/*.sol' 'sdk/**/**/*.sol' 'test/**/**/*.sol' 'test/**/**/*.t.sol' '**/*.{js,jsx,ts,tsx,json,css,md}'
+	pnpm exec prettier --check -w 'contracts/**/**/*.sol' 'sdk/**/**/*.sol' 'test/**/**/*.sol' 'test/**/**/*.t.sol' '**/*.{js,jsx,ts,tsx,json,css,md}'
 
 deps: node_modules
 
@@ -93,7 +93,7 @@ install-eth-abi:
 storage:
 	rm -rf ./cache
 	rm -rf ./cache_hardhat
-	pnpx hardhat storage-layout --update
+	pnpm exec hardhat storage-layout --update
 
 clean:
 	rm -rf ./artifacts
@@ -114,7 +114,7 @@ prepare: build-selector-library fmt lint test slither
 
 build-selector-library: | forge
 	python3 scripts/python/build_selector_library.py
-	pnpx prettier -w test/helpers/SelectorLibrary.sol
+	pnpm exec prettier -w test/helpers/SelectorLibrary.sol
 
 # Forge is used by the ipc-solidity-actors compilation steps.
 forge:
