@@ -1,14 +1,10 @@
 [profile.default]
 src = "contracts"
 out = "out"
-libs = ["lib"]
+libs = ["node_modules", "lib"]
 fs_permissions = [{ access = "read-write", path = "./config.json"}]
 remappings = [
-    "@openzeppelin/=node_modules/@openzeppelin/",
     "@ipc/=node_modules/@consensus-shipyard/ipc-contracts/",
-    "fevmate/=node_modules/fevmate/",
-    "forge-std/=lib/forge-std/src/",
     ## this murky remapping is only needed transitively for testing; we should try to get rid of this.
     "murky/=node_modules/@consensus-shipyard/ipc-contracts/lib/murky/src/",
-    "elliptic-curve-solidity/=node_modules/elliptic-curve-solidity/"
 ]
