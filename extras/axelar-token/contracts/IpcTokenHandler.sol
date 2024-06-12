@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { InterchainTokenExecutable } from '@axelar-network/interchain-token-service/executable/InterchainTokenExecutable.sol';
-import { IERC20 } from "openzeppelin-contracts/interfaces/IERC20.sol";
-import { Ownable } from "openzeppelin-contracts/access/Ownable.sol";
-import { SubnetID, SupplySource, SupplyKind } from "@ipc/contracts/structs/Subnet.sol";
-import { FvmAddress } from "@ipc/contracts/structs/FvmAddress.sol";
-import { IIpcHandler } from "@ipc/sdk/interfaces/IIpcHandler.sol";
-import { IpcMsgKind, ResultMsg, OutcomeType, IpcEnvelope } from "@ipc/contracts/structs/CrossNet.sol";
-import { FvmAddressHelper } from "@ipc/contracts/lib/FvmAddressHelper.sol";
-import { SubnetIDHelper } from "@ipc/contracts/lib/SubnetIDHelper.sol";
-import { SafeERC20 } from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
+import { InterchainTokenExecutable } from '@axelar-network/interchain-token-service/contracts/executable/InterchainTokenExecutable.sol';
+import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { SubnetID, SupplySource, SupplyKind } from "@consensus-shipyard/ipc-contracts/contracts/structs/Subnet.sol";
+import { FvmAddress } from "@consensus-shipyard/ipc-contracts/contracts/structs/FvmAddress.sol";
+import { IIpcHandler } from "@consensus-shipyard/ipc-contracts/sdk/interfaces/IIpcHandler.sol";
+import { IpcMsgKind, ResultMsg, OutcomeType, IpcEnvelope } from "@consensus-shipyard/ipc-contracts/contracts/structs/CrossNet.sol";
+import { FvmAddressHelper } from "@consensus-shipyard/ipc-contracts/contracts/lib/FvmAddressHelper.sol";
+import { SubnetIDHelper } from "@consensus-shipyard/ipc-contracts/contracts/lib/SubnetIDHelper.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 interface TokenFundedGateway {
     function fundWithToken(SubnetID calldata subnetId, FvmAddress calldata to, uint256 amount) external;
@@ -29,7 +29,6 @@ contract IpcTokenHandler is InterchainTokenExecutable, IIpcHandler, Ownable {
     using FvmAddressHelper for FvmAddress;
     using SubnetIDHelper for SubnetID;
     using SafeERC20 for IERC20;
-
     error NothingToWithdraw();
 
     event SubnetFunded(SubnetID indexed subnet, address indexed recipient, uint256 value);
