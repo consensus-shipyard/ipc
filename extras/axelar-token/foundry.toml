@@ -4,11 +4,5 @@ out = "out"
 libs = ["node_modules", "lib"]
 fs_permissions = [{ access = "read-write", path = "./out"}]
 remappings = [
-    "@axelar-network/=node_modules/@axelar-network/",
-    "@openzeppelin/=node_modules/@openzeppelin/",
-    #"@consensus-shipyard/=node_modules/@consensus-shipyard/",
-    "ds-test/=lib/forge-std/lib/ds-test/src/",
-    "elliptic-curve-solidity/=node_modules/elliptic-curve-solidity/",
-    "fevmate/=node_modules/fevmate/",
-    "forge-std/=lib/forge-std/src/",
+    "@consensus-shipyard/=node_modules/@consensus-shipyard/"
 ]
