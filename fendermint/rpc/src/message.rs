@@ -8,7 +8,6 @@ use base64::Engine;
 use bytes::Bytes;
 use fendermint_actor_objectstore::{GetParams, Method::GetObject};
 use fendermint_crypto::SecretKey;
-use fendermint_vm_actor_interface::system::SYSTEM_ACTOR_ADDR;
 use fendermint_vm_actor_interface::{eam, evm};
 use fendermint_vm_message::signed::Object;
 use fendermint_vm_message::{chain::ChainMessage, signed::SignedMessage};
@@ -103,6 +102,18 @@ impl MessageFactory {
         ))
     }
 
+    /// Get an object from an object store. This will not create a transaction.
+    pub fn os_get(
+        &mut self,
+        address: Address,
+        params: GetParams,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<Message> {
+        let params = RawBytes::serialize(params)?;
+        Ok(self.transaction(address, GetObject as u64, params, value, gas_params))
+    }
+
     pub fn fevm_call(
         &mut self,
         contract: Address,
@@ -191,32 +202,6 @@ impl SignedMessageFactory {
         let signed = SignedMessage::new_secp256k1(message, object, &self.sk, &self.chain_id)?;
         let chain = ChainMessage::Signed(signed);
         Ok(chain)
-    }
-
-    /// Get an object from an object store. This will not create a transaction.
-    pub fn os_get(
-        &mut self,
-        address: Address,
-        params: GetParams,
-        value: TokenAmount,
-        gas_params: GasParams,
-    ) -> anyhow::Result<Message> {
-        let params = RawBytes::serialize(params)?;
-        let method_num = GetObject as u64;
-        let message = Message {
-            version: Default::default(),
-            from: SYSTEM_ACTOR_ADDR,
-            to: address,
-            sequence: 0,
-            value,
-            method_num,
-            params,
-            gas_limit: gas_params.gas_limit,
-            gas_fee_cap: gas_params.gas_fee_cap,
-            gas_premium: gas_params.gas_premium,
-        };
-
-        Ok(message)
     }
 
     /// Deploy a FEVM contract.
