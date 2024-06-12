@@ -13,7 +13,7 @@ import {SubnetID, SupplyKind, PermissionMode, PermissionMode, Subnet, SupplySour
 import {SubnetIDHelper} from "../src/lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../src/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../src/lib/CrossMsgHelper.sol";
-import {FilAddress} from "fevmate/utils/FilAddress.sol";
+import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {GatewayDiamond} from "../src/GatewayDiamond.sol";
 import {SubnetActorDiamond} from "../src/SubnetActorDiamond.sol";
 import {GatewayGetterFacet} from "../src/gateway/GatewayGetterFacet.sol";

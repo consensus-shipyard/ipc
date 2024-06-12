@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {FilAddress} from "fevmate/utils/FilAddress.sol";
+import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 
 /// @title Helper library for checking account type
 /// @author LimeChain team
