@@ -6,8 +6,9 @@ use std::path::Path;
 use anyhow::Context;
 use base64::Engine;
 use bytes::Bytes;
-use fendermint_actor_objectstore::{GetParams, ListParams};
+use fendermint_actor_objectstore::{GetParams, Method::GetObject};
 use fendermint_crypto::SecretKey;
+use fendermint_vm_actor_interface::system::SYSTEM_ACTOR_ADDR;
 use fendermint_vm_actor_interface::{eam, evm};
 use fendermint_vm_message::signed::Object;
 use fendermint_vm_message::{chain::ChainMessage, signed::SignedMessage};
@@ -201,56 +202,23 @@ impl SignedMessageFactory {
         gas_params: GasParams,
     ) -> anyhow::Result<Message> {
         let params = RawBytes::serialize(params)?;
-        let message = self.transaction(
-            address,
-            fendermint_actor_objectstore::Method::GetObject as u64,
-            params,
+        let method_num = GetObject as u64;
+        let message = Message {
+            version: Default::default(),
+            from: SYSTEM_ACTOR_ADDR,
+            to: address,
+            sequence: 0,
             value,
-            gas_params,
-            None,
-        )?;
-
-        let message = if let ChainMessage::Signed(signed) = message {
-            signed.into_message()
-        } else {
-            panic!("unexpected message type: {message:?}");
+            method_num,
+            params,
+            gas_limit: gas_params.gas_limit,
+            gas_fee_cap: gas_params.gas_fee_cap,
+            gas_premium: gas_params.gas_premium,
         };
-
-        // Roll back the sequence, we don't really want to invoke anything.
-        self.inner.set_sequence(message.sequence);
 
         Ok(message)
     }
 
-    /// List objects in an object store. This will not create a transaction.
-    pub fn os_list(
-        &mut self,
-        address: Address,
-        params: ListParams,
-        value: TokenAmount,
-        gas_params: GasParams,
-    ) -> anyhow::Result<Message> {
-        let params = RawBytes::serialize(params)?;
-        let message = self.transaction(
-            address,
-            fendermint_actor_objectstore::Method::ListObjects as u64,
-            params,
-            value,
-            gas_params,
-            None,
-        )?;
-
-        let message = if let ChainMessage::Signed(signed) = message {
-            signed.into_message()
-        } else {
-            panic!("unexpected message type: {message:?}");
-        };
-
-        // Roll back the sequence, we don't really want to invoke anything.
-        self.inner.set_sequence(message.sequence);
-
-        Ok(message)
-    }
     /// Deploy a FEVM contract.
     pub fn fevm_create(
         &mut self,

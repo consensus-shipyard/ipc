@@ -3,7 +3,7 @@
 use anyhow::{anyhow, Context};
 use base64::Engine;
 use bytes::Bytes;
-use fendermint_actor_objectstore::{Object, ObjectList};
+use fendermint_actor_objectstore::Object;
 use fendermint_vm_actor_interface::eam;
 use fvm_ipld_encoding::{BytesDe, RawBytes};
 use tendermint::abci::response::DeliverTx;
@@ -65,11 +65,4 @@ pub fn decode_os_get(deliver_tx: &DeliverTx) -> anyhow::Result<Option<Object>> {
     let data = decode_data(&deliver_tx.data)?;
     fvm_ipld_encoding::from_slice::<Option<Object>>(&data)
         .map_err(|e| anyhow!("error parsing as Option<Object>: {e}"))
-}
-
-/// Parse what Tendermint returns in the `data` field of [`DeliverTx`] as an [`ObjectList`].
-pub fn decode_os_list(deliver_tx: &DeliverTx) -> anyhow::Result<ObjectList> {
-    let data = decode_data(&deliver_tx.data)?;
-    fvm_ipld_encoding::from_slice::<ObjectList>(&data)
-        .map_err(|e| anyhow!("error parsing as ObjectList: {e}"))
 }
