@@ -9,14 +9,14 @@ import {TestUtils} from "@ipc/test/helpers/TestUtils.sol";
 import {MerkleTreeHelper} from "@ipc/test/helpers/MerkleTreeHelper.sol";
 import {GatewayFacetsHelper} from "@ipc/test/helpers/GatewayFacetsHelper.sol";
 import {SubnetActorFacetsHelper} from "@ipc/test/helpers/SubnetActorFacetsHelper.sol";
-import {LinkedTokenController} from "../src/LinkedTokenController.sol";
-import {LinkedTokenReplica} from "../src/LinkedTokenReplica.sol";
+import {LinkedTokenController} from "../contracts/LinkedTokenController.sol";
+import {LinkedTokenReplica} from "../contracts/LinkedTokenReplica.sol";
 
-import {LinkedTokenControllerV2} from "../src/v2/LinkedTokenControllerV2.sol";
+import {LinkedTokenControllerV2} from "../contracts/v2/LinkedTokenControllerV2.sol";
 import {LinkedTokenControllerV2Extension} from "./LinkedTokenControllerV2Extension.sol";
 import {LinkedTokenReplicaV2Extension} from "./LinkedTokenReplicaV2Extension.sol";
-import {LinkedTokenReplicaV2} from "../src/v2/LinkedTokenReplicaV2.sol";
-import {USDCTest} from "../src/USDCTest.sol";
+import {LinkedTokenReplicaV2} from "../contracts/v2/LinkedTokenReplicaV2.sol";
+import {USDCTest} from "../contracts/USDCTest.sol";
 
 import {SubnetID, Subnet, IPCAddress, Validator} from "@ipc/contracts/structs/Subnet.sol";
 import {SubnetActorDiamond} from "@ipc/contracts/SubnetActorDiamond.sol";

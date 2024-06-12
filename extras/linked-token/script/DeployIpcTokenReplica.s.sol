@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-import "../src/LinkedTokenReplica.sol";
-import "../src/v2/LinkedTokenReplicaV2.sol";
+import "../contracts/LinkedTokenReplica.sol";
+import "../contracts/v2/LinkedTokenReplicaV2.sol";
 import "./ConfigManager.sol";
 import "@ipc/contracts/structs/Subnet.sol";
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";

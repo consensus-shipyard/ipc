@@ -2,7 +2,7 @@
 pragma solidity 0.8.23;
 
 import "forge-std/Test.sol";
-import "../src/LinkedTokenReplica.sol";
+import "../contracts/LinkedTokenReplica.sol";
 import {IntegrationTestBase} from "@ipc/test/IntegrationTestBase.sol";
 import {GatewayDiamond} from "@ipc/contracts/GatewayDiamond.sol";
 import {SubnetIDHelper} from "@ipc/contracts/lib/SubnetIDHelper.sol";
@@ -10,13 +10,12 @@ import {SubnetID, IPCAddress} from "@ipc/contracts/structs/Subnet.sol";
 import {FvmAddressHelper} from "@ipc/contracts/lib/FvmAddressHelper.sol";
 import {FvmAddress} from "@ipc/contracts/structs/FvmAddress.sol";
 
-import {InvalidOriginContract, InvalidOriginSubnet} from "../src/LinkedToken.sol";
+import {InvalidOriginContract, InvalidOriginSubnet} from "../contracts/LinkedToken.sol";
 import {IpcEnvelope, CallMsg, IpcMsgKind} from "@ipc/contracts/structs/CrossNet.sol";
 
 import {SubnetActorDiamond} from "@ipc/contracts/SubnetActorDiamond.sol";
-import {LinkedTokenController} from "../src/LinkedTokenController.sol";
-//import {InvalidOriginContract, InvalidOriginSubnet} from "../src/@ipc/contracts/examples/cross-token/IpcCrossTokenErrors.sol";
-import {USDCTest} from "../src/USDCTest.sol";
+import {LinkedTokenController} from "../contracts/LinkedTokenController.sol";
+import {USDCTest} from "../contracts/USDCTest.sol";
 
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
