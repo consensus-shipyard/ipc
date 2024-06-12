@@ -1,7 +1,27 @@
-.PHONY: deploy-ipc deploy-subnet-registry deploy-subnet upgrade-gw-diamond upgrade-sa-diamond \
-        upgrade-sr-diamond gen compile-abi rust-binding slither lint fmt pnpm deps node_modules build \
-        test install-dev install-npm-package install-eth-abi storage clean coverage coverage-for-mac \
-        prepare build-selector-library forge
+# Targets that are commands.
+COMMANDS :=  deploy-ipc deploy-subnet-registry deploy-subnet upgrade-gw-diamond upgrade-sa-diamond \
+             upgrade-sr-diamond gen compile-abi rust-binding slither lint fmt deps build \
+             test install-dev install-npm-package install-eth-abi storage clean coverage \
+             prepare build-selector-library forge
+
+# Targets that are prerequisite commands.
+PREREQ_COMMANDS := pnpm
+
+# Targets that are not commands.
+NON_COMMANDS := node_modules
+
+# Declare commands and prerequisite commands as phony targets.
+.PHONY: $(COMMANDS) $(PREREQ_COMMANDS)
+
+# Make all commands and non-command targets dependent on the prerequisites.
+$(COMMANDS): $(PREREQ_COMMANDS)
+$(NON_COMMANDS): $(PREREQ_COMMANDS)
+
+pnpm:
+	@command -v pnpm > /dev/null || { \
+		echo "pnpm is not installed. Installing pnpm..."; \
+		npm install -g pnpm; \
+	}
 
 # ==============================================================================
 # Deployment
@@ -56,22 +76,16 @@ slither:
 # ==============================================================================
 # Development support
 
-pnpm:
-	@command -v pnpm > /dev/null || { \
-		echo "pnpm is not installed. Installing pnpm..."; \
-		npm install -g pnpm; \
-	}
-
-lint: pnpm fmt
+lint: fmt
 	pnpm exec solhint 'contracts/**/*.sol' 'sdk/**/**/*.sol'
 
-fmt: pnpm
+fmt:
 	pnpm install --silent --no-save
 	pnpm exec prettier --check -w 'contracts/**/**/*.sol' 'sdk/**/**/*.sol' 'test/**/**/*.sol' 'test/**/**/*.t.sol' '**/*.{js,jsx,ts,tsx,json,css,md}'
 
 deps: node_modules
 
-node_modules: pnpm package.json pnpm-lock.yaml
+node_modules: package.json pnpm-lock.yaml
 	pnpm install
 	touch node_modules
 

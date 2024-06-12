@@ -1,8 +1,8 @@
 # Before deploying:
 
-- Copy `.env.template` to `.env`.
-- In `.env`, fill in your own values for private key and RPC URL for the target network (e.g. for Calibrationnet).
-- Install `pnpm`: `npm install -g pnpm`.
+-   Copy `.env.template` to `.env`.
+-   In `.env`, fill in your own values for private key and RPC URL for the target network (e.g. for Calibrationnet).
+-   Install `pnpm`: `npm install -g pnpm`.
 
 # To deploy everything run:
 
