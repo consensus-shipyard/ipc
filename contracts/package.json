@@ -56,8 +56,8 @@
         "utf-8-validate": "^5.0.10"
     },
     "dependencies": {
-        "@openzeppelin/contracts": "5.0.1",
-        "@openzeppelin/contracts-upgradeable": "5.0.1",
+        "@openzeppelin/contracts": "5.0.2",
+        "@openzeppelin/contracts-upgradeable": "5.0.2",
         "@solidity-parser/parser": "^0.18.0",
         "diamond-util": "^1.1.1",
         "elliptic-curve-solidity": "github:witnet/elliptic-curve-solidity#3475478",

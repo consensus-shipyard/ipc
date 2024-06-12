@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  axios@>=0.8.1 <0.28.0: '>=0.28.0'
+
 importers:
 
   .: {}
@@ -11,11 +14,11 @@ importers:
   contracts:
     dependencies:
       '@openzeppelin/contracts':
-        specifier: 5.0.1
-        version: 5.0.1
+        specifier: 5.0.2
+        version: 5.0.2
       '@openzeppelin/contracts-upgradeable':
-        specifier: 5.0.1
-        version: 5.0.1(@openzeppelin/contracts@5.0.1)
+        specifier: 5.0.2
+        version: 5.0.2(@openzeppelin/contracts@5.0.2)
       '@solidity-parser/parser':
         specifier: ^0.18.0
         version: 0.18.0
@@ -105,11 +108,11 @@ importers:
         specifier: workspace:^
         version: link:../../contracts
       '@openzeppelin/contracts':
-        specifier: 5.0.1
-        version: 5.0.1
+        specifier: 5.0.2
+        version: 5.0.2
       '@openzeppelin/contracts-upgradeable':
-        specifier: 5.0.1
-        version: 5.0.1(@openzeppelin/contracts@5.0.1)
+        specifier: 5.0.2
+        version: 5.0.2(@openzeppelin/contracts@5.0.2)
       elliptic-curve-solidity:
         specifier: github:witnet/elliptic-curve-solidity#3475478
         version: https://codeload.github.com/witnet/elliptic-curve-solidity/tar.gz/3475478
@@ -364,16 +367,16 @@ packages:
       ethers: ^5.0.0
       hardhat: ^2.0.0
 
-  '@openzeppelin/contracts-upgradeable@5.0.1':
-    resolution: {integrity: sha512-MvaLoPnVcoZr/qqZP+4cl9piuR4gg0iIGgxVSZ/AL1iId3M6IdEHzz9Naw5Lirl4KKBI6ciTVnX07yL4dOMIJg==}
+  '@openzeppelin/contracts-upgradeable@5.0.2':
+    resolution: {integrity: sha512-0MmkHSHiW2NRFiT9/r5Lu4eJq5UJ4/tzlOgYXNAIj/ONkQTVnz22pLxDvp4C4uZ9he7ZFvGn3Driptn1/iU7tQ==}
     peerDependencies:
-      '@openzeppelin/contracts': 5.0.1
+      '@openzeppelin/contracts': 5.0.2
 
   '@openzeppelin/contracts@4.9.6':
     resolution: {integrity: sha512-xSmezSupL+y9VkHZJGDoCBpmnB2ogM13ccaYDWqJTfS3dbuHkgjuwDFUmaFauBCboQMGB/S5UqUl2y54X99BmA==}
 
-  '@openzeppelin/contracts@5.0.1':
-    resolution: {integrity: sha512-yQJaT5HDp9hYOOp4jTYxMsR02gdFZFXhewX5HW9Jo4fsqSVqqyIO/xTHdWDaKX5a3pv1txmf076Lziz+sO7L1w==}
+  '@openzeppelin/contracts@5.0.2':
+    resolution: {integrity: sha512-ytPc6eLGcHHnapAZ9S+5qsdomhjo6QBHTDRRBFfTxXIpsicMhVPouPgmUPebZZZGX7vt9USA+Z+0M0dSVtSUEA==}
 
   '@prettier/sync@0.3.0':
     resolution: {integrity: sha512-3dcmCyAxIcxy036h1I7MQU/uEEBq8oLwf1CE3xeze+MPlgkdlb/+w6rGR/1dhp6Hqi17fRS6nvwnOzkESxEkOw==}
@@ -609,8 +612,8 @@ packages:
     resolution: {integrity: sha512-+q/t7Ekv1EDY2l6Gda6LLiX14rU9TV20Wa3ofeQmwPFZbOMo9DXrLbOjFaaclkXKWidIaopwAObQDqwWtGUjqg==}
     engines: {node: '>= 4.0.0'}
 
-  axios@0.21.4:
-    resolution: {integrity: sha512-ut5vewkiu8jjGBdqpM44XxjuCjq9LAKeHVmoVfHVzy8eHgxxq8SbAVQNovDA8mVi05kP0Ea/n/UzcSHcTJQfNg==}
+  axios@1.7.2:
+    resolution: {integrity: sha512-2A8QhOMrbomlDuiLeK9XibIBzuHeRcqqNOHp0Cyp5EoJ1IFDh+XZH3A6BkXtv0K4gFGCI0Y4BM7B1wOEi0Rmgw==}
 
   balanced-match@1.0.2:
     resolution: {integrity: sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw==}
@@ -1578,6 +1581,9 @@ packages:
     engines: {node: '>=14'}
     hasBin: true
 
+  proxy-from-env@1.1.0:
+    resolution: {integrity: sha512-D+zkORCbA9f1tdWRK0RaCR3GPv50cMxcrz4X8k5LTSUD1Dkw47mKJEZQNunItRTkWwgtaUSo1RVFRIG9ZXiFYg==}
+
   punycode@2.3.1:
     resolution: {integrity: sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==}
     engines: {node: '>=6'}
@@ -2416,13 +2422,13 @@ snapshots:
       ethers: 5.7.2(bufferutil@4.0.7)(utf-8-validate@5.0.10)
       hardhat: 2.22.5(bufferutil@4.0.7)(ts-node@10.9.2(@types/node@20.14.2)(typescript@5.4.5))(typescript@5.4.5)(utf-8-validate@5.0.10)
 
-  '@openzeppelin/contracts-upgradeable@5.0.1(@openzeppelin/contracts@5.0.1)':
+  '@openzeppelin/contracts-upgradeable@5.0.2(@openzeppelin/contracts@5.0.2)':
     dependencies:
-      '@openzeppelin/contracts': 5.0.1
+      '@openzeppelin/contracts': 5.0.2
 
   '@openzeppelin/contracts@4.9.6': {}
 
-  '@openzeppelin/contracts@5.0.1': {}
+  '@openzeppelin/contracts@5.0.2': {}
 
   '@prettier/sync@0.3.0(prettier@3.3.2)':
     dependencies:
@@ -2674,9 +2680,11 @@ snapshots:
 
   at-least-node@1.0.0: {}
 
-  axios@0.21.4(debug@4.3.5):
+  axios@1.7.2(debug@4.3.5):
     dependencies:
       follow-redirects: 1.15.6(debug@4.3.5)
+      form-data: 4.0.0
+      proxy-from-env: 1.1.0
     transitivePeerDependencies:
       - debug
 
@@ -3287,7 +3295,7 @@ snapshots:
       '@ethersproject/transactions': 5.7.0
       '@ethersproject/wallet': 5.7.0
       '@types/qs': 6.9.15
-      axios: 0.21.4(debug@4.3.5)
+      axios: 1.7.2(debug@4.3.5)
       chalk: 4.1.2
       chokidar: 3.6.0
       debug: 4.3.5
@@ -3789,6 +3797,8 @@ snapshots:
   prettier@3.3.1: {}
 
   prettier@3.3.2: {}
+
+  proxy-from-env@1.1.0: {}
 
   punycode@2.3.1: {}
 

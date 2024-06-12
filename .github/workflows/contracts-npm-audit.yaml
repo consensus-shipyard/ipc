@@ -21,5 +21,4 @@ jobs:
       - name: NPM Audit
         run: |
           cd contracts
-          pnpm install -g npm-audit-resolver
-          check-audit --omit dev --audit-level critical
+          pnpm audit

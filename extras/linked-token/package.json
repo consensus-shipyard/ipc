@@ -27,8 +27,8 @@
     "../../LICENSE-MIT"
   ],
   "dependencies": {
-    "@openzeppelin/contracts": "5.0.1",
-    "@openzeppelin/contracts-upgradeable": "5.0.1",
+    "@openzeppelin/contracts": "5.0.2",
+    "@openzeppelin/contracts-upgradeable": "5.0.2",
     "@consensus-shipyard/ipc-contracts": "workspace:^",
     "fevmate": "github:wadealexc/fevmate#6a80e98",
     "elliptic-curve-solidity": "github:witnet/elliptic-curve-solidity#3475478"
