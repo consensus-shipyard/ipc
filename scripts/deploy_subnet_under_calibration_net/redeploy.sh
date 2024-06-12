@@ -149,7 +149,7 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e CMT_RPC_HOST_PORT=${CMT_RPC_HOST_PORTS[0]} \
     -e ETHAPI_HOST_PORT=${ETHAPI_HOST_PORTS[0]} \
     -e RESOLVER_HOST_PORT=${RESOLVER_HOST_PORTS[0]} \
-    -e PROXY_HOST_PORT=${PROXY_HOST_PORTS[0]} \
+    -e OBJECTS_HOST_PORT=${OBJECTS_HOST_PORTS[0]} \
     -e IPFS_SWARM_HOST_PORT=${IPFS_SWARM_HOST_PORTS[0]} \
     -e IPFS_RPC_HOST_PORT=${IPFS_RPC_HOST_PORTS[0]} \
     -e IPFS_GATEWAY_HOST_PORT=${IPFS_GATEWAY_HOST_PORTS[0]} \
@@ -158,7 +158,7 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e PARENT_REGISTRY=${parent_registry_address} \
     -e PARENT_GATEWAY=${parent_gateway_address} \
     -e FM_PULL_SKIP=1 \
-    -e FM_LOG_LEVEL="info,fendermint=debug" \
+    -e FM_LOG_LEVEL="info" \
     child-validator-restart 2>&1)
 echo "$bootstrap_output"
 bootstrap_node_id=$(echo "$bootstrap_output" | sed -n '/CometBFT node ID:/ {n;p;}' | tr -d "[:blank:]")
@@ -193,7 +193,7 @@ do
       -e PARENT_REGISTRY=${parent_registry_address} \
       -e PARENT_GATEWAY=${parent_gateway_address} \
       -e FM_PULL_SKIP=1 \
-      -e FM_LOG_LEVEL="info,fendermint=debug" \
+      -e FM_LOG_LEVEL="info" \
       child-validator-restart
 done
 
