@@ -6,11 +6,12 @@ use std::marker::PhantomData;
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use bytes::Bytes;
+use fendermint_vm_actor_interface::system::SYSTEM_ACTOR_ADDR;
 use fendermint_vm_message::query::{FvmQueryHeight, GasEstimate};
 use tendermint::abci::response::DeliverTx;
 use tendermint_rpc::endpoint::broadcast::{tx_async, tx_commit, tx_sync};
 
-use fendermint_actor_objectstore::{GetParams, ListParams, Object, ObjectList};
+use fendermint_actor_objectstore::{GetParams, Object};
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
@@ -19,11 +20,9 @@ use fvm_shared::MethodNum;
 use fendermint_vm_actor_interface::eam;
 use fendermint_vm_message::chain::ChainMessage;
 
-use crate::message::{GasParams, SignedMessageFactory};
+use crate::message::{GasParams, MessageFactory, SignedMessageFactory};
 use crate::query::{QueryClient, QueryResponse};
-use crate::response::{
-    decode_bytes, decode_fevm_create, decode_fevm_invoke, decode_os_get, decode_os_list,
-};
+use crate::response::{decode_bytes, decode_fevm_create, decode_fevm_invoke, decode_os_get};
 
 /// Abstracting away what the return value is based on whether
 /// we broadcast transactions in sync, async or commit mode.
@@ -120,9 +119,8 @@ pub trait CallClient: QueryClient + BoundClient {
         gas_params: GasParams,
         height: FvmQueryHeight,
     ) -> anyhow::Result<CallResponse<Object>> {
-        let msg = self
-            .message_factory_mut()
-            .os_get(address, params, value, gas_params)?;
+        let msg =
+            MessageFactory::new(SYSTEM_ACTOR_ADDR, 0).os_get(address, params, value, gas_params)?;
 
         let response = self.call(msg, height).await?;
         if response.value.code.is_err() {
@@ -134,34 +132,6 @@ pub trait CallClient: QueryClient + BoundClient {
         let response = CallResponse {
             response,
             return_data,
-        };
-
-        Ok(response)
-    }
-
-    /// List objects in an object store without including a transaction on the blockchain.
-    async fn os_list_call(
-        &mut self,
-        address: Address,
-        params: ListParams,
-        value: TokenAmount,
-        gas_params: GasParams,
-        height: FvmQueryHeight,
-    ) -> anyhow::Result<CallResponse<ObjectList>> {
-        let msg = self
-            .message_factory_mut()
-            .os_list(address, params, value, gas_params)?;
-
-        let response = self.call(msg, height).await?;
-        if response.value.code.is_err() {
-            return Err(anyhow!("{}", response.value.info));
-        }
-        let return_data = decode_os_list(&response.value)
-            .context("error decoding data from deliver_tx in call")?;
-
-        let response = CallResponse {
-            response,
-            return_data: Some(return_data),
         };
 
         Ok(response)

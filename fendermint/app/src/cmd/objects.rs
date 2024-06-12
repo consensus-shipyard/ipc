@@ -10,7 +10,7 @@ use base64::{engine::general_purpose, Engine};
 use bytes::Buf;
 use cid::Cid;
 use ethers::core::types::{self as et};
-use fendermint_actor_objectstore::{Object, ObjectList, ObjectListItem};
+use fendermint_actor_objectstore::Object;
 use fendermint_rpc::QueryClient;
 use fendermint_vm_message::conv::from_fvm::to_eth_tokens;
 use fendermint_vm_message::signed::SignedMessage;
@@ -19,7 +19,6 @@ use fvm_shared::{address::Address, econ::TokenAmount};
 use ipfs_api_backend_hyper::request::Add;
 use ipfs_api_backend_hyper::{IpfsApi, IpfsClient, TryFromUri};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
 use thiserror::Error;
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 use tokio_util::compat::TokioAsyncReadCompatExt;
@@ -31,7 +30,7 @@ use warp::{
     Filter, Rejection, Reply,
 };
 
-use fendermint_actor_objectstore::{GetParams, ListParams};
+use fendermint_actor_objectstore::GetParams;
 use fendermint_app_settings::objects::ObjectsSettings;
 use fendermint_rpc::{client::FendermintClient, tx::CallClient};
 use fendermint_vm_message::query::FvmQueryHeight;
@@ -79,24 +78,9 @@ cmd! {
                 .and(with_args(args.clone()))
                 .and_then(handle_object_download);
 
-                // TODO: Deprecated, remove after SDK migration
-                let os_get_or_list_route = warp::path!("v1" / "objectstores" / Address / ..)
-                    .and(
-                        warp::get().or(warp::head()).unify()
-                    )
-                    .and(warp::path::tail())
-                    .and(warp::query::<HeightQuery>())
-                    .and(warp::query::<ListQuery>())
-                    .and(warp::header::optional::<String>("Range"))
-                    .and(with_client(client.clone()))
-                    .and(with_ipfs(ipfs.clone()))
-                    .and(with_args(args.clone()))
-                    .and_then(handle_object_download_deprecated);
-
                 let router = health_route
                     .or(objects_upload)
                     .or(objects_download)
-                    .or(os_get_or_list_route)
                     .with(warp::cors().allow_any_origin()
                         .allow_headers(vec!["Content-Type"])
                         .allow_methods(vec!["PUT", "DEL", "GET", "HEAD"]))
@@ -411,198 +395,6 @@ fn get_range_params(range: String, size: u64) -> Result<(u64, u64), ObjectsError
     Ok((start, end))
 }
 
-// TODO: Deprecated, remove after SDK migration
-#[allow(clippy::too_many_arguments)]
-async fn handle_object_download_deprecated(
-    address: Address,
-    tail: Tail,
-    height_query: HeightQuery,
-    list_query: ListQuery,
-    range: Option<String>,
-    client: FendermintClient,
-    ipfs: IpfsClient,
-    args: TransArgs,
-) -> Result<impl Reply, Rejection> {
-    let path = tail.as_str();
-    if path.is_empty() || path.ends_with('/') {
-        return handle_os_list(address, path, height_query, list_query, client, args).await;
-    }
-
-    let key: Vec<u8> = path.into();
-    let height = height_query.height.unwrap_or(0);
-
-    let res = os_get(client, args, address, GetParams { key }, height)
-        .await
-        .map_err(|e| {
-            Rejection::from(BadRequest {
-                message: format!("objectstore get error: {}", e),
-            })
-        })?;
-
-    match res {
-        Some(obj) => {
-            let (body, start, end, len, size) = match obj {
-                Object::Internal(buf) => {
-                    let size = buf.0.len() as u64;
-                    match range {
-                        Some(range) => {
-                            let (start, end) = get_range_params(range, size).map_err(|e| {
-                                Rejection::from(BadRequest {
-                                    message: format!("failed to get range params: {}", e),
-                                })
-                            })?;
-                            let len = end - start + 1;
-                            (
-                                warp::hyper::Body::from(
-                                    buf.0[start as usize..=end as usize].to_vec(),
-                                ),
-                                start,
-                                end,
-                                len,
-                                size,
-                            )
-                        }
-                        None => (warp::hyper::Body::from(buf.0), 0, size - 1, size, size),
-                    }
-                }
-                Object::External((buf, resolved)) => {
-                    let cid = Cid::try_from(buf.0).map_err(|e| {
-                        Rejection::from(BadRequest {
-                            message: format!("failed to decode cid: {}", e),
-                        })
-                    })?;
-                    let cid = cid.to_string();
-                    if !resolved {
-                        return Err(Rejection::from(BadRequest {
-                            message: "object is not resolved".to_string(),
-                        }));
-                    }
-
-                    let stat = ipfs
-                        .files_stat(format!("/ipfs/{cid}").as_str())
-                        .await
-                        .map_err(|e| {
-                            Rejection::from(BadRequest {
-                                message: format!("failed to stat object: {}", e),
-                            })
-                        })?;
-                    let size = stat.size;
-
-                    match range {
-                        Some(range) => {
-                            let (start, end) = get_range_params(range, size).map_err(|e| {
-                                Rejection::from(BadRequest {
-                                    message: format!("failed to get range params: {}", e),
-                                })
-                            })?;
-                            let len = end - start + 1;
-                            (
-                                warp::hyper::Body::wrap_stream(ipfs.cat_range(
-                                    &cid,
-                                    start as usize,
-                                    len as usize,
-                                )),
-                                start,
-                                end,
-                                len,
-                                size,
-                            )
-                        }
-                        None => (
-                            warp::hyper::Body::wrap_stream(ipfs.cat(&cid)),
-                            0,
-                            size - 1,
-                            size,
-                            size,
-                        ),
-                    }
-                }
-            };
-
-            let mut response = warp::reply::Response::new(body);
-            let mut header_map = HeaderMap::new();
-            if len < size {
-                *response.status_mut() = StatusCode::PARTIAL_CONTENT;
-                header_map.insert(
-                    "Content-Range",
-                    HeaderValue::from_str(&format!("bytes {}-{}/{}", start, end, len)).unwrap(),
-                );
-            } else {
-                header_map.insert("Accept-Ranges", HeaderValue::from_str("bytes").unwrap());
-            }
-            header_map.insert("Content-Length", HeaderValue::from(len));
-            let headers = response.headers_mut();
-            headers.extend(header_map);
-
-            Ok(response)
-        }
-        None => Err(Rejection::from(NotFound)),
-    }
-}
-
-// TODO: Deprecated, remove after SDK migration
-async fn handle_os_list(
-    address: Address,
-    mut prefix: &str,
-    height_query: HeightQuery,
-    list_query: ListQuery,
-    client: FendermintClient,
-    args: TransArgs,
-) -> Result<warp::reply::Response, Rejection> {
-    if prefix == "/" {
-        prefix = "";
-    }
-    let params = ListParams {
-        prefix: prefix.into(),
-        delimiter: "/".into(),
-        offset: list_query.offset.unwrap_or(0),
-        limit: list_query.limit.unwrap_or(0),
-    };
-    let height = height_query.height.unwrap_or(0);
-
-    let res = os_list(client, args, address, params, height)
-        .await
-        .map_err(|e| {
-            Rejection::from(BadRequest {
-                message: format!("objectstore list error: {}", e),
-            })
-        })?;
-
-    let list = res.unwrap_or_default();
-    let objects = list
-        .objects
-        .iter()
-        .map(|v| {
-            let key = core::str::from_utf8(&v.0).unwrap_or_default().to_string();
-            match &v.1 {
-                ObjectListItem::Internal((cid, size)) => {
-                    json!({"key": key, "value": json!({"kind": "internal", "content": cid.to_string(), "size": size})})
-                }
-                ObjectListItem::External((cid, resolved)) => {
-                    json!({"key": key, "value": json!({"kind": "external", "content": cid.to_string(), "resolved": resolved})})
-                }
-            }
-        })
-        .collect::<Vec<Value>>();
-    let common_prefixes = list
-        .common_prefixes
-        .iter()
-        .map(|v| Value::String(core::str::from_utf8(v).unwrap_or_default().to_string()))
-        .collect::<Vec<Value>>();
-
-    let list = json!({"objects": objects, "common_prefixes": common_prefixes});
-    let list = serde_json::to_vec(&list).unwrap();
-    let mut header_map = HeaderMap::new();
-    header_map.insert("Content-Length", HeaderValue::from(list.len()));
-    header_map.insert("Content-Type", HeaderValue::from_static("application/json"));
-    let body = warp::hyper::Body::from(list);
-    let mut response = warp::reply::Response::new(body);
-    let headers = response.headers_mut();
-    headers.extend(header_map);
-
-    Ok(response)
-}
-
 struct ObjectRange {
     start: u64,
     end: u64,
@@ -787,26 +579,6 @@ async fn os_get(
     let res = client
         .inner
         .os_get_call(address, params, TokenAmount::default(), gas_params, h)
-        .await?;
-
-    Ok(res.return_data)
-}
-
-// TODO: Deprecated, remove after SDK migration
-async fn os_list(
-    client: FendermintClient,
-    args: TransArgs,
-    address: Address,
-    params: ListParams,
-    height: u64,
-) -> anyhow::Result<Option<ObjectList>> {
-    let mut client = TransClient::new(client, &args)?;
-    let gas_params = gas_params(&args);
-    let h = FvmQueryHeight::from(height);
-
-    let res = client
-        .inner
-        .os_list_call(address, params, TokenAmount::default(), gas_params, h)
         .await?;
 
     Ok(res.return_data)
