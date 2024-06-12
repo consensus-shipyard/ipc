@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
-import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IntegrationTestBase, RootSubnetDefinition, TestSubnetDefinition} from "@ipc/test/IntegrationTestBase.sol";
 import {ERC20PresetFixedSupply} from "@ipc/test/helpers/ERC20PresetFixedSupply.sol";
@@ -9,34 +9,34 @@ import {TestUtils} from "@ipc/test/helpers/TestUtils.sol";
 import {MerkleTreeHelper} from "@ipc/test/helpers/MerkleTreeHelper.sol";
 import {GatewayFacetsHelper} from "@ipc/test/helpers/GatewayFacetsHelper.sol";
 import {SubnetActorFacetsHelper} from "@ipc/test/helpers/SubnetActorFacetsHelper.sol";
-import {LinkedTokenController} from "../src/LinkedTokenController.sol";
-import {LinkedTokenReplica} from "../src/LinkedTokenReplica.sol";
+import {LinkedTokenController} from "../contracts/LinkedTokenController.sol";
+import {LinkedTokenReplica} from "../contracts/LinkedTokenReplica.sol";
 
-import {LinkedTokenControllerV2} from "../src/v2/LinkedTokenControllerV2.sol";
+import {LinkedTokenControllerV2} from "../contracts/v2/LinkedTokenControllerV2.sol";
 import {LinkedTokenControllerV2Extension} from "./LinkedTokenControllerV2Extension.sol";
 import {LinkedTokenReplicaV2Extension} from "./LinkedTokenReplicaV2Extension.sol";
-import {LinkedTokenReplicaV2} from "../src/v2/LinkedTokenReplicaV2.sol";
-import {USDCTest} from "../src/USDCTest.sol";
+import {LinkedTokenReplicaV2} from "../contracts/v2/LinkedTokenReplicaV2.sol";
+import {USDCTest} from "../contracts/USDCTest.sol";
 
-import {SubnetID, Subnet, IPCAddress, Validator} from "@ipc/src/structs/Subnet.sol";
-import {SubnetActorDiamond} from "@ipc/src/SubnetActorDiamond.sol";
-import {GatewayDiamond} from "@ipc/src/GatewayDiamond.sol";
-import {TopDownFinalityFacet} from "@ipc/src/gateway/router/TopDownFinalityFacet.sol";
-import {XnetMessagingFacet} from "@ipc/src/gateway/router/XnetMessagingFacet.sol";
-import {SubnetActorManagerFacet} from "@ipc/src/subnet/SubnetActorManagerFacet.sol";
-import {GatewayGetterFacet} from "@ipc/src/gateway/GatewayGetterFacet.sol";
-import {SubnetActorCheckpointingFacet} from "@ipc/src/subnet/SubnetActorCheckpointingFacet.sol";
-import {CheckpointingFacet} from "@ipc/src/gateway/router/CheckpointingFacet.sol";
-import {FvmAddressHelper} from "@ipc/src/lib/FvmAddressHelper.sol";
-import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMsgKind, ResultMsg, CallMsg} from "@ipc/src/structs/CrossNet.sol";
-import {SubnetIDHelper} from "@ipc/src/lib/SubnetIDHelper.sol";
-import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
-import {CrossMsgHelper} from "@ipc/src/lib/CrossMsgHelper.sol";
+import {SubnetID, Subnet, IPCAddress, Validator} from "@ipc/contracts/structs/Subnet.sol";
+import {SubnetActorDiamond} from "@ipc/contracts/SubnetActorDiamond.sol";
+import {GatewayDiamond} from "@ipc/contracts/GatewayDiamond.sol";
+import {TopDownFinalityFacet} from "@ipc/contracts/gateway/router/TopDownFinalityFacet.sol";
+import {XnetMessagingFacet} from "@ipc/contracts/gateway/router/XnetMessagingFacet.sol";
+import {SubnetActorManagerFacet} from "@ipc/contracts/subnet/SubnetActorManagerFacet.sol";
+import {GatewayGetterFacet} from "@ipc/contracts/gateway/GatewayGetterFacet.sol";
+import {SubnetActorCheckpointingFacet} from "@ipc/contracts/subnet/SubnetActorCheckpointingFacet.sol";
+import {CheckpointingFacet} from "@ipc/contracts/gateway/router/CheckpointingFacet.sol";
+import {FvmAddressHelper} from "@ipc/contracts/lib/FvmAddressHelper.sol";
+import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMsgKind, ResultMsg, CallMsg} from "@ipc/contracts/structs/CrossNet.sol";
+import {SubnetIDHelper} from "@ipc/contracts/lib/SubnetIDHelper.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {CrossMsgHelper} from "@ipc/contracts/lib/CrossMsgHelper.sol";
 import {IIpcHandler} from "@ipc/sdk/interfaces/IIpcHandler.sol";
-import {FilAddress} from "fevmate/utils/FilAddress.sol";
+import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import "forge-std/console.sol";
 
-import "openzeppelin-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 string constant REPLICA_TOKEN_NAME = "USDCTestReplica";
 string constant REPLICA_TOKEN_SYMBOL = "USDCtR";
@@ -298,7 +298,7 @@ contract MultiSubnetTest is IntegrationTestBase {
 
         //ensure that tokens are delivered on subnet
         require(
-            IERC20Upgradeable(ipcTokenReplica).balanceOf(recipient) == transferAmount,
+            IERC20(ipcTokenReplica).balanceOf(recipient) == transferAmount,
             "incorrect proxy token balance"
         );
     }

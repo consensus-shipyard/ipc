@@ -4,7 +4,7 @@
 -include .env
 export
 
-.PHONY: help install fmt set-original-token deploy-usdctest mint-usdc check-balance deploy-replica deploy-controller initialize-replica initialize-controller approve-token deposit withdraw check-replica-balance
+.PHONY: help install pnpm fmt set-original-token deploy-usdctest mint-usdc check-balance deploy-replica deploy-controller initialize-replica initialize-controller approve-token deposit withdraw check-replica-balance
 
 help:
 	@echo "Available targets:"
@@ -43,13 +43,20 @@ help:
 	@echo "  make <target>                          - Run a specific make target."
 	@echo "  make help                              - Display this help message."
 
-install:
+pnpm:
+	@command -v pnpm > /dev/null || { \
+		echo "pnpm is not installed. Installing pnpm..."; \
+		npm install -g pnpm; \
+	}
+
+install: pnpm
 	@echo "Installing dependencies..."
+	pnpm install
 	forge install
 
-fmt:
-	npm install --silent --no-save
-	npx prettier --check -w 'src/**/**/*.sol' 'script/**/**/*.sol' 'test/**/**/*.sol' 'test/**/**/*.t.sol' '**/*.{js,jsx,ts,tsx,json,css}'
+fmt: pnpm
+	pnpm install --silent --no-save
+	pnpm exec prettier --check -w 'src/**/**/*.sol' 'script/**/**/*.sol' 'test/**/**/*.sol' 'test/**/**/*.t.sol' '**/*.{js,jsx,ts,tsx,json,css}'
 
 set-original-token:
 	@echo "Please enter the Original Token address:"

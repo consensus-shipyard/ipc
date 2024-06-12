@@ -7,7 +7,6 @@ crytic-export/
 broadcast/
 out/
 binding/src
-contracts/
 
 node_modules
 

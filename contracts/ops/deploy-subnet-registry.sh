@@ -17,4 +17,4 @@ if [ "$NETWORK" = "auto" ]; then
 fi
 
 
-npx hardhat deploy-subnet-registry --network ${NETWORK}
+pnpm exec hardhat deploy-subnet-registry --network ${NETWORK}

@@ -26,7 +26,7 @@ jobs:
           node-version: 18.19.0
       - name: Install dependencies
         run: npm install
-        working-directory: fevm-contract-tests
+        working-directory: 'fevm-contract-tests'
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:

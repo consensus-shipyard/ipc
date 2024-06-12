@@ -42,7 +42,7 @@ jobs:
         run: cargo install aderyn
 
       - name: Run aderyn
-        run: cd contracts && aderyn ./ -o report.json
+        run: cd contracts && make deps && aderyn ./ -o report.json
 
       - name: Check results
         run: cd contracts && ./tools/check_aderyn.sh
@@ -53,20 +53,20 @@ jobs:
     if: ${{ !github.event.pull_request.draft }}
     steps:
       - uses: actions/checkout@v3
-      - name: Setup Node 16
-        uses: actions/setup-node@v3
+      - uses: pnpm/action-setup@v2
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: '18.x'
-          cache: 'npm'
-          cache-dependency-path: 'contracts/package-lock.json'
+          cache: 'pnpm'
       - name: Install Node dependencies
-        run: cd contracts && npm i --unsafe-perm
+        run: cd contracts && pnpm i --unsafe-perm
       - name: Install solidity plugin
-        run: cd contracts && npm i --unsafe-perm prettier prettier-plugin-solidity
+        run: cd contracts && pnpm i --unsafe-perm prettier prettier-plugin-solidity
       - name: Prettier check
-        run: cd contracts && npx prettier --check 'src/**/*.sol' 'test/*.sol'
+        run: cd contracts && pnpm exec prettier --check 'contracts/**/*.sol' 'test/*.sol'
       - name: Solhint check
-        run: cd contracts && npx solhint 'src/**/*.sol'
+        run: cd contracts && pnpm exec solhint 'contracts/**/*.sol'
 
   codespell:
     name: Codespell check
@@ -79,5 +79,5 @@ jobs:
         with:
           check_hidden: true
           check_filenames: true
-          path: contracts/src/*,contracts/script/*,contracts/scripts/*,contracts/test/*
+          path: contracts/contracts/*,contracts/script/*,contracts/scripts/*,contracts/test/*
           ignore_words_file: contracts/.codespellignore
