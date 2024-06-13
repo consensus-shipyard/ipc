@@ -11,6 +11,7 @@ use bytes::Buf;
 use cid::Cid;
 use ethers::core::types::{self as et};
 use fendermint_actor_objectstore::Object;
+use fendermint_rpc::message::GasParams;
 use fendermint_rpc::QueryClient;
 use fendermint_vm_message::conv::from_fvm::to_eth_tokens;
 use fendermint_vm_message::signed::SignedMessage;
@@ -32,23 +33,19 @@ use warp::{
 
 use fendermint_actor_objectstore::GetParams;
 use fendermint_app_settings::objects::ObjectsSettings;
-use fendermint_rpc::{client::FendermintClient, tx::CallClient};
+use fendermint_rpc::client::FendermintClient;
 use fendermint_vm_message::query::FvmQueryHeight;
 use fvm_shared::chainid::ChainID;
 
-use super::rpc::{gas_params, TransClient};
 use crate::cmd;
-use crate::options::{
-    objects::{ObjectsArgs, ObjectsCommands},
-    rpc::TransArgs,
-};
+use crate::options::objects::{ObjectsArgs, ObjectsCommands};
 
 const MAX_OBJECT_LENGTH: u64 = 1024 * 1024 * 1024;
 
 cmd! {
     ObjectsArgs(self, settings: ObjectsSettings) {
         match self.command.clone() {
-            ObjectsCommands::Run { tendermint_url, ipfs_addr, args} => {
+            ObjectsCommands::Run { tendermint_url, ipfs_addr} => {
                 let client = FendermintClient::new_http(tendermint_url, None)?;
                 let ipfs = IpfsClient::from_multiaddr_str(&ipfs_addr)?;
                 let ipfs_adapter = Ipfs { inner: ipfs.clone() };
@@ -75,7 +72,6 @@ cmd! {
                 .and(warp::query::<HeightQuery>())
                 .and(with_client(client.clone()))
                 .and(with_ipfs(ipfs.clone()))
-                .and(with_args(args.clone()))
                 .and_then(handle_object_download);
 
                 let router = health_route
@@ -115,19 +111,9 @@ fn with_ipfs_adapter<I: IpfsApiAdapter + Clone + Send>(
     warp::any().map(move || client.clone())
 }
 
-fn with_args(args: TransArgs) -> impl Filter<Extract = (TransArgs,), Error = Infallible> + Clone {
-    warp::any().map(move || args.clone())
-}
-
 #[derive(Serialize, Deserialize)]
 struct HeightQuery {
     pub height: Option<u64>,
-}
-
-#[derive(Serialize, Deserialize)]
-struct ListQuery {
-    pub offset: Option<u64>,
-    pub limit: Option<u64>,
 }
 
 #[derive(Debug, Error)]
@@ -417,22 +403,21 @@ struct ObjectRange {
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn handle_object_download(
+async fn handle_object_download<F: QueryClient + Send + Sync>(
     address: Address,
     tail: Tail,
     method: String,
     range: Option<String>,
     height_query: HeightQuery,
-    client: FendermintClient,
+    client: F,
     ipfs: IpfsClient,
-    args: TransArgs,
 ) -> Result<impl Reply, Rejection> {
     let height = height_query
         .height
         .unwrap_or(FvmQueryHeight::Committed.into());
     let path = tail.as_str();
     let key: Vec<u8> = path.into();
-    let maybe_object = os_get(client, args, address, GetParams { key }, height)
+    let maybe_object = os_get(client, address, GetParams { key }, height)
         .await
         .map_err(|e| {
             Rejection::from(BadRequest {
@@ -578,23 +563,24 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
 
 // RPC methods
 
-async fn os_get(
-    client: FendermintClient,
-    args: TransArgs,
+async fn os_get<F: QueryClient + Send + Sync>(
+    mut client: F,
     address: Address,
     params: GetParams,
     height: u64,
 ) -> anyhow::Result<Option<Object>> {
-    let mut client = TransClient::new(client, &args)?;
-    let gas_params = gas_params(&args);
+    let gas_params = GasParams {
+        gas_limit: Default::default(),
+        gas_fee_cap: Default::default(),
+        gas_premium: Default::default(),
+    };
     let h = FvmQueryHeight::from(height);
 
-    let res = client
-        .inner
+    let return_data = client
         .os_get_call(address, params, TokenAmount::default(), gas_params, h)
         .await?;
 
-    Ok(res.return_data)
+    Ok(return_data)
 }
 
 #[cfg(test)]

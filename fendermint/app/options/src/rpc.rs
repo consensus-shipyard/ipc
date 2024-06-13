@@ -154,13 +154,13 @@ pub struct TransArgs {
     #[arg(long, short, value_parser = parse_full_fil, default_value = "0")]
     pub value: TokenAmount,
     /// Path to the secret key of the sender to sign the transaction.
-    #[arg(long, short, env = "FM_PROXY_SECRET_KEY")]
+    #[arg(long, short)]
     pub secret_key: PathBuf,
     /// Indicate whether its a regular or ethereum account.
-    #[arg(long, short, default_value = "regular", env = "FM_PROXY_ACCOUNT_KIND")]
+    #[arg(long, short, default_value = "regular")]
     pub account_kind: AccountKind,
     /// Sender account nonce.
-    #[arg(long, short = 'n', env = "FM_PROXY_SEQUENCE")]
+    #[arg(long, short = 'n')]
     pub sequence: u64,
     /// Maximum amount of gas that can be charged.
     #[arg(long, default_value_t = 10_000_000_000)] // Default from ref-fvm testkit.
@@ -175,7 +175,7 @@ pub struct TransArgs {
     #[arg(long, value_parser = parse_token_amount, default_value = "0")]
     pub gas_premium: TokenAmount,
     /// Whether to wait for the results from Tendermint or not.
-    #[arg(long, short, default_value = "commit", env = "FM_PROXY_BROADCAST_MODE")]
+    #[arg(long, short, default_value = "commit")]
     pub broadcast_mode: BroadcastMode,
 }
 
