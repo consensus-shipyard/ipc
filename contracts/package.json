@@ -1,6 +1,6 @@
 {
     "name": "@consensus-shipyard/ipc-contracts",
-    "version": "1.0.0-alpha.0",
+    "version": "1.0.0-alpha.1",
     "description": "This repository includes the reference implementation of all the actors (i.e. smart contracts) responsible for the operation of the IPC (i.e. Inter-Planetary Consensus) protocol. These actors are written in Solidity and target FileCoin’s FEVM.",
     "author": "ConsensusLab, Protocol Labs, Filecoin Core Devs, Limechain",
     "packageManager": "pnpm@9.3.0",
