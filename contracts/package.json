@@ -12,11 +12,12 @@
         "contracts",
         "sdk",
         "README.md",
-        "LICENSE-APACHE",
-        "LICENSE-MIT"
+        "LICENSE-*"
     ],
     "scripts": {
-        "preinstall": "git submodule update --init --recursive"
+        "prepack": "sh -c 'cp ../LICENSE-* .'",
+        "preinstall": "git submodule update --init --recursive",
+        "postpack": "sh -c 'rm -f LICENSE-*'"
     },
     "repository": {
         "type": "git",

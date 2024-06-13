@@ -10,6 +10,10 @@
     "lib": "lib",
     "test": "test"
   },
+  "scripts": {
+    "prepack": "sh -c 'cp ../../LICENSE-* .'",
+    "postpack": "sh -c 'rm -f LICENSE-*'"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/consensus-shipyard/ipc.git"
@@ -23,8 +27,7 @@
   "files": [
     "contracts",
     "README.md",
-    "../../LICENSE-APACHE",
-    "../../LICENSE-MIT"
+    "LICENSE-*"
   ],
   "dependencies": {
     "@axelar-network/axelar-gmp-sdk-solidity": "v5.6.4",
