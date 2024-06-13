@@ -4,7 +4,7 @@ env = { "ENTRY" = "fendermint", "CMD" = "run", "FLAGS" = "-d" }
 
 [tasks.fendermint-pull]
 condition = { env_not_set = [
-    "FM_PULL_SKIP",
+  "FM_PULL_SKIP",
 ], fail_message = "Skipped pulling fendermint Docker image." }
 script = """
   docker pull ghcr.io/consensus-shipyard/fendermint:${FM_DOCKER_TAG}
@@ -192,12 +192,6 @@ script.post = "chmod 600 ${BASE_DIR}/${NODE_NAME}/${KEYS_SUBDIR}/${NETWORK_KEY_N
 [tasks.fendermint-network-peer-id]
 extend = "fendermint-tool"
 env = { "CMD" = "key show-peer-id --public-key /data/${NODE_NAME}/${NETWORK_PUB_KEY_PATH}" }
-
-[tasks.fendermint-new-proxy-key]
-extend = "fendermint-tool"
-env = { "CMD" = "key gen --out-dir /data/${NODE_NAME}/${KEYS_SUBDIR} --name ${PROXY_KEY_NAME}" }
-script.pre = "mkdir -p ${BASE_DIR}/${NODE_NAME}/${KEYS_SUBDIR}"
-script.post = "chmod 600 ${BASE_DIR}/${NODE_NAME}/${KEYS_SUBDIR}/${PROXY_KEY_NAME}.sk"
 
 
 [tasks.fendermint-deps]

@@ -176,29 +176,7 @@ do
       child-validator-no-parent-init
 done
 
-# Step 6: Setup proxy wallets
-echo "$DASHES Configuring proxy wallets"
-for i in {0..2}
-do
-  # Import wallet
-  proxy_key=$(cat ${IPC_CONFIG_FOLDER}/evm_keystore_proxy.json | jq .[$i].private_key | tr -d '"' | tr -d '\n')
-  proxy_address=$(cat ${IPC_CONFIG_FOLDER}/evm_keystore_proxy.json | jq .[$i].address | tr -d '"' | tr -d '\n')
-  ipc-cli wallet import --wallet-type evm --private-key ${proxy_key}
-
-  # Export private key to proxy
-  out=${subnet_folder}/validator-${i}/validator-${i}/keys/proxy_key.sk
-  ipc-cli wallet export --wallet-type evm --address ${proxy_address} --fendermint | tr -d '\n' > ${out}
-  chmod 600 ${subnet_folder}/validator-${i}/validator-${i}/keys/proxy_key.sk
-
-  # Export public key to proxy
-  pubkey=$(ipc-cli wallet pub-key --wallet-type evm --address ${proxy_address})
-  echo "Proxy wallet $i address's pubkey: $pubkey"
-  echo $pubkey | tr -d '\n' > ${subnet_folder}/validator-${i}/validator-${i}/keys/proxy_key.pk
-
-  # Remove wallet
-  ipc-cli wallet remove --wallet-type evm --address ${proxy_address}
-done
-
+# Step 6: Copy genesis file into each validator
 # Copy genesis file into each validator
 for i in {0..2}
 do
