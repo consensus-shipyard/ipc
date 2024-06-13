@@ -342,6 +342,13 @@ async fn handle_object_upload<F: QueryClient, I: IpfsApiAdapter>(
             message: format!("failed to ensure balance: {}", e),
         })
     })?;
+    ensure_objectstore_exists(client, message.to)
+        .await
+        .map_err(|e| {
+            Rejection::from(BadRequest {
+                message: format!("failed to connect with objectstore: {}", e),
+            })
+        })?;
     let client_cid = match object {
         Some(object) => object.value,
         None => {
@@ -365,6 +372,12 @@ async fn handle_object_upload<F: QueryClient, I: IpfsApiAdapter>(
     })?;
 
     Ok(cid.to_string())
+}
+
+async fn ensure_objectstore_exists<F: QueryClient>(client: F, to: Address) -> anyhow::Result<()> {
+    let actor_state = client.actor_state(&to, FvmQueryHeight::Committed).await?;
+    actor_state.value.ok_or(anyhow!("cannot find actor {to}"))?;
+    Ok(())
 }
 
 fn get_range_params(range: String, size: u64) -> Result<(u64, u64), ObjectsError> {
