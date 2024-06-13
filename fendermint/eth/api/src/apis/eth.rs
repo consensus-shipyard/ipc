@@ -109,6 +109,7 @@ where
         block_gas_limit =
             i64::try_from(fvm_shared::BLOCK_GAS_LIMIT).expect("FVM block gas limit not i64")
     };
+    tracing::info!(block_gas_limit, "block gas limit");
 
     let mut premiums = Vec::new();
     // iterate through the blocks in the range
@@ -145,6 +146,7 @@ where
 
                 if let ChainMessage::Signed(msg) = msg {
                     let premium = crate::gas::effective_gas_premium(&msg.message, base_fee);
+                    tracing::info!(height = height.value(), premium = premium.to_string(), "message premium");
                     premiums.push((premium, txres.gas_used));
                 }
             }
@@ -154,6 +156,8 @@ where
 
     // compute median gas price
     let mut median = crate::gas::median_gas_premium(&mut premiums, block_gas_limit);
+    tracing::info!(median = median.to_string(), "median gas premium");
+
     let min_premium = data.gas_opt.min_gas_premium.clone();
     if median < min_premium {
         median = min_premium;
@@ -166,6 +170,8 @@ where
     let noise: f64 = 1.0 + rng.gen::<f64>() * 0.005;
     let precision: i64 = 32;
     let coeff: u64 = ((noise * (1 << precision) as f64) as u64) + 1;
+
+    tracing::info!(noise, coeff, "noise generation");
 
     median *= BigInt::from(coeff);
     median.div_ceil(BigInt::from(1 << PRECISION));
