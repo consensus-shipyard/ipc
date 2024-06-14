@@ -71,7 +71,7 @@ cmd! {
                 .and(warp::header::optional::<String>("Range"))
                 .and(warp::query::<HeightQuery>())
                 .and(with_client(client.clone()))
-                .and(with_ipfs(ipfs.clone()))
+                .and(with_ipfs_adapter(ipfs_adapter.clone()))
                 .and_then(handle_object_download);
 
                 let router = health_route
@@ -96,12 +96,6 @@ cmd! {
 fn with_client(
     client: FendermintClient,
 ) -> impl Filter<Extract = (FendermintClient,), Error = Infallible> + Clone {
-    warp::any().map(move || client.clone())
-}
-
-fn with_ipfs(
-    client: IpfsClient,
-) -> impl Filter<Extract = (IpfsClient,), Error = Infallible> + Clone {
     warp::any().map(move || client.clone())
 }
 
@@ -131,7 +125,8 @@ impl From<ParseIntError> for ObjectsError {
 }
 
 pub trait IpfsApiAdapter {
-    async fn add_file(&self, temp_file: TempFile, cid: Cid) -> anyhow::Result<String>;
+    async fn add_object(&self, temp_file: TempFile, cid: Cid) -> anyhow::Result<String>;
+    async fn get_object(&self, range: Option<String>, cid: Cid) -> anyhow::Result<ObjectRange>;
 }
 
 #[derive(Clone)]
@@ -140,7 +135,7 @@ pub struct Ipfs {
 }
 
 impl IpfsApiAdapter for Ipfs {
-    async fn add_file(&self, temp_file: TempFile, cid_from_msg: Cid) -> anyhow::Result<String> {
+    async fn add_object(&self, temp_file: TempFile, cid_from_msg: Cid) -> anyhow::Result<String> {
         let res = self
             .inner
             .add_async_with_options(
@@ -169,6 +164,39 @@ impl IpfsApiAdapter for Ipfs {
         }
 
         Ok(ipfs_cid.to_string())
+    }
+
+    async fn get_object(&self, range: Option<String>, cid: Cid) -> anyhow::Result<ObjectRange> {
+        let stat = self
+            .inner
+            .files_stat(format!("/ipfs/{cid}").as_str())
+            .await?;
+        let size = stat.size;
+        Ok(match range {
+            Some(range) => {
+                let (start, end) = get_range_params(range, size)?;
+                let len = end - start + 1;
+                let body = Body::wrap_stream(self.inner.cat_range(
+                    &cid.to_string(),
+                    start as usize,
+                    len as usize,
+                ));
+                ObjectRange {
+                    start,
+                    end,
+                    len,
+                    size,
+                    body,
+                }
+            }
+            None => ObjectRange {
+                start: 0,
+                end: size - 1,
+                len: size,
+                size,
+                body: Body::wrap_stream(self.inner.cat(&cid.to_string())),
+            },
+        })
     }
 }
 
@@ -351,7 +379,7 @@ async fn handle_object_upload<F: QueryClient, I: IpfsApiAdapter>(
             }))
         }
     };
-    let cid = ipfs.add_file(file, client_cid).await.map_err(|e| {
+    let cid = ipfs.add_object(file, client_cid).await.map_err(|e| {
         Rejection::from(BadRequest {
             message: format!("failed to add file: {}", e),
         })
@@ -394,7 +422,7 @@ fn get_range_params(range: String, size: u64) -> Result<(u64, u64), ObjectsError
     Ok((start, end))
 }
 
-struct ObjectRange {
+pub(crate) struct ObjectRange {
     start: u64,
     end: u64,
     len: u64,
@@ -402,15 +430,14 @@ struct ObjectRange {
     body: warp::hyper::Body,
 }
 
-#[allow(clippy::too_many_arguments)]
-async fn handle_object_download<F: QueryClient + Send + Sync>(
+async fn handle_object_download<F: QueryClient + Send + Sync, I: IpfsApiAdapter>(
     address: Address,
     tail: Tail,
     method: String,
     range: Option<String>,
     height_query: HeightQuery,
     client: F,
-    ipfs: IpfsClient,
+    ipfs: I,
 ) -> Result<impl Reply, Rejection> {
     let height = height_query
         .height
@@ -444,7 +471,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
                             message: "object is not resolved".to_string(),
                         }));
                     }
-                    fetch_object(ipfs, range, cid.into()).await.map_err(|e| {
+                    ipfs.get_object(range, cid).await.map_err(|e| {
                         Rejection::from(BadRequest {
                             message: format!("failed to fetch detached object {}", e),
                         })
@@ -486,36 +513,6 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
         }
         None => Err(Rejection::from(NotFound)),
     }
-}
-
-async fn fetch_object(
-    ipfs: IpfsClient,
-    range: Option<String>,
-    cid: String,
-) -> anyhow::Result<ObjectRange> {
-    let stat = ipfs.files_stat(format!("/ipfs/{cid}").as_str()).await?;
-    let size = stat.size;
-    Ok(match range {
-        Some(range) => {
-            let (start, end) = get_range_params(range, size)?;
-            let len = end - start + 1;
-            let body = Body::wrap_stream(ipfs.cat_range(&cid, start as usize, len as usize));
-            ObjectRange {
-                start,
-                end,
-                len,
-                size,
-                body,
-            }
-        }
-        None => ObjectRange {
-            start: 0,
-            end: size - 1,
-            len: size,
-            size,
-            body: Body::wrap_stream(ipfs.cat(&cid)),
-        },
-    })
 }
 
 // Rejection handlers
@@ -600,13 +597,49 @@ mod tests {
     }
 
     impl IpfsApiAdapter for IpfsMocked {
-        async fn add_file(&self, _temp_file: TempFile, _cid: Cid) -> anyhow::Result<String> {
+        async fn add_object(&self, _temp_file: TempFile, _cid: Cid) -> anyhow::Result<String> {
             Ok("Qm123".to_string())
+        }
+
+        async fn get_object(
+            &self,
+            range: Option<String>,
+            _cid: Cid,
+        ) -> anyhow::Result<ObjectRange> {
+            let content = "hello world";
+            if let Some(range) = range {
+                let (start, end) = get_range_params(range, content.len() as u64).unwrap();
+                let ranged_content = content[start as usize..=end as usize].to_string();
+                let body = make_request_body(ranged_content);
+                Ok(ObjectRange {
+                    start,
+                    end,
+                    len: end - start + 1,
+                    size: content.len() as u64,
+                    body,
+                })
+            } else {
+                let body = make_request_body(content.to_string());
+                let size = content.len() as u64;
+                Ok(ObjectRange {
+                    start: 0,
+                    end: size - 1,
+                    len: size,
+                    size,
+                    body,
+                })
+            }
         }
     }
 
+    fn make_request_body(content: String) -> Body {
+        let chunks: Vec<Result<_, std::io::Error>> = vec![Ok(content)];
+        let stream = futures_util::stream::iter(chunks);
+        Body::wrap_stream(stream)
+    }
+
     // Used to mocking Actor State
-    const ABCI_QUERY_RESPONSE: &str = r#"{
+    const ABCI_QUERY_RESPONSE_UPLOAD: &str = r#"{
         "jsonrpc": "2.0",
         "id": "",
         "result": {
@@ -619,6 +652,24 @@ mod tests {
              "value": "pWRjb2Rl2CpYJwABVaDkAiB4ZQKaqaSEiu8tIb2Ef7bIWOoxPeNkAEljZabMaAMlaGVzdGF0ZdgqWCcAAXGg5AIgRbDPwiDO7Ft8HGLE1Bk9OOTrpI6IFXKc51+cCrDkwcBoc2VxdWVuY2UAZ2JhbGFuY2VKADY1ya3F3qAAAHFkZWxlZ2F0ZWRfYWRkcmVzc1YECqf8cO8ArRpoWzmcqFtkasWDXCqx",
              "proof": null,
              "height": "8",
+             "codespace": ""
+           }
+        }
+     }"#;
+
+    const ABCI_QUERY_RESPONSE_DOWNLOAD: &str = r#"{
+        "jsonrpc": "2.0",
+        "id": "",
+        "result": {
+         "response": {
+             "code": 0,
+             "log": "",
+             "info": "",
+             "index": "0",
+             "key": "",
+             "value": "mIUSGDIYoRhoGEUYeBh0GGUYchhuGGEYbBiCGFgYJAEYcBIYIA0YmQ4AGGsYaRhIGEIYvxjzDxhbGKUYQxjTGCAYVxiHGL0Y6xg0GHIY8hgwGM8Y3RgYGF0YVRi2GPIYphj1GDAYyxiSGGQYOhhLCgcYbRhlGHMYcxhhGGcYZRINCgQYZhhyGG8YbRIDGHQYMBgwGBgBEhgxCgIYdBhvEhgpGHQYMhhtGG4YZBg1GGoYaxh1GHYYbRhzGGEYZhg0GDUYNxh5GG0YcBhuGGYYMxhtGG8YbhhhGGwYaBgzGHYYbxh0GGgYZBhkGDUYbhhqGG8YeRgYAQ==",
+             "proof": null,
+             "height": "6017",
              "codespace": ""
            }
         }
@@ -677,8 +728,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_handle_object_upload() {
-        let matcher = MockRequestMethodMatcher::default()
-            .map(Method::AbciQuery, Ok(ABCI_QUERY_RESPONSE.to_string()));
+        let matcher = MockRequestMethodMatcher::default().map(
+            Method::AbciQuery,
+            Ok(ABCI_QUERY_RESPONSE_UPLOAD.to_string()),
+        );
         let client = FendermintClient::new(MockClient::new(matcher).0);
         let ipfs = IpfsMocked {
             _inner: IpfsClient::default(),
@@ -731,5 +784,102 @@ mod tests {
             .unwrap();
         let response = reply.into_response();
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_handle_object_download_get() {
+        let matcher = MockRequestMethodMatcher::default().map(
+            Method::AbciQuery,
+            Ok(ABCI_QUERY_RESPONSE_DOWNLOAD.to_string()),
+        );
+        let client = FendermintClient::new(MockClient::new(matcher).0);
+        let ipfs = IpfsMocked {
+            _inner: IpfsClient::default(),
+        };
+        let result = handle_object_download(
+            Address::new_actor("t2mnd5jkuvmsaf457ympnf3monalh3vothdd5njoy".as_bytes()),
+            warp::test::request()
+                .path("/foo/bar")
+                .filter(&warp::path::tail())
+                .await
+                .unwrap(),
+            "GET".to_string(),
+            None,
+            HeightQuery { height: Some(1) },
+            client,
+            ipfs,
+        )
+        .await;
+        assert!(result.is_ok());
+        let response = result.unwrap().into_response();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = warp::hyper::body::to_bytes(response.into_body())
+            .await
+            .unwrap();
+        assert_eq!(body, "hello world".as_bytes());
+    }
+
+    #[tokio::test]
+    async fn test_handle_object_download_with_range() {
+        let matcher = MockRequestMethodMatcher::default().map(
+            Method::AbciQuery,
+            Ok(ABCI_QUERY_RESPONSE_DOWNLOAD.to_string()),
+        );
+        let client = FendermintClient::new(MockClient::new(matcher).0);
+        let ipfs = IpfsMocked {
+            _inner: IpfsClient::default(),
+        };
+        let result = handle_object_download(
+            Address::new_actor("t2mnd5jkuvmsaf457ympnf3monalh3vothdd5njoy".as_bytes()),
+            warp::test::request()
+                .path("/foo/bar")
+                .filter(&warp::path::tail())
+                .await
+                .unwrap(),
+            "GET".to_string(),
+            Some("bytes=0-4".to_string()),
+            HeightQuery { height: Some(1) },
+            client,
+            ipfs,
+        )
+        .await;
+        assert!(result.is_ok());
+        let response = result.unwrap().into_response();
+        assert_eq!(response.status(), StatusCode::PARTIAL_CONTENT);
+        let body = warp::hyper::body::to_bytes(response.into_body())
+            .await
+            .unwrap();
+        assert_eq!(body, "hello".as_bytes());
+    }
+
+    #[tokio::test]
+    async fn test_handle_object_download_head() {
+        let matcher = MockRequestMethodMatcher::default().map(
+            Method::AbciQuery,
+            Ok(ABCI_QUERY_RESPONSE_DOWNLOAD.to_string()),
+        );
+        let client = FendermintClient::new(MockClient::new(matcher).0);
+        let ipfs = IpfsMocked {
+            _inner: IpfsClient::default(),
+        };
+        let result = handle_object_download(
+            Address::new_actor("t2mnd5jkuvmsaf457ympnf3monalh3vothdd5njoy".as_bytes()),
+            warp::test::request()
+                .path("/foo/bar")
+                .filter(&warp::path::tail())
+                .await
+                .unwrap(),
+            "HEAD".to_string(),
+            None,
+            HeightQuery { height: Some(1) },
+            client,
+            ipfs,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let response = result.unwrap().into_response();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers().get("Content-Length").unwrap(), "11");
     }
 }
