@@ -10,6 +10,7 @@ use quickcheck::Arbitrary;
 /// that so we can generate arbitrary addresses that don't fail equality
 /// after a roundtrip.
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub struct ArbAddress(pub Address);
 
 impl Arbitrary for ArbAddress {
@@ -54,6 +55,7 @@ impl Arbitrary for ArbSubnetID {
 /// NOTE: This is based on the [simpler version](https://github.com/ChainSafe/forest/blob/v0.6.0/blockchain/blocks/src/lib.rs) in Forest.
 ///       The original uses weighted distributions to generate more plausible CIDs.
 #[derive(Clone)]
+#[allow(dead_code)]
 pub struct ArbCid(pub Cid);
 
 impl Arbitrary for ArbCid {

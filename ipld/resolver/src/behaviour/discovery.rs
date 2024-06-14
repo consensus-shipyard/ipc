@@ -36,6 +36,7 @@ use super::NetworkConfig;
 pub enum Event {
     /// Event emitted when a peer is added or updated in the routing table,
     /// which means if we later ask for its addresses, they should be known.
+    #[allow(dead_code)]
     Added(PeerId, Vec<Multiaddr>),
 
     /// Event emitted when a peer is removed from the routing table.
