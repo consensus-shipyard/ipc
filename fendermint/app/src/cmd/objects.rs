@@ -586,7 +586,7 @@ mod tests {
     use cid::multihash::{Code, MultihashDigest};
     use ethers::core::k256::ecdsa::SigningKey;
     use ethers::core::rand::{rngs::StdRng, SeedableRng};
-    use fendermint_actor_objectstore::{ObjectKind, PutParams};
+    use fendermint_actor_objectstore::{AddParams, ObjectKind};
     use fendermint_rpc::FendermintClient;
     use fendermint_vm_message::conv::from_eth::to_fvm_address;
     use fvm_ipld_encoding::RawBytes;
@@ -741,7 +741,7 @@ mod tests {
         let external_object = b"hello world".as_ref();
         let digest = Code::Blake2b256.digest(external_object);
         let object_cid = Cid::new_v1(fvm_ipld_encoding::IPLD_RAW, digest);
-        let params = PutParams {
+        let params = AddParams {
             key: key.to_vec(),
             kind: ObjectKind::External(object_cid),
             overwrite: true,

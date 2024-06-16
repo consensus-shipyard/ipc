@@ -29,10 +29,13 @@ fvm_ipld_hamt = { workspace = true }
 fendermint_actor_machine = { path = "../machine" }
 
 [dev-dependencies]
+fendermint_testing = { path = "../../testing", features = ["arb"] }
 fil_actors_runtime = { workspace = true, features = [
     "test_utils",
     "fil-actor",
 ] }
+quickcheck = { workspace = true }
+quickcheck_macros = { workspace = true }
 
 [features]
 default = []

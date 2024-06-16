@@ -2927,6 +2927,7 @@ dependencies = [
  "anyhow",
  "cid",
  "fendermint_actor_machine",
+ "fendermint_testing",
  "fil_actors_runtime",
  "frc42_dispatch",
  "fvm_ipld_blockstore",
@@ -2935,6 +2936,8 @@ dependencies = [
  "fvm_shared",
  "num-derive 0.3.3",
  "num-traits",
+ "quickcheck",
+ "quickcheck_macros",
  "serde",
  "serde_tuple",
 ]

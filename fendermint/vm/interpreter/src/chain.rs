@@ -6,7 +6,7 @@ use async_stm::atomically;
 use async_trait::async_trait;
 use fendermint_actor_objectstore::{
     GetParams,
-    Method::{GetObject, ResolveExternalObject},
+    Method::{GetObject, ResolveObject},
 };
 use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::{ipc, system};
@@ -513,10 +513,10 @@ where
                 IpcMessage::ObjectResolved(obj) => {
                     let from = system::SYSTEM_ACTOR_ADDR;
                     let to = obj.address;
-                    let method_num = ResolveExternalObject as u64;
+                    let method_num = ResolveObject as u64;
                     let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
 
-                    let params = fendermint_actor_objectstore::ResolveExternalParams {
+                    let params = fendermint_actor_objectstore::ResolveParams {
                         key: obj.key,
                         value: obj.value,
                     };
