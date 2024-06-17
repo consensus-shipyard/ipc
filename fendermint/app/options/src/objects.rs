@@ -30,8 +30,5 @@ pub enum ObjectsCommands {
             env = "IPFS_RPC_ADDR"
         )]
         ipfs_addr: String,
-
-        #[command(flatten)]
-        args: super::rpc::TransArgs,
     },
 }

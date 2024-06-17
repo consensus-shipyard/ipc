@@ -43,9 +43,11 @@ const PUBSUB_PREEMPTIVE: &str = "/ipc/ipld/pre-emptive";
 #[derive(Debug)]
 pub enum Event<V> {
     /// Indicate a change in the subnets a peer is known to support.
+    #[allow(dead_code)]
     Updated(PeerId, ProviderDelta),
 
     /// Indicate that we no longer treat a peer as routable and removed all their supported subnet associations.
+    #[allow(dead_code)]
     Removed(PeerId),
 
     /// We could not add a provider record to the cache because the chache hasn't

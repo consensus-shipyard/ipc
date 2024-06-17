@@ -3,7 +3,10 @@
 
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
+use fendermint_actor_objectstore::{GetParams, Object};
+use fendermint_vm_actor_interface::system::SYSTEM_ACTOR_ADDR;
 use fvm_ipld_encoding::serde::Serialize;
+use fvm_shared::econ::TokenAmount;
 use fvm_shared::message::Message;
 use prost::Message as ProstMessage;
 use tendermint::abci::response::DeliverTx;
@@ -19,6 +22,8 @@ use fendermint_vm_message::query::{
     ActorState, BuiltinActors, FvmQuery, FvmQueryHeight, GasEstimate, StateParams,
 };
 
+use crate::message::{GasParams, MessageFactory};
+use crate::response::decode_os_get;
 use crate::response::encode_data;
 
 #[derive(Serialize, Debug, Clone)]
@@ -126,6 +131,28 @@ pub trait QueryClient: Sync {
             BuiltinActors { registry }
         };
         Ok(QueryResponse { height, value })
+    }
+
+    /// Get an object in an object store without including a transaction on the blockchain.
+    async fn os_get_call(
+        &mut self,
+        address: Address,
+        params: GetParams,
+        value: TokenAmount,
+        gas_params: GasParams,
+        height: FvmQueryHeight,
+    ) -> anyhow::Result<Option<Object>> {
+        let msg =
+            MessageFactory::new(SYSTEM_ACTOR_ADDR, 0).os_get(address, params, value, gas_params)?;
+
+        let response = self.call(msg, height).await?;
+        if response.value.code.is_err() {
+            return Err(anyhow!("{}", response.value.info));
+        }
+        let return_data = decode_os_get(&response.value)
+            .context("error decoding data from deliver_tx in call")?;
+
+        Ok(return_data)
     }
 
     /// Run an ABCI query.
