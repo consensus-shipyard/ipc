@@ -116,6 +116,9 @@ where
     // we may be able to de-duplicate a lot of this code from fee_history
     let latest_h: u64 = latest_h.into();
     let mut blk = latest_h;
+
+    tracing::info!(latest_h, histories = latest_h - data.gas_opt.num_blocks_max_prio_fee, "heights");
+
     while blk > latest_h - data.gas_opt.num_blocks_max_prio_fee {
         let block = data
             .block_by_height(blk.into())
@@ -139,6 +142,8 @@ where
         // The latest block might not have results yet.
         if let Ok(block_results) = data.tm().block_results(height).await {
             let txs_results = block_results.txs_results.unwrap_or_default();
+
+            tracing::info!(len = txs_results.len(), height = height.value(), "num transactions");
 
             for (tx, txres) in block.data().iter().zip(txs_results) {
                 let msg = fvm_ipld_encoding::from_slice::<ChainMessage>(tx)
