@@ -156,6 +156,7 @@ where
 
     // compute median gas price
     let mut median = crate::gas::median_gas_premium(&mut premiums, block_gas_limit);
+    tracing::info!(?premiums, "premiums");
     tracing::info!(median = median.to_string(), "median gas premium");
 
     let min_premium = data.gas_opt.min_gas_premium.clone();
