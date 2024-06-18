@@ -399,11 +399,7 @@ impl NetworkBehaviour for Behaviour {
                             self.outbox.push_back(Event::Added(peer))
                         }
                         // This event should ensure that we will be able to answer address lookups later.
-                        kad::Event::RoutingUpdated {
-                            peer,
-                            old_peer,
-                            ..
-                        } => {
+                        kad::Event::RoutingUpdated { peer, old_peer, .. } => {
                             debug!("{peer} added to the routing table of {}", self.peer_id);
                             // There are two events here; we can only return one, so let's defer them to the outbox.
                             if let Some(peer_id) = old_peer {
@@ -411,8 +407,7 @@ impl NetworkBehaviour for Behaviour {
                                     self.outbox.push_back(Event::Removed(peer_id))
                                 }
                             }
-                            self.outbox
-                                .push_back(Event::Added(peer))
+                            self.outbox.push_back(Event::Added(peer))
                         }
                     }
                 }
