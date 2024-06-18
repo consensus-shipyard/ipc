@@ -380,7 +380,7 @@ where
                 debug!("peer updated: {} with {:?}", p, delta.added);
             }
             membership::Event::Removed(p) => {
-                debug!("remove peer {}", p);
+                debug!("removed peer {}", p);
             }
             membership::Event::ReceivedVote(vote) => {
                 let event = Event::ReceivedVote(vote);
