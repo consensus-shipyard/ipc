@@ -285,7 +285,7 @@ task(
         const network = hre.network.name
         if (!args.address) {
             console.error(
-                'No address provided. Usage: npx hardhat upgrade-sa-diamond --address 0x80afa...',
+                'No address provided. Usage: pnpm exec hardhat upgrade-sa-diamond --address 0x80afa...',
             )
             process.exit(1)
         }

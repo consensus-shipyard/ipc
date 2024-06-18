@@ -1,34 +1,35 @@
 # Before deploying:
 
--   change .env.template to .env
--   fill in your own values for private key and rpc url (for calibrationnet)
+-   Copy `.env.template` to `.env`.
+-   In `.env`, fill in your own values for private key and RPC URL for the target network (e.g. for Calibrationnet).
+-   Install `pnpm`: `npm install -g pnpm`.
 
 # To deploy everything run:
 
 ```bash
-npx hardhat deploy
+pnpm exec hardhat deploy
 ```
 
 ## To deploy only the libraries:
 
 ```bash
-npx hardhat deploy-libraries
+pnpm exec hardhat deploy-libraries
 ```
 
 ## To deploy only the Gateway:
 
 ```bash
-npx hardhat deploy-gateway
+pnpm exec hardhat deploy-gateway
 ```
 
 ## To deploy only the Gateway Actor:
 
 ```bash
-npx hardhat deploy-gateway
+pnpm exec hardhat deploy-gateway
 ```
 
 ## To deploy only the Registry:
 
 ```bash
-npx hardhat run scripts/deploy-registry.ts
+pnpm exec hardhat run scripts/deploy-registry.ts
 ```

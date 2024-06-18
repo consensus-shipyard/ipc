@@ -17,4 +17,4 @@ if [ "$NETWORK" = "auto" ]; then
 fi
 
 
-npx hardhat upgrade-gw-diamond --network "${NETWORK}"
+pnpm exec hardhat upgrade-gw-diamond --network "${NETWORK}"
