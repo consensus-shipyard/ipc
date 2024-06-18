@@ -64,13 +64,11 @@ pub fn median_gas_premium(prices: &mut [(TokenAmount, i64)], block_gas_target: i
         }
     }
 
-    let premium = if !prev2.is_zero() {
+    if !prev2.is_zero() {
         (prev1 + &prev2).div_ceil(BigInt::from(2))
     } else {
         prev1
-    };
-
-    premium
+    }
 }
 
 #[cfg(test)]
