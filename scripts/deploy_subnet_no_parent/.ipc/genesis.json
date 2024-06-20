@@ -22,56 +22,7 @@
   "validators": [],
   "app_hash": "",
   "app_state": {
-    "accounts": [
-      {
-        "balance": "1000000000000000000",
-        "meta": {
-          "Account": {
-            "owner": "t410favumzh4cmz4ohr6f54hh4s2a7ivjs3dm6cyzugi"
-          }
-        }
-      },
-      {
-        "balance": "1000000000000000000",
-        "meta": {
-          "Account": {
-            "owner": "t410figo3ovvqiipmav6oyofddpd72bwbpdjqyywzq6i"
-          }
-        }
-      },
-      {
-        "balance": "1000000000000000000",
-        "meta": {
-          "Account": {
-            "owner": "t410fucfot2gahdfps5s5pw3slstdvex46ewojfhqjuq"
-          }
-        }
-      },
-      {
-        "balance": "1000000000000000000",
-        "meta": {
-          "Account": {
-            "owner": "t410fvonza3uucdleykleyw5wmlhtwlwlkrwhxohsfsa"
-          }
-        }
-      },
-      {
-        "balance": "1000000000000000000",
-        "meta": {
-          "Account": {
-            "owner": "t410frl6yippxnk6vgpr6a3ey7ljf6dixp5bspmju4tq"
-          }
-        }
-      },
-      {
-        "balance": "1000000000000000000",
-        "meta": {
-          "Account": {
-            "owner": "t410f2gkuvrxzdwpujhwlnozlipeyswv4c646wqukakq"
-          }
-        }
-      }
-    ],
+    "accounts": [],
     "base_fee": "1000",
     "chain_name": "/r314159/t410f726d2jv6uj4mpkcbgg5ndlpp3l7dd5rlcpgzkoi",
     "eam_permission_mode": {
@@ -88,19 +39,6 @@
     "network_version": 21,
     "power_scale": 3,
     "timestamp": 1412713,
-    "validators": [
-      {
-        "power": "10000000000000000000",
-        "public_key": "BJx8VHF1bKOITlJGnZdadq1xUOuq1h3az/z6VY7S2i3yUBea2gdH6kT66b4/ehatIQ8sT3wFt/f2q9MBg8moBJM="
-      },
-      {
-        "power": "10000000000000000000",
-        "public_key": "BO5yZjN0AsdR1QnkDABVV5cQx6y0LldZj7TwFfAA3ODJPekX1PgK0vB3U2SiM2nqY/sbHwwD7iT2Mi2Xn+zZmXY="
-      },
-      {
-        "power": "10000000000000000000",
-        "public_key": "BCoOpFqMTvFe5BtCj+7kjNxB4fnyWz3Amsg6rhBm10x/xj1yOpIy02SZNk3bm92vs9qA/A+fsu+UL4do1Pt2aRQ="
-      }
-    ]
+    "validators": []
   }
 }

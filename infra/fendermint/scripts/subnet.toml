@@ -205,9 +205,6 @@ IPFS API:
 Eth API:
 \thttp://0.0.0.0:${ETHAPI_HOST_PORT}
 
-Chain ID:
-\t$(curl -s --location --request POST 'http://localhost:${ETHAPI_HOST_PORT}/' --header 'Content-Type: application/json' --data-raw '{ "jsonrpc":"2.0", "method":"eth_chainId", "params":[], "id":1 }' | jq -r '.result' | xargs printf "%d")
-
 Fendermint API:
 \thttp://localhost:26658
 
