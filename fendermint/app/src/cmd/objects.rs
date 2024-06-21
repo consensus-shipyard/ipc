@@ -19,6 +19,7 @@ use futures_util::StreamExt;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipfs_api_backend_hyper::request::Add;
 use ipfs_api_backend_hyper::{IpfsApi, IpfsClient, TryFromUri};
+use iroh::net::NodeAddr;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
@@ -50,6 +51,9 @@ cmd! {
                 let ipfs = IpfsClient::from_multiaddr_str(&ipfs_addr)?;
                 let ipfs_adapter = Ipfs { inner: ipfs.clone() };
 
+                // TODO: pass in path and use persistent node
+                let iroh = iroh::node::Node::memory().spawn().await?;
+
                 // Admin routes
                 let health_route = warp::path!("health")
                     .and(warp::get()).and_then(health);
@@ -58,7 +62,7 @@ cmd! {
                 let objects_upload = warp::path!("v1" / "objects" )
                 .and(warp::post())
                 .and(with_client(client.clone()))
-                .and(with_ipfs_adapter(ipfs_adapter.clone()))
+                .and(with_iroh(iroh.client().clone()))
                 .and(warp::multipart::form().max_length(MAX_OBJECT_LENGTH))
                 .and_then(handle_object_upload);
 
@@ -102,6 +106,12 @@ fn with_client(
 fn with_ipfs_adapter<I: IpfsApiAdapter + Clone + Send>(
     client: I,
 ) -> impl Filter<Extract = (I,), Error = Infallible> + Clone {
+    warp::any().map(move || client.clone())
+}
+
+fn with_iroh(
+    client: iroh::client::Iroh,
+) -> impl Filter<Extract = (iroh::client::Iroh,), Error = Infallible> + Clone {
     warp::any().map(move || client.clone())
 }
 
@@ -203,7 +213,8 @@ impl IpfsApiAdapter for Ipfs {
 struct ObjectParser {
     signed_msg: Option<SignedMessage>,
     chain_id: ChainID,
-    temp_file: Option<TempFile>,
+    cid: Option<Cid>,
+    source: Option<iroh::net::NodeId>,
 }
 
 impl Default for ObjectParser {
@@ -211,7 +222,8 @@ impl Default for ObjectParser {
         ObjectParser {
             signed_msg: None,
             chain_id: ChainID::from(0),
-            temp_file: None,
+            cid: None,
+            source: None,
         }
     }
 }
@@ -238,6 +250,22 @@ impl ObjectParser {
         Ok(())
     }
 
+    async fn read_source(&mut self, form_part: Part) -> anyhow::Result<()> {
+        let value = self.read_part(form_part).await?;
+        let text = String::from_utf8(value).map_err(|_| anyhow!("cannot parse source"))?;
+        let source: iroh::net::NodeId = text.parse().map_err(|_| anyhow!("cannot parse source"))?;
+        self.source = Some(source);
+        Ok(())
+    }
+
+    async fn read_cid(&mut self, form_part: Part) -> anyhow::Result<()> {
+        let value = self.read_part(form_part).await?;
+        let text = String::from_utf8(value).map_err(|_| anyhow!("cannot parse cid"))?;
+        let cid: Cid = text.parse().map_err(|_| anyhow!("cannot parse cid"))?;
+        self.cid = Some(cid);
+        Ok(())
+    }
+
     async fn read_msg(&mut self, form_part: Part) -> anyhow::Result<()> {
         let value = self.read_part(form_part).await?;
         let signed_msg = general_purpose::URL_SAFE
@@ -248,31 +276,6 @@ impl ObjectParser {
                     .map_err(|e| anyhow!("Failed to deserialize signed message: {}", e))
             })?;
         self.signed_msg = Some(signed_msg);
-        Ok(())
-    }
-
-    async fn read_object(&mut self, form_part: Part) -> anyhow::Result<()> {
-        let mut temp_file = TempFile::new()
-            .await
-            .map_err(|e| anyhow!("failed to create temporary file: {}", e))?;
-        let mut part_stream = form_part.stream();
-
-        while let Some(data) = part_stream.next().await {
-            let mut data = data?;
-            while data.remaining() > 0 {
-                let chunk = data.chunk().to_owned();
-                let chunk_len = chunk.len();
-                temp_file.write_all(&chunk).await?;
-                temp_file.flush().await?;
-                data.advance(chunk_len);
-            }
-        }
-        temp_file
-            .rewind()
-            .await
-            .map_err(|e| anyhow!("failed to rewind temporary file: {}", e))?;
-
-        self.temp_file = Some(temp_file);
         Ok(())
     }
 
@@ -287,8 +290,11 @@ impl ObjectParser {
                 "msg" => {
                     object_parser.read_msg(part).await?;
                 }
-                "object" => {
-                    object_parser.read_object(part).await?;
+                "cid" => {
+                    object_parser.read_cid(part).await?;
+                }
+                "source" => {
+                    object_parser.read_source(part).await?;
                 }
                 _ => {
                     return Err(anyhow!("unknown form field"));
@@ -321,9 +327,9 @@ async fn health() -> Result<impl Reply, Rejection> {
     Ok(warp::reply::reply())
 }
 
-async fn handle_object_upload<F: QueryClient, I: IpfsApiAdapter>(
+async fn handle_object_upload<F: QueryClient>(
     client: F,
-    ipfs: I,
+    iroh: iroh::client::Iroh,
     form_parts: warp::multipart::FormData,
 ) -> Result<impl Reply, Rejection> {
     let parser = ObjectParser::read_form(form_parts).await.map_err(|e| {
@@ -347,7 +353,7 @@ async fn handle_object_upload<F: QueryClient, I: IpfsApiAdapter>(
         })
     })?;
 
-    // Ensure the sender has enough balance, and add the data to IPFS
+    // Ensure the sender has enough balance, and fetch the data through iroh
     let SignedMessage {
         object, message, ..
     } = signed_msg;
@@ -371,17 +377,43 @@ async fn handle_object_upload<F: QueryClient, I: IpfsApiAdapter>(
             }))
         }
     };
-    let file = match parser.temp_file {
-        Some(file) => file,
+
+    let cid = match parser.cid {
+        Some(cid) => cid,
         None => {
             return Err(Rejection::from(BadRequest {
-                message: "missing file in form".to_string(),
+                message: "missing cid in form".to_string(),
             }))
         }
     };
-    let cid = ipfs.add_object(file, client_cid).await.map_err(|e| {
+    let source = match parser.source {
+        Some(source) => source,
+        None => {
+            return Err(Rejection::from(BadRequest {
+                message: "missing source in form".to_string(),
+            }))
+        }
+    };
+
+    if client_cid != cid {
+        return Err(Rejection::from(BadRequest {
+            message: "missmatched cids".to_string(),
+        }));
+    }
+
+    let hash = iroh::blobs::Hash::new(cid.hash().digest());
+    let progress = iroh
+        .blobs()
+        .download(hash, NodeAddr::new(source))
+        .await
+        .map_err(|e| {
+            Rejection::from(BadRequest {
+                message: format!("failed to fetch file: {}", e),
+            })
+        })?;
+    progress.finish().await.map_err(|e| {
         Rejection::from(BadRequest {
-            message: format!("failed to add file: {}", e),
+            message: format!("failed to fetch file: {}", e),
         })
     })?;
 
@@ -774,7 +806,9 @@ mod tests {
             general_purpose::URL_SAFE.encode(&serialized_signed_message);
 
         let multipart_form = multipart_form(&serialized_signed_message_b64, external_object).await;
-        let reply = handle_object_upload(client, ipfs, multipart_form)
+        let iroh = iroh::node::Node::memory().spawn().await.unwrap();
+
+        let reply = handle_object_upload(client, iroh.client().clone(), multipart_form)
             .await
             .unwrap();
         let response = reply.into_response();

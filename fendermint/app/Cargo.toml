@@ -42,6 +42,7 @@ tracing-subscriber = { workspace = true }
 literally = { workspace = true }
 ethers = { workspace = true }
 base64 = { workspace = true }
+iroh = { workspace = true }
 
 fendermint_abci = { path = "../abci" }
 fendermint_app_options = { path = "./options" }
