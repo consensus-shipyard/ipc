@@ -2,9 +2,8 @@
 
 set -euo pipefail
 
-if [[ ! -v IPC_FOLDER ]]; then
-    IPC_FOLDER="$PWD"
-fi
+dir=$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")
+IPC_FOLDER="$dir"/../..
 IPC_CONFIG_FOLDER=${HOME}/.ipc
 
 CMT_P2P_HOST_PORTS=(26656 26756 26856)

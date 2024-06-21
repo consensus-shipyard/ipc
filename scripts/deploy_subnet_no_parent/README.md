@@ -88,9 +88,6 @@ source ${HOME}/.bashrc # This step will vary by OS
 
 # Running
 
-All scripts are meant to be run from the IPC repo root by default.
-If run from elsewhere, specify the path to your IPC repo with `IPC_FOLDER=/path/to/ipc/repo`.
-
 All scripts use `cargo make` to start docker containers, volumes, and a docker network. Use `docker ps` to check status.
 
 ## Start
@@ -100,13 +97,13 @@ config folder (`~/.ipc`).
 You only need to run `setup.sh` once on your machine.
 
 ```shell
-bash scripts/deploy_subnet_no_parent/setup.sh
+./scripts/deploy_subnet_no_parent/setup.sh
 ```
 
 Now you can start the three-node `localnet`. The IPC contracts take a while to compile the first time.
 
 ```shell
-bash scripts/deploy_subnet_no_parent/start.sh
+./scripts/deploy_subnet_no_parent/start.sh
 ```
 
 ### Logs
@@ -160,7 +157,7 @@ actors, you'll have to _stop and start_ instead of restarting because the actor 
 genesis.
 
 ```shell
-bash scripts/deploy_subnet_no_parent/restart.sh
+./scripts/deploy_subnet_no_parent/restart.sh
 ```
 
 ## Stop
@@ -168,5 +165,5 @@ bash scripts/deploy_subnet_no_parent/restart.sh
 Stops all validators and deletes all data.
 
 ```shell
-bash scripts/deploy_subnet_no_parent/stop.sh
+./scripts/deploy_subnet_no_parent/stop.sh
 ```
