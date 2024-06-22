@@ -84,7 +84,6 @@ warp = "0.3.6"
 futures-util = { workspace = true }
 tokio-util = { workspace = true }
 async-tempfile = "0.5.0"
-ipfs-api-backend-hyper = { version = "0.6.0", features = ["with-send-sync"] }
 thiserror = { workspace = true }
 
 [dev-dependencies]
@@ -94,6 +93,8 @@ quickcheck_macros = { workspace = true }
 
 fendermint_vm_genesis = { path = "../vm/genesis", features = ["arb"] }
 fendermint_vm_snapshot = { path = "../vm/snapshot", features = ["arb"] }
+
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Using a single binary to run the application as well as to execute client commands.
 [[bin]]

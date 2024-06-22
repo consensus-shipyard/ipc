@@ -1021,6 +1021,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "blake3"
+version = "1.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "30cca6d3674597c30ddf2c587bf8d9d65c9a84d2326d941cc79c9842dfe0ef52"
+dependencies = [
+ "arrayref",
+ "arrayvec 0.7.4",
+ "cc",
+ "cfg-if",
+ "constant_time_eq 0.3.0",
+]
+
+[[package]]
 name = "block-buffer"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3349,7 +3362,6 @@ dependencies = [
  "ipc-api",
  "ipc-provider",
  "ipc_ipld_resolver",
- "ipfs-api-backend-hyper",
  "iroh",
  "k256 0.11.6",
  "lazy_static",
@@ -7542,6 +7554,7 @@ checksum = "cfd8a792c1694c6da4f68db0a9d707c72bd260994da179e6030a5dcee00bb815"
 dependencies = [
  "arbitrary",
  "blake2b_simd",
+ "blake3",
  "core2",
  "digest 0.10.7",
  "multihash-derive",
