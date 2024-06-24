@@ -1,12 +1,21 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use cid::multihash::Code;
+use cid::multihash::MultihashDigest;
 use cid::Cid;
+use fvm_ipld_encoding::DAG_CBOR;
 use fvm_shared::{
     address::Address, clock::ChainEpoch, crypto::signature::Signature, econ::TokenAmount,
 };
+use ipc_api::cross::IpcEnvelope;
+use ipc_api::staking::StakingChangeRequest;
 use ipc_api::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
+
+pub type BlockHeight = u64;
+pub type Bytes = Vec<u8>;
+pub type BlockHash = Bytes;
 
 /// Messages involved in InterPlanetary Consensus.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -28,6 +37,13 @@ pub enum IpcMessage {
     /// A top-down checkpoint parent finality proposal. This proposal should contain the latest parent
     /// state that to be checked and voted by validators.
     TopDownExec(ParentFinality),
+
+    /// A top-down checkpoint parent finality proposal. This proposal should contain latest parent data:
+    /// - height
+    /// - block hash
+    /// - validator changes
+    /// - cross network messages
+    TopDownExecV2(SealedTopdownProposal),
 }
 
 /// A message relayed by a user on the current subnet.
@@ -101,6 +117,97 @@ pub struct ParentFinality {
     pub height: ChainEpoch,
     /// The block hash of the parent, expressed as bytes
     pub block_hash: Vec<u8>,
+}
+
+/// The ipc topdown finality proposal with the sealed CID for the finality. The reason for including
+/// topdown messages + validator changes in the proposal is avoiding querying RPC when executing
+/// proposals.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SealedTopdownProposal {
+    /// The cid of the finality for quicker comparison
+    commitment: Cid,
+    /// The topdown finality data
+    finality: ParentFinalityV2,
+}
+
+impl SealedTopdownProposal {
+    pub fn new(
+        height: BlockHeight,
+        hash: BlockHash,
+        msgs: Vec<IpcEnvelope>,
+        chns: Vec<StakingChangeRequest>,
+    ) -> Self {
+        let finality = ParentFinalityV2::new(height as ChainEpoch, hash, msgs, chns);
+        Self {
+            commitment: finality.cid(),
+            finality,
+        }
+    }
+
+    pub fn commitment(&self) -> Cid {
+        self.commitment
+    }
+
+    pub fn finality(&self) -> &ParentFinalityV2 {
+        &self.finality
+    }
+}
+
+impl From<SealedTopdownProposal> for ParentFinalityV2 {
+    fn from(value: SealedTopdownProposal) -> Self {
+        value.finality
+    }
+}
+
+impl From<ParentFinalityV2> for SealedTopdownProposal {
+    fn from(finality: ParentFinalityV2) -> Self {
+        Self {
+            commitment: finality.cid(),
+            finality,
+        }
+    }
+}
+
+/// The finality view for IPC parent at certain height.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ParentFinalityV2 {
+    /// The latest chain height
+    pub height: BlockHeight,
+    /// The block hash. For FVM, it is a Cid. For Evm, it is bytes32 as one can now potentially
+    /// deploy a subnet on EVM.
+    pub block_hash: BlockHash,
+    /// The topdown messages to be executed.
+    ///
+    /// Note that this is not the cross messages at the `height`,
+    /// but instead the cross messages since the last topdown finality to the current `height`.
+    pub cross_messages: Vec<IpcEnvelope>,
+    /// The validator changes to be applied
+    ///
+    /// Note that this is not the validator changes at the `height`,
+    /// but instead the validator changes since the last topdown finality to the current `height`.
+    pub validator_changes: Vec<StakingChangeRequest>,
+}
+
+impl ParentFinalityV2 {
+    pub fn new(
+        height: ChainEpoch,
+        hash: BlockHash,
+        cross_messages: Vec<IpcEnvelope>,
+        validator_changes: Vec<StakingChangeRequest>,
+    ) -> Self {
+        Self {
+            height: height as BlockHeight,
+            block_hash: hash,
+            cross_messages,
+            validator_changes,
+        }
+    }
+
+    pub fn cid(&self) -> Cid {
+        let bytes = fvm_ipld_encoding::to_vec(self).expect("should not have failed");
+        let cid = Cid::new_v1(DAG_CBOR, Code::Blake2b256.digest(&bytes));
+        cid
+    }
 }
 
 #[cfg(feature = "arb")]

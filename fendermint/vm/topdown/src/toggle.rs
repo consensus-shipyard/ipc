@@ -4,10 +4,11 @@
 use crate::finality::ParentViewPayload;
 use crate::{
     BlockHash, BlockHeight, CachedFinalityProvider, Error, IPCParentFinality,
-    ParentFinalityProvider, ParentViewProvider,
+    ParentFinalityProvider, ParentFinalityProviderV2, ParentViewProvider,
 };
 use anyhow::anyhow;
 use async_stm::{Stm, StmResult};
+use fendermint_vm_message::ipc::SealedTopdownProposal;
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
 
@@ -88,6 +89,27 @@ impl<P: ParentFinalityProvider + Send + Sync + 'static> ParentFinalityProvider f
         previous_finality: Option<IPCParentFinality>,
     ) -> Stm<()> {
         self.perform_or_else(|p| p.set_new_finality(finality, previous_finality), ())
+    }
+}
+
+impl<P: ParentFinalityProviderV2 + Send + Sync + 'static> ParentFinalityProviderV2 for Toggle<P> {
+    fn sealed_proposal_at_height(&self, height: BlockHeight) -> Stm<Option<SealedTopdownProposal>> {
+        self.perform_or_else(|p| p.sealed_proposal_at_height(height), None)
+    }
+
+    fn check_sealed_proposal(&self, proposal: &SealedTopdownProposal) -> Stm<bool> {
+        self.perform_or_else(|p| p.check_sealed_proposal(proposal), false)
+    }
+
+    fn set_new_sealed_finality(
+        &self,
+        finality: SealedTopdownProposal,
+        previous_finality: Option<IPCParentFinality>,
+    ) -> Stm<()> {
+        self.perform_or_else(
+            |p| p.set_new_sealed_finality(finality, previous_finality),
+            (),
+        )
     }
 }
 

@@ -3457,6 +3457,7 @@ dependencies = [
  "fendermint_tracing",
  "fendermint_vm_event",
  "fendermint_vm_genesis",
+ "fendermint_vm_message",
  "fvm_ipld_encoding",
  "fvm_shared",
  "hex",

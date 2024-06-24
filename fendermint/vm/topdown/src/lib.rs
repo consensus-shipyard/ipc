@@ -11,9 +11,14 @@ pub mod proxy;
 mod toggle;
 pub mod voting;
 
-use async_stm::Stm;
+use anyhow::anyhow;
+use async_stm::{abort, Stm, StmResult};
 use async_trait::async_trait;
+use cid::multihash::Code;
+use cid::Cid;
 use ethers::utils::hex;
+use fendermint_vm_message::ipc::{ParentFinalityV2, SealedTopdownProposal};
+use fvm_ipld_encoding::DAG_CBOR;
 use fvm_shared::clock::ChainEpoch;
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
@@ -104,6 +109,31 @@ impl Config {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum VotePayload {
+    V1(IPCParentFinality),
+    V2 {
+        height: BlockHeight,
+        commitment: Cid,
+    },
+}
+
+impl VotePayload {
+    pub fn new(height: BlockHeight, bytes: Bytes) -> StmResult<Self, anyhow::Error> {
+        if bytes.len() == 32 {
+            // this is a block hash
+            Ok(Self::V1(IPCParentFinality::new(
+                height as ChainEpoch,
+                bytes,
+            )))
+        } else if let Ok(commitment) = Cid::try_from(bytes.as_slice()) {
+            Ok(Self::V2 { height, commitment })
+        } else {
+            abort(anyhow!("invalid vote tally payload"))
+        }
+    }
+}
+
 /// The finality view for IPC parent at certain height.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct IPCParentFinality {
@@ -161,6 +191,19 @@ pub trait ParentFinalityProvider: ParentViewProvider {
     fn set_new_finality(
         &self,
         finality: IPCParentFinality,
+        previous_finality: Option<IPCParentFinality>,
+    ) -> Stm<()>;
+}
+
+pub trait ParentFinalityProviderV2: ParentViewProvider {
+    /// Latest proposal for parent finality
+    fn sealed_proposal_at_height(&self, height: BlockHeight) -> Stm<Option<SealedTopdownProposal>>;
+    /// Check if the target proposal is valid
+    fn check_sealed_proposal(&self, proposal: &SealedTopdownProposal) -> Stm<bool>;
+    /// Called when finality is committed
+    fn set_new_sealed_finality(
+        &self,
+        finality: SealedTopdownProposal,
         previous_finality: Option<IPCParentFinality>,
     ) -> Stm<()>;
 }

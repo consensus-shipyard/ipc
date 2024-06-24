@@ -9,12 +9,11 @@ use crate::{
     CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
 };
 use anyhow::{bail, Context};
-use async_stm::atomically;
+use async_stm::{atomically, atomically_or_err, Stm};
 use async_trait::async_trait;
-use fendermint_tracing::emit;
+use cid::Cid;
 use fendermint_vm_actor_interface::ipc;
-use fendermint_vm_event::ParentFinalityMissingQuorum;
-use fendermint_vm_message::ipc::ParentFinality;
+use fendermint_vm_message::ipc::{ParentFinality, ParentFinalityV2};
 use fendermint_vm_message::{
     chain::ChainMessage,
     ipc::{BottomUpCheckpoint, CertifiedMessage, IpcMessage, SignedRelayedMessage},
@@ -23,7 +22,8 @@ use fendermint_vm_resolver::pool::{ResolveKey, ResolvePool};
 use fendermint_vm_topdown::proxy::IPCProviderProxy;
 use fendermint_vm_topdown::voting::{ValidatorKey, VoteTally};
 use fendermint_vm_topdown::{
-    CachedFinalityProvider, IPCParentFinality, ParentFinalityProvider, ParentViewProvider, Toggle,
+    BlockHeight, CachedFinalityProvider, IPCParentFinality, ParentFinalityProvider,
+    ParentFinalityProviderV2, ParentViewProvider, Toggle, VotePayload,
 };
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
@@ -126,47 +126,27 @@ where
         // Before we try to find a quorum, pause incoming votes. This is optional but if there are lots of votes coming in it might hold up proposals.
         atomically(|| state.parent_finality_votes.pause_votes_until_find_quorum()).await;
 
-        // The pre-requisite for proposal is that there is a quorum of gossiped votes at that height.
-        // The final proposal can be at most as high as the quorum, but can be less if we have already,
-        // hit some limits such as how many blocks we can propose in a single step.
-        let finalities = atomically(|| {
-            let parent = state.parent_finality_provider.next_proposal()?;
-            let quorum = state
-                .parent_finality_votes
-                .find_quorum()?
-                .map(|(height, block_hash)| IPCParentFinality { height, block_hash });
+        let maybe_finality = atomically_or_err(|| {
+            // The pre-requisite for proposal is that there is a quorum of gossiped votes at that height.
+            // The final proposal can be at most as high as the quorum.
+            if let Some((height, bytes)) = state.parent_finality_votes.find_quorum()? {
+                let vote_payload = VotePayload::new(height, bytes)?;
 
-            Ok((parent, quorum))
-        })
-        .await;
-
-        let maybe_finality = match finalities {
-            (Some(parent), Some(quorum)) => Some(if parent.height <= quorum.height {
-                parent
-            } else {
-                quorum
-            }),
-            (Some(parent), None) => {
-                emit!(
-                    DEBUG,
-                    ParentFinalityMissingQuorum {
-                        block_height: parent.height,
-                        block_hash: &hex::encode(&parent.block_hash),
+                return Ok(match vote_payload {
+                    VotePayload::V1(finality) => prep_topdown_v1(&state, finality)?,
+                    VotePayload::V2 { height, commitment } => {
+                        prep_topdown_v2(&state, height, commitment)?
                     }
-                );
-                None
+                });
             }
-            (None, _) => {
-                // This is normal, the parent probably hasn't produced a block yet.
-                None
-            }
-        };
 
-        if let Some(finality) = maybe_finality {
-            msgs.push(ChainMessage::Ipc(IpcMessage::TopDownExec(ParentFinality {
-                height: finality.height as ChainEpoch,
-                block_hash: finality.block_hash,
-            })))
+            tracing::info!("no quorum found yet");
+
+            Ok(None)
+        })
+        .await?;
+        if let Some(msg) = maybe_finality {
+            msgs.push(msg);
         }
 
         // Append at the end - if we run out of block space, these are going to be reproposed in the next block.
@@ -207,6 +187,20 @@ where
                     };
                     let is_final =
                         atomically(|| env.parent_finality_provider.check_proposal(&prop)).await;
+                    if !is_final {
+                        return Ok(false);
+                    }
+                }
+                ChainMessage::Ipc(IpcMessage::TopDownExecV2(sealed)) => {
+                    // TODO: Ideally, one just need to check the quorum has reached for the proposed
+                    // TODO: finality. This is scheduled as future work.
+                    // TODO: The idea is, in TopDownExecV2, the aggregated quorum signature should
+                    // TODO: also be included such that only the signature needs to be validated
+                    // TODO: here instead of checking against the RPCs.
+
+                    let is_final =
+                        atomically(|| env.parent_finality_provider.check_sealed_proposal(&sealed))
+                            .await;
                     if !is_final {
                         return Ok(false);
                     }
@@ -380,6 +374,80 @@ where
 
                     Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
                 }
+                IpcMessage::TopDownExecV2(sealed) => {
+                    if !env.parent_finality_provider.is_enabled() {
+                        bail!("cannot execute IPC top-down message: parent provider disabled");
+                    }
+
+                    let p = ParentFinalityV2::from(sealed);
+
+                    // commit parent finality first
+                    let finality = IPCParentFinality::new(p.height as ChainEpoch, p.block_hash);
+                    tracing::debug!(
+                        finality = finality.to_string(),
+                        "chain interpreter received topdown exec v2 proposal",
+                    );
+
+                    let (prev_height, prev_finality) = topdown::commit_finality(
+                        &self.gateway_caller,
+                        &mut state,
+                        finality.clone(),
+                        &env.parent_finality_provider,
+                    )
+                    .await
+                    .context("failed to commit finality")?;
+
+                    tracing::debug!(
+                        previous_committed_height = prev_height,
+                        previous_committed_finality = prev_finality
+                            .as_ref()
+                            .map(|f| format!("{f}"))
+                            .unwrap_or_else(|| String::from("None")),
+                        "chain interpreter committed topdown finality",
+                    );
+
+                    tracing::debug!(
+                        msgs = p.validator_changes.len(),
+                        "chain interpreter received total validator changes"
+                    );
+
+                    self.gateway_caller
+                        .store_validator_changes(&mut state, p.validator_changes)
+                        .context("failed to store validator changes")?;
+
+                    tracing::debug!(
+                        number_of_messages = p.cross_messages.len(),
+                        "chain interpreter received topdown msgs",
+                    );
+
+                    let ret = topdown::execute_topdown_msgs(
+                        &self.gateway_caller,
+                        &mut state,
+                        p.cross_messages,
+                    )
+                    .await
+                    .context("failed to execute top down messages")?;
+
+                    tracing::debug!("chain interpreter applied topdown msgs");
+
+                    atomically(|| {
+                        env.parent_finality_provider
+                            .set_new_finality(finality.clone(), prev_finality.clone())?;
+
+                        env.parent_finality_votes
+                            .set_finalized(finality.height, finality.block_hash.clone())?;
+
+                        Ok(())
+                    })
+                    .await;
+
+                    tracing::debug!(
+                        finality = finality.to_string(),
+                        "chain interpreter has set new"
+                    );
+
+                    Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
+                }
             },
         }
     }
@@ -460,7 +528,9 @@ where
 
                         Ok((state, Ok(ret)))
                     }
-                    IpcMessage::TopDownExec(_) | IpcMessage::BottomUpExec(_) => {
+                    IpcMessage::TopDownExec(_)
+                    | IpcMessage::TopDownExecV2(_)
+                    | IpcMessage::BottomUpExec(_) => {
                         // Users cannot send these messages, only validators can propose them in blocks.
                         Ok((state, Err(IllegalMessage)))
                     }
@@ -536,4 +606,48 @@ fn relayed_bottom_up_ckpt_to_fvm(
         .context("failed to create syntetic message")?;
 
     Ok(msg)
+}
+
+fn prep_topdown_v1(state: &ChainEnv, quorum: IPCParentFinality) -> Stm<Option<ChainMessage>> {
+    Ok(state
+        .parent_finality_provider
+        .next_proposal()?
+        .map(|parent| {
+            let finality = if parent.height <= quorum.height {
+                parent
+            } else {
+                quorum
+            };
+            ChainMessage::Ipc(IpcMessage::TopDownExec(ParentFinality {
+                height: finality.height as ChainEpoch,
+                block_hash: finality.block_hash,
+            }))
+        }))
+}
+
+fn prep_topdown_v2(
+    state: &ChainEnv,
+    height: BlockHeight,
+    commitment: Cid,
+) -> Stm<Option<ChainMessage>> {
+    Ok(
+        if let Some(sealed) = state
+            .parent_finality_provider
+            .sealed_proposal_at_height(height)?
+        {
+            if sealed.commitment() != commitment {
+                // This means the data stored in this node's cache does not match that in the quorum.
+                // Since the quorum has already reached, the node has to follow the quorum but prepare
+                // the data according to the quorum's commitment, so just give up the chance to propose
+                // the topdown message
+                None
+            } else {
+                Some(ChainMessage::Ipc(IpcMessage::TopDownExecV2(sealed)))
+            }
+        } else {
+            // no sealed proposal can be made at the quorum height, maybe this is not the node to prepare
+            // the proposal, skip
+            None
+        },
+    )
 }
