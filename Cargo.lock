@@ -5937,7 +5937,7 @@ dependencies = [
  "gcra",
  "ipc-api",
  "ipc_ipld_resolver",
- "ipfs-api-backend-hyper",
+ "iroh",
  "lazy_static",
  "libipld",
  "libp2p",
@@ -6020,7 +6020,7 @@ checksum = "8f518f335dce6725a761382244631d86cf0ccb2863413590b31338feb467f9c3"
 [[package]]
 name = "iroh"
 version = "0.18.0"
-source = "git+https://github.com/n0-computer/iroh?branch=main#aba70ea9251d9eeb91b946ae5a25f4f0921fbe29"
+source = "git+https://github.com/n0-computer/iroh?branch=feat-connect-addr#c084abc0ef6733aa54e2bc1aaaf34745c64ff89a"
 dependencies = [
  "anyhow",
  "bao-tree",
@@ -6061,7 +6061,7 @@ dependencies = [
 [[package]]
 name = "iroh-base"
 version = "0.18.0"
-source = "git+https://github.com/n0-computer/iroh?branch=main#aba70ea9251d9eeb91b946ae5a25f4f0921fbe29"
+source = "git+https://github.com/n0-computer/iroh?branch=feat-connect-addr#c084abc0ef6733aa54e2bc1aaaf34745c64ff89a"
 dependencies = [
  "aead",
  "anyhow",
@@ -6102,7 +6102,7 @@ dependencies = [
 [[package]]
 name = "iroh-blobs"
 version = "0.18.0"
-source = "git+https://github.com/n0-computer/iroh?branch=main#aba70ea9251d9eeb91b946ae5a25f4f0921fbe29"
+source = "git+https://github.com/n0-computer/iroh?branch=feat-connect-addr#c084abc0ef6733aa54e2bc1aaaf34745c64ff89a"
 dependencies = [
  "anyhow",
  "bao-tree",
@@ -6141,7 +6141,7 @@ dependencies = [
 [[package]]
 name = "iroh-docs"
 version = "0.18.0"
-source = "git+https://github.com/n0-computer/iroh?branch=main#aba70ea9251d9eeb91b946ae5a25f4f0921fbe29"
+source = "git+https://github.com/n0-computer/iroh?branch=feat-connect-addr#c084abc0ef6733aa54e2bc1aaaf34745c64ff89a"
 dependencies = [
  "anyhow",
  "bytes",
@@ -6179,7 +6179,7 @@ dependencies = [
 [[package]]
 name = "iroh-gossip"
 version = "0.18.0"
-source = "git+https://github.com/n0-computer/iroh?branch=main#aba70ea9251d9eeb91b946ae5a25f4f0921fbe29"
+source = "git+https://github.com/n0-computer/iroh?branch=feat-connect-addr#c084abc0ef6733aa54e2bc1aaaf34745c64ff89a"
 dependencies = [
  "anyhow",
  "bytes",
@@ -6217,7 +6217,7 @@ dependencies = [
 [[package]]
 name = "iroh-metrics"
 version = "0.18.0"
-source = "git+https://github.com/n0-computer/iroh?branch=main#aba70ea9251d9eeb91b946ae5a25f4f0921fbe29"
+source = "git+https://github.com/n0-computer/iroh?branch=feat-connect-addr#c084abc0ef6733aa54e2bc1aaaf34745c64ff89a"
 dependencies = [
  "anyhow",
  "erased_set",
@@ -6237,7 +6237,7 @@ dependencies = [
 [[package]]
 name = "iroh-net"
 version = "0.18.0"
-source = "git+https://github.com/n0-computer/iroh?branch=main#aba70ea9251d9eeb91b946ae5a25f4f0921fbe29"
+source = "git+https://github.com/n0-computer/iroh?branch=feat-connect-addr#c084abc0ef6733aa54e2bc1aaaf34745c64ff89a"
 dependencies = [
  "aead",
  "anyhow",

@@ -105,7 +105,7 @@ impl ClusterBuilder {
     }
 
     /// Add a node with randomized address, optionally bootstrapping from an existing node.
-    fn add_node(&mut self, bootstrap: Option<usize>) {
+    async fn add_node(&mut self, bootstrap: Option<usize>) {
         let bootstrap_addr = bootstrap.map(|i| {
             let config = &self.agents[i].config;
             let peer_id = config.network.local_peer_id();
@@ -114,7 +114,7 @@ impl ClusterBuilder {
             addr
         });
         let config = make_config(&mut self.rng, self.size, bootstrap_addr);
-        let (service, store) = make_service(config.clone());
+        let (service, store) = make_service(config.clone()).await;
         let client = service.client();
         let events = service.subscribe();
         self.services.push(service);
@@ -288,7 +288,7 @@ async fn single_bootstrap_publish_receive_preemptive() {
 async fn can_register_metrics() {
     let mut rng = rand::rngs::StdRng::seed_from_u64(0);
     let config = make_config(&mut rng, 1, None);
-    let (mut service, _) = make_service(config);
+    let (mut service, _) = make_service(config).await;
     let registry = prometheus::Registry::new();
     service.register_metrics(&registry).unwrap();
 }
@@ -299,7 +299,9 @@ async fn make_cluster_with_bootstrap(cluster_size: u32, bootstrap_idx: usize) ->
 
     // Build a cluster of nodes.
     for i in 0..builder.size {
-        builder.add_node(if i == 0 { None } else { Some(bootstrap_idx) });
+        builder
+            .add_node(if i == 0 { None } else { Some(bootstrap_idx) })
+            .await;
     }
 
     // Start the swarms.
@@ -308,9 +310,11 @@ async fn make_cluster_with_bootstrap(cluster_size: u32, bootstrap_idx: usize) ->
     cluster
 }
 
-fn make_service(config: Config) -> (Service<TestStoreParams, TestVote>, TestBlockstore) {
+async fn make_service(config: Config) -> (Service<TestStoreParams, TestVote>, TestBlockstore) {
     let store = TestBlockstore::default();
-    let svc = Service::new_with_transport(config, store.clone(), build_transport).unwrap();
+    let svc = Service::new_with_transport(config, store.clone(), build_transport)
+        .await
+        .unwrap();
     (svc, store)
 }
 

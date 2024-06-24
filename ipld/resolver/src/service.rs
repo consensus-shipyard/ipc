@@ -1,11 +1,13 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
 use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::time::Duration;
 
 use anyhow::anyhow;
 use bloom::{BloomFilter, ASMS};
 use ipc_api::subnet_id::SubnetID;
+use iroh::client::blobs::BlobStatus;
 use libipld::store::StoreParams;
 use libipld::Cid;
 use libp2p::futures::StreamExt;
@@ -142,8 +144,8 @@ where
     background_lookup_filter: BloomFilter,
     /// To limit the number of peers contacted in a Bitswap resolution attempt.
     max_peers_per_query: usize,
-    // /// Iroh client
-    // TODO: iroh client
+    /// Iroh client
+    iroh: iroh::client::Iroh,
 }
 
 impl<P, V> Service<P, V>
@@ -152,17 +154,17 @@ where
     V: Serialize + DeserializeOwned + Clone + Send + 'static,
 {
     /// Build a [`Service`] and a [`Client`] with the default `tokio` transport.
-    pub fn new<S>(config: Config, store: S) -> Result<Self, ConfigError>
+    pub async fn new<S>(config: Config, store: S) -> Result<Self, ConfigError>
     where
         S: BitswapStore<Params = P>,
     {
-        Self::new_with_transport(config, store, build_transport)
+        Self::new_with_transport(config, store, build_transport).await
     }
 
     /// Build a [`Service`] and a [`Client`] by passing in a transport factory function.
     ///
     /// The main goal is to be facilitate testing with a [`MemoryTransport`].
-    pub fn new_with_transport<S, F>(
+    pub async fn new_with_transport<S, F>(
         config: Config,
         store: S,
         transport: F,
@@ -210,7 +212,8 @@ where
         let (request_tx, request_rx) = mpsc::unbounded_channel();
         let (event_tx, _) = broadcast::channel(config.connection.event_buffer_capacity as usize);
 
-        // TODO: create iroh client
+        let iroh_addr: SocketAddr = config.iroh_addr.parse()?;
+        let iroh = iroh::client::Iroh::connect_addr(iroh_addr).await?;
 
         let service = Self {
             peer_id,
@@ -225,6 +228,7 @@ where
                 config.connection.expected_peer_count,
             ),
             max_peers_per_query: config.connection.max_peers_per_query as usize,
+            iroh,
         };
 
         Ok(service)
@@ -526,15 +530,14 @@ where
 
     /// Start a CID resolution using iorh.
     fn start_iroh_query(&mut self, cid: Cid, response_channel: ResponseChannel) {
-        todo!()
-        /*let ipfs = self.ipfs_client.clone();
+        let iroh = self.iroh.clone();
         tokio::spawn(async move {
-            let res = ipfs.pin_add(&cid.to_string(), true).await;
+            let res = download_blob(iroh, cid).await;
             match res {
                 Ok(_) => send_resolve_result(response_channel, Ok(())),
                 Err(e) => send_resolve_result(response_channel, Err(anyhow!(e))),
             }
-        });*/
+        });
     }
 
     /// Handle the results from a resolve attempt. If it succeeded, notify the
@@ -627,4 +630,15 @@ pub fn build_transport(local_key: Keypair) -> Boxed<(PeerId, StreamMuxerBox)> {
         .multiplex(mplex_config)
         .timeout(Duration::from_secs(20))
         .boxed()
+}
+
+async fn download_blob(iroh: iroh::client::Iroh, cid: Cid) -> anyhow::Result<()> {
+    let hash: [u8; 32] = cid.hash().digest().try_into()?;
+    let hash = iroh::blobs::Hash::from_bytes(hash);
+    // TODO: actually download from relevant nodes
+    // let res = iroh.blobs().download(hash).await?.await?;
+    match iroh.blobs().status(hash).await? {
+        BlobStatus::Complete { .. } => Ok(()),
+        _ => anyhow::bail!("blob not found"),
+    }
 }

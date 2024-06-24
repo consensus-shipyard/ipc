@@ -31,7 +31,6 @@ use fvm_shared::address::{current_network, Address, Network};
 use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
-use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::broadcast::error::RecvError;
 use tower::ServiceBuilder;

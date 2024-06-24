@@ -5,11 +5,6 @@ use clap::Args;
 
 #[derive(Args, Debug)]
 pub struct RunArgs {
-    #[arg(
-        long,
-        short,
-        default_value = "127.0.0.1:4919",
-        env = "IROH_RPC_ADDR"
-    )]
+    #[arg(long, short, default_value = "127.0.0.1:4919", env = "IROH_RPC_ADDR")]
     pub iroh_addr: String,
 }

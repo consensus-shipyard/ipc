@@ -177,7 +177,7 @@ tracing-subscriber = { version = "0.3", features = [
 tracing-appender = "0.2.3"
 url = { version = "2.4.1", features = ["serde"] }
 zeroize = "1.6"
-iroh = { git = "https://github.com/n0-computer/iroh", branch = "main" }
+iroh = { git = "https://github.com/n0-computer/iroh", branch = "feat-connect-addr" }
 
 # Workspace deps
 ipc-api = { path = "ipc/api" }

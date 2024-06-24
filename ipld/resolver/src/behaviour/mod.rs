@@ -42,6 +42,10 @@ pub enum ConfigError {
     Discovery(#[from] discovery::ConfigError),
     #[error("Error in the membership configuration")]
     Membership(#[from] membership::ConfigError),
+    #[error("Invalid iroh address")]
+    IrohAddr(#[from] std::net::AddrParseError),
+    #[error("Unable to create iroh client")]
+    IrohClient(#[from] anyhow::Error),
 }
 
 /// Libp2p behaviour bundle to manage content resolution from other subnets, using:

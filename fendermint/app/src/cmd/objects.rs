@@ -2,7 +2,11 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::{convert::Infallible, net::ToSocketAddrs, num::ParseIntError};
+use std::{
+    convert::Infallible,
+    net::{SocketAddr, ToSocketAddrs},
+    num::ParseIntError,
+};
 
 use anyhow::anyhow;
 use base64::{engine::general_purpose, Engine};
@@ -41,11 +45,11 @@ const MAX_OBJECT_LENGTH: u64 = 1024 * 1024 * 1024;
 cmd! {
     ObjectsArgs(self, settings: ObjectsSettings) {
         match self.command.clone() {
-            ObjectsCommands::Run { tendermint_url, iroh_addr: _} => {
+            ObjectsCommands::Run { tendermint_url, iroh_addr} => {
                 let client = FendermintClient::new_http(tendermint_url, None)?;
 
-                // TODO: pass in path and use persistent node
-                let iroh = iroh::node::Node::memory().spawn().await?;
+                let iroh_addr: SocketAddr = iroh_addr.parse()?;
+                let iroh = iroh::client::Iroh::connect_addr(iroh_addr).await?;
 
                 // Admin routes
                 let health_route = warp::path!("health")
@@ -55,7 +59,7 @@ cmd! {
                 let objects_upload = warp::path!("v1" / "objects" )
                 .and(warp::post())
                 .and(with_client(client.clone()))
-                .and(with_iroh(iroh.client().clone()))
+                .and(with_iroh(iroh.clone()))
                 .and(warp::multipart::form().max_length(MAX_OBJECT_LENGTH))
                 .and_then(handle_object_upload);
 
@@ -68,7 +72,7 @@ cmd! {
                 .and(warp::header::optional::<String>("Range"))
                 .and(warp::query::<HeightQuery>())
                 .and(with_client(client.clone()))
-                .and(with_iroh(iroh.client().clone()))
+                .and(with_iroh(iroh.clone()))
                 .and_then(handle_object_download);
 
                 let router = health_route
