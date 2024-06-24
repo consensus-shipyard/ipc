@@ -8,8 +8,8 @@ pub struct RunArgs {
     #[arg(
         long,
         short,
-        default_value = "/ip4/127.0.0.1/tcp/5001",
-        env = "IPFS_RPC_ADDR"
+        default_value = "127.0.0.1:4919",
+        env = "IROH_RPC_ADDR"
     )]
-    pub ipfs_addr: String,
+    pub iroh_addr: String,
 }

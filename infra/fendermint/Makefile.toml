@@ -4,7 +4,7 @@ extend = [
     { path = "scripts/fendermint.toml" },
     { path = "scripts/ethapi.toml" },
     { path = "scripts/genesis.toml" },
-    { path = "scripts/ipfs.toml" },
+    # { path = "scripts/ipfs.toml" },
     { path = "scripts/node.toml" },
     { path = "scripts/promtail.toml" },
     { path = "scripts/objects.toml" },
@@ -116,7 +116,7 @@ PRIVATE_KEY_PATH = { value = "", condition = { env_not_set = [
 BASE_DIR = "${HOME}/.ipc/${NETWORK_NAME}/${NODE_NAME}"
 FM_DIR = "${BASE_DIR}/${NODE_NAME}/fendermint"
 CMT_DIR = "${BASE_DIR}/${NODE_NAME}/cometbft"
-IPFS_DIR = "${BASE_DIR}/${NODE_NAME}/ipfs"
+# IPFS_DIR = "${BASE_DIR}/${NODE_NAME}/ipfs"
 KEYS_DIR = "${BASE_DIR}/${NODE_NAME}/keys"
 
 # Common env vars
@@ -140,14 +140,14 @@ FM_CONTAINER_NAME = "${NODE_NAME}-fendermint"
 ETHAPI_CONTAINER_NAME = "${NODE_NAME}-ethapi"
 PROMTAIL_CONTAINER_NAME = "${NODE_NAME}-promtail"
 OBJECTS_CONTAINER_NAME = "${NODE_NAME}-objects"
-IPFS_CONTAINER_NAME = "${NODE_NAME}-ipfs"
+# IPFS_CONTAINER_NAME = "${NODE_NAME}-ipfs"
 
 CMT_DOCKER_IMAGE = "cometbft/cometbft:v0.37.x"
 FM_DOCKER_TAG = "latest"
 FM_DOCKER_IMAGE = "fendermint:${FM_DOCKER_TAG}"
 FM_REMOTE_DOCKER_IMAGE = "ghcr.io/consensus-shipyard/fendermint:${FM_DOCKER_TAG}"
 PROMTAIL_DOCKER_IMAGE = "grafana/promtail:latest"
-IPFS_DOCKER_IMAGE = "ipfs/kubo:latest"
+# IPFS_DOCKER_IMAGE = "ipfs/kubo:latest"
 
 IPFS_PROFILE = { value = "server", condition = { env_not_set = [
     "IPFS_PROFILE",

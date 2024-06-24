@@ -41,7 +41,7 @@ const MAX_OBJECT_LENGTH: u64 = 1024 * 1024 * 1024;
 cmd! {
     ObjectsArgs(self, settings: ObjectsSettings) {
         match self.command.clone() {
-            ObjectsCommands::Run { tendermint_url, ipfs_addr: _} => {
+            ObjectsCommands::Run { tendermint_url, iroh_addr: _} => {
                 let client = FendermintClient::new_http(tendermint_url, None)?;
 
                 // TODO: pass in path and use persistent node

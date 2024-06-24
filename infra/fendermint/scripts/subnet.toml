@@ -60,7 +60,7 @@ dependencies = [
     "cometbft-wait",
     "ethapi-start",
     "objects-start",
-    "ipfs-start",
+    # "ipfs-start",
     "node-report",
 ]
 
@@ -80,7 +80,7 @@ dependencies = [
     "cometbft-wait",
     "ethapi-start",
     "objects-start",
-    "ipfs-start",
+    # "ipfs-start",
     "node-report",
 ]
 
@@ -90,13 +90,13 @@ run_task = { name = [
     "fendermint-destroy",
     "ethapi-destroy",
     "objects-destroy",
-    "ipfs-destroy",
+    # "ipfs-destroy",
     "fendermint-start-validator",
     "cometbft-start",
     "cometbft-wait",
     "ethapi-start",
     "objects-start",
-    "ipfs-start",
+    # "ipfs-start",
     "node-report",
 ] }
 
@@ -106,13 +106,13 @@ run_task = { name = [
     "fendermint-destroy",
     "ethapi-destroy",
     "objects-destroy",
-    "ipfs-destroy",
+    # "ipfs-destroy",
     "fendermint-start-validator-no-parent",
     "cometbft-start",
     "cometbft-wait",
     "ethapi-start",
     "objects-start",
-    "ipfs-start",
+    # "ipfs-start",
     "node-report",
 ] }
 
@@ -137,7 +137,7 @@ dependencies = [
     "cometbft-wait",
     "ethapi-start",
     "objects-start",
-    "ipfs-start",
+    # "ipfs-start",
     "node-report",
 ]
 

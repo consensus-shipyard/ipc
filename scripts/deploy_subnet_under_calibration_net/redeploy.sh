@@ -32,9 +32,6 @@ CMT_RPC_HOST_PORTS=(26657 26757 26857)
 ETHAPI_HOST_PORTS=(8545 8645 8745)
 RESOLVER_HOST_PORTS=(26655 26755 26855)
 OBJECTS_HOST_PORTS=(8001 8002 8003)
-IPFS_SWARM_HOST_PORTS=(4001 4002 4003)
-IPFS_RPC_HOST_PORTS=(5001 5002 5003)
-IPFS_GATEWAY_HOST_PORTS=(8080 8081 8082)
 
 if (($# != 1)); then
   echo "Arguments: <Specify github remote branch name to use to deploy. Or use 'local' (without quote) to indicate using local repo instead. If not provided, will default to main branch"
@@ -150,10 +147,6 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e ETHAPI_HOST_PORT=${ETHAPI_HOST_PORTS[0]} \
     -e RESOLVER_HOST_PORT=${RESOLVER_HOST_PORTS[0]} \
     -e OBJECTS_HOST_PORT=${OBJECTS_HOST_PORTS[0]} \
-    -e IPFS_SWARM_HOST_PORT=${IPFS_SWARM_HOST_PORTS[0]} \
-    -e IPFS_RPC_HOST_PORT=${IPFS_RPC_HOST_PORTS[0]} \
-    -e IPFS_GATEWAY_HOST_PORT=${IPFS_GATEWAY_HOST_PORTS[0]} \
-    -e IPFS_PROFILE="local-discovery" \
     -e PARENT_HTTP_AUTH_TOKEN=${PARENT_HTTP_AUTH_TOKEN} \
     -e PARENT_REGISTRY=${parent_registry_address} \
     -e PARENT_GATEWAY=${parent_gateway_address} \
@@ -183,10 +176,6 @@ do
       -e ETHAPI_HOST_PORT=${ETHAPI_HOST_PORTS[i]} \
       -e RESOLVER_HOST_PORT=${RESOLVER_HOST_PORTS[i]} \
       -e OBJECTS_HOST_PORT=${OBJECTS_HOST_PORTS[i]} \
-      -e IPFS_SWARM_HOST_PORT=${IPFS_SWARM_HOST_PORTS[i]} \
-      -e IPFS_RPC_HOST_PORT=${IPFS_RPC_HOST_PORTS[i]} \
-      -e IPFS_GATEWAY_HOST_PORT=${IPFS_GATEWAY_HOST_PORTS[i]} \
-      -e IPFS_PROFILE="local-discovery" \
       -e RESOLVER_BOOTSTRAPS=${bootstrap_resolver_endpoint} \
       -e BOOTSTRAPS=${bootstrap_node_endpoint} \
       -e PARENT_HTTP_AUTH_TOKEN=${PARENT_HTTP_AUTH_TOKEN} \
@@ -240,11 +229,6 @@ Object API:
 http://localhost:${OBJECTS_HOST_PORTS[0]}
 http://localhost:${OBJECTS_HOST_PORTS[1]}
 http://localhost:${OBJECTS_HOST_PORTS[2]}
-
-IPFS API:
-http://localhost:${IPFS_RPC_HOST_PORTS[0]}
-http://localhost:${IPFS_RPC_HOST_PORTS[1]}
-http://localhost:${IPFS_RPC_HOST_PORTS[2]}
 
 ETH API:
 http://localhost:${ETHAPI_HOST_PORTS[0]}

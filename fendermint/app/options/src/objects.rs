@@ -26,9 +26,9 @@ pub enum ObjectsCommands {
         #[arg(
             long,
             short,
-            default_value = "/ip4/127.0.0.1/tcp/5001",
-            env = "IPFS_RPC_ADDR"
+            default_value = "127.0.0.1:4919",
+            env = "IROH_RPC_ADDR"
         )]
-        ipfs_addr: String,
+        iroh_addr: String,
     },
 }

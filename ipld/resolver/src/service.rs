@@ -6,7 +6,6 @@ use std::time::Duration;
 use anyhow::anyhow;
 use bloom::{BloomFilter, ASMS};
 use ipc_api::subnet_id::SubnetID;
-use ipfs_api_backend_hyper::{IpfsApi, IpfsClient, TryFromUri};
 use libipld::store::StoreParams;
 use libipld::Cid;
 use libp2p::futures::StreamExt;
@@ -94,7 +93,7 @@ pub struct Config {
     pub membership: MembershipConfig,
     pub connection: ConnectionConfig,
     pub content: ContentConfig,
-    pub ipfs_addr: String,
+    pub iroh_addr: String,
 }
 
 /// Internal requests to enqueue to the [`Service`]
@@ -107,7 +106,7 @@ pub(crate) enum Request<V> {
     PinSubnet(SubnetID),
     UnpinSubnet(SubnetID),
     Resolve(Cid, SubnetID, ResponseChannel),
-    ResolveIpfs(Cid, ResponseChannel),
+    ResolveIroh(Cid, ResponseChannel),
     RateLimitUsed(PeerId, usize),
     UpdateRateLimit(u32),
 }
@@ -143,8 +142,8 @@ where
     background_lookup_filter: BloomFilter,
     /// To limit the number of peers contacted in a Bitswap resolution attempt.
     max_peers_per_query: usize,
-    /// IPFS client
-    ipfs_client: IpfsClient,
+    // /// Iroh client
+    // TODO: iroh client
 }
 
 impl<P, V> Service<P, V>
@@ -211,8 +210,7 @@ where
         let (request_tx, request_rx) = mpsc::unbounded_channel();
         let (event_tx, _) = broadcast::channel(config.connection.event_buffer_capacity as usize);
 
-        let ipfs_client = IpfsClient::from_multiaddr_str(&config.ipfs_addr)
-            .expect("failed to create ipfs client");
+        // TODO: create iroh client
 
         let service = Self {
             peer_id,
@@ -227,7 +225,6 @@ where
                 config.connection.expected_peer_count,
             ),
             max_peers_per_query: config.connection.max_peers_per_query as usize,
-            ipfs_client,
         };
 
         Ok(service)
@@ -481,8 +478,8 @@ where
             Request::Resolve(cid, subnet_id, response_channel) => {
                 self.start_query(cid, subnet_id, response_channel)
             }
-            Request::ResolveIpfs(cid, response_channel) => {
-                self.start_ipfs_query(cid, response_channel)
+            Request::ResolveIroh(cid, response_channel) => {
+                self.start_iroh_query(cid, response_channel)
             }
             Request::RateLimitUsed(peer_id, bytes) => {
                 self.content_mut().rate_limit_used(peer_id, bytes)
@@ -527,16 +524,17 @@ where
         }
     }
 
-    /// Start a CID resolution using local IPFS.
-    fn start_ipfs_query(&mut self, cid: Cid, response_channel: ResponseChannel) {
-        let ipfs = self.ipfs_client.clone();
+    /// Start a CID resolution using iorh.
+    fn start_iroh_query(&mut self, cid: Cid, response_channel: ResponseChannel) {
+        todo!()
+        /*let ipfs = self.ipfs_client.clone();
         tokio::spawn(async move {
             let res = ipfs.pin_add(&cid.to_string(), true).await;
             match res {
                 Ok(_) => send_resolve_result(response_channel, Ok(())),
                 Err(e) => send_resolve_result(response_channel, Err(anyhow!(e))),
             }
-        });
+        });*/
     }
 
     /// Handle the results from a resolve attempt. If it succeeded, notify the

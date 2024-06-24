@@ -20,7 +20,7 @@ echo creating directories: $BASE_DIR $FM_DIR $CMT_DIR $IPFS_DIR $KEYS_DIR
 mkdir -p $BASE_DIR
 mkdir -p $FM_DIR
 mkdir -p $CMT_DIR
-mkdir -p $IPFS_DIR
+# mkdir -p $IPFS_DIR
 mkdir -p $KEYS_DIR
 touch $ENV_FILE
 """

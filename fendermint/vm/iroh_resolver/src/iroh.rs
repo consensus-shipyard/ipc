@@ -8,16 +8,16 @@ use async_stm::{atomically, atomically_or_err, queues::TQueueLike};
 use cid::Cid;
 use fendermint_vm_topdown::voting::VoteTally;
 use ipc_api::subnet_id::SubnetID;
-use ipc_ipld_resolver::{Client, ResolverIpfs, ValidatorKey, VoteRecord};
+use ipc_ipld_resolver::{Client, ResolverIroh, ValidatorKey, VoteRecord};
 use libp2p::identity::Keypair;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::pool::{ResolveQueue, ResolveTask};
 
-/// The IPFS Resolver takes resolution tasks from the [ResolvePool] and
-/// uses the [ipc_ipld_resolver] to fetch the content from the local IPFS node.
-pub struct IpfsResolver<V> {
+/// The iroh Resolver takes resolution tasks from the [ResolvePool] and
+/// uses the [ipc_ipld_resolver] to fetch the content from the local iroh node.
+pub struct IrohResolver<V> {
     client: Client<V>,
     queue: ResolveQueue,
     retry_delay: Duration,
@@ -27,7 +27,7 @@ pub struct IpfsResolver<V> {
     to_vote: fn(Cid) -> V,
 }
 
-impl<V> IpfsResolver<V>
+impl<V> IrohResolver<V>
 where
     V: Clone + Send + Sync + Serialize + DeserializeOwned + 'static,
 {
@@ -51,7 +51,7 @@ where
         }
     }
 
-    /// Start taking tasks from the resolver pool and resolving them using the IPFS Resolver.
+    /// Start taking tasks from the resolver pool and resolving them using the iroh Resolver.
     pub async fn run(self) {
         loop {
             let task = atomically(|| {
@@ -90,14 +90,14 @@ fn start_resolve<V>(
     V: Clone + Send + Sync + Serialize + DeserializeOwned + 'static,
 {
     tokio::spawn(async move {
-        tracing::debug!(cid = ?task.cid(), "starting ipfs content resolve");
-        let res = client.resolve_ipfs(task.cid()).await;
+        tracing::debug!(cid = ?task.cid(), "starting iroh content resolve");
+        let res = client.resolve_iroh(task.cid()).await;
 
         let err = match res {
             Err(e) => {
                 tracing::error!(
                     error = e.to_string(),
-                    "failed to submit ipfs resolution task"
+                    "failed to submit iroh resolution task"
                 );
                 // The service is no longer listening, we might as well stop taking new tasks from the queue.
                 // By not quitting we should see this error every time there is a new task, which is at least is a constant reminder.
@@ -109,7 +109,7 @@ fn start_resolve<V>(
 
         match err {
             None => {
-                tracing::debug!(cid = ?task.cid(), "ipfs content resolved");
+                tracing::debug!(cid = ?task.cid(), "iroh content resolved");
 
                 // Mark task as resolved
                 atomically(|| task.set_resolved()).await;
@@ -150,7 +150,7 @@ fn start_resolve<V>(
                 tracing::error!(
                     cid = ?task.cid(),
                     error = e.to_string(),
-                    "ipfs content resolution failed; retrying later"
+                    "iroh content resolution failed; retrying later"
                 );
                 schedule_retry(task, queue, retry_delay);
             }

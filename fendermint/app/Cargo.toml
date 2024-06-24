@@ -64,7 +64,7 @@ fendermint_vm_interpreter = { path = "../vm/interpreter", features = [
 ] }
 fendermint_vm_message = { path = "../vm/message" }
 fendermint_vm_resolver = { path = "../vm/resolver" }
-fendermint_vm_ipfs_resolver = { path = "../vm/ipfs_resolver" }
+fendermint_vm_iroh_resolver = { path = "../vm/iroh_resolver" }
 fendermint_vm_snapshot = { path = "../vm/snapshot" }
 fendermint_vm_topdown = { path = "../vm/topdown" }
 fendermint_actor_machine = { path = "../actors/machine" }

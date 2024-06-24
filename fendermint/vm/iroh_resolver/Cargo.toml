@@ -1,6 +1,6 @@
 [package]
-name = "fendermint_vm_ipfs_resolver"
-description = "Resolve IPFS content in messages"
+name = "fendermint_vm_iroh_resolver"
+description = "Resolve iroh content in messages"
 version = "0.1.0"
 authors.workspace = true
 edition.workspace = true

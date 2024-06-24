@@ -16,7 +16,7 @@ extend = [
     { path = "../../../infra/fendermint/scripts/ethapi.toml" },
     { path = "../../../infra/fendermint/scripts/fendermint.toml" },
     { path = "../../../infra/fendermint/scripts/promtail.toml" },
-    { path = "../../../infra/fendermint/scripts/ipfs.toml" },
+    # { path = "../../../infra/fendermint/scripts/ipfs.toml" },
     { path = "./fendermint.toml" },
 ]
 
@@ -68,7 +68,7 @@ run_task = { name = [
     "cometbft-destroy",
     "fendermint-destroy",
     "ethapi-destroy",
-    "ipfs-destroy",
+    # "ipfs-destroy",
     "promtail-destroy",
     "docker-network-rm",
     "test-data-dir-rm",

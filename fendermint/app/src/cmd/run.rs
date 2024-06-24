@@ -20,7 +20,7 @@ use fendermint_vm_interpreter::{
     fvm::{Broadcaster, FvmMessageInterpreter, ValidatorContext},
     signed::SignedMessageInterpreter,
 };
-use fendermint_vm_ipfs_resolver::ipfs::IpfsResolver;
+use fendermint_vm_iroh_resolver::iroh::IrohResolver;
 use fendermint_vm_resolver::ipld::IpldResolver;
 use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::proxy::IPCProviderProxy;
@@ -31,6 +31,7 @@ use fvm_shared::address::{current_network, Address, Network};
 use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::broadcast::error::RecvError;
 use tower::ServiceBuilder;
@@ -41,7 +42,7 @@ use crate::{cmd, options::run::RunArgs, settings::Settings};
 
 cmd! {
   RunArgs(self, settings) {
-    run(self.ipfs_addr.clone(), settings).await
+    run(self.iroh_addr.clone(), settings).await
   }
 }
 
@@ -58,7 +59,7 @@ namespaces! {
 /// Run the Fendermint ABCI Application.
 ///
 /// This method acts as our composition root.
-async fn run(ipfs_addr: String, settings: Settings) -> anyhow::Result<()> {
+async fn run(iroh_addr: String, settings: Settings) -> anyhow::Result<()> {
     let tendermint_rpc_url = settings.tendermint_rpc_url()?;
     tracing::info!("Connecting to Tendermint at {tendermint_rpc_url}");
 
@@ -156,7 +157,7 @@ async fn run(ipfs_addr: String, settings: Settings) -> anyhow::Result<()> {
         NamespaceBlockstore::new(db.clone(), ns.state_store).context("error creating state DB")?;
 
     let checkpoint_pool = CheckpointPool::new();
-    let ipfs_pin_pool = ObjectPool::new();
+    let iroh_pin_pool = ObjectPool::new();
     let parent_finality_votes = VoteTally::empty();
 
     let topdown_enabled = settings.topdown_enabled();
@@ -168,7 +169,7 @@ async fn run(ipfs_addr: String, settings: Settings) -> anyhow::Result<()> {
             db.clone(),
             state_store.clone(),
             ns.bit_store,
-            ipfs_addr,
+            iroh_addr,
         )?;
 
         // Register all metrics from the IPLD resolver stack
@@ -222,9 +223,9 @@ async fn run(ipfs_addr: String, settings: Settings) -> anyhow::Result<()> {
         }
 
         if let Some(key) = validator_keypair {
-            let ipfs_resolver = IpfsResolver::new(
+            let iroh_resolver = IrohResolver::new(
                 client.clone(),
-                ipfs_pin_pool.queue(),
+                iroh_pin_pool.queue(),
                 settings.resolver.retry_delay,
                 parent_finality_votes.clone(),
                 key,
@@ -232,10 +233,10 @@ async fn run(ipfs_addr: String, settings: Settings) -> anyhow::Result<()> {
                 |value| AppVote::ObjectFinality(IPCObjectFinality { object: value }),
             );
 
-            tracing::info!("starting the IPFS Resolver...");
-            tokio::spawn(async move { ipfs_resolver.run().await });
+            tracing::info!("starting the iroh Resolver...");
+            tokio::spawn(async move { iroh_resolver.run().await });
         } else {
-            tracing::info!("IPFS Resolver disabled.")
+            tracing::info!("iroh Resolver disabled.")
         }
 
         tracing::info!("subscribing to gossip...");
@@ -327,7 +328,7 @@ async fn run(ipfs_addr: String, settings: Settings) -> anyhow::Result<()> {
             checkpoint_pool,
             parent_finality_provider: parent_finality_provider.clone(),
             parent_finality_votes: parent_finality_votes.clone(),
-            object_pool: ipfs_pin_pool,
+            object_pool: iroh_pin_pool,
         },
         snapshots,
     )?;
@@ -422,7 +423,7 @@ fn make_resolver_service(
     db: RocksDb,
     state_store: NamespaceBlockstore,
     bit_store_ns: String,
-    ipfs_addr: String,
+    iroh_addr: String,
 ) -> anyhow::Result<ipc_ipld_resolver::Service<libipld::DefaultParams, AppVote>> {
     // Blockstore for Bitswap.
     let bit_store = NamespaceBlockstore::new(db, bit_store_ns).context("error creating bit DB")?;
@@ -431,7 +432,7 @@ fn make_resolver_service(
     let bitswap_store = BitswapBlockstore::new(state_store, bit_store);
 
     let config =
-        to_resolver_config(settings, ipfs_addr).context("error creating resolver config")?;
+        to_resolver_config(settings, iroh_addr).context("error creating resolver config")?;
 
     let service = ipc_ipld_resolver::Service::new(config, bitswap_store)
         .context("error creating IPLD Resolver Service")?;
@@ -467,7 +468,7 @@ fn make_ipc_provider_proxy(settings: &Settings) -> anyhow::Result<IPCProviderPro
 
 fn to_resolver_config(
     settings: &Settings,
-    ipfs_addr: String,
+    iroh_addr: String,
 ) -> anyhow::Result<ipc_ipld_resolver::Config> {
     use ipc_ipld_resolver::{
         Config, ConnectionConfig, ContentConfig, DiscoveryConfig, MembershipConfig, NetworkConfig,
@@ -517,7 +518,7 @@ fn to_resolver_config(
             rate_limit_bytes: r.content.rate_limit_bytes,
             rate_limit_period: r.content.rate_limit_period,
         },
-        ipfs_addr,
+        iroh_addr,
     };
 
     Ok(config)

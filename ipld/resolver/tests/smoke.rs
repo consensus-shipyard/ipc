@@ -344,7 +344,7 @@ fn make_config(rng: &mut StdRng, cluster_size: u32, bootstrap_addr: Option<Multi
             rate_limit_bytes: 1 << 20,
             rate_limit_period: Duration::from_secs(60),
         },
-        ipfs_addr: "/ip4/127.0.0.1/tcp/5001".to_string(),
+        iroh_addr: "127.0.0.1:4919".to_string(),
     };
 
     config

@@ -3347,7 +3347,7 @@ dependencies = [
  "fendermint_vm_event",
  "fendermint_vm_genesis",
  "fendermint_vm_interpreter",
- "fendermint_vm_ipfs_resolver",
+ "fendermint_vm_iroh_resolver",
  "fendermint_vm_message",
  "fendermint_vm_resolver",
  "fendermint_vm_snapshot",
@@ -3814,7 +3814,7 @@ dependencies = [
  "fendermint_vm_event",
  "fendermint_vm_genesis",
  "fendermint_vm_interpreter",
- "fendermint_vm_ipfs_resolver",
+ "fendermint_vm_iroh_resolver",
  "fendermint_vm_message",
  "fendermint_vm_resolver",
  "fendermint_vm_topdown",
@@ -3851,7 +3851,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "fendermint_vm_ipfs_resolver"
+name = "fendermint_vm_iroh_resolver"
 version = "0.1.0"
 dependencies = [
  "async-stm",

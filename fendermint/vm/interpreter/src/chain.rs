@@ -11,7 +11,7 @@ use fendermint_actor_objectstore::{
 use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::{ipc, system};
 use fendermint_vm_event::ParentFinalityMissingQuorum;
-use fendermint_vm_ipfs_resolver::pool::{
+use fendermint_vm_iroh_resolver::pool::{
     ResolveKey as IpfsResolveKey, ResolvePool as IpfsResolvePool,
 };
 use fendermint_vm_message::ipc::ParentFinality;
