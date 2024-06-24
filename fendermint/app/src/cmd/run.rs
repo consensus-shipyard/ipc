@@ -169,7 +169,7 @@ async fn run(iroh_addr: String, settings: Settings) -> anyhow::Result<()> {
             state_store.clone(),
             ns.bit_store,
             iroh_addr,
-        )?;
+        ).await?;
 
         // Register all metrics from the IPLD resolver stack
         if let Some(ref registry) = metrics_registry {
@@ -417,7 +417,7 @@ fn open_db(settings: &Settings, ns: &Namespaces) -> anyhow::Result<RocksDb> {
     Ok(db)
 }
 
-fn make_resolver_service(
+async fn make_resolver_service(
     settings: &Settings,
     db: RocksDb,
     state_store: NamespaceBlockstore,
@@ -433,7 +433,7 @@ fn make_resolver_service(
     let config =
         to_resolver_config(settings, iroh_addr).context("error creating resolver config")?;
 
-    let service = ipc_ipld_resolver::Service::new(config, bitswap_store)
+    let service = ipc_ipld_resolver::Service::new(config, bitswap_store).await
         .context("error creating IPLD Resolver Service")?;
 
     Ok(service)
