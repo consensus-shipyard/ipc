@@ -11,14 +11,10 @@ pub mod proxy;
 mod toggle;
 pub mod voting;
 
-use anyhow::anyhow;
-use async_stm::{abort, Stm, StmResult};
+use async_stm::Stm;
 use async_trait::async_trait;
-use cid::multihash::Code;
-use cid::Cid;
 use ethers::utils::hex;
-use fendermint_vm_message::ipc::{ParentFinalityV2, SealedTopdownProposal};
-use fvm_ipld_encoding::DAG_CBOR;
+use fendermint_vm_message::ipc::SealedTopdownProposal;
 use fvm_shared::clock::ChainEpoch;
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
@@ -106,31 +102,6 @@ impl Config {
 
     pub fn max_cache_blocks(&self) -> BlockHeight {
         self.max_cache_blocks.unwrap_or(DEFAULT_MAX_CACHE_BLOCK)
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum VotePayload {
-    V1(IPCParentFinality),
-    V2 {
-        height: BlockHeight,
-        commitment: Cid,
-    },
-}
-
-impl VotePayload {
-    pub fn new(height: BlockHeight, bytes: Bytes) -> StmResult<Self, anyhow::Error> {
-        if bytes.len() == 32 {
-            // this is a block hash
-            Ok(Self::V1(IPCParentFinality::new(
-                height as ChainEpoch,
-                bytes,
-            )))
-        } else if let Ok(commitment) = Cid::try_from(bytes.as_slice()) {
-            Ok(Self::V2 { height, commitment })
-        } else {
-            abort(anyhow!("invalid vote tally payload"))
-        }
     }
 }
 

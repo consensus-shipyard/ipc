@@ -9,9 +9,8 @@ use crate::{
     CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
 };
 use anyhow::{bail, Context};
-use async_stm::{atomically, atomically_or_err, Stm};
+use async_stm::{atomically, Stm};
 use async_trait::async_trait;
-use cid::Cid;
 use fendermint_vm_actor_interface::ipc;
 use fendermint_vm_message::ipc::{ParentFinality, ParentFinalityV2};
 use fendermint_vm_message::{
@@ -23,7 +22,7 @@ use fendermint_vm_topdown::proxy::IPCProviderProxy;
 use fendermint_vm_topdown::voting::{ValidatorKey, VoteTally};
 use fendermint_vm_topdown::{
     BlockHeight, CachedFinalityProvider, IPCParentFinality, ParentFinalityProvider,
-    ParentFinalityProviderV2, ParentViewProvider, Toggle, VotePayload,
+    ParentFinalityProviderV2, ParentViewProvider, Toggle,
 };
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
@@ -126,25 +125,19 @@ where
         // Before we try to find a quorum, pause incoming votes. This is optional but if there are lots of votes coming in it might hold up proposals.
         atomically(|| state.parent_finality_votes.pause_votes_until_find_quorum()).await;
 
-        let maybe_finality = atomically_or_err(|| {
+        let maybe_finality = atomically(|| {
             // The pre-requisite for proposal is that there is a quorum of gossiped votes at that height.
             // The final proposal can be at most as high as the quorum.
-            if let Some((height, bytes)) = state.parent_finality_votes.find_quorum()? {
-                let vote_payload = VotePayload::new(height, bytes)?;
-
-                return Ok(match vote_payload {
-                    VotePayload::V1(finality) => prep_topdown_v1(&state, finality)?,
-                    VotePayload::V2 { height, commitment } => {
-                        prep_topdown_v2(&state, height, commitment)?
-                    }
-                });
-            }
-
-            tracing::info!("no quorum found yet");
-
-            Ok(None)
+            Ok(
+                if let Some((height, _)) = state.parent_finality_votes.find_quorum()? {
+                    prep_topdown_v2(&state, height)?
+                } else {
+                    tracing::info!("no quorum found yet");
+                    None
+                },
+            )
         })
-        .await?;
+        .await;
         if let Some(msg) = maybe_finality {
             msgs.push(msg);
         }
@@ -608,6 +601,8 @@ fn relayed_bottom_up_ckpt_to_fvm(
     Ok(msg)
 }
 
+/// Keep this for some prod system to switch at a height
+#[allow(dead_code)]
 fn prep_topdown_v1(state: &ChainEnv, quorum: IPCParentFinality) -> Stm<Option<ChainMessage>> {
     Ok(state
         .parent_finality_provider
@@ -625,29 +620,9 @@ fn prep_topdown_v1(state: &ChainEnv, quorum: IPCParentFinality) -> Stm<Option<Ch
         }))
 }
 
-fn prep_topdown_v2(
-    state: &ChainEnv,
-    height: BlockHeight,
-    commitment: Cid,
-) -> Stm<Option<ChainMessage>> {
-    Ok(
-        if let Some(sealed) = state
-            .parent_finality_provider
-            .sealed_proposal_at_height(height)?
-        {
-            if sealed.commitment() != commitment {
-                // This means the data stored in this node's cache does not match that in the quorum.
-                // Since the quorum has already reached, the node has to follow the quorum but prepare
-                // the data according to the quorum's commitment, so just give up the chance to propose
-                // the topdown message
-                None
-            } else {
-                Some(ChainMessage::Ipc(IpcMessage::TopDownExecV2(sealed)))
-            }
-        } else {
-            // no sealed proposal can be made at the quorum height, maybe this is not the node to prepare
-            // the proposal, skip
-            None
-        },
-    )
+fn prep_topdown_v2(state: &ChainEnv, height: BlockHeight) -> Stm<Option<ChainMessage>> {
+    Ok(state
+        .parent_finality_provider
+        .sealed_proposal_at_height(height)?
+        .map(|sealed| ChainMessage::Ipc(IpcMessage::TopDownExecV2(sealed))))
 }

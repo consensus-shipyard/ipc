@@ -205,8 +205,7 @@ impl ParentFinalityV2 {
 
     pub fn cid(&self) -> Cid {
         let bytes = fvm_ipld_encoding::to_vec(self).expect("should not have failed");
-        let cid = Cid::new_v1(DAG_CBOR, Code::Blake2b256.digest(&bytes));
-        cid
+        Cid::new_v1(DAG_CBOR, Code::Blake2b256.digest(&bytes))
     }
 }
 
