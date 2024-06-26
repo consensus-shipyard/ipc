@@ -130,7 +130,9 @@ where
             // The final proposal can be at most as high as the quorum.
             Ok(
                 if let Some((height, _)) = state.parent_finality_votes.find_quorum()? {
-                    prep_topdown_v2(&state, height)?
+                    let p = prep_topdown_v2(&state, height)?;
+                    tracing::debug!(proposal = ?p, "proposed topdown proposal");
+                    p
                 } else {
                     tracing::info!("no quorum found yet");
                     None
