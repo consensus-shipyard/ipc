@@ -12,7 +12,7 @@ use ipc_api::staking::StakingChangeRequest;
 use std::cmp::min;
 
 use fendermint_tracing::emit;
-use fendermint_vm_event::{ParentFinalityCommitted, ParentFinalityV2Committed};
+use fendermint_vm_event::ParentFinalityCommitted;
 use fendermint_vm_message::ipc::SealedTopdownProposal;
 
 /// Finality provider that can handle null blocks
@@ -194,10 +194,9 @@ impl FinalityWithNull {
         self.last_committed_finality.write(Some(finality))?;
 
         // emit event only after successful write
-        emit!(ParentFinalityV2Committed {
+        emit!(ParentFinalityCommitted {
             block_height: height,
             block_hash: &hash,
-            commitment: sealed_proposal.commitment(),
         });
 
         Ok(())

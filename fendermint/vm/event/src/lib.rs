@@ -21,13 +21,6 @@ pub struct ParentFinalityCommitted<'a> {
 }
 
 #[derive(Debug, Default)]
-pub struct ParentFinalityV2Committed<'a> {
-    pub block_height: BlockHeight,
-    pub block_hash: BlockHashHex<'a>,
-    pub commitment: Cid,
-}
-
-#[derive(Debug, Default)]
 pub struct NewBottomUpCheckpoint<'a> {
     pub block_height: BlockHeight,
     pub block_hash: BlockHashHex<'a>,
