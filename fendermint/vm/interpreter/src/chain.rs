@@ -195,6 +195,7 @@ where
                         atomically(|| env.parent_finality_provider.check_sealed_proposal(&sealed))
                             .await;
                     if !is_final {
+                        tracing::warn!("proposal rejected");
                         return Ok(false);
                     }
                 }
