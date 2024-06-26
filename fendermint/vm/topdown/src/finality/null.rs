@@ -141,16 +141,10 @@ impl FinalityWithNull {
         &self,
         target_height: BlockHeight,
     ) -> Stm<Option<SealedTopdownProposal>> {
-        let height = if let Some(h) = self.propose_next_height()? {
-            h
-        } else {
-            return Ok(None);
-        };
-
-        if height < target_height {
-            tracing::info!(height, target_height, "target height is bigger than proposed height");
-            // This means the cache does not have enough data to cover the target height, skip
-            // this round of proposal
+        if self.get_at_height(target_height, |v| v.0)?.is_none() {
+            // this means the vote tally has agreed on a height which our current node
+            // does not have information on, give up on proposing.
+            tracing::warn!(target_height, "target height has no data in cache");
             return Ok(None);
         }
 
