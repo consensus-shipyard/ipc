@@ -393,7 +393,7 @@ where
                     .await
                     .context("failed to commit finality")?;
 
-                    tracing::debug!(
+                    tracing::info!(
                         previous_committed_height = prev_height,
                         previous_committed_finality = prev_finality
                             .as_ref()
@@ -402,7 +402,7 @@ where
                         "chain interpreter committed topdown finality",
                     );
 
-                    tracing::debug!(
+                    tracing::info!(
                         msgs = p.validator_changes.len(),
                         "chain interpreter received total validator changes"
                     );
@@ -411,7 +411,7 @@ where
                         .store_validator_changes(&mut state, p.validator_changes)
                         .context("failed to store validator changes")?;
 
-                    tracing::debug!(
+                    tracing::info!(
                         number_of_messages = p.cross_messages.len(),
                         "chain interpreter received topdown msgs",
                     );
