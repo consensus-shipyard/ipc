@@ -375,7 +375,7 @@ where
                         bail!("cannot execute IPC top-down message: parent provider disabled");
                     }
 
-                    let p = ParentFinalityV2::from(sealed);
+                    let p = ParentFinalityV2::from(sealed.clone());
 
                     // commit parent finality first
                     let finality = IPCParentFinality::new(p.height as ChainEpoch, p.block_hash);
@@ -428,7 +428,7 @@ where
 
                     atomically(|| {
                         env.parent_finality_provider
-                            .set_new_finality(finality.clone(), prev_finality.clone())?;
+                            .set_new_sealed_finality(sealed.clone(), prev_finality.clone())?;
 
                         env.parent_finality_votes
                             .set_finalized(finality.height, finality.block_hash.clone())?;
