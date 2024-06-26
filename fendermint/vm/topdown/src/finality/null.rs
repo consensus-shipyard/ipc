@@ -148,6 +148,7 @@ impl FinalityWithNull {
         };
 
         if height < target_height {
+            tracing::info!(height, target_height, "target height is bigger than proposed height");
             // This means the cache does not have enough data to cover the target height, skip
             // this round of proposal
             return Ok(None);
