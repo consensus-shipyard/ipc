@@ -19,7 +19,7 @@ Communication between the parent chain and its subnets can occur in both directi
 
 ## **Data Handling with IPLD and IPFS**
 
-Instead of transmitting actual data directly, IPC utilizes [InterPlanetary Linked Data (IPLD)](https://spec.filecoin.io/libraries/ipld/) to create data links. These links are then resolved using a resolver that fetches the actual data stored on the [InterPlanetary File System (IPFS)](https://docs.ipfs.tech/), ensuring efficient and secure data management across the network.
+Instead of transmitting actual data directly, IPC utilizes [InterPlanetary Linked Data (IPLD)](https://spec.filecoin.io/libraries/ipld/) to create data links. These links are then resolved using a resolver that fetches the actual data stored on the [InterPlanetary File System (IPFS)](https://docs.ipfs.tech/), ensuring efficient and secure data management across the network. Additionally, the CometBFT validators run a quorum to agree on the top-down messages from the parent chain, ensuring they can achieve consensus and end up with the same state.
 
 ## **Architecture**
 
