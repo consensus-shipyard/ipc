@@ -11,9 +11,8 @@ description: >-
 The IPC framework offers several significant benefits:
 
 - **Scalability**: By enabling the creation of subnets, IPC allows for on-demand horizontal scalability, effectively managing increased network load by distributing transactions across multiple chains.
-- **Flexibility**: The ability to tailor consensus mechanisms and stakeholder incentives per subnet caters to diverse application needs, optimizing performance and security.
+- **Flexibility**: The ability to tailor stakeholder incentives per subnet caters to diverse application needs, optimizing performance and security. However, switching consensus mechanisms may not be straightforward at the current stage.
 - **Interoperability**: Full EVM compatibility ensures that subnets can seamlessly integrate with the broader Ethereum ecosystem, leveraging existing development tools and community resources.
-- **Reduced Latency and Cost**: Efficient data handling and the distribution of workload across subnets lead to reduced latency and lower operational costs, enhancing user experience and system performance.
 - **Decentralization and Security**: The hierarchical structure of subnets supports a robust security architecture while promoting greater decentralization, as subnets can operate independently but are still connected to the main network.
 
 ## **Highly customizable without compromising security**
