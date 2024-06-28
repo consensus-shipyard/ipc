@@ -6,20 +6,66 @@
 
 use crate::HybridClient;
 use jsonrpc_v2::{MapRouter, ServerBuilder};
-use paste::paste;
+use lazy_static::lazy_static;
+use prometheus::{register_histogram_vec, HistogramVec};
 
 mod eth;
 mod net;
 mod web3;
 
-macro_rules! with_methods {
+// TODO - move this to a more appropriate place - perhaps in the metrics module?
+lazy_static! {
+    pub static ref RPC_METHOD_CALL_LATENCY_SECONDS: HistogramVec = register_histogram_vec!(
+        "rpc_method_call_duration_seconds",
+        "Histogram of RPC method call durations",
+        &["method"]
+    )
+    .unwrap();
+}
+
+// TODO - find a better way to generate these methods ideally with single macro or without macros.
+macro_rules! with_methods_one_arg {
     ($server:ident, $module:ident, { $($method:ident),* }) => {
-        paste!{
+        paste::paste! {
             $server
-                $(.with_method(
-                    stringify!([< $module _ $method >]),
-                    $module :: [< $method:snake >] ::<HybridClient>
-                ))*
+                $(
+                    .with_method(
+                        stringify!([< $module _ $method >]),
+                        |arg| {
+                            async move {
+                                let timer = RPC_METHOD_CALL_LATENCY_SECONDS
+                                    .with_label_values(&[stringify!([< $module _ $method >])])
+                                    .start_timer();
+                                let result = $module::[< $method:snake >]::<HybridClient>(arg).await;
+                                timer.observe_duration();
+                                result
+                            }
+                        }
+                    )
+                )*
+        }
+    };
+}
+
+macro_rules! with_methods_two_args {
+    ($server:ident, $module:ident, { $($method:ident),* }) => {
+        paste::paste! {
+            $server
+                $(
+                    .with_method(
+                        stringify!([< $module _ $method >]),
+                        |arg1, arg2| {
+                            async move {
+                                let timer = RPC_METHOD_CALL_LATENCY_SECONDS
+                                    .with_label_values(&[stringify!([< $module _ $method >])])
+                                    .start_timer();
+                                let result = $module::[< $method:snake >]::<HybridClient>(arg1, arg2).await;
+                                timer.observe_duration();
+                                result
+                            }
+                        }
+                    )
+                )*
         }
     };
 }
@@ -28,31 +74,51 @@ pub fn register_methods(server: ServerBuilder<MapRouter>) -> ServerBuilder<MapRo
     // This is the list of eth methods. Apart from these Lotus implements 1 method from web3,
     // while Ethermint does more across web3, debug, miner, net, txpool, and personal.
     // The unimplemented ones are commented out, to make it easier to see where we're at.
-    let server = with_methods!(server, eth, {
-        accounts,
-        blockNumber,
-        call,
-        chainId,
+
+    /*
+        TODO - add missing methods:
         // eth_coinbase
         // eth_compileLLL
         // eth_compileSerpent
         // eth_compileSolidity
-        estimateGas,
-        feeHistory,
+        // eth_getCompilers
+        // eth_getWork
+        // eth_hashrate
+        // eth_mining
+        // eth_sendTransaction
+        // eth_sign
+        // eth_signTransaction
+        // eth_submitHashrate
+        // eth_submitWork
+    */
+
+    let server = with_methods_one_arg!(server, eth, {
+        accounts,
+        blockNumber,
+        chainId,
         maxPriorityFeePerGas,
         gasPrice,
+        newBlockFilter,
+        newPendingTransactionFilter,
+        protocolVersion,
+        syncing
+    });
+
+    let server = with_methods_two_args!(server, eth, {
+        call,
+        estimateGas,
+        feeHistory,
         getBalance,
         getBlockByHash,
         getBlockByNumber,
-        getBlockTransactionCountByHash,
-        getBlockTransactionCountByNumber,
         getBlockReceipts,
         getCode,
-        // eth_getCompilers
         getFilterChanges,
         getFilterLogs,
         getLogs,
         getStorageAt,
+        getBlockTransactionCountByNumber,
+        getBlockTransactionCountByHash,
         getTransactionByBlockHashAndIndex,
         getTransactionByBlockNumberAndIndex,
         getTransactionByHash,
@@ -62,31 +128,18 @@ pub fn register_methods(server: ServerBuilder<MapRouter>) -> ServerBuilder<MapRo
         getUncleByBlockNumberAndIndex,
         getUncleCountByBlockHash,
         getUncleCountByBlockNumber,
-        // eth_getWork
-        // eth_hashrate
-        // eth_mining
-        newBlockFilter,
         newFilter,
-        newPendingTransactionFilter,
-        protocolVersion,
         sendRawTransaction,
-        // eth_sendTransaction
-        // eth_sign
-        // eth_signTransaction
-        // eth_submitHashrate
-        // eth_submitWork
-        syncing,
+        sendRawTransaction,
         uninstallFilter,
         subscribe,
         unsubscribe
     });
 
-    let server = with_methods!(server, web3, {
-        clientVersion,
-        sha3
-    });
+    let server = with_methods_one_arg!(server, web3, { clientVersion });
+    let server = with_methods_two_args!(server, web3, { sha3 });
 
-    with_methods!(server, net, {
+    with_methods_one_arg!(server, net, {
         version,
         listening,
         peerCount

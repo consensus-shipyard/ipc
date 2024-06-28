@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use anyhow::Context;
 use fendermint_eth_api::HybridClient;
+use tracing::info;
 
 use crate::{
     cmd,
@@ -33,6 +34,31 @@ cmd! {
 
 /// Run the Ethereum API facade.
 async fn run(settings: EthSettings, client: HybridClient) -> anyhow::Result<()> {
+    // Prometheus metrics
+    let metrics_registry = if settings.metrics.enabled {
+        let registry = prometheus::Registry::new();
+
+        fendermint_app::metrics::register_eth_metrics(&registry)
+            .context("failed to register metrics")?;
+
+        Some(registry)
+    } else {
+        None
+    };
+
+    // Start the metrics on a background thread.
+    if let Some(registry) = metrics_registry {
+        info!(
+            listen_addr = settings.metrics.listen.to_string(),
+            "serving metrics"
+        );
+        let mut builder = prometheus_exporter::Builder::new(settings.metrics.listen.try_into()?);
+        builder.with_registry(registry);
+        let _ = builder.start().context("failed to start metrics server")?;
+    } else {
+        info!("metrics disabled");
+    }
+
     let gas = fendermint_eth_api::GasOpt {
         min_gas_premium: settings.gas.min_gas_premium,
         num_blocks_max_prio_fee: settings.gas.num_blocks_max_prio_fee,
