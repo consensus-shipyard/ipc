@@ -10,7 +10,7 @@ use tendermint_rpc::Client;
 use crate::{JsonRpcData, JsonRpcResult};
 
 /// Returns the current client version.
-pub async fn client_version<C>(data: JsonRpcData<C>) -> JsonRpcResult<String>
+pub async fn client_version<C>(data: JsonRpcData<C>, _params: Params<()>) -> JsonRpcResult<String>
 where
     C: Client + Sync + Send,
 {
