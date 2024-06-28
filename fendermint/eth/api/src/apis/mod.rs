@@ -23,51 +23,30 @@ lazy_static! {
     .unwrap();
 }
 
-// TODO - find a better way to generate these methods ideally with single macro or without macros.
-macro_rules! with_methods_one_arg {
-    ($server:ident, $module:ident, { $($method:ident),* }) => {
-        paste::paste! {
-            $server
-                $(
-                    .with_method(
-                        stringify!([< $module _ $method >]),
-                        |arg| {
-                            async move {
-                                let timer = RPC_METHOD_CALL_LATENCY_SECONDS
-                                    .with_label_values(&[stringify!([< $module _ $method >])])
-                                    .start_timer();
-                                let result = $module::[< $method:snake >]::<HybridClient>(arg).await;
-                                timer.observe_duration();
-                                result
-                            }
-                        }
-                    )
-                )*
+/// Middleware to record handler latencies as Prometheus metrics, labelled with the JSON-RPC method name.
+macro_rules! wrap_with_latency {
+    ($handler:path, $method_name:expr) => {
+        |data, params| async move {
+            let timer = RPC_METHOD_CALL_LATENCY_SECONDS
+                .with_label_values(&[$method_name])
+                .start_timer();
+            let result = $handler(data, params).await;
+            timer.observe_duration();
+            result
         }
     };
 }
 
-macro_rules! with_methods_two_args {
-    ($server:ident, $module:ident, { $($method:ident),* }) => {
-        paste::paste! {
-            $server
-                $(
-                    .with_method(
-                        stringify!([< $module _ $method >]),
-                        |arg1, arg2| {
-                            async move {
-                                let timer = RPC_METHOD_CALL_LATENCY_SECONDS
-                                    .with_label_values(&[stringify!([< $module _ $method >])])
-                                    .start_timer();
-                                let result = $module::[< $method:snake >]::<HybridClient>(arg1, arg2).await;
-                                timer.observe_duration();
-                                result
-                            }
-                        }
-                    )
-                )*
-        }
-    };
+macro_rules! with_methods {
+   ($server:ident, $module:ident, { $($method_name:ident),* $(,)? }) => {
+       paste::paste! {
+           $server
+               $(.with_method(
+                   stringify!([<$module _ $method_name>]),
+                   wrap_with_latency!($module::[< $method_name:snake >]::<HybridClient>, stringify!([<$module _ $method_name>]))
+               ))*
+       }
+   };
 }
 
 pub fn register_methods(server: ServerBuilder<MapRouter>) -> ServerBuilder<MapRouter> {
@@ -92,33 +71,25 @@ pub fn register_methods(server: ServerBuilder<MapRouter>) -> ServerBuilder<MapRo
         // eth_submitWork
     */
 
-    let server = with_methods_one_arg!(server, eth, {
+    let server = with_methods!(server, eth, {
         accounts,
         blockNumber,
-        chainId,
-        maxPriorityFeePerGas,
-        gasPrice,
-        newBlockFilter,
-        newPendingTransactionFilter,
-        protocolVersion,
-        syncing
-    });
-
-    let server = with_methods_two_args!(server, eth, {
         call,
+        chainId,
         estimateGas,
         feeHistory,
+        gasPrice,
         getBalance,
         getBlockByHash,
         getBlockByNumber,
         getBlockReceipts,
+        getBlockTransactionCountByHash,
+        getBlockTransactionCountByNumber,
         getCode,
         getFilterChanges,
         getFilterLogs,
         getLogs,
         getStorageAt,
-        getBlockTransactionCountByNumber,
-        getBlockTransactionCountByHash,
         getTransactionByBlockHashAndIndex,
         getTransactionByBlockNumberAndIndex,
         getTransactionByHash,
@@ -128,18 +99,25 @@ pub fn register_methods(server: ServerBuilder<MapRouter>) -> ServerBuilder<MapRo
         getUncleByBlockNumberAndIndex,
         getUncleCountByBlockHash,
         getUncleCountByBlockNumber,
+        maxPriorityFeePerGas,
+        newBlockFilter,
         newFilter,
+        newPendingTransactionFilter,
+        protocolVersion,
         sendRawTransaction,
         sendRawTransaction,
-        uninstallFilter,
         subscribe,
+        syncing,
+        uninstallFilter,
         unsubscribe
     });
 
-    let server = with_methods_one_arg!(server, web3, { clientVersion });
-    let server = with_methods_two_args!(server, web3, { sha3 });
+    let server = with_methods!(server, web3, {
+        clientVersion,
+        sha3
+    });
 
-    with_methods_one_arg!(server, net, {
+    with_methods!(server, net, {
         version,
         listening,
         peerCount

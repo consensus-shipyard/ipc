@@ -54,12 +54,15 @@ use crate::{
 /// Returns a list of addresses owned by client.
 ///
 /// It will always return [] since we don't expect Fendermint to manage private keys.
-pub async fn accounts<C>(_data: JsonRpcData<C>) -> JsonRpcResult<Vec<et::Address>> {
+pub async fn accounts<C>(
+    _data: JsonRpcData<C>,
+    _params: Params<()>,
+) -> JsonRpcResult<Vec<et::Address>> {
     Ok(vec![])
 }
 
 /// Returns the number of most recent block.
-pub async fn block_number<C>(data: JsonRpcData<C>) -> JsonRpcResult<et::U64>
+pub async fn block_number<C>(data: JsonRpcData<C>, _params: Params<()>) -> JsonRpcResult<et::U64>
 where
     C: Client + Sync + Send,
 {
@@ -68,7 +71,7 @@ where
 }
 
 /// Returns the chain ID used for signing replay-protected transactions.
-pub async fn chain_id<C>(data: JsonRpcData<C>) -> JsonRpcResult<et::U64>
+pub async fn chain_id<C>(data: JsonRpcData<C>, _params: Params<()>) -> JsonRpcResult<et::U64>
 where
     C: Client + Sync + Send,
 {
@@ -77,7 +80,7 @@ where
 }
 
 /// The current FVM network version.
-pub async fn protocol_version<C>(data: JsonRpcData<C>) -> JsonRpcResult<String>
+pub async fn protocol_version<C>(data: JsonRpcData<C>, _params: Params<()>) -> JsonRpcResult<String>
 where
     C: Client + Sync + Send,
 {
@@ -88,7 +91,10 @@ where
 
 /// Returns a fee per gas that is an estimate of how much you can pay as a
 /// priority fee, or 'tip', to get a transaction included in the current block.
-pub async fn max_priority_fee_per_gas<C>(data: JsonRpcData<C>) -> JsonRpcResult<et::U256>
+pub async fn max_priority_fee_per_gas<C>(
+    data: JsonRpcData<C>,
+    _params: Params<()>,
+) -> JsonRpcResult<et::U256>
 where
     C: Client + Sync + Send,
 {
@@ -304,7 +310,7 @@ where
 }
 
 /// Returns the current price per gas in wei.
-pub async fn gas_price<C>(data: JsonRpcData<C>) -> JsonRpcResult<et::U256>
+pub async fn gas_price<C>(data: JsonRpcData<C>, _params: Params<()>) -> JsonRpcResult<et::U256>
 where
     C: Client + Sync + Send,
 {
@@ -847,7 +853,10 @@ where
 }
 
 /// Returns an object with data about the sync status or false.
-pub async fn syncing<C>(data: JsonRpcData<C>) -> JsonRpcResult<et::SyncingStatus>
+pub async fn syncing<C>(
+    data: JsonRpcData<C>,
+    _params: Params<()>,
+) -> JsonRpcResult<et::SyncingStatus>
 where
     C: Client + Sync + Send,
 {
@@ -1030,7 +1039,10 @@ where
 
 /// Creates a filter in the node, to notify when a new block arrives.
 /// To check if the state has changed, call eth_getFilterChanges.
-pub async fn new_block_filter<C>(data: JsonRpcData<C>) -> JsonRpcResult<FilterId>
+pub async fn new_block_filter<C>(
+    data: JsonRpcData<C>,
+    _params: Params<()>,
+) -> JsonRpcResult<FilterId>
 where
     C: Client + SubscriptionClient + Clone + Sync + Send + 'static,
 {
@@ -1043,7 +1055,10 @@ where
 
 /// Creates a filter in the node, to notify when new pending transactions arrive.
 /// To check if the state has changed, call eth_getFilterChanges.
-pub async fn new_pending_transaction_filter<C>(data: JsonRpcData<C>) -> JsonRpcResult<FilterId>
+pub async fn new_pending_transaction_filter<C>(
+    data: JsonRpcData<C>,
+    _params: Params<()>,
+) -> JsonRpcResult<FilterId>
 where
     C: Client + SubscriptionClient + Clone + Sync + Send + 'static,
 {

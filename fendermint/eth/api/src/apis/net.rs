@@ -5,6 +5,7 @@ use anyhow::Context;
 use ethers_core::types as et;
 use fendermint_rpc::query::QueryClient;
 use fendermint_vm_message::query::FvmQueryHeight;
+use jsonrpc_v2::Params;
 use tendermint_rpc::endpoint::net_info;
 use tendermint_rpc::Client;
 
@@ -13,7 +14,7 @@ use crate::{JsonRpcData, JsonRpcResult};
 /// The current FVM network version.
 ///
 /// Same as eth_protocolVersion
-pub async fn version<C>(data: JsonRpcData<C>) -> JsonRpcResult<String>
+pub async fn version<C>(data: JsonRpcData<C>, _params: Params<()>) -> JsonRpcResult<String>
 where
     C: Client + Sync + Send,
 {
@@ -23,7 +24,7 @@ where
 }
 
 /// Returns true if client is actively listening for network connections.
-pub async fn listening<C>(data: JsonRpcData<C>) -> JsonRpcResult<bool>
+pub async fn listening<C>(data: JsonRpcData<C>, _params: Params<()>) -> JsonRpcResult<bool>
 where
     C: Client + Sync + Send,
 {
@@ -37,7 +38,7 @@ where
 }
 
 /// Returns true if client is actively listening for network connections.
-pub async fn peer_count<C>(data: JsonRpcData<C>) -> JsonRpcResult<et::U64>
+pub async fn peer_count<C>(data: JsonRpcData<C>, _params: Params<()>) -> JsonRpcResult<et::U64>
 where
     C: Client + Sync + Send,
 {
