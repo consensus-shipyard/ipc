@@ -34,20 +34,14 @@ cmd! {
 
 /// Run the Ethereum API facade.
 async fn run(settings: EthSettings, client: HybridClient) -> anyhow::Result<()> {
-    // Prometheus metrics
-    let metrics_registry = if settings.metrics.enabled {
+    if settings.metrics.enabled {
+        info!("metrics enabled");
+
         let registry = prometheus::Registry::new();
 
         fendermint_app::metrics::register_eth_metrics(&registry)
             .context("failed to register metrics")?;
 
-        Some(registry)
-    } else {
-        None
-    };
-
-    // Start the metrics on a background thread.
-    if let Some(registry) = metrics_registry {
         info!(
             listen_addr = settings.metrics.listen.to_string(),
             "serving metrics"
