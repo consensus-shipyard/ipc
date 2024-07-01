@@ -5,9 +5,10 @@
 // and https://ethereum.github.io/execution-apis/api-documentation/
 
 use crate::HybridClient;
-use jsonrpc_v2::{MapRouter, ServerBuilder};
+use jsonrpc_v2::{Factory, MapRouter, ServerBuilder};
 use lazy_static::lazy_static;
 use prometheus::{register_histogram_vec, HistogramVec};
+use std::marker::PhantomData;
 
 mod eth;
 mod net;
@@ -24,17 +25,32 @@ lazy_static! {
 }
 
 /// Middleware to record handler latencies as Prometheus metrics, labelled with the JSON-RPC method name.
-macro_rules! wrap_with_latency {
-    ($handler:path, $method_name:expr) => {
-        |data, params| async move {
-            let timer = RPC_METHOD_CALL_LATENCY_SECONDS
-                .with_label_values(&[$method_name])
-                .start_timer();
-            let result = $handler(data, params).await;
-            timer.observe_duration();
-            result
+pub struct Timer<S, E, T, F: Factory<S, E, T>> {
+    pub factory: F,
+    ph: PhantomData<(S, E, T)>,
+}
+
+impl<S, E, T, F: Factory<S, E, T>> Timer<S, E, T, F> {
+    pub fn new(f: F) -> Self {
+        Self {
+            factory: f,
+            ph: Default::default(),
         }
-    };
+    }
+}
+
+#[async_trait::async_trait]
+impl<S: Sync, E: Sync, T: Sync + Send, F: Factory<S, E, T> + Sync> Factory<S, E, T>
+    for Timer<S, E, T, F>
+{
+    async fn call(&self, param: T) -> Result<S, E> {
+        let timer = RPC_METHOD_CALL_LATENCY_SECONDS
+            .with_label_values(&[stringify!([< $module _ $method >])])
+            .start_timer();
+        let result = self.factory.call(param).await;
+        timer.observe_duration();
+        result
+    }
 }
 
 macro_rules! with_methods {
@@ -43,7 +59,7 @@ macro_rules! with_methods {
            $server
                $(.with_method(
                    stringify!([<$module _ $method_name>]),
-                   wrap_with_latency!($module::[< $method_name:snake >]::<HybridClient>, stringify!([<$module _ $method_name>]))
+                   Timer::new($module::[< $method_name:snake >]::<HybridClient>),
                ))*
        }
    };
