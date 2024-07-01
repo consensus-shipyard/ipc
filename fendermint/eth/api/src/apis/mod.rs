@@ -5,13 +5,56 @@
 // and https://ethereum.github.io/execution-apis/api-documentation/
 
 use crate::HybridClient;
-use jsonrpc_v2::{MapRouter, ServerBuilder};
+use jsonrpc_v2::{Factory, MapRouter, ServerBuilder};
 use lazy_static::lazy_static;
 use prometheus::{register_histogram_vec, HistogramVec};
+use std::marker::PhantomData;
 
 mod eth;
 mod net;
 mod web3;
+
+pub struct Timer<S, E, T, F: Factory<S, E, T>> {
+    pub factory: F,
+    ph: PhantomData<(S, E, T)>,
+}
+
+impl<S, E, T, F: Factory<S, E, T>> Timer<S, E, T, F> {
+    pub fn new(f: F) -> Self {
+        Self {
+            factory: f,
+            ph: Default::default(),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl<S: Sync, E: Sync, T: Sync + Send, F: Factory<S, E, T> + Sync> Factory<S, E, T>
+    for Timer<S, E, T, F>
+{
+    async fn call(&self, param: T) -> Result<S, E> {
+        let timer = RPC_METHOD_CALL_LATENCY_SECONDS
+            .with_label_values(&[stringify!([< $module _ $method >])])
+            .start_timer();
+        let result = self.factory.call(param).await;
+        timer.observe_duration();
+        result
+    }
+}
+
+macro_rules! with_methods_timer {
+    ($server:ident, $module:ident, { $($method:ident),* }) => {
+        paste::paste! {
+            $server
+                $(
+                    .with_method(
+                        stringify!([< $module _ $method >]),
+                        Timer::new($module::[< $method:snake >]::<HybridClient>)
+                    )
+                )*
+        }
+    };
+}
 
 // TODO - move this to a more appropriate place - perhaps in the metrics module?
 lazy_static! {
@@ -92,9 +135,13 @@ pub fn register_methods(server: ServerBuilder<MapRouter>) -> ServerBuilder<MapRo
         // eth_submitWork
     */
 
-    let server = with_methods_one_arg!(server, eth, {
+    let server = with_methods_timer!(server, eth, {
         accounts,
         blockNumber,
+        call
+    });
+
+    let server = with_methods_one_arg!(server, eth, {
         chainId,
         maxPriorityFeePerGas,
         gasPrice,
@@ -105,7 +152,6 @@ pub fn register_methods(server: ServerBuilder<MapRouter>) -> ServerBuilder<MapRo
     });
 
     let server = with_methods_two_args!(server, eth, {
-        call,
         estimateGas,
         feeHistory,
         getBalance,
