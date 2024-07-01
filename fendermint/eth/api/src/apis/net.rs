@@ -5,7 +5,6 @@ use anyhow::Context;
 use ethers_core::types as et;
 use fendermint_rpc::query::QueryClient;
 use fendermint_vm_message::query::FvmQueryHeight;
-use jsonrpc_v2::Params;
 use tendermint_rpc::endpoint::net_info;
 use tendermint_rpc::Client;
 
