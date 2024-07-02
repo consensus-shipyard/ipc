@@ -96,7 +96,11 @@ impl serde_with::SerializeAs<Vec<u8>> for HumanReadable {
     where
         S: Serializer,
     {
-        hex::encode(source).serialize(serializer)
+        if serializer.is_human_readable() {
+            hex::encode(source).serialize(serializer)
+        } else {
+            source.serialize(serializer)
+        }
     }
 }
 

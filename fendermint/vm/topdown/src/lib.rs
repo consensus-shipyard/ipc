@@ -14,6 +14,7 @@ pub mod voting;
 use async_stm::Stm;
 use async_trait::async_trait;
 use ethers::utils::hex;
+use fendermint_vm_message::ipc::SealedTopdownProposal;
 use fvm_shared::clock::ChainEpoch;
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
@@ -161,6 +162,19 @@ pub trait ParentFinalityProvider: ParentViewProvider {
     fn set_new_finality(
         &self,
         finality: IPCParentFinality,
+        previous_finality: Option<IPCParentFinality>,
+    ) -> Stm<()>;
+}
+
+pub trait ParentFinalityProviderV2: ParentViewProvider {
+    /// Latest proposal for parent finality
+    fn sealed_proposal_at_height(&self, height: BlockHeight) -> Stm<Option<SealedTopdownProposal>>;
+    /// Check if the target proposal is valid
+    fn check_sealed_proposal(&self, proposal: &SealedTopdownProposal) -> Stm<bool>;
+    /// Called when finality is committed
+    fn set_new_sealed_finality(
+        &self,
+        finality: SealedTopdownProposal,
         previous_finality: Option<IPCParentFinality>,
     ) -> Stm<()>;
 }

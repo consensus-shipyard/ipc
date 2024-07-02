@@ -6,9 +6,10 @@ use crate::finality::ParentViewPayload;
 use crate::proxy::ParentQueryProxy;
 use crate::{
     handle_null_round, BlockHash, BlockHeight, Config, Error, IPCParentFinality,
-    ParentFinalityProvider, ParentViewProvider,
+    ParentFinalityProvider, ParentFinalityProviderV2, ParentViewProvider,
 };
 use async_stm::{Stm, StmResult};
+use fendermint_vm_message::ipc::SealedTopdownProposal;
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
 use std::sync::Arc;
@@ -125,6 +126,27 @@ impl<T: ParentQueryProxy + Send + Sync + 'static> ParentFinalityProvider
         previous_finality: Option<IPCParentFinality>,
     ) -> Stm<()> {
         self.inner.set_new_finality(finality, previous_finality)
+    }
+}
+
+impl<T: ParentQueryProxy + Send + Sync + 'static> ParentFinalityProviderV2
+    for CachedFinalityProvider<T>
+{
+    fn sealed_proposal_at_height(&self, height: BlockHeight) -> Stm<Option<SealedTopdownProposal>> {
+        self.inner.sealed_proposal_at_height(height)
+    }
+
+    fn check_sealed_proposal(&self, proposal: &SealedTopdownProposal) -> Stm<bool> {
+        self.inner.check_sealed_proposal(proposal)
+    }
+
+    fn set_new_sealed_finality(
+        &self,
+        finality: SealedTopdownProposal,
+        previous_finality: Option<IPCParentFinality>,
+    ) -> Stm<()> {
+        self.inner
+            .set_new_sealed_finality(finality, previous_finality)
     }
 }
 

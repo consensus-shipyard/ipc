@@ -3,7 +3,6 @@
 use fnv::FnvHasher;
 use fvm_shared::address::Address;
 use lazy_static::lazy_static;
-use serde_tuple::{Deserialize_tuple, Serialize_tuple};
 use std::fmt;
 use std::fmt::Write;
 use std::hash::{Hash, Hasher};
@@ -22,7 +21,7 @@ pub const MAX_CHAIN_ID: u64 = 4503599627370476;
 /// It is composed of the chainID of the root network, and the address of
 /// all the subnet actors from the root to the corresponding level in the
 /// hierarchy where the subnet is spawned.
-#[derive(PartialEq, Eq, Hash, Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug, Serialize, Deserialize)]
 pub struct SubnetID {
     root: u64,
     children: Vec<Address>,

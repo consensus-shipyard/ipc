@@ -48,7 +48,13 @@ mod arb {
 
 #[cfg(test)]
 mod tests {
-    use crate::chain::ChainMessage;
+    use crate::chain::{ChainMessage, IpcMessage};
+    use fvm_shared::econ::TokenAmount;
+    use std::str::FromStr;
+
+    use crate::ipc::SealedTopdownProposal;
+    use ipc_api::address::IPCAddress;
+    use ipc_api::cross::{IpcEnvelope, IpcMsgKind};
     use quickcheck_macros::quickcheck;
 
     #[quickcheck]
@@ -58,5 +64,33 @@ mod tests {
             fvm_ipld_encoding::from_slice(repr.as_ref()).expect("failed to decode");
 
         assert_eq!(value1, value0)
+    }
+
+    #[test]
+    fn test_sealed_finality() {
+        let sealed = SealedTopdownProposal::new(
+            1735339,
+            vec![
+                29, 242, 28, 50, 92, 203, 187, 118, 19, 5, 6, 41, 177, 77, 62, 21, 170, 251, 221,
+                205, 233, 83, 29, 92, 217, 175, 241, 171, 167, 249, 52, 66,
+            ],
+            vec![IpcEnvelope {
+                kind: IpcMsgKind::Transfer,
+                to: IPCAddress::from_str("/r314159:f410filqucpvo75uywfpmakbpnrileto6powcfxi2wea")
+                    .unwrap(),
+                value: TokenAmount::from_whole(1),
+                from: IPCAddress::from_str("/r314159:f410fdj4tqxvnb2dt7ygeihadiy3nh3pxafgm42mxxjy")
+                    .unwrap(),
+                message: vec![],
+                nonce: 0,
+            }],
+            vec![],
+        );
+
+        let msg = ChainMessage::Ipc(IpcMessage::TopDownExecV2(sealed));
+        let bytes = fvm_ipld_encoding::to_vec(&msg).unwrap();
+        let m = fvm_ipld_encoding::from_slice::<ChainMessage>(&bytes).unwrap();
+
+        assert_eq!(m, msg);
     }
 }
