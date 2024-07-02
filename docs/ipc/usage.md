@@ -80,7 +80,7 @@ imported wallet with address "0x406a7a1d002b71ece175cc7e067620ae5b58e9ec"
 As a sanity-check that we have joined the subnet successfully and that the subnet has been registered in IPC successfully can be performed through:
 
 ```bash
-./bin/ipc-cli subnet list --subnet=<PARENT_SUBBNET_ID>
+./bin/ipc-cli subnet list --subnet=<PARENT_SUBNET_ID>
 ```
 ```console
 # Example execution
@@ -118,7 +118,7 @@ $ ./bin/ipc-cli subnet stake --subnet=/r314159/t410fh4ywg4wvxcjzz4vsja3uh4f53joh
 > ```
 
 ## Listing your balance in a subnet
-In order to send messages in a subnet, you'll need to have funds in your subnt account. You can use the following command to list the balance of your wallets in a subnet:
+In order to send messages in a subnet, you'll need to have funds in your subnet account. You can use the following command to list the balance of your wallets in a subnet:
 ```bash
 ./bin/ipc-cli wallet balances --wallet-type evm --subnet <subnet-id>
 ```
@@ -197,7 +197,7 @@ $ ./bin/ipc-cli cross-msg pre-fund --subnet=/r31415926/t4xwzbdu7z5sam6hc57xxwkct
 ```
 
 ### Release
-In order to release funds from a subnet, your account must hold enough funds inside it. Releasing funds to the parent subnet can be permformed with the following commnd:
+In order to release funds from a subnet, your account must hold enough funds inside it. Releasing funds to the parent subnet can be performed with the following command:
 ```bash
 ./bin/ipc-cli cross-msg release --subnet <subnet-id> [--from <from-addr>] [--to <to-addr>] <amount>
 ```
