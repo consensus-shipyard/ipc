@@ -19,7 +19,7 @@ macro_rules! metrics {
         };
     }
 
-/// Metrics emitted by fendermint.
+/// Metrics emitted by endermint.
 pub mod app {
     use lazy_static::lazy_static;
     use paste::paste;
@@ -48,14 +48,25 @@ pub mod app {
 
 /// Metrics emitted by the Ethereum API facade.
 pub mod eth {
-    // TODO: Define Ethereum metrics and events.
+    use fendermint_eth_api::apis::RPC_METHOD_CALL_LATENCY_SECONDS;
+
+    pub fn register_metrics(registry: &prometheus::Registry) -> anyhow::Result<()> {
+        registry.register(Box::new(RPC_METHOD_CALL_LATENCY_SECONDS.clone()))?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     #[test]
-    fn can_register_metrics() {
+    fn can_register_app_metrics() {
         let r = prometheus::Registry::new();
         super::app::register_metrics(&r).unwrap();
+    }
+
+    #[test]
+    fn can_register_eth_metrics() {
+        let r = prometheus::Registry::new();
+        super::eth::register_metrics(&r).unwrap();
     }
 }
