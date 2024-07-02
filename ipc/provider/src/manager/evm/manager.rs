@@ -573,7 +573,7 @@ impl SubnetManager for EthSubnetManager {
         from: Address,
         amount: TokenAmount,
     ) -> Result<ChainEpoch> {
-        log::debug!("approve token, subnet: {subnet}, amount: {amount}, from: {from}");
+        tracing::debug!("approve token, subnet: {subnet}, amount: {amount}, from: {from}");
 
         let value = fil_amount_to_eth_amount(&amount)?;
 
