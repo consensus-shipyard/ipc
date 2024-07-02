@@ -26,7 +26,7 @@ lazy_static! {
 
 /// Middleware to record handler latencies as Prometheus metrics, labelled with the JSON-RPC method name.
 pub struct Timer<S, E, T, F: Factory<S, E, T>> {
-    pub factory: F,
+    factory: F,
     ph: PhantomData<(S, E, T)>,
 }
 
