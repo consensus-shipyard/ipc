@@ -14,6 +14,7 @@ use fendermint_vm_genesis::{
     ipc, Account, Actor, ActorMeta, Collateral, Genesis, Multisig, PermissionMode, SignerAddr,
     Validator, ValidatorKey,
 };
+use fendermint_vm_interpreter::genesis::GenesisCreator;
 
 use crate::cmd;
 use crate::options::genesis::*;
@@ -93,6 +94,8 @@ cmd! {
             set_ipc_gateway(&genesis_file, args),
         GenesisIpcCommands::FromParent(args) =>
             new_genesis_from_parent(&genesis_file, args).await,
+        GenesisIpcCommands::SealState(args) =>
+            seal_state(&genesis_file, args).await,
     }
   }
 }
@@ -212,7 +215,7 @@ fn set_eam_permissions(
 
 fn into_tendermint(genesis_file: &PathBuf, args: &GenesisIntoTendermintArgs) -> anyhow::Result<()> {
     let genesis = read_genesis(genesis_file)?;
-    let genesis_json = serde_json::to_value(&genesis)?;
+    let app_state = hex::encode(std::fs::read(&args.sealed)?);
 
     let chain_id: u64 = chainid::from_str_hashed(&genesis.chain_name)?.into();
     let chain_id = chain_id.to_string();
@@ -247,7 +250,7 @@ fn into_tendermint(genesis_file: &PathBuf, args: &GenesisIntoTendermintArgs) -> 
         // Hopefully leaving this empty will skip validation,
         // otherwise we have to run the genesis in memory here and now.
         app_hash: tendermint::AppHash::default(),
-        app_state: genesis_json,
+        app_state: serde_json::Value::String(app_state),
     };
     let tmg_json = serde_json::to_string_pretty(&tmg)?;
     std::fs::write(&args.out, tmg_json)?;
@@ -277,6 +280,19 @@ fn set_ipc_gateway(genesis_file: &PathBuf, args: &GenesisIpcGatewayArgs) -> anyh
 
         Ok(genesis)
     })
+}
+
+async fn seal_state(genesis_file: &PathBuf, args: &SealGenesisArgs) -> anyhow::Result<()> {
+    let genesis = read_genesis(genesis_file)?;
+
+    let genesis_creator = GenesisCreator::new(
+        args.builtin_actors_path.clone(),
+        args.custom_actors_path.clone(),
+        args.artifacts_path.clone(),
+        args.output_path.clone(),
+    );
+
+    genesis_creator.create(genesis).await
 }
 
 async fn new_genesis_from_parent(

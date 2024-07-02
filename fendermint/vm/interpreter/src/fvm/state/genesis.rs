@@ -177,6 +177,17 @@ where
         }
     }
 
+    /// Flush the data to the block store. Returns the state root cid and the underlying state store.
+    pub fn finalize(self) -> anyhow::Result<(Cid, DB)> {
+        match self.stage {
+            Stage::Tree(_) => Err(anyhow!("invalid finalize state")),
+            Stage::Exec(exec_state) => match exec_state.commit()? {
+                (_, _, true) => bail!("FVM parameters are not expected to be updated in genesis"),
+                (cid, _, _) => Ok((cid, self.store)),
+            },
+        }
+    }
+
     /// Replaces the built in actor with custom actor. This assumes the system actor is already
     /// created, else it would throw an error.
     pub fn replace_builtin_actor(

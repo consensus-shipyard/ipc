@@ -44,6 +44,7 @@ fendermint_vm_core = { path = "../../vm/core" }
 fendermint_vm_genesis = { path = "../../vm/genesis" }
 fendermint_vm_encoding = { path = "../../vm/encoding" }
 fendermint_vm_message = { path = "../../vm/message" }
+fendermint_vm_interpreter = { path = "../../vm/interpreter" }
 fendermint_testing = { path = "..", optional = true }
 
 
