@@ -29,6 +29,7 @@ pub use crate::toggle::Toggle;
 pub type BlockHeight = u64;
 pub type Bytes = Vec<u8>;
 pub type BlockHash = Bytes;
+pub type Nonce = u64;
 
 /// The null round error message
 pub(crate) const NULL_ROUND_ERR_MSG: &str = "requested epoch was a null round";

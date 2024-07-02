@@ -36,6 +36,12 @@ pub trait ParentQueryProxy {
         &self,
         height: BlockHeight,
     ) -> anyhow::Result<TopDownQueryPayload<Vec<StakingChangeRequest>>>;
+
+    /// Get the top down message nonce at the target block
+    async fn get_top_down_nonce(
+        &self,
+        block_hash: &[u8],
+    ) -> anyhow::Result<TopDownQueryPayload<u64>>;
 }
 
 /// The proxy to the subnet's parent
@@ -114,5 +120,14 @@ impl ParentQueryProxy for IPCProviderProxy {
                     .sort_by(|a, b| a.configuration_number.cmp(&b.configuration_number));
                 v
             })
+    }
+
+    async fn get_top_down_nonce(
+        &self,
+        block_hash: &[u8],
+    ) -> anyhow::Result<TopDownQueryPayload<u64>> {
+        self.ipc_provider
+            .get_top_down_nonce(&self.child_subnet, block_hash)
+            .await
     }
 }

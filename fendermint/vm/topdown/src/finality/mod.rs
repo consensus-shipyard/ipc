@@ -88,6 +88,16 @@ mod tests {
                 block_hash: vec![],
             })
         }
+
+        async fn get_top_down_nonce(
+            &self,
+            block_hash: &[u8],
+        ) -> anyhow::Result<TopDownQueryPayload<u64>> {
+            Ok(TopDownQueryPayload {
+                value: 0,
+                block_hash: block_hash.to_vec(),
+            })
+        }
     }
 
     fn mocked_agent_proxy() -> Arc<MockedParentQuery> {

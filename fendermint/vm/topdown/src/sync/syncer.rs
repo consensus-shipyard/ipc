@@ -7,7 +7,7 @@ use crate::proxy::ParentQueryProxy;
 use crate::sync::{query_starting_finality, ParentFinalityStateQuery};
 use crate::voting::{self, VoteTally};
 use crate::{
-    is_null_round_str, BlockHash, BlockHeight, CachedFinalityProvider, Config, Error, Toggle,
+    is_null_round_str, BlockHash, BlockHeight, CachedFinalityProvider, Config, Error, Nonce, Toggle,
 };
 use anyhow::anyhow;
 use async_stm::{atomically, atomically_or_err, StmError};
@@ -89,14 +89,19 @@ where
             return Ok(());
         }
 
+        let mut parent_block_nonce = None;
         loop {
             if self.exceed_cache_size_limit().await {
                 tracing::debug!("exceeded cache size limit");
                 break;
             }
 
-            first_non_null_parent_hash = match self
-                .poll_next(latest_height_fetched + 1, first_non_null_parent_hash)
+            (first_non_null_parent_hash, parent_block_nonce) = match self
+                .poll_next(
+                    latest_height_fetched + 1,
+                    first_non_null_parent_hash,
+                    parent_block_nonce,
+                )
                 .await
             {
                 Ok(h) => h,
@@ -179,7 +184,8 @@ where
         &mut self,
         height: BlockHeight,
         parent_block_hash: BlockHash,
-    ) -> Result<BlockHash, Error> {
+        parent_block_nonce: Option<Nonce>,
+    ) -> Result<(BlockHash, Option<Nonce>), Error> {
         tracing::debug!(
             height,
             parent_block_hash = hex::encode(&parent_block_hash),
@@ -215,7 +221,7 @@ where
 
                     // Null block received, no block hash for the current height being polled.
                     // Return the previous parent hash as the non-null block hash.
-                    return Ok(parent_block_hash);
+                    return Ok((parent_block_hash, None));
                 }
                 return Err(Error::CannotQueryParent(
                     format!("get_block_hash: {e}"),
@@ -235,6 +241,14 @@ where
         }
 
         let data = self.fetch_data(height, block_hash_res.block_hash).await?;
+        let nonce = self
+            .check_data(
+                height,
+                &data,
+                &block_hash_res.parent_block_hash,
+                parent_block_nonce,
+            )
+            .await?;
 
         tracing::debug!(
             height,
@@ -264,9 +278,68 @@ where
             num_validator_changes: data.1.len(),
         });
 
-        Ok(data.0)
+        Ok((data.0, Some(nonce)))
     }
 
+    #[instrument(skip(self))]
+    async fn check_data(
+        &self,
+        height: BlockHeight,
+        current_view: &ParentViewPayload,
+        parent_block_hash: &BlockHash,
+        parent_block_nonce: Option<Nonce>,
+    ) -> Result<Nonce, Error> {
+        let prev_nonce = if let Some(v) = parent_block_nonce {
+            v
+        } else {
+            self.top_down_nonce(parent_block_hash).await?
+        };
+        let curr_nonce = self.top_down_nonce(&current_view.0).await?;
+
+        tracing::debug!(
+            prev_block = hex::encode(parent_block_hash),
+            prev_nonce,
+            curr_block = hex::encode(&current_view.0),
+            curr_nonce,
+            "consecutive height nonces"
+        );
+
+        let num_msgs = curr_nonce - prev_nonce;
+        let msgs = &current_view.2;
+
+        tracing::debug!(
+            expected = num_msgs,
+            actual = msgs.len(),
+            "expected topdown messages"
+        );
+
+        if num_msgs != msgs.len() as u64 {
+            return Err(Error::TopDownMsgsLengthIncorrect(
+                height,
+                num_msgs,
+                current_view.2.len() as u64,
+            ));
+        }
+
+        Ok(curr_nonce)
+    }
+
+    #[inline]
+    async fn top_down_nonce(&self, block_hash: &[u8]) -> Result<u64, Error> {
+        Ok(self
+            .parent_proxy
+            .get_top_down_nonce(block_hash)
+            .await
+            .map_err(|e| {
+                Error::CannotQueryParentHash(
+                    format!("top down nonce: {e}"),
+                    hex::encode(block_hash),
+                )
+            })?
+            .value)
+    }
+
+    #[instrument(skip(self))]
     async fn fetch_data(
         &self,
         height: BlockHeight,
@@ -472,6 +545,16 @@ mod tests {
             Ok(TopDownQueryPayload {
                 value: vec![],
                 block_hash: self.blocks.get_value(height).cloned().unwrap().unwrap(),
+            })
+        }
+
+        async fn get_top_down_nonce(
+            &self,
+            block_hash: &[u8],
+        ) -> anyhow::Result<TopDownQueryPayload<u64>> {
+            Ok(TopDownQueryPayload {
+                value: 0,
+                block_hash: block_hash.to_vec(),
             })
         }
     }
