@@ -1,3 +1,8 @@
+---
+status: Implementing
+authors: @raulk
+---
+
 # Observability
 
 ## Model
@@ -6,10 +11,10 @@ Our mental model when designing our observability logic is as follows.
 
 ---
 ```
-💥 An **event** happens at runtime
-  ⇒ 📸 A trace object captures the fact, including key data about it
-    ⇒ ✍️ The trace gets journaled (if the journal is enabled)
-    ⇒ 📊 The trace is applied to mutate metrics
+💥 An **event** happens at runtime
+  ⇒ 📸 A trace object captures the fact, including key data about it
+    ⇒ ✍️ The trace gets journaled (if the journal is enabled)
+    ⇒ 📊 The trace is applied to mutate metrics
 ```
 ---
 
@@ -19,7 +24,7 @@ Once we capture the trace object (hopefully with negligible overhead), and we en
 - The metrics.
 
 | Done | Domain    | Subsystem     | Event                                                                                    | Trace                                                                                                                                                           | Metrics                                                                            |
-| ---- | --------- | ------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+|------|-----------|---------------|------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------|
 |      | Topdown   | Parent syncer | Parent RPC calls                                                                         | ParentRpcCalled{source, json-rpc method, status, latency}                                                                                                       | topdown_parent_rpc_call_total{source, method, status}++ (counter)                  |
 |      |           |               |                                                                                          |                                                                                                                                                                 | topdown_parent_rpc_call_latency_secs{source, method, status} ← latency (histogram) |
 |      | Topdown   | Parent syncer | Latest locally acquired parent finality                                                  | ~NewParentView~ already exists, rename to...ParentFinalityAcquired{source, is_null, block_height, block_hash, commitment_hash, num_msgs, num_validator_changes} | topdown_parent_finality_latest_acquired_height{source} = height (gauge)            |
