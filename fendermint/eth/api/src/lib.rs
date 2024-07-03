@@ -7,7 +7,7 @@ use fvm_shared::econ::TokenAmount;
 use jsonrpc_v2::Data;
 use std::{net::ToSocketAddrs, sync::Arc, time::Duration};
 
-mod apis;
+pub mod apis;
 mod cache;
 mod client;
 mod conv;
