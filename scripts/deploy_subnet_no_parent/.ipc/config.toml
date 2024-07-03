@@ -1,0 +1,21 @@
+keystore_path = "~/.ipc"
+
+# Filecoin Calibration
+[[subnets]]
+id = "/r314159"
+
+[subnets.config]
+network_type = "fevm"
+provider_http = "https://calibration.filfox.info/rpc/v1"
+gateway_addr = "0x0c9CA7cec711Cb3E8eE8833C8198fDE8F928ceeb"
+registry_addr = "0xF7f8109e02bb619EB2A0CFe480eCdD2357eFBfCa"
+
+# Local subnet
+[[subnets]]
+id = "/r314159/t410f726d2jv6uj4mpkcbgg5ndlpp3l7dd5rlcpgzkoi"
+
+[subnets.config]
+network_type = "fevm"
+provider_http = "http://127.0.0.1:8545"
+gateway_addr = "0x77aa40b105843728088c0132e43fc44348881da8"
+registry_addr = "0x74539671a1d2f1c8f200826baba665179f53a1b7"

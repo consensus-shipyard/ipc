@@ -2,12 +2,8 @@
 
 set -euo pipefail
 
-DASHES='------'
-if [[ ! -v IPC_FOLDER ]]; then
-    IPC_FOLDER=${HOME}/ipc
-else
-    IPC_FOLDER=${IPC_FOLDER}
-fi
+dir=$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")
+IPC_FOLDER="$dir"/../..
 IPC_CONFIG_FOLDER=${HOME}/.ipc
 
 CMT_P2P_HOST_PORTS=(26656 26756 26856)
@@ -21,45 +17,62 @@ IPFS_GATEWAY_HOST_PORTS=(8080 8081 8082)
 
 # Use "dummy" subnet
 subnet_id="/r314159/t410f726d2jv6uj4mpkcbgg5ndlpp3l7dd5rlcpgzkoi"
-echo "Use existing subnet id: $subnet_id"
 subnet_folder=$IPC_CONFIG_FOLDER/$(echo $subnet_id | sed 's|^/||;s|/|-|g')
 
-# Step 1: Restart validators
-# Step 1.1: Rebuild fendermint docker
-echo "$DASHES Rebuild fendermint docker"
-cd ${IPC_FOLDER}/fendermint
+# Rebuild fendermint docker
+cd "$IPC_FOLDER"/fendermint
 make clean
 make docker-build
 
-# Step 1.2: Start other validator node
-echo "$DASHES Restart validator nodes"
-cd ${IPC_FOLDER}
-for i in {0..2}
+# Restart validators
+cd "$IPC_FOLDER"
+bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
+    -e NODE_NAME=validator-0 \
+    -e PRIVATE_KEY_PATH="$IPC_CONFIG_FOLDER"/validator_0.sk \
+    -e SUBNET_ID="$subnet_id" \
+    -e CMT_P2P_HOST_PORT="${CMT_P2P_HOST_PORTS[0]}" \
+    -e CMT_RPC_HOST_PORT="${CMT_RPC_HOST_PORTS[0]}" \
+    -e ETHAPI_HOST_PORT="${ETHAPI_HOST_PORTS[0]}" \
+    -e RESOLVER_HOST_PORT="${RESOLVER_HOST_PORTS[0]}" \
+    -e OBJECTS_HOST_PORT="${OBJECTS_HOST_PORTS[0]}" \
+    -e IPFS_SWARM_HOST_PORT="${IPFS_SWARM_HOST_PORTS[0]}" \
+    -e IPFS_RPC_HOST_PORT="${IPFS_RPC_HOST_PORTS[0]}" \
+    -e IPFS_GATEWAY_HOST_PORT="${IPFS_GATEWAY_HOST_PORTS[0]}" \
+    -e IPFS_PROFILE="local-discovery" \
+    -e FM_PULL_SKIP=1 \
+    -e FM_LOG_LEVEL="info,fendermint=debug" \
+    child-validator-restart-no-parent 2>&1)
+echo "$bootstrap_output"
+bootstrap_node_id=$(echo "$bootstrap_output" | sed -n '/CometBFT node ID:/ {n;p;}' | tr -d "[:blank:]")
+bootstrap_peer_id=$(echo "$bootstrap_output" | sed -n '/IPLD Resolver Multiaddress:/ {n;p;}' | tr -d "[:blank:]" | sed 's/.*\/p2p\///')
+bootstrap_node_endpoint=${bootstrap_node_id}@validator-0-cometbft:${CMT_P2P_HOST_PORTS[0]}
+bootstrap_resolver_endpoint="/dns/validator-0-fendermint/tcp/${RESOLVER_HOST_PORTS[0]}/p2p/${bootstrap_peer_id}"
+for i in {1..2}
 do
   cargo make --makefile infra/fendermint/Makefile.toml \
-      -e NODE_NAME=validator-${i} \
-      -e PRIVATE_KEY_PATH=${IPC_CONFIG_FOLDER}/validator_${i}.sk \
-      -e SUBNET_ID=${subnet_id} \
-      -e CMT_P2P_HOST_PORT=${CMT_P2P_HOST_PORTS[i]} \
-      -e CMT_RPC_HOST_PORT=${CMT_RPC_HOST_PORTS[i]} \
-      -e ETHAPI_HOST_PORT=${ETHAPI_HOST_PORTS[i]} \
-      -e RESOLVER_HOST_PORT=${RESOLVER_HOST_PORTS[i]} \
-      -e OBJECTS_HOST_PORT=${OBJECTS_HOST_PORTS[i]} \
-      -e IPFS_SWARM_HOST_PORT=${IPFS_SWARM_HOST_PORTS[i]} \
-      -e IPFS_RPC_HOST_PORT=${IPFS_RPC_HOST_PORTS[i]} \
-      -e IPFS_GATEWAY_HOST_PORT=${IPFS_GATEWAY_HOST_PORTS[i]} \
+      -e NODE_NAME=validator-"$i" \
+      -e PRIVATE_KEY_PATH="$IPC_CONFIG_FOLDER"/validator_"$i".sk \
+      -e SUBNET_ID="$subnet_id" \
+      -e CMT_P2P_HOST_PORT="${CMT_P2P_HOST_PORTS[i]}" \
+      -e CMT_RPC_HOST_PORT="${CMT_RPC_HOST_PORTS[i]}" \
+      -e ETHAPI_HOST_PORT="${ETHAPI_HOST_PORTS[i]}" \
+      -e RESOLVER_HOST_PORT="${RESOLVER_HOST_PORTS[i]}" \
+      -e OBJECTS_HOST_PORT="${OBJECTS_HOST_PORTS[i]}" \
+      -e IPFS_SWARM_HOST_PORT="${IPFS_SWARM_HOST_PORTS[i]}" \
+      -e IPFS_RPC_HOST_PORT="${IPFS_RPC_HOST_PORTS[i]}" \
+      -e IPFS_GATEWAY_HOST_PORT="${IPFS_GATEWAY_HOST_PORTS[i]}" \
       -e IPFS_PROFILE="local-discovery" \
+      -e RESOLVER_BOOTSTRAPS="$bootstrap_resolver_endpoint" \
+      -e BOOTSTRAPS="$bootstrap_node_endpoint" \
       -e FM_PULL_SKIP=1 \
       -e FM_LOG_LEVEL="info,fendermint=debug" \
       child-validator-restart-no-parent
 done
 
-# Step 2: Test
-# Step 2.1: Test ETH API endpoint
-echo "$DASHES Test ETH API endpoints of validator nodes"
+# Test ETH API endpoint
 for i in {0..2}
 do
-  curl --location http://localhost:${ETHAPI_HOST_PORTS[i]} \
+  curl --location http://localhost:"${ETHAPI_HOST_PORTS[i]}" \
   --header 'Content-Type: application/json' \
   --data '{
     "jsonrpc":"2.0",
@@ -69,14 +82,13 @@ do
   }'
 done
 
-# Step 2.2: Test object API endpoint
-printf "\n$DASHES Test object API endpoints of validator nodes\n"
+# Test object API endpoint
 for i in {0..2}
 do
-  curl --location http://localhost:${OBJECTS_HOST_PORTS[i]}/health
+  curl --location http://localhost:"${OBJECTS_HOST_PORTS[i]}"/health
 done
 
-# Step 3: Print a summary of the deployment
+# Print a summary of the deployment
 cat << EOF
 ############################
 #                          #
@@ -85,6 +97,9 @@ cat << EOF
 ############################
 Subnet ID:
 $subnet_id
+
+Chain ID:
+$(curl -s --location --request POST http://localhost:"${ETHAPI_HOST_PORTS[0]}" --header 'Content-Type: application/json' --data-raw '{ "jsonrpc":"2.0", "method":"eth_chainId", "params":[], "id":1 }' | jq -r '.result' | xargs printf "%d")
 
 Object API:
 http://localhost:${OBJECTS_HOST_PORTS[0]}
@@ -101,20 +116,16 @@ http://localhost:${ETHAPI_HOST_PORTS[0]}
 http://localhost:${ETHAPI_HOST_PORTS[1]}
 http://localhost:${ETHAPI_HOST_PORTS[2]}
 
-Accounts:
-$(jq -r '.app_state.accounts[] | "\(.meta.Account.owner): \(.balance) coin units"' ${subnet_folder}/validator-0/genesis.json)
-
-Private keys (hex ready to import in MetaMask):
-$(cat ${IPC_CONFIG_FOLDER}/validator_0.sk | base64 -d | xxd -p -c 1000000)
-$(cat ${IPC_CONFIG_FOLDER}/validator_1.sk | base64 -d | xxd -p -c 1000000)
-$(cat ${IPC_CONFIG_FOLDER}/validator_2.sk | base64 -d | xxd -p -c 1000000)
-
-Chain ID:
-$(curl -s --location --request POST 'http://localhost:8645/' --header 'Content-Type: application/json' --data-raw '{ "jsonrpc":"2.0", "method":"eth_chainId", "params":[], "id":1 }' | jq -r '.result' | xargs printf "%d")
-
-Fendermint API:
-http://localhost:26658
-
 CometBFT API:
 http://localhost:${CMT_RPC_HOST_PORTS[0]}
+http://localhost:${CMT_RPC_HOST_PORTS[1]}
+http://localhost:${CMT_RPC_HOST_PORTS[2]}
+
+Accounts:
+$(jq -r '.app_state.accounts[] | "\(.meta.Account.owner): \(.balance) coin units"' "$subnet_folder"/validator-0/genesis.json)
+
+Private keys (hex ready to use with ADM SDK/CLI):
+$(jq .[0].private_key "$IPC_CONFIG_FOLDER"/evm_keystore.json | tr -d '"')
+$(jq .[1].private_key "$IPC_CONFIG_FOLDER"/evm_keystore.json | tr -d '"')
+$(jq .[2].private_key "$IPC_CONFIG_FOLDER"/evm_keystore.json | tr -d '"')
 EOF
