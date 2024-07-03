@@ -224,7 +224,7 @@ done
 pkill -f "relayer" || true
 # Start relayer
 echo "$DASHES Start relayer process (in the background)"
-nohup ipc-cli checkpoint relayer --subnet $subnet_id --submitter 0xA08aE9E8c038CAf9765D7Db725CA63a92FCf12Ce > nohup.out 2> nohup.err < /dev/null &
+nohup ipc-cli checkpoint relayer --subnet $subnet_id --submitter 0xA08aE9E8c038CAf9765D7Db725CA63a92FCf12Ce > relayer.log &
 
 # Step 7: Print a summary of the deployment
 cat << EOF
