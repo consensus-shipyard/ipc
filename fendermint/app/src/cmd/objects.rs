@@ -454,30 +454,21 @@ async fn handle_object_download<F: QueryClient + Send + Sync, I: IpfsApiAdapter>
 
     match maybe_object {
         Some(object) => {
-            let object_range = match object {
-                Object::Internal(_) => {
-                    return Err(Rejection::from(BadRequest {
-                        message: "internal objects are not supported".to_string(),
-                    }))
-                }
-                Object::External((buf, resolved)) => {
-                    let cid = Cid::try_from(buf.0).map_err(|e| {
-                        Rejection::from(BadRequest {
-                            message: format!("failed to decode cid: {}", e),
-                        })
-                    })?;
-                    if !resolved {
-                        return Err(Rejection::from(BadRequest {
-                            message: "object is not resolved".to_string(),
-                        }));
-                    }
-                    ipfs.get_object(range, cid).await.map_err(|e| {
-                        Rejection::from(BadRequest {
-                            message: format!("failed to fetch detached object {}", e),
-                        })
-                    })?
-                }
-            };
+            let cid = Cid::try_from(object.cid.0).map_err(|e| {
+                Rejection::from(BadRequest {
+                    message: format!("failed to decode cid: {}", e),
+                })
+            })?;
+            if !object.resolved {
+                return Err(Rejection::from(BadRequest {
+                    message: "object is not resolved".to_string(),
+                }));
+            }
+            let object_range = ipfs.get_object(range, cid).await.map_err(|e| {
+                Rejection::from(BadRequest {
+                    message: format!("failed to fetch object {}", e),
+                })
+            })?;
 
             // If it is a HEAD request, we don't need to send the body
             // but we still need to send the Content-Length header
@@ -582,11 +573,13 @@ async fn os_get<F: QueryClient + Send + Sync>(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
     use cid::multihash::{Code, MultihashDigest};
     use ethers::core::k256::ecdsa::SigningKey;
     use ethers::core::rand::{rngs::StdRng, SeedableRng};
-    use fendermint_actor_objectstore::{AddParams, ObjectKind};
+    use fendermint_actor_objectstore::AddParams;
     use fendermint_rpc::FendermintClient;
     use fendermint_vm_message::conv::from_eth::to_fvm_address;
     use fvm_ipld_encoding::RawBytes;
@@ -667,7 +660,7 @@ mod tests {
              "info": "",
              "index": "0",
              "key": "",
-             "value": "mIUSGDIYoRhoGEUYeBh0GGUYchhuGGEYbBiCGFgYJAEYcBIYIA0YmQ4AGGsYaRhIGEIYvxjzDxhbGKUYQxjTGCAYVxiHGL0Y6xg0GHIY8hgwGM8Y3RgYGF0YVRi2GPIYphj1GDAYyxiSGGQYOhhLCgcYbRhlGHMYcxhhGGcYZRINCgQYZhhyGG8YbRIDGHQYMBgwGBgBEhgxCgIYdBhvEhgpGHQYMhhtGG4YZBg1GGoYaxh1GHYYbRhzGGEYZhg0GDUYNxh5GG0YcBhuGGYYMxhtGG8YbhhhGGwYaBgzGHYYbxh0GGgYZBhkGDUYbhhqGG8YeRgYAQ==",
+             "value": "mJoSGEcYoxhjGGMYaRhkGFgYJAEYcBIYIBiRGMEYgBjyGIEYohiGGB8YKRgdGDoYSRj4GOIYSgIYzhh/GNgY/RiPGFwYcRi5GNYY1BEYZhhFGFoCGMwYaBhyGGUYcxhvGGwYdhhlGGQY9RhoGG0YZRh0GGEYZBhhGHQYYRihGGUYXxhzGGkYehhlGGEYNhgwGNAYwRhtGDoYSwoHGG0YZRhzGHMYYRhnGGUSDQoEGGYYchhvGG0SAxh0GDAYMBgYARIYMQoCGHQYbxIYKRh0GDIYcBhjGDQYahhpGGIYbxhiGDMYdhhzGHQYMxh2GHAYchg1GDYYaBhuGDIYaRhpGGYYZhhlGGwYdhhsGHkYbRhoGHYYZBh5GGMYeRhoGGEYGAE=",
              "proof": null,
              "height": "6017",
              "codespace": ""
@@ -743,7 +736,8 @@ mod tests {
         let object_cid = Cid::new_v1(fvm_ipld_encoding::IPLD_RAW, digest);
         let params = AddParams {
             key: key.to_vec(),
-            kind: ObjectKind::External(object_cid),
+            cid: object_cid,
+            metadata: HashMap::new(),
             overwrite: true,
         };
         let params = RawBytes::serialize(params).unwrap();
@@ -759,7 +753,7 @@ mod tests {
             to,
             sequence: 0,
             value: TokenAmount::from_atto(0),
-            method_num: fendermint_actor_objectstore::Method::PutObject as u64,
+            method_num: fendermint_actor_objectstore::Method::AddObject as u64,
             params,
             gas_limit: 3000000,
             gas_fee_cap: TokenAmount::from_atto(0),

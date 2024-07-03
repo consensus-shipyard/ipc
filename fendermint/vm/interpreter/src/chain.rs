@@ -761,10 +761,7 @@ where
             .map_err(|e| anyhow!("error parsing as Option<Object>: {e}"))?;
 
     Ok(match object {
-        Some(object) => match object {
-            fendermint_actor_objectstore::Object::External((_, resolved)) => resolved,
-            fendermint_actor_objectstore::Object::Internal(_) => true, // cannot happen
-        },
+        Some(object) => object.resolved,
         None => {
             // The object was deleted before it was resolved.
             // We can return true here because the objectstore actor will ignore the final implicit
