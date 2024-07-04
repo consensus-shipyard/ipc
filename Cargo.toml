@@ -33,7 +33,7 @@ members = [
   "fendermint/tracing",
   "fendermint/vm/*",
   "fendermint/actors",
-  "fendermint/actors/chainmetadata",
+  "fendermint/actors/chainmetadata", "fendermint/ipc-metrics",
 ]
 
 [workspace.package]

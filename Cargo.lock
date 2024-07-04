@@ -2886,6 +2886,7 @@ dependencies = [
  "fvm_shared",
  "hex",
  "ipc-api",
+ "ipc-metrics",
  "ipc-provider",
  "ipc_ipld_resolver",
  "k256 0.11.6",
@@ -5043,6 +5044,15 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "zeroize",
+]
+
+[[package]]
+name = "ipc-metrics"
+version = "0.1.0"
+dependencies = [
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
 ]
 
 [[package]]
