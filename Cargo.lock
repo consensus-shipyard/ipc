@@ -3040,6 +3040,7 @@ dependencies = [
  "lazy_static",
  "lru_time_cache",
  "paste",
+ "prometheus",
  "quickcheck",
  "quickcheck_macros",
  "rand",

@@ -213,7 +213,7 @@ resource_name!(CliName: Testnet);
 
 impl TestnetName {
     pub fn new<T: Into<TestnetId>>(id: T) -> Self {
-        // Not including a leadign slash (ie. "/testnets") so that we can join with directory paths.
+        // Not including a leading slash (ie. "/testnets") so that we can join with directory paths.
         Self(ResourceName::from("testnets").join_id(&id.into()))
     }
 
