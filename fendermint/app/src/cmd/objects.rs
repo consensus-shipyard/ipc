@@ -660,7 +660,7 @@ mod tests {
              "info": "",
              "index": "0",
              "key": "",
-             "value": "mJoSGEcYoxhjGGMYaRhkGFgYJAEYcBIYIBiRGMEYgBjyGIEYohiGGB8YKRgdGDoYSRj4GOIYSgIYzhh/GNgY/RiPGFwYcRi5GNYY1BEYZhhFGFoCGMwYaBhyGGUYcxhvGGwYdhhlGGQY9RhoGG0YZRh0GGEYZBhhGHQYYRihGGUYXxhzGGkYehhlGGEYNhgwGNAYwRhtGDoYSwoHGG0YZRhzGHMYYRhnGGUSDQoEGGYYchhvGG0SAxh0GDAYMBgYARIYMQoCGHQYbxIYKRh0GDIYcBhjGDQYahhpGGIYbxhiGDMYdhhzGHQYMxh2GHAYchg1GDYYaBhuGDIYaRhpGGYYZhhlGGwYdhhsGHkYbRhoGHYYZBh5GGMYeRhoGGEYGAE=",
+             "value": "mKASGE0YpBhjGGMYaRhkGFgYJAEYcBIYIBilGGgY5AQY2BjqGNoY7BiSGFoYwxi8GBsYNhglGJwPGG0YcAANGHIYnBjZGBgYxBhqGIMYbxhJGHYYVxhkGHMYaRh6GGUGGGgYchhlGHMYbxhsGHYYZRhkGPUYaBhtGGUYdBhhGGQYYRh0GGEYoRhlGF8YcxhpGHoYZRhhGDYYMBiiGNgYbhg6GEsKBxhtGGUYcxhzGGEYZxhlEg0KBBhmGHIYbxhtEgMYdBgwGDAYGAESGDEKAhh0GG8SGCkYdBgyGHcYdRhoGHEYNxh0GGEYMxgzGGUYdxgzGGMYMhhuGGQYbRhnGGIYbBg3GDcYNxh6GDUYeBg0GGQYbBh5GGYYbhhtGHkYbBhqGGkYaBhxGBgB",
              "proof": null,
              "height": "6017",
              "codespace": ""
@@ -737,6 +737,7 @@ mod tests {
         let params = AddParams {
             key: key.to_vec(),
             cid: object_cid,
+            size: 11,
             metadata: HashMap::new(),
             overwrite: true,
         };

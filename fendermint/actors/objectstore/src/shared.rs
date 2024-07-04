@@ -21,6 +21,8 @@ pub struct AddParams {
     pub key: Vec<u8>,
     /// Object value.
     pub cid: Cid,
+    /// Object size.
+    pub size: usize,
     /// Object metadata.
     pub metadata: HashMap<String, String>,
     /// Whether to overwrite a key if it already exists.

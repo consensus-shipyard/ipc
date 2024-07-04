@@ -45,6 +45,8 @@ impl MachineState for State {
 pub struct Object {
     /// The object content identifier.
     pub cid: ByteBuf,
+    /// The size of the content.
+    pub size: usize,
     /// Whether the object has been resolved.
     pub resolved: bool,
     /// User-defined object metadata (e.g., size, last modified timestamp, etc.).
@@ -87,12 +89,14 @@ impl State {
         store: &BS,
         key: BytesKey,
         cid: Cid,
+        size: usize,
         metadata: HashMap<String, String>,
         overwrite: bool,
     ) -> anyhow::Result<Cid> {
         let mut hamt = Hamt::<_, Object>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
         let object = Object {
             cid: ByteBuf(cid.to_bytes()),
+            size,
             resolved: false,
             metadata,
         };
@@ -219,6 +223,7 @@ mod tests {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
             Object {
                 cid: ByteBuf(ArbCid::<64>::arbitrary(g).0.to_bytes()),
+                size: usize::arbitrary(g),
                 metadata: HashMap::arbitrary(g),
                 resolved: false,
             }
@@ -228,6 +233,7 @@ mod tests {
     fn default_object() -> Object {
         Object {
             cid: ByteBuf(Cid::default().to_bytes()),
+            size: 0,
             metadata: HashMap::<String, String>::new(),
             resolved: false,
         }
@@ -243,12 +249,13 @@ mod tests {
         metadata.insert("_modified".to_string(), String::from("1718464345"));
         Object {
             cid: ByteBuf(cid.to_bytes()),
+            size: 5,
             metadata,
             resolved: false,
         }
     }
 
-    const GOLDEN_CID: &str = "bafy2bzacebi2bfkcucl3r2oih4du4hd7jrlvm7cqgggofnkzzz3m4asycsbmq";
+    const GOLDEN_CID: &str = "bafy2bzacebmog6w3ept45xctbw3lrt76i3rdbeaib6bikuhcddu5y5bqspozu";
 
     #[test]
     fn test_constructor() {
@@ -272,6 +279,7 @@ mod tests {
                 &store,
                 BytesKey(vec![1, 2, 3]),
                 Cid::from_bytes(&object.cid.0).unwrap(),
+                object.size,
                 object.metadata,
                 true
             )
@@ -287,7 +295,9 @@ mod tests {
         let key = BytesKey(vec![1, 2, 3]);
         let cid = Cid::from_bytes(&object.cid.0).unwrap();
         let md = object.metadata.clone();
-        state.add(&store, key.clone(), cid, md, true).unwrap();
+        state
+            .add(&store, key.clone(), cid, object.size, md, true)
+            .unwrap();
         assert!(state.resolve(&store, key.clone(), cid).is_ok());
 
         object.resolved = true;
@@ -306,6 +316,7 @@ mod tests {
                 &store,
                 key.clone(),
                 Cid::from_bytes(&object.cid.0).unwrap(),
+                object.size,
                 object.metadata,
                 true,
             )
@@ -324,7 +335,9 @@ mod tests {
         let key = BytesKey(vec![1, 2, 3]);
         let cid = Cid::from_bytes(&object.cid.0).unwrap();
         let md = object.metadata.clone();
-        state.add(&store, key.clone(), cid, md, true).unwrap();
+        state
+            .add(&store, key.clone(), cid, object.size, md, true)
+            .unwrap();
         let result = state.get(&store, &key);
 
         assert!(result.is_ok());
@@ -340,6 +353,7 @@ mod tests {
             store,
             jpeg_key.clone(),
             Cid::default(),
+            0,
             HashMap::<String, String>::new(),
             false,
         )?;
@@ -348,6 +362,7 @@ mod tests {
             store,
             bar_key.clone(),
             Cid::default(),
+            0,
             HashMap::<String, String>::new(),
             false,
         )?;
@@ -356,6 +371,7 @@ mod tests {
             store,
             baz_key.clone(),
             Cid::default(),
+            0,
             HashMap::<String, String>::new(),
             false,
         )?;
@@ -366,6 +382,7 @@ mod tests {
             &store,
             other_key.clone(),
             Cid::default(),
+            0,
             HashMap::<String, String>::new(),
             false,
         )?;
@@ -438,6 +455,7 @@ mod tests {
                 &store,
                 jpeg_key.clone(),
                 Cid::default(),
+                0,
                 HashMap::<String, String>::new(),
                 false,
             )
@@ -448,6 +466,7 @@ mod tests {
                 &store,
                 bar_key.clone(),
                 Cid::default(),
+                0,
                 HashMap::<String, String>::new(),
                 false,
             )
@@ -458,6 +477,7 @@ mod tests {
                 &store,
                 baz_key.clone(),
                 Cid::default(),
+                0,
                 HashMap::<String, String>::new(),
                 false,
             )
@@ -503,6 +523,7 @@ mod tests {
                 &store,
                 one.clone(),
                 Cid::default(),
+                0,
                 HashMap::<String, String>::new(),
                 false,
             )
@@ -513,6 +534,7 @@ mod tests {
                 &store,
                 two.clone(),
                 Cid::default(),
+                0,
                 HashMap::<String, String>::new(),
                 false,
             )

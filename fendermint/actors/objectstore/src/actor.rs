@@ -44,6 +44,7 @@ impl Actor {
                 rt.store(),
                 BytesKey(params.key),
                 params.cid,
+                params.size,
                 params.metadata,
                 params.overwrite,
             )
