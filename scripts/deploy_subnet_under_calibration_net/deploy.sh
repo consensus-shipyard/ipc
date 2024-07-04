@@ -174,7 +174,11 @@ do
   echo "Export private key for ${wallet_addresses[i]} to ${IPC_CONFIG_FOLDER}/validator_${i}.sk"
 done
 
-# Step 4.2: Deploy IPC contracts
+# Step 4.2: Update IPC config file with parent auth token
+toml set ${IPC_CONFIG_FOLDER}/config.toml subnets[0].config.auth_token $PARENT_HTTP_AUTH_TOKEN > /tmp/config.toml.0
+cp /tmp/config.toml.0 ${IPC_CONFIG_FOLDER}/config.toml
+
+# Step 4.3: Deploy IPC contracts
 cd ${IPC_FOLDER}/contracts
 npm install
 export RPC_URL=https://calibration.filfox.info/rpc/v1
@@ -186,7 +190,7 @@ parent_registry_address=$(echo "$deploy_contracts_output" | grep '"SubnetRegistr
 echo "New parent gateway address: $parent_gateway_address"
 echo "New parent registry address: $parent_registry_address"
 
-# Step 4.3: Use the new parent gateway and registry address to update IPC config file
+# Step 4.4: Use the new parent gateway and registry address to update IPC config file
 toml set ${IPC_CONFIG_FOLDER}/config.toml subnets[0].config.gateway_addr $parent_gateway_address > /tmp/config.toml.1
 toml set /tmp/config.toml.1 subnets[0].config.registry_addr $parent_registry_address > /tmp/config.toml.2
 cp /tmp/config.toml.2 ${IPC_CONFIG_FOLDER}/config.toml
@@ -313,7 +317,7 @@ done
 pkill -f "relayer" || true
 # Start relayer
 echo "$DASHES Start relayer process (in the background)"
-nohup ipc-cli checkpoint relayer --subnet $subnet_id --submitter $default_wallet_address > nohup.out 2> nohup.err < /dev/null &
+nohup ipc-cli checkpoint relayer --subnet $subnet_id --submitter 0xA08aE9E8c038CAf9765D7Db725CA63a92FCf12Ce > relayer.log &
 
 # Step 11: Print a summary of the deployment
 cat << EOF
