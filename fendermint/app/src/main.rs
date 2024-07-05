@@ -3,17 +3,29 @@
 
 pub use fendermint_app_options as options;
 pub use fendermint_app_settings as settings;
-use ipc_metrics::register::{register_tracing_subscriber, JournalOpts, WorkerGuard};
+use ipc_observability::traces::{
+    register_tracing_subscriber, ConsoleLayerOpts, FileLayerOpts, WorkerGuard,
+};
 
 mod cmd;
 
 fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
-    let console_filter = opts.log_console_filter().expect("invalid filter");
+    // let console_filter = opts.log_console_filter().expect("invalid filter");
     // let file_filter = opts.log_file_filter().expect("invalid filter");
-    // TODO Karel - map the config to journal options
-    let journal_opts = JournalOpts::default();
 
-    register_tracing_subscriber(console_filter, &journal_opts)
+    // TODO Karel - map the config to journal options
+    let console_opts = ConsoleLayerOpts {
+        enabled: true,
+        ..Default::default()
+    };
+
+    let journal_opts = FileLayerOpts {
+        enabled: true,
+        directory: Some("/var/logs/fendermint"),
+        ..FileLayerOpts::default()
+    };
+
+    register_tracing_subscriber(console_opts, journal_opts)
 }
 
 /// Install a panic handler that prints stuff to the logs, otherwise it only shows up in the console.
