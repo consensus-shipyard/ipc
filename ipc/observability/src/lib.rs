@@ -30,11 +30,11 @@ where
     T: Recordable + Traceable + Debug,
 {
     match trace.trace_level() {
-        TraceLevel::Trace => trace!(event = ?trace),
-        TraceLevel::Debug => debug!(event = ?trace),
-        TraceLevel::Info => info!(event = ?trace),
-        TraceLevel::Warn => warn!(event = ?trace),
-        TraceLevel::Error => error!(event = ?trace),
+        TraceLevel::Trace => trace!(domain=trace.domain(), event = ?trace),
+        TraceLevel::Debug => debug!(domain=trace.domain(), event = ?trace),
+        TraceLevel::Info => info!(domain=trace.domain(), event = ?trace),
+        TraceLevel::Warn => warn!(domain=trace.domain(), event = ?trace),
+        TraceLevel::Error => error!(domain=trace.domain(), event = ?trace),
     }
 
     trace.record_metrics();
