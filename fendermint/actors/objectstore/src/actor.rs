@@ -14,8 +14,8 @@ use fvm_ipld_hamt::BytesKey;
 use fvm_shared::{error::ExitCode, MethodNum};
 
 use crate::{
-    DeleteParams, GetParams, ListParams, Method, Object, ObjectList, PutParams,
-    ResolveExternalParams, State, OBJECTSTORE_ACTOR_NAME,
+    AddParams, DeleteParams, GetParams, ListParams, Method, Object, ObjectList, ResolveParams,
+    State, OBJECTSTORE_ACTOR_NAME,
 };
 
 #[cfg(feature = "fil-actor")]
@@ -36,29 +36,28 @@ impl Actor {
         rt.create(&state)
     }
 
-    fn put_object(rt: &impl Runtime, params: PutParams) -> Result<Cid, ActorError> {
+    fn add_object(rt: &impl Runtime, params: AddParams) -> Result<Cid, ActorError> {
         Self::ensure_write_allowed(rt)?;
 
         let root = rt.transaction(|st: &mut State, rt| {
-            st.put(
+            st.add(
                 rt.store(),
                 BytesKey(params.key),
-                params.kind,
+                params.cid,
+                params.size,
+                params.metadata,
                 params.overwrite,
             )
-            .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to put object"))
+            .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to add object"))
         })?;
         Ok(root)
     }
 
-    fn resolve_external_object(
-        rt: &impl Runtime,
-        params: ResolveExternalParams,
-    ) -> Result<(), ActorError> {
+    fn resolve_object(rt: &impl Runtime, params: ResolveParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
         rt.transaction(|st: &mut State, rt| {
-            st.resolve_external(rt.store(), BytesKey(params.key), params.value)
+            st.resolve(rt.store(), BytesKey(params.key), params.value)
                 .map_err(|e| {
                     e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to resolve object")
                 })
@@ -135,8 +134,8 @@ impl ActorCode for Actor {
     actor_dispatch! {
         Constructor => constructor,
         GetMetadata => get_metadata,
-        PutObject => put_object,
-        ResolveExternalObject => resolve_external_object,
+        AddObject => add_object,
+        ResolveObject => resolve_object,
         DeleteObject => delete_object,
         GetObject => get_object,
         ListObjects => list_objects,

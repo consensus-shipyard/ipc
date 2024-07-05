@@ -7,30 +7,35 @@ use fendermint_actor_machine::GET_METADATA_METHOD;
 use fvm_ipld_encoding::{strict_bytes, tuple::*};
 use fvm_shared::METHOD_CONSTRUCTOR;
 use num_derive::FromPrimitive;
+use std::collections::HashMap;
 
-pub use crate::state::{Object, ObjectKind, ObjectList, ObjectListItem, State};
+pub use crate::state::{Object, ObjectList, State};
 
 pub const OBJECTSTORE_ACTOR_NAME: &str = "objectstore";
 
 /// Params for putting an object.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct PutParams {
+pub struct AddParams {
     /// Object key.
     #[serde(with = "strict_bytes")]
     pub key: Vec<u8>,
-    /// Kind of object.
-    pub kind: ObjectKind,
+    /// Object value.
+    pub cid: Cid,
+    /// Object size.
+    pub size: usize,
+    /// Object metadata.
+    pub metadata: HashMap<String, String>,
     /// Whether to overwrite a key if it already exists.
     pub overwrite: bool,
 }
 
-/// Params for resolving an external object.
+/// Params for resolving an object.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct ResolveExternalParams {
+pub struct ResolveParams {
     /// Object key.
     #[serde(with = "strict_bytes")]
     pub key: Vec<u8>,
-    /// External object value.
+    /// Object value.
     pub value: Cid,
 }
 
@@ -70,8 +75,8 @@ pub struct ListParams {
 pub enum Method {
     Constructor = METHOD_CONSTRUCTOR,
     GetMetadata = GET_METADATA_METHOD,
-    PutObject = frc42_dispatch::method_hash!("PutObject"),
-    ResolveExternalObject = frc42_dispatch::method_hash!("ResolveExternalObject"),
+    AddObject = frc42_dispatch::method_hash!("AddObject"),
+    ResolveObject = frc42_dispatch::method_hash!("ResolveObject"),
     DeleteObject = frc42_dispatch::method_hash!("DeleteObject"),
     GetObject = frc42_dispatch::method_hash!("GetObject"),
     ListObjects = frc42_dispatch::method_hash!("ListObjects"),

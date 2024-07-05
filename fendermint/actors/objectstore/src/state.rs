@@ -2,16 +2,16 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
 use fendermint_actor_machine::{Kind, MachineState, WriteAccess};
 use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding::{strict_bytes::ByteBuf, tuple::*, DAG_CBOR};
+use fvm_ipld_encoding::{strict_bytes::ByteBuf, tuple::*};
 use fvm_ipld_hamt::{BytesKey, Hamt};
 use fvm_shared::address::Address;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
-pub const BIT_WIDTH: u32 = 8;
+const BIT_WIDTH: u32 = 8;
 
 const MAX_LIST_LIMIT: usize = 10000;
 
@@ -42,41 +42,24 @@ impl MachineState for State {
 
 /// The stored representation of an object in the object store.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum Object {
-    /// Internal objects are stored on-chain.
-    Internal(ByteBuf),
-    /// External objects reference an off-chain object by Cid.
-    /// The bool indicates whether the object has been resolved.
-    External((ByteBuf, bool)),
-}
-
-/// The kind of object. This is used during object creation.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum ObjectKind {
-    /// Internal objects are stored on-chain.
-    Internal(ByteBuf),
-    /// External objects reference an off-chain object by Cid.
-    External(Cid),
+pub struct Object {
+    /// The object content identifier.
+    pub cid: ByteBuf,
+    /// The size of the content.
+    pub size: usize,
+    /// Whether the object has been resolved.
+    pub resolved: bool,
+    /// User-defined object metadata (e.g., size, last modified timestamp, etc.).
+    pub metadata: HashMap<String, String>,
 }
 
 /// A list of objects and their common prefixes.
 #[derive(Default, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ObjectList {
     /// List of key-values matching the list query.
-    pub objects: Vec<(Vec<u8>, ObjectListItem)>,
+    pub objects: Vec<(Vec<u8>, Object)>,
     /// When a delimiter is used in the list query, this contains common key prefixes.
     pub common_prefixes: Vec<Vec<u8>>,
-}
-
-/// The kind of object. This is used during object creation.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum ObjectListItem {
-    /// Internal objects are stored on-chain.
-    /// The u64 is the size of the object.
-    Internal((Cid, u64)),
-    /// External objects reference an off-chain object by Cid.
-    /// The bool indicates whether the object has been resolved.
-    External((Cid, bool)),
 }
 
 impl State {
@@ -101,17 +84,21 @@ impl State {
         })
     }
 
-    pub fn put<BS: Blockstore>(
+    pub fn add<BS: Blockstore>(
         &mut self,
         store: &BS,
         key: BytesKey,
-        kind: ObjectKind,
+        cid: Cid,
+        size: usize,
+        metadata: HashMap<String, String>,
         overwrite: bool,
     ) -> anyhow::Result<Cid> {
         let mut hamt = Hamt::<_, Object>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
-        let object = match kind {
-            ObjectKind::Internal(buf) => Object::Internal(buf),
-            ObjectKind::External(cid) => Object::External((ByteBuf(cid.to_bytes()), false)),
+        let object = Object {
+            cid: ByteBuf(cid.to_bytes()),
+            size,
+            resolved: false,
+            metadata,
         };
         if overwrite {
             hamt.set(key, object)?;
@@ -122,7 +109,7 @@ impl State {
         Ok(self.root)
     }
 
-    pub fn resolve_external<BS: Blockstore>(
+    pub fn resolve<BS: Blockstore>(
         &mut self,
         store: &BS,
         key: BytesKey,
@@ -130,18 +117,14 @@ impl State {
     ) -> anyhow::Result<()> {
         let mut hamt = Hamt::<_, Object>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
         match hamt.get(&key).map(|v| v.cloned())? {
-            Some(object) => {
-                match object {
-                    Object::Internal(_) => Ok(()),
-                    Object::External((v, _)) => {
-                        // Ignore if value changed before it was resolved.
-                        if v.0 == value.to_bytes() {
-                            hamt.set(key, Object::External((v, true)))?;
-                            self.root = hamt.flush()?;
-                        }
-                        Ok(())
-                    }
+            Some(mut object) => {
+                // Ignore if value changed before it was resolved.
+                if object.cid.0 == value.to_bytes() {
+                    object.resolved = true;
+                    hamt.set(key, object)?;
+                    self.root = hamt.flush()?;
                 }
+                Ok(())
             }
             // Don't error here in case the key was deleted before the value was resolved.
             None => Ok(()),
@@ -210,18 +193,7 @@ impl State {
             if count <= offset {
                 continue;
             }
-            let item = match v {
-                Object::Internal(b) => {
-                    let mh_code = Code::Blake2b256;
-                    let mh = mh_code.digest(&b.0);
-                    let cid = Cid::new_v1(DAG_CBOR, mh);
-                    ObjectListItem::Internal((cid, b.0.len() as u64))
-                }
-                Object::External((b, resolved)) => {
-                    ObjectListItem::External((Cid::try_from(b.0.as_slice())?, *resolved))
-                }
-            };
-            objects.push((key, item));
+            objects.push((key, v.to_owned()));
             if limit > 0 && objects.len() >= limit {
                 break;
             }
@@ -237,10 +209,53 @@ impl State {
 
 #[cfg(test)]
 mod tests {
-    use fvm_ipld_blockstore::MemoryBlockstore;
-
     use super::*;
+    use cid::multihash::{Code, MultihashDigest};
+    use fendermint_testing::arb::ArbCid;
+    use fil_actors_runtime::MapKey;
+    use fvm_ipld_blockstore::MemoryBlockstore;
+    use fvm_ipld_encoding::DAG_CBOR;
+    use quickcheck::Arbitrary;
+    use quickcheck_macros::quickcheck;
     use std::str::FromStr;
+
+    impl Arbitrary for Object {
+        fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+            Object {
+                cid: ByteBuf(ArbCid::<64>::arbitrary(g).0.to_bytes()),
+                size: usize::arbitrary(g),
+                metadata: HashMap::arbitrary(g),
+                resolved: false,
+            }
+        }
+    }
+
+    fn default_object() -> Object {
+        Object {
+            cid: ByteBuf(Cid::default().to_bytes()),
+            size: 0,
+            metadata: HashMap::<String, String>::new(),
+            resolved: false,
+        }
+    }
+
+    fn golden_object() -> Object {
+        let mh_code = Code::Blake2b256;
+        let mh = mh_code.digest(&[1, 2, 3, 4, 5]);
+        let cid = Cid::new_v1(DAG_CBOR, mh);
+        let mut metadata = HashMap::<String, String>::new();
+        metadata.insert("_size".to_string(), String::from("5"));
+        metadata.insert("_created".to_string(), String::from("1718464344"));
+        metadata.insert("_modified".to_string(), String::from("1718464345"));
+        Object {
+            cid: ByteBuf(cid.to_bytes()),
+            size: 5,
+            metadata,
+            resolved: false,
+        }
+    }
+
+    const GOLDEN_CID: &str = "bafy2bzacebmog6w3ept45xctbw3lrt76i3rdbeaib6bikuhcddu5y5bqspozu";
 
     #[test]
     fn test_constructor() {
@@ -255,80 +270,54 @@ mod tests {
     }
 
     #[test]
-    fn test_put_internal() {
+    fn test_add() {
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store, Address::new_id(100), WriteAccess::OnlyOwner).unwrap();
+        let object = golden_object();
         assert!(state
-            .put(
+            .add(
                 &store,
                 BytesKey(vec![1, 2, 3]),
-                ObjectKind::Internal(ByteBuf(vec![4, 5, 6])),
+                Cid::from_bytes(&object.cid.0).unwrap(),
+                object.size,
+                object.metadata,
                 true
             )
             .is_ok());
 
-        assert_eq!(
-            state.root,
-            Cid::from_str("bafy2bzacecyfqn52y34p5fu2yxne263thvwc2pitaec36ul3l7ghocmwjli5k")
-                .unwrap()
-        );
+        assert_eq!(state.root, Cid::from_str(GOLDEN_CID).unwrap());
     }
 
-    #[test]
-    fn test_put_external() {
-        let store = MemoryBlockstore::default();
-        let mut state = State::new(&store, Address::new_id(100), WriteAccess::OnlyOwner).unwrap();
-        assert!(state
-            .put(
-                &store,
-                BytesKey(vec![1, 2, 3]),
-                ObjectKind::External(Cid::default()),
-                true
-            )
-            .is_ok());
-
-        assert_eq!(
-            state.root,
-            Cid::from_str("bafy2bzaceaq7b4t24dmwbnkztaib3jlv7bcajecsqobshg6juoitave2rxws2")
-                .unwrap()
-        );
-    }
-
-    #[test]
-    fn test_resolve_external() {
+    #[quickcheck]
+    fn test_resolve(mut object: Object) {
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store, Address::new_id(100), WriteAccess::OnlyOwner).unwrap();
         let key = BytesKey(vec![1, 2, 3]);
+        let cid = Cid::from_bytes(&object.cid.0).unwrap();
+        let md = object.metadata.clone();
         state
-            .put(
-                &store,
-                key.clone(),
-                ObjectKind::External(Cid::default()),
-                true,
-            )
+            .add(&store, key.clone(), cid, object.size, md, true)
             .unwrap();
-        assert!(state
-            .resolve_external(&store, key.clone(), Cid::default())
-            .is_ok());
+        assert!(state.resolve(&store, key.clone(), cid).is_ok());
 
+        object.resolved = true;
         let result = state.get(&store, &key);
         assert!(result.is_ok());
-        assert_eq!(
-            result.unwrap(),
-            Some(Object::External((ByteBuf(Cid::default().to_bytes()), true)))
-        );
+        assert_eq!(result.unwrap().unwrap(), object);
     }
 
-    #[test]
-    fn test_delete_internal() {
+    #[quickcheck]
+    fn test_delete(object: Object) {
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store, Address::new_id(100), WriteAccess::OnlyOwner).unwrap();
         let key = BytesKey(vec![1, 2, 3]);
         state
-            .put(
+            .add(
                 &store,
                 key.clone(),
-                ObjectKind::Internal(ByteBuf(vec![4, 5, 6])),
+                Cid::from_bytes(&object.cid.0).unwrap(),
+                object.size,
+                object.metadata,
                 true,
             )
             .unwrap();
@@ -339,71 +328,20 @@ mod tests {
         assert_eq!(result.unwrap(), None);
     }
 
-    #[test]
-    fn test_delete_external() {
+    #[quickcheck]
+    fn test_get(object: Object) {
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store, Address::new_id(100), WriteAccess::OnlyOwner).unwrap();
         let key = BytesKey(vec![1, 2, 3]);
+        let cid = Cid::from_bytes(&object.cid.0).unwrap();
+        let md = object.metadata.clone();
         state
-            .put(
-                &store,
-                key.clone(),
-                ObjectKind::External(Cid::default()),
-                true,
-            )
-            .unwrap();
-        assert!(state.delete(&store, &key).is_ok());
-
-        let result = state.get(&store, &key);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), None);
-    }
-
-    #[test]
-    fn test_get_internal() {
-        let store = MemoryBlockstore::default();
-        let mut state = State::new(&store, Address::new_id(100), WriteAccess::OnlyOwner).unwrap();
-        let key = BytesKey(vec![1, 2, 3]);
-        state
-            .put(
-                &store,
-                key.clone(),
-                ObjectKind::Internal(ByteBuf(vec![4, 5, 6])),
-                true,
-            )
+            .add(&store, key.clone(), cid, object.size, md, true)
             .unwrap();
         let result = state.get(&store, &key);
 
         assert!(result.is_ok());
-        assert_eq!(
-            result.unwrap(),
-            Some(Object::Internal(ByteBuf(vec![4, 5, 6]))),
-        );
-    }
-
-    #[test]
-    fn test_get_external() {
-        let store = MemoryBlockstore::default();
-        let mut state = State::new(&store, Address::new_id(100), WriteAccess::OnlyOwner).unwrap();
-        let key = BytesKey(vec![1, 2, 3]);
-        state
-            .put(
-                &store,
-                key.clone(),
-                ObjectKind::External(Cid::default()),
-                true,
-            )
-            .unwrap();
-        let result = state.get(&store, &key);
-
-        assert!(result.is_ok());
-        assert_eq!(
-            result.unwrap(),
-            Some(Object::External((
-                ByteBuf(Cid::default().to_bytes()),
-                false
-            )))
-        );
+        assert_eq!(result.unwrap().unwrap(), object);
     }
 
     fn create_and_put_objects(
@@ -411,33 +349,41 @@ mod tests {
         store: &MemoryBlockstore,
     ) -> anyhow::Result<(BytesKey, BytesKey, BytesKey)> {
         let jpeg_key = BytesKey("foo.jpeg".as_bytes().to_vec());
-        state.put(
+        state.add(
             store,
             jpeg_key.clone(),
-            ObjectKind::Internal(ByteBuf(vec![4, 5, 6])),
+            Cid::default(),
+            0,
+            HashMap::<String, String>::new(),
             false,
         )?;
         let bar_key = BytesKey("foo/bar.png".as_bytes().to_vec());
-        state.put(
+        state.add(
             store,
             bar_key.clone(),
-            ObjectKind::External(Cid::default()),
+            Cid::default(),
+            0,
+            HashMap::<String, String>::new(),
             false,
         )?;
         let baz_key = BytesKey("foo/baz.png".as_bytes().to_vec());
-        state.put(
+        state.add(
             store,
             baz_key.clone(),
-            ObjectKind::External(Cid::default()),
+            Cid::default(),
+            0,
+            HashMap::<String, String>::new(),
             false,
         )?;
 
         // We'll mostly ignore this one
         let other_key = BytesKey("zzzz/image.png".as_bytes().to_vec());
-        state.put(
+        state.add(
             &store,
             other_key.clone(),
-            ObjectKind::External(Cid::default()),
+            Cid::default(),
+            0,
+            HashMap::<String, String>::new(),
             false,
         )?;
         Ok((jpeg_key, bar_key, baz_key))
@@ -450,14 +396,14 @@ mod tests {
 
         let (_, _, baz_key) = create_and_put_objects(&mut state, &store).unwrap();
 
-        let default_item = ObjectListItem::External((Cid::default(), false));
+        let default_obj = default_object();
 
         // List all keys with a limit
         let result = state.list(&store, vec![], vec![], 0, 0);
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.objects.len(), 4);
-        assert_eq!(result.objects.first(), Some(&(baz_key.0, default_item)));
+        assert_eq!(result.objects.first(), Some(&(baz_key.0, default_obj)));
     }
 
     #[test]
@@ -467,15 +413,15 @@ mod tests {
 
         let (_, bar_key, baz_key) = create_and_put_objects(&mut state, &store).unwrap();
 
-        let default_item = ObjectListItem::External((Cid::default(), false));
+        let default_obj = default_object();
 
         let foo_key = BytesKey("foo".as_bytes().to_vec());
         let result = state.list(&store, foo_key.0.clone(), vec![], 0, 0);
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.objects.len(), 3);
-        assert_eq!(result.objects[0], (baz_key.0, default_item.clone()));
-        assert_eq!(result.objects[1], (bar_key.0, default_item.clone()));
+        assert_eq!(result.objects[0], (baz_key.0, default_obj.clone()));
+        assert_eq!(result.objects[1], (bar_key.0, default_obj.clone()));
     }
 
     #[test]
@@ -485,10 +431,7 @@ mod tests {
 
         let (jpeg_key, _, _) = create_and_put_objects(&mut state, &store).unwrap();
 
-        let mh_code = Code::Blake2b256;
-        let mh = mh_code.digest(&[4, 5, 6]);
-        let cid = Cid::new_v1(DAG_CBOR, mh);
-        let default_item = ObjectListItem::Internal((cid, 3));
+        let default_obj = default_object();
 
         let foo_key = BytesKey("foo".as_bytes().to_vec());
         let delimiter_key = BytesKey("/".as_bytes().to_vec());
@@ -497,7 +440,7 @@ mod tests {
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.objects.len(), 1);
-        assert_eq!(result.objects[0], (jpeg_key.0, default_item));
+        assert_eq!(result.objects[0], (jpeg_key.0, default_obj));
         assert_eq!(result.common_prefixes[0], full_key);
     }
 
@@ -508,28 +451,34 @@ mod tests {
 
         let jpeg_key = BytesKey("foo.jpeg".as_bytes().to_vec());
         state
-            .put(
+            .add(
                 &store,
                 jpeg_key.clone(),
-                ObjectKind::External(Cid::default()),
+                Cid::default(),
+                0,
+                HashMap::<String, String>::new(),
                 false,
             )
             .unwrap();
         let bar_key = BytesKey("bin/foo/bar.png".as_bytes().to_vec());
         state
-            .put(
+            .add(
                 &store,
                 bar_key.clone(),
-                ObjectKind::External(Cid::default()),
+                Cid::default(),
+                0,
+                HashMap::<String, String>::new(),
                 false,
             )
             .unwrap();
         let baz_key = BytesKey("bin/foo/baz.png".as_bytes().to_vec());
         state
-            .put(
+            .add(
                 &store,
                 baz_key.clone(),
-                ObjectKind::External(Cid::default()),
+                Cid::default(),
+                0,
+                HashMap::<String, String>::new(),
                 false,
             )
             .unwrap();
@@ -552,7 +501,7 @@ mod tests {
 
         let (_, bar_key, _) = create_and_put_objects(&mut state, &store).unwrap();
 
-        let default_item = ObjectListItem::External((Cid::default(), false));
+        let default_obj = default_object();
 
         // List all keys with a limit and offset
         let result = state.list(&store, vec![], vec![], 1, 1);
@@ -560,7 +509,7 @@ mod tests {
         let result = result.unwrap();
         assert_eq!(result.objects.len(), 1);
         // Note that baz is listed first in order, so an offset of 1 will return bar
-        assert_eq!(result.objects.first(), Some(&(bar_key.0, default_item)));
+        assert_eq!(result.objects.first(), Some(&(bar_key.0, default_obj)));
     }
 
     #[test]
@@ -570,19 +519,23 @@ mod tests {
 
         let one = BytesKey("hello/world".as_bytes().to_vec());
         state
-            .put(
+            .add(
                 &store,
                 one.clone(),
-                ObjectKind::Internal(ByteBuf(vec![4, 5, 6])),
+                Cid::default(),
+                0,
+                HashMap::<String, String>::new(),
                 false,
             )
             .unwrap();
         let two = BytesKey("hello/again".as_bytes().to_vec());
         state
-            .put(
+            .add(
                 &store,
                 two.clone(),
-                ObjectKind::External(Cid::default()),
+                Cid::default(),
+                0,
+                HashMap::<String, String>::new(),
                 false,
             )
             .unwrap();
