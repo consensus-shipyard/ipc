@@ -1,5 +1,4 @@
 [workspace]
-resolver = "2"
 members = [
   # contracts
   "contracts/binding",
@@ -34,7 +33,7 @@ members = [
   "fendermint/tracing",
   "fendermint/vm/*",
   "fendermint/actors",
-  "fendermint/actors/chainmetadata", "fendermint/ipc-metrics",
+  "fendermint/actors/chainmetadata",
 ]
 
 [workspace.package]
@@ -248,3 +247,4 @@ opt-level = "z"
 strip = true
 codegen-units = 1
 incremental = false
+resolver = "2"

@@ -5064,9 +5064,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "ipc-metrics"
+name = "ipc-observability"
 version = "0.1.0"
 dependencies = [
+ "lazy_static",
+ "prometheus",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
