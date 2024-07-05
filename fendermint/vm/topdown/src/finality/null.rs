@@ -233,7 +233,7 @@ impl FinalityWithNull {
 
         let proposal = SealedTopdownProposal::new(height, hash, cros_msgs, vali_chns);
         tracing::debug!(
-            commitment = proposal.finality().cid().to_string(),
+            commitment = proposal.finality().side_effect_cid().to_string(),
             height,
             "new proposal"
         );

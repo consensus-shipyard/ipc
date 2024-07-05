@@ -119,33 +119,42 @@ pub struct ParentFinality {
     pub block_hash: Vec<u8>,
 }
 
+pub enum TopdownProposal {
+    V1(SealedTopdownProposal),
+}
+
 /// The ipc topdown finality proposal with the sealed CID for the finality. The reason for including
 /// topdown messages + validator changes in the proposal is avoiding querying RPC when executing
 /// proposals.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SealedTopdownProposal {
     /// The cid of the finality for quicker comparison
-    commitment: Cid,
+    commitment: Vec<u8>,
     /// The topdown finality data
     finality: ParentFinalityV2,
 }
 
 impl SealedTopdownProposal {
+    pub(crate) fn create_commitment(mut hash: BlockHash, cid: Cid) -> Vec<u8> {
+        hash.extend(cid.to_bytes());
+        hash
+    }
+
     pub fn new(
         height: BlockHeight,
         hash: BlockHash,
         msgs: Vec<IpcEnvelope>,
         chns: Vec<StakingChangeRequest>,
     ) -> Self {
-        let finality = ParentFinalityV2::new(height as ChainEpoch, hash, msgs, chns);
+        let finality = ParentFinalityV2::new(height as ChainEpoch, hash.clone(), msgs, chns);
         Self {
-            commitment: finality.cid(),
+            commitment: Self::create_commitment(hash, finality.side_effect_cid()),
             finality,
         }
     }
 
-    pub fn commitment(&self) -> Cid {
-        self.commitment
+    pub fn commitment(&self) -> &[u8] {
+        self.commitment.as_ref()
     }
 
     pub fn finality(&self) -> &ParentFinalityV2 {
@@ -162,7 +171,10 @@ impl From<SealedTopdownProposal> for ParentFinalityV2 {
 impl From<ParentFinalityV2> for SealedTopdownProposal {
     fn from(finality: ParentFinalityV2) -> Self {
         Self {
-            commitment: finality.cid(),
+            commitment: SealedTopdownProposal::create_commitment(
+                finality.block_hash.clone(),
+                finality.side_effect_cid(),
+            ),
             finality,
         }
     }
@@ -203,8 +215,9 @@ impl ParentFinalityV2 {
         }
     }
 
-    pub fn cid(&self) -> Cid {
-        let bytes = fvm_ipld_encoding::to_vec(self).expect("should not have failed");
+    pub fn side_effect_cid(&self) -> Cid {
+        let bytes = fvm_ipld_encoding::to_vec(&(&self.cross_messages, &self.validator_changes))
+            .expect("should not have failed");
         Cid::new_v1(DAG_CBOR, Code::Blake2b256.digest(&bytes))
     }
 }
