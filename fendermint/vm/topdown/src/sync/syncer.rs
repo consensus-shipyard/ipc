@@ -251,7 +251,7 @@ where
             self.provider.new_parent_view(height, Some(data.clone()))?;
             if let Some(p) = self.provider.sealed_proposal_at_height(height)? {
                 self.vote_tally
-                    .add_block(height, Some(p.commitment().to_bytes()))
+                    .add_block(height, Some(p.into_commitment()))
                     .map_err(map_voting_err)?;
             }
 

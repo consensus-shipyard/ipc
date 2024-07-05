@@ -157,6 +157,10 @@ impl SealedTopdownProposal {
         self.commitment.as_ref()
     }
 
+    pub fn into_commitment(self) -> Vec<u8> {
+        self.commitment
+    }
+
     pub fn finality(&self) -> &ParentFinalityV2 {
         &self.finality
     }
