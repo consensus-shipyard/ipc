@@ -2886,11 +2886,7 @@ dependencies = [
  "fvm_shared",
  "hex",
  "ipc-api",
-<<<<<<< HEAD
  "ipc-observability",
-=======
- "ipc-metrics",
->>>>>>> 06eb54a0 (feat: introduce metrics crate)
  "ipc-provider",
  "ipc_ipld_resolver",
  "k256 0.11.6",
@@ -5057,18 +5053,12 @@ dependencies = [
 ]
 
 [[package]]
-<<<<<<< HEAD
 name = "ipc-observability"
 version = "0.1.0"
 dependencies = [
  "hex",
  "lazy_static",
  "prometheus",
-=======
-name = "ipc-metrics"
-version = "0.1.0"
-dependencies = [
->>>>>>> 06eb54a0 (feat: introduce metrics crate)
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
