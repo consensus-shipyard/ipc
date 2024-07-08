@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use ipc_observability::{
-    emit, impl_traceable, impl_traceables, lazy_static, register_metrics, Recordable, TraceLevel,
+    impl_traceable, impl_traceables, lazy_static, register_metrics, Recordable, TraceLevel,
     Traceable,
 };
 use prometheus::{
@@ -47,12 +47,12 @@ impl_traceables!(
 );
 
 #[derive(Debug)]
-struct ParentRpcCalled<'a> {
-    source: &'a str,
-    json_rpc: &'a str,
-    method: &'a str,
-    status: &'a str,
-    latency: f64,
+pub struct ParentRpcCalled<'a> {
+    pub source: &'a str,
+    pub json_rpc: &'a str,
+    pub method: &'a str,
+    pub status: &'a str,
+    pub latency: f64,
 }
 
 impl Recordable for ParentRpcCalled<'_> {
@@ -67,15 +67,19 @@ impl Recordable for ParentRpcCalled<'_> {
     }
 }
 
+pub type BlockHeight = u64;
+/// Hex encoded block hash.
+pub type BlockHashHex<'a> = &'a str;
+
 #[derive(Debug)]
-struct ParentFinalityAcquired<'a> {
-    source: &'a str,
-    is_null: bool,
-    block_height: u64,
-    block_hash: &'a str,
-    commitment_hash: &'a str,
-    num_msgs: u32,
-    num_validator_changes: u32,
+pub struct ParentFinalityAcquired<'a> {
+    pub source: &'a str,
+    pub is_null: bool,
+    pub block_height: BlockHeight,
+    pub block_hash: Option<BlockHashHex<'a>>,
+    pub commitment_hash: Option<BlockHashHex<'a>>,
+    pub num_msgs: usize,
+    pub num_validator_changes: usize,
 }
 
 impl Recordable for ParentFinalityAcquired<'_> {
@@ -87,7 +91,7 @@ impl Recordable for ParentFinalityAcquired<'_> {
 }
 
 #[derive(Debug)]
-struct ParentFinalityPeerVoteReceived<'a> {
+pub struct ParentFinalityPeerVoteReceived<'a> {
     validator: &'a str,
     block_height: u64,
     block_hash: &'a str,
@@ -103,7 +107,7 @@ impl Recordable for ParentFinalityPeerVoteReceived<'_> {
 }
 
 #[derive(Debug)]
-struct ParentFinalityPeerVoteSent<'a> {
+pub struct ParentFinalityPeerVoteSent<'a> {
     block_height: u64,
     block_hash: &'a str,
     commitment_hash: &'a str,
@@ -116,7 +120,7 @@ impl Recordable for ParentFinalityPeerVoteSent<'_> {
 }
 
 #[derive(Debug)]
-struct ParentFinalityPeerQuorumReached<'a> {
+pub struct ParentFinalityPeerQuorumReached<'a> {
     block_height: u64,
     block_hash: &'a str,
     commitment_hash: &'a str,
@@ -133,7 +137,7 @@ impl Recordable for ParentFinalityPeerQuorumReached<'_> {
 }
 
 #[derive(Debug)]
-struct ParentFinalityCommitted<'a> {
+pub struct ParentFinalityCommitted<'a> {
     local_height: u64,
     parent_height: u64,
     block_hash: &'a str,
@@ -149,11 +153,41 @@ impl Recordable for ParentFinalityCommitted<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ipc_observability::emit;
 
     #[test]
     fn test_metrics() {
         let registry = Registry::new();
         register_metrics(&registry).unwrap();
+    }
+
+    #[test]
+    fn test_metric_increase() {
+        let registry = Registry::new();
+        register_metrics(&registry).unwrap();
+
+        // Initialize the metric values
+        let source = "source";
+        let method = "method";
+        let status = "status";
+        let initial_value = TOPDOWN_PARENT_RPC_CALL_TOTAL
+            .with_label_values(&[source, method, status])
+            .get();
+
+        // Emit a record to increase the metric
+        emit(ParentRpcCalled {
+            source,
+            json_rpc: "json_rpc",
+            method,
+            status,
+            latency: 0.0,
+        });
+
+        // Check that the metric value has increased by 1
+        let new_value = TOPDOWN_PARENT_RPC_CALL_TOTAL
+            .with_label_values(&[source, method, status])
+            .get();
+        assert_eq!(new_value, initial_value + 1);
     }
 
     #[test]
@@ -170,8 +204,8 @@ mod tests {
             source: "source",
             is_null: false,
             block_height: 0,
-            block_hash: "block_hash",
-            commitment_hash: "commitment_hash",
+            block_hash: Some("block_hash"),
+            commitment_hash: Some("commitment_hash"),
             num_msgs: 0,
             num_validator_changes: 0,
         });
