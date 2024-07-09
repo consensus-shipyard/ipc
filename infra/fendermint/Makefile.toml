@@ -6,6 +6,7 @@ extend = [
     { path = "scripts/genesis.toml" },
     { path = "scripts/ipfs.toml" },
     { path = "scripts/node.toml" },
+    { path = "scripts/prometheus.toml" },
     { path = "scripts/promtail.toml" },
     { path = "scripts/objects.toml" },
     { path = "scripts/testnet.toml" },
