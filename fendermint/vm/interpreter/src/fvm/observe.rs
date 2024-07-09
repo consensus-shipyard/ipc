@@ -5,7 +5,11 @@ use ipc_observability::{
     impl_traceable, impl_traceables, lazy_static, register_metrics, Recordable, TraceLevel,
     Traceable,
 };
-use prometheus::{register_histogram, Histogram, Registry};
+
+use prometheus::{
+    register_histogram, register_int_counter, register_int_gauge, register_int_gauge_vec,
+    Histogram, IntCounter, IntGauge, IntGaugeVec, Registry,
+};
 
 use fvm_shared::message::Message;
 
@@ -18,6 +22,21 @@ register_metrics! {
         = register_histogram!("exec_fvm_apply_execution_time_secs", "Execution time of FVM apply in seconds");
     EXEC_FVM_CALL_EXECUTION_TIME_SECS: Histogram
         = register_histogram!("exec_fvm_call_execution_time_secs", "Execution time of FVM call in seconds");
+    BOTTOMUP_CHECKPOINT_CREATED_TOTAL: IntCounter
+        = register_int_counter!("bottomup_checkpoint_created_total", "Bottom-up checkpoint produced");
+    BOTTOMUP_CHECKPOINT_CREATED_HEIGHT: IntGauge
+        = register_int_gauge!("bottomup_checkpoint_created_height", "Height of the checkpoint created");
+    BOTTOMUP_CHECKPOINT_CREATED_MSGCOUNT: IntGauge
+        = register_int_gauge!("bottomup_checkpoint_created_msgcount", "Number of messages in the checkpoint created");
+    BOTTOMUP_CHECKPOINT_CREATED_CONFIGNUM: IntGauge
+        = register_int_gauge!("bottomup_checkpoint_created_confignum", "Configuration number of the checkpoint created");
+    BOTTOMUP_CHECKPOINT_SIGNED_HEIGHT: IntGaugeVec = register_int_gauge_vec!(
+        "bottomup_checkpoint_signed_height",
+        "Height of the checkpoint signed",
+        &["validator"]
+    );
+    BOTTOMUP_CHECKPOINT_FINALIZED_HEIGHT: IntGauge
+        = register_int_gauge!("bottomup_checkpoint_finalized_height", "Height of the checkpoint finalized");
 }
 
 impl_traceables!(TraceLevel::Info, "Execution", MsgExec);
@@ -51,6 +70,61 @@ impl Recordable for MsgExec {
             MsgExecPurpose::Apply => EXEC_FVM_APPLY_EXECUTION_TIME_SECS.observe(self.duration),
             MsgExecPurpose::Call => EXEC_FVM_CALL_EXECUTION_TIME_SECS.observe(self.duration),
         }
+    }
+}
+
+impl_traceables!(
+    TraceLevel::Info,
+    "Bottom-up",
+    CheckpointCreated<'a>,
+    CheckpointSigned<'a>,
+    CheckpointFinalized<'a>
+);
+
+/// Hex encoded hash.
+pub type HashHex<'a> = &'a str;
+
+#[derive(Debug)]
+pub struct CheckpointCreated<'a> {
+    pub height: u64,
+    pub hash: HashHex<'a>,
+    pub msg_count: usize,
+    pub config_number: u64,
+}
+
+impl Recordable for CheckpointCreated<'_> {
+    fn record_metrics(&self) {
+        BOTTOMUP_CHECKPOINT_CREATED_TOTAL.inc();
+        BOTTOMUP_CHECKPOINT_CREATED_HEIGHT.set(self.height as i64);
+        BOTTOMUP_CHECKPOINT_CREATED_MSGCOUNT.set(self.msg_count as i64);
+        BOTTOMUP_CHECKPOINT_CREATED_CONFIGNUM.set(self.config_number as i64);
+    }
+}
+
+#[derive(Debug)]
+pub struct CheckpointSigned<'a> {
+    pub height: u64,
+    pub hash: HashHex<'a>,
+    pub validator: &'a str,
+}
+
+impl Recordable for CheckpointSigned<'_> {
+    fn record_metrics(&self) {
+        BOTTOMUP_CHECKPOINT_SIGNED_HEIGHT
+            .with_label_values(&[self.validator])
+            .set(self.height as i64);
+    }
+}
+
+#[derive(Debug)]
+pub struct CheckpointFinalized<'a> {
+    pub height: usize,
+    pub hash: HashHex<'a>,
+}
+
+impl Recordable for CheckpointFinalized<'_> {
+    fn record_metrics(&self) {
+        BOTTOMUP_CHECKPOINT_FINALIZED_HEIGHT.set(self.height as i64);
     }
 }
 
@@ -90,6 +164,22 @@ mod tests {
             duration: 1.0,
             exit_code: 1,
             message: message.clone(),
+        });
+
+        emit(CheckpointCreated {
+            height: 1,
+            hash: "hash",
+            msg_count: 2,
+            config_number: 3,
+        });
+        emit(CheckpointSigned {
+            height: 1,
+            hash: "hash",
+            validator: "validator",
+        });
+        emit(CheckpointFinalized {
+            height: 1,
+            hash: "hash",
         });
     }
 }

@@ -15,16 +15,16 @@ use fvm_shared::{address::Address, chainid::ChainID};
 
 use fendermint_crypto::PublicKey;
 use fendermint_crypto::SecretKey;
-use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::BottomUpCheckpoint;
-use fendermint_vm_event::NewBottomUpCheckpoint;
 use fendermint_vm_genesis::{Power, Validator, ValidatorKey};
 
 use ipc_actors_abis::checkpointing_facet as checkpoint;
 use ipc_actors_abis::gateway_getter_facet as getter;
 use ipc_api::staking::ConfigurationNumber;
+use ipc_observability::emit;
 
+use super::observe::{CheckpointCreated, CheckpointSigned};
 use super::state::ipc::tokens_to_burn;
 use super::{
     broadcast::Broadcaster,
@@ -121,11 +121,11 @@ where
         power_diff(curr_power_table, next_power_table)
     };
 
-    emit!(NewBottomUpCheckpoint {
-        block_height: height.value(),
-        block_hash: &hex::encode(block_hash),
-        num_msgs,
-        next_configuration_number,
+    emit(CheckpointCreated {
+        height: height.value(),
+        hash: &hex::encode(block_hash),
+        msg_count: num_msgs,
+        config_number: next_configuration_number,
     });
 
     Ok(Some((checkpoint, power_updates)))
@@ -254,6 +254,12 @@ where
             )
             .await
             .context("failed to broadcast checkpoint signature")?;
+
+            emit(CheckpointSigned {
+                height: height.value(),
+                hash: &hex::encode(cp.block_hash),
+                validator: &hex::encode(validator_ctx.public_key.serialize()),
+            });
 
             tracing::debug!(?height, "submitted checkpoint signature");
         }
