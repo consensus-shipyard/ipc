@@ -17,7 +17,6 @@ use std::sync::Arc;
 use tracing::instrument;
 
 use crate::observe::ParentFinalityAcquired;
-use fendermint_vm_event::{BlockHashHex, NewParentView};
 use ipc_observability::emit;
 
 /// Parent syncer that constantly poll parent. This struct handles lotus null blocks and deferred

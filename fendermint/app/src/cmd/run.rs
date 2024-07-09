@@ -4,13 +4,11 @@
 use anyhow::{anyhow, bail, Context};
 use async_stm::atomically_or_err;
 use fendermint_abci::ApplicationService;
-use fendermint_app::events::{ParentFinalityVoteAdded, ParentFinalityVoteIgnored};
 use fendermint_app::ipc::{AppParentFinalityQuery, AppVote};
 use fendermint_app::{App, AppConfig, AppStore, BitswapBlockstore};
 use fendermint_app_settings::AccountKind;
 use fendermint_crypto::SecretKey;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
-use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::chain::ChainEnv;
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
@@ -24,7 +22,7 @@ use fendermint_vm_resolver::ipld::IpldResolver;
 use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::proxy::IPCProviderProxy;
 use fendermint_vm_topdown::sync::launch_polling_syncer;
-use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
+use fendermint_vm_topdown::voting::{publish_vote_loop, VoteTally};
 use fendermint_vm_topdown::{CachedFinalityProvider, IPCParentFinality, Toggle};
 use fvm_shared::address::{current_network, Address, Network};
 use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
@@ -533,7 +531,7 @@ async fn dispatch_vote(
                 tracing::debug!("ignoring vote; topdown disabled");
                 return;
             }
-            let res = atomically_or_err(|| {
+            let _res = atomically_or_err(|| {
                 parent_finality_votes.add_vote(
                     vote.public_key.clone(),
                     f.height,
@@ -541,48 +539,6 @@ async fn dispatch_vote(
                 )
             })
             .await;
-
-            let added = match res {
-                Ok(added) => {
-                    added
-                }
-                Err(e @ VoteError::Equivocation(_, _, _, _)) => {
-                    tracing::warn!(error = e.to_string(), "failed to handle vote");
-                    false
-                }
-                Err(e @ (
-                      VoteError::Uninitialized // early vote, we're not ready yet
-                    | VoteError::UnpoweredValidator(_) // maybe arrived too early or too late, or spam
-                    | VoteError::UnexpectedBlock(_, _) // won't happen here
-                )) => {
-                    tracing::debug!(error = e.to_string(), "failed to handle vote");
-                    false
-                }
-            };
-
-            let block_height = f.height;
-            let block_hash = &hex::encode(&f.block_hash);
-            let validator = &format!("{:?}", vote.public_key);
-
-            if added {
-                emit!(
-                    DEBUG,
-                    ParentFinalityVoteAdded {
-                        block_height,
-                        block_hash,
-                        validator,
-                    }
-                )
-            } else {
-                emit!(
-                    DEBUG,
-                    ParentFinalityVoteIgnored {
-                        block_height,
-                        block_hash,
-                        validator,
-                    }
-                )
-            }
         }
     }
 }

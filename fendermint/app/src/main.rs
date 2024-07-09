@@ -9,7 +9,7 @@ use ipc_observability::traces::{
 
 mod cmd;
 
-fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
+fn init_tracing(_opts: &options::Options) -> Option<WorkerGuard> {
     // let console_filter = opts.log_console_filter().expect("invalid filter");
     // let file_filter = opts.log_file_filter().expect("invalid filter");
 

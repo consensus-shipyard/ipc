@@ -55,17 +55,6 @@ macro_rules! set_gauge {
     };
 }
 
-/// Set a gauge to the maximum of its value and a field in an event.
-macro_rules! max_gauge {
-    ($event:ident, $event_ty:ident :: $field:ident, $gauge:expr) => {
-        check_field!($event_ty::$field);
-        let mut fld = visitors::FindU64::new(stringify!($field));
-        $event.record(&mut fld);
-        let curr = $gauge.get();
-        $gauge.set(std::cmp::max(fld.value as i64, curr));
-    };
-}
-
 /// Increment a counter by the value of a field in the event.
 macro_rules! inc_counter {
     ($event:ident, $event_ty:ident :: $field:ident, $counter:expr) => {
@@ -119,25 +108,8 @@ macro_rules! event_match {
 impl<S: Subscriber> Layer<S> for MetricsLayer<S> {
     fn on_event(&self, event: &Event<'_>, _ctx: layer::Context<'_, S>) {
         event_match!(event {
-            NewParentView {
-                block_height              => set_gauge   ! &am::TOPDOWN_VIEW_BLOCK_HEIGHT,
-                num_msgs                  => inc_counter ! &am::TOPDOWN_VIEW_NUM_MSGS,
-                num_validator_changes     => inc_counter ! &am::TOPDOWN_VIEW_NUM_VAL_CHNGS,
-            },
             ParentFinalityCommitted {
                 block_height              => set_gauge   ! &am::TOPDOWN_FINALIZED_BLOCK_HEIGHT,
-            },
-            ParentFinalityVoteAdded {
-                // This one can move up and down randomly as votes come in, but statistically should
-                // be less likely to be affected by Byzantine validators casting nonsense votes.
-                block_height              => set_gauge    ! &am::TOPDOWN_FINALITY_VOTE_BLOCK_HEIGHT,
-                // This one should only move up, showing the highest vote in the tally.
-                // It should be easy to produce this on Grafana as well from the one above.
-                block_height              => max_gauge    ! &am::TOPDOWN_FINALITY_VOTE_MAX_BLOCK_HEIGHT,
-                validator                 => inc1_counter ! &am::TOPDOWN_FINALITY_VOTE_ADDED,
-            },
-            ParentFinalityVoteIgnored {
-                validator                 => inc1_counter ! &am::TOPDOWN_FINALITY_VOTE_IGNORED,
             },
             ParentFinalityMissingQuorum {
                 block_hash                => inc1_counter ! &am::TOPDOWN_FINALITY_MISSING_QUORUM,
