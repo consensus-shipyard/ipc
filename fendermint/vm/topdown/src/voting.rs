@@ -21,6 +21,8 @@ use ipc_ipld_resolver::VoteRecord;
 pub type Weight = u64;
 pub type EcdsaSignature = Vec<u8>;
 
+/// A collection of validator public key that have signed the `content`. This includes their key
+/// and signatures. Mostly this comes from vote tally in the gossip channel.
 pub struct Quorum<K, V> {
     content: V,
     validators: HashMap<K, EcdsaSignature>,
@@ -297,64 +299,6 @@ where
         Ok(None)
     }
 
-    /// Find a block on the (from our perspective) finalized chain that gathered enough votes from validators.
-    pub fn find_quorum_with_cert(&self) -> Stm<Option<(BlockHeight, V)>> {
-        self.pause_votes.write(false)?;
-
-        let quorum_threshold = self.quorum_threshold()?;
-        let chain = self.chain.read()?;
-
-        let Some((finalized_height, _)) = chain.get_min() else {
-            tracing::debug!("finalized height not found");
-            return Ok(None);
-        };
-
-        let votes = self.votes.read()?;
-        let power_table = self.power_table.read()?;
-
-        let mut weight = 0;
-        let mut voters = im::HashSet::new();
-
-        for (block_height, block_hash) in chain.iter().rev() {
-            if block_height == finalized_height {
-                tracing::debug!(
-                    block_height,
-                    finalized_height,
-                    "finalized height and block height equal, no new proposals"
-                );
-                break; // This block is already finalized in the ledger, no need to propose it again.
-            }
-            let Some(block_hash) = block_hash else {
-                tracing::debug!(block_height, "null block found in vote proposal");
-                continue; // Skip null blocks
-            };
-            let Some(votes_at_height) = votes.get(block_height) else {
-                tracing::debug!(block_height, "no votes");
-                continue;
-            };
-            let Some(votes_for_block) = votes_at_height.get(block_hash) else {
-                tracing::debug!(block_height, "no votes for block");
-                continue; // We could detect equovicating voters here.
-            };
-
-            for vk in votes_for_block {
-                if voters.insert(vk.clone()).is_none() {
-                    // New voter, get their current weight; it might be 0 if they have been removed.
-                    weight += power_table.get(vk).cloned().unwrap_or_default();
-                    tracing::debug!(weight, key = ?vk, "new voter");
-                }
-            }
-
-            tracing::debug!(weight, quorum_threshold, "showdown");
-
-            if weight >= quorum_threshold {
-                return Ok(Some((*block_height, block_hash.clone())));
-            }
-        }
-
-        Ok(None)
-    }
-
     /// Call when a new finalized block is added to the ledger, to clear out all preceding blocks.
     ///
     /// After this operation the minimum item in the chain will the new finalized block.
@@ -413,11 +357,15 @@ pub enum AggregatedSignature {
 }
 
 impl AggregatedSignature {
-    pub fn add(&mut self, sig: Bytes) {
+    /// Add the signature to the aggregate. Returns true if the signature is added else false.
+    pub fn add(&mut self, sig: Bytes) -> bool {
         match self {
             AggregatedSignature::Ecdsa(sigs) => {
                 if !sigs.iter().any(|v| *v == sig) {
                     sigs.push(sig);
+                    true
+                } else {
+                    false
                 }
             }
             _ => todo!(),
@@ -479,11 +427,13 @@ impl MultiSigCert {
 
     pub fn extend<I: Iterator<Item = Option<Bytes>>>(&mut self, iter: I) {
         for sig in iter {
-            if let Some(sig) = sig {
-                self.agg_signatures.add(sig);
-                self.signed_validator_bitmap.push(true);
-            } else {
+            let Some(sig) = sig else {
                 self.signed_validator_bitmap.push(false);
+                continue;
+            };
+
+            if self.agg_signatures.add(sig) {
+                self.signed_validator_bitmap.push(true);
             }
         }
     }
@@ -643,7 +593,7 @@ pub async fn publish_vote_loop<V, F>(
 
 #[cfg(test)]
 mod tests {
-    use crate::voting::MultiSigCert;
+    use crate::voting::{AggregatedSignature, MultiSigCert};
     use libp2p::identity::Keypair;
 
     #[test]
@@ -654,16 +604,34 @@ mod tests {
             .collect();
 
         let message = vec![1, 2, 3];
-        let signatures = key_pairs.iter().map(|pair| {
-            if rand::random::<bool>() == true {
-                Some(pair.sign(&message).unwrap())
-            } else {
-                None
-            }
-        });
+        let signatures = key_pairs
+            .iter()
+            .map(|pair| {
+                if rand::random::<bool>() == true {
+                    Some(pair.sign(&message).unwrap())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
 
         let mut cert = MultiSigCert::ecdsa(20);
-        cert.extend(signatures);
+        cert.extend(signatures.clone().into_iter());
+        // add again with duplicates, should have no effect
+        cert.extend(signatures.clone().into_iter().filter(|v| v.is_some()));
+        match cert.agg_signatures {
+            AggregatedSignature::Ecdsa(ref v) => assert_eq!(
+                *v,
+                signatures
+                    .clone()
+                    .into_iter()
+                    .filter(|v| v.is_some())
+                    .map(|v| v.unwrap())
+                    .collect::<Vec<_>>()
+            ),
+            AggregatedSignature::Schnorr(_) => unreachable!(),
+        }
+        assert_eq!(cert.signed_validator_bitmap.len(), key_pairs.len());
 
         let pub_keys = key_pairs.iter().map(|p| p.public()).collect::<Vec<_>>();
         assert!(
