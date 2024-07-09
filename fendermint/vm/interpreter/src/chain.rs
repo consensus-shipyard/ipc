@@ -366,8 +366,15 @@ where
                         env.parent_finality_provider
                             .set_new_finality(finality.clone(), prev_finality.clone())?;
 
-                        env.parent_finality_votes
-                            .set_finalized(finality.height, finality.block_hash.clone())?;
+                        let local_block_height = state.block_height() as u64;
+                        let proposer = state.validator_id();
+
+                        env.parent_finality_votes.set_finalized(
+                            finality.height,
+                            finality.block_hash.clone(),
+                            proposer,
+                            Some(local_block_height),
+                        )?;
 
                         Ok(())
                     })

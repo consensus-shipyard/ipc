@@ -1,10 +1,12 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use ethers::core::k256::elliptic_curve::rand_core::block;
 use ipc_observability::{
     impl_traceable, impl_traceables, lazy_static, register_metrics, Recordable, TraceLevel,
     Traceable,
 };
+use ipc_provider::lotus::message::chain::Block;
 use prometheus::{
     register_histogram_vec, register_int_counter_vec, register_int_gauge, register_int_gauge_vec,
     HistogramVec, IntCounterVec, IntGauge, IntGaugeVec, Registry,
@@ -92,10 +94,10 @@ impl Recordable for ParentFinalityAcquired<'_> {
 
 #[derive(Debug)]
 pub struct ParentFinalityPeerVoteReceived<'a> {
-    validator: &'a str,
-    block_height: u64,
-    block_hash: &'a str,
-    commitment_hash: &'a str,
+    pub validator: &'a str,
+    pub block_height: BlockHeight,
+    pub block_hash: BlockHashHex<'a>,
+    pub commitment_hash: BlockHashHex<'a>,
 }
 
 impl Recordable for ParentFinalityPeerVoteReceived<'_> {
@@ -108,9 +110,9 @@ impl Recordable for ParentFinalityPeerVoteReceived<'_> {
 
 #[derive(Debug)]
 pub struct ParentFinalityPeerVoteSent<'a> {
-    block_height: u64,
-    block_hash: &'a str,
-    commitment_hash: &'a str,
+    pub block_height: BlockHeight,
+    pub block_hash: BlockHashHex<'a>,
+    pub commitment_hash: BlockHashHex<'a>,
 }
 
 impl Recordable for ParentFinalityPeerVoteSent<'_> {
@@ -121,10 +123,10 @@ impl Recordable for ParentFinalityPeerVoteSent<'_> {
 
 #[derive(Debug)]
 pub struct ParentFinalityPeerQuorumReached<'a> {
-    block_height: u64,
-    block_hash: &'a str,
-    commitment_hash: &'a str,
-    weight: u32,
+    pub block_height: BlockHeight,
+    pub block_hash: BlockHashHex<'a>,
+    pub commitment_hash: BlockHashHex<'a>,
+    pub weight: u64,
 }
 
 impl Recordable for ParentFinalityPeerQuorumReached<'_> {
@@ -138,10 +140,10 @@ impl Recordable for ParentFinalityPeerQuorumReached<'_> {
 
 #[derive(Debug)]
 pub struct ParentFinalityCommitted<'a> {
-    local_height: u64,
-    parent_height: u64,
-    block_hash: &'a str,
-    proposer: &'a str,
+    pub parent_height: BlockHeight,
+    pub block_hash: BlockHashHex<'a>,
+    pub local_height: Option<BlockHeight>,
+    pub proposer: Option<&'a str>,
 }
 
 impl Recordable for ParentFinalityCommitted<'_> {
@@ -231,10 +233,10 @@ mod tests {
         });
 
         emit(ParentFinalityCommitted {
-            local_height: 0,
             parent_height: 0,
             block_hash: "block_hash",
-            proposer: "proposer",
+            local_height: Some(0),
+            proposer: Some("proposer"),
         });
     }
 }
