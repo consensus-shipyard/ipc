@@ -1,18 +1,30 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use anyhow::anyhow;
 use async_stm::{abort, atomically_or_err, retry, Stm, StmResult, TVar};
-use serde::{de::DeserializeOwned, Serialize};
+use bitvec::vec::BitVec;
+use im::HashMap;
+use libp2p::identity::PublicKey;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::hash::Hash;
+use std::iter::zip;
 use std::{fmt::Debug, time::Duration};
 
-use crate::{BlockHash, BlockHeight};
+use crate::{BlockHash, BlockHeight, Bytes};
 
 // Usign this type because it's `Hash`, unlike the normal `libsecp256k1::PublicKey`.
 pub use ipc_ipld_resolver::ValidatorKey;
 use ipc_ipld_resolver::VoteRecord;
 
 pub type Weight = u64;
+pub type EcdsaSignature = Vec<u8>;
+
+pub struct Quorum<K, V> {
+    content: V,
+    validators: HashMap<K, EcdsaSignature>,
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error<K = ValidatorKey, V: AsRef<[u8]> = BlockHash> {
@@ -285,6 +297,64 @@ where
         Ok(None)
     }
 
+    /// Find a block on the (from our perspective) finalized chain that gathered enough votes from validators.
+    pub fn find_quorum_with_cert(&self) -> Stm<Option<(BlockHeight, V)>> {
+        self.pause_votes.write(false)?;
+
+        let quorum_threshold = self.quorum_threshold()?;
+        let chain = self.chain.read()?;
+
+        let Some((finalized_height, _)) = chain.get_min() else {
+            tracing::debug!("finalized height not found");
+            return Ok(None);
+        };
+
+        let votes = self.votes.read()?;
+        let power_table = self.power_table.read()?;
+
+        let mut weight = 0;
+        let mut voters = im::HashSet::new();
+
+        for (block_height, block_hash) in chain.iter().rev() {
+            if block_height == finalized_height {
+                tracing::debug!(
+                    block_height,
+                    finalized_height,
+                    "finalized height and block height equal, no new proposals"
+                );
+                break; // This block is already finalized in the ledger, no need to propose it again.
+            }
+            let Some(block_hash) = block_hash else {
+                tracing::debug!(block_height, "null block found in vote proposal");
+                continue; // Skip null blocks
+            };
+            let Some(votes_at_height) = votes.get(block_height) else {
+                tracing::debug!(block_height, "no votes");
+                continue;
+            };
+            let Some(votes_for_block) = votes_at_height.get(block_hash) else {
+                tracing::debug!(block_height, "no votes for block");
+                continue; // We could detect equovicating voters here.
+            };
+
+            for vk in votes_for_block {
+                if voters.insert(vk.clone()).is_none() {
+                    // New voter, get their current weight; it might be 0 if they have been removed.
+                    weight += power_table.get(vk).cloned().unwrap_or_default();
+                    tracing::debug!(weight, key = ?vk, "new voter");
+                }
+            }
+
+            tracing::debug!(weight, quorum_threshold, "showdown");
+
+            if weight >= quorum_threshold {
+                return Ok(Some((*block_height, block_hash.clone())));
+            }
+        }
+
+        Ok(None)
+    }
+
     /// Call when a new finalized block is added to the ledger, to clear out all preceding blocks.
     ///
     /// After this operation the minimum item in the chain will the new finalized block.
@@ -328,6 +398,142 @@ where
                 }
             }
         })
+    }
+}
+
+/// Note that currently IPC is using seckp private keys which makes BLS impossible.
+/// Ecdsa is not going to be scalable for large set of public keys, still ok for small set of public keys
+///
+/// Most promising solution is using Schnorr which is already implemented in Bitcoin, rust implementation
+/// is still new. Keep `Schnorr` variant as kiv and should definitely implement
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum AggregatedSignature {
+    Ecdsa(Vec<Bytes>),
+    Schnorr(Bytes),
+}
+
+impl AggregatedSignature {
+    pub fn add(&mut self, sig: Bytes) {
+        match self {
+            AggregatedSignature::Ecdsa(sigs) => {
+                if !sigs.iter().any(|v| *v == sig) {
+                    sigs.push(sig);
+                }
+            }
+            _ => todo!(),
+        }
+    }
+
+    pub fn is_valid(&self, message: &[u8], pub_keys: &[PublicKey]) -> bool {
+        match self {
+            AggregatedSignature::Ecdsa(ref signatures) => {
+                if signatures.len() != pub_keys.len() {
+                    return false;
+                }
+
+                for (sig, key) in zip(signatures, pub_keys) {
+                    if !key.verify(message, sig) {
+                        return false;
+                    }
+                }
+
+                true
+            }
+            _ => todo!(),
+        }
+    }
+}
+
+/// The ecdsa signature aggregation quorum cert for topdown proposal
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MultiSigCert {
+    signed_validator_bitmap: BitVec,
+    agg_signatures: AggregatedSignature,
+}
+
+impl MultiSigCert {
+    pub fn signed_validators<T: Clone>(&self, validators: &[T]) -> anyhow::Result<Vec<T>> {
+        if validators.len() != self.signed_validator_bitmap.len() {
+            return Err(anyhow!("validators length and bitmap length not match"));
+        }
+
+        let mut pks: Vec<T> = Vec::new();
+        self.signed_validator_bitmap
+            .iter()
+            .enumerate()
+            .for_each(|(idx, bit)| {
+                if bit == true {
+                    pks.push(validators[idx].clone());
+                }
+            });
+
+        Ok(pks)
+    }
+
+    pub fn ecdsa(capacity: usize) -> Self {
+        Self {
+            signed_validator_bitmap: BitVec::with_capacity(capacity),
+            agg_signatures: AggregatedSignature::Ecdsa(Vec::with_capacity(capacity)),
+        }
+    }
+
+    pub fn extend<I: Iterator<Item = Option<Bytes>>>(&mut self, iter: I) {
+        for sig in iter {
+            if let Some(sig) = sig {
+                self.agg_signatures.add(sig);
+                self.signed_validator_bitmap.push(true);
+            } else {
+                self.signed_validator_bitmap.push(false);
+            }
+        }
+    }
+
+    /// Checks if the cert contains aggregated signature signed by the public keys against the message
+    pub fn is_valid(&self, message: &[u8], validator_set: &[PublicKey]) -> anyhow::Result<bool> {
+        let pub_keys = self.signed_validators(validator_set)?;
+        Ok(self.agg_signatures.is_valid(message, &pub_keys))
+    }
+}
+
+impl<K: Hash + Eq + Clone + Ord, V: PartialEq + AsRef<u8>> Quorum<K, V> {
+    pub fn new(content: V) -> Self {
+        Self {
+            content,
+            validators: HashMap::new(),
+        }
+    }
+
+    pub fn add_vote(&mut self, k: K, content: V, sig: EcdsaSignature) -> anyhow::Result<()> {
+        if self.content != content {
+            return Err(anyhow!("quorum content not match"));
+        }
+
+        self.validators.insert(k, sig);
+
+        Ok(())
+    }
+
+    pub fn to_cert(mut self, power_table: &HashMap<K, Weight>) -> MultiSigCert {
+        let mut sorted_powers = power_table.iter().collect::<Vec<_>>();
+
+        sorted_powers.sort_by(|a, b| {
+            let cmp = b.1.cmp(a.1);
+            if cmp != Ordering::Equal {
+                cmp
+            } else {
+                b.0.cmp(a.0)
+            }
+        });
+
+        let mut cert = MultiSigCert::ecdsa(sorted_powers.len());
+
+        let iter = sorted_powers
+            .into_iter()
+            .map(|(validator, _)| self.validators.remove(validator));
+
+        cert.extend(iter);
+
+        cert
     }
 }
 
@@ -432,5 +638,43 @@ pub async fn publish_vote_loop<V, F>(
         }
 
         prev = Some((next_height, next_hash, has_power));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::voting::MultiSigCert;
+    use libp2p::identity::Keypair;
+
+    #[test]
+    fn test_cert() {
+        let num_validators = 100;
+        let key_pairs: Vec<Keypair> = (0..num_validators)
+            .map(|_| Keypair::generate_secp256k1())
+            .collect();
+
+        let message = vec![1, 2, 3];
+        let signatures = key_pairs.iter().map(|pair| {
+            if rand::random::<bool>() == true {
+                Some(pair.sign(&message).unwrap())
+            } else {
+                None
+            }
+        });
+
+        let mut cert = MultiSigCert::ecdsa(20);
+        cert.extend(signatures);
+
+        let pub_keys = key_pairs.iter().map(|p| p.public()).collect::<Vec<_>>();
+        assert!(
+            cert.is_valid(&message, &pub_keys).unwrap(),
+            "should validate cert"
+        );
+
+        assert_eq!(
+            cert.is_valid(&vec![1, 2], &pub_keys).unwrap(),
+            false,
+            "should invalidate cert"
+        );
     }
 }

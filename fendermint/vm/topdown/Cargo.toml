@@ -7,9 +7,11 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+
 anyhow = { workspace = true }
 async-stm = { workspace = true }
 async-trait = { workspace = true }
+bitvec = { workspace = true, features = ["serde"] }
 bytes = { workspace = true }
 cid = { workspace = true }
 ethers = { workspace = true }
