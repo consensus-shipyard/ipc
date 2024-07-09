@@ -1,10 +1,10 @@
 [tasks.prometheus-run]
 script = """
+# TODO: need to add a --user $(id -u):(65534?)  once we figure out what group:user has the needed permission
 docker run \
   ${FLAGS} \
   --name ${PROMETHEUS_CONTAINER_NAME} \
   --init \
-  --user $(id -u) \
   --network ${NETWORK_NAME} \
   --volume ${PROMETHEUS_DIR}:/data/prometheus \
   --publish ${PROMETHEUS_HOST_PORT}:9090 \
