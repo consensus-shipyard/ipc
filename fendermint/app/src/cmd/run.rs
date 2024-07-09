@@ -23,7 +23,7 @@ use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::observe::register_metrics as register_topdown_metrics;
 use fendermint_vm_topdown::proxy::{IPCProviderProxy, IPCProviderProxyWithLatency};
 use fendermint_vm_topdown::sync::launch_polling_syncer;
-use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
+use fendermint_vm_topdown::voting::{publish_vote_loop, VoteTally};
 use fendermint_vm_topdown::{CachedFinalityProvider, IPCParentFinality, Toggle};
 use fvm_shared::address::{current_network, Address, Network};
 use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
@@ -539,7 +539,7 @@ async fn dispatch_vote(
                 tracing::debug!("ignoring vote; topdown disabled");
                 return;
             }
-            let res = atomically_or_err(|| {
+            let _res = atomically_or_err(|| {
                 parent_finality_votes.add_vote(
                     vote.public_key.clone(),
                     f.height,

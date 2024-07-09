@@ -1,4 +1,5 @@
 [workspace]
+resolver = "2"
 members = [
   # contracts
   "contracts/binding",
@@ -245,4 +246,3 @@ opt-level = "z"
 strip = true
 codegen-units = 1
 incremental = false
-resolver = "2"
