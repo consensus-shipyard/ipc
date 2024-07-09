@@ -1,10 +1,12 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use ethers::core::k256::elliptic_curve::rand_core::block;
 use ipc_observability::{
     impl_traceable, impl_traceables, lazy_static, register_metrics, serde::HexEncodableBlockHash,
     Recordable, TraceLevel, Traceable,
 };
+use ipc_provider::lotus::message::chain::Block;
 use prometheus::{
     register_histogram_vec, register_int_counter_vec, register_int_gauge, register_int_gauge_vec,
     HistogramVec, IntCounterVec, IntGauge, IntGaugeVec, Registry,
