@@ -19,8 +19,9 @@ fn init_tracing(_opts: &options::Options) -> Option<WorkerGuard> {
         ..Default::default()
     };
 
+    // TODO Karel - map the config to journal options
     let journal_opts = FileLayerOpts {
-        enabled: true,
+        enabled: false,
         directory: Some("/var/logs/fendermint"),
         ..FileLayerOpts::default()
     };
