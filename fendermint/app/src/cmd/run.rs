@@ -20,6 +20,7 @@ use fendermint_vm_interpreter::{
 };
 use fendermint_vm_resolver::ipld::IpldResolver;
 use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
+use fendermint_vm_topdown::observe::register_metrics as register_topdown_metrics;
 use fendermint_vm_topdown::proxy::{IPCProviderProxy, IPCProviderProxyWithLatency};
 use fendermint_vm_topdown::sync::launch_polling_syncer;
 use fendermint_vm_topdown::voting::{publish_vote_loop, VoteTally};
@@ -68,6 +69,8 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     // Prometheus metrics
     let metrics_registry = if settings.metrics.enabled {
         let registry = prometheus::Registry::new();
+
+        register_topdown_metrics(&registry).context("failed to register topdown metrics")?;
 
         fendermint_app::metrics::register_app_metrics(&registry)
             .context("failed to register metrics")?;
