@@ -1,6 +1,9 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use hex;
+use std::fmt;
+
 use ipc_observability::{
     impl_traceable, impl_traceables, lazy_static, register_metrics, Recordable, TraceLevel,
     Traceable,
@@ -41,8 +44,8 @@ impl_traceables!(
     ParentRpcCalled<'a>,
     ParentFinalityAcquired<'a>,
     ParentFinalityPeerVoteReceived<'a>,
-    ParentFinalityPeerVoteSent<'a>,
-    ParentFinalityPeerQuorumReached<'a>,
+    ParentFinalityPeerVoteSent,
+    ParentFinalityPeerQuorumReached,
     ParentFinalityCommitted<'a>
 );
 
@@ -68,16 +71,22 @@ impl Recordable for ParentRpcCalled<'_> {
 }
 
 pub type BlockHeight = u64;
-/// Hex encoded block hash.
-pub type BlockHashHex<'a> = &'a str;
+/// Hex encodable block hash.
+pub struct HexEncodableBlockHash(pub Vec<u8>);
+
+impl fmt::Debug for HexEncodableBlockHash {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", hex::encode(&self.0))
+    }
+}
 
 #[derive(Debug)]
 pub struct ParentFinalityAcquired<'a> {
     pub source: &'a str,
     pub is_null: bool,
     pub block_height: BlockHeight,
-    pub block_hash: Option<BlockHashHex<'a>>,
-    pub commitment_hash: Option<BlockHashHex<'a>>,
+    pub block_hash: Option<HexEncodableBlockHash>,
+    pub commitment_hash: Option<HexEncodableBlockHash>,
     pub num_msgs: usize,
     pub num_validator_changes: usize,
 }
@@ -94,8 +103,8 @@ impl Recordable for ParentFinalityAcquired<'_> {
 pub struct ParentFinalityPeerVoteReceived<'a> {
     pub validator: &'a str,
     pub block_height: BlockHeight,
-    pub block_hash: BlockHashHex<'a>,
-    pub commitment_hash: BlockHashHex<'a>,
+    pub block_hash: HexEncodableBlockHash,
+    pub commitment_hash: HexEncodableBlockHash,
 }
 
 impl Recordable for ParentFinalityPeerVoteReceived<'_> {
@@ -107,27 +116,27 @@ impl Recordable for ParentFinalityPeerVoteReceived<'_> {
 }
 
 #[derive(Debug)]
-pub struct ParentFinalityPeerVoteSent<'a> {
+pub struct ParentFinalityPeerVoteSent {
     pub block_height: BlockHeight,
-    pub block_hash: BlockHashHex<'a>,
-    pub commitment_hash: BlockHashHex<'a>,
+    pub block_hash: HexEncodableBlockHash,
+    pub commitment_hash: HexEncodableBlockHash,
 }
 
-impl Recordable for ParentFinalityPeerVoteSent<'_> {
+impl Recordable for ParentFinalityPeerVoteSent {
     fn record_metrics(&self) {
         TOPDOWN_PARENT_FINALITY_VOTING_LATEST_SENT_HEIGHT.set(self.block_height as i64);
     }
 }
 
 #[derive(Debug)]
-pub struct ParentFinalityPeerQuorumReached<'a> {
+pub struct ParentFinalityPeerQuorumReached {
     pub block_height: BlockHeight,
-    pub block_hash: BlockHashHex<'a>,
-    pub commitment_hash: BlockHashHex<'a>,
+    pub block_hash: HexEncodableBlockHash,
+    pub commitment_hash: HexEncodableBlockHash,
     pub weight: u64,
 }
 
-impl Recordable for ParentFinalityPeerQuorumReached<'_> {
+impl Recordable for ParentFinalityPeerQuorumReached {
     fn record_metrics(&self) {
         TOPDOWN_PARENT_FINALITY_VOTING_QUORUM_HEIGHT.set(self.block_height as i64);
 
@@ -139,7 +148,7 @@ impl Recordable for ParentFinalityPeerQuorumReached<'_> {
 #[derive(Debug)]
 pub struct ParentFinalityCommitted<'a> {
     pub parent_height: BlockHeight,
-    pub block_hash: BlockHashHex<'a>,
+    pub block_hash: HexEncodableBlockHash,
     pub local_height: Option<BlockHeight>,
     pub proposer: Option<&'a str>,
 }
@@ -200,12 +209,14 @@ mod tests {
             latency: 0.0,
         });
 
+        let hash = vec![0u8; 32];
+
         emit(ParentFinalityAcquired {
             source: "source",
             is_null: false,
             block_height: 0,
-            block_hash: Some("block_hash"),
-            commitment_hash: Some("commitment_hash"),
+            block_hash: Some(HexEncodableBlockHash(hash.clone())),
+            commitment_hash: Some(HexEncodableBlockHash(hash.clone())),
             num_msgs: 0,
             num_validator_changes: 0,
         });
@@ -213,26 +224,26 @@ mod tests {
         emit(ParentFinalityPeerVoteReceived {
             validator: "validator",
             block_height: 0,
-            block_hash: "block_hash",
-            commitment_hash: "commitment_hash",
+            block_hash: HexEncodableBlockHash(hash.clone()),
+            commitment_hash: HexEncodableBlockHash(hash.clone()),
         });
 
         emit(ParentFinalityPeerVoteSent {
             block_height: 0,
-            block_hash: "block_hash",
-            commitment_hash: "commitment_hash",
+            block_hash: HexEncodableBlockHash(hash.clone()),
+            commitment_hash: HexEncodableBlockHash(hash.clone()),
         });
 
         emit(ParentFinalityPeerQuorumReached {
             block_height: 0,
-            block_hash: "block_hash",
-            commitment_hash: "commitment_hash",
+            block_hash: HexEncodableBlockHash(hash.clone()),
+            commitment_hash: HexEncodableBlockHash(hash.clone()),
             weight: 0,
         });
 
         emit(ParentFinalityCommitted {
             parent_height: 0,
-            block_hash: "block_hash",
+            block_hash: HexEncodableBlockHash(hash.clone()),
             local_height: Some(0),
             proposer: Some("proposer"),
         });

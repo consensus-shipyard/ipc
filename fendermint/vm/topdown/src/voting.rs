@@ -8,8 +8,8 @@ use std::hash::Hash;
 use std::{fmt::Debug, time::Duration};
 
 use crate::observe::{
-    ParentFinalityCommitted, ParentFinalityPeerQuorumReached, ParentFinalityPeerVoteReceived,
-    ParentFinalityPeerVoteSent,
+    HexEncodableBlockHash, ParentFinalityCommitted, ParentFinalityPeerQuorumReached,
+    ParentFinalityPeerVoteReceived, ParentFinalityPeerVoteSent,
 };
 use crate::{BlockHash, BlockHeight};
 use ipc_observability::emit;
@@ -217,9 +217,8 @@ where
         }
 
         let validator_pub_key = validator_key.to_string();
-        let block_hash_hex = hex::encode(&block_hash);
 
-        let votes_for_block = votes_at_height.entry(block_hash).or_default();
+        let votes_for_block = votes_at_height.entry(block_hash.clone()).or_default();
 
         if votes_for_block.insert(validator_key).is_some() {
             return Ok(false);
@@ -230,9 +229,9 @@ where
         emit(ParentFinalityPeerVoteReceived {
             block_height,
             validator: &validator_pub_key,
-            block_hash: &block_hash_hex,
+            block_hash: HexEncodableBlockHash(block_hash.as_ref().to_vec()),
             // TODO Karel - this needs to be the commitment hash once implemented
-            commitment_hash: &block_hash_hex,
+            commitment_hash: HexEncodableBlockHash(block_hash.as_ref().to_vec()),
         });
 
         Ok(true)
@@ -295,12 +294,11 @@ where
             tracing::debug!(weight, quorum_threshold, "showdown");
 
             if weight >= quorum_threshold {
-                let block_hash_hex = hex::encode(block_hash);
-
                 emit(ParentFinalityPeerQuorumReached {
                     block_height: *block_height,
-                    block_hash: &block_hash_hex,
-                    commitment_hash: &block_hash_hex,
+                    block_hash: HexEncodableBlockHash(block_hash.as_ref().to_vec()),
+                    // TODO Karel - just placeholder - need to use real commitment once implemented
+                    commitment_hash: HexEncodableBlockHash(block_hash.as_ref().to_vec()),
                     weight,
                 });
 
@@ -321,11 +319,9 @@ where
         proposer: Option<&str>,
         local_block_height: Option<BlockHeight>,
     ) -> Stm<()> {
-        let block_hash_hex = hex::encode(&parent_block_hash);
-
         self.chain.update(|chain| {
             let (_, mut chain) = chain.split(&parent_block_height);
-            chain.insert(parent_block_height, Some(parent_block_hash));
+            chain.insert(parent_block_height, Some(parent_block_hash.clone()));
             chain
         })?;
 
@@ -335,7 +331,7 @@ where
         emit(ParentFinalityCommitted {
             local_height: local_block_height,
             parent_height: parent_block_height,
-            block_hash: &block_hash_hex,
+            block_hash: HexEncodableBlockHash(parent_block_hash.as_ref().to_vec()),
             proposer,
         });
 
@@ -461,12 +457,10 @@ pub async fn publish_vote_loop<V, F>(
                         tracing::error!(error = e.to_string(), "failed to publish vote");
                     }
 
-                    let block_hash_hex = hex::encode(&next_hash);
-
                     emit(ParentFinalityPeerVoteSent {
                         block_height: next_height,
-                        block_hash: &block_hash_hex,
-                        commitment_hash: &block_hash_hex,
+                        block_hash: HexEncodableBlockHash(next_hash.clone()),
+                        commitment_hash: HexEncodableBlockHash(next_hash.clone()),
                     });
                 }
                 Err(e) => {

@@ -16,7 +16,7 @@ use libp2p::futures::TryFutureExt;
 use std::sync::Arc;
 use tracing::instrument;
 
-use crate::observe::ParentFinalityAcquired;
+use crate::observe::{HexEncodableBlockHash, ParentFinalityAcquired};
 use ipc_observability::emit;
 
 /// Parent syncer that constantly poll parent. This struct handles lotus null blocks and deferred
@@ -262,7 +262,7 @@ where
             source: "Parent syncer",
             is_null: false,
             block_height: height,
-            block_hash: Some(&hex::encode(&data.0)),
+            block_hash: Some(HexEncodableBlockHash(data.0.clone())),
             // TODO Karel, Willes - when we introduce commitment hash, we should add it here
             commitment_hash: None,
             num_msgs: data.2.len(),
