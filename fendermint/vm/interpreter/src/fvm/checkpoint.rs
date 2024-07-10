@@ -24,7 +24,7 @@ use ipc_actors_abis::gateway_getter_facet as getter;
 use ipc_api::staking::ConfigurationNumber;
 use ipc_observability::emit;
 
-use super::observe::{CheckpointCreated, CheckpointSigned};
+use super::observe::{CheckpointCreated, CheckpointSigned, HexEncodableBlockHash};
 use super::state::ipc::tokens_to_burn;
 use super::{
     broadcast::Broadcaster,
@@ -123,7 +123,7 @@ where
 
     emit(CheckpointCreated {
         height: height.value(),
-        hash: &hex::encode(block_hash),
+        hash: HexEncodableBlockHash(block_hash.to_vec()),
         msg_count: num_msgs,
         config_number: next_configuration_number,
     });
@@ -257,7 +257,7 @@ where
 
             emit(CheckpointSigned {
                 height: height.value(),
-                hash: &hex::encode(cp.block_hash),
+                hash: HexEncodableBlockHash(cp.block_hash.to_vec()),
                 validator: &hex::encode(validator_ctx.public_key.serialize()),
             });
 

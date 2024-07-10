@@ -1,6 +1,9 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use hex;
+use std::fmt;
+
 use ipc_observability::{
     impl_traceable, impl_traceables, lazy_static, register_metrics, Recordable, TraceLevel,
     Traceable,
@@ -76,23 +79,31 @@ impl Recordable for MsgExec {
 impl_traceables!(
     TraceLevel::Info,
     "Bottom-up",
-    CheckpointCreated<'a>,
+    CheckpointCreated,
     CheckpointSigned<'a>,
-    CheckpointFinalized<'a>
+    CheckpointFinalized
 );
 
 /// Hex encoded hash.
 pub type HashHex<'a> = &'a str;
+// Hex encodable block hash.
+pub struct HexEncodableBlockHash(pub Vec<u8>);
+
+impl fmt::Debug for HexEncodableBlockHash {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", hex::encode(&self.0))
+    }
+}
 
 #[derive(Debug)]
-pub struct CheckpointCreated<'a> {
+pub struct CheckpointCreated {
     pub height: u64,
-    pub hash: HashHex<'a>,
+    pub hash: HexEncodableBlockHash,
     pub msg_count: usize,
     pub config_number: u64,
 }
 
-impl Recordable for CheckpointCreated<'_> {
+impl Recordable for CheckpointCreated {
     fn record_metrics(&self) {
         BOTTOMUP_CHECKPOINT_CREATED_TOTAL.inc();
         BOTTOMUP_CHECKPOINT_CREATED_HEIGHT.set(self.height as i64);
@@ -104,7 +115,7 @@ impl Recordable for CheckpointCreated<'_> {
 #[derive(Debug)]
 pub struct CheckpointSigned<'a> {
     pub height: u64,
-    pub hash: HashHex<'a>,
+    pub hash: HexEncodableBlockHash,
     pub validator: &'a str,
 }
 
@@ -117,12 +128,12 @@ impl Recordable for CheckpointSigned<'_> {
 }
 
 #[derive(Debug)]
-pub struct CheckpointFinalized<'a> {
+pub struct CheckpointFinalized {
     pub height: usize,
-    pub hash: HashHex<'a>,
+    pub hash: HexEncodableBlockHash,
 }
 
-impl Recordable for CheckpointFinalized<'_> {
+impl Recordable for CheckpointFinalized {
     fn record_metrics(&self) {
         BOTTOMUP_CHECKPOINT_FINALIZED_HEIGHT.set(self.height as i64);
     }
@@ -165,21 +176,22 @@ mod tests {
             exit_code: 1,
             message: message.clone(),
         });
+        let hash = vec![0x01, 0x02, 0x03];
 
         emit(CheckpointCreated {
             height: 1,
-            hash: "hash",
+            hash: HexEncodableBlockHash(hash.clone()),
             msg_count: 2,
             config_number: 3,
         });
         emit(CheckpointSigned {
             height: 1,
-            hash: "hash",
+            hash: HexEncodableBlockHash(hash.clone()),
             validator: "validator",
         });
         emit(CheckpointFinalized {
             height: 1,
-            hash: "hash",
+            hash: HexEncodableBlockHash(hash.clone()),
         });
     }
 }
