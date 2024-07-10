@@ -68,33 +68,94 @@ impl IPCProviderProxy {
 #[async_trait]
 impl ParentQueryProxy for IPCProviderProxy {
     async fn get_chain_head_height(&self) -> anyhow::Result<BlockHeight> {
-        emit_event_with_latency(&self.parent_subnet.to_string(), "chain_head", || async {
-            let height = self.ipc_provider.chain_head(&self.parent_subnet).await?;
-            Ok(height as BlockHeight)
-        })
-        .await
+        let height = self.ipc_provider.chain_head(&self.parent_subnet).await?;
+        Ok(height as BlockHeight)
     }
 
     /// Get the genesis epoch of the child subnet, i.e. the epoch that the subnet was created in
     /// the parent subnet.
     async fn get_genesis_epoch(&self) -> anyhow::Result<BlockHeight> {
-        emit_event_with_latency(&self.parent_subnet.to_string(), "genesis_epoch", || async {
-            let height = self.ipc_provider.genesis_epoch(&self.child_subnet).await?;
-            Ok(height as BlockHeight)
-        })
-        .await
+        let height = self.ipc_provider.genesis_epoch(&self.child_subnet).await?;
+        Ok(height as BlockHeight)
     }
 
     /// Getting the block hash at the target height.
     async fn get_block_hash(&self, height: BlockHeight) -> anyhow::Result<GetBlockHashResult> {
+        self.ipc_provider
+            .get_block_hash(&self.parent_subnet, height as ChainEpoch)
+            .await
+    }
+
+    /// Get the top down messages from the starting to the ending height.
+    async fn get_top_down_msgs(
+        &self,
+        height: BlockHeight,
+    ) -> anyhow::Result<TopDownQueryPayload<Vec<IpcEnvelope>>> {
+        self.ipc_provider
+            .get_top_down_msgs(&self.child_subnet, height as ChainEpoch)
+            .await
+            .map(|mut v| {
+                // sort ascending, we dont assume the changes are ordered
+                v.value.sort_by(|a, b| a.nonce.cmp(&b.nonce));
+                v
+            })
+    }
+
+    /// Get the validator set at the specified height.
+    async fn get_validator_changes(
+        &self,
+        height: BlockHeight,
+    ) -> anyhow::Result<TopDownQueryPayload<Vec<StakingChangeRequest>>> {
+        self.ipc_provider
+            .get_validator_changeset(&self.child_subnet, height as ChainEpoch)
+            .await
+            .map(|mut v| {
+                // sort ascending, we dont assume the changes are ordered
+                v.value
+                    .sort_by(|a, b| a.configuration_number.cmp(&b.configuration_number));
+                v
+            })
+    }
+}
+
+pub struct IPCProviderProxyWithLatency {
+    inner: IPCProviderProxy,
+}
+
+impl IPCProviderProxyWithLatency {
+    pub fn new(inner: IPCProviderProxy) -> Self {
+        Self { inner }
+    }
+}
+
+#[async_trait]
+impl ParentQueryProxy for IPCProviderProxyWithLatency {
+    #[instrument(skip(self))]
+    async fn get_chain_head_height(&self) -> anyhow::Result<BlockHeight> {
         emit_event_with_latency(
-            &self.parent_subnet.to_string(),
+            &self.inner.parent_subnet.to_string(),
+            "chain_head",
+            || async { self.inner.get_chain_head_height().await },
+        )
+        .await
+    }
+
+    #[instrument(skip(self))]
+    async fn get_genesis_epoch(&self) -> anyhow::Result<BlockHeight> {
+        emit_event_with_latency(
+            &self.inner.parent_subnet.to_string(),
+            "genesis_epoch",
+            || async { self.inner.get_genesis_epoch().await },
+        )
+        .await
+    }
+
+    #[instrument(skip(self))]
+    async fn get_block_hash(&self, height: BlockHeight) -> anyhow::Result<GetBlockHashResult> {
+        emit_event_with_latency(
+            &self.inner.parent_subnet.to_string(),
             "get_block_hash",
-            || async {
-                self.ipc_provider
-                    .get_block_hash(&self.parent_subnet, height as ChainEpoch)
-                    .await
-            },
+            || async { self.inner.get_block_hash(height).await },
         )
         .await
     }
@@ -105,18 +166,9 @@ impl ParentQueryProxy for IPCProviderProxy {
         height: BlockHeight,
     ) -> anyhow::Result<TopDownQueryPayload<Vec<IpcEnvelope>>> {
         emit_event_with_latency(
-            &self.parent_subnet.to_string(),
+            &self.inner.parent_subnet.to_string(),
             "get_top_down_msgs",
-            || async {
-                self.ipc_provider
-                    .get_top_down_msgs(&self.child_subnet, height as ChainEpoch)
-                    .await
-                    .map(|mut v| {
-                        // sort ascending, we dont assume the changes are ordered
-                        v.value.sort_by(|a, b| a.nonce.cmp(&b.nonce));
-                        v
-                    })
-            },
+            || async { self.inner.get_top_down_msgs(height).await },
         )
         .await
     }
@@ -127,19 +179,9 @@ impl ParentQueryProxy for IPCProviderProxy {
         height: BlockHeight,
     ) -> anyhow::Result<TopDownQueryPayload<Vec<StakingChangeRequest>>> {
         emit_event_with_latency(
-            &self.parent_subnet.to_string(),
+            &self.inner.parent_subnet.to_string(),
             "get_validator_changeset",
-            || async {
-                self.ipc_provider
-                    .get_validator_changeset(&self.child_subnet, height as ChainEpoch)
-                    .await
-                    .map(|mut v| {
-                        // sort ascending, we dont assume the changes are ordered
-                        v.value
-                            .sort_by(|a, b| a.configuration_number.cmp(&b.configuration_number));
-                        v
-                    })
-            },
+            || async { self.inner.get_validator_changes(height).await },
         )
         .await
     }
