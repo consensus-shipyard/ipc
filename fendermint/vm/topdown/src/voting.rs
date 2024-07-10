@@ -21,14 +21,6 @@ use ipc_ipld_resolver::VoteRecord;
 pub type Weight = u64;
 pub type Signature = Bytes;
 
-/// A collection of validator public key that have signed the `content`. This includes their key
-/// and signatures. Mostly this comes from vote tally in the gossip channel.
-pub struct VoteSignatures<K, V> {
-    /// The content of the vote
-    content: V,
-    validators: HashMap<K, Signature>,
-}
-
 #[derive(Debug, thiserror::Error)]
 pub enum Error<K = ValidatorKey, V: AsRef<[u8]> = BlockHash> {
     #[error("the last finalized block has not been set")]
@@ -446,21 +438,15 @@ impl MultiSigCert {
     }
 }
 
-impl<K: Hash + Eq + Clone + Ord, V: PartialEq + AsRef<u8>> VoteSignatures<K, V> {
-    pub fn new(content: V) -> Self {
-        Self {
-            content,
-            validators: HashMap::new(),
-        }
-    }
+/// A collection of validator public key that have signed the same content.
+#[derive(Default)]
+struct ValidatorSignatures<K> {
+    validators: HashMap<K, Signature>,
+}
 
-    pub fn add_vote(&mut self, k: K, content: V, sig: Signature) -> anyhow::Result<()> {
-        if self.content != content {
-            return Err(anyhow!("quorum content not match"));
-        }
-
+impl<K: Hash + Eq + Clone + Ord> ValidatorSignatures<K> {
+    pub fn add_vote(&mut self, k: K, sig: Signature) -> anyhow::Result<()> {
         self.validators.insert(k, sig);
-
         Ok(())
     }
 
