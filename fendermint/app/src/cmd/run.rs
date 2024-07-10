@@ -20,7 +20,7 @@ use fendermint_vm_interpreter::{
 };
 use fendermint_vm_resolver::ipld::IpldResolver;
 use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
-use fendermint_vm_topdown::proxy::IPCProviderProxy;
+use fendermint_vm_topdown::proxy::{IPCProviderProxy, IPCProviderProxyWithLatency};
 use fendermint_vm_topdown::sync::launch_polling_syncer;
 use fendermint_vm_topdown::voting::{publish_vote_loop, VoteTally};
 use fendermint_vm_topdown::{CachedFinalityProvider, IPCParentFinality, Toggle};
@@ -247,11 +247,16 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             config = config.with_max_cache_blocks(v);
         }
 
-        let ipc_provider = Arc::new(make_ipc_provider_proxy(&settings)?);
-        let finality_provider =
-            CachedFinalityProvider::uninitialized(config.clone(), ipc_provider.clone()).await?;
+        let ipc_provider = make_ipc_provider_proxy(&settings)?;
+        let ipc_provider_with_latency = Arc::new(IPCProviderProxyWithLatency::new(ipc_provider));
+
+        let finality_provider = CachedFinalityProvider::uninitialized(
+            config.clone(),
+            ipc_provider_with_latency.clone(),
+        )
+        .await?;
         let p = Arc::new(Toggle::enabled(finality_provider));
-        (p, Some((ipc_provider, config)))
+        (p, Some((ipc_provider_with_latency, config)))
     } else {
         info!("topdown finality disabled");
         (Arc::new(Toggle::disabled()), None)

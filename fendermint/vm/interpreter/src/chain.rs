@@ -20,7 +20,7 @@ use fendermint_vm_message::{
     ipc::{BottomUpCheckpoint, CertifiedMessage, IpcMessage, SignedRelayedMessage},
 };
 use fendermint_vm_resolver::pool::{ResolveKey, ResolvePool};
-use fendermint_vm_topdown::proxy::IPCProviderProxy;
+use fendermint_vm_topdown::proxy::IPCProviderProxyWithLatency;
 use fendermint_vm_topdown::voting::{ValidatorKey, VoteTally};
 use fendermint_vm_topdown::{
     CachedFinalityProvider, IPCParentFinality, ParentFinalityProvider, ParentViewProvider, Toggle,
@@ -34,7 +34,7 @@ use std::sync::Arc;
 
 /// A resolution pool for bottom-up and top-down checkpoints.
 pub type CheckpointPool = ResolvePool<CheckpointPoolItem>;
-pub type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProviderProxy>>>;
+pub type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProviderProxyWithLatency>>>;
 
 /// These are the extra state items that the chain interpreter needs,
 /// a sort of "environment" supporting IPC.
