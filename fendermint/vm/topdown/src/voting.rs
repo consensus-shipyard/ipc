@@ -19,13 +19,14 @@ pub use ipc_ipld_resolver::ValidatorKey;
 use ipc_ipld_resolver::VoteRecord;
 
 pub type Weight = u64;
-pub type EcdsaSignature = Vec<u8>;
+pub type Signature = Bytes;
 
 /// A collection of validator public key that have signed the `content`. This includes their key
 /// and signatures. Mostly this comes from vote tally in the gossip channel.
-pub struct Quorum<K, V> {
+pub struct VoteSignatures<K, V> {
+    /// The content of the vote
     content: V,
-    validators: HashMap<K, EcdsaSignature>,
+    validators: HashMap<K, Signature>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -445,7 +446,7 @@ impl MultiSigCert {
     }
 }
 
-impl<K: Hash + Eq + Clone + Ord, V: PartialEq + AsRef<u8>> Quorum<K, V> {
+impl<K: Hash + Eq + Clone + Ord, V: PartialEq + AsRef<u8>> VoteSignatures<K, V> {
     pub fn new(content: V) -> Self {
         Self {
             content,
@@ -453,7 +454,7 @@ impl<K: Hash + Eq + Clone + Ord, V: PartialEq + AsRef<u8>> Quorum<K, V> {
         }
     }
 
-    pub fn add_vote(&mut self, k: K, content: V, sig: EcdsaSignature) -> anyhow::Result<()> {
+    pub fn add_vote(&mut self, k: K, content: V, sig: Signature) -> anyhow::Result<()> {
         if self.content != content {
             return Err(anyhow!("quorum content not match"));
         }
