@@ -29,6 +29,16 @@ pub struct VoteSignatures<K, V> {
     validators: HashMap<K, Signature>,
 }
 
+/// The vote submitted to the vote tally
+pub struct Vote<K, V> {
+    /// The version number of the vote
+    version: u8,
+    payload: V,
+    /// The signature of the signed content using the pubkey
+    signature: Bytes,
+    pubkey: K,
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error<K = ValidatorKey, V: AsRef<[u8]> = BlockHash> {
     #[error("the last finalized block has not been set")]
@@ -73,7 +83,7 @@ pub struct VoteTally<K = ValidatorKey, V = BlockHash> {
     /// all the votes for a given block hash and also to verify that a validator
     /// isn't equivocating by trying to vote for two different things at the
     /// same height.
-    votes: TVar<im::OrdMap<BlockHeight, im::HashMap<V, im::HashSet<K>>>>,
+    votes: TVar<im::OrdMap<BlockHeight, im::HashMap<V, VoteSignatures<K, V>>>>,
 
     /// Adding votes can be paused if we observe that looking for a quorum takes too long
     /// and is often retried due to votes being added.
@@ -191,6 +201,59 @@ where
     /// Returns `true` if this vote was added, `false` if it was ignored as a
     /// duplicate or a height we already finalized, and an error if it's an
     /// equivocation or from a validator we don't know.
+    pub fn vote_received(
+        &self,
+        block_height: BlockHeight,
+        vote: Vote<K, V>,
+    ) -> StmResult<bool, Error<K, V>> {
+        if *self.pause_votes.read()? {
+            retry()?;
+        }
+
+        let min_height = self.last_finalized_height()?;
+
+        if block_height < min_height {
+            return Ok(false);
+        }
+
+        let validator_key = vote.pubkey;
+
+        if !self.has_power(&validator_key)? {
+            return abort(Error::UnpoweredValidator(validator_key));
+        }
+
+        let mut votes = self.votes.read_clone()?;
+        let votes_at_height = votes.entry(block_height).or_default();
+
+        for (content, submissions) in votes_at_height.iter() {
+            if submissions.has_voted(&validator_key) && *content != vote.payload {
+                // this means the validator has voted a different content at the same block height.
+                // todo: replace with a HashMap<BlockHeight, HashSet<K>> is much faster
+                return abort(Error::Equivocation(
+                    validator_key,
+                    block_height,
+                    vote.payload,
+                    content.clone(),
+                ));
+            }
+        }
+
+        let submissions = votes_at_height.entry(vote.payload.clone()).or_insert(VoteSignatures::new(vote.payload.clone()));
+        if submissions.add_vote(validator_key, vote.payload,vote.signature).is_some() {
+            return Ok(false);
+        }
+
+        self.votes.write(votes)?;
+
+        Ok(true)
+    }
+
+
+    /// Add a vote we received.
+    ///
+    /// Returns `true` if this vote was added, `false` if it was ignored as a
+    /// duplicate or a height we already finalized, and an error if it's an
+    /// equivocation or from a validator we don't know.
     pub fn add_vote(
         &self,
         validator_key: K,
@@ -215,7 +278,7 @@ where
         let votes_at_height = votes.entry(block_height).or_default();
 
         for (bh, vs) in votes_at_height.iter() {
-            if *bh != block_hash && vs.contains(&validator_key) {
+            if *bh != block_hash && vs.has_voted(&validator_key) {
                 return abort(Error::Equivocation(
                     validator_key,
                     block_height,
@@ -225,9 +288,9 @@ where
             }
         }
 
-        let votes_for_block = votes_at_height.entry(block_hash).or_default();
+        let votes_for_block = votes_at_height.entry(block_hash.clone()).or_default();
 
-        if votes_for_block.insert(validator_key).is_some() {
+        if votes_for_block.add_vote(validator_key, block_hash, Default::default()).is_some() {
             return Ok(false);
         }
 
@@ -297,6 +360,10 @@ where
             }
         }
 
+        Ok(None)
+    }
+
+    pub fn find_quorum_with_cert(&self) -> Stm<Option<(BlockHeight, V, MultiSigCert)>> {
         Ok(None)
     }
 
@@ -454,7 +521,11 @@ impl<K: Hash + Eq + Clone + Ord, V: PartialEq + AsRef<u8>> VoteSignatures<K, V> 
         }
     }
 
-    pub fn add_vote(&mut self, k: K, content: V, sig: Signature) -> anyhow::Result<()> {
+    pub fn has_voted(&self, k: &K) -> bool {
+        self.validators.contains_key(k)
+    }
+
+    pub fn add_vote(&mut self, k: K, content: V, sig: EcdsaSignature) -> anyhow::Result<()> {
         if self.content != content {
             return Err(anyhow!("quorum content not match"));
         }
