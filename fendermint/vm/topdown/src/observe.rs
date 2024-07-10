@@ -1,6 +1,9 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use hex;
+use std::fmt;
+
 use ipc_observability::{
     impl_traceable, impl_traceables, lazy_static, register_metrics, serde::HexEncodableBlockHash,
     Recordable, TraceLevel, Traceable,
