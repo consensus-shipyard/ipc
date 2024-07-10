@@ -607,7 +607,7 @@ mod tests {
         let signatures = key_pairs
             .iter()
             .map(|pair| {
-                if rand::random::<bool>() == true {
+                if rand::random::<bool>() {
                     Some(pair.sign(&message).unwrap())
                 } else {
                     None
@@ -622,12 +622,7 @@ mod tests {
         match cert.agg_signatures {
             AggregatedSignature::Ecdsa(ref v) => assert_eq!(
                 *v,
-                signatures
-                    .clone()
-                    .into_iter()
-                    .filter(|v| v.is_some())
-                    .map(|v| v.unwrap())
-                    .collect::<Vec<_>>()
+                signatures.clone().into_iter().flatten().collect::<Vec<_>>()
             ),
             AggregatedSignature::Schnorr(_) => unreachable!(),
         }
@@ -639,9 +634,8 @@ mod tests {
             "should validate cert"
         );
 
-        assert_eq!(
-            cert.is_valid(&vec![1, 2], &pub_keys).unwrap(),
-            false,
+        assert!(
+            !cert.is_valid(&[1, 2], &pub_keys).unwrap(),
             "should invalidate cert"
         );
     }
