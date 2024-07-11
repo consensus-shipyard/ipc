@@ -41,6 +41,7 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e IPFS_RPC_HOST_PORT="${IPFS_RPC_HOST_PORTS[0]}" \
     -e IPFS_GATEWAY_HOST_PORT="${IPFS_GATEWAY_HOST_PORTS[0]}" \
     -e PROMETHEUS_HOST_PORT="${PROMETHEUS_HOST_PORTS[0]}" \
+    -e PROMETHEUS_CONFIG_FOLDER="${PROMETHEUS_CONFIG_FOLDER}" \
     -e IPFS_PROFILE="local-discovery" \
     -e FM_PULL_SKIP=1 \
     -e FM_LOG_LEVEL="info,fendermint=debug" \
@@ -65,6 +66,7 @@ do
       -e IPFS_RPC_HOST_PORT="${IPFS_RPC_HOST_PORTS[i]}" \
       -e IPFS_GATEWAY_HOST_PORT="${IPFS_GATEWAY_HOST_PORTS[i]}" \
       -e PROMETHEUS_HOST_PORT="${PROMETHEUS_HOST_PORTS[i]}" \
+      -e PROMETHEUS_CONFIG_FOLDER="${PROMETHEUS_CONFIG_FOLDER}" \
       -e IPFS_PROFILE="local-discovery" \
       -e RESOLVER_BOOTSTRAPS="$bootstrap_resolver_endpoint" \
       -e BOOTSTRAPS="$bootstrap_node_endpoint" \
@@ -124,6 +126,11 @@ CometBFT API:
 http://localhost:${CMT_RPC_HOST_PORTS[0]}
 http://localhost:${CMT_RPC_HOST_PORTS[1]}
 http://localhost:${CMT_RPC_HOST_PORTS[2]}
+
+Prometheus API:
+http://localhost:${PROMETHEUS_HOST_PORTS[0]}
+http://localhost:${PROMETHEUS_HOST_PORTS[1]}
+http://localhost:${PROMETHEUS_HOST_PORTS[2]}
 
 Accounts:
 $(jq -r '.app_state.accounts[] | "\(.meta.Account.owner): \(.balance) coin units"' "$subnet_folder"/validator-0/genesis.json)
