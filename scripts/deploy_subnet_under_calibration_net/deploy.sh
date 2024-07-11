@@ -37,6 +37,7 @@ OBJECTS_HOST_PORTS=(8001 8002 8003)
 IPFS_SWARM_HOST_PORTS=(4001 4002 4003)
 IPFS_RPC_HOST_PORTS=(5001 5002 5003)
 IPFS_GATEWAY_HOST_PORTS=(8080 8081 8082)
+PROMETHEUS_HOST_PORTS=(9090 9091 9092)
 
 if (($# != 1)); then
   echo "Arguments: <Specify github remote branch name to use to deploy. Or use 'local' (without quote) to indicate using local repo instead. If not provided, will default to main branch"
@@ -246,6 +247,7 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e IPFS_SWARM_HOST_PORT=${IPFS_SWARM_HOST_PORTS[0]} \
     -e IPFS_RPC_HOST_PORT=${IPFS_RPC_HOST_PORTS[0]} \
     -e IPFS_GATEWAY_HOST_PORT=${IPFS_GATEWAY_HOST_PORTS[0]} \
+    -e PROMETHEUS_HOST_PORT="${PROMETHEUS_HOST_PORTS[0]}" \
     -e IPFS_PROFILE="local-discovery" \
     -e PARENT_HTTP_AUTH_TOKEN=${PARENT_HTTP_AUTH_TOKEN} \
     -e PARENT_REGISTRY=${parent_registry_address} \
@@ -280,6 +282,7 @@ do
       -e IPFS_SWARM_HOST_PORT=${IPFS_SWARM_HOST_PORTS[i]} \
       -e IPFS_RPC_HOST_PORT=${IPFS_RPC_HOST_PORTS[i]} \
       -e IPFS_GATEWAY_HOST_PORT=${IPFS_GATEWAY_HOST_PORTS[i]} \
+      -e PROMETHEUS_HOST_PORT="${PROMETHEUS_HOST_PORTS[i]}" \
       -e IPFS_PROFILE="local-discovery" \
       -e RESOLVER_BOOTSTRAPS=${bootstrap_resolver_endpoint} \
       -e BOOTSTRAPS=${bootstrap_node_endpoint} \
@@ -344,6 +347,11 @@ ETH API:
 http://localhost:${ETHAPI_HOST_PORTS[0]}
 http://localhost:${ETHAPI_HOST_PORTS[1]}
 http://localhost:${ETHAPI_HOST_PORTS[2]}
+
+Prometheus API:
+http://localhost:${PROMETHEUS_HOST_PORTS[0]}
+http://localhost:${PROMETHEUS_HOST_PORTS[1]}
+http://localhost:${PROMETHEUS_HOST_PORTS[2]}
 
 Accounts:
 $(jq -r '.accounts[] | "\(.meta.Account.owner): \(.balance) coin units"' ${subnet_folder}/validator-0/genesis.json)
