@@ -7,6 +7,7 @@ docker run \
   --init \
   --network ${NETWORK_NAME} \
   --volume ${PROMETHEUS_DIR}:/data/prometheus \
+  --volume ${PROMETHEUS_CONFIG_DIR}/prometheus.yml:/etc/prometheus/prometheus.yml \
   --publish ${PROMETHEUS_HOST_PORT}:9090 \
   ${PROMETHEUS_DOCKER_IMAGE}
 """

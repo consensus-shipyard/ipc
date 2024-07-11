@@ -26,6 +26,7 @@ else
     IPC_FOLDER=${IPC_FOLDER}
 fi
 IPC_CONFIG_FOLDER=${HOME}/.ipc
+PROMETHEUS_CONFIG_FOLDER=${IPC_FOLDER}/infra/prometheus
 
 wallet_addresses=()
 CMT_P2P_HOST_PORTS=(26656 26756 26856)

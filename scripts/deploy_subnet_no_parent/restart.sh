@@ -5,6 +5,7 @@ set -euo pipefail
 dir=$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")
 IPC_FOLDER="$dir"/../..
 IPC_CONFIG_FOLDER=${HOME}/.ipc
+PROMETHEUS_CONFIG_FOLDER=${IPC_FOLDER}/infra/prometheus
 
 CMT_P2P_HOST_PORTS=(26656 26756 26856)
 CMT_RPC_HOST_PORTS=(26657 26757 26857)
