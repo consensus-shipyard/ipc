@@ -159,6 +159,59 @@ impl Recordable for ParentFinalityCommitted<'_> {
     }
 }
 
+pub fn emit_all() {
+    use ipc_observability::emit;
+
+    emit(ParentRpcCalled {
+        source: "source",
+        json_rpc: "json_rpc",
+        method: "method",
+        status: "status",
+        latency: 1.0,
+    });
+
+    let hash = vec![0u8; 32];
+
+    emit(ParentFinalityAcquired {
+        source: "parent-finality",
+        is_null: false,
+        block_height: 10,
+        block_hash: Some(HexEncodableBlockHash(hash.clone())),
+        commitment_hash: Some(HexEncodableBlockHash(hash.clone())),
+        num_msgs: 5,
+        num_validator_changes: 6,
+    });
+
+    emit(ParentFinalityPeerVoteReceived {
+        validator: "abcd",
+        block_height: 10,
+        block_hash: HexEncodableBlockHash(hash.clone()),
+        commitment_hash: HexEncodableBlockHash(hash.clone()),
+    });
+
+    emit(ParentFinalityPeerVoteSent {
+        block_height: 10,
+        block_hash: HexEncodableBlockHash(hash.clone()),
+        commitment_hash: HexEncodableBlockHash(hash.clone()),
+    });
+
+    emit(ParentFinalityPeerQuorumReached {
+        block_height: 10,
+        block_hash: HexEncodableBlockHash(hash.clone()),
+        commitment_hash: HexEncodableBlockHash(hash.clone()),
+        weight: 5,
+    });
+
+    emit(ParentFinalityCommitted {
+        parent_height: 10,
+        block_hash: HexEncodableBlockHash(hash.clone()),
+        local_height: Some(3),
+        proposer: Some("proposer-validator"),
+    });
+
+    println!("Emitted all events");
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
