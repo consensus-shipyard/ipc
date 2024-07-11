@@ -8,6 +8,7 @@ use im::HashMap;
 use libp2p::identity::PublicKey;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
 use std::hash::Hash;
 use std::iter::zip;
 use std::{fmt::Debug, time::Duration};
@@ -21,18 +22,9 @@ use ipc_ipld_resolver::VoteRecord;
 pub type Weight = u64;
 pub type Signature = Bytes;
 
-/// A collection of validator public key that have signed the `content`. This includes their key
-/// and signatures. Mostly this comes from vote tally in the gossip channel.
-pub struct VoteSignatures<K, V> {
-    /// The content of the vote
-    content: V,
-    validators: HashMap<K, Signature>,
-}
-
 /// The vote submitted to the vote tally
 pub struct Vote<K, V> {
-    /// The version number of the vote
-    version: u8,
+    block_height: BlockHeight,
     payload: V,
     /// The signature of the signed content using the pubkey
     signature: Bytes,
@@ -62,6 +54,238 @@ pub enum Error<K = ValidatorKey, V: AsRef<[u8]> = BlockHash> {
 /// and tally up the weights of the validators on the child subnet,
 /// so that we can ask for proposals that are not going to be voted
 /// down.
+#[derive(Default)]
+struct Inner<K = ValidatorKey, V = BlockHash> {
+    /// Current validator weights. These are the ones who will vote on the blocks,
+    /// so these are the weights which need to form a quorum.
+    power_table: HashMap<K, Weight>,
+
+    /// The *finalized mainchain* of the parent as observed by this node.
+    ///
+    /// These are assumed to be final because IIRC that's how the syncer works,
+    /// only fetching the info about blocks which are already sufficiently deep.
+    ///
+    /// When we want to propose, all we have to do is walk back this chain and
+    /// tally the votes we collected for the block hashes until we reach a quorum.
+    ///
+    /// The block hash is optional to allow for null blocks on Filecoin rootnet.
+    parent_data: BTreeMap<BlockHeight, Option<V>>,
+
+    /// Index votes received by height, which makes it easy to look up
+    /// all the votes for a given block height and also to verify that a validator
+    /// isn't equivocating by trying to vote for two different things at the
+    /// same height.
+    votes: BTreeMap<BlockHeight, HashMap<V, ValidatorSignatures<K>>>,
+}
+
+impl<K, V> Inner<K, V>
+where
+    K: Clone + Hash + Eq + Sync + Send + 'static + Debug + Ord,
+    V: AsRef<[u8]> + Clone + Hash + Eq + Sync + Send + 'static,
+{
+    /// Create an uninitialized instance. Before blocks can be added to it
+    /// we will have to set the last finalized block.
+    ///
+    /// The reason this exists is so that we can delay initialization until
+    /// after the genesis block has been executed.
+    pub fn empty() -> Self {
+        Self {
+            power_table: HashMap::new(),
+            parent_data: BTreeMap::new(),
+            votes: BTreeMap::new(),
+        }
+    }
+
+    /// Initialize the vote tally from the current power table
+    /// and the last finalized block from the ledger.
+    pub fn new(power_table: Vec<(K, Weight)>, last_finalized_block: (BlockHeight, V)) -> Self {
+        let (height, payload) = last_finalized_block;
+
+        let mut chain = BTreeMap::new();
+        chain.insert(height, Some(payload));
+
+        Self {
+            power_table: HashMap::from_iter(power_table),
+            parent_data: chain,
+            votes: BTreeMap::new(),
+        }
+    }
+
+    /// Check that a validator key is currently part of the power table.
+    pub fn has_power(&self, validator_key: &K) -> bool {
+        // For consistency consider validators without power unknown.
+        self.power_table
+            .get(validator_key)
+            .map(|weight| *weight > 0)
+            .unwrap_or(false)
+    }
+
+    /// Calculate the minimum weight needed for a proposal to pass with the current membership.
+    ///
+    /// This is inclusive, that is, if the sum of weight is greater or equal to this, it should pass.
+    /// The equivalent formula can be found in CometBFT [here](https://github.com/cometbft/cometbft/blob/a8991d63e5aad8be82b90329b55413e3a4933dc0/types/vote_set.go#L307).
+    pub fn quorum_threshold(&self) -> Weight {
+        let total_weight: Weight = self.power_table.values().sum();
+        total_weight * 2 / 3 + 1
+    }
+
+    /// Return the height of the first entry in the chain.
+    ///
+    /// This is the block that was finalized *in the ledger*.
+    fn min_height(&self) -> BlockHeight {
+        self.parent_data
+            .first_key_value()
+            .map(|v| *v.0)
+            .unwrap_or(0)
+    }
+
+    /// Return the height of the last entry in the chain.
+    ///
+    /// This is the block that we can cast our vote on as final.
+    pub fn latest_height(&self) -> Option<BlockHeight> {
+        self.parent_data.last_key_value().map(|v| *v.0)
+    }
+
+    /// Get the payload of the vote at a specific height, if known.
+    pub fn vote_payload(&self, height: BlockHeight) -> Option<&V> {
+        match self.parent_data.get(&height) {
+            Some(v) => v.as_ref(),
+            None => None,
+        }
+    }
+
+    /// Add a vote we received.
+    ///
+    /// Returns `true` if this vote was added, `false` if it was ignored as a
+    /// duplicate or a height we already finalized, and an error if it's an
+    /// equivocation or from a validator we don't know.
+    pub fn vote_received(&mut self, vote: Vote<K, V>) -> Result<bool, Error<K, V>> {
+        let min_height = self.min_height();
+        let block_height = vote.block_height;
+
+        if block_height < min_height {
+            return Ok(false);
+        }
+
+        let validator_key = vote.pubkey;
+
+        if !self.has_power(&validator_key) {
+            return Err(Error::UnpoweredValidator(validator_key));
+        }
+
+        let votes_at_height = self.votes.entry(block_height).or_default();
+        for (content, submissions) in votes_at_height.iter() {
+            if submissions.has_voted(&validator_key) && *content != vote.payload {
+                // this means the validator has voted a different content at the same block height.
+                // todo: replace with a HashMap<BlockHeight, HashSet<K>> is much faster
+                return Err(Error::Equivocation(
+                    validator_key,
+                    block_height,
+                    vote.payload,
+                    content.clone(),
+                ));
+            }
+        }
+
+        let submissions = votes_at_height
+            .entry(vote.payload)
+            .or_insert(ValidatorSignatures::empty());
+        Ok(submissions.add_vote(validator_key, vote.signature))
+    }
+
+    /// Find a block on the (from our perspective) finalized chain that gathered enough votes from validators.
+    pub fn find_quorum(&self) -> Option<(BlockHeight, MultiSigCert)> {
+        let quorum_threshold = self.quorum_threshold();
+
+        let Some((finalized_height, _)) = self.parent_data.first_key_value() else {
+            tracing::debug!("finalized height not found");
+            return None;
+        };
+
+        let mut weight = 0;
+
+        for (block_height, maybe_payload) in self.parent_data.iter().rev() {
+            if block_height == finalized_height {
+                tracing::debug!(
+                    block_height,
+                    finalized_height,
+                    "finalized height and block height equal, no new proposals"
+                );
+                break; // This block is already finalized in the ledger, no need to propose it again.
+            }
+            let Some(payload) = maybe_payload else {
+                tracing::debug!(block_height, "null block found in vote proposal");
+                continue; // Skip null blocks
+            };
+            let Some(votes_at_height) = self.votes.get(block_height) else {
+                tracing::debug!(block_height, "no votes");
+                continue;
+            };
+            let Some(votes_for_block) = votes_at_height.get(payload) else {
+                tracing::debug!(block_height, "no votes for block");
+                continue; // We could detect equovicating voters here.
+            };
+
+            for vk in votes_for_block.validators.keys() {
+                weight += self.power_table.get(vk).cloned().unwrap_or_default();
+                tracing::debug!(weight, key = ?vk, "aggregating vote power");
+            }
+
+            tracing::debug!(weight, quorum_threshold, "showdown");
+
+            if weight >= quorum_threshold {
+                return Some((*block_height, votes_for_block.to_cert(&self.power_table)));
+            }
+        }
+
+        None
+    }
+
+    /// Call when a new finalized block is added to the ledger, to clear out all preceding blocks.
+    ///
+    /// After this operation the minimum item in the chain will the new finalized block.
+    pub fn set_finalized(&mut self, block_height: BlockHeight, payload: V) -> Stm<()> {
+        self.parent_data = self.parent_data.split_off(&block_height);
+        self.parent_data.insert(block_height, Some(payload));
+
+        self.votes.split_off(&(block_height + 1));
+
+        Ok(())
+    }
+
+    /// Overwrite the power table after it has changed to a new snapshot.
+    ///
+    /// This method expects absolute values, it completely replaces the existing powers.
+    pub fn set_power_table(&mut self, power_table: Vec<(K, Weight)>) {
+        // We don't actually have to remove the votes of anyone who is no longer a validator,
+        // we just have to make sure to handle the case when they are not in the power table.
+        self.power_table = HashMap::from_iter(power_table);
+    }
+
+    /// Update the power table after it has changed with changes.
+    ///
+    /// This method expects only the updated values, leaving everyone who isn't in it untouched
+    pub fn update_power_table(&mut self, power_updates: Vec<(K, Weight)>) {
+        if power_updates.is_empty() {
+            return;
+        }
+
+        // We don't actually have to remove the votes of anyone who is no longer a validator,
+        // we just have to make sure to handle the case when they are not in the power table.
+        for (vk, w) in power_updates {
+            if w == 0 {
+                self.power_table.remove(&vk);
+            } else {
+                self.power_table.insert(vk, w);
+            }
+        }
+    }
+}
+
+/// Keep track of votes being gossiped about parent chain finality
+/// and tally up the weights of the validators on the child subnet,
+/// so that we can ask for proposals that are not going to be voted
+/// down.
 #[derive(Clone)]
 pub struct VoteTally<K = ValidatorKey, V = BlockHash> {
     /// Current validator weights. These are the ones who will vote on the blocks,
@@ -83,7 +307,7 @@ pub struct VoteTally<K = ValidatorKey, V = BlockHash> {
     /// all the votes for a given block hash and also to verify that a validator
     /// isn't equivocating by trying to vote for two different things at the
     /// same height.
-    votes: TVar<im::OrdMap<BlockHeight, im::HashMap<V, VoteSignatures<K, V>>>>,
+    votes: TVar<im::OrdMap<BlockHeight, im::HashMap<V, im::HashSet<K>>>>,
 
     /// Adding votes can be paused if we observe that looking for a quorum takes too long
     /// and is often retried due to votes being added.
@@ -201,59 +425,6 @@ where
     /// Returns `true` if this vote was added, `false` if it was ignored as a
     /// duplicate or a height we already finalized, and an error if it's an
     /// equivocation or from a validator we don't know.
-    pub fn vote_received(
-        &self,
-        block_height: BlockHeight,
-        vote: Vote<K, V>,
-    ) -> StmResult<bool, Error<K, V>> {
-        if *self.pause_votes.read()? {
-            retry()?;
-        }
-
-        let min_height = self.last_finalized_height()?;
-
-        if block_height < min_height {
-            return Ok(false);
-        }
-
-        let validator_key = vote.pubkey;
-
-        if !self.has_power(&validator_key)? {
-            return abort(Error::UnpoweredValidator(validator_key));
-        }
-
-        let mut votes = self.votes.read_clone()?;
-        let votes_at_height = votes.entry(block_height).or_default();
-
-        for (content, submissions) in votes_at_height.iter() {
-            if submissions.has_voted(&validator_key) && *content != vote.payload {
-                // this means the validator has voted a different content at the same block height.
-                // todo: replace with a HashMap<BlockHeight, HashSet<K>> is much faster
-                return abort(Error::Equivocation(
-                    validator_key,
-                    block_height,
-                    vote.payload,
-                    content.clone(),
-                ));
-            }
-        }
-
-        let submissions = votes_at_height.entry(vote.payload.clone()).or_insert(VoteSignatures::new(vote.payload.clone()));
-        if submissions.add_vote(validator_key, vote.payload,vote.signature).is_some() {
-            return Ok(false);
-        }
-
-        self.votes.write(votes)?;
-
-        Ok(true)
-    }
-
-
-    /// Add a vote we received.
-    ///
-    /// Returns `true` if this vote was added, `false` if it was ignored as a
-    /// duplicate or a height we already finalized, and an error if it's an
-    /// equivocation or from a validator we don't know.
     pub fn add_vote(
         &self,
         validator_key: K,
@@ -278,7 +449,7 @@ where
         let votes_at_height = votes.entry(block_height).or_default();
 
         for (bh, vs) in votes_at_height.iter() {
-            if *bh != block_hash && vs.has_voted(&validator_key) {
+            if *bh != block_hash && vs.contains(&validator_key) {
                 return abort(Error::Equivocation(
                     validator_key,
                     block_height,
@@ -288,9 +459,9 @@ where
             }
         }
 
-        let votes_for_block = votes_at_height.entry(block_hash.clone()).or_default();
+        let votes_for_block = votes_at_height.entry(block_hash).or_default();
 
-        if votes_for_block.add_vote(validator_key, block_hash, Default::default()).is_some() {
+        if votes_for_block.insert(validator_key).is_some() {
             return Ok(false);
         }
 
@@ -360,10 +531,6 @@ where
             }
         }
 
-        Ok(None)
-    }
-
-    pub fn find_quorum_with_cert(&self) -> Stm<Option<(BlockHeight, V, MultiSigCert)>> {
         Ok(None)
     }
 
@@ -513,29 +680,34 @@ impl MultiSigCert {
     }
 }
 
-impl<K: Hash + Eq + Clone + Ord, V: PartialEq + AsRef<u8>> VoteSignatures<K, V> {
-    pub fn new(content: V) -> Self {
+/// A collection of validator public key that have signed the same content.
+#[derive(Default, Clone)]
+struct ValidatorSignatures<K> {
+    validators: HashMap<K, Signature>,
+}
+
+impl<K: Hash + Eq + Clone + Ord> ValidatorSignatures<K> {
+    fn empty() -> Self {
         Self {
-            content,
             validators: HashMap::new(),
         }
     }
 
-    pub fn has_voted(&self, k: &K) -> bool {
+    fn has_voted(&self, k: &K) -> bool {
         self.validators.contains_key(k)
     }
 
-    pub fn add_vote(&mut self, k: K, content: V, sig: EcdsaSignature) -> anyhow::Result<()> {
-        if self.content != content {
-            return Err(anyhow!("quorum content not match"));
+    /// Returns `true` if the vote is successfully added, `false` is the validator has already
+    /// voted.
+    fn add_vote(&mut self, k: K, sig: Signature) -> bool {
+        if self.validators.contains_key(&k) {
+            return false;
         }
-
         self.validators.insert(k, sig);
-
-        Ok(())
+        true
     }
 
-    pub fn to_cert(mut self, power_table: &HashMap<K, Weight>) -> MultiSigCert {
+    fn to_cert(&self, power_table: &HashMap<K, Weight>) -> MultiSigCert {
         let mut sorted_powers = power_table.iter().collect::<Vec<_>>();
 
         sorted_powers.sort_by(|a, b| {
@@ -551,7 +723,7 @@ impl<K: Hash + Eq + Clone + Ord, V: PartialEq + AsRef<u8>> VoteSignatures<K, V> 
 
         let iter = sorted_powers
             .into_iter()
-            .map(|(validator, _)| self.validators.remove(validator));
+            .map(|(validator, _)| self.validators.get(validator).cloned());
 
         cert.extend(iter);
 
