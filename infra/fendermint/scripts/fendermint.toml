@@ -137,6 +137,7 @@ docker run \
   --network ${NETWORK_NAME} \
   --volume ${BASE_DIR}:/data \
   --publish ${RESOLVER_HOST_PORT}:${RESOLVER_HOST_PORT} \
+  --publish ${PROMETHEUS_METRICS_PORT}:9100 \
   --env FM_DATA_DIR=/data/${NODE_NAME}/fendermint/data \
   --env FM_LOG_DIR=/data/${NODE_NAME}/fendermint/data/logs \
   --env FM_SNAPSHOTS_DIR=/data/${NODE_NAME}/fendermint/snapshots \

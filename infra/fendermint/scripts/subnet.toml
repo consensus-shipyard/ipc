@@ -61,7 +61,6 @@ dependencies = [
     "ethapi-start",
     "objects-start",
     "ipfs-start",
-    "prometheus-start",
     "node-report",
 ]
 
@@ -82,7 +81,6 @@ dependencies = [
     "ethapi-start",
     "objects-start",
     "ipfs-start",
-    "prometheus-start",
     "node-report",
 ]
 
@@ -205,9 +203,6 @@ Object API:
 
 IPFS API:
 \thttp://0.0.0.0:${IPFS_RPC_HOST_PORT}
-
-PROMETHEUS API:
-\thttp://0.0.0.0:${PROMETHEUS_HOST_PORT}
 
 Eth API:
 \thttp://0.0.0.0:${ETHAPI_HOST_PORT}
