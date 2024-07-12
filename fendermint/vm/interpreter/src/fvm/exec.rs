@@ -1,6 +1,8 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::time::Instant;
+
 use anyhow::Context;
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -9,12 +11,14 @@ use fendermint_vm_actor_interface::{chainmetadata, cron, system};
 use fvm::executor::ApplyRet;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::{address::Address, ActorID, MethodNum, BLOCK_GAS_LIMIT};
+use ipc_observability::emit;
 use tendermint_rpc::Client;
 
 use crate::ExecInterpreter;
 
 use super::{
     checkpoint::{self, PowerUpdates},
+    observe::MsgExecApply,
     state::FvmExecState,
     FvmMessage, FvmMessageInterpreter,
 };
@@ -153,22 +157,36 @@ where
         let to = msg.to;
         let method_num = msg.method_num;
         let gas_limit = msg.gas_limit;
+        let sequence = msg.sequence;
+        let params = msg.params.clone();
+        let value = msg.value.to_string();
+        // TODO Karel - this should probably not be gas_premium but something else??
+        let gas_price = msg.gas_premium.to_string();
 
-        let (apply_ret, emitters) = if from == system::SYSTEM_ACTOR_ADDR {
-            state.execute_implicit(msg)?
+        let (latency, apply_ret, emitters) = if from == system::SYSTEM_ACTOR_ADDR {
+            let start = Instant::now();
+            let res = state.execute_implicit(msg)?;
+            (start.elapsed().as_secs_f64(), res.0, res.1)
         } else {
-            state.execute_explicit(msg)?
+            let start = Instant::now();
+            let res = state.execute_explicit(msg)?;
+            (start.elapsed().as_secs_f64(), res.0, res.1)
         };
 
-        tracing::info!(
-            height = state.block_height(),
-            from = from.to_string(),
-            to = to.to_string(),
-            method_num = method_num,
-            exit_code = apply_ret.msg_receipt.exit_code.value(),
-            gas_used = apply_ret.msg_receipt.gas_used,
-            "tx delivered"
-        );
+        emit(MsgExecApply {
+            height: state.block_height(),
+            from: from.to_string().as_str(),
+            to: to.to_string().as_str(),
+            value: value.as_str(),
+            method_num,
+            gas_limit,
+            gas_price: gas_price.as_str(),
+            // TODO Karel - this should be the serialized params
+            params: params.bytes(),
+            nonce: sequence,
+            duration: latency,
+            exit_code: apply_ret.msg_receipt.exit_code.value(),
+        });
 
         let ret = FvmApplyRet {
             apply_ret,

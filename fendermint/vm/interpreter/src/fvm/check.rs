@@ -1,15 +1,21 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::time::Instant;
+
 use async_trait::async_trait;
 
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::{address::Address, error::ExitCode};
+use ipc_observability::emit;
 
 use crate::CheckInterpreter;
 
-use super::{state::FvmExecState, store::ReadOnlyBlockstore, FvmMessage, FvmMessageInterpreter};
+use super::{
+    observe::MsgExecCheck, state::FvmExecState, store::ReadOnlyBlockstore, FvmMessage,
+    FvmMessageInterpreter,
+};
 
 /// Transaction check results are expressed by the exit code, so that hopefully
 /// they would result in the same error code if they were applied.
@@ -109,8 +115,25 @@ where
                     // Instead of modifying just the partial state, we will execute the call in earnest.
                     // This is required for fully supporting the Ethereum API "pending" queries, if that's needed.
 
+                    let start = Instant::now();
                     // This will stack the effect for subsequent transactions added to the mempool.
                     let (apply_ret, _) = state.execute_explicit(msg.clone())?;
+                    let latency = start.elapsed().as_secs_f64();
+
+                    emit(MsgExecCheck {
+                        height: state.block_height(),
+                        from: msg.from.to_string().as_str(),
+                        to: msg.to.to_string().as_str(),
+                        value: msg.value.to_string().as_str(),
+                        method_num: msg.method_num,
+                        gas_limit: msg.gas_limit,
+                        gas_price: msg.gas_premium.to_string().as_str(),
+                        // TODO Karel - this should be the serialized params
+                        params: msg.params.clone().bytes(),
+                        nonce: msg.sequence,
+                        duration: latency,
+                        exit_code: apply_ret.msg_receipt.exit_code.value(),
+                    });
 
                     return checked(
                         state,
