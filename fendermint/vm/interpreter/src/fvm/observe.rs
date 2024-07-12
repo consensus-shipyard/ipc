@@ -78,7 +78,7 @@ impl Recordable for MsgExec {
 
 impl_traceables!(
     TraceLevel::Info,
-    "Bottom-up",
+    "Bottomup",
     CheckpointCreated,
     CheckpointSigned<'a>,
     CheckpointFinalized
@@ -129,7 +129,7 @@ impl Recordable for CheckpointSigned<'_> {
 
 #[derive(Debug)]
 pub struct CheckpointFinalized {
-    pub height: usize,
+    pub height: u64,
     pub hash: HexEncodableBlockHash,
 }
 
