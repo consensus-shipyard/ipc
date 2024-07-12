@@ -1,0 +1,97 @@
+{
+  "chain_name": "test",
+  "timestamp": 1680101412,
+  "network_version": 21,
+  "base_fee": "1000",
+  "power_scale": 0,
+  "validators": [
+    {
+      "public_key": "BPMMj79Dc5slgNl1v29V0mn/ixHt7CO/MbsNLQP0ZpSEd5FuW2UQ5hzNsKhauI97UZ9jQN3t+kRJQaWlcRjcJdI=",
+      "power": "1000000000000000000"
+    }
+  ],
+  "accounts": [
+    {
+      "meta": {
+        "Account": {
+          "owner": "t1vfs6z4k6cyoevukvhqomsgwqrb75i2jodwa4jxa"
+        }
+      },
+      "balance": "10000000000000000000"
+    },
+    {
+      "meta": {
+        "Account": {
+          "owner": "t410frr6xjymicyh4iltk5v27c4y4misr73mcqjzh45a"
+        }
+      },
+      "balance": "10000000000000000000"
+    },
+    {
+      "meta": {
+        "Account": {
+          "owner": "t1zrk7jjngc3uzobjkmlzjynjfgpxvxctxbxuvs5a"
+        }
+      },
+      "balance": "10000000000000000000"
+    },
+    {
+      "meta": {
+        "Account": {
+          "owner": "t410f5qlw62wdgzwdwfb3rjoheibxrhke3vmzxtcdzrq"
+        }
+      },
+      "balance": "10000000000000000000"
+    },
+    {
+      "meta": {
+        "Account": {
+          "owner": "t1kwdghtw7j72qb5dwf4gskyp4be4cter73nlojuy"
+        }
+      },
+      "balance": "10000000000000000000"
+    },
+    {
+      "meta": {
+        "Account": {
+          "owner": "t410flcjfiuotgwadabcoftuuo26ooaxrovjvwdccoji"
+        }
+      },
+      "balance": "10000000000000000000"
+    },
+    {
+      "meta": {
+        "Account": {
+          "owner": "t1e3acffdre4egtul5kp3c2hamm522dg6aqfgzioy"
+        }
+      },
+      "balance": "10000000000000000000"
+    },
+    {
+      "meta": {
+        "Account": {
+          "owner": "t410fst6awyokeeevmqiwcnlzwt3g2uazcsavr2u2iwi"
+        }
+      },
+      "balance": "10000000000000000000"
+    },
+    {
+      "meta": {
+        "Multisig": {
+          "signers": [
+            "t1zrk7jjngc3uzobjkmlzjynjfgpxvxctxbxuvs5a",
+            "t1kwdghtw7j72qb5dwf4gskyp4be4cter73nlojuy",
+            "t1e3acffdre4egtul5kp3c2hamm522dg6aqfgzioy"
+          ],
+          "threshold": 2,
+          "vesting_duration": 1000000,
+          "vesting_start": 0
+        }
+      },
+      "balance": "30000000000000000000"
+    }
+  ],
+  "eam_permission_mode": {
+    "mode": "unrestricted"
+  }
+}

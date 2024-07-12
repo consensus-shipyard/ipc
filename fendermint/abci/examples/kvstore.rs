@@ -75,7 +75,8 @@ impl Application for KVStore {
         &self,
         request: request::PrepareProposal,
     ) -> Result<response::PrepareProposal> {
-        let mut txs = take_until_max_size(request.txs, request.max_tx_bytes.try_into().unwrap());
+        let (txs, _) = take_until_max_size(request.txs, request.max_tx_bytes.try_into().unwrap());
+        let mut txs = txs.clone();
 
         // Enfore transaciton limit so that we don't have a problem with buffering.
         txs.truncate(MAX_TXNS);

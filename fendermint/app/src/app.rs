@@ -13,7 +13,6 @@ use fendermint_abci::{AbciResult, Application};
 use fendermint_storage::{
     Codec, Encode, KVCollection, KVRead, KVReadable, KVStore, KVWritable, KVWrite,
 };
-use fendermint_tracing::emit;
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_interpreter::bytes::{
     BytesMessageApplyRes, BytesMessageCheckRes, BytesMessageQuery, BytesMessageQueryRes,
@@ -37,13 +36,17 @@ use fvm_shared::chainid::ChainID;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
+use ipc_observability::emit;
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 use tendermint::abci::request::CheckTxKind;
 use tendermint::abci::{request, response};
 use tracing::instrument;
 
-use crate::events::{NewBlock, ProposalProcessed};
+use crate::observe::{
+    BlockCommitted, BlockProposalAccepted, BlockProposalReceived, BlockProposalRejected,
+    BlockProposalSent, HexEncodableBlockHash,
+};
 use crate::AppExitCode;
 use crate::BlockHeight;
 use crate::{tmconv::*, VERSION};
@@ -650,7 +653,13 @@ where
             .context("failed to prepare proposal")?;
 
         let txs = txs.into_iter().map(bytes::Bytes::from).collect();
-        let txs = take_until_max_size(txs, request.max_tx_bytes.try_into().unwrap());
+        let (txs, size) = take_until_max_size(txs, request.max_tx_bytes.try_into().unwrap());
+
+        emit(BlockProposalSent {
+            height: request.height.value(),
+            tx_count: txs.len(),
+            size,
+        });
 
         Ok(response::PrepareProposal { txs })
     }
@@ -666,6 +675,7 @@ where
             "process proposal"
         );
         let txs: Vec<_> = request.txs.into_iter().map(|tx| tx.to_vec()).collect();
+        let size_txs = txs.iter().map(|tx| tx.len()).sum::<usize>();
         let num_txs = txs.len();
 
         let accept = self
@@ -674,17 +684,31 @@ where
             .await
             .context("failed to process proposal")?;
 
-        emit!(ProposalProcessed {
-            is_accepted: accept,
-            block_height: request.height.value(),
-            block_hash: request.hash.to_string().as_str(),
-            num_txs,
-            proposer: request.proposer_address.to_string().as_str()
+        emit(BlockProposalReceived {
+            height: request.height.value(),
+            hash: HexEncodableBlockHash(request.hash.into()),
+            size: size_txs,
+            tx_count: num_txs,
+            validator: request.proposer_address.to_string().as_str(),
         });
 
         if accept {
+            emit(BlockProposalAccepted {
+                height: request.height.value(),
+                hash: HexEncodableBlockHash(request.hash.into()),
+                size: size_txs,
+                tx_count: num_txs,
+                validator: request.proposer_address.to_string().as_str(),
+            });
             Ok(response::ProcessProposal::Accept)
         } else {
+            emit(BlockProposalRejected {
+                height: request.height.value(),
+                size: size_txs,
+                tx_count: num_txs,
+                validator: request.proposer_address.to_string().as_str(),
+                reason: "rejected",
+            });
             Ok(response::ProcessProposal::Reject)
         }
     }
@@ -867,11 +891,14 @@ where
         // Commit app state to the datastore.
         self.set_committed_state(state)?;
 
-        emit!(NewBlock { block_height });
-
         // Reset check state.
         let mut guard = self.check_state.lock().await;
         *guard = None;
+
+        emit(BlockCommitted {
+            height: block_height,
+            app_hash: HexEncodableBlockHash(app_hash.clone().into()),
+        });
 
         Ok(response::Commit {
             data: app_hash.into(),
