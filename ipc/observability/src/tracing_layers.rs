@@ -1,6 +1,8 @@
-use std::sync::{Arc, RwLock};
-use tracing::{field::Visit, span::Record, Event, Id, Metadata, Subscriber};
-use tracing_subscriber::registry::LookupSpan;
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: Apache-2.0, MIT
+
+use std::ops::Deref;
+use tracing::{field::Visit, Event, Subscriber};
 use tracing_subscriber::Registry;
 use tracing_subscriber::{layer::Context, Layer};
 
@@ -11,6 +13,14 @@ pub struct DomainEventFilterLayer<L> {
     domains: Option<Vec<String>>,
     events: Option<Vec<String>>,
     inner: L,
+}
+
+impl Deref for DomainEventFilterLayer<Registry> {
+    type Target = Registry;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
 }
 
 impl<L> DomainEventFilterLayer<L> {

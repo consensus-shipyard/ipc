@@ -3,9 +3,7 @@
 
 pub use fendermint_app_options as options;
 pub use fendermint_app_settings as settings;
-use ipc_observability::traces::{
-    register_tracing_subscriber, FileLayerConfig, RotationKind, WorkerGuard,
-};
+use ipc_observability::traces::{register_tracing_subscriber, WorkerGuard};
 
 mod cmd;
 
@@ -14,18 +12,9 @@ fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
         .log_console_filter()
         .expect("invalid console level filter");
     let file_filter = opts.log_file_filter().expect("invalid file level filter");
+    let file_config = opts.log_file_config();
 
-    // TODO Karel - map the config to journal options
-    let journal_opts = FileLayerConfig {
-        enabled: true,
-        directory: Some("/Users/karlem/work/ipc/test-network/traces"),
-        max_log_files: Some(1),
-        rotation: Some(RotationKind::from("minutely")),
-        domain_filter: None,
-        events_filter: Some(vec!["ParentFinalityPeerVoteReceived"]),
-    };
-
-    register_tracing_subscriber(console_filter, file_filter, journal_opts)
+    register_tracing_subscriber(console_filter, file_filter, file_config)
 }
 
 /// Install a panic handler that prints stuff to the logs, otherwise it only shows up in the console.
@@ -58,9 +47,6 @@ async fn main() {
     let _guard = init_tracing(&opts);
 
     init_panic_handler();
-
-    use fendermint_vm_topdown::observe::emit_all;
-    emit_all();
 
     if let Err(e) = cmd::exec(&opts).await {
         tracing::error!("failed to execute {:?}: {e:?}", opts);

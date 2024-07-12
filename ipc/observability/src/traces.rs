@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use std::num::NonZeroUsize;
+use std::path::PathBuf;
 pub use tracing_appender::non_blocking;
 pub use tracing_appender::non_blocking::WorkerGuard;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
@@ -10,7 +11,7 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, Layer};
 
 use crate::tracing_layers::DomainEventFilterLayer;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RotationKind {
     Minutely,
     Hourly,
@@ -42,13 +43,13 @@ impl From<&str> for RotationKind {
 }
 
 #[derive(Default)]
-pub struct FileLayerConfig<'a> {
+pub struct FileLayerConfig {
     pub enabled: bool,
-    pub directory: Option<&'a str>,
+    pub directory: Option<PathBuf>,
     pub max_log_files: Option<usize>,
     pub rotation: Option<RotationKind>,
-    pub domain_filter: Option<Vec<&'a str>>,
-    pub events_filter: Option<Vec<&'a str>>,
+    pub domain_filter: Option<Vec<String>>,
+    pub events_filter: Option<Vec<String>>,
 }
 
 // Register a tracing subscriber with the given options
@@ -56,7 +57,7 @@ pub struct FileLayerConfig<'a> {
 pub fn register_tracing_subscriber(
     console_level_filter: EnvFilter,
     file_level_filter: EnvFilter,
-    file_opts: FileLayerConfig<'_>,
+    file_opts: FileLayerConfig,
 ) -> Option<WorkerGuard> {
     // log all traces to stderr (reserving stdout for any actual output such as from the CLI commands)
     let console_layer = fmt::layer()
@@ -102,8 +103,11 @@ pub fn register_tracing_subscriber(
     file_guard
 }
 
-fn file_appender_from_opts(opts: &FileLayerConfig<'_>) -> RollingFileAppender {
-    let directory = opts.directory.expect("traces directory must be set");
+fn file_appender_from_opts(opts: &FileLayerConfig) -> RollingFileAppender {
+    let directory = opts
+        .directory
+        .as_deref()
+        .expect("missing file log directory");
     let mut appender = RollingFileAppender::builder().filename_suffix("traces");
 
     if let Some(max_log_files) = opts.max_log_files {
