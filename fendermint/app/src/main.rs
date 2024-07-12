@@ -48,9 +48,6 @@ async fn main() {
 
     init_panic_handler();
 
-    use fendermint_vm_topdown::observe::emit_all;
-    emit_all();
-
     if let Err(e) = cmd::exec(&opts).await {
         tracing::error!("failed to execute {:?}: {e:?}", opts);
         std::process::exit(fendermint_app::AppExitCode::UnknownError as i32);
