@@ -715,8 +715,22 @@ where
         });
 
         if accept {
+            emit(BlockProposalAccepted {
+                height: request.height.value(),
+                hash: HexEncodableBlockHash(request.hash.into()),
+                size: size_txs,
+                tx_count: num_txs,
+                validator: request.proposer_address.to_string().as_str(),
+            });
             Ok(response::ProcessProposal::Accept)
         } else {
+            emit(BlockProposalRejected {
+                height: request.height.value(),
+                size: size_txs,
+                tx_count: num_txs,
+                validator: request.proposer_address.to_string().as_str(),
+                reason: "rejected",
+            });
             Ok(response::ProcessProposal::Reject)
         }
     }
