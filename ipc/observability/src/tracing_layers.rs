@@ -13,6 +13,14 @@ pub struct DomainEventFilterLayer<L> {
     inner: L,
 }
 
+impl Deref for DomainEventFilterLayer<Registry> {
+    type Target = Registry;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
 impl<L> DomainEventFilterLayer<L> {
     pub fn new(domains: Option<Vec<String>>, events: Option<Vec<String>>, inner: L) -> Self {
         DomainEventFilterLayer {
