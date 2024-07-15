@@ -203,11 +203,15 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                     let result =
                         Self::submit_checkpoint(parent_handler_clone, submitter, bundle, event)
                             .await
+                            .inspect(|_| {
+                                tracing::info!("submitted bottom up checkpoint at height {height}");
+                            })
                             .inspect_err(|err| {
                                 tracing::error!(
                                     "Fail to submit checkpoint at height {height}: {err}"
                                 );
                             });
+
                     drop(submission_permit);
                     result
                 }));
