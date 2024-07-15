@@ -3,6 +3,7 @@
 
 pub mod macros;
 pub mod traces;
+mod tracing_layers;
 pub use lazy_static::lazy_static;
 
 use std::fmt::Debug;

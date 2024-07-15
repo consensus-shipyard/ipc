@@ -65,16 +65,6 @@ macro_rules! inc_counter {
     };
 }
 
-/// Increment a counter by 1.
-///
-/// The field is ignored, it's only here because of how the macros look like.
-macro_rules! inc1_counter {
-    ($event:ident, $event_ty:ident :: $field:ident, $counter:expr) => {
-        check_field!($event_ty::$field);
-        $counter.inc();
-    };
-}
-
 /// Produce the prefixed event name from the type name.
 macro_rules! event_name {
     ($event_ty:ident) => {
@@ -108,12 +98,6 @@ macro_rules! event_match {
 impl<S: Subscriber> Layer<S> for MetricsLayer<S> {
     fn on_event(&self, event: &Event<'_>, _ctx: layer::Context<'_, S>) {
         event_match!(event {
-            ParentFinalityCommitted {
-                block_height              => set_gauge   ! &am::TOPDOWN_FINALIZED_BLOCK_HEIGHT,
-            },
-            ParentFinalityMissingQuorum {
-                block_hash                => inc1_counter ! &am::TOPDOWN_FINALITY_MISSING_QUORUM,
-            },
             NewBottomUpCheckpoint {
                 block_height              => set_gauge   ! &am::BOTTOMUP_CKPT_BLOCK_HEIGHT,
                 next_configuration_number => set_gauge   ! &am::BOTTOMUP_CKPT_CONFIG_NUM,
@@ -167,42 +151,5 @@ mod visitors {
         }
 
         fn record_debug(&mut self, _field: &Field, _value: &dyn std::fmt::Debug) {}
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use fendermint_tracing::emit;
-    use fendermint_vm_event::ParentFinalityCommitted;
-    use prometheus::IntGauge;
-    use tracing_subscriber::layer::SubscriberExt;
-
-    #[test]
-    fn test_metrics_layer() {
-        let gauge: &IntGauge = &super::super::prometheus::app::TOPDOWN_FINALIZED_BLOCK_HEIGHT;
-
-        let v0 = gauge.get();
-        gauge.inc();
-        let v1 = gauge.get();
-        assert!(v1 > v0, "gague should change without being registered");
-
-        let block_height = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
-        let subscriber = tracing_subscriber::registry().with(super::layer());
-
-        tracing::subscriber::with_default(subscriber, || {
-            emit! {
-                ParentFinalityCommitted { block_height, block_hash: "metrics-test-block" }
-            }
-        });
-
-        assert_eq!(
-            gauge.get() as u64,
-            block_height,
-            "metrics should be captured"
-        );
     }
 }

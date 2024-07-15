@@ -7,6 +7,7 @@ use clap::{Args, Parser, Subcommand};
 use config::ConfigArgs;
 use debug::DebugArgs;
 use fvm_shared::address::Network;
+use ipc_observability::traces::FileLayerConfig;
 use lazy_static::lazy_static;
 use tracing_subscriber::EnvFilter;
 
@@ -27,7 +28,7 @@ pub mod run;
 mod log;
 mod parse;
 
-use log::{parse_log_level, LogLevel};
+use log::{parse_log_level, parse_rotation_kind, LogLevel, RotationKind};
 use parse::parse_network;
 
 lazy_static! {
@@ -102,13 +103,45 @@ pub struct Options {
     #[arg(long, env = "FM_CONFIG_DIR")]
     config_dir: Option<PathBuf>,
 
+    // TODO Karel - move all FM_LOG_FILE* flags to a configuration file instead
+
+    // Enable logging to a file.
+    #[arg(long, env = "FM_LOG_FILE_ENABLED")]
+    pub log_file_enabled: Option<bool>,
+
     /// Set a custom directory for ipc log files.
-    #[arg(long, env = "FM_LOG_DIR")]
+    #[arg(long, env = "FM_LOG_FILE_DIR")]
     pub log_dir: Option<PathBuf>,
 
-    /// Set a custom prefix for ipc log files.
-    #[arg(long, env = "FM_LOG_FILE_PREFIX")]
-    pub log_file_prefix: Option<String>,
+    #[arg(long, env = "FM_LOG_FILE_MAX_FILES")]
+    pub max_log_files: Option<usize>,
+
+    #[arg(
+        short = 'l',
+        long,
+        default_value = "daily",
+        value_enum,
+        env = "FM_LOG_FILE_ROTATION",
+        help = "The kind of rotation to use for log files. Options: minutely, hourly, daily, never.",
+        value_parser = parse_rotation_kind,
+    )]
+    pub log_files_rotation: Option<RotationKind>,
+
+    #[arg(
+        long,
+        env = "FM_LOG_FILE_DOMAINS_FILTER",
+        help = "Filter log events by domains. Only events from the specified domains will be logged. Comma separated.",
+        value_delimiter = ','
+    )]
+    pub domains_filter: Option<Vec<String>>,
+
+    #[arg(
+        long,
+        env = "FM_LOG_FILE_EVENTS_FILTER",
+        help = "Filter log events by name. Only events with the specified names will be logged. Comma separated.",
+        value_delimiter = ','
+    )]
+    pub events_filter: Option<Vec<String>>,
 
     /// Optionally override the default configuration.
     #[arg(short, long, default_value = "dev")]
@@ -159,6 +192,17 @@ impl Options {
             level.to_filter()
         } else {
             self.log_console_filter()
+        }
+    }
+
+    pub fn log_file_config(&self) -> FileLayerConfig {
+        FileLayerConfig {
+            enabled: self.log_file_enabled.unwrap_or(false),
+            directory: self.log_dir.clone(),
+            max_log_files: self.max_log_files,
+            rotation: self.log_files_rotation.clone(),
+            domain_filter: self.domains_filter.clone(),
+            events_filter: self.events_filter.clone(),
         }
     }
 
