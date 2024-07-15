@@ -11,34 +11,25 @@ pub type Signature = Bytes;
 
 /// The different versions of vote casted in topdown gossip pub-sub channel
 #[derive(Serialize, Deserialize, Hash, Debug, Clone, Eq, PartialEq)]
-pub enum TopdownVote {
-    V1(TopdownVoteV1),
-}
-
-#[derive(Serialize, Deserialize, Hash, Debug, Clone, Eq, PartialEq)]
-pub struct TopdownVoteV1 {
-    // TODO: add subnet id as part of the vote
-    // parent: SubnetID,
+pub struct TopdownVote {
+    version: u8,
     block_height: BlockHeight,
-    /// The block hash of the parent chain at the `block_height`.
-    block_hash: BlockHash,
-    /// The commitment or proof of the side effects (topdown messages and validator changes)
-    commitment: Bytes,
+    /// The content that represents the data to be voted on for the block height
+    ballot: Bytes,
 }
 
 impl TopdownVote {
-    pub fn v1(block_height: BlockHeight, block_hash: BlockHash, commitment: Bytes) -> Self {
-        Self::V1(TopdownVoteV1 {
+    pub fn v1(block_height: BlockHeight, mut block_hash: BlockHash, commitment: Bytes) -> Self {
+        block_hash.extend(commitment);
+        Self {
+            version: 1,
             block_height,
-            block_hash,
-            commitment,
-        })
+            ballot: block_hash,
+        }
     }
 
     pub fn block_height(&self) -> BlockHeight {
-        match self {
-            Self::V1(v) => v.block_height,
-        }
+        self.block_height
     }
 }
 
