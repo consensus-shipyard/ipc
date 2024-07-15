@@ -4,13 +4,11 @@
 use anyhow::{anyhow, bail, Context};
 use async_stm::atomically_or_err;
 use fendermint_abci::ApplicationService;
-use fendermint_app::events::{ParentFinalityVoteAdded, ParentFinalityVoteIgnored};
-use fendermint_app::ipc::{AppParentFinalityQuery, AppVote};
+use fendermint_app::ipc::AppParentFinalityQuery;
 use fendermint_app::{App, AppConfig, AppStore, BitswapBlockstore};
 use fendermint_app_settings::AccountKind;
 use fendermint_crypto::SecretKey;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
-use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::chain::ChainEnv;
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
@@ -24,8 +22,9 @@ use fendermint_vm_resolver::ipld::IpldResolver;
 use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::proxy::IPCProviderProxy;
 use fendermint_vm_topdown::sync::launch_polling_syncer;
+use fendermint_vm_topdown::voting::payload::SignedVote;
 use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
-use fendermint_vm_topdown::{CachedFinalityProvider, IPCParentFinality, Toggle};
+use fendermint_vm_topdown::{CachedFinalityProvider, Toggle};
 use fvm_shared::address::{current_network, Address, Network};
 use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
@@ -55,6 +54,9 @@ namespaces! {
         bit_store
     }
 }
+
+/// `Gossipsub` topic identifier for voting about content.
+const PUBSUB_VOTES: &str = "/ipc/ipld/votes";
 
 /// Run the Fendermint ABCI Application.
 ///
@@ -192,18 +194,21 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             if let Some(key) = validator_keypair {
                 let parent_finality_votes = parent_finality_votes.clone();
 
+                let topic = format!(
+                    "{}/{}/{}",
+                    PUBSUB_VOTES,
+                    network_name(&settings).replace('/', "_"),
+                    own_subnet_id.to_string().replace('/', "_")
+                );
                 tracing::info!("starting the parent finality vote gossip loop...");
                 tokio::spawn(async move {
-                    publish_vote_loop(
+                    publish_vote_loop::<SignedVote>(
                         parent_finality_votes,
                         settings.ipc.vote_interval,
                         settings.ipc.vote_timeout,
                         key,
-                        own_subnet_id,
+                        topic,
                         client,
-                        |height, block_hash| {
-                            AppVote::ParentFinality(IPCParentFinality { height, block_hash })
-                        },
                     )
                     .await
                 });
@@ -395,7 +400,7 @@ fn make_resolver_service(
     db: RocksDb,
     state_store: NamespaceBlockstore,
     bit_store_ns: String,
-) -> anyhow::Result<ipc_ipld_resolver::Service<libipld::DefaultParams, AppVote>> {
+) -> anyhow::Result<ipc_ipld_resolver::Service<libipld::DefaultParams, SignedVote>> {
     // Blockstore for Bitswap.
     let bit_store = NamespaceBlockstore::new(db, bit_store_ns).context("error creating bit DB")?;
 
@@ -436,6 +441,14 @@ fn make_ipc_provider_proxy(settings: &Settings) -> anyhow::Result<IPCProviderPro
     IPCProviderProxy::new(ipc_provider, settings.ipc.subnet_id.clone())
 }
 
+fn network_name(settings: &Settings) -> String {
+    format!(
+        "ipld-resolver-{}-{}",
+        settings.ipc.subnet_id.root_id(),
+        &settings.resolver.network.network_name
+    )
+}
+
 fn to_resolver_config(settings: &Settings) -> anyhow::Result<ipc_ipld_resolver::Config> {
     use ipc_ipld_resolver::{
         Config, ConnectionConfig, ContentConfig, DiscoveryConfig, MembershipConfig, NetworkConfig,
@@ -450,11 +463,12 @@ fn to_resolver_config(settings: &Settings) -> anyhow::Result<ipc_ipld_resolver::
         secp256k1::Keypair::from(sk).into()
     };
 
-    let network_name = format!(
-        "ipld-resolver-{}-{}",
-        settings.ipc.subnet_id.root_id(),
-        r.network.network_name
-    );
+    // let network_name = format!(
+    //     "ipld-resolver-{}-{}",
+    //     settings.ipc.subnet_id.root_id(),
+    //     r.network.network_name
+    // );
+    let network_name = network_name(settings);
 
     let config = Config {
         connection: ConnectionConfig {
@@ -499,7 +513,7 @@ fn to_address(sk: &SecretKey, kind: &AccountKind) -> anyhow::Result<Address> {
 }
 
 async fn dispatch_resolver_events(
-    mut rx: tokio::sync::broadcast::Receiver<ResolverEvent<AppVote>>,
+    mut rx: tokio::sync::broadcast::Receiver<ResolverEvent<SignedVote>>,
     parent_finality_votes: VoteTally,
     topdown_enabled: bool,
 ) {
@@ -523,66 +537,49 @@ async fn dispatch_resolver_events(
 }
 
 async fn dispatch_vote(
-    vote: VoteRecord<AppVote>,
+    vote: VoteRecord<SignedVote>,
     parent_finality_votes: &VoteTally,
     topdown_enabled: bool,
 ) {
-    match vote.content {
-        AppVote::ParentFinality(f) => {
-            if !topdown_enabled {
-                tracing::debug!("ignoring vote; topdown disabled");
-                return;
-            }
-            let res = atomically_or_err(|| {
-                parent_finality_votes.add_vote(
-                    vote.public_key.clone(),
-                    f.height,
-                    f.block_hash.clone(),
-                )
-            })
-            .await;
-
-            let added = match res {
-                Ok(added) => {
-                    added
-                }
-                Err(e @ VoteError::Equivocation(_, _, _, _)) => {
-                    tracing::warn!(error = e.to_string(), "failed to handle vote");
-                    false
-                }
-                Err(e @ (
-                      VoteError::Uninitialized // early vote, we're not ready yet
-                    | VoteError::UnpoweredValidator(_) // maybe arrived too early or too late, or spam
-                    | VoteError::UnexpectedBlock(_, _) // won't happen here
-                )) => {
-                    tracing::debug!(error = e.to_string(), "failed to handle vote");
-                    false
-                }
-            };
-
-            let block_height = f.height;
-            let block_hash = &hex::encode(&f.block_hash);
-            let validator = &format!("{:?}", vote.public_key);
-
-            if added {
-                emit!(
-                    DEBUG,
-                    ParentFinalityVoteAdded {
-                        block_height,
-                        block_hash,
-                        validator,
-                    }
-                )
-            } else {
-                emit!(
-                    DEBUG,
-                    ParentFinalityVoteIgnored {
-                        block_height,
-                        block_hash,
-                        validator,
-                    }
-                )
-            }
-        }
+    if !topdown_enabled {
+        tracing::debug!("ignoring vote; topdown disabled");
+        return;
     }
+    let res = atomically_or_err(|| parent_finality_votes.add_vote(vote.content.clone())).await;
+
+    // TODO: figure out a better way to log
+    let _added = match res {
+        Ok(added) => added,
+        Err(e @ VoteError::Equivocation(_, _)) => {
+            tracing::warn!(error = e.to_string(), "failed to handle vote");
+            false
+        }
+        Err(e) => {
+            tracing::debug!(error = e.to_string(), "failed to handle vote");
+            false
+        }
+    };
+    //
+    // let block_height = f.height;
+    // let validator = &format!("{:?}", vote.public_key);
+
+    // if added {
+    //     emit!(
+    //                 DEBUG,
+    //                 ParentFinalityVoteAdded {
+    //                     block_height,
+    //                     block_hash,
+    //                     validator,
+    //                 }
+    //             )
+    // } else {
+    //     emit!(
+    //                 DEBUG,
+    //                 ParentFinalityVoteIgnored {
+    //                     block_height,
+    //                     block_hash,
+    //                     validator,
+    //                 }
+    //             )
+    // }
 }

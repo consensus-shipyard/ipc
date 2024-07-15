@@ -129,18 +129,19 @@ where
             // The pre-requisite for proposal is that there is a quorum of gossiped votes at that height.
             // The final proposal can be at most as high as the quorum.
             Ok(
-                if let Some((height, bytes)) = state.parent_finality_votes.find_quorum()? {
-                    // The first version of parent finality is a block hash of 32 bytes
-                    let p = if bytes.len() == 32 {
-                        prep_topdown_v1(
-                            &state,
-                            IPCParentFinality::new(height as ChainEpoch, bytes),
-                        )?
-                    } else {
-                        prep_topdown_v2(&state, height)?
-                    };
-                    tracing::debug!(proposal = ?p, "proposed topdown proposal");
-                    p
+                if let Some((height, _quorum_cert)) = state.parent_finality_votes.find_quorum()? {
+                    todo!("integrate {height} and cert")
+                    // // The first version of parent finality is a block hash of 32 bytes
+                    // let p = if bytes.len() == 32 {
+                    //     prep_topdown_v1(
+                    //         &state,
+                    //         IPCParentFinality::new(height as ChainEpoch, bytes),
+                    //     )?
+                    // } else {
+                    //     prep_topdown_v2(&state, height)?
+                    // };
+                    // tracing::debug!(proposal = ?p, "proposed topdown proposal");
+                    // p
                 } else {
                     tracing::info!("no quorum found yet");
                     None
@@ -364,8 +365,7 @@ where
                         env.parent_finality_provider
                             .set_new_finality(finality.clone(), prev_finality.clone())?;
 
-                        env.parent_finality_votes
-                            .set_finalized(finality.height, finality.block_hash.clone())?;
+                        env.parent_finality_votes.set_finalized(finality.height)?;
 
                         Ok(())
                     })
@@ -438,8 +438,7 @@ where
                         env.parent_finality_provider
                             .set_new_sealed_finality(sealed.clone(), prev_finality.clone())?;
 
-                        env.parent_finality_votes
-                            .set_finalized(finality.height, finality.block_hash.clone())?;
+                        env.parent_finality_votes.set_finalized(finality.height)?;
 
                         Ok(())
                     })

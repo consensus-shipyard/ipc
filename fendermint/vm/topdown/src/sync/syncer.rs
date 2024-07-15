@@ -17,6 +17,7 @@ use libp2p::futures::TryFutureExt;
 use std::sync::Arc;
 use tracing::instrument;
 
+use crate::voting::payload::TopdownVote;
 use fendermint_tracing::emit;
 use fendermint_vm_event::{BlockHashHex, NewParentView};
 
@@ -250,8 +251,13 @@ where
 
             self.provider.new_parent_view(height, Some(data.clone()))?;
             if let Some(p) = self.provider.sealed_proposal_at_height(height)? {
+                let vote = TopdownVote::v1(
+                    p.finality().height,
+                    p.finality().block_hash.clone(),
+                    p.commitment().to_vec(),
+                );
                 self.vote_tally
-                    .add_block(height, Some(p.into_commitment()))
+                    .add_block(height, Some(vote))
                     .map_err(map_voting_err)?;
             }
 
