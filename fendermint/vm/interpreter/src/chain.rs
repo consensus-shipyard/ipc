@@ -175,7 +175,11 @@ where
     }
 
     /// Perform finality checks on top-down transactions and availability checks on bottom-up transactions.
-    async fn process(&self, env: Self::State, msgs: Vec<Self::Message>) -> anyhow::Result<bool> {
+    async fn process(
+        &self,
+        env: Self::State,
+        msgs: Vec<Self::Message>,
+    ) -> anyhow::Result<(bool, Option<String>)> {
         for msg in msgs {
             match msg {
                 ChainMessage::Ipc(IpcMessage::BottomUpExec(msg)) => {
@@ -194,7 +198,7 @@ where
                         .await;
 
                     if !is_resolved {
-                        return Ok(false);
+                        return Ok((false, Some("checkpoint not resolved".to_string())));
                     }
                 }
                 ChainMessage::Ipc(IpcMessage::TopDownExec(ParentFinality {
@@ -208,13 +212,13 @@ where
                     let is_final =
                         atomically(|| env.parent_finality_provider.check_proposal(&prop)).await;
                     if !is_final {
-                        return Ok(false);
+                        return Ok((false, Some("parent finality not available".to_string())));
                     }
                 }
                 _ => {}
             };
         }
-        Ok(true)
+        Ok((true, None))
     }
 }
 
