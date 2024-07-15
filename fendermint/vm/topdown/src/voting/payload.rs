@@ -15,7 +15,7 @@ pub struct TopdownVote {
     version: u8,
     block_height: BlockHeight,
     /// The content that represents the data to be voted on for the block height
-    ballot: Bytes,
+    payload: Bytes,
 }
 
 impl TopdownVote {
@@ -24,8 +24,13 @@ impl TopdownVote {
         Self {
             version: 1,
             block_height,
-            ballot: block_hash,
+            payload: block_hash,
         }
+    }
+
+    /// The bytes that it will be signed and voted on
+    pub fn ballot(&self) -> anyhow::Result<Bytes> {
+        Ok(fvm_ipld_encoding::to_vec(self)?)
     }
 
     pub fn block_height(&self) -> BlockHeight {
@@ -47,7 +52,7 @@ impl SignedVote {
     /// Create a new [`SignedVoteRecord`] with the current timestamp
     /// and a signed envelope which can be shared with others.
     pub fn signed(key: &Keypair, vote: &TopdownVote) -> anyhow::Result<Self> {
-        let payload = fvm_ipld_encoding::to_vec(vote)?;
+        let payload = vote.ballot()?;
         let signature = key.sign(&payload)?;
         let pubkey = ValidatorKey::from(key.public());
         Ok(Self {

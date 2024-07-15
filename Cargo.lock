@@ -3369,6 +3369,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "arbitrary",
+ "bitvec",
  "blake2b_simd",
  "cid",
  "ethers",
@@ -3460,6 +3461,7 @@ dependencies = [
  "fendermint_tracing",
  "fendermint_vm_event",
  "fendermint_vm_genesis",
+ "fendermint_vm_message",
  "fvm_ipld_encoding",
  "fvm_shared",
  "hex",

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 pub mod payload;
-mod quorum;
+pub mod quorum;
 
 use crate::voting::quorum::{MultiSigCert, ValidatorSignatures};
 use async_stm::{abort, atomically_or_err, retry, Stm, StmResult, TVar};

@@ -166,6 +166,50 @@ impl ValidatorSignatures {
     }
 }
 
+// Because chain interpreter is importing from fendermint_vm_message, no choice but to define the
+// type twice.
+impl From<fendermint_vm_message::ipc::MultiSigCert> for MultiSigCert {
+    fn from(value: fendermint_vm_message::ipc::MultiSigCert) -> Self {
+        Self {
+            signed_validator_bitmap: value.signed_validator_bitmap,
+            agg_signatures: AggregatedSignature::from(value.agg_signatures),
+        }
+    }
+}
+
+impl From<fendermint_vm_message::ipc::AggregatedSignature> for AggregatedSignature {
+    fn from(value: fendermint_vm_message::ipc::AggregatedSignature) -> Self {
+        match value {
+            fendermint_vm_message::ipc::AggregatedSignature::Ecdsa(v) => Self::Ecdsa(v),
+            fendermint_vm_message::ipc::AggregatedSignature::Schnorr(v) => Self::Schnorr(v),
+        }
+    }
+}
+
+impl From<MultiSigCert> for fendermint_vm_message::ipc::MultiSigCert {
+    fn from(value: MultiSigCert) -> fendermint_vm_message::ipc::MultiSigCert {
+        fendermint_vm_message::ipc::MultiSigCert {
+            signed_validator_bitmap: value.signed_validator_bitmap,
+            agg_signatures: fendermint_vm_message::ipc::AggregatedSignature::from(
+                value.agg_signatures,
+            ),
+        }
+    }
+}
+
+impl From<AggregatedSignature> for fendermint_vm_message::ipc::AggregatedSignature {
+    fn from(value: AggregatedSignature) -> fendermint_vm_message::ipc::AggregatedSignature {
+        match value {
+            AggregatedSignature::Ecdsa(v) => {
+                fendermint_vm_message::ipc::AggregatedSignature::Ecdsa(v)
+            }
+            AggregatedSignature::Schnorr(v) => {
+                fendermint_vm_message::ipc::AggregatedSignature::Schnorr(v)
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::voting::quorum::{AggregatedSignature, MultiSigCert};
