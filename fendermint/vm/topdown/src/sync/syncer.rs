@@ -16,6 +16,7 @@ use libp2p::futures::TryFutureExt;
 use std::sync::Arc;
 use tracing::instrument;
 
+use crate::voting::payload::TopdownVote;
 use fendermint_tracing::emit;
 use fendermint_vm_event::{BlockHashHex, NewParentView};
 
@@ -248,9 +249,17 @@ where
             tracing::debug!(height, "adding data to the cache");
 
             self.provider.new_parent_view(height, Some(data.clone()))?;
-            self.vote_tally
-                .add_block(height, Some(data.0.clone()))
-                .map_err(map_voting_err)?;
+            if let Some(p) = self.provider.sealed_proposal_at_height(height)? {
+                let vote = TopdownVote::v1(
+                    p.finality().height,
+                    p.finality().block_hash.clone(),
+                    p.commitment().to_vec(),
+                );
+                self.vote_tally
+                    .add_block(height, Some(vote))
+                    .map_err(map_voting_err)?;
+            }
+
             tracing::debug!(height, "non-null block pushed to cache");
             Ok(())
         })

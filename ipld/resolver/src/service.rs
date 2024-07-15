@@ -34,7 +34,7 @@ use crate::behaviour::{
 };
 use crate::client::Client;
 use crate::stats;
-use crate::vote_record::{SignedVoteRecord, VoteRecord};
+use crate::vote_record::{GossipPayload, VoteRecord};
 
 /// Result of attempting to resolve a CID.
 pub type ResolveResult = anyhow::Result<()>;
@@ -91,7 +91,7 @@ pub(crate) enum Request<V> {
     SetProvidedSubnets(Vec<SubnetID>),
     AddProvidedSubnet(SubnetID),
     RemoveProvidedSubnet(SubnetID),
-    PublishVote(Box<SignedVoteRecord<V>>),
+    PublishVote(Box<GossipPayload<V>>),
     PublishPreemptive(SubnetID, Vec<u8>),
     PinSubnet(SubnetID),
     UnpinSubnet(SubnetID),

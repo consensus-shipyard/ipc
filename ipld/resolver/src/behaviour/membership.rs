@@ -27,7 +27,7 @@ use tokio::time::{Instant, Interval};
 use crate::hash::blake2b_256;
 use crate::provider_cache::{ProviderDelta, SubnetProviderCache};
 use crate::provider_record::{ProviderRecord, SignedProviderRecord};
-use crate::vote_record::{SignedVoteRecord, VoteRecord};
+use crate::vote_record::{GossipPayload, SignedVoteRecord, VoteRecord};
 use crate::{stats, Timestamp};
 
 use super::NetworkConfig;
@@ -341,10 +341,12 @@ where
     }
 
     /// Publish the vote of the validator running the agent about a CID to a subnet.
-    pub fn publish_vote(&mut self, vote: SignedVoteRecord<V>) -> anyhow::Result<()> {
-        let topic = self.voting_topic(&vote.record().subnet_id);
-        let data = vote.into_envelope().into_protobuf_encoding();
-        match self.inner.publish(topic, data) {
+    pub fn publish_vote(&mut self, vote: GossipPayload<V>) -> anyhow::Result<()> {
+        // let topic = self.voting_topic(&vote.record().subnet_id);
+        match self.inner.publish(
+            Sha256Topic::new(vote.topic),
+            fvm_ipld_encoding::to_vec(&vote.data)?,
+        ) {
             Err(e) => {
                 stats::MEMBERSHIP_PUBLISH_FAILURE.inc();
                 Err(anyhow!(e))

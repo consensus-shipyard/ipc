@@ -1,21 +1,25 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+pub mod payload;
+mod quorum;
+
+use crate::voting::quorum::{MultiSigCert, ValidatorSignatures};
 use async_stm::{abort, atomically_or_err, retry, Stm, StmResult, TVar};
-use serde::{de::DeserializeOwned, Serialize};
-use std::hash::Hash;
+use std::borrow::Borrow;
 use std::{fmt::Debug, time::Duration};
 
-use crate::{BlockHash, BlockHeight};
+use crate::{BlockHeight, Bytes};
 
 // Usign this type because it's `Hash`, unlike the normal `libsecp256k1::PublicKey`.
+use crate::voting::payload::{SignedVote, TopdownVote};
 pub use ipc_ipld_resolver::ValidatorKey;
-use ipc_ipld_resolver::VoteRecord;
 
 pub type Weight = u64;
+pub type Signature = Bytes;
 
 #[derive(Debug, thiserror::Error)]
-pub enum Error<K = ValidatorKey, V: AsRef<[u8]> = BlockHash> {
+pub enum Error {
     #[error("the last finalized block has not been set")]
     Uninitialized,
 
@@ -23,14 +27,16 @@ pub enum Error<K = ValidatorKey, V: AsRef<[u8]> = BlockHash> {
     UnexpectedBlock(BlockHeight, BlockHeight),
 
     #[error("validator unknown or has no power: {0:?}")]
-    UnpoweredValidator(K),
+    UnpoweredValidator(ValidatorKey),
 
-    #[error(
-        "equivocation by validator {0:?} at height {1}; {} != {}",
-        hex::encode(.2),
-        hex::encode(.3)
-    )]
-    Equivocation(K, BlockHeight, V, V),
+    #[error("equivocation by validator {0:?} at height {1};")]
+    Equivocation(ValidatorKey, BlockHeight),
+
+    #[error("validator vote is invalidated")]
+    VoteCannotBeValidated,
+
+    #[error("validator cannot sign vote")]
+    CannotSignVote,
 }
 
 /// Keep track of votes being gossiped about parent chain finality
@@ -38,12 +44,13 @@ pub enum Error<K = ValidatorKey, V: AsRef<[u8]> = BlockHash> {
 /// so that we can ask for proposals that are not going to be voted
 /// down.
 #[derive(Clone)]
-pub struct VoteTally<K = ValidatorKey, V = BlockHash> {
+pub struct VoteTally {
     /// Current validator weights. These are the ones who will vote on the blocks,
     /// so these are the weights which need to form a quorum.
-    power_table: TVar<im::HashMap<K, Weight>>,
+    power_table: TVar<im::HashMap<ValidatorKey, Weight>>,
 
-    /// The *finalized mainchain* of the parent as observed by this node.
+    /// The *finalized mainchain* of the parent as observed by this node and it's not
+    /// considered finalized by the quorum and will be voted on.
     ///
     /// These are assumed to be final because IIRC that's how the syncer works,
     /// only fetching the info about blocks which are already sufficiently deep.
@@ -52,24 +59,23 @@ pub struct VoteTally<K = ValidatorKey, V = BlockHash> {
     /// tally the votes we collected for the block hashes until we reach a quorum.
     ///
     /// The block hash is optional to allow for null blocks on Filecoin rootnet.
-    chain: TVar<im::OrdMap<BlockHeight, Option<V>>>,
+    chain: TVar<im::OrdMap<BlockHeight, Option<TopdownVote>>>,
 
     /// Index votes received by height and hash, which makes it easy to look up
     /// all the votes for a given block hash and also to verify that a validator
     /// isn't equivocating by trying to vote for two different things at the
     /// same height.
-    votes: TVar<im::OrdMap<BlockHeight, im::HashMap<V, im::HashSet<K>>>>,
+    votes: TVar<im::OrdMap<BlockHeight, im::HashMap<TopdownVote, ValidatorSignatures>>>,
 
     /// Adding votes can be paused if we observe that looking for a quorum takes too long
     /// and is often retried due to votes being added.
     pause_votes: TVar<bool>,
+
+    /// The latest height that was voted to be finalized and committed to child blockchian
+    last_finalized_height: TVar<BlockHeight>,
 }
 
-impl<K, V> VoteTally<K, V>
-where
-    K: Clone + Hash + Eq + Sync + Send + 'static + Debug,
-    V: AsRef<[u8]> + Clone + Hash + Eq + Sync + Send + 'static,
-{
+impl VoteTally {
     /// Create an uninitialized instance. Before blocks can be added to it
     /// we will have to set the last finalized block.
     ///
@@ -81,23 +87,27 @@ where
             chain: TVar::default(),
             votes: TVar::default(),
             pause_votes: TVar::new(false),
+            last_finalized_height: Default::default(),
         }
     }
 
     /// Initialize the vote tally from the current power table
     /// and the last finalized block from the ledger.
-    pub fn new(power_table: Vec<(K, Weight)>, last_finalized_block: (BlockHeight, V)) -> Self {
-        let (height, hash) = last_finalized_block;
+    pub fn new(
+        power_table: Vec<(ValidatorKey, Weight)>,
+        last_finalized_height: BlockHeight,
+    ) -> Self {
         Self {
             power_table: TVar::new(im::HashMap::from_iter(power_table)),
-            chain: TVar::new(im::OrdMap::from_iter([(height, Some(hash))])),
+            chain: TVar::default(),
             votes: TVar::default(),
             pause_votes: TVar::new(false),
+            last_finalized_height: TVar::new(last_finalized_height),
         }
     }
 
     /// Check that a validator key is currently part of the power table.
-    pub fn has_power(&self, validator_key: &K) -> Stm<bool> {
+    pub fn has_power(&self, validator_key: &ValidatorKey) -> Stm<bool> {
         let pt = self.power_table.read()?;
         // For consistency consider validators without power unknown.
         match pt.get(validator_key) {
@@ -120,9 +130,7 @@ where
     ///
     /// This is the block that was finalized *in the ledger*.
     pub fn last_finalized_height(&self) -> Stm<BlockHeight> {
-        self.chain
-            .read()
-            .map(|c| c.get_min().map(|(h, _)| *h).unwrap_or_default())
+        self.last_finalized_height.read_clone()
     }
 
     /// Return the height of the last entry in the chain.
@@ -135,7 +143,7 @@ where
     }
 
     /// Get the hash of a block at the given height, if known.
-    pub fn block_hash(&self, height: BlockHeight) -> Stm<Option<V>> {
+    pub fn payload(&self, height: BlockHeight) -> Stm<Option<TopdownVote>> {
         self.chain.read().map(|c| c.get(&height).cloned().flatten())
     }
 
@@ -148,8 +156,8 @@ where
     pub fn add_block(
         &self,
         block_height: BlockHeight,
-        block_hash: Option<V>,
-    ) -> StmResult<(), Error<K>> {
+        payload: Option<TopdownVote>,
+    ) -> StmResult<(), Error> {
         let mut chain = self.chain.read_clone()?;
 
         // Check that we are extending the chain. We could also ignore existing heights.
@@ -164,7 +172,7 @@ where
             }
         }
 
-        chain.insert(block_height, block_hash);
+        chain.insert(block_height, payload);
 
         self.chain.write(chain)?;
 
@@ -176,19 +184,21 @@ where
     /// Returns `true` if this vote was added, `false` if it was ignored as a
     /// duplicate or a height we already finalized, and an error if it's an
     /// equivocation or from a validator we don't know.
-    pub fn add_vote(
-        &self,
-        validator_key: K,
-        block_height: BlockHeight,
-        block_hash: V,
-    ) -> StmResult<bool, Error<K, V>> {
+    pub fn add_vote(&self, vote: SignedVote) -> StmResult<bool, Error> {
         if *self.pause_votes.read()? {
             retry()?;
         }
 
-        let min_height = self.last_finalized_height()?;
+        let (payload, signature, validator_key) = match vote.into_validated_payload() {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::error!("error when validating vote payload: {e}");
+                return abort(Error::VoteCannotBeValidated);
+            }
+        };
 
-        if block_height < min_height {
+        let block_height = payload.block_height();
+        if block_height < self.last_finalized_height()? {
             return Ok(false);
         }
 
@@ -200,19 +210,16 @@ where
         let votes_at_height = votes.entry(block_height).or_default();
 
         for (bh, vs) in votes_at_height.iter() {
-            if *bh != block_hash && vs.contains(&validator_key) {
-                return abort(Error::Equivocation(
-                    validator_key,
-                    block_height,
-                    block_hash,
-                    bh.clone(),
-                ));
+            if *bh != payload && vs.has_voted(&validator_key) {
+                return abort(Error::Equivocation(validator_key, block_height));
             }
         }
 
-        let votes_for_block = votes_at_height.entry(block_hash).or_default();
+        let votes_for_block = votes_at_height
+            .entry(payload)
+            .or_insert(ValidatorSignatures::empty());
 
-        if votes_for_block.insert(validator_key).is_some() {
+        if votes_for_block.add_vote(validator_key, signature) {
             return Ok(false);
         }
 
@@ -228,7 +235,7 @@ where
     }
 
     /// Find a block on the (from our perspective) finalized chain that gathered enough votes from validators.
-    pub fn find_quorum(&self) -> Stm<Option<(BlockHeight, V)>> {
+    pub fn find_quorum(&self) -> Stm<Option<(BlockHeight, MultiSigCert)>> {
         self.pause_votes.write(false)?;
 
         let quorum_threshold = self.quorum_threshold()?;
@@ -243,9 +250,8 @@ where
         let power_table = self.power_table.read()?;
 
         let mut weight = 0;
-        let mut voters = im::HashSet::new();
 
-        for (block_height, block_hash) in chain.iter().rev() {
+        for (block_height, maybe_payload) in chain.iter().rev() {
             if block_height == finalized_height {
                 tracing::debug!(
                     block_height,
@@ -254,7 +260,7 @@ where
                 );
                 break; // This block is already finalized in the ledger, no need to propose it again.
             }
-            let Some(block_hash) = block_hash else {
+            let Some(payload) = maybe_payload else {
                 tracing::debug!(block_height, "null block found in vote proposal");
                 continue; // Skip null blocks
             };
@@ -262,23 +268,23 @@ where
                 tracing::debug!(block_height, "no votes");
                 continue;
             };
-            let Some(votes_for_block) = votes_at_height.get(block_hash) else {
+            let Some(votes_for_block) = votes_at_height.get(payload) else {
                 tracing::debug!(block_height, "no votes for block");
                 continue; // We could detect equovicating voters here.
             };
 
-            for vk in votes_for_block {
-                if voters.insert(vk.clone()).is_none() {
-                    // New voter, get their current weight; it might be 0 if they have been removed.
-                    weight += power_table.get(vk).cloned().unwrap_or_default();
-                    tracing::debug!(weight, key = ?vk, "new voter");
-                }
+            for vk in votes_for_block.validators() {
+                weight += power_table.get(vk).cloned().unwrap_or_default();
+                tracing::debug!(weight, key = ?vk, "aggregating vote power");
             }
 
             tracing::debug!(weight, quorum_threshold, "showdown");
 
             if weight >= quorum_threshold {
-                return Ok(Some((*block_height, block_hash.clone())));
+                return Ok(Some((
+                    *block_height,
+                    votes_for_block.to_cert(power_table.borrow()),
+                )));
             }
         }
 
@@ -288,14 +294,15 @@ where
     /// Call when a new finalized block is added to the ledger, to clear out all preceding blocks.
     ///
     /// After this operation the minimum item in the chain will the new finalized block.
-    pub fn set_finalized(&self, block_height: BlockHeight, block_hash: V) -> Stm<()> {
+    pub fn set_finalized(&self, block_height: BlockHeight) -> Stm<()> {
         self.chain.update(|chain| {
-            let (_, mut chain) = chain.split(&block_height);
-            chain.insert(block_height, Some(block_hash));
+            let (_, chain) = chain.split(&block_height);
             chain
         })?;
 
         self.votes.update(|votes| votes.split(&block_height).1)?;
+
+        self.last_finalized_height.write(block_height)?;
 
         Ok(())
     }
@@ -303,7 +310,7 @@ where
     /// Overwrite the power table after it has changed to a new snapshot.
     ///
     /// This method expects absolute values, it completely replaces the existing powers.
-    pub fn set_power_table(&self, power_table: Vec<(K, Weight)>) -> Stm<()> {
+    pub fn set_power_table(&self, power_table: Vec<(ValidatorKey, Weight)>) -> Stm<()> {
         let power_table = im::HashMap::from_iter(power_table);
         // We don't actually have to remove the votes of anyone who is no longer a validator,
         // we just have to make sure to handle the case when they are not in the power table.
@@ -313,7 +320,7 @@ where
     /// Update the power table after it has changed with changes.
     ///
     /// This method expects only the updated values, leaving everyone who isn't in it untouched
-    pub fn update_power_table(&self, power_updates: Vec<(K, Weight)>) -> Stm<()> {
+    pub fn update_power_table(&self, power_updates: Vec<(ValidatorKey, Weight)>) -> Stm<()> {
         if power_updates.is_empty() {
             return Ok(());
         }
@@ -332,20 +339,16 @@ where
 }
 
 /// Poll the vote tally for new finalized blocks and publish a vote about them if the validator is part of the power table.
-pub async fn publish_vote_loop<V, F>(
+pub async fn publish_vote_loop<V>(
     vote_tally: VoteTally,
     // Throttle votes to maximum 1/interval
     vote_interval: Duration,
     // Publish a vote after a timeout even if it's the same as before.
     vote_timeout: Duration,
     key: libp2p::identity::Keypair,
-    subnet_id: ipc_api::subnet_id::SubnetID,
-    client: ipc_ipld_resolver::Client<V>,
-    to_vote: F,
-) where
-    F: Fn(BlockHeight, BlockHash) -> V,
-    V: Serialize + DeserializeOwned,
-{
+    pubsub_topic: String,
+    client: ipc_ipld_resolver::Client<SignedVote>,
+) {
     let validator_key = ValidatorKey::from(key.public());
 
     let mut vote_interval = tokio::time::interval(vote_interval);
@@ -368,8 +371,8 @@ pub async fn publish_vote_loop<V, F>(
                     retry()?;
                 }
 
-                let next_hash = match vote_tally.block_hash(next_height)? {
-                    Some(next_hash) => next_hash,
+                let vote = match vote_tally.payload(next_height)? {
+                    Some(vote) => vote,
                     None => retry()?,
                 };
 
@@ -380,15 +383,23 @@ pub async fn publish_vote_loop<V, F>(
                     // TODO (ENG-622): I'm not sure gossip messages published by this node would be delivered to it, so this might be the only way.
                     // NOTE: We should not see any other error from this as we just checked that the validator had power,
                     //       but for piece of mind let's return and log any potential errors, rather than ignore them.
-                    vote_tally.add_vote(validator_key.clone(), next_height, next_hash.clone())?;
+
+                    let vote = match SignedVote::signed(&key, &vote) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            tracing::error!("cannot sign topdown vote payload: {e}");
+                            return abort(Error::CannotSignVote);
+                        }
+                    };
+                    vote_tally.add_vote(vote)?;
                 }
 
-                Ok((next_height, next_hash, has_power))
+                Ok((next_height, vote, has_power))
             }),
         )
         .await;
 
-        let (next_height, next_hash, has_power) = match result {
+        let (next_height, next_vote, has_power) = match result {
             Ok(Ok(vs)) => vs,
             Err(_) => {
                 if let Some(ref vs) = prev {
@@ -411,11 +422,9 @@ pub async fn publish_vote_loop<V, F>(
         if has_power && prev_height > 0 {
             tracing::debug!(block_height = next_height, "publishing finality vote");
 
-            let vote = to_vote(next_height, next_hash.clone());
-
-            match VoteRecord::signed(&key, subnet_id.clone(), vote) {
-                Ok(vote) => {
-                    if let Err(e) = client.publish_vote(vote) {
+            match SignedVote::signed(&key, &next_vote) {
+                Ok(signed) => {
+                    if let Err(e) = client.publish_vote(pubsub_topic.clone(), signed) {
                         tracing::error!(error = e.to_string(), "failed to publish vote");
                     }
                 }
@@ -431,6 +440,6 @@ pub async fn publish_vote_loop<V, F>(
             vote_interval.tick().await;
         }
 
-        prev = Some((next_height, next_hash, has_power));
+        prev = Some((next_height, next_vote, has_power));
     }
 }

@@ -31,6 +31,7 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use num_traits::Zero;
 use std::sync::Arc;
+use fendermint_vm_genesis::ValidatorKey;
 
 /// A resolution pool for bottom-up and top-down checkpoints.
 pub type CheckpointPool = ResolvePool<CheckpointPoolItem>;
@@ -366,8 +367,7 @@ where
                         env.parent_finality_provider
                             .set_new_finality(finality.clone(), prev_finality.clone())?;
 
-                        env.parent_finality_votes
-                            .set_finalized(finality.height, finality.block_hash.clone())?;
+                        env.parent_finality_votes.set_finalized(finality.height)?;
 
                         Ok(())
                     })
@@ -404,7 +404,7 @@ where
                 .0
                 .iter()
                 .map(|v| {
-                    let vk = ValidatorKey::from(v.public_key.0);
+                    let vk = v.public_key.0;
                     let w = v.power.0;
                     (vk, w)
                 })
