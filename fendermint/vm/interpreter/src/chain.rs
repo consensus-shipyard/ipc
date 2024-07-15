@@ -31,7 +31,6 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use num_traits::Zero;
 use std::sync::Arc;
-use fendermint_vm_genesis::ValidatorKey;
 
 /// A resolution pool for bottom-up and top-down checkpoints.
 pub type CheckpointPool = ResolvePool<CheckpointPoolItem>;
@@ -130,44 +129,32 @@ where
         // The pre-requisite for proposal is that there is a quorum of gossiped votes at that height.
         // The final proposal can be at most as high as the quorum, but can be less if we have already,
         // hit some limits such as how many blocks we can propose in a single step.
-        let finalities = atomically(|| {
-            let parent = state.parent_finality_provider.next_proposal()?;
-            let quorum = state
-                .parent_finality_votes
-                .find_quorum()?
-                .map(|(height, block_hash)| IPCParentFinality { height, block_hash });
-
-            Ok((parent, quorum))
+        let maybe_finality = atomically(|| {
+            // The pre-requisite for proposal is that there is a quorum of gossiped votes at that height.
+            // The final proposal can be at most as high as the quorum.
+            Ok(
+                if let Some((vote, quorum_cert)) = state.parent_finality_votes.find_quorum()? {
+                    todo!("integrate cert and vote")
+                    // // The first version of parent finality is a block hash of 32 bytes
+                    // let p = if bytes.len() == 32 {
+                    //     prep_topdown_v1(
+                    //         &state,
+                    //         IPCParentFinality::new(height as ChainEpoch, bytes),
+                    //     )?
+                    // } else {
+                    //     prep_topdown_v2(&state, height)?
+                    // };
+                    // tracing::debug!(proposal = ?p, "proposed topdown proposal");
+                    // p
+                } else {
+                    tracing::info!("no quorum found yet");
+                    None
+                },
+            )
         })
         .await;
-
-        let maybe_finality = match finalities {
-            (Some(parent), Some(quorum)) => Some(if parent.height <= quorum.height {
-                parent
-            } else {
-                quorum
-            }),
-            (Some(parent), None) => {
-                emit!(
-                    DEBUG,
-                    ParentFinalityMissingQuorum {
-                        block_height: parent.height,
-                        block_hash: &hex::encode(&parent.block_hash),
-                    }
-                );
-                None
-            }
-            (None, _) => {
-                // This is normal, the parent probably hasn't produced a block yet.
-                None
-            }
-        };
-
-        if let Some(finality) = maybe_finality {
-            msgs.push(ChainMessage::Ipc(IpcMessage::TopDownExec(ParentFinality {
-                height: finality.height as ChainEpoch,
-                block_hash: finality.block_hash,
-            })))
+        if let Some(msg) = maybe_finality {
+            msgs.push(msg);
         }
 
         // Append at the end - if we run out of block space, these are going to be reproposed in the next block.
@@ -201,16 +188,18 @@ where
                 ChainMessage::Ipc(IpcMessage::TopDownExec(ParentFinality {
                     height,
                     block_hash,
+                    ..
                 })) => {
-                    let prop = IPCParentFinality {
-                        height: height as u64,
-                        block_hash,
-                    };
-                    let is_final =
-                        atomically(|| env.parent_finality_provider.check_proposal(&prop)).await;
-                    if !is_final {
-                        return Ok(false);
-                    }
+                    todo!("implement quorum cert checking")
+                    // let prop = IPCParentFinality {
+                    //     height: height as u64,
+                    //     block_hash,
+                    // };
+                    // let is_final =
+                    //     atomically(|| env.parent_finality_provider.check_proposal(&prop)).await;
+                    // if !is_final {
+                    //     return Ok(false);
+                    // }
                 }
                 _ => {}
             };
@@ -404,7 +393,7 @@ where
                 .0
                 .iter()
                 .map(|v| {
-                    let vk = v.public_key.0;
+                    let vk = ValidatorKey::from(v.public_key.0);
                     let w = v.power.0;
                     (vk, w)
                 })

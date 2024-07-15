@@ -1,10 +1,15 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use cid::multihash::Code;
+use cid::multihash::MultihashDigest;
 use cid::Cid;
+use fvm_ipld_encoding::DAG_CBOR;
 use fvm_shared::{
     address::Address, clock::ChainEpoch, crypto::signature::Signature, econ::TokenAmount,
 };
+use ipc_api::cross::IpcEnvelope;
+use ipc_api::staking::StakingChangeRequest;
 use ipc_api::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 
@@ -101,6 +106,38 @@ pub struct ParentFinality {
     pub height: ChainEpoch,
     /// The block hash of the parent, expressed as bytes
     pub block_hash: Vec<u8>,
+    /// The topdown messages to be executed.
+    ///
+    /// Note that this is not the cross messages at the `height`,
+    /// but instead the cross messages since the last topdown finality to the current `height`.
+    pub cross_messages: Vec<IpcEnvelope>,
+    /// The validator changes to be applied
+    ///
+    /// Note that this is not the validator changes at the `height`,
+    /// but instead the validator changes since the last topdown finality to the current `height`.
+    pub validator_changes: Vec<StakingChangeRequest>,
+}
+
+impl ParentFinality {
+    pub fn new(
+        height: ChainEpoch,
+        hash: Vec<u8>,
+        cross_messages: Vec<IpcEnvelope>,
+        validator_changes: Vec<StakingChangeRequest>,
+    ) -> Self {
+        Self {
+            height,
+            block_hash: hash,
+            cross_messages,
+            validator_changes,
+        }
+    }
+
+    pub fn side_effect_cid(&self) -> Cid {
+        let bytes = fvm_ipld_encoding::to_vec(&(&self.cross_messages, &self.validator_changes))
+            .expect("should not have failed");
+        Cid::new_v1(DAG_CBOR, Code::Blake2b256.digest(&bytes))
+    }
 }
 
 #[cfg(feature = "arb")]
@@ -192,6 +229,8 @@ mod arb {
             Self {
                 height: u32::arbitrary(g).into(),
                 block_hash: Vec::arbitrary(g),
+                cross_messages: vec![],
+                validator_changes: vec![],
             }
         }
     }

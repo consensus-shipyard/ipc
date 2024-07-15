@@ -235,7 +235,7 @@ impl VoteTally {
     }
 
     /// Find a block on the (from our perspective) finalized chain that gathered enough votes from validators.
-    pub fn find_quorum(&self) -> Stm<Option<(BlockHeight, MultiSigCert)>> {
+    pub fn find_quorum(&self) -> Stm<Option<(TopdownVote, MultiSigCert)>> {
         self.pause_votes.write(false)?;
 
         let quorum_threshold = self.quorum_threshold()?;
@@ -282,7 +282,7 @@ impl VoteTally {
 
             if weight >= quorum_threshold {
                 return Ok(Some((
-                    *block_height,
+                    payload.clone(),
                     votes_for_block.to_cert(power_table.borrow()),
                 )));
             }

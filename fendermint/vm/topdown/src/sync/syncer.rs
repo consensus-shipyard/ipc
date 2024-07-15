@@ -7,7 +7,8 @@ use crate::proxy::ParentQueryProxy;
 use crate::sync::{query_starting_finality, ParentFinalityStateQuery};
 use crate::voting::{self, VoteTally};
 use crate::{
-    is_null_round_str, BlockHash, BlockHeight, CachedFinalityProvider, Config, Error, Toggle,
+    is_null_round_str, BlockHash, BlockHeight, CachedFinalityProvider, Config, Error,
+    ParentFinalityProvider, Toggle,
 };
 use anyhow::anyhow;
 use async_stm::{atomically, atomically_or_err, StmError};
@@ -249,12 +250,8 @@ where
             tracing::debug!(height, "adding data to the cache");
 
             self.provider.new_parent_view(height, Some(data.clone()))?;
-            if let Some(p) = self.provider.sealed_proposal_at_height(height)? {
-                let vote = TopdownVote::v1(
-                    p.finality().height,
-                    p.finality().block_hash.clone(),
-                    p.commitment().to_vec(),
-                );
+            if let Some(p) = self.provider.next_proposal()? {
+                let vote = TopdownVote::v1(p.height, p.block_hash.clone(), todo!("add commitment"));
                 self.vote_tally
                     .add_block(height, Some(vote))
                     .map_err(map_voting_err)?;
