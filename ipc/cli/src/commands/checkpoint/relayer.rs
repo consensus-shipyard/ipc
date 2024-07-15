@@ -20,9 +20,6 @@ use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
-use prometheus;
-use prometheus_exporter;
-
 const DEFAULT_POLLING_INTERVAL: u64 = 15;
 
 /// The command to run the bottom up relayer in the background.
@@ -38,6 +35,9 @@ impl CommandLineHandler for BottomUpRelayer {
         // Prometheus metrics
         match &arguments.metrics_address {
             Some(addr) => {
+                use prometheus;
+                use prometheus_exporter;
+
                 let addr = SocketAddr::from_str(addr)?;
 
                 let registry = prometheus::Registry::new();
