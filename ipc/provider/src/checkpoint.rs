@@ -4,11 +4,13 @@
 
 use crate::config::Subnet;
 use crate::manager::{BottomUpCheckpointRelayer, EthSubnetManager};
+use crate::observe::{CheckpointFinalized, HexEncodableBlockHash};
 use anyhow::{anyhow, Result};
 use futures_util::future::try_join_all;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use ipc_api::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
+use ipc_observability::emit;
 use ipc_wallet::{EthKeyAddress, PersistentKeyStore};
 use std::cmp::max;
 use std::fmt::{Display, Formatter};
@@ -200,11 +202,16 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                     .unwrap();
                 all_submit_tasks.push(tokio::task::spawn(async move {
                     let height = event.height;
+                    let hash = bundle.checkpoint.block_hash.clone();
+
                     let result =
                         Self::submit_checkpoint(parent_handler_clone, submitter, bundle, event)
                             .await
                             .inspect(|_| {
-                                tracing::info!("submitted bottom up checkpoint at height {height}");
+                                emit(CheckpointFinalized {
+                                    height,
+                                    hash: HexEncodableBlockHash(hash),
+                                });
                             })
                             .inspect_err(|err| {
                                 tracing::error!(
