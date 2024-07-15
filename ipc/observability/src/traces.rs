@@ -3,6 +3,7 @@
 
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
+use std::str::FromStr;
 pub use tracing_appender::non_blocking;
 pub use tracing_appender::non_blocking::WorkerGuard;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
@@ -30,14 +31,16 @@ impl RotationKind {
     }
 }
 
-impl From<&str> for RotationKind {
-    fn from(s: &str) -> Self {
+impl FromStr for RotationKind {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "minutely" => RotationKind::Minutely,
-            "hourly" => RotationKind::Hourly,
-            "daily" => RotationKind::Daily,
-            "never" => RotationKind::Never,
-            _ => panic!("invalid rotation kind"),
+            "minutely" => Ok(RotationKind::Minutely),
+            "hourly" => Ok(RotationKind::Hourly),
+            "daily" => Ok(RotationKind::Daily),
+            "never" => Ok(RotationKind::Never),
+            _ => Err(format!("invalid rotation kind: {}", s)),
         }
     }
 }
