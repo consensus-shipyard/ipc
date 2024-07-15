@@ -125,13 +125,17 @@ where
     }
 
     /// Parse messages in the block, reject if unknown format. Pass the rest to the inner `ChainMessage` interpreter.
-    async fn process(&self, state: Self::State, msgs: Vec<Self::Message>) -> anyhow::Result<bool> {
+    async fn process(
+        &self,
+        state: Self::State,
+        msgs: Vec<Self::Message>,
+    ) -> anyhow::Result<(bool, Option<String>)> {
         if msgs.len() > self.max_msgs {
             tracing::warn!(
                 block_msgs = msgs.len(),
                 "rejecting block: too many messages"
             );
-            return Ok(false);
+            return Ok((false, Some(format!("too many messages: {}", msgs.len()))));
         }
 
         let mut chain_msgs = Vec::new();
@@ -152,7 +156,13 @@ where
                         "failed to decode message in proposal as ChainMessage"
                     );
                     if self.reject_malformed_proposal {
-                        return Ok(false);
+                        return Ok((
+                            false,
+                            Some(format!(
+                                "failed to decode message in proposal as ChainMessage: {}",
+                                e
+                            )),
+                        ));
                     }
                 }
                 Ok(msg) => chain_msgs.push(msg),
