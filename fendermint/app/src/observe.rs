@@ -4,7 +4,25 @@
 use hex;
 use std::fmt;
 
-use ipc_observability::{impl_traceable, impl_traceables, Recordable, TraceLevel, Traceable};
+use ipc_observability::{
+    impl_traceable, impl_traceables, lazy_static, register_metrics, Recordable, TraceLevel,
+    Traceable,
+};
+
+use prometheus::{register_counter_vec, CounterVec, Registry};
+
+register_metrics! {
+    PROPOSALS_BLOCK_PROPOSAL_RECEIVED: CounterVec
+        = register_counter_vec!("proposals_block_proposal_received", "Block proposal received", &["height"]);
+    PROPOSALS_BLOCK_PROPOSAL_SENT: CounterVec
+        = register_counter_vec!("proposals_block_proposal_sent", "Block proposal sent", &["height"]);
+    PROPOSALS_BLOCK_PROPOSAL_ACCEPTED: CounterVec
+        = register_counter_vec!("proposals_block_proposal_accepted", "Block proposal accepted", &["height"]);
+    PROPOSALS_BLOCK_PROPOSAL_REJECTED: CounterVec
+        = register_counter_vec!("proposals_block_proposal_rejected", "Block proposal rejected", &["height"]);
+    PROPOSALS_BLOCK_COMMITTED: CounterVec
+        = register_counter_vec!("proposals_block_committed", "Block committed", &["height"]);
+}
 
 impl_traceables!(
     TraceLevel::Info,
@@ -36,7 +54,11 @@ pub struct BlockProposalReceived<'a> {
 }
 
 impl Recordable for BlockProposalReceived<'_> {
-    fn record_metrics(&self) {}
+    fn record_metrics(&self) {
+        PROPOSALS_BLOCK_PROPOSAL_RECEIVED
+            .with_label_values(&[&self.height.to_string()])
+            .inc();
+    }
 }
 
 #[derive(Debug)]
@@ -47,7 +69,11 @@ pub struct BlockProposalSent {
 }
 
 impl Recordable for BlockProposalSent {
-    fn record_metrics(&self) {}
+    fn record_metrics(&self) {
+        PROPOSALS_BLOCK_PROPOSAL_SENT
+            .with_label_values(&[&self.height.to_string()])
+            .inc();
+    }
 }
 
 #[derive(Debug)]
@@ -60,7 +86,11 @@ pub struct BlockProposalAccepted<'a> {
 }
 
 impl Recordable for BlockProposalAccepted<'_> {
-    fn record_metrics(&self) {}
+    fn record_metrics(&self) {
+        PROPOSALS_BLOCK_PROPOSAL_ACCEPTED
+            .with_label_values(&[&self.height.to_string()])
+            .inc();
+    }
 }
 
 #[derive(Debug)]
@@ -73,7 +103,11 @@ pub struct BlockProposalRejected<'a> {
 }
 
 impl Recordable for BlockProposalRejected<'_> {
-    fn record_metrics(&self) {}
+    fn record_metrics(&self) {
+        PROPOSALS_BLOCK_PROPOSAL_REJECTED
+            .with_label_values(&[&self.height.to_string()])
+            .inc();
+    }
 }
 
 #[derive(Debug)]
@@ -83,7 +117,11 @@ pub struct BlockCommitted {
 }
 
 impl Recordable for BlockCommitted {
-    fn record_metrics(&self) {}
+    fn record_metrics(&self) {
+        PROPOSALS_BLOCK_COMMITTED
+            .with_label_values(&[&self.height.to_string()])
+            .inc();
+    }
 }
 
 #[cfg(test)]

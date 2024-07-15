@@ -678,7 +678,7 @@ where
         let size_txs = txs.iter().map(|tx| tx.len()).sum::<usize>();
         let num_txs = txs.len();
 
-        let accept = self
+        let (accept, reason) = self
             .interpreter
             .process(self.chain_env.clone(), txs)
             .await
@@ -707,7 +707,7 @@ where
                 size: size_txs,
                 tx_count: num_txs,
                 validator: request.proposer_address.to_string().as_str(),
-                reason: "rejected",
+                reason: reason.unwrap_or_default().as_str(),
             });
             Ok(response::ProcessProposal::Reject)
         }
