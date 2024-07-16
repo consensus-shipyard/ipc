@@ -1,8 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::time::Instant;
-
 use async_trait::async_trait;
 
 use fvm_ipld_blockstore::Blockstore;
@@ -13,8 +11,10 @@ use ipc_observability::emit;
 use crate::CheckInterpreter;
 
 use super::{
-    observe::MsgExecCheck, state::FvmExecState, store::ReadOnlyBlockstore, FvmMessage,
-    FvmMessageInterpreter,
+    observe::MsgExecCheck,
+    state::{ElapsedExecution, FvmExecState},
+    store::ReadOnlyBlockstore,
+    FvmMessage, FvmMessageInterpreter,
 };
 
 /// Transaction check results are expressed by the exit code, so that hopefully
@@ -116,11 +116,8 @@ where
                 } else if self.exec_in_check {
                     // Instead of modifying just the partial state, we will execute the call in earnest.
                     // This is required for fully supporting the Ethereum API "pending" queries, if that's needed.
-
-                    let start = Instant::now();
-                    // This will stack the effect for subsequent transactions added to the mempool.
-                    let (apply_ret, _) = state.execute_explicit(msg.clone())?;
-                    let latency = start.elapsed().as_secs_f64();
+                    let (apply_ret, _, latency) =
+                        ElapsedExecution::new(&mut state).execute_explicit(msg.clone())?;
 
                     emit(MsgExecCheck {
                         height: state.block_height(),
@@ -133,7 +130,7 @@ where
                         // TODO Karel - this should be the serialized params
                         params: msg.params.clone().bytes(),
                         nonce: msg.sequence,
-                        duration: latency,
+                        duration: latency.as_secs_f64(),
                         exit_code: apply_ret.msg_receipt.exit_code.value(),
                     });
 

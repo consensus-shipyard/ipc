@@ -1,8 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::time::Instant;
-
 use anyhow::Context;
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -19,7 +17,7 @@ use crate::ExecInterpreter;
 use super::{
     checkpoint::{self, PowerUpdates},
     observe::MsgExecApply,
-    state::FvmExecState,
+    state::{ElapsedExecution, FvmExecState},
     FvmMessage, FvmMessageInterpreter,
 };
 
@@ -163,14 +161,10 @@ where
         // TODO Karel - this should probably not be gas_premium but something else??
         let gas_price = msg.gas_premium.to_string();
 
-        let (latency, apply_ret, emitters) = if from == system::SYSTEM_ACTOR_ADDR {
-            let start = Instant::now();
-            let res = state.execute_implicit(msg)?;
-            (start.elapsed().as_secs_f64(), res.0, res.1)
+        let (apply_ret, emitters, latency) = if from == system::SYSTEM_ACTOR_ADDR {
+            ElapsedExecution::new(&mut state).execute_implicit(msg)?
         } else {
-            let start = Instant::now();
-            let res = state.execute_explicit(msg)?;
-            (start.elapsed().as_secs_f64(), res.0, res.1)
+            ElapsedExecution::new(&mut state).execute_explicit(msg)?
         };
 
         emit(MsgExecApply {
@@ -184,7 +178,7 @@ where
             // TODO Karel - this should be the serialized params
             params: params.bytes(),
             nonce: sequence,
-            duration: latency,
+            duration: latency.as_secs_f64(),
             exit_code: apply_ret.msg_receipt.exit_code.value(),
         });
 

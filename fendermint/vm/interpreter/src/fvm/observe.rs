@@ -30,8 +30,8 @@ impl_traceables!(
 macro_rules! message_exec_struct {
     ($($name:ident),*) => {
         $(
-            #[warn(dead_code)]
             #[derive(std::fmt::Debug)]
+            #[allow(dead_code)]
             pub struct $name<'a> {
                 pub height: i64,
                 pub from: &'a str,
