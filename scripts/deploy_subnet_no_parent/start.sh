@@ -1,6 +1,7 @@
 #!/bin/bash
 
-set -euo pipefail
+# TODO: uncomment this when done debugging
+#set -euo pipefail
 
 dir=$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")
 IPC_FOLDER="$dir"/../..
@@ -15,7 +16,6 @@ OBJECTS_HOST_PORTS=(8001 8002 8003)
 IPFS_SWARM_HOST_PORTS=(4001 4002 4003)
 IPFS_RPC_HOST_PORTS=(5001 5002 5003)
 IPFS_GATEWAY_HOST_PORTS=(8080 8081 8082)
-# PROMETHEUS_HOST_PORTS=(9090 9091 9092)
 PROMETHEUS_HOST_PORT=9090
 PROMETHEUS_METRICS_PORTS=(9184 9185 9186)
 
