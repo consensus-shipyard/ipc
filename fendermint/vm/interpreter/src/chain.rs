@@ -179,7 +179,7 @@ where
         &self,
         env: Self::State,
         msgs: Vec<Self::Message>,
-    ) -> anyhow::Result<(bool, Option<String>)> {
+    ) -> anyhow::Result<bool, String> {
         for msg in msgs {
             match msg {
                 ChainMessage::Ipc(IpcMessage::BottomUpExec(msg)) => {
@@ -198,7 +198,7 @@ where
                         .await;
 
                     if !is_resolved {
-                        return Ok((false, Some("checkpoint not resolved".to_string())));
+                        return Err("checkpoint not resolved".to_string());
                     }
                 }
                 ChainMessage::Ipc(IpcMessage::TopDownExec(ParentFinality {
@@ -212,13 +212,13 @@ where
                     let is_final =
                         atomically(|| env.parent_finality_provider.check_proposal(&prop)).await;
                     if !is_final {
-                        return Ok((false, Some("parent finality not available".to_string())));
+                        return Err("parent finality not available".to_string());
                     }
                 }
                 _ => {}
             };
         }
-        Ok((true, None))
+        Ok(true)
     }
 }
 

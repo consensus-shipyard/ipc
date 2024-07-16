@@ -129,13 +129,13 @@ where
         &self,
         state: Self::State,
         msgs: Vec<Self::Message>,
-    ) -> anyhow::Result<(bool, Option<String>)> {
+    ) -> anyhow::Result<bool, String> {
         if msgs.len() > self.max_msgs {
             tracing::warn!(
                 block_msgs = msgs.len(),
                 "rejecting block: too many messages"
             );
-            return Ok((false, Some(format!("too many messages: {}", msgs.len()))));
+            return Err(format!("too many messages: {}", msgs.len()));
         }
 
         let mut chain_msgs = Vec::new();
@@ -156,12 +156,9 @@ where
                         "failed to decode message in proposal as ChainMessage"
                     );
                     if self.reject_malformed_proposal {
-                        return Ok((
-                            false,
-                            Some(format!(
-                                "failed to decode message in proposal as ChainMessage: {}",
-                                e
-                            )),
+                        return Err(format!(
+                            "failed to decode message in proposal as ChainMessage: {}",
+                            e
                         ));
                     }
                 }
