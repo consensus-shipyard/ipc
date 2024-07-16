@@ -9,6 +9,7 @@ use fvm_ipld_encoding::Error as IpldError;
 
 use crate::{
     chain::{ChainMessageApplyRet, ChainMessageCheckRes},
+    errors::ProcessError,
     fvm::{FvmQuery, FvmQueryRet},
     CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
 };
@@ -129,13 +130,13 @@ where
         &self,
         state: Self::State,
         msgs: Vec<Self::Message>,
-    ) -> anyhow::Result<bool, String> {
+    ) -> anyhow::Result<bool, ProcessError> {
         if msgs.len() > self.max_msgs {
             tracing::warn!(
                 block_msgs = msgs.len(),
                 "rejecting block: too many messages"
             );
-            return Err(format!("too many messages: {}", msgs.len()));
+            return Err(ProcessError::TooManyMessages(msgs.len()));
         }
 
         let mut chain_msgs = Vec::new();
@@ -156,10 +157,7 @@ where
                         "failed to decode message in proposal as ChainMessage"
                     );
                     if self.reject_malformed_proposal {
-                        return Err(format!(
-                            "failed to decode message in proposal as ChainMessage: {}",
-                            e
-                        ));
+                        return Err(ProcessError::FailedToDecodeMessage(e.to_string()));
                     }
                 }
                 Ok(msg) => chain_msgs.push(msg),
