@@ -22,6 +22,9 @@ register_metrics! {
         = register_counter_vec!("proposals_block_proposal_rejected", "Block proposal rejected", &["height"]);
     PROPOSALS_BLOCK_COMMITTED: CounterVec
         = register_counter_vec!("proposals_block_committed", "Block committed", &["height"]);
+    MPOOL_RECEIVED: CounterVec = register_counter_vec!("mpool_received", "Mpool received", &["accept", "from", "to"]);
+    MPOOL_RECEIVED_INVALID_MESSAGE: CounterVec
+        = register_counter_vec!("mpool_received_invalid_message", "Mpool received invalid message", &["reason"]);
 }
 
 impl_traceables!(
@@ -146,7 +149,11 @@ pub struct MpoolReceived<'a> {
 }
 
 impl Recordable for MpoolReceived<'_> {
-    fn record_metrics(&self) {}
+    fn record_metrics(&self) {
+        MPOOL_RECEIVED
+            .with_label_values(&[&self.accept.to_string(), self.from, self.to])
+            .inc();
+    }
 }
 
 #[derive(Debug)]
@@ -156,7 +163,11 @@ pub struct MpoolReceivedInvalidMessage<'a> {
 }
 
 impl Recordable for MpoolReceivedInvalidMessage<'_> {
-    fn record_metrics(&self) {}
+    fn record_metrics(&self) {
+        MPOOL_RECEIVED_INVALID_MESSAGE
+            .with_label_values(&[self.reason])
+            .inc();
+    }
 }
 
 #[cfg(test)]
