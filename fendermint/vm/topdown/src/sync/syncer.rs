@@ -16,8 +16,8 @@ use libp2p::futures::TryFutureExt;
 use std::sync::Arc;
 use tracing::instrument;
 
-use crate::observe::{HexEncodableBlockHash, ParentFinalityAcquired};
-use ipc_observability::emit;
+use crate::observe::ParentFinalityAcquired;
+use ipc_observability::{emit, serde::HexEncodableBlockHash};
 
 /// Parent syncer that constantly poll parent. This struct handles lotus null blocks and deferred
 /// execution. For ETH based parent, it should work out of the box as well.

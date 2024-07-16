@@ -36,7 +36,7 @@ use fvm_shared::chainid::ChainID;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
-use ipc_observability::emit;
+use ipc_observability::{emit, serde::HexEncodableBlockHash};
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 use tendermint::abci::request::CheckTxKind;
@@ -44,8 +44,8 @@ use tendermint::abci::{request, response};
 use tracing::instrument;
 
 use crate::observe::{
-    BlockCommitted, BlockProposalAccepted, BlockProposalReceived, BlockProposalRejected,
-    BlockProposalSent, HexEncodableBlockHash, MpoolReceived, MpoolReceivedInvalidMessage,
+    BlockCommitted, BlockProposalEvaluated, BlockProposalReceived, BlockProposalSent,
+    MpoolReceived, MpoolReceivedInvalidMessage,
 };
 use crate::AppExitCode;
 use crate::BlockHeight;
@@ -648,14 +648,15 @@ where
                 }
                 Ok(Ok(ret)) => {
                     emit(MpoolReceived {
-                        from: ret.message.from.to_string().as_str(),
-                        to: ret.message.to.to_string().as_str(),
-                        value: ret.message.value.to_string().as_str(),
+                        from: &ret.message.from,
+                        to: &ret.message.to,
+                        value: &ret.message.value,
                         param_len: ret.message.params.len(),
                         gas_limit: ret.message.gas_limit,
-                        fee_cap: ret.message.gas_fee_cap.to_string().as_str(),
-                        premium: ret.message.gas_premium.to_string().as_str(),
+                        fee_cap: &ret.message.gas_fee_cap,
+                        premium: &ret.message.gas_premium,
                         accept: ret.exit_code.is_success(),
+                        reason: None,
                     });
                     to_check_tx(ret)
                 }
@@ -687,6 +688,7 @@ where
         let (txs, size) = take_until_max_size(txs, request.max_tx_bytes.try_into().unwrap());
 
         emit(BlockProposalSent {
+            validator: &request.proposer_address,
             height: request.height.value(),
             tx_count: txs.len(),
             size,
@@ -719,28 +721,27 @@ where
             validator: request.proposer_address.to_string().as_str(),
         });
 
-        match process_result {
-            Ok(_) => {
-                emit(BlockProposalAccepted {
-                    height: request.height.value(),
-                    hash: HexEncodableBlockHash(request.hash.into()),
-                    size: size_txs,
-                    tx_count: num_txs,
-                    validator: request.proposer_address.to_string().as_str(),
-                });
-                Ok(response::ProcessProposal::Accept)
-            }
+        let mut proposal_evaluated = BlockProposalEvaluated {
+            height: request.height.value(),
+            hash: HexEncodableBlockHash(request.hash.into()),
+            size: size_txs,
+            tx_count: num_txs,
+            validator: &request.proposer_address,
+            accept: true,
+            reason: None,
+        };
+
+        let process_proposal = match process_result {
+            Ok(_) => response::ProcessProposal::Accept,
             Err(e) => {
-                emit(BlockProposalRejected {
-                    height: request.height.value(),
-                    size: size_txs,
-                    tx_count: num_txs,
-                    validator: request.proposer_address.to_string().as_str(),
-                    reason: e.to_string().as_str(),
-                });
-                Ok(response::ProcessProposal::Reject)
+                proposal_evaluated.accept = false;
+                proposal_evaluated.reason = Some(e);
+                response::ProcessProposal::Reject
             }
-        }
+        };
+
+        emit(proposal_evaluated);
+        Ok(process_proposal)
     }
 
     /// Signals the beginning of a new block, prior to any `DeliverTx` calls.

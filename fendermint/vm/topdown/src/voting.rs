@@ -8,11 +8,11 @@ use std::hash::Hash;
 use std::{fmt::Debug, time::Duration};
 
 use crate::observe::{
-    HexEncodableBlockHash, ParentFinalityCommitted, ParentFinalityPeerQuorumReached,
-    ParentFinalityPeerVoteReceived, ParentFinalityPeerVoteSent,
+    ParentFinalityCommitted, ParentFinalityPeerQuorumReached, ParentFinalityPeerVoteReceived,
+    ParentFinalityPeerVoteSent,
 };
 use crate::{BlockHash, BlockHeight};
-use ipc_observability::emit;
+use ipc_observability::{emit, serde::HexEncodableBlockHash};
 
 // Usign this type because it's `Hash`, unlike the normal `libsecp256k1::PublicKey`.
 pub use ipc_ipld_resolver::ValidatorKey;

@@ -1,12 +1,15 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use hex;
-use std::fmt;
+use fvm_shared::address::Address;
+use fvm_shared::econ::TokenAmount;
+
+use fendermint_vm_interpreter::errors::ProcessError;
+use tendermint::account::Id;
 
 use ipc_observability::{
-    impl_traceable, impl_traceables, lazy_static, register_metrics, Recordable, TraceLevel,
-    Traceable,
+    impl_traceable, impl_traceables, lazy_static, register_metrics, serde::HexEncodableBlockHash,
+    Recordable, TraceLevel, Traceable,
 };
 
 use prometheus::{register_counter_vec, CounterVec, Registry};
@@ -31,9 +34,8 @@ impl_traceables!(
     TraceLevel::Info,
     "Proposals",
     BlockProposalReceived<'a>,
-    BlockProposalSent,
-    BlockProposalAccepted<'a>,
-    BlockProposalRejected<'a>,
+    BlockProposalSent<'a>,
+    BlockProposalEvaluated<'a>,
     BlockCommitted
 );
 
@@ -45,14 +47,6 @@ impl_traceables!(
 );
 
 pub type BlockHeight = u64;
-/// Hex encodable block hash.
-pub struct HexEncodableBlockHash(pub Vec<u8>);
-
-impl fmt::Debug for HexEncodableBlockHash {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", hex::encode(&self.0))
-    }
-}
 
 #[derive(Debug)]
 pub struct BlockProposalReceived<'a> {
@@ -72,13 +66,14 @@ impl Recordable for BlockProposalReceived<'_> {
 }
 
 #[derive(Debug)]
-pub struct BlockProposalSent {
+pub struct BlockProposalSent<'a> {
+    pub validator: &'a Id,
     pub height: BlockHeight,
     pub size: usize,
     pub tx_count: usize,
 }
 
-impl Recordable for BlockProposalSent {
+impl Recordable for BlockProposalSent<'_> {
     fn record_metrics(&self) {
         PROPOSALS_BLOCK_PROPOSAL_SENT
             .with_label_values(&[&self.height.to_string()])
@@ -87,36 +82,27 @@ impl Recordable for BlockProposalSent {
 }
 
 #[derive(Debug)]
-pub struct BlockProposalAccepted<'a> {
+pub struct BlockProposalEvaluated<'a> {
     pub height: BlockHeight,
     pub hash: HexEncodableBlockHash,
     pub size: usize,
     pub tx_count: usize,
-    pub validator: &'a str,
+    pub validator: &'a Id,
+    pub accept: bool,
+    pub reason: Option<ProcessError>,
 }
 
-impl Recordable for BlockProposalAccepted<'_> {
+impl Recordable for BlockProposalEvaluated<'_> {
     fn record_metrics(&self) {
-        PROPOSALS_BLOCK_PROPOSAL_ACCEPTED
-            .with_label_values(&[&self.height.to_string()])
-            .inc();
-    }
-}
-
-#[derive(Debug)]
-pub struct BlockProposalRejected<'a> {
-    pub height: BlockHeight,
-    pub size: usize,
-    pub tx_count: usize,
-    pub validator: &'a str,
-    pub reason: &'a str,
-}
-
-impl Recordable for BlockProposalRejected<'_> {
-    fn record_metrics(&self) {
-        PROPOSALS_BLOCK_PROPOSAL_REJECTED
-            .with_label_values(&[&self.height.to_string()])
-            .inc();
+        if self.accept {
+            PROPOSALS_BLOCK_PROPOSAL_ACCEPTED
+                .with_label_values(&[&self.height.to_string()])
+                .inc();
+        } else {
+            PROPOSALS_BLOCK_PROPOSAL_REJECTED
+                .with_label_values(&[&self.height.to_string()])
+                .inc();
+        }
     }
 }
 
@@ -138,20 +124,25 @@ impl Recordable for BlockCommitted {
 pub struct MpoolReceived<'a> {
     // TODO - add cid later on
     // pub message_cid: &'a str,
-    pub from: &'a str,
-    pub to: &'a str,
-    pub value: &'a str,
+    pub from: &'a Address,
+    pub to: &'a Address,
+    pub value: &'a TokenAmount,
     pub param_len: usize,
     pub gas_limit: u64,
-    pub fee_cap: &'a str,
-    pub premium: &'a str,
+    pub fee_cap: &'a TokenAmount,
+    pub premium: &'a TokenAmount,
     pub accept: bool,
+    pub reason: Option<&'a str>,
 }
 
 impl Recordable for MpoolReceived<'_> {
     fn record_metrics(&self) {
         MPOOL_RECEIVED
-            .with_label_values(&[&self.accept.to_string(), self.from, self.to])
+            .with_label_values(&[
+                &self.accept.to_string(),
+                self.from.to_string().as_str(),
+                self.to.to_string().as_str(),
+            ])
             .inc();
     }
 }
@@ -185,26 +176,33 @@ mod tests {
             validator: "validator",
         });
 
+        let id = Id::new([0x01; 20]);
+
         emit(BlockProposalSent {
             height: 1,
             size: 100,
             tx_count: 10,
+            validator: &id,
         });
 
-        emit(BlockProposalAccepted {
+        emit(BlockProposalEvaluated {
             height: 1,
             hash: HexEncodableBlockHash(vec![0x01, 0x02, 0x03]),
             size: 100,
             tx_count: 10,
-            validator: "validator",
+            validator: &id,
+            accept: true,
+            reason: None,
         });
 
-        emit(BlockProposalRejected {
+        emit(BlockProposalEvaluated {
             height: 1,
+            hash: HexEncodableBlockHash(vec![0x01, 0x02, 0x03]),
             size: 100,
             tx_count: 10,
-            validator: "validator",
-            reason: "reason",
+            validator: &id,
+            accept: false,
+            reason: Some(ProcessError::CheckpointNotResolved),
         });
 
         emit(BlockCommitted {
