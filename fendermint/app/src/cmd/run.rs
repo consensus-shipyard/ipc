@@ -263,7 +263,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             CachedFinalityProvider::uninitialized(config.clone(), ipc_provider.clone()).await?;
 
         let p = Arc::new(Toggle::enabled(finality_provider));
-        (p, Some((ipc_provider_with_latency, config)))
+        (p, Some((ipc_provider, config)))
     } else {
         info!("topdown finality disabled");
         (Arc::new(Toggle::disabled()), None)
