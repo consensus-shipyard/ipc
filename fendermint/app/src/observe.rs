@@ -34,6 +34,13 @@ impl_traceables!(
     BlockCommitted
 );
 
+impl_traceables!(
+    TraceLevel::Info,
+    "Mpool",
+    MpoolReceived<'a>,
+    MpoolReceivedInvalidMessage<'a>
+);
+
 pub type BlockHeight = u64;
 /// Hex encodable block hash.
 pub struct HexEncodableBlockHash(pub Vec<u8>);
@@ -122,6 +129,34 @@ impl Recordable for BlockCommitted {
             .with_label_values(&[&self.height.to_string()])
             .inc();
     }
+}
+
+#[derive(Debug)]
+pub struct MpoolReceived<'a> {
+    // TODO - add cid later on
+    // pub message_cid: &'a str,
+    pub from: &'a str,
+    pub to: &'a str,
+    pub value: &'a str,
+    pub param_len: usize,
+    pub gas_limit: u64,
+    pub fee_cap: &'a str,
+    pub premium: &'a str,
+    pub accept: bool,
+}
+
+impl Recordable for MpoolReceived<'_> {
+    fn record_metrics(&self) {}
+}
+
+#[derive(Debug)]
+pub struct MpoolReceivedInvalidMessage<'a> {
+    pub reason: &'a str,
+    pub description: &'a str,
+}
+
+impl Recordable for MpoolReceivedInvalidMessage<'_> {
+    fn record_metrics(&self) {}
 }
 
 #[cfg(test)]

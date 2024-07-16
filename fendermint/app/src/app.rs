@@ -45,7 +45,7 @@ use tracing::instrument;
 
 use crate::observe::{
     BlockCommitted, BlockProposalAccepted, BlockProposalReceived, BlockProposalRejected,
-    BlockProposalSent, HexEncodableBlockHash,
+    BlockProposalSent, HexEncodableBlockHash, MpoolReceived, MpoolReceivedInvalidMessage,
 };
 use crate::AppExitCode;
 use crate::BlockHeight;
@@ -623,11 +623,42 @@ where
         *guard = Some(state);
 
         let response = match result {
-            Err(e) => invalid_check_tx(AppError::InvalidEncoding, e.description),
+            Err(e) => {
+                emit(MpoolReceivedInvalidMessage {
+                    reason: "InvalidEncoding",
+                    description: e.description.as_ref(),
+                });
+                invalid_check_tx(AppError::InvalidEncoding, e.description)
+            }
             Ok(result) => match result {
-                Err(IllegalMessage) => invalid_check_tx(AppError::IllegalMessage, "".to_owned()),
-                Ok(Err(InvalidSignature(d))) => invalid_check_tx(AppError::InvalidSignature, d),
-                Ok(Ok(ret)) => to_check_tx(ret),
+                Err(IllegalMessage) => {
+                    emit(MpoolReceivedInvalidMessage {
+                        reason: "IllegalMessage",
+                        description: "",
+                    });
+
+                    invalid_check_tx(AppError::IllegalMessage, "".to_owned())
+                }
+                Ok(Err(InvalidSignature(d))) => {
+                    emit(MpoolReceivedInvalidMessage {
+                        reason: "InvalidSignature",
+                        description: d.as_ref(),
+                    });
+                    invalid_check_tx(AppError::InvalidSignature, d)
+                }
+                Ok(Ok(ret)) => {
+                    emit(MpoolReceived {
+                        from: ret.message.from.to_string().as_str(),
+                        to: ret.message.to.to_string().as_str(),
+                        value: ret.message.value.to_string().as_str(),
+                        param_len: ret.message.params.len(),
+                        gas_limit: ret.message.gas_limit,
+                        fee_cap: ret.message.gas_fee_cap.to_string().as_str(),
+                        premium: ret.message.gas_premium.to_string().as_str(),
+                        accept: ret.exit_code.is_success(),
+                    });
+                    to_check_tx(ret)
+                }
             },
         };
 

@@ -25,6 +25,7 @@ pub struct FvmCheckRet {
     pub exit_code: ExitCode,
     pub return_data: Option<RawBytes>,
     pub info: Option<String>,
+    pub message: FvmMessage,
 }
 
 #[async_trait]
@@ -70,6 +71,7 @@ where
                 exit_code,
                 return_data,
                 info,
+                message: msg.clone(),
             };
             Ok((state, ret))
         };
