@@ -252,7 +252,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
 
         let ipc_provider = {
             let p = make_ipc_provider_proxy(&settings)?;
-            Arc::new(IPCProviderProxyWithLatency::new(p));
+            Arc::new(IPCProviderProxyWithLatency::new(p))
         };
 
         let finality_provider =
