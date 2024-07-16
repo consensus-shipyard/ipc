@@ -625,7 +625,13 @@ where
         let mut mpool_received_trace = MpoolReceived::default();
 
         let response = match result {
-            Err(e) => invalid_check_tx(AppError::InvalidEncoding, e.description),
+            Err(e) => {
+                emit(MpoolReceivedInvalidMessage {
+                    reason: "InvalidEncoding",
+                    description: e.description.as_ref(),
+                });
+                invalid_check_tx(AppError::InvalidEncoding, e.description)
+            }
             Ok(result) => match result {
                 Err(IllegalMessage) => invalid_check_tx(AppError::IllegalMessage, "".to_owned()),
                 Ok(Err(InvalidSignature(d))) => invalid_check_tx(AppError::InvalidSignature, d),
