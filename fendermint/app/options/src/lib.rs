@@ -117,7 +117,6 @@ pub struct Options {
     pub max_log_files: Option<usize>,
 
     #[arg(
-        short = 'l',
         long,
         default_value = "daily",
         value_enum,

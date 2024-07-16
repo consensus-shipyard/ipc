@@ -6,10 +6,16 @@ use async_trait::async_trait;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::{address::Address, error::ExitCode};
+use ipc_observability::emit;
 
 use crate::CheckInterpreter;
 
-use super::{state::FvmExecState, store::ReadOnlyBlockstore, FvmMessage, FvmMessageInterpreter};
+use super::{
+    observe::MsgExecCheck,
+    state::{ElapsedExecution, FvmExecState},
+    store::ReadOnlyBlockstore,
+    FvmMessage, FvmMessageInterpreter,
+};
 
 /// Transaction check results are expressed by the exit code, so that hopefully
 /// they would result in the same error code if they were applied.
@@ -19,6 +25,7 @@ pub struct FvmCheckRet {
     pub exit_code: ExitCode,
     pub return_data: Option<RawBytes>,
     pub info: Option<String>,
+    pub message: FvmMessage,
 }
 
 #[async_trait]
@@ -64,6 +71,7 @@ where
                 exit_code,
                 return_data,
                 info,
+                message: msg.clone(),
             };
             Ok((state, ret))
         };
@@ -108,9 +116,23 @@ where
                 } else if self.exec_in_check {
                     // Instead of modifying just the partial state, we will execute the call in earnest.
                     // This is required for fully supporting the Ethereum API "pending" queries, if that's needed.
+                    let (apply_ret, _, latency) =
+                        ElapsedExecution::new(&mut state).execute_explicit(msg.clone())?;
 
-                    // This will stack the effect for subsequent transactions added to the mempool.
-                    let (apply_ret, _) = state.execute_explicit(msg.clone())?;
+                    emit(MsgExecCheck {
+                        height: state.block_height(),
+                        from: msg.from.to_string().as_str(),
+                        to: msg.to.to_string().as_str(),
+                        value: msg.value.to_string().as_str(),
+                        method_num: msg.method_num,
+                        gas_limit: msg.gas_limit,
+                        gas_price: msg.gas_premium.to_string().as_str(),
+                        // TODO Karel - this should be the serialized params
+                        params: msg.params.clone().bytes(),
+                        nonce: msg.sequence,
+                        duration: latency.as_secs_f64(),
+                        exit_code: apply_ret.msg_receipt.exit_code.value(),
+                    });
 
                     return checked(
                         state,

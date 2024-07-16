@@ -4,6 +4,7 @@ use async_trait::async_trait;
 
 pub mod bytes;
 pub mod chain;
+pub mod errors;
 pub mod fvm;
 pub mod signed;
 
@@ -54,7 +55,11 @@ pub trait ProposalInterpreter: Sync + Send {
     /// This is our chance check whether CIDs proposed for execution are available.
     ///
     /// Return `true` if we can accept this block, `false` to reject it.
-    async fn process(&self, state: Self::State, msgs: Vec<Self::Message>) -> anyhow::Result<bool>;
+    async fn process(
+        &self,
+        state: Self::State,
+        msgs: Vec<Self::Message>,
+    ) -> anyhow::Result<bool, errors::ProcessError>;
 }
 
 /// The `ExecInterpreter` applies messages on some state, which is

@@ -1,5 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
+use std::time::Instant;
+
 use async_trait::async_trait;
 use cid::Cid;
 use fendermint_vm_message::query::{ActorState, FvmQuery, GasEstimate, StateParams};
@@ -8,8 +10,10 @@ use fvm_ipld_encoding::RawBytes;
 use fvm_shared::{
     bigint::BigInt, econ::TokenAmount, error::ExitCode, message::Message, ActorID, BLOCK_GAS_LIMIT,
 };
+use ipc_observability::emit;
 use num_traits::Zero;
 
+use super::observe::{MsgExecCall, MsgExecEstimate};
 use crate::QueryInterpreter;
 
 use super::{state::FvmQueryState, FvmApplyRet, FvmMessageInterpreter};
@@ -79,24 +83,25 @@ where
                 let method_num = msg.method_num;
                 let gas_limit = msg.gas_limit;
 
+                let start = Instant::now();
                 // Do not stack effects
-                let (state, (apply_ret, emitters)) = state.call(*msg).await?;
+                let (state, (apply_ret, emitters)) = state.call(*msg.clone()).await?;
+                let latency = start.elapsed().as_secs_f64();
+                let exit_code = apply_ret.msg_receipt.exit_code.value();
 
-                tracing::info!(
-                    height = state.block_height(),
-                    pending = state.pending(),
-                    to = to.to_string(),
-                    from = from.to_string(),
-                    method_num,
-                    exit_code = apply_ret.msg_receipt.exit_code.value(),
-                    data = hex::encode(apply_ret.msg_receipt.return_data.bytes()),
-                    info = apply_ret
-                        .failure_info
-                        .as_ref()
-                        .map(|i| i.to_string())
-                        .unwrap_or_default(),
-                    "query call"
-                );
+                emit(MsgExecCall {
+                    height: state.block_height(),
+                    from: msg.from.to_string().as_str(),
+                    to: msg.to.to_string().as_str(),
+                    value: msg.value.to_string().as_str(),
+                    method_num: msg.method_num,
+                    gas_limit: msg.gas_limit,
+                    gas_price: msg.gas_premium.to_string().as_str(),
+                    params: &msg.params,
+                    nonce: msg.sequence,
+                    duration: latency,
+                    exit_code,
+                });
 
                 let ret = FvmApplyRet {
                     apply_ret,
@@ -177,15 +182,25 @@ where
         msg.gas_premium = TokenAmount::zero();
         msg.gas_fee_cap = TokenAmount::zero();
 
+        let start = Instant::now();
         // estimate the gas limit and assign it to the message
         // revert any changes because we'll repeat the estimation
         let (state, (ret, _)) = state.call(msg.clone()).await?;
+        let latency = start.elapsed().as_secs_f64();
 
-        tracing::debug!(
-            gas_used = ret.msg_receipt.gas_used,
-            exit_code = ret.msg_receipt.exit_code.value(),
-            "estimated gassed message"
-        );
+        emit(MsgExecEstimate {
+            height: state.block_height(),
+            from: msg.from.to_string().as_str(),
+            to: msg.to.to_string().as_str(),
+            value: msg.value.to_string().as_str(),
+            method_num: msg.method_num,
+            gas_limit: msg.gas_limit,
+            gas_price: msg.gas_premium.to_string().as_str(),
+            params: &msg.params,
+            nonce: msg.sequence,
+            duration: latency,
+            exit_code: ret.msg_receipt.exit_code.value(),
+        });
 
         if !ret.msg_receipt.exit_code.is_success() {
             // if the message fail we can't estimate the gas.
@@ -278,7 +293,9 @@ where
         // set message nonce to zero so the right one is picked up
         msg.sequence = 0;
 
-        let (state, (apply_ret, _)) = state.call(msg).await?;
+        let start = Instant::now();
+        let (state, (apply_ret, _)) = state.call(msg.clone()).await?;
+        let latency = start.elapsed().as_secs_f64();
 
         let ret = GasEstimate {
             exit_code: apply_ret.msg_receipt.exit_code,
@@ -289,6 +306,20 @@ where
             return_data: apply_ret.msg_receipt.return_data,
             gas_limit: apply_ret.msg_receipt.gas_used,
         };
+
+        emit(MsgExecEstimate {
+            height: state.block_height(),
+            from: msg.from.to_string().as_str(),
+            to: msg.to.to_string().as_str(),
+            value: msg.value.to_string().as_str(),
+            method_num: msg.method_num,
+            gas_limit: msg.gas_limit,
+            gas_price: msg.gas_premium.to_string().as_str(),
+            params: &msg.params,
+            nonce: msg.sequence,
+            duration: latency,
+            exit_code: ret.exit_code.value(),
+        });
 
         // if the message succeeded or failed with a different error than `SYS_OUT_OF_GAS`,
         // immediately return as we either succeeded finding the right gas estimation,

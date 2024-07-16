@@ -28,6 +28,7 @@ fendermint_testing = { path = "../../testing", optional = true }
 ipc_actors_abis = { workspace = true }
 
 ipc-api = { workspace = true }
+ipc-observability = { workspace = true }
 
 async-trait = { workspace = true }
 async-stm = { workspace = true }
@@ -42,6 +43,7 @@ tendermint = { workspace = true }
 tendermint-rpc = { workspace = true }
 tracing = { workspace = true }
 thiserror = { workspace = true }
+prometheus = { workspace = true }
 
 cid = { workspace = true }
 fvm = { workspace = true }

@@ -1,5 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
+use crate::errors::ProcessError;
 use crate::fvm::state::ipc::GatewayCaller;
 use crate::fvm::{topdown, FvmApplyRet, PowerUpdates};
 use crate::{
@@ -175,7 +176,11 @@ where
     }
 
     /// Perform finality checks on top-down transactions and availability checks on bottom-up transactions.
-    async fn process(&self, env: Self::State, msgs: Vec<Self::Message>) -> anyhow::Result<bool> {
+    async fn process(
+        &self,
+        env: Self::State,
+        msgs: Vec<Self::Message>,
+    ) -> anyhow::Result<bool, ProcessError> {
         for msg in msgs {
             match msg {
                 ChainMessage::Ipc(IpcMessage::BottomUpExec(msg)) => {
@@ -194,7 +199,7 @@ where
                         .await;
 
                     if !is_resolved {
-                        return Ok(false);
+                        return Err(ProcessError::CheckpointNotResolved);
                     }
                 }
                 ChainMessage::Ipc(IpcMessage::TopDownExec(ParentFinality {
@@ -208,7 +213,7 @@ where
                     let is_final =
                         atomically(|| env.parent_finality_provider.check_proposal(&prop)).await;
                     if !is_final {
-                        return Ok(false);
+                        return Err(ProcessError::ParentFinalityNotAvailable);
                     }
                 }
                 _ => {}
