@@ -25,9 +25,7 @@ register_metrics! {
         = register_counter_vec!("proposals_block_proposal_rejected", "Block proposal rejected", &["height"]);
     PROPOSALS_BLOCK_COMMITTED: CounterVec
         = register_counter_vec!("proposals_block_committed", "Block committed", &["height"]);
-    MPOOL_RECEIVED: CounterVec = register_counter_vec!("mpool_received", "Mpool received", &["accept", "from", "to"]);
-    MPOOL_RECEIVED_INVALID_MESSAGE: CounterVec
-        = register_counter_vec!("mpool_received_invalid_message", "Mpool received invalid message", &["reason"]);
+    MPOOL_RECEIVED: CounterVec = register_counter_vec!("mpool_received", "Mpool received", &["accept", "from"]);
 }
 
 impl_traceables!(
@@ -39,12 +37,7 @@ impl_traceables!(
     BlockCommitted
 );
 
-impl_traceables!(
-    TraceLevel::Info,
-    "Mpool",
-    MpoolReceived<'a>,
-    MpoolReceivedInvalidMessage<'a>
-);
+impl_traceables!(TraceLevel::Info, "Mpool", MpoolReceived);
 
 pub type BlockHeight = u64;
 
@@ -54,7 +47,7 @@ pub struct BlockProposalReceived<'a> {
     pub hash: HexEncodableBlockHash,
     pub size: usize,
     pub tx_count: usize,
-    pub validator: &'a str,
+    pub validator: &'a Id,
 }
 
 impl Recordable for BlockProposalReceived<'_> {
@@ -120,43 +113,25 @@ impl Recordable for BlockCommitted {
     }
 }
 
-#[derive(Debug)]
-pub struct MpoolReceived<'a> {
+#[derive(Debug, Default)]
+pub struct MpoolReceived {
     // TODO - add cid later on
     // pub message_cid: &'a str,
-    pub from: &'a Address,
-    pub to: &'a Address,
-    pub value: &'a TokenAmount,
+    pub from: Option<Address>,
+    pub to: Option<Address>,
+    pub value: Option<TokenAmount>,
     pub param_len: usize,
     pub gas_limit: u64,
-    pub fee_cap: &'a TokenAmount,
-    pub premium: &'a TokenAmount,
+    pub fee_cap: Option<TokenAmount>,
+    pub premium: Option<TokenAmount>,
     pub accept: bool,
-    pub reason: Option<&'a str>,
+    pub reason: Option<String>,
 }
 
-impl Recordable for MpoolReceived<'_> {
+impl Recordable for MpoolReceived {
     fn record_metrics(&self) {
         MPOOL_RECEIVED
-            .with_label_values(&[
-                &self.accept.to_string(),
-                self.from.to_string().as_str(),
-                self.to.to_string().as_str(),
-            ])
-            .inc();
-    }
-}
-
-#[derive(Debug)]
-pub struct MpoolReceivedInvalidMessage<'a> {
-    pub reason: &'a str,
-    pub description: &'a str,
-}
-
-impl Recordable for MpoolReceivedInvalidMessage<'_> {
-    fn record_metrics(&self) {
-        MPOOL_RECEIVED_INVALID_MESSAGE
-            .with_label_values(&[self.reason])
+            .with_label_values(&[&self.accept.to_string(), self.from.map_or("", |_| "")])
             .inc();
     }
 }
@@ -168,15 +143,15 @@ mod tests {
 
     #[test]
     fn test_emit() {
+        let id = Id::new([0x01; 20]);
+
         emit(BlockProposalReceived {
             height: 1,
             hash: HexEncodableBlockHash(vec![0x01, 0x02, 0x03]),
             size: 100,
             tx_count: 10,
-            validator: "validator",
+            validator: &id,
         });
-
-        let id = Id::new([0x01; 20]);
 
         emit(BlockProposalSent {
             height: 1,

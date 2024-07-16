@@ -44,8 +44,7 @@ use tendermint::abci::{request, response};
 use tracing::instrument;
 
 use crate::observe::{
-    BlockCommitted, BlockProposalEvaluated, BlockProposalReceived, BlockProposalSent,
-    MpoolReceived, MpoolReceivedInvalidMessage,
+    BlockCommitted, BlockProposalEvaluated, BlockProposalReceived, BlockProposalSent, MpoolReceived,
 };
 use crate::AppExitCode;
 use crate::BlockHeight;
@@ -622,47 +621,35 @@ where
         // Update the check state.
         *guard = Some(state);
 
-        let response = match result {
-            Err(e) => {
-                emit(MpoolReceivedInvalidMessage {
-                    reason: "InvalidEncoding",
-                    description: e.description.as_ref(),
-                });
-                invalid_check_tx(AppError::InvalidEncoding, e.description)
-            }
-            Ok(result) => match result {
-                Err(IllegalMessage) => {
-                    emit(MpoolReceivedInvalidMessage {
-                        reason: "IllegalMessage",
-                        description: "",
-                    });
+        let mut mpool_received_trace = MpoolReceived::default();
 
-                    invalid_check_tx(AppError::IllegalMessage, "".to_owned())
-                }
-                Ok(Err(InvalidSignature(d))) => {
-                    emit(MpoolReceivedInvalidMessage {
-                        reason: "InvalidSignature",
-                        description: d.as_ref(),
-                    });
-                    invalid_check_tx(AppError::InvalidSignature, d)
-                }
+        let response = match result {
+            Err(e) => invalid_check_tx(AppError::InvalidEncoding, e.description),
+            Ok(result) => match result {
+                Err(IllegalMessage) => invalid_check_tx(AppError::IllegalMessage, "".to_owned()),
+                Ok(Err(InvalidSignature(d))) => invalid_check_tx(AppError::InvalidSignature, d),
                 Ok(Ok(ret)) => {
-                    emit(MpoolReceived {
-                        from: &ret.message.from,
-                        to: &ret.message.to,
-                        value: &ret.message.value,
-                        param_len: ret.message.params.len(),
-                        gas_limit: ret.message.gas_limit,
-                        fee_cap: &ret.message.gas_fee_cap,
-                        premium: &ret.message.gas_premium,
-                        accept: ret.exit_code.is_success(),
-                        reason: None,
-                    });
+                    mpool_received_trace.from = Some(ret.message.from);
+                    mpool_received_trace.to = Some(ret.message.to);
+                    mpool_received_trace.value = Some(ret.message.value.clone());
+                    mpool_received_trace.param_len = ret.message.params.len();
+                    mpool_received_trace.gas_limit = ret.message.gas_limit;
+                    mpool_received_trace.fee_cap = Some(ret.message.gas_fee_cap.clone());
+                    mpool_received_trace.premium = Some(ret.message.gas_premium.clone());
+
                     to_check_tx(ret)
                 }
             },
         };
 
+        if response.code.is_ok() {
+            mpool_received_trace.accept = true;
+        } else {
+            mpool_received_trace.accept = false;
+            mpool_received_trace.reason = Some(format!("{:?} - {}", response.code, response.info));
+        }
+
+        emit(mpool_received_trace);
         Ok(response)
     }
 
@@ -718,7 +705,7 @@ where
             hash: HexEncodableBlockHash(request.hash.into()),
             size: size_txs,
             tx_count: num_txs,
-            validator: request.proposer_address.to_string().as_str(),
+            validator: &request.proposer_address,
         });
 
         let mut proposal_evaluated = BlockProposalEvaluated {
