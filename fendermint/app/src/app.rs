@@ -716,28 +716,27 @@ where
             reason: None,
         });
 
-        match process_result {
-            Ok(_) => {
-                emit(BlockProposalAccepted {
-                    height: request.height.value(),
-                    hash: HexEncodableBlockHash(request.hash.into()),
-                    size: size_txs,
-                    tx_count: num_txs,
-                    validator: request.proposer_address.to_string().as_str(),
-                });
-                Ok(response::ProcessProposal::Accept)
-            }
+        let mut proposal_evaluated = BlockProposalEvaluated {
+            height: request.height.value(),
+            hash: HexEncodableBlockHash(request.hash.into()),
+            size: size_txs,
+            tx_count: num_txs,
+            validator: &request.proposer_address,
+            accept: true,
+            reason: None,
+        };
+
+        let process_proposal = match process_result {
+            Ok(_) => response::ProcessProposal::Accept,
             Err(e) => {
-                emit(BlockProposalRejected {
-                    height: request.height.value(),
-                    size: size_txs,
-                    tx_count: num_txs,
-                    validator: request.proposer_address.to_string().as_str(),
-                    reason: e.to_string().as_str(),
-                });
-                Ok(response::ProcessProposal::Reject)
+                proposal_evaluated.accept = false;
+                proposal_evaluated.reason = Some(e);
+                response::ProcessProposal::Reject
             }
-        }
+        };
+
+        emit(proposal_evaluated);
+        Ok(process_proposal)
     }
 
     /// Signals the beginning of a new block, prior to any `DeliverTx` calls.

@@ -170,6 +170,8 @@ mod tests {
             validator: &id,
         });
 
+        let id = Id::new([0x01; 20]);
+
         emit(BlockProposalSent {
             height: 1,
             size: 100,
