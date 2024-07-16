@@ -733,7 +733,7 @@ where
                     size: size_txs,
                     tx_count: num_txs,
                     validator: request.proposer_address.to_string().as_str(),
-                    reason: e.as_str(),
+                    reason: e.to_string().as_str(),
                 });
                 Ok(response::ProcessProposal::Reject)
             }
