@@ -316,6 +316,12 @@ do
   curl --location http://localhost:${OBJECTS_HOST_PORTS[i]}/health
 done
 
+# Step 9.3: Test prometheus endpoints
+curl --location http://localhost:"${PROMETHEUS_HOST_PORT}"/graph
+curl --location http://localhost:"${PROMETHEUS_METRICS_PORTS[0]}"/metrics
+curl --location http://localhost:"${PROMETHEUS_METRICS_PORTS[1]}"/metrics
+curl --location http://localhost:"${PROMETHEUS_METRICS_PORTS[2]}"/metrics
+
 # Step 10: Start a relayer process
 # Kill existing relayer if there's one
 pkill -f "relayer" || true
@@ -349,9 +355,7 @@ http://localhost:${ETHAPI_HOST_PORTS[1]}
 http://localhost:${ETHAPI_HOST_PORTS[2]}
 
 Prometheus API:
-http://localhost:${PROMETHEUS_HOST_PORTS[0]}
-http://localhost:${PROMETHEUS_HOST_PORTS[1]}
-http://localhost:${PROMETHEUS_HOST_PORTS[2]}
+http://localhost:${PROMETHEUS_HOST_PORT}
 
 Accounts:
 $(jq -r '.accounts[] | "\(.meta.Account.owner): \(.balance) coin units"' ${subnet_folder}/validator-0/genesis.json)

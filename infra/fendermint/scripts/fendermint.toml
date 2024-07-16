@@ -94,8 +94,6 @@ env = { "CMD" = "run", "FLAGS" = "-d" }
 
 [tasks.fendermint-run-validator-no-parent]
 script = """
-
-echo NETWORK_NAME $NETWORK_NAME
 docker run \
   ${FLAGS} \
   --name ${FM_CONTAINER_NAME} \

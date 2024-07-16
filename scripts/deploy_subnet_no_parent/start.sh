@@ -1,7 +1,6 @@
 #!/bin/bash
 
-# TODO: uncomment this when done debugging
-#set -euo pipefail
+set -euo pipefail
 
 dir=$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")
 IPC_FOLDER="$dir"/../..
@@ -121,8 +120,6 @@ cargo make --makefile infra/fendermint/Makefile.toml \
     -e PROMETHEUS_CONFIG_FOLDER="${PROMETHEUS_CONFIG_FOLDER}" \
     prometheus-start
 
-# TODO: test prometheus expression browser or metrics with curl
-
 # Test ETH API endpoint
 for i in {0..2}
 do
@@ -141,6 +138,12 @@ for i in {0..2}
 do
   curl --location http://localhost:"${OBJECTS_HOST_PORTS[i]}"/health
 done
+
+# test prometheus endpoints
+curl --location http://localhost:"${PROMETHEUS_HOST_PORT}"/graph
+curl --location http://localhost:"${PROMETHEUS_METRICS_PORTS[0]}"/metrics
+curl --location http://localhost:"${PROMETHEUS_METRICS_PORTS[1]}"/metrics
+curl --location http://localhost:"${PROMETHEUS_METRICS_PORTS[2]}"/metrics
 
 # Print a summary of the deployment
 cat << EOF

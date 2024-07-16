@@ -1,7 +1,6 @@
 #!/bin/bash
 
-# TODO: uncomment this when done debugging
-#set -euo pipefail
+set -euo pipefail
 
 dir=$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")
 IPC_FOLDER="$dir"/../..
@@ -100,6 +99,12 @@ for i in {0..2}
 do
   curl --location http://localhost:"${OBJECTS_HOST_PORTS[i]}"/health
 done
+
+# Test prometheus endpoints
+curl --location http://localhost:"${PROMETHEUS_HOST_PORT}"/graph
+curl --location http://localhost:"${PROMETHEUS_METRICS_PORTS[0]}"/metrics
+curl --location http://localhost:"${PROMETHEUS_METRICS_PORTS[1]}"/metrics
+curl --location http://localhost:"${PROMETHEUS_METRICS_PORTS[2]}"/metrics
 
 # Print a summary of the deployment
 cat << EOF

@@ -1,7 +1,6 @@
 #!/bin/bash
 
-# TODO: uncomment this when done debugging
-#set -euo pipefail
+set -euo pipefail
 
 dir=$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")
 IPC_FOLDER="$dir"/../..
