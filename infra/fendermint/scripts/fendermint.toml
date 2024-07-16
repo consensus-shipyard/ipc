@@ -19,6 +19,7 @@ docker run \
   --init \
   --user $(id -u) \
   --network ${NETWORK_NAME} \
+  --publish ${PROMETHEUS_METRICS_PORT}:9184 \
   --volume ${BASE_DIR}:/data \
   --volume fendermint-logs:/fendermint/logs \
   --env-file ${ENV_FILE} \
@@ -53,6 +54,7 @@ docker run \
   --network ${NETWORK_NAME} \
   --volume ${BASE_DIR}:/data \
   --publish ${RESOLVER_HOST_PORT}:${RESOLVER_HOST_PORT} \
+  --publish ${PROMETHEUS_METRICS_PORT}:9184 \
   --env FM_DATA_DIR=/data/${NODE_NAME}/fendermint/data \
   --env FM_LOG_DIR=/data/${NODE_NAME}/fendermint/data/logs \
   --env FM_SNAPSHOTS_DIR=/data/${NODE_NAME}/fendermint/snapshots \
@@ -92,6 +94,8 @@ env = { "CMD" = "run", "FLAGS" = "-d" }
 
 [tasks.fendermint-run-validator-no-parent]
 script = """
+
+echo NETWORK_NAME $NETWORK_NAME
 docker run \
   ${FLAGS} \
   --name ${FM_CONTAINER_NAME} \
@@ -100,6 +104,7 @@ docker run \
   --network ${NETWORK_NAME} \
   --volume ${BASE_DIR}:/data \
   --publish ${RESOLVER_HOST_PORT}:${RESOLVER_HOST_PORT} \
+  --publish ${PROMETHEUS_METRICS_PORT}:9184 \
   --env FM_DATA_DIR=/data/${NODE_NAME}/fendermint/data \
   --env FM_LOG_DIR=/data/${NODE_NAME}/fendermint/data/logs \
   --env FM_SNAPSHOTS_DIR=/data/${NODE_NAME}/fendermint/snapshots \
@@ -137,7 +142,7 @@ docker run \
   --network ${NETWORK_NAME} \
   --volume ${BASE_DIR}:/data \
   --publish ${RESOLVER_HOST_PORT}:${RESOLVER_HOST_PORT} \
-  --publish ${PROMETHEUS_METRICS_PORT}:9100 \
+  --publish ${PROMETHEUS_METRICS_PORT}:9184 \
   --env FM_DATA_DIR=/data/${NODE_NAME}/fendermint/data \
   --env FM_LOG_DIR=/data/${NODE_NAME}/fendermint/data/logs \
   --env FM_SNAPSHOTS_DIR=/data/${NODE_NAME}/fendermint/snapshots \

@@ -1,17 +1,17 @@
 [tasks.prometheus-run]
 script = """
-# TODO: need to add a --user $(id -u):(65534?)  once we figure out what group:user has the needed permission
+# TODO: add a --user $(id -u):(65534?) once we figure out what group:user has the needed permission
+mkdir -p $PROMETHEUS_DIR
 docker run \
   ${FLAGS} \
   --name ${PROMETHEUS_CONTAINER_NAME} \
   --init \
-  --network ${NETWORK_NAME} \
+  --net host \
   --volume ${PROMETHEUS_DIR}:/data/prometheus \
-  --volume ${PROMETHEUS_CONFIG_FOLDER}/prometheus.yaml:/etc/prometheus/prometheus.yaml \
+  --volume ${PROMETHEUS_CONFIG_FOLDER}/prometheus.yaml:/etc/prometheus/prometheus.yml \
   --publish ${PROMETHEUS_HOST_PORT}:9090 \
   ${PROMETHEUS_DOCKER_IMAGE}
 """
-dependencies = ["docker-network-create"]
 
 [tasks.prometheus-start]
 extend = "prometheus-run"

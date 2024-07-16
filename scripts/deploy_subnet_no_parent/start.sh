@@ -17,7 +17,7 @@ IPFS_RPC_HOST_PORTS=(5001 5002 5003)
 IPFS_GATEWAY_HOST_PORTS=(8080 8081 8082)
 # PROMETHEUS_HOST_PORTS=(9090 9091 9092)
 PROMETHEUS_HOST_PORT=9090
-PROMETHEUS_METRICS_PORTS=(9100 9101 9102)
+PROMETHEUS_METRICS_PORTS=(9184 9185 9186)
 
 # Use "dummy" subnet
 subnet_id="/r314159/t410f726d2jv6uj4mpkcbgg5ndlpp3l7dd5rlcpgzkoi"
@@ -116,6 +116,7 @@ done
 
 cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=prometheus \
+    -e SUBNET_ID="$subnet_id" \
     -e PROMETHEUS_HOST_PORT="${PROMETHEUS_HOST_PORT}" \
     -e PROMETHEUS_CONFIG_FOLDER="${PROMETHEUS_CONFIG_FOLDER}" \
     prometheus-start
