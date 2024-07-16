@@ -8,8 +8,8 @@ use std::hash::Hash;
 use std::{fmt::Debug, time::Duration};
 
 use crate::observe::{
-    HexEncodableBlockHash, ParentFinalityCommitted, ParentFinalityPeerQuorumReached,
-    ParentFinalityPeerVoteReceived, ParentFinalityPeerVoteSent,
+    ParentFinalityCommitted, ParentFinalityPeerQuorumReached, ParentFinalityPeerVoteReceived,
+    ParentFinalityPeerVoteSent,
 };
 use crate::{BlockHash, BlockHeight};
 use ipc_observability::{emit, serde::HexEncodableBlockHash};
