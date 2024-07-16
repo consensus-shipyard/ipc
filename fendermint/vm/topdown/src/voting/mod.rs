@@ -26,11 +26,11 @@ pub enum Error {
     #[error("failed to extend chain; expected block height {0}, got {1}")]
     UnexpectedBlock(BlockHeight, BlockHeight),
 
-    #[error("validator unknown or has no power: {0:?}")]
-    UnpoweredValidator(ValidatorKey),
+    #[error("validator unknown or has no power")]
+    UnpoweredValidator,
 
-    #[error("equivocation by validator {0:?} at height {1};")]
-    Equivocation(ValidatorKey, BlockHeight),
+    #[error("equivocation by validator")]
+    Equivocation,
 
     #[error("validator vote is invalidated")]
     VoteCannotBeValidated,
@@ -104,6 +104,10 @@ impl VoteTally {
             pause_votes: TVar::new(false),
             last_finalized_height: TVar::new(last_finalized_height),
         }
+    }
+
+    pub fn power_table(&self) -> Stm<im::HashMap<ValidatorKey, Weight>> {
+        self.power_table.read_clone()
     }
 
     /// Check that a validator key is currently part of the power table.
@@ -203,7 +207,8 @@ impl VoteTally {
         }
 
         if !self.has_power(&validator_key)? {
-            return abort(Error::UnpoweredValidator(validator_key));
+            tracing::error!(validator = ?validator_key, "validator unknown or has no power");
+            return abort(Error::UnpoweredValidator);
         }
 
         let mut votes = self.votes.read_clone()?;
@@ -211,7 +216,8 @@ impl VoteTally {
 
         for (bh, vs) in votes_at_height.iter() {
             if *bh != payload && vs.has_voted(&validator_key) {
-                return abort(Error::Equivocation(validator_key, block_height));
+                tracing::error!(block_height, validator = ?validator_key, "equivocation by validator");
+                return abort(Error::Equivocation);
             }
         }
 

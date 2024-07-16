@@ -550,7 +550,7 @@ async fn dispatch_vote(
     // TODO: figure out a better way to log
     let _added = match res {
         Ok(added) => added,
-        Err(e @ VoteError::Equivocation(_, _)) => {
+        Err(e @ VoteError::Equivocation) => {
             tracing::warn!(error = e.to_string(), "failed to handle vote");
             false
         }
