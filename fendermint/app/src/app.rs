@@ -696,11 +696,7 @@ where
         let size_txs = txs.iter().map(|tx| tx.len()).sum::<usize>();
         let num_txs = txs.len();
 
-        let (accept, reason) = self
-            .interpreter
-            .process(self.chain_env.clone(), txs)
-            .await
-            .context("failed to process proposal")?;
+        let process_result = self.interpreter.process(self.chain_env.clone(), txs).await;
 
         emit(BlockProposalReceived {
             height: request.height.value(),
@@ -720,24 +716,27 @@ where
             reason: None,
         });
 
-        if accept {
-            emit(BlockProposalAccepted {
-                height: request.height.value(),
-                hash: HexEncodableBlockHash(request.hash.into()),
-                size: size_txs,
-                tx_count: num_txs,
-                validator: request.proposer_address.to_string().as_str(),
-            });
-            Ok(response::ProcessProposal::Accept)
-        } else {
-            emit(BlockProposalRejected {
-                height: request.height.value(),
-                size: size_txs,
-                tx_count: num_txs,
-                validator: request.proposer_address.to_string().as_str(),
-                reason: reason.unwrap_or_default().as_str(),
-            });
-            Ok(response::ProcessProposal::Reject)
+        match process_result {
+            Ok(_) => {
+                emit(BlockProposalAccepted {
+                    height: request.height.value(),
+                    hash: HexEncodableBlockHash(request.hash.into()),
+                    size: size_txs,
+                    tx_count: num_txs,
+                    validator: request.proposer_address.to_string().as_str(),
+                });
+                Ok(response::ProcessProposal::Accept)
+            }
+            Err(e) => {
+                emit(BlockProposalRejected {
+                    height: request.height.value(),
+                    size: size_txs,
+                    tx_count: num_txs,
+                    validator: request.proposer_address.to_string().as_str(),
+                    reason: e.as_str(),
+                });
+                Ok(response::ProcessProposal::Reject)
+            }
         }
     }
 

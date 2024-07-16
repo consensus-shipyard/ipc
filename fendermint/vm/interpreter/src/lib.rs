@@ -58,7 +58,7 @@ pub trait ProposalInterpreter: Sync + Send {
         &self,
         state: Self::State,
         msgs: Vec<Self::Message>,
-    ) -> anyhow::Result<(bool, Option<String>)>;
+    ) -> anyhow::Result<bool, String>;
 }
 
 /// The `ExecInterpreter` applies messages on some state, which is

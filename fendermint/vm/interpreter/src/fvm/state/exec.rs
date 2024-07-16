@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use std::collections::{HashMap, HashSet};
+use std::time::{Duration, Instant};
 
 use anyhow::Ok;
 use cid::Cid;
@@ -349,4 +350,40 @@ fn check_error(e: anyhow::Error) -> (ApplyRet, ActorAddressMap) {
         events: Vec::new(),
     };
     (ret, Default::default())
+}
+
+pub struct ElapsedExecution<'a, DB>
+where
+    DB: Blockstore + Clone + 'static,
+{
+    state: &'a mut FvmExecState<DB>,
+}
+
+impl<'a, DB> ElapsedExecution<'a, DB>
+where
+    DB: Blockstore + Clone + 'static,
+{
+    pub fn new(state: &'a mut FvmExecState<DB>) -> Self {
+        Self { state }
+    }
+
+    pub fn execute_implicit(
+        &mut self,
+        msg: Message,
+    ) -> anyhow::Result<(ApplyRet, ActorAddressMap, Duration)> {
+        let start = Instant::now();
+        let result = self.state.execute_implicit(msg)?;
+        let duration = start.elapsed();
+        Ok((result.0, result.1, duration))
+    }
+
+    pub fn execute_explicit(
+        &mut self,
+        msg: Message,
+    ) -> anyhow::Result<(ApplyRet, ActorAddressMap, Duration)> {
+        let start = Instant::now();
+        let result = self.state.execute_explicit(msg)?;
+        let duration = start.elapsed();
+        Ok((result.0, result.1, duration))
+    }
 }
