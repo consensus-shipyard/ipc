@@ -5,8 +5,8 @@ on:
   workflow_call:
 
 jobs:
-  npm-audit:
-    name: NPM Audit
+  pnpm-audit:
+    name: pnpm audit
     runs-on: ubuntu-latest
     if: ${{ !github.event.pull_request.draft }}
     steps:
