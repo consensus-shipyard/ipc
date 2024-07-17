@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use anyhow::Context;
 use fendermint_eth_api::HybridClient;
+use ipc_observability::traces::set_global_tracing_subscriber;
 use tracing::info;
 
 use crate::{
@@ -34,6 +35,8 @@ cmd! {
 
 /// Run the Ethereum API facade.
 async fn run(settings: EthSettings, client: HybridClient) -> anyhow::Result<()> {
+    // TOOO kare - set up tracing
+
     if settings.metrics.enabled {
         info!("metrics enabled");
 

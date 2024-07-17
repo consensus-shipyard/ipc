@@ -2959,6 +2959,7 @@ dependencies = [
  "fvm_ipld_encoding",
  "fvm_shared",
  "ipc-api",
+ "ipc-observability",
  "ipc-provider",
  "lazy_static",
  "multiaddr",
@@ -5067,9 +5068,12 @@ dependencies = [
 name = "ipc-observability"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "hex",
  "lazy_static",
  "prometheus",
+ "serde",
+ "serde_with 2.3.3",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",

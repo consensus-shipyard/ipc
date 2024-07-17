@@ -3,19 +3,11 @@
 
 pub use fendermint_app_options as options;
 pub use fendermint_app_settings as settings;
-use ipc_observability::traces::{register_tracing_subscriber, WorkerGuard};
+
+use ipc_observability::traces::create_subscriber;
+use tracing::subscriber;
 
 mod cmd;
-
-fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
-    let console_filter = opts
-        .log_console_filter()
-        .expect("invalid console level filter");
-    let file_filter = opts.log_file_filter().expect("invalid file level filter");
-    let file_config = opts.log_file_config();
-
-    register_tracing_subscriber(console_filter, file_filter, file_config)
-}
 
 /// Install a panic handler that prints stuff to the logs, otherwise it only shows up in the console.
 fn init_panic_handler() {
@@ -28,11 +20,13 @@ fn init_panic_handler() {
         // let stacktrace = std::backtrace::Backtrace::capture();
         let stacktrace = std::backtrace::Backtrace::force_capture();
 
-        tracing::error!(
-            stacktrace = stacktrace.to_string(),
-            info = info.to_string(),
-            "panicking"
-        );
+        subscriber::with_default(create_subscriber(), || {
+            tracing::error!(
+                "panic occurred: {error:?}\n{stacktrace}",
+                error = info,
+                stacktrace = stacktrace
+            )
+        });
 
         // We could exit the application if any of the background tokio tasks panic.
         // However, they are not necessarily critical processes, the chain might still make progress.
@@ -44,12 +38,12 @@ fn init_panic_handler() {
 async fn main() {
     let opts = options::parse();
 
-    let _guard = init_tracing(&opts);
-
     init_panic_handler();
 
     if let Err(e) = cmd::exec(&opts).await {
-        tracing::error!("failed to execute {:?}: {e:?}", opts);
+        subscriber::with_default(create_subscriber(), || {
+            tracing::error!("failed to execute {:?}: {e:?}", opts)
+        });
         std::process::exit(fendermint_app::AppExitCode::UnknownError as i32);
     }
 }

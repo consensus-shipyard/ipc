@@ -10,6 +10,9 @@ use crate::{
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 
+use ipc_observability::traces::create_subscriber;
+use tracing::subscriber;
+
 pub mod config;
 pub mod debug;
 pub mod eth;
@@ -81,10 +84,13 @@ fn settings(opts: &Options) -> anyhow::Result<Settings> {
         d => d,
     };
 
-    tracing::info!(
-        path = config_dir.to_string_lossy().into_owned(),
-        "reading configuration"
-    );
+    subscriber::with_default(create_subscriber(), || {
+        tracing::info!(
+            path = config_dir.to_string_lossy().into_owned(),
+            "reading configuration"
+        )
+    });
+
     let settings =
         Settings::new(&config_dir, &opts.home_dir, &opts.mode).context("error parsing settings")?;
 

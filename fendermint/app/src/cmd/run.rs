@@ -42,6 +42,8 @@ use crate::cmd::key::read_secret_key;
 use crate::{cmd, options::run::RunArgs, settings::Settings};
 use fendermint_app::observe::register_metrics as register_consensus_metrics;
 
+use ipc_observability::traces::set_global_tracing_subscriber;
+
 cmd! {
   RunArgs(self, settings) {
     run(settings).await
@@ -62,6 +64,8 @@ namespaces! {
 ///
 /// This method acts as our composition root.
 async fn run(settings: Settings) -> anyhow::Result<()> {
+    let _work_guard = set_global_tracing_subscriber(&settings.tracing)?;
+
     let tendermint_rpc_url = settings.tendermint_rpc_url()?;
     tracing::info!("Connecting to Tendermint at {tendermint_rpc_url}");
 
