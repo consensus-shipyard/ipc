@@ -7,7 +7,7 @@ use crate::finality::{
 use crate::{
     BlockHash, BlockHeight, Config, Error, IPCParentFinality, SequentialKeyCache, TopdownProposal,
 };
-use async_stm::{abort, atomically, Stm, StmResult, TVar};
+use async_stm::{abort, Stm, StmResult, TVar};
 use fvm_shared::clock::ChainEpoch;
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
@@ -45,22 +45,6 @@ impl FinalityWithNull {
 
     pub fn genesis_epoch(&self) -> anyhow::Result<BlockHeight> {
         Ok(self.genesis_epoch)
-    }
-
-    pub async fn validator_changes(
-        &self,
-        height: BlockHeight,
-    ) -> anyhow::Result<Option<Vec<StakingChangeRequest>>> {
-        let r = atomically(|| self.handle_null_block(height, validator_changes, Vec::new)).await;
-        Ok(r)
-    }
-
-    pub async fn top_down_msgs(
-        &self,
-        height: BlockHeight,
-    ) -> anyhow::Result<Option<Vec<IpcEnvelope>>> {
-        let r = atomically(|| self.handle_null_block(height, topdown_cross_msgs, Vec::new)).await;
-        Ok(r)
     }
 
     pub fn last_committed_finality(&self) -> Stm<Option<IPCParentFinality>> {
@@ -108,13 +92,6 @@ impl FinalityWithNull {
 
         // safe to unwrap as we make sure null height will not be proposed
         self.proposal_at_height(height)
-    }
-
-    pub fn check_proposal(&self, proposal: &IPCParentFinality) -> Stm<bool> {
-        if !self.check_height(proposal)? {
-            return Ok(false);
-        }
-        self.check_block_hash(proposal)
     }
 
     pub fn set_new_finality(
@@ -366,59 +343,6 @@ impl FinalityWithNull {
         }
 
         Ok(())
-    }
-
-    fn check_height(&self, proposal: &IPCParentFinality) -> Stm<bool> {
-        let binding = self.last_committed_finality.read()?;
-        // last committed finality is not ready yet, we don't vote, just reject
-        let last_committed_finality = if let Some(f) = binding.as_ref() {
-            f
-        } else {
-            return Ok(false);
-        };
-
-        // the incoming proposal has height already committed, reject
-        if last_committed_finality.height >= proposal.height {
-            tracing::debug!(
-                last_committed = last_committed_finality.height,
-                proposed = proposal.height,
-                "proposed height already committed",
-            );
-            return Ok(false);
-        }
-
-        if let Some(latest_height) = self.latest_height_in_cache()? {
-            let r = latest_height >= proposal.height;
-            tracing::debug!(
-                is_true = r,
-                latest_height,
-                proposal = proposal.height.to_string(),
-                "incoming proposal height seen?"
-            );
-            // requires the incoming height cannot be more advanced than our trusted parent node
-            Ok(r)
-        } else {
-            // latest height is not found, meaning we dont have any prefetched cache, we just be
-            // strict and vote no simply because we don't know.
-            tracing::debug!(
-                proposal = proposal.height.to_string(),
-                "reject proposal, no data in cache"
-            );
-            Ok(false)
-        }
-    }
-
-    fn check_block_hash(&self, proposal: &IPCParentFinality) -> Stm<bool> {
-        Ok(
-            if let Some(block_hash) = self.block_hash_at_height(proposal.height)? {
-                let r = block_hash == proposal.block_hash;
-                tracing::debug!(proposal = proposal.to_string(), is_same = r, "same hash?");
-                r
-            } else {
-                tracing::debug!(proposal = proposal.to_string(), "reject, hash not found");
-                false
-            },
-        )
     }
 }
 

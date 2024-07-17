@@ -5,122 +5,32 @@ use crate::finality::null::FinalityWithNull;
 use crate::finality::ParentViewPayload;
 use crate::proxy::ParentQueryProxy;
 use crate::{
-    handle_null_round, BlockHash, BlockHeight, Config, Error, IPCParentFinality,
-    ParentFinalityProvider, ParentViewProvider, TopdownProposal,
+    BlockHash, BlockHeight, Config, Error, IPCParentFinality, ParentFinalityProvider,
+    ParentViewProvider, TopdownProposal,
 };
 use async_stm::{Stm, StmResult};
-use ipc_api::cross::IpcEnvelope;
-use ipc_api::staking::StakingChangeRequest;
 use std::sync::Arc;
 
 /// The finality provider that performs io to the parent if not found in cache
 #[derive(Clone)]
-pub struct CachedFinalityProvider<T> {
+pub struct CachedFinalityProvider {
     inner: FinalityWithNull,
-    config: Config,
-    /// The ipc client proxy that works as a back up if cache miss
-    parent_client: Arc<T>,
-}
-
-/// Exponential backoff for futures
-macro_rules! retry {
-    ($wait:expr, $retires:expr, $f:expr) => {{
-        let mut retries = $retires;
-        let mut wait = $wait;
-
-        loop {
-            let res = $f;
-            if let Err(e) = &res {
-                // there is no point in retrying if the current block is null round
-                if crate::is_null_round_str(&e.to_string()) {
-                    tracing::warn!(
-                        "cannot query ipc parent_client due to null round, skip retry"
-                    );
-                    break res;
-                }
-
-                tracing::warn!(
-                    error = e.to_string(),
-                    retries,
-                    wait = ?wait,
-                    "cannot query ipc parent_client"
-                );
-
-                if retries > 0 {
-                    retries -= 1;
-
-                    tokio::time::sleep(wait).await;
-
-                    wait *= 2;
-                    continue;
-                }
-            }
-
-            break res;
-        }
-    }};
 }
 
 #[async_trait::async_trait]
-impl<T: ParentQueryProxy + Send + Sync + 'static> ParentViewProvider for CachedFinalityProvider<T> {
+impl ParentViewProvider for CachedFinalityProvider {
     fn genesis_epoch(&self) -> anyhow::Result<BlockHeight> {
         self.inner.genesis_epoch()
     }
-
-    async fn validator_changes_from(
-        &self,
-        from: BlockHeight,
-        to: BlockHeight,
-    ) -> anyhow::Result<Vec<StakingChangeRequest>> {
-        let mut v = vec![];
-        for h in from..=to {
-            let mut r = self.validator_changes(h).await?;
-            tracing::debug!(
-                number_of_messages = r.len(),
-                height = h,
-                "fetched validator change set",
-            );
-            v.append(&mut r);
-        }
-
-        Ok(v)
-    }
-
-    /// Get top down message in the range `from` to `to`, both inclusive. For the check to be valid, one
-    /// should not pass a height `to` that is a null block, otherwise the check is useless. In debug
-    /// mode, it will throw an error.
-    async fn top_down_msgs_from(
-        &self,
-        from: BlockHeight,
-        to: BlockHeight,
-    ) -> anyhow::Result<Vec<IpcEnvelope>> {
-        let mut v = vec![];
-        for h in from..=to {
-            let mut r = self.top_down_msgs(h).await?;
-            tracing::debug!(
-                number_of_top_down_messages = r.len(),
-                height = h,
-                "obtained topdown messages",
-            );
-            v.append(&mut r);
-        }
-        Ok(v)
-    }
 }
 
-impl<T: ParentQueryProxy + Send + Sync + 'static> ParentFinalityProvider
-    for CachedFinalityProvider<T>
-{
+impl ParentFinalityProvider for CachedFinalityProvider {
     fn next_proposal(&self) -> Stm<Option<TopdownProposal>> {
         self.inner.next_proposal()
     }
 
     fn proposal_at_height(&self, height: BlockHeight) -> Stm<Option<TopdownProposal>> {
         self.inner.proposal_at_height(height)
-    }
-
-    fn check_proposal(&self, proposal: &IPCParentFinality) -> Stm<bool> {
-        self.inner.check_proposal(proposal)
     }
 
     fn set_new_finality(
@@ -132,75 +42,28 @@ impl<T: ParentQueryProxy + Send + Sync + 'static> ParentFinalityProvider
     }
 }
 
-impl<T: ParentQueryProxy + Send + Sync + 'static> CachedFinalityProvider<T> {
+impl CachedFinalityProvider {
     /// Creates an uninitialized provider
     /// We need this because `fendermint` has yet to be initialized and might
     /// not be able to provide an existing finality from the storage. This provider requires an
     /// existing committed finality. Providing the finality will enable other functionalities.
-    pub async fn uninitialized(config: Config, parent_client: Arc<T>) -> anyhow::Result<Self> {
+    pub async fn uninitialized<T: ParentQueryProxy + Send + Sync + 'static>(
+        config: Config,
+        parent_client: Arc<T>,
+    ) -> anyhow::Result<Self> {
         let genesis = parent_client.get_genesis_epoch().await?;
-        Ok(Self::new(config, genesis, None, parent_client))
-    }
-
-    /// Should always return the top down messages, only when ipc parent_client is down after exponential
-    /// retries
-    async fn validator_changes(
-        &self,
-        height: BlockHeight,
-    ) -> anyhow::Result<Vec<StakingChangeRequest>> {
-        let r = self.inner.validator_changes(height).await?;
-
-        if let Some(v) = r {
-            return Ok(v);
-        }
-
-        let r = retry!(
-            self.config.exponential_back_off,
-            self.config.exponential_retry_limit,
-            self.parent_client
-                .get_validator_changes(height)
-                .await
-                .map(|r| r.value)
-        );
-
-        handle_null_round(r, Vec::new)
-    }
-
-    /// Should always return the top down messages, only when ipc parent_client is down after exponential
-    /// retries
-    async fn top_down_msgs(&self, height: BlockHeight) -> anyhow::Result<Vec<IpcEnvelope>> {
-        let r = self.inner.top_down_msgs(height).await?;
-
-        if let Some(v) = r {
-            return Ok(v);
-        }
-
-        let r = retry!(
-            self.config.exponential_back_off,
-            self.config.exponential_retry_limit,
-            self.parent_client
-                .get_top_down_msgs(height)
-                .await
-                .map(|r| r.value)
-        );
-
-        handle_null_round(r, Vec::new)
+        Ok(Self::new(config, genesis, None))
     }
 }
 
-impl<T> CachedFinalityProvider<T> {
+impl CachedFinalityProvider {
     pub(crate) fn new(
         config: Config,
         genesis_epoch: BlockHeight,
         committed_finality: Option<IPCParentFinality>,
-        parent_client: Arc<T>,
     ) -> Self {
         let inner = FinalityWithNull::new(config.clone(), genesis_epoch, committed_finality);
-        Self {
-            inner,
-            config,
-            parent_client,
-        }
+        Self { inner }
     }
 
     pub fn block_hash(&self, height: BlockHeight) -> Stm<Option<BlockHash>> {
@@ -342,7 +205,7 @@ mod tests {
 
     fn new_provider(
         blocks: SequentialKeyCache<BlockHeight, Option<ParentViewPayload>>,
-    ) -> CachedFinalityProvider<TestParentProxy> {
+    ) -> CachedFinalityProvider {
         let config = Config {
             chain_head_delay: 2,
             polling_interval: Default::default(),
@@ -359,7 +222,7 @@ mod tests {
             block_hash: vec![0; 32],
         };
 
-        CachedFinalityProvider::new(config, genesis_epoch, Some(committed_finality), proxy)
+        CachedFinalityProvider::new(config, genesis_epoch, Some(committed_finality))
     }
 
     fn new_cross_msg(nonce: u64) -> IpcEnvelope {

@@ -23,7 +23,7 @@ pub enum Error {
     #[error("the last finalized block has not been set")]
     Uninitialized,
 
-    #[error("failed to extend chain; expected block height {0}, got {1}")]
+    #[error("failed to extend chain; height going backwards, current height {0}, got {1}")]
     UnexpectedBlock(BlockHeight, BlockHeight),
 
     #[error("validator unknown or has no power")]
@@ -157,26 +157,22 @@ impl VoteTally {
     /// so the caller has to call this in every epoch. If the parent
     /// chain produced no blocks in that epoch then pass `None` to
     /// represent that null-round in the tally.
-    pub fn add_block(
-        &self,
-        block_height: BlockHeight,
-        payload: Option<TopdownVote>,
-    ) -> StmResult<(), Error> {
+    pub fn add_block(&self, payload: TopdownVote) -> StmResult<(), Error> {
         let mut chain = self.chain.read_clone()?;
 
         // Check that we are extending the chain. We could also ignore existing heights.
-        match chain.get_max() {
-            None => {
-                return abort(Error::Uninitialized);
-            }
-            Some((parent_height, _)) => {
-                if block_height != parent_height + 1 {
-                    return abort(Error::UnexpectedBlock(parent_height + 1, block_height));
-                }
-            }
+        let parent_height = match chain.get_max() {
+            None => self.last_finalized_height.read_clone()?,
+            Some((parent_height, _)) => *parent_height,
+        };
+
+        let block_height = payload.block_height();
+
+        if block_height <= parent_height {
+            return abort(Error::UnexpectedBlock(parent_height, block_height));
         }
 
-        chain.insert(block_height, payload);
+        chain.insert(block_height, Some(payload));
 
         self.chain.write(chain)?;
 
@@ -225,7 +221,7 @@ impl VoteTally {
             .entry(payload)
             .or_insert(ValidatorSignatures::empty());
 
-        if votes_for_block.add_vote(validator_key, signature) {
+        if !votes_for_block.add_vote(validator_key, signature) {
             return Ok(false);
         }
 
@@ -247,10 +243,7 @@ impl VoteTally {
         let quorum_threshold = self.quorum_threshold()?;
         let chain = self.chain.read()?;
 
-        let Some((finalized_height, _)) = chain.get_min() else {
-            tracing::debug!("finalized height not found");
-            return Ok(None);
-        };
+        let finalized_height = self.last_finalized_height.read_clone()?;
 
         let votes = self.votes.read()?;
         let power_table = self.power_table.read()?;
@@ -258,7 +251,7 @@ impl VoteTally {
         let mut weight = 0;
 
         for (block_height, maybe_payload) in chain.iter().rev() {
-            if block_height == finalized_height {
+            if *block_height == finalized_height {
                 tracing::debug!(
                     block_height,
                     finalized_height,

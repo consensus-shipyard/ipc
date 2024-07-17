@@ -8,8 +8,6 @@ use crate::{
 };
 use anyhow::anyhow;
 use async_stm::{Stm, StmResult};
-use ipc_api::cross::IpcEnvelope;
-use ipc_api::staking::StakingChangeRequest;
 
 /// The parent finality provider could have all functionalities disabled.
 #[derive(Clone)]
@@ -49,28 +47,6 @@ impl<P: ParentViewProvider + Send + Sync + 'static> ParentViewProvider for Toggl
             None => Err(anyhow!("provider is toggled off")),
         }
     }
-
-    async fn validator_changes_from(
-        &self,
-        from: BlockHeight,
-        to: BlockHeight,
-    ) -> anyhow::Result<Vec<StakingChangeRequest>> {
-        match self.inner.as_ref() {
-            Some(p) => p.validator_changes_from(from, to).await,
-            None => Err(anyhow!("provider is toggled off")),
-        }
-    }
-
-    async fn top_down_msgs_from(
-        &self,
-        from: BlockHeight,
-        to: BlockHeight,
-    ) -> anyhow::Result<Vec<IpcEnvelope>> {
-        match self.inner.as_ref() {
-            Some(p) => p.top_down_msgs_from(from, to).await,
-            None => Err(anyhow!("provider is toggled off")),
-        }
-    }
 }
 
 impl<P: ParentFinalityProvider + Send + Sync + 'static> ParentFinalityProvider for Toggle<P> {
@@ -82,10 +58,6 @@ impl<P: ParentFinalityProvider + Send + Sync + 'static> ParentFinalityProvider f
         self.perform_or_else(|p| p.proposal_at_height(height), None)
     }
 
-    fn check_proposal(&self, proposal: &IPCParentFinality) -> Stm<bool> {
-        self.perform_or_else(|p| p.check_proposal(proposal), false)
-    }
-
     fn set_new_finality(
         &self,
         finality: IPCParentFinality,
@@ -95,7 +67,7 @@ impl<P: ParentFinalityProvider + Send + Sync + 'static> ParentFinalityProvider f
     }
 }
 
-impl<P> Toggle<CachedFinalityProvider<P>> {
+impl Toggle<CachedFinalityProvider> {
     pub fn block_hash(&self, height: BlockHeight) -> Stm<Option<BlockHash>> {
         self.perform_or_else(|p| p.block_hash(height), None)
     }

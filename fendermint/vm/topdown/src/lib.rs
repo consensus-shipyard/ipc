@@ -141,18 +141,6 @@ impl Display for IPCParentFinality {
 pub trait ParentViewProvider {
     /// Obtain the genesis epoch of the current subnet in the parent
     fn genesis_epoch(&self) -> anyhow::Result<BlockHeight>;
-    /// Get the validator changes from and to height.
-    async fn validator_changes_from(
-        &self,
-        from: BlockHeight,
-        to: BlockHeight,
-    ) -> anyhow::Result<Vec<StakingChangeRequest>>;
-    /// Get the top down messages from and to height.
-    async fn top_down_msgs_from(
-        &self,
-        from: BlockHeight,
-        to: BlockHeight,
-    ) -> anyhow::Result<Vec<IpcEnvelope>>;
 }
 
 pub trait ParentFinalityProvider: ParentViewProvider {
@@ -160,35 +148,12 @@ pub trait ParentFinalityProvider: ParentViewProvider {
     fn next_proposal(&self) -> Stm<Option<TopdownProposal>>;
     /// The proposal for parent finality at the target height
     fn proposal_at_height(&self, height: BlockHeight) -> Stm<Option<TopdownProposal>>;
-    /// Check if the target proposal is valid
-    fn check_proposal(&self, proposal: &IPCParentFinality) -> Stm<bool>;
     /// Called when finality is committed
     fn set_new_finality(
         &self,
         finality: IPCParentFinality,
         previous_finality: Option<IPCParentFinality>,
     ) -> Stm<()>;
-}
-
-/// If res is null round error, returns the default value from f()
-pub(crate) fn handle_null_round<T, F: FnOnce() -> T>(
-    res: anyhow::Result<T>,
-    f: F,
-) -> anyhow::Result<T> {
-    match res {
-        Ok(t) => Ok(t),
-        Err(e) => {
-            if is_null_round_error(&e) {
-                Ok(f())
-            } else {
-                Err(e)
-            }
-        }
-    }
-}
-
-pub(crate) fn is_null_round_error(err: &anyhow::Error) -> bool {
-    is_null_round_str(&err.to_string())
 }
 
 pub(crate) fn is_null_round_str(s: &str) -> bool {

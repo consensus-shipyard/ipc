@@ -25,7 +25,7 @@ use fendermint_vm_event::{BlockHashHex, NewParentView};
 pub(crate) struct LotusParentSyncer<T, P> {
     config: Config,
     parent_proxy: Arc<P>,
-    provider: Arc<Toggle<CachedFinalityProvider<P>>>,
+    provider: Arc<Toggle<CachedFinalityProvider>>,
     vote_tally: VoteTally,
     query: Arc<T>,
 
@@ -46,7 +46,7 @@ where
     pub fn new(
         config: Config,
         parent_proxy: Arc<P>,
-        provider: Arc<Toggle<CachedFinalityProvider<P>>>,
+        provider: Arc<Toggle<CachedFinalityProvider>>,
         vote_tally: VoteTally,
         query: Arc<T>,
     ) -> anyhow::Result<Self> {
@@ -199,9 +199,6 @@ where
 
                     atomically_or_err::<_, Error, _>(|| {
                         self.provider.new_parent_view(height, None)?;
-                        self.vote_tally
-                            .add_block(height, None)
-                            .map_err(map_voting_err)?;
                         Ok(())
                     })
                     .await?;
@@ -251,7 +248,7 @@ where
             self.provider.new_parent_view(height, Some(data.clone()))?;
             if let Some(p) = self.provider.next_proposal()? {
                 self.vote_tally
-                    .add_block(height, Some(p.vote()))
+                    .add_block(p.vote())
                     .map_err(map_voting_err)?;
             }
 

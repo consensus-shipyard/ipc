@@ -109,7 +109,7 @@ where
 pub async fn launch_polling_syncer<T, C, P>(
     query: T,
     config: Config,
-    view_provider: Arc<Toggle<CachedFinalityProvider<P>>>,
+    view_provider: Arc<Toggle<CachedFinalityProvider>>,
     vote_tally: VoteTally,
     parent_client: Arc<P>,
     tendermint_client: C,
@@ -164,7 +164,7 @@ where
 /// Start the parent finality listener in the background
 fn start_syncing<T, C, P>(
     config: Config,
-    view_provider: Arc<Toggle<CachedFinalityProvider<P>>>,
+    view_provider: Arc<Toggle<CachedFinalityProvider>>,
     vote_tally: VoteTally,
     parent_proxy: Arc<P>,
     query: Arc<T>,
