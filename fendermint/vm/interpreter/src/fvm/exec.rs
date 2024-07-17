@@ -186,6 +186,8 @@ where
     }
 
     async fn end(&self, mut state: Self::State) -> anyhow::Result<(Self::State, Self::EndOutput)> {
+        checkpoint::emit_trace_if_check_checkpoint_finalized(&self.gateway, &mut state)?;
+
         let updates = if let Some((checkpoint, updates)) =
             checkpoint::maybe_create_checkpoint(&self.gateway, &mut state)
                 .context("failed to create checkpoint")?

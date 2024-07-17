@@ -1,12 +1,9 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use hex;
-use std::fmt;
-
 use ipc_observability::{
-    impl_traceable, impl_traceables, lazy_static, register_metrics, Recordable, TraceLevel,
-    Traceable,
+    impl_traceable, impl_traceables, lazy_static, register_metrics, serde::HexEncodableBlockHash,
+    Recordable, TraceLevel, Traceable,
 };
 
 use prometheus::{
@@ -38,6 +35,8 @@ register_metrics! {
         "Height of the checkpoint signed",
         &["validator"]
     );
+    BOTTOMUP_CHECKPOINT_FINALIZED_HEIGHT: IntGauge
+        = register_int_gauge!("bottomup_checkpoint_finalized_height", "Height of the checkpoint finalized");
 }
 
 impl_traceables!(TraceLevel::Info, "Execution", MsgExec);
@@ -78,7 +77,8 @@ impl_traceables!(
     TraceLevel::Info,
     "Bottomup",
     CheckpointCreated,
-    CheckpointSigned<'a>
+    CheckpointSigned<'a>,
+    CheckpointFinalized
 );
 
 /// Hex encoded hash.
@@ -121,6 +121,18 @@ impl Recordable for CheckpointSigned<'_> {
         BOTTOMUP_CHECKPOINT_SIGNED_HEIGHT
             .with_label_values(&[self.validator])
             .set(self.height as i64);
+    }
+}
+
+#[derive(Debug)]
+pub struct CheckpointFinalized {
+    pub height: i64,
+    pub hash: HexEncodableBlockHash,
+}
+
+impl Recordable for CheckpointFinalized {
+    fn record_metrics(&self) {
+        BOTTOMUP_CHECKPOINT_FINALIZED_HEIGHT.set(self.height);
     }
 }
 

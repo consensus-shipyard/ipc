@@ -22,9 +22,9 @@ use fendermint_vm_genesis::{Power, Validator, ValidatorKey};
 use ipc_actors_abis::checkpointing_facet as checkpoint;
 use ipc_actors_abis::gateway_getter_facet as getter;
 use ipc_api::staking::ConfigurationNumber;
-use ipc_observability::emit;
+use ipc_observability::{emit, serde::HexEncodableBlockHash};
 
-use super::observe::{CheckpointCreated, CheckpointSigned, HexEncodableBlockHash};
+use super::observe::{CheckpointCreated, CheckpointFinalized, CheckpointSigned};
 use super::state::ipc::tokens_to_burn;
 use super::{
     broadcast::Broadcaster,
@@ -292,6 +292,36 @@ where
 
     // The transaction should be in the mempool now.
     tracing::info!(tx_hash = tx_hash.to_string(), "broadcasted signature");
+
+    Ok(())
+}
+
+// Emit a CheckpointFinalized trace event if a checkpoint has been finalized on the current block.
+pub fn emit_trace_if_check_checkpoint_finalized<DB>(
+    gateway: &GatewayCaller<DB>,
+    state: &mut FvmExecState<DB>,
+) -> anyhow::Result<()>
+where
+    DB: Blockstore + Clone,
+{
+    if !gateway.enabled(state)? {
+        return Ok(());
+    }
+
+    let block_height = state.block_height();
+    let block_hash = state
+        .block_hash()
+        .ok_or_else(|| anyhow!("block hash not set"))?;
+
+    // Check if the checkpoint has been finalized.
+    let checkpoint_quorum = gateway.checkpoint_info(state, block_height)?;
+
+    if checkpoint_quorum.reached {
+        emit(CheckpointFinalized {
+            height: block_height,
+            hash: HexEncodableBlockHash(block_hash.to_vec()),
+        })
+    }
 
     Ok(())
 }

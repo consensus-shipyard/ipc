@@ -4,13 +4,13 @@
 
 use crate::config::Subnet;
 use crate::manager::{BottomUpCheckpointRelayer, EthSubnetManager};
-use crate::observe::{CheckpointFinalized, HexEncodableBlockHash};
+use crate::observe::CheckpointFinalized;
 use anyhow::{anyhow, Result};
 use futures_util::future::try_join_all;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use ipc_api::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
-use ipc_observability::emit;
+use ipc_observability::{emit, serde::HexEncodableBlockHash};
 use ipc_wallet::{EthKeyAddress, PersistentKeyStore};
 use std::cmp::max;
 use std::fmt::{Display, Formatter};
