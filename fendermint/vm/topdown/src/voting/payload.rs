@@ -36,10 +36,6 @@ impl TopdownVote {
     pub fn block_height(&self) -> BlockHeight {
         self.block_height
     }
-
-    pub fn ballot(&self) -> &Bytes {
-        &self.ballot
-    }
 }
 
 /// The vote submitted to the vote tally
