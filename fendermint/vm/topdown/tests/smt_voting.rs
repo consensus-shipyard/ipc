@@ -352,11 +352,11 @@ impl smt::StateMachine for VotingMachine {
         eprintln!("RUN CMD {cmd:?}");
         match cmd {
             VotingCommand::ExtendChain(block_height, block_hash) => self.atomically_or_err(|| {
-                let v = block_hash.as_ref().map(|v| {
-                    TopdownVote::v1(*block_height, block_hash.clone().unwrap(), Cid::default().to_bytes())
-                });
+                if block_hash.is_none() {
+                    return Ok(None);
+                }
                 system
-                    .add_block(*block_height, v)
+                    .add_block( TopdownVote::v1(*block_height, block_hash.clone().unwrap(), Cid::default().to_bytes()))
                     .map(|_| None)
             }),
             VotingCommand::AddVote(vote) => self.atomically_or_err(|| {
