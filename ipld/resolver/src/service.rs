@@ -105,7 +105,7 @@ pub(crate) enum Request<V> {
 #[derive(Clone, Debug)]
 pub enum Event<V> {
     /// Received a vote about in a subnet about a CID.
-    ReceivedVote(Box<VoteRecord<V>>),
+    ReceivedVote(Box<GossipPayload<V>>),
     /// Received raw pre-emptive data published to a pinned subnet.
     ReceivedPreemptive(SubnetID, Vec<u8>),
 }
