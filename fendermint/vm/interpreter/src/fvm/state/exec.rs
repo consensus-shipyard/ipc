@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use std::collections::{HashMap, HashSet};
-use std::time::{Duration, Instant};
 
 use anyhow::Ok;
 use cid::Cid;
