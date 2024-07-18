@@ -10,6 +10,7 @@ use crate::{
     Timestamp,
 };
 
+#[derive(Debug, Clone)]
 pub struct GossipPayload<V> {
     pub topic: String,
     pub data: V,
