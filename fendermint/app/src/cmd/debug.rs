@@ -6,6 +6,8 @@ use fendermint_app_options::debug::{
     DebugArgs, DebugCommands, DebugExportTopDownEventsArgs, DebugIpcCommands,
 };
 use fendermint_vm_topdown::proxy::IPCProviderProxy;
+use ipc_observability::traces::set_global_tracing_subscriber;
+use ipc_observability::traces_settings::TracesSettings;
 use ipc_provider::{
     config::subnet::{EVMSubnet, SubnetConfig},
     IpcProvider,
@@ -23,9 +25,12 @@ cmd! {
 
 cmd! {
   DebugIpcCommands(self) {
+    let _trace_file_guard = set_global_tracing_subscriber(&TracesSettings::default())?;
+
     match self {
-        DebugIpcCommands::ExportTopDownEvents(args) =>
+        DebugIpcCommands::ExportTopDownEvents(args) => {
             export_topdown_events(args).await
+        }
     }
   }
 }

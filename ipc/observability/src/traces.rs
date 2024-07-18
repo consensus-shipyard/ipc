@@ -8,7 +8,7 @@ pub use tracing_appender::non_blocking::WorkerGuard;
 use tracing_appender::rolling::RollingFileAppender;
 use tracing_subscriber::{fmt, fmt::Subscriber, layer::SubscriberExt, Layer};
 
-use crate::traces_settings::{FileLayerSettings, TracesSettings};
+use crate::traces_settings::{FileLayerSettings, LogLevel, TracesSettings};
 use crate::tracing_layers::DomainEventFilterLayer;
 use anyhow::Result;
 
@@ -29,7 +29,14 @@ pub fn set_global_tracing_subscriber(config: &TracesSettings) -> Result<WorkerGu
         .with_target(false)
         .with_file(true)
         .with_line_number(true)
-        .with_filter(config.console.level.to_filter()?);
+        .with_filter(
+            config
+                .console
+                .level
+                .as_ref()
+                .unwrap_or(&LogLevel::default())
+                .to_filter()?,
+        );
 
     let (file_layer, file_guard) = if config.file.enabled {
         let (non_blocking, file_guard) = non_blocking(create_file_appender(&config.file));
@@ -41,7 +48,14 @@ pub fn set_global_tracing_subscriber(config: &TracesSettings) -> Result<WorkerGu
             .with_target(false)
             .with_file(true)
             .with_line_number(true)
-            .with_filter(config.file.level.to_filter()?);
+            .with_filter(
+                config
+                    .file
+                    .level
+                    .as_ref()
+                    .unwrap_or(&LogLevel::default())
+                    .to_filter()?,
+            );
 
         let domains = config
             .file

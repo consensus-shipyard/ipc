@@ -16,9 +16,10 @@ use crate::{
 
 cmd! {
   EthArgs(self, settings: EthSettings) {
+    let _trace_file_guard = set_global_tracing_subscriber(&settings.tracing)?;
+
     match self.command.clone() {
       EthCommands::Run { ws_url, http_url, connect_retry_delay } => {
-
         let (client, driver) = HybridClient::new(http_url, ws_url, Duration::from_secs(connect_retry_delay)).context("failed to create HybridClient")?;
 
         let driver_handle = tokio::spawn(async move { driver.run().await });
@@ -35,8 +36,6 @@ cmd! {
 
 /// Run the Ethereum API facade.
 async fn run(settings: EthSettings, client: HybridClient) -> anyhow::Result<()> {
-    // TOOO kare - set up tracing
-
     if settings.metrics.enabled {
         info!("metrics enabled");
 

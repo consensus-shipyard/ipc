@@ -6,6 +6,8 @@ use fendermint_app_options::key::KeyShowPeerIdArgs;
 use fendermint_crypto::{from_b64, to_b64, PublicKey, SecretKey};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fvm_shared::address::Address;
+use ipc_observability::traces::set_global_tracing_subscriber;
+use ipc_observability::traces_settings::TracesSettings;
 use rand_chacha::{rand_core::SeedableRng, ChaCha20Rng};
 use serde_json::json;
 use std::path::Path;
@@ -21,6 +23,8 @@ use crate::{
 
 cmd! {
     KeyArgs(self) {
+        let _trace_file_guard = set_global_tracing_subscriber(&TracesSettings::default())?;
+
         match &self.command {
             KeyCommands::Gen(args) => args.exec(()).await,
             KeyCommands::IntoTendermint(args) => args.exec(()).await,

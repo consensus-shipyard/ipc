@@ -46,6 +46,8 @@ use ipc_observability::traces::set_global_tracing_subscriber;
 
 cmd! {
   RunArgs(self, settings) {
+    let _trace_file_guard = set_global_tracing_subscriber(&settings.tracing)?;
+
     run(settings).await
   }
 }
@@ -64,8 +66,6 @@ namespaces! {
 ///
 /// This method acts as our composition root.
 async fn run(settings: Settings) -> anyhow::Result<()> {
-    let _work_guard = set_global_tracing_subscriber(&settings.tracing)?;
-
     let tendermint_rpc_url = settings.tendermint_rpc_url()?;
     tracing::info!("Connecting to Tendermint at {tendermint_rpc_url}");
 

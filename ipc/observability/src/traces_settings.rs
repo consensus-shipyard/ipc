@@ -75,7 +75,7 @@ impl FromStr for RotationKind {
 }
 
 #[serde_as]
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Default)]
 pub struct TracesSettings {
     pub console: ConsoleLayerSettings,
     pub file: FileLayerSettings,
@@ -85,24 +85,23 @@ pub struct TracesSettings {
 #[derive(Debug, Deserialize, Clone)]
 pub struct ConsoleLayerSettings {
     pub enabled: bool,
-    pub level: LogLevel,
+    pub level: Option<LogLevel>,
 }
 
 impl Default for ConsoleLayerSettings {
     fn default() -> Self {
         ConsoleLayerSettings {
             enabled: true,
-            level: LogLevel::default(),
+            level: Some(LogLevel::default()),
         }
     }
 }
 
 #[serde_as]
 #[derive(Debug, Deserialize, Clone, Default)]
-
 pub struct FileLayerSettings {
     pub enabled: bool,
-    pub level: LogLevel,
+    pub level: Option<LogLevel>,
     pub directory: Option<PathBuf>,
     pub max_log_files: Option<usize>,
     pub rotation: Option<RotationKind>,

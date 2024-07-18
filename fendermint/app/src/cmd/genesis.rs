@@ -14,6 +14,8 @@ use fendermint_vm_genesis::{
     ipc, Account, Actor, ActorMeta, Collateral, Genesis, Multisig, PermissionMode, SignerAddr,
     Validator, ValidatorKey,
 };
+use ipc_observability::traces::set_global_tracing_subscriber;
+use ipc_observability::traces_settings::TracesSettings;
 
 use crate::cmd;
 use crate::options::genesis::*;
@@ -22,7 +24,9 @@ use super::key::read_public_key;
 
 cmd! {
   GenesisArgs(self) {
+    let _trace_file_guard = set_global_tracing_subscriber(&TracesSettings::default())?;
     let genesis_file = self.genesis_file.clone();
+
     match &self.command {
         GenesisCommands::New(args) => args.exec(genesis_file).await,
         GenesisCommands::AddAccount(args) => args.exec(genesis_file).await,
