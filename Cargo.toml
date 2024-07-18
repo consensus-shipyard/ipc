@@ -57,6 +57,7 @@ async-channel = "1.8.0"
 axum = { version = "0.6", features = ["ws"] }
 base64 = "0.21"
 bollard = "0.15"
+bitvec = "1.0.1"
 blake2b_simd = "1.0"
 bloom = "0.3"
 bytes = "1.4"

@@ -10,6 +10,12 @@ use crate::{
     Timestamp,
 };
 
+#[derive(Debug, Clone)]
+pub struct GossipPayload<V> {
+    pub topic: String,
+    pub data: V,
+}
+
 /// The basic idea is that validators, identified by their public key,
 /// vote about things regarding the subnet in which they participate.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
@@ -35,6 +41,12 @@ impl<'de> Deserialize<'de> for ValidatorKey {
             Ok(pk) => Ok(Self(pk)),
             Err(e) => Err(D::Error::custom(format!("error decoding PublicKey: {e}"))),
         }
+    }
+}
+
+impl ValidatorKey {
+    pub fn verify(&self, message: &[u8], signature: &[u8]) -> bool {
+        self.0.verify(message, signature)
     }
 }
 

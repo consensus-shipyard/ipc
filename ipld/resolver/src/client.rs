@@ -7,10 +7,8 @@ use libipld::Cid;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::oneshot;
 
-use crate::{
-    service::{Request, ResolveResult},
-    vote_record::SignedVoteRecord,
-};
+use crate::service::{Request, ResolveResult};
+use crate::vote_record::GossipPayload;
 
 /// A facade to the [`Service`] to provide a nicer interface than message passing would allow on its own.
 #[derive(Clone)]
@@ -71,8 +69,9 @@ impl<V> Client<V> {
     }
 
     /// Publish a signed vote into a topic based on its subnet.
-    pub fn publish_vote(&self, vote: SignedVoteRecord<V>) -> anyhow::Result<()> {
-        let req = Request::PublishVote(Box::new(vote));
+    pub fn publish_vote(&self, topic: String, data: V) -> anyhow::Result<()> {
+        let v = GossipPayload { topic, data };
+        let req = Request::PublishVote(Box::new(v));
         self.send_request(req)
     }
 

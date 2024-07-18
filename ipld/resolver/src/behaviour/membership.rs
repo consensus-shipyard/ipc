@@ -27,7 +27,7 @@ use tokio::time::{Instant, Interval};
 use crate::hash::blake2b_256;
 use crate::provider_cache::{ProviderDelta, SubnetProviderCache};
 use crate::provider_record::{ProviderRecord, SignedProviderRecord};
-use crate::vote_record::{SignedVoteRecord, VoteRecord};
+use crate::vote_record::{GossipPayload, SignedVoteRecord, VoteRecord};
 use crate::{stats, Timestamp};
 
 use super::NetworkConfig;
@@ -53,8 +53,8 @@ pub enum Event<V> {
     /// to trigger a lookup by the discovery module to learn the address.
     Skipped(PeerId),
 
-    /// We received a [`VoteRecord`] in one of the subnets we are providing data for.
-    ReceivedVote(Box<VoteRecord<V>>),
+    /// We received a [`V`] in one of the subnets we are providing data for.
+    ReceivedVote(Box<GossipPayload<V>>),
 
     /// We received preemptive data published in a subnet we were interested in.
     ReceivedPreemptive(SubnetID, Vec<u8>),
@@ -101,7 +101,7 @@ pub struct Behaviour<V> {
     /// List of subnet IDs this agent is providing data for.
     subnet_ids: Vec<SubnetID>,
     /// Voting topics we are currently subscribed to.
-    voting_topics: HashSet<TopicHash>,
+    voting_topics: HashMap<TopicHash, String>,
     /// Remember which subnet a topic was about.
     preemptive_topics: HashMap<TopicHash, SubnetID>,
     /// Caching the latest state of subnet providers.
@@ -233,26 +233,28 @@ where
     /// Construct the topic used to gossip about votes.
     ///
     /// Replaces "/" with "_" to avoid clashes from prefix/suffix overlap.
-    fn voting_topic(&self, subnet_id: &SubnetID) -> Sha256Topic {
-        Topic::new(format!(
+    fn voting_topic(&self, subnet_id: &SubnetID) -> String {
+        format!(
             "{}/{}/{}",
             PUBSUB_VOTES,
             self.network_name.replace('/', "_"),
             subnet_id.to_string().replace('/', "_")
-        ))
+        )
     }
 
     /// Subscribe to a voting topic.
     fn voting_subscribe(&mut self, subnet_id: &SubnetID) -> Result<(), SubscriptionError> {
         let topic = self.voting_topic(subnet_id);
-        self.subscribe(&topic)?;
-        self.voting_topics.insert(topic.hash());
+        let sha_topic = Sha256Topic::new(topic.clone());
+        self.subscribe(&sha_topic)?;
+        self.voting_topics.insert(sha_topic.hash(), topic);
         Ok(())
     }
 
     /// Unsubscribe from a voting topic.
     fn voting_unsubscribe(&mut self, subnet_id: &SubnetID) -> anyhow::Result<()> {
         let topic = self.voting_topic(subnet_id);
+        let topic = Sha256Topic::new(topic.clone());
         self.unsubscribe(&topic)?;
         self.voting_topics.remove(&topic.hash());
         Ok(())
@@ -341,10 +343,12 @@ where
     }
 
     /// Publish the vote of the validator running the agent about a CID to a subnet.
-    pub fn publish_vote(&mut self, vote: SignedVoteRecord<V>) -> anyhow::Result<()> {
-        let topic = self.voting_topic(&vote.record().subnet_id);
-        let data = vote.into_envelope().into_protobuf_encoding();
-        match self.inner.publish(topic, data) {
+    pub fn publish_vote(&mut self, vote: GossipPayload<V>) -> anyhow::Result<()> {
+        // let topic = self.voting_topic(&vote.record().subnet_id);
+        match self.inner.publish(
+            Sha256Topic::new(vote.topic),
+            fvm_ipld_encoding::to_vec(&vote.data)?,
+        ) {
             Err(e) => {
                 stats::MEMBERSHIP_PUBLISH_FAILURE.inc();
                 Err(anyhow!(e))
@@ -414,9 +418,12 @@ where
                     );
                 }
             }
-        } else if self.voting_topics.contains(&msg.topic) {
-            match SignedVoteRecord::from_bytes(&msg.data).map(|r| r.into_record()) {
-                Ok(record) => self.handle_vote_record(record),
+        } else if let Some(topic) = self.voting_topics.get(&msg.topic) {
+            match fvm_ipld_encoding::from_slice::<V>(&msg.data) {
+                Ok(data) => self.handle_vote_record(GossipPayload {
+                    topic: topic.clone(),
+                    data,
+                }),
                 Err(e) => {
                     stats::MEMBERSHIP_INVALID_MESSAGE.inc();
                     warn!(
@@ -465,7 +472,7 @@ where
     }
 
     /// Raise an event to tell we received a new vote.
-    fn handle_vote_record(&mut self, record: VoteRecord<V>) {
+    fn handle_vote_record(&mut self, record: GossipPayload<V>) {
         self.outbox.push_back(Event::ReceivedVote(Box::new(record)))
     }
 

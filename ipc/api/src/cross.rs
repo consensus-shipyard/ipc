@@ -13,7 +13,7 @@ use serde_tuple::{Deserialize_tuple, Serialize_tuple};
 use serde_with::serde_as;
 
 #[serde_as]
-#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct IpcEnvelope {
     /// Type of message being propagated.
     pub kind: IpcMsgKind,
@@ -109,7 +109,7 @@ impl IpcEnvelope {
 }
 
 /// Type of cross-net messages currently supported
-#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize, strum::Display)]
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize, Hash, strum::Display)]
 #[repr(u8)]
 pub enum IpcMsgKind {
     /// for cross-net messages that move native token, i.e. fund/release.

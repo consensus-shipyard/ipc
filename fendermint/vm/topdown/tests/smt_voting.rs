@@ -21,12 +21,17 @@ use std::{
 
 use arbitrary::Unstructured;
 use async_stm::{atomically, atomically_or_err, Stm, StmResult};
+use cid::Cid;
 use fendermint_testing::{smt, state_machine_test};
 use fendermint_vm_topdown::{
     voting::{self, VoteTally, Weight},
     BlockHash, BlockHeight,
 };
 use im::HashSet;
+use libp2p::identity::Keypair;
+use fendermint_vm_topdown::voting::payload::{SignedVote, TopdownVote};
+use fendermint_vm_topdown::voting::quorum::MultiSigCert;
+use ipc_ipld_resolver::ValidatorKey;
 //use rand::{rngs::StdRng, SeedableRng};
 
 /// Size of window of voting relative to the last cast vote.
@@ -37,19 +42,15 @@ const MAX_FINALIZED_DELTA: BlockHeight = 5;
 state_machine_test!(voting, 10000 ms, 65512 bytes, 200 steps, VotingMachine::new());
 //state_machine_test!(voting, 0xf7ac11a50000ffe8, 200 steps, VotingMachine::new());
 
-/// Test key to make debugging more readable.
-#[derive(Debug, Clone, Hash, Eq, PartialEq, PartialOrd, Ord)]
-pub struct VotingKey(u64);
-
-pub type VotingError = voting::Error<VotingKey>;
+pub type VotingError = voting::Error;
 
 pub enum VotingCommand {
     /// The tally observes the next block fo the chain.
     ExtendChain(BlockHeight, Option<BlockHash>),
     /// One of the validators voted on a block.
-    AddVote(VotingKey, BlockHeight, BlockHash),
+    AddVote(SignedVote),
     /// Update the power table.
-    UpdatePower(Vec<(VotingKey, Weight)>),
+    UpdatePower(Vec<(ValidatorKey, Weight)>),
     /// A certain height was finalized in the ledger.
     BlockFinalized(BlockHeight, BlockHash),
     /// Ask the tally for the highest agreeable block.
@@ -65,8 +66,8 @@ impl Debug for VotingCommand {
                 .field(arg0)
                 .field(&arg1.is_some())
                 .finish(),
-            Self::AddVote(arg0, arg1, _arg2) => {
-                f.debug_tuple("AddVote").field(arg0).field(arg1).finish()
+            Self::AddVote(arg0) => {
+                f.debug_tuple("AddVote").field(arg0).finish()
             }
             Self::UpdatePower(arg0) => f.debug_tuple("UpdatePower").field(arg0).finish(),
             Self::BlockFinalized(arg0, _arg1) => {
@@ -91,9 +92,9 @@ pub struct VotingState {
     /// TODO (ENG-623): Decide what we want to achieve with Equivocation detection.
     chain: Vec<Option<BlockHash>>,
     /// All the validator keys to help pic random ones.
-    validator_keys: Vec<VotingKey>,
+    validator_keys: Vec<ValidatorKey>,
     /// All the validators with varying weights (can be zero).
-    validator_states: BTreeMap<VotingKey, ValidatorState>,
+    validator_states: BTreeMap<ValidatorKey, ValidatorState>,
 
     last_finalized_block: BlockHeight,
     last_chain_block: BlockHeight,
@@ -158,6 +159,8 @@ pub struct ValidatorState {
     /// The highest vote *currently on the chain* the validator has voted for already.
     /// Initially zero, meaning everyone voted on the initial finalized block.
     highest_vote: BlockHeight,
+    /// The key pair for the validator, used to sign the votes
+    key_pair: Keypair,
 }
 
 pub struct VotingMachine {
@@ -203,7 +206,7 @@ impl Default for VotingMachine {
 
 impl smt::StateMachine for VotingMachine {
     /// The System Under Test is the Vote Tally.
-    type System = VoteTally<VotingKey>;
+    type System = VoteTally;
     /// The model state is defined here in the test.
     type State = VotingState;
     /// Random commands we can apply in a step.
@@ -211,7 +214,7 @@ impl smt::StateMachine for VotingMachine {
     /// Result of command application on the system.
     ///
     /// The only return value we are interested in is the finality.
-    type Result = Result<Option<(BlockHeight, BlockHash)>, voting::Error<VotingKey>>;
+    type Result = Result<Option<(TopdownVote, MultiSigCert)>, voting::Error>;
 
     /// New random state.
     fn gen_state(&self, u: &mut Unstructured) -> arbitrary::Result<Self::State> {
@@ -235,16 +238,9 @@ impl smt::StateMachine for VotingMachine {
             let weight = u.int_in_range(min_weight..=100)?;
 
             // A VotingKey is has a lot of wrapping...
-            // let secret_key = fendermint_crypto::SecretKey::random(&mut rng);
-            // let public_key = secret_key.public_key();
-            // let public_key = libp2p::identity::secp256k1::PublicKey::try_from_bytes(
-            //     &public_key.serialize_compressed(),
-            // )
-            // .expect("secp256k1 public key");
-            // let public_key = libp2p::identity::PublicKey::from(public_key);
-            // let validator_key = VotingKey::from(public_key);
-
-            let validator_key = VotingKey(i);
+            let key_pair = Keypair::generate_secp256k1();
+            let public_key = key_pair.public();
+            let validator_key = ValidatorKey::from(public_key);
 
             validator_states.insert(
                 validator_key,
@@ -252,6 +248,7 @@ impl smt::StateMachine for VotingMachine {
                     weight,
                     votes: HashSet::default(),
                     highest_vote: 0,
+                    key_pair,
                 },
             );
         }
@@ -276,9 +273,7 @@ impl smt::StateMachine for VotingMachine {
             .map(|(vk, vs)| (vk.clone(), vs.weight))
             .collect();
 
-        let last_finalized_block = (0, state.block_hash(0).expect("first block is not null"));
-
-        VoteTally::<VotingKey>::new(power_table, last_finalized_block)
+        VoteTally::new(power_table, 0)
     }
 
     /// New random command.
@@ -309,7 +304,11 @@ impl smt::StateMachine for VotingMachine {
                     .block_hash(vote_height)
                     .expect("the first block not null");
 
-                VotingCommand::AddVote(vk.clone(), vote_height, vote_hash)
+                // commitment is ok to be the same, because vote hash is different
+                let vote = TopdownVote::v1(vote_height, vote_hash, Cid::default().to_bytes());
+                let key_pair = &state.validator_states[vk].key_pair;
+                let signed = SignedVote::signed(key_pair, &vote).unwrap();
+                VotingCommand::AddVote(signed)
             }
             // Update the power table
             i if i < 80 => {
@@ -353,13 +352,16 @@ impl smt::StateMachine for VotingMachine {
         eprintln!("RUN CMD {cmd:?}");
         match cmd {
             VotingCommand::ExtendChain(block_height, block_hash) => self.atomically_or_err(|| {
+                let v = block_hash.as_ref().map(|v| {
+                    TopdownVote::v1(*block_height, block_hash.clone().unwrap(), Cid::default().to_bytes())
+                });
                 system
-                    .add_block(*block_height, block_hash.clone())
+                    .add_block(*block_height, v)
                     .map(|_| None)
             }),
-            VotingCommand::AddVote(vk, block_height, block_hash) => self.atomically_or_err(|| {
+            VotingCommand::AddVote(vote) => self.atomically_or_err(|| {
                 system
-                    .add_vote(vk.clone(), *block_height, block_hash.clone())
+                    .add_vote(vote.clone())
                     .map(|_| None)
             }),
 
@@ -367,9 +369,9 @@ impl smt::StateMachine for VotingMachine {
                 self.atomically_ok(|| system.update_power_table(power_table.clone()).map(|_| None))
             }
 
-            VotingCommand::BlockFinalized(block_height, block_hash) => self.atomically_ok(|| {
+            VotingCommand::BlockFinalized(block_height, _) => self.atomically_ok(|| {
                 system
-                    .set_finalized(*block_height, block_hash.clone())
+                    .set_finalized(*block_height)
                     .map(|_| None)
             }),
 
@@ -383,10 +385,11 @@ impl smt::StateMachine for VotingMachine {
             VotingCommand::ExtendChain(_, _) => {
                 result.expect("chain extension should succeed; not simulating unexpected heights");
             }
-            VotingCommand::AddVote(vk, h, _) => {
-                if *h < pre_state.last_finalized_block {
+            VotingCommand::AddVote(vote) => {
+                let (vote, _, vk) = vote.clone().into_validated_payload().unwrap();
+                if vote.block_height() < pre_state.last_finalized_block {
                     result.expect("old votes are ignored");
-                } else if pre_state.validator_states[vk].weight == 0 {
+                } else if pre_state.validator_states[&vk].weight == 0 {
                     result.expect_err("not accepting votes from validators with 0 power");
                 } else {
                     result.expect("vote should succeed; not simulating equivocations");
@@ -397,25 +400,26 @@ impl smt::StateMachine for VotingMachine {
 
                 let height = match result {
                     None => pre_state.last_finalized_block,
-                    Some((height, hash)) => {
+                    Some((vote, _cert)) => {
                         assert!(
-                            pre_state.has_quorum(height),
-                            "find: height {height} should have quorum"
+                            pre_state.has_quorum(vote.block_height()),
+                            "find: height {} should have quorum",
+                            vote.block_height()
                         );
                         assert!(
-                            height > pre_state.last_finalized_block,
+                            vote.block_height() > pre_state.last_finalized_block,
                             "find: should be above last finalized"
                         );
                         assert!(
-                            height <= pre_state.last_chain_block,
+                            vote.block_height() <= pre_state.last_chain_block,
                             "find: should not be beyond last chain"
                         );
                         assert_eq!(
-                            pre_state.block_hash(height),
-                            Some(hash),
+                            pre_state.block_hash(vote.block_height()),
+                            Some(vote.ballot()[..32].to_vec()),
                             "find: should be correct hash"
                         );
-                        height
+                        vote.block_height()
                     }
                 };
 
@@ -449,17 +453,18 @@ impl smt::StateMachine for VotingMachine {
                     }
                 }
             }
-            VotingCommand::AddVote(vk, h, _) => {
+            VotingCommand::AddVote(vote) => {
+                let (vote, _, vk) = vote.clone().into_validated_payload().unwrap();
                 let vs = state
                     .validator_states
-                    .get_mut(vk)
+                    .get_mut(&vk)
                     .expect("validator exists");
 
                 if vs.weight > 0 {
-                    vs.votes.insert(*h);
+                    vs.votes.insert(vote.block_height());
 
-                    if *h <= state.last_chain_block {
-                        vs.highest_vote = max(vs.highest_vote, *h);
+                    if vote.block_height() <= state.last_chain_block {
+                        vs.highest_vote = max(vs.highest_vote, vote.block_height());
                     }
                 }
             }
