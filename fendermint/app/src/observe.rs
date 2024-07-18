@@ -1,10 +1,12 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use fendermint_vm_message::conv::from_eth;
 use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
 
 use fendermint_vm_interpreter::errors::ProcessError;
+use fendermint_vm_interpreter::fvm::FvmMessage;
 use tendermint::account::Id;
 
 use ipc_observability::{
@@ -113,25 +115,48 @@ impl Recordable for BlockCommitted {
     }
 }
 
+#[derive(Debug)]
+pub struct Message {
+    pub from: Address,
+    pub to: Address,
+    pub value: TokenAmount,
+    pub gas_limit: u64,
+    pub fee_cap: TokenAmount,
+    pub premium: TokenAmount,
+}
+
+impl From<&FvmMessage> for Message {
+    fn from(fvm_message: &FvmMessage) -> Self {
+        Message {
+            from: fvm_message.from,
+            to: fvm_message.to,
+            value: fvm_message.value.clone(),
+            gas_limit: fvm_message.gas_limit,
+            fee_cap: fvm_message.gas_fee_cap.clone(),
+            premium: fvm_message.gas_premium.clone(),
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct MpoolReceived {
     // TODO - add cid later on
     // pub message_cid: &'a str,
-    pub from: Option<Address>,
-    pub to: Option<Address>,
-    pub value: Option<TokenAmount>,
-    pub param_len: usize,
-    pub gas_limit: u64,
-    pub fee_cap: Option<TokenAmount>,
-    pub premium: Option<TokenAmount>,
+    pub message: Option<Message>,
     pub accept: bool,
     pub reason: Option<String>,
 }
 
 impl Recordable for MpoolReceived {
     fn record_metrics(&self) {
+        let from = self
+            .message
+            .as_ref()
+            .map(|m| m.from.to_string())
+            .unwrap_or("".to_string());
+
         MPOOL_RECEIVED
-            .with_label_values(&[&self.accept.to_string(), self.from.map_or("", |_| "")])
+            .with_label_values(&[&self.accept.to_string(), &from])
             .inc();
     }
 }

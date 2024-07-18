@@ -230,8 +230,8 @@ where
             block_height,
             validator: &validator_pub_key,
             block_hash: HexEncodableBlockHash(block_hash.as_ref().to_vec()),
-            // TODO Karel - this needs to be the commitment hash once implemented
-            commitment_hash: HexEncodableBlockHash(block_hash.as_ref().to_vec()),
+            // TODO- this needs to be the commitment hash once implemented
+            commitment_hash: None,
         });
 
         Ok(true)
@@ -297,8 +297,8 @@ where
                 emit(ParentFinalityPeerQuorumReached {
                     block_height: *block_height,
                     block_hash: HexEncodableBlockHash(block_hash.as_ref().to_vec()),
-                    // TODO Karel - just placeholder - need to use real commitment once implemented
-                    commitment_hash: HexEncodableBlockHash(block_hash.as_ref().to_vec()),
+                    // TODO - just placeholder - need to use real commitment once implemented
+                    commitment_hash: None,
                     weight,
                 });
 
@@ -460,7 +460,7 @@ pub async fn publish_vote_loop<V, F>(
                     emit(ParentFinalityPeerVoteSent {
                         block_height: next_height,
                         block_hash: HexEncodableBlockHash(next_hash.clone()),
-                        commitment_hash: HexEncodableBlockHash(next_hash.clone()),
+                        commitment_hash: None,
                     });
                 }
                 Err(e) => {

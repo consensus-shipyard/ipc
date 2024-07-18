@@ -13,7 +13,7 @@ use fvm_shared::{
 use ipc_observability::emit;
 use num_traits::Zero;
 
-use super::observe::{MsgExecCall, MsgExecEstimate};
+use super::observe::{MsgExec, MsgExecPurpose};
 use crate::QueryInterpreter;
 
 use super::{state::FvmQueryState, FvmApplyRet, FvmMessageInterpreter};
@@ -89,16 +89,10 @@ where
                 let latency = start.elapsed().as_secs_f64();
                 let exit_code = apply_ret.msg_receipt.exit_code.value();
 
-                emit(MsgExecCall {
+                emit(MsgExec {
+                    purpose: MsgExecPurpose::Call,
                     height: state.block_height(),
-                    from: msg.from.to_string().as_str(),
-                    to: msg.to.to_string().as_str(),
-                    value: msg.value.to_string().as_str(),
-                    method_num: msg.method_num,
-                    gas_limit: msg.gas_limit,
-                    gas_price: msg.gas_premium.to_string().as_str(),
-                    params: &msg.params,
-                    nonce: msg.sequence,
+                    message: *msg,
                     duration: latency,
                     exit_code,
                 });
@@ -188,16 +182,10 @@ where
         let (state, (ret, _)) = state.call(msg.clone()).await?;
         let latency = start.elapsed().as_secs_f64();
 
-        emit(MsgExecEstimate {
+        emit(MsgExec {
+            purpose: MsgExecPurpose::Estimate,
             height: state.block_height(),
-            from: msg.from.to_string().as_str(),
-            to: msg.to.to_string().as_str(),
-            value: msg.value.to_string().as_str(),
-            method_num: msg.method_num,
-            gas_limit: msg.gas_limit,
-            gas_price: msg.gas_premium.to_string().as_str(),
-            params: &msg.params,
-            nonce: msg.sequence,
+            message: msg.clone(),
             duration: latency,
             exit_code: ret.msg_receipt.exit_code.value(),
         });
@@ -307,16 +295,10 @@ where
             gas_limit: apply_ret.msg_receipt.gas_used,
         };
 
-        emit(MsgExecEstimate {
+        emit(MsgExec {
+            purpose: MsgExecPurpose::Estimate,
             height: state.block_height(),
-            from: msg.from.to_string().as_str(),
-            to: msg.to.to_string().as_str(),
-            value: msg.value.to_string().as_str(),
-            method_num: msg.method_num,
-            gas_limit: msg.gas_limit,
-            gas_price: msg.gas_premium.to_string().as_str(),
-            params: &msg.params,
-            nonce: msg.sequence,
+            message: msg,
             duration: latency,
             exit_code: ret.exit_code.value(),
         });

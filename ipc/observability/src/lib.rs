@@ -10,6 +10,8 @@ pub mod serde;
 use std::fmt::Debug;
 use tracing::{debug, error, info, trace, warn};
 
+use std::time::Instant;
+
 pub trait Recordable {
     fn record_metrics(&self);
 }
@@ -40,4 +42,14 @@ where
     }
 
     trace.record_metrics();
+}
+
+pub fn measure_time<F, T>(f: F) -> (T, std::time::Duration)
+where
+    F: FnOnce() -> T,
+{
+    let start = Instant::now();
+    let result = f();
+    let duration = start.elapsed();
+    (result, duration)
 }

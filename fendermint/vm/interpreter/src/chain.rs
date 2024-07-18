@@ -7,7 +7,8 @@ use crate::{
     fvm::state::FvmExecState,
     fvm::FvmMessage,
     signed::{SignedMessageApplyRes, SignedMessageCheckRes, SyntheticMessage, VerifiableMessage},
-    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
+    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProcessResult, ProposalInterpreter,
+    QueryInterpreter,
 };
 use anyhow::{bail, Context};
 use async_stm::atomically;
@@ -180,7 +181,7 @@ where
         &self,
         env: Self::State,
         msgs: Vec<Self::Message>,
-    ) -> anyhow::Result<bool, ProcessError> {
+    ) -> anyhow::Result<ProcessResult> {
         for msg in msgs {
             match msg {
                 ChainMessage::Ipc(IpcMessage::BottomUpExec(msg)) => {
@@ -199,7 +200,7 @@ where
                         .await;
 
                     if !is_resolved {
-                        return Err(ProcessError::CheckpointNotResolved);
+                        return Ok(ProcessResult::Rejected(ProcessError::CheckpointNotResolved));
                     }
                 }
                 ChainMessage::Ipc(IpcMessage::TopDownExec(ParentFinality {
@@ -213,13 +214,15 @@ where
                     let is_final =
                         atomically(|| env.parent_finality_provider.check_proposal(&prop)).await;
                     if !is_final {
-                        return Err(ProcessError::ParentFinalityNotAvailable);
+                        return Ok(ProcessResult::Rejected(
+                            ProcessError::ParentFinalityNotAvailable,
+                        ));
                     }
                 }
                 _ => {}
             };
         }
-        Ok(true)
+        Ok(ProcessResult::Accepted)
     }
 }
 

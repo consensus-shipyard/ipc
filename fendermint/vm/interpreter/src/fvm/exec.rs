@@ -9,15 +9,15 @@ use fendermint_vm_actor_interface::{chainmetadata, cron, system};
 use fvm::executor::ApplyRet;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::{address::Address, ActorID, MethodNum, BLOCK_GAS_LIMIT};
-use ipc_observability::emit;
+use ipc_observability::{emit, measure_time};
 use tendermint_rpc::Client;
 
 use crate::ExecInterpreter;
 
 use super::{
     checkpoint::{self, PowerUpdates},
-    observe::MsgExecApply,
-    state::{ElapsedExecution, FvmExecState},
+    observe::{MsgExec, MsgExecPurpose},
+    state::FvmExecState,
     FvmMessage, FvmMessageInterpreter,
 };
 
@@ -151,45 +151,36 @@ where
         mut state: Self::State,
         msg: Self::Message,
     ) -> anyhow::Result<(Self::State, Self::DeliverOutput)> {
-        let from = msg.from;
-        let to = msg.to;
-        let method_num = msg.method_num;
-        let gas_limit = msg.gas_limit;
-        let sequence = msg.sequence;
-        let params = msg.params.clone();
-        let value = msg.value.to_string();
-        // TODO Karel - this should probably not be gas_premium but something else??
-        let gas_price = msg.gas_premium.to_string();
+        let (apply_ret, emitters, latency) = if msg.from == system::SYSTEM_ACTOR_ADDR {
+            let (execution_result, latency) = measure_time(|| state.execute_implicit(msg.clone()));
+            let (apply_ret, emitters) = execution_result?;
 
-        let (apply_ret, emitters, latency) = if from == system::SYSTEM_ACTOR_ADDR {
-            ElapsedExecution::new(&mut state).execute_implicit(msg)?
+            (apply_ret, emitters, latency)
         } else {
-            ElapsedExecution::new(&mut state).execute_explicit(msg)?
+            let (execution_result, latency) = measure_time(|| state.execute_explicit(msg.clone()));
+            let (apply_ret, emitters) = execution_result?;
+
+            (apply_ret, emitters, latency)
         };
 
-        emit(MsgExecApply {
-            height: state.block_height(),
-            from: from.to_string().as_str(),
-            to: to.to_string().as_str(),
-            value: value.as_str(),
-            method_num,
-            gas_limit,
-            gas_price: gas_price.as_str(),
-            // TODO Karel - this should be the serialized params
-            params: params.bytes(),
-            nonce: sequence,
-            duration: latency.as_secs_f64(),
-            exit_code: apply_ret.msg_receipt.exit_code.value(),
-        });
+        let exit_code = apply_ret.msg_receipt.exit_code.value();
 
         let ret = FvmApplyRet {
             apply_ret,
-            from,
-            to,
-            method_num,
-            gas_limit,
+            from: msg.from,
+            to: msg.to,
+            method_num: msg.method_num,
+            gas_limit: msg.gas_limit,
             emitters,
         };
+
+        emit(MsgExec {
+            purpose: MsgExecPurpose::Apply,
+            height: state.block_height(),
+            message: msg,
+            duration: latency.as_secs_f64(),
+            exit_code,
+        });
 
         Ok((state, ret))
     }

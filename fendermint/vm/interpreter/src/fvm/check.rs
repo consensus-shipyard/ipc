@@ -6,13 +6,13 @@ use async_trait::async_trait;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::{address::Address, error::ExitCode};
-use ipc_observability::emit;
+use ipc_observability::{emit, measure_time};
 
 use crate::CheckInterpreter;
 
 use super::{
-    observe::MsgExecCheck,
-    state::{ElapsedExecution, FvmExecState},
+    observe::{MsgExec, MsgExecPurpose},
+    state::FvmExecState,
     store::ReadOnlyBlockstore,
     FvmMessage, FvmMessageInterpreter,
 };
@@ -116,20 +116,16 @@ where
                 } else if self.exec_in_check {
                     // Instead of modifying just the partial state, we will execute the call in earnest.
                     // This is required for fully supporting the Ethereum API "pending" queries, if that's needed.
-                    let (apply_ret, _, latency) =
-                        ElapsedExecution::new(&mut state).execute_explicit(msg.clone())?;
 
-                    emit(MsgExecCheck {
+                    let (execution_result, latency) =
+                        measure_time(|| state.execute_explicit(msg.clone()));
+
+                    let (apply_ret, _) = execution_result?;
+
+                    emit(MsgExec {
+                        purpose: MsgExecPurpose::Check,
                         height: state.block_height(),
-                        from: msg.from.to_string().as_str(),
-                        to: msg.to.to_string().as_str(),
-                        value: msg.value.to_string().as_str(),
-                        method_num: msg.method_num,
-                        gas_limit: msg.gas_limit,
-                        gas_price: msg.gas_premium.to_string().as_str(),
-                        // TODO Karel - this should be the serialized params
-                        params: msg.params.clone().bytes(),
-                        nonce: msg.sequence,
+                        message: msg.clone(),
                         duration: latency.as_secs_f64(),
                         exit_code: apply_ret.msg_receipt.exit_code.value(),
                     });

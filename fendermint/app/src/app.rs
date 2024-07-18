@@ -26,7 +26,8 @@ use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
 use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmGenesisOutput, PowerUpdates};
 use fendermint_vm_interpreter::signed::InvalidSignature;
 use fendermint_vm_interpreter::{
-    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
+    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProcessResult, ProposalInterpreter,
+    QueryInterpreter,
 };
 use fendermint_vm_message::query::FvmQueryHeight;
 use fendermint_vm_snapshot::{SnapshotClient, SnapshotError};
@@ -44,7 +45,8 @@ use tendermint::abci::{request, response};
 use tracing::instrument;
 
 use crate::observe::{
-    BlockCommitted, BlockProposalEvaluated, BlockProposalReceived, BlockProposalSent, MpoolReceived,
+    BlockCommitted, BlockProposalEvaluated, BlockProposalReceived, BlockProposalSent, Message,
+    MpoolReceived,
 };
 use crate::AppExitCode;
 use crate::BlockHeight;
@@ -629,23 +631,14 @@ where
                 Err(IllegalMessage) => invalid_check_tx(AppError::IllegalMessage, "".to_owned()),
                 Ok(Err(InvalidSignature(d))) => invalid_check_tx(AppError::InvalidSignature, d),
                 Ok(Ok(ret)) => {
-                    mpool_received_trace.from = Some(ret.message.from);
-                    mpool_received_trace.to = Some(ret.message.to);
-                    mpool_received_trace.value = Some(ret.message.value.clone());
-                    mpool_received_trace.param_len = ret.message.params.len();
-                    mpool_received_trace.gas_limit = ret.message.gas_limit;
-                    mpool_received_trace.fee_cap = Some(ret.message.gas_fee_cap.clone());
-                    mpool_received_trace.premium = Some(ret.message.gas_premium.clone());
-
+                    mpool_received_trace.message = Some(Message::from(&ret.message));
                     to_check_tx(ret)
                 }
             },
         };
 
-        if response.code.is_ok() {
-            mpool_received_trace.accept = true;
-        } else {
-            mpool_received_trace.accept = false;
+        mpool_received_trace.accept = response.code.is_ok();
+        if !mpool_received_trace.accept {
             mpool_received_trace.reason = Some(format!("{:?} - {}", response.code, response.info));
         }
 
@@ -698,7 +691,10 @@ where
         let size_txs = txs.iter().map(|tx| tx.len()).sum::<usize>();
         let num_txs = txs.len();
 
-        let process_result = self.interpreter.process(self.chain_env.clone(), txs).await;
+        let process_result = self
+            .interpreter
+            .process(self.chain_env.clone(), txs)
+            .await?;
 
         emit(BlockProposalReceived {
             height: request.height.value(),
@@ -719,10 +715,10 @@ where
         };
 
         let process_proposal = match process_result {
-            Ok(_) => response::ProcessProposal::Accept,
-            Err(e) => {
+            ProcessResult::Accepted => response::ProcessProposal::Accept,
+            ProcessResult::Rejected(reason) => {
                 proposal_evaluated.accept = false;
-                proposal_evaluated.reason = Some(e);
+                proposal_evaluated.reason = Some(reason);
                 response::ProcessProposal::Reject
             }
         };

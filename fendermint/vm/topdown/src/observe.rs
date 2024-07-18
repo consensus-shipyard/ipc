@@ -93,7 +93,7 @@ pub struct ParentFinalityPeerVoteReceived<'a> {
     pub validator: &'a str,
     pub block_height: BlockHeight,
     pub block_hash: HexEncodableBlockHash,
-    pub commitment_hash: HexEncodableBlockHash,
+    pub commitment_hash: Option<HexEncodableBlockHash>,
 }
 
 impl Recordable for ParentFinalityPeerVoteReceived<'_> {
@@ -108,7 +108,7 @@ impl Recordable for ParentFinalityPeerVoteReceived<'_> {
 pub struct ParentFinalityPeerVoteSent {
     pub block_height: BlockHeight,
     pub block_hash: HexEncodableBlockHash,
-    pub commitment_hash: HexEncodableBlockHash,
+    pub commitment_hash: Option<HexEncodableBlockHash>,
 }
 
 impl Recordable for ParentFinalityPeerVoteSent {
@@ -121,7 +121,7 @@ impl Recordable for ParentFinalityPeerVoteSent {
 pub struct ParentFinalityPeerQuorumReached {
     pub block_height: BlockHeight,
     pub block_hash: HexEncodableBlockHash,
-    pub commitment_hash: HexEncodableBlockHash,
+    pub commitment_hash: Option<HexEncodableBlockHash>,
     pub weight: u64,
 }
 
@@ -214,19 +214,19 @@ mod tests {
             validator: "validator",
             block_height: 0,
             block_hash: HexEncodableBlockHash(hash.clone()),
-            commitment_hash: HexEncodableBlockHash(hash.clone()),
+            commitment_hash: Some(HexEncodableBlockHash(hash.clone())),
         });
 
         emit(ParentFinalityPeerVoteSent {
             block_height: 0,
             block_hash: HexEncodableBlockHash(hash.clone()),
-            commitment_hash: HexEncodableBlockHash(hash.clone()),
+            commitment_hash: Some(HexEncodableBlockHash(hash.clone())),
         });
 
         emit(ParentFinalityPeerQuorumReached {
             block_height: 0,
             block_hash: HexEncodableBlockHash(hash.clone()),
-            commitment_hash: HexEncodableBlockHash(hash.clone()),
+            commitment_hash: Some(HexEncodableBlockHash(hash.clone())),
             weight: 0,
         });
 
@@ -234,7 +234,7 @@ mod tests {
             parent_height: 0,
             block_hash: HexEncodableBlockHash(hash.clone()),
             local_height: Some(0),
-            proposer: Some("proposer"),
+            proposer: Some("proposerOption"),
         });
     }
 }

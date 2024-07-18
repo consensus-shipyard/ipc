@@ -118,6 +118,7 @@ impl ParentQueryProxy for IPCProviderProxy {
     }
 }
 
+// TODO - create a macro for this
 pub struct IPCProviderProxyWithLatency {
     inner: IPCProviderProxy,
 }
