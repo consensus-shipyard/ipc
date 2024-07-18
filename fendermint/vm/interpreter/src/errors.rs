@@ -13,4 +13,6 @@ pub enum ProcessError {
     TooManyMessages(usize),
     #[error("failed to decode message in proposal as ChainMessage: {0}")]
     FailedToDecodeMessage(String),
+    #[error("")]
+    Empty,
 }

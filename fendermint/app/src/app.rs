@@ -26,7 +26,8 @@ use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
 use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmGenesisOutput, PowerUpdates};
 use fendermint_vm_interpreter::signed::InvalidSignature;
 use fendermint_vm_interpreter::{
-    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
+    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProcessResult, ProposalInterpreter,
+    QueryInterpreter,
 };
 use fendermint_vm_message::query::FvmQueryHeight;
 use fendermint_vm_snapshot::{SnapshotClient, SnapshotError};
@@ -696,7 +697,10 @@ where
         let size_txs = txs.iter().map(|tx| tx.len()).sum::<usize>();
         let num_txs = txs.len();
 
-        let process_result = self.interpreter.process(self.chain_env.clone(), txs).await;
+        let process_result = self
+            .interpreter
+            .process(self.chain_env.clone(), txs)
+            .await?;
 
         emit(BlockProposalReceived {
             height: request.height.value(),
@@ -727,10 +731,10 @@ where
         };
 
         let process_proposal = match process_result {
-            Ok(_) => response::ProcessProposal::Accept,
-            Err(e) => {
+            ProcessResult::Accepted => response::ProcessProposal::Accept,
+            ProcessResult::Rejected(reason) => {
                 proposal_evaluated.accept = false;
-                proposal_evaluated.reason = Some(e);
+                proposal_evaluated.reason = Some(reason);
                 response::ProcessProposal::Reject
             }
         };
