@@ -589,7 +589,7 @@ async fn dispatch_vote(
             DEBUG,
             ParentFinalityVoteAdded {
                 block_height,
-                block_hash: &hex::encode(vote.ballot()),
+                block_hash: &hex::encode(vote.ballot().unwrap()),
                 validator,
             }
         )
@@ -598,7 +598,7 @@ async fn dispatch_vote(
             DEBUG,
             ParentFinalityVoteIgnored {
                 block_height,
-                block_hash: &hex::encode(vote.ballot()),
+                block_hash: &hex::encode(vote.ballot().unwrap()),
                 validator,
             }
         )

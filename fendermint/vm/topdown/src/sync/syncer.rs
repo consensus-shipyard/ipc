@@ -500,10 +500,7 @@ mod tests {
             block_hash: vec![0; 32],
         };
 
-        let vote_tally = VoteTally::new(
-            vec![],
-                committed_finality.height,
-        );
+        let vote_tally = VoteTally::new(vec![], committed_finality.height);
 
         let provider = CachedFinalityProvider::new(
             config.clone(),

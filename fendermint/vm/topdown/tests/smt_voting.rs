@@ -23,15 +23,15 @@ use arbitrary::Unstructured;
 use async_stm::{atomically, atomically_or_err, Stm, StmResult};
 use cid::Cid;
 use fendermint_testing::{smt, state_machine_test};
+use fendermint_vm_topdown::voting::payload::{SignedVote, TopdownVote};
+use fendermint_vm_topdown::voting::quorum::MultiSigCert;
 use fendermint_vm_topdown::{
     voting::{self, VoteTally, Weight},
     BlockHash, BlockHeight,
 };
 use im::HashSet;
-use libp2p::identity::Keypair;
-use fendermint_vm_topdown::voting::payload::{SignedVote, TopdownVote};
-use fendermint_vm_topdown::voting::quorum::MultiSigCert;
 use ipc_ipld_resolver::ValidatorKey;
+use libp2p::identity::Keypair;
 //use rand::{rngs::StdRng, SeedableRng};
 
 /// Size of window of voting relative to the last cast vote.
@@ -66,9 +66,7 @@ impl Debug for VotingCommand {
                 .field(arg0)
                 .field(&arg1.is_some())
                 .finish(),
-            Self::AddVote(arg0) => {
-                f.debug_tuple("AddVote").field(arg0).finish()
-            }
+            Self::AddVote(arg0) => f.debug_tuple("AddVote").field(arg0).finish(),
             Self::UpdatePower(arg0) => f.debug_tuple("UpdatePower").field(arg0).finish(),
             Self::BlockFinalized(arg0, _arg1) => {
                 f.debug_tuple("BlockFinalized").field(arg0).finish()
@@ -353,27 +351,25 @@ impl smt::StateMachine for VotingMachine {
         match cmd {
             VotingCommand::ExtendChain(block_height, block_hash) => self.atomically_or_err(|| {
                 let v = block_hash.as_ref().map(|v| {
-                    TopdownVote::v1(*block_height, block_hash.clone().unwrap(), Cid::default().to_bytes())
+                    TopdownVote::v1(
+                        *block_height,
+                        block_hash.clone().unwrap(),
+                        Cid::default().to_bytes(),
+                    )
                 });
-                system
-                    .add_block(*block_height, v)
-                    .map(|_| None)
+                system.add_block(*block_height, v).map(|_| None)
             }),
-            VotingCommand::AddVote(vote) => self.atomically_or_err(|| {
-                system
-                    .add_vote(vote.clone())
-                    .map(|_| None)
-            }),
+            VotingCommand::AddVote(vote) => {
+                self.atomically_or_err(|| system.add_vote(vote.clone()).map(|_| None))
+            }
 
             VotingCommand::UpdatePower(power_table) => {
                 self.atomically_ok(|| system.update_power_table(power_table.clone()).map(|_| None))
             }
 
-            VotingCommand::BlockFinalized(block_height, _) => self.atomically_ok(|| {
-                system
-                    .set_finalized(*block_height)
-                    .map(|_| None)
-            }),
+            VotingCommand::BlockFinalized(block_height, _) => {
+                self.atomically_ok(|| system.set_finalized(*block_height).map(|_| None))
+            }
 
             VotingCommand::FindQuorum => self.atomically_ok(|| system.find_quorum()),
         }
