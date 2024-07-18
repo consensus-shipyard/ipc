@@ -258,7 +258,7 @@ where
             emit(CheckpointSigned {
                 height: height.value(),
                 hash: HexEncodableBlockHash(cp.block_hash.to_vec()),
-                validator: &hex::encode(validator_ctx.public_key.serialize()),
+                validator: validator_ctx.public_key,
             });
 
             tracing::debug!(?height, "submitted checkpoint signature");

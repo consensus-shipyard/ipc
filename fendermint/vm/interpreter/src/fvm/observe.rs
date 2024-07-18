@@ -11,6 +11,7 @@ use prometheus::{
     Histogram, IntCounter, IntGauge, IntGaugeVec, Registry,
 };
 
+use fendermint_crypto::PublicKey;
 use fvm_shared::message::Message;
 
 register_metrics! {
@@ -77,7 +78,7 @@ impl_traceables!(
     TraceLevel::Info,
     "Bottomup",
     CheckpointCreated,
-    CheckpointSigned<'a>,
+    CheckpointSigned,
     CheckpointFinalized
 );
 
@@ -102,16 +103,16 @@ impl Recordable for CheckpointCreated {
 }
 
 #[derive(Debug)]
-pub struct CheckpointSigned<'a> {
+pub struct CheckpointSigned {
     pub height: u64,
     pub hash: HexEncodableBlockHash,
-    pub validator: &'a str,
+    pub validator: PublicKey,
 }
 
-impl Recordable for CheckpointSigned<'_> {
+impl Recordable for CheckpointSigned {
     fn record_metrics(&self) {
         BOTTOMUP_CHECKPOINT_SIGNED_HEIGHT
-            .with_label_values(&[self.validator])
+            .with_label_values(&[format!("{:?}", self.validator).as_str()])
             .set(self.height as i64);
     }
 }
@@ -141,9 +142,11 @@ mod tests {
 
     #[test]
     fn test_emit() {
+        use fendermint_crypto::SecretKey;
         use fvm_ipld_encoding::RawBytes;
         use fvm_shared::address::Address;
         use fvm_shared::econ::TokenAmount;
+        use rand::thread_rng;
 
         let message = Message {
             version: 1,
@@ -173,10 +176,14 @@ mod tests {
             msg_count: 2,
             config_number: 3,
         });
+
+        let mut r = thread_rng();
+        let secret_key = SecretKey::random(&mut r);
+
         emit(CheckpointSigned {
             height: 1,
             hash: HexEncodableBlockHash(hash.clone()),
-            validator: "validator",
+            validator: secret_key.public_key(),
         });
     }
 }
