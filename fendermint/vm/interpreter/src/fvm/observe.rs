@@ -14,6 +14,8 @@ use prometheus::{
 use fendermint_crypto::PublicKey;
 use fvm_shared::message::Message;
 
+use fvm_shared::message::Message;
+
 register_metrics! {
     EXEC_FVM_CHECK_EXECUTION_TIME_SECS: Histogram
         = register_histogram!("exec_fvm_check_execution_time_secs", "Execution time of FVM check in seconds");
@@ -181,7 +183,6 @@ mod tests {
             config_number: 3,
         });
 
-        let mut r = thread_rng();
         let secret_key = SecretKey::random(&mut r);
 
         emit(CheckpointSigned {

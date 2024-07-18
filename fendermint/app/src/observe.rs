@@ -1,6 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use fendermint_vm_message::conv::from_eth;
 use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
 
@@ -147,6 +148,12 @@ pub struct MpoolReceived {
 
 impl Recordable for MpoolReceived {
     fn record_metrics(&self) {
+        let from = self
+            .message
+            .as_ref()
+            .map(|m| m.from.to_string())
+            .unwrap_or("".to_string());
+
         MPOOL_RECEIVED
             .with_label_values(&[&self.accept.to_string()])
             .inc();

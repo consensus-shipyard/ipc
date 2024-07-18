@@ -28,6 +28,17 @@ pub trait GenesisInterpreter: Sync + Send {
     ) -> anyhow::Result<(Self::State, Self::Output)>;
 }
 
+pub enum ProcessResult {
+    Accepted,
+    Rejected(errors::ProcessError),
+}
+
+impl ProcessResult {
+    pub fn is_accepted(&self) -> bool {
+        matches!(self, ProcessResult::Accepted)
+    }
+}
+
 /// Prepare and process transaction proposals.
 #[async_trait]
 pub trait ProposalInterpreter: Sync + Send {
@@ -59,7 +70,7 @@ pub trait ProposalInterpreter: Sync + Send {
         &self,
         state: Self::State,
         msgs: Vec<Self::Message>,
-    ) -> anyhow::Result<bool, errors::ProcessError>;
+    ) -> anyhow::Result<ProcessResult>;
 }
 
 /// The `ExecInterpreter` applies messages on some state, which is

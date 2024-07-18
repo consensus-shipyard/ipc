@@ -11,7 +11,8 @@ use crate::{
     chain::{ChainMessageApplyRet, ChainMessageCheckRes},
     errors::ProcessError,
     fvm::{FvmQuery, FvmQueryRet},
-    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
+    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProcessResult, ProposalInterpreter,
+    QueryInterpreter,
 };
 
 pub type BytesMessageApplyRes = Result<ChainMessageApplyRet, IpldError>;
@@ -130,13 +131,15 @@ where
         &self,
         state: Self::State,
         msgs: Vec<Self::Message>,
-    ) -> anyhow::Result<bool, ProcessError> {
+    ) -> anyhow::Result<ProcessResult> {
         if msgs.len() > self.max_msgs {
             tracing::warn!(
                 block_msgs = msgs.len(),
                 "rejecting block: too many messages"
             );
-            return Err(ProcessError::TooManyMessages(msgs.len()));
+            return Ok(ProcessResult::Rejected(ProcessError::TooManyMessages(
+                msgs.len(),
+            )));
         }
 
         let mut chain_msgs = Vec::new();
@@ -157,7 +160,9 @@ where
                         "failed to decode message in proposal as ChainMessage"
                     );
                     if self.reject_malformed_proposal {
-                        return Err(ProcessError::FailedToDecodeMessage(e.to_string()));
+                        return Ok(ProcessResult::Rejected(
+                            ProcessError::FailedToDecodeMessage(e.to_string()),
+                        ));
                     }
                 }
                 Ok(msg) => chain_msgs.push(msg),
