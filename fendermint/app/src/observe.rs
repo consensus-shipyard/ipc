@@ -1,7 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use fendermint_vm_message::conv::from_eth;
 use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
 

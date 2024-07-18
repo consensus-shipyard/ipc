@@ -32,6 +32,7 @@ pub enum MsgExecPurpose {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct MsgExec {
     pub purpose: MsgExecPurpose,
     pub message: Message,
