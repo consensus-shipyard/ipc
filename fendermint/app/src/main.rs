@@ -4,7 +4,7 @@
 pub use fendermint_app_options as options;
 pub use fendermint_app_settings as settings;
 
-use ipc_observability::traces::create_subscriber;
+use ipc_observability::traces::create_temporary_subscriber;
 use tracing::subscriber;
 
 mod cmd;
@@ -20,12 +20,12 @@ fn init_panic_handler() {
         // let stacktrace = std::backtrace::Backtrace::capture();
         let stacktrace = std::backtrace::Backtrace::force_capture();
 
-        subscriber::with_default(create_subscriber(), || {
+        subscriber::with_default(create_temporary_subscriber(), || {
             tracing::error!(
-                "panic occurred: {error:?}\n{stacktrace}",
-                error = info,
-                stacktrace = stacktrace
-            )
+                stacktrace = stacktrace.to_string(),
+                info = info.to_string(),
+                "panicking"
+            );
         });
 
         // We could exit the application if any of the background tokio tasks panic.
@@ -41,7 +41,7 @@ async fn main() {
     init_panic_handler();
 
     if let Err(e) = cmd::exec(&opts).await {
-        subscriber::with_default(create_subscriber(), || {
+        subscriber::with_default(create_temporary_subscriber(), || {
             tracing::error!("failed to execute {:?}: {e:?}", opts)
         });
         std::process::exit(fendermint_app::AppExitCode::UnknownError as i32);

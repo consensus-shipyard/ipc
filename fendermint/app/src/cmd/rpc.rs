@@ -42,7 +42,7 @@ use super::key::read_secret_key;
 
 cmd! {
   RpcArgs(self) {
-    let _trace_file_guard = set_global_tracing_subscriber(&TracesSettings::default())?;
+    let _trace_file_guard = set_global_tracing_subscriber(&TracesSettings::default());
 
     let client = FendermintClient::new_http(self.url.clone(), self.proxy_url.clone())?;
     match self.command.clone() {

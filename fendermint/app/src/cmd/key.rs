@@ -23,7 +23,7 @@ use crate::{
 
 cmd! {
     KeyArgs(self) {
-        let _trace_file_guard = set_global_tracing_subscriber(&TracesSettings::default())?;
+        let _trace_file_guard = set_global_tracing_subscriber(&TracesSettings::default());
 
         match &self.command {
             KeyCommands::Gen(args) => args.exec(()).await,

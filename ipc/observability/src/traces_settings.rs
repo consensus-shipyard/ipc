@@ -77,21 +77,25 @@ impl FromStr for RotationKind {
 #[serde_as]
 #[derive(Debug, Deserialize, Clone, Default)]
 pub struct TracesSettings {
-    pub console: ConsoleLayerSettings,
-    pub file: FileLayerSettings,
+    pub console: Option<ConsoleLayerSettings>,
+    pub file: Option<FileLayerSettings>,
 }
 
 #[serde_as]
 #[derive(Debug, Deserialize, Clone)]
 pub struct ConsoleLayerSettings {
-    pub enabled: bool,
     pub level: Option<LogLevel>,
+}
+
+impl ConsoleLayerSettings {
+    pub fn level_to_filter(&self) -> EnvFilter {
+        level_to_filter(&self.level)
+    }
 }
 
 impl Default for ConsoleLayerSettings {
     fn default() -> Self {
         ConsoleLayerSettings {
-            enabled: true,
             level: Some(LogLevel::default()),
         }
     }
@@ -107,4 +111,17 @@ pub struct FileLayerSettings {
     pub rotation: Option<RotationKind>,
     pub domain_filter: Option<Vec<String>>,
     pub events_filter: Option<Vec<String>>,
+}
+
+impl FileLayerSettings {
+    pub fn level_to_filter(&self) -> EnvFilter {
+        level_to_filter(&self.level)
+    }
+}
+
+fn level_to_filter(level: &Option<LogLevel>) -> EnvFilter {
+    match level {
+        Some(level) => level.to_filter().unwrap_or_default(),
+        None => EnvFilter::default(),
+    }
 }

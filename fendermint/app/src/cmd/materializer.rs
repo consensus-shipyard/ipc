@@ -23,7 +23,7 @@ use super::key::{read_secret_key, read_secret_key_hex};
 
 cmd! {
   MaterializerArgs(self) {
-    let _trace_file_guard = set_global_tracing_subscriber(&TracesSettings::default())?;
+    let _trace_file_guard = set_global_tracing_subscriber(&TracesSettings::default());
 
     let data_dir = expand_tilde(&self.data_dir);
     let dm = || DockerMaterializer::new(&data_dir, self.seed).map(|m| m.with_policy(DropPolicy::PERSISTENT));

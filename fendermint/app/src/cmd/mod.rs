@@ -10,7 +10,7 @@ use crate::{
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 
-use ipc_observability::traces::create_subscriber;
+use ipc_observability::traces::create_temporary_subscriber;
 use tracing::subscriber;
 
 pub mod config;
@@ -84,7 +84,7 @@ fn settings(opts: &Options) -> anyhow::Result<Settings> {
         d => d,
     };
 
-    subscriber::with_default(create_subscriber(), || {
+    subscriber::with_default(create_temporary_subscriber(), || {
         tracing::info!(
             path = config_dir.to_string_lossy().into_owned(),
             "reading configuration"

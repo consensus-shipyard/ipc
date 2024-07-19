@@ -24,7 +24,7 @@ use super::key::read_public_key;
 
 cmd! {
   GenesisArgs(self) {
-    let _trace_file_guard = set_global_tracing_subscriber(&TracesSettings::default())?;
+    let _trace_file_guard = set_global_tracing_subscriber(&TracesSettings::default());
     let genesis_file = self.genesis_file.clone();
 
     match &self.command {

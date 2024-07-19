@@ -16,7 +16,7 @@ use crate::{
 
 cmd! {
   EthArgs(self, settings: EthSettings) {
-    let _trace_file_guard = set_global_tracing_subscriber(&settings.tracing)?;
+    let _trace_file_guard = set_global_tracing_subscriber(&settings.tracing);
 
     match self.command.clone() {
       EthCommands::Run { ws_url, http_url, connect_retry_delay } => {

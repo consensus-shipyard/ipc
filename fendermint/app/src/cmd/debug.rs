@@ -25,7 +25,7 @@ cmd! {
 
 cmd! {
   DebugIpcCommands(self) {
-    let _trace_file_guard = set_global_tracing_subscriber(&TracesSettings::default())?;
+    let _trace_file_guard = set_global_tracing_subscriber(&TracesSettings::default());
 
     match self {
         DebugIpcCommands::ExportTopDownEvents(args) => {
