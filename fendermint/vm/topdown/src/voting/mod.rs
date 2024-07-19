@@ -6,6 +6,7 @@ pub mod quorum;
 
 use crate::voting::quorum::{MultiSigCert, ValidatorSignatures};
 use async_stm::{abort, atomically_or_err, retry, Stm, StmResult, TVar};
+use im::OrdMap;
 use std::borrow::Borrow;
 use std::{fmt::Debug, time::Duration};
 
@@ -301,13 +302,14 @@ impl VoteTally {
     ///
     /// After this operation the minimum item in the chain will the new finalized block.
     pub fn set_finalized(&self, block_height: BlockHeight) -> Stm<()> {
-        self.chain.update(|chain| {
-            let (_, chain) = chain.split(&block_height);
-            chain
-        })?;
-
-        self.votes.update(|votes| votes.split(&block_height).1)?;
-
+        // Clears all the previous `chain` and `votes`. Because now the proposals are accumulative
+        // because of side effects. For example, if votes contains proposals from height 10, the
+        // commitment includes the cross messages till height 10. If the vote tally receives a
+        // vote for height 11, then the commitment includes cross messages till height 10 and
+        // height 11. If height 10 is finalized, the proposal for height 11 should be void because
+        // a new proposal contains commitment of only height 11 should be included.
+        self.chain.write(OrdMap::new())?;
+        self.votes.write(OrdMap::new())?;
         self.last_finalized_height.write(block_height)?;
 
         Ok(())
