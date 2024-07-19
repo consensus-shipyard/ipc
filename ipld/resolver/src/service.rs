@@ -34,7 +34,7 @@ use crate::behaviour::{
 };
 use crate::client::Client;
 use crate::stats;
-use crate::vote_record::{GossipPayload, VoteRecord};
+use crate::vote_record::GossipPayload;
 
 /// Result of attempting to resolve a CID.
 pub type ResolveResult = anyhow::Result<()>;

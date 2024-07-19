@@ -28,7 +28,7 @@ use fendermint_vm_topdown::voting::payload::SignedVote;
 use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
 use fendermint_vm_topdown::{CachedFinalityProvider, Toggle};
 use fvm_shared::address::{current_network, Address, Network};
-use ipc_ipld_resolver::{Event as ResolverEvent, GossipPayload, VoteRecord};
+use ipc_ipld_resolver::{Event as ResolverEvent, GossipPayload};
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
 use libp2p::identity::secp256k1;
@@ -589,7 +589,7 @@ async fn dispatch_vote(
             DEBUG,
             ParentFinalityVoteAdded {
                 block_height,
-                block_hash: &hex::encode(vote.ballot()),
+                block_hash: &hex::encode(vote.ballot().unwrap()),
                 validator,
             }
         )
@@ -598,7 +598,7 @@ async fn dispatch_vote(
             DEBUG,
             ParentFinalityVoteIgnored {
                 block_height,
-                block_hash: &hex::encode(vote.ballot()),
+                block_hash: &hex::encode(vote.ballot().unwrap()),
                 validator,
             }
         )

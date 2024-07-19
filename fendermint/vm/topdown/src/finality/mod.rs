@@ -41,58 +41,9 @@ pub(crate) fn topdown_cross_msgs(p: &ParentViewPayload) -> Vec<IpcEnvelope> {
 
 #[cfg(test)]
 mod tests {
-    use crate::proxy::ParentQueryProxy;
-    use crate::{
-        BlockHeight, CachedFinalityProvider, Config, IPCParentFinality, ParentFinalityProvider,
-    };
+    use crate::{CachedFinalityProvider, Config, IPCParentFinality, ParentFinalityProvider};
     use async_stm::atomically_or_err;
-    use async_trait::async_trait;
-    use ipc_api::cross::IpcEnvelope;
-    use ipc_api::staking::StakingChangeRequest;
-    use ipc_provider::manager::{GetBlockHashResult, TopDownQueryPayload};
-    use std::sync::Arc;
     use tokio::time::Duration;
-
-    struct MockedParentQuery;
-
-    #[async_trait]
-    impl ParentQueryProxy for MockedParentQuery {
-        async fn get_chain_head_height(&self) -> anyhow::Result<BlockHeight> {
-            Ok(1)
-        }
-
-        async fn get_genesis_epoch(&self) -> anyhow::Result<BlockHeight> {
-            Ok(10)
-        }
-
-        async fn get_block_hash(&self, _height: BlockHeight) -> anyhow::Result<GetBlockHashResult> {
-            Ok(GetBlockHashResult::default())
-        }
-
-        async fn get_top_down_msgs(
-            &self,
-            _height: BlockHeight,
-        ) -> anyhow::Result<TopDownQueryPayload<Vec<IpcEnvelope>>> {
-            Ok(TopDownQueryPayload {
-                value: vec![],
-                block_hash: vec![],
-            })
-        }
-
-        async fn get_validator_changes(
-            &self,
-            _height: BlockHeight,
-        ) -> anyhow::Result<TopDownQueryPayload<Vec<StakingChangeRequest>>> {
-            Ok(TopDownQueryPayload {
-                value: vec![],
-                block_hash: vec![],
-            })
-        }
-    }
-
-    fn mocked_agent_proxy() -> Arc<MockedParentQuery> {
-        Arc::new(MockedParentQuery)
-    }
 
     fn genesis_finality() -> IPCParentFinality {
         IPCParentFinality {
@@ -101,7 +52,7 @@ mod tests {
         }
     }
 
-    fn new_provider() -> CachedFinalityProvider<MockedParentQuery> {
+    fn new_provider() -> CachedFinalityProvider {
         let config = Config {
             chain_head_delay: 20,
             polling_interval: Duration::from_secs(10),
@@ -112,7 +63,7 @@ mod tests {
             proposal_delay: None,
         };
 
-        CachedFinalityProvider::new(config, 10, Some(genesis_finality()), mocked_agent_proxy())
+        CachedFinalityProvider::new(config, 10, Some(genesis_finality()))
     }
 
     #[tokio::test]
@@ -138,36 +89,6 @@ mod tests {
 
             let f = provider.last_committed_finality()?;
             assert_eq!(f, Some(finality));
-
-            Ok(())
-        })
-        .await
-        .unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_check_proposal_works() {
-        let provider = new_provider();
-
-        atomically_or_err(|| {
-            let target_block = 100;
-
-            // inject data
-            provider.new_parent_view(target_block, Some((vec![1u8; 32], vec![], vec![])))?;
-            provider.set_new_finality(
-                IPCParentFinality {
-                    height: target_block - 1,
-                    block_hash: vec![1u8; 32],
-                },
-                Some(genesis_finality()),
-            )?;
-
-            let finality = IPCParentFinality {
-                height: target_block,
-                block_hash: vec![1u8; 32],
-            };
-
-            assert!(provider.check_proposal(&finality).is_ok());
 
             Ok(())
         })

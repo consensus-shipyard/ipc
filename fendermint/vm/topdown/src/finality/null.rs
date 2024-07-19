@@ -350,8 +350,9 @@ impl FinalityWithNull {
 mod tests {
     use super::FinalityWithNull;
     use crate::finality::ParentViewPayload;
-    use crate::{BlockHeight, Config, IPCParentFinality};
+    use crate::{BlockHeight, Config, IPCParentFinality, TopdownProposal};
     use async_stm::{atomically, atomically_or_err};
+    use fendermint_vm_message::ipc::ParentFinalityPayload;
 
     async fn new_provider(
         mut blocks: Vec<(BlockHeight, Option<ParentViewPayload>)>,
@@ -396,25 +397,35 @@ mod tests {
         ];
         let provider = new_provider(parent_blocks).await;
 
-        let f = IPCParentFinality {
-            height: 104,
-            block_hash: vec![4; 32],
-        };
         assert_eq!(
             atomically(|| provider.next_proposal()).await,
-            Some(f.clone())
+            Some(TopdownProposal::v1(ParentFinalityPayload {
+                height: 104,
+                block_hash: vec![4; 32],
+                cross_messages: vec![],
+                validator_changes: vec![],
+            }))
         );
 
         // Test set new finality
         atomically(|| {
             let last = provider.last_committed_finality.read_clone()?;
-            provider.set_new_finality(f.clone(), last)
+            provider.set_new_finality(
+                IPCParentFinality {
+                    height: 104,
+                    block_hash: vec![4; 32],
+                },
+                last,
+            )
         })
         .await;
 
         assert_eq!(
             atomically(|| provider.last_committed_finality()).await,
-            Some(f.clone())
+            Some(IPCParentFinality {
+                height: 104,
+                block_hash: vec![4; 32],
+            })
         );
 
         // this ensures sequential insertion is still valid
@@ -439,10 +450,12 @@ mod tests {
 
         assert_eq!(
             atomically(|| provider.next_proposal()).await,
-            Some(IPCParentFinality {
+            Some(TopdownProposal::v1(ParentFinalityPayload {
                 height: 103,
-                block_hash: vec![3; 32]
-            })
+                block_hash: vec![3; 32],
+                cross_messages: vec![],
+                validator_changes: vec![],
+            }))
         );
     }
 
@@ -508,10 +521,12 @@ mod tests {
 
         assert_eq!(
             atomically(|| provider.next_proposal()).await,
-            Some(IPCParentFinality {
+            Some(TopdownProposal::v1(ParentFinalityPayload {
                 height: 107,
-                block_hash: vec![7; 32]
-            })
+                block_hash: vec![7; 32],
+                cross_messages: vec![],
+                validator_changes: vec![],
+            }))
         );
     }
 
@@ -536,10 +551,12 @@ mod tests {
 
         assert_eq!(
             atomically(|| provider.next_proposal()).await,
-            Some(IPCParentFinality {
+            Some(TopdownProposal::v1(ParentFinalityPayload {
                 height: 107,
-                block_hash: vec![7; 32]
-            })
+                block_hash: vec![7; 32],
+                cross_messages: vec![],
+                validator_changes: vec![],
+            }))
         );
     }
 }

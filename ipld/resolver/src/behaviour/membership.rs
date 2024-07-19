@@ -1,6 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
 use std::marker::PhantomData;
 use std::task::{Context, Poll};
 use std::time::Duration;
@@ -27,7 +27,7 @@ use tokio::time::{Instant, Interval};
 use crate::hash::blake2b_256;
 use crate::provider_cache::{ProviderDelta, SubnetProviderCache};
 use crate::provider_record::{ProviderRecord, SignedProviderRecord};
-use crate::vote_record::{GossipPayload, SignedVoteRecord, VoteRecord};
+use crate::vote_record::GossipPayload;
 use crate::{stats, Timestamp};
 
 use super::NetworkConfig;

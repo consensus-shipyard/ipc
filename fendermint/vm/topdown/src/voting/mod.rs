@@ -248,8 +248,6 @@ impl VoteTally {
         let votes = self.votes.read()?;
         let power_table = self.power_table.read()?;
 
-        let mut weight = 0;
-
         for (block_height, maybe_payload) in chain.iter().rev() {
             if *block_height == finalized_height {
                 tracing::debug!(
@@ -271,6 +269,8 @@ impl VoteTally {
                 tracing::debug!(block_height, "no votes for block");
                 continue; // We could detect equovicating voters here.
             };
+
+            let mut weight = 0;
 
             for vk in votes_for_block.validators() {
                 weight += power_table.get(vk).cloned().unwrap_or_default();
@@ -440,5 +440,104 @@ pub async fn publish_vote_loop<V>(
         }
 
         prev = Some((next_height, next_vote, has_power));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::voting::payload::{SignedVote, TopdownVote};
+    use crate::voting::VoteTally;
+    use crate::BlockHeight;
+    use async_stm::atomically_or_err;
+    use ipc_ipld_resolver::ValidatorKey;
+    use libp2p::identity::Keypair;
+
+    fn random_validator_key() -> (Keypair, ValidatorKey) {
+        let key_pair = Keypair::generate_secp256k1();
+        let public_key = key_pair.public();
+        (key_pair, ValidatorKey::from(public_key))
+    }
+
+    fn random_vote(height: BlockHeight) -> TopdownVote {
+        let rand_bytes = |u: usize| {
+            let mut v = vec![];
+            for _ in 0..u {
+                v.push(rand::random::<u8>());
+            }
+            v
+        };
+        let hash = rand_bytes(32);
+        let commitment = rand_bytes(64);
+
+        TopdownVote::v1(height, hash, commitment)
+    }
+
+    #[tokio::test]
+    async fn simple_3_validators_vote() {
+        atomically_or_err(|| {
+            let validators = (0..3)
+                .map(|_| random_validator_key())
+                .collect::<Vec<(Keypair, ValidatorKey)>>();
+            let powers = validators
+                .iter()
+                .map(|v| (v.1.clone(), 1))
+                .collect::<Vec<_>>();
+
+            let vote_tally = VoteTally::new(powers.clone(), 0);
+
+            let votes = (11..15).map(random_vote).collect::<Vec<_>>();
+
+            for v in votes.clone() {
+                vote_tally.add_block(v)?;
+            }
+
+            for validator in validators {
+                for v in votes.iter() {
+                    let signed = SignedVote::signed(&validator.0, v).unwrap();
+                    assert!(vote_tally.add_vote(signed)?);
+                }
+            }
+
+            let (vote, cert) = vote_tally.find_quorum()?.unwrap();
+            assert_eq!(vote, votes[votes.len() - 1]);
+            cert.validate_power_table::<3, 2>(&vote.ballot().unwrap(), im::HashMap::from(powers))
+                .unwrap();
+
+            Ok(())
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn simple_3_validators_no_quorum() {
+        atomically_or_err(|| {
+            let validators = (0..3)
+                .map(|_| random_validator_key())
+                .collect::<Vec<(Keypair, ValidatorKey)>>();
+            let powers = validators
+                .iter()
+                .map(|v| (v.1.clone(), 1))
+                .collect::<Vec<_>>();
+
+            let vote_tally = VoteTally::new(powers.clone(), 0);
+
+            let votes = [random_vote(10), random_vote(10)];
+
+            vote_tally.add_block(votes[0].clone())?;
+
+            let signed = SignedVote::signed(&validators[0].0, &votes[0]).unwrap();
+            assert!(vote_tally.add_vote(signed)?);
+            let signed = SignedVote::signed(&validators[1].0, &votes[0]).unwrap();
+            assert!(vote_tally.add_vote(signed)?);
+            let signed = SignedVote::signed(&validators[2].0, &votes[1]).unwrap();
+            assert!(vote_tally.add_vote(signed)?);
+
+            assert!(vote_tally.find_quorum()?.is_none());
+
+            Ok(())
+        })
+        .await
+        .unwrap();
     }
 }

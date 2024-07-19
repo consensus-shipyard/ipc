@@ -6,6 +6,7 @@ use anyhow::anyhow;
 use ipc_ipld_resolver::ValidatorKey;
 use libp2p::identity::Keypair;
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 
 pub type Signature = Bytes;
 
@@ -33,12 +34,24 @@ impl TopdownVote {
         Ok(fvm_ipld_encoding::to_vec(self)?)
     }
 
+    pub fn payload(&self) -> &[u8] {
+        self.payload.as_slice()
+    }
+
     pub fn block_height(&self) -> BlockHeight {
         self.block_height
     }
+}
 
-    pub fn ballot(&self) -> &Bytes {
-        &self.ballot
+impl Display for TopdownVote {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "TopdownVote {{ payload = {}, version = {}, block_height = {} }}",
+            hex::encode(self.payload.as_slice()),
+            self.version,
+            self.block_height,
+        )
     }
 }
 
@@ -76,5 +89,17 @@ impl SignedVote {
                 self.pubkey,
             ))
         }
+    }
+}
+
+impl Display for SignedVote {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "SignedVote {{ payload = {}, signature = {}, pubkey = {} }}",
+            hex::encode(self.payload.as_slice()),
+            hex::encode(self.signature.as_slice()),
+            hex::encode(self.pubkey.to_bytes().as_slice()),
+        )
     }
 }
