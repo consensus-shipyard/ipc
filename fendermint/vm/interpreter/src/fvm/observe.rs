@@ -82,9 +82,6 @@ impl_traceables!(
     CheckpointFinalized
 );
 
-/// Hex encoded hash.
-pub type HashHex<'a> = &'a str;
-
 #[derive(Debug)]
 pub struct CheckpointCreated {
     pub height: u64,
@@ -103,7 +100,14 @@ impl Recordable for CheckpointCreated {
 }
 
 #[derive(Debug)]
+pub enum CheckpointSignedRole {
+    Own,
+    Peer,
+}
+
+#[derive(Debug)]
 pub struct CheckpointSigned {
+    pub role: CheckpointSignedRole,
     pub height: u64,
     pub hash: HexEncodableBlockHash,
     pub validator: PublicKey,
@@ -181,6 +185,7 @@ mod tests {
         let secret_key = SecretKey::random(&mut r);
 
         emit(CheckpointSigned {
+            role: CheckpointSignedRole::Own,
             height: 1,
             hash: HexEncodableBlockHash(hash.clone()),
             validator: secret_key.public_key(),

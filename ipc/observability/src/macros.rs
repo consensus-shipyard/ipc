@@ -22,6 +22,10 @@ macro_rules! register_metrics {
 macro_rules! impl_traceable {
     ($struct_name:ident<$lifetime:tt>, $trace_level:expr, $domain:expr) => {
         impl<$lifetime> Traceable for $struct_name<$lifetime> {
+            fn name() -> &'static str {
+                stringify!($struct_name)
+            }
+
             fn trace_level(&self) -> TraceLevel {
                 $trace_level
             }
@@ -33,6 +37,10 @@ macro_rules! impl_traceable {
     };
     ($struct_name:ident, $trace_level:expr, $domain:expr) => {
         impl Traceable for $struct_name {
+            fn name() -> &'static str {
+                stringify!($struct_name)
+            }
+
             fn trace_level(&self) -> TraceLevel {
                 $trace_level
             }

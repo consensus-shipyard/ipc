@@ -13,3 +13,4 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing-appender = { workspace = true }
 hex = { workspace = true }
+anyhow = { workspace = true }

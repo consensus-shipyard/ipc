@@ -5058,6 +5058,7 @@ dependencies = [
 name = "ipc-observability"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "hex",
  "lazy_static",
  "prometheus",

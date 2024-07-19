@@ -24,7 +24,9 @@ use ipc_actors_abis::gateway_getter_facet as getter;
 use ipc_api::staking::ConfigurationNumber;
 use ipc_observability::{emit, serde::HexEncodableBlockHash};
 
-use super::observe::{CheckpointCreated, CheckpointFinalized, CheckpointSigned};
+use super::observe::{
+    CheckpointCreated, CheckpointFinalized, CheckpointSigned, CheckpointSignedRole,
+};
 use super::state::ipc::tokens_to_burn;
 use super::{
     broadcast::Broadcaster,
@@ -256,6 +258,7 @@ where
             .context("failed to broadcast checkpoint signature")?;
 
             emit(CheckpointSigned {
+                role: CheckpointSignedRole::Own,
                 height: height.value(),
                 hash: HexEncodableBlockHash(cp.block_hash.to_vec()),
                 validator: validator_ctx.public_key,
