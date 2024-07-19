@@ -6,6 +6,8 @@ use clap::{builder::PossibleValue, ValueEnum};
 use lazy_static::lazy_static;
 use tracing_subscriber::EnvFilter;
 
+pub use ipc_observability::traces::RotationKind;
+
 /// Standard log levels, or something we can pass to <https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html>
 ///
 /// To be fair all of these could be handled by the `EnvFilter`, even `off`,
@@ -77,5 +79,15 @@ pub fn parse_log_level(s: &str) -> Result<LogLevel, String> {
         Err(e.to_string())
     } else {
         Ok(LogLevel::Filter(s.to_string()))
+    }
+}
+
+pub fn parse_rotation_kind(s: &str) -> Result<RotationKind, String> {
+    match s {
+        "minutely" => Ok(RotationKind::Minutely),
+        "hourly" => Ok(RotationKind::Hourly),
+        "daily" => Ok(RotationKind::Daily),
+        "never" => Ok(RotationKind::Never),
+        _ => Err(format!("invalid rotation kind: {}", s)),
     }
 }

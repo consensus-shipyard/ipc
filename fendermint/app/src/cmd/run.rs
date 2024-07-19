@@ -4,13 +4,11 @@
 use anyhow::{anyhow, bail, Context};
 use async_stm::atomically_or_err;
 use fendermint_abci::ApplicationService;
-use fendermint_app::events::{ParentFinalityVoteAdded, ParentFinalityVoteIgnored};
 use fendermint_app::ipc::{AppParentFinalityQuery, AppVote};
 use fendermint_app::{App, AppConfig, AppStore, BitswapBlockstore};
 use fendermint_app_settings::AccountKind;
 use fendermint_crypto::SecretKey;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
-use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::chain::ChainEnv;
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
@@ -22,7 +20,8 @@ use fendermint_vm_interpreter::{
 };
 use fendermint_vm_resolver::ipld::IpldResolver;
 use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
-use fendermint_vm_topdown::proxy::IPCProviderProxy;
+use fendermint_vm_topdown::observe::register_metrics as register_topdown_metrics;
+use fendermint_vm_topdown::proxy::{IPCProviderProxy, IPCProviderProxyWithLatency};
 use fendermint_vm_topdown::sync::launch_polling_syncer;
 use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
 use fendermint_vm_topdown::{CachedFinalityProvider, IPCParentFinality, Toggle};
@@ -70,6 +69,8 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     // Prometheus metrics
     let metrics_registry = if settings.metrics.enabled {
         let registry = prometheus::Registry::new();
+
+        register_topdown_metrics(&registry).context("failed to register topdown metrics")?;
 
         fendermint_app::metrics::register_app_metrics(&registry)
             .context("failed to register metrics")?;
@@ -249,9 +250,14 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             config = config.with_max_cache_blocks(v);
         }
 
-        let ipc_provider = Arc::new(make_ipc_provider_proxy(&settings)?);
+        let ipc_provider = {
+            let p = make_ipc_provider_proxy(&settings)?;
+            Arc::new(IPCProviderProxyWithLatency::new(p))
+        };
+
         let finality_provider =
             CachedFinalityProvider::uninitialized(config.clone(), ipc_provider.clone()).await?;
+
         let p = Arc::new(Toggle::enabled(finality_provider));
         (p, Some((ipc_provider, config)))
     } else {
@@ -542,13 +548,9 @@ async fn dispatch_vote(
             })
             .await;
 
-            let added = match res {
-                Ok(added) => {
-                    added
-                }
+            match res {
                 Err(e @ VoteError::Equivocation(_, _, _, _)) => {
                     tracing::warn!(error = e.to_string(), "failed to handle vote");
-                    false
                 }
                 Err(e @ (
                       VoteError::Uninitialized // early vote, we're not ready yet
@@ -556,33 +558,11 @@ async fn dispatch_vote(
                     | VoteError::UnexpectedBlock(_, _) // won't happen here
                 )) => {
                     tracing::debug!(error = e.to_string(), "failed to handle vote");
-                    false
+                }
+                _ => {
+                    tracing::debug!("vote handled");
                 }
             };
-
-            let block_height = f.height;
-            let block_hash = &hex::encode(&f.block_hash);
-            let validator = &format!("{:?}", vote.public_key);
-
-            if added {
-                emit!(
-                    DEBUG,
-                    ParentFinalityVoteAdded {
-                        block_height,
-                        block_hash,
-                        validator,
-                    }
-                )
-            } else {
-                emit!(
-                    DEBUG,
-                    ParentFinalityVoteIgnored {
-                        block_height,
-                        block_hash,
-                        validator,
-                    }
-                )
-            }
         }
     }
 }

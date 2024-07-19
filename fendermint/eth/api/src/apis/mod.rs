@@ -121,7 +121,6 @@ pub fn register_methods(server: ServerBuilder<MapRouter>) -> ServerBuilder<MapRo
         newPendingTransactionFilter,
         protocolVersion,
         sendRawTransaction,
-        sendRawTransaction,
         subscribe,
         syncing,
         uninstallFilter,

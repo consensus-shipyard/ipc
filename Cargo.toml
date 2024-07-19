@@ -13,6 +13,7 @@ members = [
   "ipc/provider",
   "ipc/api",
   "ipc/types",
+  "ipc/observability",
 
   # ipld
   "ipld/resolver",
@@ -157,7 +158,11 @@ tokio-util = { version = "0.7.8", features = ["compat"] }
 tokio-tungstenite = { version = "0.18.0", features = ["native-tls"] }
 toml = "0.8"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "registry"] }
+tracing-subscriber = { version = "0.3", features = [
+  "env-filter",
+  "json",
+  "registry",
+] }
 tracing-appender = "0.2.3"
 url = { version = "2.4.1", features = ["serde"] }
 zeroize = "1.6"
@@ -168,6 +173,7 @@ ipc-provider = { path = "ipc/provider" }
 ipc-wallet = { path = "ipc/wallet", features = ["with-ethers"] }
 ipc_ipld_resolver = { path = "ipld/resolver" }
 ipc-types = { path = "ipc/types" }
+ipc-observability = { path = "ipc/observability" }
 ipc_actors_abis = { path = "contracts/binding" }
 
 # Vendored for cross-compilation, see https://github.com/cross-rs/cross/wiki/Recipes#openssl

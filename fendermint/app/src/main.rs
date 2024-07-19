@@ -3,73 +3,18 @@
 
 pub use fendermint_app_options as options;
 pub use fendermint_app_settings as settings;
-use tracing_appender::{
-    non_blocking::WorkerGuard,
-    rolling::{RollingFileAppender, Rotation},
-};
-use tracing_subscriber::fmt::format::FmtSpan;
-use tracing_subscriber::{fmt, layer::SubscriberExt, Layer};
+use ipc_observability::traces::{register_tracing_subscriber, WorkerGuard};
 
 mod cmd;
 
 fn init_tracing(opts: &options::Options) -> Option<WorkerGuard> {
-    let console_filter = opts.log_console_filter().expect("invalid filter");
-    let file_filter = opts.log_file_filter().expect("invalid filter");
+    let console_filter = opts
+        .log_console_filter()
+        .expect("invalid console level filter");
+    let file_filter = opts.log_file_filter().expect("invalid file level filter");
+    let file_config = opts.log_file_config();
 
-    // log all traces to stderr (reserving stdout for any actual output such as from the CLI commands)
-    let console_layer = fmt::layer()
-        .with_writer(std::io::stderr)
-        .with_target(false)
-        .with_file(true)
-        .with_line_number(true)
-        .with_filter(console_filter);
-
-    // add a file layer if log_dir is set
-    let (file_layer, file_guard) = match &opts.log_dir {
-        Some(log_dir) => {
-            let filename = match &opts.log_file_prefix {
-                Some(prefix) => format!("{}-{}", prefix, "fendermint"),
-                None => "fendermint".to_string(),
-            };
-
-            let appender = RollingFileAppender::builder()
-                .filename_prefix(filename)
-                .filename_suffix("log")
-                .rotation(Rotation::DAILY)
-                .max_log_files(7)
-                .build(log_dir)
-                .expect("failed to initialize rolling file appender");
-
-            let (non_blocking, file_guard) = tracing_appender::non_blocking(appender);
-
-            let file_layer = fmt::layer()
-                .json()
-                .with_writer(non_blocking)
-                .with_span_events(FmtSpan::CLOSE)
-                .with_target(false)
-                .with_file(true)
-                .with_line_number(true)
-                .with_filter(file_filter);
-
-            (Some(file_layer), Some(file_guard))
-        }
-        None => (None, None),
-    };
-
-    let metrics_layer = if opts.metrics_enabled() {
-        Some(fendermint_app::metrics::layer())
-    } else {
-        None
-    };
-
-    let registry = tracing_subscriber::registry()
-        .with(console_layer)
-        .with(file_layer)
-        .with(metrics_layer);
-
-    tracing::subscriber::set_global_default(registry).expect("Unable to set a global collector");
-
-    file_guard
+    register_tracing_subscriber(console_filter, file_filter, file_config)
 }
 
 /// Install a panic handler that prints stuff to the logs, otherwise it only shows up in the console.
