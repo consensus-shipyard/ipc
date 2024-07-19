@@ -4,7 +4,6 @@
 use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
 
-use fendermint_vm_interpreter::errors::ProcessError;
 use fendermint_vm_interpreter::fvm::FvmMessage;
 use tendermint::account::Id;
 
@@ -26,7 +25,7 @@ register_metrics! {
         = register_counter_vec!("proposals_block_proposal_rejected", "Block proposal rejected", &["height"]);
     PROPOSALS_BLOCK_COMMITTED: CounterVec
         = register_counter_vec!("proposals_block_committed", "Block committed", &["height"]);
-    MPOOL_RECEIVED: CounterVec = register_counter_vec!("mpool_received", "Mpool received", &["accept", "from"]);
+    MPOOL_RECEIVED: CounterVec = register_counter_vec!("mpool_received", "Mpool received", &["accept"]);
 }
 
 impl_traceables!(
@@ -83,7 +82,7 @@ pub struct BlockProposalEvaluated<'a> {
     pub tx_count: usize,
     pub validator: &'a Id,
     pub accept: bool,
-    pub reason: Option<ProcessError>,
+    pub reason: Option<&'a str>,
 }
 
 impl Recordable for BlockProposalEvaluated<'_> {
@@ -148,14 +147,8 @@ pub struct MpoolReceived {
 
 impl Recordable for MpoolReceived {
     fn record_metrics(&self) {
-        let from = self
-            .message
-            .as_ref()
-            .map(|m| m.from.to_string())
-            .unwrap_or("".to_string());
-
         MPOOL_RECEIVED
-            .with_label_values(&[&self.accept.to_string(), &from])
+            .with_label_values(&[&self.accept.to_string()])
             .inc();
     }
 }
@@ -201,7 +194,7 @@ mod tests {
             tx_count: 10,
             validator: &id,
             accept: false,
-            reason: Some(ProcessError::CheckpointNotResolved),
+            reason: None,
         });
 
         emit(BlockCommitted {

@@ -26,8 +26,7 @@ use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
 use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmGenesisOutput, PowerUpdates};
 use fendermint_vm_interpreter::signed::InvalidSignature;
 use fendermint_vm_interpreter::{
-    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProcessResult, ProposalInterpreter,
-    QueryInterpreter,
+    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
 };
 use fendermint_vm_message::query::FvmQueryHeight;
 use fendermint_vm_snapshot::{SnapshotClient, SnapshotError};
@@ -691,10 +690,11 @@ where
         let size_txs = txs.iter().map(|tx| tx.len()).sum::<usize>();
         let num_txs = txs.len();
 
-        let process_result = self
+        let accept = self
             .interpreter
             .process(self.chain_env.clone(), txs)
-            .await?;
+            .await
+            .context("failed to process proposal")?;
 
         emit(BlockProposalReceived {
             height: request.height.value(),
@@ -704,27 +704,21 @@ where
             validator: &request.proposer_address,
         });
 
-        let mut proposal_evaluated = BlockProposalEvaluated {
+        emit(BlockProposalEvaluated {
             height: request.height.value(),
             hash: HexEncodableBlockHash(request.hash.into()),
             size: size_txs,
             tx_count: num_txs,
             validator: &request.proposer_address,
-            accept: true,
+            accept,
             reason: None,
-        };
+        });
 
-        let process_proposal = match process_result {
-            ProcessResult::Accepted => response::ProcessProposal::Accept,
-            ProcessResult::Rejected(reason) => {
-                proposal_evaluated.accept = false;
-                proposal_evaluated.reason = Some(reason);
-                response::ProcessProposal::Reject
-            }
-        };
-
-        emit(proposal_evaluated);
-        Ok(process_proposal)
+        if accept {
+            Ok(response::ProcessProposal::Accept)
+        } else {
+            Ok(response::ProcessProposal::Reject)
+        }
     }
 
     /// Signals the beginning of a new block, prior to any `DeliverTx` calls.

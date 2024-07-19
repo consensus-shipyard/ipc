@@ -4,7 +4,6 @@ use async_trait::async_trait;
 
 pub mod bytes;
 pub mod chain;
-pub mod errors;
 pub mod fvm;
 pub mod signed;
 
@@ -26,17 +25,6 @@ pub trait GenesisInterpreter: Sync + Send {
         state: Self::State,
         genesis: Self::Genesis,
     ) -> anyhow::Result<(Self::State, Self::Output)>;
-}
-
-pub enum ProcessResult {
-    Accepted,
-    Rejected(errors::ProcessError),
-}
-
-impl ProcessResult {
-    pub fn is_accepted(&self) -> bool {
-        matches!(self, ProcessResult::Accepted)
-    }
 }
 
 /// Prepare and process transaction proposals.
@@ -66,11 +54,7 @@ pub trait ProposalInterpreter: Sync + Send {
     /// This is our chance check whether CIDs proposed for execution are available.
     ///
     /// Return `true` if we can accept this block, `false` to reject it.
-    async fn process(
-        &self,
-        state: Self::State,
-        msgs: Vec<Self::Message>,
-    ) -> anyhow::Result<ProcessResult>;
+    async fn process(&self, state: Self::State, msgs: Vec<Self::Message>) -> anyhow::Result<bool>;
 }
 
 /// The `ExecInterpreter` applies messages on some state, which is
