@@ -4,10 +4,6 @@
 use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
 
-<<<<<<< HEAD
-=======
-use fendermint_vm_interpreter::errors::ProcessError;
->>>>>>> e7e7cb5c (feat: address comments)
 use fendermint_vm_interpreter::fvm::FvmMessage;
 use tendermint::account::Id;
 
@@ -158,11 +154,7 @@ impl Recordable for MpoolReceived {
             .unwrap_or("".to_string());
 
         MPOOL_RECEIVED
-<<<<<<< HEAD
             .with_label_values(&[&self.accept.to_string()])
-=======
-            .with_label_values(&[&self.accept.to_string(), &from])
->>>>>>> e7e7cb5c (feat: address comments)
             .inc();
     }
 }

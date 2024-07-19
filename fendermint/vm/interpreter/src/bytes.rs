@@ -9,10 +9,8 @@ use fvm_ipld_encoding::Error as IpldError;
 
 use crate::{
     chain::{ChainMessageApplyRet, ChainMessageCheckRes},
-    errors::ProcessError,
     fvm::{FvmQuery, FvmQueryRet},
-    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProcessResult, ProposalInterpreter,
-    QueryInterpreter,
+    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
 };
 
 pub type BytesMessageApplyRes = Result<ChainMessageApplyRet, IpldError>;
@@ -127,19 +125,13 @@ where
     }
 
     /// Parse messages in the block, reject if unknown format. Pass the rest to the inner `ChainMessage` interpreter.
-    async fn process(
-        &self,
-        state: Self::State,
-        msgs: Vec<Self::Message>,
-    ) -> anyhow::Result<ProcessResult> {
+    async fn process(&self, state: Self::State, msgs: Vec<Self::Message>) -> anyhow::Result<bool> {
         if msgs.len() > self.max_msgs {
             tracing::warn!(
                 block_msgs = msgs.len(),
                 "rejecting block: too many messages"
             );
-            return Ok(ProcessResult::Rejected(ProcessError::TooManyMessages(
-                msgs.len(),
-            )));
+            return Ok(false);
         }
 
         let mut chain_msgs = Vec::new();
@@ -160,9 +152,7 @@ where
                         "failed to decode message in proposal as ChainMessage"
                     );
                     if self.reject_malformed_proposal {
-                        return Ok(ProcessResult::Rejected(
-                            ProcessError::FailedToDecodeMessage(e.to_string()),
-                        ));
+                        return Ok(false);
                     }
                 }
                 Ok(msg) => chain_msgs.push(msg),
