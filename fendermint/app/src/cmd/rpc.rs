@@ -31,8 +31,8 @@ use tendermint_rpc::HttpClient;
 use fendermint_rpc::message::{GasParams, SignedMessageFactory};
 use fendermint_rpc::{client::FendermintClient, query::QueryClient};
 use fendermint_vm_actor_interface::eam::{self, CreateReturn, EthAddress};
+use ipc_observability::config::TracingSettings;
 use ipc_observability::traces::set_global_tracing_subscriber;
-use ipc_observability::traces_settings::TracesSettings;
 
 use crate::cmd;
 use crate::options::rpc::{BroadcastMode, FevmArgs, RpcFevmCommands, TransArgs};
@@ -42,7 +42,7 @@ use super::key::read_secret_key;
 
 cmd! {
   RpcArgs(self) {
-    let _trace_file_guard = set_global_tracing_subscriber(&TracesSettings::default());
+    let _trace_file_guard = set_global_tracing_subscriber(&TracingSettings::default());
 
     let client = FendermintClient::new_http(self.url.clone(), self.proxy_url.clone())?;
     match self.command.clone() {

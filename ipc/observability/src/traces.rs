@@ -6,10 +6,11 @@ use tracing::Level;
 pub use tracing_appender::non_blocking;
 pub use tracing_appender::non_blocking::WorkerGuard;
 use tracing_appender::rolling::RollingFileAppender;
-use tracing_subscriber::{fmt, fmt::Subscriber, layer::SubscriberExt, Layer, LogLevel};
+use tracing_subscriber::{fmt, fmt::Subscriber, layer::SubscriberExt, Layer};
 
-use crate::traces_settings::{FileLayerSettings, TracesSettings};
+use crate::config::{FileLayerSettings, LogLevel, TracingSettings};
 use crate::tracing_layers::DomainEventFilterLayer;
+use tracing_subscriber::filter::EnvFilter;
 
 //
 pub fn create_temporary_subscriber() -> Subscriber {
@@ -21,10 +22,10 @@ pub fn create_temporary_subscriber() -> Subscriber {
         .finish()
 }
 
-pub fn set_global_tracing_subscriber(config: &TracesSettings) -> Option<WorkerGuard> {
-    let console_filter = match config.console {
+pub fn set_global_tracing_subscriber(config: &TracingSettings) -> Option<WorkerGuard> {
+    let console_filter = match &config.console {
         Some(console_settings) => console_settings.level_to_filter(),
-        None => LogLevel::default().to_filter(),
+        None => EnvFilter::default(),
     };
 
     // log all traces to stderr (reserving stdout for any actual output such as from the CLI commands)
@@ -35,9 +36,9 @@ pub fn set_global_tracing_subscriber(config: &TracesSettings) -> Option<WorkerGu
         .with_line_number(true)
         .with_filter(console_filter);
 
-    let (file_layer, file_guard) = match config.file {
+    let (file_layer, file_guard) = match &config.file {
         Some(file_settings) if file_settings.enabled => {
-            let (non_blocking, file_guard) = non_blocking(create_file_appender(&file_settings));
+            let (non_blocking, file_guard) = non_blocking(create_file_appender(file_settings));
 
             let file_layer = fmt::layer()
                 .json()
@@ -94,7 +95,7 @@ fn create_file_appender(settings: &FileLayerSettings) -> RollingFileAppender {
 
     if let Some(rotation_kind) = &settings.rotation {
         println!("rotation kind: {:?}", rotation_kind);
-        appender = appender.rotation(rotation_kind.to_tracing_rotation());
+        appender = appender.rotation(rotation_kind.into());
     };
 
     appender

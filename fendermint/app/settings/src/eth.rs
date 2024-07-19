@@ -10,7 +10,7 @@ use serde_with::{serde_as, DurationSeconds};
 use std::time::Duration;
 use tower_http::cors::{AllowHeaders, AllowMethods, AllowOrigin};
 
-use ipc_observability::traces_settings::TracesSettings;
+use ipc_observability::config::TracingSettings;
 
 use crate::{IsHumanReadable, MetricsSettings, SocketAddress};
 
@@ -26,7 +26,7 @@ pub struct EthSettings {
     pub max_nonce_gap: u64,
     pub metrics: MetricsSettings,
     pub cors: CorsOpt,
-    pub tracing: TracesSettings,
+    pub tracing: TracingSettings,
 }
 
 #[serde_as]
