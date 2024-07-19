@@ -147,12 +147,6 @@ pub struct MpoolReceived {
 
 impl Recordable for MpoolReceived {
     fn record_metrics(&self) {
-        let from = self
-            .message
-            .as_ref()
-            .map(|m| m.from.to_string())
-            .unwrap_or("".to_string());
-
         MPOOL_RECEIVED
             .with_label_values(&[&self.accept.to_string()])
             .inc();
