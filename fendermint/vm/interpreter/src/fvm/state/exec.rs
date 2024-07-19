@@ -176,13 +176,11 @@ where
 
     /// Execute message implicitly.
     pub fn execute_implicit(&mut self, msg: Message) -> ExecResult {
-        // TODO Karel - measure here
         self.execute_message(msg, ApplyKind::Implicit)
     }
 
     /// Execute message explicitly.
     pub fn execute_explicit(&mut self, msg: Message) -> ExecResult {
-        // TODO Karel - measure here
         self.execute_message(msg, ApplyKind::Explicit)
     }
 

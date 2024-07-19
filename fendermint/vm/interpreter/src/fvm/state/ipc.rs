@@ -315,7 +315,7 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         height: u64,
     ) -> anyhow::Result<Vec<EthAddress>> {
         let (_, _, addrs, _) = self.getter.call(state, |c| {
-            c.get_checkpoint_signature_bundle(et::U256::from(height))
+            c.get_checkpoint_signature_bundle(ethers::types::U256::from(height))
         })?;
 
         let addrs = addrs.into_iter().map(|a| a.into()).collect();
