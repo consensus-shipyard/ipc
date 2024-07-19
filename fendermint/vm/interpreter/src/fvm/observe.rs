@@ -79,7 +79,7 @@ impl_traceables!(
     "Bottomup",
     CheckpointCreated,
     CheckpointSigned,
-    CheckpointFinalized
+    CheckpointCommitted
 );
 
 #[derive(Debug)]
@@ -122,12 +122,12 @@ impl Recordable for CheckpointSigned {
 }
 
 #[derive(Debug)]
-pub struct CheckpointFinalized {
+pub struct CheckpointCommitted {
     pub height: i64,
     pub hash: HexEncodableBlockHash,
 }
 
-impl Recordable for CheckpointFinalized {
+impl Recordable for CheckpointCommitted {
     fn record_metrics(&self) {
         BOTTOMUP_CHECKPOINT_FINALIZED_HEIGHT.set(self.height);
     }
