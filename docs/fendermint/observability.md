@@ -21,7 +21,7 @@ The observability framework operates by introducing events and metrics that allo
 - **Alerting**: Allows for the setup of alerts based on specific metric thresholds, ensuring timely responses to potential problems.
 - **Ease of Use**: The `ipc-observability` crate simplifies the integration of observability features, reducing the effort required to instrument the code.
 
-By leveraging this observability framework, developers can gain valuable insights into their systems, leading to improved reliability, performance, and overall system health.
+By leveraging this observability framework, developers can gain valuable insights into their systems, leading to improved reliability, performance, and ov
 
 ## Metrics
 
@@ -302,3 +302,55 @@ Represents an error that occurs during tracing.
 **Affects metrics:**
 
 - `tracing_errors`
+
+## Configuration
+
+### Metrics Configuration
+
+The metrics can be configured via the configuration file for `Fendermint`. You can enable metrics and specify the listening host and port as follows:
+
+````toml
+[metrics]
+enabled = true
+
+[metrics.listen]
+host = "127.0.0.1"
+port = 9184
+For Ethereum metrics, you can configure them similarly:
+
+```toml
+[eth.metrics]
+enabled = true
+````
+
+## Tracing Configuration
+
+Tracing can also be configured via the configuration file for `Fendermint`. You can set the tracing level and specify whether to log to console or file.
+
+### Console Tracing
+
+Example config:
+
+```toml
+[tracing]
+
+[tracing.console]
+level = "trace" # Options: off, error, warn, info, debug, trace (default: trace)
+```
+
+### File Tracing
+
+Example config:
+
+```toml
+[tracing.file]
+enabled = true # Options: true, false
+level = "trace" # Options: off, error, warn, info, debug, trace (default: trace)
+directory = "/path/to/log/directory"
+max_log_files = 5 # Number of files to keep after rotation
+rotation = "daily" # Options: minutely, hourly, daily, never
+domain_filter = "Bottomup, Proposals, Mpool, Execution, Topdown, TracingError"
+events_filter = "ParentFinalityAcquired, ParentRpcCalled"
+```
+
+By configuring these options, you can control the behavior of metrics and tracing, enabling fine-grained monitoring and logging for your application.
