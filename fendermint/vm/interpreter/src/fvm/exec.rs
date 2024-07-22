@@ -16,7 +16,7 @@ use crate::ExecInterpreter;
 
 use super::{
     checkpoint::{self, PowerUpdates},
-    observe::{CheckpointCommitted, MsgExec, MsgExecPurpose},
+    observe::{CheckpointFinalized, MsgExec, MsgExecPurpose},
     state::FvmExecState,
     FvmMessage, FvmMessageInterpreter,
 };
@@ -189,7 +189,7 @@ where
         let _ = checkpoint::emit_trace_if_check_checkpoint_finalized(&self.gateway, &mut state)
             .inspect_err(|e| {
                 emit(TracingError {
-                    affected_event: CheckpointCommitted::name(),
+                    affected_event: CheckpointFinalized::name(),
                     reason: e.to_string(),
                 });
             });

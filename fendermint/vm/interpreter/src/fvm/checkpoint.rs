@@ -25,7 +25,7 @@ use ipc_api::staking::ConfigurationNumber;
 use ipc_observability::{emit, serde::HexEncodableBlockHash};
 
 use super::observe::{
-    CheckpointCommitted, CheckpointCreated, CheckpointSigned, CheckpointSignedRole,
+    CheckpointFinalized, CheckpointCreated, CheckpointSigned, CheckpointSignedRole,
 };
 use super::state::ipc::tokens_to_burn;
 use super::{
@@ -320,7 +320,7 @@ where
     let checkpoint_quorum = gateway.checkpoint_info(state, block_height)?;
 
     if checkpoint_quorum.reached {
-        emit(CheckpointCommitted {
+        emit(CheckpointFinalized {
             height: block_height,
             hash: HexEncodableBlockHash(block_hash.to_vec()),
         })

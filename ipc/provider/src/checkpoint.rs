@@ -4,7 +4,7 @@
 
 use crate::config::Subnet;
 use crate::manager::{BottomUpCheckpointRelayer, EthSubnetManager};
-use crate::observe::CheckpointFinalized;
+use crate::observe::CheckpointSubmitted;
 use anyhow::{anyhow, Result};
 use futures_util::future::try_join_all;
 use fvm_shared::address::Address;
@@ -208,7 +208,7 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                         Self::submit_checkpoint(parent_handler_clone, submitter, bundle, event)
                             .await
                             .inspect(|_| {
-                                emit(CheckpointFinalized {
+                                emit(CheckpointSubmitted {
                                     height,
                                     hash: HexEncodableBlockHash(hash),
                                 });

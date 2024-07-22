@@ -12,15 +12,15 @@ register_metrics! {
         = register_int_gauge!("bottomup_checkpoint_finalized_height", "Height of the checkpoint finalized");
 }
 
-impl_traceables!(TraceLevel::Info, "Bottomup", CheckpointFinalized);
+impl_traceables!(TraceLevel::Info, "Bottomup", CheckpointSubmitted);
 
 #[derive(Debug)]
-pub struct CheckpointFinalized {
+pub struct CheckpointSubmitted {
     pub height: i64,
     pub hash: HexEncodableBlockHash,
 }
 
-impl Recordable for CheckpointFinalized {
+impl Recordable for CheckpointSubmitted {
     fn record_metrics(&self) {
         BOTTOMUP_CHECKPOINT_FINALIZED_HEIGHT.set(self.height);
     }
@@ -41,7 +41,7 @@ mod tests {
     fn test_emit() {
         let hash = vec![0x01, 0x02, 0x03];
 
-        emit(CheckpointFinalized {
+        emit(CheckpointSubmitted {
             height: 1,
             hash: HexEncodableBlockHash(hash.clone()),
         });
