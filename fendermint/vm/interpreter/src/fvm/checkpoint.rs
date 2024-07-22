@@ -317,6 +317,8 @@ where
         .ok_or_else(|| anyhow!("block hash not set"))?;
 
     // Check if the checkpoint has been finalized.
+    // If no checkpoint was emitted at this height, the QuorumInfo struct will carry zero values,
+    // including reached=false.
     let checkpoint_quorum = gateway.checkpoint_info(state, block_height)?;
 
     if checkpoint_quorum.reached {
