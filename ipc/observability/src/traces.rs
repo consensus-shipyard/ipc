@@ -8,11 +8,11 @@ pub use tracing_appender::non_blocking::WorkerGuard;
 use tracing_appender::rolling::RollingFileAppender;
 use tracing_subscriber::{fmt, fmt::Subscriber, layer::SubscriberExt, Layer};
 
-use crate::config::{FileLayerSettings, LogLevel, TracingSettings};
+use crate::config::{FileLayerSettings, TracingSettings};
 use crate::tracing_layers::DomainEventFilterLayer;
 use tracing_subscriber::filter::EnvFilter;
 
-//
+// Creates a temporary subscriber that logs all traces to stderr. Useful when global tracing is not set yet.
 pub fn create_temporary_subscriber() -> Subscriber {
     tracing_subscriber::FmtSubscriber::builder()
         .with_max_level(Level::TRACE)
@@ -22,6 +22,7 @@ pub fn create_temporary_subscriber() -> Subscriber {
         .finish()
 }
 
+// Sets a global tracing subscriber with the given configuration. Returns a guard that can be used to drop the subscriber.
 pub fn set_global_tracing_subscriber(config: &TracingSettings) -> Option<WorkerGuard> {
     let console_filter = match &config.console {
         Some(console_settings) => console_settings.level_to_filter(),
@@ -95,7 +96,8 @@ fn create_file_appender(settings: &FileLayerSettings) -> RollingFileAppender {
 
     if let Some(rotation_kind) = &settings.rotation {
         println!("rotation kind: {:?}", rotation_kind);
-        appender = appender.rotation(rotation_kind.into());
+        let rotation: tracing_appender::rolling::Rotation = rotation_kind.clone().into();
+        appender = appender.rotation(rotation);
     };
 
     appender

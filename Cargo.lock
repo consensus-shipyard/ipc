@@ -2886,7 +2886,6 @@ dependencies = [
  "fvm_shared",
  "hex",
  "ipc-api",
- "ipc-metrics",
  "ipc-observability",
  "ipc-provider",
  "ipc_ipld_resolver",
@@ -5074,19 +5073,7 @@ dependencies = [
  "prometheus",
  "serde",
  "serde_with 2.3.3",
- "tracing",
- "tracing-appender",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "ipc-observability"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "hex",
- "lazy_static",
- "prometheus",
+ "strum 0.26.1",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
