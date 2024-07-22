@@ -9,14 +9,14 @@ use fendermint_vm_actor_interface::{chainmetadata, cron, system};
 use fvm::executor::ApplyRet;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::{address::Address, ActorID, MethodNum, BLOCK_GAS_LIMIT};
-use ipc_observability::{emit, measure_time};
+use ipc_observability::{emit, measure_time, observe::TracingError, Traceable};
 use tendermint_rpc::Client;
 
 use crate::ExecInterpreter;
 
 use super::{
     checkpoint::{self, PowerUpdates},
-    observe::{MsgExec, MsgExecPurpose},
+    observe::{CheckpointFinalized, MsgExec, MsgExecPurpose},
     state::FvmExecState,
     FvmMessage, FvmMessageInterpreter,
 };
@@ -186,6 +186,15 @@ where
     }
 
     async fn end(&self, mut state: Self::State) -> anyhow::Result<(Self::State, Self::EndOutput)> {
+        // TODO: Consider doing this async, since it's purely informational and not consensus-critical.
+        let _ = checkpoint::emit_trace_if_check_checkpoint_finalized(&self.gateway, &mut state)
+            .inspect_err(|e| {
+                emit(TracingError {
+                    affected_event: CheckpointFinalized::name(),
+                    reason: e.to_string(),
+                });
+            });
+
         let updates = if let Some((checkpoint, updates)) =
             checkpoint::maybe_create_checkpoint(&self.gateway, &mut state)
                 .context("failed to create checkpoint")?

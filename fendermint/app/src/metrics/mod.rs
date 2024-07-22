@@ -3,5 +3,4 @@
 
 mod prometheus;
 
-pub use prometheus::app::register_metrics as register_app_metrics;
 pub use prometheus::eth::register_metrics as register_eth_metrics;
