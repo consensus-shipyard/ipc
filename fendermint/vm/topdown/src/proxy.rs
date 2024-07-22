@@ -128,6 +128,7 @@ impl IPCProviderProxyWithLatency {
         Self { inner }
     }
 }
+
 #[async_trait]
 impl ParentQueryProxy for IPCProviderProxyWithLatency {
     #[instrument(skip(self))]

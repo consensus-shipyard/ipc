@@ -108,9 +108,9 @@ impl FileLayerSettings {
     }
 }
 
-fn level_to_filter(level: &Option<LogLevel>) -> EnvFilter {
+pub fn level_to_filter(level: &Option<LogLevel>) -> EnvFilter {
     match level {
         Some(level) => level.to_filter().unwrap_or_default(),
-        None => EnvFilter::default(),
+        None => LogLevel::Trace.to_filter().unwrap_or_default(),
     }
 }

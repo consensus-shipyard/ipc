@@ -8,9 +8,8 @@ pub use tracing_appender::non_blocking::WorkerGuard;
 use tracing_appender::rolling::RollingFileAppender;
 use tracing_subscriber::{fmt, fmt::Subscriber, layer::SubscriberExt, Layer};
 
-use crate::config::{FileLayerSettings, TracingSettings};
+use crate::config::{level_to_filter, FileLayerSettings, TracingSettings};
 use crate::tracing_layers::DomainEventFilterLayer;
-use tracing_subscriber::filter::EnvFilter;
 
 // Creates a temporary subscriber that logs all traces to stderr. Useful when global tracing is not set yet.
 pub fn create_temporary_subscriber() -> Subscriber {
@@ -26,7 +25,7 @@ pub fn create_temporary_subscriber() -> Subscriber {
 pub fn set_global_tracing_subscriber(config: &TracingSettings) -> Option<WorkerGuard> {
     let console_filter = match &config.console {
         Some(console_settings) => console_settings.level_to_filter(),
-        None => EnvFilter::default(),
+        None => level_to_filter(&None),
     };
 
     // log all traces to stderr (reserving stdout for any actual output such as from the CLI commands)
