@@ -8,7 +8,7 @@ use jsonrpc_v2::Data;
 use std::{net::ToSocketAddrs, sync::Arc, time::Duration};
 use tower_http::cors::{AllowHeaders, AllowMethods, AllowOrigin, CorsLayer};
 
-mod apis;
+pub mod apis;
 mod cache;
 mod client;
 mod conv;

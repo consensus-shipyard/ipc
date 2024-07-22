@@ -2,14 +2,14 @@
 pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
-import "../../src/lib/CrossMsgHelper.sol";
-import "../../src/lib/SubnetIDHelper.sol";
-import "../../src/lib/FvmAddressHelper.sol";
-import {FvmAddress} from "../../src/structs/FvmAddress.sol";
-import {SupplySource} from "../../src/structs/Subnet.sol";
-import {IpcMsgKind, CallMsg} from "../../src/structs/CrossNet.sol";
+import "../../contracts/lib/CrossMsgHelper.sol";
+import "../../contracts/lib/SubnetIDHelper.sol";
+import "../../contracts/lib/FvmAddressHelper.sol";
+import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
+import {SupplySource} from "../../contracts/structs/Subnet.sol";
+import {IpcMsgKind, CallMsg} from "../../contracts/structs/CrossNet.sol";
 
-import "openzeppelin-contracts/utils/Address.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 
 contract CrossMsgHelperTest is Test {
     using SubnetIDHelper for SubnetID;

@@ -79,8 +79,8 @@ jobs:
     uses: ./.github/workflows/contracts-storage.yaml
     needs: [contracts-prettier]
 
-  contracts-npm-audit:
-    uses: ./.github/workflows/contracts-npm-audit.yaml
+  contracts-pnpm-audit:
+    uses: ./.github/workflows/contracts-pnpm-audit.yaml
     needs: [contracts-prettier]
 
   contracts-sast:

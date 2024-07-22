@@ -72,3 +72,47 @@ The image can be pulled with the following command:
 ```bash
 docker pull ghcr.io/consensus-shipyard/fendermint:latest
 ```
+
+## Configuration
+
+The [settings](./app/settings/) contains the configuration options for the `fendermint` application, for which the defaults are in the [config](./app/config/) directory. The [options](./app/options/) crate contains CLI parameters only; out of these only the `run` and the `eth` commands use the configuration settings.
+
+`fendermint` can be configured using either a configuration file, or using environmnet variables.
+
+### Config files
+
+The default configuration is in [default.toml](./app/config/default.toml). This file is copied into the `fendermint` docker image and should not be edited, so that any further releases can provide any new keys with default values necessary for the application to start; instead the operator can provide further partial configuration files to override the defaults.
+
+The [Settings::config](./app/settings/src/lib.rs) method expects the following files in a configuration directory:
+* `default.toml` with the settings for the keys that have meaningful default values
+* `<mode>.toml` is an optional file correponding to the `--mode` CLI option (by default `dev`); these are files that could be checked into Github e.g. to have values for production or test environments
+* `local.toml` is also optional with potential overrides specific to the developer's machine
+
+An example of this override is the [test.toml](./app/config/test.toml) file which contains keys that do not have meaningful defaults, for the purpose of testing the parsing logic.
+
+#### Config directory
+
+The location of the configuration directory is determined by [Options::config_dir](./app/options/src/lib.rs) in the following way: The optional `--config-dir` CLI parameter can be used to set it directly. If it's missing, the default is the `config` directory under the `--home-dir` CLI parameter, which by default is `~/.fendermint`. The `FM_CONFIG_DIR` and `FM_HOME_DIR` env vars are also recognised.
+
+The `--config-dir` can be used in combination with `--home-dir` and the pre-build docker image to:
+1. set `--home-dir` to a custom mounted volume where the data files can persist
+2. set `--config-dir` to `/fendermint/config`, which is where the `runner.Dockerfile` places the `default.toml` file
+3. mount any custom config files next to `default.toml` in the container
+
+This way the `default.toml` that the image comes with is always active. Without setting `--config-dir` the operator would have to put it in the mounted `--home-dir`.
+
+Alternatively individual paths for the relative directories inside the config can be mounted, e.g. `/fendermint/data`, `/fendermint/snapshots`, etc.
+
+### Environment Variables
+
+Every setting in the config file can be overridden by an environment variable using the `FM_` prefix and `__` path separator.
+
+For example if the TOML file has a setting such as this:
+
+```toml
+[abci]
+[abci.listen]
+host = "127.0.0.1
+```
+
+Then the corresponding environment variable would be `FM_ABCI__LISTEN__HOST=0.0.0.0`. Basically every `.` becomes `__`. If a field name contains `_` that stays as it is, e.g. `FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES`.

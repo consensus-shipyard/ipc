@@ -38,6 +38,7 @@ pub mod config;
 pub mod jsonrpc;
 pub mod lotus;
 pub mod manager;
+pub mod observe;
 
 const DEFAULT_REPO_PATH: &str = ".ipc";
 const DEFAULT_CONFIG_NAME: &str = "config.toml";

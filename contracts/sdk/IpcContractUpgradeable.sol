@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {IpcEnvelope, ResultMsg, CallMsg, IpcMsgKind} from "../src/structs/CrossNet.sol";
-import {IPCAddress} from "../src/structs/Subnet.sol";
-import {EMPTY_BYTES} from "../src/constants/Constants.sol";
-import {IGateway} from "../src/interfaces/IGateway.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import {IpcEnvelope, ResultMsg, CallMsg, IpcMsgKind} from "../contracts/structs/CrossNet.sol";
+import {IPCAddress} from "../contracts/structs/Subnet.sol";
+import {EMPTY_BYTES} from "../contracts/constants/Constants.sol";
+import {IGateway} from "../contracts/interfaces/IGateway.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-import {CrossMsgHelper} from "../src/lib/CrossMsgHelper.sol";
+import {CrossMsgHelper} from "../contracts/lib/CrossMsgHelper.sol";
 
 import {IIpcHandler} from "./interfaces/IIpcHandler.sol";
 

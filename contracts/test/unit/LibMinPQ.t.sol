@@ -3,9 +3,9 @@ pragma solidity ^0.8.23;
 
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
-import {MinPQ, LibMinPQ} from "../../src/lib/priority/LibMinPQ.sol";
-import {LibValidatorSet} from "../../src/lib/LibStaking.sol";
-import {ValidatorSet} from "../../src/structs/Subnet.sol";
+import {MinPQ, LibMinPQ} from "../../contracts/lib/priority/LibMinPQ.sol";
+import {LibValidatorSet} from "../../contracts/lib/LibStaking.sol";
+import {ValidatorSet} from "../../contracts/structs/Subnet.sol";
 
 contract LibMinPQTest is Test {
     using LibValidatorSet for ValidatorSet;

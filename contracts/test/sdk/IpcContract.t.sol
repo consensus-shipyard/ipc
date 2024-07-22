@@ -4,18 +4,18 @@ pragma solidity ^0.8.23;
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-import "../../src/errors/IPCErrors.sol";
-import {IpcEnvelope, CallMsg, ResultMsg, IpcMsgKind, OutcomeType} from "../../src/structs/CrossNet.sol";
-import {FvmAddress} from "../../src/structs/FvmAddress.sol";
-import {SubnetID, Subnet, IPCAddress, Validator} from "../../src/structs/Subnet.sol";
-import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
-import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
-import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
+import "../../contracts/errors/IPCErrors.sol";
+import {IpcEnvelope, CallMsg, ResultMsg, IpcMsgKind, OutcomeType} from "../../contracts/structs/CrossNet.sol";
+import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
+import {SubnetID, Subnet, IPCAddress, Validator} from "../../contracts/structs/Subnet.sol";
+import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
+import {FvmAddressHelper} from "../../contracts/lib/FvmAddressHelper.sol";
+import {CrossMsgHelper} from "../../contracts/lib/CrossMsgHelper.sol";
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {IpcExchange} from "../../sdk/IpcContract.sol";
 import {IIpcHandler} from "../../sdk/interfaces/IIpcHandler.sol";
-import {IGateway} from "../../src/interfaces/IGateway.sol";
-import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
+import {IGateway} from "../../contracts/interfaces/IGateway.sol";
+import {CrossMsgHelper} from "../../contracts/lib/CrossMsgHelper.sol";
 
 interface Foo {
     function foo(string calldata) external returns (string memory);

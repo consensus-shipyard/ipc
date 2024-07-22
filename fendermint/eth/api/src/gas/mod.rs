@@ -64,12 +64,28 @@ pub fn median_gas_premium(prices: &mut [(TokenAmount, i64)], block_gas_target: i
         }
     }
 
-    let mut premium = prev1;
-
-    if prev2 != TokenAmount::zero() {
-        premium += &prev2;
-        premium.div_ceil(BigInt::from(2));
+    if !prev2.is_zero() {
+        (prev1 + &prev2).div_ceil(BigInt::from(2))
+    } else {
+        prev1
     }
+}
 
-    premium
+#[cfg(test)]
+mod tests {
+    use crate::gas::median_gas_premium;
+    use fvm_shared::econ::TokenAmount;
+
+    #[test]
+    fn test_medium() {
+        let mut prices = vec![
+            (TokenAmount::from_atto(500000), 1297005),
+            (TokenAmount::from_atto(400000), 1297005),
+            (TokenAmount::from_atto(300000), 1297005),
+        ];
+        let block_gas_limit = 10000000000;
+
+        let medium = median_gas_premium(&mut prices, block_gas_limit);
+        assert_eq!(medium, TokenAmount::from_atto(350000));
+    }
 }

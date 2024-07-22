@@ -3,10 +3,10 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 import "elliptic-curve-solidity/contracts/EllipticCurve.sol";
-import {IPCAddress} from "../../src/structs/Subnet.sol";
-import {CallMsg, IpcMsgKind, IpcEnvelope} from "../../src/structs/CrossNet.sol";
+import {IPCAddress} from "../../contracts/structs/Subnet.sol";
+import {CallMsg, IpcMsgKind, IpcEnvelope} from "../../contracts/structs/CrossNet.sol";
 import {IIpcHandler} from "../../sdk/interfaces/IIpcHandler.sol";
-import {METHOD_SEND, EMPTY_BYTES} from "../../src/constants/Constants.sol";
+import {METHOD_SEND, EMPTY_BYTES} from "../../contracts/constants/Constants.sol";
 
 library TestUtils {
     uint256 public constant GX = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798;
