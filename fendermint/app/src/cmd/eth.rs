@@ -5,7 +5,6 @@ use std::time::Duration;
 
 use anyhow::Context;
 use fendermint_eth_api::HybridClient;
-use ipc_observability::traces::set_global_tracing_subscriber;
 use tracing::info;
 
 use crate::{
@@ -16,8 +15,6 @@ use crate::{
 
 cmd! {
   EthArgs(self, settings: EthSettings) {
-    let _trace_file_guard = set_global_tracing_subscriber(&settings.tracing);
-
     match self.command.clone() {
       EthCommands::Run { ws_url, http_url, connect_retry_delay } => {
         let (client, driver) = HybridClient::new(http_url, ws_url, Duration::from_secs(connect_retry_delay)).context("failed to create HybridClient")?;
