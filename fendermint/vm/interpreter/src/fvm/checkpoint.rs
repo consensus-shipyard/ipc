@@ -25,7 +25,7 @@ use ipc_api::staking::ConfigurationNumber;
 use ipc_observability::{emit, serde::HexEncodableBlockHash};
 
 use super::observe::{
-    CheckpointFinalized, CheckpointCreated, CheckpointSigned, CheckpointSignedRole,
+    CheckpointCreated, CheckpointFinalized, CheckpointSigned, CheckpointSignedRole,
 };
 use super::state::ipc::tokens_to_burn;
 use super::{
