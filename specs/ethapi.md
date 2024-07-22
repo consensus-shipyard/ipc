@@ -1,4 +1,4 @@
-# IPC Spec - Ethereum API
+# Ethereum JSON-RPC API
 
 This document focuses on interacting with Fendermint through JSON-RPC interfaces.
 
