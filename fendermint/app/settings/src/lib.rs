@@ -9,7 +9,7 @@ use ipc_api::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use std::fmt::{Display, Formatter};
-use std::net::{SocketAddr, ToSocketAddrs};
+use std::net::ToSocketAddrs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tendermint_rpc::Url;
@@ -52,18 +52,18 @@ impl Display for SocketAddress {
     }
 }
 
-impl ToSocketAddrs for SocketAddress {
-    type Iter = <String as ToSocketAddrs>::Iter;
+impl std::net::ToSocketAddrs for SocketAddress {
+    type Iter = <String as std::net::ToSocketAddrs>::Iter;
 
     fn to_socket_addrs(&self) -> std::io::Result<Self::Iter> {
         self.to_string().to_socket_addrs()
     }
 }
 
-impl TryInto<SocketAddr> for SocketAddress {
+impl TryInto<std::net::SocketAddr> for SocketAddress {
     type Error = std::io::Error;
 
-    fn try_into(self) -> Result<SocketAddr, Self::Error> {
+    fn try_into(self) -> Result<std::net::SocketAddr, Self::Error> {
         self.to_socket_addrs()?
             .next()
             .ok_or_else(|| std::io::Error::from(std::io::ErrorKind::AddrNotAvailable))
