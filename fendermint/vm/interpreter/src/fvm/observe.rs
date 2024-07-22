@@ -183,6 +183,7 @@ mod tests {
             config_number: 3,
         });
 
+        let mut r = thread_rng();
         let secret_key = SecretKey::random(&mut r);
 
         emit(CheckpointSigned {

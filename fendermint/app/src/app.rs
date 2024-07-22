@@ -625,13 +625,7 @@ where
         let mut mpool_received_trace = MpoolReceived::default();
 
         let response = match result {
-            Err(e) => {
-                emit(MpoolReceivedInvalidMessage {
-                    reason: "InvalidEncoding",
-                    description: e.description.as_ref(),
-                });
-                invalid_check_tx(AppError::InvalidEncoding, e.description)
-            }
+            Err(e) => invalid_check_tx(AppError::InvalidEncoding, e.description),
             Ok(result) => match result {
                 Err(IllegalMessage) => invalid_check_tx(AppError::IllegalMessage, "".to_owned()),
                 Ok(Err(InvalidSignature(d))) => invalid_check_tx(AppError::InvalidSignature, d),
@@ -711,16 +705,6 @@ where
         });
 
         emit(BlockProposalEvaluated {
-            height: request.height.value(),
-            hash: HexEncodableBlockHash(request.hash.into()),
-            size: size_txs,
-            tx_count: num_txs,
-            validator: &request.proposer_address,
-            accept,
-            reason: None,
-        });
-
-        let mut proposal_evaluated = BlockProposalEvaluated {
             height: request.height.value(),
             hash: HexEncodableBlockHash(request.hash.into()),
             size: size_txs,
