@@ -42,12 +42,8 @@ use crate::cmd::key::read_secret_key;
 use crate::{cmd, options::run::RunArgs, settings::Settings};
 use fendermint_app::observe::register_metrics as register_consensus_metrics;
 
-use ipc_observability::traces::set_global_tracing_subscriber;
-
 cmd! {
   RunArgs(self, settings) {
-    let _trace_file_guard = set_global_tracing_subscriber(&settings.tracing);
-
     run(settings).await
   }
 }
