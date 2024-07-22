@@ -19,9 +19,8 @@ async function upgradeSubnetActorDiamond(deployments) {
     const onChainFacets = await getFacets(subnetActorDiamondAddress)
 
     const updatedFacets = {}
-    const onChainFacetBytecodes = await getOnChainBytecodeFromFacets(
-        onChainFacets,
-    )
+    const onChainFacetBytecodes =
+        await getOnChainBytecodeFromFacets(onChainFacets)
 
     for (const facet of deployments.Facets) {
         await upgradeFacet(

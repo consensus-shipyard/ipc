@@ -64,7 +64,7 @@ pub trait Application {
         &self,
         request: request::PrepareProposal,
     ) -> AbciResult<response::PrepareProposal> {
-        let txs = take_until_max_size(request.txs, request.max_tx_bytes.try_into().unwrap());
+        let (txs, _) = take_until_max_size(request.txs, request.max_tx_bytes.try_into().unwrap());
 
         Ok(response::PrepareProposal { txs })
     }
@@ -160,6 +160,7 @@ where
         // See https://github.com/tower-rs/tower/issues/547
         let app: A = std::mem::replace(&mut self.0, app);
 
+        // Because this is async, make sure the `Consensus` service is wrapped in a concurrency limiting Tower layer.
         let res = async move {
             let res = match req {
                 Request::Echo(r) => Response::Echo(log_error(app.echo(r).await)?),

@@ -80,7 +80,7 @@ imported wallet with address "0x406a7a1d002b71ece175cc7e067620ae5b58e9ec"
 As a sanity-check that we have joined the subnet successfully and that the subnet has been registered in IPC successfully can be performed through:
 
 ```bash
-./bin/ipc-cli subnet list --subnet=<PARENT_SUBBNET_ID>
+./bin/ipc-cli subnet list --subnet=<PARENT_SUBNET_ID>
 ```
 ```console
 # Example execution
@@ -94,12 +94,11 @@ This command only shows subnets that have been registered to the gateway, i.e. t
 
 * To join a subnet with the `ipc-cli`
 ```bash
-./bin/ipc-cli subnet join --subnet <subnet-id> --collateral <collateral_amount> --public-key <public_key_validator_addr>
+./bin/ipc-cli subnet join --subnet <subnet-id> --collateral <collateral_amount>
 ```
 ```console
 # Example execution
-$ ./bin/ipc-cli subnet join --subnet=/r314159/t410fh4ywg4wvxcjzz4vsja3uh4f53johc2lf5bpjo6i --collateral=1 \
-    --public-key=043385c3b9ab8a697cd7bec6ca623cbdd0fea1293e8b464df825b104eb58a44cc8efacc6a3482b866b85ecdf734b5d4ef5495737deb348625ce6a35536142d2955
+$ ./bin/ipc-cli subnet join --subnet=/r314159/t410fh4ywg4wvxcjzz4vsja3uh4f53johc2lf5bpjo6i --collateral=1
 ```
 This command specifies the subnet to join, the amount of collateral to provide and the public key of the `--from` address that is joining as a validator.
 
@@ -119,7 +118,7 @@ $ ./bin/ipc-cli subnet stake --subnet=/r314159/t410fh4ywg4wvxcjzz4vsja3uh4f53joh
 > ```
 
 ## Listing your balance in a subnet
-In order to send messages in a subnet, you'll need to have funds in your subnt account. You can use the following command to list the balance of your wallets in a subnet:
+In order to send messages in a subnet, you'll need to have funds in your subnet account. You can use the following command to list the balance of your wallets in a subnet:
 ```bash
 ./bin/ipc-cli wallet balances --wallet-type evm --subnet <subnet-id>
 ```
@@ -198,7 +197,7 @@ $ ./bin/ipc-cli cross-msg pre-fund --subnet=/r31415926/t4xwzbdu7z5sam6hc57xxwkct
 ```
 
 ### Release
-In order to release funds from a subnet, your account must hold enough funds inside it. Releasing funds to the parent subnet can be permformed with the following commnd:
+In order to release funds from a subnet, your account must hold enough funds inside it. Releasing funds to the parent subnet can be performed with the following command:
 ```bash
 ./bin/ipc-cli cross-msg release --subnet <subnet-id> [--from <from-addr>] [--to <to-addr>] <amount>
 ```
@@ -276,23 +275,22 @@ You can find the checkpoint where your cross-message was included by listing the
 
 * To join a subnet with the `ipc-cli`
 ```bash
-./bin/ipc-cli subnet join --subnet <subnet-id> --collateral <collateral_amount> --public-key <public_key_validator_addr>
+./bin/ipc-cli subnet join --subnet <subnet-id> --collateral <collateral_amount>
 ```
 ```console
 # Example execution
-$ ./bin/ipc-cli subnet join --subnet=/r314159/t410fh4ywg4wvxcjzz4vsja3uh4f53johc2lf5bpjo6i --collateral=1 \
-    --public-key=043385c3b9ab8a697cd7bec6ca623cbdd0fea1293e8b464df825b104eb58a44cc8efacc6a3482b866b85ecdf734b5d4ef5495737deb348625ce6a35536142d2955
+$ ./bin/ipc-cli subnet join --subnet=/r314159/t410fh4ywg4wvxcjzz4vsja3uh4f53johc2lf5bpjo6i --collateral=1
 ```
 This command specifies the subnet to join, the amount of collateral to provide and the public key of the `--from` address that is joining as a validator.
 
 * To join a subnet and also include some initial balance for the validator in the subnet, you can add the `--initial-balance` flag with the balance to be included in genesis:
 ```bash
-./bin/ipc-cli subnet join --subnet <subnet-id> --collateral <collateral_amount> --public-key <public_key_validator_addr> --initial-balance <genesis-balance>
+./bin/ipc-cli subnet join --subnet <subnet-id> --collateral <collateral_amount> --initial-balance <genesis-balance>
 ```
 ```console
 # Example execution
 $ ./bin/ipc-cli subnet join --subnet=/r314159/t410fh4ywg4wvxcjzz4vsja3uh4f53johc2lf5bpjo6i --collateral=1 \
-    --public-key=043385c3b9ab8a697cd7bec6ca623cbdd0fea1293e8b464df825b104eb58a44cc8efacc6a3482b866b85ecdf734b5d4ef5495737deb348625ce6a35536142d2955 --initial-balance 0.5
+    --initial-balance 0.5
 ```
 
 * To leave a subnet, the following agent command can be used:

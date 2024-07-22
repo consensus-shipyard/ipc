@@ -11,6 +11,7 @@ use fendermint_crypto::SecretKey;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::chain::ChainEnv;
+use fendermint_vm_interpreter::fvm::observe::register_metrics as register_interpreter_metrics;
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
 use fendermint_vm_interpreter::{
     bytes::{BytesMessageInterpreter, ProposalPrepareMode},
@@ -20,22 +21,26 @@ use fendermint_vm_interpreter::{
 };
 use fendermint_vm_resolver::ipld::IpldResolver;
 use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
-use fendermint_vm_topdown::proxy::IPCProviderProxy;
+use fendermint_vm_topdown::observe::register_metrics as register_topdown_metrics;
+use fendermint_vm_topdown::proxy::{IPCProviderProxy, IPCProviderProxyWithLatency};
 use fendermint_vm_topdown::sync::launch_polling_syncer;
 use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
 use fendermint_vm_topdown::{CachedFinalityProvider, IPCParentFinality, Toggle};
-use fvm_shared::address::Address;
+use fvm_shared::address::{current_network, Address, Network};
 use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
+use ipc_observability::observe::register_metrics as register_default_metrics;
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
 use libp2p::identity::secp256k1;
 use libp2p::identity::Keypair;
 use std::sync::Arc;
 use tokio::sync::broadcast::error::RecvError;
+use tower::ServiceBuilder;
 use tracing::info;
 
 use crate::cmd::key::read_secret_key;
 use crate::{cmd, options::run::RunArgs, settings::Settings};
+use fendermint_app::observe::register_metrics as register_consensus_metrics;
 
 cmd! {
   RunArgs(self, settings) {
@@ -68,8 +73,11 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     let metrics_registry = if settings.metrics.enabled {
         let registry = prometheus::Registry::new();
 
-        fendermint_app::metrics::register_app_metrics(&registry)
-            .context("failed to register metrics")?;
+        register_default_metrics(&registry).context("failed to register default metrics")?;
+        register_topdown_metrics(&registry).context("failed to register topdown metrics")?;
+        register_interpreter_metrics(&registry)
+            .context("failed to register interpreter metrics")?;
+        register_consensus_metrics(&registry).context("failed to register consensus metrics")?;
 
         Some(registry)
     } else {
@@ -119,6 +127,13 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         ValidatorContext::new(sk, broadcaster)
     });
 
+    let testing_settings = match settings.testing.as_ref() {
+        Some(_) if current_network() == Network::Mainnet => {
+            bail!("testing settings are not allowed on Mainnet");
+        }
+        other => other,
+    };
+
     let interpreter = FvmMessageInterpreter::<NamespaceBlockstore, _>::new(
         tendermint_client.clone(),
         validator_ctx,
@@ -127,11 +142,17 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         settings.fvm.gas_search_step,
         settings.fvm.exec_in_check,
         UpgradeScheduler::new(),
-    );
+    )
+    .with_push_chain_meta(testing_settings.map_or(true, |t| t.push_chain_meta));
+
     let interpreter = SignedMessageInterpreter::new(interpreter);
     let interpreter = ChainMessageInterpreter::<_, NamespaceBlockstore>::new(interpreter);
-    let interpreter =
-        BytesMessageInterpreter::new(interpreter, ProposalPrepareMode::AppendOnly, false);
+    let interpreter = BytesMessageInterpreter::new(
+        interpreter,
+        ProposalPrepareMode::PrependOnly,
+        false,
+        settings.abci.block_max_msgs,
+    );
 
     let ns = Namespaces::default();
     let db = open_db(&settings, &ns).context("error opening DB")?;
@@ -233,9 +254,14 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             config = config.with_max_cache_blocks(v);
         }
 
-        let ipc_provider = Arc::new(make_ipc_provider_proxy(&settings)?);
+        let ipc_provider = {
+            let p = make_ipc_provider_proxy(&settings)?;
+            Arc::new(IPCProviderProxyWithLatency::new(p))
+        };
+
         let finality_provider =
             CachedFinalityProvider::uninitialized(config.clone(), ipc_provider.clone()).await?;
+
         let p = Arc::new(Toggle::enabled(finality_provider));
         (p, Some((ipc_provider, config)))
     } else {
@@ -328,8 +354,22 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         tower_abci::split::service(service, settings.abci.bound);
 
     // Hand those components to the ABCI server. This is where tower layers could be added.
+    // TODO: Check out the examples about load shedding in `info` requests.
     let server = tower_abci::v037::Server::builder()
-        .consensus(consensus)
+        .consensus(
+            // Limiting the concurrency to 1 here because the `AplicationService::poll_ready` always
+            // reports `Ready`, because it doesn't know which request it's going to get.
+            // Not limiting the concurrency to 1 can lead to transactions being applied
+            // in different order across nodes. The buffer size has to be large enough
+            // to allow all in-flight requests to not block message handling in
+            // `tower_abci::Connection::run`, which could lead to deadlocks.
+            // With ABCI++ we need to be able to handle all block transactions plus the begin/end/commit
+            // around it. With ABCI 2.0 we'll get the block as a whole, which makes this easier.
+            ServiceBuilder::new()
+                .buffer(settings.abci.block_max_msgs + 3)
+                .concurrency_limit(1)
+                .service(consensus),
+        )
         .snapshot(snapshot)
         .mempool(mempool)
         .info(info)
@@ -352,7 +392,11 @@ fn open_db(settings: &Settings, ns: &Namespaces) -> anyhow::Result<RocksDb> {
         path = path.to_string_lossy().into_owned(),
         "opening database"
     );
-    let db = RocksDb::open_cf(path, &RocksDbConfig::default(), ns.values().iter())?;
+    let config = RocksDbConfig {
+        compaction_style: settings.db.compaction_style.to_string(),
+        ..Default::default()
+    };
+    let db = RocksDb::open_cf(path, &config, ns.values().iter())?;
     Ok(db)
 }
 
@@ -509,7 +553,6 @@ async fn dispatch_vote(
             .await;
 
             match res {
-                Ok(_) => {}
                 Err(e @ VoteError::Equivocation(_, _, _, _)) => {
                     tracing::warn!(error = e.to_string(), "failed to handle vote");
                 }
@@ -518,9 +561,12 @@ async fn dispatch_vote(
                     | VoteError::UnpoweredValidator(_) // maybe arrived too early or too late, or spam
                     | VoteError::UnexpectedBlock(_, _) // won't happen here
                 )) => {
-                    tracing::debug!(error = e.to_string(), "failed to handle vote")
+                    tracing::debug!(error = e.to_string(), "failed to handle vote");
                 }
-            }
+                _ => {
+                    tracing::debug!("vote handled");
+                }
+            };
         }
     }
 }

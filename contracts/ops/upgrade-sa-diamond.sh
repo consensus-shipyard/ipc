@@ -18,4 +18,4 @@ if [ "$NETWORK" = "auto" ]; then
 fi
 
 
-npx hardhat upgrade-sa-diamond --network "${NETWORK}" --address "$SUBNET_ACTOR_ADDRESS"
+pnpm exec hardhat upgrade-sa-diamond --network "${NETWORK}" --address "$SUBNET_ACTOR_ADDRESS"

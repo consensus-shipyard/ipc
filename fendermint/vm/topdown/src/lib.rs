@@ -11,6 +11,8 @@ pub mod proxy;
 mod toggle;
 pub mod voting;
 
+pub mod observe;
+
 use async_stm::Stm;
 use async_trait::async_trait;
 use ethers::utils::hex;

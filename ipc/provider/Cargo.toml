@@ -14,6 +14,8 @@ async-trait = { workspace = true }
 futures-util = { workspace = true }
 reqwest = { workspace = true }
 
+libsecp256k1 = { workspace = true }
+log = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -45,6 +47,8 @@ ipc-types = { workspace = true }
 ipc-wallet = { workspace = true, features = ["with-ethers"] }
 ipc-api = { workspace = true }
 ipc_actors_abis = { workspace = true }
+ipc-observability = { workspace = true }
+prometheus = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

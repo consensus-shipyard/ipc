@@ -34,6 +34,7 @@ tendermint-config = { workspace = true }
 tendermint-rpc = { workspace = true }
 tendermint-proto = { workspace = true }
 tokio = { workspace = true }
+tower = { workspace = true }
 tower-abci = { workspace = true }
 tracing = { workspace = true }
 tracing-appender = { workspace = true }
@@ -63,6 +64,7 @@ fendermint_vm_resolver = { path = "../vm/resolver" }
 fendermint_vm_snapshot = { path = "../vm/snapshot" }
 fendermint_vm_topdown = { path = "../vm/topdown" }
 
+
 fvm = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }
 fvm_ipld_car = { workspace = true }
@@ -71,6 +73,7 @@ fvm_shared = { workspace = true }
 ipc-api = { workspace = true }
 ipc-provider = { workspace = true }
 ipc_ipld_resolver = { workspace = true }
+ipc-observability = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

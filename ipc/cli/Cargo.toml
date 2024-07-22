@@ -41,8 +41,11 @@ tokio-tungstenite = { workspace = true }
 toml = "0.7.2"
 url = { workspace = true }
 zeroize = "1.6.0"
+prometheus = { workspace = true }
+prometheus_exporter = { workspace = true }
 
 ipc-wallet = { workspace = true }
 ipc-provider = { workspace = true }
 ipc-api = { workspace = true }
 ipc-types = { workspace = true }
+tracing-subscriber.workspace = true

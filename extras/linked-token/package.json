@@ -1,4 +1,41 @@
 {
+  "name": "@consensus-shipyard/ipc-linked-token",
+  "version": "1.0.0-alpha.0",
+  "description": "A set of contracts to replicate a pre-existing ERC20 token from one network (parent) to another (child).",
+  "author": "ConsensusLab, Protocol Labs",
+  "packageManager": "pnpm@9.3.0",
+  "homepage": "https://github.com/consensus-shipyard/ipc/",
+  "license": "MIT OR Apache-2.0",
+  "directories": {
+    "lib": "lib",
+    "test": "test"
+  },
+  "scripts": {
+    "prepack": "sh -c 'cp ../../LICENSE-* .'",
+    "postpack": "sh -c 'rm -f LICENSE-*'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/consensus-shipyard/ipc.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "bugs": {
+    "url": "https://github.com/consensus-shipyard/ipc/issues"
+  },
+  "files": [
+    "contracts",
+    "README.md",
+    "LICENSE-*"
+  ],
+  "dependencies": {
+    "@openzeppelin/contracts": "5.0.2",
+    "@openzeppelin/contracts-upgradeable": "5.0.2",
+    "@consensus-shipyard/ipc-contracts": "workspace:^",
+    "fevmate": "github:wadealexc/fevmate#6a80e98",
+    "elliptic-curve-solidity": "github:witnet/elliptic-curve-solidity#3475478"
+  },
   "devDependencies": {
     "@solidity-parser/parser": "^0.18.0",
     "prettier": "^3.2.5",

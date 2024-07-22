@@ -17,5 +17,5 @@ if [ "$NETWORK" = "auto" ]; then
 fi
 
 
-npx hardhat deploy-sa-diamond-and-facets --network ${NETWORK}
+pnpm exec hardhat deploy-sa-diamond-and-facets --network ${NETWORK}
 

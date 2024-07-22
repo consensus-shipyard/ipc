@@ -13,7 +13,6 @@ use fendermint_abci::{AbciResult, Application};
 use fendermint_storage::{
     Codec, Encode, KVCollection, KVRead, KVReadable, KVStore, KVWritable, KVWrite,
 };
-use fendermint_tracing::emit;
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_interpreter::bytes::{
     BytesMessageApplyRes, BytesMessageCheckRes, BytesMessageQuery, BytesMessageQueryRes,
@@ -37,13 +36,17 @@ use fvm_shared::chainid::ChainID;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
+use ipc_observability::{emit, serde::HexEncodableBlockHash};
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 use tendermint::abci::request::CheckTxKind;
 use tendermint::abci::{request, response};
 use tracing::instrument;
 
-use crate::events::{NewBlock, ProposalProcessed};
+use crate::observe::{
+    BlockCommitted, BlockProposalEvaluated, BlockProposalReceived, BlockProposalSent, Message,
+    MpoolReceived,
+};
 use crate::AppExitCode;
 use crate::BlockHeight;
 use crate::{tmconv::*, VERSION};
@@ -619,15 +622,26 @@ where
         // Update the check state.
         *guard = Some(state);
 
+        let mut mpool_received_trace = MpoolReceived::default();
+
         let response = match result {
             Err(e) => invalid_check_tx(AppError::InvalidEncoding, e.description),
             Ok(result) => match result {
                 Err(IllegalMessage) => invalid_check_tx(AppError::IllegalMessage, "".to_owned()),
                 Ok(Err(InvalidSignature(d))) => invalid_check_tx(AppError::InvalidSignature, d),
-                Ok(Ok(ret)) => to_check_tx(ret),
+                Ok(Ok(ret)) => {
+                    mpool_received_trace.message = Some(Message::from(&ret.message));
+                    to_check_tx(ret)
+                }
             },
         };
 
+        mpool_received_trace.accept = response.code.is_ok();
+        if !mpool_received_trace.accept {
+            mpool_received_trace.reason = Some(format!("{:?} - {}", response.code, response.info));
+        }
+
+        emit(mpool_received_trace);
         Ok(response)
     }
 
@@ -650,7 +664,14 @@ where
             .context("failed to prepare proposal")?;
 
         let txs = txs.into_iter().map(bytes::Bytes::from).collect();
-        let txs = take_until_max_size(txs, request.max_tx_bytes.try_into().unwrap());
+        let (txs, size) = take_until_max_size(txs, request.max_tx_bytes.try_into().unwrap());
+
+        emit(BlockProposalSent {
+            validator: &request.proposer_address,
+            height: request.height.value(),
+            tx_count: txs.len(),
+            size,
+        });
 
         Ok(response::PrepareProposal { txs })
     }
@@ -666,6 +687,7 @@ where
             "process proposal"
         );
         let txs: Vec<_> = request.txs.into_iter().map(|tx| tx.to_vec()).collect();
+        let size_txs = txs.iter().map(|tx| tx.len()).sum::<usize>();
         let num_txs = txs.len();
 
         let accept = self
@@ -674,12 +696,22 @@ where
             .await
             .context("failed to process proposal")?;
 
-        emit!(ProposalProcessed {
-            is_accepted: accept,
-            block_height: request.height.value(),
-            block_hash: request.hash.to_string().as_str(),
-            num_txs,
-            proposer: request.proposer_address.to_string().as_str()
+        emit(BlockProposalReceived {
+            height: request.height.value(),
+            hash: HexEncodableBlockHash(request.hash.into()),
+            size: size_txs,
+            tx_count: num_txs,
+            validator: &request.proposer_address,
+        });
+
+        emit(BlockProposalEvaluated {
+            height: request.height.value(),
+            hash: HexEncodableBlockHash(request.hash.into()),
+            size: size_txs,
+            tx_count: num_txs,
+            validator: &request.proposer_address,
+            accept,
+            reason: None,
         });
 
         if accept {
@@ -721,7 +753,8 @@ where
 
         let state = FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
             .context("error creating new state")?
-            .with_block_hash(block_hash);
+            .with_block_hash(block_hash)
+            .with_validator_id(request.header.proposer_address);
 
         tracing::debug!("initialized exec state");
 
@@ -866,11 +899,14 @@ where
         // Commit app state to the datastore.
         self.set_committed_state(state)?;
 
-        emit!(NewBlock { block_height });
-
         // Reset check state.
         let mut guard = self.check_state.lock().await;
         *guard = None;
+
+        emit(BlockCommitted {
+            height: block_height,
+            app_hash: HexEncodableBlockHash(app_hash.clone().into()),
+        });
 
         Ok(response::Commit {
             data: app_hash.into(),

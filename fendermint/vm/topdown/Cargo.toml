@@ -29,10 +29,13 @@ tendermint-rpc = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
+prometheus = { workspace = true }
 
 fendermint_vm_genesis = { path = "../genesis" }
 fendermint_vm_event = { path = "../event" }
 fendermint_tracing = { path = "../../tracing" }
+
+ipc-observability = { workspace = true }
 
 [dev-dependencies]
 arbitrary = { workspace = true }

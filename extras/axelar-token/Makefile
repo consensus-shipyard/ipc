@@ -5,17 +5,9 @@ export
 install:
 	forge install # installs existing dependencies
 
-.PHONY: deps
-deps:
-	forge install --no-commit \
-		axelarnetwork/axelar-gmp-sdk-solidity@v5.6.4 \
-		axelarnetwork/interchain-token-service@v1.2.1 \
-		openzeppelin/openzeppelin-contracts@v5.0.1
-
 .PHONY: help
 help:
 	@echo "\033[0;32mAvailable targets:\033[0m"
-	@echo "deps               - Install Foundry dependencies"
 	@echo "deploy-sender      - Deploy the token sender contract on Polygon Mumbai"
 	@echo "deploy-handler     - Deploy the token handler contract on Filecoin Calibrationnet"
 	@echo "deposit            - Deposit tokens into the subnet"

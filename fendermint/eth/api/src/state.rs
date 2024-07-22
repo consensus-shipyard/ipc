@@ -37,15 +37,19 @@ use crate::filters::{
     FilterRecords,
 };
 use crate::handlers::ws::MethodNotification;
-use crate::mpool::TransactionCache;
+use crate::mpool::{TransactionBuffer, TransactionCache};
 use crate::GasOpt;
 use crate::{
     conv::from_tm::{map_rpc_block_txs, to_chain_message, to_eth_block, to_eth_transaction},
     error, JsonRpcResult,
 };
 
+/// How long to keep transactions in the caches.
+const TX_CACHE_TTL_SECS: u64 = 5 * 60;
+
 pub type WebSocketId = usize;
 pub type WebSocketSender = UnboundedSender<MethodNotification>;
+pub type Nonce = u64;
 
 // Made generic in the client type so we can mock it if we want to test API
 // methods without having to spin up a server. In those tests the methods
@@ -56,10 +60,13 @@ pub struct JsonRpcState<C> {
     pub addr_cache: AddressCache<C>,
     /// Cache submitted transactions until they are added to a block.
     pub tx_cache: TransactionCache,
+    /// Buffer out-of-order transactions until they can be submitted.
+    pub tx_buffer: TransactionBuffer,
     filter_timeout: Duration,
     filters: FilterMap,
     next_web_socket_id: AtomicUsize,
     web_sockets: RwLock<HashMap<WebSocketId, WebSocketSender>>,
+    pub max_nonce_gap: Nonce,
     pub gas_opt: GasOpt,
 }
 
@@ -71,20 +78,27 @@ where
         client: C,
         filter_timeout: Duration,
         cache_capacity: usize,
+        max_nonce_gap: Nonce,
         gas_opt: GasOpt,
     ) -> Self {
         let client = FendermintClient::new(client);
         let addr_cache = AddressCache::new(client.clone(), cache_capacity);
-        let tx_cache = Cache::new(cache_capacity);
+        let tx_cache = Cache::new_with_ttl(cache_capacity, Duration::from_secs(TX_CACHE_TTL_SECS));
+        let tx_buffer = TransactionBuffer(Cache::new_with_ttl(
+            cache_capacity,
+            Duration::from_secs(TX_CACHE_TTL_SECS),
+        ));
         Self {
             client,
             addr_cache,
             tx_cache,
+            tx_buffer,
             filter_timeout,
             filters: Default::default(),
             next_web_socket_id: Default::default(),
             web_sockets: Default::default(),
             gas_opt,
+            max_nonce_gap,
         }
     }
 }

@@ -11,14 +11,16 @@ use crate::{
 use anyhow::{bail, Context};
 use async_stm::atomically;
 use async_trait::async_trait;
+use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::ipc;
+use fendermint_vm_event::ParentFinalityMissingQuorum;
 use fendermint_vm_message::ipc::ParentFinality;
 use fendermint_vm_message::{
     chain::ChainMessage,
     ipc::{BottomUpCheckpoint, CertifiedMessage, IpcMessage, SignedRelayedMessage},
 };
 use fendermint_vm_resolver::pool::{ResolveKey, ResolvePool};
-use fendermint_vm_topdown::proxy::IPCProviderProxy;
+use fendermint_vm_topdown::proxy::IPCProviderProxyWithLatency;
 use fendermint_vm_topdown::voting::{ValidatorKey, VoteTally};
 use fendermint_vm_topdown::{
     CachedFinalityProvider, IPCParentFinality, ParentFinalityProvider, ParentViewProvider, Toggle,
@@ -32,7 +34,7 @@ use std::sync::Arc;
 
 /// A resolution pool for bottom-up and top-down checkpoints.
 pub type CheckpointPool = ResolvePool<CheckpointPoolItem>;
-pub type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProviderProxy>>>;
+pub type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProviderProxyWithLatency>>>;
 
 /// These are the extra state items that the chain interpreter needs,
 /// a sort of "environment" supporting IPC.
@@ -127,25 +129,38 @@ where
         // The pre-requisite for proposal is that there is a quorum of gossiped votes at that height.
         // The final proposal can be at most as high as the quorum, but can be less if we have already,
         // hit some limits such as how many blocks we can propose in a single step.
-        let maybe_finality = atomically(|| {
-            if let Some((quorum_height, quorum_hash)) = state.parent_finality_votes.find_quorum()? {
-                if let Some(finality) = state.parent_finality_provider.next_proposal()? {
-                    let finality = if finality.height <= quorum_height {
-                        finality
-                    } else {
-                        IPCParentFinality {
-                            height: quorum_height,
-                            block_hash: quorum_hash,
-                        }
-                    };
-                    return Ok(Some(finality));
-                }
-            } else {
-                tracing::debug!("no quorum found for parent finality votes")
-            }
-            Ok(None)
+        let finalities = atomically(|| {
+            let parent = state.parent_finality_provider.next_proposal()?;
+            let quorum = state
+                .parent_finality_votes
+                .find_quorum()?
+                .map(|(height, block_hash)| IPCParentFinality { height, block_hash });
+
+            Ok((parent, quorum))
         })
         .await;
+
+        let maybe_finality = match finalities {
+            (Some(parent), Some(quorum)) => Some(if parent.height <= quorum.height {
+                parent
+            } else {
+                quorum
+            }),
+            (Some(parent), None) => {
+                emit!(
+                    DEBUG,
+                    ParentFinalityMissingQuorum {
+                        block_height: parent.height,
+                        block_hash: &hex::encode(&parent.block_hash),
+                    }
+                );
+                None
+            }
+            (None, _) => {
+                // This is normal, the parent probably hasn't produced a block yet.
+                None
+            }
+        };
 
         if let Some(finality) = maybe_finality {
             msgs.push(ChainMessage::Ipc(IpcMessage::TopDownExec(ParentFinality {
@@ -352,12 +367,20 @@ where
 
                     tracing::debug!("chain interpreter applied topdown msgs");
 
+                    let local_block_height = state.block_height() as u64;
+                    let proposer = state.validator_id().map(|id| id.to_string());
+                    let proposer_ref = proposer.as_deref();
+
                     atomically(|| {
                         env.parent_finality_provider
                             .set_new_finality(finality.clone(), prev_finality.clone())?;
 
-                        env.parent_finality_votes
-                            .set_finalized(finality.height, finality.block_hash.clone())?;
+                        env.parent_finality_votes.set_finalized(
+                            finality.height,
+                            finality.block_hash.clone(),
+                            proposer_ref,
+                            Some(local_block_height),
+                        )?;
 
                         Ok(())
                     })

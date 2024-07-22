@@ -3,6 +3,7 @@ use ethers::providers::{Http, Provider};
 // SPDX-License-Identifier: Apache-2.0, MIT
 use multihash::MultihashDigest;
 use serde::{Deserialize, Serialize};
+use std::fmt::Formatter;
 use std::{
     fmt::{Debug, Display},
     path::{Path, PathBuf},
@@ -212,7 +213,7 @@ resource_name!(CliName: Testnet);
 
 impl TestnetName {
     pub fn new<T: Into<TestnetId>>(id: T) -> Self {
-        // Not including a leadign slash (ie. "/testnets") so that we can join with directory paths.
+        // Not including a leading slash (ie. "/testnets") so that we can join with directory paths.
         Self(ResourceName::from("testnets").join_id(&id.into()))
     }
 
@@ -335,9 +336,9 @@ impl ResourceHash {
     }
 }
 
-impl ToString for ResourceHash {
-    fn to_string(&self) -> String {
-        hex::encode(self.0)
+impl Display for ResourceHash {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", hex::encode(self.0))
     }
 }
 

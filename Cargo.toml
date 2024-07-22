@@ -3,12 +3,17 @@ resolver = "2"
 members = [
   # contracts
   "contracts/binding",
+
+  # merkle
+  "ext/merkle-tree-rs",
+
   # ipc
   "ipc/cli",
   "ipc/wallet",
   "ipc/provider",
   "ipc/api",
   "ipc/types",
+  "ipc/observability",
 
   # ipld
   "ipld/resolver",
@@ -108,7 +113,6 @@ libsecp256k1 = "0.7"
 literally = "0.1.3"
 log = "0.4"
 lru_time_cache = "0.11"
-merkle-tree-rs = "0.1.0"
 multiaddr = "0.18"
 multihash = { version = "0.18.1", default-features = false, features = [
   "sha2",
@@ -154,7 +158,11 @@ tokio-util = { version = "0.7.8", features = ["compat"] }
 tokio-tungstenite = { version = "0.18.0", features = ["native-tls"] }
 toml = "0.8"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "registry"] }
+tracing-subscriber = { version = "0.3", features = [
+  "env-filter",
+  "json",
+  "registry",
+] }
 tracing-appender = "0.2.3"
 url = { version = "2.4.1", features = ["serde"] }
 zeroize = "1.6"
@@ -165,6 +173,7 @@ ipc-provider = { path = "ipc/provider" }
 ipc-wallet = { path = "ipc/wallet", features = ["with-ethers"] }
 ipc_ipld_resolver = { path = "ipld/resolver" }
 ipc-types = { path = "ipc/types" }
+ipc-observability = { path = "ipc/observability" }
 ipc_actors_abis = { path = "contracts/binding" }
 
 # Vendored for cross-compilation, see https://github.com/cross-rs/cross/wiki/Recipes#openssl
@@ -214,6 +223,7 @@ frc42_dispatch = "6.0.0"
 
 # Using the same tendermint-rs dependency as tower-abci. From both we are interested in v037 modules.
 tower-abci = { version = "0.7" }
+tower = { version = "0.4" }
 tendermint = { version = "0.31", features = ["secp256k1"] }
 tendermint-config = "0.33.0"
 tendermint-rpc = { version = "0.31", features = [
@@ -226,8 +236,6 @@ tendermint-proto = { version = "0.31" }
 [patch.crates-io]
 # Use stable-only features.
 gcra = { git = "https://github.com/consensus-shipyard/gcra-rs.git", branch = "main" }
-# Contains some API changes that the upstream has not merged.
-merkle-tree-rs = { git = "https://github.com/consensus-shipyard/merkle-tree-rs.git", branch = "dev" }
 
 [profile.wasm]
 inherits = "release"
