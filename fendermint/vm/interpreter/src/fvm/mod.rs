@@ -8,7 +8,7 @@ mod checkpoint;
 mod exec;
 mod externs;
 mod genesis;
-mod observe;
+pub mod observe;
 mod query;
 pub mod state;
 pub mod store;

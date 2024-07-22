@@ -5037,6 +5037,8 @@ dependencies = [
  "num-derive 0.3.3",
  "num-traits",
  "openssl",
+ "prometheus",
+ "prometheus_exporter",
  "reqwest",
  "serde",
  "serde_bytes",
@@ -5056,6 +5058,7 @@ dependencies = [
 name = "ipc-observability"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "hex",
  "lazy_static",
  "prometheus",
@@ -5084,6 +5087,7 @@ dependencies = [
  "hex",
  "indoc",
  "ipc-api",
+ "ipc-observability",
  "ipc-types",
  "ipc-wallet",
  "ipc_actors_abis",
@@ -5091,6 +5095,7 @@ dependencies = [
  "log",
  "num-derive 0.3.3",
  "num-traits",
+ "prometheus",
  "reqwest",
  "serde",
  "serde_bytes",

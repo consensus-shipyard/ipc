@@ -2,11 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use ipc_observability::{
-    impl_traceable, impl_traceables, lazy_static, register_metrics, Recordable, TraceLevel,
-    Traceable,
+    impl_traceable, impl_traceables, lazy_static, register_metrics, serde::HexEncodableBlockHash,
+    Recordable, TraceLevel, Traceable,
 };
-use prometheus::{register_histogram, Histogram, Registry};
 
+use prometheus::{
+    register_histogram, register_int_counter, register_int_gauge, register_int_gauge_vec,
+    Histogram, IntCounter, IntGauge, IntGaugeVec, Registry,
+};
+
+use fendermint_crypto::PublicKey;
 use fvm_shared::message::Message;
 
 register_metrics! {
@@ -18,6 +23,21 @@ register_metrics! {
         = register_histogram!("exec_fvm_apply_execution_time_secs", "Execution time of FVM apply in seconds");
     EXEC_FVM_CALL_EXECUTION_TIME_SECS: Histogram
         = register_histogram!("exec_fvm_call_execution_time_secs", "Execution time of FVM call in seconds");
+    BOTTOMUP_CHECKPOINT_CREATED_TOTAL: IntCounter
+        = register_int_counter!("bottomup_checkpoint_created_total", "Bottom-up checkpoint produced");
+    BOTTOMUP_CHECKPOINT_CREATED_HEIGHT: IntGauge
+        = register_int_gauge!("bottomup_checkpoint_created_height", "Height of the checkpoint created");
+    BOTTOMUP_CHECKPOINT_CREATED_MSGCOUNT: IntGauge
+        = register_int_gauge!("bottomup_checkpoint_created_msgcount", "Number of messages in the checkpoint created");
+    BOTTOMUP_CHECKPOINT_CREATED_CONFIGNUM: IntGauge
+        = register_int_gauge!("bottomup_checkpoint_created_confignum", "Configuration number of the checkpoint created");
+    BOTTOMUP_CHECKPOINT_SIGNED_HEIGHT: IntGaugeVec = register_int_gauge_vec!(
+        "bottomup_checkpoint_signed_height",
+        "Height of the checkpoint signed",
+        &["validator"]
+    );
+    BOTTOMUP_CHECKPOINT_FINALIZED_HEIGHT: IntGauge
+        = register_int_gauge!("bottomup_checkpoint_finalized_height", "Height of the checkpoint finalized");
 }
 
 impl_traceables!(TraceLevel::Info, "Execution", MsgExec);
@@ -54,6 +74,65 @@ impl Recordable for MsgExec {
     }
 }
 
+impl_traceables!(
+    TraceLevel::Info,
+    "Bottomup",
+    CheckpointCreated,
+    CheckpointSigned,
+    CheckpointFinalized
+);
+
+#[derive(Debug)]
+pub struct CheckpointCreated {
+    pub height: u64,
+    pub hash: HexEncodableBlockHash,
+    pub msg_count: usize,
+    pub config_number: u64,
+}
+
+impl Recordable for CheckpointCreated {
+    fn record_metrics(&self) {
+        BOTTOMUP_CHECKPOINT_CREATED_TOTAL.inc();
+        BOTTOMUP_CHECKPOINT_CREATED_HEIGHT.set(self.height as i64);
+        BOTTOMUP_CHECKPOINT_CREATED_MSGCOUNT.set(self.msg_count as i64);
+        BOTTOMUP_CHECKPOINT_CREATED_CONFIGNUM.set(self.config_number as i64);
+    }
+}
+
+#[derive(Debug)]
+pub enum CheckpointSignedRole {
+    Own,
+    Peer,
+}
+
+#[derive(Debug)]
+pub struct CheckpointSigned {
+    pub role: CheckpointSignedRole,
+    pub height: u64,
+    pub hash: HexEncodableBlockHash,
+    pub validator: PublicKey,
+}
+
+impl Recordable for CheckpointSigned {
+    fn record_metrics(&self) {
+        BOTTOMUP_CHECKPOINT_SIGNED_HEIGHT
+            .with_label_values(&[format!("{:?}", self.validator).as_str()])
+            .set(self.height as i64);
+    }
+}
+
+#[derive(Debug)]
+pub struct CheckpointFinalized {
+    pub height: i64,
+    pub hash: HexEncodableBlockHash,
+}
+
+impl Recordable for CheckpointFinalized {
+    fn record_metrics(&self) {
+        BOTTOMUP_CHECKPOINT_FINALIZED_HEIGHT.set(self.height);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -67,9 +146,11 @@ mod tests {
 
     #[test]
     fn test_emit() {
+        use fendermint_crypto::SecretKey;
         use fvm_ipld_encoding::RawBytes;
         use fvm_shared::address::Address;
         use fvm_shared::econ::TokenAmount;
+        use rand::thread_rng;
 
         let message = Message {
             version: 1,
@@ -90,6 +171,24 @@ mod tests {
             duration: 1.0,
             exit_code: 1,
             message: message.clone(),
+        });
+        let hash = vec![0x01, 0x02, 0x03];
+
+        emit(CheckpointCreated {
+            height: 1,
+            hash: HexEncodableBlockHash(hash.clone()),
+            msg_count: 2,
+            config_number: 3,
+        });
+
+        let mut r = thread_rng();
+        let secret_key = SecretKey::random(&mut r);
+
+        emit(CheckpointSigned {
+            role: CheckpointSignedRole::Own,
+            height: 1,
+            hash: HexEncodableBlockHash(hash.clone()),
+            validator: secret_key.public_key(),
         });
     }
 }

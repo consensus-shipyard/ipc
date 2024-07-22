@@ -5,6 +5,7 @@ pub mod macros;
 pub mod traces;
 mod tracing_layers;
 pub use lazy_static::lazy_static;
+pub mod observe;
 pub mod serde;
 
 use std::fmt::Debug;
@@ -19,6 +20,7 @@ pub trait Recordable {
 pub trait Traceable {
     fn trace_level(&self) -> TraceLevel;
     fn domain(&self) -> &'static str;
+    fn name() -> &'static str;
 }
 
 pub enum TraceLevel {

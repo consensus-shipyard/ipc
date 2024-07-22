@@ -11,6 +11,7 @@ use fendermint_crypto::SecretKey;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::chain::ChainEnv;
+use fendermint_vm_interpreter::fvm::observe::register_metrics as register_interpreter_metrics;
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
 use fendermint_vm_interpreter::{
     bytes::{BytesMessageInterpreter, ProposalPrepareMode},
@@ -27,6 +28,7 @@ use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteT
 use fendermint_vm_topdown::{CachedFinalityProvider, IPCParentFinality, Toggle};
 use fvm_shared::address::{current_network, Address, Network};
 use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
+use ipc_observability::observe::register_metrics as register_default_metrics;
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
 use libp2p::identity::secp256k1;
@@ -38,6 +40,7 @@ use tracing::info;
 
 use crate::cmd::key::read_secret_key;
 use crate::{cmd, options::run::RunArgs, settings::Settings};
+use fendermint_app::observe::register_metrics as register_consensus_metrics;
 
 cmd! {
   RunArgs(self, settings) {
@@ -70,10 +73,11 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     let metrics_registry = if settings.metrics.enabled {
         let registry = prometheus::Registry::new();
 
+        register_default_metrics(&registry).context("failed to register default metrics")?;
         register_topdown_metrics(&registry).context("failed to register topdown metrics")?;
-
-        fendermint_app::metrics::register_app_metrics(&registry)
-            .context("failed to register metrics")?;
+        register_interpreter_metrics(&registry)
+            .context("failed to register interpreter metrics")?;
+        register_consensus_metrics(&registry).context("failed to register consensus metrics")?;
 
         Some(registry)
     } else {
