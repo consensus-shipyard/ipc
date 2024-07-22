@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {StdAssertions} from "forge-std/StdAssertions.sol";
-import {GatewayDiamond} from "../../src/GatewayDiamond.sol";
+import {GatewayDiamond} from "../../contracts/GatewayDiamond.sol";
 import {IntegrationTestBase, TestGatewayActor} from "../IntegrationTestBase.sol";
 import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 

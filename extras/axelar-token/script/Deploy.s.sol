@@ -2,8 +2,8 @@
 pragma solidity ^0.8.20;
 
 import { Script, console2 as console } from "forge-std/Script.sol";
-import "../src/IpcTokenHandler.sol";
-import "../src/IpcTokenSender.sol";
+import "../contracts/IpcTokenHandler.sol";
+import "../contracts/IpcTokenSender.sol";
 
 contract Deploy is Script {
     function setUp() public {}

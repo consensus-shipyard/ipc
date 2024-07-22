@@ -2,10 +2,10 @@
 pragma solidity ^0.8.23;
 
 import "./ConfigManager.sol";
-import "../src/LinkedTokenController.sol";
-import "../src/v2/LinkedTokenControllerV2.sol";
-import "@ipc/src/structs/Subnet.sol";
-import "openzeppelin-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import "../contracts/LinkedTokenController.sol";
+import "../contracts/v2/LinkedTokenControllerV2.sol";
+import "@ipc/contracts/structs/Subnet.sol";
+import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 contract DeployIpcTokenController is ConfigManager {
     function deployIpcTokenController() external {

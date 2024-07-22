@@ -2,44 +2,44 @@
 pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
-import "../src/errors/IPCErrors.sol";
+import "../contracts/errors/IPCErrors.sol";
 
-import {EMPTY_BYTES, METHOD_SEND} from "../src/constants/Constants.sol";
-import {ConsensusType} from "../src/enums/ConsensusType.sol";
-import {IDiamond} from "../src/interfaces/IDiamond.sol";
-import {IpcEnvelope, BottomUpCheckpoint, IpcMsgKind, ParentFinality, CallMsg} from "../src/structs/CrossNet.sol";
-import {FvmAddress} from "../src/structs/FvmAddress.sol";
-import {SubnetID, SupplyKind, PermissionMode, PermissionMode, Subnet, SupplySource, IPCAddress, Validator} from "../src/structs/Subnet.sol";
-import {SubnetIDHelper} from "../src/lib/SubnetIDHelper.sol";
-import {FvmAddressHelper} from "../src/lib/FvmAddressHelper.sol";
-import {CrossMsgHelper} from "../src/lib/CrossMsgHelper.sol";
+import {EMPTY_BYTES, METHOD_SEND} from "../contracts/constants/Constants.sol";
+import {ConsensusType} from "../contracts/enums/ConsensusType.sol";
+import {IDiamond} from "../contracts/interfaces/IDiamond.sol";
+import {IpcEnvelope, BottomUpCheckpoint, IpcMsgKind, ParentFinality, CallMsg} from "../contracts/structs/CrossNet.sol";
+import {FvmAddress} from "../contracts/structs/FvmAddress.sol";
+import {SubnetID, SupplyKind, PermissionMode, PermissionMode, Subnet, SupplySource, IPCAddress, Validator} from "../contracts/structs/Subnet.sol";
+import {SubnetIDHelper} from "../contracts/lib/SubnetIDHelper.sol";
+import {FvmAddressHelper} from "../contracts/lib/FvmAddressHelper.sol";
+import {CrossMsgHelper} from "../contracts/lib/CrossMsgHelper.sol";
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
-import {GatewayDiamond} from "../src/GatewayDiamond.sol";
-import {SubnetActorDiamond} from "../src/SubnetActorDiamond.sol";
-import {GatewayGetterFacet} from "../src/gateway/GatewayGetterFacet.sol";
-import {GatewayMessengerFacet} from "../src/gateway/GatewayMessengerFacet.sol";
-import {GatewayManagerFacet} from "../src/gateway/GatewayManagerFacet.sol";
+import {GatewayDiamond} from "../contracts/GatewayDiamond.sol";
+import {SubnetActorDiamond} from "../contracts/SubnetActorDiamond.sol";
+import {GatewayGetterFacet} from "../contracts/gateway/GatewayGetterFacet.sol";
+import {GatewayMessengerFacet} from "../contracts/gateway/GatewayMessengerFacet.sol";
+import {GatewayManagerFacet} from "../contracts/gateway/GatewayManagerFacet.sol";
 
-import {CheckpointingFacet} from "../src/gateway/router/CheckpointingFacet.sol";
-import {XnetMessagingFacet} from "../src/gateway/router/XnetMessagingFacet.sol";
-import {TopDownFinalityFacet} from "../src/gateway/router/TopDownFinalityFacet.sol";
+import {CheckpointingFacet} from "../contracts/gateway/router/CheckpointingFacet.sol";
+import {XnetMessagingFacet} from "../contracts/gateway/router/XnetMessagingFacet.sol";
+import {TopDownFinalityFacet} from "../contracts/gateway/router/TopDownFinalityFacet.sol";
 
 import {SubnetActorMock} from "./mocks/SubnetActorMock.sol";
-import {SubnetActorManagerFacet} from "../src/subnet/SubnetActorManagerFacet.sol";
-import {SubnetActorPauseFacet} from "../src/subnet/SubnetActorPauseFacet.sol";
-import {SubnetActorCheckpointingFacet} from "../src/subnet/SubnetActorCheckpointingFacet.sol";
-import {SubnetActorRewardFacet} from "../src/subnet/SubnetActorRewardFacet.sol";
-import {SubnetActorGetterFacet} from "../src/subnet/SubnetActorGetterFacet.sol";
+import {SubnetActorManagerFacet} from "../contracts/subnet/SubnetActorManagerFacet.sol";
+import {SubnetActorPauseFacet} from "../contracts/subnet/SubnetActorPauseFacet.sol";
+import {SubnetActorCheckpointingFacet} from "../contracts/subnet/SubnetActorCheckpointingFacet.sol";
+import {SubnetActorRewardFacet} from "../contracts/subnet/SubnetActorRewardFacet.sol";
+import {SubnetActorGetterFacet} from "../contracts/subnet/SubnetActorGetterFacet.sol";
 
-import {SubnetRegistryDiamond} from "../src/SubnetRegistryDiamond.sol";
-import {RegisterSubnetFacet} from "../src/subnetregistry/RegisterSubnetFacet.sol";
-import {SubnetGetterFacet} from "../src/subnetregistry/SubnetGetterFacet.sol";
+import {SubnetRegistryDiamond} from "../contracts/SubnetRegistryDiamond.sol";
+import {RegisterSubnetFacet} from "../contracts/subnetregistry/RegisterSubnetFacet.sol";
+import {SubnetGetterFacet} from "../contracts/subnetregistry/SubnetGetterFacet.sol";
 
-import {OwnershipFacet} from "../src/OwnershipFacet.sol";
+import {OwnershipFacet} from "../contracts/OwnershipFacet.sol";
 
-import {DiamondLoupeFacet} from "../src/diamond/DiamondLoupeFacet.sol";
-import {DiamondCutFacet} from "../src/diamond/DiamondCutFacet.sol";
-import {SupplySourceHelper} from "../src/lib/SupplySourceHelper.sol";
+import {DiamondLoupeFacet} from "../contracts/diamond/DiamondLoupeFacet.sol";
+import {DiamondCutFacet} from "../contracts/diamond/DiamondCutFacet.sol";
+import {SupplySourceHelper} from "../contracts/lib/SupplySourceHelper.sol";
 import {TestUtils} from "./helpers/TestUtils.sol";
 import {SelectorLibrary} from "./helpers/SelectorLibrary.sol";
 import {GatewayFacetsHelper} from "./helpers/GatewayFacetsHelper.sol";

@@ -1,21 +1,21 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import "../../src/errors/IPCErrors.sol";
+import "../../contracts/errors/IPCErrors.sol";
 import {StdInvariant} from "forge-std/Test.sol";
-import {SubnetID, Subnet} from "../../src/structs/Subnet.sol";
-import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
-import {GatewayDiamond} from "../../src/GatewayDiamond.sol";
-import {SubnetActorDiamond} from "../../src/SubnetActorDiamond.sol";
-import {GatewayDiamond} from "../../src/GatewayDiamond.sol";
-import {GatewayGetterFacet} from "../../src/gateway/GatewayGetterFacet.sol";
-import {GatewayMessengerFacet} from "../../src/gateway/GatewayMessengerFacet.sol";
-import {GatewayManagerFacet} from "../../src/gateway/GatewayManagerFacet.sol";
+import {SubnetID, Subnet} from "../../contracts/structs/Subnet.sol";
+import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
+import {GatewayDiamond} from "../../contracts/GatewayDiamond.sol";
+import {SubnetActorDiamond} from "../../contracts/SubnetActorDiamond.sol";
+import {GatewayDiamond} from "../../contracts/GatewayDiamond.sol";
+import {GatewayGetterFacet} from "../../contracts/gateway/GatewayGetterFacet.sol";
+import {GatewayMessengerFacet} from "../../contracts/gateway/GatewayMessengerFacet.sol";
+import {GatewayManagerFacet} from "../../contracts/gateway/GatewayManagerFacet.sol";
 import {SubnetActorHandler, ETH_SUPPLY} from "./handlers/SubnetActorHandler.sol";
 import {SubnetActorMock} from "../mocks/SubnetActorMock.sol";
-import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
+import {SubnetActorGetterFacet} from "../../contracts/subnet/SubnetActorGetterFacet.sol";
 import {IntegrationTestBase} from "../IntegrationTestBase.sol";
-import {SupplySourceHelper} from "../../src/lib/SupplySourceHelper.sol";
+import {SupplySourceHelper} from "../../contracts/lib/SupplySourceHelper.sol";
 import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 import {SubnetActorFacetsHelper} from "../helpers/SubnetActorFacetsHelper.sol";
 import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";

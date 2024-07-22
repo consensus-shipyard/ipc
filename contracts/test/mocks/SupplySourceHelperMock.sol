@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.23;
 
-import {SupplySource} from "../../src/structs/Subnet.sol";
-import {SupplySourceHelper} from "../../src/lib/SupplySourceHelper.sol";
+import {SupplySource} from "../../contracts/structs/Subnet.sol";
+import {SupplySourceHelper} from "../../contracts/lib/SupplySourceHelper.sol";
 
 /// @notice Helpers to deal with a supply source.
 contract SupplySourceHelperMock {

@@ -1,57 +1,61 @@
-#!/usr/bin/env bash
-set -eux
-set -o pipefail
+#!/bin/sh
+set -eu
 
 # Path to the report file
 REPORT_FILE="./report.json"
 
 # List of severities that make us fail
-SEVERITIES=(critical high medium)
+SEVERITIES="critical high medium"
 
-# List of vulnerability titles to ignore
-IGNORE_TITLES=("Centralization Risk for trusted owners")
+# Function to check if a vulnerability title should be ignored
+ignore_title() {
+    case "$1" in
+        "Centralization Risk for trusted owners") return 0 ;;
+        # Add more titles to ignore here, one per line
+        *) return 1 ;;
+    esac
+}
 
-# Specific vulnerabilities to ignore with path and line number
-declare -A IGNORE_SPECIFIC
-IGNORE_SPECIFIC["src/lib/LibDiamond.sol:204:Unprotected initializer"]=1
-IGNORE_SPECIFIC["src/lib/LibDiamond.sol:203:Unprotected initializer"]=1
-
-containsElement() {
-  local e match="$1"
-  shift
-  for e; do [[ "$e" == "$match" ]] && return 0; done
-  return 1
+# Function to check if a specific vulnerability should be ignored
+ignore_specific() {
+    case "$1" in
+        "src/lib/LibDiamond.sol:204:Unprotected initializer") return 0 ;;
+        "src/lib/LibDiamond.sol:203:Unprotected initializer") return 0 ;;
+        *) return 1 ;;
+    esac
 }
 
 # Read vulnerabilities from the report
-readVulnerabilities() {
-  level="$1"
-  jq -c --argjson ignoreTitles "$(printf '%s\n' "${IGNORE_TITLES[@]}" | jq -R . | jq -s .)" ".${level}_issues.issues[] | select(.title as \$title | .instances[].contract_path as \$path | .instances[].line_no as \$line | \$ignoreTitles | index(\$title) | not)" $REPORT_FILE
+read_vulnerabilities() {
+    level="$1"
+    jq -c ".${level}_issues.issues[]? // empty" "$REPORT_FILE"
 }
 
 # Main function to process the report
-processReport() {
-  local hasVulnerabilities=0
+process_report() {
+    has_vulnerabilities=0
 
-  for level in ${SEVERITIES[@]}; do
-    while IFS= read -r vulnerability; do
-      title=$(echo "$vulnerability" | jq -r ".title")
-      path=$(echo "$vulnerability" | jq -r ".instances[].contract_path")
-      line=$(echo "$vulnerability" | jq -r ".instances[].line_no")
-      specificKey="${path}:${line}:${title}"
+    for level in $SEVERITIES; do
+        read_vulnerabilities "$level" | while IFS= read -r vulnerability; do
+            title=$(printf '%s' "$vulnerability" | jq -r ".title")
+            path=$(printf '%s' "$vulnerability" | jq -r ".instances[].contract_path")
+            line=$(printf '%s' "$vulnerability" | jq -r ".instances[].line_no")
+            specific_key="${path}:${line}:${title}"
 
-      if [[ ${IGNORE_SPECIFIC[$specificKey]+_} ]]; then
-        echo "Ignoring specific vulnerability: $title at $path line $line"
-      else
-        echo "Found $level vulnerability: $title at $path line $line"
-        hasVulnerabilities=1
-      fi
-    done < <(readVulnerabilities "$level")
-  done
+            if ignore_specific "$specific_key"; then
+                printf "Ignoring specific vulnerability: %s at %s line %s\n" "$title" "$path" "$line"
+            elif ignore_title "$title"; then
+                printf "Ignoring vulnerability by title: %s at %s line %s\n" "$title" "$path" "$line"
+            else
+                printf "Found %s vulnerability: %s at %s line %s\n" "$level" "$title" "$path" "$line"
+                has_vulnerabilities=1
+            fi
+        done
+    done
 
-  return $hasVulnerabilities
+    return $has_vulnerabilities
 }
 
-# Process the report and exit with the code returned by processReport
-processReport
+# Process the report and exit with the code returned by process_report
+process_report
 exit $?

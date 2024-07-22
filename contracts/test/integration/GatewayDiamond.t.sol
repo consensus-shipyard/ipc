@@ -3,40 +3,40 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 
-import "../../src/errors/IPCErrors.sol";
+import "../../contracts/errors/IPCErrors.sol";
 import {NumberContractFacetSeven} from "../helpers/NumberContractFacetSeven.sol";
 import {NumberContractFacetEight} from "../helpers/NumberContractFacetEight.sol";
-import {EMPTY_BYTES, METHOD_SEND} from "../../src/constants/Constants.sol";
-import {IERC165} from "../../src/interfaces/IERC165.sol";
-import {IDiamond} from "../../src/interfaces/IDiamond.sol";
-import {IDiamondLoupe} from "../../src/interfaces/IDiamondLoupe.sol";
-import {IDiamondCut} from "../../src/interfaces/IDiamondCut.sol";
-import {QuorumInfo} from "../../src/structs/Quorum.sol";
-import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../../src/structs/CrossNet.sol";
-import {FvmAddress} from "../../src/structs/FvmAddress.sol";
-import {SubnetID, Subnet, IPCAddress, Validator, StakingChange, StakingChangeRequest, StakingOperation} from "../../src/structs/Subnet.sol";
-import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
-import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
-import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
+import {EMPTY_BYTES, METHOD_SEND} from "../../contracts/constants/Constants.sol";
+import {IERC165} from "../../contracts/interfaces/IERC165.sol";
+import {IDiamond} from "../../contracts/interfaces/IDiamond.sol";
+import {IDiamondLoupe} from "../../contracts/interfaces/IDiamondLoupe.sol";
+import {IDiamondCut} from "../../contracts/interfaces/IDiamondCut.sol";
+import {QuorumInfo} from "../../contracts/structs/Quorum.sol";
+import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../../contracts/structs/CrossNet.sol";
+import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
+import {SubnetID, Subnet, IPCAddress, Validator, StakingChange, StakingChangeRequest, StakingOperation} from "../../contracts/structs/Subnet.sol";
+import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
+import {FvmAddressHelper} from "../../contracts/lib/FvmAddressHelper.sol";
+import {CrossMsgHelper} from "../../contracts/lib/CrossMsgHelper.sol";
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
-import {GatewayDiamond, FunctionNotFound} from "../../src/GatewayDiamond.sol";
-import {GatewayGetterFacet} from "../../src/gateway/GatewayGetterFacet.sol";
-import {GatewayManagerFacet} from "../../src/gateway/GatewayManagerFacet.sol";
+import {GatewayDiamond, FunctionNotFound} from "../../contracts/GatewayDiamond.sol";
+import {GatewayGetterFacet} from "../../contracts/gateway/GatewayGetterFacet.sol";
+import {GatewayManagerFacet} from "../../contracts/gateway/GatewayManagerFacet.sol";
 
-import {CheckpointingFacet} from "../../src/gateway/router/CheckpointingFacet.sol";
-import {XnetMessagingFacet} from "../../src/gateway/router/XnetMessagingFacet.sol";
-import {TopDownFinalityFacet} from "../../src/gateway/router/TopDownFinalityFacet.sol";
+import {CheckpointingFacet} from "../../contracts/gateway/router/CheckpointingFacet.sol";
+import {XnetMessagingFacet} from "../../contracts/gateway/router/XnetMessagingFacet.sol";
+import {TopDownFinalityFacet} from "../../contracts/gateway/router/TopDownFinalityFacet.sol";
 
-import {ERR_GENERAL_CROSS_MSG_DISABLED} from "../../src/gateway/GatewayMessengerFacet.sol";
-import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
-import {LibDiamond} from "../../src/lib/LibDiamond.sol";
+import {ERR_GENERAL_CROSS_MSG_DISABLED} from "../../contracts/gateway/GatewayMessengerFacet.sol";
+import {DiamondCutFacet} from "../../contracts/diamond/DiamondCutFacet.sol";
+import {LibDiamond} from "../../contracts/lib/LibDiamond.sol";
 import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
 import {TestUtils, MockIpcContract} from "../helpers/TestUtils.sol";
 import {IntegrationTestBase} from "../IntegrationTestBase.sol";
 import {SelectorLibrary} from "../helpers/SelectorLibrary.sol";
 import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 
-import {SubnetActorDiamond} from "../../src/SubnetActorDiamond.sol";
+import {SubnetActorDiamond} from "../../contracts/SubnetActorDiamond.sol";
 import {SubnetActorFacetsHelper} from "../helpers/SubnetActorFacetsHelper.sol";
 
 contract GatewayActorDiamondTest is Test, IntegrationTestBase {

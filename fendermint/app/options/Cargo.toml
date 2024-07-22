@@ -26,6 +26,7 @@ fvm_shared = { workspace = true }
 ipc-api = { workspace = true }
 ipc-types = { workspace = true }
 url = { workspace = true }
+ipc-observability = { workspace = true }
 
 fendermint_vm_genesis = { path = "../../vm/genesis" }
 fendermint_vm_actor_interface = { path = "../../vm/actor_interface" }
