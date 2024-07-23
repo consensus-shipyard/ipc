@@ -63,6 +63,14 @@ host = "127.0.0.1"
 # The default port where the Prometheus exporter makes the metrics available.
 port = 9184
 
+[tracing]
+
+[tracing.console]
+enabled = true
+
+[tracing.file]
+enabled = false
+
 [snapshots]
 # Enable the export and import of snapshots.
 enabled = false
@@ -159,6 +167,14 @@ allowed_methods = []
 # A list of non-simple headers the client is allowed to use with cross-domain requests
 # Suggested headers if allowing origins: "Accept", "Authorization", "Content-Type", "Origin"
 allowed_headers = []
+
+[eth.tracing]
+
+[eth.tracing.console]
+enabled = true
+
+[eth.tracing.file]
+enabled = false
 
 # IPLD Resolver Configuration
 [resolver]
