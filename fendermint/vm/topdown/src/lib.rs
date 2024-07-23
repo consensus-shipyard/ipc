@@ -255,9 +255,3 @@ impl From<TopdownProposalWithQuorum> for TopdownProposalWithCert {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_voting() {}
-}
