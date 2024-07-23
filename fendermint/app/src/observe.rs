@@ -9,10 +9,7 @@ use ipc_observability::{
     impl_traceable, impl_traceables, lazy_static, register_metrics, serde::HexEncodableBlockHash,
     Recordable, TraceLevel, Traceable,
 };
-use prometheus::{
-    register_counter_vec, register_int_gauge, CounterVec,
-    IntGauge, Registry,
-};
+use prometheus::{register_counter_vec, register_int_gauge, CounterVec, IntGauge, Registry};
 use tendermint::account::Id;
 
 register_metrics! {
