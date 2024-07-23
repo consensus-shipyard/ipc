@@ -2,9 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
+## [axon-r02] - 2024-07-23
 
-### Experimental: Observability Framework 👁️📊
+_Full changelog below._
+
+### ⭐ HIGHLIGHTED | Observability Framework 👁️📊
 
 - Introduced a new observability framework utilizing the `ipc-observability` crate.
   - This framework introduces events and metrics for detailed system monitoring and analysis.
@@ -34,6 +36,30 @@ Refer to full observability documentation [here](./docs/fendermint/observability
 | Topdown   | `ParentFinalityPeerQuorumReached` | Records quorum reached in parent finality voting                          | `topdown_parent_finality_voting_quorum_height` (IntGauge), `topdown_parent_finality_voting_quorum_weight` (IntGauge)                                                                                     |
 | Topdown   | `ParentFinalityCommitted`         | Tracks parent finality committed on chain                                 | `topdown_parent_finality_committed_height` (IntGauge)                                                                                                                                                    |
 | System    | `TracingError`                    | Logs tracing errors                                                       | `tracing_errors` (IntCounterVec)                                                                                                                                                                         |
+
+### 🚀 Features
+
+- *(node)* New observability architecture + events (#1053)
+- *(node)* New observability bottom up tracing/metrics (#1061)
+- *(ethapi)* Add eth cors settings (#1021)
+- *(node)* File-based observability configuration (#1078)
+- *(node)* Observability docs and changelog section (#1083)
+
+### 🐛 Bug Fixes
+
+- *(ethapi)* Make `eth_getTransactionReceipt` null for unexecuted/unknown transactions (#1006)
+
+### 🚜 Refactor
+
+- *(node)* Observability refinements. (#1085)
+
+### 📚 Documentation
+
+- *(specs)* Ethereum JSON-RPC API (#913)
+
+### ⚙️ Miscellaneous Tasks
+
+- Validate PR titles against conventional commits. (#1075)
 
 ## [axon-r01] - 2024-07-15
 
