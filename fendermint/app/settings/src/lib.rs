@@ -1,9 +1,10 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, bail, Context};
 use config::{Config, ConfigError, Environment, File};
 use fvm_shared::address::Address;
+use fvm_shared::bigint::Zero;
 use fvm_shared::econ::TokenAmount;
 use ipc_api::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
@@ -212,9 +213,16 @@ pub struct IpcSettings {
 
 impl IpcSettings {
     pub fn topdown_config(&self) -> anyhow::Result<&TopDownSettings> {
-        self.topdown
+        let ret = self
+            .topdown
             .as_ref()
-            .ok_or_else(|| anyhow!("top down config missing"))
+            .ok_or_else(|| anyhow!("top down config missing"))?;
+
+        if ret.chain_head_delay.is_zero() {
+            bail!("unsafe top-down chain head delay: zero value not accepted")
+        };
+
+        Ok(ret)
     }
 }
 
