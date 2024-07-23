@@ -1,35 +1,36 @@
-# Observability Framework Documentation
+# Observability
 
 ## Overview
 
-The observability framework operates by introducing events and metrics that allow for detailed monitoring and analysis of system behavior. This is achieved through the use of the `ipc-observability` crate/library, which provides all the necessary helpers and tools to facilitate this process.
+IPC's observability framework emits events throughout execution, which are recorded in a journal and transformed to Prometheus metrics.
+This enables detailed monitoring and analysis of system behavior.
+This is achieved through the use of the `ipc-observability` crate/library, which provides all the necessary helpers and tools to facilitate this process.
 
-### How It Works
+### How it works
 
-1. **Events**: Specific events are defined and triggered throughout the codebase to capture significant occurrences or actions. These events encapsulate relevant data and context about what is happening within the system.
+1. **Events**: Specific events are defined and triggered throughout the codebase to capture significant occurrences or actions.
+These events encapsulate relevant data and context about what is happening within the system.
 
-2. **Metrics**: Each event is associated with one or more Prometheus metrics. When an event is triggered, the corresponding metrics are updated to reflect the event's occurrence. This allows for real-time tracking and monitoring of various system activities and states.
+2. **Journal**: Events are recorded in a journal, which is a rotational ledger that records chronologically ordered, timestamped trace objects to log files on disk.
+The journal can also be emitted to console.
 
-3. **Prometheus Integration**: The metrics collected are designed to integrate seamlessly with Prometheus, a powerful monitoring and alerting toolkit. Prometheus collects and stores these metrics, enabling detailed analysis and visualization through its query language and dashboarding capabilities.
+3. **Metrics**: Each event is associated with one or more Prometheus metrics.
+When an event is triggered, the corresponding metrics are updated to reflect the event's occurrence.
+This allows for real-time tracking and monitoring of various system activities and states through dashboards and alerts.
 
-4. **ipc-observability Crate**: This custom library encapsulates the logic and functionality required to define, trigger, and record events and metrics. It simplifies the process of adding observability to the codebase by providing ready-to-use macros, structs, and functions.
+4. **Prometheus integration**: The metrics collected are designed to integrate seamlessly with Prometheus, a powerful monitoring and alerting toolkit.
+Prometheus collects and stores these metrics, enabling detailed analysis and visualization through its query language and dashboarding capabilities.
 
-### Benefits
-
-- **Real-time Monitoring**: Enables immediate visibility into the system's performance and behavior.
-- **Detailed Analysis**: Facilitates in-depth analysis of trends, anomalies, and issues.
-- **Alerting**: Allows for the setup of alerts based on specific metric thresholds, ensuring timely responses to potential problems.
-- **Ease of Use**: The `ipc-observability` crate simplifies the integration of observability features, reducing the effort required to instrument the code.
-
-By leveraging this observability framework, developers can gain valuable insights into their systems, leading to improved reliability, performance, and ov
+5. **ipc-observability crate**: This custom library encapsulates the logic and functionality required to define, trigger, and record events and metrics.
+It simplifies the process of adding observability to the codebase by providing ready-to-use macros, structs, and functions.
 
 ## Metrics
 
-- `proposals_block_proposal_received` (CounterVec): Incremented when a block proposal is received.
-- `proposals_block_proposal_sent` (CounterVec): Incremented when a block proposal is sent.
-- `proposals_block_proposal_accepted` (CounterVec): Incremented if the block proposal is accepted.
-- `proposals_block_proposal_rejected` (CounterVec): Incremented if the block proposal is rejected.
-- `proposals_block_committed` (CounterVec): Incremented when a block is committed.
+- `consensus_block_proposal_received_height` (IntGauge): Incremented when a block proposal is received.
+- `consensus_block_proposal_sent_height` (IntGauge): Incremented when a block proposal is sent.
+- `consensus_block_proposal_accepted_height` (IntGauge): Incremented if the block proposal is accepted.
+- `consensus_block_proposal_rejected_height` (IntGauge): Incremented if the block proposal is rejected.
+- `consensus_block_committed_height` (IntGauge): Incremented when a block is committed.
 - `exec_fvm_check_execution_time_secs` (Histogram): Records the execution time of FVM check in seconds.
 - `exec_fvm_estimate_execution_time_secs` (Histogram): Records the execution time of FVM estimate in seconds.
 - `exec_fvm_apply_execution_time_secs` (Histogram): Records the execution time of FVM apply in seconds.
@@ -50,7 +51,7 @@ By leveraging this observability framework, developers can gain valuable insight
 - `topdown_parent_finality_committed_height` (IntGauge): Sets the height of the committed parent finality.
 - `tracing_errors` (IntCounterVec): Increments the count of tracing errors for the affected event.
 
-## Events and Corresponding Metrics
+## Events and corresponding metrics
 
 ### BlockProposalReceived
 
@@ -67,7 +68,7 @@ Represents a block proposal received event.
 
 **Affects metrics:**
 
-- `proposals_block_proposal_received`
+- `consensus_block_proposal_received_height`
 
 ### BlockProposalSent
 
@@ -83,7 +84,7 @@ Represents a block proposal sent event.
 
 **Affects metrics:**
 
-- `proposals_block_proposal_sent`
+- `consensus_block_proposal_sent_height`
 
 ### BlockProposalEvaluated
 
@@ -102,8 +103,8 @@ Represents the evaluation of a block proposal.
 
 **Affects metrics:**
 
-- `proposals_block_proposal_accepted`
-- `proposals_block_proposal_rejected`
+- `consensus_block_proposal_accepted_height`
+- `consensus_block_proposal_rejected_height`
 
 ### BlockCommitted
 
@@ -117,7 +118,7 @@ Represents a block committed event.
 
 **Affects metrics:**
 
-- `proposals_block_committed`
+- `consensus_block_committed_height`
 
 ### MsgExec
 
@@ -305,29 +306,35 @@ Represents an error that occurs during tracing.
 
 ## Configuration
 
-### Metrics Configuration
+### Metrics configuration
 
-The metrics can be configured via the configuration file for `Fendermint`. You can enable metrics and specify the listening host and port as follows:
+The metrics can be configured via the `config.toml` configuration file for Fendermint. You can enable metrics and specify the listening host and port as follows:
 
-````toml
+```toml
 [metrics]
 enabled = true
 
 [metrics.listen]
 host = "127.0.0.1"
 port = 9184
+```
+
 For Ethereum metrics, you can configure them similarly:
 
 ```toml
 [eth.metrics]
 enabled = true
-````
+```
 
-## Tracing Configuration
+## Tracing and journal configuration
 
-Tracing can also be configured via the configuration file for `Fendermint`. You can set the tracing level and specify whether to log to console or file.
+> 🚧 Note: the event journal and general logs are currently output to the same file.
+> We plan to segregate in the near future so that the event journal has its dedicated file.
+> See this issue: https://github.com/consensus-shipyard/ipc/issues/1084.  
 
-### Console Tracing
+Tracing can also be configured via the configuration file for Fendermint. You can set the tracing level and specify whether to log to console or file.
+
+### Console tracing
 
 Example config:
 
@@ -338,7 +345,7 @@ Example config:
 level = "trace" # Options: off, error, warn, info, debug, trace (default: trace)
 ```
 
-### File Tracing
+### File tracing
 
 Example config:
 
@@ -349,7 +356,9 @@ level = "trace" # Options: off, error, warn, info, debug, trace (default: trace)
 directory = "/path/to/log/directory"
 max_log_files = 5 # Number of files to keep after rotation
 rotation = "daily" # Options: minutely, hourly, daily, never
-domain_filter = "Bottomup, Proposals, Mpool, Execution, Topdown, TracingError"
+## Optional: filter events by domain
+domain_filter = "Bottomup, Consenesus, Mpool, Execution, Topdown, TracingError"
+## Optional: filter events by event name
 events_filter = "ParentFinalityAcquired, ParentRpcCalled"
 ```
 

@@ -5,32 +5,30 @@ use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
 
 use fendermint_vm_interpreter::fvm::FvmMessage;
-use tendermint::account::Id;
-
 use ipc_observability::{
     impl_traceable, impl_traceables, lazy_static, register_metrics, serde::HexEncodableBlockHash,
     Recordable, TraceLevel, Traceable,
 };
-
-use prometheus::{register_counter_vec, CounterVec, Registry};
+use prometheus::{register_counter_vec, register_int_gauge, CounterVec, IntGauge, Registry};
+use tendermint::account::Id;
 
 register_metrics! {
-    PROPOSALS_BLOCK_PROPOSAL_RECEIVED: CounterVec
-        = register_counter_vec!("proposals_block_proposal_received", "Block proposal received", &["height"]);
-    PROPOSALS_BLOCK_PROPOSAL_SENT: CounterVec
-        = register_counter_vec!("proposals_block_proposal_sent", "Block proposal sent", &["height"]);
-    PROPOSALS_BLOCK_PROPOSAL_ACCEPTED: CounterVec
-        = register_counter_vec!("proposals_block_proposal_accepted", "Block proposal accepted", &["height"]);
-    PROPOSALS_BLOCK_PROPOSAL_REJECTED: CounterVec
-        = register_counter_vec!("proposals_block_proposal_rejected", "Block proposal rejected", &["height"]);
-    PROPOSALS_BLOCK_COMMITTED: CounterVec
-        = register_counter_vec!("proposals_block_committed", "Block committed", &["height"]);
-    MPOOL_RECEIVED: CounterVec = register_counter_vec!("mpool_received", "Mpool received", &["accept"]);
+    CONSENSUS_BLOCK_PROPOSAL_RECEIVED: IntGauge
+        = register_int_gauge!("consensus_block_proposal_received_height", "Block proposal received (last height)");
+    CONSENSUS_BLOCK_PROPOSAL_SENT: IntGauge
+        = register_int_gauge!("consensus_block_proposal_sent_height", "Block proposal sent (last height)");
+    CONSENSUS_BLOCK_PROPOSAL_ACCEPTED: IntGauge
+        = register_int_gauge!("consensus_block_proposal_accepted_height", "Block proposal accepted (last height)");
+    CONSENSUS_BLOCK_PROPOSAL_REJECTED: IntGauge
+        = register_int_gauge!("consensus_block_proposal_rejected_height", "Block proposal rejected (last height)");
+    CONSENSUS_BLOCK_COMMITTED: IntGauge
+        = register_int_gauge!("consensus_block_committed_height", "Block committed (last height)");
+    MPOOL_RECEIVED: CounterVec = register_counter_vec!("mpool_received", "Message received in mpool", &["accept"]);
 }
 
 impl_traceables!(
     TraceLevel::Info,
-    "Proposals",
+    "Consensus",
     BlockProposalReceived<'a>,
     BlockProposalSent<'a>,
     BlockProposalEvaluated<'a>,
@@ -52,9 +50,7 @@ pub struct BlockProposalReceived<'a> {
 
 impl Recordable for BlockProposalReceived<'_> {
     fn record_metrics(&self) {
-        PROPOSALS_BLOCK_PROPOSAL_RECEIVED
-            .with_label_values(&[&self.height.to_string()])
-            .inc();
+        CONSENSUS_BLOCK_PROPOSAL_RECEIVED.set(self.height as i64);
     }
 }
 
@@ -68,9 +64,7 @@ pub struct BlockProposalSent<'a> {
 
 impl Recordable for BlockProposalSent<'_> {
     fn record_metrics(&self) {
-        PROPOSALS_BLOCK_PROPOSAL_SENT
-            .with_label_values(&[&self.height.to_string()])
-            .inc();
+        CONSENSUS_BLOCK_PROPOSAL_SENT.set(self.height as i64)
     }
 }
 
@@ -88,13 +82,9 @@ pub struct BlockProposalEvaluated<'a> {
 impl Recordable for BlockProposalEvaluated<'_> {
     fn record_metrics(&self) {
         if self.accept {
-            PROPOSALS_BLOCK_PROPOSAL_ACCEPTED
-                .with_label_values(&[&self.height.to_string()])
-                .inc();
+            CONSENSUS_BLOCK_PROPOSAL_ACCEPTED.set(self.height as i64);
         } else {
-            PROPOSALS_BLOCK_PROPOSAL_REJECTED
-                .with_label_values(&[&self.height.to_string()])
-                .inc();
+            CONSENSUS_BLOCK_PROPOSAL_REJECTED.set(self.height as i64);
         }
     }
 }
@@ -107,9 +97,7 @@ pub struct BlockCommitted {
 
 impl Recordable for BlockCommitted {
     fn record_metrics(&self) {
-        PROPOSALS_BLOCK_COMMITTED
-            .with_label_values(&[&self.height.to_string()])
-            .inc();
+        CONSENSUS_BLOCK_COMMITTED.set(self.height as i64)
     }
 }
 

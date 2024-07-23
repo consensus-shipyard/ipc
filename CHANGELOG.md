@@ -2,46 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
-### Observability Framework
+## Unreleased
+
+### Experimental: Observability Framework 👁️📊
 
 - Introduced a new observability framework utilizing the `ipc-observability` crate.
-
   - This framework introduces events and metrics for detailed system monitoring and analysis.
-  - Seamlessly integrates with Prometheus for real-time tracking, alerting, and visualization.
+  - Integrates with Prometheus for real-time tracking, alerting, and visualization.
   - Simplifies observability integration with ready-to-use macros, structs, and functions.
 
-## Added traces and metrics
+IPC now emits events during execution. These events are recorded in the Journal, and are transformed into Prometheus metrics. Observability configuration is performed via `config.toml`.
 
-- Introduced the `BlockProposalReceived` event, which tracks block proposal reception.
-  - Metric: `proposals_block_proposal_received` (CounterVec)
-- Added the `BlockProposalSent` event, which tracks block proposal sending.
-  - Metric: `proposals_block_proposal_sent` (CounterVec)
-- Implemented the `BlockProposalEvaluated` event, which evaluates block proposals.
-  - Metrics: `proposals_block_proposal_accepted` (CounterVec), `proposals_block_proposal_rejected` (CounterVec)
-- Created the `BlockCommitted` event for tracking committed blocks.
-  - Metric: `proposals_block_committed` (CounterVec)
-- Added the `MsgExec` event to represent various execution purposes such as Check, Apply, Estimate, and Call.
-  - Metrics: `exec_fvm_check_execution_time_secs` (Histogram), `exec_fvm_estimate_execution_time_secs` (Histogram), `exec_fvm_apply_execution_time_secs` (Histogram), `exec_fvm_call_execution_time_secs` (Histogram)
-- Introduced the `CheckpointCreated` event for creating bottom-up checkpoints.
-  - Metrics: `bottomup_checkpoint_created_total` (IntCounter), `bottomup_checkpoint_created_height` (IntGauge), `bottomup_checkpoint_created_msgcount` (IntGauge), `bottomup_checkpoint_created_confignum` (IntGauge)
-- Implemented the `CheckpointSigned` event for signing bottom-up checkpoints.
-  - Metric: `bottomup_checkpoint_signed_height` (IntGaugeVec)
-- Added the `CheckpointFinalized` event for finalizing bottom-up checkpoints.
-  - Metric: `bottomup_checkpoint_finalized_height` (IntGauge)
-- Created the `ParentRpcCalled` event to track parent RPC calls.
-  - Metrics: `topdown_parent_rpc_call_total` (IntCounterVec), `topdown_parent_rpc_call_latency_secs` (HistogramVec)
-- Added the `ParentFinalityAcquired` event for acquiring parent finality.
-  - Metric: `topdown_parent_finality_latest_acquired_height` (IntGaugeVec)
-- Implemented the `ParentFinalityPeerVoteReceived` event for receiving parent finality peer votes.
-  - Metric: `topdown_parent_finality_voting_latest_received_height` (IntGaugeVec)
-- Created the `ParentFinalityPeerVoteSent` event for sending parent finality peer votes.
-  - Metric: `topdown_parent_finality_voting_latest_sent_height` (IntGauge)
-- Introduced the `ParentFinalityPeerQuorumReached` event to signify quorum reach in parent finality.
-  - Metrics: `topdown_parent_finality_voting_quorum_height` (IntGauge), `topdown_parent_finality_voting_quorum_weight` (IntGauge)
-- Added the `ParentFinalityCommitted` event to track committed parent finality.
-  - Metric: `topdown_parent_finality_committed_height` (IntGauge)
-- Implemented the `TracingError` event to log tracing errors.
-  - Metric: `tracing_errors` (IntCounterVec)
+Refer to full observability documentation [here](./docs/fendermint/observability.md).
+
+### New events and metrics
+
+| Domain    | Event                             | Description                                                               | Metric(s) derived                                                                                                                                                                                        |
+|:----------|-----------------------------------|---------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Consensus | `BlockProposalReceived`           | Tracks block proposal reception                                           | `consensus_block_proposal_received_height` (IntGauge)                                                                                                                                                    |
+| Consensus | `BlockProposalSent`               | Tracks block proposal sending                                             | `consensus_block_proposal_sent_height` (IntGauge)                                                                                                                                                        |
+| Consensus | `BlockProposalEvaluated`          | Records the result from evaluating block proposals                        | `consensus_block_proposal_accepted_height` (IntGauge), `consensus_block_proposal_rejected_height` (IntGauge)                                                                                             |
+| Consensus | `BlockCommitted`                  | Tracks committed blocks                                                   | `consensus_block_committed_height` (IntGauge)                                                                                                                                                            |
+| Execution | `MsgExec`                         | Represents various message execution paths (Check, Apply, Estimate, Call) | `exec_fvm_check_execution_time_secs` (Histogram), `exec_fvm_estimate_execution_time_secs` (Histogram), `exec_fvm_apply_execution_time_secs` (Histogram), `exec_fvm_call_execution_time_secs` (Histogram) |
+| Bottomup  | `CheckpointCreated`               | Records checkpoint creation                                               | `bottomup_checkpoint_created_total` (IntCounter), `bottomup_checkpoint_created_height` (IntGauge), `bottomup_checkpoint_created_msgcount` (IntGauge), `bottomup_checkpoint_created_confignum` (IntGauge) |
+| Bottomup  | `CheckpointSigned`                | Records checkpoint signatures                                             | `bottomup_checkpoint_signed_height` (IntGaugeVec)                                                                                                                                                        |
+| Bottomup  | `CheckpointFinalized`             | Records checkpoint finalization (quorum reached)                          | `bottomup_checkpoint_finalized_height` (IntGauge)                                                                                                                                                        |
+| Topdown   | `ParentRpcCalled`                 | Tracks parent RPC calls in the context of top-down finality               | `topdown_parent_rpc_call_total` (IntCounterVec), `topdown_parent_rpc_call_latency_secs` (HistogramVec)                                                                                                   |
+| Topdown   | `ParentFinalityAcquired`          | Records acquisition of new parent finality                                | `topdown_parent_finality_latest_acquired_height` (IntGaugeVec)                                                                                                                                           |
+| Topdown   | `ParentFinalityPeerVoteReceived`  | Records peer votes for parent finality                                    | `topdown_parent_finality_voting_latest_received_height` (IntGaugeVec)                                                                                                                                    |
+| Topdown   | `ParentFinalityPeerVoteSent`      | Records own votes for parent finality                                     | `topdown_parent_finality_voting_latest_sent_height` (IntGauge)                                                                                                                                           |
+| Topdown   | `ParentFinalityPeerQuorumReached` | Records quorum reached in parent finality voting                          | `topdown_parent_finality_voting_quorum_height` (IntGauge), `topdown_parent_finality_voting_quorum_weight` (IntGauge)                                                                                     |
+| Topdown   | `ParentFinalityCommitted`         | Tracks parent finality committed on chain                                 | `topdown_parent_finality_committed_height` (IntGauge)                                                                                                                                                    |
+| System    | `TracingError`                    | Logs tracing errors                                                       | `tracing_errors` (IntCounterVec)                                                                                                                                                                         |
 
 ## [axon-r01] - 2024-07-15
 
