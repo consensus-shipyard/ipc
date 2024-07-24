@@ -23,7 +23,7 @@ use serde::{de::DeserializeOwned, Serialize};
 pub struct NetworkConfig {
     /// Cryptographic key used to sign messages.
     pub local_key: Keypair,
-    /// Network name to be differentiate this peer group.
+    /// Network name to differentiate this peer group.
     pub network_name: String,
 }
 

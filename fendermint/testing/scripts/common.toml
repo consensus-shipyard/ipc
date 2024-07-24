@@ -16,7 +16,7 @@ extend = [
     { path = "../../../infra/fendermint/scripts/ethapi.toml" },
     { path = "../../../infra/fendermint/scripts/fendermint.toml" },
     { path = "../../../infra/fendermint/scripts/promtail.toml" },
-    # { path = "../../../infra/fendermint/scripts/ipfs.toml" },
+    { path = "../../../infra/fendermint/scripts/iroh.toml" },
     { path = "./fendermint.toml" },
 ]
 
@@ -50,7 +50,7 @@ dependencies = [
     "fendermint-start",
     "cometbft-start",
     "ethapi-start",
-    "ipfs-start",
+    "iroh-start",
     "cometbft-wait",
     "promtail-start",
     "fendermint-logs",
@@ -68,7 +68,7 @@ run_task = { name = [
     "cometbft-destroy",
     "fendermint-destroy",
     "ethapi-destroy",
-    # "ipfs-destroy",
+    "iroh-destroy",
     "promtail-destroy",
     "docker-network-rm",
     "test-data-dir-rm",
@@ -96,7 +96,7 @@ touch ${TEST_DATA_DIR}/.env
 script = """
 mkdir -p ${TEST_DATA_DIR}/${NODE_NAME}/fendermint/data/logs;
 mkdir -p ${TEST_DATA_DIR}/${NODE_NAME}/cometbft;
-mkdir -p ${TEST_DATA_DIR}/${NODE_NAME}/ipfs;
+mkdir -p ${TEST_DATA_DIR}/${NODE_NAME}/iroh;
 """
 
 [tasks.test-node-dir-rm]

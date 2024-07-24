@@ -17,11 +17,6 @@
 // so we can leave the polling to the `Service` running in a `Task`, rather than do it from the test
 // (although these might be orthogonal).
 
-use std::{
-    sync::atomic::{AtomicU64, Ordering},
-    time::Duration,
-};
-
 use anyhow::anyhow;
 use cid::Cid;
 use fvm_ipld_encoding::IPLD_RAW;
@@ -43,6 +38,10 @@ use libp2p::{
 };
 use multihash::{Code, MultihashDigest};
 use rand::{rngs::StdRng, Rng, SeedableRng};
+use std::{
+    sync::atomic::{AtomicU64, Ordering},
+    time::Duration,
+};
 
 mod store;
 use serde::{Deserialize, Serialize};
@@ -98,7 +97,7 @@ impl ClusterBuilder {
     fn new_with_seed(size: u32, seed: u64) -> Self {
         Self {
             size,
-            rng: rand::rngs::StdRng::seed_from_u64(seed),
+            rng: StdRng::seed_from_u64(seed),
             services: Default::default(),
             agents: Default::default(),
         }
@@ -286,7 +285,7 @@ async fn single_bootstrap_publish_receive_preemptive() {
 
 #[tokio::test]
 async fn can_register_metrics() {
-    let mut rng = rand::rngs::StdRng::seed_from_u64(0);
+    let mut rng = StdRng::seed_from_u64(0);
     let config = make_config(&mut rng, 1, None);
     let (mut service, _) = make_service(config).await;
     let registry = prometheus::Registry::new();
@@ -348,7 +347,7 @@ fn make_config(rng: &mut StdRng, cluster_size: u32, bootstrap_addr: Option<Multi
             rate_limit_bytes: 1 << 20,
             rate_limit_period: Duration::from_secs(60),
         },
-        iroh_addr: "127.0.0.1:4919".to_string(),
+        iroh_addr: "127.0.0.1:4919".parse().unwrap(),
     };
 
     config

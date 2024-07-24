@@ -1,5 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
+
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::time::Duration;
@@ -28,10 +29,10 @@ use serde::Serialize;
 use tokio::select;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
-use tokio::sync::oneshot::{self, Sender};
+use tokio::sync::oneshot::Sender;
 
 use crate::behaviour::{
-    self, content, discovery, membership, Behaviour, BehaviourEvent, ConfigError, ContentConfig,
+    content, discovery, membership, Behaviour, BehaviourEvent, ConfigError, ContentConfig,
     DiscoveryConfig, MembershipConfig, NetworkConfig,
 };
 use crate::client::Client;
@@ -42,7 +43,7 @@ use crate::vote_record::{SignedVoteRecord, VoteRecord};
 pub type ResolveResult = anyhow::Result<()>;
 
 /// Channel to complete the results with.
-type ResponseChannel = oneshot::Sender<ResolveResult>;
+type ResponseChannel = Sender<ResolveResult>;
 
 /// State of a query. The fallback peers can be used
 /// if the current attempt fails.
@@ -95,7 +96,7 @@ pub struct Config {
     pub membership: MembershipConfig,
     pub connection: ConnectionConfig,
     pub content: ContentConfig,
-    pub iroh_addr: String,
+    pub iroh_addr: SocketAddr,
 }
 
 /// Internal requests to enqueue to the [`Service`]
@@ -212,8 +213,7 @@ where
         let (request_tx, request_rx) = mpsc::unbounded_channel();
         let (event_tx, _) = broadcast::channel(config.connection.event_buffer_capacity as usize);
 
-        let iroh_addr: SocketAddr = config.iroh_addr.parse()?;
-        let iroh = iroh::client::Iroh::connect_addr(iroh_addr).await?;
+        let iroh = iroh::client::Iroh::connect_addr(config.iroh_addr).await?;
 
         let service = Self {
             peer_id,
@@ -307,7 +307,7 @@ where
                     // All Client instances have been dropped.
                     None => { break; }
                 }
-            };
+            }
         }
         Ok(())
     }
@@ -587,13 +587,13 @@ where
 
     // The following are helper functions because Rust Analyzer has trouble with recognising that `swarm.behaviour_mut()` is a legal call.
 
-    fn discovery_mut(&mut self) -> &mut behaviour::discovery::Behaviour {
+    fn discovery_mut(&mut self) -> &mut discovery::Behaviour {
         self.swarm.behaviour_mut().discovery_mut()
     }
-    fn membership_mut(&mut self) -> &mut behaviour::membership::Behaviour<V> {
+    fn membership_mut(&mut self) -> &mut membership::Behaviour<V> {
         self.swarm.behaviour_mut().membership_mut()
     }
-    fn content_mut(&mut self) -> &mut behaviour::content::Behaviour<P> {
+    fn content_mut(&mut self) -> &mut content::Behaviour<P> {
         self.swarm.behaviour_mut().content_mut()
     }
 }

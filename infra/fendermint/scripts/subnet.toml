@@ -55,12 +55,12 @@ dependencies = [
     "cometbft-config",
     "fendermint-deps",
     "validator-config",
+    "iroh-start",
     "fendermint-start-validator",
     "cometbft-start",
     "cometbft-wait",
     "ethapi-start",
     "objects-start",
-    # "ipfs-start",
     "node-report",
 ]
 
@@ -75,12 +75,12 @@ dependencies = [
     "cometbft-config",
     "fendermint-deps",
     "validator-no-parent-config",
+    "iroh-start",
     "fendermint-start-validator-no-parent",
     "cometbft-start",
     "cometbft-wait",
     "ethapi-start",
     "objects-start",
-    # "ipfs-start",
     "node-report",
 ]
 
@@ -90,13 +90,13 @@ run_task = { name = [
     "fendermint-destroy",
     "ethapi-destroy",
     "objects-destroy",
-    # "ipfs-destroy",
+    "iroh-destroy",
+    "iroh-start",
     "fendermint-start-validator",
     "cometbft-start",
     "cometbft-wait",
     "ethapi-start",
     "objects-start",
-    # "ipfs-start",
     "node-report",
 ] }
 
@@ -106,13 +106,13 @@ run_task = { name = [
     "fendermint-destroy",
     "ethapi-destroy",
     "objects-destroy",
-    # "ipfs-destroy",
+    "iroh-destroy",
+    "iroh-start",
     "fendermint-start-validator-no-parent",
     "cometbft-start",
     "cometbft-wait",
     "ethapi-start",
     "objects-start",
-    # "ipfs-start",
     "node-report",
 ] }
 
@@ -132,12 +132,12 @@ dependencies = [
     "cometbft-config",
     "fendermint-deps",
     "subnet-config",
+    "iroh-start",
     "fendermint-start-subnet",
     "cometbft-start",
     "cometbft-wait",
     "ethapi-start",
     "objects-start",
-    # "ipfs-start",
     "node-report",
 ]
 
@@ -199,8 +199,8 @@ Subnet ID:
 Object API:
 \thttp://0.0.0.0:${OBJECTS_HOST_PORT}
 
-IPFS API:
-\thttp://0.0.0.0:${IPFS_RPC_HOST_PORT}
+Iroh API:
+\thttp://0.0.0.0:${IROH_RPC_HOST_PORT}
 
 Eth API:
 \thttp://0.0.0.0:${ETHAPI_HOST_PORT}

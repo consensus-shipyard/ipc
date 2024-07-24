@@ -1,6 +1,9 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::net::ToSocketAddrs;
+use std::sync::Arc;
+
 use anyhow::{anyhow, bail, Context};
 use async_stm::atomically_or_err;
 use fendermint_abci::ApplicationService;
@@ -31,10 +34,9 @@ use fvm_shared::address::{current_network, Address, Network};
 use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
-use std::sync::Arc;
 use tokio::sync::broadcast::error::RecvError;
 use tower::ServiceBuilder;
-use tracing::info;
+use tracing::{debug, error, info, warn};
 
 use crate::cmd::key::read_secret_key;
 use crate::{cmd, options::run::RunArgs, settings::Settings};
@@ -60,7 +62,7 @@ namespaces! {
 /// This method acts as our composition root.
 async fn run(iroh_addr: String, settings: Settings) -> anyhow::Result<()> {
     let tendermint_rpc_url = settings.tendermint_rpc_url()?;
-    tracing::info!("Connecting to Tendermint at {tendermint_rpc_url}");
+    info!("Connecting to Tendermint at {tendermint_rpc_url}");
 
     let tendermint_client: tendermint_rpc::HttpClient =
         tendermint_rpc::HttpClient::new(tendermint_rpc_url)
@@ -84,14 +86,14 @@ async fn run(iroh_addr: String, settings: Settings) -> anyhow::Result<()> {
             if sk.exists() && sk.is_file() {
                 let sk = read_secret_key(&sk).context("failed to read validator key")?;
                 let addr = to_address(&sk, &key.kind)?;
-                tracing::info!("validator key address: {addr} detected");
+                info!("validator key address: {addr} detected");
                 Some((sk, addr))
             } else {
                 bail!("validator key does not exist: {}", sk.to_string_lossy());
             }
         }
         None => {
-            tracing::info!("validator key not configured");
+            info!("validator key not configured");
             None
         }
     };
@@ -169,7 +171,8 @@ async fn run(iroh_addr: String, settings: Settings) -> anyhow::Result<()> {
             state_store.clone(),
             ns.bit_store,
             iroh_addr,
-        ).await?;
+        )
+        .await?;
 
         // Register all metrics from the IPLD resolver stack
         if let Some(ref registry) = metrics_registry {
@@ -198,7 +201,7 @@ async fn run(iroh_addr: String, settings: Settings) -> anyhow::Result<()> {
                 let parent_finality_votes = parent_finality_votes.clone();
                 let own_subnet_id = own_subnet_id.clone();
 
-                tracing::info!("starting the parent finality vote gossip loop...");
+                info!("starting the parent finality vote gossip loop...");
                 let client = client.clone();
                 tokio::spawn(async move {
                     publish_vote_loop(
@@ -215,10 +218,10 @@ async fn run(iroh_addr: String, settings: Settings) -> anyhow::Result<()> {
                     .await
                 });
             } else {
-                tracing::info!("parent finality vote gossip disabled");
+                info!("parent finality vote gossip disabled");
             }
         } else {
-            tracing::info!("parent finality vote gossip disabled");
+            info!("parent finality vote gossip disabled");
         }
 
         if let Some(key) = validator_keypair {
@@ -232,34 +235,34 @@ async fn run(iroh_addr: String, settings: Settings) -> anyhow::Result<()> {
                 |value| AppVote::ObjectFinality(IPCObjectFinality { object: value }),
             );
 
-            tracing::info!("starting the iroh Resolver...");
+            info!("starting the iroh Resolver...");
             tokio::spawn(async move { iroh_resolver.run().await });
         } else {
-            tracing::info!("iroh Resolver disabled.")
+            info!("iroh Resolver disabled.")
         }
 
-        tracing::info!("subscribing to gossip...");
+        info!("subscribing to gossip...");
         let rx = service.subscribe();
         let parent_finality_votes = parent_finality_votes.clone();
         tokio::spawn(async move {
             dispatch_resolver_events(rx, parent_finality_votes, topdown_enabled).await;
         });
 
-        tracing::info!("starting the IPLD Resolver Service...");
+        info!("starting the IPLD Resolver Service...");
         tokio::spawn(async move {
             if let Err(e) = service.run().await {
-                tracing::error!("IPLD Resolver Service failed: {e:#}")
+                error!("IPLD Resolver Service failed: {e:#}")
             }
         });
 
-        tracing::info!("starting the IPLD Resolver...");
+        info!("starting the IPLD Resolver...");
         tokio::spawn(async move { resolver.run().await });
     } else {
-        tracing::info!("IPLD Resolver disabled.")
+        info!("IPLD Resolver disabled.")
     }
 
     let (parent_finality_provider, ipc_tuple) = if topdown_enabled {
-        tracing::info!("topdown finality enabled");
+        info!("topdown finality enabled");
         let topdown_config = settings.ipc.topdown_config()?;
         let mut config = fendermint_vm_topdown::Config::new(
             topdown_config.chain_head_delay,
@@ -281,7 +284,7 @@ async fn run(iroh_addr: String, settings: Settings) -> anyhow::Result<()> {
         let p = Arc::new(Toggle::enabled(finality_provider));
         (p, Some((ipc_provider, config)))
     } else {
-        tracing::info!("topdown finality disabled");
+        info!("topdown finality disabled");
         (Arc::new(Toggle::disabled()), None)
     };
 
@@ -301,13 +304,13 @@ async fn run(iroh_addr: String, settings: Settings) -> anyhow::Result<()> {
         )
         .context("failed to create snapshot manager")?;
 
-        tracing::info!("starting the SnapshotManager...");
+        info!("starting the SnapshotManager...");
         let tendermint_client = tendermint_client.clone();
         tokio::spawn(async move { manager.run(tendermint_client).await });
 
         Some(client)
     } else {
-        tracing::info!("snapshots disabled");
+        info!("snapshots disabled");
         None
     };
 
@@ -346,7 +349,7 @@ async fn run(iroh_addr: String, settings: Settings) -> anyhow::Result<()> {
             .await
             {
                 Ok(_) => {}
-                Err(e) => tracing::error!("cannot launch polling syncer: {e}"),
+                Err(e) => error!("cannot launch polling syncer: {e}"),
             }
         });
     }
@@ -405,7 +408,7 @@ async fn run(iroh_addr: String, settings: Settings) -> anyhow::Result<()> {
 /// Open database with all
 fn open_db(settings: &Settings, ns: &Namespaces) -> anyhow::Result<RocksDb> {
     let path = settings.data_dir().join("rocksdb");
-    tracing::info!(
+    info!(
         path = path.to_string_lossy().into_owned(),
         "opening database"
     );
@@ -433,7 +436,8 @@ async fn make_resolver_service(
     let config =
         to_resolver_config(settings, iroh_addr).context("error creating resolver config")?;
 
-    let service = ipc_ipld_resolver::Service::new(config, bitswap_store).await
+    let service = ipc_ipld_resolver::Service::new(config, bitswap_store)
+        .await
         .context("error creating IPLD Resolver Service")?;
 
     Ok(service)
@@ -459,7 +463,7 @@ fn make_ipc_provider_proxy(settings: &Settings) -> anyhow::Result<IPCProviderPro
             gateway_addr: topdown_config.parent_gateway,
         }),
     };
-    tracing::info!("init ipc provider with subnet: {}", subnet.id);
+    info!("init ipc provider with subnet: {}", subnet.id);
 
     let ipc_provider = IpcProvider::new_with_subnet(None, subnet)?;
     IPCProviderProxy::new(ipc_provider, settings.ipc.subnet_id.clone())
@@ -487,6 +491,11 @@ fn to_resolver_config(
         settings.ipc.subnet_id.root_id(),
         r.network.network_name
     );
+
+    let iroh_addr = iroh_addr
+        .to_socket_addrs()?
+        .next()
+        .ok_or(anyhow!("failed to convert iroh_addr to a socket address"))?;
 
     let config = Config {
         connection: ConnectionConfig {
@@ -545,10 +554,10 @@ async fn dispatch_resolver_events(
                 }
             },
             Err(RecvError::Lagged(n)) => {
-                tracing::warn!("the resolver service skipped {n} gossip events")
+                warn!("the resolver service skipped {n} gossip events")
             }
             Err(RecvError::Closed) => {
-                tracing::error!("the resolver service stopped receiving gossip");
+                error!("the resolver service stopped receiving gossip");
                 return;
             }
         }
@@ -563,7 +572,7 @@ async fn dispatch_vote(
     match vote.content {
         AppVote::ParentFinality(f) => {
             if !topdown_enabled {
-                tracing::debug!("ignoring vote; topdown disabled");
+                debug!("ignoring vote; topdown disabled");
                 return;
             }
             let res = atomically_or_err(|| {
@@ -580,7 +589,7 @@ async fn dispatch_vote(
                     added
                 }
                 Err(e @ VoteError::Equivocation(_, _, _, _)) => {
-                    tracing::warn!(error = e.to_string(), "failed to handle vote");
+                    warn!(error = e.to_string(), "failed to handle vote");
                     false
                 }
                 Err(e @ (
@@ -588,7 +597,7 @@ async fn dispatch_vote(
                 | VoteError::UnpoweredValidator(_) // maybe arrived too early or too late, or spam
                 | VoteError::UnexpectedBlock(_, _) // won't happen here
                 )) => {
-                    tracing::debug!(error = e.to_string(), "failed to handle vote");
+                    debug!(error = e.to_string(), "failed to handle vote");
                     false
                 }
             };
@@ -618,7 +627,7 @@ async fn dispatch_vote(
             }
         }
         AppVote::ObjectFinality(f) => {
-            tracing::debug!(cid = ?f.object, "received vote for object finality");
+            debug!(cid = ?f.object, "received vote for object finality");
 
             let res = atomically_or_err(|| {
                 parent_finality_votes.add_object_vote(vote.public_key.clone(), f.object.to_bytes())
@@ -628,14 +637,14 @@ async fn dispatch_vote(
             match res {
                 Ok(_) => {}
                 Err(e @ VoteError::Equivocation(_, _, _, _)) => {
-                    tracing::warn!(error = e.to_string(), "failed to handle vote");
+                    warn!(error = e.to_string(), "failed to handle vote");
                 }
                 Err(e @ (
                 VoteError::Uninitialized // early vote, we're not ready yet
                 | VoteError::UnpoweredValidator(_) // maybe arrived too early or too late, or spam
                 | VoteError::UnexpectedBlock(_, _) // won't happen here
                 )) => {
-                    tracing::debug!(error = e.to_string(), "failed to handle vote");
+                    debug!(error = e.to_string(), "failed to handle vote");
                 }
             };
         }

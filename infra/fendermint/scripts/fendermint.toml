@@ -4,7 +4,7 @@ env = { "ENTRY" = "fendermint", "CMD" = "run", "FLAGS" = "-d" }
 
 [tasks.fendermint-pull]
 condition = { env_not_set = [
-  "FM_PULL_SKIP",
+    "FM_PULL_SKIP",
 ], fail_message = "Skipped pulling fendermint Docker image." }
 script = """
   docker pull ghcr.io/consensus-shipyard/fendermint:${FM_DOCKER_TAG}
@@ -29,7 +29,7 @@ docker run \
   --env FM_SNAPSHOTS_DIR=/data/${NODE_NAME}/fendermint/snapshots \
   --env FM_CHAIN_NAME=${NETWORK_NAME} \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
-  --env IPFS_RPC_ADDR=/dns4/${IPFS_CONTAINER_NAME}/tcp/5001 \
+  --env IROH_RPC_ADDR=${IROH_CONTAINER_NAME}:4919 \
   --env LOG_LEVEL=${FM_LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
   --entrypoint ${ENTRY} \
@@ -77,7 +77,7 @@ docker run \
   --env FM_VALIDATOR_KEY__PATH=/data/${NODE_NAME}/${VALIDATOR_PRIV_KEY_PATH} \
   --env FM_VALIDATOR_KEY__KIND=ethereum \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
-  --env IPFS_RPC_ADDR=/dns4/${IPFS_CONTAINER_NAME}/tcp/5001 \
+  --env IROH_RPC_ADDR=${IROH_CONTAINER_NAME}:4919 \
   --env LOG_LEVEL=${FM_LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
   ${FM_DOCKER_IMAGE} \
@@ -112,7 +112,7 @@ docker run \
   --env FM_VALIDATOR_KEY__PATH=/data/${NODE_NAME}/${VALIDATOR_PRIV_KEY_PATH} \
   --env FM_VALIDATOR_KEY__KIND=ethereum \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
-  --env IPFS_RPC_ADDR=/dns4/${IPFS_CONTAINER_NAME}/tcp/5001 \
+  --env IROH_RPC_ADDR=${IROH_CONTAINER_NAME}:4919 \
   --env LOG_LEVEL=${FM_LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
   ${FM_DOCKER_IMAGE} \
@@ -157,7 +157,7 @@ docker run \
   --env FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES=${RESOLVER_BOOTSTRAPS} \
   --env FM_TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
-  --env IPFS_RPC_ADDR=/dns4/${IPFS_CONTAINER_NAME}/tcp/5001 \
+  --env IROH_RPC_ADDR=${IROH_CONTAINER_NAME}:4919 \
   --env LOG_LEVEL=${FM_LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
   ${FM_DOCKER_IMAGE} \

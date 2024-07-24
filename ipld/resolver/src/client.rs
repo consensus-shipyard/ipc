@@ -113,7 +113,7 @@ where
     }
 }
 
-/// Trait to limit the capabilities to resolving CIDs from IPFS.
+/// Trait to limit the capabilities to resolving CIDs from Iroh.
 #[async_trait]
 pub trait ResolverIroh {
     /// Send a CID for resolution from an iroh node, await its completion,

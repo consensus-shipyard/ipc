@@ -2,11 +2,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::{
-    convert::Infallible,
-    net::{SocketAddr, ToSocketAddrs},
-    num::ParseIntError,
-};
+use std::{convert::Infallible, net::ToSocketAddrs, num::ParseIntError};
 
 use anyhow::anyhow;
 use base64::{engine::general_purpose, Engine};
@@ -31,14 +27,13 @@ use warp::{
     Filter, Rejection, Reply,
 };
 
+use crate::cmd;
+use crate::options::objects::{ObjectsArgs, ObjectsCommands};
 use fendermint_actor_objectstore::GetParams;
 use fendermint_app_settings::objects::ObjectsSettings;
 use fendermint_rpc::client::FendermintClient;
 use fendermint_vm_message::query::FvmQueryHeight;
 use fvm_shared::chainid::ChainID;
-
-use crate::cmd;
-use crate::options::objects::{ObjectsArgs, ObjectsCommands};
 
 const MAX_OBJECT_LENGTH: u64 = 1024 * 1024 * 1024;
 
@@ -48,8 +43,11 @@ cmd! {
             ObjectsCommands::Run { tendermint_url, iroh_addr} => {
                 let client = FendermintClient::new_http(tendermint_url, None)?;
 
-                let iroh_addr: SocketAddr = iroh_addr.parse()?;
-                let iroh = iroh::client::Iroh::connect_addr(iroh_addr).await?;
+                let iroh_addr = iroh_addr
+                    .to_socket_addrs()?
+                    .next()
+                    .ok_or(anyhow!("failed to convert iroh_addr to a socket address"))?;
+                let iroh_client = iroh::client::Iroh::connect_addr(iroh_addr).await?;
 
                 // Admin routes
                 let health_route = warp::path!("health")
@@ -59,7 +57,7 @@ cmd! {
                 let objects_upload = warp::path!("v1" / "objects" )
                 .and(warp::post())
                 .and(with_client(client.clone()))
-                .and(with_iroh(iroh.clone()))
+                .and(with_iroh(iroh_client.clone()))
                 .and(warp::multipart::form().max_length(MAX_OBJECT_LENGTH))
                 .and_then(handle_object_upload);
 
@@ -72,7 +70,7 @@ cmd! {
                 .and(warp::header::optional::<String>("Range"))
                 .and(warp::query::<HeightQuery>())
                 .and(with_client(client.clone()))
-                .and(with_iroh(iroh.clone()))
+                .and(with_iroh(iroh_client.clone()))
                 .and_then(handle_object_download);
 
                 let router = health_route
@@ -87,7 +85,7 @@ cmd! {
                     warp::serve(router).run(listen_addr).await;
                     Ok(())
                 } else {
-                    Err(anyhow!("failed to convert to any socket address"))
+                    Err(anyhow!("failed to convert to a socket address"))
                 }
             },
         }
@@ -653,7 +651,7 @@ mod tests {
             .as_bytes(),
         );
 
-        dbg!(std::str::from_utf8(&body));
+        dbg!(std::str::from_utf8(&body)).unwrap();
         body
     }
 
@@ -746,13 +744,7 @@ mod tests {
             gas_premium: TokenAmount::from_atto(0),
         };
         let chain_id = fvm_shared::chainid::ChainID::from(314159);
-        let signed = fendermint_vm_message::signed::SignedMessage::new_secp256k1(
-            message,
-            Some(object),
-            &sk,
-            &chain_id,
-        )
-        .unwrap();
+        let signed = SignedMessage::new_secp256k1(message, Some(object), &sk, &chain_id).unwrap();
 
         let serialized_signed_message = fvm_ipld_encoding::to_vec(&signed).unwrap();
         let serialized_signed_message_b64 =
