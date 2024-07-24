@@ -312,7 +312,9 @@ impl smt::StateMachine for VotingMachine {
                 // commitment is ok to be the same, because vote hash is different
                 let vote = TopdownVote::v1(vote_height, vote_hash, Cid::default().to_bytes());
                 let key_pair = &state.validator_states[vk].key_pair;
-                let signed = SignedVote::signed(key_pair, &vote).unwrap();
+                let signed =
+                    SignedVote::signed(&key_pair.clone().try_into_secp256k1().unwrap(), &vote)
+                        .unwrap();
                 VotingCommand::AddVote(signed)
             }
             // Update the power table

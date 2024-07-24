@@ -365,11 +365,12 @@ pub async fn publish_vote_loop<V>(
     vote_interval: Duration,
     // Publish a vote after a timeout even if it's the same as before.
     vote_timeout: Duration,
-    key: libp2p::identity::Keypair,
+    key: libp2p::identity::secp256k1::Keypair,
     pubsub_topic: String,
     client: ipc_ipld_resolver::Client<SignedVote>,
 ) {
-    let validator_key = ValidatorKey::from(key.public());
+    let pubkey = libp2p::identity::PublicKey::from(key.public().clone());
+    let validator_key = ValidatorKey::from(pubkey);
 
     let mut vote_interval = tokio::time::interval(vote_interval);
     vote_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);

@@ -197,7 +197,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         if topdown_enabled {
             if let Some(key) = validator_keypair {
                 let parent_finality_votes = parent_finality_votes.clone();
-
+                let key = key.try_into_secp256k1().expect("only secp key for now");
                 let topic = format!(
                     "{}/{}/{}",
                     PUBSUB_VOTES,
