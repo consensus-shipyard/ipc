@@ -1,10 +1,10 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::finality::ParentViewPayload;
+use crate::finality::{CachedFinalityProvider, ParentViewPayload};
 use crate::{
-    BlockHash, BlockHeight, CachedFinalityProvider, Error, IPCParentFinality,
-    ParentFinalityProvider, ParentViewProvider, TopdownProposal,
+    BlockHash, BlockHeight, Error, IPCParentFinality, ParentFinalityProvider, ParentViewProvider,
+    TopdownProposal,
 };
 use anyhow::anyhow;
 use async_stm::{Stm, StmResult};

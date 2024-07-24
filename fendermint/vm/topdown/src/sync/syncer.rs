@@ -2,13 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! The inner type of parent syncer
 
-use crate::finality::ParentViewPayload;
+use crate::finality::{CachedFinalityProvider, ParentViewPayload};
 use crate::proxy::ParentQueryProxy;
 use crate::sync::{query_starting_finality, ParentFinalityStateQuery};
 use crate::voting::{self, VoteTally};
 use crate::{
-    is_null_round_str, BlockHash, BlockHeight, CachedFinalityProvider, Config, Error,
-    ParentFinalityProvider, Toggle,
+    is_null_round_str, BlockHash, BlockHeight, Config, Error, ParentFinalityProvider, Toggle,
 };
 use anyhow::anyhow;
 use async_stm::{atomically, atomically_or_err, StmError};
@@ -390,13 +389,14 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::finality::CachedFinalityProvider;
     use crate::proxy::ParentQueryProxy;
     use crate::sync::syncer::LotusParentSyncer;
     use crate::sync::ParentFinalityStateQuery;
     use crate::voting::VoteTally;
     use crate::{
-        BlockHash, BlockHeight, CachedFinalityProvider, Config, IPCParentFinality,
-        SequentialKeyCache, Toggle, NULL_ROUND_ERR_MSG,
+        BlockHash, BlockHeight, Config, IPCParentFinality, SequentialKeyCache, Toggle,
+        NULL_ROUND_ERR_MSG,
     };
     use anyhow::anyhow;
     use async_stm::atomically;

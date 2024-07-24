@@ -9,7 +9,7 @@ use crate::proxy::ParentQueryProxy;
 use crate::sync::syncer::LotusParentSyncer;
 use crate::sync::tendermint::TendermintAwareSyncer;
 use crate::voting::VoteTally;
-use crate::{CachedFinalityProvider, Config, IPCParentFinality, ParentFinalityProvider, Toggle};
+use crate::{Config, IPCParentFinality, ParentFinalityProvider, Toggle};
 use anyhow::anyhow;
 use async_stm::atomically;
 use ethers::utils::hex;
@@ -19,6 +19,7 @@ use std::time::Duration;
 
 use fendermint_vm_genesis::{Power, Validator};
 
+use crate::finality::CachedFinalityProvider;
 pub use syncer::fetch_topdown_events;
 
 /// Query the parent finality from the block chain state.

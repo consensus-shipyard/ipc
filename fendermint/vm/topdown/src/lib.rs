@@ -24,10 +24,10 @@ use std::time::Duration;
 
 pub use crate::cache::{SequentialAppendError, SequentialKeyCache, ValueIter};
 pub use crate::error::Error;
-pub use crate::finality::CachedFinalityProvider;
 pub use crate::toggle::Toggle;
 use crate::voting::payload::TopdownVote;
 use crate::voting::quorum::MultiSigCert;
+pub use finality::CachedFinalityProvider;
 
 pub type BlockHeight = u64;
 pub type Bytes = Vec<u8>;

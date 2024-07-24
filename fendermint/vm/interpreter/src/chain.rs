@@ -19,9 +19,8 @@ use fendermint_vm_message::{
 };
 use fendermint_vm_resolver::pool::{ResolveKey, ResolvePool};
 use fendermint_vm_topdown::voting::{ValidatorKey, VoteTally, Weight};
-use fendermint_vm_topdown::{
-    CachedFinalityProvider, ParentFinalityProvider, Toggle, TopdownProposalWithQuorum,
-};
+use fendermint_vm_topdown::CachedFinalityProvider;
+use fendermint_vm_topdown::{ParentFinalityProvider, Toggle, TopdownProposalWithQuorum};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::econ::TokenAmount;

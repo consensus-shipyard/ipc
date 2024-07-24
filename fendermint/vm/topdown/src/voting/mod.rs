@@ -161,17 +161,36 @@ impl VoteTally {
     pub fn add_block(&self, payload: TopdownVote) -> StmResult<(), Error> {
         let mut chain = self.chain.read_clone()?;
 
-        // Check that we are extending the chain. We could also ignore existing heights.
-        let parent_height = match chain.get_max() {
-            None => self.last_finalized_height.read_clone()?,
-            Some((parent_height, _)) => *parent_height,
-        };
-
         let block_height = payload.block_height();
 
-        if block_height <= parent_height {
-            return abort(Error::UnexpectedBlock(parent_height, block_height));
-        }
+        // Check that we are extending the chain. We could also ignore existing heights.
+        match chain.get_max() {
+            None => {
+                let last_finalized_height = self.last_finalized_height.read_clone()?;
+                if block_height <= last_finalized_height {
+                    tracing::error!(
+                        height = block_height,
+                        last_finalized_height,
+                        "block data for vote tally went backwards"
+                    );
+                    return abort(Error::UnexpectedBlock(last_finalized_height, block_height));
+                }
+            }
+            Some((parent_height, vote)) => {
+                if block_height == *parent_height {
+                    debug_assert!(*vote == Some(payload.clone()), "inconsistent block data");
+                }
+
+                if block_height <= *parent_height {
+                    tracing::warn!(
+                        height = block_height,
+                        parent_height,
+                        "past block data added, this should not have happened, ignore"
+                    );
+                    return Ok(());
+                }
+            }
+        };
 
         chain.insert(block_height, Some(payload));
 

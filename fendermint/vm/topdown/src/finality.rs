@@ -1,25 +1,45 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::finality::{
-    ensure_sequential, topdown_cross_msgs, validator_changes, ParentViewPayload,
-};
+use crate::error::Error;
 use crate::{
-    BlockHash, BlockHeight, Config, Error, IPCParentFinality, SequentialKeyCache, TopdownProposal,
+    BlockHash, BlockHeight, Config, IPCParentFinality, ParentFinalityProvider, ParentViewProvider,
+    SequentialKeyCache, TopdownProposal,
 };
 use async_stm::{abort, Stm, StmResult, TVar};
-use fvm_shared::clock::ChainEpoch;
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
-use std::cmp::min;
 
+use crate::proxy::ParentQueryProxy;
 use fendermint_tracing::emit;
 use fendermint_vm_event::ParentFinalityCommitted;
 use fendermint_vm_message::ipc::ParentFinalityPayload;
+use fvm_shared::clock::ChainEpoch;
+use std::cmp::min;
+use std::sync::Arc;
 
-/// Finality provider that can handle null blocks
+pub(crate) type ParentViewPayload = (BlockHash, Vec<StakingChangeRequest>, Vec<IpcEnvelope>);
+
+fn ensure_sequential<T, F: Fn(&T) -> u64>(msgs: &[T], f: F) -> StmResult<(), Error> {
+    if msgs.is_empty() {
+        return Ok(());
+    }
+
+    let first = msgs.first().unwrap();
+    let mut nonce = f(first);
+    for msg in msgs.iter().skip(1) {
+        if nonce + 1 != f(msg) {
+            return abort(Error::NotSequential);
+        }
+        nonce += 1;
+    }
+
+    Ok(())
+}
+
+/// The finality provider that performs io to the parent if not found in cache
 #[derive(Clone)]
-pub struct FinalityWithNull {
+pub struct CachedFinalityProvider {
     config: Config,
     genesis_epoch: BlockHeight,
     /// Cached data that always syncs with the latest parent chain proactively
@@ -29,47 +49,26 @@ pub struct FinalityWithNull {
     last_committed_finality: TVar<Option<IPCParentFinality>>,
 }
 
-impl FinalityWithNull {
-    pub fn new(
-        config: Config,
-        genesis_epoch: BlockHeight,
-        committed_finality: Option<IPCParentFinality>,
-    ) -> Self {
-        Self {
-            config,
-            genesis_epoch,
-            cached_data: TVar::new(SequentialKeyCache::sequential()),
-            last_committed_finality: TVar::new(committed_finality),
-        }
-    }
-
-    pub fn genesis_epoch(&self) -> anyhow::Result<BlockHeight> {
+#[async_trait::async_trait]
+impl ParentViewProvider for CachedFinalityProvider {
+    fn genesis_epoch(&self) -> anyhow::Result<BlockHeight> {
         Ok(self.genesis_epoch)
     }
+}
 
-    pub fn last_committed_finality(&self) -> Stm<Option<IPCParentFinality>> {
-        self.last_committed_finality.read_clone()
-    }
-
-    /// Clear the cache and set the committed finality to the provided value
-    pub fn reset(&self, finality: IPCParentFinality) -> Stm<()> {
-        self.cached_data.write(SequentialKeyCache::sequential())?;
-        self.last_committed_finality.write(Some(finality))
-    }
-
-    pub fn new_parent_view(
-        &self,
-        height: BlockHeight,
-        maybe_payload: Option<ParentViewPayload>,
-    ) -> StmResult<(), Error> {
-        if let Some((block_hash, validator_changes, top_down_msgs)) = maybe_payload {
-            self.parent_block_filled(height, block_hash, validator_changes, top_down_msgs)
+impl ParentFinalityProvider for CachedFinalityProvider {
+    fn next_proposal(&self) -> Stm<Option<TopdownProposal>> {
+        let height = if let Some(h) = self.propose_next_height()? {
+            h
         } else {
-            self.parent_null_round(height)
-        }
+            return Ok(None);
+        };
+
+        // safe to unwrap as we make sure null height will not be proposed
+        self.proposal_at_height(height)
     }
 
-    pub fn proposal_at_height(&self, target_height: BlockHeight) -> Stm<Option<TopdownProposal>> {
+    fn proposal_at_height(&self, target_height: BlockHeight) -> Stm<Option<TopdownProposal>> {
         if self
             .get_at_height(target_height, |v| v.0.clone())?
             .is_none()
@@ -83,18 +82,7 @@ impl FinalityWithNull {
         self.proposal_sealed_till_height(target_height)
     }
 
-    pub fn next_proposal(&self) -> Stm<Option<TopdownProposal>> {
-        let height = if let Some(h) = self.propose_next_height()? {
-            h
-        } else {
-            return Ok(None);
-        };
-
-        // safe to unwrap as we make sure null height will not be proposed
-        self.proposal_at_height(height)
-    }
-
-    pub fn set_new_finality(
+    fn set_new_finality(
         &self,
         finality: IPCParentFinality,
         previous_finality: Option<IPCParentFinality>,
@@ -124,7 +112,69 @@ impl FinalityWithNull {
     }
 }
 
-impl FinalityWithNull {
+impl CachedFinalityProvider {
+    /// Creates an uninitialized provider
+    /// We need this because `fendermint` has yet to be initialized and might
+    /// not be able to provide an existing finality from the storage. This provider requires an
+    /// existing committed finality. Providing the finality will enable other functionalities.
+    pub async fn uninitialized<T: ParentQueryProxy + Send + Sync + 'static>(
+        config: Config,
+        parent_client: Arc<T>,
+    ) -> anyhow::Result<Self> {
+        let genesis = parent_client.get_genesis_epoch().await?;
+        Ok(Self::new(config, genesis, None))
+    }
+}
+
+impl CachedFinalityProvider {
+    pub(crate) fn new(
+        config: Config,
+        genesis_epoch: BlockHeight,
+        committed_finality: Option<IPCParentFinality>,
+    ) -> Self {
+        Self {
+            config,
+            genesis_epoch,
+            cached_data: TVar::new(SequentialKeyCache::sequential()),
+            last_committed_finality: TVar::new(committed_finality),
+        }
+    }
+
+    pub fn block_hash(&self, height: BlockHeight) -> Stm<Option<BlockHash>> {
+        if let Some(f) = self.last_committed_finality.read()?.as_ref() {
+            if f.height == height {
+                return Ok(Some(f.block_hash.clone()));
+            }
+        }
+
+        self.get_at_height(height, |i| i.0.clone())
+    }
+
+    pub fn last_committed_finality(&self) -> Stm<Option<IPCParentFinality>> {
+        self.last_committed_finality.read_clone()
+    }
+
+    /// Clear the cache and set the committed finality to the provided value
+    pub fn reset(&self, finality: IPCParentFinality) -> Stm<()> {
+        self.cached_data.write(SequentialKeyCache::sequential())?;
+        self.last_committed_finality.write(Some(finality))
+    }
+
+    pub fn new_parent_view(
+        &self,
+        height: BlockHeight,
+        maybe_payload: Option<ParentViewPayload>,
+    ) -> StmResult<(), Error> {
+        if let Some((block_hash, validator_changes, top_down_msgs)) = maybe_payload {
+            self.parent_block_filled(height, block_hash, validator_changes, top_down_msgs)
+        } else {
+            self.parent_null_round(height)
+        }
+    }
+}
+
+/// All the private functions
+impl CachedFinalityProvider {
     /// Makes a proposal from the last committed finality height till the `height` passed in, exclusive.
     ///
     /// Make sure the height range actually exists in cache before calling this method.
@@ -133,7 +183,7 @@ impl FinalityWithNull {
         // is already loaded.
         let last_committed = self.last_committed_finality()?.unwrap().height;
 
-        let hash = self.block_hash_at_height(height)?.unwrap();
+        let hash = self.block_hash(height)?.unwrap();
 
         let mut cros_msgs = vec![];
         let mut vali_chns = vec![];
@@ -143,10 +193,10 @@ impl FinalityWithNull {
         // deferred execution chains, this is the latest state that
         // we know for sure that we have available.
         for h in last_committed..height {
-            if let Some(v) = self.handle_null_block(h, topdown_cross_msgs, Vec::new)? {
+            if let Some(v) = self.handle_null_block(h, |p| p.2.clone(), Vec::new)? {
                 cros_msgs.extend(v);
             }
-            if let Some(v) = self.handle_null_block(h, validator_changes, Vec::new)? {
+            if let Some(v) = self.handle_null_block(h, |p| p.1.clone(), Vec::new)? {
                 vali_chns.extend(v);
             }
         }
@@ -172,23 +222,13 @@ impl FinalityWithNull {
         Ok(cache.size() as BlockHeight)
     }
 
-    pub(crate) fn block_hash_at_height(&self, height: BlockHeight) -> Stm<Option<BlockHash>> {
-        if let Some(f) = self.last_committed_finality.read()?.as_ref() {
-            if f.height == height {
-                return Ok(Some(f.block_hash.clone()));
-            }
-        }
-
-        self.get_at_height(height, |i| i.0.clone())
-    }
-
-    pub(crate) fn latest_height_in_cache(&self) -> Stm<Option<BlockHeight>> {
+    pub fn latest_height_in_cache(&self) -> Stm<Option<BlockHeight>> {
         let cache = self.cached_data.read()?;
         Ok(cache.upper_bound())
     }
 
     /// Get the latest height tracked in the provider, includes both cache and last committed finality
-    pub(crate) fn latest_height(&self) -> Stm<Option<BlockHeight>> {
+    pub fn latest_height(&self) -> Stm<Option<BlockHeight>> {
         let h = if let Some(h) = self.latest_height_in_cache()? {
             h
         } else if let Some(p) = self.last_committed_finality()? {
@@ -211,10 +251,7 @@ impl FinalityWithNull {
             None
         }))
     }
-}
 
-/// All the private functions
-impl FinalityWithNull {
     fn propose_next_height(&self) -> Stm<Option<BlockHeight>> {
         let latest_height = if let Some(h) = self.latest_height_in_cache()? {
             h
@@ -348,15 +385,14 @@ impl FinalityWithNull {
 
 #[cfg(test)]
 mod tests {
-    use super::FinalityWithNull;
-    use crate::finality::ParentViewPayload;
-    use crate::{BlockHeight, Config, IPCParentFinality, TopdownProposal};
+    use crate::finality::{CachedFinalityProvider, ParentViewPayload};
+    use crate::{BlockHeight, Config, IPCParentFinality, ParentFinalityProvider, TopdownProposal};
     use async_stm::{atomically, atomically_or_err};
     use fendermint_vm_message::ipc::ParentFinalityPayload;
 
     async fn new_provider(
         mut blocks: Vec<(BlockHeight, Option<ParentViewPayload>)>,
-    ) -> FinalityWithNull {
+    ) -> CachedFinalityProvider {
         let config = Config {
             chain_head_delay: 2,
             polling_interval: Default::default(),
@@ -373,7 +409,7 @@ mod tests {
 
         blocks.remove(0);
 
-        let f = FinalityWithNull::new(config, 1, Some(committed_finality));
+        let f = CachedFinalityProvider::new(config, 1, Some(committed_finality));
         for (h, p) in blocks {
             atomically_or_err(|| f.new_parent_view(h, p.clone()))
                 .await
