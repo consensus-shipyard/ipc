@@ -20,7 +20,7 @@ use fendermint_vm_message::{
     ipc::{BottomUpCheckpoint, CertifiedMessage, IpcMessage, SignedRelayedMessage},
 };
 use fendermint_vm_resolver::pool::{ResolveKey, ResolvePool};
-use fendermint_vm_topdown::proxy::IPCProviderProxy;
+use fendermint_vm_topdown::proxy::IPCProviderProxyWithLatency;
 use fendermint_vm_topdown::voting::{ValidatorKey, VoteTally};
 use fendermint_vm_topdown::{
     CachedFinalityProvider, IPCParentFinality, ParentFinalityProvider, ParentViewProvider, Toggle,
@@ -34,7 +34,7 @@ use std::sync::Arc;
 
 /// A resolution pool for bottom-up and top-down checkpoints.
 pub type CheckpointPool = ResolvePool<CheckpointPoolItem>;
-pub type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProviderProxy>>>;
+pub type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProviderProxyWithLatency>>>;
 
 /// These are the extra state items that the chain interpreter needs,
 /// a sort of "environment" supporting IPC.
@@ -362,12 +362,20 @@ where
 
                     tracing::debug!("chain interpreter applied topdown msgs");
 
+                    let local_block_height = state.block_height() as u64;
+                    let proposer = state.validator_id().map(|id| id.to_string());
+                    let proposer_ref = proposer.as_deref();
+
                     atomically(|| {
                         env.parent_finality_provider
                             .set_new_finality(finality.clone(), prev_finality.clone())?;
 
-                        env.parent_finality_votes
-                            .set_finalized(finality.height, finality.block_hash.clone())?;
+                        env.parent_finality_votes.set_finalized(
+                            finality.height,
+                            finality.block_hash.clone(),
+                            proposer_ref,
+                            Some(local_block_height),
+                        )?;
 
                         Ok(())
                     })

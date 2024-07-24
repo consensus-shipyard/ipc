@@ -15,6 +15,7 @@ memory_limit =  2147483648 # 2GB
 remappings = [
     "murky/=lib/murky/src/",
 ]
+allow_paths = ["../node_modules"]
 
 [fuzz]
 runs = 512
