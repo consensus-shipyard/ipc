@@ -30,6 +30,7 @@ tendermint-rpc = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
+secp256k1 = { workspace = true, features = ["recovery", "bitcoin_hashes"] }
 
 fendermint_vm_genesis = { path = "../genesis" }
 fendermint_vm_event = { path = "../event" }
