@@ -4,14 +4,18 @@
 use crate::finality::{
     ensure_sequential, topdown_cross_msgs, validator_changes, ParentViewPayload,
 };
-use crate::{BlockHash, BlockHeight, Config, Error, IPCParentFinality, SequentialKeyCache};
+use crate::{
+    BlockHash, BlockHeight, Config, Error, IPCParentFinality, SequentialKeyCache, TopdownProposal,
+};
 use async_stm::{abort, atomically, Stm, StmResult, TVar};
+use fvm_shared::clock::ChainEpoch;
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
 use std::cmp::min;
 
 use fendermint_tracing::emit;
 use fendermint_vm_event::ParentFinalityCommitted;
+use fendermint_vm_message::ipc::ParentFinalityPayload;
 
 /// Finality provider that can handle null blocks
 #[derive(Clone)]
@@ -81,7 +85,21 @@ impl FinalityWithNull {
         }
     }
 
-    pub fn next_proposal(&self) -> Stm<Option<IPCParentFinality>> {
+    pub fn proposal_at_height(&self, target_height: BlockHeight) -> Stm<Option<TopdownProposal>> {
+        if self
+            .get_at_height(target_height, |v| v.0.clone())?
+            .is_none()
+        {
+            // this means the vote tally has agreed on a height which our current node
+            // does not have information on, give up on proposing.
+            tracing::warn!(target_height, "target height has no data in cache");
+            return Ok(None);
+        }
+
+        self.proposal_sealed_till_height(target_height)
+    }
+
+    pub fn next_proposal(&self) -> Stm<Option<TopdownProposal>> {
         let height = if let Some(h) = self.propose_next_height()? {
             h
         } else {
@@ -89,11 +107,7 @@ impl FinalityWithNull {
         };
 
         // safe to unwrap as we make sure null height will not be proposed
-        let block_hash = self.block_hash_at_height(height)?.unwrap();
-
-        let proposal = IPCParentFinality { height, block_hash };
-        tracing::debug!(proposal = proposal.to_string(), "new proposal");
-        Ok(Some(proposal))
+        self.proposal_at_height(height)
     }
 
     pub fn check_proposal(&self, proposal: &IPCParentFinality) -> Stm<bool> {
@@ -134,6 +148,47 @@ impl FinalityWithNull {
 }
 
 impl FinalityWithNull {
+    /// Makes a proposal from the last committed finality height till the `height` passed in, exclusive.
+    ///
+    /// Make sure the height range actually exists in cache before calling this method.
+    fn proposal_sealed_till_height(&self, height: BlockHeight) -> Stm<Option<TopdownProposal>> {
+        // safe to unwrap as there are already height in cache, which means last committed finality
+        // is already loaded.
+        let last_committed = self.last_committed_finality()?.unwrap().height;
+
+        let hash = self.block_hash_at_height(height)?.unwrap();
+
+        let mut cros_msgs = vec![];
+        let mut vali_chns = vec![];
+
+        // The commitment of the finality for block `N` triggers
+        // the execution of all side-effects up till `N-1`, as for
+        // deferred execution chains, this is the latest state that
+        // we know for sure that we have available.
+        for h in last_committed..height {
+            if let Some(v) = self.handle_null_block(h, topdown_cross_msgs, Vec::new)? {
+                cros_msgs.extend(v);
+            }
+            if let Some(v) = self.handle_null_block(h, validator_changes, Vec::new)? {
+                vali_chns.extend(v);
+            }
+        }
+
+        let proposal = TopdownProposal::v1(ParentFinalityPayload {
+            height: height as ChainEpoch,
+            block_hash: hash,
+            cross_messages: cros_msgs,
+            validator_changes: vali_chns,
+        });
+        tracing::debug!(
+            vote = ?proposal.vote(),
+            height,
+            "new proposal"
+        );
+
+        Ok(Some(proposal))
+    }
+
     /// Returns the number of blocks cached.
     pub(crate) fn cached_blocks(&self) -> Stm<BlockHeight> {
         let cache = self.cached_data.read()?;

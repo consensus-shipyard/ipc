@@ -1,6 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use bitvec::vec::BitVec;
 use cid::multihash::Code;
 use cid::multihash::MultihashDigest;
 use cid::Cid;
@@ -32,7 +33,7 @@ pub enum IpcMessage {
 
     /// A top-down checkpoint parent finality proposal. This proposal should contain the latest parent
     /// state that to be checked and voted by validators.
-    TopDownExec(ParentFinality),
+    TopDownExec(TopdownProposalWithCert),
 }
 
 /// A message relayed by a user on the current subnet.
@@ -99,9 +100,38 @@ pub struct BottomUpCheckpoint {
     pub bottom_up_messages: Cid, // TODO: Use TCid
 }
 
+/// The ecdsa signature aggregation quorum cert for topdown proposal
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MultiSigCert {
+    pub signed_validator_bitmap: BitVec,
+    pub agg_signatures: AggregatedSignature,
+}
+
+/// Note that currently IPC is using seckp private keys which makes BLS impossible.
+/// Ecdsa is not going to be scalable for large set of public keys, still ok for small set of public keys
+///
+/// Most promising solution is using Schnorr which is already implemented in Bitcoin, rust implementation
+/// is still new. Keep `Schnorr` variant as kiv and should definitely implement
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum AggregatedSignature {
+    Ecdsa(Vec<Vec<u8>>),
+    Schnorr(Vec<u8>),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum TopdownProposal {
+    V1(ParentFinalityPayload),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TopdownProposalWithCert {
+    pub proposal: TopdownProposal,
+    pub cert: MultiSigCert,
+}
+
 /// A proposal of the parent view that validators will be voting on.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub struct ParentFinality {
+pub struct ParentFinalityPayload {
     /// Block height of this proposal.
     pub height: ChainEpoch,
     /// The block hash of the parent, expressed as bytes
@@ -118,7 +148,7 @@ pub struct ParentFinality {
     pub validator_changes: Vec<StakingChangeRequest>,
 }
 
-impl ParentFinality {
+impl ParentFinalityPayload {
     pub fn new(
         height: ChainEpoch,
         hash: Vec<u8>,
@@ -143,7 +173,7 @@ impl ParentFinality {
 #[cfg(feature = "arb")]
 mod arb {
 
-    use crate::ipc::ParentFinality;
+    use crate::ipc::ParentFinalityPayload;
     use fendermint_testing::arb::{ArbAddress, ArbCid, ArbSubnetID, ArbTokenAmount};
     use fvm_shared::crypto::signature::Signature;
     use quickcheck::{Arbitrary, Gen};
@@ -224,7 +254,7 @@ mod arb {
         }
     }
 
-    impl Arbitrary for ParentFinality {
+    impl Arbitrary for ParentFinalityPayload {
         fn arbitrary(g: &mut Gen) -> Self {
             Self {
                 height: u32::arbitrary(g).into(),

@@ -14,6 +14,7 @@ pub mod voting;
 use async_stm::Stm;
 use async_trait::async_trait;
 use ethers::utils::hex;
+use fendermint_vm_message::ipc::{ParentFinalityPayload, TopdownProposalWithCert};
 use fvm_shared::clock::ChainEpoch;
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
@@ -25,6 +26,8 @@ pub use crate::cache::{SequentialAppendError, SequentialKeyCache, ValueIter};
 pub use crate::error::Error;
 pub use crate::finality::CachedFinalityProvider;
 pub use crate::toggle::Toggle;
+use crate::voting::payload::TopdownVote;
+use crate::voting::quorum::MultiSigCert;
 
 pub type BlockHeight = u64;
 pub type Bytes = Vec<u8>;
@@ -154,7 +157,9 @@ pub trait ParentViewProvider {
 
 pub trait ParentFinalityProvider: ParentViewProvider {
     /// Latest proposal for parent finality
-    fn next_proposal(&self) -> Stm<Option<IPCParentFinality>>;
+    fn next_proposal(&self) -> Stm<Option<TopdownProposal>>;
+    /// The proposal for parent finality at the target height
+    fn proposal_at_height(&self, height: BlockHeight) -> Stm<Option<TopdownProposal>>;
     /// Check if the target proposal is valid
     fn check_proposal(&self, proposal: &IPCParentFinality) -> Stm<bool>;
     /// Called when finality is committed
@@ -188,4 +193,100 @@ pub(crate) fn is_null_round_error(err: &anyhow::Error) -> bool {
 
 pub(crate) fn is_null_round_str(s: &str) -> bool {
     s.contains(NULL_ROUND_ERR_MSG)
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TopdownProposalWithQuorum {
+    pub proposal: TopdownProposal,
+    pub cert: MultiSigCert,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum TopdownProposal {
+    V1(ParentFinalityPayload),
+}
+
+impl TopdownProposal {
+    pub fn v1(finality: ParentFinalityPayload) -> Self {
+        Self::V1(finality)
+    }
+
+    pub fn block_height(&self) -> BlockHeight {
+        match self {
+            TopdownProposal::V1(v) => v.height as BlockHeight,
+        }
+    }
+
+    pub fn block_hash(&self) -> BlockHash {
+        match self {
+            TopdownProposal::V1(v) => v.block_hash.clone(),
+        }
+    }
+
+    pub fn finality(&self) -> IPCParentFinality {
+        match self {
+            TopdownProposal::V1(ref v) => IPCParentFinality {
+                height: v.height as BlockHeight,
+                block_hash: v.block_hash.clone(),
+            },
+        }
+    }
+
+    pub fn cross_msgs(&self) -> &[IpcEnvelope] {
+        match self {
+            TopdownProposal::V1(ref v) => v.cross_messages.as_slice(),
+        }
+    }
+
+    pub fn validator_changes(&self) -> &[StakingChangeRequest] {
+        match self {
+            TopdownProposal::V1(ref v) => v.validator_changes.as_slice(),
+        }
+    }
+
+    pub fn vote(&self) -> TopdownVote {
+        match self {
+            TopdownProposal::V1(ref v) => TopdownVote::v1(
+                v.height as BlockHeight,
+                v.block_hash.clone(),
+                v.side_effect_cid().to_bytes(),
+            ),
+        }
+    }
+}
+
+// Because chain interpreter is importing from fendermint_vm_message, no choice but to define the
+// type twice.
+impl From<TopdownProposalWithCert> for TopdownProposalWithQuorum {
+    fn from(value: TopdownProposalWithCert) -> Self {
+        Self {
+            proposal: TopdownProposal::from(value.proposal),
+            cert: MultiSigCert::from(value.cert),
+        }
+    }
+}
+
+impl From<fendermint_vm_message::ipc::TopdownProposal> for TopdownProposal {
+    fn from(value: fendermint_vm_message::ipc::TopdownProposal) -> Self {
+        match value {
+            fendermint_vm_message::ipc::TopdownProposal::V1(f) => Self::V1(f),
+        }
+    }
+}
+
+impl From<TopdownProposal> for fendermint_vm_message::ipc::TopdownProposal {
+    fn from(value: TopdownProposal) -> fendermint_vm_message::ipc::TopdownProposal {
+        match value {
+            TopdownProposal::V1(v) => fendermint_vm_message::ipc::TopdownProposal::V1(v),
+        }
+    }
+}
+
+impl From<TopdownProposalWithQuorum> for TopdownProposalWithCert {
+    fn from(value: TopdownProposalWithQuorum) -> Self {
+        Self {
+            proposal: fendermint_vm_message::ipc::TopdownProposal::from(value.proposal),
+            cert: fendermint_vm_message::ipc::MultiSigCert::from(value.cert),
+        }
+    }
 }

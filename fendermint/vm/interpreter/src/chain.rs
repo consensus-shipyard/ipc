@@ -11,10 +11,8 @@ use crate::{
 use anyhow::{bail, Context};
 use async_stm::atomically;
 use async_trait::async_trait;
-use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::ipc;
-use fendermint_vm_event::ParentFinalityMissingQuorum;
-use fendermint_vm_message::ipc::ParentFinality;
+use fendermint_vm_message::ipc::TopdownProposalWithCert;
 use fendermint_vm_message::{
     chain::ChainMessage,
     ipc::{BottomUpCheckpoint, CertifiedMessage, IpcMessage, SignedRelayedMessage},
@@ -23,11 +21,10 @@ use fendermint_vm_resolver::pool::{ResolveKey, ResolvePool};
 use fendermint_vm_topdown::proxy::IPCProviderProxy;
 use fendermint_vm_topdown::voting::{ValidatorKey, VoteTally};
 use fendermint_vm_topdown::{
-    CachedFinalityProvider, IPCParentFinality, ParentFinalityProvider, ParentViewProvider, Toggle,
+    CachedFinalityProvider, ParentFinalityProvider, Toggle, TopdownProposalWithQuorum,
 };
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
-use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use num_traits::Zero;
 use std::sync::Arc;
@@ -134,18 +131,31 @@ where
             // The final proposal can be at most as high as the quorum.
             Ok(
                 if let Some((vote, quorum_cert)) = state.parent_finality_votes.find_quorum()? {
-                    todo!("integrate cert and vote")
-                    // // The first version of parent finality is a block hash of 32 bytes
-                    // let p = if bytes.len() == 32 {
-                    //     prep_topdown_v1(
-                    //         &state,
-                    //         IPCParentFinality::new(height as ChainEpoch, bytes),
-                    //     )?
-                    // } else {
-                    //     prep_topdown_v2(&state, height)?
-                    // };
-                    // tracing::debug!(proposal = ?p, "proposed topdown proposal");
-                    // p
+                    let Some(p) = state
+                        .parent_finality_provider
+                        .proposal_at_height(vote.block_height())?
+                    else {
+                        tracing::info!(
+                            height = vote.block_height(),
+                            "quorum reached, but current node does not have data"
+                        );
+                        return Ok(None);
+                    };
+
+                    if p.vote() != vote {
+                        tracing::info!(
+                            received = ?vote,
+                            current = ?p.vote(),
+                            "vote formed in the quorum is not the same as current node vote");
+                        return Ok(None);
+                    }
+
+                    // now the quorum formed is the same as the node's data
+                    let cert = TopdownProposalWithCert::from(TopdownProposalWithQuorum {
+                        proposal: p,
+                        cert: quorum_cert,
+                    });
+                    Some(ChainMessage::Ipc(IpcMessage::TopDownExec(cert)))
                 } else {
                     tracing::info!("no quorum found yet");
                     None
@@ -185,11 +195,7 @@ where
                         return Ok(false);
                     }
                 }
-                ChainMessage::Ipc(IpcMessage::TopDownExec(ParentFinality {
-                    height,
-                    block_hash,
-                    ..
-                })) => {
+                ChainMessage::Ipc(IpcMessage::TopDownExec(_p)) => {
                     todo!("implement quorum cert checking")
                     // let prop = IPCParentFinality {
                     //     height: height as u64,
@@ -283,16 +289,18 @@ where
                     }
 
                     // commit parent finality first
-                    let finality = IPCParentFinality::new(p.height, p.block_hash);
+                    let TopdownProposalWithQuorum { proposal, .. } =
+                        TopdownProposalWithQuorum::from(p);
+
                     tracing::debug!(
-                        finality = finality.to_string(),
+                        proposal = ?proposal,
                         "chain interpreter received topdown exec proposal",
                     );
 
                     let (prev_height, prev_finality) = topdown::commit_finality(
                         &self.gateway_caller,
                         &mut state,
-                        finality.clone(),
+                        proposal.finality(),
                         &env.parent_finality_provider,
                     )
                     .await
@@ -312,14 +320,10 @@ where
                     // deferred execution chains, this is the latest state that
                     // we know for sure that we have available.
                     let execution_fr = prev_height;
-                    let execution_to = finality.height - 1;
+                    let execution_to = proposal.block_height() - 1;
 
                     // error happens if we cannot get the validator set from ipc agent after retries
-                    let validator_changes = env
-                        .parent_finality_provider
-                        .validator_changes_from(execution_fr, execution_to)
-                        .await
-                        .context("failed to fetch validator changes")?;
+                    let validator_changes = proposal.validator_changes().to_vec();
 
                     tracing::debug!(
                         from = execution_fr,
@@ -333,11 +337,7 @@ where
                         .context("failed to store validator changes")?;
 
                     // error happens if we cannot get the cross messages from ipc agent after retries
-                    let msgs = env
-                        .parent_finality_provider
-                        .top_down_msgs_from(execution_fr, execution_to)
-                        .await
-                        .context("failed to fetch top down messages")?;
+                    let msgs = proposal.cross_msgs().to_vec();
 
                     tracing::debug!(
                         number_of_messages = msgs.len(),
@@ -354,16 +354,17 @@ where
 
                     atomically(|| {
                         env.parent_finality_provider
-                            .set_new_finality(finality.clone(), prev_finality.clone())?;
+                            .set_new_finality(proposal.finality(), prev_finality.clone())?;
 
-                        env.parent_finality_votes.set_finalized(finality.height)?;
+                        env.parent_finality_votes
+                            .set_finalized(proposal.block_height())?;
 
                         Ok(())
                     })
                     .await;
 
                     tracing::debug!(
-                        finality = finality.to_string(),
+                        height = proposal.block_height(),
                         "chain interpreter has set new"
                     );
 

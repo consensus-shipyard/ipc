@@ -6,7 +6,7 @@ use crate::finality::ParentViewPayload;
 use crate::proxy::ParentQueryProxy;
 use crate::{
     handle_null_round, BlockHash, BlockHeight, Config, Error, IPCParentFinality,
-    ParentFinalityProvider, ParentViewProvider,
+    ParentFinalityProvider, ParentViewProvider, TopdownProposal,
 };
 use async_stm::{Stm, StmResult};
 use ipc_api::cross::IpcEnvelope;
@@ -111,8 +111,12 @@ impl<T: ParentQueryProxy + Send + Sync + 'static> ParentViewProvider for CachedF
 impl<T: ParentQueryProxy + Send + Sync + 'static> ParentFinalityProvider
     for CachedFinalityProvider<T>
 {
-    fn next_proposal(&self) -> Stm<Option<IPCParentFinality>> {
+    fn next_proposal(&self) -> Stm<Option<TopdownProposal>> {
         self.inner.next_proposal()
+    }
+
+    fn proposal_at_height(&self, height: BlockHeight) -> Stm<Option<TopdownProposal>> {
+        self.inner.proposal_at_height(height)
     }
 
     fn check_proposal(&self, proposal: &IPCParentFinality) -> Stm<bool> {

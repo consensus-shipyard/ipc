@@ -4,7 +4,7 @@
 use crate::finality::ParentViewPayload;
 use crate::{
     BlockHash, BlockHeight, CachedFinalityProvider, Error, IPCParentFinality,
-    ParentFinalityProvider, ParentViewProvider,
+    ParentFinalityProvider, ParentViewProvider, TopdownProposal,
 };
 use anyhow::anyhow;
 use async_stm::{Stm, StmResult};
@@ -74,8 +74,12 @@ impl<P: ParentViewProvider + Send + Sync + 'static> ParentViewProvider for Toggl
 }
 
 impl<P: ParentFinalityProvider + Send + Sync + 'static> ParentFinalityProvider for Toggle<P> {
-    fn next_proposal(&self) -> Stm<Option<IPCParentFinality>> {
+    fn next_proposal(&self) -> Stm<Option<TopdownProposal>> {
         self.perform_or_else(|p| p.next_proposal(), None)
+    }
+
+    fn proposal_at_height(&self, height: BlockHeight) -> Stm<Option<TopdownProposal>> {
+        self.perform_or_else(|p| p.proposal_at_height(height), None)
     }
 
     fn check_proposal(&self, proposal: &IPCParentFinality) -> Stm<bool> {

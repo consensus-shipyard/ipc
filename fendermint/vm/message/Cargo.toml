@@ -9,6 +9,7 @@ license.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 blake2b_simd = { workspace = true }
+bitvec = { workspace = true, features = ["serde"] }
 ethers-core = { workspace = true }
 lazy_static = { workspace = true }
 thiserror = { workspace = true }

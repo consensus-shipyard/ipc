@@ -35,6 +35,7 @@ secp256k1 = { workspace = true, features = ["recovery", "bitcoin_hashes"] }
 fendermint_vm_genesis = { path = "../genesis" }
 fendermint_vm_event = { path = "../event" }
 fendermint_tracing = { path = "../../tracing" }
+fendermint_vm_message = { path = "../message" }
 
 [dev-dependencies]
 arbitrary = { workspace = true }
