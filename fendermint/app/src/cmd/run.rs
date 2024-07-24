@@ -565,7 +565,7 @@ async fn dispatch_vote(
 
     let added = match res {
         Ok(added) => added,
-        Err(e @ VoteError::Equivocation(_, _)) => {
+        Err(e @ VoteError::Equivocation) => {
             tracing::warn!(error = e.to_string(), "failed to handle vote");
             false
         }

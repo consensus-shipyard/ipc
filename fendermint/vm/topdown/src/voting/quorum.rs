@@ -66,7 +66,7 @@ pub struct MultiSigCert {
 }
 
 impl MultiSigCert {
-    pub fn signed_validators(&self, validators: &[PublicKey]) -> anyhow::Result<Vec<PublicKey>> {
+    pub fn signed_validators<T: Clone>(&self, validators: &[T]) -> anyhow::Result<Vec<T>> {
         if validators.len() != self.signed_validator_bitmap.len() {
             return Err(anyhow!("validators length and bitmap length not match"));
         }
@@ -109,6 +109,31 @@ impl MultiSigCert {
         let pub_keys = self.signed_validators(validator_set)?;
         Ok(self.agg_signatures.is_valid(message, &pub_keys))
     }
+
+    /// Checks if the cert contains aggregated signature signed by the public keys against the message
+    pub fn validate_power_table<const DEN: Weight, const NUM: Weight>(
+        &self,
+        message: &[u8],
+        powers: im::HashMap<ValidatorKey, Weight>,
+    ) -> anyhow::Result<()> {
+        let keys = order_validators(&powers)
+            .iter()
+            .map(|(validator_key, _)| (*validator_key).clone())
+            .collect::<Vec<_>>();
+
+        let signed_validators = self.signed_validators(&keys)?;
+
+        if !threshold_reached::<DEN, NUM>(&powers, &signed_validators) {
+            return Err(anyhow!("quorum threshold not reached"));
+        }
+
+        let pub_keys = keys.into_iter().map(PublicKey::from).collect::<Vec<_>>();
+        if !self.is_valid(message, &pub_keys)? {
+            Err(anyhow!("cert contains invalid signature"))
+        } else {
+            Ok(())
+        }
+    }
 }
 
 /// A collection of validator public key that have signed the same content.
@@ -143,16 +168,7 @@ impl ValidatorSignatures {
     }
 
     pub fn to_cert(&self, power_table: &im::HashMap<ValidatorKey, Weight>) -> MultiSigCert {
-        let mut sorted_powers = power_table.iter().collect::<Vec<_>>();
-
-        sorted_powers.sort_by(|a, b| {
-            let cmp = b.1.cmp(a.1);
-            if cmp != Ordering::Equal {
-                cmp
-            } else {
-                b.0.cmp(a.0)
-            }
-        });
+        let sorted_powers = order_validators(power_table);
 
         let mut cert = MultiSigCert::ecdsa(sorted_powers.len());
 
@@ -164,6 +180,37 @@ impl ValidatorSignatures {
 
         cert
     }
+}
+
+fn threshold_reached<const DEN: Weight, const NUM: Weight>(
+    all: &im::HashMap<ValidatorKey, Weight>,
+    signed: &[ValidatorKey],
+) -> bool {
+    let threshold = all.values().sum::<Weight>() * NUM / DEN;
+
+    let mut accumulated = 0;
+    for k in signed {
+        accumulated += all.get(k).unwrap_or(&0);
+    }
+
+    accumulated > threshold
+}
+
+fn order_validators(
+    power_table: &im::HashMap<ValidatorKey, Weight>,
+) -> Vec<(&ValidatorKey, &Weight)> {
+    let mut sorted_powers = power_table.iter().collect::<Vec<_>>();
+
+    sorted_powers.sort_by(|a, b| {
+        let cmp = b.1.cmp(a.1);
+        if cmp != Ordering::Equal {
+            cmp
+        } else {
+            b.0.cmp(a.0)
+        }
+    });
+
+    sorted_powers
 }
 
 // Because chain interpreter is importing from fendermint_vm_message, no choice but to define the

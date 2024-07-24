@@ -19,7 +19,7 @@ use fendermint_vm_message::{
 };
 use fendermint_vm_resolver::pool::{ResolveKey, ResolvePool};
 use fendermint_vm_topdown::proxy::IPCProviderProxy;
-use fendermint_vm_topdown::voting::{ValidatorKey, VoteTally};
+use fendermint_vm_topdown::voting::{ValidatorKey, VoteTally, Weight};
 use fendermint_vm_topdown::{
     CachedFinalityProvider, ParentFinalityProvider, Toggle, TopdownProposalWithQuorum,
 };
@@ -32,6 +32,9 @@ use std::sync::Arc;
 /// A resolution pool for bottom-up and top-down checkpoints.
 pub type CheckpointPool = ResolvePool<CheckpointPoolItem>;
 pub type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProviderProxy>>>;
+
+const QUORUM_THRESHOLD_DENOMINATOR: Weight = 3;
+const QUORUM_THRESHOLD_NUMERATOR: Weight = 2;
 
 /// These are the extra state items that the chain interpreter needs,
 /// a sort of "environment" supporting IPC.
@@ -195,17 +198,32 @@ where
                         return Ok(false);
                     }
                 }
-                ChainMessage::Ipc(IpcMessage::TopDownExec(_p)) => {
-                    todo!("implement quorum cert checking")
-                    // let prop = IPCParentFinality {
-                    //     height: height as u64,
-                    //     block_hash,
-                    // };
-                    // let is_final =
-                    //     atomically(|| env.parent_finality_provider.check_proposal(&prop)).await;
-                    // if !is_final {
-                    //     return Ok(false);
-                    // }
+                ChainMessage::Ipc(IpcMessage::TopDownExec(p)) => {
+                    let p = TopdownProposalWithQuorum::from(p);
+
+                    // Ideally, one should get the power table from latest state, but the current
+                    // associate type definition greatly limits access to the latest state. At the
+                    // same time, `self.gateway_caller.current_power_table(&mut state)` take a mut
+                    // state, but in process, it should be a immutable reference. Instead, the power
+                    // table is obtained from vote tally, it should be in sync with the latest state
+                    // see `end` abci call for power update.
+                    let power_table = atomically(|| env.parent_finality_votes.power_table()).await;
+
+                    let ballot = match p.proposal.vote().ballot() {
+                        Ok(v) => v,
+                        Err(e) => {
+                            tracing::info!(
+                                err = e.to_string(),
+                                "cannot parse ballot from the proposal"
+                            );
+                            return Ok(false);
+                        }
+                    };
+
+                    if let Err(e) = p.cert.validate_power_table::<QUORUM_THRESHOLD_DENOMINATOR, QUORUM_THRESHOLD_NUMERATOR>(&ballot, power_table) {
+                        tracing::info!(err = e.to_string(), "invalid quorum cert received");
+                        return Ok(false);
+                    }
                 }
                 _ => {}
             };
