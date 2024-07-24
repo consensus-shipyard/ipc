@@ -1,1 +1,1 @@
-Ipc(TopDownExec(ParentFinality { height: 3772348491, block_hash: [57, 187, 8, 33], cross_messages: [], validator_changes: [] }))
+Ipc(TopDownExec(TopdownProposalWithCert { proposal: V1(ParentFinalityPayload { height: 3859522062, block_hash: [108, 217, 123, 115, 247, 111, 50], cross_messages: [], validator_changes: [] }), cert: MultiSigCert { signed_validator_bitmap: BitVec<usize, bitvec::order::Lsb0> { addr: 0x8, head: 000000, bits: 0, capacity: 0 } [], agg_signatures: Ecdsa([]) } }))

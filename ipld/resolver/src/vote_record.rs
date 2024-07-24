@@ -48,6 +48,10 @@ impl ValidatorKey {
     pub fn verify(&self, message: &[u8], signature: &[u8]) -> bool {
         self.0.verify(message, signature)
     }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        self.0.encode_protobuf()
+    }
 }
 
 impl From<PublicKey> for ValidatorKey {

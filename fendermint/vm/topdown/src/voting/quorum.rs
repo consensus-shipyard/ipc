@@ -137,7 +137,7 @@ impl MultiSigCert {
 }
 
 /// A collection of validator public key that have signed the same content.
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub(crate) struct ValidatorSignatures {
     validators: im::HashMap<ValidatorKey, Signature>,
 }

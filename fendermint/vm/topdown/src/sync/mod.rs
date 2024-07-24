@@ -9,7 +9,7 @@ use crate::proxy::ParentQueryProxy;
 use crate::sync::syncer::LotusParentSyncer;
 use crate::sync::tendermint::TendermintAwareSyncer;
 use crate::voting::VoteTally;
-use crate::{CachedFinalityProvider, Config, IPCParentFinality, ParentFinalityProvider, Toggle};
+use crate::{Config, IPCParentFinality, ParentFinalityProvider, Toggle};
 use anyhow::anyhow;
 use async_stm::atomically;
 use ethers::utils::hex;
@@ -19,6 +19,7 @@ use std::time::Duration;
 
 use fendermint_vm_genesis::{Power, Validator};
 
+use crate::finality::CachedFinalityProvider;
 pub use syncer::fetch_topdown_events;
 
 /// Query the parent finality from the block chain state.
@@ -109,7 +110,7 @@ where
 pub async fn launch_polling_syncer<T, C, P>(
     query: T,
     config: Config,
-    view_provider: Arc<Toggle<CachedFinalityProvider<P>>>,
+    view_provider: Arc<Toggle<CachedFinalityProvider>>,
     vote_tally: VoteTally,
     parent_client: Arc<P>,
     tendermint_client: C,
@@ -164,7 +165,7 @@ where
 /// Start the parent finality listener in the background
 fn start_syncing<T, C, P>(
     config: Config,
-    view_provider: Arc<Toggle<CachedFinalityProvider<P>>>,
+    view_provider: Arc<Toggle<CachedFinalityProvider>>,
     vote_tally: VoteTally,
     parent_proxy: Arc<P>,
     query: Arc<T>,

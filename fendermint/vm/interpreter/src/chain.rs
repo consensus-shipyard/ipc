@@ -18,11 +18,9 @@ use fendermint_vm_message::{
     ipc::{BottomUpCheckpoint, CertifiedMessage, IpcMessage, SignedRelayedMessage},
 };
 use fendermint_vm_resolver::pool::{ResolveKey, ResolvePool};
-use fendermint_vm_topdown::proxy::IPCProviderProxy;
 use fendermint_vm_topdown::voting::{ValidatorKey, VoteTally, Weight};
-use fendermint_vm_topdown::{
-    CachedFinalityProvider, ParentFinalityProvider, Toggle, TopdownProposalWithQuorum,
-};
+use fendermint_vm_topdown::CachedFinalityProvider;
+use fendermint_vm_topdown::{ParentFinalityProvider, Toggle, TopdownProposalWithQuorum};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::econ::TokenAmount;
@@ -31,7 +29,7 @@ use std::sync::Arc;
 
 /// A resolution pool for bottom-up and top-down checkpoints.
 pub type CheckpointPool = ResolvePool<CheckpointPoolItem>;
-pub type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProviderProxy>>>;
+pub type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider>>;
 
 const QUORUM_THRESHOLD_DENOMINATOR: Weight = 3;
 const QUORUM_THRESHOLD_NUMERATOR: Weight = 2;

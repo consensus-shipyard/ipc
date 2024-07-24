@@ -2,13 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! The inner type of parent syncer
 
-use crate::finality::ParentViewPayload;
+use crate::finality::{CachedFinalityProvider, ParentViewPayload};
 use crate::proxy::ParentQueryProxy;
 use crate::sync::{query_starting_finality, ParentFinalityStateQuery};
 use crate::voting::{self, VoteTally};
 use crate::{
-    is_null_round_str, BlockHash, BlockHeight, CachedFinalityProvider, Config, Error,
-    ParentFinalityProvider, Toggle,
+    is_null_round_str, BlockHash, BlockHeight, Config, Error, ParentFinalityProvider, Toggle,
 };
 use anyhow::anyhow;
 use async_stm::{atomically, atomically_or_err, StmError};
@@ -25,7 +24,7 @@ use fendermint_vm_event::{BlockHashHex, NewParentView};
 pub(crate) struct LotusParentSyncer<T, P> {
     config: Config,
     parent_proxy: Arc<P>,
-    provider: Arc<Toggle<CachedFinalityProvider<P>>>,
+    provider: Arc<Toggle<CachedFinalityProvider>>,
     vote_tally: VoteTally,
     query: Arc<T>,
 
@@ -46,7 +45,7 @@ where
     pub fn new(
         config: Config,
         parent_proxy: Arc<P>,
-        provider: Arc<Toggle<CachedFinalityProvider<P>>>,
+        provider: Arc<Toggle<CachedFinalityProvider>>,
         vote_tally: VoteTally,
         query: Arc<T>,
     ) -> anyhow::Result<Self> {
@@ -199,9 +198,6 @@ where
 
                     atomically_or_err::<_, Error, _>(|| {
                         self.provider.new_parent_view(height, None)?;
-                        self.vote_tally
-                            .add_block(height, None)
-                            .map_err(map_voting_err)?;
                         Ok(())
                     })
                     .await?;
@@ -251,7 +247,7 @@ where
             self.provider.new_parent_view(height, Some(data.clone()))?;
             if let Some(p) = self.provider.next_proposal()? {
                 self.vote_tally
-                    .add_block(height, Some(p.vote()))
+                    .add_block(p.vote())
                     .map_err(map_voting_err)?;
             }
 
@@ -393,13 +389,14 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::finality::CachedFinalityProvider;
     use crate::proxy::ParentQueryProxy;
     use crate::sync::syncer::LotusParentSyncer;
     use crate::sync::ParentFinalityStateQuery;
     use crate::voting::VoteTally;
     use crate::{
-        BlockHash, BlockHeight, CachedFinalityProvider, Config, IPCParentFinality,
-        SequentialKeyCache, Toggle, NULL_ROUND_ERR_MSG,
+        BlockHash, BlockHeight, Config, IPCParentFinality, SequentialKeyCache, Toggle,
+        NULL_ROUND_ERR_MSG,
     };
     use anyhow::anyhow;
     use async_stm::atomically;
@@ -506,7 +503,6 @@ mod tests {
             config.clone(),
             genesis_epoch,
             Some(committed_finality.clone()),
-            proxy.clone(),
         );
         let mut syncer = LotusParentSyncer::new(
             config,
@@ -559,31 +555,31 @@ mod tests {
         }
     }
 
-    // #[tokio::test]
-    // async fn with_non_null_block() {
-    //     let parent_blocks = new_parent_blocks!(
-    //         100 => Some(vec![0; 32]),   // genesis block
-    //         101 => None,
-    //         102 => None,
-    //         103 => None,
-    //         104 => Some(vec![4; 32]),
-    //         105 => None,
-    //         106 => None,
-    //         107 => None,
-    //         108 => Some(vec![5; 32]),
-    //         109 => None,
-    //         110 => None,
-    //         111 => None
-    //     );
-    //
-    //     let mut syncer = new_syncer(parent_blocks, false).await;
-    //
-    //     for h in 101..=109 {
-    //         syncer.sync().await.unwrap();
-    //         assert_eq!(
-    //             atomically(|| syncer.provider.latest_height()).await,
-    //             Some(h)
-    //         );
-    //     }
-    // }
+    #[tokio::test]
+    async fn with_non_null_block() {
+        let parent_blocks = new_parent_blocks!(
+            100 => Some(vec![0; 32]),   // genesis block
+            101 => None,
+            102 => None,
+            103 => None,
+            104 => Some(vec![4; 32]),
+            105 => None,
+            106 => None,
+            107 => None,
+            108 => Some(vec![5; 32]),
+            109 => None,
+            110 => None,
+            111 => None
+        );
+
+        let mut syncer = new_syncer(parent_blocks, false).await;
+
+        for h in 101..=109 {
+            syncer.sync().await.unwrap();
+            assert_eq!(
+                atomically(|| syncer.provider.latest_height()).await,
+                Some(h)
+            );
+        }
+    }
 }

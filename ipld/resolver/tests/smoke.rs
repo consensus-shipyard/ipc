@@ -30,7 +30,7 @@ use fvm_shared::{address::Address, ActorID};
 use ipc_api::subnet_id::SubnetID;
 use ipc_ipld_resolver::{
     Client, Config, ConnectionConfig, ContentConfig, DiscoveryConfig, Event, GossipPayload,
-    MembershipConfig, NetworkConfig, Resolver, Service, VoteRecord,
+    MembershipConfig, NetworkConfig, Resolver, Service,
 };
 use libp2p::{
     core::{

@@ -173,7 +173,10 @@ impl ParentFinalityPayload {
 #[cfg(feature = "arb")]
 mod arb {
 
-    use crate::ipc::ParentFinalityPayload;
+    use crate::ipc::{
+        AggregatedSignature, MultiSigCert, ParentFinalityPayload, TopdownProposal,
+        TopdownProposalWithCert,
+    };
     use fendermint_testing::arb::{ArbAddress, ArbCid, ArbSubnetID, ArbTokenAmount};
     use fvm_shared::crypto::signature::Signature;
     use quickcheck::{Arbitrary, Gen};
@@ -261,6 +264,18 @@ mod arb {
                 block_hash: Vec::arbitrary(g),
                 cross_messages: vec![],
                 validator_changes: vec![],
+            }
+        }
+    }
+
+    impl Arbitrary for TopdownProposalWithCert {
+        fn arbitrary(g: &mut Gen) -> Self {
+            Self {
+                proposal: TopdownProposal::V1(ParentFinalityPayload::arbitrary(g)),
+                cert: MultiSigCert {
+                    signed_validator_bitmap: Default::default(),
+                    agg_signatures: AggregatedSignature::Ecdsa(vec![]),
+                },
             }
         }
     }
