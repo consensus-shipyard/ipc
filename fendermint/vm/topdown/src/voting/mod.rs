@@ -474,6 +474,11 @@ mod tests {
     use ipc_ipld_resolver::ValidatorKey;
     use libp2p::identity::Keypair;
 
+    fn convert_key(key: &Keypair) -> libp2p::identity::secp256k1::Keypair {
+        let key = key.clone();
+        key.try_into_secp256k1().unwrap()
+    }
+
     fn random_validator_key() -> (Keypair, ValidatorKey) {
         let key_pair = Keypair::generate_secp256k1();
         let public_key = key_pair.public();
@@ -515,7 +520,7 @@ mod tests {
 
             for validator in validators {
                 for v in votes.iter() {
-                    let signed = SignedVote::signed(&validator.0, v).unwrap();
+                    let signed = SignedVote::signed(&convert_key(&validator.0), v).unwrap();
                     assert!(vote_tally.add_vote(signed)?);
                 }
             }
@@ -552,7 +557,7 @@ mod tests {
 
             for validator in validators {
                 for v in votes.iter() {
-                    let signed = SignedVote::signed(&validator.0, v).unwrap();
+                    let signed = SignedVote::signed(&convert_key(&validator.0), v).unwrap();
                     assert!(vote_tally.add_vote(signed)?);
                 }
             }
@@ -600,7 +605,7 @@ mod tests {
 
             for validator in validators {
                 for v in votes.iter() {
-                    let signed = SignedVote::signed(&validator.0, v).unwrap();
+                    let signed = SignedVote::signed(&convert_key(&validator.0), v).unwrap();
                     assert!(vote_tally.add_vote(signed)?);
                 }
             }
@@ -641,11 +646,11 @@ mod tests {
 
             vote_tally.add_block(votes[0].clone())?;
 
-            let signed = SignedVote::signed(&validators[0].0, &votes[0]).unwrap();
+            let signed = SignedVote::signed(&convert_key(&validators[0].0), &votes[0]).unwrap();
             assert!(vote_tally.add_vote(signed)?);
-            let signed = SignedVote::signed(&validators[1].0, &votes[0]).unwrap();
+            let signed = SignedVote::signed(&convert_key(&validators[1].0), &votes[0]).unwrap();
             assert!(vote_tally.add_vote(signed)?);
-            let signed = SignedVote::signed(&validators[2].0, &votes[1]).unwrap();
+            let signed = SignedVote::signed(&convert_key(&validators[2].0), &votes[1]).unwrap();
             assert!(vote_tally.add_vote(signed)?);
 
             assert!(vote_tally.find_quorum()?.is_none());

@@ -77,7 +77,7 @@ impl SignedVote {
     }
 
     pub fn into_validated_payload(self) -> anyhow::Result<(TopdownVote, Signature, ValidatorKey)> {
-        let (pubkey, sig) = self.signature.pubkey_with_signature(&self.payload)?;
+        let (pubkey, sig) = self.signature.validate_sig(&self.payload)?;
         if !pubkey.verify(&self.payload, &sig) {
             Err(anyhow!("invalid validator signature"))
         } else {
@@ -129,21 +129,26 @@ impl SignatureInner {
         })
     }
 
-    fn pubkey_with_signature(self, payload: &[u8]) -> anyhow::Result<(PublicKey, Signature)> {
+    fn validate_sig(self, payload: &[u8]) -> anyhow::Result<(PublicKey, Signature)> {
         match self {
             SignatureInner::Secpk1Recoverable { sig, rec } => {
                 let secp = secp256k1::Secp256k1::new();
 
+                let message = secp256k1::Message::from_hashed_data::<secp256k1::hashes::sha256::Hash>(
+                    payload,
+                );
                 let pubkey = secp.recover_ecdsa(
-                    &secp256k1::Message::from_hashed_data::<secp256k1::hashes::sha256::Hash>(
-                        payload,
-                    ),
+                    &message,
                     &RecoverableSignature::from_compact(&sig, RecoveryId::from_i32(rec as i32)?)?,
                 )?;
+                let signature = secp256k1::ecdsa::Signature::from_compact(sig.as_slice())?
+                    .serialize_der()
+                    .to_vec();
+
                 Ok((
                     libp2p::identity::secp256k1::PublicKey::try_from_bytes(&pubkey.serialize())?
                         .into(),
-                    sig,
+                    signature,
                 ))
             }
         }
@@ -158,7 +163,7 @@ impl SignatureInner {
 
 #[cfg(test)]
 mod tests {
-    use crate::voting::payload::SignatureInner;
+    use crate::voting::payload::{SignatureInner, SignedVote, TopdownVote};
     use rand::random;
 
     #[test]
@@ -168,7 +173,22 @@ mod tests {
 
         let sig = SignatureInner::from_secp(&key, &payload).unwrap();
 
-        let verified = sig.pubkey_with_signature(&payload).unwrap();
+        let verified = sig.validate_sig(&payload).unwrap();
         assert_eq!(verified.0, (key.public().clone()).into())
+    }
+
+    #[test]
+    fn test_signed_vote() {
+        let payload = (0..1024).map(|_| random::<u8>()).collect::<Vec<_>>();
+        let key = libp2p::identity::secp256k1::Keypair::generate();
+
+        let vote = TopdownVote::v1(
+            100,
+                payload.clone(),
+            payload.clone(),
+        );
+
+        let sig = SignedVote::signed(&key, &vote).unwrap();
+        assert!(sig.into_validated_payload().is_ok())
     }
 }
