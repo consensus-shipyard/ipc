@@ -26,6 +26,7 @@ else
     IPC_FOLDER=${IPC_FOLDER}
 fi
 IPC_CONFIG_FOLDER=${HOME}/.ipc
+PROMETHEUS_CONFIG_FOLDER=$(dirname -- "$(readlink -f -- $IPC_FOLDER/infra/prometheus/prometheus.yaml)")
 
 wallet_addresses=()
 CMT_P2P_HOST_PORTS=(26656 26756 26856)
@@ -36,6 +37,7 @@ OBJECTS_HOST_PORTS=(8001 8002 8003)
 IPFS_SWARM_HOST_PORTS=(4001 4002 4003)
 IPFS_RPC_HOST_PORTS=(5001 5002 5003)
 IPFS_GATEWAY_HOST_PORTS=(8080 8081 8082)
+PROMETHEUS_HOST_PORTS=(9090 9091 9092)
 
 if (($# != 1)); then
   echo "Arguments: <Specify github remote branch name to use to deploy. Or use 'local' (without quote) to indicate using local repo instead. If not provided, will default to main branch"
@@ -245,6 +247,7 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e IPFS_SWARM_HOST_PORT=${IPFS_SWARM_HOST_PORTS[0]} \
     -e IPFS_RPC_HOST_PORT=${IPFS_RPC_HOST_PORTS[0]} \
     -e IPFS_GATEWAY_HOST_PORT=${IPFS_GATEWAY_HOST_PORTS[0]} \
+    -e PROMETHEUS_HOST_PORT="${PROMETHEUS_HOST_PORTS[0]}" \
     -e IPFS_PROFILE="local-discovery" \
     -e PARENT_HTTP_AUTH_TOKEN=${PARENT_HTTP_AUTH_TOKEN} \
     -e PARENT_REGISTRY=${parent_registry_address} \
@@ -279,6 +282,7 @@ do
       -e IPFS_SWARM_HOST_PORT=${IPFS_SWARM_HOST_PORTS[i]} \
       -e IPFS_RPC_HOST_PORT=${IPFS_RPC_HOST_PORTS[i]} \
       -e IPFS_GATEWAY_HOST_PORT=${IPFS_GATEWAY_HOST_PORTS[i]} \
+      -e PROMETHEUS_HOST_PORT="${PROMETHEUS_HOST_PORTS[i]}" \
       -e IPFS_PROFILE="local-discovery" \
       -e RESOLVER_BOOTSTRAPS=${bootstrap_resolver_endpoint} \
       -e BOOTSTRAPS=${bootstrap_node_endpoint} \
@@ -312,6 +316,12 @@ do
   curl --location http://localhost:${OBJECTS_HOST_PORTS[i]}/health
 done
 
+# Step 9.3: Test prometheus endpoints
+curl --location http://localhost:"${PROMETHEUS_HOST_PORT}"/graph
+curl --location http://localhost:"${PROMETHEUS_METRICS_PORTS[0]}"/metrics
+curl --location http://localhost:"${PROMETHEUS_METRICS_PORTS[1]}"/metrics
+curl --location http://localhost:"${PROMETHEUS_METRICS_PORTS[2]}"/metrics
+
 # Step 10: Start a relayer process
 # Kill existing relayer if there's one
 pkill -f "relayer" || true
@@ -343,6 +353,9 @@ ETH API:
 http://localhost:${ETHAPI_HOST_PORTS[0]}
 http://localhost:${ETHAPI_HOST_PORTS[1]}
 http://localhost:${ETHAPI_HOST_PORTS[2]}
+
+Prometheus API:
+http://localhost:${PROMETHEUS_HOST_PORT}
 
 Accounts:
 $(jq -r '.accounts[] | "\(.meta.Account.owner): \(.balance) coin units"' ${subnet_folder}/validator-0/genesis.json)

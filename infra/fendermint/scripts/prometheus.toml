@@ -1,0 +1,35 @@
+[tasks.prometheus-run]
+script = """
+# TODO: I can't get prometheus to run without root perms. Ideally using --user $(id -u):(prometheus-user-id?) would be better
+# TODO: I don't know if we need to be using `--net host` here, but without i can't get prometheus to find it's targets
+mkdir -p $PROMETHEUS_DIR
+docker run \
+  ${FLAGS} \
+  --name ${PROMETHEUS_CONTAINER_NAME} \
+  --init \
+  --network host \
+  --volume ${PROMETHEUS_DIR}:/data/prometheus \
+  --volume ${PROMETHEUS_CONFIG_FOLDER}/prometheus.yaml:/etc/prometheus/prometheus.yml \
+  ${PROMETHEUS_DOCKER_IMAGE}
+"""
+
+[tasks.prometheus-start]
+extend = "prometheus-run"
+env = { "FLAGS" = "-d" }
+
+[tasks.prometheus-restart]
+extend = "prometheus-run"
+env = { "FLAGS" = "-d" }
+dependencies = ["prometheus-destroy"]
+
+[tasks.prometheus-stop]
+env = { "CONTAINER_NAME" = "${PROMETHEUS_CONTAINER_NAME}" }
+run_task = "docker-stop"
+
+[tasks.prometheus-destroy]
+env = { "CONTAINER_NAME" = "${PROMETHEUS_CONTAINER_NAME}" }
+run_task = "docker-destroy"
+
+[tasks.prometheus-logs]
+extend = "docker-logs"
+env = { "CONTAINER_NAME" = "${PROMETHEUS_CONTAINER_NAME}" }

@@ -5,6 +5,7 @@ set -euo pipefail
 dir=$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")
 IPC_FOLDER="$dir"/../..
 IPC_CONFIG_FOLDER=${HOME}/.ipc
+PROMETHEUS_CONFIG_FOLDER=$(dirname -- "$(readlink -f -- $IPC_FOLDER/infra/prometheus/prometheus.yaml)")
 
 CMT_P2P_HOST_PORTS=(26656 26756 26856)
 CMT_RPC_HOST_PORTS=(26657 26757 26857)
@@ -14,6 +15,8 @@ OBJECTS_HOST_PORTS=(8001 8002 8003)
 IPFS_SWARM_HOST_PORTS=(4001 4002 4003)
 IPFS_RPC_HOST_PORTS=(5001 5002 5003)
 IPFS_GATEWAY_HOST_PORTS=(8080 8081 8082)
+PROMETHEUS_HOST_PORT=9090
+PROMETHEUS_METRICS_PORTS=(9184 9185 9186)
 
 # Use "dummy" subnet
 subnet_id="/r314159/t410f726d2jv6uj4mpkcbgg5ndlpp3l7dd5rlcpgzkoi"
@@ -38,6 +41,7 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e IPFS_SWARM_HOST_PORT="${IPFS_SWARM_HOST_PORTS[0]}" \
     -e IPFS_RPC_HOST_PORT="${IPFS_RPC_HOST_PORTS[0]}" \
     -e IPFS_GATEWAY_HOST_PORT="${IPFS_GATEWAY_HOST_PORTS[0]}" \
+    -e PROMETHEUS_METRICS_PORT="${PROMETHEUS_METRICS_PORTS[0]}" \
     -e IPFS_PROFILE="local-discovery" \
     -e FM_PULL_SKIP=1 \
     -e FM_LOG_LEVEL="info,fendermint=debug" \
@@ -61,6 +65,7 @@ do
       -e IPFS_SWARM_HOST_PORT="${IPFS_SWARM_HOST_PORTS[i]}" \
       -e IPFS_RPC_HOST_PORT="${IPFS_RPC_HOST_PORTS[i]}" \
       -e IPFS_GATEWAY_HOST_PORT="${IPFS_GATEWAY_HOST_PORTS[i]}" \
+      -e PROMETHEUS_METRICS_PORT="${PROMETHEUS_METRICS_PORTS[0]}" \
       -e IPFS_PROFILE="local-discovery" \
       -e RESOLVER_BOOTSTRAPS="$bootstrap_resolver_endpoint" \
       -e BOOTSTRAPS="$bootstrap_node_endpoint" \
@@ -68,6 +73,13 @@ do
       -e FM_LOG_LEVEL="info,fendermint=debug" \
       child-validator-restart-no-parent
 done
+
+cargo make --makefile infra/fendermint/Makefile.toml \
+    -e NODE_NAME=prometheus \
+    -e SUBNET_ID="$subnet_id" \
+    -e PROMETHEUS_HOST_PORT="${PROMETHEUS_HOST_PORT}" \
+    -e PROMETHEUS_CONFIG_FOLDER="${PROMETHEUS_CONFIG_FOLDER}" \
+    prometheus-restart
 
 # Test ETH API endpoint
 for i in {0..2}
@@ -87,6 +99,12 @@ for i in {0..2}
 do
   curl --location http://localhost:"${OBJECTS_HOST_PORTS[i]}"/health
 done
+
+# Test prometheus endpoints
+curl --location http://localhost:"${PROMETHEUS_HOST_PORT}"/graph
+curl --location http://localhost:"${PROMETHEUS_METRICS_PORTS[0]}"/metrics
+curl --location http://localhost:"${PROMETHEUS_METRICS_PORTS[1]}"/metrics
+curl --location http://localhost:"${PROMETHEUS_METRICS_PORTS[2]}"/metrics
 
 # Print a summary of the deployment
 cat << EOF
@@ -120,6 +138,9 @@ CometBFT API:
 http://localhost:${CMT_RPC_HOST_PORTS[0]}
 http://localhost:${CMT_RPC_HOST_PORTS[1]}
 http://localhost:${CMT_RPC_HOST_PORTS[2]}
+
+Prometheus API:
+http://localhost:${PROMETHEUS_HOST_PORT}
 
 Accounts:
 $(jq -r '.app_state.accounts[] | "\(.meta.Account.owner): \(.balance) coin units"' "$subnet_folder"/validator-0/genesis.json)

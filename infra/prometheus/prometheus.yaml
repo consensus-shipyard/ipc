@@ -1,0 +1,8 @@
+global:
+  scrape_interval: 30s
+  evaluation_interval: 25s
+
+scrape_configs:
+  - job_name: "prometheus1"
+    static_configs:
+      - targets: ["localhost:9184", "localhost:9185", "localhost:9186", "localhost:9090"]
