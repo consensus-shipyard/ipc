@@ -22,7 +22,13 @@ pub struct Actor;
 impl Actor {
     fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&INIT_ACTOR_ADDR))?;
-        let state = State::new(rt.store(), params.creator, params.write_access).map_err(|e| {
+        let state = State::new(
+            rt.store(),
+            params.creator,
+            params.write_access,
+            params.metadata,
+        )
+        .map_err(|e| {
             e.downcast_default(
                 ExitCode::USR_ILLEGAL_STATE,
                 "failed to construct empty store",
