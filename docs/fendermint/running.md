@@ -83,7 +83,7 @@ $ cat test-network/keys/alice.pk
 Ak5Juk793ZAg/7Ojj4bzOmIFGpwLhET1vg2ROihUJFkq
 ```
 
-If you want to use existing ethereum private key, perform the follwoing:
+If you want to use existing ethereum private key, perform the following:
 
 ```shell
 cargo run -p fendermint_app --release -- key eth-to-fendermint --secret-key <path to private key> --name eth --out-dir test-network/keys
