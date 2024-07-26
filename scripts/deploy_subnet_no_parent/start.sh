@@ -116,6 +116,19 @@ cargo make --makefile infra/fendermint/Makefile.toml \
     -e PROMETHEUS_CONFIG_FOLDER="${PROMETHEUS_CONFIG_FOLDER}" \
     prometheus-start
 
+cargo make --makefile infra/fendermint/Makefile.toml \
+    -e NODE_NAME=grafana \
+    -e SUBNET_ID="$subnet_id" \
+    -e GRAFANA_CONFIG_FOLDER="${GRAFANA_CONFIG_FOLDER}" \
+    grafana-start
+
+cargo make --makefile infra/fendermint/Makefile.toml \
+    -e NODE_NAME=loki \
+    -e SUBNET_ID="$subnet_id" \
+    -e LOKI_HOST_PORT="${LOKI_HOST_PORT}" \
+    -e LOKI_CONFIG_FOLDER="${LOKI_CONFIG_FOLDER}" \
+    loki-start
+
 # Test ETH API endpoint
 for i in {0..2}
 do

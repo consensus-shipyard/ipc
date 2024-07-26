@@ -81,6 +81,7 @@ dependencies = [
     "ethapi-start",
     "objects-start",
     "ipfs-start",
+    "promtail-start",
     "node-report",
 ]
 

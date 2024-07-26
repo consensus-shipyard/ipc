@@ -1,0 +1,30 @@
+
+[tasks.grafana-run]
+script = """
+docker run \
+  ${FLAGS} \
+  --name grafana \
+  --net host
+  ${GRAFANA_CONTAINER_NAME}
+"""
+
+[tasks.grafana-start]
+extend = "grafana-run"
+env = { "FLAGS" = "-d" }
+
+[tasks.grafana-restart]
+extend = "grafana-run"
+env = { "FLAGS" = "-d" }
+dependencies = ["grafana-destroy"]
+
+[tasks.grafana-stop]
+env = { "CONTAINER_NAME" = "${GRAFANA_CONTAINER_NAME}" }
+run_task = "docker-stop"
+
+[tasks.grafana-destroy]
+env = { "CONTAINER_NAME" = "${GRAFANA_CONTAINER_NAME}" }
+run_task = "docker-destroy"
+
+[tasks.grafana-logs]
+extend = "docker-logs"
+env = { "CONTAINER_NAME" = "${GRAFANA_CONTAINER_NAME}" }
