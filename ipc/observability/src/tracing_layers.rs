@@ -28,6 +28,10 @@ where
     S: Subscriber,
     L: Layer<S>,
 {
+    fn on_layer(&mut self, subscriber: &mut S) {
+        self.inner.on_layer(subscriber);
+    }
+
     fn on_event(&self, event: &Event, ctx: Context<S>) {
         if self.domains.is_none() && self.events.is_none() {
             self.inner.on_event(event, ctx);
