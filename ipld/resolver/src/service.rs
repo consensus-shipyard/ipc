@@ -9,6 +9,7 @@ use anyhow::anyhow;
 use bloom::{BloomFilter, ASMS};
 use ipc_api::subnet_id::SubnetID;
 use iroh::client::blobs::BlobStatus;
+use iroh::net::NodeAddr;
 use libipld::store::StoreParams;
 use libipld::Cid;
 use libp2p::futures::StreamExt;
@@ -109,7 +110,7 @@ pub(crate) enum Request<V> {
     PinSubnet(SubnetID),
     UnpinSubnet(SubnetID),
     Resolve(Cid, SubnetID, ResponseChannel),
-    ResolveIroh(Cid, ResponseChannel),
+    ResolveIroh(Cid, NodeAddr, ResponseChannel),
     RateLimitUsed(PeerId, usize),
     UpdateRateLimit(u32),
 }
@@ -482,8 +483,8 @@ where
             Request::Resolve(cid, subnet_id, response_channel) => {
                 self.start_query(cid, subnet_id, response_channel)
             }
-            Request::ResolveIroh(cid, response_channel) => {
-                self.start_iroh_query(cid, response_channel)
+            Request::ResolveIroh(cid, node_addr, response_channel) => {
+                self.start_iroh_query(cid, node_addr, response_channel)
             }
             Request::RateLimitUsed(peer_id, bytes) => {
                 self.content_mut().rate_limit_used(peer_id, bytes)
@@ -529,10 +530,15 @@ where
     }
 
     /// Start a CID resolution using iorh.
-    fn start_iroh_query(&mut self, cid: Cid, response_channel: ResponseChannel) {
+    fn start_iroh_query(
+        &mut self,
+        cid: Cid,
+        node_addr: NodeAddr,
+        response_channel: ResponseChannel,
+    ) {
         let iroh = self.iroh.clone();
         tokio::spawn(async move {
-            let res = download_blob(iroh, cid).await;
+            let res = download_blob(iroh, cid, node_addr).await;
             match res {
                 Ok(_) => send_resolve_result(response_channel, Ok(())),
                 Err(e) => send_resolve_result(response_channel, Err(anyhow!(e))),
@@ -632,7 +638,11 @@ pub fn build_transport(local_key: Keypair) -> Boxed<(PeerId, StreamMuxerBox)> {
         .boxed()
 }
 
-async fn download_blob(iroh: iroh::client::Iroh, cid: Cid) -> anyhow::Result<()> {
+async fn download_blob(
+    iroh: iroh::client::Iroh,
+    cid: Cid,
+    node_addr: NodeAddr,
+) -> anyhow::Result<()> {
     let hash: [u8; 32] = cid.hash().digest().try_into()?;
     let hash = iroh::blobs::Hash::from_bytes(hash);
     // TODO: actually download from relevant nodes

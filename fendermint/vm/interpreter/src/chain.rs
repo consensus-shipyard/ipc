@@ -12,7 +12,7 @@ use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::{ipc, system};
 use fendermint_vm_event::ParentFinalityMissingQuorum;
 use fendermint_vm_iroh_resolver::pool::{
-    ResolveKey as IpfsResolveKey, ResolvePool as IpfsResolvePool,
+    ResolveKey as IrohResolveKey, ResolvePool as IrohResolvePool,
 };
 use fendermint_vm_message::ipc::ParentFinality;
 use fendermint_vm_message::signed::Object;
@@ -48,7 +48,7 @@ use crate::{
 /// A resolution pool for bottom-up and top-down checkpoints.
 pub type CheckpointPool = ResolvePool<CheckpointPoolItem>;
 pub type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProviderProxy>>>;
-pub type ObjectPool = IpfsResolvePool<ObjectPoolItem>;
+pub type ObjectPool = IrohResolvePool<ObjectPoolItem>;
 
 /// These are the extra state items that the chain interpreter needs,
 /// a sort of "environment" supporting IPC.
@@ -87,9 +87,9 @@ pub struct ObjectPoolItem {
     obj: Object,
 }
 
-impl From<&ObjectPoolItem> for IpfsResolveKey {
+impl From<&ObjectPoolItem> for IrohResolveKey {
     fn from(value: &ObjectPoolItem) -> Self {
-        value.obj.value
+        (value.obj.cid, value.obj.source_id, value.obj.source_addr)
     }
 }
 
@@ -217,18 +217,18 @@ where
             state.state_tree_mut().begin_transaction();
             for item in local_resolved_objects.iter() {
                 if is_object_finalized(&mut state, item)? {
-                    tracing::debug!(cid = ?item.obj.value, "object already finalized; removing from pool");
+                    tracing::debug!(cid = ?item.obj.cid, "object already finalized; removing from pool");
                     atomically(|| env.object_pool.remove(item)).await;
                     continue;
                 }
 
                 let is_globally_resolved = atomically(|| {
                     env.parent_finality_votes
-                        .find_object_quorum(&item.obj.value.to_bytes())
+                        .find_object_quorum(&item.obj.cid.to_bytes())
                 })
                 .await;
                 if is_globally_resolved {
-                    tracing::debug!(cid = ?item.obj.value, "object has quorum; adding tx to chain");
+                    tracing::debug!(cid = ?item.obj.cid, "object has quorum; adding tx to chain");
                     objects.push(ChainMessage::Ipc(IpcMessage::ObjectResolved(
                         item.obj.clone(),
                     )));
@@ -300,7 +300,7 @@ where
                     // Start a blockstore transaction that can be reverted.
                     state.state_tree_mut().begin_transaction();
                     if is_object_finalized(&mut state, &item)? {
-                        tracing::debug!(cid = ?item.obj.value, "object is already finalized; rejecting proposal");
+                        tracing::debug!(cid = ?item.obj.cid, "object is already finalized; rejecting proposal");
                         return Ok(false);
                     }
                     state
@@ -310,11 +310,11 @@ where
 
                     let is_globally_resolved = atomically(|| {
                         env.parent_finality_votes
-                            .find_object_quorum(&item.obj.value.to_bytes())
+                            .find_object_quorum(&item.obj.cid.to_bytes())
                     })
                     .await;
                     if !is_globally_resolved {
-                        tracing::debug!(cid = ?item.obj.value, "object is not globally resolved; rejecting proposal");
+                        tracing::debug!(cid = ?item.obj.cid, "object is not globally resolved; rejecting proposal");
                         return Ok(false);
                     }
 
@@ -326,10 +326,10 @@ where
                         })
                         .await;
                     if is_locally_resolved {
-                        tracing::debug!(cid = ?item.obj.value, "object is locally resolved; removing from pool");
+                        tracing::debug!(cid = ?item.obj.cid, "object is locally resolved; removing from pool");
                         atomically(|| env.object_pool.remove(&item)).await;
                     } else {
-                        tracing::debug!(cid = ?item.obj.value, "object is not locally resolved");
+                        tracing::debug!(cid = ?item.obj.cid, "object is not locally resolved");
                     }
                 }
                 _ => {}
@@ -376,7 +376,7 @@ where
                     if let Some(obj) = msg.object {
                         atomically(|| env.object_pool.add(ObjectPoolItem { obj: obj.clone() }))
                             .await;
-                        tracing::debug!(cid = ?obj.value, store = ?obj.address, "object added to pool");
+                        tracing::debug!(cid = ?obj.cid, store = ?obj.store_addr, "object added to pool");
                     }
                 }
 
@@ -512,13 +512,13 @@ where
                 }
                 IpcMessage::ObjectResolved(obj) => {
                     let from = system::SYSTEM_ACTOR_ADDR;
-                    let to = obj.address;
+                    let to = obj.store_addr;
                     let method_num = ResolveObject as u64;
                     let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
 
                     let params = fendermint_actor_objectstore::ResolveParams {
                         key: obj.key,
-                        value: obj.value,
+                        value: obj.cid,
                     };
                     let params = RawBytes::serialize(params)?;
                     let msg = Message {
@@ -553,7 +553,7 @@ where
                     );
 
                     tracing::debug!(
-                        cid = ?obj.value,
+                        cid = ?obj.cid,
                         "chain interpreter has finalized object"
                     );
 
@@ -744,7 +744,7 @@ where
     let msg = FvmMessage {
         version: 0,
         from: system::SYSTEM_ACTOR_ADDR,
-        to: item.obj.address,
+        to: item.obj.store_addr,
         sequence: 0,
         value: Default::default(),
         method_num: GetObject as u64,

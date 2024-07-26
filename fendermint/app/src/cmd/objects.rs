@@ -287,7 +287,7 @@ async fn handle_object_upload<F: QueryClient>(
             })
         })?;
     let client_cid = match object {
-        Some(object) => object.value,
+        Some(object) => object.cid,
         None => {
             return Err(Rejection::from(BadRequest {
                 message: "missing CID in signed message".to_string(),
@@ -710,7 +710,7 @@ mod tests {
             .await
             .unwrap()
             .hash;
-        let source = iroh2.my_addr().await.unwrap();
+        let source = iroh2.node_addr().await.unwrap();
 
         let key = b"key";
         let digest =
@@ -725,8 +725,15 @@ mod tests {
             overwrite: true,
         };
         let params = RawBytes::serialize(params).unwrap();
-        let to = Address::new_id(90);
-        let object = fendermint_vm_message::signed::Object::new(key.to_vec(), object_cid, to);
+        let store = Address::new_id(90);
+        let source_addr = source.direct_addresses().next().unwrap().to_owned();
+        let object = fendermint_vm_message::signed::Object::new(
+            key.to_vec(),
+            object_cid,
+            store,
+            source.node_id,
+            source_addr,
+        );
 
         let sk = fendermint_crypto::SecretKey::random(&mut StdRng::from_entropy());
         let signing_key = SigningKey::from_slice(sk.serialize().as_ref()).unwrap();
@@ -734,7 +741,7 @@ mod tests {
         let message = fvm_shared::message::Message {
             version: Default::default(),
             from: to_fvm_address(from_address),
-            to,
+            to: store,
             sequence: 0,
             value: TokenAmount::from_atto(0),
             method_num: fendermint_actor_objectstore::Method::AddObject as u64,

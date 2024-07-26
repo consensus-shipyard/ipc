@@ -16,7 +16,8 @@ use fvm_shared::chainid::ChainID;
 use fvm_shared::crypto::signature::ops::recover_secp_public_key;
 use fvm_shared::crypto::signature::{Signature, SignatureType, SECP_SIG_LEN};
 use fvm_shared::message::Message;
-
+use iroh::net::NodeId;
+use std::net::SocketAddr;
 use thiserror::Error;
 
 use crate::conv::from_fvm;
@@ -57,17 +58,32 @@ pub enum DomainHash {
 /// The object's value will be queued for resolution.
 #[derive(PartialEq, Clone, Debug, Serialize_tuple, Deserialize_tuple, Hash, Eq)]
 pub struct Object {
+    /// Object key.
     pub key: Vec<u8>,
-    pub value: Cid,
-    pub address: Address,
+    /// Object content identifier.
+    pub cid: Cid,
+    /// Target store address.
+    pub store_addr: Address,
+    /// Source Iroh node identifier.
+    pub source_id: NodeId,
+    /// Source Iroh node address.
+    pub source_addr: SocketAddr,
 }
 
 impl Object {
-    pub fn new(key: Vec<u8>, value: Cid, address: Address) -> Self {
+    pub fn new(
+        key: Vec<u8>,
+        cid: Cid,
+        store_addr: Address,
+        source_id: NodeId,
+        source_addr: SocketAddr,
+    ) -> Self {
         Object {
             key,
-            value,
-            address,
+            cid,
+            store_addr,
+            source_id,
+            source_addr,
         }
     }
 }

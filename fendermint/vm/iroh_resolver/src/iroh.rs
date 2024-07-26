@@ -91,7 +91,7 @@ fn start_resolve<V>(
 {
     tokio::spawn(async move {
         tracing::debug!(cid = ?task.cid(), "starting iroh content resolve");
-        let res = client.resolve_iroh(task.cid()).await;
+        let res = client.resolve_iroh(task.cid(), task.node_addr()).await;
 
         let err = match res {
             Err(e) => {
@@ -100,7 +100,7 @@ fn start_resolve<V>(
                     "failed to submit iroh resolution task"
                 );
                 // The service is no longer listening, we might as well stop taking new tasks from the queue.
-                // By not quitting we should see this error every time there is a new task, which is at least is a constant reminder.
+                // By not quitting, we should see this error every time there is a new task, which is at least a constant reminder.
                 return;
             }
             Ok(Ok(())) => None,

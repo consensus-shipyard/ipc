@@ -2,21 +2,22 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::{collections::HashSet, hash::Hash};
-
 use async_stm::{
     queues::{tchan::TChan, TQueueLike},
     Stm, TVar,
 };
 use cid::Cid;
+use iroh::net::{NodeAddr, NodeId};
+use std::net::SocketAddr;
+use std::{collections::HashSet, hash::Hash};
 
 /// CIDs we need to resolve from a specific source subnet, or our own.
-pub type ResolveKey = Cid;
+pub type ResolveKey = (Cid, NodeId, SocketAddr);
 
 /// Ongoing status of a resolution.
 ///
 /// The status also keeps track of which original items mapped to the same resolution key.
-/// These could be for example checkpoint of the same data with slightly different signatories.
+/// These could be, for example, checkpoint of the same data with slightly different signatories.
 /// Once resolved, they all become available at the same time.
 #[derive(Clone)]
 pub struct ResolveStatus<T> {
@@ -57,7 +58,11 @@ pub struct ResolveTask {
 
 impl ResolveTask {
     pub fn cid(&self) -> Cid {
-        self.key
+        self.key.0
+    }
+
+    pub fn node_addr(&self) -> NodeAddr {
+        NodeAddr::new(self.key.1).with_direct_addresses([self.key.2])
     }
 
     pub fn set_resolved(&self) -> Stm<()> {
@@ -180,23 +185,31 @@ where
 mod tests {
     use async_stm::{atomically, queues::TQueueLike};
     use cid::Cid;
+    use iroh::base::key::SecretKey;
+    use iroh::net::NodeId;
+    use std::net::SocketAddr;
 
     #[derive(Clone, Hash, Eq, PartialEq, Debug)]
     struct TestItem {
         cid: Cid,
+        source_id: NodeId,
+        source_addr: SocketAddr,
     }
 
     impl TestItem {
         pub fn dummy() -> Self {
+            let node_id = SecretKey::generate().public();
             Self {
                 cid: Cid::default(),
+                source_id: node_id,
+                source_addr: "127.0.0.1:4919".parse().unwrap(),
             }
         }
     }
 
     impl From<&TestItem> for ResolveKey {
         fn from(value: &TestItem) -> Self {
-            value.cid
+            (value.cid, value.source_id, value.source_addr)
         }
     }
 
