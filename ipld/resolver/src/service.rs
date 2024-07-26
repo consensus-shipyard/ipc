@@ -8,7 +8,6 @@ use std::time::Duration;
 use anyhow::anyhow;
 use bloom::{BloomFilter, ASMS};
 use ipc_api::subnet_id::SubnetID;
-use iroh::client::blobs::BlobStatus;
 use iroh::net::NodeAddr;
 use libipld::store::StoreParams;
 use libipld::Cid;
@@ -645,10 +644,8 @@ async fn download_blob(
 ) -> anyhow::Result<()> {
     let hash: [u8; 32] = cid.hash().digest().try_into()?;
     let hash = iroh::blobs::Hash::from_bytes(hash);
-    // TODO: actually download from relevant nodes
-    // let res = iroh.blobs().download(hash).await?.await?;
-    match iroh.blobs().status(hash).await? {
-        BlobStatus::Complete { .. } => Ok(()),
-        _ => anyhow::bail!("blob not found"),
-    }
+    let res = iroh.blobs().download(hash, node_addr).await?.await?;
+    info!("downloaded {}: {:?}", cid, res);
+
+    Ok(())
 }
