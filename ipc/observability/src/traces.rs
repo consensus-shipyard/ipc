@@ -37,7 +37,7 @@ pub fn set_global_tracing_subscriber(
                 non_blocking(create_file_appender(file_settings, "app.logs"));
 
             let log_filter = file_settings.level_to_filter().add_directive(
-                format!("{TRACING_TARGET}=off")
+                format!("{TRACING_TARGET}={}", LogLevel::Off)
                     .parse()
                     .expect("invalid logs level"),
             );
