@@ -3,10 +3,10 @@
 script = """
 docker run \
   ${FLAGS} \
-  --name loki \
+  --name ${LOKI_CONTAINER_NAME} \
+  --net host \
   -v ${LOKI_CONFIG_FOLDER}:/mnt/config \
-  -p 3100:${LOKI_HOST_PORT} \
-  ${LOKI_CONTAINER_NAME} -config.file=/mnt/config/loki-config.yaml
+  ${LOKI_DOCKER_IMAGE} -config.file=/mnt/config/loki-config.yaml
 """
 
 [tasks.loki-start]

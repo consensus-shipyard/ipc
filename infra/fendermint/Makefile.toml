@@ -55,6 +55,9 @@ IPFS_GATEWAY_HOST_PORT = { value = "8080", condition = { env_not_set = [
 PROMETHEUS_HOST_PORT = { value = "9090", condition = { env_not_set = [
     "PROMETHEUS_HOST_PORT",
 ] } }
+LOKI_HOST_PORT = { value = "3100", condition = { env_not_set = [
+    "LOKI_HOST_PORT",
+] } }
 
 BALANCE = { value = "1000", condition = { env_not_set = ["BALANCE"] } }
 BASE_FEE = { value = "1000", condition = { env_not_set = ["BASE_FEE"] } }
@@ -149,17 +152,18 @@ PROMTAIL_CONTAINER_NAME = "${NODE_NAME}-promtail"
 OBJECTS_CONTAINER_NAME = "${NODE_NAME}-objects"
 IPFS_CONTAINER_NAME = "${NODE_NAME}-ipfs"
 PROMETHEUS_CONTAINER_NAME = "prometheus"
-GRAFANA_CONTAINER_NAME = "grafana/grafana-enterprise"
-LOKI_CONTAINER_NAME = "grafana/loki:3.0.0"
-PROMTAIL_CONTAINER_NAME = "grafana/promtail:3.0.0"
+GRAFANA_CONTAINER_NAME = "grafana"
+LOKI_CONTAINER_NAME = "loki"
 
 CMT_DOCKER_IMAGE = "cometbft/cometbft:v0.37.x"
 FM_DOCKER_TAG = "latest"
 FM_DOCKER_IMAGE = "fendermint:${FM_DOCKER_TAG}"
 FM_REMOTE_DOCKER_IMAGE = "ghcr.io/consensus-shipyard/fendermint:${FM_DOCKER_TAG}"
-PROMTAIL_DOCKER_IMAGE = "grafana/promtail:latest"
 IPFS_DOCKER_IMAGE = "ipfs/kubo:latest"
 PROMETHEUS_DOCKER_IMAGE = "prom/prometheus:latest"
+PROMTAIL_DOCKER_IMAGE = "grafana/promtail:3.0.0"
+LOKI_DOCKER_IMAGE = "grafana/loki:3.0.0"
+GRAFANA_DOCKER_IMAGE = "grafana/grafana-enterprise"
 
 IPFS_PROFILE = { value = "server", condition = { env_not_set = [
     "IPFS_PROFILE",

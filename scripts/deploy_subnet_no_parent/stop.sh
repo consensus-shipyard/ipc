@@ -24,3 +24,11 @@ done
 cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=prometheus \
     prometheus-destroy
+
+cargo make --makefile infra/fendermint/Makefile.toml \
+    -e NODE_NAME=grafana \
+    grafana-destroy
+
+cargo make --makefile infra/fendermint/Makefile.toml \
+    -e NODE_NAME=loki \
+    loki-destroy

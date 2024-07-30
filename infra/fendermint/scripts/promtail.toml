@@ -8,15 +8,15 @@ script = "docker volume rm fendermint-logs || true"
 
 [tasks.promtail-run]
 script = """
-unixtime=$(date +%s)
-echo "Starting promtail with promtailrunid: $unixtime"
 docker run \
+  ${FLAGS} \
   --name ${PROMTAIL_CONTAINER_NAME} \
-  --network ${SUBNET_ID} \
-  --port 9080:${PROMTAIL_AGENT_PORT} \
-  --volume /var/run/docker.sock:/var/run/docker.sock
-  --volume "$(readlink -f ../../../infra/promtail)/promtail-config.yaml:/etc/promtail/promtail-config.yaml" \
-  --volume ${FM_DIR}/data/logs:/var/log/findermint/   grafana/promtail:3.0.0 -config.file=/etc/promtail/promtail-config.yaml
+  --network ${NETWORK_NAME} \
+  --publish ${PROMTAIL_AGENT_PORT}:9080 \
+  --volume /var/run/docker.sock:/var/run/docker.sock \
+  --volume ${PROMTAIL_CONFIG_FOLDER}/promtail-config.yaml:/etc/promtail/promtail-config.yaml \
+  --volume ${FM_DIR}/data/logs:/var/log/fendermint/   \
+  ${PROMTAIL_DOCKER_IMAGE} -config.file=/etc/promtail/promtail-config.yaml
 """
 
 [tasks.promtail-start]

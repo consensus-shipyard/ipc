@@ -3,9 +3,9 @@
 script = """
 docker run \
   ${FLAGS} \
-  --name grafana \
-  --net host
-  ${GRAFANA_CONTAINER_NAME}
+  --name ${GRAFANA_CONTAINER_NAME} \
+  --net host \
+  ${GRAFANA_DOCKER_IMAGE}
 """
 
 [tasks.grafana-start]
