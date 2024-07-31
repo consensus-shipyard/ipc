@@ -6,6 +6,8 @@ dir=$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")
 IPC_FOLDER="$dir"/../..
 IPC_CONFIG_FOLDER=${HOME}/.ipc
 PROMETHEUS_CONFIG_FOLDER=$(dirname -- "$(readlink -f -- $IPC_FOLDER/infra/prometheus/prometheus.yaml)")
+LOKI_CONFIG_FOLDER=$(dirname -- "$(readlink -f -- $IPC_FOLDER/infra/loki/loki-config.yaml)")
+PROMTAIL_CONFIG_FOLDER=$(dirname -- "$(readlink -f $IPC_FOLDER/infra/promtail/promtail-config.yaml)")
 
 CMT_P2P_HOST_PORTS=(26656 26756 26856)
 CMT_RPC_HOST_PORTS=(26657 26757 26857)
@@ -17,6 +19,7 @@ IPFS_RPC_HOST_PORTS=(5001 5002 5003)
 IPFS_GATEWAY_HOST_PORTS=(8080 8081 8082)
 PROMETHEUS_HOST_PORT=9090
 PROMETHEUS_METRICS_PORTS=(9184 9185 9186)
+PROMTAIL_AGENT_PORTS=(9080 9081 9082)
 
 # Use "dummy" subnet
 subnet_id="/r314159/t410f726d2jv6uj4mpkcbgg5ndlpp3l7dd5rlcpgzkoi"

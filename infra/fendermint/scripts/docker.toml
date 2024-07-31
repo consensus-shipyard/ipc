@@ -15,7 +15,7 @@ ignore_errors = true
 
 [tasks.docker-rm]
 command = "docker"
-args = ["rm", "--force", "${CONTAINER_NAME}"]
+args = ["rm", "-fv", "${CONTAINER_NAME}"]
 ignore_errors = true
 
 [tasks.docker-destroy]

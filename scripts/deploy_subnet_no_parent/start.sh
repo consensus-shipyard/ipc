@@ -18,6 +18,8 @@ IPFS_SWARM_HOST_PORTS=(4001 4002 4003)
 IPFS_RPC_HOST_PORTS=(5001 5002 5003)
 IPFS_GATEWAY_HOST_PORTS=(8080 8081 8082)
 PROMETHEUS_HOST_PORT=9090
+LOKI_HOST_PORT=3100
+GRAFANA_HOST_PORT=3000
 PROMETHEUS_METRICS_PORTS=(9184 9185 9186)
 PROMTAIL_AGENT_PORTS=(9080 9081 9082)
 
@@ -135,6 +137,9 @@ cargo make --makefile infra/fendermint/Makefile.toml \
     -e PROMETHEUS_HOST_PORT="${PROMETHEUS_HOST_PORT}" \
     -e PROMETHEUS_CONFIG_FOLDER="${PROMETHEUS_CONFIG_FOLDER}" \
     prometheus-start
+
+# TODO: loki doesn't finish initializing unless we ping this endpoint. maybe missing something?
+curl --location http://localhost:3100/ready
 
 # Test ETH API endpoint
 for i in {0..2}

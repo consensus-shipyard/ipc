@@ -12,6 +12,7 @@ docker run \
   ${FLAGS} \
   --name ${PROMTAIL_CONTAINER_NAME} \
   --network ${NETWORK_NAME} \
+  --add-host=host.docker.internal:host-gateway \
   --publish ${PROMTAIL_AGENT_PORT}:9080 \
   --volume /var/run/docker.sock:/var/run/docker.sock \
   --volume ${PROMTAIL_CONFIG_FOLDER}/promtail-config.yaml:/etc/promtail/promtail-config.yaml \
