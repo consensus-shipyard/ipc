@@ -726,13 +726,11 @@ mod tests {
         };
         let params = RawBytes::serialize(params).unwrap();
         let store = Address::new_id(90);
-        let source_addr = source.direct_addresses().next().unwrap().to_owned();
         let object = fendermint_vm_message::signed::Object::new(
             key.to_vec(),
             object_cid,
             store,
             source.node_id,
-            source_addr,
         );
 
         let sk = fendermint_crypto::SecretKey::random(&mut StdRng::from_entropy());

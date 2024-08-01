@@ -89,7 +89,10 @@ pub struct ObjectPoolItem {
 
 impl From<&ObjectPoolItem> for IrohResolveKey {
     fn from(value: &ObjectPoolItem) -> Self {
-        (value.obj.cid, value.obj.source_id, value.obj.source_addr)
+        IrohResolveKey {
+            cid: value.obj.cid,
+            node: value.obj.source_id,
+        }
     }
 }
 

@@ -8,11 +8,14 @@ use async_stm::{
 };
 use cid::Cid;
 use iroh::net::{NodeAddr, NodeId};
-use std::net::SocketAddr;
 use std::{collections::HashSet, hash::Hash};
 
 /// CIDs we need to resolve from a specific source subnet, or our own.
-pub type ResolveKey = (Cid, NodeId, SocketAddr);
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ResolveKey {
+    pub cid: Cid,
+    pub node: NodeId,
+}
 
 /// Ongoing status of a resolution.
 ///
@@ -58,11 +61,11 @@ pub struct ResolveTask {
 
 impl ResolveTask {
     pub fn cid(&self) -> Cid {
-        self.key.0
+        self.key.cid
     }
 
     pub fn node_addr(&self) -> NodeAddr {
-        NodeAddr::new(self.key.1).with_direct_addresses([self.key.2])
+        NodeAddr::new(self.key.node)
     }
 
     pub fn set_resolved(&self) -> Stm<()> {
@@ -209,7 +212,10 @@ mod tests {
 
     impl From<&TestItem> for ResolveKey {
         fn from(value: &TestItem) -> Self {
-            (value.cid, value.source_id, value.source_addr)
+            Self {
+                cid: value.cid,
+                node: value.source_id
+            }
         }
     }
 
