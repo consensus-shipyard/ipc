@@ -8,6 +8,7 @@ use fil_actors_runtime::{runtime::Runtime, ActorError};
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::{address::Address, MethodNum};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -18,6 +19,8 @@ pub struct ConstructorParams {
     pub creator: Address,
     /// Write access dictates who can write to the machine.
     pub write_access: WriteAccess,
+    /// User-defined metadata.
+    pub metadata: HashMap<String, String>,
 }
 
 /// The different types of machine write access.
@@ -92,6 +95,7 @@ pub trait MachineActor {
         Ok(Metadata {
             owner: st.owner(),
             kind: st.kind(),
+            metadata: st.metadata(),
         })
     }
 }
@@ -103,6 +107,8 @@ pub struct Metadata {
     pub kind: Kind,
     /// Machine owner robust address.
     pub owner: Address,
+    /// User-defined data.
+    pub metadata: HashMap<String, String>,
 }
 
 /// Trait that must be implemented by machine state.
@@ -110,4 +116,5 @@ pub trait MachineState {
     fn kind(&self) -> Kind;
     fn owner(&self) -> Address;
     fn write_access(&self) -> WriteAccess;
+    fn metadata(&self) -> HashMap<String, String>;
 }

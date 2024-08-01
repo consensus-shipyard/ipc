@@ -28,6 +28,10 @@ fvm_ipld_encoding = { workspace = true }
 default = ["lz4", "blockstore", "kvstore"]
 blockstore = ["fvm_ipld_blockstore", "cid"]
 kvstore = ["fendermint_storage"]
+zstd = []
+zlib = []
+snappy = []
+bzip2 = []
 
 lz4 = ["rocksdb/lz4"]
 # snappy = ["rocksdb/snappy"]
