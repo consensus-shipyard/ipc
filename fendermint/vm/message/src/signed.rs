@@ -17,7 +17,6 @@ use fvm_shared::crypto::signature::ops::recover_secp_public_key;
 use fvm_shared::crypto::signature::{Signature, SignatureType, SECP_SIG_LEN};
 use fvm_shared::message::Message;
 use iroh::net::NodeId;
-use std::net::SocketAddr;
 use thiserror::Error;
 
 use crate::conv::from_fvm;
@@ -66,8 +65,6 @@ pub struct Object {
     pub store_addr: Address,
     /// Source Iroh node identifier.
     pub source_id: NodeId,
-    /// Source Iroh node address.
-    pub source_addr: SocketAddr,
 }
 
 impl Object {
@@ -76,14 +73,12 @@ impl Object {
         cid: Cid,
         store_addr: Address,
         source_id: NodeId,
-        source_addr: SocketAddr,
     ) -> Self {
         Object {
             key,
             cid,
             store_addr,
             source_id,
-            source_addr,
         }
     }
 }
