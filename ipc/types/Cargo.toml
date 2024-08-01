@@ -23,3 +23,7 @@ num-traits =  { workspace = true }
 serde =  { workspace = true, features = ["derive"]}
 uint = {version = "0.9.3", default-features = false}
 thiserror = { workspace = true }
+
+[features]
+default = []
+fil-actor = []
