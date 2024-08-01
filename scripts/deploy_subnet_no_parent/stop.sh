@@ -20,3 +20,7 @@ do
       -e SUBNET_ID="$subnet_id" \
       child-validator-down
 done
+
+cargo make --makefile infra/fendermint/Makefile.toml \
+    -e NODE_NAME=prometheus \
+    prometheus-destroy

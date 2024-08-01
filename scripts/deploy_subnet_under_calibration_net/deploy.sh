@@ -26,6 +26,7 @@ else
     IPC_FOLDER=${IPC_FOLDER}
 fi
 IPC_CONFIG_FOLDER=${HOME}/.ipc
+PROMETHEUS_CONFIG_FOLDER=$(dirname -- "$(readlink -f -- $IPC_FOLDER/infra/prometheus/prometheus.yaml)")
 
 wallet_addresses=()
 CMT_P2P_HOST_PORTS=(26656 26756 26856)
@@ -34,7 +35,10 @@ ETHAPI_HOST_PORTS=(8545 8645 8745)
 RESOLVER_HOST_PORTS=(26655 26755 26855)
 OBJECTS_HOST_PORTS=(8001 8002 8003)
 IROH_RPC_HOST_PORTS=(4921 4922 4923)
+
+FENDERMINT_METRICS_HOST_PORTS=(9184 9185 9186)
 IROH_METRICS_HOST_PORTS=(9091 9092 9093)
+PROMETHEUS_HOST_PORT=9090
 
 if (($# != 1)); then
   echo "Arguments: <Specify github remote branch name to use to deploy. Or use 'local' (without quote) to indicate using local repo instead. If not provided, will default to main branch"
@@ -242,6 +246,7 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e RESOLVER_HOST_PORT=${RESOLVER_HOST_PORTS[0]} \
     -e OBJECTS_HOST_PORT=${OBJECTS_HOST_PORTS[0]} \
     -e IROH_RPC_HOST_PORT="${IROH_RPC_HOST_PORTS[0]}" \
+    -e FENDERMINT_METRICS_HOST_PORT="${FENDERMINT_METRICS_HOST_PORTS[0]}" \
     -e IROH_METRICS_HOST_PORT="${IROH_METRICS_HOST_PORTS[0]}" \
     -e PARENT_HTTP_AUTH_TOKEN=${PARENT_HTTP_AUTH_TOKEN} \
     -e PARENT_REGISTRY=${parent_registry_address} \
@@ -274,6 +279,7 @@ do
       -e RESOLVER_HOST_PORT=${RESOLVER_HOST_PORTS[i]} \
       -e OBJECTS_HOST_PORT=${OBJECTS_HOST_PORTS[i]} \
       -e IROH_RPC_HOST_PORT="${IROH_RPC_HOST_PORTS[i]}" \
+      -e FENDERMINT_METRICS_HOST_PORT="${FENDERMINT_METRICS_HOST_PORTS[i]}" \
       -e IROH_METRICS_HOST_PORT="${IROH_METRICS_HOST_PORTS[i]}" \
       -e RESOLVER_BOOTSTRAPS=${bootstrap_resolver_endpoint} \
       -e BOOTSTRAPS=${bootstrap_node_endpoint} \
@@ -284,6 +290,13 @@ do
       -e FM_LOG_LEVEL="info" \
       child-validator
 done
+
+cargo make --makefile infra/fendermint/Makefile.toml \
+    -e NODE_NAME=prometheus \
+    -e SUBNET_ID="$subnet_id" \
+    -e PROMETHEUS_HOST_PORT="${PROMETHEUS_HOST_PORT}" \
+    -e PROMETHEUS_CONFIG_FOLDER="${PROMETHEUS_CONFIG_FOLDER}" \
+    prometheus-start
 
 # Step 9: Test
 # Step 9.1: Test ETH API endpoint
@@ -305,6 +318,14 @@ printf "\n$DASHES Test object API endpoints of validator nodes\n"
 for i in {0..2}
 do
   curl --location http://localhost:${OBJECTS_HOST_PORTS[i]}/health
+done
+
+# Step 9.3: Test Prometheus endpoints
+printf "\n$DASHES Test Prometheus endpoints of validator nodes\n"
+curl --location http://localhost:"${PROMETHEUS_HOST_PORT}"/graph
+for i in {0..2}
+do
+  curl --location http://localhost:"${FENDERMINT_METRICS_HOST_PORTS[i]}"/metrics
 done
 
 # Step 10: Start a relayer process
@@ -338,6 +359,9 @@ ETH API:
 http://localhost:${ETHAPI_HOST_PORTS[0]}
 http://localhost:${ETHAPI_HOST_PORTS[1]}
 http://localhost:${ETHAPI_HOST_PORTS[2]}
+
+Prometheus API:
+http://localhost:${PROMETHEUS_HOST_PORT}
 
 Accounts:
 $(jq -r '.accounts[] | "\(.meta.Account.owner): \(.balance) coin units"' ${subnet_folder}/validator-0/genesis.json)
