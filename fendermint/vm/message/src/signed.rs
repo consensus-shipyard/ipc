@@ -68,12 +68,7 @@ pub struct Object {
 }
 
 impl Object {
-    pub fn new(
-        key: Vec<u8>,
-        cid: Cid,
-        store_addr: Address,
-        source_id: NodeId,
-    ) -> Self {
+    pub fn new(key: Vec<u8>, cid: Cid, store_addr: Address, source_id: NodeId) -> Self {
         Object {
             key,
             cid,

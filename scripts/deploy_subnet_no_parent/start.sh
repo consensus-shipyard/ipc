@@ -24,16 +24,16 @@ rm -rf "$subnet_folder"
 
 # Build IPC contracts
 cd "$IPC_FOLDER"/contracts
-#make gen
+make gen
 
 # Build ipc-cli
 cd "$IPC_FOLDER"/ipc
-#make install
+make install
 
 # Rebuild fendermint docker
 cd "$IPC_FOLDER"/fendermint
-#make clean
-#make docker-build
+make clean
+make docker-build
 
 # Prepare wallet by using existing wallet json file
 wallet_addresses=()

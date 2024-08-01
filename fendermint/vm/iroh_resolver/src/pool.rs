@@ -214,7 +214,7 @@ mod tests {
         fn from(value: &TestItem) -> Self {
             Self {
                 cid: value.cid,
-                node: value.source_id
+                node: value.source_id,
             }
         }
     }

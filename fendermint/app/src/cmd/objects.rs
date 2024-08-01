@@ -773,7 +773,7 @@ mod tests {
         );
         let client = FendermintClient::new(MockClient::new(matcher).0);
         let iroh = iroh::node::Node::memory().spawn().await.unwrap();
-        let hash = iroh
+        let _hash = iroh
             .blobs()
             .add_bytes(&b"hello world"[..])
             .await
@@ -811,7 +811,7 @@ mod tests {
         );
         let client = FendermintClient::new(MockClient::new(matcher).0);
         let iroh = iroh::node::Node::memory().spawn().await.unwrap();
-        let hash = iroh
+        let _hash = iroh
             .blobs()
             .add_bytes(&b"hello world"[..])
             .await
@@ -849,7 +849,7 @@ mod tests {
         );
         let client = FendermintClient::new(MockClient::new(matcher).0);
         let iroh = iroh::node::Node::memory().spawn().await.unwrap();
-        let hash = iroh
+        let _hash = iroh
             .blobs()
             .add_bytes(&b"hello world"[..])
             .await
