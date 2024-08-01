@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -euo pipefail
+#set -euo pipefail
 
 dir=$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")
 IPC_FOLDER="$dir"/../..
@@ -18,20 +18,36 @@ IPFS_SWARM_HOST_PORTS=(4001 4002 4003)
 IPFS_RPC_HOST_PORTS=(5001 5002 5003)
 IPFS_GATEWAY_HOST_PORTS=(8080 8081 8082)
 PROMETHEUS_HOST_PORT=9090
+LOKI_HOST_PORT=3100
+GRAFANA_HOST_PORT=3000
 PROMETHEUS_METRICS_PORTS=(9184 9185 9186)
 PROMTAIL_AGENT_PORTS=(9080 9081 9082)
 
 # Use "dummy" subnet
 subnet_id="/r314159/t410f726d2jv6uj4mpkcbgg5ndlpp3l7dd5rlcpgzkoi"
 subnet_folder=$IPC_CONFIG_FOLDER/$(echo $subnet_id | sed 's|^/||;s|/|-|g')
+rm -rf "$subnet_folder"
 
 # Rebuild fendermint docker
 cd "$IPC_FOLDER"/fendermint
 make clean
 make docker-build
 
-# Restart validators
 cd "$IPC_FOLDER"
+
+cargo make --makefile infra/fendermint/Makefile.toml \
+    -e NODE_NAME=grafana \
+    -e SUBNET_ID="$subnet_id" \
+    grafana-start
+
+cargo make --makefile infra/fendermint/Makefile.toml \
+    -e NODE_NAME=loki \
+    -e SUBNET_ID="$subnet_id" \
+    -e LOKI_HOST_PORT="${LOKI_HOST_PORT}" \
+    -e LOKI_CONFIG_FOLDER="${LOKI_CONFIG_FOLDER}" \
+    loki-start
+
+# Restart validators
 bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=validator-0 \
     -e PRIVATE_KEY_PATH="$IPC_CONFIG_FOLDER"/validator_0.sk \
@@ -45,6 +61,8 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e IPFS_RPC_HOST_PORT="${IPFS_RPC_HOST_PORTS[0]}" \
     -e IPFS_GATEWAY_HOST_PORT="${IPFS_GATEWAY_HOST_PORTS[0]}" \
     -e PROMETHEUS_METRICS_PORT="${PROMETHEUS_METRICS_PORTS[0]}" \
+    -e PROMTAIL_AGENT_PORT="${PROMTAIL_AGENT_PORTS[0]}" \
+    -e PROMTAIL_CONFIG_FOLDER="${PROMTAIL_CONFIG_FOLDER}" \
     -e IPFS_PROFILE="local-discovery" \
     -e FM_PULL_SKIP=1 \
     -e FM_LOG_LEVEL="info,fendermint=debug" \
@@ -54,6 +72,7 @@ bootstrap_node_id=$(echo "$bootstrap_output" | sed -n '/CometBFT node ID:/ {n;p;
 bootstrap_peer_id=$(echo "$bootstrap_output" | sed -n '/IPLD Resolver Multiaddress:/ {n;p;}' | tr -d "[:blank:]" | sed 's/.*\/p2p\///')
 bootstrap_node_endpoint=${bootstrap_node_id}@validator-0-cometbft:${CMT_P2P_HOST_PORTS[0]}
 bootstrap_resolver_endpoint="/dns/validator-0-fendermint/tcp/${RESOLVER_HOST_PORTS[0]}/p2p/${bootstrap_peer_id}"
+
 for i in {1..2}
 do
   cargo make --makefile infra/fendermint/Makefile.toml \
@@ -69,6 +88,8 @@ do
       -e IPFS_RPC_HOST_PORT="${IPFS_RPC_HOST_PORTS[i]}" \
       -e IPFS_GATEWAY_HOST_PORT="${IPFS_GATEWAY_HOST_PORTS[i]}" \
       -e PROMETHEUS_METRICS_PORT="${PROMETHEUS_METRICS_PORTS[0]}" \
+      -e PROMTAIL_AGENT_PORT="${PROMTAIL_AGENT_PORTS[i]}" \
+      -e PROMTAIL_CONFIG_FOLDER="${PROMTAIL_CONFIG_FOLDER}" \
       -e IPFS_PROFILE="local-discovery" \
       -e RESOLVER_BOOTSTRAPS="$bootstrap_resolver_endpoint" \
       -e BOOTSTRAPS="$bootstrap_node_endpoint" \
@@ -83,6 +104,9 @@ cargo make --makefile infra/fendermint/Makefile.toml \
     -e PROMETHEUS_HOST_PORT="${PROMETHEUS_HOST_PORT}" \
     -e PROMETHEUS_CONFIG_FOLDER="${PROMETHEUS_CONFIG_FOLDER}" \
     prometheus-restart
+
+# TODO: loki doesn't finish initializing unless we ping this endpoint. maybe missing something?
+curl --location http://localhost:3100/ready
 
 # Test ETH API endpoint
 for i in {0..2}
@@ -144,6 +168,12 @@ http://localhost:${CMT_RPC_HOST_PORTS[2]}
 
 Prometheus API:
 http://localhost:${PROMETHEUS_HOST_PORT}
+
+Loki API:
+http://localhost:${LOKI_HOST_PORT}
+
+Grafana API:
+http://localhost:${GRAFANA_HOST_PORT}
 
 Accounts:
 $(jq -r '.app_state.accounts[] | "\(.meta.Account.owner): \(.balance) coin units"' "$subnet_folder"/validator-0/genesis.json)

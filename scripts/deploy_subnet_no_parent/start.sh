@@ -208,7 +208,6 @@ http://localhost:${LOKI_HOST_PORT}
 Grafana API:
 http://localhost:${GRAFANA_HOST_PORT}
 
-
 Accounts:
 $(jq -r '.app_state.accounts[] | "\(.meta.Account.owner): \(.balance) coin units"' "$subnet_folder"/validator-0/genesis.json)
 
