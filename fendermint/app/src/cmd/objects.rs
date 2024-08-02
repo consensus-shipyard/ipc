@@ -23,6 +23,7 @@ use thiserror::Error;
 use warp::{
     filters::multipart::Part,
     http::{HeaderMap, HeaderValue, StatusCode},
+    hyper::body::Body,
     path::Tail,
     Filter, Rejection, Reply,
 };
@@ -454,7 +455,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
                                 message: format!("failed to fetch object: {} {}", hash, e),
                             })
                         })?;
-                    let body = warp::hyper::Body::wrap_stream(reader);
+                    let body = Body::wrap_stream(reader);
                     ObjectRange {
                         start,
                         end,
@@ -469,7 +470,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
                             message: format!("failed to fetch object: {} {}", hash, e),
                         })
                     })?;
-                    let body = warp::hyper::Body::wrap_stream(reader);
+                    let body = Body::wrap_stream(reader);
                     ObjectRange {
                         start: 0,
                         end: size - 1,

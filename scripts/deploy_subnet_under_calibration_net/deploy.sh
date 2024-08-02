@@ -26,7 +26,6 @@ else
     IPC_FOLDER=${IPC_FOLDER}
 fi
 IPC_CONFIG_FOLDER=${HOME}/.ipc
-PROMETHEUS_CONFIG_FOLDER=$(dirname -- "$(readlink -f -- $IPC_FOLDER/infra/prometheus/prometheus.yaml)")
 
 wallet_addresses=()
 CMT_P2P_HOST_PORTS=(26656 26756 26856)
@@ -295,7 +294,7 @@ cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=prometheus \
     -e SUBNET_ID="$subnet_id" \
     -e PROMETHEUS_HOST_PORT="${PROMETHEUS_HOST_PORT}" \
-    -e PROMETHEUS_CONFIG_FOLDER="${PROMETHEUS_CONFIG_FOLDER}" \
+    -e PROMETHEUS_CONFIG_FOLDER="${IPC_CONFIG_FOLDER}" \
     prometheus-start
 
 # Step 9: Test

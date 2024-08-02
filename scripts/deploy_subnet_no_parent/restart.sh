@@ -5,7 +5,6 @@ set -euo pipefail
 dir=$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")
 IPC_FOLDER="$dir"/../..
 IPC_CONFIG_FOLDER=${HOME}/.ipc
-PROMETHEUS_CONFIG_FOLDER=$(dirname -- "$(readlink -f -- $IPC_FOLDER/infra/prometheus/prometheus.yaml)")
 
 CMT_P2P_HOST_PORTS=(26656 26756 26856)
 CMT_RPC_HOST_PORTS=(26657 26757 26857)
@@ -39,7 +38,7 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e RESOLVER_HOST_PORT="${RESOLVER_HOST_PORTS[0]}" \
     -e OBJECTS_HOST_PORT="${OBJECTS_HOST_PORTS[0]}" \
     -e IROH_RPC_HOST_PORT="${IROH_RPC_HOST_PORTS[0]}" \
-    -e FENDERMINT_METRICS_HOST_PORT="${PROMETHEUS_METRICS_HOST_PORTS[0]}" \
+    -e FENDERMINT_METRICS_HOST_PORT="${FENDERMINT_METRICS_HOST_PORTS[0]}" \
     -e IROH_METRICS_HOST_PORT="${IROH_METRICS_HOST_PORTS[0]}" \
     -e FM_PULL_SKIP=1 \
     -e FM_LOG_LEVEL="info,fendermint=debug" \
@@ -74,7 +73,7 @@ cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=prometheus \
     -e SUBNET_ID="$subnet_id" \
     -e PROMETHEUS_HOST_PORT="${PROMETHEUS_HOST_PORT}" \
-    -e PROMETHEUS_CONFIG_FOLDER="${PROMETHEUS_CONFIG_FOLDER}" \
+    -e PROMETHEUS_CONFIG_FOLDER="${IPC_CONFIG_FOLDER}" \
     prometheus-restart
 
 # Test ETH API endpoint
