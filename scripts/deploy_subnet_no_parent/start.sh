@@ -26,10 +26,6 @@ rm -rf "$subnet_folder"
 cd "$IPC_FOLDER"/contracts
 make gen
 
-# Build ipc-cli
-cd "$IPC_FOLDER"/ipc
-make install
-
 # Rebuild fendermint docker
 cd "$IPC_FOLDER"/fendermint
 make clean

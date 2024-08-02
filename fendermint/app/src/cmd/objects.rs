@@ -390,7 +390,7 @@ pub(crate) struct ObjectRange {
     end: u64,
     len: u64,
     size: u64,
-    body: warp::hyper::Body,
+    body: Body,
 }
 
 async fn handle_object_download<F: QueryClient + Send + Sync>(
@@ -483,7 +483,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
             // If it is a HEAD request, we don't need to send the body
             // but we still need to send the Content-Length header
             if method == "HEAD" {
-                let mut response = warp::reply::Response::new(warp::hyper::Body::empty());
+                let mut response = warp::reply::Response::new(Body::empty());
                 let mut header_map = HeaderMap::new();
                 header_map.insert("Content-Length", HeaderValue::from(object_range.size));
                 let headers = response.headers_mut();

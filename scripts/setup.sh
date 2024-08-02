@@ -19,7 +19,6 @@ done
 echo "HDI9SU0dBp/kyJE1Ch7GkcQhbBdBigyzx1M7FDvSuBI=" | tr -d '\n' > test-network/keys/alice.sk
 echo "Ayh506Z/KRZnDgtarffTZQympqQ8A4hfwse1gK9t0NJi" | tr -d '\n' > test-network/keys/alice.pk
 
-
 # Add accounts to the Genesis file
 ## A stand-alone account
 fendermint genesis --genesis-file test-network/genesis.json add-account --public-key test-network/keys/alice.pk --balance 1000 --kind ethereum
