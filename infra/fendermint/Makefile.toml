@@ -158,6 +158,7 @@ PROMETHEUS_DOCKER_IMAGE = "prom/prometheus:latest"
 CARGO_MAKE_WAIT_MILLISECONDS = 5000
 # This wait time seems to work locally.
 CMT_WAIT_MILLIS = 20000
+IROH_WAIT_MILLIS = 5000
 # Keep example logs to a minimum.
 VERBOSITY = ""
 # supports info, error, debug, etc.

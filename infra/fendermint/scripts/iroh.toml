@@ -31,3 +31,7 @@ run_task = "docker-destroy"
 [tasks.iroh-logs]
 extend = "docker-logs"
 env = { "CONTAINER_NAME" = "${IROH_CONTAINER_NAME}" }
+
+[tasks.iroh-wait]
+extend = "wait"
+env = { "CARGO_MAKE_WAIT_MILLISECONDS" = "${IROH_WAIT_MILLIS}" }
