@@ -50,8 +50,12 @@ cmd! {
                 let iroh_client = iroh::client::Iroh::connect_addr(iroh_addr).await?;
 
                 // Admin routes
-                let health_route = warp::path!("health")
-                    .and(warp::get()).and_then(health);
+                let health = warp::path!("health")
+                    .and(warp::get()).and_then(handle_health);
+                let node_addr = warp::path!("v1" / "node" )
+                .and(warp::get())
+                .and(with_iroh(iroh_client.clone()))
+                .and_then(handle_node_addr);
 
                 // Objects routes
                 let objects_upload = warp::path!("v1" / "objects" )
@@ -73,7 +77,8 @@ cmd! {
                 .and(with_iroh(iroh_client.clone()))
                 .and_then(handle_object_download);
 
-                let router = health_route
+                let router = health
+                    .or(node_addr)
                     .or(objects_upload)
                     .or(objects_download)
                     .with(warp::cors().allow_any_origin()
@@ -240,8 +245,17 @@ async fn ensure_balance<F: QueryClient>(client: &F, from: Address) -> anyhow::Re
     Ok(())
 }
 
-async fn health() -> Result<impl Reply, Rejection> {
+async fn handle_health() -> Result<impl Reply, Rejection> {
     Ok(warp::reply::reply())
+}
+
+async fn handle_node_addr(iroh: iroh::client::Iroh) -> Result<impl Reply, Rejection> {
+    let node_addr = iroh.node_addr().await.map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("failed to get iroh node address info: {}", e),
+        })
+    })?;
+    Ok(warp::reply::json(&node_addr))
 }
 
 async fn handle_object_upload<F: QueryClient>(

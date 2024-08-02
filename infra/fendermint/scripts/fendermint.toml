@@ -185,13 +185,11 @@ docker run \
 """
 dependencies = ["fendermint-deps"]
 
-
 [tasks.fendermint-new-network-key]
 extend = "fendermint-tool"
 env = { "CMD" = "key gen --out-dir /data/${NODE_NAME}/${KEYS_SUBDIR} --name ${NETWORK_KEY_NAME}" }
 script.pre = "mkdir -p ${BASE_DIR}/${NODE_NAME}/${KEYS_SUBDIR}"
 script.post = "chmod 600 ${BASE_DIR}/${NODE_NAME}/${KEYS_SUBDIR}/${NETWORK_KEY_NAME}.sk"
-
 
 [tasks.fendermint-network-peer-id]
 extend = "fendermint-tool"
