@@ -427,7 +427,7 @@ pub(crate) struct ObjectRange {
     end: u64,
     len: u64,
     size: u64,
-    body: warp::hyper::Body,
+    body: Body,
 }
 
 async fn handle_object_download<F: QueryClient + Send + Sync, I: IpfsApiAdapter>(
@@ -473,7 +473,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync, I: IpfsApiAdapter>
             // If it is a HEAD request, we don't need to send the body
             // but we still need to send the Content-Length header
             if method == "HEAD" {
-                let mut response = warp::reply::Response::new(warp::hyper::Body::empty());
+                let mut response = warp::reply::Response::new(Body::empty());
                 let mut header_map = HeaderMap::new();
                 header_map.insert("Content-Length", HeaderValue::from(object_range.size));
                 let headers = response.headers_mut();
@@ -761,13 +761,7 @@ mod tests {
             gas_premium: TokenAmount::from_atto(0),
         };
         let chain_id = fvm_shared::chainid::ChainID::from(314159);
-        let signed = fendermint_vm_message::signed::SignedMessage::new_secp256k1(
-            message,
-            Some(object),
-            &sk,
-            &chain_id,
-        )
-        .unwrap();
+        let signed = SignedMessage::new_secp256k1(message, Some(object), &sk, &chain_id).unwrap();
 
         let serialized_signed_message = fvm_ipld_encoding::to_vec(&signed).unwrap();
         let serialized_signed_message_b64 =

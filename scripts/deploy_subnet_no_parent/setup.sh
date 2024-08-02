@@ -12,6 +12,10 @@ mkdir -p "$IPC_CONFIG_FOLDER"
 cp "$IPC_FOLDER"/scripts/deploy_subnet_no_parent/.ipc/config.toml "$IPC_CONFIG_FOLDER"
 cp "$IPC_FOLDER"/scripts/deploy_subnet_no_parent/.ipc/genesis.json "$IPC_CONFIG_FOLDER"
 
+# Build ipc-cli
+cd "$IPC_FOLDER"/ipc
+make install
+
 for _ in {0..2}
 do
   ipc-cli wallet new --wallet-type evm 1> /dev/null
