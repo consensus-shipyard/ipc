@@ -15,16 +15,18 @@ use fvm_shared::{address::Address, chainid::ChainID};
 
 use fendermint_crypto::PublicKey;
 use fendermint_crypto::SecretKey;
-use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::BottomUpCheckpoint;
-use fendermint_vm_event::NewBottomUpCheckpoint;
 use fendermint_vm_genesis::{Power, Validator, ValidatorKey};
 
 use ipc_actors_abis::checkpointing_facet as checkpoint;
 use ipc_actors_abis::gateway_getter_facet as getter;
 use ipc_api::staking::ConfigurationNumber;
+use ipc_observability::{emit, serde::HexEncodableBlockHash};
 
+use super::observe::{
+    CheckpointCreated, CheckpointFinalized, CheckpointSigned, CheckpointSignedRole,
+};
 use super::state::ipc::tokens_to_burn;
 use super::{
     broadcast::Broadcaster,
@@ -121,11 +123,11 @@ where
         power_diff(curr_power_table, next_power_table)
     };
 
-    emit!(NewBottomUpCheckpoint {
-        block_height: height.value(),
-        block_hash: &hex::encode(block_hash),
-        num_msgs,
-        next_configuration_number,
+    emit(CheckpointCreated {
+        height: height.value(),
+        hash: HexEncodableBlockHash(block_hash.to_vec()),
+        msg_count: num_msgs,
+        config_number: next_configuration_number,
     });
 
     Ok(Some((checkpoint, power_updates)))
@@ -255,6 +257,13 @@ where
             .await
             .context("failed to broadcast checkpoint signature")?;
 
+            emit(CheckpointSigned {
+                role: CheckpointSignedRole::Own,
+                height: height.value(),
+                hash: HexEncodableBlockHash(cp.block_hash.to_vec()),
+                validator: validator_ctx.public_key,
+            });
+
             tracing::debug!(?height, "submitted checkpoint signature");
         }
     }
@@ -286,6 +295,38 @@ where
 
     // The transaction should be in the mempool now.
     tracing::info!(tx_hash = tx_hash.to_string(), "broadcasted signature");
+
+    Ok(())
+}
+
+// Emit a CheckpointFinalized trace event if a checkpoint has been finalized on the current block.
+pub fn emit_trace_if_check_checkpoint_finalized<DB>(
+    gateway: &GatewayCaller<DB>,
+    state: &mut FvmExecState<DB>,
+) -> anyhow::Result<()>
+where
+    DB: Blockstore + Clone,
+{
+    if !gateway.enabled(state)? {
+        return Ok(());
+    }
+
+    let block_height = state.block_height();
+    let block_hash = state
+        .block_hash()
+        .ok_or_else(|| anyhow!("block hash not set"))?;
+
+    // Check if the checkpoint has been finalized.
+    // If no checkpoint was emitted at this height, the QuorumInfo struct will carry zero values,
+    // including reached=false.
+    let checkpoint_quorum = gateway.checkpoint_info(state, block_height)?;
+
+    if checkpoint_quorum.reached {
+        emit(CheckpointFinalized {
+            height: block_height,
+            hash: HexEncodableBlockHash(block_hash.to_vec()),
+        })
+    }
 
     Ok(())
 }

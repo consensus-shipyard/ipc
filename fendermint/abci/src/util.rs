@@ -4,7 +4,7 @@
 /// Take the first transactions until the first one that would exceed the maximum limit.
 ///
 /// The function does not skip or reorder transaction even if a later one would stay within the limit.
-pub fn take_until_max_size<T: AsRef<[u8]>>(txs: Vec<T>, max_tx_bytes: usize) -> Vec<T> {
+pub fn take_until_max_size<T: AsRef<[u8]>>(txs: Vec<T>, max_tx_bytes: usize) -> (Vec<T>, usize) {
     let mut size: usize = 0;
     let mut out = Vec::new();
     for tx in txs {
@@ -15,5 +15,5 @@ pub fn take_until_max_size<T: AsRef<[u8]>>(txs: Vec<T>, max_tx_bytes: usize) -> 
         size += bz.len();
         out.push(tx);
     }
-    out
+    (out, size)
 }

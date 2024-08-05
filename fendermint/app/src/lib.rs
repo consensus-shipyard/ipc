@@ -3,9 +3,9 @@ extern crate core;
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 mod app;
-pub mod events;
 pub mod ipc;
 pub mod metrics;
+pub mod observe;
 mod store;
 mod tmconv;
 

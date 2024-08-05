@@ -5,6 +5,8 @@ use libp2p::identity::{Keypair, PublicKey};
 use serde::de::{DeserializeOwned, Error};
 use serde::{Deserialize, Serialize};
 
+use std::fmt::Display;
+
 use crate::{
     signed_record::{Record, SignedRecord},
     Timestamp,
@@ -14,6 +16,12 @@ use crate::{
 /// vote about things regarding the subnet in which they participate.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct ValidatorKey(PublicKey);
+
+impl Display for ValidatorKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.to_peer_id().fmt(f)
+    }
+}
 
 impl Serialize for ValidatorKey {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

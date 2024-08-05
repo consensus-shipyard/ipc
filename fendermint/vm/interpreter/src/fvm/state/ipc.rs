@@ -146,6 +146,17 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         self.getter.call(state, |c| c.get_incomplete_checkpoints())
     }
 
+    /// Retrieve checkpoint info by block height.
+    pub fn checkpoint_info(
+        &self,
+        state: &mut FvmExecState<DB>,
+        height: i64,
+    ) -> anyhow::Result<getter::QuorumInfo> {
+        self.getter.call(state, |c| {
+            c.get_checkpoint_info(ethers::types::U256::from(height))
+        })
+    }
+
     /// Apply all pending validator changes, returning the newly adopted configuration number, or 0 if there were no changes.
     pub fn apply_validator_changes(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<u64> {
         self.topdown.call(state, |c| c.apply_finality_changes())

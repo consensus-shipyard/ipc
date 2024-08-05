@@ -7,7 +7,6 @@ crytic-export/
 broadcast/
 out/
 binding/src
-contracts/
 
 node_modules
 
@@ -36,3 +35,6 @@ report.json
 
 #vim
 *.un~
+
+## Licenses are picked up from the root when packing the npm package.
+LICENSE-*

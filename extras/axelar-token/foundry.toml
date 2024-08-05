@@ -1,9 +1,8 @@
 [profile.default]
-src = "src"
+src = "contracts"
 out = "out"
-libs = ["lib"]
-
+libs = ["node_modules", "lib"]
 fs_permissions = [{ access = "read-write", path = "./out"}]
-allow_paths = ["../../"]
-
-# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+remappings = [
+    "@consensus-shipyard/=node_modules/@consensus-shipyard/"
+]

@@ -6,10 +6,16 @@ use async_trait::async_trait;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::{address::Address, error::ExitCode};
+use ipc_observability::{emit, measure_time};
 
 use crate::CheckInterpreter;
 
-use super::{state::FvmExecState, store::ReadOnlyBlockstore, FvmMessage, FvmMessageInterpreter};
+use super::{
+    observe::{MsgExec, MsgExecPurpose},
+    state::FvmExecState,
+    store::ReadOnlyBlockstore,
+    FvmMessage, FvmMessageInterpreter,
+};
 
 /// Transaction check results are expressed by the exit code, so that hopefully
 /// they would result in the same error code if they were applied.
@@ -19,6 +25,7 @@ pub struct FvmCheckRet {
     pub exit_code: ExitCode,
     pub return_data: Option<RawBytes>,
     pub info: Option<String>,
+    pub message: FvmMessage,
 }
 
 #[async_trait]
@@ -64,6 +71,7 @@ where
                 exit_code,
                 return_data,
                 info,
+                message: msg.clone(),
             };
             Ok((state, ret))
         };
@@ -109,8 +117,18 @@ where
                     // Instead of modifying just the partial state, we will execute the call in earnest.
                     // This is required for fully supporting the Ethereum API "pending" queries, if that's needed.
 
-                    // This will stack the effect for subsequent transactions added to the mempool.
-                    let (apply_ret, _) = state.execute_explicit(msg.clone())?;
+                    let (execution_result, latency) =
+                        measure_time(|| state.execute_explicit(msg.clone()));
+
+                    let (apply_ret, _) = execution_result?;
+
+                    emit(MsgExec {
+                        purpose: MsgExecPurpose::Check,
+                        height: state.block_height(),
+                        message: msg.clone(),
+                        duration: latency.as_secs_f64(),
+                        exit_code: apply_ret.msg_receipt.exit_code.value(),
+                    });
 
                     return checked(
                         state,

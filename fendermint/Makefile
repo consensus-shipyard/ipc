@@ -32,7 +32,7 @@ diagrams:
 	make -C  ../docs/fendermint/diagrams diagrams
 
 build: $(IPC_ACTORS_GEN) | protoc npm
-	cargo build --release
+	cargo build --locked --release
 
 install: $(IPC_ACTORS_GEN)
 	cargo install --locked --path app
@@ -43,14 +43,14 @@ test: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 	FM_BUILTIN_ACTORS_BUNDLE=$(BUILTIN_ACTORS_BUNDLE) \
 	FM_CUSTOM_ACTORS_BUNDLE=$(CUSTOM_ACTORS_BUNDLE) \
 	FM_CONTRACTS_DIR=$(IPC_ACTORS_OUT) \
-	cargo test --release $(shell echo $(PACKAGE) | sed 's/--package fendermint_materializer//g')
+	cargo test --locked --release $(shell echo $(PACKAGE) | sed 's/--package fendermint_materializer//g')
 
 # Not using --release beause the build has been done in docker and the wasm code runs inside the container.
 e2e: docker-build | cargo-make
 	cd testing/smoke-test    && cargo make --profile $(PROFILE)
 	cd testing/snapshot-test && cargo make --profile $(PROFILE)
 	cd testing/graph-test    && cargo make --profile $(PROFILE)
-	PROFILE=$(PROFILE) cargo test --package fendermint_materializer
+	PROFILE=$(PROFILE) cargo test --locked --package fendermint_materializer
 
 clean:
 	cargo clean

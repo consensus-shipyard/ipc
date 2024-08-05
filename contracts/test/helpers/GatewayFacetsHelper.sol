@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {OwnershipFacet} from "../../src/OwnershipFacet.sol";
-import {GatewayGetterFacet} from "../../src/gateway/GatewayGetterFacet.sol";
-import {GatewayManagerFacet} from "../../src/gateway/GatewayManagerFacet.sol";
-import {GatewayMessengerFacet} from "../../src/gateway/GatewayMessengerFacet.sol";
-import {TopDownFinalityFacet} from "../../src/gateway/router/TopDownFinalityFacet.sol";
-import {CheckpointingFacet} from "../../src/gateway/router/CheckpointingFacet.sol";
-import {XnetMessagingFacet} from "../../src/gateway/router/XnetMessagingFacet.sol";
-import {GatewayDiamond} from "../../src/GatewayDiamond.sol";
-import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
-import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
+import {OwnershipFacet} from "../../contracts/OwnershipFacet.sol";
+import {GatewayGetterFacet} from "../../contracts/gateway/GatewayGetterFacet.sol";
+import {GatewayManagerFacet} from "../../contracts/gateway/GatewayManagerFacet.sol";
+import {GatewayMessengerFacet} from "../../contracts/gateway/GatewayMessengerFacet.sol";
+import {TopDownFinalityFacet} from "../../contracts/gateway/router/TopDownFinalityFacet.sol";
+import {CheckpointingFacet} from "../../contracts/gateway/router/CheckpointingFacet.sol";
+import {XnetMessagingFacet} from "../../contracts/gateway/router/XnetMessagingFacet.sol";
+import {GatewayDiamond} from "../../contracts/GatewayDiamond.sol";
+import {DiamondLoupeFacet} from "../../contracts/diamond/DiamondLoupeFacet.sol";
+import {DiamondCutFacet} from "../../contracts/diamond/DiamondCutFacet.sol";
 
 library GatewayFacetsHelper {
     function ownership(address gw) internal pure returns (OwnershipFacet) {

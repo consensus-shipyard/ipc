@@ -3,9 +3,9 @@ pragma solidity ^0.8.23;
 
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
-import {MaxPQ, LibMaxPQ} from "../../src/lib/priority/LibMaxPQ.sol";
-import {LibValidatorSet} from "../../src/lib/LibStaking.sol";
-import {ValidatorSet} from "../../src/structs/Subnet.sol";
+import {MaxPQ, LibMaxPQ} from "../../contracts/lib/priority/LibMaxPQ.sol";
+import {LibValidatorSet} from "../../contracts/lib/LibStaking.sol";
+import {ValidatorSet} from "../../contracts/structs/Subnet.sol";
 
 contract LibMaxPQTest is Test {
     using LibValidatorSet for ValidatorSet;
