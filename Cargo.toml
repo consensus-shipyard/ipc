@@ -159,6 +159,7 @@ tokio-stream = "0.1.14"
 tokio-util = { version = "0.7.8", features = ["compat"] }
 tokio-tungstenite = { version = "0.18.0", features = ["native-tls"] }
 toml = "0.8"
+time = "0.3.33"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = [
   "env-filter",
