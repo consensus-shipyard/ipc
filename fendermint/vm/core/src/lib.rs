@@ -2,5 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 pub mod chainid;
 mod timestamp;
+pub mod gas;
 
 pub use timestamp::Timestamp;
