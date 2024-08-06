@@ -6,7 +6,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::hash::Hash;
 use std::{fmt::Debug, time::Duration};
 
-use crate::{BlockHash, BlockHeight, Object};
+use crate::{Blob, BlockHash, BlockHeight};
 
 // Usign this type because it's `Hash`, unlike the normal `libsecp256k1::PublicKey`.
 pub use ipc_ipld_resolver::ValidatorKey;
@@ -38,7 +38,7 @@ pub enum Error<K = ValidatorKey, V: AsRef<[u8]> = BlockHash> {
 /// so that we can ask for proposals that are not going to be voted
 /// down.
 #[derive(Clone)]
-pub struct VoteTally<K = ValidatorKey, V = BlockHash, O = Object> {
+pub struct VoteTally<K = ValidatorKey, V = BlockHash, O = Blob> {
     /// Current validator weights. These are the ones who will vote on the blocks,
     /// so these are the weights which need to form a quorum.
     power_table: TVar<im::HashMap<K, Weight>>,
@@ -64,12 +64,12 @@ pub struct VoteTally<K = ValidatorKey, V = BlockHash, O = Object> {
     /// and is often retried due to votes being added.
     pause_votes: TVar<bool>,
 
-    /// Index votes received by object.
-    object_votes: TVar<im::HashMap<O, im::HashSet<K>>>,
+    /// Index votes received by blob.
+    blob_votes: TVar<im::HashMap<O, im::HashSet<K>>>,
 
     /// Adding votes can be paused if we observe that looking for a quorum takes too long
     /// and is often retried due to votes being added.
-    pause_object_votes: TVar<bool>,
+    pause_blob_votes: TVar<bool>,
 }
 
 impl<K, V, O> VoteTally<K, V, O>
@@ -89,8 +89,8 @@ where
             chain: TVar::default(),
             votes: TVar::default(),
             pause_votes: TVar::new(false),
-            object_votes: TVar::default(),
-            pause_object_votes: TVar::new(false),
+            blob_votes: TVar::default(),
+            pause_blob_votes: TVar::new(false),
         }
     }
 
@@ -103,8 +103,8 @@ where
             chain: TVar::new(im::OrdMap::from_iter([(height, Some(hash))])),
             votes: TVar::default(),
             pause_votes: TVar::new(false),
-            object_votes: TVar::default(),
-            pause_object_votes: TVar::new(false),
+            blob_votes: TVar::default(),
+            pause_blob_votes: TVar::new(false),
         }
     }
 
@@ -317,12 +317,12 @@ where
         Ok(())
     }
 
-    /// Add a vote for an object we received.
+    /// Add a vote for a blob we received.
     ///
     /// Returns `true` if this vote was added, `false` if it was ignored as a duplicate,
     /// and an error if it's an equivocation or from a validator we don't know.
-    pub fn add_object_vote(&self, validator_key: K, object: O) -> StmResult<bool, Error<K, O>> {
-        if *self.pause_object_votes.read()? {
+    pub fn add_blob_vote(&self, validator_key: K, blob: O) -> StmResult<bool, Error<K, O>> {
+        if *self.pause_blob_votes.read()? {
             retry()?;
         }
 
@@ -330,41 +330,41 @@ where
             return abort(Error::UnpoweredValidator(validator_key));
         }
 
-        let mut votes = self.object_votes.read_clone()?;
-        let votes_for_object = votes.entry(object).or_default();
+        let mut votes = self.blob_votes.read_clone()?;
+        let votes_for_blob = votes.entry(blob).or_default();
 
-        if votes_for_object.insert(validator_key).is_some() {
+        if votes_for_blob.insert(validator_key).is_some() {
             return Ok(false);
         }
 
-        self.object_votes.write(votes)?;
+        self.blob_votes.write(votes)?;
 
         Ok(true)
     }
 
     /// Pause adding more votes until we are finished calling `find_quorum` which
     /// automatically re-enables them.
-    pub fn pause_object_votes_until_find_quorum(&self) -> Stm<()> {
-        self.pause_object_votes.write(true)
+    pub fn pause_blob_votes_until_find_quorum(&self) -> Stm<()> {
+        self.pause_blob_votes.write(true)
     }
 
-    /// Determine if an object has (from our perspective) gathered enoughvotes from validators.
-    pub fn find_object_quorum(&self, object: &O) -> Stm<bool> {
-        self.pause_object_votes.write(false)?;
+    /// Determine if a blob has (from our perspective) gathered enough votes from validators.
+    pub fn find_blob_quorum(&self, blob: &O) -> Stm<bool> {
+        self.pause_blob_votes.write(false)?;
 
         let quorum_threshold = self.quorum_threshold()?;
 
-        let votes = self.object_votes.read()?;
+        let votes = self.blob_votes.read()?;
         let power_table = self.power_table.read()?;
 
         let mut weight = 0;
         let mut voters = im::HashSet::new();
 
-        let Some(votes_for_object) = votes.get(object) else {
+        let Some(votes_for_blob) = votes.get(blob) else {
             return Ok(false);
         };
 
-        for vk in votes_for_object {
+        for vk in votes_for_blob {
             if voters.insert(vk.clone()).is_none() {
                 // New voter, get their current weight; it might be 0 if they have been removed.
                 weight += power_table.get(vk).cloned().unwrap_or_default();

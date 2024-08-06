@@ -2,7 +2,6 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-pub use crate::state::{Blob, State};
 use cid::Cid;
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
@@ -11,7 +10,8 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::METHOD_CONSTRUCTOR;
 use num_derive::FromPrimitive;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+
+pub use crate::state::{Blob, State};
 
 pub const BLOBS_ACTOR_NAME: &str = "blobs";
 
@@ -25,11 +25,9 @@ pub struct ConstructorParams {
 }
 
 /// Params for funding.
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct FundParams {
-    /// The actor address to fund.
-    pub address: Address,
-}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct FundParams(pub Address);
 
 /// Params for putting a blob.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
@@ -40,8 +38,8 @@ pub struct AddParams {
     pub size: u64,
     /// Blob expiry epoch.
     pub expiry: ChainEpoch,
-    /// Blob metadata.
-    pub metadata: HashMap<String, String>,
+    /// Optional source actor robust address. Required is source is a machine.
+    pub source: Option<Address>,
 }
 
 /// Params for resolving a blob.
@@ -51,14 +49,16 @@ pub struct ResolveParams(pub Cid);
 
 /// Params for deleting a blob.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct DeleteParams(pub Cid);
 
 /// Params for getting a blob.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct GetParams(pub Cid);
 
 /// The status of the blob actor.
-#[derive(Serialize_tuple, Deserialize_tuple)]
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct Status {
     /// The total free storage capacity of the subnet.
     pub capacity_free: BigInt,
@@ -76,10 +76,12 @@ pub struct Status {
     pub num_accounts: u64,
     /// Total number of actively stored blobs.
     pub num_blobs: u64,
+    /// Total number of currently resolving blobs.
+    pub num_resolving: u64,
 }
 
 /// Account storage and credit details.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize_tuple, Deserialize_tuple)]
 pub struct Account {
     /// Total size of all blobs managed by the account.
     pub capacity_used: BigInt,
@@ -95,8 +97,11 @@ pub struct Account {
 #[repr(u64)]
 pub enum Method {
     Constructor = METHOD_CONSTRUCTOR,
+    GetStatus = frc42_dispatch::method_hash!("GetStatus"),
     FundAccount = frc42_dispatch::method_hash!("FundAccount"),
     AddBlob = frc42_dispatch::method_hash!("AddBlob"),
+    GetResolvingBlobs = frc42_dispatch::method_hash!("GetResolvingBlobs"),
+    IsBlobResolving = frc42_dispatch::method_hash!("IsBlobResolving"),
     ResolveBlob = frc42_dispatch::method_hash!("ResolveBlob"),
     DeleteBlob = frc42_dispatch::method_hash!("DeleteBlob"),
     GetBlob = frc42_dispatch::method_hash!("GetBlob"),

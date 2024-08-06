@@ -5,16 +5,17 @@
 use cid::Cid;
 use fendermint_actor_machine::{ConstructorParams, MachineActor};
 use fil_actors_runtime::{
-    actor_dispatch, actor_error,
+    actor_dispatch, actor_error, deserialize_block, extract_send_result,
     runtime::{ActorCode, Runtime},
     ActorDowncast, ActorError, FIRST_EXPORTED_METHOD_NUMBER, INIT_ACTOR_ADDR, SYSTEM_ACTOR_ADDR,
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_ipld_hamt::BytesKey;
 use fvm_shared::{error::ExitCode, MethodNum};
+use log::info;
 
 use crate::{
-    AddParams, DeleteParams, GetParams, ListParams, Method, Object, ObjectList, ResolveParams,
+    ext, AddParams, DeleteParams, GetParams, ListParams, Method, Object, ObjectList, ResolveParams,
     State, OBJECTSTORE_ACTOR_NAME,
 };
 
@@ -42,8 +43,24 @@ impl Actor {
         rt.create(&state)
     }
 
+    // TODO: if overwriting, delete the old blob from blobs actor
     fn add_object(rt: &impl Runtime, params: AddParams) -> Result<Cid, ActorError> {
         Self::ensure_write_allowed(rt)?;
+
+        let blob_params = ext::blobs::AddParams {
+            cid: params.cid,
+            size: params.size as u64,
+            expiry: rt.curr_epoch() + 100,
+            source: Some(params.store),
+        };
+
+        let ret: ext::blobs::Account = deserialize_block(extract_send_result(rt.send_simple(
+            &ext::blobs::BLOBS_ACTOR_ADDR,
+            ext::blobs::ADD_BLOB_METHOD,
+            IpldBlock::serialize_cbor(&blob_params)?,
+            rt.message().value_received(),
+        ))?)?;
+        info!("response from blobs: {:#?}", ret);
 
         let root = rt.transaction(|st: &mut State, rt| {
             st.add(
@@ -59,6 +76,7 @@ impl Actor {
         Ok(root)
     }
 
+    // TODO: remove this
     fn resolve_object(rt: &impl Runtime, params: ResolveParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
@@ -75,6 +93,7 @@ impl Actor {
     // So, we can't just delete it here via syscall.
     // Once implemented, the DA mechanism may cause the data to be entangled with other data.
     // The retention policies will handle deleting / GC.
+    // TODO: call blobs actor to delete
     fn delete_object(rt: &impl Runtime, params: DeleteParams) -> Result<Cid, ActorError> {
         Self::ensure_write_allowed(rt)?;
 
@@ -86,6 +105,7 @@ impl Actor {
         Ok(res.1)
     }
 
+    // TODO: fetch blob from blobs actor
     fn get_object(rt: &impl Runtime, params: GetParams) -> Result<Option<Object>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
@@ -94,6 +114,7 @@ impl Actor {
             .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get object"))
     }
 
+    // TODO: fetch size from blobs actor?
     fn list_objects(rt: &impl Runtime, params: ListParams) -> Result<ObjectList, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let st: State = rt.state()?;

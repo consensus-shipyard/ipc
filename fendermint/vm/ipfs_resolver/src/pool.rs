@@ -119,9 +119,9 @@ where
 
         if items.contains_key(&key) {
             let status = items.get(&key).cloned().unwrap();
-            status.items.update_mut(|items| {
-                items.insert(item);
-            })?;
+            // status.items.update_mut(|items| {
+            //     items.insert(item);
+            // })?;
             Ok(status)
         } else {
             let status = ResolveStatus::new(item);

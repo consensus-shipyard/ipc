@@ -12,12 +12,14 @@ use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::address::Address;
 use fvm_shared::sys::SendFlags;
 use fvm_shared::{error::ExitCode, MethodNum};
+use log::info;
 use num_traits::Zero;
+use std::collections::BTreeSet;
 
 use crate::ext::account::PUBKEY_ADDRESS_METHOD;
 use crate::{
     Account, AddParams, Blob, ConstructorParams, DeleteParams, FundParams, GetParams, Method,
-    ResolveParams, State, BLOBS_ACTOR_NAME,
+    ResolveParams, State, Status, BLOBS_ACTOR_NAME,
 };
 
 #[cfg(feature = "fil-actor")]
@@ -38,19 +40,29 @@ impl BlobsActor {
         rt.create(&state)
     }
 
+    fn get_status(rt: &impl Runtime) -> Result<Status, ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+
+        let status = rt.transaction(|st: &mut State, _rt| {
+            st.get_status().map_err(|e| {
+                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get status")
+            })
+        })?;
+
+        info!("current balance: {}", rt.current_balance());
+
+        Ok(status)
+    }
+
     fn fund_account(rt: &impl Runtime, params: FundParams) -> Result<Account, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
         let account = rt.transaction(|st: &mut State, rt| {
-            st.fund_account(
-                params.address,
-                rt.message().value_received(),
-                rt.curr_epoch(),
-            )
-            .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to fund account"))
+            st.fund_account(params.0, rt.message().value_received(), rt.curr_epoch())
+                .map_err(|e| {
+                    e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to fund account")
+                })
         })?;
-
-        println!("current balance: {}", rt.current_balance());
 
         Ok(account)
     }
@@ -59,7 +71,23 @@ impl BlobsActor {
         rt.validate_immediate_caller_accept_any()?;
 
         // Caller must be converted to robust (non-ID) address for safe storage
-        let caller = resolve_caller_external(rt)?;
+        let caller = if let Some(machine) = params.source {
+            match rt.resolve_address(&machine) {
+                Some(id) => {
+                    // Caller is always an ID address
+                    if id == rt.message().caller().id().unwrap() {
+                        machine
+                    } else {
+                        return Err(ActorError::illegal_argument(
+                            "machine address does not match caller".into(),
+                        ));
+                    }
+                }
+                None => return Err(ActorError::not_found("machine address not found".into())),
+            }
+        } else {
+            resolve_caller_external(rt)?
+        };
 
         let account = rt.transaction(|st: &mut State, rt| {
             st.add_blob(
@@ -68,11 +96,34 @@ impl BlobsActor {
                 params.cid,
                 params.size,
                 params.expiry,
-                params.metadata,
             )
             .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to add blob"))
         })?;
         Ok(account)
+    }
+
+    // TODO: limit return via param
+    fn get_resolving_blobs(rt: &impl Runtime) -> Result<BTreeSet<Vec<u8>>, ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+
+        let resolving = rt.transaction(|st: &mut State, _| {
+            st.get_resolving_blobs().map_err(|e| {
+                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get resolving blobs")
+            })
+        })?;
+        Ok(resolving)
+    }
+
+    // TODO: change to returning general status about blob
+    fn is_blob_resolving(rt: &impl Runtime, params: ResolveParams) -> Result<bool, ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+
+        let resolving = rt.transaction(|st: &mut State, _| {
+            st.is_blob_resolving(params.0).map_err(|e| {
+                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get blob status")
+            })
+        })?;
+        Ok(resolving)
     }
 
     fn resolve_blob(rt: &impl Runtime, params: ResolveParams) -> Result<(), ActorError> {
@@ -124,6 +175,7 @@ impl BlobsActor {
     }
 }
 
+// TODO: record added at block epoch for resolution failure determination
 impl ActorCode for BlobsActor {
     type Methods = Method;
 
@@ -133,8 +185,11 @@ impl ActorCode for BlobsActor {
 
     actor_dispatch! {
         Constructor => constructor,
+        GetStatus => get_status,
         FundAccount => fund_account,
         AddBlob => add_blob,
+        GetResolvingBlobs => get_resolving_blobs,
+        IsBlobResolving => is_blob_resolving,
         ResolveBlob => resolve_blob,
         DeleteBlob => delete_blob,
         GetBlob => get_blob,
@@ -263,9 +318,7 @@ mod tests {
         let mut expected_credits = BigInt::from(1000000000000000000u64);
         rt.set_received(TokenAmount::from_whole(1));
         rt.expect_validate_caller_any();
-        let fund_params = FundParams {
-            address: f4_eth_addr,
-        };
+        let fund_params = FundParams(f4_eth_addr);
         let result = rt
             .call::<BlobsActor>(
                 Method::FundAccount as u64,
@@ -281,9 +334,7 @@ mod tests {
         expected_credits += BigInt::from(1000000000u64);
         rt.set_received(TokenAmount::from_nano(1));
         rt.expect_validate_caller_any();
-        let fund_params = FundParams {
-            address: f4_eth_addr,
-        };
+        let fund_params = FundParams(f4_eth_addr);
         let result = rt
             .call::<BlobsActor>(
                 Method::FundAccount as u64,
@@ -299,9 +350,7 @@ mod tests {
         expected_credits += BigInt::from(1u64);
         rt.set_received(TokenAmount::from_atto(1));
         rt.expect_validate_caller_any();
-        let fund_params = FundParams {
-            address: f4_eth_addr,
-        };
+        let fund_params = FundParams(f4_eth_addr);
         let result = rt
             .call::<BlobsActor>(
                 Method::FundAccount as u64,
@@ -336,7 +385,7 @@ mod tests {
             cid: new_cid(),
             size: 1024,
             expiry: 10,
-            metadata: Default::default(),
+            source: None,
         };
         let result = rt.call::<BlobsActor>(
             Method::AddBlob as u64,
@@ -348,9 +397,7 @@ mod tests {
         // Fund an account
         rt.set_received(TokenAmount::from_whole(1));
         rt.expect_validate_caller_any();
-        let fund_params = FundParams {
-            address: f4_eth_addr,
-        };
+        let fund_params = FundParams(f4_eth_addr);
         let result = rt.call::<BlobsActor>(
             Method::FundAccount as u64,
             IpldBlock::serialize_cbor(&fund_params).unwrap(),

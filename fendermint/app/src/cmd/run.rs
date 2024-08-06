@@ -16,7 +16,7 @@ use fendermint_vm_interpreter::chain::ChainEnv;
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
 use fendermint_vm_interpreter::{
     bytes::{BytesMessageInterpreter, ProposalPrepareMode},
-    chain::{ChainMessageInterpreter, CheckpointPool, ObjectPool},
+    chain::{BlobPool, ChainMessageInterpreter, CheckpointPool},
     fvm::{Broadcaster, FvmMessageInterpreter, ValidatorContext},
     signed::SignedMessageInterpreter,
 };
@@ -156,7 +156,7 @@ async fn run(ipfs_addr: String, settings: Settings) -> anyhow::Result<()> {
         NamespaceBlockstore::new(db.clone(), ns.state_store).context("error creating state DB")?;
 
     let checkpoint_pool = CheckpointPool::new();
-    let ipfs_pin_pool = ObjectPool::new();
+    let ipfs_pin_pool = BlobPool::new();
     let parent_finality_votes = VoteTally::empty();
 
     let topdown_enabled = settings.topdown_enabled();
@@ -327,7 +327,7 @@ async fn run(ipfs_addr: String, settings: Settings) -> anyhow::Result<()> {
             checkpoint_pool,
             parent_finality_provider: parent_finality_provider.clone(),
             parent_finality_votes: parent_finality_votes.clone(),
-            object_pool: ipfs_pin_pool,
+            blob_pool: ipfs_pin_pool,
         },
         snapshots,
     )?;
@@ -621,7 +621,7 @@ async fn dispatch_vote(
             tracing::debug!(cid = ?f.object, "received vote for object finality");
 
             let res = atomically_or_err(|| {
-                parent_finality_votes.add_object_vote(vote.public_key.clone(), f.object.to_bytes())
+                parent_finality_votes.add_blob_vote(vote.public_key.clone(), f.object.to_bytes())
             })
             .await;
 

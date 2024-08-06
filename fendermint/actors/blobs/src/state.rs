@@ -2,7 +2,7 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 use anyhow::anyhow;
 use cid::Cid;
@@ -11,13 +11,14 @@ use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
+use log::info;
 use num_traits::{ToPrimitive, Zero};
-use serde::{Deserialize, Serialize};
 
 use crate::{Account, Status};
 
 /// The state represents all accounts and stored blobs.
-#[derive(Serialize_tuple, Deserialize_tuple)]
+/// TODO: use raw HAMTs
+#[derive(Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct State {
     /// The total free storage capacity of the subnet.
     pub capacity_free: BigInt,
@@ -32,23 +33,33 @@ pub struct State {
     /// The byte-blocks per atto token rate set at genesis.
     pub credit_debit_rate: u64,
     /// Map containing all accounts by robust (non-ID) actor address.
+    /// TODO: add list of blobs to account
     pub accounts: HashMap<Address, Account>,
     /// Map containing all blobs.
     /// TODO: After merging Iroh branch, this should be HashMap<iroh_base::Hash, Blob>
     pub blobs: HashMap<Vec<u8>, Blob>,
+    /// Set of currently resolving blob hashes.
+    pub resolving: BTreeSet<Vec<u8>>,
 }
 
 /// The stored representation of a blob.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct Blob {
     /// The size of the content.
     pub size: u64,
     /// Expiry block.
     pub expiry: ChainEpoch,
-    /// User-defined blob metadata (e.g., last modified timestamp, etc.).
-    pub metadata: HashMap<String, String>,
+    /// TODO: add subs
+    //pub subs: HashMap<Address, Subscription>,
     /// Whether the blob has been resolved.
+    /// TODO: change to enum: resolving, resolved, failed
     pub resolved: bool,
+}
+
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct Subscription {
+    /// Expiry block.
+    pub expiry: ChainEpoch,
 }
 
 impl State {
@@ -62,6 +73,7 @@ impl State {
             credit_debit_rate,
             accounts: HashMap::new(),
             blobs: HashMap::new(),
+            resolving: BTreeSet::new(),
         })
     }
 
@@ -75,6 +87,7 @@ impl State {
             credit_debit_rate: self.credit_debit_rate,
             num_accounts: self.accounts.len() as u64,
             num_blobs: self.blobs.len() as u64,
+            num_resolving: self.resolving.len() as u64,
         })
     }
 
@@ -119,7 +132,7 @@ impl State {
         Ok(account)
     }
 
-    // TODO: Handle hash collisions?
+    // TODO: check for already existing blob _for the sender_
     pub fn add_blob(
         &mut self,
         sender: Address,
@@ -127,7 +140,6 @@ impl State {
         cid: Cid,
         size: u64,
         expiry: ChainEpoch,
-        metadata: HashMap<String, String>,
     ) -> anyhow::Result<Account> {
         if expiry <= current_epoch {
             return Err(anyhow!("expiry must be in the future"));
@@ -139,6 +151,10 @@ impl State {
                 let size = BigInt::from(size);
                 let required_credit = (expiry as u64) * &size;
                 if account.credit_free < required_credit {
+                    info!(
+                        "account {} has insufficient credit (available: {}; required: {})",
+                        sender, account.credit_free, required_credit
+                    );
                     return Err(anyhow!(
                         "account {} has insufficient credit (available: {}; required: {})",
                         sender,
@@ -162,21 +178,34 @@ impl State {
                 account.credit_committed += &required_credit;
                 account.credit_free -= &required_credit;
 
-                // Save item
+                let key = cid.to_bytes();
+                self.resolving.insert(key.clone());
                 self.blobs.insert(
-                    cid.to_bytes(),
+                    key,
                     Blob {
                         size: size.to_u64().unwrap(),
                         expiry,
-                        metadata,
                         resolved: false,
                     },
                 );
 
                 Ok(account.clone())
             }
-            None => Err(anyhow!("account {} not found", sender)),
+            None => {
+                info!("account {} not found", sender);
+                Err(anyhow!("account {} not found", sender))
+            }
         }
+    }
+
+    pub fn get_resolving_blobs(&self) -> anyhow::Result<BTreeSet<Vec<u8>>> {
+        Ok(self.resolving.clone())
+    }
+
+    pub fn is_blob_resolving(&self, cid: Cid) -> anyhow::Result<bool> {
+        let key = cid.to_bytes();
+        let resolving = self.resolving.contains(&key);
+        Ok(resolving)
     }
 
     // TODO: Need method for unresolving, ie, if a blob can't be fetched, the account
@@ -184,6 +213,7 @@ impl State {
     // many bad validators).
     pub fn resolve_blob(&mut self, cid: Cid) -> anyhow::Result<()> {
         let key = cid.to_bytes();
+        self.resolving.remove(&key);
         match self.blobs.get_mut(&key) {
             Some(blob) => {
                 blob.resolved = true;

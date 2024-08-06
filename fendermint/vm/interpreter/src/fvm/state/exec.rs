@@ -132,7 +132,8 @@ where
         params: FvmStateParams,
     ) -> anyhow::Result<Self> {
         let mut nc = NetworkConfig::new(params.network_version);
-        // nc.enable_actor_debugging();
+        // TODO (findme): Make this configurable
+        nc.enable_actor_debugging();
         nc.chain_id = ChainID::from(params.chain_id);
 
         // TODO: Configure:

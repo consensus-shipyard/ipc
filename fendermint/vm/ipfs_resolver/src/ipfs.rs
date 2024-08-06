@@ -120,7 +120,7 @@ fn start_resolve<V>(
                         // Add our own vote
                         let validator_key = ValidatorKey::from(key.public());
                         let res = atomically_or_err(|| {
-                            vote_tally.add_object_vote(validator_key.clone(), task.cid().to_bytes())
+                            vote_tally.add_blob_vote(validator_key.clone(), task.cid().to_bytes())
                         })
                         .await;
 

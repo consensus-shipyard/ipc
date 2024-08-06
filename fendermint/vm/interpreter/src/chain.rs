@@ -1,21 +1,30 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::fvm::state::ipc::GatewayCaller;
+use crate::fvm::{topdown, FvmApplyRet, PowerUpdates};
+use crate::{
+    fvm::state::FvmExecState,
+    fvm::store::ReadOnlyBlockstore,
+    fvm::FvmMessage,
+    signed::{SignedMessageApplyRes, SignedMessageCheckRes, SyntheticMessage, VerifiableMessage},
+    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
+};
 use anyhow::{anyhow, bail, Context};
 use async_stm::atomically;
 use async_trait::async_trait;
-use fendermint_actor_objectstore::{
-    GetParams,
-    Method::{GetObject, ResolveObject},
+use cid::Cid;
+use fendermint_actor_blobs::{
+    Method::{GetResolvingBlobs, IsBlobResolving, ResolveBlob},
+    ResolveParams,
 };
 use fendermint_tracing::emit;
-use fendermint_vm_actor_interface::{ipc, system};
+use fendermint_vm_actor_interface::{blobs, ipc, system};
 use fendermint_vm_event::ParentFinalityMissingQuorum;
 use fendermint_vm_ipfs_resolver::pool::{
     ResolveKey as IpfsResolveKey, ResolvePool as IpfsResolvePool,
 };
 use fendermint_vm_message::ipc::ParentFinality;
-use fendermint_vm_message::signed::Object;
 use fendermint_vm_message::{
     chain::ChainMessage,
     ipc::{BottomUpCheckpoint, CertifiedMessage, IpcMessage, SignedRelayedMessage},
@@ -32,23 +41,14 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::message::Message;
 use num_traits::Zero;
+use std::collections::BTreeSet;
 use std::sync::Arc;
 use tokio_util::bytes;
-
-use crate::fvm::state::ipc::GatewayCaller;
-use crate::fvm::{topdown, FvmApplyRet, PowerUpdates};
-use crate::{
-    fvm::state::FvmExecState,
-    fvm::store::ReadOnlyBlockstore,
-    fvm::FvmMessage,
-    signed::{SignedMessageApplyRes, SignedMessageCheckRes, SyntheticMessage, VerifiableMessage},
-    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
-};
 
 /// A resolution pool for bottom-up and top-down checkpoints.
 pub type CheckpointPool = ResolvePool<CheckpointPoolItem>;
 pub type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProviderProxy>>>;
-pub type ObjectPool = IpfsResolvePool<ObjectPoolItem>;
+pub type BlobPool = IpfsResolvePool<BlobPoolItem>;
 
 /// These are the extra state items that the chain interpreter needs,
 /// a sort of "environment" supporting IPC.
@@ -60,7 +60,7 @@ pub struct ChainEnv {
     pub parent_finality_provider: TopDownFinalityProvider,
     pub parent_finality_votes: VoteTally,
     /// IPFS pin resolution pool.
-    pub object_pool: ObjectPool,
+    pub blob_pool: BlobPool,
 }
 
 #[derive(Clone, Hash, PartialEq, Eq)]
@@ -83,13 +83,13 @@ impl From<&CheckpointPoolItem> for ResolveKey {
 }
 
 #[derive(Clone, Hash, PartialEq, Eq)]
-pub struct ObjectPoolItem {
-    obj: Object,
+pub struct BlobPoolItem {
+    hash: Cid,
 }
 
-impl From<&ObjectPoolItem> for IpfsResolveKey {
-    fn from(value: &ObjectPoolItem) -> Self {
-        value.obj.value
+impl From<&BlobPoolItem> for IpfsResolveKey {
+    fn from(value: &BlobPoolItem) -> Self {
+        value.hash
     }
 }
 
@@ -199,38 +199,51 @@ where
         // Append at the end - if we run out of block space, these are going to be reproposed in the next block.
         msgs.extend(ckpts);
 
-        // Collect locally resolved objects from the pool. We're relying on the proposer's local
-        // view of object resolution, rather than considering those that _might_ have a quorum,
-        // but have not yet been resolved by _this_ proposer. However, an object like this will get
+        // Collect and enqueue blobs that need to be resolved.
+        state.state_tree_mut().begin_transaction();
+        let resolving_blobs = get_resolving_blobs(&mut state)?;
+        state
+            .state_tree_mut()
+            .end_transaction(true)
+            .expect("we just started a transaction");
+        for key in resolving_blobs {
+            let cid = Cid::try_from(key.as_slice()).expect("invalid cid bytes");
+            atomically(|| env.blob_pool.add(BlobPoolItem { hash: cid })).await;
+            tracing::debug!(cid = ?cid, "blob added to pool");
+        }
+
+        // Collect locally resolved blobs from the pool. We're relying on the proposer's local
+        // view of blob resolution, rather than considering those that _might_ have a quorum,
+        // but have not yet been resolved by _this_ proposer. However, a blob like this will get
         // picked up by a different proposer who _does_ consider it resolved.
-        let local_resolved_objects = atomically(|| env.object_pool.collect_resolved()).await;
+        let local_resolved_blobs = atomically(|| env.blob_pool.collect_resolved()).await;
 
         // Create transactions ready to be included on the chain. These are from locally resolved
-        // objects that have reached a global quorum and are not yet finalized.
+        // blobs that have reached a global quorum and are not yet finalized.
         //
-        // If the object has already been finalized, i.e., it was proposed in an earlier block with
+        // If the blob has already been finalized, i.e., it was proposed in an earlier block with
         // a quorum that did not include _this_ proposer, we can just remove it from the local
         // resolve pool. If we were to propose it, it would be rejected in the process step.
-        if !local_resolved_objects.is_empty() {
-            let mut objects: Vec<ChainMessage> = vec![];
+        if !local_resolved_blobs.is_empty() {
+            let mut blobs: Vec<ChainMessage> = vec![];
             // We start a blockstore transaction that can be reverted
             state.state_tree_mut().begin_transaction();
-            for item in local_resolved_objects.iter() {
-                if is_object_finalized(&mut state, item)? {
-                    tracing::debug!(cid = ?item.obj.value, "object already finalized; removing from pool");
-                    atomically(|| env.object_pool.remove(item)).await;
+            for item in local_resolved_blobs.iter() {
+                if is_blob_resolved(&mut state, item)? {
+                    tracing::debug!(cid = ?item.hash, "blob already finalized; removing from pool");
+                    atomically(|| env.blob_pool.remove(item)).await;
                     continue;
                 }
 
                 let is_globally_resolved = atomically(|| {
                     env.parent_finality_votes
-                        .find_object_quorum(&item.obj.value.to_bytes())
+                        .find_blob_quorum(&item.hash.to_bytes())
                 })
                 .await;
                 if is_globally_resolved {
-                    tracing::debug!(cid = ?item.obj.value, "object has quorum; adding tx to chain");
-                    objects.push(ChainMessage::Ipc(IpcMessage::ObjectResolved(
-                        item.obj.clone(),
+                    tracing::debug!(cid = ?item.hash, "blob has quorum; adding tx to chain");
+                    blobs.push(ChainMessage::Ipc(IpcMessage::BlobResolved(
+                        item.hash.clone(),
                     )));
                 }
             }
@@ -239,12 +252,12 @@ where
                 .end_transaction(true)
                 .expect("we just started a transaction");
 
-            let pending_objects = atomically(|| env.object_pool.count()).await;
-            tracing::info!(size = pending_objects, "ipfs pool status");
+            let pending_blobs = atomically(|| env.blob_pool.count()).await;
+            tracing::info!(size = pending_blobs, "ipfs pool status");
 
             // Append at the end - if we run out of block space,
             // these are going to be reproposed in the next block.
-            msgs.extend(objects);
+            msgs.extend(blobs);
         }
 
         Ok(msgs)
@@ -291,16 +304,16 @@ where
                         return Ok(false);
                     }
                 }
-                ChainMessage::Ipc(IpcMessage::ObjectResolved(obj)) => {
-                    let item = ObjectPoolItem { obj };
+                ChainMessage::Ipc(IpcMessage::BlobResolved(obj)) => {
+                    let item = BlobPoolItem { hash: obj };
 
-                    // Ensure that the object is ready to be included on-chain.
-                    // We can accept the proposal if the object has reached a global quorum and is
+                    // Ensure that the blob is ready to be included on-chain.
+                    // We can accept the proposal if the blob has reached a global quorum and is
                     // not yet finalized.
                     // Start a blockstore transaction that can be reverted.
                     state.state_tree_mut().begin_transaction();
-                    if is_object_finalized(&mut state, &item)? {
-                        tracing::debug!(cid = ?item.obj.value, "object is already finalized; rejecting proposal");
+                    if is_blob_resolved(&mut state, &item)? {
+                        tracing::debug!(cid = ?item.hash, "blob is already finalized; rejecting proposal");
                         return Ok(false);
                     }
                     state
@@ -310,26 +323,26 @@ where
 
                     let is_globally_resolved = atomically(|| {
                         env.parent_finality_votes
-                            .find_object_quorum(&item.obj.value.to_bytes())
+                            .find_blob_quorum(&item.hash.to_bytes())
                     })
                     .await;
                     if !is_globally_resolved {
-                        tracing::debug!(cid = ?item.obj.value, "object is not globally resolved; rejecting proposal");
+                        tracing::debug!(cid = ?item.hash, "blob is not globally resolved; rejecting proposal");
                         return Ok(false);
                     }
 
                     // Remove from pool if locally resolved
                     let is_locally_resolved =
-                        atomically(|| match env.object_pool.get_status(&item)? {
+                        atomically(|| match env.blob_pool.get_status(&item)? {
                             None => Ok(false),
                             Some(status) => status.is_resolved(),
                         })
                         .await;
                     if is_locally_resolved {
-                        tracing::debug!(cid = ?item.obj.value, "object is locally resolved; removing from pool");
-                        atomically(|| env.object_pool.remove(&item)).await;
+                        tracing::debug!(cid = ?item.hash, "blob is locally resolved; removing from pool");
+                        atomically(|| env.blob_pool.remove(&item)).await;
                     } else {
-                        tracing::debug!(cid = ?item.obj.value, "object is not locally resolved");
+                        tracing::debug!(cid = ?item.hash, "blob is not locally resolved");
                     }
                 }
                 _ => {}
@@ -371,15 +384,6 @@ where
                     .inner
                     .deliver(state, VerifiableMessage::Signed(msg.clone()))
                     .await?;
-
-                if ret.is_ok() {
-                    if let Some(obj) = msg.object {
-                        atomically(|| env.object_pool.add(ObjectPoolItem { obj: obj.clone() }))
-                            .await;
-                        tracing::debug!(cid = ?obj.value, store = ?obj.address, "object added to pool");
-                    }
-                }
-
                 Ok(((env, state), ChainMessageApplyRet::Signed(ret)))
             }
             ChainMessage::Ipc(msg) => match msg {
@@ -510,16 +514,13 @@ where
 
                     Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
                 }
-                IpcMessage::ObjectResolved(obj) => {
+                IpcMessage::BlobResolved(hash) => {
                     let from = system::SYSTEM_ACTOR_ADDR;
-                    let to = obj.address;
-                    let method_num = ResolveObject as u64;
+                    let to = blobs::BLOBS_ACTOR_ADDR;
+                    let method_num = ResolveBlob as u64;
                     let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
 
-                    let params = fendermint_actor_objectstore::ResolveParams {
-                        key: obj.key,
-                        value: obj.value,
-                    };
+                    let params = ResolveParams(hash);
                     let params = RawBytes::serialize(params)?;
                     let msg = Message {
                         version: Default::default(),
@@ -553,8 +554,8 @@ where
                     );
 
                     tracing::debug!(
-                        cid = ?obj.value,
-                        "chain interpreter has finalized object"
+                        cid = ?hash,
+                        "chain interpreter has finalized blob"
                     );
 
                     let ret = FvmApplyRet {
@@ -650,7 +651,7 @@ where
                     }
                     IpcMessage::TopDownExec(_)
                     | IpcMessage::BottomUpExec(_)
-                    | IpcMessage::ObjectResolved(_) => {
+                    | IpcMessage::BlobResolved(_) => {
                         // Users cannot send these messages, only validators can propose them in blocks.
                         Ok((state, Err(IllegalMessage)))
                     }
@@ -728,26 +729,51 @@ fn relayed_bottom_up_ckpt_to_fvm(
     Ok(msg)
 }
 
-/// Check if an object has been finalized (resolved) by reading its on-chain state.
+/// Get blobs that need to be resolved.
 /// This approach uses an implicit FVM transaction to query a read-only blockstore.
-fn is_object_finalized<DB>(
+fn get_resolving_blobs<DB>(
     state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
-    item: &ObjectPoolItem,
+) -> anyhow::Result<BTreeSet<Vec<u8>>>
+where
+    DB: Blockstore + Clone + 'static + Send + Sync,
+{
+    let msg = FvmMessage {
+        version: 0,
+        from: system::SYSTEM_ACTOR_ADDR,
+        to: blobs::BLOBS_ACTOR_ADDR,
+        sequence: 0,
+        value: Default::default(),
+        method_num: GetResolvingBlobs as u64,
+        params: Default::default(),
+        gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
+        gas_fee_cap: Default::default(),
+        gas_premium: Default::default(),
+    };
+    let (apply_ret, _) = state.execute_implicit(msg)?;
+
+    let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
+    fvm_ipld_encoding::from_slice::<BTreeSet<Vec<u8>>>(&data)
+        .map_err(|e| anyhow!("error parsing as BTreeSet<Vec<u8>>: {e}"))
+}
+
+/// Check if a blob has been resolved by reading its on-chain state.
+/// This approach uses an implicit FVM transaction to query a read-only blockstore.
+fn is_blob_resolved<DB>(
+    state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
+    item: &BlobPoolItem,
 ) -> anyhow::Result<bool>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
-    let params = GetParams {
-        key: item.obj.key.clone(),
-    };
+    let params = ResolveParams(item.hash);
     let params = RawBytes::serialize(params)?;
     let msg = FvmMessage {
         version: 0,
         from: system::SYSTEM_ACTOR_ADDR,
-        to: item.obj.address,
+        to: blobs::BLOBS_ACTOR_ADDR,
         sequence: 0,
         value: Default::default(),
-        method_num: GetObject as u64,
+        method_num: IsBlobResolving as u64,
         params,
         gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
         gas_fee_cap: Default::default(),
@@ -756,18 +782,7 @@ where
     let (apply_ret, _) = state.execute_implicit(msg)?;
 
     let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
-    let object =
-        fvm_ipld_encoding::from_slice::<Option<fendermint_actor_objectstore::Object>>(&data)
-            .map_err(|e| anyhow!("error parsing as Option<Object>: {e}"))?;
-
-    Ok(match object {
-        Some(object) => object.resolved,
-        None => {
-            // The object was deleted before it was resolved.
-            // We can return true here because the objectstore actor will ignore the final implicit
-            // call to resolve an object if it doesn't exist.
-            // Otherwise, we'd have to reject the proposal and do another round of voting.
-            true
-        }
-    })
+    let resolving = fvm_ipld_encoding::from_slice::<bool>(&data)
+        .map_err(|e| anyhow!("error parsing as bool: {e}"))?;
+    Ok(!resolving)
 }

@@ -1,7 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::signed::Object;
 use cid::Cid;
 use fvm_shared::{
     address::Address, clock::ChainEpoch, crypto::signature::Signature, econ::TokenAmount,
@@ -31,7 +30,7 @@ pub enum IpcMessage {
     TopDownExec(ParentFinality),
 
     /// Proposed by validators when an object accompanying a message has been resolved and is ready to be executed.
-    ObjectResolved(Object),
+    BlobResolved(Cid),
 }
 
 /// A message relayed by a user on the current subnet.

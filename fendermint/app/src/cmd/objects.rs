@@ -125,7 +125,7 @@ impl From<ParseIntError> for ObjectsError {
 }
 
 pub trait IpfsApiAdapter {
-    async fn add_object(&self, temp_file: TempFile, cid: Cid) -> anyhow::Result<String>;
+    async fn add_object(&self, temp_file: TempFile) -> anyhow::Result<String>;
     async fn get_object(&self, range: Option<String>, cid: Cid) -> anyhow::Result<ObjectRange>;
 }
 
@@ -135,7 +135,7 @@ pub struct Ipfs {
 }
 
 impl IpfsApiAdapter for Ipfs {
-    async fn add_object(&self, temp_file: TempFile, cid_from_msg: Cid) -> anyhow::Result<String> {
+    async fn add_object(&self, temp_file: TempFile) -> anyhow::Result<String> {
         let res = self
             .inner
             .add_async_with_options(
@@ -155,13 +155,13 @@ impl IpfsApiAdapter for Ipfs {
         // separately from signature because the signature is over the CID,
         // it is unaware of the actual data.
         let ipfs_cid = Cid::try_from(res.hash)?;
-        if ipfs_cid != cid_from_msg {
-            return Err(anyhow!(
-                "computed cid {:?} does not match {:?}",
-                ipfs_cid,
-                cid_from_msg
-            ));
-        }
+        // if ipfs_cid != cid_from_msg {
+        //     return Err(anyhow!(
+        //         "computed cid {:?} does not match {:?}",
+        //         ipfs_cid,
+        //         cid_from_msg
+        //     ));
+        // }
 
         Ok(ipfs_cid.to_string())
     }
@@ -348,9 +348,7 @@ async fn handle_object_upload<F: QueryClient, I: IpfsApiAdapter>(
     })?;
 
     // Ensure the sender has enough balance, and add the data to IPFS
-    let SignedMessage {
-        object, message, ..
-    } = signed_msg;
+    let SignedMessage { message, .. } = signed_msg;
     ensure_balance(&client, message.from).await.map_err(|e| {
         Rejection::from(BadRequest {
             message: format!("failed to ensure balance: {}", e),
@@ -363,14 +361,14 @@ async fn handle_object_upload<F: QueryClient, I: IpfsApiAdapter>(
                 message: format!("failed to connect with objectstore: {}", e),
             })
         })?;
-    let client_cid = match object {
-        Some(object) => object.value,
-        None => {
-            return Err(Rejection::from(BadRequest {
-                message: "missing CID in signed message".to_string(),
-            }))
-        }
-    };
+    // let client_cid = match object {
+    //     Some(object) => object.value,
+    //     None => {
+    //         return Err(Rejection::from(BadRequest {
+    //             message: "missing CID in signed message".to_string(),
+    //         }))
+    //     }
+    // };
     let file = match parser.temp_file {
         Some(file) => file,
         None => {
@@ -379,7 +377,7 @@ async fn handle_object_upload<F: QueryClient, I: IpfsApiAdapter>(
             }))
         }
     };
-    let cid = ipfs.add_object(file, client_cid).await.map_err(|e| {
+    let cid = ipfs.add_object(file).await.map_err(|e| {
         Rejection::from(BadRequest {
             message: format!("failed to add file: {}", e),
         })
@@ -590,7 +588,7 @@ mod tests {
     }
 
     impl IpfsApiAdapter for IpfsMocked {
-        async fn add_object(&self, _temp_file: TempFile, _cid: Cid) -> anyhow::Result<String> {
+        async fn add_object(&self, _temp_file: TempFile) -> anyhow::Result<String> {
             Ok("Qm123".to_string())
         }
 
@@ -734,16 +732,17 @@ mod tests {
         let external_object = b"hello world".as_ref();
         let digest = Code::Blake2b256.digest(external_object);
         let object_cid = Cid::new_v1(fvm_ipld_encoding::IPLD_RAW, digest);
+        let to = Address::new_id(90);
         let params = AddParams {
             key: key.to_vec(),
             cid: object_cid,
             size: 11,
             metadata: HashMap::new(),
             overwrite: true,
+            store: to,
         };
         let params = RawBytes::serialize(params).unwrap();
-        let to = Address::new_id(90);
-        let object = fendermint_vm_message::signed::Object::new(key.to_vec(), object_cid, to);
+        // let object = fendermint_vm_message::signed::Object::new(key.to_vec(), object_cid, to);
 
         let sk = fendermint_crypto::SecretKey::random(&mut StdRng::from_entropy());
         let signing_key = SigningKey::from_slice(sk.serialize().as_ref()).unwrap();
@@ -761,7 +760,7 @@ mod tests {
             gas_premium: TokenAmount::from_atto(0),
         };
         let chain_id = fvm_shared::chainid::ChainID::from(314159);
-        let signed = SignedMessage::new_secp256k1(message, Some(object), &sk, &chain_id).unwrap();
+        let signed = SignedMessage::new_secp256k1(message, &sk, &chain_id).unwrap();
 
         let serialized_signed_message = fvm_ipld_encoding::to_vec(&signed).unwrap();
         let serialized_signed_message_b64 =

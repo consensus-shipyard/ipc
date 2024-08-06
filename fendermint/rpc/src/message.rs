@@ -9,7 +9,6 @@ use bytes::Bytes;
 use fendermint_actor_objectstore::{GetParams, Method::GetObject};
 use fendermint_crypto::SecretKey;
 use fendermint_vm_actor_interface::{eam, evm};
-use fendermint_vm_message::signed::Object;
 use fendermint_vm_message::{chain::ChainMessage, signed::SignedMessage};
 use fvm_ipld_encoding::{BytesSer, RawBytes};
 use fvm_shared::{
@@ -183,7 +182,7 @@ impl SignedMessageFactory {
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<ChainMessage> {
-        self.transaction(to, METHOD_SEND, Default::default(), value, gas_params, None)
+        self.transaction(to, METHOD_SEND, Default::default(), value, gas_params)
     }
 
     /// Send a message to an actor.
@@ -194,12 +193,11 @@ impl SignedMessageFactory {
         params: RawBytes,
         value: TokenAmount,
         gas_params: GasParams,
-        object: Option<Object>,
     ) -> anyhow::Result<ChainMessage> {
         let message = self
             .inner
             .transaction(to, method_num, params, value, gas_params);
-        let signed = SignedMessage::new_secp256k1(message, object, &self.sk, &self.chain_id)?;
+        let signed = SignedMessage::new_secp256k1(message, &self.sk, &self.chain_id)?;
         let chain = ChainMessage::Signed(signed);
         Ok(chain)
     }
@@ -220,7 +218,6 @@ impl SignedMessageFactory {
             initcode,
             value,
             gas_params,
-            None,
         )?;
         Ok(message)
     }
@@ -240,7 +237,6 @@ impl SignedMessageFactory {
             calldata,
             value,
             gas_params,
-            None,
         )?;
         Ok(message)
     }
