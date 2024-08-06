@@ -16,8 +16,10 @@ pub mod upgrades;
 
 #[cfg(any(test, feature = "bundle"))]
 pub mod bundle;
+pub(crate) mod gas;
 pub(crate) mod topdown;
 
+use crate::fvm::gas::default::DefaultGas;
 pub use check::FvmCheckRet;
 pub use checkpoint::PowerUpdates;
 pub use exec::FvmApplyRet;
@@ -82,6 +84,7 @@ where
     gateway: GatewayCaller<DB>,
     /// Upgrade scheduler stores all the upgrades to be executed at given heights.
     upgrade_scheduler: UpgradeScheduler<DB>,
+    gas: DefaultGas<DB>,
 }
 
 impl<DB, C> FvmMessageInterpreter<DB, C>
@@ -107,6 +110,7 @@ where
             push_chain_meta: true,
             gateway: GatewayCaller::default(),
             upgrade_scheduler,
+            gas: DefaultGas::new(),
         }
     }
 

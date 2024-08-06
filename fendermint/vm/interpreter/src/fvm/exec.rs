@@ -57,6 +57,8 @@ where
         // Block height (FVM epoch) as sequence is intentional
         let height = state.block_height();
 
+        self.gas.reset_block_gas_quota(&mut state)?;
+
         // check for upgrades in the upgrade_scheduler
         let chain_id = state.chain_id();
         let block_height: u64 = state.block_height().try_into().unwrap();
@@ -149,7 +151,7 @@ where
     async fn deliver(
         &self,
         mut state: Self::State,
-        msg: Self::Message,
+        mut msg: Self::Message,
     ) -> anyhow::Result<(Self::State, Self::DeliverOutput)> {
         let (apply_ret, emitters, latency) = if msg.from == system::SYSTEM_ACTOR_ADDR {
             let (execution_result, latency) = measure_time(|| state.execute_implicit(msg.clone()));
@@ -157,9 +159,12 @@ where
 
             (apply_ret, emitters, latency)
         } else {
+            msg.gas_limit = msg.gas_limit.min(self.gas.available_block_gas());
+
             let (execution_result, latency) = measure_time(|| state.execute_explicit(msg.clone()));
             let (apply_ret, emitters) = execution_result?;
 
+            self.gas.deduct_block_gas_quota(apply_ret.msg_receipt.gas_used)?;
             (apply_ret, emitters, latency)
         };
 

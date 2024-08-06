@@ -14,23 +14,21 @@ use num_derive::FromPrimitive;
 fil_actors_runtime::wasm_trampoline!(IPCEamActor);
 
 pub const IPC_GAS_ACTOR_NAME: &str = "gas";
+pub type Gas = u64;
+
+pub struct IPCGasActor;
 
 #[derive(Serialize_tuple, Deserialize_tuple, Debug, Clone)]
 pub struct State {
     block_gas_limit: Gas,
 }
 
-pub struct IPCGasActor;
-
 #[derive(FromPrimitive)]
 #[repr(u64)]
 pub enum Method {
     Constructor = METHOD_CONSTRUCTOR,
     SetBlockGasLimit = frc42_dispatch::method_hash!("SetBlockGasLimit"),
-    BlockGasLimit = frc42_dispatch::method_hash!("BlockGasLimit"),
 }
-
-type Gas = u64;
 
 impl IPCGasActor {
     /// Creates the actor
@@ -55,10 +53,6 @@ impl IPCGasActor {
 
         Ok(())
     }
-
-    fn block_gas_limit(rt: &impl Runtime) -> Result<Gas, ActorError> {
-        Ok(rt.state::<State>()?.block_gas_limit)
-    }
 }
 
 impl ActorCode for IPCGasActor {
@@ -81,8 +75,6 @@ impl ActorCode for IPCGasActor {
             fil_actors_runtime::dispatch(rt, method, Self::constructor, params)
         } else if method == Method::SetBlockGasLimit as u64 {
             fil_actors_runtime::dispatch(rt, method, Self::set_block_gas_limit, params)
-        } else if method == Method::BlockGasLimit as u64 {
-            fil_actors_runtime::dispatch(rt, method, Self::block_gas_limit, params)
         } else {
             Err(ActorError::not_found("method not found".into()))
         }
@@ -92,6 +84,12 @@ impl ActorCode for IPCGasActor {
 #[derive(Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ConstructorParams {
     block_gas_limit: Gas,
+}
+
+impl State {
+    pub fn block_gas_limit(&self) -> Gas {
+        self.block_gas_limit
+    }
 }
 
 #[cfg(test)]
