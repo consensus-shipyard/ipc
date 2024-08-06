@@ -16,7 +16,7 @@ use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
 use fendermint_vm_actor_interface::{
-    account, adm, burntfunds, chainmetadata, cron, eam, init, ipc, reward, system, EMPTY_ARR,
+    account, adm, blobs, burntfunds, chainmetadata, cron, eam, init, ipc, reward, system, EMPTY_ARR,
 };
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Genesis, Power, PowerScale, Validator};
@@ -275,6 +275,22 @@ where
                 None,
             )
             .context("failed to create chainmetadata actor")?;
+
+        // Initialize the blobs actor.
+        // Make rate a config?
+        // Currently using 1e18, i.e., one atto token (1e-18 tokens) buys you one byte-block,
+        // i.e., you can store one byte for one block.
+        let capacity = 1024 * 1024 * 1024u64;
+        let blobs_state = fendermint_actor_blobs::State::new(capacity, 1)?;
+        state
+            .create_custom_actor(
+                fendermint_actor_blobs::BLOBS_ACTOR_NAME,
+                blobs::BLOBS_ACTOR_ID,
+                &blobs_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create blobs actor")?;
 
         let eam_state = fendermint_actor_eam::State::new(
             state.store(),

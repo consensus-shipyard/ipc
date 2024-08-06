@@ -3,6 +3,7 @@
 use anyhow::{anyhow, Context};
 use cid::Cid;
 use fendermint_actor_accumulator::ACCUMULATOR_ACTOR_NAME;
+use fendermint_actor_blobs::BLOBS_ACTOR_NAME;
 use fendermint_actor_chainmetadata::CHAINMETADATA_ACTOR_NAME;
 use fendermint_actor_eam::IPC_EAM_ACTOR_NAME;
 use fendermint_actor_objectstore::OBJECTSTORE_ACTOR_NAME;
@@ -12,10 +13,11 @@ use std::collections::HashMap;
 
 // array of required actors
 pub const REQUIRED_ACTORS: &[&str] = &[
+    ACCUMULATOR_ACTOR_NAME,
+    BLOBS_ACTOR_NAME,
     CHAINMETADATA_ACTOR_NAME,
     IPC_EAM_ACTOR_NAME,
     OBJECTSTORE_ACTOR_NAME,
-    ACCUMULATOR_ACTOR_NAME,
 ];
 
 /// A mapping of internal actor CIDs to their respective types.

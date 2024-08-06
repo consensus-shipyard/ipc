@@ -892,6 +892,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "blake3"
+version = "1.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e9ec96fe9a81b5e365f9db71fe00edc4fe4ca2cc7dcb7861f0603012a7caa210"
+dependencies = [
+ "arrayref",
+ "arrayvec 0.7.4",
+ "cc",
+ "cfg-if",
+ "constant_time_eq 0.3.0",
+]
+
+[[package]]
 name = "block-buffer"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2868,6 +2881,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_actor_blobs"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cid",
+ "fil_actors_evm_shared",
+ "fil_actors_runtime",
+ "frc42_dispatch",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
+ "fvm_shared",
+ "hex-literal 0.4.1",
+ "multihash 0.18.1",
+ "num-derive 0.3.3",
+ "num-traits",
+ "rand",
+ "serde",
+ "serde_tuple",
+]
+
+[[package]]
 name = "fendermint_actor_chainmetadata"
 version = "0.1.0"
 dependencies = [
@@ -2949,6 +2983,7 @@ dependencies = [
  "anyhow",
  "cid",
  "fendermint_actor_accumulator",
+ "fendermint_actor_blobs",
  "fendermint_actor_chainmetadata",
  "fendermint_actor_eam",
  "fendermint_actor_objectstore",
@@ -3442,6 +3477,7 @@ dependencies = [
  "cid",
  "ethers",
  "fendermint_actor_accumulator",
+ "fendermint_actor_blobs",
  "fendermint_actor_chainmetadata",
  "fendermint_actor_eam",
  "fendermint_actor_objectstore",
@@ -6634,6 +6670,7 @@ checksum = "cfd8a792c1694c6da4f68db0a9d707c72bd260994da179e6030a5dcee00bb815"
 dependencies = [
  "arbitrary",
  "blake2b_simd",
+ "blake3",
  "core2",
  "digest 0.10.7",
  "multihash-derive",

@@ -31,9 +31,10 @@ members = [
     "fendermint/actors",
     "fendermint/actors/chainmetadata",
     # adm
-    "fendermint/actors/objectstore",
     "fendermint/actors/accumulator",
+    "fendermint/actors/blobs",
     "fendermint/actors/machine",
+    "fendermint/actors/objectstore",
     "textile/objectstore_actor_sdk",
     "textile/objectstore_syscall",
 ]
@@ -44,10 +45,6 @@ authors = ["Protocol Labs"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
 license-file = "LICENSE-APACHE"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-## dummy trigger ci
 
 [workspace.dependencies]
 ambassador = "0.3.5"
