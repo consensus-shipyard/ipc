@@ -3,6 +3,7 @@ extend = [
     { path = "scripts/cometbft.toml" },
     { path = "scripts/fendermint.toml" },
     { path = "scripts/ethapi.toml" },
+    { path = "scripts/anvil.toml" },
     { path = "scripts/genesis.toml" },
     { path = "scripts/iroh.toml" },
     { path = "scripts/node.toml" },
@@ -55,6 +56,9 @@ IROH_METRICS_HOST_PORT = { value = "9091", condition = { env_not_set = [
 ] } }
 PROMTAIL_AGENT_HOST_PORT = { value = "9080", condition = { env_not_set = [
     "PROMTAIL_AGENT_HOST_PORT",
+] } }
+GRAFANA_HOST_PORT = { value = "3000", condition = { env_not_set = [
+    "GRAFANA_HOST_PORT",
 ] } }
 
 BALANCE = { value = "1000", condition = { env_not_set = ["BALANCE"] } }
@@ -154,6 +158,12 @@ IROH_CONTAINER_NAME = "${NODE_NAME}-iroh"
 PROMETHEUS_CONTAINER_NAME = "prometheus"
 GRAFANA_CONTAINER_NAME = "grafana"
 LOKI_CONTAINER_NAME = "loki"
+
+
+ANVIL_CONTAINER_NAME="anvil"
+ANVIL_HOST_PORT=8544
+FOUNDRY_DOCKER_IMAGE="ghcr.io/foundry-rs/foundry"
+
 
 CMT_DOCKER_IMAGE = "cometbft/cometbft:v0.37.x"
 FM_DOCKER_TAG = "latest"

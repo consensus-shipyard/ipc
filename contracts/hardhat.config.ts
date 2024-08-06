@@ -317,9 +317,13 @@ const config: HardhatUserConfig = {
             timeout: 1000000,
         },
         localnet: {
-            chainId: 31415926,
+            chainId: 31337,
             url: process.env.RPC_URL!,
-            accounts: [process.env.PRIVATE_KEY!],
+            // accounts: [process.env.PRIVATE_KEY!],
+            // TODO: the anvil chain has some standardized accounts that are prefunded, but
+            //      they are different than the three validator's accounts.  Need to decide
+            //      how to fund wallets and which ones to fund.
+            accounts: ["0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"],
         },
         // automatically fetch chainID for network
         auto: {

@@ -1,0 +1,36 @@
+
+# --network ${NETWORK_NAME} \
+# --publish ${ANVIL_HOST_PORT}:8545 \
+
+[tasks.anvil-run]
+script = """
+
+echo FLAGS ${FLAGS}
+echo ANVIL_CONTAINER_NAME ${ANVIL_CONTAINER_NAME}
+echo NETWORK_NAME ${NETWORK_NAME}
+echo ANVIL_HOST_PORT ${ANVIL_HOST_PORT}
+echo FOUNDRY_DOCKER_IMAGE ${FOUNDRY_DOCKER_IMAGE}
+
+docker run \
+  ${FLAGS} \
+  --name ${ANVIL_CONTAINER_NAME} \
+  --network host \
+  ${FOUNDRY_DOCKER_IMAGE} "anvil --host 0.0.0.0"
+"""
+
+[tasks.anvil-start]
+extend = "anvil-run"
+env = { "FLAGS" = "-d" }
+
+[tasks.anvil-restart]
+extend = "anvil-run"
+env = { "FLAGS" = "-d" }
+dependencies = ["anvil-destroy"]
+
+[tasks.anvil-stop]
+env = { "CONTAINER_NAME" = "${ANVIL_CONTAINER_NAME}" }
+run_task = "docker-stop"
+
+[tasks.anvil-destroy]
+env = { "CONTAINER_NAME" = "${ANVIL_CONTAINER_NAME}" }
+run_task = "docker-destroy"

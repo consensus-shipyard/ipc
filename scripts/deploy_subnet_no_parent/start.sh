@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -euo pipefail
+#set -euo pipefail
 
 dir=$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")
 IPC_FOLDER="$dir"/../..
@@ -8,7 +8,7 @@ IPC_CONFIG_FOLDER=${HOME}/.ipc
 
 CMT_P2P_HOST_PORTS=(26656 26756 26856)
 CMT_RPC_HOST_PORTS=(26657 26757 26857)
-ETHAPI_HOST_PORTS=(8545 8645 8745)
+ETHAPI_HOST_PORTS=(8645 8745 8845)
 RESOLVER_HOST_PORTS=(26655 26755 26855)
 OBJECTS_HOST_PORTS=(8001 8002 8003)
 IROH_RPC_HOST_PORTS=(4921 4922 4923)
@@ -17,6 +17,7 @@ FENDERMINT_METRICS_HOST_PORTS=(9184 9185 9186)
 IROH_METRICS_HOST_PORTS=(9091 9092 9093)
 PROMTAIL_AGENT_HOST_PORTS=(9080 9081 9082)
 
+ANVIL_HOST_PORT=8545
 PROMETHEUS_HOST_PORT=9090
 LOKI_HOST_PORT=3100
 GRAFANA_HOST_PORT=3000
@@ -26,14 +27,14 @@ subnet_id="/r314159/t410f726d2jv6uj4mpkcbgg5ndlpp3l7dd5rlcpgzkoi"
 subnet_folder=$IPC_CONFIG_FOLDER/$(echo $subnet_id | sed 's|^/||;s|/|-|g')
 rm -rf "$subnet_folder"
 
-# Build IPC contracts
-cd "$IPC_FOLDER"/contracts
-make gen
+# # Build IPC contracts
+# cd "$IPC_FOLDER"/contracts
+# make gen
 
-# Rebuild fendermint docker
-cd "$IPC_FOLDER"/fendermint
-make clean
-make docker-build
+# # Rebuild fendermint docker
+# cd "$IPC_FOLDER"/fendermint
+# make clean
+# make docker-build
 
 # Prepare wallet by using existing wallet json file
 wallet_addresses=()
@@ -59,6 +60,72 @@ do
       -e FM_PULL_SKIP=1 \
       child-validator-no-parent-init
 done
+
+# Prepare wallet by using existing wallet json file
+wallet_addresses=()
+for i in {0..2}
+do
+  addr=$(jq .["$i"].address "$IPC_CONFIG_FOLDER"/evm_keystore.json | tr -d '"')
+
+echo "adding address: " $addr
+  wallet_addresses+=("$addr")
+done
+
+# Init ipc cli config
+ipc-cli config init
+
+# Export validator private keys into files
+for i in {0..2}
+do
+  ipc-cli wallet export --wallet-type evm --address "${wallet_addresses[i]}" --hex > "$IPC_CONFIG_FOLDER"/validator_"$i".sk
+done
+
+
+# Start anvil node and deploy contracts
+echo "starting anvil"
+# Step 1 Start Anvil
+cd "$IPC_FOLDER"
+cargo make --makefile infra/fendermint/Makefile.toml \
+    -e NODE_NAME=anvil \
+    -e ANVIL_HOST_PORT="${ANVIL_HOST_PORT}" \
+    -e SUBNET_ID="$subnet_id" \
+    anvil-start
+
+echo "started anvil"
+
+# Step 2: Deploy IPC contracts
+cd ${IPC_FOLDER}/contracts
+npm install
+
+export RPC_URL=http://localhost:8545
+export PRIVATE_KEY=$(cat ${IPC_CONFIG_FOLDER}/validator_0.sk)
+
+echo PRIVATE_KEY $PRIVATE_KEY
+echo pwd $(pwd)
+deploy_contracts_output=$(make deploy-ipc NETWORK="localnet")
+
+echo "**************************************************"
+echo "             deploy_contracts_output"
+echo $deploy_contracts_output
+echo ""
+echo ""
+
+
+parent_gateway_address=$(echo "$deploy_contracts_output" | grep '"Gateway"' | awk -F'"' '{print $4}')
+parent_registry_address=$(echo "$deploy_contracts_output" | grep '"SubnetRegistry"' | awk -F'"' '{print $4}')
+echo "New parent gateway address: $parent_gateway_address"
+echo "New parent registry address: $parent_registry_address"
+echo ""
+
+# Step 3: Use the new parent gateway and registry address to update IPC config file
+toml set ${IPC_CONFIG_FOLDER}/config.toml subnets[0].config.gateway_addr $parent_gateway_address > /tmp/config.toml.1
+toml set /tmp/config.toml.1 subnets[0].config.registry_addr $parent_registry_address > /tmp/config.toml.2
+toml set /tmp/config.toml.2 subnets[0].config.network_type "evm" > /tmp/config.toml.3
+toml set /tmp/config.toml.3 subnets[0].config.provider_http "http://localhost:8545" > /tmp/config.toml.4
+toml set /tmp/config.toml.4 subnets[0].id "$subnet_id" > /tmp/config.toml.5
+
+cp /tmp/config.toml.5 ${IPC_CONFIG_FOLDER}/config.toml
+
 
 # Copy genesis file into each validator
 for i in {0..2}

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -euo pipefail
+#set -euo pipefail
 
 dir=$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")
 IPC_FOLDER="$dir"/../..
@@ -38,5 +38,10 @@ do
       child-validator-down
 done
 
+
 # Remove deployment data
 rm -rf "$subnet_folder"
+
+cargo make --makefile infra/fendermint/Makefile.toml \
+    -e NODE_NAME=anvil \
+    anvil-destroy
