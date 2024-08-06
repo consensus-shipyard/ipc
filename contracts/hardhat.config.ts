@@ -323,7 +323,9 @@ const config: HardhatUserConfig = {
             // TODO: the anvil chain has some standardized accounts that are prefunded, but
             //      they are different than the three validator's accounts.  Need to decide
             //      how to fund wallets and which ones to fund.
-            accounts: ["0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"],
+            accounts: [
+                '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
+            ],
         },
         // automatically fetch chainID for network
         auto: {
