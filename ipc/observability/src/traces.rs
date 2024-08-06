@@ -27,10 +27,8 @@ pub fn create_temporary_subscriber() -> Subscriber {
 // Sets a global tracing subscriber with the given configuration. Returns a guard that can be used to drop the subscriber.
 pub fn set_global_tracing_subscriber(
     config: &TracingSettings,
-) -> (Option<WorkerGuard>, Option<WorkerGuard>) {
-    let (logs_file_layer, traces_file_layer, logs_file_guard, traces_file_guard) = match &config
-        .file
-    {
+) -> Option<(WorkerGuard, WorkerGuard)> {
+    let (logs_file_layer, traces_file_layer, file_guards) = match &config.file {
         Some(file_settings) if file_settings.enabled => {
             // setup logs file layer first - logs are traces that does not have the target set to TRACING_TARGET
             let (logs_non_blocking, logs_file_guard) =
@@ -85,11 +83,10 @@ pub fn set_global_tracing_subscriber(
             (
                 Some(logs_file_layer),
                 Some(traces_file_layer),
-                Some(logs_file_guard),
-                Some(traces_file_guard),
+                Some((logs_file_guard, traces_file_guard)),
             )
         }
-        _ => (None, None, None, None),
+        _ => (None, None, None),
     };
 
     let console_filter = match &config.console {
@@ -113,7 +110,7 @@ pub fn set_global_tracing_subscriber(
     tracing::subscriber::set_global_default(global_registry)
         .expect("Unable to set a global tracing subscriber");
 
-    (logs_file_guard, traces_file_guard)
+    file_guards
 }
 
 fn create_file_appender(settings: &FileLayerSettings, suffix: &str) -> RollingFileAppender {
