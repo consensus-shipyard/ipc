@@ -179,7 +179,7 @@ impl GenesisCreator {
 
         let custom_actors_bundle = std::fs::read(&self.custom_actors_path).with_context(|| {
             format!(
-                "failed to read custom actors_bundle: {}",
+                "failed to read custom actors bundle: {}",
                 self.custom_actors_path.to_string_lossy()
             )
         })?;
