@@ -186,14 +186,14 @@ impl GenesisCreator {
     async fn init_state(&self) -> anyhow::Result<FvmGenesisState<MemoryBlockstore>> {
         let bundle = std::fs::read(&self.builtin_actors_path).with_context(|| {
             format!(
-                "failed to read bundle: {}",
+                "failed to read builtin actors bundle: {}",
                 self.builtin_actors_path.to_string_lossy()
             )
         })?;
 
         let custom_actors_bundle = std::fs::read(&self.custom_actors_path).with_context(|| {
             format!(
-                "failed to read custom actors_bundle: {}",
+                "failed to read custom actors bundle: {}",
                 self.custom_actors_path.to_string_lossy()
             )
         })?;
