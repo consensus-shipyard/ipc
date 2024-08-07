@@ -2836,7 +2836,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "fendermint_actor_gas"
+name = "fendermint_actor_gas_market"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -3343,7 +3343,7 @@ dependencies = [
  "ethers",
  "fendermint_actor_chainmetadata",
  "fendermint_actor_eam",
- "fendermint_actor_gas",
+ "fendermint_actor_gas_market",
  "fendermint_actors",
  "fendermint_crypto",
  "fendermint_eth_hardhat",

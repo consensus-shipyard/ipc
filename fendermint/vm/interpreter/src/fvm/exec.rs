@@ -57,7 +57,7 @@ where
         // Block height (FVM epoch) as sequence is intentional
         let height = state.block_height();
 
-        self.gas.reset_block_gas_quota(&mut state)?;
+        self.gas.reset_from_chain_state(&state)?;
 
         // check for upgrades in the upgrade_scheduler
         let chain_id = state.chain_id();
@@ -159,12 +159,14 @@ where
 
             (apply_ret, emitters, latency)
         } else {
+            // TODO: maybe compare the gas limits are better?
             msg.gas_limit = msg.gas_limit.min(self.gas.available_block_gas());
 
             let (execution_result, latency) = measure_time(|| state.execute_explicit(msg.clone()));
             let (apply_ret, emitters) = execution_result?;
 
-            self.gas.deduct_block_gas_quota(apply_ret.msg_receipt.gas_used)?;
+            self.gas
+                .deduct_available_block_gas(apply_ret.msg_receipt.gas_used)?;
             (apply_ret, emitters, latency)
         };
 
