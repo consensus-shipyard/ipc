@@ -70,20 +70,54 @@ impl GenesisMetadata {
     }
 }
 
-pub fn compress_and_encode(bytes: &[u8]) -> anyhow::Result<String> {
-    let mut wtr = snap::write::FrameEncoder::new(vec![]);
-    wtr.write_all(bytes)?;
-    let compressed = wtr.into_inner()?;
-    Ok(base64::engine::general_purpose::STANDARD.encode(compressed))
+/// Genesis app state wrapper for cometbft
+pub enum GenesisAppState {
+    V1(Vec<u8>),
 }
 
-pub fn decode_and_decompress(raw: &str) -> anyhow::Result<Vec<u8>> {
-    let bytes = base64::engine::general_purpose::STANDARD.decode(raw)?;
+impl GenesisAppState {
+    pub fn v1(bytes: Vec<u8>) -> Self {
+        Self::V1(bytes)
+    }
 
-    let mut buf = vec![];
-    snap::read::FrameDecoder::new(bytes.as_slice()).read_to_end(&mut buf)?;
+    pub fn into_bytes(self) -> Vec<u8> {
+        match self {
+            Self::V1(b) => b,
+        }
+    }
 
-    Ok(buf)
+    pub fn compress_and_encode(&self) -> anyhow::Result<String> {
+        let bytes = match self {
+            GenesisAppState::V1(ref bytes) => {
+                let mut wtr = snap::write::FrameEncoder::new(vec![]);
+                wtr.write_all(bytes)?;
+                let compressed = wtr.into_inner()?;
+
+                let mut res = vec![0];
+                res.extend(compressed);
+
+                res
+            }
+        };
+
+        Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
+    }
+
+    pub fn decode_and_decompress(raw: &str) -> anyhow::Result<Vec<u8>> {
+        let bytes = base64::engine::general_purpose::STANDARD.decode(raw)?;
+        if bytes.is_empty() {
+            return Err(anyhow!("empty bytes for genesis app state"));
+        }
+
+        match bytes[0] {
+            0 => {
+                let mut buf = vec![];
+                snap::read::FrameDecoder::new(&bytes.as_slice()[1..]).read_to_end(&mut buf)?;
+                Ok(buf)
+            }
+            _ => Err(anyhow!("not supported schema versioin")),
+        }
+    }
 }
 
 pub async fn read_genesis_car<DB: Blockstore + 'static + Send + Sync>(
@@ -655,14 +689,18 @@ fn circ_supply(g: &Genesis) -> TokenAmount {
 
 #[cfg(test)]
 mod tests {
-    use crate::genesis::{compress_and_encode, decode_and_decompress};
+    use crate::genesis::GenesisAppState;
 
     #[test]
     fn test_compression() {
-        let bytes = (0..10000).map(|_| rand::random::<u8>()).collect::<Vec<u8>>();
+        let bytes = (0..10000)
+            .map(|_| rand::random::<u8>())
+            .collect::<Vec<u8>>();
 
-        let s = compress_and_encode(&bytes).unwrap();
-        let recovered = decode_and_decompress(&s).unwrap();
+        let s = GenesisAppState::v1(bytes.clone())
+            .compress_and_encode()
+            .unwrap();
+        let recovered = GenesisAppState::decode_and_decompress(&s).unwrap();
 
         assert_eq!(recovered, bytes);
     }

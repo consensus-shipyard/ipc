@@ -14,7 +14,7 @@ use fendermint_vm_genesis::{
     ipc, Account, Actor, ActorMeta, Collateral, Genesis, Multisig, PermissionMode, SignerAddr,
     Validator, ValidatorKey,
 };
-use fendermint_vm_interpreter::genesis::{compress_and_encode, GenesisCreator};
+use fendermint_vm_interpreter::genesis::{compress_and_encode, GenesisAppState, GenesisCreator};
 
 use crate::cmd;
 use crate::options::genesis::*;
@@ -218,7 +218,7 @@ fn into_tendermint(genesis_file: &PathBuf, args: &GenesisIntoTendermintArgs) -> 
     let genesis = read_genesis(genesis_file)?;
     let app_state: String = match args.app_state {
         None => String::from(""),
-        Some(ref path) => compress_and_encode(&std::fs::read(path)?)?,
+        Some(ref path) => GenesisAppState::v1(std::fs::read(path)?).compress_and_encode()?,
     };
 
     let chain_id: u64 = chainid::from_str_hashed(&genesis.chain_name)?.into();

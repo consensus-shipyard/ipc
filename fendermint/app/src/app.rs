@@ -23,7 +23,9 @@ use fendermint_vm_interpreter::fvm::state::{
 };
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
 use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmGenesisOutput, PowerUpdates};
-use fendermint_vm_interpreter::genesis::{decode_and_decompress, read_genesis_car};
+use fendermint_vm_interpreter::genesis::{
+    decode_and_decompress, read_genesis_car, GenesisAppState,
+};
 use fendermint_vm_interpreter::signed::InvalidSignature;
 use fendermint_vm_interpreter::{
     CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
@@ -380,7 +382,7 @@ where
     fn parse_genesis_app_bytes(bytes: &[u8]) -> Result<Vec<u8>> {
         // cometbft serves data in json format, convert from json string
         match serde_json::from_slice(bytes)? {
-            serde_json::Value::String(s) => Ok(decode_and_decompress(&s)?),
+            serde_json::Value::String(s) => Ok(GenesisAppState::decode_and_decompress(&s)?),
             _ => Err(anyhow!("invalid app state json")),
         }
     }
