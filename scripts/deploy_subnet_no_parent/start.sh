@@ -2,6 +2,7 @@
 
 #set -euo pipefail
 
+DASHES='------'
 dir=$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")
 IPC_FOLDER="$dir"/../..
 IPC_CONFIG_FOLDER=${HOME}/.ipc
@@ -22,14 +23,16 @@ PROMETHEUS_HOST_PORT=9090
 LOKI_HOST_PORT=3100
 GRAFANA_HOST_PORT=3000
 
-# Use "dummy" subnet
-subnet_id="/r314159/t410f726d2jv6uj4mpkcbgg5ndlpp3l7dd5rlcpgzkoi"
-subnet_folder=$IPC_CONFIG_FOLDER/$(echo $subnet_id | sed 's|^/||;s|/|-|g')
-rm -rf "$subnet_folder"
+if [[ ! -v SKIP_BUILD ]]; then 
+  # Build IPC contracts
+  cd "$IPC_FOLDER"/contracts
+  make gen
 
-# # Build IPC contracts
-# cd "$IPC_FOLDER"/contracts
-# make gen
+  # Rebuild fendermint docker
+  cd "$IPC_FOLDER"/fendermint
+  make clean
+  make docker-build
+fi
 
 # # Rebuild fendermint docker
 # cd "$IPC_FOLDER"/fendermint
@@ -88,7 +91,6 @@ cd "$IPC_FOLDER"
 cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=anvil \
     -e ANVIL_HOST_PORT="${ANVIL_HOST_PORT}" \
-    -e SUBNET_ID="$subnet_id" \
     anvil-start
 
 echo "started anvil"
@@ -100,13 +102,11 @@ npm install
 export RPC_URL=http://localhost:8545
 export PRIVATE_KEY=$(cat ${IPC_CONFIG_FOLDER}/validator_0.sk)
 
-echo PRIVATE_KEY $PRIVATE_KEY
-echo pwd $(pwd)
 deploy_contracts_output=$(make deploy-ipc NETWORK="localnet")
 
 echo "**************************************************"
 echo "             deploy_contracts_output"
-echo $deploy_contracts_output
+echo "$deploy_contracts_output"
 echo ""
 echo ""
 
@@ -118,13 +118,63 @@ echo "New parent registry address: $parent_registry_address"
 echo ""
 
 # Step 3: Use the new parent gateway and registry address to update IPC config file
+parent_id=/r31337
+
 toml set ${IPC_CONFIG_FOLDER}/config.toml subnets[0].config.gateway_addr $parent_gateway_address > /tmp/config.toml.1
 toml set /tmp/config.toml.1 subnets[0].config.registry_addr $parent_registry_address > /tmp/config.toml.2
-toml set /tmp/config.toml.2 subnets[0].config.network_type "evm" > /tmp/config.toml.3
+toml set /tmp/config.toml.2 subnets[0].config.network_type "fevm" > /tmp/config.toml.3
 toml set /tmp/config.toml.3 subnets[0].config.provider_http "http://localhost:8545" > /tmp/config.toml.4
-toml set /tmp/config.toml.4 subnets[0].id "$subnet_id" > /tmp/config.toml.5
-
+toml set /tmp/config.toml.4 subnets[0].id "$parent_id" > /tmp/config.toml.5
 cp /tmp/config.toml.5 ${IPC_CONFIG_FOLDER}/config.toml
+
+
+# Step 5: Create a subnet
+
+default_wallet_address=${wallet_addresses[0]}
+echo "Default wallet address: $default_wallet_address"
+
+echo "$DASHES Creating a child subnet... $DASHES"
+create_subnet_output=$(ipc-cli subnet create --parent $parent_id --min-validators 3 --min-validator-stake 1 --bottomup-check-period 600 --from $default_wallet_address --permission-mode collateral --supply-source-kind native 2>&1)
+echo "$create_subnet_output"
+subnet_id=$(echo $create_subnet_output | sed 's/.*with id: \([^ ]*\).*/\1/')
+echo "Created new subnet id: $subnet_id"
+
+subnet_folder=$IPC_CONFIG_FOLDER/$(echo $subnet_id | sed 's|^/||;s|/|-|g')
+rm -rf "$subnet_folder"
+
+# Take down any existing validators and init from scratch
+cd "$IPC_FOLDER"
+for i in {0..2}
+do
+  cargo make --makefile infra/fendermint/Makefile.toml \
+      -e NODE_NAME=validator-"$i" \
+      -e SUBNET_ID="$subnet_id" \
+      -e FM_PULL_SKIP=1 \
+      child-validator-no-parent-init
+done
+
+
+# Step 6: Use the new subnet ID to update IPC config file
+echo "[[subnets]]" >> /tmp/config.toml.5
+toml set /tmp/config.toml.5 subnets[1].id $subnet_id > /tmp/config.toml.6
+echo "" >> /tmp/config.toml.6
+echo "[subnets.config]" >> /tmp/config.toml.6
+echo "network_type = \"fevm\"" >> /tmp/config.toml.6
+toml set /tmp/config.toml.6 subnets[1].config.provider_http "http://localhost:8545" > /tmp/config.toml.7
+toml set /tmp/config.toml.7 subnets[1].config.gateway_addr $parent_gateway_address > /tmp/config.toml.8
+toml set /tmp/config.toml.8 subnets[1].config.registry_addr $parent_registry_address > /tmp/config.toml.9
+
+cp /tmp/config.toml.9 ${IPC_CONFIG_FOLDER}/config.toml
+
+
+
+# Step 7: Join subnet for addresses in wallet
+echo "$DASHES Join subnet for addresses in wallet..."
+for i in {0..2}
+do
+  echo "Joining subnet ${subnet_id} for address ${wallet_addresses[i]}"
+  ipc-cli subnet join --from ${wallet_addresses[i]} --subnet $subnet_id --initial-balance 1 --collateral 10
+done
 
 
 # Copy genesis file into each validator

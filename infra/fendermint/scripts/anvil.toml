@@ -4,13 +4,6 @@
 
 [tasks.anvil-run]
 script = """
-
-echo FLAGS ${FLAGS}
-echo ANVIL_CONTAINER_NAME ${ANVIL_CONTAINER_NAME}
-echo NETWORK_NAME ${NETWORK_NAME}
-echo ANVIL_HOST_PORT ${ANVIL_HOST_PORT}
-echo FOUNDRY_DOCKER_IMAGE ${FOUNDRY_DOCKER_IMAGE}
-
 docker run \
   ${FLAGS} \
   --name ${ANVIL_CONTAINER_NAME} \
