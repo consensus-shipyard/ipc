@@ -11,10 +11,9 @@ use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
-use log::info;
 use num_traits::{ToPrimitive, Zero};
 
-use crate::{Account, Status};
+use crate::GetStatsReturn;
 
 /// The state represents all accounts and stored blobs.
 /// TODO: use raw HAMTs
@@ -40,6 +39,19 @@ pub struct State {
     pub blobs: HashMap<Vec<u8>, Blob>,
     /// Set of currently resolving blob hashes.
     pub resolving: BTreeSet<Vec<u8>>,
+}
+
+/// The stored representation of a credit account.
+#[derive(Clone, Debug, PartialEq, Serialize_tuple, Deserialize_tuple)]
+pub struct Account {
+    /// Total size of all blobs managed by the account.
+    pub capacity_used: BigInt,
+    /// Current free credit in byte-blocks that can be used for new commitments.
+    pub credit_free: BigInt,
+    /// Current committed credit in byte-blocks that will be used for debits.
+    pub credit_committed: BigInt,
+    /// The chain epoch of the last debit.
+    pub last_debit_epoch: ChainEpoch,
 }
 
 /// The stored representation of a blob.
@@ -77,8 +89,9 @@ impl State {
         })
     }
 
-    pub fn get_status(&self) -> anyhow::Result<Status> {
-        Ok(Status {
+    pub fn get_stats(&self, balance: TokenAmount) -> anyhow::Result<GetStatsReturn> {
+        Ok(GetStatsReturn {
+            balance,
             capacity_free: self.capacity_free.clone(),
             capacity_used: self.capacity_used.clone(),
             credit_sold: self.credit_sold.clone(),
@@ -91,7 +104,7 @@ impl State {
         })
     }
 
-    pub fn fund_account(
+    pub fn buy_credit(
         &mut self,
         address: Address,
         amount: TokenAmount,
@@ -127,7 +140,7 @@ impl State {
         }
     }
 
-    pub fn get_account(&mut self, address: Address) -> anyhow::Result<Option<Account>> {
+    pub fn get_account(&self, address: Address) -> anyhow::Result<Option<Account>> {
         let account = self.accounts.get(&address).cloned();
         Ok(account)
     }
@@ -151,10 +164,6 @@ impl State {
                 let size = BigInt::from(size);
                 let required_credit = (expiry as u64) * &size;
                 if account.credit_free < required_credit {
-                    info!(
-                        "account {} has insufficient credit (available: {}; required: {})",
-                        sender, account.credit_free, required_credit
-                    );
                     return Err(anyhow!(
                         "account {} has insufficient credit (available: {}; required: {})",
                         sender,
@@ -191,10 +200,7 @@ impl State {
 
                 Ok(account.clone())
             }
-            None => {
-                info!("account {} not found", sender);
-                Err(anyhow!("account {} not found", sender))
-            }
+            None => Err(anyhow!("account {} not found", sender)),
         }
     }
 

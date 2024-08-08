@@ -5,14 +5,13 @@
 use cid::Cid;
 use fendermint_actor_machine::{ConstructorParams, MachineActor};
 use fil_actors_runtime::{
-    actor_dispatch, actor_error, deserialize_block, extract_send_result,
+    actor_dispatch, actor_error, extract_send_result,
     runtime::{ActorCode, Runtime},
     ActorDowncast, ActorError, FIRST_EXPORTED_METHOD_NUMBER, INIT_ACTOR_ADDR, SYSTEM_ACTOR_ADDR,
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_ipld_hamt::BytesKey;
 use fvm_shared::{error::ExitCode, MethodNum};
-use log::info;
 
 use crate::{
     ext, AddParams, DeleteParams, GetParams, ListParams, Method, Object, ObjectList, ResolveParams,
@@ -47,20 +46,20 @@ impl Actor {
     fn add_object(rt: &impl Runtime, params: AddParams) -> Result<Cid, ActorError> {
         Self::ensure_write_allowed(rt)?;
 
-        let blob_params = ext::blobs::AddParams {
+        let blob_params = ext::blobs::AddBlobParams {
             cid: params.cid,
             size: params.size as u64,
             expiry: rt.curr_epoch() + 100,
             source: Some(params.store),
         };
 
-        let ret: ext::blobs::Account = deserialize_block(extract_send_result(rt.send_simple(
+        // TODO: use read-only flag
+        extract_send_result(rt.send_simple(
             &ext::blobs::BLOBS_ACTOR_ADDR,
             ext::blobs::ADD_BLOB_METHOD,
             IpldBlock::serialize_cbor(&blob_params)?,
             rt.message().value_received(),
-        ))?)?;
-        info!("response from blobs: {:#?}", ret);
+        ))?;
 
         let root = rt.transaction(|st: &mut State, rt| {
             st.add(

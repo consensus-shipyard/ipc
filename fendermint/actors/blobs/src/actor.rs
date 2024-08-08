@@ -12,18 +12,21 @@ use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::address::Address;
 use fvm_shared::sys::SendFlags;
 use fvm_shared::{error::ExitCode, MethodNum};
-use log::info;
 use num_traits::Zero;
 use std::collections::BTreeSet;
 
 use crate::ext::account::PUBKEY_ADDRESS_METHOD;
 use crate::{
-    Account, AddParams, Blob, ConstructorParams, DeleteParams, FundParams, GetParams, Method,
-    ResolveParams, State, Status, BLOBS_ACTOR_NAME,
+    Account, AddBlobParams, Blob, BuyCreditParams, ConstructorParams, DeleteBlobParams,
+    GetAccountParams, GetBlobParams, GetStatsReturn, Method, ResolveBlobParams, State,
+    BLOBS_ACTOR_NAME,
 };
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(BlobsActor);
+
+// TODO: cron debits
+// TODO: handle expiry
 
 pub struct BlobsActor;
 
@@ -40,25 +43,23 @@ impl BlobsActor {
         rt.create(&state)
     }
 
-    fn get_status(rt: &impl Runtime) -> Result<Status, ActorError> {
+    fn get_stats(rt: &impl Runtime) -> Result<GetStatsReturn, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
         let status = rt.transaction(|st: &mut State, _rt| {
-            st.get_status().map_err(|e| {
+            st.get_stats(rt.current_balance()).map_err(|e| {
                 e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get status")
             })
         })?;
 
-        info!("current balance: {}", rt.current_balance());
-
         Ok(status)
     }
 
-    fn fund_account(rt: &impl Runtime, params: FundParams) -> Result<Account, ActorError> {
+    fn buy_credit(rt: &impl Runtime, params: BuyCreditParams) -> Result<Account, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
         let account = rt.transaction(|st: &mut State, rt| {
-            st.fund_account(params.0, rt.message().value_received(), rt.curr_epoch())
+            st.buy_credit(params.0, rt.message().value_received(), rt.curr_epoch())
                 .map_err(|e| {
                     e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to fund account")
                 })
@@ -67,7 +68,20 @@ impl BlobsActor {
         Ok(account)
     }
 
-    fn add_blob(rt: &impl Runtime, params: AddParams) -> Result<Account, ActorError> {
+    fn get_account(
+        rt: &impl Runtime,
+        params: GetAccountParams,
+    ) -> Result<Option<Account>, ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+
+        let st: State = rt.state()?;
+        let foo = st.get_account(params.0).map_err(|e| {
+            e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get account")
+        })?;
+        Ok(foo)
+    }
+
+    fn add_blob(rt: &impl Runtime, params: AddBlobParams) -> Result<Account, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
         // Caller must be converted to robust (non-ID) address for safe storage
@@ -115,7 +129,7 @@ impl BlobsActor {
     }
 
     // TODO: change to returning general status about blob
-    fn is_blob_resolving(rt: &impl Runtime, params: ResolveParams) -> Result<bool, ActorError> {
+    fn is_blob_resolving(rt: &impl Runtime, params: ResolveBlobParams) -> Result<bool, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
         let resolving = rt.transaction(|st: &mut State, _| {
@@ -126,7 +140,7 @@ impl BlobsActor {
         Ok(resolving)
     }
 
-    fn resolve_blob(rt: &impl Runtime, params: ResolveParams) -> Result<(), ActorError> {
+    fn resolve_blob(rt: &impl Runtime, params: ResolveBlobParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
         rt.transaction(|st: &mut State, _| {
@@ -141,7 +155,7 @@ impl BlobsActor {
     // // So, we can't just delete it here via syscall.
     // // Once implemented, the DA mechanism may cause the data to be entangled with other data.
     // // The retention policies will handle deleting / GC.
-    fn delete_blob(rt: &impl Runtime, params: DeleteParams) -> Result<(), ActorError> {
+    fn delete_blob(rt: &impl Runtime, params: DeleteBlobParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
         rt.transaction(|st: &mut State, _| {
@@ -152,7 +166,7 @@ impl BlobsActor {
         Ok(())
     }
 
-    fn get_blob(rt: &impl Runtime, params: GetParams) -> Result<Option<Blob>, ActorError> {
+    fn get_blob(rt: &impl Runtime, params: GetBlobParams) -> Result<Option<Blob>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
         let st: State = rt.state()?;
@@ -185,8 +199,9 @@ impl ActorCode for BlobsActor {
 
     actor_dispatch! {
         Constructor => constructor,
-        GetStatus => get_status,
-        FundAccount => fund_account,
+        GetStats => get_stats,
+        BuyCredit => buy_credit,
+        GetAccount => get_account,
         AddBlob => add_blob,
         GetResolvingBlobs => get_resolving_blobs,
         IsBlobResolving => is_blob_resolving,
@@ -266,7 +281,7 @@ mod tests {
     use rand::Rng;
 
     use crate::actor::BlobsActor;
-    use crate::{Account, AddParams, ConstructorParams, FundParams, Method};
+    use crate::{Account, AddBlobParams, BuyCreditParams, ConstructorParams, Method};
 
     pub fn new_cid() -> Cid {
         let mut rng = rand::thread_rng();
@@ -318,10 +333,10 @@ mod tests {
         let mut expected_credits = BigInt::from(1000000000000000000u64);
         rt.set_received(TokenAmount::from_whole(1));
         rt.expect_validate_caller_any();
-        let fund_params = FundParams(f4_eth_addr);
+        let fund_params = BuyCreditParams(f4_eth_addr);
         let result = rt
             .call::<BlobsActor>(
-                Method::FundAccount as u64,
+                Method::BuyCredit as u64,
                 IpldBlock::serialize_cbor(&fund_params).unwrap(),
             )
             .unwrap()
@@ -334,10 +349,10 @@ mod tests {
         expected_credits += BigInt::from(1000000000u64);
         rt.set_received(TokenAmount::from_nano(1));
         rt.expect_validate_caller_any();
-        let fund_params = FundParams(f4_eth_addr);
+        let fund_params = BuyCreditParams(f4_eth_addr);
         let result = rt
             .call::<BlobsActor>(
-                Method::FundAccount as u64,
+                Method::BuyCredit as u64,
                 IpldBlock::serialize_cbor(&fund_params).unwrap(),
             )
             .unwrap()
@@ -350,10 +365,10 @@ mod tests {
         expected_credits += BigInt::from(1u64);
         rt.set_received(TokenAmount::from_atto(1));
         rt.expect_validate_caller_any();
-        let fund_params = FundParams(f4_eth_addr);
+        let fund_params = BuyCreditParams(f4_eth_addr);
         let result = rt
             .call::<BlobsActor>(
-                Method::FundAccount as u64,
+                Method::BuyCredit as u64,
                 IpldBlock::serialize_cbor(&fund_params).unwrap(),
             )
             .unwrap()
@@ -381,7 +396,7 @@ mod tests {
 
         // Try without first funding
         rt.expect_validate_caller_any();
-        let add_params = AddParams {
+        let add_params = AddBlobParams {
             cid: new_cid(),
             size: 1024,
             expiry: 10,
@@ -397,9 +412,9 @@ mod tests {
         // Fund an account
         rt.set_received(TokenAmount::from_whole(1));
         rt.expect_validate_caller_any();
-        let fund_params = FundParams(f4_eth_addr);
+        let fund_params = BuyCreditParams(f4_eth_addr);
         let result = rt.call::<BlobsActor>(
-            Method::FundAccount as u64,
+            Method::BuyCredit as u64,
             IpldBlock::serialize_cbor(&fund_params).unwrap(),
         );
         assert!(result.is_ok());

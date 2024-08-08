@@ -5,11 +5,9 @@
 pub mod blobs {
     use cid::Cid;
     use fvm_ipld_encoding::tuple::*;
-    use fvm_shared::address::Address;
-    use fvm_shared::bigint::BigInt;
-    use fvm_shared::clock::ChainEpoch;
+    use fvm_shared::{address::Address, bigint::BigInt, clock::ChainEpoch, ActorID};
 
-    pub const BLOBS_ACTOR_ID: fvm_shared::ActorID = 49;
+    pub const BLOBS_ACTOR_ID: ActorID = 49;
     pub const BLOBS_ACTOR_ADDR: Address = Address::new_id(BLOBS_ACTOR_ID);
 
     pub const ADD_BLOB_METHOD: u64 = frc42_dispatch::method_hash!("AddBlob");
@@ -29,9 +27,9 @@ pub mod blobs {
         pub last_debit_epoch: ChainEpoch,
     }
 
-    /// Params for putting a blob.
+    /// Params for adding a blob.
     #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-    pub struct AddParams {
+    pub struct AddBlobParams {
         /// Blob content identifier.
         pub cid: Cid,
         /// Blob size.

@@ -7,11 +7,12 @@ use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
+use fvm_shared::econ::TokenAmount;
 use fvm_shared::METHOD_CONSTRUCTOR;
 use num_derive::FromPrimitive;
 use serde::{Deserialize, Serialize};
 
-pub use crate::state::{Blob, State};
+pub use crate::state::{Account, Blob, State};
 
 pub const BLOBS_ACTOR_NAME: &str = "blobs";
 
@@ -24,14 +25,19 @@ pub struct ConstructorParams {
     pub debit_rate: u64,
 }
 
-/// Params for funding.
+/// Params for buying credits.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct FundParams(pub Address);
+pub struct BuyCreditParams(pub Address);
 
-/// Params for putting a blob.
+/// Params for getting an account.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct GetAccountParams(pub Address);
+
+/// Params for adding a blob.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct AddParams {
+pub struct AddBlobParams {
     /// Blob content identifier.
     pub cid: Cid,
     /// Blob size.
@@ -45,21 +51,23 @@ pub struct AddParams {
 /// Params for resolving a blob.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct ResolveParams(pub Cid);
+pub struct ResolveBlobParams(pub Cid);
 
 /// Params for deleting a blob.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct DeleteParams(pub Cid);
+pub struct DeleteBlobParams(pub Cid);
 
 /// Params for getting a blob.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct GetParams(pub Cid);
+pub struct GetBlobParams(pub Cid);
 
-/// The status of the blob actor.
+/// The stats of the blob actor.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct Status {
+pub struct GetStatsReturn {
+    /// The current token balance earned by the subnet.
+    pub balance: TokenAmount,
     /// The total free storage capacity of the subnet.
     pub capacity_free: BigInt,
     /// The total used storage capacity of the subnet.
@@ -80,25 +88,13 @@ pub struct Status {
     pub num_resolving: u64,
 }
 
-/// Account storage and credit details.
-#[derive(Clone, Debug, PartialEq, Serialize_tuple, Deserialize_tuple)]
-pub struct Account {
-    /// Total size of all blobs managed by the account.
-    pub capacity_used: BigInt,
-    /// Current free credit in byte-blocks that can be used for new commitments.
-    pub credit_free: BigInt,
-    /// Current committed credit in byte-blocks that will be used for debits.
-    pub credit_committed: BigInt,
-    /// The chain epoch of the last debit.
-    pub last_debit_epoch: ChainEpoch,
-}
-
 #[derive(FromPrimitive)]
 #[repr(u64)]
 pub enum Method {
     Constructor = METHOD_CONSTRUCTOR,
-    GetStatus = frc42_dispatch::method_hash!("GetStatus"),
-    FundAccount = frc42_dispatch::method_hash!("FundAccount"),
+    GetStats = frc42_dispatch::method_hash!("GetStats"),
+    BuyCredit = frc42_dispatch::method_hash!("FundAccount"),
+    GetAccount = frc42_dispatch::method_hash!("GetAccount"),
     AddBlob = frc42_dispatch::method_hash!("AddBlob"),
     GetResolvingBlobs = frc42_dispatch::method_hash!("GetResolvingBlobs"),
     IsBlobResolving = frc42_dispatch::method_hash!("IsBlobResolving"),
