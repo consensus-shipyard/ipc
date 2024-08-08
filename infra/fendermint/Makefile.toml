@@ -73,6 +73,7 @@ CMT_DIR = "${BASE_DIR}/${NODE_NAME}/cometbft"
 ENV_FILE = "${BASE_DIR}/.env"
 
 GENESIS_FILE = "${BASE_DIR}/genesis.json"
+SEALED_GENESIS = "/data/sealed_genesis.car"
 KEYS_SUBDIR = "keys"
 
 VALIDATOR_KEY_NAME = "validator_key"
@@ -122,6 +123,7 @@ echo - CometBFT directory: ${CMT_DIR}
 echo - Fendermint directory: ${FM_DIR}
 echo - Keys directory: ${KEYS_DIR}
 echo - Genesis file: ${GENESIS_FILE}
+echo - Sealed Genesis: ${SEALED_GENESIS}
 echo - Validator Private key: ${VALIDATOR_PRIV_KEY_PATH}
 echo - Network: ${NETWORK_NAME}
 echo - CometBFT container: ${CMT_CONTAINER_NAME}
@@ -131,6 +133,7 @@ echo
 echo 4 nodes testnet layout:
 echo - IPC directory: ${BASE_DIR}
 echo - Genesis file: ${GENESIS_FILE}
+echo - Sealed Genesis: ${SEALED_GENESIS}
 echo - Network: ${NETWORK_NAME}
 echo
 """

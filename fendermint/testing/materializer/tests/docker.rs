@@ -166,7 +166,7 @@ async fn wait_for_startup(testnet: &DockerTestnet) -> anyhow::Result<bool> {
             }
 
             if let Some(client) = dnode.ethapi_http_provider()? {
-                if let Err(e) = client.get_chainid().await {
+                if let Err(e) = client.get_block(1).await {
                     eprintln!("EthAPI on {name} still fails: {e}");
                     continue 'startup;
                 }
