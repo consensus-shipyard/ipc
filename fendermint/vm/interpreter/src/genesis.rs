@@ -445,17 +445,14 @@ impl GenesisCreator {
             )
             .context("failed to init exec state")?;
 
-        let validators = genesis.validators;
-        {
-            let (hardhat, ipc_params) = self
-                .handle_ipc(genesis.ipc.as_ref(), |hardhat, ipc_params| {
-                    (hardhat, ipc_params)
-                })?
-                .unwrap();
+        let maybe_ipc = self.handle_ipc(genesis.ipc.as_ref(), |hardhat, ipc_params| {
+            (hardhat, ipc_params)
+        })?;
+        if let Some((hardhat, ipc_params)) = maybe_ipc {
             deploy_contracts(
                 all_ipc_contracts,
                 &ipc_entrypoints,
-                validators,
+                genesis.validators,
                 next_id,
                 state,
                 ipc_params,
