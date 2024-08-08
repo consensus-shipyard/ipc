@@ -73,7 +73,7 @@ CMT_DIR = "${BASE_DIR}/${NODE_NAME}/cometbft"
 ENV_FILE = "${BASE_DIR}/.env"
 
 GENESIS_FILE = "${BASE_DIR}/genesis.json"
-SEALED_GENESIS = "${BASE_DIR}/sealed_genesis.car"
+SEALED_GENESIS = "/data/sealed_genesis.car"
 KEYS_SUBDIR = "keys"
 
 VALIDATOR_KEY_NAME = "validator_key"
