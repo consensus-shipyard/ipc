@@ -14,7 +14,7 @@ use fendermint_vm_genesis::{
     ipc, Account, Actor, ActorMeta, Collateral, Genesis, Multisig, PermissionMode, SignerAddr,
     Validator, ValidatorKey,
 };
-use fendermint_vm_interpreter::genesis::{compress_and_encode, GenesisAppState, GenesisCreator};
+use fendermint_vm_interpreter::genesis::{GenesisAppState, GenesisCreator};
 
 use crate::cmd;
 use crate::options::genesis::*;
@@ -216,9 +216,11 @@ fn set_eam_permissions(
 
 fn into_tendermint(genesis_file: &PathBuf, args: &GenesisIntoTendermintArgs) -> anyhow::Result<()> {
     let genesis = read_genesis(genesis_file)?;
-    let app_state: String = match args.app_state {
-        None => String::from(""),
-        Some(ref path) => GenesisAppState::v1(std::fs::read(path)?).compress_and_encode()?,
+    let app_state: Option<String> = match args.app_state {
+        Some(ref path) if path.exists() => {
+            Some(GenesisAppState::v1(std::fs::read(path)?).compress_and_encode()?)
+        }
+        _ => None,
     };
 
     let chain_id: u64 = chainid::from_str_hashed(&genesis.chain_name)?.into();
@@ -255,7 +257,7 @@ fn into_tendermint(genesis_file: &PathBuf, args: &GenesisIntoTendermintArgs) -> 
         // otherwise we have to run the genesis in memory here and now.
         app_hash: tendermint::AppHash::default(),
         // cometbft serves data in json format, convert to string to be specific
-        app_state: serde_json::Value::String(app_state),
+        app_state,
     };
     let tmg_json = serde_json::to_string_pretty(&tmg)?;
     std::fs::write(&args.out, tmg_json)?;

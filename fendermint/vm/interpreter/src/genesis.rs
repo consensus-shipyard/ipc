@@ -14,7 +14,7 @@ use cid::Cid;
 use ethers::abi::Tokenize;
 use ethers::core::types as et;
 use fendermint_actor_eam::PermissionModeParams;
-use fendermint_eth_hardhat::{Hardhat, FQN};
+use fendermint_eth_hardhat::{ContractSourceAndName, Hardhat, FQN};
 use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
@@ -22,7 +22,7 @@ use fendermint_vm_actor_interface::{
     account, burntfunds, chainmetadata, cron, eam, init, ipc, reward, system, EMPTY_ARR,
 };
 use fendermint_vm_core::{chainid, Timestamp};
-use fendermint_vm_genesis::{ActorMeta, Genesis, Power, PowerScale, Validator};
+use fendermint_vm_genesis::{ActorMeta, Collateral, Genesis, Power, PowerScale, Validator};
 use futures_util::io::Cursor;
 use fvm::engine::MultiEngine;
 use fvm_ipld_blockstore::Blockstore;
@@ -37,6 +37,7 @@ use num_traits::Zero;
 use crate::fvm::state::snapshot::{derive_cid, StateTreeStreamer};
 use crate::fvm::state::{FvmGenesisState, FvmStateParams};
 use crate::fvm::store::memory::MemoryBlockstore;
+use fendermint_vm_genesis::ipc::IpcParams;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use tokio_stream::StreamExt;
@@ -80,23 +81,12 @@ impl GenesisAppState {
         Self::V1(bytes)
     }
 
-    pub fn into_bytes(self) -> Vec<u8> {
-        match self {
-            Self::V1(b) => b,
-        }
-    }
-
     pub fn compress_and_encode(&self) -> anyhow::Result<String> {
         let bytes = match self {
             GenesisAppState::V1(ref bytes) => {
-                let mut wtr = snap::write::FrameEncoder::new(vec![]);
+                let mut wtr = snap::write::FrameEncoder::new(vec![0]);
                 wtr.write_all(bytes)?;
-                let compressed = wtr.into_inner()?;
-
-                let mut res = vec![0];
-                res.extend(compressed);
-
-                res
+                wtr.into_inner()?
             }
         };
 
@@ -154,7 +144,7 @@ pub struct GenesisOutput {
 
 pub struct GenesisCreator {
     /// Hardhat like util to deploy ipc contracts
-    hardhat: Hardhat,
+    hardhat: Option<Hardhat>,
     /// The built in actors bundle path
     builtin_actors_path: PathBuf,
     /// The custom actors bundle path
@@ -167,11 +157,11 @@ impl GenesisCreator {
     pub fn new(
         builtin_actors_path: PathBuf,
         custom_actors_path: PathBuf,
-        artifacts_path: PathBuf,
+        maybe_artifacts_path: Option<PathBuf>,
         sealed_out_path: PathBuf,
     ) -> Self {
         Self {
-            hardhat: Hardhat::new(artifacts_path),
+            hardhat: maybe_artifacts_path.map(Hardhat::new),
             builtin_actors_path,
             custom_actors_path,
             out_path: sealed_out_path,
@@ -244,6 +234,19 @@ impl GenesisCreator {
         .context("failed to create genesis state")
     }
 
+    fn handle_ipc<'a, T, F: Fn(&'a Hardhat, &'a IpcParams) -> T>(
+        &'a self,
+        maybe_ipc: Option<&'a IpcParams>,
+        f: F,
+    ) -> anyhow::Result<Option<T>> {
+        // Only allocate IDs if the contracts are deployed.
+        match (maybe_ipc, &self.hardhat) {
+            (Some(ipc_params), Some(ref hardhat)) => Ok(Some(f(hardhat, ipc_params))),
+            (Some(_), None) => Err(anyhow!("ipc enabled but artifacts path not provided")),
+            _ => Ok(None),
+        }
+    }
+
     fn populate_state(
         &self,
         state: &mut FvmGenesisState<MemoryBlockstore>,
@@ -277,38 +280,14 @@ impl GenesisCreator {
         };
 
         // STAGE 0: Declare the built-in EVM contracts we'll have to deploy.
-
-        // Pre-defined IDs for top-level Ethereum contracts.
-        let mut all_contracts = Vec::new();
-        let mut top_level_contracts = EthContractMap::default();
-
-        // Only allocate IDs if the contracts are deployed.
-        if genesis.ipc.is_some() {
-            top_level_contracts.extend(IPC_CONTRACTS.clone());
-        }
-
-        all_contracts.extend(top_level_contracts.keys());
-        all_contracts.extend(
-            top_level_contracts
-                .values()
-                .flat_map(|c| c.facets.iter().map(|f| f.name)),
-        );
-        // Collect dependencies of the main IPC actors.
-        let mut eth_libs = self
-            .hardhat
-            .dependencies(
-                &all_contracts
-                    .iter()
-                    .map(|n| (contract_src(n), *n))
-                    .collect::<Vec<_>>(),
-            )
-            .context("failed to collect EVM contract dependencies")?;
-
-        // Only keep library dependencies, not contracts with constructors.
-        eth_libs.retain(|(_, d)| !top_level_contracts.contains_key(d.as_str()));
+        // ipc_entrypoints contains the external user facing contracts
+        // all_ipc_contracts contains ipc_entrypoints + util contracts
+        let (all_ipc_contracts, ipc_entrypoints) = self
+            .handle_ipc(genesis.ipc.as_ref(), |h, _| collect_contracts(h))?
+            .transpose()?
+            .unwrap_or((Vec::new(), EthContractMap::new()));
 
         // STAGE 1: First we initialize native built-in actors.
-
         // System actor
         state
             .create_builtin_actor(
@@ -327,11 +306,11 @@ impl GenesisCreator {
             state.store(),
             genesis.chain_name.clone(),
             &genesis.accounts,
-            &top_level_contracts
+            &ipc_entrypoints
                 .values()
                 .map(|c| c.actor_id)
                 .collect::<BTreeSet<_>>(),
-            eth_libs.len() as u64,
+            all_ipc_contracts.len() as u64,
         )
         .context("failed to create init state")?;
 
@@ -466,75 +445,131 @@ impl GenesisCreator {
             )
             .context("failed to init exec state")?;
 
-        let mut deployer =
-            ContractDeployer::<MemoryBlockstore>::new(&self.hardhat, &top_level_contracts);
-
-        // Deploy Ethereum libraries.
-        for (lib_src, lib_name) in eth_libs {
-            deployer.deploy_library(state, &mut next_id, lib_src, &lib_name)?;
-        }
-
-        if let Some(ipc_params) = genesis.ipc {
-            // IPC Gateway actor.
-            let gateway_addr = {
-                use ipc::gateway::ConstructorParameters;
-
-                let params = ConstructorParameters::new(ipc_params.gateway, genesis.validators)
-                    .context("failed to create gateway constructor")?;
-
-                let facets = deployer
-                    .facets(ipc::gateway::CONTRACT_NAME)
-                    .context("failed to collect gateway facets")?;
-
-                deployer.deploy_contract(state, ipc::gateway::CONTRACT_NAME, (facets, params))?
-            };
-
-            // IPC SubnetRegistry actor.
-            {
-                use ipc::registry::ConstructorParameters;
-
-                let mut facets = deployer
-                    .facets(ipc::registry::CONTRACT_NAME)
-                    .context("failed to collect registry facets")?;
-
-                let getter_facet = facets.remove(0);
-                let manager_facet = facets.remove(0);
-                let rewarder_facet = facets.remove(0);
-                let checkpointer_facet = facets.remove(0);
-                let pauser_facet = facets.remove(0);
-                let diamond_loupe_facet = facets.remove(0);
-                let diamond_cut_facet = facets.remove(0);
-                let ownership_facet = facets.remove(0);
-
-                debug_assert_eq!(facets.len(), 2, "SubnetRegistry has 2 facets of its own");
-
-                let params = ConstructorParameters {
-                    gateway: gateway_addr,
-                    getter_facet: getter_facet.facet_address,
-                    manager_facet: manager_facet.facet_address,
-                    rewarder_facet: rewarder_facet.facet_address,
-                    pauser_facet: pauser_facet.facet_address,
-                    checkpointer_facet: checkpointer_facet.facet_address,
-                    diamond_cut_facet: diamond_cut_facet.facet_address,
-                    diamond_loupe_facet: diamond_loupe_facet.facet_address,
-                    ownership_facet: ownership_facet.facet_address,
-                    subnet_getter_selectors: getter_facet.function_selectors,
-                    subnet_manager_selectors: manager_facet.function_selectors,
-                    subnet_rewarder_selectors: rewarder_facet.function_selectors,
-                    subnet_checkpointer_selectors: checkpointer_facet.function_selectors,
-                    subnet_pauser_selectors: pauser_facet.function_selectors,
-                    subnet_actor_diamond_cut_selectors: diamond_cut_facet.function_selectors,
-                    subnet_actor_diamond_loupe_selectors: diamond_loupe_facet.function_selectors,
-                    subnet_actor_ownership_selectors: ownership_facet.function_selectors,
-                    creation_privileges: 0,
-                };
-
-                deployer.deploy_contract(state, ipc::registry::CONTRACT_NAME, (facets, params))?;
-            };
+        let validators = genesis.validators;
+        {
+            let (hardhat, ipc_params) = self
+                .handle_ipc(genesis.ipc.as_ref(), |hardhat, ipc_params| {
+                    (hardhat, ipc_params)
+                })?
+                .unwrap();
+            deploy_contracts(
+                all_ipc_contracts,
+                &ipc_entrypoints,
+                validators,
+                next_id,
+                state,
+                ipc_params,
+                hardhat,
+            )?;
         }
 
         Ok(out)
     }
+}
+
+fn collect_contracts(
+    hardhat: &Hardhat,
+) -> anyhow::Result<(Vec<ContractSourceAndName>, EthContractMap)> {
+    let mut all_contracts = Vec::new();
+    let mut top_level_contracts = EthContractMap::default();
+
+    top_level_contracts.extend(IPC_CONTRACTS.clone());
+
+    all_contracts.extend(top_level_contracts.keys());
+    all_contracts.extend(
+        top_level_contracts
+            .values()
+            .flat_map(|c| c.facets.iter().map(|f| f.name)),
+    );
+    // Collect dependencies of the main IPC actors.
+    let mut eth_libs = hardhat
+        .dependencies(
+            &all_contracts
+                .iter()
+                .map(|n| (contract_src(n), *n))
+                .collect::<Vec<_>>(),
+        )
+        .context("failed to collect EVM contract dependencies")?;
+
+    // Only keep library dependencies, not contracts with constructors.
+    eth_libs.retain(|(_, d)| !top_level_contracts.contains_key(d.as_str()));
+    Ok((eth_libs, top_level_contracts))
+}
+
+fn deploy_contracts(
+    ipc_contracts: Vec<ContractSourceAndName>,
+    top_level_contracts: &EthContractMap,
+    validators: Vec<Validator<Collateral>>,
+    mut next_id: u64,
+    state: &mut FvmGenesisState<MemoryBlockstore>,
+    ipc_params: &IpcParams,
+    hardhat: &Hardhat,
+) -> anyhow::Result<()> {
+    let mut deployer = ContractDeployer::<MemoryBlockstore>::new(hardhat, top_level_contracts);
+
+    // Deploy Ethereum libraries.
+    for (lib_src, lib_name) in ipc_contracts {
+        deployer.deploy_library(state, &mut next_id, lib_src, &lib_name)?;
+    }
+
+    // IPC Gateway actor.
+    let gateway_addr = {
+        use ipc::gateway::ConstructorParameters;
+
+        let params = ConstructorParameters::new(ipc_params.gateway.clone(), validators)
+            .context("failed to create gateway constructor")?;
+
+        let facets = deployer
+            .facets(ipc::gateway::CONTRACT_NAME)
+            .context("failed to collect gateway facets")?;
+
+        deployer.deploy_contract(state, ipc::gateway::CONTRACT_NAME, (facets, params))?
+    };
+
+    // IPC SubnetRegistry actor.
+    {
+        use ipc::registry::ConstructorParameters;
+
+        let mut facets = deployer
+            .facets(ipc::registry::CONTRACT_NAME)
+            .context("failed to collect registry facets")?;
+
+        let getter_facet = facets.remove(0);
+        let manager_facet = facets.remove(0);
+        let rewarder_facet = facets.remove(0);
+        let checkpointer_facet = facets.remove(0);
+        let pauser_facet = facets.remove(0);
+        let diamond_loupe_facet = facets.remove(0);
+        let diamond_cut_facet = facets.remove(0);
+        let ownership_facet = facets.remove(0);
+
+        debug_assert_eq!(facets.len(), 2, "SubnetRegistry has 2 facets of its own");
+
+        let params = ConstructorParameters {
+            gateway: gateway_addr,
+            getter_facet: getter_facet.facet_address,
+            manager_facet: manager_facet.facet_address,
+            rewarder_facet: rewarder_facet.facet_address,
+            pauser_facet: pauser_facet.facet_address,
+            checkpointer_facet: checkpointer_facet.facet_address,
+            diamond_cut_facet: diamond_cut_facet.facet_address,
+            diamond_loupe_facet: diamond_loupe_facet.facet_address,
+            ownership_facet: ownership_facet.facet_address,
+            subnet_getter_selectors: getter_facet.function_selectors,
+            subnet_manager_selectors: manager_facet.function_selectors,
+            subnet_rewarder_selectors: rewarder_facet.function_selectors,
+            subnet_checkpointer_selectors: checkpointer_facet.function_selectors,
+            subnet_pauser_selectors: pauser_facet.function_selectors,
+            subnet_actor_diamond_cut_selectors: diamond_cut_facet.function_selectors,
+            subnet_actor_diamond_loupe_selectors: diamond_loupe_facet.function_selectors,
+            subnet_actor_ownership_selectors: ownership_facet.function_selectors,
+            creation_privileges: 0,
+        };
+
+        deployer.deploy_contract(state, ipc::registry::CONTRACT_NAME, (facets, params))?;
+    }
+
+    Ok(())
 }
 
 fn contract_src(name: &str) -> PathBuf {
