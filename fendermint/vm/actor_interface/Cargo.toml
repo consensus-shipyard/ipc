@@ -46,3 +46,6 @@ quickcheck_macros = { workspace = true }
 rand = { workspace = true }
 
 fendermint_vm_genesis = { path = "../genesis", features = ["arb"] }
+
+[features]
+m2-native = []
