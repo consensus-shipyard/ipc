@@ -19,7 +19,7 @@ pub mod bundle;
 pub(crate) mod gas;
 pub(crate) mod topdown;
 
-use crate::fvm::gas::EIP1559GasMarket;
+use crate::fvm::gas::eip1559::EIP1559GasMarket;
 pub use check::FvmCheckRet;
 pub use checkpoint::PowerUpdates;
 pub use exec::FvmApplyRet;
@@ -84,7 +84,7 @@ where
     gateway: GatewayCaller<DB>,
     /// Upgrade scheduler stores all the upgrades to be executed at given heights.
     upgrade_scheduler: UpgradeScheduler<DB>,
-    gas: EIP1559GasMarket<DB>,
+    gas: EIP1559GasMarket,
 }
 
 impl<DB, C> FvmMessageInterpreter<DB, C>
@@ -110,7 +110,7 @@ where
             push_chain_meta: true,
             gateway: GatewayCaller::default(),
             upgrade_scheduler,
-            gas: EIP1559GasMarket::new(),
+            gas: EIP1559GasMarket::default(),
         }
     }
 
