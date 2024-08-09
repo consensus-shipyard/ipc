@@ -10,9 +10,10 @@ pub mod observe;
 pub mod serde;
 
 use std::fmt::Debug;
+use std::time::Instant;
 use tracing::{debug, error, info, trace, warn};
 
-use std::time::Instant;
+use crate::traces::TRACING_TARGET;
 
 pub trait Recordable {
     fn record_metrics(&self);
@@ -37,11 +38,11 @@ where
     T: Recordable + Traceable + Debug,
 {
     match trace.trace_level() {
-        TraceLevel::Trace => trace!(domain=trace.domain(), event = ?trace),
-        TraceLevel::Debug => debug!(domain=trace.domain(), event = ?trace),
-        TraceLevel::Info => info!(domain=trace.domain(), event = ?trace),
-        TraceLevel::Warn => warn!(domain=trace.domain(), event = ?trace),
-        TraceLevel::Error => error!(domain=trace.domain(), event = ?trace),
+        TraceLevel::Trace => trace!(target:TRACING_TARGET, domain=trace.domain(), event = ?trace),
+        TraceLevel::Debug => debug!(target:TRACING_TARGET, domain=trace.domain(), event = ?trace),
+        TraceLevel::Info => info!(target:TRACING_TARGET, domain=trace.domain(), event = ?trace),
+        TraceLevel::Warn => warn!(target:TRACING_TARGET, domain=trace.domain(), event = ?trace),
+        TraceLevel::Error => error!(target:TRACING_TARGET, domain=trace.domain(), event = ?trace),
     }
 
     trace.record_metrics();
