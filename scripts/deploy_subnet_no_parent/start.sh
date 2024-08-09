@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#set -euo pipefail
+set -euo pipefail
 
 DASHES='------'
 dir=$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")
@@ -23,7 +23,8 @@ PROMETHEUS_HOST_PORT=9090
 LOKI_HOST_PORT=3100
 GRAFANA_HOST_PORT=3000
 
-if [[ ! -v SKIP_BUILD ]]; then 
+if [[ "$SKIP_BUILD" == "" || "$SKIP_BUILD" == "false" ]]; then 
+  echo "$DASHES starting build for ipc contracts and fendermint $DASHES"
   # Build IPC contracts
   cd "$IPC_FOLDER"/contracts
   make gen
@@ -32,6 +33,8 @@ if [[ ! -v SKIP_BUILD ]]; then
   cd "$IPC_FOLDER"/fendermint
   make clean
   make docker-build
+else
+  echo "$DASHES skpping build for ipc contracts and fendermint $DASHES"
 fi
 
 # # Rebuild fendermint docker
@@ -129,7 +132,6 @@ cp /tmp/config.toml.5 ${IPC_CONFIG_FOLDER}/config.toml
 
 
 # Step 5: Create a subnet
-
 default_wallet_address=${wallet_addresses[0]}
 echo "Default wallet address: $default_wallet_address"
 
@@ -165,7 +167,6 @@ toml set /tmp/config.toml.7 subnets[1].config.gateway_addr $parent_gateway_addre
 toml set /tmp/config.toml.8 subnets[1].config.registry_addr $parent_registry_address > /tmp/config.toml.9
 
 cp /tmp/config.toml.9 ${IPC_CONFIG_FOLDER}/config.toml
-
 
 
 # Step 7: Join subnet for addresses in wallet
@@ -280,10 +281,15 @@ done
 
 # Test Prometheus endpoints
 curl --location http://localhost:"${PROMETHEUS_HOST_PORT}"/graph
+
 for i in {0..2}
 do
   curl --location http://localhost:"${FENDERMINT_METRICS_HOST_PORTS[i]}"/metrics
 done
+
+curl --location http://localhost:"${PROMETHEUS_METRICS_PORTS[0]}"/metrics | grep success
+curl --location http://localhost:"${PROMETHEUS_METRICS_PORTS[1]}"/metrics | grep success
+curl --location http://localhost:"${PROMETHEUS_METRICS_PORTS[2]}"/metrics | grep success
 
 # Print a summary of the deployment
 cat << EOF

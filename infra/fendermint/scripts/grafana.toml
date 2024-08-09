@@ -4,15 +4,11 @@ mkdir -p $GRAFANA_DIR
 docker run \
   ${FLAGS} \
   --name ${GRAFANA_CONTAINER_NAME} \
-<<<<<<< HEAD
   --init \
   --user $(id -u) \
   --network ${NETWORK_NAME} \
   --publish ${GRAFANA_HOST_PORT}:3000 \
   --volume ${GRAFANA_DIR}:/var/lib/grafana \
-=======
-  --network host \
->>>>>>> d3dd08f7 (wip: anvil node running and reg+gateway deploying)
   ${GRAFANA_DOCKER_IMAGE}
 """
 
