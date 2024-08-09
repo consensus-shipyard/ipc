@@ -4,11 +4,11 @@ env = { "ENTRY" = "fendermint", "CMD" = "run", "FLAGS" = "-d" }
 
 [tasks.fendermint-pull]
 condition = { env_not_set = [
-  "FM_PULL_SKIP",
+    "FM_PULL_SKIP",
 ], fail_message = "Skipped pulling fendermint Docker image." }
 script = """
-  docker pull ghcr.io/consensus-shipyard/fendermint:${FM_DOCKER_TAG}
-  docker tag ghcr.io/consensus-shipyard/fendermint:${FM_DOCKER_TAG} fendermint:${FM_DOCKER_TAG}
+  docker pull textile/fendermint:${FM_DOCKER_TAG}
+  docker tag textile/fendermint:${FM_DOCKER_TAG} fendermint:${FM_DOCKER_TAG}
 """
 
 [tasks.fendermint-run]
