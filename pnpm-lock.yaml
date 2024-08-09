@@ -32,6 +32,9 @@ importers:
       fevmate:
         specifier: github:wadealexc/fevmate#6a80e98
         version: https://codeload.github.com/wadealexc/fevmate/tar.gz/6a80e98
+      lodash:
+        specifier: ^4.17.21
+        version: 4.17.21
     devDependencies:
       '@nomicfoundation/hardhat-foundry':
         specifier: ^1.0.1
@@ -45,6 +48,9 @@ importers:
       '@typechain/hardhat':
         specifier: ^7.0.0
         version: 7.0.0(@ethersproject/abi@5.7.0)(@ethersproject/providers@5.7.2(bufferutil@4.0.7)(utf-8-validate@5.0.10))(@typechain/ethers-v5@11.1.2(@ethersproject/abi@5.7.0)(@ethersproject/providers@5.7.2(bufferutil@4.0.7)(utf-8-validate@5.0.10))(ethers@5.7.2(bufferutil@4.0.7)(utf-8-validate@5.0.10))(typechain@8.3.2(typescript@5.4.5))(typescript@5.4.5))(ethers@5.7.2(bufferutil@4.0.7)(utf-8-validate@5.0.10))(hardhat@2.22.5(bufferutil@4.0.7)(ts-node@10.9.2(@types/node@20.14.2)(typescript@5.4.5))(typescript@5.4.5)(utf-8-validate@5.0.10))(typechain@8.3.2(typescript@5.4.5))
+      '@types/lodash':
+        specifier: ^4.17.7
+        version: 4.17.7
       dotenv:
         specifier: ^16.0.1
         version: 16.4.5
@@ -515,6 +521,9 @@ packages:
 
   '@types/bn.js@5.1.5':
     resolution: {integrity: sha512-V46N0zwKRF5Q00AZ6hWtN0T8gGmDUaUzLWQvHFo5yThtVwK/VCenFY3wXVbOvNfajEpsTfQM4IN9k/d6gUVX3A==}
+
+  '@types/lodash@4.17.7':
+    resolution: {integrity: sha512-8wTvZawATi/lsmNu10/j2hk1KEP0IvjubqPE3cu1Xz7xfXXt5oCq3SNUz4fMIP4XGF9Ky+Ue2tBA3hcS7LSBlA==}
 
   '@types/lru-cache@5.1.1':
     resolution: {integrity: sha512-ssE3Vlrys7sdIzs5LOxCzTVMsU7i9oa/IaW92wF32JFb3CVczqOkru2xspuKczHEbG3nvmPY7IFqVmGGHdNbYw==}
@@ -2580,6 +2589,8 @@ snapshots:
   '@types/bn.js@5.1.5':
     dependencies:
       '@types/node': 20.14.2
+
+  '@types/lodash@4.17.7': {}
 
   '@types/lru-cache@5.1.1': {}
 
