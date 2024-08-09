@@ -23,7 +23,7 @@ use serde::{de::DeserializeOwned, Serialize};
 pub struct NetworkConfig {
     /// Cryptographic key used to sign messages.
     pub local_key: Keypair,
-    /// Network name to be differentiate this peer group.
+    /// Network name to differentiate this peer group.
     pub network_name: String,
 }
 
@@ -42,6 +42,10 @@ pub enum ConfigError {
     Discovery(#[from] discovery::ConfigError),
     #[error("Error in the membership configuration")]
     Membership(#[from] membership::ConfigError),
+    #[error("Invalid iroh address")]
+    IrohAddr(#[from] std::net::AddrParseError),
+    #[error("Unable to create iroh client")]
+    IrohClient(#[from] anyhow::Error),
 }
 
 /// Libp2p behaviour bundle to manage content resolution from other subnets, using:

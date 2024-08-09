@@ -11,6 +11,9 @@ rm -rf "$IPC_CONFIG_FOLDER"
 mkdir -p "$IPC_CONFIG_FOLDER"
 cp "$IPC_FOLDER"/scripts/deploy_subnet_no_parent/.ipc/config.toml "$IPC_CONFIG_FOLDER"
 cp "$IPC_FOLDER"/scripts/deploy_subnet_no_parent/.ipc/genesis.json "$IPC_CONFIG_FOLDER"
+cp "$IPC_FOLDER"/infra/prometheus/prometheus.yaml "$IPC_CONFIG_FOLDER"
+cp "$IPC_FOLDER"/infra/loki/loki-config.yaml "$IPC_CONFIG_FOLDER"
+cp "$IPC_FOLDER"/infra/promtail/promtail-config.yaml "$IPC_CONFIG_FOLDER"
 
 # Build ipc-cli
 cd "$IPC_FOLDER"/ipc
