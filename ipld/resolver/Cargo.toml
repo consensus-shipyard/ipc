@@ -35,7 +35,7 @@ fvm_ipld_blockstore = { workspace = true, optional = true }
 
 ipc-api = { path = "../../ipc/api", default-features = false }
 
-ipfs-api-backend-hyper = { version = "0.6.0", features = ["with-send-sync"] }
+iroh = { workspace = true }
 
 [dev-dependencies]
 cid = { workspace = true }

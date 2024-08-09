@@ -19,7 +19,7 @@ docker run \
   --init \
   --user $(id -u) \
   --network ${NETWORK_NAME} \
-  --publish ${PROMETHEUS_METRICS_PORT}:9184 \
+  --publish 127.0.0.1:${FENDERMINT_METRICS_HOST_PORT}:9184 \
   --volume ${BASE_DIR}:/data \
   --volume fendermint-logs:/fendermint/logs \
   --env-file ${ENV_FILE} \
@@ -30,7 +30,7 @@ docker run \
   --env FM_SNAPSHOTS_DIR=/data/${NODE_NAME}/fendermint/snapshots \
   --env FM_CHAIN_NAME=${NETWORK_NAME} \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
-  --env IPFS_RPC_ADDR=/dns4/${IPFS_CONTAINER_NAME}/tcp/5001 \
+  --env IROH_RPC_ADDR=${IROH_CONTAINER_NAME}:4919 \
   --env LOG_LEVEL=${FM_LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
   --entrypoint ${ENTRY} \
@@ -54,7 +54,7 @@ docker run \
   --network ${NETWORK_NAME} \
   --volume ${BASE_DIR}:/data \
   --publish ${RESOLVER_HOST_PORT}:${RESOLVER_HOST_PORT} \
-  --publish ${PROMETHEUS_METRICS_PORT}:9184 \
+  --publish 127.0.0.1:${FENDERMINT_METRICS_HOST_PORT}:9184 \
   --env FM_DATA_DIR=/data/${NODE_NAME}/fendermint/data \
   --env FM_LOG_DIR=/data/${NODE_NAME}/fendermint/data/logs \
   --env FM_SNAPSHOTS_DIR=/data/${NODE_NAME}/fendermint/snapshots \
@@ -79,7 +79,7 @@ docker run \
   --env FM_VALIDATOR_KEY__PATH=/data/${NODE_NAME}/${VALIDATOR_PRIV_KEY_PATH} \
   --env FM_VALIDATOR_KEY__KIND=ethereum \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
-  --env IPFS_RPC_ADDR=/dns4/${IPFS_CONTAINER_NAME}/tcp/5001 \
+  --env IROH_RPC_ADDR=${IROH_CONTAINER_NAME}:4919 \
   --env LOG_LEVEL=${FM_LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
   ${FM_DOCKER_IMAGE} \
@@ -102,7 +102,7 @@ docker run \
   --network ${NETWORK_NAME} \
   --volume ${BASE_DIR}:/data \
   --publish ${RESOLVER_HOST_PORT}:${RESOLVER_HOST_PORT} \
-  --publish ${PROMETHEUS_METRICS_PORT}:9184 \
+  --publish 127.0.0.1:${FENDERMINT_METRICS_HOST_PORT}:9184 \
   --env FM_DATA_DIR=/data/${NODE_NAME}/fendermint/data \
   --env FM_LOG_DIR=/data/${NODE_NAME}/fendermint/data/logs \
   --env FM_SNAPSHOTS_DIR=/data/${NODE_NAME}/fendermint/snapshots \
@@ -115,7 +115,7 @@ docker run \
   --env FM_VALIDATOR_KEY__PATH=/data/${NODE_NAME}/${VALIDATOR_PRIV_KEY_PATH} \
   --env FM_VALIDATOR_KEY__KIND=ethereum \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
-  --env IPFS_RPC_ADDR=/dns4/${IPFS_CONTAINER_NAME}/tcp/5001 \
+  --env IROH_RPC_ADDR=${IROH_CONTAINER_NAME}:4919 \
   --env LOG_LEVEL=${FM_LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
   ${FM_DOCKER_IMAGE} \
@@ -140,7 +140,7 @@ docker run \
   --network ${NETWORK_NAME} \
   --volume ${BASE_DIR}:/data \
   --publish ${RESOLVER_HOST_PORT}:${RESOLVER_HOST_PORT} \
-  --publish ${PROMETHEUS_METRICS_PORT}:9184 \
+  --publish 127.0.0.1:${FENDERMINT_METRICS_HOST_PORT}:9184 \
   --env FM_DATA_DIR=/data/${NODE_NAME}/fendermint/data \
   --env FM_LOG_DIR=/data/${NODE_NAME}/fendermint/data/logs \
   --env FM_SNAPSHOTS_DIR=/data/${NODE_NAME}/fendermint/snapshots \
@@ -161,7 +161,7 @@ docker run \
   --env FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES=${RESOLVER_BOOTSTRAPS} \
   --env FM_TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
-  --env IPFS_RPC_ADDR=/dns4/${IPFS_CONTAINER_NAME}/tcp/5001 \
+  --env IROH_RPC_ADDR=${IROH_CONTAINER_NAME}:4919 \
   --env LOG_LEVEL=${FM_LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
   ${FM_DOCKER_IMAGE} \
@@ -185,13 +185,11 @@ docker run \
 """
 dependencies = ["fendermint-deps"]
 
-
 [tasks.fendermint-new-network-key]
 extend = "fendermint-tool"
 env = { "CMD" = "key gen --out-dir /data/${NODE_NAME}/${KEYS_SUBDIR} --name ${NETWORK_KEY_NAME}" }
 script.pre = "mkdir -p ${BASE_DIR}/${NODE_NAME}/${KEYS_SUBDIR}"
 script.post = "chmod 600 ${BASE_DIR}/${NODE_NAME}/${KEYS_SUBDIR}/${NETWORK_KEY_NAME}.sk"
-
 
 [tasks.fendermint-network-peer-id]
 extend = "fendermint-tool"
