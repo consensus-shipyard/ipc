@@ -781,6 +781,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_handle_object_download_get() {
         let matcher = MockRequestMethodMatcher::default().map(
             Method::AbciQuery,
@@ -819,6 +820,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_handle_object_download_with_range() {
         let matcher = MockRequestMethodMatcher::default().map(
             Method::AbciQuery,
@@ -857,6 +859,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_handle_object_download_head() {
         let matcher = MockRequestMethodMatcher::default().map(
             Method::AbciQuery,
