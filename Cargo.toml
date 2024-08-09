@@ -48,6 +48,7 @@ license-file = "LICENSE-APACHE"
 ## dummy trigger ci
 
 [workspace.dependencies]
+time = "0.3.33"
 anyhow = "1"
 arbitrary = { version = "1", features = ["derive"] }
 arbtest = "0.2"
