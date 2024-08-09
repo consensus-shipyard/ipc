@@ -35,7 +35,7 @@ use async_trait::async_trait;
 use ethers::abi::Tokenizable;
 use ethers::contract::abigen;
 use ethers::prelude::k256::ecdsa::SigningKey;
-use ethers::prelude::{Signer, SignerMiddleware};
+use ethers::prelude::{Signer, SignerMiddleware, H256};
 use ethers::providers::{Authorization, Http, Middleware, Provider};
 use ethers::signers::{LocalWallet, Wallet};
 use ethers::types::{BlockId, Eip1559TransactionRequest, ValueOrArray, I256, U256};
@@ -52,6 +52,7 @@ use ipc_api::subnet_id::SubnetID;
 use ipc_wallet::{EthKeyAddress, EvmKeyStore, PersistentKeyStore};
 use num_traits::ToPrimitive;
 use std::result;
+use tracing::log;
 
 pub type DefaultSignerMiddleware = SignerMiddleware<Provider<Http>, Wallet<SigningKey>>;
 
@@ -896,6 +897,36 @@ impl SubnetManager for EthSubnetManager {
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
         block_number_from_receipt(receipt)
+    }
+
+    async fn get_top_down_nonce(
+        &self,
+        subnet: &SubnetID,
+        block_hash: &[u8],
+    ) -> Result<TopDownQueryPayload<u64>> {
+        let gateway_contract = gateway_getter_facet::GatewayGetterFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+
+        let evm_subnet_id = gateway_getter_facet::SubnetID::try_from(subnet)?;
+        let (exists, nonce) = gateway_contract
+            .get_top_down_nonce(evm_subnet_id)
+            .block(BlockId::Hash(H256::from_slice(block_hash)))
+            .call()
+            .await?;
+
+        let nonce = if !exists {
+            log::warn!("subnet does not exists at block hash, return 0 nonce");
+            0
+        } else {
+            nonce
+        };
+
+        Ok(TopDownQueryPayload {
+            value: nonce,
+            block_hash: block_hash.to_vec(),
+        })
     }
 }
 
