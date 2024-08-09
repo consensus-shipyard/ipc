@@ -96,7 +96,7 @@ pub struct Config {
     pub membership: MembershipConfig,
     pub connection: ConnectionConfig,
     pub content: ContentConfig,
-    pub iroh_addr: SocketAddr,
+    pub iroh_addr: Option<SocketAddr>,
 }
 
 /// Internal requests to enqueue to the [`Service`]
@@ -146,7 +146,7 @@ where
     /// To limit the number of peers contacted in a Bitswap resolution attempt.
     max_peers_per_query: usize,
     /// Iroh client
-    iroh: iroh::client::Iroh,
+    iroh: Option<iroh::client::Iroh>,
 }
 
 impl<P, V> Service<P, V>
@@ -213,7 +213,11 @@ where
         let (request_tx, request_rx) = mpsc::unbounded_channel();
         let (event_tx, _) = broadcast::channel(config.connection.event_buffer_capacity as usize);
 
-        let iroh = iroh::client::Iroh::connect_addr(config.iroh_addr).await?;
+        let iroh = if let Some(addr) = config.iroh_addr {
+            Some(iroh::client::Iroh::connect_addr(addr).await?)
+        } else {
+            None
+        };
 
         let service = Self {
             peer_id,
@@ -535,14 +539,17 @@ where
         node_addr: NodeAddr,
         response_channel: ResponseChannel,
     ) {
-        let iroh = self.iroh.clone();
-        tokio::spawn(async move {
-            let res = download_blob(iroh, cid, node_addr).await;
-            match res {
-                Ok(_) => send_resolve_result(response_channel, Ok(())),
-                Err(e) => send_resolve_result(response_channel, Err(anyhow!(e))),
-            }
-        });
+        if let Some(iroh) = self.iroh.clone() {
+            tokio::spawn(async move {
+                let res = download_blob(iroh, cid, node_addr).await;
+                match res {
+                    Ok(_) => send_resolve_result(response_channel, Ok(())),
+                    Err(e) => send_resolve_result(response_channel, Err(anyhow!(e))),
+                }
+            });
+        } else {
+            warn!("cannot resolve {}; iroh is not configured", cid);
+        }
     }
 
     /// Handle the results from a resolve attempt. If it succeeded, notify the

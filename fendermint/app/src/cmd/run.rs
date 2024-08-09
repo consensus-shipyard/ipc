@@ -43,7 +43,7 @@ use crate::{cmd, options::run::RunArgs, settings::Settings};
 
 cmd! {
   RunArgs(self, settings) {
-    run(self.iroh_addr.clone(), settings).await
+    run(settings, self.iroh_addr.clone()).await
   }
 }
 
@@ -60,7 +60,7 @@ namespaces! {
 /// Run the Fendermint ABCI Application.
 ///
 /// This method acts as our composition root.
-async fn run(iroh_addr: String, settings: Settings) -> anyhow::Result<()> {
+async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
     let tendermint_rpc_url = settings.tendermint_rpc_url()?;
     info!("Connecting to Tendermint at {tendermint_rpc_url}");
 
@@ -526,7 +526,7 @@ fn to_resolver_config(
             rate_limit_bytes: r.content.rate_limit_bytes,
             rate_limit_period: r.content.rate_limit_period,
         },
-        iroh_addr,
+        iroh_addr: Some(iroh_addr),
     };
 
     Ok(config)

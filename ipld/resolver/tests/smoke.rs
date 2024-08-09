@@ -347,7 +347,7 @@ fn make_config(rng: &mut StdRng, cluster_size: u32, bootstrap_addr: Option<Multi
             rate_limit_bytes: 1 << 20,
             rate_limit_period: Duration::from_secs(60),
         },
-        iroh_addr: "127.0.0.1:4919".parse().unwrap(),
+        iroh_addr: None,
     };
 
     config
