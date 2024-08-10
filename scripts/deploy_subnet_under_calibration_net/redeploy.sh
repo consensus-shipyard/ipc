@@ -10,9 +10,9 @@
 
 set -euo pipefail
 
-eval `ssh-agent -s`
+eval "$(ssh-agent -s)"
 ssh-add
-ssh-add ${HOME}/.ssh/id_rsa.ipc
+ssh-add "${HOME}"/.ssh/id_rsa.ipc
 
 if [[ ! -v PARENT_HTTP_AUTH_TOKEN ]]; then
     echo "PARENT_HTTP_AUTH_TOKEN is not set"
@@ -22,8 +22,6 @@ fi
 DASHES='------'
 if [[ ! -v IPC_FOLDER ]]; then
     IPC_FOLDER=${HOME}/ipc
-else
-    IPC_FOLDER=${IPC_FOLDER}
 fi
 IPC_CONFIG_FOLDER=${HOME}/.ipc
 
@@ -36,14 +34,14 @@ IROH_RPC_HOST_PORTS=(4921 4922 4923)
 
 FENDERMINT_METRICS_HOST_PORTS=(9184 9185 9186)
 IROH_METRICS_HOST_PORTS=(9091 9092 9093)
-PROMETHEUS_HOST_PORT=9090
+PROMTAIL_AGENT_HOST_PORTS=(9080 9081 9082)
 
 if (($# != 1)); then
   echo "Arguments: <Specify github remote branch name to use to deploy. Or use 'local' (without quote) to indicate using local repo instead. If not provided, will default to main branch"
   head_ref=main
   local_deploy=false
 else
-  if [ $1 = "local" ]; then
+  if [ "$1" = "local" ]; then
     local_deploy=true
   else
     local_deploy=false
@@ -65,7 +63,7 @@ else
   echo "$DASHES Need to install rustc & cargo"
   curl https://sh.rustup.rs -sSf | sh -s -- -y
   # Refresh env
-  source ${HOME}/.bashrc
+  source "${HOME}"/.bashrc
 fi
 
 # Step 1.3: Install cargo-make and toml-cli
@@ -99,7 +97,7 @@ else
 
   # Remove the need to use sudo
   getent group docker || sudo groupadd docker
-  sudo usermod -aG docker $USER
+  sudo usermod -aG docker "$USER"
   newgrp docker
 
   # Test running docker without sudo
@@ -108,56 +106,58 @@ fi
 
 # Make sure we re-read the latest env before finishing dependency installation.
 set +u
-source ${HOME}/.bashrc
+source "${HOME}"/.bashrc
 set -u
 
 # Step 2: Prepare code repo and build ipc-cli
 if ! $local_deploy ; then
   echo "$DASHES Preparing ipc repo..."
-  if ! ls $IPC_FOLDER ; then
-    git clone --recurse-submodules -j8 git@github.com-ipc:amazingdatamachine/ipc.git ${IPC_FOLDER}
+  if ! ls "$IPC_FOLDER" ; then
+    git clone --recurse-submodules -j8 git@github.com-ipc:amazingdatamachine/ipc.git "${IPC_FOLDER}"
   fi
-  cd ${IPC_FOLDER}
+  cd "${IPC_FOLDER}"
   git fetch
   git stash
-  git checkout $head_ref
-  git pull --rebase origin $head_ref
+  git checkout "$head_ref"
+  git pull --rebase origin "$head_ref"
   git submodule sync
   git submodule update --init --recursive
 fi
 
 # Step 3: Use already-created subnet
-subnet_id=$(toml get -r ${IPC_CONFIG_FOLDER}/config.toml subnets[1].id)
+subnet_id=$(toml get -r "${IPC_CONFIG_FOLDER}"/config.toml subnets[1].id)
 echo "Use existing subnet id: $subnet_id"
-subnet_folder=$IPC_CONFIG_FOLDER/$(echo $subnet_id | sed 's|^/||;s|/|-|g')
-parent_gateway_address=$(toml get -r ${IPC_CONFIG_FOLDER}/config.toml subnets[0].config.gateway_addr)
-parent_registry_address=$(toml get -r ${IPC_CONFIG_FOLDER}/config.toml subnets[0].config.registry_addr)
+subnet_folder=$IPC_CONFIG_FOLDER/$(echo "$subnet_id" | sed 's|^/||;s|/|-|g')
+parent_gateway_address=$(toml get -r "${IPC_CONFIG_FOLDER}"/config.toml subnets[0].config.gateway_addr)
+parent_registry_address=$(toml get -r "${IPC_CONFIG_FOLDER}"/config.toml subnets[0].config.registry_addr)
 
 # Step 4: Restart validators
 # Step 4.1: Rebuild fendermint docker
 echo "$DASHES Rebuild fendermint docker"
-cd ${IPC_FOLDER}/fendermint
+cd "${IPC_FOLDER}"/fendermint
 make clean
 make docker-build
 
 # Step 4.2: Start first validator node as bootstrap
 echo "$DASHES Start first validator node as bootstrap"
-cd ${IPC_FOLDER}
+cd "${IPC_FOLDER}"
 bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=validator-0 \
-    -e PRIVATE_KEY_PATH=${IPC_CONFIG_FOLDER}/validator_0.sk \
-    -e SUBNET_ID=${subnet_id} \
-    -e CMT_P2P_HOST_PORT=${CMT_P2P_HOST_PORTS[0]} \
-    -e CMT_RPC_HOST_PORT=${CMT_RPC_HOST_PORTS[0]} \
-    -e ETHAPI_HOST_PORT=${ETHAPI_HOST_PORTS[0]} \
-    -e RESOLVER_HOST_PORT=${RESOLVER_HOST_PORTS[0]} \
-    -e OBJECTS_HOST_PORT=${OBJECTS_HOST_PORTS[0]} \
+    -e PRIVATE_KEY_PATH="${IPC_CONFIG_FOLDER}"/validator_0.sk \
+    -e SUBNET_ID="${subnet_id}" \
+    -e CMT_P2P_HOST_PORT="${CMT_P2P_HOST_PORTS[0]}" \
+    -e CMT_RPC_HOST_PORT="${CMT_RPC_HOST_PORTS[0]}" \
+    -e ETHAPI_HOST_PORT="${ETHAPI_HOST_PORTS[0]}" \
+    -e RESOLVER_HOST_PORT="${RESOLVER_HOST_PORTS[0]}" \
+    -e OBJECTS_HOST_PORT="${OBJECTS_HOST_PORTS[0]}" \
     -e IROH_RPC_HOST_PORT="${IROH_RPC_HOST_PORTS[0]}" \
     -e FENDERMINT_METRICS_HOST_PORT="${FENDERMINT_METRICS_HOST_PORTS[0]}" \
     -e IROH_METRICS_HOST_PORT="${IROH_METRICS_HOST_PORTS[0]}" \
-    -e PARENT_HTTP_AUTH_TOKEN=${PARENT_HTTP_AUTH_TOKEN} \
-    -e PARENT_REGISTRY=${parent_registry_address} \
-    -e PARENT_GATEWAY=${parent_gateway_address} \
+    -e PROMTAIL_AGENT_HOST_PORT="${PROMTAIL_AGENT_HOST_PORTS[0]}" \
+    -e PROMTAIL_CONFIG_FOLDER="${IPC_CONFIG_FOLDER}" \
+    -e PARENT_HTTP_AUTH_TOKEN="${PARENT_HTTP_AUTH_TOKEN}" \
+    -e PARENT_REGISTRY="${parent_registry_address}" \
+    -e PARENT_GATEWAY="${parent_gateway_address}" \
     -e FM_PULL_SKIP=1 \
     -e FM_LOG_LEVEL="info" \
     child-validator-restart 2>&1)
@@ -176,40 +176,35 @@ echo "$DASHES Start the other validator nodes"
 for i in {1..2}
 do
   cargo make --makefile infra/fendermint/Makefile.toml \
-      -e NODE_NAME=validator-${i} \
-      -e PRIVATE_KEY_PATH=${IPC_CONFIG_FOLDER}/validator_${i}.sk \
-      -e SUBNET_ID=${subnet_id} \
-      -e CMT_P2P_HOST_PORT=${CMT_P2P_HOST_PORTS[i]} \
-      -e CMT_RPC_HOST_PORT=${CMT_RPC_HOST_PORTS[i]} \
-      -e ETHAPI_HOST_PORT=${ETHAPI_HOST_PORTS[i]} \
-      -e RESOLVER_HOST_PORT=${RESOLVER_HOST_PORTS[i]} \
-      -e OBJECTS_HOST_PORT=${OBJECTS_HOST_PORTS[i]} \
+      -e NODE_NAME=validator-"${i}" \
+      -e PRIVATE_KEY_PATH="${IPC_CONFIG_FOLDER}"/validator_"${i}".sk \
+      -e SUBNET_ID="${subnet_id}" \
+      -e CMT_P2P_HOST_PORT="${CMT_P2P_HOST_PORTS[i]}" \
+      -e CMT_RPC_HOST_PORT="${CMT_RPC_HOST_PORTS[i]}" \
+      -e ETHAPI_HOST_PORT="${ETHAPI_HOST_PORTS[i]}" \
+      -e RESOLVER_HOST_PORT="${RESOLVER_HOST_PORTS[i]}" \
+      -e OBJECTS_HOST_PORT="${OBJECTS_HOST_PORTS[i]}" \
       -e IROH_RPC_HOST_PORT="${IROH_RPC_HOST_PORTS[i]}" \
       -e FENDERMINT_METRICS_HOST_PORT="${FENDERMINT_METRICS_HOST_PORTS[i]}" \
       -e IROH_METRICS_HOST_PORT="${IROH_METRICS_HOST_PORTS[i]}" \
-      -e RESOLVER_BOOTSTRAPS=${bootstrap_resolver_endpoint} \
-      -e BOOTSTRAPS=${bootstrap_node_endpoint} \
-      -e PARENT_HTTP_AUTH_TOKEN=${PARENT_HTTP_AUTH_TOKEN} \
-      -e PARENT_REGISTRY=${parent_registry_address} \
-      -e PARENT_GATEWAY=${parent_gateway_address} \
+      -e PROMTAIL_AGENT_HOST_PORT="${PROMTAIL_AGENT_HOST_PORTS[i]}" \
+      -e PROMTAIL_CONFIG_FOLDER="${IPC_CONFIG_FOLDER}" \
+      -e RESOLVER_BOOTSTRAPS="${bootstrap_resolver_endpoint}" \
+      -e BOOTSTRAPS="${bootstrap_node_endpoint}" \
+      -e PARENT_HTTP_AUTH_TOKEN="${PARENT_HTTP_AUTH_TOKEN}" \
+      -e PARENT_REGISTRY="${parent_registry_address}" \
+      -e PARENT_GATEWAY="${parent_gateway_address}" \
       -e FM_PULL_SKIP=1 \
       -e FM_LOG_LEVEL="info" \
       child-validator-restart
 done
-
-cargo make --makefile infra/fendermint/Makefile.toml \
-    -e NODE_NAME=prometheus \
-    -e SUBNET_ID="$subnet_id" \
-    -e PROMETHEUS_HOST_PORT="${PROMETHEUS_HOST_PORT}" \
-    -e PROMETHEUS_CONFIG_FOLDER="${IPC_CONFIG_FOLDER}" \
-    prometheus-restart
 
 # Step 5: Test
 # Step 5.1: Test ETH API endpoint
 echo "$DASHES Test ETH API endpoints of validator nodes"
 for i in {0..2}
 do
-  curl --location http://localhost:${ETHAPI_HOST_PORTS[i]} \
+  curl --location http://localhost:"${ETHAPI_HOST_PORTS[i]}" \
   --header 'Content-Type: application/json' \
   --data '{
     "jsonrpc":"2.0",
@@ -220,18 +215,10 @@ do
 done
 
 # Step 5.2: Test Object API endpoint
-printf "\n$DASHES Test Object API endpoints of validator nodes\n"
+printf "\n%s Test Object API endpoints of validator nodes\n" $DASHES
 for i in {0..2}
 do
-  curl --location http://localhost:${OBJECTS_HOST_PORTS[i]}/health
-done
-
-# Step 5.3: Test Prometheus endpoints
-printf "\n$DASHES Test Prometheus endpoints of validator nodes\n"
-curl --location http://localhost:"${PROMETHEUS_HOST_PORT}"/graph
-for i in {0..2}
-do
-  curl --location http://localhost:"${FENDERMINT_METRICS_HOST_PORTS[i]}"/metrics
+  curl --location http://localhost:"${OBJECTS_HOST_PORTS[i]}"/health
 done
 
 # Step 6: Start a relayer process
@@ -239,7 +226,7 @@ done
 pkill -f "relayer" || true
 # Start relayer
 echo "$DASHES Start relayer process (in the background)"
-nohup ipc-cli checkpoint relayer --subnet $subnet_id --submitter 0xA08aE9E8c038CAf9765D7Db725CA63a92FCf12Ce > relayer.log &
+nohup ipc-cli checkpoint relayer --subnet "$subnet_id" --submitter 0xA08aE9E8c038CAf9765D7Db725CA63a92FCf12Ce > relayer.log &
 
 # Step 7: Print a summary of the deployment
 cat << EOF
@@ -269,13 +256,19 @@ http://localhost:${ETHAPI_HOST_PORTS[2]}
 Prometheus API:
 http://localhost:${PROMETHEUS_HOST_PORT}
 
+Loki API:
+http://localhost:${LOKI_HOST_PORT}
+
+Grafana API:
+http://localhost:${GRAFANA_HOST_PORT}
+
 Accounts:
-$(jq -r '.accounts[] | "\(.meta.Account.owner): \(.balance) coin units"' ${subnet_folder}/validator-0/genesis.json)
+$(jq -r '.accounts[] | "\(.meta.Account.owner): \(.balance) coin units"' "${subnet_folder}"/validator-0/genesis.json)
 
 Private keys (hex ready to import in MetaMask):
-$(cat ${IPC_CONFIG_FOLDER}/validator_0.sk | base64 -d | xxd -p -c 1000000)
-$(cat ${IPC_CONFIG_FOLDER}/validator_1.sk | base64 -d | xxd -p -c 1000000)
-$(cat ${IPC_CONFIG_FOLDER}/validator_2.sk | base64 -d | xxd -p -c 1000000)
+$(base64 -d "${IPC_CONFIG_FOLDER}"/validator_0.sk | xxd -p -c 1000000)
+$(base64 -d "${IPC_CONFIG_FOLDER}"/validator_1.sk | xxd -p -c 1000000)
+$(base64 -d "${IPC_CONFIG_FOLDER}"/validator_2.sk | xxd -p -c 1000000)
 
 Chain ID:
 $(curl -s --location --request POST 'http://localhost:8645/' --header 'Content-Type: application/json' --data-raw '{ "jsonrpc":"2.0", "method":"eth_chainId", "params":[], "id":1 }' | jq -r '.result' | xargs printf "%d")

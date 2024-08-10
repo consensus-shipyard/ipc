@@ -88,17 +88,10 @@ do
   }'
 done
 
-# Test object API endpoint
+# Test Object API endpoint
 for i in {0..2}
 do
   curl --location http://localhost:"${OBJECTS_HOST_PORTS[i]}"/health
-done
-
-# Test Prometheus endpoints
-curl --location http://localhost:"${PROMETHEUS_HOST_PORT}"/graph
-for i in {0..2}
-do
-  curl --location http://localhost:"${FENDERMINT_METRICS_HOST_PORTS[i]}"/metrics
 done
 
 # Print a summary of the deployment

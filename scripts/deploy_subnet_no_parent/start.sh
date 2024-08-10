@@ -149,7 +149,7 @@ do
   }'
 done
 
-# Test object API endpoint
+# Test Object API endpoint
 for i in {0..2}
 do
   curl --location http://localhost:"${OBJECTS_HOST_PORTS[i]}"/health
