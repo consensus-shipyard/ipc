@@ -11,6 +11,21 @@ subnet_id="/r314159/t410f726d2jv6uj4mpkcbgg5ndlpp3l7dd5rlcpgzkoi"
 subnet_folder=$IPC_CONFIG_FOLDER/$(echo $subnet_id | sed 's|^/||;s|/|-|g')
 rm -rf "$subnet_folder"
 
+# Stop prometheus
+cargo make --makefile infra/fendermint/Makefile.toml \
+    -e NODE_NAME=prometheus \
+    prometheus-destroy
+
+# Stop grafana
+cargo make --makefile infra/fendermint/Makefile.toml \
+    -e NODE_NAME=grafana \
+    grafana-destroy
+
+# Stop loki
+cargo make --makefile infra/fendermint/Makefile.toml \
+    -e NODE_NAME=loki \
+    loki-destroy
+
 # Stop validators
 cd "$IPC_FOLDER"
 for i in {0..2}
@@ -20,15 +35,3 @@ do
       -e SUBNET_ID="$subnet_id" \
       child-validator-down
 done
-
-cargo make --makefile infra/fendermint/Makefile.toml \
-    -e NODE_NAME=prometheus \
-    prometheus-destroy
-
-cargo make --makefile infra/fendermint/Makefile.toml \
-    -e NODE_NAME=grafana \
-    grafana-destroy
-
-cargo make --makefile infra/fendermint/Makefile.toml \
-    -e NODE_NAME=loki \
-    loki-destroy

@@ -1,10 +1,12 @@
-
 [tasks.grafana-run]
 script = """
 docker run \
   ${FLAGS} \
   --name ${GRAFANA_CONTAINER_NAME} \
-  --net host \
+  --init \
+  --user $(id -u) \
+  --network ${NETWORK_NAME} \
+  --publish ${GRAFANA_HOST_PORT}:3000 \
   ${GRAFANA_DOCKER_IMAGE}
 """
 

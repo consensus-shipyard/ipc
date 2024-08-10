@@ -15,11 +15,7 @@ IROH_RPC_HOST_PORTS=(4921 4922 4923)
 
 FENDERMINT_METRICS_HOST_PORTS=(9184 9185 9186)
 IROH_METRICS_HOST_PORTS=(9091 9092 9093)
-PROMTAIL_AGENT_PORTS=(9080 9081 9082)
-
-PROMETHEUS_HOST_PORT=9090
-LOKI_HOST_PORT=3100
-GRAFANA_HOST_PORT=3000
+PROMTAIL_AGENT_HOST_PORTS=(9080 9081 9082)
 
 # Use "dummy" subnet
 subnet_id="/r314159/t410f726d2jv6uj4mpkcbgg5ndlpp3l7dd5rlcpgzkoi"
@@ -31,21 +27,8 @@ cd "$IPC_FOLDER"/fendermint
 make clean
 make docker-build
 
-cd "$IPC_FOLDER"
-
-cargo make --makefile infra/fendermint/Makefile.toml \
-    -e NODE_NAME=grafana \
-    -e SUBNET_ID="$subnet_id" \
-    grafana-start
-
-cargo make --makefile infra/fendermint/Makefile.toml \
-    -e NODE_NAME=loki \
-    -e SUBNET_ID="$subnet_id" \
-    -e LOKI_HOST_PORT="${LOKI_HOST_PORT}" \
-    -e LOKI_CONFIG_FOLDER="${IPC_CONFIG_FOLDER}" \
-    loki-start
-
 # Restart validators
+cd "$IPC_FOLDER"
 bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=validator-0 \
     -e PRIVATE_KEY_PATH="$IPC_CONFIG_FOLDER"/validator_0.sk \
@@ -58,7 +41,7 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e IROH_RPC_HOST_PORT="${IROH_RPC_HOST_PORTS[0]}" \
     -e FENDERMINT_METRICS_HOST_PORT="${FENDERMINT_METRICS_HOST_PORTS[0]}" \
     -e IROH_METRICS_HOST_PORT="${IROH_METRICS_HOST_PORTS[0]}" \
-    -e PROMTAIL_AGENT_PORT="${PROMTAIL_AGENT_PORTS[0]}" \
+    -e PROMTAIL_AGENT_HOST_PORT="${PROMTAIL_AGENT_HOST_PORTS[0]}" \
     -e PROMTAIL_CONFIG_FOLDER="${IPC_CONFIG_FOLDER}" \
     -e FM_PULL_SKIP=1 \
     -e FM_LOG_LEVEL="info,fendermint=debug" \
@@ -83,7 +66,7 @@ do
       -e IROH_RPC_HOST_PORT="${IROH_RPC_HOST_PORTS[i]}" \
       -e FENDERMINT_METRICS_HOST_PORT="${FENDERMINT_METRICS_HOST_PORTS[i]}" \
       -e IROH_METRICS_HOST_PORT="${IROH_METRICS_HOST_PORTS[i]}" \
-      -e PROMTAIL_AGENT_PORT="${PROMTAIL_AGENT_PORTS[0]}" \
+      -e PROMTAIL_AGENT_HOST_PORT="${PROMTAIL_AGENT_HOST_PORTS[0]}" \
       -e PROMTAIL_CONFIG_FOLDER="${IPC_CONFIG_FOLDER}" \
       -e RESOLVER_BOOTSTRAPS="$bootstrap_resolver_endpoint" \
       -e BOOTSTRAPS="$bootstrap_node_endpoint" \
@@ -91,16 +74,6 @@ do
       -e FM_LOG_LEVEL="info,fendermint=debug" \
       child-validator-restart-no-parent
 done
-
-cargo make --makefile infra/fendermint/Makefile.toml \
-    -e NODE_NAME=prometheus \
-    -e SUBNET_ID="$subnet_id" \
-    -e PROMETHEUS_HOST_PORT="${PROMETHEUS_HOST_PORT}" \
-    -e PROMETHEUS_CONFIG_FOLDER="${IPC_CONFIG_FOLDER}" \
-    prometheus-restart
-
-# TODO: loki doesn't finish initializing unless we ping this endpoint. maybe missing something?
-curl --location http://localhost:3100/ready
 
 # Test ETH API endpoint
 for i in {0..2}

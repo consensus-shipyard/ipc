@@ -53,6 +53,9 @@ FENDERMINT_METRICS_HOST_PORT = { value = "9184", condition = { env_not_set = [
 IROH_METRICS_HOST_PORT = { value = "9091", condition = { env_not_set = [
     "IROH_METRICS_HOST_PORT",
 ] } }
+PROMTAIL_AGENT_HOST_PORT = { value = "9080", condition = { env_not_set = [
+    "PROMTAIL_AGENT_HOST_PORT",
+] } }
 
 BALANCE = { value = "1000", condition = { env_not_set = ["BALANCE"] } }
 BASE_FEE = { value = "1000", condition = { env_not_set = ["BASE_FEE"] } }

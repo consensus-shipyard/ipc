@@ -1,11 +1,13 @@
-
 [tasks.loki-run]
 script = """
 docker run \
   ${FLAGS} \
   --name ${LOKI_CONTAINER_NAME} \
-  --net host \
-  -v ${LOKI_CONFIG_FOLDER}:/mnt/config \
+  --init \
+  --user $(id -u) \
+  --network ${NETWORK_NAME} \
+  --publish 127.0.0.1:${LOKI_HOST_PORT}:3100 \
+  --volume ${LOKI_CONFIG_FOLDER}:/mnt/config \
   ${LOKI_DOCKER_IMAGE} -config.file=/mnt/config/loki-config.yaml
 """
 
