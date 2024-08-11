@@ -15,13 +15,13 @@ ignore_errors = true
 
 [tasks.docker-rm]
 command = "docker"
-args = ["rm", "-fv", "${CONTAINER_NAME}"]
+args = ["rm", "--force", "${CONTAINER_NAME}"]
 ignore_errors = true
 
 [tasks.docker-destroy]
 run_task = { name = [
-  "docker-stop",
-  "docker-rm",
+    "docker-stop",
+    "docker-rm",
 ] }
 
 [tasks.docker-logs]

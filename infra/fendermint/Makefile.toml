@@ -125,6 +125,8 @@ FM_DIR = "${BASE_DIR}/${NODE_NAME}/fendermint"
 CMT_DIR = "${BASE_DIR}/${NODE_NAME}/cometbft"
 IROH_DIR = "${BASE_DIR}/${NODE_NAME}/iroh"
 PROMETHEUS_DIR = "${HOME}/.ipc/${NETWORK_NAME}/prometheus"
+LOKI_DIR = "${HOME}/.ipc/${NETWORK_NAME}/loki"
+GRAFANA_DIR = "${HOME}/.ipc/${NETWORK_NAME}/grafana"
 KEYS_DIR = "${BASE_DIR}/${NODE_NAME}/keys"
 
 # Common env vars
@@ -159,8 +161,8 @@ FM_DOCKER_IMAGE = "fendermint:${FM_DOCKER_TAG}"
 FM_REMOTE_DOCKER_IMAGE = "ghcr.io/consensus-shipyard/fendermint:${FM_DOCKER_TAG}"
 IROH_DOCKER_IMAGE = "n0computer/iroh:latest"
 PROMETHEUS_DOCKER_IMAGE = "prom/prometheus:latest"
-PROMTAIL_DOCKER_IMAGE = "grafana/promtail:3.0.0"
-LOKI_DOCKER_IMAGE = "grafana/loki:3.0.0"
+PROMTAIL_DOCKER_IMAGE = "grafana/promtail:latest"
+LOKI_DOCKER_IMAGE = "grafana/loki:latest"
 GRAFANA_DOCKER_IMAGE = "grafana/grafana-enterprise"
 
 # If this wasn't present, any wait task is skipped.

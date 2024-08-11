@@ -1,5 +1,6 @@
 [tasks.grafana-run]
 script = """
+mkdir -p $GRAFANA_DIR
 docker run \
   ${FLAGS} \
   --name ${GRAFANA_CONTAINER_NAME} \
@@ -7,6 +8,7 @@ docker run \
   --user $(id -u) \
   --network ${NETWORK_NAME} \
   --publish ${GRAFANA_HOST_PORT}:3000 \
+  --volume ${GRAFANA_DIR}:/var/lib/grafana \
   ${GRAFANA_DOCKER_IMAGE}
 """
 
