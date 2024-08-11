@@ -66,7 +66,7 @@ do
   cp "$IPC_CONFIG_FOLDER"/genesis.json "$subnet_folder"/validator-"$i"
 done
 
-# Start validators
+# Start bootstrap validator
 bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=validator-0 \
     -e PRIVATE_KEY_PATH="$IPC_CONFIG_FOLDER"/validator_0.sk \
@@ -90,6 +90,7 @@ bootstrap_peer_id=$(echo "$bootstrap_output" | sed -n '/IPLD Resolver Multiaddre
 bootstrap_node_endpoint=${bootstrap_node_id}@validator-0-cometbft:${CMT_P2P_HOST_PORTS[0]}
 bootstrap_resolver_endpoint="/dns/validator-0-fendermint/tcp/${RESOLVER_HOST_PORTS[0]}/p2p/${bootstrap_peer_id}"
 
+# Start other validators
 for i in {1..2}
 do
   cargo make --makefile infra/fendermint/Makefile.toml \

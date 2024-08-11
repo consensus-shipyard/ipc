@@ -20,7 +20,6 @@ PROMTAIL_AGENT_HOST_PORTS=(9080 9081 9082)
 # Use "dummy" subnet
 subnet_id="/r314159/t410f726d2jv6uj4mpkcbgg5ndlpp3l7dd5rlcpgzkoi"
 subnet_folder=$IPC_CONFIG_FOLDER/$(echo $subnet_id | sed 's|^/||;s|/|-|g')
-rm -rf "$subnet_folder"
 
 # Rebuild fendermint docker
 cd "$IPC_FOLDER"/fendermint
@@ -126,15 +125,6 @@ CometBFT API:
 http://localhost:${CMT_RPC_HOST_PORTS[0]}
 http://localhost:${CMT_RPC_HOST_PORTS[1]}
 http://localhost:${CMT_RPC_HOST_PORTS[2]}
-
-Prometheus API:
-http://localhost:${PROMETHEUS_HOST_PORT}
-
-Loki API:
-http://localhost:${LOKI_HOST_PORT}
-
-Grafana API:
-http://localhost:${GRAFANA_HOST_PORT}
 
 Accounts:
 $(jq -r '.app_state.accounts[] | "\(.meta.Account.owner): \(.balance) coin units"' "$subnet_folder"/validator-0/genesis.json)

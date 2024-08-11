@@ -253,15 +253,6 @@ http://localhost:${ETHAPI_HOST_PORTS[0]}
 http://localhost:${ETHAPI_HOST_PORTS[1]}
 http://localhost:${ETHAPI_HOST_PORTS[2]}
 
-Prometheus API:
-http://localhost:${PROMETHEUS_HOST_PORT}
-
-Loki API:
-http://localhost:${LOKI_HOST_PORT}
-
-Grafana API:
-http://localhost:${GRAFANA_HOST_PORT}
-
 Accounts:
 $(jq -r '.accounts[] | "\(.meta.Account.owner): \(.balance) coin units"' "${subnet_folder}"/validator-0/genesis.json)
 
