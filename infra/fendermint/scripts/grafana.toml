@@ -1,0 +1,34 @@
+[tasks.grafana-run]
+script = """
+mkdir -p $GRAFANA_DIR
+docker run \
+  ${FLAGS} \
+  --name ${GRAFANA_CONTAINER_NAME} \
+  --init \
+  --user $(id -u) \
+  --network ${NETWORK_NAME} \
+  --publish ${GRAFANA_HOST_PORT}:3000 \
+  --volume ${GRAFANA_DIR}:/var/lib/grafana \
+  ${GRAFANA_DOCKER_IMAGE}
+"""
+
+[tasks.grafana-start]
+extend = "grafana-run"
+env = { "FLAGS" = "-d" }
+
+[tasks.grafana-restart]
+extend = "grafana-run"
+env = { "FLAGS" = "-d" }
+dependencies = ["grafana-destroy"]
+
+[tasks.grafana-stop]
+env = { "CONTAINER_NAME" = "${GRAFANA_CONTAINER_NAME}" }
+run_task = "docker-stop"
+
+[tasks.grafana-destroy]
+env = { "CONTAINER_NAME" = "${GRAFANA_CONTAINER_NAME}" }
+run_task = "docker-destroy"
+
+[tasks.grafana-logs]
+extend = "docker-logs"
+env = { "CONTAINER_NAME" = "${GRAFANA_CONTAINER_NAME}" }

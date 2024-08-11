@@ -8,6 +8,8 @@ extend = [
     { path = "scripts/node.toml" },
     { path = "scripts/prometheus.toml" },
     { path = "scripts/promtail.toml" },
+    { path = "scripts/loki.toml" },
+    { path = "scripts/grafana.toml" },
     { path = "scripts/objects.toml" },
     { path = "scripts/testnet.toml" },
     { path = "scripts/testnode.toml" },
@@ -50,6 +52,9 @@ FENDERMINT_METRICS_HOST_PORT = { value = "9184", condition = { env_not_set = [
 ] } }
 IROH_METRICS_HOST_PORT = { value = "9091", condition = { env_not_set = [
     "IROH_METRICS_HOST_PORT",
+] } }
+PROMTAIL_AGENT_HOST_PORT = { value = "9080", condition = { env_not_set = [
+    "PROMTAIL_AGENT_HOST_PORT",
 ] } }
 
 BALANCE = { value = "1000", condition = { env_not_set = ["BALANCE"] } }
@@ -120,6 +125,8 @@ FM_DIR = "${BASE_DIR}/${NODE_NAME}/fendermint"
 CMT_DIR = "${BASE_DIR}/${NODE_NAME}/cometbft"
 IROH_DIR = "${BASE_DIR}/${NODE_NAME}/iroh"
 PROMETHEUS_DIR = "${HOME}/.ipc/${NETWORK_NAME}/prometheus"
+LOKI_DIR = "${HOME}/.ipc/${NETWORK_NAME}/loki"
+GRAFANA_DIR = "${HOME}/.ipc/${NETWORK_NAME}/grafana"
 KEYS_DIR = "${BASE_DIR}/${NODE_NAME}/keys"
 
 # Common env vars
@@ -145,14 +152,18 @@ PROMTAIL_CONTAINER_NAME = "${NODE_NAME}-promtail"
 OBJECTS_CONTAINER_NAME = "${NODE_NAME}-objects"
 IROH_CONTAINER_NAME = "${NODE_NAME}-iroh"
 PROMETHEUS_CONTAINER_NAME = "prometheus"
+GRAFANA_CONTAINER_NAME = "grafana"
+LOKI_CONTAINER_NAME = "loki"
 
 CMT_DOCKER_IMAGE = "cometbft/cometbft:v0.37.x"
 FM_DOCKER_TAG = "latest"
 FM_DOCKER_IMAGE = "fendermint:${FM_DOCKER_TAG}"
 FM_REMOTE_DOCKER_IMAGE = "ghcr.io/consensus-shipyard/fendermint:${FM_DOCKER_TAG}"
-PROMTAIL_DOCKER_IMAGE = "grafana/promtail:latest"
 IROH_DOCKER_IMAGE = "n0computer/iroh:latest"
 PROMETHEUS_DOCKER_IMAGE = "prom/prometheus:latest"
+PROMTAIL_DOCKER_IMAGE = "grafana/promtail:latest"
+LOKI_DOCKER_IMAGE = "grafana/loki:latest"
+GRAFANA_DOCKER_IMAGE = "grafana/grafana-enterprise"
 
 # If this wasn't present, any wait task is skipped.
 CARGO_MAKE_WAIT_MILLISECONDS = 5000

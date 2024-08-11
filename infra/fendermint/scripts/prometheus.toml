@@ -1,7 +1,5 @@
 [tasks.prometheus-run]
 script = """
-# TODO: I can't get prometheus to run without root perms. Ideally using --user $(id -u):(prometheus-user-id?) would be better
-# TODO: I don't know if we need to be using `--net host` here, but without i can't get prometheus to find it's targets
 mkdir -p $PROMETHEUS_DIR
 docker run \
   ${FLAGS} \

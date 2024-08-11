@@ -62,6 +62,7 @@ dependencies = [
     "cometbft-wait",
     "ethapi-start",
     "objects-start",
+    "promtail-start",
     "node-report",
 ]
 
@@ -83,6 +84,7 @@ dependencies = [
     "cometbft-wait",
     "ethapi-start",
     "objects-start",
+    "promtail-start",
     "node-report",
 ]
 
@@ -92,6 +94,7 @@ run_task = { name = [
     "fendermint-destroy",
     "ethapi-destroy",
     "objects-destroy",
+    "promtail-destroy",
     "iroh-destroy",
     "iroh-start",
     "iroh-wait",
@@ -100,6 +103,7 @@ run_task = { name = [
     "cometbft-wait",
     "ethapi-start",
     "objects-start",
+    "promtail-start",
     "node-report",
 ] }
 
@@ -109,6 +113,7 @@ run_task = { name = [
     "fendermint-destroy",
     "ethapi-destroy",
     "objects-destroy",
+    "promtail-destroy",
     "iroh-destroy",
     "iroh-start",
     "iroh-wait",
@@ -117,6 +122,7 @@ run_task = { name = [
     "cometbft-wait",
     "ethapi-start",
     "objects-start",
+    "promtail-start",
     "node-report",
 ] }
 
@@ -143,6 +149,7 @@ dependencies = [
     "cometbft-wait",
     "ethapi-start",
     "objects-start",
+    "promtail-start",
     "node-report",
 ]
 

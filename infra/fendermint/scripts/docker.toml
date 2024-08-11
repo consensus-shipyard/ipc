@@ -20,8 +20,8 @@ ignore_errors = true
 
 [tasks.docker-destroy]
 run_task = { name = [
-  "docker-stop",
-  "docker-rm",
+    "docker-stop",
+    "docker-rm",
 ] }
 
 [tasks.docker-logs]
