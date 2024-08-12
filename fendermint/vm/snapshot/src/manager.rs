@@ -199,14 +199,15 @@ where
 
         let snapshot_version = snapshot.version();
         let snapshot_name = format!("snapshot-{block_height}");
-        let temp_dir = tempfile::Builder::new()
-            .prefix(&snapshot_name)
-            .tempdir()
-            .context("failed to create temp dir for snapshot")?;
 
-        let snapshot_path = temp_dir.path().join(SNAPSHOT_FILE_NAME);
-        let checksum_path = temp_dir.path().join(format!("{PARTS_DIR_NAME}.sha256"));
-        let parts_path = temp_dir.path().join(PARTS_DIR_NAME);
+        let snapshots_dir = self.snapshots_dir.join(&snapshot_name);
+        std::fs::create_dir(&snapshots_dir)?;
+
+        let snapshot_path = snapshots_dir.as_path().join(SNAPSHOT_FILE_NAME);
+        let checksum_path = snapshots_dir
+            .as_path()
+            .join(format!("{PARTS_DIR_NAME}.sha256"));
+        let parts_path = snapshots_dir.as_path().join(PARTS_DIR_NAME);
 
         // TODO: See if we can reuse the contents of an existing CAR file.
 
@@ -254,10 +255,10 @@ where
             state_params,
             version: snapshot_version,
         };
-        let _ = write_manifest(temp_dir.path(), &manifest).context("failed to export manifest")?;
+        let _ = write_manifest(snapshots_dir.as_path(), &manifest)
+            .context("failed to export manifest")?;
 
-        let snapshots_dir = self.snapshots_dir.join(&snapshot_name);
-        move_or_copy(temp_dir.path(), &snapshots_dir).context("failed to move snapshot")?;
+        // move_or_copy(temp_dir.path(), &snapshots_dir).context("failed to move snapshot")?;
 
         Ok(SnapshotItem::new(snapshots_dir, manifest))
     }
@@ -295,6 +296,7 @@ where
 /// If that fails, for example because it would be moving between a
 /// Docker container's temporary directory to the host mounted volume,
 /// then fall back to copying.
+#[allow(dead_code)]
 fn move_or_copy(from: &Path, to: &Path) -> anyhow::Result<()> {
     if std::fs::rename(from, to).is_ok() {
         // Delete the big CAR file - keep the only the parts.
