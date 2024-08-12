@@ -135,13 +135,15 @@ cp /tmp/config.toml.5 ${IPC_CONFIG_FOLDER}/config.toml
 default_wallet_address=${wallet_addresses[0]}
 echo "Default wallet address: $default_wallet_address"
 
-echo "$DASHES Creating a child subnet... $DASHES"
+echo "$DASHES Creating a child subnet $DASHES"
 create_subnet_output=$(ipc-cli subnet create --parent $parent_id --min-validators 3 --min-validator-stake 1 --bottomup-check-period 600 --from $default_wallet_address --permission-mode collateral --supply-source-kind native 2>&1)
+echo "$DASHES start create_subnet_output $DASHES"
 echo "$create_subnet_output"
+echo "$DASHES end create_subnet_output $DASHES"
 subnet_id=$(echo $create_subnet_output | sed 's/.*with id: \([^ ]*\).*/\1/')
 echo "Created new subnet id: $subnet_id"
 
-subnet_folder=$IPC_CONFIG_FOLDER/$(echo $subnet_id | sed 's|^/||;s|/|-|g')
+subnet_folder=$IPC_CONFIG_FOLDER/$(echo "$subnet_id" | sed 's|^/||;s|/|-|g')
 rm -rf "$subnet_folder"
 
 # Take down any existing validators and init from scratch
@@ -284,7 +286,7 @@ curl --location http://localhost:"${PROMETHEUS_HOST_PORT}"/graph
 
 for i in {0..2}
 do
-  curl --location http://localhost:"${FENDERMINT_METRICS_HOST_PORTS[i]}"/metrics
+  curl --location http://localhost:"${FENDERMINT_METRICS_HOST_PORTS[i]}"/metrics | grep success
 done
 
 curl --location http://localhost:"${PROMETHEUS_METRICS_PORTS[0]}"/metrics | grep success
