@@ -15,12 +15,11 @@ use fvm::{
     DefaultKernel,
 };
 use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding::{CborStore, RawBytes};
+use fvm_ipld_encoding::RawBytes;
 use fvm_shared::{
     address::Address, chainid::ChainID, clock::ChainEpoch, econ::TokenAmount, error::ExitCode,
     message::Message, receipt::Receipt, version::NetworkVersion, ActorID,
 };
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
@@ -350,21 +349,4 @@ fn check_error(e: anyhow::Error) -> (ApplyRet, ActorAddressMap) {
         events: Vec::new(),
     };
     (ret, Default::default())
-}
-
-pub(crate) fn read_actor_state<State: DeserializeOwned, DB: Blockstore + Clone + 'static>(
-    state: &FvmExecState<DB>,
-    actor_id: ActorID,
-) -> anyhow::Result<State> {
-    let state_tree = state.state_tree();
-
-    let state_cid = state_tree
-        .get_actor(actor_id)?
-        .ok_or_else(|| anyhow::anyhow!("actor state not found: {}", actor_id))?
-        .state;
-
-    Ok(state_tree
-        .store()
-        .get_cbor::<State>(&state_cid)?
-        .ok_or_else(|| anyhow::anyhow!("actor state should not be null"))?)
 }

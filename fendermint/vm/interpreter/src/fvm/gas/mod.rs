@@ -4,21 +4,12 @@
 use crate::fvm::state::FvmExecState;
 use fvm_ipld_blockstore::Blockstore;
 
-pub mod eip1559;
+pub mod actor;
 
 pub type Gas = u64;
 
 /// The gas market for fendermint. This should be backed by an fvm actor.
 pub trait GasMarket {
-    /// The gas market state
-    type State;
-
-    /// Reset the gas market based on the current block chain state
-    fn reload_from_chain<DB: Blockstore + Clone + 'static>(
-        &self,
-        chain_state: &FvmExecState<DB>,
-    ) -> anyhow::Result<()>;
-
     /// Obtain the current block gas available for execution
     fn available_block_gas(&self) -> Gas;
 

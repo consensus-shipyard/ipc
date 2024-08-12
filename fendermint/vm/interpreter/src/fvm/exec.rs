@@ -58,7 +58,7 @@ where
         // Block height (FVM epoch) as sequence is intentional
         let height = state.block_height();
 
-        self.gas.reload_from_chain(&state)?;
+        self.gas.load(&mut state)?;
 
         // check for upgrades in the upgrade_scheduler
         let chain_id = state.chain_id();

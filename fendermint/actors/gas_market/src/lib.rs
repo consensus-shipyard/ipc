@@ -36,6 +36,7 @@ pub struct EIP1559GasMarketActor {}
 #[repr(u64)]
 pub enum Method {
     Constructor = METHOD_CONSTRUCTOR,
+    GetState = frc42_dispatch::method_hash!("GetState"),
     SetBlockGasLimit = frc42_dispatch::method_hash!("SetBlockGasLimit"),
     UpdateBlockGasConsumption = frc42_dispatch::method_hash!("UpdateBlockGasConsumption"),
 }
@@ -58,6 +59,10 @@ impl EIP1559GasMarketActor {
         })?;
 
         Ok(())
+    }
+
+    fn get_state(rt: &impl Runtime) -> Result<EIP1559GasState, ActorError> {
+        rt.state()
     }
 
     fn update_block_gas_consumption(
@@ -114,6 +119,7 @@ impl ActorCode for EIP1559GasMarketActor {
     actor_dispatch! {
         Constructor => constructor,
         SetBlockGasLimit => set_block_gas_limit,
+        GetState => get_state,
         UpdateBlockGasConsumption => update_block_gas_consumption,
     }
 }
@@ -166,6 +172,12 @@ mod tests {
         );
         assert!(r.is_ok());
 
+        let r = rt
+            .call::<EIP1559GasMarketActor>(
+                Method::GetState as u64,
+                IpldBlock::serialize_cbor(&()).unwrap(),
+            )
+            .unwrap();
         let s = rt.get_state::<EIP1559GasState>();
         assert_eq!(s.block_gas_limit, 20);
     }
