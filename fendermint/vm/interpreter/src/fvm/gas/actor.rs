@@ -13,7 +13,7 @@ type AtomicGas = AtomicU64;
 type GasMarketState = fendermint_actor_gas_market::EIP1559GasState;
 
 /// The gas market based on EIP1155
-/// Due to the reference trait bound limit (`&self` instead of `&mut self`) in Interpreter, `Atmomic`
+/// Due to the reference trait bound limit (`&self` instead of `&mut self`) in Interpreter, `Atomic`
 /// is used. However, the calling pattern should be single threaded, so direct `store` could be used.
 /// The usage of `Atomic` is purely to bypass the compilation issue without using unsafe.
 /// TODO: remove this overhead when trait bound is updated.
