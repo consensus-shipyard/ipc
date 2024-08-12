@@ -3339,6 +3339,7 @@ dependencies = [
  "arbitrary",
  "async-stm",
  "async-trait",
+ "base64 0.21.7",
  "cid",
  "ethers",
  "fendermint_actor_chainmetadata",
@@ -3381,6 +3382,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with 2.3.3",
+ "snap",
  "strum 0.26.1",
  "tempfile",
  "tendermint 0.31.1",
@@ -8761,6 +8763,12 @@ name = "smallvec"
 version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6ecd384b10a64542d77071bd64bd7b231f4ed5940fba55e98c3de13824cf3d7"
+
+[[package]]
+name = "snap"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b6b67fb9a61334225b5b790716f609cd58395f895b3fe8b328786812a40bc3b"
 
 [[package]]
 name = "snow"

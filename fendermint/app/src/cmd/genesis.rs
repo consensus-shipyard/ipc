@@ -14,7 +14,7 @@ use fendermint_vm_genesis::{
     ipc, Account, Actor, ActorMeta, Collateral, Genesis, Multisig, PermissionMode, SignerAddr,
     Validator, ValidatorKey,
 };
-use fendermint_vm_interpreter::genesis::GenesisCreator;
+use fendermint_vm_interpreter::genesis::{GenesisAppState, GenesisCreator};
 
 use crate::cmd;
 use crate::options::genesis::*;
@@ -95,8 +95,8 @@ cmd! {
             set_ipc_gateway(&genesis_file, args),
         GenesisIpcCommands::FromParent(args) =>
             new_genesis_from_parent(&genesis_file, args).await,
-        GenesisIpcCommands::SealState(args) =>
-            seal_state(&genesis_file, args).await,
+        GenesisIpcCommands::SealGenesis(args) =>
+            seal_genesis(&genesis_file, args).await,
     }
   }
 }
@@ -216,7 +216,12 @@ fn set_eam_permissions(
 
 fn into_tendermint(genesis_file: &PathBuf, args: &GenesisIntoTendermintArgs) -> anyhow::Result<()> {
     let genesis = read_genesis(genesis_file)?;
-    let app_state = hex::encode(std::fs::read(&args.sealed)?);
+    let app_state: Option<String> = match args.app_state {
+        Some(ref path) if path.exists() => {
+            Some(GenesisAppState::v1(std::fs::read(path)?).compress_and_encode()?)
+        }
+        _ => None,
+    };
 
     let chain_id: u64 = chainid::from_str_hashed(&genesis.chain_name)?.into();
     let chain_id = chain_id.to_string();
@@ -251,7 +256,8 @@ fn into_tendermint(genesis_file: &PathBuf, args: &GenesisIntoTendermintArgs) -> 
         // Hopefully leaving this empty will skip validation,
         // otherwise we have to run the genesis in memory here and now.
         app_hash: tendermint::AppHash::default(),
-        app_state: serde_json::Value::String(app_state),
+        // cometbft serves data in json format, convert to string to be specific
+        app_state,
     };
     let tmg_json = serde_json::to_string_pretty(&tmg)?;
     std::fs::write(&args.out, tmg_json)?;
@@ -283,7 +289,7 @@ fn set_ipc_gateway(genesis_file: &PathBuf, args: &GenesisIpcGatewayArgs) -> anyh
     })
 }
 
-async fn seal_state(genesis_file: &PathBuf, args: &SealGenesisArgs) -> anyhow::Result<()> {
+async fn seal_genesis(genesis_file: &PathBuf, args: &SealGenesisArgs) -> anyhow::Result<()> {
     let genesis = read_genesis(genesis_file)?;
 
     let genesis_creator = GenesisCreator::new(

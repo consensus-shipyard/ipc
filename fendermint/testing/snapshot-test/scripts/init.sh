@@ -47,7 +47,7 @@ fendermint \
 fendermint \
   genesis --genesis-file $GENESIS_FILE \
   ipc \
-    seal-state \
+    seal-genesis \
       --builtin-actors-path /fendermint/bundle.car \
       --custom-actors-path /fendermint/custom_actors_bundle.car \
       --artifacts-path /fendermint/contracts \
@@ -56,7 +56,7 @@ fendermint \
 # Convert FM genesis to CMT
 fendermint \
   genesis --genesis-file $GENESIS_FILE \
-  into-tendermint --out $CMT_DIR/config/genesis.json --sealed "${SEALED_GENESIS_FILE}"
+  into-tendermint --out $CMT_DIR/config/genesis.json --app-state "${SEALED_GENESIS_FILE}"
 
 # Copy the default validator key
 cp $KEYS_DIR/$VALIDATOR_NAME.priv_validator_key.json \

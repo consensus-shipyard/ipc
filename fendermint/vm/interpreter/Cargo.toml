@@ -34,6 +34,7 @@ ipc-observability = { workspace = true }
 async-trait = { workspace = true }
 async-stm = { workspace = true }
 anyhow = { workspace = true }
+base64 = { workspace = true }
 ethers = { workspace = true }
 hex = { workspace = true }
 num-traits = { workspace = true }
@@ -59,6 +60,7 @@ futures-util = { workspace = true }
 libipld = { workspace = true }
 tokio = { workspace = true }
 pin-project = { workspace = true }
+snap = { workspace = true }
 tokio-stream = { workspace = true }
 tokio-util = { workspace = true }
 

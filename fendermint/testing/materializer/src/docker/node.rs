@@ -210,7 +210,7 @@ impl DockerNode {
                 "genesis \
                     --genesis-file /fendermint/genesis.json \
                     ipc \
-                        seal-state \
+                        seal-genesis \
                         --builtin-actors-path /fendermint/bundle.car \
                         --custom-actors-path /fendermint/custom_actors_bundle.car \
                         --artifacts-path /fendermint/contracts \
@@ -227,7 +227,7 @@ impl DockerNode {
                     --genesis-file /fendermint/genesis.json \
                     into-tendermint \
                     --out /cometbft/config/genesis.json \
-                    --sealed /cometbft/config/sealed.json \
+                    --app-state /cometbft/config/sealed.json \
                     ",
             )
             .await
