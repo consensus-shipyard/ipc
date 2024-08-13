@@ -2,7 +2,7 @@ use crate::fvm::gas::{Gas, GasMarket};
 use crate::fvm::FvmMessage;
 use anyhow::Context;
 
-use fendermint_vm_actor_interface::gas::GAS_ACTOR_ADDR;
+use fendermint_vm_actor_interface::gas::GAS_MARKET_ACTOR_ADDR;
 use fendermint_vm_actor_interface::system;
 use fvm::executor::{ApplyKind, Executor};
 use fvm_ipld_encoding::BytesDe;
@@ -40,11 +40,11 @@ impl ActorGasMarket {
     ) -> anyhow::Result<ActorGasMarket> {
         let msg = FvmMessage {
             from: system::SYSTEM_ACTOR_ADDR,
-            to: GAS_ACTOR_ADDR,
+            to: GAS_MARKET_ACTOR_ADDR,
             sequence: block_height as u64,
             // exclude this from gas restriction
             gas_limit: u64::MAX,
-            method_num: fendermint_actor_gas_market::Method::GetState as u64,
+            method_num: fendermint_actor_gas_market::Method::CurrentGasReading as u64,
             params: fvm_ipld_encoding::RawBytes::serialize(())?,
             value: Default::default(),
             version: Default::default(),
@@ -79,15 +79,17 @@ impl ActorGasMarket {
         block_height: ChainEpoch,
     ) -> anyhow::Result<()> {
         let block_gas_used = self.block_gas_used;
-        let params = fvm_ipld_encoding::RawBytes::serialize(block_gas_used)?;
+        let params = fvm_ipld_encoding::RawBytes::serialize(
+            fendermint_actor_gas_market::BlockGasUtilization { block_gas_used },
+        )?;
 
         let msg = FvmMessage {
             from: system::SYSTEM_ACTOR_ADDR,
-            to: GAS_ACTOR_ADDR,
+            to: GAS_MARKET_ACTOR_ADDR,
             sequence: block_height as u64,
             // exclude this from gas restriction
             gas_limit: u64::MAX,
-            method_num: fendermint_actor_gas_market::Method::UpdateBlockGasConsumption as u64,
+            method_num: fendermint_actor_gas_market::Method::UpdateUtilization as u64,
             params,
             value: Default::default(),
             version: Default::default(),
