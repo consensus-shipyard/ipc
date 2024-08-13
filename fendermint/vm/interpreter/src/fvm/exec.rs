@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::Context;
+use anyhow::{bail, Context};
 use async_trait::async_trait;
 use std::collections::HashMap;
 
@@ -57,8 +57,6 @@ where
     ) -> anyhow::Result<(Self::State, Self::BeginOutput)> {
         // Block height (FVM epoch) as sequence is intentional
         let height = state.block_height();
-
-        self.gas.load(&mut state)?;
 
         // check for upgrades in the upgrade_scheduler
         let chain_id = state.chain_id();
@@ -152,7 +150,7 @@ where
     async fn deliver(
         &self,
         mut state: Self::State,
-        mut msg: Self::Message,
+        msg: Self::Message,
     ) -> anyhow::Result<(Self::State, Self::DeliverOutput)> {
         let (apply_ret, emitters, latency) = if msg.from == system::SYSTEM_ACTOR_ADDR {
             let (execution_result, latency) = measure_time(|| state.execute_implicit(msg.clone()));
@@ -160,13 +158,20 @@ where
 
             (apply_ret, emitters, latency)
         } else {
-            // TODO: maybe compare the gas limits is better?
-            msg.gas_limit = msg.gas_limit.min(self.gas.available_block_gas());
+            if msg.gas_limit > state.gas_market().available_block_gas() {
+                bail!("gas limit exceed available block gas limit")
+            }
 
             let (execution_result, latency) = measure_time(|| state.execute_explicit(msg.clone()));
             let (apply_ret, emitters) = execution_result?;
 
-            self.gas.consume_gas(apply_ret.msg_receipt.gas_used)?;
+            if state
+                .gas_market_mut()
+                .record_gas_used(apply_ret.msg_receipt.gas_used)
+                .is_err()
+            {
+                tracing::warn!("should not have exceeded block gas limit");
+            }
 
             (apply_ret, emitters, latency)
         };
@@ -194,7 +199,7 @@ where
     }
 
     async fn end(&self, mut state: Self::State) -> anyhow::Result<(Self::State, Self::EndOutput)> {
-        self.gas.update_params(&mut state)?;
+        state.update_gas_market()?;
 
         // TODO: Consider doing this async, since it's purely informational and not consensus-critical.
         let _ = checkpoint::emit_trace_if_check_checkpoint_finalized(&self.gateway, &mut state)

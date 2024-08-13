@@ -24,6 +24,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
 use crate::fvm::externs::FendermintExterns;
+use crate::fvm::gas::actor::ActorGasMarket;
 use fendermint_vm_core::{chainid::HasChainID, Timestamp};
 use fendermint_vm_encoding::IsHumanReadable;
 
@@ -113,6 +114,8 @@ where
 
     /// Indicate whether the parameters have been updated.
     params_dirty: bool,
+
+    gas_market: ActorGasMarket,
 }
 
 impl<DB> FvmExecState<DB>
@@ -146,7 +149,8 @@ where
         let engine = multi_engine.get(&nc)?;
         let externs = FendermintExterns::new(blockstore.clone(), params.state_root);
         let machine = DefaultMachine::new(&mc, blockstore, externs)?;
-        let executor = DefaultExecutor::new(engine, machine)?;
+        let mut executor = DefaultExecutor::new(engine, machine)?;
+        let gas_market = ActorGasMarket::new(&mut executor, block_height)?;
 
         Ok(Self {
             executor,
@@ -159,6 +163,7 @@ where
                 power_scale: params.power_scale,
             },
             params_dirty: false,
+            gas_market,
         })
     }
 
@@ -172,6 +177,14 @@ where
     pub fn with_validator_id(mut self, validator_id: ValidatorId) -> Self {
         self.validator_id = Some(validator_id);
         self
+    }
+
+    pub fn gas_market_mut(&mut self) -> &mut ActorGasMarket {
+        &mut self.gas_market
+    }
+
+    pub fn gas_market(&self) -> &ActorGasMarket {
+        &self.gas_market
     }
 
     /// Execute message implicitly.
@@ -286,12 +299,9 @@ where
         self.update_params(|p| f(&mut p.app_version))
     }
 
-    /// Update the application version.
-    pub fn update_base_fee<F>(&mut self, f: F)
-    where
-        F: FnOnce(&mut TokenAmount),
-    {
-        self.update_params(|p| f(&mut p.base_fee))
+    pub fn update_gas_market(&mut self) -> anyhow::Result<()> {
+        let height = self.block_height();
+        self.gas_market.commit(&mut self.executor, height)
     }
 
     /// Update the circulating supply, effective from the next block.
