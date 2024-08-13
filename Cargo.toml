@@ -48,6 +48,7 @@ license-file = "LICENSE-APACHE"
 ## dummy trigger ci
 
 [workspace.dependencies]
+time = "0.3.33"
 anyhow = "1"
 arbitrary = { version = "1", features = ["derive"] }
 arbtest = "0.2"
@@ -65,7 +66,7 @@ clap = { version = "4.1", features = ["derive", "env", "string"] }
 byteorder = "1.5.0"
 config = "0.13"
 dirs = "5.0"
-dircpy = "0.3"
+dircpy = "0.3.19"
 either = "1.10"
 env_logger = "0.10"
 erased-serde = "0.3"
