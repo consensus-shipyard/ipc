@@ -10,7 +10,7 @@ use fvm_shared::econ::TokenAmount;
 use fvm_shared::METHOD_CONSTRUCTOR;
 use lazy_static::lazy_static;
 use num_derive::FromPrimitive;
-use std::ops::Mul;
+use std::cmp::Ordering;
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(EIP1559GasMarketActor);
@@ -22,7 +22,7 @@ const ELASTICITY_MULTIPLIER: u64 = 2;
 lazy_static! {
     /// Initial base fee as defined in [EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)
     static ref INITIAL_BASE_FEE: TokenAmount = TokenAmount::from_atto(1_000_000_000);
-    static ref MIN_BASE_FEE: TokenAmount = TokenAmount::from_atto(100);
+    static ref MINIMAL_BASE_FEE: TokenAmount = TokenAmount::from_atto(100);
 }
 pub const IPC_GAS_MARKET_ACTOR_NAME: &str = "gas_market";
 pub type Gas = u64;
@@ -95,31 +95,25 @@ impl EIP1559GasState {
         let base_fee = self.base_fee.clone();
         let gas_target = self.block_gas_limit / ELASTICITY_MULTIPLIER;
 
-        if gas_used == gas_target {
-            return base_fee;
-        }
-
-        if gas_used > gas_target {
-            let gas_used_delta = gas_used - gas_target;
-            let base_fee_delta = base_fee
-                .clone()
-                .mul(gas_used_delta)
-                .div_floor(gas_target)
-                .div_floor(BASE_FEE_MAX_CHANGE_DENOMINATOR)
-                .max(TokenAmount::from_atto(1));
-            return base_fee + base_fee_delta;
-        }
-
-        let gas_used_delta = gas_target - gas_used;
-        let base_fee_per_gas_delta = base_fee
-            .clone()
-            .mul(gas_used_delta)
-            .div_floor(gas_target)
-            .div_floor(BASE_FEE_MAX_CHANGE_DENOMINATOR);
-        if base_fee_per_gas_delta > base_fee {
-            MIN_BASE_FEE.clone()
-        } else {
-            base_fee - base_fee_per_gas_delta
+        match gas_used.cmp(&gas_target) {
+            Ordering::Equal => base_fee,
+            Ordering::Less => {
+                let base_fee_delta = base_fee.atto() * (gas_target - gas_used)
+                    / gas_target
+                    / BASE_FEE_MAX_CHANGE_DENOMINATOR;
+                let base_fee_delta = TokenAmount::from_atto(base_fee_delta);
+                if base_fee_delta >= base_fee {
+                    MINIMAL_BASE_FEE.clone()
+                } else {
+                    base_fee - base_fee_delta
+                }
+            }
+            Ordering::Greater => {
+                let gas_used_delta = gas_used - gas_target;
+                let delta =
+                    base_fee.atto() * gas_used_delta / gas_target / BASE_FEE_MAX_CHANGE_DENOMINATOR;
+                base_fee + TokenAmount::from_atto(delta).max(TokenAmount::from_atto(1))
+            }
         }
     }
 }
