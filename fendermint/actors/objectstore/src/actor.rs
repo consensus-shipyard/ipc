@@ -273,7 +273,8 @@ mod tests {
             )
             .unwrap()
             .unwrap()
-            .deserialize::<Cid>().unwrap();
+            .deserialize::<Cid>()
+            .unwrap();
         let state = rt.state::<State>().unwrap();
         assert_eq!(state.root, result);
     }
