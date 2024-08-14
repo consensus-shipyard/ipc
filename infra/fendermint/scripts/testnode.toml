@@ -6,7 +6,6 @@ workspace = false
 dependencies = [
     "create-log-volume",
     "testnode-down",
-    "fendermint-pull",
     "testnode-init",
     "docker-network-create",
     "cometbft-init",
@@ -19,7 +18,6 @@ dependencies = [
     "ethapi-start",
     "testnode-report",
 ]
-env = { FM_PULL_SKIP = true }
 
 [tasks.testnode-init]
 dependencies = [
