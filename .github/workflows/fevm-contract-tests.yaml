@@ -71,7 +71,7 @@ jobs:
         id: docker-build
         working-directory: ipc/fendermint
         run: |
-          make docker-build
+          export PATH="$PATH:/home/runner/.config/.foundry/bin" && make docker-build
       - name: Run a testnode
         id: testnode
         working-directory: ipc/
