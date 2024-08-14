@@ -6,7 +6,6 @@ pub mod blobs {
     use cid::Cid;
     use fvm_ipld_encoding::tuple::*;
     use fvm_shared::{address::Address, bigint::BigInt, clock::ChainEpoch, ActorID};
-    use serde::{Deserialize, Serialize};
 
     pub const BLOBS_ACTOR_ID: ActorID = 49;
     pub const BLOBS_ACTOR_ADDR: Address = Address::new_id(BLOBS_ACTOR_ID);
@@ -42,7 +41,9 @@ pub mod blobs {
     }
 
     /// Params for deleting a blob.
-    #[derive(Clone, Debug, Serialize, Deserialize)]
-    #[serde(transparent)]
-    pub struct DeleteBlobParams(pub Cid);
+    #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+    pub struct DeleteBlobParams {
+        /// Blob content identifier.
+        pub cid: Cid
+    }
 }
