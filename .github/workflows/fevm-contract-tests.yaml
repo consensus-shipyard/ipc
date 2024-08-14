@@ -71,8 +71,7 @@ jobs:
         id: docker-build
         working-directory: ipc/fendermint
         run: |
-          export PATH="$PATH:/home/runner/.config/.foundry/bin"
-          docker pull ghcr.io/consensus-shipyard/fendermint:latest
+          make docker-build
       - name: Run a testnode
         id: testnode
         working-directory: ipc/
