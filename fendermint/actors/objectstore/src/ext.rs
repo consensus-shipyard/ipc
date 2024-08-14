@@ -44,6 +44,6 @@ pub mod blobs {
     #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
     pub struct DeleteBlobParams {
         /// Blob content identifier.
-        pub cid: Cid
+        pub cid: Cid,
     }
 }

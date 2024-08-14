@@ -182,18 +182,18 @@ mod tests {
     use fil_actors_runtime::test_utils::{
         expect_empty, MockRuntime, ETHACCOUNT_ACTOR_CODE_ID, SYSTEM_ACTOR_CODE_ID,
     };
-    use fil_actors_runtime::{INIT_ACTOR_ADDR};
+    use fil_actors_runtime::INIT_ACTOR_ADDR;
     use fvm_ipld_encoding::ipld_block::IpldBlock;
     use fvm_shared::address::Address;
     use fvm_shared::econ::TokenAmount;
 
-    use crate::{ext, AddParams, Method, State, actor::Actor};
+    use crate::{actor::Actor, ext, AddParams, Method, State};
     use cid::{multihash, Cid};
     use fendermint_actor_machine::WriteAccess;
+    use fil_actors_runtime::runtime::Runtime;
     use fvm_shared::error::ExitCode;
     use rand::Rng;
     use std::collections::HashMap;
-    use fil_actors_runtime::runtime::Runtime;
 
     fn construct_and_verify(creator: Address) -> MockRuntime {
         let rt = MockRuntime {
