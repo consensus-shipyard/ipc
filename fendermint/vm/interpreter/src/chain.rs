@@ -21,8 +21,8 @@ use fendermint_actor_blobs::{
 use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::{blobs, ipc, system};
 use fendermint_vm_event::ParentFinalityMissingQuorum;
-use fendermint_vm_ipfs_resolver::pool::{
-    ResolveKey as IpfsResolveKey, ResolvePool as IpfsResolvePool,
+use fendermint_vm_iroh_resolver::pool::{
+    ResolveKey as IrohResolveKey, ResolvePool as IrohResolvePool,
 };
 use fendermint_vm_message::ipc::ParentFinality;
 use fendermint_vm_message::{
@@ -48,7 +48,7 @@ use tokio_util::bytes;
 /// A resolution pool for bottom-up and top-down checkpoints.
 pub type CheckpointPool = ResolvePool<CheckpointPoolItem>;
 pub type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProviderProxy>>>;
-pub type BlobPool = IpfsResolvePool<BlobPoolItem>;
+pub type BlobPool = IrohResolvePool<BlobPoolItem>;
 
 /// These are the extra state items that the chain interpreter needs,
 /// a sort of "environment" supporting IPC.
@@ -85,9 +85,10 @@ impl From<&CheckpointPoolItem> for ResolveKey {
 #[derive(Clone, Hash, PartialEq, Eq)]
 pub struct BlobPoolItem {
     hash: Cid,
+    source_node_id: NodeId,
 }
 
-impl From<&BlobPoolItem> for IpfsResolveKey {
+impl From<&BlobPoolItem> for IrohResolveKey {
     fn from(value: &BlobPoolItem) -> Self {
         value.hash
     }

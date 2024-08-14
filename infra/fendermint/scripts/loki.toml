@@ -1,0 +1,35 @@
+[tasks.loki-run]
+script = """
+mkdir -p $LOKI_DIR
+docker run \
+  ${FLAGS} \
+  --name ${LOKI_CONTAINER_NAME} \
+  --init \
+  --user $(id -u) \
+  --network ${NETWORK_NAME} \
+  --publish 127.0.0.1:${LOKI_HOST_PORT}:3100 \
+  --volume ${LOKI_DIR}:/loki \
+  --volume ${LOKI_CONFIG_FOLDER}:/mnt/config \
+  ${LOKI_DOCKER_IMAGE} -config.file=/mnt/config/loki-config.yaml
+"""
+
+[tasks.loki-start]
+extend = "loki-run"
+env = { "FLAGS" = "-d" }
+
+[tasks.loki-restart]
+extend = "loki-run"
+env = { "FLAGS" = "-d" }
+dependencies = ["loki-destroy"]
+
+[tasks.loki-stop]
+env = { "CONTAINER_NAME" = "${LOKI_CONTAINER_NAME}" }
+run_task = "docker-stop"
+
+[tasks.loki-destroy]
+env = { "CONTAINER_NAME" = "${LOKI_CONTAINER_NAME}" }
+run_task = "docker-destroy"
+
+[tasks.loki-logs]
+extend = "docker-logs"
+env = { "CONTAINER_NAME" = "${LOKI_CONTAINER_NAME}" }

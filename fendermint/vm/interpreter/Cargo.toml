@@ -16,7 +16,7 @@ fendermint_vm_encoding = { path = "../encoding" }
 fendermint_vm_genesis = { path = "../genesis" }
 fendermint_vm_message = { path = "../message" }
 fendermint_vm_resolver = { path = "../resolver" }
-fendermint_vm_ipfs_resolver = { path = "../ipfs_resolver" }
+fendermint_vm_iroh_resolver = { path = "../iroh_resolver" }
 fendermint_vm_topdown = { path = "../topdown" }
 fendermint_crypto = { path = "../../crypto" }
 fendermint_eth_hardhat = { path = "../../eth/hardhat" }

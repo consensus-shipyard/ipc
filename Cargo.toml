@@ -123,6 +123,7 @@ multiaddr = "0.18"
 multihash = { version = "0.18.1", default-features = false, features = [
     "sha2",
     "sha3",
+    "blake3",
 ] }
 num-bigint = "0.4"
 num-derive = "0.3"
@@ -173,6 +174,7 @@ tracing-subscriber = { version = "0.3", features = [
 tracing-appender = "0.2.3"
 url = { version = "2.4.1", features = ["serde"] }
 zeroize = "1.6"
+iroh = "0.22"
 
 # Workspace deps
 ipc-api = { path = "ipc/api" }

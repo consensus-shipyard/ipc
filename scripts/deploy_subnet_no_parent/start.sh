@@ -5,18 +5,21 @@ set -euo pipefail
 dir=$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")
 IPC_FOLDER="$dir"/../..
 IPC_CONFIG_FOLDER=${HOME}/.ipc
-PROMETHEUS_CONFIG_FOLDER=$(dirname -- "$(readlink -f -- $IPC_FOLDER/infra/prometheus/prometheus.yaml)")
 
 CMT_P2P_HOST_PORTS=(26656 26756 26856)
 CMT_RPC_HOST_PORTS=(26657 26757 26857)
 ETHAPI_HOST_PORTS=(8545 8645 8745)
 RESOLVER_HOST_PORTS=(26655 26755 26855)
 OBJECTS_HOST_PORTS=(8001 8002 8003)
-IPFS_SWARM_HOST_PORTS=(4001 4002 4003)
-IPFS_RPC_HOST_PORTS=(5001 5002 5003)
-IPFS_GATEWAY_HOST_PORTS=(8080 8081 8082)
+IROH_RPC_HOST_PORTS=(4921 4922 4923)
+
+FENDERMINT_METRICS_HOST_PORTS=(9184 9185 9186)
+IROH_METRICS_HOST_PORTS=(9091 9092 9093)
+PROMTAIL_AGENT_HOST_PORTS=(9080 9081 9082)
+
 PROMETHEUS_HOST_PORT=9090
-PROMETHEUS_METRICS_PORTS=(9184 9185 9186)
+LOKI_HOST_PORT=3100
+GRAFANA_HOST_PORT=3000
 
 # Use "dummy" subnet
 subnet_id="/r314159/t410f726d2jv6uj4mpkcbgg5ndlpp3l7dd5rlcpgzkoi"
@@ -63,7 +66,7 @@ do
   cp "$IPC_CONFIG_FOLDER"/genesis.json "$subnet_folder"/validator-"$i"
 done
 
-# Start validators
+# Start bootstrap validator
 bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=validator-0 \
     -e PRIVATE_KEY_PATH="$IPC_CONFIG_FOLDER"/validator_0.sk \
@@ -73,11 +76,11 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e ETHAPI_HOST_PORT="${ETHAPI_HOST_PORTS[0]}" \
     -e RESOLVER_HOST_PORT="${RESOLVER_HOST_PORTS[0]}" \
     -e OBJECTS_HOST_PORT="${OBJECTS_HOST_PORTS[0]}" \
-    -e IPFS_SWARM_HOST_PORT="${IPFS_SWARM_HOST_PORTS[0]}" \
-    -e IPFS_RPC_HOST_PORT="${IPFS_RPC_HOST_PORTS[0]}" \
-    -e IPFS_GATEWAY_HOST_PORT="${IPFS_GATEWAY_HOST_PORTS[0]}" \
-    -e PROMETHEUS_METRICS_PORT="${PROMETHEUS_METRICS_PORTS[0]}" \
-    -e IPFS_PROFILE="local-discovery" \
+    -e IROH_RPC_HOST_PORT="${IROH_RPC_HOST_PORTS[0]}" \
+    -e FENDERMINT_METRICS_HOST_PORT="${FENDERMINT_METRICS_HOST_PORTS[0]}" \
+    -e IROH_METRICS_HOST_PORT="${IROH_METRICS_HOST_PORTS[0]}" \
+    -e PROMTAIL_AGENT_HOST_PORT="${PROMTAIL_AGENT_HOST_PORTS[0]}" \
+    -e PROMTAIL_CONFIG_FOLDER="${IPC_CONFIG_FOLDER}" \
     -e FM_PULL_SKIP=1 \
     -e FM_LOG_LEVEL="info,fendermint=debug" \
     child-validator-no-parent 2>&1)
@@ -86,6 +89,8 @@ bootstrap_node_id=$(echo "$bootstrap_output" | sed -n '/CometBFT node ID:/ {n;p;
 bootstrap_peer_id=$(echo "$bootstrap_output" | sed -n '/IPLD Resolver Multiaddress:/ {n;p;}' | tr -d "[:blank:]" | sed 's/.*\/p2p\///')
 bootstrap_node_endpoint=${bootstrap_node_id}@validator-0-cometbft:${CMT_P2P_HOST_PORTS[0]}
 bootstrap_resolver_endpoint="/dns/validator-0-fendermint/tcp/${RESOLVER_HOST_PORTS[0]}/p2p/${bootstrap_peer_id}"
+
+# Start other validators
 for i in {1..2}
 do
   cargo make --makefile infra/fendermint/Makefile.toml \
@@ -97,11 +102,11 @@ do
       -e ETHAPI_HOST_PORT="${ETHAPI_HOST_PORTS[i]}" \
       -e RESOLVER_HOST_PORT="${RESOLVER_HOST_PORTS[i]}" \
       -e OBJECTS_HOST_PORT="${OBJECTS_HOST_PORTS[i]}" \
-      -e IPFS_SWARM_HOST_PORT="${IPFS_SWARM_HOST_PORTS[i]}" \
-      -e IPFS_RPC_HOST_PORT="${IPFS_RPC_HOST_PORTS[i]}" \
-      -e IPFS_GATEWAY_HOST_PORT="${IPFS_GATEWAY_HOST_PORTS[i]}" \
-      -e PROMETHEUS_METRICS_PORT="${PROMETHEUS_METRICS_PORTS[i]}" \
-      -e IPFS_PROFILE="local-discovery" \
+      -e IROH_RPC_HOST_PORT="${IROH_RPC_HOST_PORTS[i]}" \
+      -e FENDERMINT_METRICS_HOST_PORT="${FENDERMINT_METRICS_HOST_PORTS[i]}" \
+      -e IROH_METRICS_HOST_PORT="${IROH_METRICS_HOST_PORTS[i]}" \
+      -e PROMTAIL_AGENT_HOST_PORT="${PROMTAIL_AGENT_HOST_PORTS[i]}" \
+      -e PROMTAIL_CONFIG_FOLDER="${IPC_CONFIG_FOLDER}" \
       -e RESOLVER_BOOTSTRAPS="$bootstrap_resolver_endpoint" \
       -e BOOTSTRAPS="$bootstrap_node_endpoint" \
       -e FM_PULL_SKIP=1 \
@@ -109,12 +114,28 @@ do
       child-validator-no-parent
 done
 
+# Start prometheus
 cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=prometheus \
     -e SUBNET_ID="$subnet_id" \
     -e PROMETHEUS_HOST_PORT="${PROMETHEUS_HOST_PORT}" \
-    -e PROMETHEUS_CONFIG_FOLDER="${PROMETHEUS_CONFIG_FOLDER}" \
+    -e PROMETHEUS_CONFIG_FOLDER="${IPC_CONFIG_FOLDER}" \
     prometheus-start
+
+# Start grafana
+cargo make --makefile infra/fendermint/Makefile.toml \
+    -e NODE_NAME=grafana \
+    -e SUBNET_ID="$subnet_id" \
+    -e GRAFANA_HOST_PORT="${GRAFANA_HOST_PORT}" \
+    grafana-start
+
+# Start loki
+cargo make --makefile infra/fendermint/Makefile.toml \
+    -e NODE_NAME=loki \
+    -e SUBNET_ID="$subnet_id" \
+    -e LOKI_HOST_PORT="${LOKI_HOST_PORT}" \
+    -e LOKI_CONFIG_FOLDER="${IPC_CONFIG_FOLDER}" \
+    loki-start
 
 # Test ETH API endpoint
 for i in {0..2}
@@ -129,17 +150,18 @@ do
   }'
 done
 
-# Test object API endpoint
+# Test Object API endpoint
 for i in {0..2}
 do
   curl --location http://localhost:"${OBJECTS_HOST_PORTS[i]}"/health
 done
 
-# test prometheus endpoints
+# Test Prometheus endpoints
 curl --location http://localhost:"${PROMETHEUS_HOST_PORT}"/graph
-curl --location http://localhost:"${PROMETHEUS_METRICS_PORTS[0]}"/metrics
-curl --location http://localhost:"${PROMETHEUS_METRICS_PORTS[1]}"/metrics
-curl --location http://localhost:"${PROMETHEUS_METRICS_PORTS[2]}"/metrics
+for i in {0..2}
+do
+  curl --location http://localhost:"${FENDERMINT_METRICS_HOST_PORTS[i]}"/metrics
+done
 
 # Print a summary of the deployment
 cat << EOF
@@ -159,10 +181,10 @@ http://localhost:${OBJECTS_HOST_PORTS[0]}
 http://localhost:${OBJECTS_HOST_PORTS[1]}
 http://localhost:${OBJECTS_HOST_PORTS[2]}
 
-IPFS API:
-http://localhost:${IPFS_RPC_HOST_PORTS[0]}
-http://localhost:${IPFS_RPC_HOST_PORTS[1]}
-http://localhost:${IPFS_RPC_HOST_PORTS[2]}
+Iroh API:
+http://localhost:${IROH_RPC_HOST_PORTS[0]}
+http://localhost:${IROH_RPC_HOST_PORTS[1]}
+http://localhost:${IROH_RPC_HOST_PORTS[2]}
 
 ETH API:
 http://localhost:${ETHAPI_HOST_PORTS[0]}
@@ -176,6 +198,12 @@ http://localhost:${CMT_RPC_HOST_PORTS[2]}
 
 Prometheus API:
 http://localhost:${PROMETHEUS_HOST_PORT}
+
+Loki API:
+http://localhost:${LOKI_HOST_PORT}
+
+Grafana API:
+http://localhost:${GRAFANA_HOST_PORT}
 
 Accounts:
 $(jq -r '.app_state.accounts[] | "\(.meta.Account.owner): \(.balance) coin units"' "$subnet_folder"/validator-0/genesis.json)
