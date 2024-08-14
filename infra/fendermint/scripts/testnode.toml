@@ -6,7 +6,6 @@ workspace = false
 dependencies = [
     "create-log-volume",
     "testnode-down",
-    "fendermint-pull",
     "testnode-init",
     "docker-network-create",
     "cometbft-init",
