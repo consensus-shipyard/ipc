@@ -31,7 +31,6 @@ fendermint_actor_machine = { path = "../machine" }
 [dev-dependencies]
 rand = { workspace = true }
 fil_actors_evm_shared = { workspace = true }
-fendermint_actor_blobs = { path = "../blobs" }
 hex-literal = { workspace = true }
 fendermint_testing = { path = "../../testing", features = ["arb"] }
 fil_actors_runtime = { workspace = true, features = [

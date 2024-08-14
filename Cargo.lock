@@ -2961,7 +2961,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid",
- "fendermint_actor_blobs",
  "fendermint_actor_machine",
  "fendermint_testing",
  "fil_actors_evm_shared",
