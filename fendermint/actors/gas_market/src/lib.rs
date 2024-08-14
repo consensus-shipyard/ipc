@@ -135,7 +135,7 @@ impl ActorCode for EIP1559GasMarketActor {
 
 #[cfg(test)]
 mod tests {
-    use crate::{EIP1559GasMarketActor, EIP1559GasState, Method};
+    use crate::{EIP1559GasMarketActor, EIP1559GasState, Method, SetConstants};
     use fil_actors_runtime::test_utils::{expect_empty, MockRuntime, SYSTEM_ACTOR_CODE_ID};
     use fil_actors_runtime::SYSTEM_ACTOR_ADDR;
     use fvm_ipld_encoding::ipld_block::IpldBlock;
@@ -176,17 +176,11 @@ mod tests {
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
 
         let r = rt.call::<EIP1559GasMarketActor>(
-            Method::SetBlockGasLimit as u64,
-            IpldBlock::serialize_cbor(&20).unwrap(),
+            Method::SetConstants as u64,
+            IpldBlock::serialize_cbor(&SetConstants { block_gas_limit: 20 }).unwrap(),
         );
         assert!(r.is_ok());
 
-        let r = rt
-            .call::<EIP1559GasMarketActor>(
-                Method::CurrentGasReading as u64,
-                IpldBlock::serialize_cbor(&()).unwrap(),
-            )
-            .unwrap();
         let s = rt.get_state::<EIP1559GasState>();
         assert_eq!(s.block_gas_limit, 20);
     }
@@ -199,8 +193,8 @@ mod tests {
 
         let code = rt
             .call::<EIP1559GasMarketActor>(
-                Method::SetBlockGasLimit as u64,
-                IpldBlock::serialize_cbor(&20).unwrap(),
+                Method::SetConstants as u64,
+                IpldBlock::serialize_cbor(&SetConstants { block_gas_limit: 20}).unwrap(),
             )
             .unwrap_err()
             .exit_code();
