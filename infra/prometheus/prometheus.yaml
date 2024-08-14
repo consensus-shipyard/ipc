@@ -8,6 +8,7 @@ scrape_configs:
   - job_name: "prometheus1"
     static_configs:
       - targets: [
+        # note the ports are the container internal values since we are using the network domain resolution
         "validator-0-fendermint:9184",
         "validator-1-fendermint:9184",
         "validator-2-fendermint:9184",

@@ -73,7 +73,7 @@ for i in {0..2}
 do
   addr=$(jq .["$i"].address "$IPC_CONFIG_FOLDER"/evm_keystore.json | tr -d '"')
 
-echo "adding address: " $addr
+  echo "adding address: " $addr
   wallet_addresses+=("$addr")
 done
 
@@ -99,10 +99,11 @@ cargo make --makefile infra/fendermint/Makefile.toml \
 echo "started anvil"
 
 # Step 2: Deploy IPC contracts
+echo "deploying contracts"
 cd ${IPC_FOLDER}/contracts
 npm install
 
-export RPC_URL=http://localhost:8545
+export RPC_URL="http://localhost:$ANVIL_HOST_PORT"
 export PRIVATE_KEY=$(cat ${IPC_CONFIG_FOLDER}/validator_0.sk)
 
 deploy_contracts_output=$(make deploy-ipc NETWORK="localnet")
@@ -121,13 +122,13 @@ echo "New parent registry address: $parent_registry_address"
 echo ""
 
 # Step 3: Use the new parent gateway and registry address to update IPC config file
-parent_id=/r31337
+parent_id="/r31337"
 
 toml set ${IPC_CONFIG_FOLDER}/config.toml subnets[0].config.gateway_addr $parent_gateway_address > /tmp/config.toml.1
 toml set /tmp/config.toml.1 subnets[0].config.registry_addr $parent_registry_address > /tmp/config.toml.2
 toml set /tmp/config.toml.2 subnets[0].config.network_type "fevm" > /tmp/config.toml.3
-toml set /tmp/config.toml.3 subnets[0].config.provider_http "http://localhost:8545" > /tmp/config.toml.4
-toml set /tmp/config.toml.4 subnets[0].id "$parent_id" > /tmp/config.toml.5
+toml set /tmp/config.toml.3 subnets[0].config.provider_http "http://localhost:$ANVIL_HOST_PORT" > /tmp/config.toml.4
+toml set /tmp/config.toml.4 subnets[0].id $parent_id > /tmp/config.toml.5
 cp /tmp/config.toml.5 ${IPC_CONFIG_FOLDER}/config.toml
 
 
@@ -140,13 +141,15 @@ create_subnet_output=$(ipc-cli subnet create --parent $parent_id --min-validator
 echo "$DASHES start create_subnet_output $DASHES"
 echo "$create_subnet_output"
 echo "$DASHES end create_subnet_output $DASHES"
-subnet_id=$(echo $create_subnet_output | sed 's/.*with id: \([^ ]*\).*/\1/')
+# Note the output will (sometimes?) be multi line the sed command is expecting a single line
+subnet_id=$(echo "$create_subnet_output" | tr '\n' ' ' | sed 's/.*subnet actor with id: \([^ ]*\).*/\1/')
 echo "Created new subnet id: $subnet_id"
 
+# remove any old subnet folder and setup a new one
 subnet_folder=$IPC_CONFIG_FOLDER/$(echo "$subnet_id" | sed 's|^/||;s|/|-|g')
 rm -rf "$subnet_folder"
 
-# Take down any existing validators and init from scratch
+# Step 6: Take down any existing validators and init from scratch
 cd "$IPC_FOLDER"
 for i in {0..2}
 do
@@ -156,19 +159,6 @@ do
       -e FM_PULL_SKIP=1 \
       child-validator-no-parent-init
 done
-
-
-# Step 6: Use the new subnet ID to update IPC config file
-echo "[[subnets]]" >> /tmp/config.toml.5
-toml set /tmp/config.toml.5 subnets[1].id $subnet_id > /tmp/config.toml.6
-echo "" >> /tmp/config.toml.6
-echo "[subnets.config]" >> /tmp/config.toml.6
-echo "network_type = \"fevm\"" >> /tmp/config.toml.6
-toml set /tmp/config.toml.6 subnets[1].config.provider_http "http://localhost:8545" > /tmp/config.toml.7
-toml set /tmp/config.toml.7 subnets[1].config.gateway_addr $parent_gateway_address > /tmp/config.toml.8
-toml set /tmp/config.toml.8 subnets[1].config.registry_addr $parent_registry_address > /tmp/config.toml.9
-
-cp /tmp/config.toml.9 ${IPC_CONFIG_FOLDER}/config.toml
 
 
 # Step 7: Join subnet for addresses in wallet
@@ -198,6 +188,7 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e RESOLVER_HOST_PORT="${RESOLVER_HOST_PORTS[0]}" \
     -e OBJECTS_HOST_PORT="${OBJECTS_HOST_PORTS[0]}" \
     -e IROH_RPC_HOST_PORT="${IROH_RPC_HOST_PORTS[0]}" \
+    -e IROH_CONFIG_FOLDER="${IPC_CONFIG_FOLDER}" \
     -e FENDERMINT_METRICS_HOST_PORT="${FENDERMINT_METRICS_HOST_PORTS[0]}" \
     -e IROH_METRICS_HOST_PORT="${IROH_METRICS_HOST_PORTS[0]}" \
     -e PROMTAIL_AGENT_HOST_PORT="${PROMTAIL_AGENT_HOST_PORTS[0]}" \
@@ -225,6 +216,7 @@ do
       -e RESOLVER_HOST_PORT="${RESOLVER_HOST_PORTS[i]}" \
       -e OBJECTS_HOST_PORT="${OBJECTS_HOST_PORTS[i]}" \
       -e IROH_RPC_HOST_PORT="${IROH_RPC_HOST_PORTS[i]}" \
+      -e IROH_CONFIG_FOLDER="${IPC_CONFIG_FOLDER}" \
       -e FENDERMINT_METRICS_HOST_PORT="${FENDERMINT_METRICS_HOST_PORTS[i]}" \
       -e IROH_METRICS_HOST_PORT="${IROH_METRICS_HOST_PORTS[i]}" \
       -e PROMTAIL_AGENT_HOST_PORT="${PROMTAIL_AGENT_HOST_PORTS[i]}" \
@@ -235,15 +227,6 @@ do
       -e FM_LOG_LEVEL="info,fendermint=debug" \
       child-validator-no-parent
 done
-
-# Start prometheus
-cd "$IPC_FOLDER"
-cargo make --makefile infra/fendermint/Makefile.toml \
-    -e NODE_NAME=prometheus \
-    -e SUBNET_ID="$subnet_id" \
-    -e PROMETHEUS_HOST_PORT="${PROMETHEUS_HOST_PORT}" \
-    -e PROMETHEUS_CONFIG_FOLDER="${IPC_CONFIG_FOLDER}" \
-    prometheus-start
 
 # Start grafana
 cd "$IPC_FOLDER"
@@ -261,6 +244,14 @@ cargo make --makefile infra/fendermint/Makefile.toml \
     -e LOKI_HOST_PORT="${LOKI_HOST_PORT}" \
     -e LOKI_CONFIG_FOLDER="${IPC_CONFIG_FOLDER}" \
     loki-start
+
+# Start prometheus, note it should start after it's targets become available
+cargo make --makefile infra/fendermint/Makefile.toml \
+    -e NODE_NAME=prometheus \
+    -e SUBNET_ID="$subnet_id" \
+    -e PROMETHEUS_HOST_PORT="${PROMETHEUS_HOST_PORT}" \
+    -e PROMETHEUS_CONFIG_FOLDER="${IPC_CONFIG_FOLDER}" \
+    prometheus-start
 
 # Test ETH API endpoint
 for i in {0..2}
@@ -288,10 +279,6 @@ for i in {0..2}
 do
   curl --location http://localhost:"${FENDERMINT_METRICS_HOST_PORTS[i]}"/metrics | grep success
 done
-
-curl --location http://localhost:"${PROMETHEUS_METRICS_PORTS[0]}"/metrics | grep success
-curl --location http://localhost:"${PROMETHEUS_METRICS_PORTS[1]}"/metrics | grep success
-curl --location http://localhost:"${PROMETHEUS_METRICS_PORTS[2]}"/metrics | grep success
 
 # Print a summary of the deployment
 cat << EOF

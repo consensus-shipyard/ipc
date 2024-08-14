@@ -2,6 +2,7 @@
 
 set -euo pipefail
 
+DASHES='------'
 dir=$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")
 source "$dir"/util.sh
 IPC_FOLDER="$dir"/../..
@@ -15,10 +16,17 @@ cp "$IPC_FOLDER"/scripts/deploy_subnet_no_parent/.ipc/genesis.json "$IPC_CONFIG_
 cp "$IPC_FOLDER"/infra/prometheus/prometheus.yaml "$IPC_CONFIG_FOLDER"
 cp "$IPC_FOLDER"/infra/loki/loki-config.yaml "$IPC_CONFIG_FOLDER"
 cp "$IPC_FOLDER"/infra/promtail/promtail-config.yaml "$IPC_CONFIG_FOLDER"
+cp "$IPC_FOLDER"/infra/iroh/iroh.config.toml "$IPC_CONFIG_FOLDER"
 
-# Build ipc-cli
-cd "$IPC_FOLDER"/ipc
-make install
+if [[ "$SKIP_BUILD" == "" || "$SKIP_BUILD" == "false" ]]; then
+  echo "$DASHES starting build for ipc cli $DASHES"
+  # Build ipc-cli
+  cd "$IPC_FOLDER"/ipc
+  make install
+else
+  echo "$DASHES skpping build for ipc cli $DASHES"
+fi
+
 
 # use Anvil default pk values
 ipc-cli wallet import --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --wallet-type evm
