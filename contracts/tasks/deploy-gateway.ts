@@ -23,35 +23,25 @@ task('deploy-gateway')
         false,
         types.boolean,
     )
-    .setAction(
-        async (
-            args: TaskArguments,
-            hre: HardhatRuntimeEnvironment,
-        ): Promise<Deployments> => {
-            await hre.run('compile')
+    .setAction(async (args: TaskArguments, hre: HardhatRuntimeEnvironment): Promise<Deployments> => {
+        await hre.run('compile')
 
-            const [deployer] = await hre.getUnnamedAccounts()
+        const [deployer] = await hre.getUnnamedAccounts()
 
-            // Deploy the facets.
-            const facets = await deployFacets(hre, deployer)
+        // Deploy the facets.
+        const facets = await deployFacets(hre, deployer)
 
-            if (args.upgrade) {
-                console.log(
-                    'Running as part of an upgrade; skipping deployment of GatewayDiamond',
-                )
-                return facets
-            }
+        if (args.upgrade) {
+            console.log('Running as part of an upgrade; skipping deployment of GatewayDiamond')
+            return facets
+        }
 
-            // Deploy the diamond.
-            const diamond = await deployGatewayDiamond(hre, deployer, facets)
-            return facets.join(diamond)
-        },
-    )
+        // Deploy the diamond.
+        const diamond = await deployGatewayDiamond(hre, deployer, facets)
+        return facets.join(diamond)
+    })
 
-async function deployFacets(
-    hre: HardhatRuntimeEnvironment,
-    deployer: string,
-): Promise<Deployments> {
+async function deployFacets(hre: HardhatRuntimeEnvironment, deployer: string): Promise<Deployments> {
     const facets = [
         {
             name: 'GatewayGetterFacet',
@@ -88,8 +78,7 @@ async function deployGatewayDiamond(
     facets: Deployments,
 ): Promise<Deployments> {
     gatewayConstructorParams.networkName.root = await hre.getChainId()
-    gatewayConstructorParams.commitSha =
-        hre.ethers.utils.formatBytes32String(gitCommitSha())
+    gatewayConstructorParams.commitSha = hre.ethers.utils.formatBytes32String(gitCommitSha())
 
     const deployments = await Deployments.deploy(hre, deployer, {
         name: 'GatewayDiamond',
@@ -99,8 +88,5 @@ async function deployGatewayDiamond(
 }
 
 function gitCommitSha(): string {
-    return require('child_process')
-        .execSync('git rev-parse --short HEAD')
-        .toString()
-        .trim()
+    return require('child_process').execSync('git rev-parse --short HEAD').toString().trim()
 }

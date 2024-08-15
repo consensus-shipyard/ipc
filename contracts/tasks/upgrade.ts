@@ -5,24 +5,14 @@ import { IDiamond, IDiamondCut } from '../typechain'
 import _ = require('lodash')
 
 task('upgrade', 'Upgrades a diamond contract')
-    .addParam(
-        'contract',
-        'The contract to upgrade. One of: gateway, registry',
-        null,
-        types.string,
-    )
+    .addParam('contract', 'The contract to upgrade. One of: gateway, registry', null, types.string)
     .addOptionalParam(
         'initAddress',
         'The address of the contract to call init on (optional)',
         '0x0000000000000000000000000000000000000000',
         types.string,
     )
-    .addOptionalParam(
-        'initCalldata',
-        'The calldata to pass to init in hex(optional)',
-        '0x',
-        types.string,
-    )
+    .addOptionalParam('initCalldata', 'The calldata to pass to init in hex(optional)', '0x', types.string)
     .setAction(async (args: TaskArguments, hre: HardhatRuntimeEnvironment) => {
         await hre.run('compile')
 
@@ -64,15 +54,8 @@ task('upgrade', 'Upgrades a diamond contract')
 
         console.log(`Facet cuts:\n\n${JSON.stringify(facetCuts, null, 2)}`)
 
-        const diamondCut = (await hre.ethers.getContractAt(
-            'IDiamondCut',
-            diamond.contract.address,
-        )) as IDiamondCut
-        const result = await diamondCut.diamondCut(
-            facetCuts,
-            initAddress,
-            initCalldata,
-        )
+        const diamondCut = (await hre.ethers.getContractAt('IDiamondCut', diamond.contract.address)) as IDiamondCut
+        const result = await diamondCut.diamondCut(facetCuts, initAddress, initCalldata)
         const receipt = await result.wait(1)
         console.log(`Diamond cut transaction: ${receipt.transactionHash}`)
         console.log(`Included in block: ${receipt.blockNumber}`)
@@ -82,10 +65,7 @@ task('upgrade', 'Upgrades a diamond contract')
     })
 
 function logNewDeployments(kind: string, deployments: Deployments) {
-    const newlyDeployed = _.pickBy(
-        deployments.results,
-        ({ newlyDeployed }) => newlyDeployed,
-    )
+    const newlyDeployed = _.pickBy(deployments.results, ({ newlyDeployed }) => newlyDeployed)
     if (Object.keys(newlyDeployed).length === 0) {
         console.log(`No ${kind} contracts were newly deployed`)
         return

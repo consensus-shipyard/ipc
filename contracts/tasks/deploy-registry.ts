@@ -54,9 +54,7 @@ task('deploy-registry')
         )
 
         if (args.upgrade) {
-            console.log(
-                'Running as part of an upgrade; skipping deployment of SubnetRegistryDiamond',
-            )
+            console.log('Running as part of an upgrade; skipping deployment of SubnetRegistryDiamond')
             return
         }
 
@@ -77,41 +75,22 @@ task('deploy-registry')
         const registryConstructorParams = {
             gateway: (await hre.deployments.get('GatewayDiamond')).address,
             getterFacet: subnetActorFacets.addresses['SubnetActorGetterFacet'],
-            managerFacet:
-                subnetActorFacets.addresses['SubnetActorManagerFacet'],
-            rewarderFacet:
-                subnetActorFacets.addresses['SubnetActorRewardFacet'],
-            checkpointerFacet:
-                subnetActorFacets.addresses['SubnetActorCheckpointingFacet'],
+            managerFacet: subnetActorFacets.addresses['SubnetActorManagerFacet'],
+            rewarderFacet: subnetActorFacets.addresses['SubnetActorRewardFacet'],
+            checkpointerFacet: subnetActorFacets.addresses['SubnetActorCheckpointingFacet'],
             pauserFacet: subnetActorFacets.addresses['SubnetActorPauseFacet'],
             diamondCutFacet: subnetActorFacets.addresses['DiamondCutFacet'],
             diamondLoupeFacet: subnetActorFacets.addresses['DiamondLoupeFacet'],
             ownershipFacet: subnetActorFacets.addresses['OwnershipFacet'],
 
-            subnetActorGetterSelectors: selectors(
-                subnetActorFacets.contracts['SubnetActorGetterFacet'],
-            ),
-            subnetActorManagerSelectors: selectors(
-                subnetActorFacets.contracts['SubnetActorManagerFacet'],
-            ),
-            subnetActorRewarderSelectors: selectors(
-                subnetActorFacets.contracts['SubnetActorRewardFacet'],
-            ),
-            subnetActorCheckpointerSelectors: selectors(
-                subnetActorFacets.contracts['SubnetActorCheckpointingFacet'],
-            ),
-            subnetActorPauserSelectors: selectors(
-                subnetActorFacets.contracts['SubnetActorPauseFacet'],
-            ),
-            subnetActorDiamondCutSelectors: selectors(
-                subnetActorFacets.contracts['DiamondCutFacet'],
-            ),
-            subnetActorDiamondLoupeSelectors: selectors(
-                subnetActorFacets.contracts['DiamondLoupeFacet'],
-            ),
-            subnetActorOwnershipSelectors: selectors(
-                subnetActorFacets.contracts['OwnershipFacet'],
-            ),
+            subnetActorGetterSelectors: selectors(subnetActorFacets.contracts['SubnetActorGetterFacet']),
+            subnetActorManagerSelectors: selectors(subnetActorFacets.contracts['SubnetActorManagerFacet']),
+            subnetActorRewarderSelectors: selectors(subnetActorFacets.contracts['SubnetActorRewardFacet']),
+            subnetActorCheckpointerSelectors: selectors(subnetActorFacets.contracts['SubnetActorCheckpointingFacet']),
+            subnetActorPauserSelectors: selectors(subnetActorFacets.contracts['SubnetActorPauseFacet']),
+            subnetActorDiamondCutSelectors: selectors(subnetActorFacets.contracts['DiamondCutFacet']),
+            subnetActorDiamondLoupeSelectors: selectors(subnetActorFacets.contracts['DiamondLoupeFacet']),
+            subnetActorOwnershipSelectors: selectors(subnetActorFacets.contracts['OwnershipFacet']),
             creationPrivileges: Number(mode),
         }
 

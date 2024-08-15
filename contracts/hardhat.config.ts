@@ -60,12 +60,7 @@ const config: HardhatUserConfig = {
         storageLayouts: '.storage-layouts',
     },
     storageLayoutChanges: {
-        contracts: [
-            'GatewayDiamond',
-            'SubnetActorDiamond',
-            'GatewayActorModifiers',
-            'SubnetActorModifiers',
-        ],
+        contracts: ['GatewayDiamond', 'SubnetActorDiamond', 'GatewayActorModifiers', 'SubnetActorModifiers'],
         fullPath: false,
     },
 }
