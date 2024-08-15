@@ -100,7 +100,7 @@ impl Actor {
             extract_send_result(rt.send_simple(
                 &ext::blobs::BLOBS_ACTOR_ADDR,
                 ext::blobs::DELETE_BLOB_METHOD,
-                IpldBlock::serialize_cbor(&ext::blobs::DeleteBlobParams { cid })?,
+                IpldBlock::serialize_cbor(&ext::blobs::DeleteBlobParams(cid))?,
                 Default::default(),
             ))?;
             st.delete(rt.store(), &BytesKey(params.key)).map_err(|e| {
