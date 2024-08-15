@@ -52,8 +52,11 @@ jobs:
       - name: Force an ordinary npm install
         run: cd contracts && rm -rf node_modules && npm install
 
+      - name: Print Aderyn version
+        run: aderyn --version
+
       - name: Run aderyn
-        run: aderyn ./ -o report.json
+        run: cd contracts && aderyn ./ -o report.json
 
       - name: Check results
         run: cd contracts && ./tools/check_aderyn.sh
