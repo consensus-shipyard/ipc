@@ -99,7 +99,8 @@ impl Actor {
                 e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to delete object")
             })?;
             let cid = Cid::try_from(object.cid.0).map_err(|e| {
-                anyhow::Error::from(e).downcast_default(ExitCode::USR_ILLEGAL_STATE, "stored cid is invalid")
+                anyhow::Error::from(e)
+                    .downcast_default(ExitCode::USR_ILLEGAL_STATE, "stored cid is invalid")
             })?;
             extract_send_result(rt.send_simple(
                 &ext::blobs::BLOBS_ACTOR_ADDR,

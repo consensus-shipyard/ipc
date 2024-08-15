@@ -145,18 +145,19 @@ impl State {
         key: &BytesKey,
     ) -> anyhow::Result<(Object, Cid)> {
         let mut hamt = Hamt::<_, Object>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
-        let object = hamt.delete(key)?.map(|o| o.1).ok_or(anyhow::anyhow!("key not found"))?;
+        let object = hamt
+            .delete(key)?
+            .map(|o| o.1)
+            .ok_or(anyhow::anyhow!("key not found"))?;
         self.root = hamt.flush()?;
         Ok((object, self.root))
     }
 
-    pub fn get<BS: Blockstore>(
-        &self,
-        store: &BS,
-        key: &BytesKey,
-    ) -> anyhow::Result<Object> {
+    pub fn get<BS: Blockstore>(&self, store: &BS, key: &BytesKey) -> anyhow::Result<Object> {
         let hamt = Hamt::<_, Object>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
-        hamt.get(key).map(|v| v.cloned())?.ok_or(anyhow::anyhow!("key not found"))
+        hamt.get(key)
+            .map(|v| v.cloned())?
+            .ok_or(anyhow::anyhow!("key not found"))
     }
 
     pub fn list<BS: Blockstore>(
