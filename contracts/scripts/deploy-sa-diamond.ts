@@ -3,13 +3,9 @@ import hre, { ethers } from 'hardhat'
 
 const { getSelectors, FacetCutAction } = require('./js/diamond.js')
 
-async function deploySubnetActorDiamond(
-    gatewayDiamondAddress: string,
-    libs: { [key in string]: string },
-) {
+async function deploySubnetActorDiamond(gatewayDiamondAddress: string, libs: { [key in string]: string }) {
     if (!gatewayDiamondAddress) throw new Error(`Gateway is missing`)
-    if (!libs || Object.keys(libs).length === 0)
-        throw new Error(`Libraries are missing`)
+    if (!libs || Object.keys(libs).length === 0) throw new Error(`Libraries are missing`)
 
     console.log('Deploying Subnet Actor diamond with libraries:', libs)
 
@@ -48,12 +44,7 @@ async function deploySubnetActorDiamond(
     const facetCuts = []
 
     for (const facet of facets) {
-        const facetInstance = await deployContractWithDeployer(
-            deployer,
-            facet.name,
-            facet.libs,
-            txArgs,
-        )
+        const facetInstance = await deployContractWithDeployer(deployer, facet.name, facet.libs, txArgs)
         await facetInstance.deployed()
 
         facet.address = facetInstance.address
@@ -65,10 +56,7 @@ async function deploySubnetActorDiamond(
         })
     }
 
-    const gatewayGetterFacet = await ethers.getContractAt(
-        'GatewayGetterFacet',
-        gatewayDiamondAddress,
-    )
+    const gatewayGetterFacet = await ethers.getContractAt('GatewayGetterFacet', gatewayDiamondAddress)
     const parentId = await gatewayGetterFacet.getNetworkName()
     console.log('parentId', parentId[0])
     console.log('parentId', parentId[1])

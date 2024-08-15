@@ -59,9 +59,7 @@ function get(functionNames) {
 
 // remove selectors using an array of signatures
 function removeSelectors(selectors, signatures) {
-    const iface = new ethers.utils.Interface(
-        signatures.map((v) => 'function ' + v),
-    )
+    const iface = new ethers.utils.Interface(signatures.map((v) => 'function ' + v))
     const removeSelectors = signatures.map((v) => iface.getSighash(v))
     selectors = selectors.filter((v) => !removeSelectors.includes(v))
     return selectors
