@@ -153,10 +153,13 @@ impl State {
         Ok((object, self.root))
     }
 
-    pub fn get<BS: Blockstore>(&self, store: &BS, key: &BytesKey) -> anyhow::Result<Option<Object>> {
+    pub fn get<BS: Blockstore>(
+        &self,
+        store: &BS,
+        key: &BytesKey,
+    ) -> anyhow::Result<Option<Object>> {
         let hamt = Hamt::<_, Object>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
-        let object = hamt.get(key)
-            .map(|v| v.cloned())?;
+        let object = hamt.get(key).map(|v| v.cloned())?;
         Ok(object)
     }
 

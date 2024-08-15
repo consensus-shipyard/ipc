@@ -95,9 +95,15 @@ impl Actor {
         Self::ensure_write_allowed(rt)?;
         let res = rt.transaction(|st: &mut State, rt| {
             let key = BytesKey(params.key);
-            let object = st.get(rt.store(), &key).map_err(|e| {
-                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to delete object")
-            })?.ok_or(ActorError::unchecked(ExitCode::USR_ILLEGAL_STATE, "stored cid is invalid".to_string()))?;
+            let object = st
+                .get(rt.store(), &key)
+                .map_err(|e| {
+                    e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to delete object")
+                })?
+                .ok_or(ActorError::unchecked(
+                    ExitCode::USR_ILLEGAL_STATE,
+                    "stored cid is invalid".to_string()
+                ))?;
             let cid = Cid::try_from(object.cid.0).map_err(|e| {
                 anyhow::Error::from(e)
                     .downcast_default(ExitCode::USR_ILLEGAL_STATE, "stored cid is invalid")
