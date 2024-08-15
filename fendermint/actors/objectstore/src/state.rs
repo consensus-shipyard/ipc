@@ -143,24 +143,20 @@ impl State {
         &mut self,
         store: &BS,
         key: &BytesKey,
-    ) -> anyhow::Result<(Option<Object>, Cid)> {
+    ) -> anyhow::Result<(Object, Cid)> {
         let mut hamt = Hamt::<_, Object>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
-        if hamt.contains_key(key)? {
-            let object = hamt.delete(key)?.map(|o| o.1);
-            self.root = hamt.flush()?;
-            return Ok((object, self.root));
-        }
-        Err(anyhow::anyhow!("key not found"))
+        let object = hamt.delete(key)?.map(|o| o.1).ok_or(anyhow::anyhow!("key not found"))?;
+        self.root = hamt.flush()?;
+        Ok((object, self.root))
     }
 
     pub fn get<BS: Blockstore>(
         &self,
         store: &BS,
         key: &BytesKey,
-    ) -> anyhow::Result<Option<Object>> {
+    ) -> anyhow::Result<Object> {
         let hamt = Hamt::<_, Object>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
-        let object = hamt.get(key).map(|v| v.cloned())?;
-        Ok(object)
+        hamt.get(key).map(|v| v.cloned())?.ok_or(anyhow::anyhow!("key not found"))
     }
 
     pub fn list<BS: Blockstore>(
@@ -328,7 +324,7 @@ mod tests {
         object.resolved = true;
         let result = state.get(&store, &key);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap().unwrap(), object);
+        assert_eq!(result.unwrap(), object);
     }
 
     #[quickcheck]
@@ -355,8 +351,7 @@ mod tests {
         assert!(state.delete(&store, &key).is_ok());
 
         let result = state.get(&store, &key);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), None);
+        assert!(!result.is_ok());
     }
 
     #[quickcheck]
@@ -378,7 +373,7 @@ mod tests {
         let result = state.get(&store, &key);
 
         assert!(result.is_ok());
-        assert_eq!(result.unwrap().unwrap(), object);
+        assert_eq!(result.unwrap(), object);
     }
 
     fn create_and_put_objects(

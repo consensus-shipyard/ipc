@@ -94,8 +94,12 @@ impl Actor {
     fn delete_object(rt: &impl Runtime, params: DeleteParams) -> Result<Cid, ActorError> {
         Self::ensure_write_allowed(rt)?;
         let res = rt.transaction(|st: &mut State, rt| {
-            let cid = Cid::try_from(params.key.clone()).map_err(|e| {
-                ActorError::unchecked(ExitCode::USR_ILLEGAL_ARGUMENT, e.to_string())
+            let key = BytesKey(params.key);
+            let object = st.get(rt.store(), &key).map_err(|e| {
+                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to delete object")
+            })?;
+            let cid = Cid::try_from(object.cid.0).map_err(|e| {
+                anyhow::Error::from(e).downcast_default(ExitCode::USR_ILLEGAL_STATE, "stored cid is invalid")
             })?;
             extract_send_result(rt.send_simple(
                 &ext::blobs::BLOBS_ACTOR_ADDR,
@@ -103,7 +107,7 @@ impl Actor {
                 IpldBlock::serialize_cbor(&ext::blobs::DeleteBlobParams(cid))?,
                 Default::default(),
             ))?;
-            st.delete(rt.store(), &BytesKey(params.key)).map_err(|e| {
+            st.delete(rt.store(), &key).map_err(|e| {
                 e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to delete object")
             })
         })?;
@@ -112,7 +116,7 @@ impl Actor {
 
     // TODO: fetch blob from blobs actor
     // TODO SU: How is Blob included in Object?? Shall we return Blob??
-    fn get_object(rt: &impl Runtime, params: GetParams) -> Result<Option<Object>, ActorError> {
+    fn get_object(rt: &impl Runtime, params: GetParams) -> Result<Object, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
         let st: State = rt.state()?;
