@@ -1,7 +1,7 @@
 import { extendEnvironment } from 'hardhat/config'
 import { HardhatRuntimeEnvironment } from 'hardhat/types'
 import '@nomiclabs/hardhat-ethers'
-import {ProviderError} from "hardhat/internal/core/providers/errors";
+import { ProviderError } from 'hardhat/internal/core/providers/errors'
 
 extendEnvironment((hre) => {
     injectFilecoinProvider(hre)
@@ -52,7 +52,7 @@ function injectFilecoinProvider(hre: HardhatRuntimeEnvironment) {
             if (prop === 'send' || prop === 'sendAsync') {
                 methodFunc = ([method]: any[]) => method
             } else if (prop === 'request') {
-                methodFunc = ([{method}]: any[]) => method
+                methodFunc = ([{ method }]: any[]) => method
             } else {
                 return orig
             }
@@ -63,13 +63,9 @@ function injectFilecoinProvider(hre: HardhatRuntimeEnvironment) {
                     const method = methodFunc(args)
                     if (
                         interceptedRpcMethods.includes(method) &&
-                        err.message.includes(
-                            'requested epoch was a null round',
-                        )
+                        err.message.includes('requested epoch was a null round')
                     ) {
-                        console.warn(
-                            'null round hit, returning empty block',
-                        )
+                        console.warn('null round hit, returning empty block')
                         return emptyBlock
                     }
                     console.log(`Rethrowing error ${err}`)

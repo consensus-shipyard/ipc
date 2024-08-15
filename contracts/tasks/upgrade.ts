@@ -1,7 +1,7 @@
 import { task, types } from 'hardhat/config'
 import { HardhatRuntimeEnvironment, TaskArguments } from 'hardhat/types'
 import { Deployments, Diamond } from './lib'
-import {IDiamond, IDiamondCut} from '../typechain'
+import { IDiamond, IDiamondCut } from '../typechain'
 import _ = require('lodash')
 
 task('upgrade', 'Upgrades a diamond contract')
