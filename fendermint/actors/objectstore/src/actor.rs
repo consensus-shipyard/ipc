@@ -98,7 +98,7 @@ impl Actor {
             let object = st
                 .get(rt.store(), &key)
                 .map_err(|e| {
-                    e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to delete object")
+                    e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to retrieve object")
                 })?
                 .ok_or(ActorError::unchecked(
                     ExitCode::USR_ILLEGAL_STATE,
