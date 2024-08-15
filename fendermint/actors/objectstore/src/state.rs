@@ -153,11 +153,11 @@ impl State {
         Ok((object, self.root))
     }
 
-    pub fn get<BS: Blockstore>(&self, store: &BS, key: &BytesKey) -> anyhow::Result<Object> {
+    pub fn get<BS: Blockstore>(&self, store: &BS, key: &BytesKey) -> anyhow::Result<Option<Object>> {
         let hamt = Hamt::<_, Object>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
-        hamt.get(key)
-            .map(|v| v.cloned())?
-            .ok_or(anyhow::anyhow!("key not found"))
+        let object = hamt.get(key)
+            .map(|v| v.cloned())?;
+        Ok(object)
     }
 
     pub fn list<BS: Blockstore>(
@@ -325,7 +325,7 @@ mod tests {
         object.resolved = true;
         let result = state.get(&store, &key);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), object);
+        assert_eq!(result.unwrap().unwrap(), object);
     }
 
     #[quickcheck]
@@ -352,7 +352,8 @@ mod tests {
         assert!(state.delete(&store, &key).is_ok());
 
         let result = state.get(&store, &key);
-        assert!(!result.is_ok());
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), None);
     }
 
     #[quickcheck]
@@ -374,7 +375,7 @@ mod tests {
         let result = state.get(&store, &key);
 
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), object);
+        assert_eq!(result.unwrap().unwrap(), object);
     }
 
     fn create_and_put_objects(

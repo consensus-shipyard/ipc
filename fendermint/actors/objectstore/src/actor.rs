@@ -97,7 +97,7 @@ impl Actor {
             let key = BytesKey(params.key);
             let object = st.get(rt.store(), &key).map_err(|e| {
                 e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to delete object")
-            })?;
+            })?.ok_or(ActorError::unchecked(ExitCode::USR_ILLEGAL_STATE, "stored cid is invalid".to_string()))?;
             let cid = Cid::try_from(object.cid.0).map_err(|e| {
                 anyhow::Error::from(e)
                     .downcast_default(ExitCode::USR_ILLEGAL_STATE, "stored cid is invalid")
@@ -117,7 +117,7 @@ impl Actor {
 
     // TODO: fetch blob from blobs actor
     // TODO SU: How is Blob included in Object?? Shall we return Blob??
-    fn get_object(rt: &impl Runtime, params: GetParams) -> Result<Object, ActorError> {
+    fn get_object(rt: &impl Runtime, params: GetParams) -> Result<Option<Object>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
         let st: State = rt.state()?;
