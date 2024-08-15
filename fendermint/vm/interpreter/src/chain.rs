@@ -1,5 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
+use crate::fvm::gas::{Gas, GasMarket};
 use crate::fvm::state::ipc::GatewayCaller;
 use crate::fvm::{topdown, FvmApplyRet, PowerUpdates};
 use crate::{
@@ -8,7 +9,7 @@ use crate::{
     signed::{SignedMessageApplyRes, SignedMessageCheckRes, SyntheticMessage, VerifiableMessage},
     CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
 };
-use anyhow::{bail, Context};
+use anyhow::{anyhow, bail, Context};
 use async_stm::atomically;
 use async_trait::async_trait;
 use fendermint_tracing::emit;
@@ -94,6 +95,56 @@ impl<I, DB> ChainMessageInterpreter<I, DB> {
             gateway_caller: GatewayCaller::default(),
         }
     }
+
+    fn signed_msgs_wtih_gas_limit(
+        &self,
+        msgs: Vec<ChainMessage>,
+    ) -> anyhow::Result<Vec<(ChainMessage, Gas)>> {
+        msgs.into_iter()
+            .map(|msg| match msg {
+                ChainMessage::Signed(inner) => {
+                    let gas_limit = inner.message.gas_limit;
+                    Ok((ChainMessage::Signed(inner), gas_limit))
+                }
+                ChainMessage::Ipc(_) => {
+                    Err(anyhow!("should not have ipc messages in user proposals"))
+                }
+            })
+            .collect::<anyhow::Result<Vec<_>>>()
+    }
+
+    /// Performs message selection:
+    /// - Order by gas limit in descending order
+    /// - Make sure total gas limit does not exceed the `total_gas_limit` parameter
+    fn messages_selection(
+        &self,
+        msgs: Vec<ChainMessage>,
+        total_gas_limit: Gas,
+    ) -> anyhow::Result<Vec<ChainMessage>> {
+        let mut msgs_with_gas_limit = self.signed_msgs_wtih_gas_limit(msgs)?;
+
+        // sort by gas limit descending
+        msgs_with_gas_limit.sort_by(|a, b| b.1.cmp(&a.1));
+
+        let mut total_gas_limit_consumed = 0;
+        let mut msgs = vec![];
+        for (msg, gas_limit) in msgs_with_gas_limit {
+            if total_gas_limit_consumed + gas_limit <= total_gas_limit {
+                msgs.push(msg);
+                total_gas_limit_consumed += gas_limit;
+            } else {
+                break;
+            }
+        }
+
+        tracing::info!(
+            num_msgs = msgs.len(),
+            total_gas_limit,
+            "selected message under total gas limit"
+        );
+
+        Ok(msgs)
+    }
 }
 
 #[async_trait]
@@ -102,7 +153,7 @@ where
     DB: Blockstore + Clone + 'static + Send + Sync,
     I: Sync + Send,
 {
-    type State = ChainEnv;
+    type State = (ChainEnv, FvmExecState<DB>);
     type Message = ChainMessage;
 
     /// Check whether there are any "ready" messages in the IPLD resolution mempool which can be appended to the proposal.
@@ -111,11 +162,13 @@ where
     /// account the transactions which are part of top-down or bottom-up checkpoints, to stay within gas limits.
     async fn prepare(
         &self,
-        state: Self::State,
+        (chain_env, state): Self::State,
         mut msgs: Vec<Self::Message>,
     ) -> anyhow::Result<Vec<Self::Message>> {
+        msgs = self.messages_selection(msgs, state.gas_market().available_block_gas())?;
+
         // Collect resolved CIDs ready to be proposed from the pool.
-        let ckpts = atomically(|| state.checkpoint_pool.collect_resolved()).await;
+        let ckpts = atomically(|| chain_env.checkpoint_pool.collect_resolved()).await;
 
         // Create transactions ready to be included on the chain.
         let ckpts = ckpts.into_iter().map(|ckpt| match ckpt {
@@ -124,14 +177,19 @@ where
 
         // Prepare top down proposals.
         // Before we try to find a quorum, pause incoming votes. This is optional but if there are lots of votes coming in it might hold up proposals.
-        atomically(|| state.parent_finality_votes.pause_votes_until_find_quorum()).await;
+        atomically(|| {
+            chain_env
+                .parent_finality_votes
+                .pause_votes_until_find_quorum()
+        })
+        .await;
 
         // The pre-requisite for proposal is that there is a quorum of gossiped votes at that height.
         // The final proposal can be at most as high as the quorum, but can be less if we have already,
         // hit some limits such as how many blocks we can propose in a single step.
         let finalities = atomically(|| {
-            let parent = state.parent_finality_provider.next_proposal()?;
-            let quorum = state
+            let parent = chain_env.parent_finality_provider.next_proposal()?;
+            let quorum = chain_env
                 .parent_finality_votes
                 .find_quorum()?
                 .map(|(height, block_hash)| IPCParentFinality { height, block_hash });
@@ -175,7 +233,13 @@ where
     }
 
     /// Perform finality checks on top-down transactions and availability checks on bottom-up transactions.
-    async fn process(&self, env: Self::State, msgs: Vec<Self::Message>) -> anyhow::Result<bool> {
+    async fn process(
+        &self,
+        (chain_env, state): Self::State,
+        msgs: Vec<Self::Message>,
+    ) -> anyhow::Result<bool> {
+        let mut block_gas_usage = 0;
+
         for msg in msgs {
             match msg {
                 ChainMessage::Ipc(IpcMessage::BottomUpExec(msg)) => {
@@ -187,7 +251,7 @@ where
                     // 1) we validated it when it was relayed, and
                     // 2) if a validator proposes something invalid, we can make them pay during execution.
                     let is_resolved =
-                        atomically(|| match env.checkpoint_pool.get_status(&item)? {
+                        atomically(|| match chain_env.checkpoint_pool.get_status(&item)? {
                             None => Ok(false),
                             Some(status) => status.is_resolved(),
                         })
@@ -206,15 +270,20 @@ where
                         block_hash,
                     };
                     let is_final =
-                        atomically(|| env.parent_finality_provider.check_proposal(&prop)).await;
+                        atomically(|| chain_env.parent_finality_provider.check_proposal(&prop))
+                            .await;
                     if !is_final {
                         return Ok(false);
                     }
                 }
+                ChainMessage::Signed(signed) => {
+                    block_gas_usage += signed.message.gas_limit;
+                }
                 _ => {}
             };
         }
-        Ok(true)
+
+        Ok(block_gas_usage <= state.gas_market().available_block_gas())
     }
 }
 

@@ -407,7 +407,7 @@ where
         Genesis = Vec<u8>,
         Output = FvmGenesisOutput,
     >,
-    I: ProposalInterpreter<State = ChainEnv, Message = Vec<u8>>,
+    I: ProposalInterpreter<State = (ChainEnv, FvmExecState<SS>), Message = Vec<u8>>,
     I: ExecInterpreter<
         State = (ChainEnv, FvmExecState<SS>),
         Message = Vec<u8>,
@@ -615,13 +615,25 @@ where
         );
         let txs = request.txs.into_iter().map(|tx| tx.to_vec()).collect();
 
+        let (state_params, block_height) =
+            self.state_params_at_height(request.height.value().into())?;
+        let state = FvmExecState::new(
+            self.state_store_clone(),
+            self.multi_engine.as_ref(),
+            block_height as ChainEpoch,
+            state_params,
+        )
+        .context("error creating new state")?;
+
         let txs = self
             .interpreter
-            .prepare(self.chain_env.clone(), txs)
+            .prepare((self.chain_env.clone(), state), txs)
             .await
             .context("failed to prepare proposal")?;
 
         let txs = txs.into_iter().map(bytes::Bytes::from).collect();
+        // TODO: This seems leaky placed here, should be done in `interpreter`, that's where it's ipc
+        // TODO: aware, here might have filtered more important messages.
         let (txs, size) = take_until_max_size(txs, request.max_tx_bytes.try_into().unwrap());
 
         emit(BlockProposalSent {
@@ -648,9 +660,19 @@ where
         let size_txs = txs.iter().map(|tx| tx.len()).sum::<usize>();
         let num_txs = txs.len();
 
+        let (state_params, block_height) =
+            self.state_params_at_height(request.height.value().into())?;
+        let state = FvmExecState::new(
+            self.state_store_clone(),
+            self.multi_engine.as_ref(),
+            block_height as ChainEpoch,
+            state_params,
+        )
+        .context("error creating new state")?;
+
         let accept = self
             .interpreter
-            .process(self.chain_env.clone(), txs)
+            .process((self.chain_env.clone(), state), txs)
             .await
             .context("failed to process proposal")?;
 
