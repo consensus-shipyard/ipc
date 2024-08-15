@@ -1,11 +1,5 @@
-import { extendEnvironment } from 'hardhat/config'
-import { HardhatRuntimeEnvironment } from 'hardhat/types'
+import { extendProvider } from 'hardhat/config'
 import '@nomiclabs/hardhat-ethers'
-import { ProviderError } from 'hardhat/internal/core/providers/errors'
-
-extendEnvironment((hre) => {
-    injectFilecoinProvider(hre)
-})
 
 const emptyBlock = {
     number: '0x0',
@@ -30,42 +24,25 @@ const emptyBlock = {
     uncles: [],
 }
 
-function injectFilecoinProvider(hre: HardhatRuntimeEnvironment) {
+extendProvider((provider) => {
     const interceptedRpcMethods = ['eth_getBlockByNumber', 'eth_getBlockByHash']
-    hre.network.provider = new Proxy(hre.network.provider, {
-        get(target, prop, _receiver) {
-            const orig = (target as any)[prop]
-            // (prop === 'send' || prop === 'sendAsync')
-            // Ethers / Web3 / Hardhat provider classes are a mess and they intermix through the call stack.
-            // With this exact configuration, this code sees ExternalProvider#request(request: { method: string; params?: Array<any>; });
-            // calls only. But if we switch to Hardhat Ignition, this is likely to change.
-            if (!(typeof orig === 'function')) {
-                return orig
+
+    const originalProvider = provider.request.bind(provider)
+    provider.request = async (args) => {
+        try {
+            return await originalProvider(args)
+        } catch (err) {
+            if (
+                interceptedRpcMethods.includes(args.method) &&
+                err.message.includes('requested epoch was a null round')
+            ) {
+                console.warn(`[${args.method}] null round hit, returning empty block`)
+                return emptyBlock
             }
-            let methodFunc: (args: any[]) => string
-            if (prop === 'send' || prop === 'sendAsync') {
-                methodFunc = ([method]: any[]) => method
-            } else if (prop === 'request') {
-                methodFunc = ([{ method }]: any[]) => method
-            } else {
-                return orig
-            }
-            return async (...args: any[]) => {
-                try {
-                    return await (target as any)[prop](...args)
-                } catch (err) {
-                    const method = methodFunc(args)
-                    if (
-                        interceptedRpcMethods.includes(method) &&
-                        err.message.includes('requested epoch was a null round')
-                    ) {
-                        console.warn('null round hit, returning empty block')
-                        return emptyBlock
-                    }
-                    console.log(`Rethrowing error ${err}`)
-                    throw err
-                }
-            }
-        },
-    })
-}
+            console.log(`Rethrowing error ${err}`)
+            throw err
+        }
+    }
+
+    return provider
+})
