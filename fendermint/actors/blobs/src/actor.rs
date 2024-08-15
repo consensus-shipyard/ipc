@@ -75,10 +75,10 @@ impl BlobsActor {
         rt.validate_immediate_caller_accept_any()?;
 
         let st: State = rt.state()?;
-        let foo = st.get_account(params.0).map_err(|e| {
+        let account = st.get_account(params.0).map_err(|e| {
             e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get account")
         })?;
-        Ok(foo)
+        Ok(account)
     }
 
     fn add_blob(rt: &impl Runtime, params: AddBlobParams) -> Result<Account, ActorError> {
