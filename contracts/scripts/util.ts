@@ -56,9 +56,7 @@ export async function deployContractWithDeployer(
 
 export function subnetCreationPrivileges(): SubnetCreationPrivileges {
     const value = process.env.REGISTRY_CREATION_PRIVILEGES || 'unrestricted'
-    return value === 'owner'
-        ? SubnetCreationPrivileges.Owner
-        : SubnetCreationPrivileges.Unrestricted
+    return value === 'owner' ? SubnetCreationPrivileges.Owner : SubnetCreationPrivileges.Unrestricted
 }
 
 export async function getTransactionFees() {
@@ -155,9 +153,7 @@ export async function getRuntimeBytecode(bytecode) {
     }
     const ganacheServer = await startGanache()
 
-    const provider = new providers.JsonRpcProvider(
-        `http://127.0.0.1:${isolatedPort}`,
-    )
+    const provider = new providers.JsonRpcProvider(`http://127.0.0.1:${isolatedPort}`)
     const wallet = new Wallet(process.env.PRIVATE_KEY, provider)
     const contractFactory = new ContractFactory([], bytecode, wallet)
     const contract = await contractFactory.deploy({ gasPrice: 0 })
@@ -171,15 +167,11 @@ export async function getRuntimeBytecode(bytecode) {
 export async function getBytecodeFromFacet(facet) {
     const facetName = facet.name
     const libs = facet.libs
-    const factoryFileName = findFileInDir(
-        `${facetName}__factory.ts`,
-        `./typechain/factories/`,
-    )
+    const factoryFileName = findFileInDir(`${facetName}__factory.ts`, `./typechain/factories/`)
     if (factoryFileName === null) {
         throw new Error('Typescript bindings for Facet not found')
     }
-    const bytecodeNeedsLink =
-        getBytecodeFromFacetTypeChainFilename(factoryFileName)
+    const bytecodeNeedsLink = getBytecodeFromFacetTypeChainFilename(factoryFileName)
     let libs2 = {}
     // Loop through each key in the libs
     for (let key in libs) {
@@ -235,10 +227,7 @@ export async function getOnChainBytecodeFromFacets(facets) {
             // Log the bytecode to the console
         } catch (error) {
             // Print any errors to stderr
-            console.error(
-                `Error fetching bytecode for ${contractAddress}:`,
-                error.message,
-            )
+            console.error(`Error fetching bytecode for ${contractAddress}:`, error.message)
         }
     }
     return deployedBytecode
@@ -288,30 +277,18 @@ function compareArrays(onChain, newArr) {
 
     return result
 }
-async function cutFacetOnChain(
-    diamondAddress: string,
-    replacementFacet: any,
-    action,
-    functionSelectors,
-) {
+async function cutFacetOnChain(diamondAddress: string, replacementFacet: any, action, functionSelectors) {
     const [deployer] = await ethers.getSigners()
     const txArgs = await getTransactionFees()
 
     const facetCuts = [
         {
-            facetAddress:
-                action === FacetCutAction.Remove
-                    ? ethers.constants.AddressZero
-                    : replacementFacet.address,
+            facetAddress: action === FacetCutAction.Remove ? ethers.constants.AddressZero : replacementFacet.address,
             action: action,
             functionSelectors: functionSelectors,
         },
     ]
-    const diamondCutter = await ethers.getContractAt(
-        'DiamondCutFacet',
-        diamondAddress,
-        deployer,
-    )
+    const diamondCutter = await ethers.getContractAt('DiamondCutFacet', diamondAddress, deployer)
     const tx = await diamondCutter.diamondCut(
         facetCuts,
         ethers.constants.AddressZero,
@@ -323,11 +300,7 @@ async function cutFacetOnChain(
 
 // given a facet address and a diamond address,
 // upgrade the diamond to use the new facet
-export async function upgradeFacetOnChain(
-    diamondAddress: string,
-    facet,
-    onChainFunctionSelectors,
-) {
+export async function upgradeFacetOnChain(diamondAddress: string, facet, onChainFunctionSelectors) {
     const replacementFacetName = facet.name
     const facetLibs = facet.libs
     console.info(`
@@ -341,36 +314,20 @@ Replacement Facet Name: ${replacementFacetName}
 
     const [deployer] = await ethers.getSigners()
     const txArgs = await getTransactionFees()
-    let replacementFacet = await deployContractWithDeployer(
-        deployer,
-        replacementFacetName,
-        facetLibs,
-        txArgs,
-    )
+    let replacementFacet = await deployContractWithDeployer(deployer, replacementFacetName, facetLibs, txArgs)
     await replacementFacet.deployed()
 
-    const result = compareArrays(
-        onChainFunctionSelectors,
-        filterSelectors(getSelectors(replacementFacet)),
-    )
+    const result = compareArrays(onChainFunctionSelectors, filterSelectors(getSelectors(replacementFacet)))
 
     async function cutSelectorsOnChain(action, selectors) {
         if (selectors.length > 0) {
-            await cutFacetOnChain(
-                diamondAddress,
-                replacementFacet,
-                action,
-                selectors,
-            )
+            await cutFacetOnChain(diamondAddress, replacementFacet, action, selectors)
         }
     }
 
     // cut changes for each facet cut action - remove replace and add
     await cutSelectorsOnChain(FacetCutAction.Remove, result['removedSelectors'])
-    await cutSelectorsOnChain(
-        FacetCutAction.Replace,
-        result['matchingSelectors'],
-    )
+    await cutSelectorsOnChain(FacetCutAction.Replace, result['matchingSelectors'])
     await cutSelectorsOnChain(FacetCutAction.Add, result['addedSelectors'])
 
     //end move facet
@@ -425,16 +382,9 @@ export async function upgradeFacet(
     if (!onChainFacetBytecodes[facetBytecode]) {
         logMissingFacetInfo(facet)
 
-        const onChainFunctionSelectors =
-            onChainFacets[
-                getDeployedFacetAddressFromName(facet.name, deployments)
-            ]
+        const onChainFunctionSelectors = onChainFacets[getDeployedFacetAddressFromName(facet.name, deployments)]
 
-        const newFacet = await upgradeFacetOnChain(
-            gatewayDiamondAddress,
-            facet,
-            onChainFunctionSelectors,
-        )
+        const newFacet = await upgradeFacetOnChain(gatewayDiamondAddress, facet, onChainFunctionSelectors)
         for (let key in newFacet) updatedFacets[key] = newFacet[key]
 
         const DEPLOYMENT_STATUS_MESSAGE = `

@@ -7,15 +7,11 @@ import { ethers } from 'hardhat'
 const { getSelectors, FacetCutAction } = require('./js/diamond.js')
 
 function getGitCommitSha(): string {
-    const commitSha = require('child_process')
-        .execSync('git rev-parse --short HEAD')
-        .toString()
-        .trim()
+    const commitSha = require('child_process').execSync('git rev-parse --short HEAD').toString().trim()
     return commitSha
 }
 export async function deploy(libs: { [key in string]: string }) {
-    if (!libs || Object.keys(libs).length === 0)
-        throw new Error(`Libraries are missing`)
+    if (!libs || Object.keys(libs).length === 0) throw new Error(`Libraries are missing`)
 
     // choose chain ID according to the network in
     // environmental variable
@@ -32,12 +28,7 @@ export async function deploy(libs: { [key in string]: string }) {
 
     const [deployer] = await ethers.getSigners()
     const balance = await ethers.provider.getBalance(deployer.address)
-    console.log(
-        'Deploying gateway with the account:',
-        deployer.address,
-        ' balance:',
-        ethers.utils.formatEther(balance),
-    )
+    console.log('Deploying gateway with the account:', deployer.address, ' balance:', ethers.utils.formatEther(balance))
 
     const txArgs = await getTransactionFees()
 
@@ -96,12 +87,7 @@ export async function deploy(libs: { [key in string]: string }) {
     ]
 
     for (const facet of facets) {
-        const facetInstance = await deployContractWithDeployer(
-            deployer,
-            facet.name,
-            facet.libs,
-            txArgs,
-        )
+        const facetInstance = await deployContractWithDeployer(deployer, facet.name, facet.libs, txArgs)
         await facetInstance.deployed()
 
         facet.address = facetInstance.address

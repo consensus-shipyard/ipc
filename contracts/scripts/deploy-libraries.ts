@@ -18,32 +18,12 @@ export async function deploy() {
 
     const txArgs = await getTransactionFees()
 
-    const { address: accountHelperAddress } = await deployContractWithDeployer(
-        deployer,
-        'AccountHelper',
-        {},
-        txArgs,
-    )
-    const { address: libStakingAddress } = await deployContractWithDeployer(
-        deployer,
-        'LibStaking',
-        {},
-        txArgs,
-    )
+    const { address: accountHelperAddress } = await deployContractWithDeployer(deployer, 'AccountHelper', {}, txArgs)
+    const { address: libStakingAddress } = await deployContractWithDeployer(deployer, 'LibStaking', {}, txArgs)
 
-    const { address: subnetIDHelperAddress } = await deployContractWithDeployer(
-        deployer,
-        'SubnetIDHelper',
-        {},
-        txArgs,
-    )
+    const { address: subnetIDHelperAddress } = await deployContractWithDeployer(deployer, 'SubnetIDHelper', {}, txArgs)
 
-    const { address: libQuorumAddress } = await deployContractWithDeployer(
-        deployer,
-        'LibQuorum',
-        {},
-        txArgs,
-    )
+    const { address: libQuorumAddress } = await deployContractWithDeployer(deployer, 'LibQuorum', {}, txArgs)
 
     // nested libs
     const { address: crossMsgHelperAddress } = await deployContractWithDeployer(

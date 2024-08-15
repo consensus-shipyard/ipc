@@ -1,8 +1,4 @@
-import {
-    deployContractWithDeployer,
-    getTransactionFees,
-    subnetCreationPrivileges,
-} from './util'
+import { deployContractWithDeployer, getTransactionFees, subnetCreationPrivileges } from './util'
 import { ethers } from 'hardhat'
 
 const { getSelectors, FacetCutAction } = require('./js/diamond.js')
@@ -11,11 +7,7 @@ export async function deploy() {
     const [deployer] = await ethers.getSigners()
     const balance = await deployer.getBalance()
 
-    console.log(
-        `Deploying contracts with account: ${
-            deployer.address
-        } and balance: ${balance.toString()}`,
-    )
+    console.log(`Deploying contracts with account: ${deployer.address} and balance: ${balance.toString()}`)
 
     const mode = subnetCreationPrivileges()
     console.log(
@@ -52,12 +44,7 @@ export async function deploy() {
         address: getterFacet.address,
     })
 
-    const managerFacet = await deployContractWithDeployer(
-        deployer,
-        'SubnetActorManagerFacet',
-        {},
-        txArgs,
-    )
+    const managerFacet = await deployContractWithDeployer(deployer, 'SubnetActorManagerFacet', {}, txArgs)
     const managerSelectors = getSelectors(managerFacet)
 
     subnetActorDeployFacets.push({
@@ -66,12 +53,7 @@ export async function deploy() {
         address: managerFacet.address,
     })
 
-    const pauserFacet = await deployContractWithDeployer(
-        deployer,
-        'SubnetActorPauseFacet',
-        {},
-        txArgs,
-    )
+    const pauserFacet = await deployContractWithDeployer(deployer, 'SubnetActorPauseFacet', {}, txArgs)
     const pauserSelectors = getSelectors(pauserFacet)
 
     subnetActorDeployFacets.push({
@@ -80,12 +62,7 @@ export async function deploy() {
         address: pauserFacet.address,
     })
 
-    const rewarderFacet = await deployContractWithDeployer(
-        deployer,
-        'SubnetActorRewardFacet',
-        {},
-        txArgs,
-    )
+    const rewarderFacet = await deployContractWithDeployer(deployer, 'SubnetActorRewardFacet', {}, txArgs)
     const rewarderSelectors = getSelectors(rewarderFacet)
     subnetActorDeployFacets.push({
         name: 'SubnetActorRewardFacet',
@@ -93,12 +70,7 @@ export async function deploy() {
         address: rewarderFacet.address,
     })
 
-    const checkpointerFacet = await deployContractWithDeployer(
-        deployer,
-        'SubnetActorCheckpointingFacet',
-        {},
-        txArgs,
-    )
+    const checkpointerFacet = await deployContractWithDeployer(deployer, 'SubnetActorCheckpointingFacet', {}, txArgs)
     const checkpointerSelectors = getSelectors(checkpointerFacet)
     subnetActorDeployFacets.push({
         name: 'SubnetActorCheckpointingFacet',
@@ -106,12 +78,7 @@ export async function deploy() {
         address: checkpointerFacet.address,
     })
 
-    const diamondCutFacet = await deployContractWithDeployer(
-        deployer,
-        'DiamondCutFacet',
-        {},
-        txArgs,
-    )
+    const diamondCutFacet = await deployContractWithDeployer(deployer, 'DiamondCutFacet', {}, txArgs)
     const diamondCutSelectors = getSelectors(diamondCutFacet)
     subnetActorDeployFacets.push({
         name: 'DiamondCutFacet',
@@ -119,12 +86,7 @@ export async function deploy() {
         address: diamondCutFacet.address,
     })
 
-    const diamondLoupeFacet = await deployContractWithDeployer(
-        deployer,
-        'DiamondLoupeFacet',
-        {},
-        txArgs,
-    )
+    const diamondLoupeFacet = await deployContractWithDeployer(deployer, 'DiamondLoupeFacet', {}, txArgs)
     const diamondLoupeSelectors = getSelectors(diamondLoupeFacet)
     subnetActorDeployFacets.push({
         name: 'DiamondLoupeFacet',
@@ -132,12 +94,7 @@ export async function deploy() {
         address: diamondLoupeFacet.address,
     })
 
-    const ownershipFacet = await deployContractWithDeployer(
-        deployer,
-        'OwnershipFacet',
-        {},
-        txArgs,
-    )
+    const ownershipFacet = await deployContractWithDeployer(deployer, 'OwnershipFacet', {}, txArgs)
     const ownershipSelectors = getSelectors(ownershipFacet)
     subnetActorDeployFacets.push({
         name: 'OwnershipFacet',
@@ -187,12 +144,7 @@ export async function deploy() {
     ]
 
     for (const facet of facets) {
-        const facetInstance = await deployContractWithDeployer(
-            deployer,
-            facet.name,
-            facet.libs,
-            txArgs,
-        )
+        const facetInstance = await deployContractWithDeployer(deployer, facet.name, facet.libs, txArgs)
         await facetInstance.deployed()
 
         facet.address = facetInstance.address
