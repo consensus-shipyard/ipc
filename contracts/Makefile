@@ -1,6 +1,5 @@
 # Targets that are commands.
-COMMANDS :=  deploy-ipc deploy-subnet-registry deploy-subnet upgrade-gw-diamond upgrade-sa-diamond \
-             upgrade-sr-diamond gen compile-abi rust-binding slither lint fmt deps build \
+COMMANDS :=  deploy-stack gen compile-abi rust-binding slither lint fmt deps build \
              test install-dev install-npm-package install-eth-abi storage clean coverage \
              prepare build-selector-library forge
 
@@ -32,23 +31,8 @@ NETWORK ?= auto
 # It is required by docker builds, but shouldn't be checked into git.
 OUTPUT ?= out
 
-deploy-ipc:
-	./ops/deploy.sh $(NETWORK)
-
-deploy-subnet-registry:
-	./ops/deploy-subnet-registry.sh $(NETWORK)
-
-deploy-subnet:
-	./ops/deploy-subnet.sh $(NETWORK)
-
-upgrade-gw-diamond:
-	./ops/upgrade-gw-diamond.sh $(NETWORK)
-
-upgrade-sa-diamond:
-	./ops/upgrade-sa-diamond.sh $(NETWORK) $(SUBNET_ACTOR_ADDRESS)
-
-upgrade-sr-diamond:
-	./ops/upgrade-sr-diamond.sh $(NETWORK)
+deploy-stack:
+	pnpm exec hardhat deploy-stack --network $(NETWORK)
 
 # ==============================================================================
 # Code generation
