@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.ref_name }}
-      - name: Copy deployment script files to the host
+      - name: Copy deployment script to the host
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
@@ -24,25 +24,9 @@ jobs:
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
           source: "scripts/deploy_subnet_under_calibration_net/deploy.sh"
           target: "/home/textile"
-      - name: Copy config files to the host
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
-          username: textile
-          key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
-          source: "scripts/deploy_subnet_under_calibration_net/.ipc"
-          target: "/home/textile"
-      - name: Set up ipc config folder on the host
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
-          username: textile
-          key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
-          script: (rm -rf /home/textile/.ipc || rm -rf /home/textile/.ipc) && cp -r /home/textile/scripts/deploy_subnet_under_calibration_net/.ipc /home/textile/
       - name: Create wallet file locally
         run: |
           echo '${{ secrets.CI_TEST_WALLET_JSON }}' > evm_keystore.json
-          echo '${{ secrets.CI_TEST_PROXY_WALLET_JSON }}' | tr -d '\n' > evm_keystore_proxy.json
       - name: Copy wallet file to the host
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -50,20 +34,12 @@ jobs:
           username: textile
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
           source: "evm_keystore.json"
-          target: "/home/textile/.ipc"
-      - name: Copy proxy wallet file to the host
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
-          username: textile
-          key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
-          source: "evm_keystore_proxy.json"
-          target: "/home/textile/.ipc"
+          target: "/home/textile"
       - name: Run deploy scripts on the host
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
           username: textile
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
-          script: PARENT_HTTP_AUTH_TOKEN=${{ secrets.PARENT_HTTP_AUTH_TOKEN }} bash -il /home/textile/scripts/deploy_subnet_under_calibration_net/deploy.sh ${{ github.ref_name }}
+          script: PARENT_GATEWAY_ADDRESS=${{ secrets.PARENT_GATEWAY_ADDRESS }} PARENT_REGISTRY_ADDRESS=${{ secrets.PARENT_REGISTRY_ADDRESS }} PARENT_HTTP_AUTH_TOKEN=${{ secrets.PARENT_HTTP_AUTH_TOKEN }} bash -il /home/textile/scripts/deploy_subnet_under_calibration_net/deploy.sh ${{ github.ref_name }}
           command_timeout: 120m
