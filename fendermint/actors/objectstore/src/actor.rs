@@ -203,7 +203,7 @@ mod tests {
     use fil_actors_runtime::test_utils::{
         expect_empty, MockRuntime, ETHACCOUNT_ACTOR_CODE_ID, SYSTEM_ACTOR_CODE_ID,
     };
-    use fil_actors_runtime::{INIT_ACTOR_ADDR};
+    use fil_actors_runtime::INIT_ACTOR_ADDR;
     use fvm_ipld_encoding::ipld_block::IpldBlock;
     use fvm_shared::address::Address;
     use fvm_shared::econ::TokenAmount;
