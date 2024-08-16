@@ -93,6 +93,7 @@ impl Actor {
     fn delete_object(rt: &impl Runtime, params: DeleteParams) -> Result<Cid, ActorError> {
         Self::ensure_write_allowed(rt)?;
         let key = BytesKey(params.key);
+        // 1. Retrieve object CID
         let state = rt.state::<State>()?;
         let store = rt.store();
         let object = state
@@ -108,13 +109,14 @@ impl Actor {
             anyhow::Error::from(e)
                 .downcast_default(ExitCode::USR_ILLEGAL_STATE, "stored cid is invalid")
         })?;
+        // 2. Delete from the blobs actor
         extract_send_result(rt.send_simple(
             &ext::blobs::BLOBS_ACTOR_ADDR,
             ext::blobs::DELETE_BLOB_METHOD,
             IpldBlock::serialize_cbor(&ext::blobs::DeleteBlobParams(cid))?,
             rt.message().value_received(),
         ))?;
-
+        // 3. Delete from the state
         let res = rt.transaction(|st: &mut State, rt| {
             st.delete(rt.store(), &key).map_err(|e| {
                 e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to delete object")
@@ -125,6 +127,12 @@ impl Actor {
 
     // TODO: fetch blob from blobs actor
     // TODO SU: How is Blob included in Object?? Shall we return Blob??
+    // TODO SU: Delete the comment below.
+    // From Sander: I think here we need to:
+    //
+    // Look up the Object in this actor's State
+    // Use it's cid to lookup the Blob from blob actor
+    // Return some new struct that includes the Blob and the Object's metadata (which is the only state that won't exist on Blob. We can clean up the Object struct to just be cid and metadata.
     fn get_object(rt: &impl Runtime, params: GetParams) -> Result<Option<Object>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
