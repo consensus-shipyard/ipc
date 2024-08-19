@@ -88,7 +88,7 @@ jobs:
       - name: Build Fendermint Docker Image
         env:
           PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
-        run: cd fendermint && make docker-build
+        run: cd fendermint && PROFILE=ci make docker-build
 
       - name: Export
         run: docker save fendermint:latest > /tmp/fendermint.tar
