@@ -1,20 +1,12 @@
-name: Fendermint CI - Test
+name: Fendermint Build Docker
 
 # This workflow is triggered from the main CI workflow.
 on:
   workflow_call:
 
-env:
-  CARGO_INCREMENTAL: '0'
-  SCCACHE_CACHE_SIZE: 10G
-  CC: "sccache clang"
-  CXX: "sccache clang++"
-  PROFILE: "ci"
-  BUILDX_FLAGS: "--cache-from=type=gha --cache-to=type=gha,mode=max"
-
 jobs:
   # Check code formatting; anything that doesn't require compilation.
-  pre-compile-checks:
+  build-docker:
     # Skip tests on draft PRs, they take a long time, and drafts are for visibility.
     if: ${{ !github.event.pull_request.draft }}
 
