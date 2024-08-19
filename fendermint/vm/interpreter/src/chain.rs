@@ -242,9 +242,7 @@ where
                 .await;
                 if is_globally_resolved {
                     tracing::debug!(cid = ?item.hash, "blob has quorum; adding tx to chain");
-                    blobs.push(ChainMessage::Ipc(IpcMessage::BlobResolved(
-                        item.hash,
-                    )));
+                    blobs.push(ChainMessage::Ipc(IpcMessage::BlobResolved(item.hash)));
                 }
             }
             state

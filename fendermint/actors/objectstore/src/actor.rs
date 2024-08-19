@@ -320,7 +320,7 @@ mod tests {
         let add_params: AddParams = AddParams {
             store: f4_eth_addr,
             key: key.clone(),
-            cid: cid,
+            cid,
             size: 20,
             metadata: HashMap::new(),
             overwrite: false,
