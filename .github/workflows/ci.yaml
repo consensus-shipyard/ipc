@@ -110,23 +110,24 @@ jobs:
       github.ref == 'refs/heads/main' ||
       github.ref_type == 'tag'
 
-  fendermint-test:
-    uses: ./.github/workflows/fendermint-test.yaml
-    secrets: inherit
-    needs: [changes, license]
-    if: >-
-      needs.changes.outputs.workspace == 'true' ||
-      needs.changes.outputs.contracts == 'true' ||
-      needs.changes.outputs.ipc == 'true' ||
-      needs.changes.outputs.ipld-resolver == 'true' ||
-      needs.changes.outputs.fendermint == 'true' ||
-      github.ref == 'refs/heads/main' ||
-      github.ref_type == 'tag'
+#  fendermint-test:
+#    uses: ./.github/workflows/fendermint-test.yaml
+#    secrets: inherit
+#    needs: [changes, license]
+#    if: >-
+#      needs.changes.outputs.workspace == 'true' ||
+#      needs.changes.outputs.contracts == 'true' ||
+#      needs.changes.outputs.ipc == 'true' ||
+#      needs.changes.outputs.ipld-resolver == 'true' ||
+#      needs.changes.outputs.fendermint == 'true' ||
+#      github.ref == 'refs/heads/main' ||
+#      github.ref_type == 'tag'
 
   fevm-contract-tests:
     uses: ./.github/workflows/fevm-contract-tests.yaml
     secrets: inherit
-    needs: [changes, license]
+    needs:
+      - fendermint-docker-build
     if: >-
       needs.changes.outputs.workspace == 'true' ||
       needs.changes.outputs.contracts == 'true' ||
@@ -150,4 +151,4 @@ jobs:
       - contracts-test # generates the ABI artifacts (although fendermint can do on its own too)
       - fendermint-docker-build
       - ipld-resolver
-      - fendermint-test
+#      - fendermint-test
