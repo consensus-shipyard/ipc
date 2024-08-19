@@ -248,7 +248,7 @@ pub mod tests {
 
         let signed = SignedMessage {
             message: msg1,
-            signature: Signature::new_secp256k1(sig.to_vec())
+            signature: Signature::new_secp256k1(sig.to_vec()),
         };
 
         signed.verify(&chain_id).expect("signature should be valid")
