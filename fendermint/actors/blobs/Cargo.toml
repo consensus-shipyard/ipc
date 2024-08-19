@@ -13,7 +13,7 @@ crate-type = ["cdylib", "lib"]
 
 [dependencies]
 anyhow = { workspace = true }
-cid = { workspace = true, default-features = false }
+iroh-base = { workspace = true, features = ["key", "wasm"] }
 log = { workspace = true, features = ["std"] }
 multihash = { workspace = true, default-features = false, features = ["blake3"] }
 num-derive = { workspace = true }

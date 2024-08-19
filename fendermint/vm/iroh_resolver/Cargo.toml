@@ -6,11 +6,8 @@ authors.workspace = true
 edition.workspace = true
 license.workspace = true
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 async-stm = { workspace = true }
-cid = { workspace = true }
 im = { workspace = true }
 iroh = { workspace = true }
 libp2p = { workspace = true }
@@ -24,4 +21,5 @@ ipc_ipld_resolver = { workspace = true }
 fendermint_vm_topdown = { path = "../topdown" }
 
 [dev-dependencies]
+rand = { workspace = true }
 tokio = { workspace = true }

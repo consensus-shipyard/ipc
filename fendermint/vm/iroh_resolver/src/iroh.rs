@@ -5,10 +5,10 @@
 use std::time::Duration;
 
 use async_stm::{atomically, atomically_or_err, queues::TQueueLike};
-use cid::Cid;
 use fendermint_vm_topdown::voting::VoteTally;
 use ipc_api::subnet_id::SubnetID;
 use ipc_ipld_resolver::{Client, ResolverIroh, ValidatorKey, VoteRecord};
+use iroh::blobs::Hash;
 use libp2p::identity::Keypair;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -24,7 +24,7 @@ pub struct IrohResolver<V> {
     vote_tally: VoteTally,
     key: Keypair,
     subnet_id: SubnetID,
-    to_vote: fn(Cid) -> V,
+    to_vote: fn(Hash) -> V,
 }
 
 impl<V> IrohResolver<V>
@@ -38,7 +38,7 @@ where
         vote_tally: VoteTally,
         key: Keypair,
         subnet_id: SubnetID,
-        to_vote: fn(Cid) -> V,
+        to_vote: fn(Hash) -> V,
     ) -> Self {
         Self {
             client,
@@ -85,13 +85,13 @@ fn start_resolve<V>(
     vote_tally: VoteTally,
     key: Keypair,
     subnet_id: SubnetID,
-    to_vote: fn(Cid) -> V,
+    to_vote: fn(Hash) -> V,
 ) where
     V: Clone + Send + Sync + Serialize + DeserializeOwned + 'static,
 {
     tokio::spawn(async move {
-        tracing::debug!(cid = ?task.cid(), "starting iroh content resolve");
-        let res = client.resolve_iroh(task.cid(), task.node_addr()).await;
+        tracing::debug!(hash = ?task.hash(), "starting iroh blob resolve");
+        let res = client.resolve_iroh(task.hash(), task.node_addr()).await;
 
         let err = match res {
             Err(e) => {
@@ -109,18 +109,21 @@ fn start_resolve<V>(
 
         match err {
             None => {
-                tracing::debug!(cid = ?task.cid(), "iroh content resolved");
+                tracing::debug!(cid = ?task.hash(), "iroh blob resolved");
 
                 // Mark task as resolved
                 atomically(|| task.set_resolved()).await;
 
-                let vote = to_vote(task.cid());
+                let vote = to_vote(task.hash());
                 match VoteRecord::signed(&key, subnet_id, vote) {
                     Ok(vote) => {
                         // Add our own vote
                         let validator_key = ValidatorKey::from(key.public());
                         let res = atomically_or_err(|| {
-                            vote_tally.add_blob_vote(validator_key.clone(), task.cid().to_bytes())
+                            vote_tally.add_blob_vote(
+                                validator_key.clone(),
+                                task.hash().as_bytes().to_vec(),
+                            )
                         })
                         .await;
 
@@ -148,9 +151,9 @@ fn start_resolve<V>(
             }
             Some(e) => {
                 tracing::error!(
-                    cid = ?task.cid(),
+                    cid = ?task.hash(),
                     error = e.to_string(),
-                    "iroh content resolution failed; retrying later"
+                    "iroh blob resolution failed; retrying later"
                 );
                 schedule_retry(task, queue, retry_delay);
             }
@@ -171,7 +174,7 @@ fn start_resolve<V>(
 fn schedule_retry(task: ResolveTask, queue: ResolveQueue, retry_delay: Duration) {
     tokio::spawn(async move {
         tokio::time::sleep(retry_delay).await;
-        tracing::debug!(cid = ?task.cid(), "retrying content resolution");
+        tracing::debug!(cid = ?task.hash(), "retrying blob resolution");
         atomically(move || queue.write(task.clone())).await;
     });
 }

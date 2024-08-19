@@ -16,6 +16,7 @@ anyhow = { workspace = true }
 cid = { workspace = true, default-features = false }
 fil_actors_runtime = { workspace = true }
 frc42_dispatch = { workspace = true }
+iroh-base = { workspace = true, features = ["key", "wasm"] }
 log = { workspace = true, features = ["std"] }
 num-derive = { workspace = true }
 num-traits = { workspace = true }
@@ -35,6 +36,7 @@ fil_actors_runtime = { workspace = true, features = [
 ] }
 quickcheck = { workspace = true }
 quickcheck_macros = { workspace = true }
+rand = { workspace = true }
 
 [features]
 fil-actor = ["fil_actors_runtime/fil-actor"]

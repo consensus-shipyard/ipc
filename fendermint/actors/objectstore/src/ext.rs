@@ -3,9 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 pub mod blobs {
-    use cid::Cid;
     use fvm_ipld_encoding::tuple::*;
     use fvm_shared::{address::Address, bigint::BigInt, clock::ChainEpoch, ActorID};
+    use iroh_base::hash::Hash;
+    use iroh_base::key::PublicKey;
 
     pub const BLOBS_ACTOR_ID: ActorID = 49;
     pub const BLOBS_ACTOR_ADDR: Address = Address::new_id(BLOBS_ACTOR_ID);
@@ -30,13 +31,15 @@ pub mod blobs {
     /// Params for adding a blob.
     #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
     pub struct AddBlobParams {
-        /// Blob content identifier.
-        pub cid: Cid,
+        /// Robust address of caller. Required if the caller is a machine.
+        pub from: Option<Address>,
+        /// Source Iroh node ID used for ingestion.
+        pub source: PublicKey,
+        /// Blob blake3 hash.
+        pub hash: Hash,
         /// Blob size.
         pub size: u64,
         /// Blob expiry epoch.
         pub expiry: ChainEpoch,
-        /// Optional source actor robust address. Required is source is a machine.
-        pub source: Option<Address>,
     }
 }

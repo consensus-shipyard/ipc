@@ -2,15 +2,16 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, HashMap};
 
 use anyhow::anyhow;
-use cid::Cid;
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
+use iroh_base::hash::Hash;
+use iroh_base::key::PublicKey;
 use num_traits::{ToPrimitive, Zero};
 
 use crate::GetStatsReturn;
@@ -35,10 +36,9 @@ pub struct State {
     /// TODO: add list of blobs to account
     pub accounts: HashMap<Address, Account>,
     /// Map containing all blobs.
-    /// TODO: After merging Iroh branch, this should be HashMap<iroh_base::Hash, Blob>
-    pub blobs: HashMap<Vec<u8>, Blob>,
+    pub blobs: HashMap<Hash, Blob>,
     /// Set of currently resolving blob hashes.
-    pub resolving: BTreeSet<Vec<u8>>,
+    pub resolving: BTreeMap<Hash, PublicKey>,
 }
 
 /// The stored representation of a credit account.
@@ -64,6 +64,7 @@ pub struct Blob {
     /// TODO: add subs
     //pub subs: HashMap<Address, Subscription>,
     /// Whether the blob has been resolved.
+    pub source_node_id: PublicKey,
     /// TODO: change to enum: resolving, resolved, failed
     pub resolved: bool,
 }
@@ -85,7 +86,7 @@ impl State {
             credit_debit_rate,
             accounts: HashMap::new(),
             blobs: HashMap::new(),
-            resolving: BTreeSet::new(),
+            resolving: BTreeMap::new(),
         })
     }
 
@@ -150,9 +151,10 @@ impl State {
         &mut self,
         sender: Address,
         current_epoch: ChainEpoch,
-        cid: Cid,
+        hash: Hash,
         size: u64,
         expiry: ChainEpoch,
+        source_node_id: PublicKey,
     ) -> anyhow::Result<Account> {
         if expiry <= current_epoch {
             return Err(anyhow!("expiry must be in the future"));
@@ -187,13 +189,13 @@ impl State {
                 account.credit_committed += &required_credit;
                 account.credit_free -= &required_credit;
 
-                let key = cid.to_bytes();
-                self.resolving.insert(key.clone());
+                self.resolving.insert(hash, source_node_id);
                 self.blobs.insert(
-                    key,
+                    hash,
                     Blob {
                         size: size.to_u64().unwrap(),
                         expiry,
+                        source_node_id,
                         resolved: false,
                     },
                 );
@@ -204,23 +206,21 @@ impl State {
         }
     }
 
-    pub fn get_resolving_blobs(&self) -> anyhow::Result<BTreeSet<Vec<u8>>> {
+    pub fn get_resolving_blobs(&self) -> anyhow::Result<BTreeMap<Hash, PublicKey>> {
         Ok(self.resolving.clone())
     }
 
-    pub fn is_blob_resolving(&self, cid: Cid) -> anyhow::Result<bool> {
-        let key = cid.to_bytes();
-        let resolving = self.resolving.contains(&key);
+    pub fn is_blob_resolving(&self, hash: Hash) -> anyhow::Result<bool> {
+        let resolving = self.resolving.contains_key(&hash);
         Ok(resolving)
     }
 
     // TODO: Need method for unresolving, ie, if a blob can't be fetched, the account
     // shouldn't have to pay for it since there's no way to know who's at fault (account user or too
     // many bad validators).
-    pub fn resolve_blob(&mut self, cid: Cid) -> anyhow::Result<()> {
-        let key = cid.to_bytes();
-        self.resolving.remove(&key);
-        match self.blobs.get_mut(&key) {
+    pub fn resolve_blob(&mut self, hash: Hash) -> anyhow::Result<()> {
+        self.resolving.remove(&hash);
+        match self.blobs.get_mut(&hash) {
             Some(blob) => {
                 blob.resolved = true;
                 Ok(())
@@ -232,15 +232,13 @@ impl State {
 
     // TODO: Reverse accounting in add and return Account.
     // We need a syscall to delete the actual data (or at least untangle it from new data).
-    pub fn delete_blob(&mut self, cid: Cid) -> anyhow::Result<()> {
-        let key = cid.to_bytes();
-        self.blobs.remove(&key);
+    pub fn delete_blob(&mut self, hash: Hash) -> anyhow::Result<()> {
+        self.blobs.remove(&hash);
         Ok(())
     }
 
-    pub fn get_blob(&self, cid: Cid) -> anyhow::Result<Option<Blob>> {
-        let key = cid.to_bytes();
-        let blob = self.blobs.get(&key).cloned();
+    pub fn get_blob(&self, hash: Hash) -> anyhow::Result<Option<Blob>> {
+        let blob = self.blobs.get(&hash).cloned();
         Ok(blob)
     }
 }

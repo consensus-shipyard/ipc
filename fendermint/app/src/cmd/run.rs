@@ -29,7 +29,7 @@ use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::proxy::IPCProviderProxy;
 use fendermint_vm_topdown::sync::launch_polling_syncer;
 use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
-use fendermint_vm_topdown::{CachedFinalityProvider, IPCObjectFinality, IPCParentFinality, Toggle};
+use fendermint_vm_topdown::{CachedFinalityProvider, IPCBlobFinality, IPCParentFinality, Toggle};
 use fvm_shared::address::{current_network, Address, Network};
 use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
@@ -232,7 +232,7 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
                 parent_finality_votes.clone(),
                 key,
                 own_subnet_id,
-                |value| AppVote::ObjectFinality(IPCObjectFinality { object: value }),
+                |value| AppVote::BlobFinality(IPCBlobFinality(value)),
             );
 
             info!("starting the iroh Resolver...");
@@ -622,11 +622,12 @@ async fn dispatch_vote(
                 )
             }
         }
-        AppVote::ObjectFinality(f) => {
-            debug!(cid = ?f.object, "received vote for object finality");
+        AppVote::BlobFinality(f) => {
+            debug!(cid = ?f.0, "received vote for blob finality");
 
             let res = atomically_or_err(|| {
-                parent_finality_votes.add_blob_vote(vote.public_key.clone(), f.object.to_bytes())
+                parent_finality_votes
+                    .add_blob_vote(vote.public_key.clone(), f.0.as_bytes().to_vec())
             })
             .await;
 

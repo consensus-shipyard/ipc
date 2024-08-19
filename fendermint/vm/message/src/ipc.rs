@@ -6,6 +6,8 @@ use fvm_shared::{
     address::Address, clock::ChainEpoch, crypto::signature::Signature, econ::TokenAmount,
 };
 use ipc_api::subnet_id::SubnetID;
+use iroh_base::hash::Hash;
+use iroh_base::key::NodeId;
 use serde::{Deserialize, Serialize};
 
 /// Messages involved in InterPlanetary Consensus.
@@ -29,8 +31,8 @@ pub enum IpcMessage {
     /// state that to be checked and voted by validators.
     TopDownExec(ParentFinality),
 
-    /// Proposed by validators when an object accompanying a message has been resolved and is ready to be executed.
-    BlobResolved(Cid),
+    /// Proposed by validators when a blob has been resolved and is ready to be executed.
+    BlobResolved(Blob),
 }
 
 /// A message relayed by a user on the current subnet.
@@ -104,6 +106,15 @@ pub struct ParentFinality {
     pub height: ChainEpoch,
     /// The block hash of the parent, expressed as bytes
     pub block_hash: Vec<u8>,
+}
+
+/// A blob resolution target that the validators will be voting on.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct Blob {
+    /// The blake3 hash of the blob.
+    pub hash: Hash,
+    /// The node ID of the source node serving validators the blob.
+    pub source: NodeId,
 }
 
 #[cfg(feature = "arb")]

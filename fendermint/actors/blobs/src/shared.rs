@@ -2,13 +2,14 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use cid::Cid;
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::METHOD_CONSTRUCTOR;
+use iroh_base::hash::Hash;
+use iroh_base::key::PublicKey;
 use num_derive::FromPrimitive;
 use serde::{Deserialize, Serialize};
 
@@ -38,30 +39,32 @@ pub struct GetAccountParams(pub Address);
 /// Params for adding a blob.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct AddBlobParams {
-    /// Blob content identifier.
-    pub cid: Cid,
+    /// Robust address of caller. Required if the caller is a machine.
+    pub from: Option<Address>,
+    /// Source Iroh node ID used for ingestion.
+    pub source: PublicKey,
+    /// Blob blake3 hash.
+    pub hash: Hash,
     /// Blob size.
     pub size: u64,
     /// Blob expiry epoch.
     pub expiry: ChainEpoch,
-    /// Optional source actor robust address. Required is source is a machine.
-    pub source: Option<Address>,
 }
 
 /// Params for resolving a blob.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct ResolveBlobParams(pub Cid);
+pub struct ResolveBlobParams(pub Hash);
 
 /// Params for deleting a blob.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct DeleteBlobParams(pub Cid);
+pub struct DeleteBlobParams(pub Hash);
 
 /// Params for getting a blob.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct GetBlobParams(pub Cid);
+pub struct GetBlobParams(pub Hash);
 
 /// The stats of the blob actor.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]

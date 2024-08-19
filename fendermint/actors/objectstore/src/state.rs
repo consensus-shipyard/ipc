@@ -5,9 +5,10 @@
 use cid::Cid;
 use fendermint_actor_machine::{Kind, MachineState, WriteAccess};
 use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding::{strict_bytes::ByteBuf, tuple::*};
+use fvm_ipld_encoding::tuple::*;
 use fvm_ipld_hamt::{BytesKey, Hamt};
 use fvm_shared::address::Address;
+use iroh_base::hash::Hash;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -49,9 +50,9 @@ impl MachineState for State {
 /// The stored representation of an object in the object store.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Object {
-    /// The object content identifier.
-    pub cid: ByteBuf,
-    /// The size of the content.
+    /// The object blake3 hash.
+    pub hash: Hash,
+    /// The object size.
     pub size: usize,
     /// Whether the object has been resolved.
     pub resolved: bool,
@@ -96,14 +97,14 @@ impl State {
         &mut self,
         store: &BS,
         key: BytesKey,
-        cid: Cid,
+        hash: Hash,
         size: usize,
         metadata: HashMap<String, String>,
         overwrite: bool,
     ) -> anyhow::Result<Cid> {
         let mut hamt = Hamt::<_, Object>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
         let object = Object {
-            cid: ByteBuf(cid.to_bytes()),
+            hash,
             size,
             resolved: false,
             metadata,
@@ -121,13 +122,13 @@ impl State {
         &mut self,
         store: &BS,
         key: BytesKey,
-        value: Cid,
+        hash: Hash,
     ) -> anyhow::Result<()> {
         let mut hamt = Hamt::<_, Object>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
         match hamt.get(&key).map(|v| v.cloned())? {
             Some(mut object) => {
                 // Ignore if value changed before it was resolved.
-                if object.cid.0 == value.to_bytes() {
+                if object.hash == hash {
                     object.resolved = true;
                     hamt.set(key, object)?;
                     self.root = hamt.flush()?;
@@ -218,52 +219,74 @@ impl State {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cid::multihash::{Code, MultihashDigest};
-    use fendermint_testing::arb::ArbCid;
-    use fil_actors_runtime::MapKey;
     use fvm_ipld_blockstore::MemoryBlockstore;
-    use fvm_ipld_encoding::DAG_CBOR;
     use quickcheck::Arbitrary;
     use quickcheck_macros::quickcheck;
+    use rand::Rng;
     use std::str::FromStr;
+
+    pub fn new_hash() -> (Hash, usize) {
+        let mut rng = rand::thread_rng();
+        let mut data = [0u8; 256];
+        rng.fill(&mut data);
+        (Hash::new(&data), 256)
+    }
 
     impl Arbitrary for Object {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+            let hash = new_hash();
             Object {
-                cid: ByteBuf(ArbCid::<64>::arbitrary(g).0.to_bytes()),
-                size: usize::arbitrary(g),
+                hash: hash.0,
+                size: hash.1,
                 metadata: HashMap::arbitrary(g),
                 resolved: false,
             }
         }
     }
 
-    fn default_object() -> Object {
-        Object {
-            cid: ByteBuf(Cid::default().to_bytes()),
-            size: 0,
-            metadata: HashMap::<String, String>::new(),
-            resolved: false,
-        }
-    }
-
-    fn golden_object() -> Object {
-        let mh_code = Code::Blake2b256;
-        let mh = mh_code.digest(&[1, 2, 3, 4, 5]);
-        let cid = Cid::new_v1(DAG_CBOR, mh);
+    fn object_one() -> Object {
+        let data = [1, 2, 3, 4, 5];
+        let hash = Hash::new(&data);
         let mut metadata = HashMap::<String, String>::new();
-        metadata.insert("_size".to_string(), String::from("5"));
         metadata.insert("_created".to_string(), String::from("1718464344"));
         metadata.insert("_modified".to_string(), String::from("1718464345"));
         Object {
-            cid: ByteBuf(cid.to_bytes()),
-            size: 5,
+            hash,
+            size: data.len(),
             metadata,
             resolved: false,
         }
     }
 
-    const GOLDEN_CID: &str = "bafy2bzacebmog6w3ept45xctbw3lrt76i3rdbeaib6bikuhcddu5y5bqspozu";
+    const OBJECT_ONE_CID: &str = "bafy2bzacedsbogmen4uphnul5x3g2dh6bbxc7g6nyhjft2fubovuf6un7uvk2";
+
+    fn object_two() -> Object {
+        let data = [6, 7, 8, 9, 10, 11];
+        let hash = Hash::new(&data);
+        let mut metadata = HashMap::<String, String>::new();
+        metadata.insert("_created".to_string(), String::from("1718464456"));
+        metadata.insert("_modified".to_string(), String::from("1718480987"));
+        Object {
+            hash,
+            size: data.len(),
+            metadata,
+            resolved: false,
+        }
+    }
+
+    fn object_three() -> Object {
+        let data = [11, 12, 13, 14, 15, 16, 17];
+        let hash = Hash::new(&data);
+        let mut metadata = HashMap::<String, String>::new();
+        metadata.insert("_created".to_string(), String::from("1718465678"));
+        metadata.insert("_modified".to_string(), String::from("1718512346"));
+        Object {
+            hash,
+            size: data.len(),
+            metadata,
+            resolved: false,
+        }
+    }
 
     #[test]
     fn test_constructor() {
@@ -292,19 +315,19 @@ mod tests {
             HashMap::new(),
         )
         .unwrap();
-        let object = golden_object();
+        let object = object_one();
         assert!(state
             .add(
                 &store,
                 BytesKey(vec![1, 2, 3]),
-                Cid::from_bytes(&object.cid.0).unwrap(),
+                object.hash,
                 object.size,
                 object.metadata,
                 true
             )
             .is_ok());
 
-        assert_eq!(state.root, Cid::from_str(GOLDEN_CID).unwrap());
+        assert_eq!(state.root, Cid::from_str(OBJECT_ONE_CID).unwrap());
     }
 
     #[quickcheck]
@@ -318,12 +341,11 @@ mod tests {
         )
         .unwrap();
         let key = BytesKey(vec![1, 2, 3]);
-        let cid = Cid::from_bytes(&object.cid.0).unwrap();
         let md = object.metadata.clone();
         state
-            .add(&store, key.clone(), cid, object.size, md, true)
+            .add(&store, key.clone(), object.hash, object.size, md, true)
             .unwrap();
-        assert!(state.resolve(&store, key.clone(), cid).is_ok());
+        assert!(state.resolve(&store, key.clone(), object.hash).is_ok());
 
         object.resolved = true;
         let result = state.get(&store, &key);
@@ -346,7 +368,7 @@ mod tests {
             .add(
                 &store,
                 key.clone(),
-                Cid::from_bytes(&object.cid.0).unwrap(),
+                object.hash,
                 object.size,
                 object.metadata,
                 true,
@@ -370,10 +392,9 @@ mod tests {
         )
         .unwrap();
         let key = BytesKey(vec![1, 2, 3]);
-        let cid = Cid::from_bytes(&object.cid.0).unwrap();
         let md = object.metadata.clone();
         state
-            .add(&store, key.clone(), cid, object.size, md, true)
+            .add(&store, key.clone(), object.hash, object.size, md, true)
             .unwrap();
         let result = state.get(&store, &key);
 
@@ -385,45 +406,48 @@ mod tests {
         state: &mut State,
         store: &MemoryBlockstore,
     ) -> anyhow::Result<(BytesKey, BytesKey, BytesKey)> {
-        let jpeg_key = BytesKey("foo.jpeg".as_bytes().to_vec());
-        state.add(
-            store,
-            jpeg_key.clone(),
-            Cid::default(),
-            0,
-            HashMap::<String, String>::new(),
-            false,
-        )?;
-        let bar_key = BytesKey("foo/bar.png".as_bytes().to_vec());
-        state.add(
-            store,
-            bar_key.clone(),
-            Cid::default(),
-            0,
-            HashMap::<String, String>::new(),
-            false,
-        )?;
-        let baz_key = BytesKey("foo/baz.png".as_bytes().to_vec());
+        let baz_key = BytesKey("foo/baz.png".as_bytes().to_vec()); // index 0
+        let object = object_one();
         state.add(
             store,
             baz_key.clone(),
-            Cid::default(),
-            0,
-            HashMap::<String, String>::new(),
+            object.hash,
+            object.size,
+            object.metadata,
             false,
         )?;
-
+        let bar_key = BytesKey("foo/bar.png".as_bytes().to_vec()); // index 1
+        let object = object_two();
+        state.add(
+            store,
+            bar_key.clone(),
+            object.hash,
+            object.size,
+            object.metadata,
+            false,
+        )?;
         // We'll mostly ignore this one
-        let other_key = BytesKey("zzzz/image.png".as_bytes().to_vec());
+        let other_key = BytesKey("zzzz/image.png".as_bytes().to_vec()); // index 2
+        let hash = new_hash();
         state.add(
             &store,
             other_key.clone(),
-            Cid::default(),
-            0,
+            hash.0,
+            hash.1,
             HashMap::<String, String>::new(),
             false,
         )?;
-        Ok((jpeg_key, bar_key, baz_key))
+        let jpeg_key = BytesKey("foo.jpeg".as_bytes().to_vec()); // index 3
+        let object = object_three();
+        state.add(
+            store,
+            jpeg_key.clone(),
+            object.hash,
+            object.size,
+            object.metadata,
+            false,
+        )?;
+        Ok((baz_key, bar_key, jpeg_key))
     }
 
     #[test]
@@ -437,16 +461,14 @@ mod tests {
         )
         .unwrap();
 
-        let (_, _, baz_key) = create_and_put_objects(&mut state, &store).unwrap();
-
-        let default_obj = default_object();
+        let (baz_key, _, _) = create_and_put_objects(&mut state, &store).unwrap();
 
         // List all keys with a limit
         let result = state.list(&store, vec![], vec![], 0, 0);
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.objects.len(), 4);
-        assert_eq!(result.objects.first(), Some(&(baz_key.0, default_obj)));
+        assert_eq!(result.objects.first(), Some(&(baz_key.0, object_one())));
     }
 
     #[test]
@@ -460,17 +482,15 @@ mod tests {
         )
         .unwrap();
 
-        let (_, bar_key, baz_key) = create_and_put_objects(&mut state, &store).unwrap();
-
-        let default_obj = default_object();
+        let (baz_key, bar_key, _) = create_and_put_objects(&mut state, &store).unwrap();
 
         let foo_key = BytesKey("foo".as_bytes().to_vec());
         let result = state.list(&store, foo_key.0.clone(), vec![], 0, 0);
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.objects.len(), 3);
-        assert_eq!(result.objects[0], (baz_key.0, default_obj.clone()));
-        assert_eq!(result.objects[1], (bar_key.0, default_obj.clone()));
+        assert_eq!(result.objects[0], (baz_key.0, object_one()));
+        assert_eq!(result.objects[1], (bar_key.0, object_two()));
     }
 
     #[test]
@@ -484,9 +504,7 @@ mod tests {
         )
         .unwrap();
 
-        let (jpeg_key, _, _) = create_and_put_objects(&mut state, &store).unwrap();
-
-        let default_obj = default_object();
+        let (_, _, jpeg_key) = create_and_put_objects(&mut state, &store).unwrap();
 
         let foo_key = BytesKey("foo".as_bytes().to_vec());
         let delimiter_key = BytesKey("/".as_bytes().to_vec());
@@ -495,7 +513,7 @@ mod tests {
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.objects.len(), 1);
-        assert_eq!(result.objects[0], (jpeg_key.0, default_obj));
+        assert_eq!(result.objects[0], (jpeg_key.0, object_three()));
         assert_eq!(result.common_prefixes[0], full_key);
     }
 
@@ -511,34 +529,37 @@ mod tests {
         .unwrap();
 
         let jpeg_key = BytesKey("foo.jpeg".as_bytes().to_vec());
+        let hash = new_hash();
         state
             .add(
                 &store,
                 jpeg_key.clone(),
-                Cid::default(),
-                0,
+                hash.0,
+                hash.1,
                 HashMap::<String, String>::new(),
                 false,
             )
             .unwrap();
         let bar_key = BytesKey("bin/foo/bar.png".as_bytes().to_vec());
+        let hash = new_hash();
         state
             .add(
                 &store,
                 bar_key.clone(),
-                Cid::default(),
-                0,
+                hash.0,
+                hash.1,
                 HashMap::<String, String>::new(),
                 false,
             )
             .unwrap();
         let baz_key = BytesKey("bin/foo/baz.png".as_bytes().to_vec());
+        let hash = new_hash();
         state
             .add(
                 &store,
                 baz_key.clone(),
-                Cid::default(),
-                0,
+                hash.0,
+                hash.1,
                 HashMap::<String, String>::new(),
                 false,
             )
@@ -568,15 +589,13 @@ mod tests {
 
         let (_, bar_key, _) = create_and_put_objects(&mut state, &store).unwrap();
 
-        let default_obj = default_object();
-
         // List all keys with a limit and offset
         let result = state.list(&store, vec![], vec![], 1, 1);
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.objects.len(), 1);
         // Note that baz is listed first in order, so an offset of 1 will return bar
-        assert_eq!(result.objects.first(), Some(&(bar_key.0, default_obj)));
+        assert_eq!(result.objects.first(), Some(&(bar_key.0, object_two())));
     }
 
     #[test]
@@ -591,23 +610,25 @@ mod tests {
         .unwrap();
 
         let one = BytesKey("hello/world".as_bytes().to_vec());
+        let hash = new_hash();
         state
             .add(
                 &store,
                 one.clone(),
-                Cid::default(),
-                0,
+                hash.0,
+                hash.1,
                 HashMap::<String, String>::new(),
                 false,
             )
             .unwrap();
         let two = BytesKey("hello/again".as_bytes().to_vec());
+        let hash = new_hash();
         state
             .add(
                 &store,
                 two.clone(),
-                Cid::default(),
-                0,
+                hash.0,
+                hash.1,
                 HashMap::<String, String>::new(),
                 false,
             )

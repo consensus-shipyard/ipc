@@ -8,6 +8,7 @@ use std::time::Duration;
 use anyhow::anyhow;
 use bloom::{BloomFilter, ASMS};
 use ipc_api::subnet_id::SubnetID;
+use iroh::blobs::Hash;
 use iroh::net::NodeAddr;
 use libipld::store::StoreParams;
 use libipld::Cid;
@@ -109,7 +110,7 @@ pub(crate) enum Request<V> {
     PinSubnet(SubnetID),
     UnpinSubnet(SubnetID),
     Resolve(Cid, SubnetID, ResponseChannel),
-    ResolveIroh(Cid, NodeAddr, ResponseChannel),
+    ResolveIroh(Hash, NodeAddr, ResponseChannel),
     RateLimitUsed(PeerId, usize),
     UpdateRateLimit(u32),
 }
@@ -486,8 +487,8 @@ where
             Request::Resolve(cid, subnet_id, response_channel) => {
                 self.start_query(cid, subnet_id, response_channel)
             }
-            Request::ResolveIroh(cid, node_addr, response_channel) => {
-                self.start_iroh_query(cid, node_addr, response_channel)
+            Request::ResolveIroh(hash, node_addr, response_channel) => {
+                self.start_iroh_query(hash, node_addr, response_channel)
             }
             Request::RateLimitUsed(peer_id, bytes) => {
                 self.content_mut().rate_limit_used(peer_id, bytes)
@@ -535,20 +536,20 @@ where
     /// Start a CID resolution using iorh.
     fn start_iroh_query(
         &mut self,
-        cid: Cid,
+        hash: Hash,
         node_addr: NodeAddr,
         response_channel: ResponseChannel,
     ) {
         if let Some(iroh) = self.iroh.clone() {
             tokio::spawn(async move {
-                let res = download_blob(iroh, cid, node_addr).await;
+                let res = download_blob(iroh, hash, node_addr).await;
                 match res {
                     Ok(_) => send_resolve_result(response_channel, Ok(())),
                     Err(e) => send_resolve_result(response_channel, Err(anyhow!(e))),
                 }
             });
         } else {
-            warn!("cannot resolve {}; iroh is not configured", cid);
+            warn!("cannot resolve {}; iroh is not configured", hash);
         }
     }
 
@@ -646,13 +647,10 @@ pub fn build_transport(local_key: Keypair) -> Boxed<(PeerId, StreamMuxerBox)> {
 
 async fn download_blob(
     iroh: iroh::client::Iroh,
-    cid: Cid,
+    hash: Hash,
     node_addr: NodeAddr,
 ) -> anyhow::Result<()> {
-    let hash: [u8; 32] = cid.hash().digest().try_into()?;
-    let hash = iroh::blobs::Hash::from_bytes(hash);
     let res = iroh.blobs().download(hash, node_addr).await?.await?;
-    info!("downloaded {}: {:?}", cid, res);
-
+    debug!("downloaded blob {}: {:?}", hash, res);
     Ok(())
 }

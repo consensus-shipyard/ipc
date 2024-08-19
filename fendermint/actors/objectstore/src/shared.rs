@@ -2,11 +2,12 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use cid::Cid;
 use fendermint_actor_machine::GET_METADATA_METHOD;
 use fvm_ipld_encoding::{strict_bytes, tuple::*};
 use fvm_shared::address::Address;
 use fvm_shared::METHOD_CONSTRUCTOR;
+use iroh_base::hash::Hash;
+use iroh_base::key::PublicKey;
 use num_derive::FromPrimitive;
 use std::collections::HashMap;
 
@@ -18,12 +19,14 @@ pub const OBJECTSTORE_ACTOR_NAME: &str = "objectstore";
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct AddParams {
     /// Target object store address.
-    pub store: Address,
+    pub to: Address,
+    /// Source Iroh node ID used for ingestion.
+    pub source: PublicKey,
     /// Object key.
     #[serde(with = "strict_bytes")]
     pub key: Vec<u8>,
-    /// Object value.
-    pub cid: Cid,
+    /// Object blake3 hash.
+    pub hash: Hash,
     /// Object size.
     pub size: usize,
     /// Object metadata.
@@ -38,8 +41,8 @@ pub struct ResolveParams {
     /// Object key.
     #[serde(with = "strict_bytes")]
     pub key: Vec<u8>,
-    /// Object value.
-    pub value: Cid,
+    /// Object blake3 hash.
+    pub hash: Hash,
 }
 
 /// Params for deleting an object.

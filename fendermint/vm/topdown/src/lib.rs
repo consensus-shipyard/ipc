@@ -13,11 +13,11 @@ pub mod voting;
 
 use async_stm::Stm;
 use async_trait::async_trait;
-use cid::Cid;
 use ethers::utils::hex;
 use fvm_shared::clock::ChainEpoch;
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
+use iroh_base::hash::Hash;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::time::Duration;
@@ -136,22 +136,19 @@ impl Display for IPCParentFinality {
     }
 }
 
-/// The finality view for an IPC object at certain height.
+/// The finality view for a blob at certain height.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct IPCObjectFinality {
-    /// The Cid of the object
-    pub object: Cid,
-}
+pub struct IPCBlobFinality(pub Hash);
 
-impl IPCObjectFinality {
-    pub fn new(value: Cid) -> Self {
-        Self { object: value }
+impl IPCBlobFinality {
+    pub fn new(value: Hash) -> Self {
+        Self(value)
     }
 }
 
-impl Display for IPCObjectFinality {
+impl Display for IPCBlobFinality {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "IPCObjectFinality(value: {})", self.object)
+        write!(f, "IPCObjectFinality(value: {})", self.0)
     }
 }
 

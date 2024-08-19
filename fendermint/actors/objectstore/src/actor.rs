@@ -47,13 +47,13 @@ impl Actor {
         Self::ensure_write_allowed(rt)?;
 
         let blob_params = ext::blobs::AddBlobParams {
-            cid: params.cid,
+            from: Some(params.to),
+            source: params.source,
+            hash: params.hash,
             size: params.size as u64,
             expiry: rt.curr_epoch() + 100,
-            source: Some(params.store),
         };
 
-        // TODO: use read-only flag
         extract_send_result(rt.send_simple(
             &ext::blobs::BLOBS_ACTOR_ADDR,
             ext::blobs::ADD_BLOB_METHOD,
@@ -65,7 +65,7 @@ impl Actor {
             st.add(
                 rt.store(),
                 BytesKey(params.key),
-                params.cid,
+                params.hash,
                 params.size,
                 params.metadata,
                 params.overwrite,
@@ -80,7 +80,7 @@ impl Actor {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
         rt.transaction(|st: &mut State, rt| {
-            st.resolve(rt.store(), BytesKey(params.key), params.value)
+            st.resolve(rt.store(), BytesKey(params.key), params.hash)
                 .map_err(|e| {
                     e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to resolve object")
                 })
