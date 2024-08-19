@@ -77,12 +77,12 @@ jobs:
       - name: Clippy
         env:
           PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
-        run: cargo clippy --all
+        run: cargo clippy --no-deps -- -D clippy::all
 
       - name: Unit Tests
         env:
           PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
-        run: cd fendermint && make build test
+        run: cd fendermint && make test
 
       - name: Inject Rust Cache Into Docker
         uses: reproducible-containers/buildkit-cache-dance@v3.1.0
