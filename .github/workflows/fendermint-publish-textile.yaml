@@ -1,0 +1,105 @@
+name: Fendermint CI - Publish
+
+# This workflow is triggered from the main CI workflow.
+on:
+  workflow_dispatch:
+
+env:
+  CARGO_INCREMENTAL: "0"
+  SCCACHE_CACHE_SIZE: 10G
+  CC: "sccache clang"
+  CXX: "sccache clang++"
+  PROFILE: "ci"
+  BUILDX_FLAGS: "--cache-from=type=gha --cache-to=type=gha,mode=max"
+
+jobs:
+  # Publish Docker image on the main branch
+  publish:
+    name: Publish artifacts
+    runs-on: ubuntu-latest
+
+    permissions:
+      packages: write
+      contents: read
+
+    steps:
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.BUILTIN_ACTORS_DEPLOY_KEY }}
+
+      - name: Check out the project
+        uses: actions/checkout@v4
+
+      - name: Install Tools
+        uses: ./.github/actions/install-tools
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          rust: stable
+
+      - name: Setup Cache
+        uses: ./.github/actions/setup-cache
+        timeout-minutes: 5
+        continue-on-error: true
+        with:
+          # The Cargo.lock file is very likely to change between PRs, which would mean a cache miss.
+          # Ideally we want to download the previous cache and do an upload if something changed.
+          # That's why the Cargo.lock hash is used as a suffix, so we match on a stable one and upload if changed.
+          cache-prefix: publish-${{ hashFiles('rust-toolchain', 'rust-toolchain.toml') }}
+          cache-suffix: ${{ hashFiles('**/Cargo.lock') }}
+
+      # Not restoring Solidity artifact cache because of supply side attack potential.
+
+      # - name: Docker Build
+      #   run: make docker-build
+
+      # We used this for a single architecture build, but with `buildx` the push happens at the same time as the build.
+      # - name: Docker Push
+      #   uses: ./.github/actions/docker-push
+      #   with:
+      #     repo-token: ${{ secrets.GITHUB_TOKEN }}
+      #     repo-owner: ${{ github.repository_owner }}
+      #     image-name: ${{ github.event.repository.name }}
+
+      - name: Docker Login
+        shell: bash
+        run: echo "${{ secrets.DOCKER_HUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
+
+      - name: Docker Prep
+        id: prep
+        run: |
+          # Update the IMAGE_ID to reflect your own Docker repository
+          IMAGE_ID=textile/${{ github.repository_owner }}/fendermint
+
+          # This changes all uppercase characters to lowercase.
+          IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
+
+          # Get the short commit hash (first 7 characters of GITHUB_SHA).
+          COMMIT_HASH=$(echo "${{ github.sha }}" | cut -c1-7)
+
+          # Format the version string as sha-[short-commit-hash].
+          VERSION="sha-$COMMIT_HASH"
+
+          echo "IMAGE_TAG=$IMAGE_ID:$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Docker Deps
+        run: |
+          cd fendermint && make docker-deps
+
+      # https://github.com/marketplace/actions/free-disk-space-ubuntu
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
+      - name: Build and Push Multiarch Docker Image
+        run: |
+          export BUILDX_TAG=${{ steps.prep.outputs.IMAGE_TAG }}
+          export BUILDX_STORE="--push"
+          export BUILDX_FLAGS="--platform linux/amd64,linux/arm64 ${BUILDX_FLAGS}"
+          cd fendermint && make docker-build
