@@ -61,8 +61,8 @@ jobs:
           fi
 
       - name: Install Foundry
-        working-directory: ipc/contracts
         run: |
+          cd contracts
           curl -L https://foundry.paradigm.xyz | bash
           export PATH="$PATH:/home/runner/.config/.foundry/bin"
           foundryup
