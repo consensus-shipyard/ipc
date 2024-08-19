@@ -148,6 +148,6 @@ jobs:
       github.ref_type == 'tag'
     needs:
       - contracts-test # generates the ABI artifacts (although fendermint can do on its own too)
-      - ipc
+      - fendermint-docker-build
       - ipld-resolver
       - fendermint-test
