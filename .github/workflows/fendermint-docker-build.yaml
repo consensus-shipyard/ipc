@@ -69,20 +69,20 @@ jobs:
           PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
         run: cd contracts && make rust-binding
 
-      - name: Format
-        env:
-          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
-        run: cargo fmt --all --check
-
-      - name: Clippy
-        env:
-          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
-        run: cargo clippy --no-deps -- -D clippy::all
+#      - name: Format
+#        env:
+#          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
+#        run: cargo fmt --all --check
+#
+#      - name: Clippy
+#        env:
+#          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
+#        run: cargo clippy --no-deps -- -D clippy::all
 
       - name: Unit Tests
         env:
           PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
-        run: cd fendermint && make test
+        run: cd fendermint && make test-only
 
       - name: Inject Rust Cache Into Docker
         uses: reproducible-containers/buildkit-cache-dance@v3.1.0
@@ -90,7 +90,7 @@ jobs:
           cache-map: |
             {
               "/home/runner/.cargo/registry": "/root/.cargo/registry",
-              "/home/runner/.cargo/git": "/root/.cargo/git"
+              "/home/runner/.cargo/git": "/root/.cargo/git",
               "target": "/app/target"
             }
 

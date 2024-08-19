@@ -37,9 +37,12 @@ build: $(IPC_ACTORS_GEN) | protoc npm
 install: $(IPC_ACTORS_GEN)
 	cargo install --locked --path app
 
+test: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
+	${MAKE} test-only
+
 # Using --release for testing because wasm can otherwise be slow.
 # Excluding the materializer tests because they rely on docker; we could test with --lib
-test: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
+test-only:
 	FM_BUILTIN_ACTORS_BUNDLE=$(BUILTIN_ACTORS_BUNDLE) \
 	FM_CUSTOM_ACTORS_BUNDLE=$(CUSTOM_ACTORS_BUNDLE) \
 	FM_CONTRACTS_DIR=$(IPC_ACTORS_OUT) \
