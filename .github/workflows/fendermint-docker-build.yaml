@@ -92,11 +92,8 @@ jobs:
           PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
         run: cd fendermint && make docker-build
 
-      - name: Build and export
-        uses: docker/build-push-action@v6
-        with:
-          tags: fendermint:latest
-          outputs: type=docker,dest=/tmp/fendermint.tar
+      - name: Export
+        run: docker save fendermint:latest > /tmp/fendermint.tar
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
