@@ -13,12 +13,10 @@ jobs:
       RUSTFLAGS: -Dwarnings
 
     steps:
-      - name: Checkout Fendermint
-        uses: actions/checkout@v2
+      - name: Check out the project
+        uses: actions/checkout@v3
         with:
-          repository: 'consensus-shipyard/ipc'
-          submodules: 'recursive'
-          path: 'ipc'
+          submodules: recursive
 
       - name: Install Rust
         uses: actions-rs/toolchain@v1
