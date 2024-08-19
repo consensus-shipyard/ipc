@@ -110,7 +110,7 @@ jobs:
       github.ref == 'refs/heads/main' ||
       github.ref_type == 'tag'
 
-  fendermint-e2e-test:
+  fendermint-test:
     uses: ./.github/workflows/fendermint-test.yaml
     secrets: inherit
     needs:

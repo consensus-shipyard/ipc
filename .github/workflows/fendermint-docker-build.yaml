@@ -53,14 +53,14 @@ jobs:
         with:
           node-version: 18.19.0
 
-      - name: Setup Cache
-        uses: ./.github/actions/setup-cache
-        timeout-minutes: 5
-        continue-on-error: true
+      - name: Cache Cargo Build
+        uses: actions/cache@v4
         with:
-          # Caching everything separately, in case they don't ask for the same things to be compiled.
-          cache-prefix: fendermint-${{ matrix.make.name }}-${{ matrix.os }}-${{ matrix.rust }}-${{ hashFiles('rust-toolchain', 'rust-toolchain.toml') }}
-          cache-suffix: ${{ hashFiles('**/Cargo.lock') }}
+          path: |
+            /home/runner/.cargo/registry
+            /home/runner/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Cache Solidity ABI artifacts
         uses: actions/cache@v2
@@ -72,20 +72,30 @@ jobs:
         run: >-
           [ -d contracts/out ] || (cd contracts && curl -L https://foundry.paradigm.xyz | bash && export PATH="$PATH:/home/runner/.config/.foundry/bin" && foundryup && make compile-abi)
 
-#      - name: Format
-#        env:
-#          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
-#        run: cargo fmt --all --check
+      - name: Format
+        env:
+          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
+        run: cargo fmt --all --check
 
-#      - name: Clippy
-#        env:
-#          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
-#        run: cargo clippy --all
-#
-#      - name: Unit Tests
-#        env:
-#          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
-#        run: cd fendermint && make build test
+      - name: Clippy
+        env:
+          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
+        run: cargo clippy --all
+
+      - name: Unit Tests
+        env:
+          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
+        run: cd fendermint && make build test
+
+      - name: Inject Rust Cache Into Docker
+        uses: reproducible-containers/buildkit-cache-dance@v3.1.0
+        with:
+          cache-map: |
+            {
+              "/home/runner/.cargo/registry": "/root/.cargo/registry",
+              "/home/runner/.cargo/git": "/root/.cargo/git"
+              "target": "/app/target"
+            }
 
       - name: Build Fendermint Docker Image
         env:

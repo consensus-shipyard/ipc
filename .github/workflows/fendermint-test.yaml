@@ -1,23 +1,11 @@
-name: Fendermint CI - Test
+name: Run tests against Fendermint (remote Docker image)
 
 # This workflow is triggered from the main CI workflow.
 on:
   workflow_call:
 
-env:
-  CARGO_INCREMENTAL: '0'
-  SCCACHE_CACHE_SIZE: 10G
-  CC: "sccache clang"
-  CXX: "sccache clang++"
-  PROFILE: "ci"
-  BUILDX_FLAGS: "--cache-from=type=gha --cache-to=type=gha,mode=max"
-
 jobs:
-  tests:
-    # Skip tests on draft PRs, they take a long time, and drafts are for visibility.
-    if: ${{ !github.event.pull_request.draft }}
-
-    name: Fendermint E2E Tests
+  run:
     runs-on: ubuntu-latest
 
     env:
