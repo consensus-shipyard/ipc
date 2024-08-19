@@ -4,11 +4,17 @@ set -euo pipefail
 
 eval "$(ssh-agent -s)"
 ssh-add
-ssh-add "${HOME}"/.ssh/id_rsa.ipc
+if [ -e "${HOME}"/.ssh/id_rsa.ipc ]; then
+  ssh-add "${HOME}"/.ssh/id_rsa.ipc
+fi
 
+if [[ ! -v SUPPLY_SOURCE_ADDRESS ]]; then
+  echo "SUPPLY_SOURCE_ADDRESS is not set"
+  exit 1
+fi
 if [[ ! -v PARENT_HTTP_AUTH_TOKEN ]]; then
-    echo "PARENT_HTTP_AUTH_TOKEN is not set"
-    exit 1
+  echo "PARENT_HTTP_AUTH_TOKEN is not set"
+  exit 1
 fi
 
 DASHES='------'
@@ -18,6 +24,7 @@ fi
 IPC_CONFIG_FOLDER=${HOME}/.ipc
 
 wallet_addresses=()
+public_keys=()
 CMT_P2P_HOST_PORTS=(26656 26756 26856)
 CMT_RPC_HOST_PORTS=(26657 26757 26857)
 ETHAPI_HOST_PORTS=(8545 8645 8745)
@@ -193,12 +200,14 @@ cd "${IPC_FOLDER}"/ipc
 make install
 
 # Prepare wallet by using existing wallet json file
-echo "$DASHES Using 3 address in wallet..."
+echo "$DASHES Using 3 addresses in wallet..."
 for i in {0..2}
 do
   addr=$(jq .["$i"].address < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
   wallet_addresses+=("$addr")
   echo "Wallet $i address: $addr"
+  pk=$(ipc-cli wallet pub-key --wallet-type evm --address "$addr" | tr -d '"')
+  public_keys+=("$pk")
 done
 default_wallet_address=${wallet_addresses[0]}
 echo "Default wallet address: $default_wallet_address"
@@ -237,24 +246,18 @@ cp /tmp/config.toml.2 "${IPC_CONFIG_FOLDER}"/config.toml
 
 # Create a subnet
 echo "$DASHES Creating a child subnet..."
-create_subnet_output=$(ipc-cli subnet create --parent /r314159 --min-validators 3 --min-validator-stake 1 --bottomup-check-period 600 --from "$default_wallet_address" --permission-mode collateral --supply-source-kind native 2>&1)
+create_subnet_output=$(ipc-cli subnet create --from "$default_wallet_address" --parent /r314159 --min-validators 2 --min-validator-stake 1 --bottomup-check-period 600 --active-validators-limit 3 --permission-mode federated --supply-source-kind erc20 --supply-source-address "$SUPPLY_SOURCE_ADDRESS" 2>&1)
 echo "$create_subnet_output"
 # shellcheck disable=SC2086
 subnet_id=$(echo $create_subnet_output | sed 's/.*with id: \([^ ]*\).*/\1/')
 echo "Created new subnet id: $subnet_id"
-subnet_folder=$IPC_CONFIG_FOLDER/$(echo "$subnet_id" | sed 's|^/||;s|/|-|g')
 
 # Use the new subnet ID to update IPC config file
 toml set "${IPC_CONFIG_FOLDER}"/config.toml subnets[1].id "$subnet_id" > /tmp/config.toml.3
 cp /tmp/config.toml.3 "${IPC_CONFIG_FOLDER}"/config.toml
 
-# Join subnet for addresses in wallet
-echo "$DASHES Join subnet for addresses in wallet..."
-for i in {0..2}
-do
-  echo "Joining subnet ${subnet_id} for address ${wallet_addresses[i]}"
-  ipc-cli subnet join --from "${wallet_addresses[i]}" --subnet "$subnet_id" --initial-balance 1 --collateral 10
-done
+# Set federated power
+ipc-cli subnet set-federated-power --from "$default_wallet_address" --subnet "$subnet_id" --validator-addresses "${wallet_addresses[@]}" --validator-pubkeys "${public_keys[@]}" --validator-power 1 1 1
 
 # Rebuild fendermint docker
 cd "${IPC_FOLDER}"/fendermint
@@ -385,7 +388,7 @@ done
 pkill -f "relayer" || true
 # Start relayer
 echo "$DASHES Start relayer process (in the background)"
-nohup ipc-cli checkpoint relayer --subnet "$subnet_id" --submitter 0xA08aE9E8c038CAf9765D7Db725CA63a92FCf12Ce > relayer.log &
+nohup ipc-cli checkpoint relayer --subnet "$subnet_id" --submitter "$default_wallet_address" > relayer.log &
 
 # Print a summary of the deployment
 cat << EOF
@@ -428,7 +431,7 @@ http://localhost:${LOKI_HOST_PORT}
 
 Grafana API:
 http://localhost:${GRAFANA_HOST_PORT}
-
-Accounts:
-$(jq -r '.accounts[] | "\(.meta.Account.owner): \(.balance) coin units"' < "${subnet_folder}"/validator-0/genesis.json)
 EOF
+
+echo "Done"
+exit 0

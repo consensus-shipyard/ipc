@@ -5,16 +5,16 @@ set -euo pipefail
 eval "$(ssh-agent -s)"
 ssh-add
 if [ -e "${HOME}"/.ssh/id_rsa.ipc ]; then
-    ssh-add "${HOME}"/.ssh/id_rsa.ipc
+  ssh-add "${HOME}"/.ssh/id_rsa.ipc
 fi
 
 if [[ ! -v SUPPLY_SOURCE_ADDRESS ]]; then
-    echo "SUPPLY_SOURCE_ADDRESS is not set"
-    exit 1
+  echo "SUPPLY_SOURCE_ADDRESS is not set"
+  exit 1
 fi
 if [[ ! -v PARENT_HTTP_AUTH_TOKEN ]]; then
-    echo "PARENT_HTTP_AUTH_TOKEN is not set"
-    exit 1
+  echo "PARENT_HTTP_AUTH_TOKEN is not set"
+  exit 1
 fi
 
 DASHES='------'
@@ -197,7 +197,7 @@ cd "${IPC_FOLDER}"/ipc
 make install
 
 # Prepare wallet by using existing wallet json file
-echo "$DASHES Using 2 address in wallet..."
+echo "$DASHES Using 2 addresses in wallet..."
 for i in {0..1}
 do
   addr=$(jq .["$i"].address < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
@@ -245,7 +245,6 @@ echo "$create_subnet_output"
 # shellcheck disable=SC2086
 subnet_id=$(echo $create_subnet_output | sed 's/.*with id: \([^ ]*\).*/\1/')
 echo "Created new subnet id: $subnet_id"
-subnet_folder=$IPC_CONFIG_FOLDER/$(echo "$subnet_id" | sed 's|^/||;s|/|-|g')
 
 # Use the new subnet ID to update IPC config file
 toml set "${IPC_CONFIG_FOLDER}"/config.toml subnets[1].id "$subnet_id" > /tmp/config.toml.3
@@ -381,3 +380,6 @@ http://localhost:${LOKI_HOST_PORT}
 Grafana API:
 http://localhost:${GRAFANA_HOST_PORT}
 EOF
+
+echo "Done"
+exit 0
