@@ -68,6 +68,12 @@ jobs:
           path: ./contracts/out
           key: contracts-abi-${{ hashFiles('./contracts/src/**/*.sol') }}
 
+      - name: Cache Solidity Rust Binding
+        uses: actions/cache@v2
+        with:
+          path: ./contracts/binding
+          key: contracts-binding-${{ hashFiles('./contracts/binding/src/**/*.rs') }}
+
       - name: Generate Solidity ABI artifacts
         run: >-
           [ -d contracts/out ] || (cd contracts && curl -L https://foundry.paradigm.xyz | bash && export PATH="$PATH:/home/runner/.config/.foundry/bin" && foundryup && make compile-abi)
@@ -75,7 +81,8 @@ jobs:
       - name: Compile Abi
         env:
           PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
-        run: cd contracts && make compile-abi
+        run: >-
+          [ -d contracts/binding ] || (cd contracts && make rust-binding)
 
       - name: Format
         env:
