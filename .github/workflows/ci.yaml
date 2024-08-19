@@ -126,8 +126,8 @@ jobs:
   fevm-contract-tests:
     uses: ./.github/workflows/fevm-contract-tests.yaml
     secrets: inherit
-    needs:
-      - fendermint-docker-build
+#    needs:
+#      - fendermint-docker-build
     if: >-
       needs.changes.outputs.workspace == 'true' ||
       needs.changes.outputs.contracts == 'true' ||
