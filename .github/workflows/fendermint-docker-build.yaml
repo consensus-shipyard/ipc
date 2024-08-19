@@ -46,7 +46,7 @@ jobs:
         uses: ./.github/actions/install-tools
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          rust: ${{ matrix.rust }}
+          rust: stable
 
       - name: Install Node.js
         uses: actions/setup-node@v2
@@ -75,6 +75,11 @@ jobs:
         env:
           PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
         run: cd fendermint && make compile-abi docker-deps
+
+      - name: Format
+        env:
+          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
+        run: cargo fmt --all --check
 
       - name: Clippy
         env:
