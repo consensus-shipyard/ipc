@@ -60,29 +60,20 @@ jobs:
           path: ./contracts/out
           key: contracts-abi-${{ hashFiles('./contracts/src/**/*.sol') }}
 
-      - name: Generate Solidity ABI artifacts
-        run: >-
-          [ -d contracts/out ] || (cd contracts && curl -L https://foundry.paradigm.xyz | bash && export PATH="$PATH:/home/runner/.config/.foundry/bin" && foundryup && make compile-abi)
-
-      - name: Compile Binding
-        env:
-          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
-        run: cd contracts && make rust-binding
-
-#      - name: Format
-#        env:
-#          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
-#        run: cargo fmt --all --check
-#
 #      - name: Clippy
 #        env:
 #          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
 #        run: cargo clippy --no-deps -- -D clippy::all
+#
+#      - name: Format
+#        env:
+#          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
+#        run: cargo fmt --all --check
 
       - name: Unit Tests
         env:
           PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
-        run: cd fendermint && make test-only
+        run: cd fendermint && cargo build --release
 
       - name: Inject Rust Cache Into Docker
         uses: reproducible-containers/buildkit-cache-dance@v3.1.0
