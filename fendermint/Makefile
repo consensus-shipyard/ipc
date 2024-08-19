@@ -89,7 +89,6 @@ docker-deps: $(BUILTIN_ACTORS_BUNDLE) $(CUSTOM_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 # it can handle for anyone with `DOCKER_BUILDKIT=1`.
 docker-build: docker-deps $(FENDERMINT_CODE)
 	if [ "$(PROFILE)" = "ci" ]; then \
-  		echo "in ci"
 		cat docker/builder.ci.Dockerfile docker/runner.Dockerfile > docker/Dockerfile ; \
 		docker buildx build \
 			$(BUILDX_STORE) \
@@ -105,6 +104,22 @@ docker-build: docker-deps $(FENDERMINT_CODE)
 			-t fendermint:latest $(PWD)/..; \
 	fi
 
+docker-build-only: $(FENDERMINT_CODE)
+	if [ "$(PROFILE)" = "ci" ]; then \
+		cat docker/builder.ci.Dockerfile docker/runner.Dockerfile > docker/Dockerfile ; \
+		docker buildx build \
+			$(BUILDX_STORE) \
+			$(BUILDX_FLAGS) \
+			-f docker/Dockerfile \
+			-t $(BUILDX_TAG) $(PWD)/..; \
+	else \
+		cat docker/builder.local.Dockerfile docker/runner.Dockerfile > docker/Dockerfile ; \
+		DOCKER_BUILDKIT=1 \
+		docker build \
+			$(BUILDX_STORE) \
+			-f docker/Dockerfile \
+			-t fendermint:latest $(PWD)/..; \
+	fi
 
 # Build a bundle CAR; this is so we don't have to have a project reference,
 # which means we are not tied to the release cycle of both FVM _and_ actors;
