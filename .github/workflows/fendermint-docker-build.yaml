@@ -68,16 +68,9 @@ jobs:
           path: ./contracts/out
           key: contracts-abi-${{ hashFiles('./contracts/src/**/*.sol') }}
 
-      - name: Install Foundry
-        run: |
-          cd contracts
-          curl -L https://foundry.paradigm.xyz | bash
-          export PATH="$PATH:/home/runner/.config/.foundry/bin"
-          foundryup
-
       - name: Generate Solidity ABI artifacts
         run: >-
-          [ -d contracts/out ] || (cd contracts && make compile-abi)
+          [ -d contracts/out ] || (cd contracts && curl -L https://foundry.paradigm.xyz | bash && export PATH="$PATH:/home/runner/.config/.foundry/bin" && foundryup && make compile-abi)
 
 #      - name: Format
 #        env:
@@ -98,3 +91,15 @@ jobs:
         env:
           PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
         run: cd fendermint && make docker-build
+
+      - name: Build and export
+        uses: docker/build-push-action@v6
+        with:
+          tags: fendermint:latest
+          outputs: type=docker,dest=/tmp/fendermint.tar
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fendermint
+          path: /tmp/fendermint.tar

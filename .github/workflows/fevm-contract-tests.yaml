@@ -8,6 +8,31 @@ jobs:
   run:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Test Repository
+        uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
+          repository: 'consensus-shipyard/fevm-contract-tests'
+          path: 'fevm-contract-tests'
+
+      - name: Checkout Fendermint
+        uses: actions/checkout@v2
+        with:
+          repository: 'consensus-shipyard/ipc'
+          submodules: 'recursive'
+          path: 'ipc'
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: fendermint
+          path: /tmp
+
+      - name: Load image
+        run: |
+          docker load --input /tmp/fendermint.tar
+          docker image ls -a
+
       - name: Run a testnode
         id: testnode
         working-directory: ipc/
