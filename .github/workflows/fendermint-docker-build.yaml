@@ -53,10 +53,6 @@ jobs:
         with:
           node-version: 18.19.0
 
-      - name: Install dependencies
-        run: npm install
-        working-directory: 'fevm-contract-tests'
-
       - name: Install cargo-make
         run: |
           if ! command -v cargo-make &> /dev/null
@@ -74,7 +70,7 @@ jobs:
       - name: Compile IPC Abi
         env:
           PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
-        run: cd fendermint && make compile-abi docker-deps
+        run: cd contracts && make gen
 
       - name: Format
         env:
