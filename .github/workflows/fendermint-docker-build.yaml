@@ -108,12 +108,12 @@ jobs:
           key: contracts-abi-${{ hashFiles('./contracts/src/**/*.sol') }}
 
       - name: Check ipc code formatting
-        run: cd ipc && make check-fmt
+        run: cargo fmt --all --check
 
       - name: Clippy
         env:
           PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
-        run: cd fendermint && make check-clippy
+        run: cargo clippy --all
 
       - name: Unit Tests
         env:
