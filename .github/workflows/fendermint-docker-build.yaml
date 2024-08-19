@@ -75,10 +75,9 @@ jobs:
           export PATH="$PATH:/home/runner/.config/.foundry/bin"
           foundryup
 
-      - name: Compile IPC Abi
-        env:
-          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
-        run: cd fendermint && make build
+      - name: Generate Solidity ABI artifacts
+        run: >-
+          [ -d contracts/out ] || (cd contracts && make compile-abi)
 
 #      - name: Format
 #        env:
