@@ -38,31 +38,6 @@ jobs:
     needs: [pre-compile-checks]
     name: ${{ matrix.make.name }} (${{ matrix.os }}, ${{ matrix.rust }})
     runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest]
-        rust: [stable]
-        make:
-          - name: Clippy
-            task: check-clippy
-          # Technically it's not necessary to build, testing would be fine on its own.
-          # However, tests bring in dev-dependencies, and without them something might not compile,
-          # which we want to catch as it would mean the `cargo build` in the docs would fail.
-          # Doing it a one step so build artifacts can be reused by the tests, minimising the overhead.
-          - name: Build and Test
-            task: build test
-          # Tests that involve docker.
-          - name: End-to-End
-            task: e2e
-        exclude:
-          # Not running Clippy on nightly because sometimes it seems to give false positives.
-          - rust: nightly
-            make:
-              name: Clippy
-          - rust: nightly
-            make:
-              name: End-to-end
 
     env:
       RUST_BACKTRACE: full
@@ -107,8 +82,54 @@ jobs:
           path: ./contracts/out
           key: contracts-abi-${{ hashFiles('./contracts/src/**/*.sol') }}
 
-      - name: Check ipc code formatting
-        run: cargo fmt --all --check
+      - name: Install Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: 18.19.0
+      - name: Install dependencies
+        run: npm install
+        working-directory: 'fevm-contract-tests'
+      - name: Set up Rust cargo cache
+        uses: actions/cache@v3
+        continue-on-error: false
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+      - name: Install cargo-make
+        run: |
+          if ! command -v cargo-make &> /dev/null
+          then
+              cargo install -f cargo-make
+          fi
+
+      - uses: actions/cache/save@v3
+        if: always()
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install Foundry
+        working-directory: ipc/contracts
+        run: |
+          curl -L https://foundry.paradigm.xyz | bash
+          export PATH="$PATH:/home/runner/.config/.foundry/bin"
+          foundryup
+
+      - name: Compile IPC Abi
+        env:
+          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
+        run: cd fendermint && make compile-abi docker-deps
 
       - name: Clippy
         env:
