@@ -110,32 +110,33 @@ jobs:
       github.ref == 'refs/heads/main' ||
       github.ref_type == 'tag'
 
-#  fendermint-test:
-#    uses: ./.github/workflows/fendermint-test.yaml
-#    secrets: inherit
-#    needs: [changes, license]
-#    if: >-
-#      needs.changes.outputs.workspace == 'true' ||
-#      needs.changes.outputs.contracts == 'true' ||
-#      needs.changes.outputs.ipc == 'true' ||
-#      needs.changes.outputs.ipld-resolver == 'true' ||
-#      needs.changes.outputs.fendermint == 'true' ||
-#      github.ref == 'refs/heads/main' ||
-#      github.ref_type == 'tag'
+  fendermint-e2e-test:
+    uses: ./.github/workflows/fendermint-test.yaml
+    secrets: inherit
+    needs:
+      - fendermint-docker-build
+    if: >-
+      needs.changes.outputs.workspace == 'true' ||
+      needs.changes.outputs.contracts == 'true' ||
+      needs.changes.outputs.ipc == 'true' ||
+      needs.changes.outputs.ipld-resolver == 'true' ||
+      needs.changes.outputs.fendermint == 'true' ||
+      github.ref == 'refs/heads/main' ||
+      github.ref_type == 'tag'
 
   fevm-contract-tests:
     uses: ./.github/workflows/fevm-contract-tests.yaml
     secrets: inherit
-#    needs:
-#      - fendermint-docker-build
-#    if: >-
-#      needs.changes.outputs.workspace == 'true' ||
-#      needs.changes.outputs.contracts == 'true' ||
-#      needs.changes.outputs.ipc == 'true' ||
-#      needs.changes.outputs.ipld-resolver == 'true' ||
-#      needs.changes.outputs.fendermint == 'true' ||
-#      github.ref == 'refs/heads/main' ||
-#      github.ref_type == 'tag'
+    needs:
+      - fendermint-docker-build
+    if: >-
+      needs.changes.outputs.workspace == 'true' ||
+      needs.changes.outputs.contracts == 'true' ||
+      needs.changes.outputs.ipc == 'true' ||
+      needs.changes.outputs.ipld-resolver == 'true' ||
+      needs.changes.outputs.fendermint == 'true' ||
+      github.ref == 'refs/heads/main' ||
+      github.ref_type == 'tag'
 
   fendermint-publish:
     uses: ./.github/workflows/fendermint-publish.yaml

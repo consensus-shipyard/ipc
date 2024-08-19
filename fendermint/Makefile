@@ -47,6 +47,9 @@ test: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 
 # Not using --release beause the build has been done in docker and the wasm code runs inside the container.
 e2e: docker-build | cargo-make
+	${MAKE} e2e-only
+
+e2e-only:
 	cd testing/smoke-test    && cargo make --profile $(PROFILE)
 	cd testing/snapshot-test && cargo make --profile $(PROFILE)
 	cd testing/graph-test    && cargo make --profile $(PROFILE)
