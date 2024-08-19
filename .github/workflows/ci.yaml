@@ -94,12 +94,12 @@ jobs:
   fendermint-docker-build:
     uses: ./.github/workflows/fendermint-docker-build.yaml
     needs: [changes, license]
-    if: >-
-      needs.changes.outputs.workspace == 'true' ||
-      needs.changes.outputs.contracts == 'true' ||
-      needs.changes.outputs.ipc == 'true' ||
-      github.ref == 'refs/heads/main' ||
-      github.ref_type == 'tag'
+#    if: >-
+#      needs.changes.outputs.workspace == 'true' ||
+#      needs.changes.outputs.contracts == 'true' ||
+#      needs.changes.outputs.ipc == 'true' ||
+#      github.ref == 'refs/heads/main' ||
+#      github.ref_type == 'tag'
 
   ipld-resolver:
     uses: ./.github/workflows/ipld-resolver.yaml
