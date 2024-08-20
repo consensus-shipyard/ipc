@@ -136,7 +136,7 @@ impl ActorCode for EIP1559GasMarketActor {
     actor_dispatch! {
         Constructor => constructor,
         SetConstants => set_constants,
-        CurrentGasReading => current_gas_reading,
+        CurrentReading => current_reading,
         UpdateUtilization => update_utilization,
     }
 }
