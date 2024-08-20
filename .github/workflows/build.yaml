@@ -51,13 +51,13 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Cache Solidity ABI artifacts
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: ./contracts/out
           key: contracts-abi-${{ hashFiles('./contracts/src/**/*.sol') }}
 
       - name: Compile ABI
-        run: cd contracts && make compile-
+        run: cd contracts && make compile-abi
 
       - name: Install Rust nightly
         uses: dtolnay/rust-toolchain@master
