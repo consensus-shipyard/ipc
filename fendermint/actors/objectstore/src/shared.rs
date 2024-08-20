@@ -32,16 +32,6 @@ pub struct AddParams {
     pub overwrite: bool,
 }
 
-/// Params for resolving an object.
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct ResolveParams {
-    /// Object key.
-    #[serde(with = "strict_bytes")]
-    pub key: Vec<u8>,
-    /// Object value.
-    pub value: Cid,
-}
-
 /// Params for deleting an object.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct DeleteParams {
@@ -79,7 +69,6 @@ pub enum Method {
     Constructor = METHOD_CONSTRUCTOR,
     GetMetadata = GET_METADATA_METHOD,
     AddObject = frc42_dispatch::method_hash!("AddObject"),
-    ResolveObject = frc42_dispatch::method_hash!("ResolveObject"),
     DeleteObject = frc42_dispatch::method_hash!("DeleteObject"),
     GetObject = frc42_dispatch::method_hash!("GetObject"),
     ListObjects = frc42_dispatch::method_hash!("ListObjects"),

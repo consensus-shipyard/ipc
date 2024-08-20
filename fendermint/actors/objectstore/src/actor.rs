@@ -7,15 +7,15 @@ use fendermint_actor_machine::{ConstructorParams, MachineActor};
 use fil_actors_runtime::{
     actor_dispatch, actor_error, extract_send_result,
     runtime::{ActorCode, Runtime},
-    ActorDowncast, ActorError, FIRST_EXPORTED_METHOD_NUMBER, INIT_ACTOR_ADDR, SYSTEM_ACTOR_ADDR,
+    ActorDowncast, ActorError, FIRST_EXPORTED_METHOD_NUMBER, INIT_ACTOR_ADDR,
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_ipld_hamt::BytesKey;
 use fvm_shared::{error::ExitCode, MethodNum};
 
 use crate::{
-    ext, AddParams, DeleteParams, GetParams, ListParams, Method, Object, ObjectList, ResolveParams,
-    State, OBJECTSTORE_ACTOR_NAME,
+    ext, AddParams, DeleteParams, GetParams, ListParams, Method, Object, ObjectList, State,
+    OBJECTSTORE_ACTOR_NAME,
 };
 
 #[cfg(feature = "fil-actor")]
@@ -71,19 +71,6 @@ impl Actor {
             .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to add object"))
         })?;
         Ok(root)
-    }
-
-    // TODO: remove this
-    fn resolve_object(rt: &impl Runtime, params: ResolveParams) -> Result<(), ActorError> {
-        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-
-        rt.transaction(|st: &mut State, rt| {
-            st.resolve(rt.store(), BytesKey(params.key), params.value)
-                .map_err(|e| {
-                    e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to resolve object")
-                })
-        })?;
-        Ok(())
     }
 
     // Deleting an object removes the key from the store, but not from the underlying storage.
@@ -189,7 +176,6 @@ impl ActorCode for Actor {
         Constructor => constructor,
         GetMetadata => get_metadata,
         AddObject => add_object,
-        ResolveObject => resolve_object,
         DeleteObject => delete_object,
         GetObject => get_object,
         ListObjects => list_objects,
