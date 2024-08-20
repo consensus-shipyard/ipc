@@ -159,7 +159,8 @@ where
             (apply_ret, emitters, latency)
         } else {
             if msg.gas_limit > state.gas_market().available_block_gas() {
-                tracing::warn!("gas limit exceed available block gas limit");
+		// This is panic-worthy, but we suppress it to avoid liveness issues.
+                tracing::warn!("[ASSERTION FAILED] message gas limit exceed available block gas limit; consensus engine is misbehaving");
             }
 
             let (execution_result, latency) = measure_time(|| state.execute_explicit(msg.clone()));
