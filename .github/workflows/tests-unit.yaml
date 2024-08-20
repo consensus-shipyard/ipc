@@ -24,24 +24,6 @@ jobs:
           profile: minimal
           toolchain: stable
 
-      - name: Install cargo-make
-        run: |
-          if ! command -v cargo-make &> /dev/null
-          then
-              cargo install -f cargo-make
-          fi
-
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: fendermint
-          path: /tmp
-
-      - name: Load image
-        run: |
-          docker load --input /tmp/fendermint.tar
-          docker image ls -a
-
       - name: Cache Solidity ABI artifacts
         uses: actions/cache@v2
         with:
@@ -57,6 +39,6 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Run Test
-        run: cd fendermint && PROFILE=ci make e2e-only
+      - name: Run unit tests
+        run: cargo test --locked --release
 
