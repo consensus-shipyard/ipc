@@ -142,51 +142,59 @@ pub struct GenesisOutput {
     pub validators: Vec<Validator<Power>>,
 }
 
-pub struct GenesisCreator {
+pub struct GenesisBuilder {
     /// Hardhat like util to deploy ipc contracts
     hardhat: Option<Hardhat>,
     /// The built in actors bundle path
     builtin_actors_path: PathBuf,
     /// The custom actors bundle path
     custom_actors_path: PathBuf,
-    /// The CAR path to flush the sealed genesis state
-    out_path: PathBuf,
+
+    /// Genesis params
+    genesis_params: Genesis,
 }
 
-impl GenesisCreator {
+impl GenesisBuilder {
     pub fn new(
         builtin_actors_path: PathBuf,
         custom_actors_path: PathBuf,
-        maybe_artifacts_path: Option<PathBuf>,
-        sealed_out_path: PathBuf,
+        genesis_params: Genesis,
     ) -> Self {
         Self {
-            hardhat: maybe_artifacts_path.map(Hardhat::new),
+            hardhat: None,
             builtin_actors_path,
             custom_actors_path,
-            out_path: sealed_out_path,
+            genesis_params,
         }
     }
 
-    /// Initialize actor states from the Genesis parameters
-    pub async fn create(&self, genesis: Genesis) -> anyhow::Result<()> {
+    pub fn with_ipc_system_contracts(mut self, path: PathBuf) -> Self {
+        self.hardhat = Some(Hardhat::new(path));
+        self
+    }
+
+    /// Initialize actor states from the Genesis parameters and write the sealed genesis state to
+    /// a CAR file specified by `out_path`
+    pub async fn write_to(&self, out_path: PathBuf) -> anyhow::Result<()> {
         let mut state = self.init_state().await?;
-        let out = self.populate_state(&mut state, genesis)?;
+        let genesis_state = self.populate_state(&mut state, self.genesis_params.clone())?;
         let (state_root, store) = state.finalize()?;
-        self.write_car(state_root, out, store).await
+        self.write_car(state_root, genesis_state, out_path, store)
+            .await
     }
 
     async fn write_car(
         &self,
         state_root: Cid,
-        out: GenesisOutput,
+        genesis_state: GenesisOutput,
+        out_path: PathBuf,
         store: MemoryBlockstore,
     ) -> anyhow::Result<()> {
-        let file = tokio::fs::File::create(&self.out_path).await?;
+        let file = tokio::fs::File::create(&out_path).await?;
 
         tracing::info!(state_root = state_root.to_string(), "state root");
 
-        let metadata = GenesisMetadata::new(state_root, out);
+        let metadata = GenesisMetadata::new(state_root, genesis_state);
 
         let streamer = StateTreeStreamer::new(state_root, store);
         let (metadata_cid, metadata_bytes) = derive_cid(&metadata)?;
