@@ -87,8 +87,9 @@ docker-deps: $(BUILTIN_ACTORS_BUNDLE) $(CUSTOM_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 # To use `buildx` locally to produce multiplatform images, one needs to run `docker buildx create --use`.
 # After that it looks like even the regular docker build needs the `--load` parameter, which hopefully
 # it can handle for anyone with `DOCKER_BUILDKIT=1`.
-docker-build: docker-deps $(FENDERMINT_CODE)
+docker-build: $(FENDERMINT_CODE)
 	if [ "$(PROFILE)" = "ci" ]; then \
+  		${MAKE} docker-deps-ci ; \
 		cat docker/builder.ci.Dockerfile docker/runner.Dockerfile > docker/Dockerfile ; \
 		docker buildx build \
 			$(BUILDX_STORE) \
@@ -96,6 +97,7 @@ docker-build: docker-deps $(FENDERMINT_CODE)
 			-f docker/Dockerfile \
 			-t $(BUILDX_TAG) $(PWD)/..; \
 	else \
+	  	${MAKE} docker-deps ; \
 		cat docker/builder.local.Dockerfile docker/runner.Dockerfile > docker/Dockerfile ; \
 		DOCKER_BUILDKIT=1 \
 		docker build \
@@ -104,22 +106,8 @@ docker-build: docker-deps $(FENDERMINT_CODE)
 			-t fendermint:latest $(PWD)/..; \
 	fi
 
-docker-build-only: $(FENDERMINT_CODE)
-	if [ "$(PROFILE)" = "ci" ]; then \
-		cat docker/builder.ci.Dockerfile docker/runner.Dockerfile > docker/Dockerfile ; \
-		docker buildx build \
-			$(BUILDX_STORE) \
-			$(BUILDX_FLAGS) \
-			-f docker/Dockerfile \
-			-t $(BUILDX_TAG) $(PWD)/..; \
-	else \
-		cat docker/builder.local.Dockerfile docker/runner.Dockerfile > docker/Dockerfile ; \
-		DOCKER_BUILDKIT=1 \
-		docker build \
-			$(BUILDX_STORE) \
-			-f docker/Dockerfile \
-			-t fendermint:latest $(PWD)/..; \
-	fi
+docker-build-ci-test:
+	docker build -f docker/ci.Dockerfile -t fendermint:latest .
 
 # Build a bundle CAR; this is so we don't have to have a project reference,
 # which means we are not tied to the release cycle of both FVM _and_ actors;

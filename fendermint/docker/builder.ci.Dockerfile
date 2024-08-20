@@ -53,6 +53,7 @@ RUN rustup install ${RUST_VERSION} && rustup target add wasm32-unknown-unknown
 
 # Defined here so anything above it can be cached as a common dependency.
 ARG TARGETARCH
+ARG BUILD_BINDINGS_ARG
 
 # Only installing MacOS specific libraries if necessary.
 RUN if [ "${TARGETARCH}" = "arm64" ]; then \
@@ -64,10 +65,11 @@ RUN if [ "${TARGETARCH}" = "arm64" ]; then \
 # Copy the stripped source code.
 COPY --from=stripper /app /app
 
+ENV CARGO_HOME=/root/.cargo
+
 # Build the dependencies.
 RUN \
   --mount=type=cache,target=/root/.cargo/registry,sharing=locked \
-  --mount=type=cache,target=/root/.cargo/git,sharing=locked \
   --mount=type=cache,target=/app/target,sharing=locked \
   set -eux; \
   case "${TARGETARCH}" in \
@@ -86,10 +88,43 @@ COPY . .
 # Need to invalidate build caches otherwise they won't be recompiled with the real code.
 RUN find . -type f \( -wholename "**/src/lib.rs" -o -wholename "**/src/main.rs" \) | xargs touch
 
+## Clippy check
+#RUN \
+#  --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+#  --mount=type=cache,target=/app/target,sharing=locked \
+#  set -eux; \
+#  case "${TARGETARCH}" in \
+#  amd64) ARCH='x86_64'  ;; \
+#  arm64) ARCH='aarch64' ;; \
+#  esac; \
+#  cargo clippy --all --no-deps -- -D clippy::all \
+
+# Format check
+#RUN \
+#  --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+#  --mount=type=cache,target=/app/target,sharing=locked \
+#  set -eux; \
+#  case "${TARGETARCH}" in \
+#  amd64) ARCH='x86_64'  ;; \
+#  arm64) ARCH='aarch64' ;; \
+#  esac; \
+#  cargo fmt --all --check
+
+#RUN \
+#  --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+#  --mount=type=cache,target=/app/target,sharing=locked \
+#  set -eux; \
+#  case "${TARGETARCH}" in \
+#  amd64) ARCH='x86_64'  ;; \
+#  arm64) ARCH='aarch64' ;; \
+#  esac; \
+#  cargo test --workspace --exclude fendermint_materializer
+
 # Do the final build.
 RUN \
+  BUILD_BINDINGS=${BUILD_BINDINGS_ARG} \
+  echo ${BUILD_BINDINGS} \
   --mount=type=cache,target=/root/.cargo/registry,sharing=locked \
-  --mount=type=cache,target=/root/.cargo/git,sharing=locked \
   --mount=type=cache,target=/app/target,sharing=locked \
   set -eux; \
   case "${TARGETARCH}" in \

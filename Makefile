@@ -22,3 +22,6 @@ license:
 	./scripts/add_license.sh
 
 lint: license $(patsubst %, lint/%, $(SUBTREES))
+
+docker-build-ci:
+	@bash ./scripts/build_docker_ci.sh
