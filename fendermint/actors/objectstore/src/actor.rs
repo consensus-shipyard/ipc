@@ -42,9 +42,24 @@ impl Actor {
         rt.create(&state)
     }
 
-    // TODO: if overwriting, delete the old blob from blobs actor
     fn add_object(rt: &impl Runtime, params: AddParams) -> Result<Cid, ActorError> {
         Self::ensure_write_allowed(rt)?;
+        let key = BytesKey(params.key);
+        if let Some(object) = Self::retrieve_object(rt, &key)? {
+            if params.overwrite {
+                let cid = Self::cid_from_object(object)?;
+                extract_send_result(rt.send_simple(
+                    &ext::blobs::BLOBS_ACTOR_ADDR,
+                    ext::blobs::DELETE_BLOB_METHOD,
+                    IpldBlock::serialize_cbor(&ext::blobs::DeleteBlobParams(cid))?,
+                    rt.message().value_received(),
+                ))?;
+            } else {
+                return Err(ActorError::illegal_state(
+                    "asked not to overwrite".to_string(),
+                ));
+            }
+        }
 
         let add_params = IpldBlock::serialize_cbor(&ext::blobs::AddBlobParams {
             cid: params.cid,
@@ -62,7 +77,7 @@ impl Actor {
         let root = rt.transaction(|st: &mut State, rt| {
             st.add(
                 rt.store(),
-                BytesKey(params.key),
+                key,
                 params.cid,
                 params.size,
                 params.metadata,
@@ -81,21 +96,11 @@ impl Actor {
         Self::ensure_write_allowed(rt)?;
         let key = BytesKey(params.key);
         // 1. Retrieve object CID
-        let state = rt.state::<State>()?;
-        let store = rt.store();
-        let object = state
-            .get(store, &key)
-            .map_err(|e| {
-                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to retrieve object")
-            })?
-            .ok_or(ActorError::unchecked(
-                ExitCode::USR_ILLEGAL_STATE,
-                "stored cid is invalid".to_string(),
-            ))?;
-        let cid = Cid::try_from(object.cid.0).map_err(|e| {
-            anyhow::Error::from(e)
-                .downcast_default(ExitCode::USR_ILLEGAL_STATE, "stored cid is invalid")
-        })?;
+        let object = Self::retrieve_object(rt, &key)?.ok_or(ActorError::unchecked(
+            ExitCode::USR_ILLEGAL_STATE,
+            "no object stored".to_string(),
+        ))?;
+        let cid = Self::cid_from_object(object)?;
         // 2. Delete from the blobs actor
         extract_send_result(rt.send_simple(
             &ext::blobs::BLOBS_ACTOR_ADDR,
@@ -158,6 +163,22 @@ impl Actor {
         } else {
             Err(actor_error!(unhandled_message; "invalid method: {}", method))
         }
+    }
+
+    /// Retrieve object from the state.
+    fn retrieve_object(rt: &impl Runtime, key: &BytesKey) -> Result<Option<Object>, ActorError> {
+        let state = rt.state::<State>()?;
+        let store = rt.store();
+        state.get(store, key).map_err(|e| {
+            e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to retrieve object")
+        })
+    }
+
+    // Get CID of an object, and cast an error to ActorError if it happens
+    fn cid_from_object(object: Object) -> Result<Cid, ActorError> {
+        Cid::try_from(object.cid.0).map_err(|e| {
+            anyhow::Error::from(e).downcast_default(ExitCode::USR_ILLEGAL_STATE, "invalid cid")
+        })
     }
 }
 
@@ -284,6 +305,162 @@ mod tests {
             .unwrap();
         let state = rt.state::<State>().unwrap();
         assert_eq!(state.root, result);
+    }
+
+    #[test]
+    pub fn test_add_overwrite() {
+        let id_addr = Address::new_id(110);
+        let eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000000"
+        ));
+        let f4_eth_addr = Address::new_delegated(10, &eth_addr.0).unwrap();
+
+        let rt = construct_and_verify(f4_eth_addr);
+        rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
+        rt.set_origin(id_addr);
+        rt.expect_validate_caller_any();
+        let add_params: AddParams = AddParams {
+            store: f4_eth_addr,
+            key: vec![0, 1, 2],
+            cid: new_cid(),
+            size: 20,
+            metadata: HashMap::new(),
+            overwrite: false,
+        };
+        rt.expect_send_simple(
+            ext::blobs::BLOBS_ACTOR_ADDR,
+            ext::blobs::ADD_BLOB_METHOD,
+            IpldBlock::serialize_cbor(&ext::blobs::AddBlobParams {
+                cid: add_params.cid,
+                size: add_params.size as u64,
+                expiry: 100,
+                source: Some(add_params.store),
+            })
+            .unwrap(),
+            TokenAmount::from_whole(0),
+            None,
+            ExitCode::OK,
+        );
+        let result = rt
+            .call::<Actor>(
+                Method::AddObject as u64,
+                IpldBlock::serialize_cbor(&add_params).unwrap(),
+            )
+            .unwrap()
+            .unwrap()
+            .deserialize::<Cid>()
+            .unwrap();
+        let state = rt.state::<State>().unwrap();
+        assert_eq!(state.root, result);
+
+        let add_params2 = AddParams {
+            store: add_params.store,
+            key: add_params.key,
+            cid: new_cid(),
+            size: add_params.size,
+            metadata: HashMap::new(),
+            overwrite: true,
+        };
+        rt.expect_validate_caller_any();
+        rt.expect_send_simple(
+            ext::blobs::BLOBS_ACTOR_ADDR,
+            ext::blobs::DELETE_BLOB_METHOD,
+            IpldBlock::serialize_cbor(&ext::blobs::DeleteBlobParams(add_params.cid)).unwrap(),
+            TokenAmount::from_whole(0),
+            None,
+            ExitCode::OK,
+        );
+        rt.expect_send_simple(
+            ext::blobs::BLOBS_ACTOR_ADDR,
+            ext::blobs::ADD_BLOB_METHOD,
+            IpldBlock::serialize_cbor(&ext::blobs::AddBlobParams {
+                cid: add_params2.cid,
+                size: add_params2.size as u64,
+                expiry: 100,
+                source: Some(add_params2.store),
+            })
+            .unwrap(),
+            TokenAmount::from_whole(0),
+            None,
+            ExitCode::OK,
+        );
+        let result = rt
+            .call::<Actor>(
+                Method::AddObject as u64,
+                IpldBlock::serialize_cbor(&add_params2).unwrap(),
+            )
+            .unwrap()
+            .unwrap()
+            .deserialize::<Cid>()
+            .unwrap();
+        let state = rt.state::<State>().unwrap();
+        assert_eq!(state.root, result);
+    }
+
+    #[test]
+    pub fn test_add_overwrite_fail() {
+        let id_addr = Address::new_id(110);
+        let eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000000"
+        ));
+        let f4_eth_addr = Address::new_delegated(10, &eth_addr.0).unwrap();
+
+        let rt = construct_and_verify(f4_eth_addr);
+        rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
+        rt.set_origin(id_addr);
+        rt.expect_validate_caller_any();
+        let add_params: AddParams = AddParams {
+            store: f4_eth_addr,
+            key: vec![0, 1, 2],
+            cid: new_cid(),
+            size: 20,
+            metadata: HashMap::new(),
+            overwrite: false,
+        };
+        rt.expect_send_simple(
+            ext::blobs::BLOBS_ACTOR_ADDR,
+            ext::blobs::ADD_BLOB_METHOD,
+            IpldBlock::serialize_cbor(&ext::blobs::AddBlobParams {
+                cid: add_params.cid,
+                size: add_params.size as u64,
+                expiry: 100,
+                source: Some(add_params.store),
+            })
+            .unwrap(),
+            TokenAmount::from_whole(0),
+            None,
+            ExitCode::OK,
+        );
+        let result = rt
+            .call::<Actor>(
+                Method::AddObject as u64,
+                IpldBlock::serialize_cbor(&add_params).unwrap(),
+            )
+            .unwrap()
+            .unwrap()
+            .deserialize::<Cid>()
+            .unwrap();
+        let state = rt.state::<State>().unwrap();
+        assert_eq!(state.root, result);
+
+        let add_params2 = AddParams {
+            store: add_params.store,
+            key: add_params.key,
+            cid: new_cid(),
+            size: add_params.size,
+            metadata: HashMap::new(),
+            overwrite: false,
+        };
+        rt.expect_validate_caller_any();
+        let result = rt.call::<Actor>(
+            Method::AddObject as u64,
+            IpldBlock::serialize_cbor(&add_params2).unwrap(),
+        );
+        assert!(result.is_err_and(|e| { e.msg().eq("asked not to overwrite") }));
+        let state2 = rt.state::<State>().unwrap();
+        assert_eq!(state2.root, state.root);
     }
 
     #[test]
