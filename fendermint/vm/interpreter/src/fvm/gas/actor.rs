@@ -19,7 +19,11 @@ pub struct ActorGasMarket {
 }
 
 impl GasMarket for ActorGasMarket {
-    fn available_block_gas(&self) -> Gas {
+    struct Available {
+        block_gas: Gas
+    }
+
+    fn available(&self) -> Available {
         self.block_gas_limit - self.block_gas_used
     }
 
