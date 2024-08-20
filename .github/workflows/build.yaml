@@ -57,7 +57,7 @@ jobs:
           key: contracts-abi-${{ hashFiles('./contracts/src/**/*.sol') }}
 
       - name: Check fmt (fmt, clippy)
-        run: cargo fmt --check --all
+        run: cargo +nightly fmt --check --all
 
       - name: Check clippy
         run: cargo clippy --tests --no-deps -- -D clippy::all
