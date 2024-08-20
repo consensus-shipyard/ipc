@@ -1,0 +1,62 @@
+name: Run tests against Fendermint (remote Docker image)
+
+# This workflow is triggered from the main CI workflow.
+on:
+  workflow_call:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    env:
+      RUST_BACKTRACE: full
+      RUSTFLAGS: -Dwarnings
+
+    steps:
+      - name: Check out the project
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+
+      - name: Install cargo-make
+        run: |
+          if ! command -v cargo-make &> /dev/null
+          then
+              cargo install -f cargo-make
+          fi
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: fendermint
+          path: /tmp
+
+      - name: Load image
+        run: |
+          docker load --input /tmp/fendermint.tar
+          docker image ls -a
+
+      - name: Cache Solidity ABI artifacts
+        uses: actions/cache@v2
+        with:
+          path: ./contracts/out
+          key: contracts-abi-${{ hashFiles('./contracts/src/**/*.sol') }}
+
+      - name: Cache Cargo Build
+        uses: actions/cache@v4
+        with:
+          path: |
+            /home/runner/.cargo/registry
+            /home/runner/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run Test
+        run: cd fendermint && PROFILE=ci make e2e-only
+

@@ -1,16 +1,12 @@
-name: Fendermint Build Docker
+name: Build IPC
 
 # This workflow is triggered from the main CI workflow.
 on:
   workflow_call:
 
 jobs:
-  # Check code formatting; anything that doesn't require compilation.
-  build-docker:
-    # Skip tests on draft PRs, they take a long time, and drafts are for visibility.
-    if: ${{ !github.event.pull_request.draft }}
-
-    name: Build IPC Fendermint Image
+  build:
+    name: Build IPC
     runs-on: ubuntu-latest
     env:
       RUST_BACKTRACE: full
@@ -30,7 +26,7 @@ jobs:
           haskell: true
 
       - name: Check out the project
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
 
@@ -60,31 +56,36 @@ jobs:
           path: ./contracts/out
           key: contracts-abi-${{ hashFiles('./contracts/src/**/*.sol') }}
 
-#      - name: Clippy
-#        env:
-#          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
-#        run: cargo clippy --no-deps -- -D clippy::all
-#
-#      - name: Format
-#        env:
-#          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
-#        run: cargo fmt --all --check
+      - name: Check lint (fmt, clippy)
+        run: make lint
 
-      - name: Build Binary
-        env:
-          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
-        run: mkdir -p ./binary && cd fendermint && make builtin-bundle && cargo build --locked --release -p fendermint_app -p ipc-cli && mv ../target/release/fendermint ../target/release/ipc-cli ../binary/
+      - name: Build all
+        run: |
+          make download-builtin-actors-bundle
+          cargo build --locked --release
 
-      - name: Build Fendermint Docker Image
-        env:
-          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
-        run: cd fendermint && make docker-build-ci-test
+      - name: Build Docker image for e2e tests
+        run: |
+          cat <<EOF > /tmp/Dockerfile
+          FROM alpine as builder
 
-      - name: Export
-        run: docker save fendermint:latest > /tmp/fendermint.tar
+          COPY /fendermint/app/config /app/fendermint/app/config
+          COPY /target/release/fendermint /app/output/bin/fendermint
+          COPY /target/release/ipc-cli /app/output/bin/ipc-cli
+          
+          EOF
+          
+          cat fendermint/docker/runner.Dockerfile >> /tmp/Dockerfile
+          
+          DOCKER_BUILDKIT=1 docker build \
+            --load \
+            -f /tmp/Dockerfile \
+            -t fendermint:latest $(PWD)
 
-      - name: Upload artifact
+      - name: Export Docker image
+        run: docker save fendermint:latest > /artifacts/image.tar
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: fendermint
-          path: /tmp/fendermint.tar
+          path: /artifacts

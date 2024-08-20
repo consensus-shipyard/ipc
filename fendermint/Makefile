@@ -37,12 +37,9 @@ build: $(IPC_ACTORS_GEN) | protoc npm
 install: $(IPC_ACTORS_GEN)
 	cargo install --locked --path app
 
-test: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
-	${MAKE} test-only
-
 # Using --release for testing because wasm can otherwise be slow.
 # Excluding the materializer tests because they rely on docker; we could test with --lib
-test-only:
+test: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 	FM_BUILTIN_ACTORS_BUNDLE=$(BUILTIN_ACTORS_BUNDLE) \
 	FM_CUSTOM_ACTORS_BUNDLE=$(CUSTOM_ACTORS_BUNDLE) \
 	FM_CONTRACTS_DIR=$(IPC_ACTORS_OUT) \
@@ -104,32 +101,12 @@ docker-build: docker-deps $(FENDERMINT_CODE)
 			-t fendermint:latest $(PWD)/..; \
 	fi
 
-docker-build-ci-test:
-	docker build -f docker/ci.Dockerfile -t fendermint:latest $(PWD)/..;
-
-docker-build-only: $(FENDERMINT_CODE)
-	if [ "$(PROFILE)" = "ci" ]; then \
-		cat docker/builder.ci.Dockerfile docker/runner.Dockerfile > docker/Dockerfile ; \
-		docker buildx build \
-			$(BUILDX_STORE) \
-			$(BUILDX_FLAGS) \
-			-f docker/Dockerfile \
-			-t $(BUILDX_TAG) $(PWD)/..; \
-	else \
-		cat docker/builder.local.Dockerfile docker/runner.Dockerfile > docker/Dockerfile ; \
-		DOCKER_BUILDKIT=1 \
-		docker build \
-			$(BUILDX_STORE) \
-			-f docker/Dockerfile \
-			-t fendermint:latest $(PWD)/..; \
-	fi
-
 # Build a bundle CAR; this is so we don't have to have a project reference,
 # which means we are not tied to the release cycle of both FVM _and_ actors;
 # so long as they work together.
 actor-bundle: $(BUILTIN_ACTORS_BUNDLE) $(CUSTOM_ACTORS_BUNDLE)
 
-builtin-bundle: $(BUILTIN_ACTORS_BUNDLE)
+download-builtin-actors-bundle: $(BUILTIN_ACTORS_BUNDLE)
 
 compile-abi: $(IPC_ACTORS_GEN)
 
