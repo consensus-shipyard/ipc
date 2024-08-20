@@ -126,6 +126,8 @@ docker-build-only: $(FENDERMINT_CODE)
 # so long as they work together.
 actor-bundle: $(BUILTIN_ACTORS_BUNDLE) $(CUSTOM_ACTORS_BUNDLE)
 
+builtin-bundle: $(BUILTIN_ACTORS_BUNDLE)
+
 compile-abi: $(IPC_ACTORS_GEN)
 
 # Download a released builtin-actors bundle CAR file.
