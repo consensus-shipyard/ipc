@@ -7,12 +7,13 @@ pub mod blobs {
     use fvm_shared::{address::Address, bigint::BigInt, clock::ChainEpoch, ActorID};
     use iroh_base::hash::Hash;
     use iroh_base::key::PublicKey;
+    use serde::{Deserialize, Serialize};
 
     pub const BLOBS_ACTOR_ID: ActorID = 49;
     pub const BLOBS_ACTOR_ADDR: Address = Address::new_id(BLOBS_ACTOR_ID);
 
     pub const ADD_BLOB_METHOD: u64 = frc42_dispatch::method_hash!("AddBlob");
-    // pub const DELETE_BLOB_METHOD: u64 = frc42_dispatch::method_hash!("DeleteBlob");
+    pub const DELETE_BLOB_METHOD: u64 = frc42_dispatch::method_hash!("DeleteBlob");
     // pub const GET_BLOB_METHOD: u64 = frc42_dispatch::method_hash!("GetBlob");
 
     /// Account storage and credit details.
@@ -42,4 +43,9 @@ pub mod blobs {
         /// Blob expiry epoch.
         pub expiry: ChainEpoch,
     }
+
+    /// Params for deleting a blob.
+    #[derive(Clone, Debug, Serialize, Deserialize)]
+    #[serde(transparent)]
+    pub struct DeleteBlobParams(pub Hash);
 }
