@@ -104,6 +104,9 @@ docker-build: docker-deps $(FENDERMINT_CODE)
 			-t fendermint:latest $(PWD)/..; \
 	fi
 
+docker-build-ci-test:
+	docker build -f docker/ci.Dockerfile -t fendermint:latest $(PWD)/..;
+
 docker-build-only: $(FENDERMINT_CODE)
 	if [ "$(PROFILE)" = "ci" ]; then \
 		cat docker/builder.ci.Dockerfile docker/runner.Dockerfile > docker/Dockerfile ; \

@@ -70,10 +70,15 @@ jobs:
 #          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
 #        run: cargo fmt --all --check
 
-      - name: Unit Tests
+      - name: Build Binary
         env:
           PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
-        run: cd fendermint && make builtin-bundle && cargo build --release
+        run: mkdir -p binary && cd fendermint && make builtin-bundle && cargo build --locked --release -p fendermint_app -p ipc-cli && mv target/release/fendermint target/release/ipc-cli binary
+
+      - name: Build Fendermint Docker Image
+        env:
+          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
+        run: cd fendermint && make docker-build-ci-test
 
       - name: Inject Rust Cache Into Docker
         uses: reproducible-containers/buildkit-cache-dance@v3.1.0
