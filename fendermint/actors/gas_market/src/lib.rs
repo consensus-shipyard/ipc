@@ -8,26 +8,40 @@ use fil_actors_runtime::{actor_dispatch, ActorError};
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::METHOD_CONSTRUCTOR;
+use lazy_static::lazy_static;
 use num_derive::FromPrimitive;
-use num_traits::Zero;
-use std::ops::Mul;
+use std::cmp::Ordering;
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(EIP1559GasMarketActor);
 
 /// Base fee max change denominator as defined in [EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)
-const EIP1559_BASE_FEE_MAX_CHANGE_DENOMINATOR: u64 = 8;
+const BASE_FEE_MAX_CHANGE_DENOMINATOR: u64 = 8;
 /// Elasticity multiplier as defined in [EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)
-const EIP1559_ELASTICITY_MULTIPLIER: u64 = 2;
-/// Initial base fee as defined in [EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)
-pub const EIP1559_INITIAL_BASE_FEE: u64 = 1_000_000_000;
+const ELASTICITY_MULTIPLIER: u64 = 2;
+lazy_static! {
+    /// Initial base fee as defined in [EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)
+    static ref INITIAL_BASE_FEE: TokenAmount = TokenAmount::from_atto(1_000_000_000);
+    static ref MINIMAL_BASE_FEE: TokenAmount = TokenAmount::from_atto(100);
+}
 pub const IPC_GAS_MARKET_ACTOR_NAME: &str = "gas_market";
 pub type Gas = u64;
+pub type GasMarketReading = EIP1559GasState;
 
 #[derive(Serialize_tuple, Deserialize_tuple, Debug, Clone)]
 pub struct EIP1559GasState {
     pub block_gas_limit: Gas,
     pub base_fee: TokenAmount,
+}
+
+#[derive(Serialize_tuple, Deserialize_tuple, Debug, Clone)]
+pub struct BlockGasUtilization {
+    pub block_gas_used: Gas,
+}
+
+#[derive(Serialize_tuple, Deserialize_tuple, Debug, Clone)]
+pub struct SetConstants {
+    pub block_gas_limit: Gas,
 }
 
 pub struct EIP1559GasMarketActor {}
@@ -36,75 +50,70 @@ pub struct EIP1559GasMarketActor {}
 #[repr(u64)]
 pub enum Method {
     Constructor = METHOD_CONSTRUCTOR,
-    GetState = frc42_dispatch::method_hash!("GetState"),
-    SetBlockGasLimit = frc42_dispatch::method_hash!("SetBlockGasLimit"),
-    UpdateBlockGasConsumption = frc42_dispatch::method_hash!("UpdateBlockGasConsumption"),
+    CurrentGasReading = frc42_dispatch::method_hash!("CurrentGasReading"),
+    SetConstants = frc42_dispatch::method_hash!("SetConstants"),
+    UpdateUtilization = frc42_dispatch::method_hash!("UpdateUtilization"),
 }
 
 impl EIP1559GasMarketActor {
     /// Creates the actor
     pub fn constructor(rt: &impl Runtime, st: EIP1559GasState) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        rt.create(&st)?;
-
-        Ok(())
+        rt.create(&st)
     }
 
-    fn set_block_gas_limit(rt: &impl Runtime, block_gas_limit: Gas) -> Result<(), ActorError> {
+    fn set_constants(rt: &impl Runtime, constants: SetConstants) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
         rt.transaction(|st: &mut EIP1559GasState, _rt| {
-            st.block_gas_limit = block_gas_limit;
+            st.block_gas_limit = constants.block_gas_limit;
             Ok(())
         })?;
 
         Ok(())
     }
 
-    fn get_state(rt: &impl Runtime) -> Result<EIP1559GasState, ActorError> {
+    fn current_gas_reading(rt: &impl Runtime) -> Result<GasMarketReading, ActorError> {
         rt.state()
     }
 
-    fn update_block_gas_consumption(
+    fn update_utilization(
         rt: &impl Runtime,
-        block_gas_used: Gas,
+        utilization: BlockGasUtilization,
     ) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
         rt.transaction(|st: &mut EIP1559GasState, _rt| {
-            st.base_fee = update_base_fee(st.block_gas_limit, block_gas_used, st.base_fee.clone());
+            st.base_fee = st.next_base_fee(utilization.block_gas_used);
             Ok(())
         })
     }
 }
 
-fn update_base_fee(gas_limit: Gas, gas_used: Gas, base_fee: TokenAmount) -> TokenAmount {
-    let gas_target = gas_limit / EIP1559_ELASTICITY_MULTIPLIER;
+impl EIP1559GasState {
+    fn next_base_fee(&self, gas_used: Gas) -> TokenAmount {
+        let base_fee = self.base_fee.clone();
+        let gas_target = self.block_gas_limit / ELASTICITY_MULTIPLIER;
 
-    if gas_used == gas_target {
-        return base_fee;
-    }
-
-    if gas_used > gas_target {
-        let gas_used_delta = gas_used - gas_target;
-        let base_fee_delta = base_fee
-            .clone()
-            .mul(gas_used_delta)
-            .div_floor(gas_target)
-            .div_floor(EIP1559_BASE_FEE_MAX_CHANGE_DENOMINATOR)
-            .max(TokenAmount::from_atto(1));
-        base_fee + base_fee_delta
-    } else {
-        let gas_used_delta = gas_target - gas_used;
-        let base_fee_per_gas_delta = base_fee
-            .clone()
-            .mul(gas_used_delta)
-            .div_floor(gas_target)
-            .div_floor(EIP1559_BASE_FEE_MAX_CHANGE_DENOMINATOR);
-        if base_fee_per_gas_delta > base_fee {
-            TokenAmount::zero()
-        } else {
-            base_fee - base_fee_per_gas_delta
+        match gas_used.cmp(&gas_target) {
+            Ordering::Equal => base_fee,
+            Ordering::Less => {
+                let base_fee_delta = base_fee.atto() * (gas_target - gas_used)
+                    / gas_target
+                    / BASE_FEE_MAX_CHANGE_DENOMINATOR;
+                let base_fee_delta = TokenAmount::from_atto(base_fee_delta);
+                if base_fee_delta >= base_fee {
+                    MINIMAL_BASE_FEE.clone()
+                } else {
+                    base_fee - base_fee_delta
+                }
+            }
+            Ordering::Greater => {
+                let gas_used_delta = gas_used - gas_target;
+                let delta =
+                    base_fee.atto() * gas_used_delta / gas_target / BASE_FEE_MAX_CHANGE_DENOMINATOR;
+                base_fee + TokenAmount::from_atto(delta).max(TokenAmount::from_atto(1))
+            }
         }
     }
 }
@@ -118,15 +127,15 @@ impl ActorCode for EIP1559GasMarketActor {
 
     actor_dispatch! {
         Constructor => constructor,
-        SetBlockGasLimit => set_block_gas_limit,
-        GetState => get_state,
-        UpdateBlockGasConsumption => update_block_gas_consumption,
+        SetConstants => set_constants,
+        CurrentGasReading => current_gas_reading,
+        UpdateUtilization => update_utilization,
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{EIP1559GasMarketActor, EIP1559GasState, Method};
+    use crate::{EIP1559GasMarketActor, EIP1559GasState, Method, SetConstants};
     use fil_actors_runtime::test_utils::{expect_empty, MockRuntime, SYSTEM_ACTOR_CODE_ID};
     use fil_actors_runtime::SYSTEM_ACTOR_ADDR;
     use fvm_ipld_encoding::ipld_block::IpldBlock;
@@ -167,17 +176,14 @@ mod tests {
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
 
         let r = rt.call::<EIP1559GasMarketActor>(
-            Method::SetBlockGasLimit as u64,
-            IpldBlock::serialize_cbor(&20).unwrap(),
+            Method::SetConstants as u64,
+            IpldBlock::serialize_cbor(&SetConstants {
+                block_gas_limit: 20,
+            })
+            .unwrap(),
         );
         assert!(r.is_ok());
 
-        let r = rt
-            .call::<EIP1559GasMarketActor>(
-                Method::GetState as u64,
-                IpldBlock::serialize_cbor(&()).unwrap(),
-            )
-            .unwrap();
         let s = rt.get_state::<EIP1559GasState>();
         assert_eq!(s.block_gas_limit, 20);
     }
@@ -190,8 +196,11 @@ mod tests {
 
         let code = rt
             .call::<EIP1559GasMarketActor>(
-                Method::SetBlockGasLimit as u64,
-                IpldBlock::serialize_cbor(&20).unwrap(),
+                Method::SetConstants as u64,
+                IpldBlock::serialize_cbor(&SetConstants {
+                    block_gas_limit: 20,
+                })
+                .unwrap(),
             )
             .unwrap_err()
             .exit_code();
