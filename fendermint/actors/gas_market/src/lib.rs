@@ -91,6 +91,10 @@ impl EIP1559GasMarketActor {
 }
 
 impl EIP1559GasState {
+    pub fn new(block_gas_limit: Gas) -> Self {
+        Self { block_gas_limit, base_fee: INITIAL_BASE_FEE.clone() }
+    }
+
     fn next_base_fee(&self, gas_used: Gas) -> TokenAmount {
         let base_fee = self.base_fee.clone();
         let gas_target = self.block_gas_limit / ELASTICITY_MULTIPLIER;
