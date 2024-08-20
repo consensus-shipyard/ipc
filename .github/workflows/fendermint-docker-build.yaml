@@ -70,10 +70,10 @@ jobs:
 #          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
 #        run: cargo fmt --all --check
 
-#      - name: Unit Tests
-#        env:
-#          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
-#        run: cd fendermint && cargo build --release
+      - name: Unit Tests
+        env:
+          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
+        run: cd fendermint && make actor-bundle && cargo build --release
 
       - name: Inject Rust Cache Into Docker
         uses: reproducible-containers/buildkit-cache-dance@v3.1.0
