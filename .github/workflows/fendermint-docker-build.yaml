@@ -80,21 +80,6 @@ jobs:
           PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
         run: cd fendermint && make docker-build-ci-test
 
-      - name: Inject Rust Cache Into Docker
-        uses: reproducible-containers/buildkit-cache-dance@v3.1.0
-        with:
-          cache-map: |
-            {
-              "/home/runner/.cargo/registry": "/root/.cargo/registry",
-              "/home/runner/.cargo/git": "/root/.cargo/git",
-              "target": "/app/target"
-            }
-
-      - name: Build Fendermint Docker Image
-        env:
-          PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
-        run: cd fendermint && PROFILE=ci make docker-build-only
-
       - name: Export
         run: docker save fendermint:latest > /tmp/fendermint.tar
 
