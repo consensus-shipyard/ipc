@@ -38,7 +38,7 @@ impl GasMarket for ActorGasMarket {
 }
 
 impl ActorGasMarket {
-    pub fn new<E: Executor>(
+    pub fn create<E: Executor>(
         executor: &mut E,
         block_height: ChainEpoch,
     ) -> anyhow::Result<ActorGasMarket> {
