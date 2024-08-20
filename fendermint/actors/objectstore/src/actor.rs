@@ -46,18 +46,16 @@ impl Actor {
     fn add_object(rt: &impl Runtime, params: AddParams) -> Result<Cid, ActorError> {
         Self::ensure_write_allowed(rt)?;
 
-        let blob_params = ext::blobs::AddBlobParams {
+        let add_params = IpldBlock::serialize_cbor(&ext::blobs::AddBlobParams {
             cid: params.cid,
             size: params.size as u64,
             expiry: rt.curr_epoch() + 100,
             source: Some(params.store),
-        };
-
-        // TODO: use read-only flag
+        })?;
         extract_send_result(rt.send_simple(
             &ext::blobs::BLOBS_ACTOR_ADDR,
             ext::blobs::ADD_BLOB_METHOD,
-            IpldBlock::serialize_cbor(&blob_params)?,
+            add_params,
             rt.message().value_received(),
         ))?;
 
@@ -92,12 +90,35 @@ impl Actor {
     // So, we can't just delete it here via syscall.
     // Once implemented, the DA mechanism may cause the data to be entangled with other data.
     // The retention policies will handle deleting / GC.
-    // TODO: call blobs actor to delete
     fn delete_object(rt: &impl Runtime, params: DeleteParams) -> Result<Cid, ActorError> {
         Self::ensure_write_allowed(rt)?;
-
+        let key = BytesKey(params.key);
+        // 1. Retrieve object CID
+        let state = rt.state::<State>()?;
+        let store = rt.store();
+        let object = state
+            .get(store, &key)
+            .map_err(|e| {
+                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to retrieve object")
+            })?
+            .ok_or(ActorError::unchecked(
+                ExitCode::USR_ILLEGAL_STATE,
+                "stored cid is invalid".to_string(),
+            ))?;
+        let cid = Cid::try_from(object.cid.0).map_err(|e| {
+            anyhow::Error::from(e)
+                .downcast_default(ExitCode::USR_ILLEGAL_STATE, "stored cid is invalid")
+        })?;
+        // 2. Delete from the blobs actor
+        extract_send_result(rt.send_simple(
+            &ext::blobs::BLOBS_ACTOR_ADDR,
+            ext::blobs::DELETE_BLOB_METHOD,
+            IpldBlock::serialize_cbor(&ext::blobs::DeleteBlobParams(cid))?,
+            rt.message().value_received(),
+        ))?;
+        // 3. Delete from the state
         let res = rt.transaction(|st: &mut State, rt| {
-            st.delete(rt.store(), &BytesKey(params.key)).map_err(|e| {
+            st.delete(rt.store(), &key).map_err(|e| {
                 e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to delete object")
             })
         })?;
@@ -105,6 +126,13 @@ impl Actor {
     }
 
     // TODO: fetch blob from blobs actor
+    // TODO SU: How is Blob included in Object?? Shall we return Blob??
+    // TODO SU: Delete the comment below.
+    // From Sander: I think here we need to:
+    //
+    // Look up the Object in this actor's State
+    // Use it's cid to lookup the Blob from blob actor
+    // Return some new struct that includes the Blob and the Object's metadata (which is the only state that won't exist on Blob. We can clean up the Object struct to just be cid and metadata.
     fn get_object(rt: &impl Runtime, params: GetParams) -> Result<Option<Object>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
@@ -166,5 +194,178 @@ impl ActorCode for Actor {
         GetObject => get_object,
         ListObjects => list_objects,
         _ => fallback,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use fil_actors_evm_shared::address::EthAddress;
+    use fil_actors_runtime::test_utils::{
+        expect_empty, MockRuntime, ETHACCOUNT_ACTOR_CODE_ID, SYSTEM_ACTOR_CODE_ID,
+    };
+    use fil_actors_runtime::INIT_ACTOR_ADDR;
+    use fvm_ipld_encoding::ipld_block::IpldBlock;
+    use fvm_shared::address::Address;
+    use fvm_shared::econ::TokenAmount;
+
+    use crate::{actor::Actor, ext, AddParams, DeleteParams, Method, State};
+    use cid::{multihash, Cid};
+    use fendermint_actor_machine::WriteAccess;
+    use fil_actors_runtime::runtime::Runtime;
+    use fvm_shared::error::ExitCode;
+    use rand::Rng;
+    use std::collections::HashMap;
+
+    fn construct_and_verify(creator: Address) -> MockRuntime {
+        let rt = MockRuntime {
+            receiver: Address::new_id(10),
+            ..Default::default()
+        };
+        rt.set_caller(*SYSTEM_ACTOR_CODE_ID, INIT_ACTOR_ADDR);
+        rt.expect_validate_caller_addr(vec![INIT_ACTOR_ADDR]);
+        let write_access: WriteAccess = WriteAccess::Public;
+        let metadata = HashMap::new();
+        let actor_construction = rt
+            .call::<Actor>(
+                Method::Constructor as u64,
+                IpldBlock::serialize_cbor(&fendermint_actor_machine::ConstructorParams {
+                    creator,
+                    write_access,
+                    metadata,
+                })
+                .unwrap(),
+            )
+            .unwrap();
+        expect_empty(actor_construction);
+        rt.verify();
+        rt.reset();
+        rt
+    }
+
+    fn new_cid() -> Cid {
+        let mut rng = rand::thread_rng();
+        let mut hash = [0u8; 32];
+        rng.fill(&mut hash);
+        Cid::new_v1(
+            0x55,
+            multihash::Multihash::wrap(multihash::Code::Blake2b256.into(), &hash).unwrap(),
+        )
+    }
+
+    #[test]
+    pub fn test_add_object() {
+        let id_addr = Address::new_id(110);
+        let eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000000"
+        ));
+        let f4_eth_addr = Address::new_delegated(10, &eth_addr.0).unwrap();
+
+        let rt = construct_and_verify(f4_eth_addr);
+        rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
+        rt.set_origin(id_addr);
+        rt.expect_validate_caller_any();
+        let add_params: AddParams = AddParams {
+            store: f4_eth_addr,
+            key: vec![0, 1, 2],
+            cid: new_cid(),
+            size: 20,
+            metadata: HashMap::new(),
+            overwrite: false,
+        };
+        rt.expect_send_simple(
+            ext::blobs::BLOBS_ACTOR_ADDR,
+            ext::blobs::ADD_BLOB_METHOD,
+            IpldBlock::serialize_cbor(&ext::blobs::AddBlobParams {
+                cid: add_params.cid,
+                size: add_params.size as u64,
+                expiry: 100,
+                source: Some(add_params.store),
+            })
+            .unwrap(),
+            TokenAmount::from_whole(0),
+            None,
+            ExitCode::OK,
+        );
+        let result = rt
+            .call::<Actor>(
+                Method::AddObject as u64,
+                IpldBlock::serialize_cbor(&add_params).unwrap(),
+            )
+            .unwrap()
+            .unwrap()
+            .deserialize::<Cid>()
+            .unwrap();
+        let state = rt.state::<State>().unwrap();
+        assert_eq!(state.root, result);
+    }
+
+    #[test]
+    pub fn test_delete_object() {
+        let id_addr = Address::new_id(110);
+        let eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000000"
+        ));
+        let f4_eth_addr = Address::new_delegated(10, &eth_addr.0).unwrap();
+
+        let rt = construct_and_verify(f4_eth_addr);
+        rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
+        rt.set_origin(id_addr);
+        rt.expect_validate_caller_any();
+        let key = vec![0, 1, 2];
+        let cid = new_cid();
+
+        // Prerequisite for a delete operation: add to have a proper state of the actor.
+        let add_params: AddParams = AddParams {
+            store: f4_eth_addr,
+            key: key.clone(),
+            cid,
+            size: 20,
+            metadata: HashMap::new(),
+            overwrite: false,
+        };
+        rt.expect_send_simple(
+            ext::blobs::BLOBS_ACTOR_ADDR,
+            ext::blobs::ADD_BLOB_METHOD,
+            IpldBlock::serialize_cbor(&ext::blobs::AddBlobParams {
+                cid: add_params.cid,
+                size: add_params.size as u64,
+                expiry: 100,
+                source: Some(add_params.store),
+            })
+            .unwrap(),
+            TokenAmount::from_whole(0),
+            None,
+            ExitCode::OK,
+        );
+        let result_add = rt
+            .call::<Actor>(
+                Method::AddObject as u64,
+                IpldBlock::serialize_cbor(&add_params).unwrap(),
+            )
+            .unwrap()
+            .unwrap()
+            .deserialize::<Cid>()
+            .unwrap();
+        let state = rt.state::<State>().unwrap();
+        assert_eq!(state.root, result_add);
+
+        // Now actually delete.
+        let delete_params = DeleteParams { key: key.clone() };
+        rt.expect_validate_caller_any();
+        rt.expect_send_simple(
+            ext::blobs::BLOBS_ACTOR_ADDR,
+            ext::blobs::DELETE_BLOB_METHOD,
+            IpldBlock::serialize_cbor(&ext::blobs::DeleteBlobParams(cid)).unwrap(),
+            TokenAmount::from_whole(0),
+            None,
+            ExitCode::OK,
+        );
+        let result_delete = rt.call::<Actor>(
+            Method::DeleteObject as u64,
+            IpldBlock::serialize_cbor(&delete_params).unwrap(),
+        );
+        assert!(result_delete.is_ok());
     }
 }
