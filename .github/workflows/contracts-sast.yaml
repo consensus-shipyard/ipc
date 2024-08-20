@@ -52,8 +52,11 @@ jobs:
       - name: Force an ordinary npm install
         run: cd contracts && rm -rf node_modules && npm install
 
+      - name: Print Aderyn version
+        run: aderyn --version
+
       - name: Run aderyn
-        run: aderyn ./ -o report.json
+        run: cd contracts && aderyn ./ -o report.json
 
       - name: Check results
         run: cd contracts && ./tools/check_aderyn.sh
@@ -78,17 +81,3 @@ jobs:
         run: cd contracts && pnpm exec prettier --check 'contracts/**/*.sol' 'test/*.sol'
       - name: Solhint check
         run: cd contracts && pnpm exec solhint 'contracts/**/*.sol'
-
-  codespell:
-    name: Codespell check
-    runs-on: ubuntu-latest
-    if: ${{ !github.event.pull_request.draft }}
-    steps:
-      - uses: actions/checkout@v3
-      - name: CodeSpell check
-        uses: codespell-project/actions-codespell@v2.0
-        with:
-          check_hidden: true
-          check_filenames: true
-          path: contracts/contracts/*,contracts/script/*,contracts/scripts/*,contracts/test/*
-          ignore_words_file: contracts/.codespellignore

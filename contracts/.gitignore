@@ -17,6 +17,7 @@ solidity-files-cache.json
 typechain
 
 # Deploment assets
+deployments/
 deployments.json
 scripts/*.out
 scripts/deploy-registry.ts
