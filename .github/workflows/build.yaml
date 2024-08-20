@@ -61,7 +61,7 @@ jobs:
 
       - name: Build all
         run: |
-          make download-builtin-actors-bundle
+          cd fendermint && make $PWD/builtin-actors/output/bundle.car
           cargo build --locked --release
 
       - name: Build Docker image for e2e tests
