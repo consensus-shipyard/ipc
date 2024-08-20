@@ -4,13 +4,11 @@ use crate::fvm::gas::{Gas, GasMarket};
 use crate::fvm::FvmMessage;
 use anyhow::Context;
 
+use fendermint_actor_gas_market::GasMarketReading;
 use fendermint_vm_actor_interface::gas::GAS_MARKET_ACTOR_ADDR;
 use fendermint_vm_actor_interface::system;
 use fvm::executor::{ApplyKind, Executor};
-use fvm_ipld_encoding::BytesDe;
 use fvm_shared::clock::ChainEpoch;
-
-type GasMarketState = fendermint_actor_gas_market::EIP1559GasState;
 
 #[derive(Default)]
 pub struct ActorGasMarket {
@@ -45,9 +43,9 @@ impl ActorGasMarket {
             to: GAS_MARKET_ACTOR_ADDR,
             sequence: block_height as u64,
             // exclude this from gas restriction
-            gas_limit: u64::MAX,
+            gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
             method_num: fendermint_actor_gas_market::Method::CurrentGasReading as u64,
-            params: fvm_ipld_encoding::RawBytes::serialize(())?,
+            params: fvm_ipld_encoding::RawBytes::default(),
             value: Default::default(),
             version: Default::default(),
             gas_fee_cap: Default::default(),
@@ -61,16 +59,12 @@ impl ActorGasMarket {
             anyhow::bail!("failed to read gas market state: {}", err);
         }
 
-        let output = apply_ret
-            .msg_receipt
-            .return_data
-            .deserialize::<BytesDe>()
-            .map(|bz| bz.0)
-            .context("failed to deserialize error data")?;
-        let state = fvm_ipld_encoding::from_slice::<GasMarketState>(&output)?;
+        let reading =
+            fvm_ipld_encoding::from_slice::<GasMarketReading>(&apply_ret.msg_receipt.return_data)
+                .context("failed to parse gas market readying")?;
 
         Ok(Self {
-            block_gas_limit: state.block_gas_limit,
+            block_gas_limit: reading.block_gas_limit,
             block_gas_used: 0,
         })
     }
@@ -90,7 +84,7 @@ impl ActorGasMarket {
             to: GAS_MARKET_ACTOR_ADDR,
             sequence: block_height as u64,
             // exclude this from gas restriction
-            gas_limit: u64::MAX,
+            gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
             method_num: fendermint_actor_gas_market::Method::UpdateUtilization as u64,
             params,
             value: Default::default(),

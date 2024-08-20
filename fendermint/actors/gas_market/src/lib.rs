@@ -74,6 +74,7 @@ impl EIP1559GasMarketActor {
     }
 
     fn current_gas_reading(rt: &impl Runtime) -> Result<GasMarketReading, ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
         rt.state()
     }
 
