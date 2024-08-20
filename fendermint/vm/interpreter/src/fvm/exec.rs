@@ -170,7 +170,7 @@ where
                 .record_gas_used(apply_ret.msg_receipt.gas_used)
                 .is_err()
             {
-                tracing::warn!("should not have exceeded block gas limit");
+                tracing::warn!("[ASSERTION FAILED] gas market failed while recording utilization: {err}");
             }
 
             (apply_ret, emitters, latency)
