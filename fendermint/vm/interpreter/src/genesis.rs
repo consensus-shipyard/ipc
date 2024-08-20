@@ -418,7 +418,19 @@ impl GenesisBuilder {
             )
             .context("failed to replace built in eam actor")?;
 
-        let gas_market_state = fendermint_actor_gas_market::EIP1559GasState::new(BLOCK_GAS_LIMIT);
+        // currently hard code them for now, once genesis V2 is implemented, should be taken
+        // from genesis.
+        // initial base fee as defined in [EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)
+        // minimal base fee taken from filecoin.
+        let (initial_base_fee, minimal_base_fee) = (
+            TokenAmount::from_atto(1_000_000_000),
+            TokenAmount::from_atto(100),
+        );
+        let gas_market_state = fendermint_actor_gas_market::EIP1559GasState::new(
+            BLOCK_GAS_LIMIT,
+            initial_base_fee,
+            minimal_base_fee,
+        );
         state
             .create_custom_actor(
                 fendermint_actor_gas_market::IPC_GAS_MARKET_ACTOR_NAME,

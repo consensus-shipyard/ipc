@@ -1,6 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-use crate::fvm::gas::{Gas, GasMarket};
+
+use crate::fvm::gas::{Available, Gas, GasMarket};
 use crate::fvm::FvmMessage;
 use anyhow::Context;
 
@@ -19,21 +20,18 @@ pub struct ActorGasMarket {
 }
 
 impl GasMarket for ActorGasMarket {
-    struct Available {
-        block_gas: Gas
-    }
-
     fn available(&self) -> Available {
-        self.block_gas_limit - self.block_gas_used
+        Available {
+            block_gas: self.block_gas_limit - self.block_gas_used,
+        }
     }
 
-    fn record_utilization(&mut self, gas: Gas) -> anyhow::Result<()> {
+    fn record_utilization(&mut self, gas: Gas) {
+        // sanity check
         if self.block_gas_used + gas >= self.block_gas_limit {
-            tracing::warn!("out of block gas, should not have happened")
+            tracing::warn!("out of block gas, should not have happened, vm execution more than available gas limit");
         }
-        self.block_gas_used = self.block_gas_used.saturating_add(gas);
-
-        Ok(())
+        self.block_gas_used += gas;
     }
 }
 
@@ -48,7 +46,7 @@ impl ActorGasMarket {
             sequence: block_height as u64,
             // exclude this from gas restriction
             gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
-            method_num: fendermint_actor_gas_market::Method::CurrentGasReading as u64,
+            method_num: fendermint_actor_gas_market::Method::CurrentReading as u64,
             params: fvm_ipld_encoding::RawBytes::default(),
             value: Default::default(),
             version: Default::default(),

@@ -8,7 +8,6 @@ use fil_actors_runtime::{actor_dispatch, ActorError};
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::METHOD_CONSTRUCTOR;
-use lazy_static::lazy_static;
 use num_derive::FromPrimitive;
 use std::cmp::Ordering;
 
@@ -19,11 +18,7 @@ fil_actors_runtime::wasm_trampoline!(EIP1559GasMarketActor);
 const BASE_FEE_MAX_CHANGE_DENOMINATOR: u64 = 8;
 /// Elasticity multiplier as defined in [EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)
 const ELASTICITY_MULTIPLIER: u64 = 2;
-lazy_static! {
-    /// Initial base fee as defined in [EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)
-    static ref INITIAL_BASE_FEE: TokenAmount = TokenAmount::from_atto(1_000_000_000);
-    static ref MINIMAL_BASE_FEE: TokenAmount = TokenAmount::from_atto(100);
-}
+
 pub const IPC_GAS_MARKET_ACTOR_NAME: &str = "gas_market";
 pub type Gas = u64;
 pub type GasMarketReading = EIP1559GasState;
@@ -32,6 +27,7 @@ pub type GasMarketReading = EIP1559GasState;
 pub struct EIP1559GasState {
     pub block_gas_limit: Gas,
     pub base_fee: TokenAmount,
+    pub minimal_base_fee: TokenAmount,
 }
 
 #[derive(Serialize_tuple, Deserialize_tuple, Debug, Clone)]
@@ -41,7 +37,9 @@ pub struct BlockGasUtilization {
 
 #[derive(Serialize_tuple, Deserialize_tuple, Debug, Clone)]
 pub struct SetConstants {
-    pub block_gas_limit: Gas,
+    pub block_gas_limit: Option<Gas>,
+    pub base_fee: Option<TokenAmount>,
+    pub minimal_base_fee: Option<TokenAmount>,
 }
 
 pub struct EIP1559GasMarketActor {}
@@ -50,7 +48,7 @@ pub struct EIP1559GasMarketActor {}
 #[repr(u64)]
 pub enum Method {
     Constructor = METHOD_CONSTRUCTOR,
-    CurrentGasReading = frc42_dispatch::method_hash!("CurrentGasReading"),
+    CurrentReading = frc42_dispatch::method_hash!("CurrentReading"),
     SetConstants = frc42_dispatch::method_hash!("SetConstants"),
     UpdateUtilization = frc42_dispatch::method_hash!("UpdateUtilization"),
 }
@@ -66,14 +64,14 @@ impl EIP1559GasMarketActor {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
         rt.transaction(|st: &mut EIP1559GasState, _rt| {
-            st.block_gas_limit = constants.block_gas_limit;
+            st.set_constants(constants);
             Ok(())
         })?;
 
         Ok(())
     }
 
-    fn current_gas_reading(rt: &impl Runtime) -> Result<GasMarketReading, ActorError> {
+    fn current_reading(rt: &impl Runtime) -> Result<GasMarketReading, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         rt.state()
     }
@@ -92,11 +90,25 @@ impl EIP1559GasMarketActor {
 }
 
 impl EIP1559GasState {
-    pub fn new(block_gas_limit: Gas) -> Self {
+    pub fn new(block_gas_limit: Gas, base_fee: TokenAmount, minimal_base_fee: TokenAmount) -> Self {
         Self {
             block_gas_limit,
-            base_fee: INITIAL_BASE_FEE.clone(),
+            base_fee,
+            minimal_base_fee,
         }
+    }
+
+    #[inline]
+    fn update_if_some<T>(maybe_some: Option<T>, to_change: &mut T) {
+        if let Some(v) = maybe_some {
+            *to_change = v;
+        }
+    }
+
+    fn set_constants(&mut self, constants: SetConstants) {
+        Self::update_if_some(constants.minimal_base_fee, &mut self.minimal_base_fee);
+        Self::update_if_some(constants.base_fee, &mut self.base_fee);
+        Self::update_if_some(constants.block_gas_limit, &mut self.block_gas_limit);
     }
 
     fn next_base_fee(&self, gas_used: Gas) -> TokenAmount {
@@ -111,7 +123,7 @@ impl EIP1559GasState {
                     / BASE_FEE_MAX_CHANGE_DENOMINATOR;
                 let base_fee_delta = TokenAmount::from_atto(base_fee_delta);
                 if base_fee_delta >= base_fee {
-                    MINIMAL_BASE_FEE.clone()
+                    self.minimal_base_fee.clone()
                 } else {
                     base_fee - base_fee_delta
                 }
@@ -165,6 +177,7 @@ mod tests {
                 IpldBlock::serialize_cbor(&EIP1559GasState {
                     block_gas_limit: 100,
                     base_fee: Default::default(),
+                    minimal_base_fee: Default::default(),
                 })
                 .unwrap(),
             )
