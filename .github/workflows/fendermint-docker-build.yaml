@@ -73,7 +73,7 @@ jobs:
       - name: Build Binary
         env:
           PROMTAIL_CLIENT_URL: ${{ secrets.PROMTAIL_CLIENT_URL }}
-        run: mkdir -p ./binary_folder && cd fendermint && make builtin-bundle && cargo build --locked --release -p fendermint_app -p ipc-cli && mv target/release/fendermint target/release/ipc-cli ./binary_folder/
+        run: mkdir -p ./binary && cd fendermint && make builtin-bundle && cargo build --locked --release -p fendermint_app -p ipc-cli && mv ../target/release/fendermint ../target/release/ipc-cli ../binary/
 
       - name: Build Fendermint Docker Image
         env:
