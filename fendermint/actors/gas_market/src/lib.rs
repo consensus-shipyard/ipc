@@ -177,7 +177,10 @@ mod tests {
 
         let r = rt.call::<EIP1559GasMarketActor>(
             Method::SetConstants as u64,
-            IpldBlock::serialize_cbor(&SetConstants { block_gas_limit: 20 }).unwrap(),
+            IpldBlock::serialize_cbor(&SetConstants {
+                block_gas_limit: 20,
+            })
+            .unwrap(),
         );
         assert!(r.is_ok());
 
@@ -194,7 +197,10 @@ mod tests {
         let code = rt
             .call::<EIP1559GasMarketActor>(
                 Method::SetConstants as u64,
-                IpldBlock::serialize_cbor(&SetConstants { block_gas_limit: 20}).unwrap(),
+                IpldBlock::serialize_cbor(&SetConstants {
+                    block_gas_limit: 20,
+                })
+                .unwrap(),
             )
             .unwrap_err()
             .exit_code();

@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::{bail, Context};
+use anyhow::Context;
 use async_trait::async_trait;
 use std::collections::HashMap;
 
@@ -159,7 +159,7 @@ where
             (apply_ret, emitters, latency)
         } else {
             if msg.gas_limit > state.gas_market().available_block_gas() {
-                bail!("gas limit exceed available block gas limit")
+                tracing::warn!("gas limit exceed available block gas limit");
             }
 
             let (execution_result, latency) = measure_time(|| state.execute_explicit(msg.clone()));
