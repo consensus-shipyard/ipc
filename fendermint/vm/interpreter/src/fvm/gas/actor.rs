@@ -22,16 +22,17 @@ pub struct ActorGasMarket {
 impl GasMarket for ActorGasMarket {
     fn available(&self) -> Available {
         Available {
-            block_gas: self.block_gas_limit - self.block_gas_used,
+            block_gas: self.block_gas_limit - self.block_gas_used.min(self.block_gas_limit),
         }
     }
 
     fn record_utilization(&mut self, gas: Gas) {
-        // sanity check
-        if self.block_gas_used + gas >= self.block_gas_limit {
-            tracing::warn!("out of block gas, should not have happened, vm execution more than available gas limit");
-        }
         self.block_gas_used += gas;
+
+        // sanity check
+        if self.block_gas_used >= self.block_gas_limit {
+            tracing::warn!("out of block gas, vm execution more than available gas limit");
+        }
     }
 }
 
@@ -76,7 +77,7 @@ impl ActorGasMarket {
         executor: &mut E,
         block_height: ChainEpoch,
     ) -> anyhow::Result<()> {
-        let block_gas_used = self.block_gas_used;
+        let block_gas_used = self.block_gas_used.min(self.block_gas_limit);
         let params = fvm_ipld_encoding::RawBytes::serialize(
             fendermint_actor_gas_market::BlockGasUtilization { block_gas_used },
         )?;
