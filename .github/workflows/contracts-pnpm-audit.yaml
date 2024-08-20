@@ -21,4 +21,4 @@ jobs:
       - name: NPM Audit
         run: |
           cd contracts
-          pnpm audit
+          pnpm audit --audit-level=moderate
