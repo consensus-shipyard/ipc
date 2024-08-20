@@ -42,6 +42,21 @@ jobs:
           docker load --input /tmp/fendermint.tar
           docker image ls -a
 
+      - name: Cache Solidity ABI artifacts
+        uses: actions/cache@v2
+        with:
+          path: ./contracts/out
+          key: contracts-abi-${{ hashFiles('./contracts/src/**/*.sol') }}
+
+      - name: Cache Cargo Build
+        uses: actions/cache@v4
+        with:
+          path: |
+            /home/runner/.cargo/registry
+            /home/runner/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
       - name: Run Test
-        run: cd fendermint && make e2e-only
+        run: cd fendermint && BUILD_BINDINGS=0 make e2e-only
 
