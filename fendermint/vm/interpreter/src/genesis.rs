@@ -19,7 +19,7 @@ use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
 use fendermint_vm_actor_interface::{
-    account, burntfunds, chainmetadata, gas, cron, eam, init, ipc, reward, system, EMPTY_ARR,
+    account, burntfunds, chainmetadata, cron, eam, gas, init, ipc, reward, system, EMPTY_ARR,
 };
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Collateral, Genesis, Power, PowerScale, Validator};
@@ -28,10 +28,10 @@ use fvm::engine::MultiEngine;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_car::{load_car, CarHeader};
 use fvm_ipld_encoding::CborStore;
-use fvm_shared::BLOCK_GAS_LIMIT;
 use fvm_shared::chainid::ChainID;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
+use fvm_shared::BLOCK_GAS_LIMIT;
 use ipc_actors_abis::i_diamond::FacetCut;
 use num_traits::Zero;
 
@@ -418,9 +418,7 @@ impl GenesisBuilder {
             )
             .context("failed to replace built in eam actor")?;
 
-        let gas_market_state = fendermint_actor_gas_market::EIP1559GasState::new(
-            BLOCK_GAS_LIMIT
-        );
+        let gas_market_state = fendermint_actor_gas_market::EIP1559GasState::new(BLOCK_GAS_LIMIT);
         state
             .create_custom_actor(
                 fendermint_actor_gas_market::IPC_GAS_MARKET_ACTOR_NAME,
