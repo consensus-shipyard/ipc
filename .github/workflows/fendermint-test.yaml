@@ -58,5 +58,5 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run Test
-        run: cd fendermint && BUILD_BINDINGS=0 make e2e-only
+        run: cd fendermint && BUILD_BINDINGS=0 PROFILE=ci make e2e-only
 
