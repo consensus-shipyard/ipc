@@ -114,7 +114,8 @@ where
 
     /// Indicate whether the parameters have been updated.
     params_dirty: bool,
-
+/// Keeps track of block gas usage during execution, and takes care of updating
+/// the chosen gas market strategy (by default an on-chain actor delivering EIP-1559 behaviour).
     gas_market: ActorGasMarket,
 }
 
