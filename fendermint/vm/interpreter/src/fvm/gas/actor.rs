@@ -23,7 +23,7 @@ impl GasMarket for ActorGasMarket {
         self.block_gas_limit - self.block_gas_used
     }
 
-    fn record_gas_used(&mut self, gas: Gas) -> anyhow::Result<()> {
+    fn record_utilization(&mut self, gas: Gas) -> anyhow::Result<()> {
         if self.block_gas_used + gas >= self.block_gas_limit {
             tracing::warn!("out of block gas, should not have happened")
         }
