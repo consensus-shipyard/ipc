@@ -309,21 +309,16 @@ fn move_or_copy(from: &Path, to: &Path) -> anyhow::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use std::{sync::Arc, time::Duration};
+    use std::time::Duration;
 
     use async_stm::{atomically, retry};
     use fendermint_vm_genesis::Genesis;
-    use fendermint_vm_interpreter::{
-        fvm::{
-            bundle::{bundle_path, contracts_path, custom_actors_bundle_path},
-            state::{snapshot::Snapshot, FvmGenesisState, FvmStateParams},
-            store::memory::MemoryBlockstore,
-            upgrades::UpgradeScheduler,
-            FvmMessageInterpreter,
-        },
-        GenesisInterpreter,
+    use fendermint_vm_interpreter::fvm::{
+        bundle::{bundle_path, contracts_path, custom_actors_bundle_path},
+        state::{snapshot::Snapshot, FvmStateParams},
+        store::memory::MemoryBlockstore,
     };
-    use fvm::engine::MultiEngine;
+    use fendermint_vm_interpreter::genesis::create_test_genesis_state;
     use quickcheck::Arbitrary;
 
     use crate::{manager::SnapshotParams, manifest, PARTS_DIR_NAME};
@@ -446,33 +441,22 @@ mod tests {
         let mut g = quickcheck::Gen::new(5);
         let genesis = Genesis::arbitrary(&mut g);
 
-        let bundle = std::fs::read(bundle_path()).expect("failed to read bundle");
-        let custom_actors_bundle = std::fs::read(custom_actors_bundle_path())
-            .expect("failed to read custom actors bundle");
-        let multi_engine = Arc::new(MultiEngine::default());
-
-        let store = MemoryBlockstore::new();
-        let state =
-            FvmGenesisState::new(store.clone(), multi_engine, &bundle, &custom_actors_bundle)
-                .await
-                .expect("failed to create state");
-
-        let interpreter = FvmMessageInterpreter::new(
-            mock_client(),
-            None,
-            contracts_path(),
-            1.05,
-            1.05,
-            false,
-            UpgradeScheduler::new(),
-        );
-
-        let (state, out) = interpreter
-            .init(state, genesis)
-            .await
-            .expect("failed to init genesis");
-
-        let state_root = state.commit().expect("failed to commit");
+        let maybe_contract_path = genesis.ipc.as_ref().map(|_| contracts_path());
+        let (state, out) = create_test_genesis_state(
+            bundle_path(),
+            custom_actors_bundle_path(),
+            genesis,
+            maybe_contract_path,
+        )
+        .await
+        .expect("cannot create genesis state");
+        let store = state.store().clone();
+        // unwrap_or_else + panic is used because the return type is not Result, also the exec state
+        // does not implement debug, which expect cannot be used
+        let state = state
+            .into_exec_state()
+            .unwrap_or_else(|_| panic!("cannot create exec state"));
+        let (state_root, _, _) = state.commit().expect("failed to commit");
 
         let state_params = FvmStateParams {
             state_root,

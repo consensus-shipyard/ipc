@@ -14,7 +14,7 @@ use serde::Serialize;
 
 use crate::{
     fvm::{FvmApplyRet, FvmCheckRet, FvmMessage},
-    CheckInterpreter, ExecInterpreter, GenesisInterpreter, QueryInterpreter,
+    CheckInterpreter, ExecInterpreter, QueryInterpreter,
 };
 
 /// Message validation failed due to an invalid signature.
@@ -228,23 +228,5 @@ where
         qry: Self::Query,
     ) -> anyhow::Result<(Self::State, Self::Output)> {
         self.inner.query(state, qry).await
-    }
-}
-
-#[async_trait]
-impl<I> GenesisInterpreter for SignedMessageInterpreter<I>
-where
-    I: GenesisInterpreter,
-{
-    type State = I::State;
-    type Genesis = I::Genesis;
-    type Output = I::Output;
-
-    async fn init(
-        &self,
-        state: Self::State,
-        genesis: Self::Genesis,
-    ) -> anyhow::Result<(Self::State, Self::Output)> {
-        self.inner.init(state, genesis).await
     }
 }
