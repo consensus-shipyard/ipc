@@ -56,8 +56,8 @@ jobs:
           path: ./contracts/out
           key: contracts-abi-${{ hashFiles('./contracts/src/**/*.sol') }}
 
-      - name: Compile ABI
-        run: cd contracts && make compile-abi
+      - name: Generate ABI and bindings
+        run: cd contracts && make gen
 
       - name: Install Rust nightly
         uses: dtolnay/rust-toolchain@master
