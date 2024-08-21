@@ -95,7 +95,7 @@ jobs:
             -t fendermint:latest $(PWD)
 
       - name: Export Docker image
-        run: docker save fendermint:latest > /artifacts/image.tar
+        run: docker save fendermint:latest > /artifacts/docker-image.tar
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
