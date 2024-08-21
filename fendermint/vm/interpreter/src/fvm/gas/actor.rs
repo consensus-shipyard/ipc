@@ -46,7 +46,7 @@ impl ActorGasMarket {
             to: GAS_MARKET_ACTOR_ADDR,
             sequence: block_height as u64,
             // exclude this from gas restriction
-            gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
+            gas_limit: i64::MAX as u64,
             method_num: fendermint_actor_gas_market::Method::CurrentReading as u64,
             params: fvm_ipld_encoding::RawBytes::default(),
             value: Default::default(),
@@ -87,7 +87,7 @@ impl ActorGasMarket {
             to: GAS_MARKET_ACTOR_ADDR,
             sequence: block_height as u64,
             // exclude this from gas restriction
-            gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
+            gas_limit: i64::MAX as u64,
             method_num: fendermint_actor_gas_market::Method::UpdateUtilization as u64,
             params,
             value: Default::default(),
