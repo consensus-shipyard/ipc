@@ -3,9 +3,11 @@ script = """
 docker run \
   ${FLAGS} \
   --name ${ANVIL_CONTAINER_NAME} \
-  --network host \
+  --network ${NETWORK_NAME} \
+  --publish ${ANVIL_HOST_PORT}:8545 \
   ${FOUNDRY_DOCKER_IMAGE} "anvil --host 0.0.0.0"
 """
+dependencies = ["docker-network-create"]
 
 [tasks.anvil-start]
 extend = "anvil-run"

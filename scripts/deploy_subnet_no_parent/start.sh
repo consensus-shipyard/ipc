@@ -37,11 +37,6 @@ else
   echo "$DASHES skpping build for ipc contracts and fendermint $DASHES"
 fi
 
-# # Rebuild fendermint docker
-# cd "$IPC_FOLDER"/fendermint
-# make clean
-# make docker-build
-
 # Prepare wallet by using existing wallet json file
 wallet_addresses=()
 for i in {0..2}
@@ -91,8 +86,11 @@ done
 echo "starting anvil"
 # Step 1 Start Anvil
 cd "$IPC_FOLDER"
+# note: we want to include anvil in the docker network, and the subnet
+# doesn't exist yet but the value is always the same in our local subnet
 cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=anvil \
+    -e SUBNET_ID="/r31337/t410f6dl55afbyjbpupdtrmedyqrnmxdmpk7rxuduafq" \
     -e ANVIL_HOST_PORT="${ANVIL_HOST_PORT}" \
     anvil-start
 
@@ -169,6 +167,11 @@ do
   ipc-cli subnet join --from ${wallet_addresses[i]} --subnet $subnet_id --initial-balance 1 --collateral 10
 done
 
+# we need to create the docker network after the subnet, but before starting the validators,
+# since the fendermint cli needs to connect to the parent chain to get the genesis file
+cargo make --makefile infra/fendermint/Makefile.toml \
+    -e SUBNET_ID="${subnet_id}" \
+    docker-network-create
 
 # Copy genesis file into each validator
 for i in {0..2}
@@ -196,7 +199,9 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e FM_PULL_SKIP=1 \
     -e FM_LOG_LEVEL="info,fendermint=debug" \
     child-validator-no-parent 2>&1)
+
 echo "$bootstrap_output"
+
 bootstrap_node_id=$(echo "$bootstrap_output" | sed -n '/CometBFT node ID:/ {n;p;}' | tr -d "[:blank:]")
 bootstrap_peer_id=$(echo "$bootstrap_output" | sed -n '/IPLD Resolver Multiaddress:/ {n;p;}' | tr -d "[:blank:]" | sed 's/.*\/p2p\///')
 bootstrap_node_endpoint=${bootstrap_node_id}@validator-0-cometbft:${CMT_P2P_HOST_PORTS[0]}

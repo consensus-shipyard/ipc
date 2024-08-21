@@ -176,7 +176,8 @@ docker run \
   ${FLAGS} \
   --init \
   --user $(id -u) \
-  --volume ${BASE_DIR}:/data \
+  --volume ${BASE_DIR}:/fendermint/ \
+  --network=${NETWORK_NAME} \
   --env LOG_LEVEL=${FM_LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
   ${FM_DOCKER_IMAGE} \

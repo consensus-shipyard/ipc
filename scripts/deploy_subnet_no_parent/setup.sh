@@ -18,7 +18,7 @@ cp "$IPC_FOLDER"/infra/loki/loki-config.yaml "$IPC_CONFIG_FOLDER"
 cp "$IPC_FOLDER"/infra/promtail/promtail-config.yaml "$IPC_CONFIG_FOLDER"
 cp "$IPC_FOLDER"/infra/iroh/iroh.config.toml "$IPC_CONFIG_FOLDER"
 
-if [[ "$SKIP_BUILD" == "" || "$SKIP_BUILD" == "false" ]]; then
+if [[ -z ${SKIP_BUILD+x} || "$SKIP_BUILD" == "" || "$SKIP_BUILD" == "false" ]]; then
   echo "$DASHES starting build for ipc cli $DASHES"
   # Build ipc-cli
   cd "$IPC_FOLDER"/ipc
