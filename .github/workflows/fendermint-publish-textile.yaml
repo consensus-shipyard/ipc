@@ -1,11 +1,8 @@
 name: Fendermint CI - Publish Textile
 
-# This workflow is triggered from the main CI workflow.
+# This workflow is triggered manually.
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - avichalp/fendermint-docker
 
 env:
   CARGO_INCREMENTAL: "0"
