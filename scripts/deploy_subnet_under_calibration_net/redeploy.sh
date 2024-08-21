@@ -1,13 +1,5 @@
 #!/bin/bash
 
-# IPC Quick Start Script
-# See also https://github.com/consensus-shipyard/ipc/blob/main/docs/ipc/quickstart-calibration.md
-
-# Known issues:
-# 1. Need to previously manual enable sudo without password on the host
-# 2. You may need to rerun the script after docker installation for the first time
-# 2. You may need to manually install nodejs and npm on the host
-
 set -euo pipefail
 
 eval "$(ssh-agent -s)"
@@ -49,13 +41,11 @@ else
   fi
 fi
 
-# Step 1: Prepare system for building and running IPC
-
-# Step 1.1: Install build dependencies
+# Install build dependencies
 echo "${DASHES} Installing build dependencies..."
 sudo apt update && sudo apt install build-essential libssl-dev mesa-opencl-icd ocl-icd-opencl-dev gcc git bzr jq pkg-config curl clang hwloc libhwloc-dev wget ca-certificates gnupg -y
 
-# Step 1.2: Install rust + cargo
+# Install rust + cargo
 echo "$DASHES Check rustc & cargo..."
 if which cargo ; then
   echo "$DASHES rustc & cargo already installed."
@@ -66,7 +56,6 @@ else
   source "${HOME}"/.bashrc
 fi
 
-# Step 1.3: Install cargo-make and toml-cli
 # Install cargo make
 echo "$DASHES Installing cargo-make"
 cargo install cargo-make
@@ -74,7 +63,7 @@ cargo install cargo-make
 echo "$DASHES Installing toml-cli"
 cargo install toml-cli
 
-# Step 1.4: Install docker
+# Install docker
 echo "$DASHES check docker"
 if which docker ; then
   echo "$DASHES docker is already installed."
@@ -109,7 +98,7 @@ set +u
 source "${HOME}"/.bashrc
 set -u
 
-# Step 2: Prepare code repo and build ipc-cli
+# Prepare code repo and build ipc-cli
 if ! $local_deploy ; then
   echo "$DASHES Preparing ipc repo..."
   if ! ls "$IPC_FOLDER" ; then
@@ -124,21 +113,20 @@ if ! $local_deploy ; then
   git submodule update --init --recursive
 fi
 
-# Step 3: Use already-created subnet
+# Use already-created subnet
 subnet_id=$(toml get -r "${IPC_CONFIG_FOLDER}"/config.toml subnets[1].id)
 echo "Use existing subnet id: $subnet_id"
 subnet_folder=$IPC_CONFIG_FOLDER/$(echo "$subnet_id" | sed 's|^/||;s|/|-|g')
 parent_gateway_address=$(toml get -r "${IPC_CONFIG_FOLDER}"/config.toml subnets[0].config.gateway_addr)
 parent_registry_address=$(toml get -r "${IPC_CONFIG_FOLDER}"/config.toml subnets[0].config.registry_addr)
 
-# Step 4: Restart validators
-# Step 4.1: Rebuild fendermint docker
+# Rebuild fendermint docker
 echo "$DASHES Rebuild fendermint docker"
 cd "${IPC_FOLDER}"/fendermint
 make clean
 make docker-build
 
-# Step 4.2: Start first validator node as bootstrap
+# Start first validator node as bootstrap
 echo "$DASHES Start first validator node as bootstrap"
 cd "${IPC_FOLDER}"
 bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
@@ -165,14 +153,14 @@ echo "$bootstrap_output"
 bootstrap_node_id=$(echo "$bootstrap_output" | sed -n '/CometBFT node ID:/ {n;p;}' | tr -d "[:blank:]")
 bootstrap_peer_id=$(echo "$bootstrap_output" | sed -n '/IPLD Resolver Multiaddress:/ {n;p;}' | tr -d "[:blank:]" | sed 's/.*\/p2p\///')
 echo "Bootstrap node started. Node id ${bootstrap_node_id}, peer id ${bootstrap_peer_id}"
-
 bootstrap_node_endpoint=${bootstrap_node_id}@validator-0-cometbft:${CMT_P2P_HOST_PORTS[0]}
 echo "Bootstrap node endpoint: ${bootstrap_node_endpoint}"
 bootstrap_resolver_endpoint="/dns/validator-0-fendermint/tcp/${RESOLVER_HOST_PORTS[0]}/p2p/${bootstrap_peer_id}"
 echo "Bootstrap resolver endpoint: ${bootstrap_resolver_endpoint}"
 
-# Step 4.3: Start other validator node
+# Start other validator node
 echo "$DASHES Start the other validator nodes"
+cd "$IPC_FOLDER"
 for i in {1..2}
 do
   cargo make --makefile infra/fendermint/Makefile.toml \
@@ -199,8 +187,7 @@ do
       child-validator-restart
 done
 
-# Step 5: Test
-# Step 5.1: Test ETH API endpoint
+# Test ETH API endpoint
 echo "$DASHES Test ETH API endpoints of validator nodes"
 for i in {0..2}
 do
@@ -214,21 +201,20 @@ do
   }'
 done
 
-# Step 5.2: Test Object API endpoint
+# Test Object API endpoint
 printf "\n%s Test Object API endpoints of validator nodes\n" $DASHES
 for i in {0..2}
 do
   curl --location http://localhost:"${OBJECTS_HOST_PORTS[i]}"/health
 done
 
-# Step 6: Start a relayer process
 # Kill existing relayer if there's one
 pkill -f "relayer" || true
 # Start relayer
 echo "$DASHES Start relayer process (in the background)"
 nohup ipc-cli checkpoint relayer --subnet "$subnet_id" --submitter 0xA08aE9E8c038CAf9765D7Db725CA63a92FCf12Ce > relayer.log &
 
-# Step 7: Print a summary of the deployment
+# Print a summary of the deployment
 cat << EOF
 ############################
 #                          #
@@ -237,6 +223,9 @@ cat << EOF
 ############################
 Subnet ID:
 $subnet_id
+
+Chain ID:
+$(curl -s --location --request POST http://localhost:"${ETHAPI_HOST_PORTS[0]}" --header 'Content-Type: application/json' --data-raw '{ "jsonrpc":"2.0", "method":"eth_chainId", "params":[], "id":1 }' | jq -r '.result' | xargs printf "%d")
 
 Object API:
 http://localhost:${OBJECTS_HOST_PORTS[0]}
@@ -253,20 +242,11 @@ http://localhost:${ETHAPI_HOST_PORTS[0]}
 http://localhost:${ETHAPI_HOST_PORTS[1]}
 http://localhost:${ETHAPI_HOST_PORTS[2]}
 
-Accounts:
-$(jq -r '.accounts[] | "\(.meta.Account.owner): \(.balance) coin units"' "${subnet_folder}"/validator-0/genesis.json)
-
-Private keys (hex ready to import in MetaMask):
-$(base64 -d "${IPC_CONFIG_FOLDER}"/validator_0.sk | xxd -p -c 1000000)
-$(base64 -d "${IPC_CONFIG_FOLDER}"/validator_1.sk | xxd -p -c 1000000)
-$(base64 -d "${IPC_CONFIG_FOLDER}"/validator_2.sk | xxd -p -c 1000000)
-
-Chain ID:
-$(curl -s --location --request POST 'http://localhost:8645/' --header 'Content-Type: application/json' --data-raw '{ "jsonrpc":"2.0", "method":"eth_chainId", "params":[], "id":1 }' | jq -r '.result' | xargs printf "%d")
-
-Fendermint API:
-http://localhost:26658
-
 CometBFT API:
 http://localhost:${CMT_RPC_HOST_PORTS[0]}
+http://localhost:${CMT_RPC_HOST_PORTS[1]}
+http://localhost:${CMT_RPC_HOST_PORTS[2]}
+
+Accounts:
+$(jq -r '.accounts[] | "\(.meta.Account.owner): \(.balance) coin units"' < "${subnet_folder}"/validator-0/genesis.json)
 EOF

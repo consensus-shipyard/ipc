@@ -26,7 +26,7 @@ cd "$IPC_FOLDER"/fendermint
 make clean
 make docker-build
 
-# Restart validators
+# Restart bootstrap validator
 cd "$IPC_FOLDER"
 bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=validator-0 \
@@ -51,6 +51,8 @@ bootstrap_peer_id=$(echo "$bootstrap_output" | sed -n '/IPLD Resolver Multiaddre
 bootstrap_node_endpoint=${bootstrap_node_id}@validator-0-cometbft:${CMT_P2P_HOST_PORTS[0]}
 bootstrap_resolver_endpoint="/dns/validator-0-fendermint/tcp/${RESOLVER_HOST_PORTS[0]}/p2p/${bootstrap_peer_id}"
 
+# Restart other validators
+cd "$IPC_FOLDER"
 for i in {1..2}
 do
   cargo make --makefile infra/fendermint/Makefile.toml \
@@ -127,10 +129,10 @@ http://localhost:${CMT_RPC_HOST_PORTS[1]}
 http://localhost:${CMT_RPC_HOST_PORTS[2]}
 
 Accounts:
-$(jq -r '.app_state.accounts[] | "\(.meta.Account.owner): \(.balance) coin units"' "$subnet_folder"/validator-0/genesis.json)
+$(jq -r '.app_state.accounts[] | "\(.meta.Account.owner): \(.balance) coin units"' < "$subnet_folder"/validator-0/genesis.json)
 
 Private keys (hex ready to use with ADM SDK/CLI):
-$(jq .[0].private_key "$IPC_CONFIG_FOLDER"/evm_keystore.json | tr -d '"')
-$(jq .[1].private_key "$IPC_CONFIG_FOLDER"/evm_keystore.json | tr -d '"')
-$(jq .[2].private_key "$IPC_CONFIG_FOLDER"/evm_keystore.json | tr -d '"')
+$(jq .[0].private_key < "$IPC_CONFIG_FOLDER"/evm_keystore.json | tr -d '"')
+$(jq .[1].private_key < "$IPC_CONFIG_FOLDER"/evm_keystore.json | tr -d '"')
+$(jq .[2].private_key < "$IPC_CONFIG_FOLDER"/evm_keystore.json | tr -d '"')
 EOF
