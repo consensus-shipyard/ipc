@@ -54,7 +54,10 @@ jobs:
       - name: Cache Solidity ABI artifacts
         uses: actions/cache@v4
         with:
-          path: ./contracts/out
+          path: |
+            ./contracts/out
+            ./contracts/bindings
+          ## TODO maybe add the rust version and solc version to the key
           key: contracts-abi-${{ hashFiles('./contracts/src/**/*.sol') }}
 
       - name: Generate ABI and bindings
