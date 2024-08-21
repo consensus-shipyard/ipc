@@ -78,7 +78,8 @@ jobs:
       - name: Build all
         run: |
           cd fendermint && make $PWD/builtin-actors/output/bundle.car
-          cargo build --locked --release
+          cargo build --locked --release -p fendermint_app ipc-cli
+          mkdir -p output && mv target/release/fendermint target/release/ipc-cli output
 
       - name: Build Docker image for e2e tests
         run: |
@@ -87,10 +88,10 @@ jobs:
 
           FROM alpine as builder
 
-          COPY /fendermint/app/config /app/fendermint/app/config
-          COPY /target/release/fendermint /app/output/bin/fendermint
-          COPY /target/release/ipc-cli /app/output/bin/ipc-cli
-          
+          COPY fendermint/app/config /app/fendermint/app/config
+          COPY output/fendermint /app/output/bin/fendermint
+          COPY output/ipc-cli /app/output/bin/ipc-cli
+
           EOF
           
           cat fendermint/docker/runner.Dockerfile >> /tmp/Dockerfile
