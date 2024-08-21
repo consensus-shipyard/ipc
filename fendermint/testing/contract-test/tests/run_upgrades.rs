@@ -204,8 +204,6 @@ async fn test_applying_upgrades() {
         upgrade_scheduler,
     );
 
-    let mut tester = Tester::new(interpreter, MemoryBlockstore::new());
-
     let genesis = Genesis {
         chain_name: CHAIN_NAME.to_string(),
         timestamp: Timestamp(0),
@@ -223,7 +221,7 @@ async fn test_applying_upgrades() {
         ipc: None,
     };
 
-    tester.init(genesis).await.unwrap();
+    let mut tester = Tester::new(interpreter, genesis).await.unwrap();
 
     // check that the app version is 0
     assert_eq!(tester.state_params().app_version, 0);

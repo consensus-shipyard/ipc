@@ -727,6 +727,23 @@ fn circ_supply(g: &Genesis) -> TokenAmount {
         .fold(TokenAmount::zero(), |s, a| s + a.balance.clone())
 }
 
+#[cfg(any(feature = "test-util", test))]
+pub async fn create_test_genesis_state(
+    bundle_path: PathBuf,
+    custom_actors_bundle_path: PathBuf,
+    genesis_params: Genesis,
+    maybe_ipc_path: Option<PathBuf>,
+) -> anyhow::Result<(FvmGenesisState<MemoryBlockstore>, GenesisOutput)> {
+    let mut builder = GenesisBuilder::new(bundle_path, custom_actors_bundle_path, genesis_params);
+    if let Some(p) = maybe_ipc_path {
+        builder = builder.with_ipc_system_contracts(p);
+    }
+
+    let mut state = builder.init_state().await?;
+    let out = builder.populate_state(&mut state, builder.genesis_params.clone())?;
+    Ok((state, out))
+}
+
 #[cfg(test)]
 mod tests {
     use crate::genesis::GenesisAppState;
