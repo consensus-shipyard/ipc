@@ -251,7 +251,7 @@ async fn handle_health() -> Result<impl Reply, Rejection> {
 }
 
 async fn handle_node_addr(iroh: iroh::client::Iroh) -> Result<impl Reply, Rejection> {
-    let node_addr = iroh.node_addr().await.map_err(|e| {
+    let node_addr = iroh.net().node_addr().await.map_err(|e| {
         Rejection::from(BadRequest {
             message: format!("failed to get iroh node address info: {}", e),
         })
@@ -725,7 +725,7 @@ mod tests {
             .await
             .unwrap()
             .hash;
-        let source = iroh2.node_addr().await.unwrap();
+        let source = iroh2.net().node_addr().await.unwrap();
 
         let key = b"key";
         let digest =
