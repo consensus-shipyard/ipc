@@ -26,7 +26,7 @@ use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Account, Actor, ActorMeta, Genesis, PermissionMode, SignerAddr};
 use fendermint_vm_interpreter::fvm::store::memory::MemoryBlockstore;
 use fendermint_vm_interpreter::fvm::upgrades::{Upgrade, UpgradeScheduler};
-use fendermint_vm_interpreter::fvm::{bundle::contracts_path, FvmMessageInterpreter};
+use fendermint_vm_interpreter::fvm::FvmMessageInterpreter;
 
 // returns a seeded secret key which is guaranteed to be the same every time
 fn my_secret_key() -> SecretKey {
