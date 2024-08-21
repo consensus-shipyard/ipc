@@ -73,7 +73,7 @@ jobs:
         id: prep
         run: |
           # Update the IMAGE_ID to reflect your own Docker repository
-          IMAGE_ID=textile/fendermint
+          IMAGE_ID=textilemachine/fendermint
 
           # This changes all uppercase characters to lowercase.
           IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
