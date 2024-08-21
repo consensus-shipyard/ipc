@@ -117,6 +117,7 @@ fn main() {
         .unwrap();
     }
 
+    println!("cargo:rerun-if-changed=../out");
     println!("cargo:rerun-if-changed=build.rs");
 
     // Run rustfmt on binding/src/lib.rs to make sure we don't accidentally format it in our IDEs
