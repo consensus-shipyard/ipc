@@ -2,6 +2,11 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::ext::blobs::Blob;
+use crate::{
+    ext, AddParams, DeleteParams, GetParams, GotObject, ListParams, Method, Object, ObjectList,
+    State, OBJECTSTORE_ACTOR_NAME,
+};
 use cid::Cid;
 use fendermint_actor_machine::{ConstructorParams, MachineActor};
 use fil_actors_runtime::{
@@ -12,11 +17,6 @@ use fil_actors_runtime::{
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_ipld_hamt::BytesKey;
 use fvm_shared::{error::ExitCode, MethodNum};
-use crate::ext::blobs::Blob;
-use crate::{
-    ext, AddParams, DeleteParams, GetParams, GotObject, ListParams, Method, Object, ObjectList,
-    State, OBJECTSTORE_ACTOR_NAME,
-};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
