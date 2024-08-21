@@ -1,6 +1,5 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-use std::path::PathBuf;
 
 mod broadcast;
 mod check;
@@ -87,7 +86,6 @@ where
     pub fn new(
         client: C,
         validator_ctx: Option<ValidatorContext<C>>,
-        _contracts_dir: PathBuf,
         gas_overestimation_rate: f64,
         gas_search_step: f64,
         exec_in_check: bool,
