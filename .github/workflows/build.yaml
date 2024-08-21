@@ -83,6 +83,8 @@ jobs:
       - name: Build Docker image for e2e tests
         run: |
           cat <<EOF > /tmp/Dockerfile
+          # syntax=docker/dockerfile:1
+
           FROM alpine as builder
 
           COPY /fendermint/app/config /app/fendermint/app/config
@@ -93,10 +95,13 @@ jobs:
           
           cat fendermint/docker/runner.Dockerfile >> /tmp/Dockerfile
           
+          echo "Dockerfile:"
+          cat /tmp/Dockerfile
+          
           DOCKER_BUILDKIT=1 docker build \
             --load \
             -f /tmp/Dockerfile \
-            -t fendermint:latest $(PWD)
+            -t fendermint:latest .
 
       - name: Export Docker image
         run: docker save fendermint:latest > /artifacts/docker-image.tar
