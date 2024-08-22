@@ -89,3 +89,4 @@ arb = [
     "fendermint_testing/arb",
     "rand",
 ]
+test-util = []

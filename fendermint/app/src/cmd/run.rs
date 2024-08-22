@@ -137,7 +137,6 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     let interpreter = FvmMessageInterpreter::<NamespaceBlockstore, _>::new(
         tendermint_client.clone(),
         validator_ctx,
-        settings.contracts_dir(),
         settings.fvm.gas_overestimation_rate,
         settings.fvm.gas_search_step,
         settings.fvm.exec_in_check,
