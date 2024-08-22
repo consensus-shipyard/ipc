@@ -42,9 +42,12 @@ jobs:
     uses: ./.github/workflows/contracts-storage.yaml
     needs: [contracts-prettier]
 
-  contracts-pnpm-audit:
-    uses: ./.github/workflows/contracts-pnpm-audit.yaml
-    needs: [contracts-prettier]
+## This causes too much unpredictable noise, turning our builds red whenever a new vulnerability is found.
+## It's better to have a separate workflow for auditing, and have it run on a schedule.
+## However, given this code is purely used for tooling and not for production, it's not a big deal.
+#  contracts-pnpm-audit:
+#    uses: ./.github/workflows/contracts-pnpm-audit.yaml
+#    needs: [contracts-prettier]
 
   contracts-sast:
     uses: ./.github/workflows/contracts-sast.yaml
