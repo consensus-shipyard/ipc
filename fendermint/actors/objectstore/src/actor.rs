@@ -129,7 +129,8 @@ impl Actor {
                 rt.message().value_received(),
             ))?)?;
             Ok(Some(GotObject {
-                blob,
+                size: blob.size,
+                expiry: blob.expiry,
                 cid: object.cid,
                 metadata: object.metadata,
             }))
@@ -640,7 +641,8 @@ mod tests {
         assert_eq!(
             result.unwrap(),
             Some(GotObject {
-                blob,
+                size: blob.size,
+                expiry: blob.expiry,
                 cid: ByteBuf(cid.to_bytes()),
                 metadata: add_params.metadata
             })
