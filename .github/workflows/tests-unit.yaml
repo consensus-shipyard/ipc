@@ -18,11 +18,11 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
+      - name: Install Tools
+        uses: ./.github/actions/install-tools
         with:
-          profile: minimal
-          toolchain: stable
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          rust: stable
 
       - name: Cache Solidity ABI artifacts
         uses: actions/cache@v4

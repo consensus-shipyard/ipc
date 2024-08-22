@@ -18,18 +18,11 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
+      - name: Install Tools
+        uses: ./.github/actions/install-tools
         with:
-          profile: minimal
-          toolchain: stable
-
-      - name: Install cargo-make
-        run: |
-          if ! command -v cargo-make &> /dev/null
-          then
-              cargo install -f cargo-make
-          fi
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          rust: stable
 
       - name: Download Docker image
         uses: actions/download-artifact@v4
