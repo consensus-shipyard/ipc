@@ -42,6 +42,7 @@ jobs:
           node-version: 18.19.0
 
       - uses: Swatinem/rust-cache@v2
+        if: always()
         with:
           cache-on-failure: true
 
@@ -66,7 +67,7 @@ jobs:
             ./contracts/out
             ./contracts/bindings
           ## TODO maybe add the rust version and solc version to the key
-          key: contracts-abi-${{ hashFiles('./contracts/src/**/*.sol') }}
+          key: contracts-abi-${{ hashFiles('./contracts/**/*.sol') }}
 
       - name: Generate ABI and bindings
         run: cd contracts && make gen
