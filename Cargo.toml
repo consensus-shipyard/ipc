@@ -34,6 +34,7 @@ members = [
     # adm
     "fendermint/actors/accumulator",
     "fendermint/actors/blobs",
+    "fendermint/actors/blobs/shared",
     "fendermint/actors/machine",
     "fendermint/actors/objectstore",
     "textile/objectstore_actor_sdk",

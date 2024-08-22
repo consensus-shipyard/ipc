@@ -13,7 +13,6 @@ crate-type = ["cdylib", "lib"]
 
 [dependencies]
 anyhow = { workspace = true }
-iroh-base = { workspace = true, features = ["key", "wasm"] }
 log = { workspace = true, features = ["std"] }
 multihash = { workspace = true, default-features = false, features = ["blake3"] }
 num-derive = { workspace = true }
@@ -26,12 +25,15 @@ fvm_shared = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_tuple = { workspace = true }
 
+fendermint_actor_blobs_shared = { path = "./shared" }
+
 [dev-dependencies]
 fil_actors_evm_shared = { workspace = true }
 fil_actors_runtime = { workspace = true, features = [
     "test_utils",
 ] }
 hex-literal = { workspace = true }
+iroh-base = { workspace = true, features = ["key"] }
 rand = { workspace = true }
 
 [features]

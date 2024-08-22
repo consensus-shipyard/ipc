@@ -70,6 +70,7 @@ fendermint_vm_topdown = { path = "../vm/topdown" }
 fendermint_actor_machine = { path = "../actors/machine" }
 fendermint_actor_accumulator = { path = "../actors/accumulator" }
 fendermint_actor_objectstore = { path = "../actors/objectstore" }
+fendermint_actor_blobs_shared = { path = "../actors/blobs/shared" }
 
 fvm = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }

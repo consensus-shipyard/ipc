@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: MIT
 
 use std::collections::HashMap;
-use std::net::SocketAddr;
+use std::net::ToSocketAddrs;
 use std::time::Duration;
 
 use anyhow::anyhow;
 use bloom::{BloomFilter, ASMS};
 use ipc_api::subnet_id::SubnetID;
 use iroh::blobs::Hash;
+use iroh::client::Iroh;
 use iroh::net::NodeAddr;
 use libipld::store::StoreParams;
 use libipld::Cid;
@@ -97,7 +98,7 @@ pub struct Config {
     pub membership: MembershipConfig,
     pub connection: ConnectionConfig,
     pub content: ContentConfig,
-    pub iroh_addr: Option<SocketAddr>,
+    pub iroh_addr: Option<String>,
 }
 
 /// Internal requests to enqueue to the [`Service`]
@@ -147,7 +148,35 @@ where
     /// To limit the number of peers contacted in a Bitswap resolution attempt.
     max_peers_per_query: usize,
     /// Iroh client
-    iroh: Option<iroh::client::Iroh>,
+    iroh: MaybeIroh,
+}
+
+#[derive(Clone, Debug)]
+struct MaybeIroh {
+    addr: Option<String>,
+    client: Option<Iroh>,
+}
+
+impl MaybeIroh {
+    async fn client(&mut self) -> anyhow::Result<Iroh> {
+        if let Some(c) = self.client.clone() {
+            return Ok(c);
+        }
+        if let Some(addr) = self.addr.clone() {
+            let addr = addr.to_socket_addrs()?.next().ok_or(anyhow!(
+                "failed to convert iroh node address to a socket address"
+            ))?;
+            match Iroh::connect_addr(addr).await {
+                Ok(client) => {
+                    self.client = Some(client.clone());
+                    Ok(client)
+                }
+                Err(e) => Err(e),
+            }
+        } else {
+            Err(anyhow!("iroh node address is not configured"))
+        }
+    }
 }
 
 impl<P, V> Service<P, V>
@@ -214,12 +243,6 @@ where
         let (request_tx, request_rx) = mpsc::unbounded_channel();
         let (event_tx, _) = broadcast::channel(config.connection.event_buffer_capacity as usize);
 
-        let iroh = if let Some(addr) = config.iroh_addr {
-            Some(iroh::client::Iroh::connect_addr(addr).await?)
-        } else {
-            None
-        };
-
         let service = Self {
             peer_id,
             listen_addr: config.connection.listen_addr,
@@ -233,7 +256,10 @@ where
                 config.connection.expected_peer_count,
             ),
             max_peers_per_query: config.connection.max_peers_per_query as usize,
-            iroh,
+            iroh: MaybeIroh {
+                addr: config.iroh_addr,
+                client: None,
+            },
         };
 
         Ok(service)
@@ -540,17 +566,22 @@ where
         node_addr: NodeAddr,
         response_channel: ResponseChannel,
     ) {
-        if let Some(iroh) = self.iroh.clone() {
-            tokio::spawn(async move {
-                let res = download_blob(iroh, hash, node_addr).await;
-                match res {
-                    Ok(_) => send_resolve_result(response_channel, Ok(())),
-                    Err(e) => send_resolve_result(response_channel, Err(anyhow!(e))),
+        let mut iroh = self.iroh.clone();
+        tokio::spawn(async move {
+            match iroh.client().await {
+                Ok(client) => {
+                    let res = download_blob(client, hash, node_addr).await;
+                    match res {
+                        Ok(_) => send_resolve_result(response_channel, Ok(())),
+                        Err(e) => send_resolve_result(response_channel, Err(anyhow!(e))),
+                    }
                 }
-            });
-        } else {
-            warn!("cannot resolve {}; iroh is not configured", hash);
-        }
+                Err(e) => warn!(
+                    "cannot resolve {}; failed to create iroh client ({})",
+                    hash, e
+                ),
+            }
+        });
     }
 
     /// Handle the results from a resolve attempt. If it succeeded, notify the
@@ -645,11 +676,7 @@ pub fn build_transport(local_key: Keypair) -> Boxed<(PeerId, StreamMuxerBox)> {
         .boxed()
 }
 
-async fn download_blob(
-    iroh: iroh::client::Iroh,
-    hash: Hash,
-    node_addr: NodeAddr,
-) -> anyhow::Result<()> {
+async fn download_blob(iroh: Iroh, hash: Hash, node_addr: NodeAddr) -> anyhow::Result<()> {
     let res = iroh.blobs().download(hash, node_addr).await?.await?;
     debug!("downloaded blob {}: {:?}", hash, res);
     Ok(())

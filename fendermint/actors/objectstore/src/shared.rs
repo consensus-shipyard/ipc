@@ -2,12 +2,11 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use fendermint_actor_blobs_shared::{Hash, PublicKey};
 use fendermint_actor_machine::GET_METADATA_METHOD;
 use fvm_ipld_encoding::{strict_bytes, tuple::*};
 use fvm_shared::address::Address;
 use fvm_shared::METHOD_CONSTRUCTOR;
-use iroh_base::hash::Hash;
-use iroh_base::key::PublicKey;
 use num_derive::FromPrimitive;
 use std::collections::HashMap;
 

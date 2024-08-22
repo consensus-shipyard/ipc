@@ -3,12 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use cid::Cid;
+use fendermint_actor_blobs_shared::Hash;
 use fendermint_actor_machine::{Kind, MachineState, WriteAccess};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::tuple::*;
 use fvm_ipld_hamt::{BytesKey, Hamt};
 use fvm_shared::address::Address;
-use iroh_base::hash::Hash;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -219,25 +219,29 @@ impl State {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use fvm_ipld_blockstore::MemoryBlockstore;
     use quickcheck::Arbitrary;
     use quickcheck_macros::quickcheck;
-    use rand::Rng;
+    use rand::RngCore;
     use std::str::FromStr;
 
-    pub fn new_hash() -> (Hash, usize) {
+    pub fn new_hash(size: usize) -> (Hash, u64) {
         let mut rng = rand::thread_rng();
-        let mut data = [0u8; 256];
-        rng.fill(&mut data);
-        (Hash::new(&data), 256)
+        let mut data = vec![0u8; size];
+        rng.fill_bytes(&mut data);
+        (
+            Hash(iroh_base::hash::Hash::new(&data).as_bytes().clone()),
+            size as u64,
+        )
     }
 
     impl Arbitrary for Object {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
-            let hash = new_hash();
+            let hash = new_hash(u16::arbitrary(g) as usize);
             Object {
                 hash: hash.0,
-                size: hash.1,
+                size: hash.1 as usize,
                 metadata: HashMap::arbitrary(g),
                 resolved: false,
             }
@@ -246,12 +250,12 @@ mod tests {
 
     fn object_one() -> Object {
         let data = [1, 2, 3, 4, 5];
-        let hash = Hash::new(&data);
+        let hash = iroh_base::hash::Hash::new(&data);
         let mut metadata = HashMap::<String, String>::new();
         metadata.insert("_created".to_string(), String::from("1718464344"));
         metadata.insert("_modified".to_string(), String::from("1718464345"));
         Object {
-            hash,
+            hash: Hash(hash.as_bytes().clone()),
             size: data.len(),
             metadata,
             resolved: false,
@@ -262,12 +266,12 @@ mod tests {
 
     fn object_two() -> Object {
         let data = [6, 7, 8, 9, 10, 11];
-        let hash = Hash::new(&data);
+        let hash = iroh_base::hash::Hash::new(&data);
         let mut metadata = HashMap::<String, String>::new();
         metadata.insert("_created".to_string(), String::from("1718464456"));
         metadata.insert("_modified".to_string(), String::from("1718480987"));
         Object {
-            hash,
+            hash: Hash(hash.as_bytes().clone()),
             size: data.len(),
             metadata,
             resolved: false,
@@ -276,12 +280,12 @@ mod tests {
 
     fn object_three() -> Object {
         let data = [11, 12, 13, 14, 15, 16, 17];
-        let hash = Hash::new(&data);
+        let hash = iroh_base::hash::Hash::new(&data);
         let mut metadata = HashMap::<String, String>::new();
         metadata.insert("_created".to_string(), String::from("1718465678"));
         metadata.insert("_modified".to_string(), String::from("1718512346"));
         Object {
-            hash,
+            hash: Hash(hash.as_bytes().clone()),
             size: data.len(),
             metadata,
             resolved: false,
@@ -428,12 +432,12 @@ mod tests {
         )?;
         // We'll mostly ignore this one
         let other_key = BytesKey("zzzz/image.png".as_bytes().to_vec()); // index 2
-        let hash = new_hash();
+        let hash = new_hash(256);
         state.add(
             &store,
             other_key.clone(),
             hash.0,
-            hash.1,
+            hash.1 as usize,
             HashMap::<String, String>::new(),
             false,
         )?;
@@ -529,37 +533,37 @@ mod tests {
         .unwrap();
 
         let jpeg_key = BytesKey("foo.jpeg".as_bytes().to_vec());
-        let hash = new_hash();
+        let hash = new_hash(256);
         state
             .add(
                 &store,
                 jpeg_key.clone(),
                 hash.0,
-                hash.1,
+                hash.1 as usize,
                 HashMap::<String, String>::new(),
                 false,
             )
             .unwrap();
         let bar_key = BytesKey("bin/foo/bar.png".as_bytes().to_vec());
-        let hash = new_hash();
+        let hash = new_hash(256);
         state
             .add(
                 &store,
                 bar_key.clone(),
                 hash.0,
-                hash.1,
+                hash.1 as usize,
                 HashMap::<String, String>::new(),
                 false,
             )
             .unwrap();
         let baz_key = BytesKey("bin/foo/baz.png".as_bytes().to_vec());
-        let hash = new_hash();
+        let hash = new_hash(256);
         state
             .add(
                 &store,
                 baz_key.clone(),
                 hash.0,
-                hash.1,
+                hash.1 as usize,
                 HashMap::<String, String>::new(),
                 false,
             )
@@ -610,25 +614,25 @@ mod tests {
         .unwrap();
 
         let one = BytesKey("hello/world".as_bytes().to_vec());
-        let hash = new_hash();
+        let hash = new_hash(256);
         state
             .add(
                 &store,
                 one.clone(),
                 hash.0,
-                hash.1,
+                hash.1 as usize,
                 HashMap::<String, String>::new(),
                 false,
             )
             .unwrap();
         let two = BytesKey("hello/again".as_bytes().to_vec());
-        let hash = new_hash();
+        let hash = new_hash(256);
         state
             .add(
                 &store,
                 two.clone(),
                 hash.0,
-                hash.1,
+                hash.1 as usize,
                 HashMap::<String, String>::new(),
                 false,
             )

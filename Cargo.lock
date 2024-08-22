@@ -3143,6 +3143,7 @@ name = "fendermint_actor_blobs"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "fendermint_actor_blobs_shared",
  "fil_actors_evm_shared",
  "fil_actors_runtime",
  "frc42_dispatch",
@@ -3158,6 +3159,13 @@ dependencies = [
  "rand",
  "serde",
  "serde_tuple",
+]
+
+[[package]]
+name = "fendermint_actor_blobs_shared"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -3219,6 +3227,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid",
+ "fendermint_actor_blobs_shared",
  "fendermint_actor_machine",
  "fendermint_testing",
  "fil_actors_evm_shared",
@@ -3272,6 +3281,7 @@ dependencies = [
  "ethers",
  "fendermint_abci",
  "fendermint_actor_accumulator",
+ "fendermint_actor_blobs_shared",
  "fendermint_actor_machine",
  "fendermint_actor_objectstore",
  "fendermint_app_options",
@@ -3742,6 +3752,7 @@ dependencies = [
  "ethers",
  "fendermint_actor_accumulator",
  "fendermint_actor_blobs",
+ "fendermint_actor_blobs_shared",
  "fendermint_actor_chainmetadata",
  "fendermint_actor_eam",
  "fendermint_actor_objectstore",

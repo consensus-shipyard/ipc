@@ -3,10 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 pub mod blobs {
+    use fendermint_actor_blobs_shared::{Hash, PublicKey};
     use fvm_ipld_encoding::tuple::*;
     use fvm_shared::{address::Address, bigint::BigInt, clock::ChainEpoch, ActorID};
-    use iroh_base::hash::Hash;
-    use iroh_base::key::PublicKey;
     use serde::{Deserialize, Serialize};
 
     pub const BLOBS_ACTOR_ID: ActorID = 49;

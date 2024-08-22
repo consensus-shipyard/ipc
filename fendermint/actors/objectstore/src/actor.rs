@@ -198,8 +198,10 @@ impl ActorCode for Actor {
 
 #[cfg(test)]
 mod tests {
-    use crate::{actor::Actor, ext, AddParams, DeleteParams, Method, State};
+    use super::*;
+
     use cid::Cid;
+    use fendermint_actor_blobs_shared::{Hash, PublicKey};
     use fendermint_actor_machine::WriteAccess;
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::runtime::Runtime;
@@ -211,9 +213,7 @@ mod tests {
     use fvm_shared::address::Address;
     use fvm_shared::econ::TokenAmount;
     use fvm_shared::error::ExitCode;
-    use iroh_base::hash::Hash;
-    use iroh_base::key::PublicKey;
-    use rand::Rng;
+    use rand::RngCore;
     use std::collections::HashMap;
 
     fn construct_and_verify(creator: Address) -> MockRuntime {
@@ -228,7 +228,7 @@ mod tests {
         let actor_construction = rt
             .call::<Actor>(
                 Method::Constructor as u64,
-                IpldBlock::serialize_cbor(&fendermint_actor_machine::ConstructorParams {
+                IpldBlock::serialize_cbor(&ConstructorParams {
                     creator,
                     write_access,
                     metadata,
@@ -242,18 +242,21 @@ mod tests {
         rt
     }
 
-    pub fn new_hash() -> (Hash, usize) {
+    pub fn new_hash(size: usize) -> (Hash, u64) {
         let mut rng = rand::thread_rng();
-        let mut data = [0u8; 256];
-        rng.fill(&mut data);
-        (Hash::new(&data), 256)
+        let mut data = vec![0u8; size];
+        rng.fill_bytes(&mut data);
+        (
+            Hash(iroh_base::hash::Hash::new(&data).as_bytes().clone()),
+            size as u64,
+        )
     }
 
     pub fn new_pk() -> PublicKey {
         let mut rng = rand::thread_rng();
         let mut data = [0u8; 32];
-        rng.fill(&mut data);
-        PublicKey::from_bytes(&data).unwrap()
+        rng.fill_bytes(&mut data);
+        PublicKey(data)
     }
 
     #[test]
@@ -269,13 +272,13 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
         rt.expect_validate_caller_any();
-        let hash = new_hash();
+        let hash = new_hash(256);
         let add_params: AddParams = AddParams {
             to: f4_eth_addr,
             source: new_pk(),
             key: vec![0, 1, 2],
             hash: hash.0,
-            size: hash.1,
+            size: hash.1 as usize,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -320,13 +323,13 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
         rt.expect_validate_caller_any();
-        let hash = new_hash();
+        let hash = new_hash(256);
         let add_params: AddParams = AddParams {
             to: f4_eth_addr,
             source: new_pk(),
             key: vec![0, 1, 2],
             hash: hash.0,
-            size: hash.1,
+            size: hash.1 as usize,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -357,13 +360,13 @@ mod tests {
         let state = rt.state::<State>().unwrap();
         assert_eq!(state.root, result);
 
-        let hash = new_hash();
+        let hash = new_hash(256);
         let add_params2 = AddParams {
             to: add_params.to,
             source: add_params.source,
             key: add_params.key,
             hash: hash.0,
-            size: hash.1,
+            size: hash.1 as usize,
             metadata: HashMap::new(),
             overwrite: true,
         };
@@ -417,13 +420,13 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
         rt.expect_validate_caller_any();
-        let hash = new_hash();
+        let hash = new_hash(256);
         let add_params: AddParams = AddParams {
             to: f4_eth_addr,
             source: new_pk(),
             key: vec![0, 1, 2],
             hash: hash.0,
-            size: hash.1,
+            size: hash.1 as usize,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -454,13 +457,13 @@ mod tests {
         let state = rt.state::<State>().unwrap();
         assert_eq!(state.root, result);
 
-        let hash = new_hash();
+        let hash = new_hash(256);
         let add_params2 = AddParams {
             to: add_params.to,
             source: add_params.source,
             key: add_params.key,
             hash: hash.0,
-            size: hash.1,
+            size: hash.1 as usize,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -488,7 +491,7 @@ mod tests {
         rt.set_origin(id_addr);
         rt.expect_validate_caller_any();
         let key = vec![0, 1, 2];
-        let hash = new_hash();
+        let hash = new_hash(256);
 
         // Prerequisite for a delete operation: add to have a proper state of the actor.
         let add_params: AddParams = AddParams {
@@ -496,7 +499,7 @@ mod tests {
             source: new_pk(),
             key: key.clone(),
             hash: hash.0,
-            size: hash.1,
+            size: hash.1 as usize,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -533,7 +536,7 @@ mod tests {
         rt.expect_send_simple(
             ext::blobs::BLOBS_ACTOR_ADDR,
             ext::blobs::DELETE_BLOB_METHOD,
-            IpldBlock::serialize_cbor(&ext::blobs::DeleteBlobParams(hash)).unwrap(),
+            IpldBlock::serialize_cbor(&ext::blobs::DeleteBlobParams(hash.0)).unwrap(),
             TokenAmount::from_whole(0),
             None,
             ExitCode::OK,

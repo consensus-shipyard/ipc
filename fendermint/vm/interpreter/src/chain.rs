@@ -259,7 +259,7 @@ where
                 .expect("we just started a transaction");
 
             let pending_blobs = atomically(|| env.blob_pool.count()).await;
-            tracing::info!(size = pending_blobs, "ipfs pool status");
+            tracing::info!(size = pending_blobs, "blob pool status");
 
             // Append at the end - if we run out of block space,
             // these are going to be reproposed in the next block.
@@ -529,7 +529,8 @@ where
                     let method_num = ResolveBlob as u64;
                     let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
 
-                    let params = ResolveBlobParams(blob.hash);
+                    let hash = fendermint_actor_blobs_shared::Hash(blob.hash.as_bytes().clone());
+                    let params = ResolveBlobParams(hash);
                     let params = RawBytes::serialize(params)?;
                     let msg = Message {
                         version: Default::default(),
@@ -774,6 +775,7 @@ fn is_blob_resolved<DB>(
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
+    let hash = fendermint_actor_blobs_shared::Hash(hash.as_bytes().clone());
     let params = ResolveBlobParams(hash);
     let params = RawBytes::serialize(params)?;
     let msg = FvmMessage {

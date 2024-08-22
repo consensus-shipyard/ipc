@@ -406,15 +406,16 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
                 }));
             }
 
-            let status = iroh.blobs().status(object.hash).await.map_err(|e| {
+            let hash = Hash::from_bytes(object.hash.0);
+            let status = iroh.blobs().status(hash).await.map_err(|e| {
                 Rejection::from(BadRequest {
-                    message: format!("failed to read object: {} {}", object.hash, e),
+                    message: format!("failed to read object: {} {}", hash, e),
                 })
             })?;
             let BlobStatus::Complete { size } = status else {
                 // TODO: handle partial state if the range is in that
                 return Err(Rejection::from(BadRequest {
-                    message: format!("object {} is not available", object.hash),
+                    message: format!("object {} is not available", hash),
                 }));
             };
 
@@ -424,11 +425,11 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
                     let len = (end - start) + 1;
                     let reader = iroh
                         .blobs()
-                        .read_at(object.hash, start, Some(len as usize))
+                        .read_at(hash, start, Some(len as usize))
                         .await
                         .map_err(|e| {
                             Rejection::from(BadRequest {
-                                message: format!("failed to fetch object: {} {}", object.hash, e),
+                                message: format!("failed to fetch object: {} {}", hash, e),
                             })
                         })?;
                     let body = Body::wrap_stream(reader);
@@ -441,9 +442,9 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
                     }
                 }
                 None => {
-                    let reader = iroh.blobs().read(object.hash).await.map_err(|e| {
+                    let reader = iroh.blobs().read(hash).await.map_err(|e| {
                         Rejection::from(BadRequest {
-                            message: format!("failed to fetch object: {} {}", object.hash, e),
+                            message: format!("failed to fetch object: {} {}", hash, e),
                         })
                     })?;
                     let body = Body::wrap_stream(reader);
@@ -707,9 +708,9 @@ mod tests {
         let key = b"key";
         let params = AddParams {
             to: store,
-            source: iroh.node_id(),
+            source: fendermint_actor_blobs_shared::PublicKey(iroh.node_id().as_bytes().clone()),
             key: key.to_vec(),
-            hash,
+            hash: fendermint_actor_blobs_shared::Hash(hash.as_bytes().clone()),
             size: 11,
             metadata: HashMap::new(),
             overwrite: true,

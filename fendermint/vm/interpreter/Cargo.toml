@@ -43,6 +43,7 @@ tracing = { workspace = true }
 
 fendermint_actor_accumulator = { path = "../../actors/accumulator" }
 fendermint_actor_blobs = { path = "../../actors/blobs" }
+fendermint_actor_blobs_shared = { path = "../../actors/blobs/shared" }
 fendermint_actor_chainmetadata = { path = "../../actors/chainmetadata" }
 fendermint_actor_eam = { path = "../../actors/eam" }
 fendermint_actor_objectstore = { path = "../../actors/objectstore" }

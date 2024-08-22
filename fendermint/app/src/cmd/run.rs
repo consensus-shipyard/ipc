@@ -1,7 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::net::ToSocketAddrs;
 use std::sync::Arc;
 
 use anyhow::{anyhow, bail, Context};
@@ -487,11 +486,6 @@ fn to_resolver_config(
         settings.ipc.subnet_id.root_id(),
         r.network.network_name
     );
-
-    let iroh_addr = iroh_addr
-        .to_socket_addrs()?
-        .next()
-        .ok_or(anyhow!("failed to convert iroh_addr to a socket address"))?;
 
     let config = Config {
         connection: ConnectionConfig {

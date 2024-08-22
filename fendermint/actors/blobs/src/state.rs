@@ -5,13 +5,12 @@
 use std::collections::{BTreeMap, HashMap};
 
 use anyhow::anyhow;
+use fendermint_actor_blobs_shared::{Hash, PublicKey};
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
-use iroh_base::hash::Hash;
-use iroh_base::key::PublicKey;
 use num_traits::{ToPrimitive, Zero};
 
 use crate::GetStatsReturn;

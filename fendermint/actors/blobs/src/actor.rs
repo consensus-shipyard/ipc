@@ -4,6 +4,7 @@
 
 use std::collections::BTreeMap;
 
+use fendermint_actor_blobs_shared::{Hash, PublicKey};
 use fil_actors_runtime::runtime::builtins::Type;
 use fil_actors_runtime::{
     actor_dispatch, actor_error, deserialize_block,
@@ -14,13 +15,10 @@ use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::address::Address;
 use fvm_shared::sys::SendFlags;
 use fvm_shared::{error::ExitCode, MethodNum};
-use iroh_base::hash::Hash;
-use iroh_base::key::PublicKey;
 use num_traits::Zero;
 
-use crate::ext::account::PUBKEY_ADDRESS_METHOD;
 use crate::{
-    Account, AddBlobParams, Blob, BuyCreditParams, ConstructorParams, DeleteBlobParams,
+    ext, Account, AddBlobParams, Blob, BuyCreditParams, ConstructorParams, DeleteBlobParams,
     GetAccountParams, GetBlobParams, GetStatsReturn, Method, ResolveBlobParams, State,
     BLOBS_ACTOR_NAME,
 };
@@ -227,7 +225,7 @@ fn resolve_caller_external(rt: &impl Runtime) -> Result<Address, ActorError> {
             let result = rt
                 .send(
                     &caller,
-                    PUBKEY_ADDRESS_METHOD,
+                    ext::account::PUBKEY_ADDRESS_METHOD,
                     None,
                     Zero::zero(),
                     None,
@@ -271,6 +269,8 @@ fn resolve_caller_external(rt: &impl Runtime) -> Result<Address, ActorError> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::test_utils::{
         expect_empty, MockRuntime, ETHACCOUNT_ACTOR_CODE_ID, SYSTEM_ACTOR_CODE_ID,
@@ -281,25 +281,23 @@ mod tests {
     use fvm_shared::bigint::BigInt;
     use fvm_shared::clock::ChainEpoch;
     use fvm_shared::econ::TokenAmount;
-    use iroh_base::hash::Hash;
-    use iroh_base::key::PublicKey;
-    use rand::Rng;
+    use rand::RngCore;
 
-    use crate::actor::BlobsActor;
-    use crate::{Account, AddBlobParams, BuyCreditParams, ConstructorParams, Method};
-
-    pub fn new_hash() -> Hash {
+    pub fn new_hash(size: usize) -> (Hash, u64) {
         let mut rng = rand::thread_rng();
-        let mut data = [0u8; 256];
-        rng.fill(&mut data);
-        Hash::new(&data)
+        let mut data = vec![0u8; size];
+        rng.fill_bytes(&mut data);
+        (
+            Hash(iroh_base::hash::Hash::new(&data).as_bytes().clone()),
+            size as u64,
+        )
     }
 
     pub fn new_pk() -> PublicKey {
         let mut rng = rand::thread_rng();
         let mut data = [0u8; 32];
-        rng.fill(&mut data);
-        PublicKey::from_bytes(&data).unwrap()
+        rng.fill_bytes(&mut data);
+        PublicKey(data)
     }
 
     pub fn construct_and_verify(capacity: u64, debit_rate: u64) -> MockRuntime {
@@ -405,11 +403,12 @@ mod tests {
 
         // Try without first funding
         rt.expect_validate_caller_any();
+        let hash = new_hash(1024);
         let add_params = AddBlobParams {
             from: None,
             source: new_pk(),
-            hash: new_hash(),
-            size: 1024,
+            hash: hash.0,
+            size: hash.1,
             expiry: 10,
         };
         let result = rt.call::<BlobsActor>(
