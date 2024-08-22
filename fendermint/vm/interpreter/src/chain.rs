@@ -7,7 +7,7 @@ use crate::{
     fvm::state::FvmExecState,
     fvm::FvmMessage,
     signed::{SignedMessageApplyRes, SignedMessageCheckRes, SyntheticMessage, VerifiableMessage},
-    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
+    CheckInterpreter, ExecInterpreter, ProposalInterpreter, QueryInterpreter,
 };
 use anyhow::{anyhow, bail, Context};
 use async_stm::atomically;
@@ -95,56 +95,6 @@ impl<I, DB> ChainMessageInterpreter<I, DB> {
             gateway_caller: GatewayCaller::default(),
         }
     }
-
-    fn signed_msgs_wtih_gas_limit(
-        &self,
-        msgs: Vec<ChainMessage>,
-    ) -> anyhow::Result<Vec<(ChainMessage, Gas)>> {
-        msgs.into_iter()
-            .map(|msg| match msg {
-                ChainMessage::Signed(inner) => {
-                    let gas_limit = inner.message.gas_limit;
-                    Ok((ChainMessage::Signed(inner), gas_limit))
-                }
-                ChainMessage::Ipc(_) => {
-                    Err(anyhow!("should not have ipc messages in user proposals"))
-                }
-            })
-            .collect::<anyhow::Result<Vec<_>>>()
-    }
-
-    /// Performs message selection:
-    /// - Order by gas limit in descending order
-    /// - Make sure total gas limit does not exceed the `total_gas_limit` parameter
-    fn messages_selection(
-        &self,
-        msgs: Vec<ChainMessage>,
-        total_gas_limit: Gas,
-    ) -> anyhow::Result<Vec<ChainMessage>> {
-        let mut msgs_with_gas_limit = self.signed_msgs_wtih_gas_limit(msgs)?;
-
-        // sort by gas limit descending
-        msgs_with_gas_limit.sort_by(|a, b| b.1.cmp(&a.1));
-
-        let mut total_gas_limit_consumed = 0;
-        let mut msgs = vec![];
-        for (msg, gas_limit) in msgs_with_gas_limit {
-            if total_gas_limit_consumed + gas_limit <= total_gas_limit {
-                msgs.push(msg);
-                total_gas_limit_consumed += gas_limit;
-            } else {
-                break;
-            }
-        }
-
-        tracing::info!(
-            num_msgs = msgs.len(),
-            total_gas_limit,
-            "selected message under total gas limit"
-        );
-
-        Ok(msgs)
-    }
 }
 
 #[async_trait]
@@ -165,7 +115,7 @@ where
         (chain_env, state): Self::State,
         mut msgs: Vec<Self::Message>,
     ) -> anyhow::Result<Vec<Self::Message>> {
-        msgs = self.messages_selection(msgs, state.gas_market().available_block_gas())?;
+        msgs = messages_selection(msgs, state.gas_market().available().block_gas)?;
 
         // Collect resolved CIDs ready to be proposed from the pool.
         let ckpts = atomically(|| chain_env.checkpoint_pool.collect_resolved()).await;
@@ -283,7 +233,7 @@ where
             };
         }
 
-        Ok(block_gas_usage <= state.gas_market().available_block_gas())
+        Ok(block_gas_usage <= state.gas_market().available().block_gas)
     }
 }
 
@@ -566,25 +516,6 @@ where
     }
 }
 
-#[async_trait]
-impl<I, DB> GenesisInterpreter for ChainMessageInterpreter<I, DB>
-where
-    DB: Blockstore + Clone + 'static + Send + Sync,
-    I: GenesisInterpreter,
-{
-    type State = I::State;
-    type Genesis = I::Genesis;
-    type Output = I::Output;
-
-    async fn init(
-        &self,
-        state: Self::State,
-        genesis: Self::Genesis,
-    ) -> anyhow::Result<(Self::State, Self::Output)> {
-        self.inner.init(state, genesis).await
-    }
-}
-
 /// Convert a signed relayed bottom-up checkpoint to a syntetic message we can send to the FVM.
 ///
 /// By mapping to an FVM message we invoke the right contract to validate the checkpoint,
@@ -613,4 +544,137 @@ fn relayed_bottom_up_ckpt_to_fvm(
         .context("failed to create syntetic message")?;
 
     Ok(msg)
+}
+
+fn signed_msgs_with_gas_limit(msgs: Vec<ChainMessage>) -> anyhow::Result<Vec<(ChainMessage, Gas)>> {
+    msgs.into_iter()
+        .map(|msg| match msg {
+            ChainMessage::Signed(inner) => {
+                let gas_limit = inner.message.gas_limit;
+                Ok((ChainMessage::Signed(inner), gas_limit))
+            }
+            ChainMessage::Ipc(_) => Err(anyhow!("should not have ipc messages in user proposals")),
+        })
+        .collect::<anyhow::Result<Vec<_>>>()
+}
+
+/// Performs message selection:
+/// - Order by gas limit in descending order
+/// - Make sure total gas limit does not exceed the `total_gas_limit` parameter
+fn messages_selection(
+    msgs: Vec<ChainMessage>,
+    total_gas_limit: Gas,
+) -> anyhow::Result<Vec<ChainMessage>> {
+    let mut msgs_with_gas_limit = signed_msgs_with_gas_limit(msgs)?;
+
+    // sort by gas limit descending
+    msgs_with_gas_limit.sort_by(|a, b| b.1.cmp(&a.1));
+
+    let mut total_gas_limit_consumed = 0;
+    let mut msgs = vec![];
+    for (msg, gas_limit) in msgs_with_gas_limit {
+        if total_gas_limit_consumed + gas_limit <= total_gas_limit {
+            msgs.push(msg);
+            total_gas_limit_consumed += gas_limit;
+        } else {
+            break;
+        }
+    }
+
+    tracing::info!(
+        num_msgs = msgs.len(),
+        total_gas_limit,
+        "selected message under total gas limit"
+    );
+
+    Ok(msgs)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::chain::messages_selection;
+    use fendermint_vm_message::chain::ChainMessage;
+    use fendermint_vm_message::signed::SignedMessage;
+    use quickcheck::Arbitrary;
+    use rand::random;
+
+    #[test]
+    fn test_message_selection_partial_selected() {
+        let mut gen = quickcheck::Gen::new(100);
+
+        let mut total = 0;
+        let msgs_len = 100;
+
+        let messages = (0..msgs_len)
+            .map(|_| {
+                let mut msg = SignedMessage::arbitrary(&mut gen);
+
+                msg.message.gas_limit = random::<u64>() % fvm_shared::BLOCK_GAS_LIMIT;
+                total += msg.message.gas_limit;
+
+                ChainMessage::Signed(msg)
+            })
+            .collect::<Vec<ChainMessage>>();
+
+        let selected = messages_selection(messages, total / 2).unwrap();
+        let selected_len = selected.len();
+        let mut selected_total = 0;
+        let mut max = u64::MAX;
+
+        for s in selected {
+            if let ChainMessage::Signed(signed) = s {
+                selected_total += signed.message.gas_limit;
+                assert!(
+                    max >= signed.message.gas_limit,
+                    "gas limit should be sorted descending"
+                );
+                max = signed.message.gas_limit;
+            } else {
+                unreachable!("should be all signed messages")
+            }
+        }
+
+        assert!(selected_total <= total / 2, "should not exceed gas limit");
+        assert!(selected_len <= msgs_len, "not full selection");
+    }
+
+    #[test]
+    fn test_message_selection_all_selected() {
+        let mut gen = quickcheck::Gen::new(100);
+
+        let mut total = 0;
+        let msgs_len = 100;
+
+        let messages = (0..msgs_len)
+            .map(|_| {
+                let mut msg = SignedMessage::arbitrary(&mut gen);
+
+                msg.message.gas_limit = random::<u64>() % fvm_shared::BLOCK_GAS_LIMIT;
+                total += msg.message.gas_limit;
+
+                ChainMessage::Signed(msg)
+            })
+            .collect::<Vec<ChainMessage>>();
+
+        let selected = messages_selection(messages, total).unwrap();
+        let selected_len = selected.len();
+        let mut selected_total = 0;
+        let mut max = u64::MAX;
+
+        for s in selected {
+            if let ChainMessage::Signed(signed) = s {
+                selected_total += signed.message.gas_limit;
+                assert!(
+                    max >= signed.message.gas_limit,
+                    "gas limit should be sorted descending"
+                );
+                max = signed.message.gas_limit;
+            } else {
+                unreachable!("should be all signed messages")
+            }
+        }
+
+        assert_eq!(selected_total, total, "should not exceed gas limit");
+        assert_eq!(selected_len, msgs_len, "not full selection");
+    }
 }

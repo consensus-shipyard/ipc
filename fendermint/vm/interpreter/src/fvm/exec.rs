@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::{bail, Context};
+use anyhow::Context;
 use async_trait::async_trait;
 use std::collections::HashMap;
 
@@ -158,20 +158,23 @@ where
 
             (apply_ret, emitters, latency)
         } else {
-            if msg.gas_limit > state.gas_market().available_block_gas() {
-                bail!("gas limit exceed available block gas limit")
+            let available_gas = state.gas_market().available().block_gas;
+            if msg.gas_limit > available_gas {
+                // This is panic-worthy, but we suppress it to avoid liveness issues.
+                // Consider maybe record as evidence for the validator slashing?
+                tracing::warn!(
+                    txn_gas_limit = msg.gas_limit,
+                    block_gas_available = available_gas,
+                    "[ASSERTION FAILED] message gas limit exceed available block gas limit; consensus engine is misbehaving"
+                );
             }
 
             let (execution_result, latency) = measure_time(|| state.execute_explicit(msg.clone()));
             let (apply_ret, emitters) = execution_result?;
 
-            if state
+            state
                 .gas_market_mut()
-                .record_gas_used(apply_ret.msg_receipt.gas_used)
-                .is_err()
-            {
-                tracing::warn!("should not have exceeded block gas limit");
-            }
+                .record_utilization(apply_ret.msg_receipt.gas_used);
 
             (apply_ret, emitters, latency)
         };

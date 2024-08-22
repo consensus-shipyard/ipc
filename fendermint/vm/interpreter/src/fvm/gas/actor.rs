@@ -1,14 +1,15 @@
-use crate::fvm::gas::{Gas, GasMarket};
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: Apache-2.0, MIT
+
+use crate::fvm::gas::{Available, Gas, GasMarket};
 use crate::fvm::FvmMessage;
 use anyhow::Context;
 
+use fendermint_actor_gas_market::GasMarketReading;
 use fendermint_vm_actor_interface::gas::GAS_MARKET_ACTOR_ADDR;
 use fendermint_vm_actor_interface::system;
 use fvm::executor::{ApplyKind, Executor};
-use fvm_ipld_encoding::BytesDe;
 use fvm_shared::clock::ChainEpoch;
-
-type GasMarketState = fendermint_actor_gas_market::EIP1559GasState;
 
 #[derive(Default)]
 pub struct ActorGasMarket {
@@ -19,22 +20,24 @@ pub struct ActorGasMarket {
 }
 
 impl GasMarket for ActorGasMarket {
-    fn available_block_gas(&self) -> Gas {
-        self.block_gas_limit - self.block_gas_used
+    fn available(&self) -> Available {
+        Available {
+            block_gas: self.block_gas_limit - self.block_gas_used.min(self.block_gas_limit),
+        }
     }
 
-    fn record_gas_used(&mut self, gas: Gas) -> anyhow::Result<()> {
-        if self.block_gas_used + gas >= self.block_gas_limit {
-            anyhow::bail!("out of block gas")
-        }
+    fn record_utilization(&mut self, gas: Gas) {
         self.block_gas_used += gas;
 
-        Ok(())
+        // sanity check
+        if self.block_gas_used >= self.block_gas_limit {
+            tracing::warn!("out of block gas, vm execution more than available gas limit");
+        }
     }
 }
 
 impl ActorGasMarket {
-    pub fn new<E: Executor>(
+    pub fn create<E: Executor>(
         executor: &mut E,
         block_height: ChainEpoch,
     ) -> anyhow::Result<ActorGasMarket> {
@@ -43,9 +46,9 @@ impl ActorGasMarket {
             to: GAS_MARKET_ACTOR_ADDR,
             sequence: block_height as u64,
             // exclude this from gas restriction
-            gas_limit: u64::MAX,
-            method_num: fendermint_actor_gas_market::Method::CurrentGasReading as u64,
-            params: fvm_ipld_encoding::RawBytes::serialize(())?,
+            gas_limit: i64::MAX as u64,
+            method_num: fendermint_actor_gas_market::Method::CurrentReading as u64,
+            params: fvm_ipld_encoding::RawBytes::default(),
             value: Default::default(),
             version: Default::default(),
             gas_fee_cap: Default::default(),
@@ -59,16 +62,12 @@ impl ActorGasMarket {
             anyhow::bail!("failed to read gas market state: {}", err);
         }
 
-        let output = apply_ret
-            .msg_receipt
-            .return_data
-            .deserialize::<BytesDe>()
-            .map(|bz| bz.0)
-            .context("failed to deserialize error data")?;
-        let state = fvm_ipld_encoding::from_slice::<GasMarketState>(&output)?;
+        let reading =
+            fvm_ipld_encoding::from_slice::<GasMarketReading>(&apply_ret.msg_receipt.return_data)
+                .context("failed to parse gas market readying")?;
 
         Ok(Self {
-            block_gas_limit: state.block_gas_limit,
+            block_gas_limit: reading.block_gas_limit,
             block_gas_used: 0,
         })
     }
@@ -78,7 +77,7 @@ impl ActorGasMarket {
         executor: &mut E,
         block_height: ChainEpoch,
     ) -> anyhow::Result<()> {
-        let block_gas_used = self.block_gas_used;
+        let block_gas_used = self.block_gas_used.min(self.block_gas_limit);
         let params = fvm_ipld_encoding::RawBytes::serialize(
             fendermint_actor_gas_market::BlockGasUtilization { block_gas_used },
         )?;
@@ -88,7 +87,7 @@ impl ActorGasMarket {
             to: GAS_MARKET_ACTOR_ADDR,
             sequence: block_height as u64,
             // exclude this from gas restriction
-            gas_limit: u64::MAX,
+            gas_limit: i64::MAX as u64,
             method_num: fendermint_actor_gas_market::Method::UpdateUtilization as u64,
             params,
             value: Default::default(),
