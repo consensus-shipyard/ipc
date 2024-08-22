@@ -7,10 +7,10 @@ use fendermint_actor_machine::GET_METADATA_METHOD;
 use fvm_ipld_encoding::serde_bytes::ByteBuf;
 use fvm_ipld_encoding::{strict_bytes, tuple::*};
 use fvm_shared::address::Address;
+use fvm_shared::clock::ChainEpoch;
 use fvm_shared::METHOD_CONSTRUCTOR;
 use num_derive::FromPrimitive;
 use std::collections::HashMap;
-use fvm_shared::clock::ChainEpoch;
 
 pub use crate::state::{Object, ObjectList, State};
 

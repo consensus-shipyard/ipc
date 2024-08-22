@@ -211,7 +211,10 @@ impl ActorCode for Actor {
 
 #[cfg(test)]
 mod tests {
+    use cid::{multihash, Cid};
+    use fendermint_actor_machine::WriteAccess;
     use fil_actors_evm_shared::address::EthAddress;
+    use fil_actors_runtime::runtime::Runtime;
     use fil_actors_runtime::test_utils::{
         expect_empty, MockRuntime, ETHACCOUNT_ACTOR_CODE_ID, SYSTEM_ACTOR_CODE_ID,
     };
@@ -219,11 +222,8 @@ mod tests {
     use fvm_ipld_encoding::ipld_block::IpldBlock;
     use fvm_ipld_encoding::serde_bytes::ByteBuf;
     use fvm_shared::address::Address;
-    use fvm_shared::econ::TokenAmount;
-    use cid::{multihash, Cid};
-    use fendermint_actor_machine::WriteAccess;
-    use fil_actors_runtime::runtime::Runtime;
     use fvm_shared::clock::ChainEpoch;
+    use fvm_shared::econ::TokenAmount;
     use fvm_shared::error::ExitCode;
     use rand::Rng;
     use std::collections::HashMap;
