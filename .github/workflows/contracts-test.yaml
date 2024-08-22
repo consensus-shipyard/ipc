@@ -35,7 +35,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: ./contracts/out
-          key: contracts-abi-${{ hashFiles('./contracts/src/**/*.sol') }}
+          key: contracts-abi-${{ hashFiles('./contracts/**/*.sol') }}
 
       - name: Run coverage check - flaky so we run twice to catch false negatives
         run: cd contracts; make coverage || make coverage

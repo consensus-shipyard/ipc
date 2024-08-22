@@ -44,15 +44,15 @@ jobs:
               cargo install -f cargo-make
           fi
 
-      - name: Download artifact
+      - name: Download Docker image
         uses: actions/download-artifact@v4
         with:
-          name: fendermint
+          name: docker-image
           path: /tmp
 
-      - name: Load image
+      - name: Load Docker image
         run: |
-          docker load --input /tmp/fendermint.tar
+          docker load --input /tmp/docker-image.tar
           docker image ls -a
 
       - name: Run a testnode
