@@ -4,7 +4,12 @@
 
 use std::collections::BTreeMap;
 
-use fendermint_actor_blobs_shared::{Hash, PublicKey};
+use fendermint_actor_blobs_shared::params::{
+    AddBlobParams, BuyCreditParams, DeleteBlobParams, GetAccountParams, GetBlobParams,
+    GetStatsReturn, ResolveBlobParams,
+};
+use fendermint_actor_blobs_shared::state::{Account, Blob, Hash, PublicKey};
+use fendermint_actor_blobs_shared::Method;
 use fil_actors_runtime::runtime::builtins::Type;
 use fil_actors_runtime::{
     actor_dispatch, actor_error, deserialize_block,
@@ -17,11 +22,7 @@ use fvm_shared::sys::SendFlags;
 use fvm_shared::{error::ExitCode, MethodNum};
 use num_traits::Zero;
 
-use crate::{
-    ext, Account, AddBlobParams, Blob, BuyCreditParams, ConstructorParams, DeleteBlobParams,
-    GetAccountParams, GetBlobParams, GetStatsReturn, Method, ResolveBlobParams, State,
-    BLOBS_ACTOR_NAME,
-};
+use crate::{ext, ConstructorParams, State, BLOBS_ACTOR_NAME};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(BlobsActor);

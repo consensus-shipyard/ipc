@@ -2,21 +2,23 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::{
+    AddParams, DeleteParams, GetParams, GotObject, ListParams, Method, Object, ObjectList, State,
+    OBJECTSTORE_ACTOR_NAME,
+};
 use cid::Cid;
+use fendermint_actor_blobs_shared::params::{AddBlobParams, DeleteBlobParams, GetBlobParams};
+use fendermint_actor_blobs_shared::state::Blob;
+use fendermint_actor_blobs_shared::{Method as BlobMethod, BLOBS_ACTOR_ADDR};
 use fendermint_actor_machine::{ConstructorParams, MachineActor};
 use fil_actors_runtime::{
-    actor_dispatch, actor_error, extract_send_result,
+    actor_dispatch, actor_error, deserialize_block, extract_send_result,
     runtime::{ActorCode, Runtime},
     ActorDowncast, ActorError, FIRST_EXPORTED_METHOD_NUMBER, INIT_ACTOR_ADDR,
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_ipld_hamt::BytesKey;
 use fvm_shared::{error::ExitCode, MethodNum};
-
-use crate::{
-    ext, AddParams, DeleteParams, GetParams, ListParams, Method, Object, ObjectList, State,
-    OBJECTSTORE_ACTOR_NAME,
-};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
@@ -48,9 +50,9 @@ impl Actor {
         if let Some(object) = Self::retrieve_object(rt, &key)? {
             if params.overwrite {
                 extract_send_result(rt.send_simple(
-                    &ext::blobs::BLOBS_ACTOR_ADDR,
-                    ext::blobs::DELETE_BLOB_METHOD,
-                    IpldBlock::serialize_cbor(&ext::blobs::DeleteBlobParams(object.hash))?,
+                    &BLOBS_ACTOR_ADDR,
+                    BlobMethod::DeleteBlob as MethodNum,
+                    IpldBlock::serialize_cbor(&DeleteBlobParams(object.hash))?,
                     rt.message().value_received(),
                 ))?;
             } else {
@@ -60,7 +62,7 @@ impl Actor {
             }
         }
 
-        let add_params = IpldBlock::serialize_cbor(&ext::blobs::AddBlobParams {
+        let add_params = IpldBlock::serialize_cbor(&AddBlobParams {
             from: Some(params.to),
             source: params.source,
             hash: params.hash,
@@ -68,8 +70,8 @@ impl Actor {
             expiry: rt.curr_epoch() + 100,
         })?;
         extract_send_result(rt.send_simple(
-            &ext::blobs::BLOBS_ACTOR_ADDR,
-            ext::blobs::ADD_BLOB_METHOD,
+            &BLOBS_ACTOR_ADDR,
+            BlobMethod::AddBlob as MethodNum,
             add_params,
             rt.message().value_received(),
         ))?;
@@ -102,9 +104,9 @@ impl Actor {
         ))?;
         // 2. Delete from the blobs actor
         extract_send_result(rt.send_simple(
-            &ext::blobs::BLOBS_ACTOR_ADDR,
-            ext::blobs::DELETE_BLOB_METHOD,
-            IpldBlock::serialize_cbor(&ext::blobs::DeleteBlobParams(object.hash))?,
+            &BLOBS_ACTOR_ADDR,
+            BlobMethod::DeleteBlob as MethodNum,
+            IpldBlock::serialize_cbor(&DeleteBlobParams(object.hash))?,
             rt.message().value_received(),
         ))?;
         // 3. Delete from the state
@@ -116,23 +118,26 @@ impl Actor {
         Ok(res.1)
     }
 
-    // TODO: fetch blob from blobs actor
-    // TODO SU: How is Blob included in Object?? Shall we return Blob??
-    // TODO SU: Delete the comment below.
-    // From Sander: I think here we need to:
-    //
-    // Look up the Object in this actor's State
-    // Use it's cid to lookup the Blob from blob actor
-    // Return some new struct that includes the Blob and the Object's metadata (which is the only state that won't exist on Blob. We can clean up the Object struct to just be cid and metadata.
-    fn get_object(rt: &impl Runtime, params: GetParams) -> Result<Option<Object>, ActorError> {
+    fn get_object(rt: &impl Runtime, params: GetParams) -> Result<Option<GotObject>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-
-        let st: State = rt.state()?;
-        st.get(rt.store(), &BytesKey(params.key))
-            .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get object"))
+        if let Some(object) = Self::retrieve_object(rt, &BytesKey(params.key))? {
+            let blob = deserialize_block::<Blob>(extract_send_result(rt.send_simple(
+                &BLOBS_ACTOR_ADDR,
+                BlobMethod::GetBlob as MethodNum,
+                IpldBlock::serialize_cbor(&GetBlobParams(object.hash))?,
+                rt.message().value_received(),
+            ))?)?;
+            Ok(Some(GotObject {
+                hash: object.hash,
+                size: blob.size as usize,
+                expiry: blob.expiry,
+                metadata: object.metadata,
+            }))
+        } else {
+            Ok(None)
+        }
     }
 
-    // TODO: fetch size from blobs actor?
     fn list_objects(rt: &impl Runtime, params: ListParams) -> Result<ObjectList, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let st: State = rt.state()?;
@@ -201,7 +206,7 @@ mod tests {
     use super::*;
 
     use cid::Cid;
-    use fendermint_actor_blobs_shared::{Hash, PublicKey};
+    use fendermint_actor_blobs_shared::state::{Hash, PublicKey};
     use fendermint_actor_machine::WriteAccess;
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::runtime::Runtime;
@@ -211,6 +216,7 @@ mod tests {
     use fil_actors_runtime::INIT_ACTOR_ADDR;
     use fvm_ipld_encoding::ipld_block::IpldBlock;
     use fvm_shared::address::Address;
+    use fvm_shared::clock::ChainEpoch;
     use fvm_shared::econ::TokenAmount;
     use fvm_shared::error::ExitCode;
     use rand::RngCore;
@@ -271,7 +277,7 @@ mod tests {
         rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
-        rt.expect_validate_caller_any();
+
         let hash = new_hash(256);
         let add_params: AddParams = AddParams {
             to: f4_eth_addr,
@@ -282,10 +288,11 @@ mod tests {
             metadata: HashMap::new(),
             overwrite: false,
         };
+        rt.expect_validate_caller_any();
         rt.expect_send_simple(
-            ext::blobs::BLOBS_ACTOR_ADDR,
-            ext::blobs::ADD_BLOB_METHOD,
-            IpldBlock::serialize_cbor(&ext::blobs::AddBlobParams {
+            BLOBS_ACTOR_ADDR,
+            BlobMethod::AddBlob as MethodNum,
+            IpldBlock::serialize_cbor(&AddBlobParams {
                 from: Some(add_params.to),
                 source: add_params.source,
                 hash: add_params.hash,
@@ -308,6 +315,7 @@ mod tests {
             .unwrap();
         let state = rt.state::<State>().unwrap();
         assert_eq!(state.root, result);
+        rt.verify();
     }
 
     #[test]
@@ -322,7 +330,7 @@ mod tests {
         rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
-        rt.expect_validate_caller_any();
+
         let hash = new_hash(256);
         let add_params: AddParams = AddParams {
             to: f4_eth_addr,
@@ -333,10 +341,11 @@ mod tests {
             metadata: HashMap::new(),
             overwrite: false,
         };
+        rt.expect_validate_caller_any();
         rt.expect_send_simple(
-            ext::blobs::BLOBS_ACTOR_ADDR,
-            ext::blobs::ADD_BLOB_METHOD,
-            IpldBlock::serialize_cbor(&ext::blobs::AddBlobParams {
+            BLOBS_ACTOR_ADDR,
+            BlobMethod::AddBlob as MethodNum,
+            IpldBlock::serialize_cbor(&AddBlobParams {
                 from: Some(add_params.to),
                 source: add_params.source,
                 hash: add_params.hash,
@@ -359,6 +368,7 @@ mod tests {
             .unwrap();
         let state = rt.state::<State>().unwrap();
         assert_eq!(state.root, result);
+        rt.verify();
 
         let hash = new_hash(256);
         let add_params2 = AddParams {
@@ -372,17 +382,17 @@ mod tests {
         };
         rt.expect_validate_caller_any();
         rt.expect_send_simple(
-            ext::blobs::BLOBS_ACTOR_ADDR,
-            ext::blobs::DELETE_BLOB_METHOD,
-            IpldBlock::serialize_cbor(&ext::blobs::DeleteBlobParams(add_params.hash)).unwrap(),
+            BLOBS_ACTOR_ADDR,
+            BlobMethod::DeleteBlob as MethodNum,
+            IpldBlock::serialize_cbor(&DeleteBlobParams(add_params.hash)).unwrap(),
             TokenAmount::from_whole(0),
             None,
             ExitCode::OK,
         );
         rt.expect_send_simple(
-            ext::blobs::BLOBS_ACTOR_ADDR,
-            ext::blobs::ADD_BLOB_METHOD,
-            IpldBlock::serialize_cbor(&ext::blobs::AddBlobParams {
+            BLOBS_ACTOR_ADDR,
+            BlobMethod::AddBlob as MethodNum,
+            IpldBlock::serialize_cbor(&AddBlobParams {
                 from: Some(add_params2.to),
                 source: add_params2.source,
                 hash: add_params2.hash,
@@ -405,6 +415,7 @@ mod tests {
             .unwrap();
         let state = rt.state::<State>().unwrap();
         assert_eq!(state.root, result);
+        rt.verify();
     }
 
     #[test]
@@ -419,7 +430,7 @@ mod tests {
         rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
-        rt.expect_validate_caller_any();
+
         let hash = new_hash(256);
         let add_params: AddParams = AddParams {
             to: f4_eth_addr,
@@ -430,10 +441,11 @@ mod tests {
             metadata: HashMap::new(),
             overwrite: false,
         };
+        rt.expect_validate_caller_any();
         rt.expect_send_simple(
-            ext::blobs::BLOBS_ACTOR_ADDR,
-            ext::blobs::ADD_BLOB_METHOD,
-            IpldBlock::serialize_cbor(&ext::blobs::AddBlobParams {
+            BLOBS_ACTOR_ADDR,
+            BlobMethod::AddBlob as MethodNum,
+            IpldBlock::serialize_cbor(&AddBlobParams {
                 from: Some(add_params.to),
                 source: add_params.source,
                 hash: add_params.hash,
@@ -456,6 +468,7 @@ mod tests {
             .unwrap();
         let state = rt.state::<State>().unwrap();
         assert_eq!(state.root, result);
+        rt.verify();
 
         let hash = new_hash(256);
         let add_params2 = AddParams {
@@ -475,6 +488,7 @@ mod tests {
         assert!(result.is_err_and(|e| { e.msg().eq("asked not to overwrite") }));
         let state2 = rt.state::<State>().unwrap();
         assert_eq!(state2.root, state.root);
+        rt.verify();
     }
 
     #[test]
@@ -489,7 +503,7 @@ mod tests {
         rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
-        rt.expect_validate_caller_any();
+
         let key = vec![0, 1, 2];
         let hash = new_hash(256);
 
@@ -503,10 +517,11 @@ mod tests {
             metadata: HashMap::new(),
             overwrite: false,
         };
+        rt.expect_validate_caller_any();
         rt.expect_send_simple(
-            ext::blobs::BLOBS_ACTOR_ADDR,
-            ext::blobs::ADD_BLOB_METHOD,
-            IpldBlock::serialize_cbor(&ext::blobs::AddBlobParams {
+            BLOBS_ACTOR_ADDR,
+            BlobMethod::AddBlob as MethodNum,
+            IpldBlock::serialize_cbor(&AddBlobParams {
                 from: Some(add_params.to),
                 source: add_params.source,
                 hash: add_params.hash,
@@ -529,14 +544,15 @@ mod tests {
             .unwrap();
         let state = rt.state::<State>().unwrap();
         assert_eq!(state.root, result_add);
+        rt.verify();
 
         // Now actually delete.
         let delete_params = DeleteParams { key: key.clone() };
         rt.expect_validate_caller_any();
         rt.expect_send_simple(
-            ext::blobs::BLOBS_ACTOR_ADDR,
-            ext::blobs::DELETE_BLOB_METHOD,
-            IpldBlock::serialize_cbor(&ext::blobs::DeleteBlobParams(hash.0)).unwrap(),
+            BLOBS_ACTOR_ADDR,
+            BlobMethod::DeleteBlob as MethodNum,
+            IpldBlock::serialize_cbor(&DeleteBlobParams(hash.0)).unwrap(),
             TokenAmount::from_whole(0),
             None,
             ExitCode::OK,
@@ -546,5 +562,123 @@ mod tests {
             IpldBlock::serialize_cbor(&delete_params).unwrap(),
         );
         assert!(result_delete.is_ok());
+        rt.verify();
+    }
+
+    #[test]
+    pub fn test_get_object_none() {
+        let id_addr = Address::new_id(110);
+        let eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000000"
+        ));
+        let f4_eth_addr = Address::new_delegated(10, &eth_addr.0).unwrap();
+
+        let rt = construct_and_verify(f4_eth_addr);
+        rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
+        rt.set_origin(id_addr);
+
+        let get_params = GetParams { key: vec![0, 1, 2] };
+        rt.expect_validate_caller_any();
+        let result = rt
+            .call::<Actor>(
+                Method::GetObject as u64,
+                IpldBlock::serialize_cbor(&get_params).unwrap(),
+            )
+            .unwrap()
+            .unwrap()
+            .deserialize::<Option<GotObject>>();
+        assert!(result.is_ok());
+        assert_eq!(result, Ok(None));
+        rt.verify();
+    }
+
+    #[test]
+    pub fn test_get_object() {
+        let id_addr = Address::new_id(110);
+        let eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000000"
+        ));
+        let f4_eth_addr = Address::new_delegated(10, &eth_addr.0).unwrap();
+
+        let rt = construct_and_verify(f4_eth_addr);
+        rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
+        rt.set_origin(id_addr);
+
+        let key = vec![0, 1, 2];
+        let hash = new_hash(256);
+
+        // Prerequisite for a delete operation: add to have a proper state of the actor.
+        let add_params: AddParams = AddParams {
+            to: f4_eth_addr,
+            source: new_pk(),
+            key: key.clone(),
+            hash: hash.0,
+            size: hash.1 as usize,
+            metadata: HashMap::new(),
+            overwrite: false,
+        };
+        rt.expect_validate_caller_any();
+        rt.expect_send_simple(
+            BLOBS_ACTOR_ADDR,
+            BlobMethod::AddBlob as MethodNum,
+            IpldBlock::serialize_cbor(&AddBlobParams {
+                from: Some(add_params.to),
+                source: add_params.source,
+                hash: add_params.hash,
+                size: add_params.size as u64,
+                expiry: 100,
+            })
+            .unwrap(),
+            TokenAmount::from_whole(0),
+            None,
+            ExitCode::OK,
+        );
+        rt.call::<Actor>(
+            Method::AddObject as u64,
+            IpldBlock::serialize_cbor(&add_params).unwrap(),
+        )
+        .unwrap()
+        .unwrap()
+        .deserialize::<Cid>()
+        .unwrap();
+        rt.verify();
+
+        let blob = Blob {
+            size: add_params.size as u64,
+            expiry: 100 as ChainEpoch,
+            source: add_params.source,
+            resolved: true,
+        };
+        rt.expect_validate_caller_any();
+        rt.expect_send_simple(
+            BLOBS_ACTOR_ADDR,
+            BlobMethod::GetBlob as MethodNum,
+            IpldBlock::serialize_cbor(&GetBlobParams(add_params.hash)).unwrap(),
+            TokenAmount::from_whole(0),
+            IpldBlock::serialize_cbor(&Some(&blob)).unwrap(),
+            ExitCode::OK,
+        );
+        let get_params = GetParams { key };
+        let result = rt
+            .call::<Actor>(
+                Method::GetObject as u64,
+                IpldBlock::serialize_cbor(&get_params).unwrap(),
+            )
+            .unwrap()
+            .unwrap()
+            .deserialize::<Option<GotObject>>();
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            Some(GotObject {
+                hash: hash.0,
+                size: blob.size as usize,
+                expiry: blob.expiry,
+                metadata: add_params.metadata
+            })
+        );
+        rt.verify();
     }
 }

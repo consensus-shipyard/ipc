@@ -13,9 +13,9 @@ use crate::{
 use anyhow::{anyhow, bail, Context};
 use async_stm::atomically;
 use async_trait::async_trait;
-use fendermint_actor_blobs::{
+use fendermint_actor_blobs_shared::{
+    params::ResolveBlobParams,
     Method::{GetResolvingBlobs, IsBlobResolving, ResolveBlob},
-    ResolveBlobParams,
 };
 use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::{blobs, ipc, system};
@@ -529,7 +529,7 @@ where
                     let method_num = ResolveBlob as u64;
                     let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
 
-                    let hash = fendermint_actor_blobs_shared::Hash(*blob.hash.as_bytes());
+                    let hash = fendermint_actor_blobs_shared::state::Hash(*blob.hash.as_bytes());
                     let params = ResolveBlobParams(hash);
                     let params = RawBytes::serialize(params)?;
                     let msg = Message {
@@ -775,7 +775,7 @@ fn is_blob_resolved<DB>(
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
-    let hash = fendermint_actor_blobs_shared::Hash(*hash.as_bytes());
+    let hash = fendermint_actor_blobs_shared::state::Hash(*hash.as_bytes());
     let params = ResolveBlobParams(hash);
     let params = RawBytes::serialize(params)?;
     let msg = FvmMessage {

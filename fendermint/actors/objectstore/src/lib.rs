@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 mod actor;
-mod ext;
 mod shared;
 mod state;
 

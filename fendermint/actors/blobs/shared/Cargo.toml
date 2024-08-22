@@ -12,4 +12,10 @@ version = "0.1.0"
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
+frc42_dispatch = { workspace = true }
+fvm_ipld_encoding = { workspace = true }
+fvm_shared = { workspace = true }
+num-derive = { workspace = true }
+num-traits = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+serde_tuple = { workspace = true }

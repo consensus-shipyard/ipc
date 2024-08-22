@@ -5,15 +5,14 @@
 use std::collections::{BTreeMap, HashMap};
 
 use anyhow::anyhow;
-use fendermint_actor_blobs_shared::{Hash, PublicKey};
+use fendermint_actor_blobs_shared::params::GetStatsReturn;
+use fendermint_actor_blobs_shared::state::{Account, Blob, Hash, PublicKey};
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use num_traits::{ToPrimitive, Zero};
-
-use crate::GetStatsReturn;
 
 /// The state represents all accounts and stored blobs.
 /// TODO: use raw HAMTs
@@ -38,40 +37,6 @@ pub struct State {
     pub blobs: HashMap<Hash, Blob>,
     /// Set of currently resolving blob hashes.
     pub resolving: BTreeMap<Hash, PublicKey>,
-}
-
-/// The stored representation of a credit account.
-#[derive(Clone, Debug, PartialEq, Serialize_tuple, Deserialize_tuple)]
-pub struct Account {
-    /// Total size of all blobs managed by the account.
-    pub capacity_used: BigInt,
-    /// Current free credit in byte-blocks that can be used for new commitments.
-    pub credit_free: BigInt,
-    /// Current committed credit in byte-blocks that will be used for debits.
-    pub credit_committed: BigInt,
-    /// The chain epoch of the last debit.
-    pub last_debit_epoch: ChainEpoch,
-}
-
-/// The stored representation of a blob.
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct Blob {
-    /// The size of the content.
-    pub size: u64,
-    /// Expiry block.
-    pub expiry: ChainEpoch,
-    /// TODO: add subs
-    //pub subs: HashMap<Address, Subscription>,
-    /// Whether the blob has been resolved.
-    pub source_node_id: PublicKey,
-    /// TODO: change to enum: resolving, resolved, failed
-    pub resolved: bool,
-}
-
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct Subscription {
-    /// Expiry block.
-    pub expiry: ChainEpoch,
 }
 
 impl State {
@@ -153,7 +118,7 @@ impl State {
         hash: Hash,
         size: u64,
         expiry: ChainEpoch,
-        source_node_id: PublicKey,
+        source: PublicKey,
     ) -> anyhow::Result<Account> {
         if expiry <= current_epoch {
             return Err(anyhow!("expiry must be in the future"));
@@ -188,13 +153,13 @@ impl State {
                 account.credit_committed += &required_credit;
                 account.credit_free -= &required_credit;
 
-                self.resolving.insert(hash, source_node_id);
+                self.resolving.insert(hash, source);
                 self.blobs.insert(
                     hash,
                     Blob {
                         size: size.to_u64().unwrap(),
                         expiry,
-                        source_node_id,
+                        source,
                         resolved: false,
                     },
                 );
