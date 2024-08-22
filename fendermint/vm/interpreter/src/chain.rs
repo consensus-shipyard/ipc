@@ -529,7 +529,7 @@ where
                     let method_num = ResolveBlob as u64;
                     let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
 
-                    let hash = fendermint_actor_blobs_shared::Hash(blob.hash.as_bytes().clone());
+                    let hash = fendermint_actor_blobs_shared::Hash(*blob.hash.as_bytes());
                     let params = ResolveBlobParams(hash);
                     let params = RawBytes::serialize(params)?;
                     let msg = Message {
@@ -775,7 +775,7 @@ fn is_blob_resolved<DB>(
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
-    let hash = fendermint_actor_blobs_shared::Hash(hash.as_bytes().clone());
+    let hash = fendermint_actor_blobs_shared::Hash(*hash.as_bytes());
     let params = ResolveBlobParams(hash);
     let params = RawBytes::serialize(params)?;
     let msg = FvmMessage {

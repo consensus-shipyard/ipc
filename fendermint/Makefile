@@ -98,7 +98,8 @@ lint: \
 	check-clippy
 
 check-fmt:
-	cargo fmt $(PACKAGE) --check
+	@# `nightly` is required to support ignore list in rustfmt.toml
+	cargo +nightly fmt $(PACKAGE) --check
 
 check-clippy: $(IPC_ACTORS_GEN)
 	@# --all actually runs on the whole workspace but since fendermint depends on all, it's okay.

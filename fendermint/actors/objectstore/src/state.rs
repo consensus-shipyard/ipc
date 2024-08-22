@@ -231,7 +231,7 @@ mod tests {
         let mut data = vec![0u8; size];
         rng.fill_bytes(&mut data);
         (
-            Hash(iroh_base::hash::Hash::new(&data).as_bytes().clone()),
+            Hash(*iroh_base::hash::Hash::new(&data).as_bytes()),
             size as u64,
         )
     }
@@ -250,12 +250,12 @@ mod tests {
 
     fn object_one() -> Object {
         let data = [1, 2, 3, 4, 5];
-        let hash = iroh_base::hash::Hash::new(&data);
+        let hash = iroh_base::hash::Hash::new(data);
         let mut metadata = HashMap::<String, String>::new();
         metadata.insert("_created".to_string(), String::from("1718464344"));
         metadata.insert("_modified".to_string(), String::from("1718464345"));
         Object {
-            hash: Hash(hash.as_bytes().clone()),
+            hash: Hash(*hash.as_bytes()),
             size: data.len(),
             metadata,
             resolved: false,
@@ -266,12 +266,12 @@ mod tests {
 
     fn object_two() -> Object {
         let data = [6, 7, 8, 9, 10, 11];
-        let hash = iroh_base::hash::Hash::new(&data);
+        let hash = iroh_base::hash::Hash::new(data);
         let mut metadata = HashMap::<String, String>::new();
         metadata.insert("_created".to_string(), String::from("1718464456"));
         metadata.insert("_modified".to_string(), String::from("1718480987"));
         Object {
-            hash: Hash(hash.as_bytes().clone()),
+            hash: Hash(*hash.as_bytes()),
             size: data.len(),
             metadata,
             resolved: false,
@@ -280,12 +280,12 @@ mod tests {
 
     fn object_three() -> Object {
         let data = [11, 12, 13, 14, 15, 16, 17];
-        let hash = iroh_base::hash::Hash::new(&data);
+        let hash = iroh_base::hash::Hash::new(data);
         let mut metadata = HashMap::<String, String>::new();
         metadata.insert("_created".to_string(), String::from("1718465678"));
         metadata.insert("_modified".to_string(), String::from("1718512346"));
         Object {
-            hash: Hash(hash.as_bytes().clone()),
+            hash: Hash(*hash.as_bytes()),
             size: data.len(),
             metadata,
             resolved: false,

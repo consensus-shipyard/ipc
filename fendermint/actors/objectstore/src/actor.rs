@@ -247,7 +247,7 @@ mod tests {
         let mut data = vec![0u8; size];
         rng.fill_bytes(&mut data);
         (
-            Hash(iroh_base::hash::Hash::new(&data).as_bytes().clone()),
+            Hash(*iroh_base::hash::Hash::new(&data).as_bytes()),
             size as u64,
         )
     }

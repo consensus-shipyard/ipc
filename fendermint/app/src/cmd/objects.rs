@@ -708,9 +708,9 @@ mod tests {
         let key = b"key";
         let params = AddParams {
             to: store,
-            source: fendermint_actor_blobs_shared::PublicKey(iroh.node_id().as_bytes().clone()),
+            source: fendermint_actor_blobs_shared::PublicKey(*iroh.node_id().as_bytes()),
             key: key.to_vec(),
-            hash: fendermint_actor_blobs_shared::Hash(hash.as_bytes().clone()),
+            hash: fendermint_actor_blobs_shared::Hash(*hash.as_bytes()),
             size: 11,
             metadata: HashMap::new(),
             overwrite: true,

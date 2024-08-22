@@ -203,7 +203,7 @@ mod tests {
             let mut rng = rand::thread_rng();
             let mut data = [0u8; 256];
             rng.fill(&mut data);
-            let hash = Hash::new(&data);
+            let hash = Hash::new(data);
             let source = SecretKey::generate().public();
             Self { hash, source }
         }
