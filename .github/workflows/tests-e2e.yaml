@@ -40,8 +40,9 @@ jobs:
         with:
           path: |
             ./contracts/out
+            ./contracts/bindings
             ./contracts/cache
-          key: v1-contracts-abi-${{ hashFiles('./contracts/**/*.sol') }}
+          key: v2-contracts-abi-${{ hashFiles('./contracts/**/*.sol') }}
 
       - name: Cache Cargo Build
         uses: actions/cache@v4
