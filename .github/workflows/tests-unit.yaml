@@ -25,7 +25,7 @@ jobs:
           toolchain: stable
 
       - name: Cache Solidity ABI artifacts
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: ./contracts/out
           key: contracts-abi-${{ hashFiles('./contracts/**/*.sol') }}
