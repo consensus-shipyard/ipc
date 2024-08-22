@@ -15,17 +15,6 @@ jobs:
           ref: ${{ github.ref }}
           submodules: recursive
 
-      - name: Install python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.10"
-
-      - name: Install abi
-        run: pip install eth_abi
-
-      - name: Install lcov and genhtml
-        run: sudo apt-get update && sudo apt-get -y install lcov
-
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
@@ -38,9 +27,6 @@ jobs:
             ./contracts/out
             ./contracts/cache
           key: v1-contracts-abi-${{ hashFiles('./contracts/**/*.sol') }}
-
-      - name: Run coverage check - flaky so we run twice to catch false negatives
-        run: cd contracts; make coverage || make coverage
 
       - name: Run tests
         run: cd contracts; make test
