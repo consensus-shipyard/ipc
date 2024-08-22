@@ -31,7 +31,6 @@ use fvm_ipld_encoding::CborStore;
 use fvm_shared::chainid::ChainID;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
-use fvm_shared::BLOCK_GAS_LIMIT;
 use ipc_actors_abis::i_diamond::FacetCut;
 use num_traits::Zero;
 
@@ -423,10 +422,7 @@ impl GenesisBuilder {
         // initial base fee as defined in [EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)
         let initial_base_fee = TokenAmount::from_atto(1_000_000_000);
         let gas_market_state = fendermint_actor_gas_market::EIP1559GasState::from(
-            fendermint_actor_gas_market::GasActorConstructorParams::new(
-                BLOCK_GAS_LIMIT,
-                initial_base_fee,
-            ),
+            fendermint_actor_gas_market::GasActorConstructorParams::new(initial_base_fee),
         );
         state
             .create_custom_actor(
