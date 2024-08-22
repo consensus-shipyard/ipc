@@ -176,8 +176,8 @@ tracing-subscriber = { version = "0.3", features = [
 tracing-appender = "0.2.3"
 url = { version = "2.4.1", features = ["serde"] }
 zeroize = "1.6"
-iroh = "0.22"
-iroh-base = "0.22"
+iroh = "0.23"
+iroh-base = "0.23"
 
 # Workspace deps
 ipc-api = { path = "ipc/api" }

@@ -39,7 +39,7 @@ make docker-build
 wallet_addresses=()
 for i in {0..2}
 do
-  addr=$(jq .["$i"].address "$IPC_CONFIG_FOLDER"/evm_keystore.json | tr -d '"')
+  addr=$(jq .["$i"].address < "$IPC_CONFIG_FOLDER"/evm_keystore.json | tr -d '"')
   wallet_addresses+=("$addr")
 done
 
@@ -67,6 +67,7 @@ do
 done
 
 # Start bootstrap validator
+cd "$IPC_FOLDER"
 bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=validator-0 \
     -e PRIVATE_KEY_PATH="$IPC_CONFIG_FOLDER"/validator_0.sk \
@@ -91,6 +92,7 @@ bootstrap_node_endpoint=${bootstrap_node_id}@validator-0-cometbft:${CMT_P2P_HOST
 bootstrap_resolver_endpoint="/dns/validator-0-fendermint/tcp/${RESOLVER_HOST_PORTS[0]}/p2p/${bootstrap_peer_id}"
 
 # Start other validators
+cd "$IPC_FOLDER"
 for i in {1..2}
 do
   cargo make --makefile infra/fendermint/Makefile.toml \
@@ -115,6 +117,7 @@ do
 done
 
 # Start prometheus
+cd "$IPC_FOLDER"
 cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=prometheus \
     -e SUBNET_ID="$subnet_id" \
@@ -123,6 +126,7 @@ cargo make --makefile infra/fendermint/Makefile.toml \
     prometheus-start
 
 # Start grafana
+cd "$IPC_FOLDER"
 cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=grafana \
     -e SUBNET_ID="$subnet_id" \
@@ -130,6 +134,7 @@ cargo make --makefile infra/fendermint/Makefile.toml \
     grafana-start
 
 # Start loki
+cd "$IPC_FOLDER"
 cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=loki \
     -e SUBNET_ID="$subnet_id" \
@@ -206,10 +211,10 @@ Grafana API:
 http://localhost:${GRAFANA_HOST_PORT}
 
 Accounts:
-$(jq -r '.app_state.accounts[] | "\(.meta.Account.owner): \(.balance) coin units"' "$subnet_folder"/validator-0/genesis.json)
+$(jq -r '.app_state.accounts[] | "\(.meta.Account.owner): \(.balance) coin units"' < "$subnet_folder"/validator-0/genesis.json)
 
 Private keys (hex ready to use with ADM SDK/CLI):
-$(jq .[0].private_key "$IPC_CONFIG_FOLDER"/evm_keystore.json | tr -d '"')
-$(jq .[1].private_key "$IPC_CONFIG_FOLDER"/evm_keystore.json | tr -d '"')
-$(jq .[2].private_key "$IPC_CONFIG_FOLDER"/evm_keystore.json | tr -d '"')
+$(jq .[0].private_key < "$IPC_CONFIG_FOLDER"/evm_keystore.json | tr -d '"')
+$(jq .[1].private_key < "$IPC_CONFIG_FOLDER"/evm_keystore.json | tr -d '"')
+$(jq .[2].private_key < "$IPC_CONFIG_FOLDER"/evm_keystore.json | tr -d '"')
 EOF

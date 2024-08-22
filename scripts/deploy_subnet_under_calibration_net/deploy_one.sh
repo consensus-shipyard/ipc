@@ -25,16 +25,16 @@ IPC_CONFIG_FOLDER=${HOME}/.ipc
 
 wallet_addresses=()
 public_keys=()
-CMT_P2P_HOST_PORTS=(26656 26756 26856)
-CMT_RPC_HOST_PORTS=(26657 26757 26857)
-ETHAPI_HOST_PORTS=(8545 8645 8745)
-RESOLVER_HOST_PORTS=(26655 26755 26855)
-OBJECTS_HOST_PORTS=(8001 8002 8003)
-IROH_RPC_HOST_PORTS=(4921 4922 4923)
+CMT_P2P_HOST_PORT=26656
+CMT_RPC_HOST_PORT=26657
+ETHAPI_HOST_PORT=8545
+RESOLVER_HOST_PORT=26655
+OBJECTS_HOST_PORT=8001
+IROH_RPC_HOST_PORT=4921
 
-FENDERMINT_METRICS_HOST_PORTS=(9184 9185 9186)
-IROH_METRICS_HOST_PORTS=(9091 9092 9093)
-PROMTAIL_AGENT_HOST_PORTS=(9080 9081 9082)
+FENDERMINT_METRICS_HOST_PORT=9184
+IROH_METRICS_HOST_PORT=9091
+PROMTAIL_AGENT_HOST_PORT=9080
 
 PROMETHEUS_HOST_PORT=9090
 LOKI_HOST_PORT=3100
@@ -169,13 +169,10 @@ if [ -e "${IPC_CONFIG_FOLDER}" ]; then
     echo "Existing subnet id: $subnet_id"
     # Stop validators
     cd "$IPC_FOLDER"
-    for i in {0..2}
-    do
-      cargo make --makefile infra/fendermint/Makefile.toml \
-          -e NODE_NAME=validator-"$i" \
-          -e SUBNET_ID="$subnet_id" \
-          child-validator-down
-    done
+    cargo make --makefile infra/fendermint/Makefile.toml \
+        -e NODE_NAME=validator-0 \
+        -e SUBNET_ID="$subnet_id" \
+        child-validator-down
 fi
 
 # Remove existing deployment
@@ -200,8 +197,8 @@ cd "${IPC_FOLDER}"/ipc
 make install
 
 # Prepare wallet by using existing wallet json file
-echo "$DASHES Using 3 addresses in wallet..."
-for i in {0..2}
+echo "$DASHES Using 2 addresses in wallet..."
+for i in {0..1}
 do
   addr=$(jq .["$i"].address < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
   wallet_addresses+=("$addr")
@@ -212,12 +209,9 @@ done
 default_wallet_address=${wallet_addresses[0]}
 echo "Default wallet address: $default_wallet_address"
 
-# Export validator private keys into files
-for i in {0..2}
-do
-  ipc-cli wallet export --wallet-type evm --address "${wallet_addresses[i]}" --hex > "${IPC_CONFIG_FOLDER}"/validator_"${i}".sk
-  echo "Export private key for ${wallet_addresses[i]} to ${IPC_CONFIG_FOLDER}/validator_${i}.sk"
-done
+# Export validator private key into file
+ipc-cli wallet export --wallet-type evm --address "$default_wallet_address" --hex > "${IPC_CONFIG_FOLDER}"/validator_0.sk
+echo "Export private key for $default_wallet_address to ${IPC_CONFIG_FOLDER}/validator_0.sk"
 
 # Update IPC config file with parent auth token
 toml set "${IPC_CONFIG_FOLDER}"/config.toml subnets[0].config.auth_token "$PARENT_HTTP_AUTH_TOKEN" > /tmp/config.toml.0
@@ -246,7 +240,7 @@ cp /tmp/config.toml.2 "${IPC_CONFIG_FOLDER}"/config.toml
 
 # Create a subnet
 echo "$DASHES Creating a child subnet..."
-create_subnet_output=$(ipc-cli subnet create --from "$default_wallet_address" --parent /r314159 --min-validators 2 --min-validator-stake 1 --bottomup-check-period 600 --active-validators-limit 3 --permission-mode federated --supply-source-kind erc20 --supply-source-address "$SUPPLY_SOURCE_ADDRESS" 2>&1)
+create_subnet_output=$(ipc-cli subnet create --from "$default_wallet_address" --parent /r314159 --min-validators 1 --min-validator-stake 1 --bottomup-check-period 600 --active-validators-limit 2 --permission-mode federated --supply-source-kind erc20 --supply-source-address "$SUPPLY_SOURCE_ADDRESS" 2>&1)
 echo "$create_subnet_output"
 # shellcheck disable=SC2086
 subnet_id=$(echo $create_subnet_output | sed 's/.*with id: \([^ ]*\).*/\1/')
@@ -257,7 +251,7 @@ toml set "${IPC_CONFIG_FOLDER}"/config.toml subnets[1].id "$subnet_id" > /tmp/co
 cp /tmp/config.toml.3 "${IPC_CONFIG_FOLDER}"/config.toml
 
 # Set federated power
-ipc-cli subnet set-federated-power --from "$default_wallet_address" --subnet "$subnet_id" --validator-addresses "${wallet_addresses[@]}" --validator-pubkeys "${public_keys[@]}" --validator-power 1 1 1
+ipc-cli subnet set-federated-power --from "$default_wallet_address" --subnet "$subnet_id" --validator-addresses "${wallet_addresses[@]}" --validator-pubkeys "${public_keys[@]}" --validator-power 1 1
 
 # Rebuild fendermint docker
 cd "${IPC_FOLDER}"/fendermint
@@ -275,15 +269,15 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=validator-0 \
     -e PRIVATE_KEY_PATH="${IPC_CONFIG_FOLDER}"/validator_0.sk \
     -e SUBNET_ID="${subnet_id}" \
-    -e CMT_P2P_HOST_PORT="${CMT_P2P_HOST_PORTS[0]}" \
-    -e CMT_RPC_HOST_PORT="${CMT_RPC_HOST_PORTS[0]}" \
-    -e ETHAPI_HOST_PORT="${ETHAPI_HOST_PORTS[0]}" \
-    -e RESOLVER_HOST_PORT="${RESOLVER_HOST_PORTS[0]}" \
-    -e OBJECTS_HOST_PORT="${OBJECTS_HOST_PORTS[0]}" \
-    -e IROH_RPC_HOST_PORT="${IROH_RPC_HOST_PORTS[0]}" \
-    -e FENDERMINT_METRICS_HOST_PORT="${FENDERMINT_METRICS_HOST_PORTS[0]}" \
-    -e IROH_METRICS_HOST_PORT="${IROH_METRICS_HOST_PORTS[0]}" \
-    -e PROMTAIL_AGENT_HOST_PORT="${PROMTAIL_AGENT_HOST_PORTS[0]}" \
+    -e CMT_P2P_HOST_PORT="${CMT_P2P_HOST_PORT}" \
+    -e CMT_RPC_HOST_PORT="${CMT_RPC_HOST_PORT}" \
+    -e ETHAPI_HOST_PORT="${ETHAPI_HOST_PORT}" \
+    -e RESOLVER_HOST_PORT="${RESOLVER_HOST_PORT}" \
+    -e OBJECTS_HOST_PORT="${OBJECTS_HOST_PORT}" \
+    -e IROH_RPC_HOST_PORT="${IROH_RPC_HOST_PORT}" \
+    -e FENDERMINT_METRICS_HOST_PORT="${FENDERMINT_METRICS_HOST_PORT}" \
+    -e IROH_METRICS_HOST_PORT="${IROH_METRICS_HOST_PORT}" \
+    -e PROMTAIL_AGENT_HOST_PORT="${PROMTAIL_AGENT_HOST_PORT}" \
     -e PROMTAIL_CONFIG_FOLDER="${IPC_CONFIG_FOLDER}" \
     -e PARENT_HTTP_AUTH_TOKEN="${PARENT_HTTP_AUTH_TOKEN}" \
     -e PARENT_REGISTRY="${PARENT_REGISTRY_ADDRESS}" \
@@ -295,39 +289,10 @@ echo "$bootstrap_output"
 bootstrap_node_id=$(echo "$bootstrap_output" | sed -n '/CometBFT node ID:/ {n;p;}' | tr -d "[:blank:]")
 bootstrap_peer_id=$(echo "$bootstrap_output" | sed -n '/IPLD Resolver Multiaddress:/ {n;p;}' | tr -d "[:blank:]" | sed 's/.*\/p2p\///')
 echo "Bootstrap node started. Node id ${bootstrap_node_id}, peer id ${bootstrap_peer_id}"
-bootstrap_node_endpoint=${bootstrap_node_id}@validator-0-cometbft:${CMT_P2P_HOST_PORTS[0]}
+bootstrap_node_endpoint=${bootstrap_node_id}@validator-0-cometbft:${CMT_P2P_HOST_PORT}
 echo "Bootstrap node endpoint: ${bootstrap_node_endpoint}"
-bootstrap_resolver_endpoint="/dns/validator-0-fendermint/tcp/${RESOLVER_HOST_PORTS[0]}/p2p/${bootstrap_peer_id}"
+bootstrap_resolver_endpoint="/dns/validator-0-fendermint/tcp/${RESOLVER_HOST_PORT}/p2p/${bootstrap_peer_id}"
 echo "Bootstrap resolver endpoint: ${bootstrap_resolver_endpoint}"
-
-# Start other validator node
-echo "$DASHES Start the other validator nodes"
-cd "${IPC_FOLDER}"
-for i in {1..2}
-do
-  cargo make --makefile infra/fendermint/Makefile.toml \
-      -e NODE_NAME=validator-"${i}" \
-      -e PRIVATE_KEY_PATH="${IPC_CONFIG_FOLDER}"/validator_"${i}".sk \
-      -e SUBNET_ID="${subnet_id}" \
-      -e CMT_P2P_HOST_PORT="${CMT_P2P_HOST_PORTS[i]}" \
-      -e CMT_RPC_HOST_PORT="${CMT_RPC_HOST_PORTS[i]}" \
-      -e ETHAPI_HOST_PORT="${ETHAPI_HOST_PORTS[i]}" \
-      -e RESOLVER_HOST_PORT="${RESOLVER_HOST_PORTS[i]}" \
-      -e OBJECTS_HOST_PORT="${OBJECTS_HOST_PORTS[i]}" \
-      -e IROH_RPC_HOST_PORT="${IROH_RPC_HOST_PORTS[i]}" \
-      -e FENDERMINT_METRICS_HOST_PORT="${FENDERMINT_METRICS_HOST_PORTS[i]}" \
-      -e IROH_METRICS_HOST_PORT="${IROH_METRICS_HOST_PORTS[i]}" \
-      -e PROMTAIL_AGENT_HOST_PORT="${PROMTAIL_AGENT_HOST_PORTS[i]}" \
-      -e PROMTAIL_CONFIG_FOLDER="${IPC_CONFIG_FOLDER}" \
-      -e RESOLVER_BOOTSTRAPS="${bootstrap_resolver_endpoint}" \
-      -e BOOTSTRAPS="${bootstrap_node_endpoint}" \
-      -e PARENT_HTTP_AUTH_TOKEN="${PARENT_HTTP_AUTH_TOKEN}" \
-      -e PARENT_REGISTRY="${PARENT_REGISTRY_ADDRESS}" \
-      -e PARENT_GATEWAY="${PARENT_GATEWAY_ADDRESS}" \
-      -e FM_PULL_SKIP=1 \
-      -e FM_LOG_LEVEL="info" \
-      child-validator
-done
 
 # Start prometheus
 cd "$IPC_FOLDER"
@@ -356,33 +321,24 @@ cargo make --makefile infra/fendermint/Makefile.toml \
     loki-start
 
 # Test ETH API endpoint
-echo "$DASHES Test ETH API endpoints of validator nodes"
-for i in {0..2}
-do
-  curl --location http://localhost:"${ETHAPI_HOST_PORTS[i]}" \
-  --header 'Content-Type: application/json' \
-  --data '{
-    "jsonrpc":"2.0",
-    "method":"eth_blockNumber",
-    "params":[],
-    "id":83
-  }'
-done
+echo "$DASHES Test ETH API endpoint of validator node"
+curl --location http://localhost:"${ETHAPI_HOST_PORT}" \
+--header 'Content-Type: application/json' \
+--data '{
+  "jsonrpc":"2.0",
+  "method":"eth_blockNumber",
+  "params":[],
+  "id":83
+}'
 
 # Test Object API endpoint
-echo "$DASHES Test Object API endpoints of validator nodes"
-for i in {0..2}
-do
-  curl --location http://localhost:"${OBJECTS_HOST_PORTS[i]}"/health
-done
+echo "$DASHES Test Object API endpoint of validator node"
+curl --location http://localhost:"${OBJECTS_HOST_PORT}"/health
 
 # Test Prometheus endpoints
 printf "\n%s Test Prometheus endpoints of validator nodes\n" $DASHES
 curl --location http://localhost:"${PROMETHEUS_HOST_PORT}"/graph
-for i in {0..2}
-do
-  curl --location http://localhost:"${FENDERMINT_METRICS_HOST_PORTS[i]}"/metrics
-done
+curl --location http://localhost:"${FENDERMINT_METRICS_HOST_PORT}"/metrics
 
 # Kill existing relayer if there's one
 pkill -f "relayer" || true
@@ -401,27 +357,19 @@ Subnet ID:
 $subnet_id
 
 Chain ID:
-$(curl -s --location --request POST http://localhost:"${ETHAPI_HOST_PORTS[0]}" --header 'Content-Type: application/json' --data-raw '{ "jsonrpc":"2.0", "method":"eth_chainId", "params":[], "id":1 }' | jq -r '.result' | xargs printf "%d")
+$(curl -s --location --request POST http://localhost:"${ETHAPI_HOST_PORT}" --header 'Content-Type: application/json' --data-raw '{ "jsonrpc":"2.0", "method":"eth_chainId", "params":[], "id":1 }' | jq -r '.result' | xargs printf "%d")
 
 Object API:
-http://localhost:${OBJECTS_HOST_PORTS[0]}
-http://localhost:${OBJECTS_HOST_PORTS[1]}
-http://localhost:${OBJECTS_HOST_PORTS[2]}
+http://localhost:${OBJECTS_HOST_PORT}
 
 Iroh API:
-http://localhost:${IROH_RPC_HOST_PORTS[0]}
-http://localhost:${IROH_RPC_HOST_PORTS[1]}
-http://localhost:${IROH_RPC_HOST_PORTS[2]}
+http://localhost:${IROH_RPC_HOST_PORT}
 
 ETH API:
-http://localhost:${ETHAPI_HOST_PORTS[0]}
-http://localhost:${ETHAPI_HOST_PORTS[1]}
-http://localhost:${ETHAPI_HOST_PORTS[2]}
+http://localhost:${ETHAPI_HOST_PORT}
 
 CometBFT API:
-http://localhost:${CMT_RPC_HOST_PORTS[0]}
-http://localhost:${CMT_RPC_HOST_PORTS[1]}
-http://localhost:${CMT_RPC_HOST_PORTS[2]}
+http://localhost:${CMT_RPC_HOST_PORT}
 
 Prometheus API:
 http://localhost:${PROMETHEUS_HOST_PORT}
