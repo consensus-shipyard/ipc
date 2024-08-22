@@ -13,7 +13,7 @@ pub mod blobs {
 
     pub const ADD_BLOB_METHOD: u64 = frc42_dispatch::method_hash!("AddBlob");
     pub const DELETE_BLOB_METHOD: u64 = frc42_dispatch::method_hash!("DeleteBlob");
-    // pub const GET_BLOB_METHOD: u64 = frc42_dispatch::method_hash!("GetBlob");
+    pub const GET_BLOB_METHOD: u64 = frc42_dispatch::method_hash!("GetBlob");
 
     /// Account storage and credit details.
     #[derive(Clone, Debug, PartialEq, Serialize_tuple, Deserialize_tuple)]
@@ -45,4 +45,24 @@ pub mod blobs {
     #[derive(Clone, Debug, Serialize, Deserialize)]
     #[serde(transparent)]
     pub struct DeleteBlobParams(pub Cid);
+
+    /// Params for getting a blob.
+    #[derive(Clone, Debug, Serialize, Deserialize)]
+    #[serde(transparent)]
+    pub struct GetBlobParams(pub Cid);
+
+    /// The stored representation of a blob.
+    /// Copied from fendermint/actors/blobs/src/state.rs
+    #[derive(Clone, Debug, PartialEq, Serialize_tuple, Deserialize_tuple)]
+    pub struct Blob {
+        /// The size of the content.
+        pub size: u64,
+        /// Expiry block.
+        pub expiry: ChainEpoch,
+        /// TODO: add subs
+        //pub subs: HashMap<Address, Subscription>,
+        /// Whether the blob has been resolved.
+        /// TODO: change to enum: resolving, resolved, failed
+        pub resolved: bool,
+    }
 }

@@ -5,7 +5,7 @@
 use cid::Cid;
 use fendermint_actor_machine::{ConstructorParams, MachineActor};
 use fil_actors_runtime::{
-    actor_dispatch, actor_error, extract_send_result,
+    actor_dispatch, actor_error, deserialize_block, extract_send_result,
     runtime::{ActorCode, Runtime},
     ActorDowncast, ActorError, FIRST_EXPORTED_METHOD_NUMBER, INIT_ACTOR_ADDR,
 };
@@ -13,9 +13,10 @@ use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_ipld_hamt::BytesKey;
 use fvm_shared::{error::ExitCode, MethodNum};
 
+use crate::ext::blobs::Blob;
 use crate::{
-    ext, AddParams, DeleteParams, GetParams, ListParams, Method, Object, ObjectList, State,
-    OBJECTSTORE_ACTOR_NAME,
+    ext, AddParams, DeleteParams, GetParams, GotObject, ListParams, Method, Object, ObjectList,
+    State, OBJECTSTORE_ACTOR_NAME,
 };
 
 #[cfg(feature = "fil-actor")]
@@ -117,23 +118,27 @@ impl Actor {
         Ok(res.1)
     }
 
-    // TODO: fetch blob from blobs actor
-    // TODO SU: How is Blob included in Object?? Shall we return Blob??
-    // TODO SU: Delete the comment below.
-    // From Sander: I think here we need to:
-    //
-    // Look up the Object in this actor's State
-    // Use it's cid to lookup the Blob from blob actor
-    // Return some new struct that includes the Blob and the Object's metadata (which is the only state that won't exist on Blob. We can clean up the Object struct to just be cid and metadata.
-    fn get_object(rt: &impl Runtime, params: GetParams) -> Result<Option<Object>, ActorError> {
+    fn get_object(rt: &impl Runtime, params: GetParams) -> Result<Option<GotObject>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-
-        let st: State = rt.state()?;
-        st.get(rt.store(), &BytesKey(params.key))
-            .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get object"))
+        if let Some(object) = Self::retrieve_object(rt, &BytesKey(params.key))? {
+            let cid = Self::cid_from_object(object.clone())?;
+            let blob = deserialize_block::<Blob>(extract_send_result(rt.send_simple(
+                &ext::blobs::BLOBS_ACTOR_ADDR,
+                ext::blobs::GET_BLOB_METHOD,
+                IpldBlock::serialize_cbor(&ext::blobs::GetBlobParams(cid))?,
+                rt.message().value_received(),
+            ))?)?;
+            Ok(Some(GotObject {
+                size: blob.size,
+                expiry: blob.expiry,
+                cid: object.cid,
+                metadata: object.metadata,
+            }))
+        } else {
+            Ok(None)
+        }
     }
 
-    // TODO: fetch size from blobs actor?
     fn list_objects(rt: &impl Runtime, params: ListParams) -> Result<ObjectList, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let st: State = rt.state()?;
@@ -206,22 +211,25 @@ impl ActorCode for Actor {
 
 #[cfg(test)]
 mod tests {
+    use cid::{multihash, Cid};
+    use fendermint_actor_machine::WriteAccess;
     use fil_actors_evm_shared::address::EthAddress;
+    use fil_actors_runtime::runtime::Runtime;
     use fil_actors_runtime::test_utils::{
         expect_empty, MockRuntime, ETHACCOUNT_ACTOR_CODE_ID, SYSTEM_ACTOR_CODE_ID,
     };
     use fil_actors_runtime::INIT_ACTOR_ADDR;
     use fvm_ipld_encoding::ipld_block::IpldBlock;
+    use fvm_ipld_encoding::serde_bytes::ByteBuf;
     use fvm_shared::address::Address;
+    use fvm_shared::clock::ChainEpoch;
     use fvm_shared::econ::TokenAmount;
-
-    use crate::{actor::Actor, ext, AddParams, DeleteParams, Method, State};
-    use cid::{multihash, Cid};
-    use fendermint_actor_machine::WriteAccess;
-    use fil_actors_runtime::runtime::Runtime;
     use fvm_shared::error::ExitCode;
     use rand::Rng;
     use std::collections::HashMap;
+
+    use crate::ext::blobs::Blob;
+    use crate::{actor::Actor, ext, AddParams, DeleteParams, GetParams, GotObject, Method, State};
 
     fn construct_and_verify(creator: Address) -> MockRuntime {
         let rt = MockRuntime {
@@ -530,5 +538,114 @@ mod tests {
             IpldBlock::serialize_cbor(&delete_params).unwrap(),
         );
         assert!(result_delete.is_ok());
+    }
+
+    #[test]
+    pub fn test_get_object_none() {
+        let id_addr = Address::new_id(110);
+        let eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000000"
+        ));
+        let f4_eth_addr = Address::new_delegated(10, &eth_addr.0).unwrap();
+
+        let rt = construct_and_verify(f4_eth_addr);
+        rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
+        rt.set_origin(id_addr);
+        rt.expect_validate_caller_any();
+        let get_params = GetParams { key: vec![0, 1, 2] };
+        let result = rt
+            .call::<Actor>(
+                Method::GetObject as u64,
+                IpldBlock::serialize_cbor(&get_params).unwrap(),
+            )
+            .unwrap()
+            .unwrap()
+            .deserialize::<Option<GotObject>>();
+        assert!(result.is_ok());
+        assert_eq!(result, Ok(None));
+    }
+
+    #[test]
+    pub fn test_get_object() {
+        let id_addr = Address::new_id(110);
+        let eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000000"
+        ));
+        let f4_eth_addr = Address::new_delegated(10, &eth_addr.0).unwrap();
+
+        let rt = construct_and_verify(f4_eth_addr);
+        rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
+        rt.set_origin(id_addr);
+        rt.expect_validate_caller_any();
+        let key = vec![0, 1, 2];
+        let cid = new_cid();
+
+        // Prerequisite for a delete operation: add to have a proper state of the actor.
+        let add_params: AddParams = AddParams {
+            store: f4_eth_addr,
+            key: key.clone(),
+            cid,
+            size: 20,
+            metadata: HashMap::new(),
+            overwrite: false,
+        };
+        rt.expect_send_simple(
+            ext::blobs::BLOBS_ACTOR_ADDR,
+            ext::blobs::ADD_BLOB_METHOD,
+            IpldBlock::serialize_cbor(&ext::blobs::AddBlobParams {
+                cid: add_params.cid,
+                size: add_params.size as u64,
+                expiry: 100,
+                source: Some(add_params.store),
+            })
+            .unwrap(),
+            TokenAmount::from_whole(0),
+            None,
+            ExitCode::OK,
+        );
+        rt.call::<Actor>(
+            Method::AddObject as u64,
+            IpldBlock::serialize_cbor(&add_params).unwrap(),
+        )
+        .unwrap()
+        .unwrap()
+        .deserialize::<Cid>()
+        .unwrap();
+
+        rt.expect_validate_caller_any();
+        let blob = Blob {
+            size: 10,
+            expiry: 1 as ChainEpoch,
+            resolved: true,
+        };
+        rt.expect_send_simple(
+            ext::blobs::BLOBS_ACTOR_ADDR,
+            ext::blobs::GET_BLOB_METHOD,
+            IpldBlock::serialize_cbor(&ext::blobs::GetBlobParams(add_params.cid)).unwrap(),
+            TokenAmount::from_whole(0),
+            IpldBlock::serialize_cbor(&Some(&blob)).unwrap(),
+            ExitCode::OK,
+        );
+        let get_params = GetParams { key };
+        let result = rt
+            .call::<Actor>(
+                Method::GetObject as u64,
+                IpldBlock::serialize_cbor(&get_params).unwrap(),
+            )
+            .unwrap()
+            .unwrap()
+            .deserialize::<Option<GotObject>>();
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            Some(GotObject {
+                size: blob.size,
+                expiry: blob.expiry,
+                cid: ByteBuf(cid.to_bytes()),
+                metadata: add_params.metadata
+            })
+        );
     }
 }
