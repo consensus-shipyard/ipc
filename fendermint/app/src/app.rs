@@ -18,15 +18,15 @@ use fendermint_vm_interpreter::bytes::{
 };
 use fendermint_vm_interpreter::chain::{ChainEnv, ChainMessageApplyRet, IllegalMessage};
 use fendermint_vm_interpreter::fvm::state::{
-    empty_state_tree, CheckStateRef, FvmExecState, FvmGenesisState, FvmQueryState, FvmStateParams,
+    empty_state_tree, CheckStateRef, FvmExecState, FvmQueryState, FvmStateParams,
     FvmUpdatableParams,
 };
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
-use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmGenesisOutput, PowerUpdates};
+use fendermint_vm_interpreter::fvm::{FvmApplyRet, PowerUpdates};
 use fendermint_vm_interpreter::genesis::{read_genesis_car, GenesisAppState};
 use fendermint_vm_interpreter::signed::InvalidSignature;
 use fendermint_vm_interpreter::{
-    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
+    CheckInterpreter, ExecInterpreter, ProposalInterpreter, QueryInterpreter,
 };
 use fendermint_vm_message::query::FvmQueryHeight;
 use fendermint_vm_snapshot::{SnapshotClient, SnapshotError};
@@ -402,11 +402,6 @@ where
     S::Namespace: Sync + Send,
     DB: KVWritable<S> + KVReadable<S> + Clone + Send + Sync + 'static,
     SS: Blockstore + Clone + Send + Sync + 'static,
-    I: GenesisInterpreter<
-        State = FvmGenesisState<SS>,
-        Genesis = Vec<u8>,
-        Output = FvmGenesisOutput,
-    >,
     I: ProposalInterpreter<State = ChainEnv, Message = Vec<u8>>,
     I: ExecInterpreter<
         State = (ChainEnv, FvmExecState<SS>),

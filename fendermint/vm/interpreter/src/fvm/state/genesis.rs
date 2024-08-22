@@ -166,17 +166,6 @@ where
         Ok(())
     }
 
-    /// Flush the data to the block store.
-    pub fn commit(self) -> anyhow::Result<Cid> {
-        match self.stage {
-            Stage::Tree(mut state_tree) => Ok(state_tree.flush()?),
-            Stage::Exec(exec_state) => match exec_state.commit()? {
-                (_, _, true) => bail!("FVM parameters are not expected to be updated in genesis"),
-                (cid, _, _) => Ok(cid),
-            },
-        }
-    }
-
     /// Flush the data to the block store. Returns the state root cid and the underlying state store.
     pub fn finalize(self) -> anyhow::Result<(Cid, DB)> {
         match self.stage {
