@@ -43,6 +43,7 @@ jobs:
 
       - name: Cache Cargo Build
         uses: actions/cache@v4
+        if: always()
         with:
           path: |
             /home/runner/.cargo/registry
@@ -55,6 +56,7 @@ jobs:
 
       - name: Cache Solidity ABI artifacts
         uses: actions/cache@v4
+        if: always()
         with:
           path: |
             ./contracts/out
@@ -119,6 +121,9 @@ jobs:
             -f /tmp/Dockerfile \
             -t fendermint:latest \
             .
+
+      - name: Create artifacts directory
+        run: mkdir /artifacts
 
       - name: Export Docker image
         run: docker save fendermint:latest > /artifacts/docker-image.tar
