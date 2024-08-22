@@ -67,7 +67,7 @@ jobs:
             ./contracts/out
             ./contracts/bindings
           ## TODO maybe add the rust version and solc version to the key
-          key: contracts-abi-${{ hashFiles('./contracts/**/*.sol') }}
+          key: v1-contracts-abi-${{ hashFiles('./contracts/**/*.sol') }}
 
       - name: Generate ABI and bindings
         run: cd contracts && make gen
