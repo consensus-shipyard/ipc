@@ -1,5 +1,4 @@
-
-name: License CI
+name: Check licenses
 
 # This workflow is triggered from the main CI workflow.
 on:

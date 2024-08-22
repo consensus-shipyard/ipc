@@ -7,9 +7,15 @@ default:
 	./target/release/ipc-cli --version
 	./target/release/fendermint --version
 
-SUBTREES := fendermint ipc ipld/resolver contracts
+SUBTREES_RUST := fendermint ipc ipld/resolver
+SUBTREES_CONTRACTS := contracts
+SUBTREES_ALL := $(SUBTREES_RUST) $(SUBTREES_CONTRACTS)
 
-test: $(patsubst %, test/%, $(SUBTREES))
+test: test-rust test-contracts
+
+test-rust: $(patsubst %, test/%, $(SUBTREES_RUST))
+
+test-contracts: $(patsubst %, test/%, $(SUBTREES_CONTRACTS))
 
 # Using `cd` instead of `-C` so $(PWD) is correct.
 test/%:
@@ -21,4 +27,4 @@ lint/%:
 license:
 	./scripts/add_license.sh
 
-lint: license $(patsubst %, lint/%, $(SUBTREES))
+lint: license $(patsubst %, lint/%, $(SUBTREES_ALL))
