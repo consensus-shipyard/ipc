@@ -23,7 +23,7 @@ PROMETHEUS_HOST_PORT=9090
 LOKI_HOST_PORT=3100
 GRAFANA_HOST_PORT=3000
 
-if [[ "$SKIP_BUILD" == "" || "$SKIP_BUILD" == "false" ]]; then 
+if [[ -z "${SKIP_BUILD}" || "$SKIP_BUILD" == "" || "$SKIP_BUILD" == "false" ]]; then 
   echo "$DASHES starting build for ipc contracts and fendermint $DASHES"
   # Build IPC contracts
   cd "$IPC_FOLDER"/contracts
@@ -51,16 +51,10 @@ do
   ipc-cli wallet export --wallet-type evm --address "${wallet_addresses[i]}" --hex > "$IPC_CONFIG_FOLDER"/validator_"$i".sk
 done
 
-# Init validators
-cd "$IPC_FOLDER"
-for i in {0..2}
-do
-  cargo make --makefile infra/fendermint/Makefile.toml \
-      -e NODE_NAME=validator-"$i" \
-      -e SUBNET_ID="$subnet_id" \
-      -e FM_PULL_SKIP=1 \
-      child-validator-no-parent-init
-done
+# note: we want to include anvil in the docker network, and the subnet
+# doesn't exist at that point because anvil is the parent chain, but
+# the value is always the same in our local subnet
+subnet_id="/r31337/t410f6dl55afbyjbpupdtrmedyqrnmxdmpk7rxuduafq"
 
 # Prepare wallet by using existing wallet json file
 wallet_addresses=()
@@ -86,11 +80,9 @@ done
 echo "starting anvil"
 # Step 1 Start Anvil
 cd "$IPC_FOLDER"
-# note: we want to include anvil in the docker network, and the subnet
-# doesn't exist yet but the value is always the same in our local subnet
 cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=anvil \
-    -e SUBNET_ID="/r31337/t410f6dl55afbyjbpupdtrmedyqrnmxdmpk7rxuduafq" \
+    -e SUBNET_ID="$subnet_id" \
     -e ANVIL_HOST_PORT="${ANVIL_HOST_PORT}" \
     anvil-start
 
@@ -141,6 +133,7 @@ echo "$create_subnet_output"
 echo "$DASHES end create_subnet_output $DASHES"
 # Note the output will (sometimes?) be multi line the sed command is expecting a single line
 subnet_id=$(echo "$create_subnet_output" | tr '\n' ' ' | sed 's/.*subnet actor with id: \([^ ]*\).*/\1/')
+# TODO: should check that this matches the expected value
 echo "Created new subnet id: $subnet_id"
 
 # remove any old subnet folder and setup a new one

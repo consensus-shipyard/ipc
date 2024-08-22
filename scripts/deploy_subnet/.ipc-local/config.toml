@@ -1,0 +1,19 @@
+keystore_path = "~/.ipc"
+
+# Anvil root
+[[subnets]]
+id = "/r31337"
+
+[subnets.config]
+network_type = "fevm"
+provider_http = "http://127.0.0.1:8545"
+gateway_addr = ""
+registry_addr = ""
+
+# Local subnet
+[[subnets]]
+id = ""
+
+[subnets.config]
+network_type = "fevm"
+provider_http = ""
