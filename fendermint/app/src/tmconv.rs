@@ -3,10 +3,9 @@
 //! Conversions to Tendermint data types.
 use anyhow::{anyhow, bail, Context};
 use fendermint_vm_core::Timestamp;
-use fendermint_vm_genesis::{Power, Validator};
 use fendermint_vm_interpreter::fvm::{
     state::{BlockHash, FvmStateParams},
-    FvmApplyRet, FvmCheckRet, FvmQueryRet, PowerUpdates,
+    FvmApplyRet, FvmCheckRet, FvmQueryRet,
 };
 use fendermint_vm_message::signed::DomainHash;
 use fendermint_vm_snapshot::{SnapshotItem, SnapshotManifest};
@@ -146,18 +145,6 @@ pub fn to_check_tx(ret: FvmCheckRet) -> response::CheckTx {
         sender: ret.sender.to_string(),
         ..Default::default()
     }
-}
-
-/// Map the return values from epoch boundary operations to validator updates.
-pub fn to_end_block(power_table: PowerUpdates) -> anyhow::Result<response::EndBlock> {
-    let validator_updates =
-        to_validator_updates(power_table.0).context("failed to convert validator updates")?;
-
-    Ok(response::EndBlock {
-        validator_updates,
-        consensus_param_updates: None,
-        events: Vec::new(), // TODO: Events from epoch transitions?
-    })
 }
 
 /// Map the return values from cron operations.
@@ -317,20 +304,6 @@ pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> anyhow::Result<r
     };
 
     Ok(res)
-}
-
-/// Project Genesis validators to Tendermint.
-pub fn to_validator_updates(
-    validators: Vec<Validator<Power>>,
-) -> anyhow::Result<Vec<tendermint::validator::Update>> {
-    let mut updates = vec![];
-    for v in validators {
-        updates.push(tendermint::validator::Update {
-            pub_key: tendermint::PublicKey::try_from(v.public_key)?,
-            power: tendermint::vote::Power::try_from(v.power.0)?,
-        });
-    }
-    Ok(updates)
 }
 
 pub fn to_timestamp(time: tendermint::time::Time) -> Timestamp {

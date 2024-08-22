@@ -12,6 +12,7 @@ use fvm_shared::{address::Address, ActorID, MethodNum, BLOCK_GAS_LIMIT};
 use ipc_observability::{emit, measure_time, observe::TracingError, Traceable};
 use tendermint_rpc::Client;
 
+use crate::fvm::cometbft::EndBlockUpdate;
 use crate::fvm::gas::GasMarket;
 use crate::ExecInterpreter;
 
@@ -49,7 +50,7 @@ where
     /// Return validator power updates.
     /// Currently ignoring events as there aren't any emitted by the smart contract,
     /// but keep in mind that if there were, those would have to be propagated.
-    type EndOutput = PowerUpdates;
+    type EndOutput = EndBlockUpdate;
 
     async fn begin(
         &self,
@@ -262,6 +263,11 @@ where
             PowerUpdates::default()
         };
 
-        Ok((state, updates))
+        // process cometbft end block updates
+        let mut end_block = EndBlockUpdate::new(updates);
+        self.update_cometbft_consensus_params(&mut state, &mut end_block)
+            .await?;
+
+        Ok((state, end_block))
     }
 }

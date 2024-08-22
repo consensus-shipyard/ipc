@@ -21,13 +21,13 @@ pub type SetConstants = EIP1559Constants;
 /// Constant params used by EIP1559
 #[derive(Serialize_tuple, Deserialize_tuple, Debug, Clone)]
 pub struct EIP1559Constants {
-    block_gas_limit: Gas,
+    pub block_gas_limit: Gas,
     /// The minimal base fee when gas utilization is low
-    minimal_base_fee: TokenAmount,
+    pub minimal_base_fee: TokenAmount,
     /// Elasticity multiplier as defined in [EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)
-    elasticity_multiplier: u64,
+    pub elasticity_multiplier: u64,
     /// Base fee max change denominator as defined in [EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)
-    base_fee_max_change_denominator: u64,
+    pub base_fee_max_change_denominator: u64,
 }
 
 #[derive(Serialize_tuple, Deserialize_tuple, Debug, Clone)]

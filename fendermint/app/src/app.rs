@@ -17,12 +17,13 @@ use fendermint_vm_interpreter::bytes::{
     BytesMessageApplyRes, BytesMessageCheckRes, BytesMessageQuery, BytesMessageQueryRes,
 };
 use fendermint_vm_interpreter::chain::{ChainEnv, ChainMessageApplyRet, IllegalMessage};
+use fendermint_vm_interpreter::fvm::cometbft::{to_validator_updates, EndBlockUpdate};
 use fendermint_vm_interpreter::fvm::state::{
     empty_state_tree, CheckStateRef, FvmExecState, FvmQueryState, FvmStateParams,
     FvmUpdatableParams,
 };
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
-use fendermint_vm_interpreter::fvm::{FvmApplyRet, PowerUpdates};
+use fendermint_vm_interpreter::fvm::FvmApplyRet;
 use fendermint_vm_interpreter::genesis::{read_genesis_car, GenesisAppState};
 use fendermint_vm_interpreter::signed::InvalidSignature;
 use fendermint_vm_interpreter::{
@@ -408,7 +409,7 @@ where
         Message = Vec<u8>,
         BeginOutput = FvmApplyRet,
         DeliverOutput = BytesMessageApplyRes,
-        EndOutput = PowerUpdates,
+        EndOutput = EndBlockUpdate,
     >,
     I: CheckInterpreter<
         State = FvmExecState<ReadOnlyBlockstore<SS>>,
@@ -789,9 +790,7 @@ where
             .await
             .context("end failed")?;
 
-        let r = to_end_block(ret)?;
-
-        Ok(r)
+        Ok(response::EndBlock::try_from(ret)?)
     }
 
     /// Commit the current state at the current height.

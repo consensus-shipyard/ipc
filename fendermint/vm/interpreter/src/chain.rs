@@ -1,8 +1,9 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
+use crate::fvm::cometbft::EndBlockUpdate;
 use crate::fvm::gas::{Gas, GasMarket};
 use crate::fvm::state::ipc::GatewayCaller;
-use crate::fvm::{topdown, FvmApplyRet, PowerUpdates};
+use crate::fvm::{topdown, FvmApplyRet};
 use crate::{
     fvm::state::FvmExecState,
     fvm::FvmMessage,
@@ -245,7 +246,7 @@ where
         Message = VerifiableMessage,
         DeliverOutput = SignedMessageApplyRes,
         State = FvmExecState<DB>,
-        EndOutput = PowerUpdates,
+        EndOutput = EndBlockUpdate,
     >,
 {
     // The state consists of the resolver pool, which this interpreter needs, and the rest of the
@@ -426,8 +427,9 @@ where
         let (state, out) = self.inner.end(state).await?;
 
         // Update any component that needs to know about changes in the power table.
-        if !out.0.is_empty() {
+        if !out.validators.0.is_empty() {
             let power_updates = out
+                .validators
                 .0
                 .iter()
                 .map(|v| {
