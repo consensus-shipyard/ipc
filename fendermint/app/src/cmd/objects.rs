@@ -100,13 +100,13 @@ cmd! {
 
 fn with_client(
     client: FendermintClient,
-) -> impl Filter<Extract=(FendermintClient,), Error=Infallible> + Clone {
+) -> impl Filter<Extract = (FendermintClient,), Error = Infallible> + Clone {
     warp::any().map(move || client.clone())
 }
 
 fn with_iroh(
     client: iroh::client::Iroh,
-) -> impl Filter<Extract=(iroh::client::Iroh,), Error=Infallible> + Clone {
+) -> impl Filter<Extract = (iroh::client::Iroh,), Error = Infallible> + Clone {
     warp::any().map(move || client.clone())
 }
 
@@ -479,7 +479,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
                         "bytes {}-{}/{}",
                         object_range.start, object_range.end, object_range.len
                     ))
-                        .unwrap(),
+                    .unwrap(),
                 );
             } else {
                 header_map.insert("Accept-Ranges", HeaderValue::from_str("bytes").unwrap());
@@ -640,7 +640,7 @@ mod tests {
                 hash,
                 serde_json::to_string_pretty(&source).unwrap(),
             )
-                .as_bytes(),
+            .as_bytes(),
         );
 
         dbg!(std::str::from_utf8(&body)).unwrap();
@@ -778,7 +778,7 @@ mod tests {
             client,
             iroh.client().clone(),
         )
-            .await;
+        .await;
         assert!(result.is_ok());
         let response = result.unwrap().into_response();
         assert_eq!(response.status(), StatusCode::OK);
@@ -817,7 +817,7 @@ mod tests {
             client,
             iroh.client().clone(),
         )
-            .await;
+        .await;
         assert!(result.is_ok(), "{:#?}", result.err());
         let response = result.unwrap().into_response();
         assert_eq!(response.status(), StatusCode::PARTIAL_CONTENT);
@@ -856,7 +856,7 @@ mod tests {
             client,
             iroh.client().clone(),
         )
-            .await;
+        .await;
 
         assert!(result.is_ok());
         let response = result.unwrap().into_response();

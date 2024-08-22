@@ -19,7 +19,7 @@ lint: \
 	check-clippy
 
 check-fmt:
-	cargo fmt $(PACKAGE) --check
+	cargo +nightly fmt $(PACKAGE) --check
 
 check-clippy:
 	cargo clippy $(PACKAGE) --tests --no-deps -- -D clippy::all
