@@ -47,6 +47,9 @@ test: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 
 # Not using --release beause the build has been done in docker and the wasm code runs inside the container.
 e2e: docker-build | cargo-make
+	${MAKE} e2e-only
+
+e2e-only:
 	cd testing/smoke-test    && cargo make --profile $(PROFILE)
 	cd testing/snapshot-test && cargo make --profile $(PROFILE)
 	cd testing/graph-test    && cargo make --profile $(PROFILE)
@@ -97,7 +100,6 @@ docker-build: docker-deps $(FENDERMINT_CODE)
 			-f docker/Dockerfile \
 			-t fendermint:latest $(PWD)/..; \
 	fi
-
 
 # Build a bundle CAR; this is so we don't have to have a project reference,
 # which means we are not tied to the release cycle of both FVM _and_ actors;

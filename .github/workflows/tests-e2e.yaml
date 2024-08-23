@@ -1,0 +1,58 @@
+name: Run e2e tests
+
+# This workflow is triggered from the main CI workflow.
+on:
+  workflow_call:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    env:
+      RUST_BACKTRACE: full
+      RUSTFLAGS: -Dwarnings
+
+    steps:
+      - name: Check out the project
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Install Tools
+        uses: ./.github/actions/install-tools
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          rust: stable
+
+      - name: Download Docker image
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp
+
+      - name: Load Docker image
+        run: |
+          docker load --input /tmp/docker-image.tar
+          docker image ls -a
+
+      - name: Cache Solidity ABI artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ./contracts/out
+            ./contracts/bindings
+            ./contracts/cache
+          key: v2-contracts-abi-${{ hashFiles('./contracts/**/*.sol') }}
+
+      - name: Cache Cargo Build
+        uses: actions/cache@v4
+        with:
+          path: |
+            /home/runner/.cargo/registry
+            /home/runner/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run e2e tests
+        run: cd fendermint && PROFILE=ci make e2e-only
+
