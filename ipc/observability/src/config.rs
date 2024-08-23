@@ -22,10 +22,10 @@ pub enum LogLevel {
     Trace,
 }
 
-impl Into<EnvFilter> for LogLevel {
-    fn into(self) -> EnvFilter {
+impl From<LogLevel> for EnvFilter {
+    fn from(val: LogLevel) -> Self {
         // By default EnvFilter uses INFO, just like our default log level.
-        EnvFilter::try_new(self.to_string()).unwrap_or_default()
+        EnvFilter::try_new(val.to_string()).unwrap_or_default()
     }
 }
 

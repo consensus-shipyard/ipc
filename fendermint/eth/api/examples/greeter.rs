@@ -37,7 +37,7 @@ mod common;
 // Generate a statically typed interface for the contract.
 abigen!(Greeter, "../../testing/contracts/Greeter.abi");
 
-const GREETER_HEX: &'static str = include_str!("../../../testing/contracts/Greeter.bin");
+const GREETER_HEX: &str = include_str!("../../../testing/contracts/Greeter.bin");
 
 #[derive(Parser, Debug)]
 pub struct Options {

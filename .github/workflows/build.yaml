@@ -66,7 +66,16 @@ jobs:
           toolchain: nightly
           components: rustfmt,clippy
 
-      - name: Check fmt (fmt, clippy)
+      - name: Print Rust toolchain default versions
+        run: |
+          echo "rustup show:"
+          rustup show
+          echo "rustc version:"
+          rustc --version
+          echo "cargo version:"
+          cargo -V
+
+      - name: Check fmt (nightly)
         run: cargo +nightly fmt --check --all
 
       - name: Check clippy
