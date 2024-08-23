@@ -6,9 +6,9 @@ use tracing::Level;
 pub use tracing_appender::non_blocking;
 pub use tracing_appender::non_blocking::WorkerGuard;
 use tracing_appender::rolling::RollingFileAppender;
-use tracing_subscriber::{fmt, fmt::Subscriber, layer::SubscriberExt, Layer};
+use tracing_subscriber::{fmt, fmt::Subscriber, layer::SubscriberExt, EnvFilter, Layer};
 
-use crate::config::{level_to_filter, FileLayerSettings, TracingSettings};
+use crate::config::{FileLayerSettings, TracingSettings};
 use crate::tracing_layers::DomainEventFilterLayer;
 
 // Creates a temporary subscriber that logs all traces to stderr. Useful when global tracing is not set yet.
@@ -23,10 +23,12 @@ pub fn create_temporary_subscriber() -> Subscriber {
 
 // Sets a global tracing subscriber with the given configuration. Returns a guard that can be used to drop the subscriber.
 pub fn set_global_tracing_subscriber(config: &TracingSettings) -> Option<WorkerGuard> {
-    let console_filter = match &config.console {
-        Some(console_settings) => console_settings.level_to_filter(),
-        None => level_to_filter(&None),
-    };
+    let console_filter: EnvFilter = config
+        .console
+        .as_ref()
+        .and_then(|c| c.level.clone())
+        .unwrap_or_default()
+        .into();
 
     // log all traces to stderr (reserving stdout for any actual output such as from the CLI commands)
     let console_layer = fmt::layer()
@@ -40,6 +42,8 @@ pub fn set_global_tracing_subscriber(config: &TracingSettings) -> Option<WorkerG
         Some(file_settings) if file_settings.enabled => {
             let (non_blocking, file_guard) = non_blocking(create_file_appender(file_settings));
 
+            let file_filter: EnvFilter = file_settings.level.clone().unwrap_or_default().into();
+
             let file_layer = fmt::layer()
                 .json()
                 .with_writer(non_blocking)
@@ -47,7 +51,7 @@ pub fn set_global_tracing_subscriber(config: &TracingSettings) -> Option<WorkerG
                 .with_target(false)
                 .with_file(true)
                 .with_line_number(true)
-                .with_filter(file_settings.level_to_filter());
+                .with_filter(file_filter);
 
             let domains = file_settings
                 .domain_filter

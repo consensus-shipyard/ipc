@@ -1,4 +1,4 @@
-name: Storage check
+name: 'Contracts: Storage check'
 
 # This workflow is triggered from the main CI workflow.
 on:

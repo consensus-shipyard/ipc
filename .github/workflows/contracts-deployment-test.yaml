@@ -1,4 +1,4 @@
-name: Deployment Test
+name: 'Contracts: Smoke test deployment'
 
 # This workflow is triggered from the main CI workflow.
 on:
