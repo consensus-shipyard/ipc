@@ -1,12 +1,16 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
+
 use std::collections::HashMap;
+use std::net::ToSocketAddrs;
 use std::time::Duration;
 
 use anyhow::anyhow;
 use bloom::{BloomFilter, ASMS};
 use ipc_api::subnet_id::SubnetID;
-use ipfs_api_backend_hyper::{IpfsApi, IpfsClient, TryFromUri};
+use iroh::blobs::Hash;
+use iroh::client::Iroh;
+use iroh::net::NodeAddr;
 use libipld::store::StoreParams;
 use libipld::Cid;
 use libp2p::futures::StreamExt;
@@ -27,10 +31,10 @@ use serde::Serialize;
 use tokio::select;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
-use tokio::sync::oneshot::{self, Sender};
+use tokio::sync::oneshot::Sender;
 
 use crate::behaviour::{
-    self, content, discovery, membership, Behaviour, BehaviourEvent, ConfigError, ContentConfig,
+    content, discovery, membership, Behaviour, BehaviourEvent, ConfigError, ContentConfig,
     DiscoveryConfig, MembershipConfig, NetworkConfig,
 };
 use crate::client::Client;
@@ -41,7 +45,7 @@ use crate::vote_record::{SignedVoteRecord, VoteRecord};
 pub type ResolveResult = anyhow::Result<()>;
 
 /// Channel to complete the results with.
-type ResponseChannel = oneshot::Sender<ResolveResult>;
+type ResponseChannel = Sender<ResolveResult>;
 
 /// State of a query. The fallback peers can be used
 /// if the current attempt fails.
@@ -94,7 +98,7 @@ pub struct Config {
     pub membership: MembershipConfig,
     pub connection: ConnectionConfig,
     pub content: ContentConfig,
-    pub ipfs_addr: String,
+    pub iroh_addr: Option<String>,
 }
 
 /// Internal requests to enqueue to the [`Service`]
@@ -107,7 +111,7 @@ pub(crate) enum Request<V> {
     PinSubnet(SubnetID),
     UnpinSubnet(SubnetID),
     Resolve(Cid, SubnetID, ResponseChannel),
-    ResolveIpfs(Cid, ResponseChannel),
+    ResolveIroh(Hash, NodeAddr, ResponseChannel),
     RateLimitUsed(PeerId, usize),
     UpdateRateLimit(u32),
 }
@@ -143,8 +147,36 @@ where
     background_lookup_filter: BloomFilter,
     /// To limit the number of peers contacted in a Bitswap resolution attempt.
     max_peers_per_query: usize,
-    /// IPFS client
-    ipfs_client: IpfsClient,
+    /// Iroh client
+    iroh: MaybeIroh,
+}
+
+#[derive(Clone, Debug)]
+struct MaybeIroh {
+    addr: Option<String>,
+    client: Option<Iroh>,
+}
+
+impl MaybeIroh {
+    async fn client(&mut self) -> anyhow::Result<Iroh> {
+        if let Some(c) = self.client.clone() {
+            return Ok(c);
+        }
+        if let Some(addr) = self.addr.clone() {
+            let addr = addr.to_socket_addrs()?.next().ok_or(anyhow!(
+                "failed to convert iroh node address to a socket address"
+            ))?;
+            match Iroh::connect_addr(addr).await {
+                Ok(client) => {
+                    self.client = Some(client.clone());
+                    Ok(client)
+                }
+                Err(e) => Err(e),
+            }
+        } else {
+            Err(anyhow!("iroh node address is not configured"))
+        }
+    }
 }
 
 impl<P, V> Service<P, V>
@@ -153,17 +185,17 @@ where
     V: Serialize + DeserializeOwned + Clone + Send + 'static,
 {
     /// Build a [`Service`] and a [`Client`] with the default `tokio` transport.
-    pub fn new<S>(config: Config, store: S) -> Result<Self, ConfigError>
+    pub async fn new<S>(config: Config, store: S) -> Result<Self, ConfigError>
     where
         S: BitswapStore<Params = P>,
     {
-        Self::new_with_transport(config, store, build_transport)
+        Self::new_with_transport(config, store, build_transport).await
     }
 
     /// Build a [`Service`] and a [`Client`] by passing in a transport factory function.
     ///
     /// The main goal is to be facilitate testing with a [`MemoryTransport`].
-    pub fn new_with_transport<S, F>(
+    pub async fn new_with_transport<S, F>(
         config: Config,
         store: S,
         transport: F,
@@ -211,9 +243,6 @@ where
         let (request_tx, request_rx) = mpsc::unbounded_channel();
         let (event_tx, _) = broadcast::channel(config.connection.event_buffer_capacity as usize);
 
-        let ipfs_client = IpfsClient::from_multiaddr_str(&config.ipfs_addr)
-            .expect("failed to create ipfs client");
-
         let service = Self {
             peer_id,
             listen_addr: config.connection.listen_addr,
@@ -227,7 +256,10 @@ where
                 config.connection.expected_peer_count,
             ),
             max_peers_per_query: config.connection.max_peers_per_query as usize,
-            ipfs_client,
+            iroh: MaybeIroh {
+                addr: config.iroh_addr,
+                client: None,
+            },
         };
 
         Ok(service)
@@ -306,7 +338,7 @@ where
                     // All Client instances have been dropped.
                     None => { break; }
                 }
-            };
+            }
         }
         Ok(())
     }
@@ -481,8 +513,8 @@ where
             Request::Resolve(cid, subnet_id, response_channel) => {
                 self.start_query(cid, subnet_id, response_channel)
             }
-            Request::ResolveIpfs(cid, response_channel) => {
-                self.start_ipfs_query(cid, response_channel)
+            Request::ResolveIroh(hash, node_addr, response_channel) => {
+                self.start_iroh_query(hash, node_addr, response_channel)
             }
             Request::RateLimitUsed(peer_id, bytes) => {
                 self.content_mut().rate_limit_used(peer_id, bytes)
@@ -527,14 +559,27 @@ where
         }
     }
 
-    /// Start a CID resolution using local IPFS.
-    fn start_ipfs_query(&mut self, cid: Cid, response_channel: ResponseChannel) {
-        let ipfs = self.ipfs_client.clone();
+    /// Start a CID resolution using iorh.
+    fn start_iroh_query(
+        &mut self,
+        hash: Hash,
+        node_addr: NodeAddr,
+        response_channel: ResponseChannel,
+    ) {
+        let mut iroh = self.iroh.clone();
         tokio::spawn(async move {
-            let res = ipfs.pin_add(&cid.to_string(), true).await;
-            match res {
-                Ok(_) => send_resolve_result(response_channel, Ok(())),
-                Err(e) => send_resolve_result(response_channel, Err(anyhow!(e))),
+            match iroh.client().await {
+                Ok(client) => {
+                    let res = download_blob(client, hash, node_addr).await;
+                    match res {
+                        Ok(_) => send_resolve_result(response_channel, Ok(())),
+                        Err(e) => send_resolve_result(response_channel, Err(anyhow!(e))),
+                    }
+                }
+                Err(e) => warn!(
+                    "cannot resolve {}; failed to create iroh client ({})",
+                    hash, e
+                ),
             }
         });
     }
@@ -586,13 +631,13 @@ where
 
     // The following are helper functions because Rust Analyzer has trouble with recognising that `swarm.behaviour_mut()` is a legal call.
 
-    fn discovery_mut(&mut self) -> &mut behaviour::discovery::Behaviour {
+    fn discovery_mut(&mut self) -> &mut discovery::Behaviour {
         self.swarm.behaviour_mut().discovery_mut()
     }
-    fn membership_mut(&mut self) -> &mut behaviour::membership::Behaviour<V> {
+    fn membership_mut(&mut self) -> &mut membership::Behaviour<V> {
         self.swarm.behaviour_mut().membership_mut()
     }
-    fn content_mut(&mut self) -> &mut behaviour::content::Behaviour<P> {
+    fn content_mut(&mut self) -> &mut content::Behaviour<P> {
         self.swarm.behaviour_mut().content_mut()
     }
 }
@@ -629,4 +674,10 @@ pub fn build_transport(local_key: Keypair) -> Boxed<(PeerId, StreamMuxerBox)> {
         .multiplex(mplex_config)
         .timeout(Duration::from_secs(20))
         .boxed()
+}
+
+async fn download_blob(iroh: Iroh, hash: Hash, node_addr: NodeAddr) -> anyhow::Result<()> {
+    let res = iroh.blobs().download(hash, node_addr).await?.await?;
+    debug!("downloaded blob {}: {:?}", hash, res);
+    Ok(())
 }

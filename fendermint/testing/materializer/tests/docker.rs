@@ -30,7 +30,7 @@ pub type DockerTestnet = Testnet<DockerMaterials, DockerMaterializer>;
 
 lazy_static! {
     static ref CI_PROFILE: bool = std::env::var("PROFILE").unwrap_or_default() == "ci";
-    static ref STARTUP_TIMEOUT: Duration = Duration::from_secs(60);
+    static ref STARTUP_TIMEOUT: Duration = Duration::from_secs(90);
     static ref TEARDOWN_TIMEOUT: Duration = Duration::from_secs(30);
     static ref PRINT_LOGS_ON_ERROR: bool = *CI_PROFILE;
 }

@@ -5,24 +5,20 @@ script = "docker volume create fendermint-logs"
 # removing the volume will return exit code 1 if it does not exist, which we can just ignore
 script = "docker volume rm fendermint-logs || true"
 
-
 [tasks.promtail-run]
 script = """
-unixtime=$(date +%s)
-echo "Starting promtail with promtailrunid: $unixtime"
-
-echo "promtail client url: ${PROMTAIL_CLIENT_URL}"
-
 docker run \
   ${FLAGS} \
   --name ${PROMTAIL_CONTAINER_NAME} \
+  --network ${NETWORK_NAME} \
+  --publish 127.0.0.1:${PROMTAIL_AGENT_HOST_PORT}:9080 \
   --volume /var/run/docker.sock:/var/run/docker.sock \
-  --volume "$(readlink -f ../../../infra/promtail)/:/etc/promtail" \
-  --volume fendermint-logs:/var/log/fendermint/ \
+  --volume ${PROMTAIL_CONFIG_FOLDER}/promtail-config.yaml:/etc/promtail/promtail-config.yaml \
+  --volume ${FM_DIR}/data/logs:/var/log/fendermint/   \
   ${PROMTAIL_DOCKER_IMAGE} \
-  --client.external-labels=hostname=$(hostname),promtailrunid=$unixtime \
-  --config.file=etc/promtail/promtail-config.yaml \
-  --client.url=${PROMTAIL_CLIENT_URL}
+  --client.external-labels=host=$(hostname),node=$NODE_NAME \
+  --config.file=/etc/promtail/promtail-config.yaml \
+  --client.url=http://loki:3100/loki/api/v1/push
 """
 
 [tasks.promtail-start]

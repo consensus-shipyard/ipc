@@ -3,6 +3,8 @@
 use anyhow::anyhow;
 use async_trait::async_trait;
 use ipc_api::subnet_id::SubnetID;
+use iroh::blobs::Hash;
+use iroh::net::NodeAddr;
 use libipld::Cid;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::oneshot;
@@ -113,28 +115,22 @@ where
     }
 }
 
-/// Trait to limit the capabilities to resolving CIDs from IPFS.
+/// Trait to limit the capabilities to resolving CIDs from Iroh.
 #[async_trait]
-pub trait ResolverIpfs {
-    /// Send a CID for resolution from a local IPFS node, await its completion,
+pub trait ResolverIroh {
+    /// Send a hash for resolution from an Iroh node, await its completion,
     /// then return the result, to be inspected by the caller.
-    ///
-    /// Upon success, the data should be pinned in the local IPFS node.
-    async fn resolve_ipfs(&self, cid: Cid) -> anyhow::Result<ResolveResult>;
+    async fn resolve_iroh(&self, hash: Hash, node_addr: NodeAddr) -> anyhow::Result<ResolveResult>;
 }
 
 #[async_trait]
-impl<V> ResolverIpfs for Client<V>
+impl<V> ResolverIroh for Client<V>
 where
     V: Sync + Send + 'static,
 {
-    /// Send a CID for resolution from a local IPFS node, await its completion,
-    /// then return the result, to be inspected by the caller.
-    ///
-    /// Upon success, the data should be pinned in the local IPFS node.
-    async fn resolve_ipfs(&self, cid: Cid) -> anyhow::Result<ResolveResult> {
+    async fn resolve_iroh(&self, hash: Hash, node_addr: NodeAddr) -> anyhow::Result<ResolveResult> {
         let (tx, rx) = oneshot::channel();
-        let req = Request::ResolveIpfs(cid, tx);
+        let req = Request::ResolveIroh(hash, node_addr, tx);
         self.send_request(req)?;
         let res = rx.await?;
         Ok(res)

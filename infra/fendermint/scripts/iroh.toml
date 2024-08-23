@@ -1,0 +1,37 @@
+[tasks.iroh-run]
+script = """
+docker run \
+  ${FLAGS} \
+  --name ${IROH_CONTAINER_NAME} \
+  --init \
+  --user $(id -u) \
+  --network ${NETWORK_NAME} \
+  --volume ${IROH_DIR}:/data/iroh \
+  --publish 127.0.0.1:${IROH_RPC_HOST_PORT}:4919/udp \
+  --publish 127.0.0.1:${IROH_METRICS_HOST_PORT}:9090 \
+  --env IROH_DATA_DIR=/data/iroh \
+  ${IROH_DOCKER_IMAGE} \
+  --rpc-addr 0.0.0.0:4919 \
+  start
+"""
+dependencies = ["docker-network-create"]
+
+[tasks.iroh-start]
+extend = "iroh-run"
+env = { "FLAGS" = "-Pd" }
+
+[tasks.iroh-stop]
+env = { "CONTAINER_NAME" = "${IROH_CONTAINER_NAME}" }
+run_task = "docker-stop"
+
+[tasks.iroh-destroy]
+env = { "CONTAINER_NAME" = "${IROH_CONTAINER_NAME}" }
+run_task = "docker-destroy"
+
+[tasks.iroh-logs]
+extend = "docker-logs"
+env = { "CONTAINER_NAME" = "${IROH_CONTAINER_NAME}" }
+
+[tasks.iroh-wait]
+extend = "wait"
+env = { "CARGO_MAKE_WAIT_MILLISECONDS" = "${IROH_WAIT_MILLIS}" }

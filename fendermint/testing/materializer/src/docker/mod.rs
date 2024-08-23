@@ -768,7 +768,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         node.start(seed_nodes).await?;
         node.wait_for_started(*STARTUP_TIMEOUT).await?;
         // Trying to avoid `Tendermint RPC error: server returned malformatted JSON (no 'result' or 'error')` on first subnet creation attempt.
-        tokio::time::sleep(Duration::from_secs(5)).await;
+        tokio::time::sleep(Duration::from_secs(30)).await;
         Ok(())
     }
 

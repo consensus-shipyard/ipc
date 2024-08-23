@@ -2,6 +2,14 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::collections::BTreeMap;
+
+use fendermint_actor_blobs_shared::params::{
+    AddBlobParams, BuyCreditParams, DeleteBlobParams, GetAccountParams, GetBlobParams,
+    GetStatsReturn, ResolveBlobParams,
+};
+use fendermint_actor_blobs_shared::state::{Account, Blob, Hash, PublicKey};
+use fendermint_actor_blobs_shared::Method;
 use fil_actors_runtime::runtime::builtins::Type;
 use fil_actors_runtime::{
     actor_dispatch, actor_error, deserialize_block,
@@ -13,14 +21,8 @@ use fvm_shared::address::Address;
 use fvm_shared::sys::SendFlags;
 use fvm_shared::{error::ExitCode, MethodNum};
 use num_traits::Zero;
-use std::collections::BTreeSet;
 
-use crate::ext::account::PUBKEY_ADDRESS_METHOD;
-use crate::{
-    Account, AddBlobParams, Blob, BuyCreditParams, ConstructorParams, DeleteBlobParams,
-    GetAccountParams, GetBlobParams, GetStatsReturn, Method, ResolveBlobParams, State,
-    BLOBS_ACTOR_NAME,
-};
+use crate::{ext, ConstructorParams, State, BLOBS_ACTOR_NAME};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(BlobsActor);
@@ -85,7 +87,7 @@ impl BlobsActor {
         rt.validate_immediate_caller_accept_any()?;
 
         // Caller must be converted to robust (non-ID) address for safe storage
-        let caller = if let Some(machine) = params.source {
+        let caller = if let Some(machine) = params.from {
             match rt.resolve_address(&machine) {
                 Some(id) => {
                     // Caller is always an ID address
@@ -107,9 +109,10 @@ impl BlobsActor {
             st.add_blob(
                 caller,
                 rt.curr_epoch(),
-                params.cid,
+                params.hash,
                 params.size,
                 params.expiry,
+                params.source,
             )
             .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to add blob"))
         })?;
@@ -117,7 +120,7 @@ impl BlobsActor {
     }
 
     // TODO: limit return via param
-    fn get_resolving_blobs(rt: &impl Runtime) -> Result<BTreeSet<Vec<u8>>, ActorError> {
+    fn get_resolving_blobs(rt: &impl Runtime) -> Result<BTreeMap<Hash, PublicKey>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
         let resolving = rt.transaction(|st: &mut State, _| {
@@ -223,7 +226,7 @@ fn resolve_caller_external(rt: &impl Runtime) -> Result<Address, ActorError> {
             let result = rt
                 .send(
                     &caller,
-                    PUBKEY_ADDRESS_METHOD,
+                    ext::account::PUBKEY_ADDRESS_METHOD,
                     None,
                     Zero::zero(),
                     None,
@@ -267,7 +270,8 @@ fn resolve_caller_external(rt: &impl Runtime) -> Result<Address, ActorError> {
 
 #[cfg(test)]
 mod tests {
-    use cid::Cid;
+    use super::*;
+
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::test_utils::{
         expect_empty, MockRuntime, ETHACCOUNT_ACTOR_CODE_ID, SYSTEM_ACTOR_CODE_ID,
@@ -278,19 +282,23 @@ mod tests {
     use fvm_shared::bigint::BigInt;
     use fvm_shared::clock::ChainEpoch;
     use fvm_shared::econ::TokenAmount;
-    use rand::Rng;
+    use rand::RngCore;
 
-    use crate::actor::BlobsActor;
-    use crate::{Account, AddBlobParams, BuyCreditParams, ConstructorParams, Method};
-
-    pub fn new_cid() -> Cid {
+    pub fn new_hash(size: usize) -> (Hash, u64) {
         let mut rng = rand::thread_rng();
-        let mut hash = [0u8; 32];
-        rng.fill(&mut hash);
-        Cid::new_v1(
-            0x55,
-            multihash::Multihash::wrap(multihash::Code::Blake3_256.into(), &hash).unwrap(),
+        let mut data = vec![0u8; size];
+        rng.fill_bytes(&mut data);
+        (
+            Hash(*iroh_base::hash::Hash::new(&data).as_bytes()),
+            size as u64,
         )
+    }
+
+    pub fn new_pk() -> PublicKey {
+        let mut rng = rand::thread_rng();
+        let mut data = [0u8; 32];
+        rng.fill_bytes(&mut data);
+        PublicKey(data)
     }
 
     pub fn construct_and_verify(capacity: u64, debit_rate: u64) -> MockRuntime {
@@ -396,11 +404,13 @@ mod tests {
 
         // Try without first funding
         rt.expect_validate_caller_any();
+        let hash = new_hash(1024);
         let add_params = AddBlobParams {
-            cid: new_cid(),
-            size: 1024,
+            from: None,
+            source: new_pk(),
+            hash: hash.0,
+            size: hash.1,
             expiry: 10,
-            source: None,
         };
         let result = rt.call::<BlobsActor>(
             Method::AddBlob as u64,

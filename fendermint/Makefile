@@ -66,7 +66,7 @@ test: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 		-p fendermint_actor_chainmetadata \
 		-p fendermint_actors \
 		-p fendermint_eth_hardhat \
-		-p fendermint_vm_ipfs_resolver \
+		-p fendermint_vm_iroh_resolver \
 		-p fendermint_vm_resolver \
 		-p fendermint_graph_test \
 		-p fendermint_smoke_test \
@@ -98,7 +98,8 @@ lint: \
 	check-clippy
 
 check-fmt:
-	cargo fmt $(PACKAGE) --check
+	@# `nightly` is required to support ignore list in rustfmt.toml
+	cargo +nightly fmt $(PACKAGE) --check
 
 check-clippy: $(IPC_ACTORS_GEN)
 	@# --all actually runs on the whole workspace but since fendermint depends on all, it's okay.

@@ -28,7 +28,8 @@ lint: \
 	check-clippy
 
 check-fmt:
-	cargo fmt $(PACKAGE) --check
+	@# `nightly` is required to support ignore list in rustfmt.toml
+	cargo +nightly fmt $(PACKAGE) --check
 
 check-clippy:
 	cargo clippy $(PACKAGE) --tests --no-deps -- -D clippy::all

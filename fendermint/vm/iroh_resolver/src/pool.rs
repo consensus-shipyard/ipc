@@ -2,21 +2,25 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::{collections::HashSet, hash::Hash};
-
 use async_stm::{
     queues::{tchan::TChan, TQueueLike},
     Stm, TVar,
 };
-use cid::Cid;
+use iroh::blobs::Hash;
+use iroh::net::{NodeAddr, NodeId};
+use std::collections::HashSet;
 
-/// CIDs we need to resolve from a specific source subnet, or our own.
-pub type ResolveKey = Cid;
+/// Hashes we need to resolve from a specific source subnet, or our own.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, std::hash::Hash)]
+pub struct ResolveKey {
+    pub hash: Hash,
+    pub source: NodeId,
+}
 
 /// Ongoing status of a resolution.
 ///
 /// The status also keeps track of which original items mapped to the same resolution key.
-/// These could be for example checkpoint of the same data with slightly different signatories.
+/// These could be, for example, checkpoint of the same data with slightly different signatories.
 /// Once resolved, they all become available at the same time.
 #[derive(Clone)]
 pub struct ResolveStatus<T> {
@@ -30,7 +34,7 @@ pub struct ResolveStatus<T> {
 
 impl<T> ResolveStatus<T>
 where
-    T: Clone + Hash + Eq + PartialEq + Sync + Send + 'static,
+    T: Clone + std::hash::Hash + Eq + PartialEq + Sync + Send + 'static,
 {
     pub fn new(item: T) -> Self {
         let mut items = im::HashSet::new();
@@ -56,8 +60,12 @@ pub struct ResolveTask {
 }
 
 impl ResolveTask {
-    pub fn cid(&self) -> Cid {
-        self.key
+    pub fn hash(&self) -> Hash {
+        self.key.hash
+    }
+
+    pub fn node_addr(&self) -> NodeAddr {
+        NodeAddr::new(self.key.source)
     }
 
     pub fn set_resolved(&self) -> Stm<()> {
@@ -94,7 +102,7 @@ where
 impl<T> ResolvePool<T>
 where
     for<'a> ResolveKey: From<&'a T>,
-    T: Sync + Send + Clone + Hash + Eq + PartialEq + 'static,
+    T: Sync + Send + Clone + std::hash::Hash + Eq + PartialEq + 'static,
 {
     pub fn new() -> Self {
         Self {
@@ -179,24 +187,34 @@ where
 #[cfg(test)]
 mod tests {
     use async_stm::{atomically, queues::TQueueLike};
-    use cid::Cid;
+    use iroh::base::key::SecretKey;
+    use iroh::blobs::Hash;
+    use iroh::net::NodeId;
+    use rand::Rng;
 
     #[derive(Clone, Hash, Eq, PartialEq, Debug)]
     struct TestItem {
-        cid: Cid,
+        hash: Hash,
+        source: NodeId,
     }
 
     impl TestItem {
         pub fn dummy() -> Self {
-            Self {
-                cid: Cid::default(),
-            }
+            let mut rng = rand::thread_rng();
+            let mut data = [0u8; 256];
+            rng.fill(&mut data);
+            let hash = Hash::new(data);
+            let source = SecretKey::generate().public();
+            Self { hash, source }
         }
     }
 
     impl From<&TestItem> for ResolveKey {
         fn from(value: &TestItem) -> Self {
-            value.cid
+            Self {
+                hash: value.hash,
+                source: value.source,
+            }
         }
     }
 

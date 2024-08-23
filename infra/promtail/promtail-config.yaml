@@ -19,7 +19,7 @@ scrape_configs:
   - job_name: fendermint
     static_configs:
       - targets:
-        - localhost
+          - localhost
       - labels:
           job: fendermint_log
           __path__: /var/log/fendermint/*.log

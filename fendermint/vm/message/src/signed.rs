@@ -16,7 +16,6 @@ use fvm_shared::chainid::ChainID;
 use fvm_shared::crypto::signature::ops::recover_secp_public_key;
 use fvm_shared::crypto::signature::{Signature, SignatureType, SECP_SIG_LEN};
 use fvm_shared::message::Message;
-
 use thiserror::Error;
 
 use crate::conv::from_fvm;

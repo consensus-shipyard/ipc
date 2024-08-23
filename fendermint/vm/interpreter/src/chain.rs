@@ -13,18 +13,17 @@ use crate::{
 use anyhow::{anyhow, bail, Context};
 use async_stm::atomically;
 use async_trait::async_trait;
-use cid::Cid;
-use fendermint_actor_blobs::{
+use fendermint_actor_blobs_shared::{
+    params::ResolveBlobParams,
     Method::{GetResolvingBlobs, IsBlobResolving, ResolveBlob},
-    ResolveBlobParams,
 };
 use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::{blobs, ipc, system};
 use fendermint_vm_event::ParentFinalityMissingQuorum;
-use fendermint_vm_ipfs_resolver::pool::{
-    ResolveKey as IpfsResolveKey, ResolvePool as IpfsResolvePool,
+use fendermint_vm_iroh_resolver::pool::{
+    ResolveKey as IrohResolveKey, ResolvePool as IrohResolvePool,
 };
-use fendermint_vm_message::ipc::ParentFinality;
+use fendermint_vm_message::ipc::{Blob, ParentFinality};
 use fendermint_vm_message::{
     chain::ChainMessage,
     ipc::{BottomUpCheckpoint, CertifiedMessage, IpcMessage, SignedRelayedMessage},
@@ -40,15 +39,18 @@ use fvm_ipld_encoding::RawBytes;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::message::Message;
+use iroh::base::key::PublicKey;
+use iroh::blobs::Hash;
+use iroh::net::NodeId;
 use num_traits::Zero;
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use tokio_util::bytes;
 
 /// A resolution pool for bottom-up and top-down checkpoints.
 pub type CheckpointPool = ResolvePool<CheckpointPoolItem>;
 pub type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProviderProxy>>>;
-pub type BlobPool = IpfsResolvePool<BlobPoolItem>;
+pub type BlobPool = IrohResolvePool<BlobPoolItem>;
 
 /// These are the extra state items that the chain interpreter needs,
 /// a sort of "environment" supporting IPC.
@@ -59,7 +61,7 @@ pub struct ChainEnv {
     /// The parent finality provider for top down checkpoint
     pub parent_finality_provider: TopDownFinalityProvider,
     pub parent_finality_votes: VoteTally,
-    /// IPFS pin resolution pool.
+    /// Iroh blob resolution pool.
     pub blob_pool: BlobPool,
 }
 
@@ -84,12 +86,16 @@ impl From<&CheckpointPoolItem> for ResolveKey {
 
 #[derive(Clone, Hash, PartialEq, Eq)]
 pub struct BlobPoolItem {
-    hash: Cid,
+    hash: Hash,
+    source: NodeId,
 }
 
-impl From<&BlobPoolItem> for IpfsResolveKey {
+impl From<&BlobPoolItem> for IrohResolveKey {
     fn from(value: &BlobPoolItem) -> Self {
-        value.hash
+        Self {
+            hash: value.hash,
+            source: value.source,
+        }
     }
 }
 
@@ -206,10 +212,9 @@ where
             .state_tree_mut()
             .end_transaction(true)
             .expect("we just started a transaction");
-        for key in resolving_blobs {
-            let cid = Cid::try_from(key.as_slice()).expect("invalid cid bytes");
-            atomically(|| env.blob_pool.add(BlobPoolItem { hash: cid })).await;
-            tracing::debug!(cid = ?cid, "blob added to pool");
+        for (hash, source) in resolving_blobs {
+            atomically(|| env.blob_pool.add(BlobPoolItem { hash, source })).await;
+            tracing::debug!(hash = ?hash, "blob added to pool");
         }
 
         // Collect locally resolved blobs from the pool. We're relying on the proposer's local
@@ -229,7 +234,7 @@ where
             // We start a blockstore transaction that can be reverted
             state.state_tree_mut().begin_transaction();
             for item in local_resolved_blobs.iter() {
-                if is_blob_resolved(&mut state, item)? {
+                if is_blob_resolved(&mut state, item.hash)? {
                     tracing::debug!(cid = ?item.hash, "blob already finalized; removing from pool");
                     atomically(|| env.blob_pool.remove(item)).await;
                     continue;
@@ -237,12 +242,15 @@ where
 
                 let is_globally_resolved = atomically(|| {
                     env.parent_finality_votes
-                        .find_blob_quorum(&item.hash.to_bytes())
+                        .find_blob_quorum(&item.hash.as_bytes().to_vec())
                 })
                 .await;
                 if is_globally_resolved {
                     tracing::debug!(cid = ?item.hash, "blob has quorum; adding tx to chain");
-                    blobs.push(ChainMessage::Ipc(IpcMessage::BlobResolved(item.hash)));
+                    blobs.push(ChainMessage::Ipc(IpcMessage::BlobResolved(Blob {
+                        hash: item.hash,
+                        source: item.source,
+                    })));
                 }
             }
             state
@@ -251,7 +259,7 @@ where
                 .expect("we just started a transaction");
 
             let pending_blobs = atomically(|| env.blob_pool.count()).await;
-            tracing::info!(size = pending_blobs, "ipfs pool status");
+            tracing::info!(size = pending_blobs, "blob pool status");
 
             // Append at the end - if we run out of block space,
             // these are going to be reproposed in the next block.
@@ -302,16 +310,19 @@ where
                         return Ok(false);
                     }
                 }
-                ChainMessage::Ipc(IpcMessage::BlobResolved(obj)) => {
-                    let item = BlobPoolItem { hash: obj };
+                ChainMessage::Ipc(IpcMessage::BlobResolved(blob)) => {
+                    let item = BlobPoolItem {
+                        hash: blob.hash,
+                        source: blob.source,
+                    };
 
                     // Ensure that the blob is ready to be included on-chain.
                     // We can accept the proposal if the blob has reached a global quorum and is
                     // not yet finalized.
                     // Start a blockstore transaction that can be reverted.
                     state.state_tree_mut().begin_transaction();
-                    if is_blob_resolved(&mut state, &item)? {
-                        tracing::debug!(cid = ?item.hash, "blob is already finalized; rejecting proposal");
+                    if is_blob_resolved(&mut state, item.hash)? {
+                        tracing::debug!(hash = ?item.hash, "blob is already finalized; rejecting proposal");
                         return Ok(false);
                     }
                     state
@@ -321,11 +332,11 @@ where
 
                     let is_globally_resolved = atomically(|| {
                         env.parent_finality_votes
-                            .find_blob_quorum(&item.hash.to_bytes())
+                            .find_blob_quorum(&item.hash.as_bytes().to_vec())
                     })
                     .await;
                     if !is_globally_resolved {
-                        tracing::debug!(cid = ?item.hash, "blob is not globally resolved; rejecting proposal");
+                        tracing::debug!(hash = ?blob.hash, "blob is not globally resolved; rejecting proposal");
                         return Ok(false);
                     }
 
@@ -337,10 +348,10 @@ where
                         })
                         .await;
                     if is_locally_resolved {
-                        tracing::debug!(cid = ?item.hash, "blob is locally resolved; removing from pool");
+                        tracing::debug!(hash = ?item.hash, "blob is locally resolved; removing from pool");
                         atomically(|| env.blob_pool.remove(&item)).await;
                     } else {
-                        tracing::debug!(cid = ?item.hash, "blob is not locally resolved");
+                        tracing::debug!(hash = ?item.hash, "blob is not locally resolved");
                     }
                 }
                 _ => {}
@@ -512,12 +523,13 @@ where
 
                     Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
                 }
-                IpcMessage::BlobResolved(hash) => {
+                IpcMessage::BlobResolved(blob) => {
                     let from = system::SYSTEM_ACTOR_ADDR;
                     let to = blobs::BLOBS_ACTOR_ADDR;
                     let method_num = ResolveBlob as u64;
                     let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
 
+                    let hash = fendermint_actor_blobs_shared::state::Hash(*blob.hash.as_bytes());
                     let params = ResolveBlobParams(hash);
                     let params = RawBytes::serialize(params)?;
                     let msg = Message {
@@ -552,7 +564,7 @@ where
                     );
 
                     tracing::debug!(
-                        cid = ?hash,
+                        hash = ?blob.hash,
                         "chain interpreter has finalized blob"
                     );
 
@@ -731,7 +743,7 @@ fn relayed_bottom_up_ckpt_to_fvm(
 /// This approach uses an implicit FVM transaction to query a read-only blockstore.
 fn get_resolving_blobs<DB>(
     state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
-) -> anyhow::Result<BTreeSet<Vec<u8>>>
+) -> anyhow::Result<BTreeMap<Hash, PublicKey>>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
@@ -750,20 +762,21 @@ where
     let (apply_ret, _) = state.execute_implicit(msg)?;
 
     let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
-    fvm_ipld_encoding::from_slice::<BTreeSet<Vec<u8>>>(&data)
-        .map_err(|e| anyhow!("error parsing as BTreeSet<Vec<u8>>: {e}"))
+    fvm_ipld_encoding::from_slice::<BTreeMap<Hash, PublicKey>>(&data)
+        .map_err(|e| anyhow!("error parsing as BTreeMap<Hash, PublicKey>: {e}"))
 }
 
 /// Check if a blob has been resolved by reading its on-chain state.
 /// This approach uses an implicit FVM transaction to query a read-only blockstore.
 fn is_blob_resolved<DB>(
     state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
-    item: &BlobPoolItem,
+    hash: Hash,
 ) -> anyhow::Result<bool>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
-    let params = ResolveBlobParams(item.hash);
+    let hash = fendermint_actor_blobs_shared::state::Hash(*hash.as_bytes());
+    let params = ResolveBlobParams(hash);
     let params = RawBytes::serialize(params)?;
     let msg = FvmMessage {
         version: 0,

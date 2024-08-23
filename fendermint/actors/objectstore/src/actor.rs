@@ -2,7 +2,14 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::{
+    AddParams, DeleteParams, GetParams, GotObject, ListParams, Method, Object, ObjectList, State,
+    OBJECTSTORE_ACTOR_NAME,
+};
 use cid::Cid;
+use fendermint_actor_blobs_shared::params::{AddBlobParams, DeleteBlobParams, GetBlobParams};
+use fendermint_actor_blobs_shared::state::Blob;
+use fendermint_actor_blobs_shared::{Method as BlobMethod, BLOBS_ACTOR_ADDR};
 use fendermint_actor_machine::{ConstructorParams, MachineActor};
 use fil_actors_runtime::{
     actor_dispatch, actor_error, deserialize_block, extract_send_result,
@@ -12,12 +19,6 @@ use fil_actors_runtime::{
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_ipld_hamt::BytesKey;
 use fvm_shared::{error::ExitCode, MethodNum};
-
-use crate::ext::blobs::Blob;
-use crate::{
-    ext, AddParams, DeleteParams, GetParams, GotObject, ListParams, Method, Object, ObjectList,
-    State, OBJECTSTORE_ACTOR_NAME,
-};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
@@ -48,11 +49,10 @@ impl Actor {
         let key = BytesKey(params.key);
         if let Some(object) = Self::retrieve_object(rt, &key)? {
             if params.overwrite {
-                let cid = Self::cid_from_object(object)?;
                 extract_send_result(rt.send_simple(
-                    &ext::blobs::BLOBS_ACTOR_ADDR,
-                    ext::blobs::DELETE_BLOB_METHOD,
-                    IpldBlock::serialize_cbor(&ext::blobs::DeleteBlobParams(cid))?,
+                    &BLOBS_ACTOR_ADDR,
+                    BlobMethod::DeleteBlob as MethodNum,
+                    IpldBlock::serialize_cbor(&DeleteBlobParams(object.hash))?,
                     rt.message().value_received(),
                 ))?;
             } else {
@@ -62,15 +62,16 @@ impl Actor {
             }
         }
 
-        let add_params = IpldBlock::serialize_cbor(&ext::blobs::AddBlobParams {
-            cid: params.cid,
+        let add_params = IpldBlock::serialize_cbor(&AddBlobParams {
+            from: Some(params.to),
+            source: params.source,
+            hash: params.hash,
             size: params.size as u64,
             expiry: rt.curr_epoch() + 100,
-            source: Some(params.store),
         })?;
         extract_send_result(rt.send_simple(
-            &ext::blobs::BLOBS_ACTOR_ADDR,
-            ext::blobs::ADD_BLOB_METHOD,
+            &BLOBS_ACTOR_ADDR,
+            BlobMethod::AddBlob as MethodNum,
             add_params,
             rt.message().value_received(),
         ))?;
@@ -79,7 +80,7 @@ impl Actor {
             st.add(
                 rt.store(),
                 key,
-                params.cid,
+                params.hash,
                 params.size,
                 params.metadata,
                 params.overwrite,
@@ -101,12 +102,11 @@ impl Actor {
             ExitCode::USR_ILLEGAL_STATE,
             "no object stored".to_string(),
         ))?;
-        let cid = Self::cid_from_object(object)?;
         // 2. Delete from the blobs actor
         extract_send_result(rt.send_simple(
-            &ext::blobs::BLOBS_ACTOR_ADDR,
-            ext::blobs::DELETE_BLOB_METHOD,
-            IpldBlock::serialize_cbor(&ext::blobs::DeleteBlobParams(cid))?,
+            &BLOBS_ACTOR_ADDR,
+            BlobMethod::DeleteBlob as MethodNum,
+            IpldBlock::serialize_cbor(&DeleteBlobParams(object.hash))?,
             rt.message().value_received(),
         ))?;
         // 3. Delete from the state
@@ -121,17 +121,16 @@ impl Actor {
     fn get_object(rt: &impl Runtime, params: GetParams) -> Result<Option<GotObject>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         if let Some(object) = Self::retrieve_object(rt, &BytesKey(params.key))? {
-            let cid = Self::cid_from_object(object.clone())?;
             let blob = deserialize_block::<Blob>(extract_send_result(rt.send_simple(
-                &ext::blobs::BLOBS_ACTOR_ADDR,
-                ext::blobs::GET_BLOB_METHOD,
-                IpldBlock::serialize_cbor(&ext::blobs::GetBlobParams(cid))?,
+                &BLOBS_ACTOR_ADDR,
+                BlobMethod::GetBlob as MethodNum,
+                IpldBlock::serialize_cbor(&GetBlobParams(object.hash))?,
                 rt.message().value_received(),
             ))?)?;
             Ok(Some(GotObject {
-                size: blob.size,
+                hash: object.hash,
+                size: blob.size as usize,
                 expiry: blob.expiry,
-                cid: object.cid,
                 metadata: object.metadata,
             }))
         } else {
@@ -178,13 +177,6 @@ impl Actor {
             e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to retrieve object")
         })
     }
-
-    // Get CID of an object, and cast an error to ActorError if it happens
-    fn cid_from_object(object: Object) -> Result<Cid, ActorError> {
-        Cid::try_from(object.cid.0).map_err(|e| {
-            anyhow::Error::from(e).downcast_default(ExitCode::USR_ILLEGAL_STATE, "invalid cid")
-        })
-    }
 }
 
 impl MachineActor for Actor {
@@ -211,7 +203,10 @@ impl ActorCode for Actor {
 
 #[cfg(test)]
 mod tests {
-    use cid::{multihash, Cid};
+    use super::*;
+
+    use cid::Cid;
+    use fendermint_actor_blobs_shared::state::{Hash, PublicKey};
     use fendermint_actor_machine::WriteAccess;
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::runtime::Runtime;
@@ -220,16 +215,12 @@ mod tests {
     };
     use fil_actors_runtime::INIT_ACTOR_ADDR;
     use fvm_ipld_encoding::ipld_block::IpldBlock;
-    use fvm_ipld_encoding::serde_bytes::ByteBuf;
     use fvm_shared::address::Address;
     use fvm_shared::clock::ChainEpoch;
     use fvm_shared::econ::TokenAmount;
     use fvm_shared::error::ExitCode;
-    use rand::Rng;
+    use rand::RngCore;
     use std::collections::HashMap;
-
-    use crate::ext::blobs::Blob;
-    use crate::{actor::Actor, ext, AddParams, DeleteParams, GetParams, GotObject, Method, State};
 
     fn construct_and_verify(creator: Address) -> MockRuntime {
         let rt = MockRuntime {
@@ -243,7 +234,7 @@ mod tests {
         let actor_construction = rt
             .call::<Actor>(
                 Method::Constructor as u64,
-                IpldBlock::serialize_cbor(&fendermint_actor_machine::ConstructorParams {
+                IpldBlock::serialize_cbor(&ConstructorParams {
                     creator,
                     write_access,
                     metadata,
@@ -257,14 +248,21 @@ mod tests {
         rt
     }
 
-    fn new_cid() -> Cid {
+    pub fn new_hash(size: usize) -> (Hash, u64) {
         let mut rng = rand::thread_rng();
-        let mut hash = [0u8; 32];
-        rng.fill(&mut hash);
-        Cid::new_v1(
-            0x55,
-            multihash::Multihash::wrap(multihash::Code::Blake2b256.into(), &hash).unwrap(),
+        let mut data = vec![0u8; size];
+        rng.fill_bytes(&mut data);
+        (
+            Hash(*iroh_base::hash::Hash::new(&data).as_bytes()),
+            size as u64,
         )
+    }
+
+    pub fn new_pk() -> PublicKey {
+        let mut rng = rand::thread_rng();
+        let mut data = [0u8; 32];
+        rng.fill_bytes(&mut data);
+        PublicKey(data)
     }
 
     #[test]
@@ -279,23 +277,27 @@ mod tests {
         rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
-        rt.expect_validate_caller_any();
+
+        let hash = new_hash(256);
         let add_params: AddParams = AddParams {
-            store: f4_eth_addr,
+            to: f4_eth_addr,
+            source: new_pk(),
             key: vec![0, 1, 2],
-            cid: new_cid(),
-            size: 20,
+            hash: hash.0,
+            size: hash.1 as usize,
             metadata: HashMap::new(),
             overwrite: false,
         };
+        rt.expect_validate_caller_any();
         rt.expect_send_simple(
-            ext::blobs::BLOBS_ACTOR_ADDR,
-            ext::blobs::ADD_BLOB_METHOD,
-            IpldBlock::serialize_cbor(&ext::blobs::AddBlobParams {
-                cid: add_params.cid,
+            BLOBS_ACTOR_ADDR,
+            BlobMethod::AddBlob as MethodNum,
+            IpldBlock::serialize_cbor(&AddBlobParams {
+                from: Some(add_params.to),
+                source: add_params.source,
+                hash: add_params.hash,
                 size: add_params.size as u64,
                 expiry: 100,
-                source: Some(add_params.store),
             })
             .unwrap(),
             TokenAmount::from_whole(0),
@@ -313,6 +315,7 @@ mod tests {
             .unwrap();
         let state = rt.state::<State>().unwrap();
         assert_eq!(state.root, result);
+        rt.verify();
     }
 
     #[test]
@@ -327,23 +330,27 @@ mod tests {
         rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
-        rt.expect_validate_caller_any();
+
+        let hash = new_hash(256);
         let add_params: AddParams = AddParams {
-            store: f4_eth_addr,
+            to: f4_eth_addr,
+            source: new_pk(),
             key: vec![0, 1, 2],
-            cid: new_cid(),
-            size: 20,
+            hash: hash.0,
+            size: hash.1 as usize,
             metadata: HashMap::new(),
             overwrite: false,
         };
+        rt.expect_validate_caller_any();
         rt.expect_send_simple(
-            ext::blobs::BLOBS_ACTOR_ADDR,
-            ext::blobs::ADD_BLOB_METHOD,
-            IpldBlock::serialize_cbor(&ext::blobs::AddBlobParams {
-                cid: add_params.cid,
+            BLOBS_ACTOR_ADDR,
+            BlobMethod::AddBlob as MethodNum,
+            IpldBlock::serialize_cbor(&AddBlobParams {
+                from: Some(add_params.to),
+                source: add_params.source,
+                hash: add_params.hash,
                 size: add_params.size as u64,
                 expiry: 100,
-                source: Some(add_params.store),
             })
             .unwrap(),
             TokenAmount::from_whole(0),
@@ -361,32 +368,36 @@ mod tests {
             .unwrap();
         let state = rt.state::<State>().unwrap();
         assert_eq!(state.root, result);
+        rt.verify();
 
+        let hash = new_hash(256);
         let add_params2 = AddParams {
-            store: add_params.store,
+            to: add_params.to,
+            source: add_params.source,
             key: add_params.key,
-            cid: new_cid(),
-            size: add_params.size,
+            hash: hash.0,
+            size: hash.1 as usize,
             metadata: HashMap::new(),
             overwrite: true,
         };
         rt.expect_validate_caller_any();
         rt.expect_send_simple(
-            ext::blobs::BLOBS_ACTOR_ADDR,
-            ext::blobs::DELETE_BLOB_METHOD,
-            IpldBlock::serialize_cbor(&ext::blobs::DeleteBlobParams(add_params.cid)).unwrap(),
+            BLOBS_ACTOR_ADDR,
+            BlobMethod::DeleteBlob as MethodNum,
+            IpldBlock::serialize_cbor(&DeleteBlobParams(add_params.hash)).unwrap(),
             TokenAmount::from_whole(0),
             None,
             ExitCode::OK,
         );
         rt.expect_send_simple(
-            ext::blobs::BLOBS_ACTOR_ADDR,
-            ext::blobs::ADD_BLOB_METHOD,
-            IpldBlock::serialize_cbor(&ext::blobs::AddBlobParams {
-                cid: add_params2.cid,
+            BLOBS_ACTOR_ADDR,
+            BlobMethod::AddBlob as MethodNum,
+            IpldBlock::serialize_cbor(&AddBlobParams {
+                from: Some(add_params2.to),
+                source: add_params2.source,
+                hash: add_params2.hash,
                 size: add_params2.size as u64,
                 expiry: 100,
-                source: Some(add_params2.store),
             })
             .unwrap(),
             TokenAmount::from_whole(0),
@@ -404,6 +415,7 @@ mod tests {
             .unwrap();
         let state = rt.state::<State>().unwrap();
         assert_eq!(state.root, result);
+        rt.verify();
     }
 
     #[test]
@@ -418,23 +430,27 @@ mod tests {
         rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
-        rt.expect_validate_caller_any();
+
+        let hash = new_hash(256);
         let add_params: AddParams = AddParams {
-            store: f4_eth_addr,
+            to: f4_eth_addr,
+            source: new_pk(),
             key: vec![0, 1, 2],
-            cid: new_cid(),
-            size: 20,
+            hash: hash.0,
+            size: hash.1 as usize,
             metadata: HashMap::new(),
             overwrite: false,
         };
+        rt.expect_validate_caller_any();
         rt.expect_send_simple(
-            ext::blobs::BLOBS_ACTOR_ADDR,
-            ext::blobs::ADD_BLOB_METHOD,
-            IpldBlock::serialize_cbor(&ext::blobs::AddBlobParams {
-                cid: add_params.cid,
+            BLOBS_ACTOR_ADDR,
+            BlobMethod::AddBlob as MethodNum,
+            IpldBlock::serialize_cbor(&AddBlobParams {
+                from: Some(add_params.to),
+                source: add_params.source,
+                hash: add_params.hash,
                 size: add_params.size as u64,
                 expiry: 100,
-                source: Some(add_params.store),
             })
             .unwrap(),
             TokenAmount::from_whole(0),
@@ -452,12 +468,15 @@ mod tests {
             .unwrap();
         let state = rt.state::<State>().unwrap();
         assert_eq!(state.root, result);
+        rt.verify();
 
+        let hash = new_hash(256);
         let add_params2 = AddParams {
-            store: add_params.store,
+            to: add_params.to,
+            source: add_params.source,
             key: add_params.key,
-            cid: new_cid(),
-            size: add_params.size,
+            hash: hash.0,
+            size: hash.1 as usize,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -469,6 +488,7 @@ mod tests {
         assert!(result.is_err_and(|e| { e.msg().eq("asked not to overwrite") }));
         let state2 = rt.state::<State>().unwrap();
         assert_eq!(state2.root, state.root);
+        rt.verify();
     }
 
     #[test]
@@ -483,27 +503,30 @@ mod tests {
         rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
-        rt.expect_validate_caller_any();
+
         let key = vec![0, 1, 2];
-        let cid = new_cid();
+        let hash = new_hash(256);
 
         // Prerequisite for a delete operation: add to have a proper state of the actor.
         let add_params: AddParams = AddParams {
-            store: f4_eth_addr,
+            to: f4_eth_addr,
+            source: new_pk(),
             key: key.clone(),
-            cid,
-            size: 20,
+            hash: hash.0,
+            size: hash.1 as usize,
             metadata: HashMap::new(),
             overwrite: false,
         };
+        rt.expect_validate_caller_any();
         rt.expect_send_simple(
-            ext::blobs::BLOBS_ACTOR_ADDR,
-            ext::blobs::ADD_BLOB_METHOD,
-            IpldBlock::serialize_cbor(&ext::blobs::AddBlobParams {
-                cid: add_params.cid,
+            BLOBS_ACTOR_ADDR,
+            BlobMethod::AddBlob as MethodNum,
+            IpldBlock::serialize_cbor(&AddBlobParams {
+                from: Some(add_params.to),
+                source: add_params.source,
+                hash: add_params.hash,
                 size: add_params.size as u64,
                 expiry: 100,
-                source: Some(add_params.store),
             })
             .unwrap(),
             TokenAmount::from_whole(0),
@@ -521,14 +544,15 @@ mod tests {
             .unwrap();
         let state = rt.state::<State>().unwrap();
         assert_eq!(state.root, result_add);
+        rt.verify();
 
         // Now actually delete.
         let delete_params = DeleteParams { key: key.clone() };
         rt.expect_validate_caller_any();
         rt.expect_send_simple(
-            ext::blobs::BLOBS_ACTOR_ADDR,
-            ext::blobs::DELETE_BLOB_METHOD,
-            IpldBlock::serialize_cbor(&ext::blobs::DeleteBlobParams(cid)).unwrap(),
+            BLOBS_ACTOR_ADDR,
+            BlobMethod::DeleteBlob as MethodNum,
+            IpldBlock::serialize_cbor(&DeleteBlobParams(hash.0)).unwrap(),
             TokenAmount::from_whole(0),
             None,
             ExitCode::OK,
@@ -538,6 +562,7 @@ mod tests {
             IpldBlock::serialize_cbor(&delete_params).unwrap(),
         );
         assert!(result_delete.is_ok());
+        rt.verify();
     }
 
     #[test]
@@ -552,8 +577,9 @@ mod tests {
         rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
-        rt.expect_validate_caller_any();
+
         let get_params = GetParams { key: vec![0, 1, 2] };
+        rt.expect_validate_caller_any();
         let result = rt
             .call::<Actor>(
                 Method::GetObject as u64,
@@ -564,6 +590,7 @@ mod tests {
             .deserialize::<Option<GotObject>>();
         assert!(result.is_ok());
         assert_eq!(result, Ok(None));
+        rt.verify();
     }
 
     #[test]
@@ -578,27 +605,30 @@ mod tests {
         rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
-        rt.expect_validate_caller_any();
+
         let key = vec![0, 1, 2];
-        let cid = new_cid();
+        let hash = new_hash(256);
 
         // Prerequisite for a delete operation: add to have a proper state of the actor.
         let add_params: AddParams = AddParams {
-            store: f4_eth_addr,
+            to: f4_eth_addr,
+            source: new_pk(),
             key: key.clone(),
-            cid,
-            size: 20,
+            hash: hash.0,
+            size: hash.1 as usize,
             metadata: HashMap::new(),
             overwrite: false,
         };
+        rt.expect_validate_caller_any();
         rt.expect_send_simple(
-            ext::blobs::BLOBS_ACTOR_ADDR,
-            ext::blobs::ADD_BLOB_METHOD,
-            IpldBlock::serialize_cbor(&ext::blobs::AddBlobParams {
-                cid: add_params.cid,
+            BLOBS_ACTOR_ADDR,
+            BlobMethod::AddBlob as MethodNum,
+            IpldBlock::serialize_cbor(&AddBlobParams {
+                from: Some(add_params.to),
+                source: add_params.source,
+                hash: add_params.hash,
                 size: add_params.size as u64,
                 expiry: 100,
-                source: Some(add_params.store),
             })
             .unwrap(),
             TokenAmount::from_whole(0),
@@ -613,17 +643,19 @@ mod tests {
         .unwrap()
         .deserialize::<Cid>()
         .unwrap();
+        rt.verify();
 
-        rt.expect_validate_caller_any();
         let blob = Blob {
-            size: 10,
-            expiry: 1 as ChainEpoch,
+            size: add_params.size as u64,
+            expiry: 100 as ChainEpoch,
+            source: add_params.source,
             resolved: true,
         };
+        rt.expect_validate_caller_any();
         rt.expect_send_simple(
-            ext::blobs::BLOBS_ACTOR_ADDR,
-            ext::blobs::GET_BLOB_METHOD,
-            IpldBlock::serialize_cbor(&ext::blobs::GetBlobParams(add_params.cid)).unwrap(),
+            BLOBS_ACTOR_ADDR,
+            BlobMethod::GetBlob as MethodNum,
+            IpldBlock::serialize_cbor(&GetBlobParams(add_params.hash)).unwrap(),
             TokenAmount::from_whole(0),
             IpldBlock::serialize_cbor(&Some(&blob)).unwrap(),
             ExitCode::OK,
@@ -641,11 +673,12 @@ mod tests {
         assert_eq!(
             result.unwrap(),
             Some(GotObject {
-                size: blob.size,
+                hash: hash.0,
+                size: blob.size as usize,
                 expiry: blob.expiry,
-                cid: ByteBuf(cid.to_bytes()),
                 metadata: add_params.metadata
             })
         );
+        rt.verify();
     }
 }
