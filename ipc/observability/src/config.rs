@@ -16,18 +16,16 @@ pub enum LogLevel {
     Off,
     Error,
     Warn,
+    #[default]
     Info,
     Debug,
-    #[default]
     Trace,
 }
 
-impl LogLevel {
-    pub fn to_filter(&self) -> anyhow::Result<EnvFilter> {
-        // At this point the filter should have been parsed before,
-        // but if we created a log level directly, it can fail.
-        // We fail if it doesn't parse because presumably we _want_ to see those things.
-        Ok(EnvFilter::try_new(self.to_string())?)
+impl Into<EnvFilter> for LogLevel {
+    fn into(self) -> EnvFilter {
+        // By default EnvFilter uses INFO, just like our default log level.
+        EnvFilter::try_new(self.to_string()).unwrap_or_default()
     }
 }
 
@@ -71,23 +69,9 @@ pub struct TracingSettings {
 }
 
 #[serde_as]
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Default)]
 pub struct ConsoleLayerSettings {
     pub level: Option<LogLevel>,
-}
-
-impl ConsoleLayerSettings {
-    pub fn level_to_filter(&self) -> EnvFilter {
-        level_to_filter(&self.level)
-    }
-}
-
-impl Default for ConsoleLayerSettings {
-    fn default() -> Self {
-        ConsoleLayerSettings {
-            level: Some(LogLevel::default()),
-        }
-    }
 }
 
 #[serde_as]
@@ -100,17 +84,4 @@ pub struct FileLayerSettings {
     pub rotation: Option<RotationKind>,
     pub domain_filter: Option<Vec<String>>,
     pub events_filter: Option<Vec<String>>,
-}
-
-impl FileLayerSettings {
-    pub fn level_to_filter(&self) -> EnvFilter {
-        level_to_filter(&self.level)
-    }
-}
-
-pub fn level_to_filter(level: &Option<LogLevel>) -> EnvFilter {
-    match level {
-        Some(level) => level.to_filter().unwrap_or_default(),
-        None => LogLevel::Trace.to_filter().unwrap_or_default(),
-    }
 }
