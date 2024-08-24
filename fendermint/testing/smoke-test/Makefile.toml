@@ -18,6 +18,9 @@ env_files = [
   { path = "../scripts/ci.env", profile = "ci" },
 ]
 
+[env]
+PROFILE = { value = "dev", condition = { env_not_set = ["PROFILE"] } }
+
 [tasks.test-data-env]
 script = """
 cat << EOF > ${TEST_DATA_DIR}/.env
@@ -39,7 +42,7 @@ dependencies = [
 [tasks.simplecoin-example]
 script = """
 cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint
-cargo run -p fendermint_rpc --example simplecoin -- \
+cargo run --profile ${PROFILE} -p fendermint_rpc --example simplecoin -- \
   --secret-key testing/smoke-test/test-data/keys/alice.sk \
   ${VERBOSITY}
 """
@@ -48,7 +51,7 @@ cargo run -p fendermint_rpc --example simplecoin -- \
 [tasks.transfer-example]
 script = """
 cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint
-cargo run -p fendermint_rpc --example transfer -- \
+cargo run --profile ${PROFILE} -p fendermint_rpc --example transfer -- \
   --secret-key testing/smoke-test/test-data/keys/eric.sk \
   ${VERBOSITY}
 """
@@ -57,7 +60,7 @@ cargo run -p fendermint_rpc --example transfer -- \
 [tasks.ethers-example]
 script = """
 cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint
-cargo run -p fendermint_eth_api --example ethers -- \
+cargo run --profile ${PROFILE} -p fendermint_eth_api --example ethers -- \
   --secret-key-from testing/smoke-test/test-data/keys/emily.sk \
   --secret-key-to   testing/smoke-test/test-data/keys/eric.sk
 """
@@ -65,7 +68,7 @@ cargo run -p fendermint_eth_api --example ethers -- \
 [tasks.query-blockhash-example]
 script = """
 cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint
-cargo run -p fendermint_eth_api --example query_blockhash -- \
+cargo run --profile ${PROFILE} -p fendermint_eth_api --example query_blockhash -- \
    --secret-key testing/smoke-test/test-data/keys/emily.sk \
   ${VERBOSITY}
 """
