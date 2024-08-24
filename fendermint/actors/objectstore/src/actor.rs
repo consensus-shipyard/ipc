@@ -2,8 +2,9 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use anyhow::anyhow;
 use cid::Cid;
-use fendermint_actor_blobs_shared::state::Blob;
+use fendermint_actor_blobs_shared::state::{Blob, BlobStatus};
 use fendermint_actor_blobs_shared::{add_blob, delete_blob, get_blob};
 use fendermint_actor_machine::{ConstructorParams, MachineActor};
 use fil_actors_runtime::{
@@ -29,36 +30,29 @@ pub struct Actor;
 impl Actor {
     fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&INIT_ACTOR_ADDR))?;
-
         let state = State::new(
             rt.store(),
             params.creator,
             params.write_access,
             params.metadata,
         )
-        .map_err(|e| {
-            e.downcast_default(
-                ExitCode::USR_ILLEGAL_STATE,
-                "failed to construct empty store",
-            )
-        })?;
+        .map_err(to_state_error("failed to construct empty store"))?;
         rt.create(&state)
     }
 
     fn add_object(rt: &impl Runtime, params: AddParams) -> Result<Cid, ActorError> {
         Self::ensure_write_allowed(rt)?;
-
         let key = BytesKey(params.key);
         if let Some(object) = retrieve_object_state(rt, &key)? {
             if params.overwrite {
                 delete_blob(rt, object.hash)?;
             } else {
                 return Err(ActorError::illegal_state(
-                    "key exists; use overwrite to force".to_string(),
+                    "key exists; use overwrite to force".into(),
                 ));
             }
         }
-
+        // Add object's blob
         add_blob(
             rt,
             params.to,
@@ -67,7 +61,7 @@ impl Actor {
             params.size,
             rt.curr_epoch() + 100,
         )?;
-
+        // Update state
         let root = rt.transaction(|st: &mut State, rt| {
             st.add(
                 rt.store(),
@@ -76,39 +70,33 @@ impl Actor {
                 params.metadata,
                 params.overwrite,
             )
-            .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to add object"))
+            .map_err(to_state_error("failed to add object"))
         })?;
         Ok(root)
     }
 
-    // TODO: use syscall to delete from actual storage
     fn delete_object(rt: &impl Runtime, params: DeleteParams) -> Result<Cid, ActorError> {
         Self::ensure_write_allowed(rt)?;
-
         let key = BytesKey(params.key);
-        let object = retrieve_object_state(rt, &key)?.ok_or(ActorError::unchecked(
-            ExitCode::USR_ILLEGAL_STATE,
-            "object not found".to_string(),
-        ))?;
-
+        let object = retrieve_object_state(rt, &key)?
+            .ok_or(ActorError::illegal_state("object not found".into()))?;
+        // Delete object's blob
         delete_blob(rt, object.hash)?;
-
+        // Update state
         let res = rt.transaction(|st: &mut State, rt| {
-            st.delete(rt.store(), &key).map_err(|e| {
-                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to delete object")
-            })
+            st.delete(rt.store(), &key)
+                .map_err(to_state_error("failed to delete object"))
         })?;
-
         Ok(res.1)
     }
 
     fn get_object(rt: &impl Runtime, params: GetParams) -> Result<Option<Object>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-
         if let Some(object_state) = retrieve_object_state(rt, &BytesKey(params.key))? {
             let blob = get_blob(rt, object_state.hash)?;
-            let object = build_object(&blob, &object_state);
-            Ok(Some(object))
+            let object = build_object(&blob, &object_state)
+                .map_err(to_state_error("failed to build object"))?;
+            Ok(object)
         } else {
             Ok(None)
         }
@@ -119,10 +107,9 @@ impl Actor {
         params: ListParams,
     ) -> Result<ListObjectsReturn, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-
-        let st: State = rt.state()?;
         let mut objects = Vec::new();
-        let prefixes = st
+        let prefixes = rt
+            .state::<State>()?
             .list(
                 rt.store(),
                 params.prefix,
@@ -131,15 +118,13 @@ impl Actor {
                 params.limit,
                 |key: Vec<u8>, object_state: ObjectState| -> anyhow::Result<()> {
                     let blob = get_blob(rt, object_state.hash)?;
-                    let object = build_object(&blob, &object_state);
-                    objects.push((key, object));
+                    if let Some(object) = build_object(&blob, &object_state)? {
+                        objects.push((key, object));
+                    }
                     Ok(())
                 },
             )
-            .map_err(|e| {
-                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to list objects")
-            })?;
-
+            .map_err(to_state_error("failed to list objects"))?;
         Ok(ListObjectsReturn {
             objects,
             common_prefixes: prefixes,
@@ -153,7 +138,6 @@ impl Actor {
         _: Option<IpldBlock>,
     ) -> Result<Option<IpldBlock>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-
         if method >= FIRST_EXPORTED_METHOD_NUMBER {
             Ok(None)
         } else {
@@ -167,21 +151,33 @@ fn retrieve_object_state(
     rt: &impl Runtime,
     key: &BytesKey,
 ) -> Result<Option<ObjectState>, ActorError> {
-    let state = rt.state::<State>()?;
-    state
+    rt.state::<State>()?
         .get(rt.store(), key)
-        .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to retrieve object"))
+        .map_err(to_state_error("failed to retrieve object"))
 }
 
 /// Build an object from its state and blob.
-fn build_object(blob: &Blob, object_state: &ObjectState) -> Object {
-    Object {
-        hash: object_state.hash,
-        size: blob.size,
-        expiry: blob.expiry,
-        metadata: object_state.metadata.clone(),
-        resolved: blob.resolved,
+fn build_object(blob: &Blob, object_state: &ObjectState) -> anyhow::Result<Option<Object>> {
+    match blob.status {
+        BlobStatus::Resolved => {
+            let max_sub = blob
+                .subs
+                .values()
+                .max_by_key(|sub| sub.expiry)
+                .ok_or_else(|| anyhow!("blob has no subscriptions; this should not happen"))?;
+            Ok(Some(Object {
+                hash: object_state.hash,
+                size: blob.size,
+                expiry: max_sub.expiry,
+                metadata: object_state.metadata.clone(),
+            }))
+        }
+        BlobStatus::Added(_) | BlobStatus::Failed => Ok(None),
     }
+}
+
+fn to_state_error(message: &'static str) -> impl FnOnce(anyhow::Error) -> ActorError {
+    move |e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, message)
 }
 
 impl MachineActor for Actor {
@@ -210,9 +206,11 @@ impl ActorCode for Actor {
 mod tests {
     use super::*;
 
+    use std::collections::HashMap;
+
     use cid::Cid;
     use fendermint_actor_blobs_shared::params::{AddBlobParams, DeleteBlobParams, GetBlobParams};
-    use fendermint_actor_blobs_shared::state::{Hash, PublicKey};
+    use fendermint_actor_blobs_shared::state::{BlobStatus, Hash, PublicKey, Subscription};
     use fendermint_actor_blobs_shared::{Method as BlobMethod, BLOBS_ACTOR_ADDR};
     use fendermint_actor_machine::WriteAccess;
     use fil_actors_evm_shared::address::EthAddress;
@@ -227,7 +225,6 @@ mod tests {
     use fvm_shared::econ::TokenAmount;
     use fvm_shared::error::ExitCode;
     use rand::RngCore;
-    use std::collections::HashMap;
 
     fn construct_and_verify(creator: Address) -> MockRuntime {
         let rt = MockRuntime {
@@ -615,6 +612,7 @@ mod tests {
 
         let key = vec![0, 1, 2];
         let hash = new_hash(256);
+        let expiry = ChainEpoch::from(100);
 
         // Prerequisite for a delete operation: add to have a proper state of the actor.
         let add_params: AddParams = AddParams {
@@ -635,7 +633,7 @@ mod tests {
                 source: add_params.source,
                 hash: add_params.hash,
                 size: add_params.size,
-                expiry: 100,
+                expiry,
             })
             .unwrap(),
             TokenAmount::from_whole(0),
@@ -654,9 +652,14 @@ mod tests {
 
         let blob = Blob {
             size: add_params.size,
-            expiry: 100 as ChainEpoch,
-            source: add_params.source,
-            resolved: true,
+            subs: HashMap::from([(
+                f4_eth_addr,
+                Subscription {
+                    expiry,
+                    source: add_params.source,
+                },
+            )]),
+            status: BlobStatus::Added(rt.curr_epoch()),
         };
         rt.expect_validate_caller_any();
         rt.expect_send_simple(
@@ -682,9 +685,8 @@ mod tests {
             Some(Object {
                 hash: hash.0,
                 size: blob.size,
-                expiry: blob.expiry,
+                expiry,
                 metadata: add_params.metadata,
-                resolved: blob.resolved,
             })
         );
         rt.verify();

@@ -10,7 +10,7 @@ use iroh::blobs::Hash;
 use iroh::net::{NodeAddr, NodeId};
 use std::collections::HashSet;
 
-/// Hashes we need to resolve from a specific source subnet, or our own.
+/// Hashes we need to resolve.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, std::hash::Hash)]
 pub struct ResolveKey {
     pub hash: Hash,
@@ -20,15 +20,15 @@ pub struct ResolveKey {
 /// Ongoing status of a resolution.
 ///
 /// The status also keeps track of which original items mapped to the same resolution key.
-/// These could be, for example, checkpoint of the same data with slightly different signatories.
 /// Once resolved, they all become available at the same time.
+/// TODO: include failure mechanism
 #[derive(Clone)]
 pub struct ResolveStatus<T> {
     /// Indicate whether the content has been resolved.
     ///
     /// If needed we can expand on this to include failure states.
     is_resolved: TVar<bool>,
-    /// The collection of items that all resolve to the same root CID and subnet.
+    /// The collection of items that all resolve to the same hash.
     items: TVar<im::HashSet<T>>,
 }
 
@@ -79,15 +79,8 @@ pub type ResolveQueue = TChan<ResolveTask>;
 /// between the resolver running in the background and the application waiting
 /// for the results.
 ///
-/// It is designed to resolve a single CID from a single subnet, per item,
-/// with the possibility of multiple items mapping to the same CID.
-///
-/// If items needed to have multiple CIDs, the completion of all resolutions
-/// culminating in the availability of the item, then we have to refactor this
-/// component to track dependencies in a different way. For now I am assuming
-/// that we can always design our messages in a way that there is a single root.
-/// We can also use technical wrappers to submit the same item under different
-/// guises and track the completion elsewhere.
+/// It is designed to resolve a single hash, per item,
+/// with the possibility of multiple items mapping to the same hash.
 #[derive(Clone, Default)]
 pub struct ResolvePool<T>
 where
@@ -127,6 +120,7 @@ where
 
         if items.contains_key(&key) {
             let status = items.get(&key).cloned().unwrap();
+            // TODO: fix to have multiple items per hash
             // status.items.update_mut(|items| {
             //     items.insert(item);
             // })?;

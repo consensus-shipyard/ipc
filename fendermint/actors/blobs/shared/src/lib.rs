@@ -2,7 +2,6 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::params::AddBlobParams;
 use fil_actors_runtime::runtime::Runtime;
 use fil_actors_runtime::{deserialize_block, extract_send_result, ActorError};
 use fvm_ipld_encoding::ipld_block::IpldBlock;
@@ -22,14 +21,15 @@ pub const BLOBS_ACTOR_ADDR: Address = Address::new_id(BLOBS_ACTOR_ID);
 pub enum Method {
     Constructor = METHOD_CONSTRUCTOR,
     GetStats = frc42_dispatch::method_hash!("GetStats"),
-    BuyCredit = frc42_dispatch::method_hash!("FundAccount"),
+    BuyCredit = frc42_dispatch::method_hash!("BuyCredit"),
     GetAccount = frc42_dispatch::method_hash!("GetAccount"),
     AddBlob = frc42_dispatch::method_hash!("AddBlob"),
-    GetResolvingBlobs = frc42_dispatch::method_hash!("GetResolvingBlobs"),
-    IsBlobResolving = frc42_dispatch::method_hash!("IsBlobResolving"),
-    ResolveBlob = frc42_dispatch::method_hash!("ResolveBlob"),
-    DeleteBlob = frc42_dispatch::method_hash!("DeleteBlob"),
     GetBlob = frc42_dispatch::method_hash!("GetBlob"),
+    GetBlobStatus = frc42_dispatch::method_hash!("GetBlobStatus"),
+    ResolveBlob = frc42_dispatch::method_hash!("ResolveBlob"),
+    GetResolvingBlobs = frc42_dispatch::method_hash!("GetResolvingBlobs"),
+    FailBlob = frc42_dispatch::method_hash!("FailBlob"),
+    DeleteBlob = frc42_dispatch::method_hash!("DeleteBlob"),
 }
 
 pub fn add_blob(
@@ -40,7 +40,7 @@ pub fn add_blob(
     size: u64,
     expiry: ChainEpoch,
 ) -> Result<(), ActorError> {
-    let add_params = IpldBlock::serialize_cbor(&AddBlobParams {
+    let add_params = IpldBlock::serialize_cbor(&params::AddBlobParams {
         from: Some(from),
         source,
         hash,
