@@ -42,13 +42,9 @@ jobs:
           node-version: 18.19.0
 
       - uses: Swatinem/rust-cache@v2
-        if: always()
-        with:
-          cache-on-failure: true
 
       - name: Cache Solidity ABI artifacts
         uses: actions/cache@v4
-        if: always()
         with:
           path: |
             ./contracts/out
@@ -79,7 +75,7 @@ jobs:
         run: cargo +nightly fmt --check --all
 
       - name: Check clippy
-        run: cargo clippy --tests --no-deps -- -D clippy::all
+        run: cargo clippy --release --tests --no-deps -- -D clippy::all
 
       - name: Build all
         run: |

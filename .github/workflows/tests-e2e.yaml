@@ -45,9 +45,6 @@ jobs:
           key: v2-contracts-abi-${{ hashFiles('./contracts/**/*.sol') }}
 
       - uses: Swatinem/rust-cache@v2
-        if: always()
-        with:
-          cache-on-failure: true
 
       - name: Run e2e tests
         run: cd fendermint && PROFILE=ci make e2e-only
