@@ -2,23 +2,24 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::{
-    AddParams, DeleteParams, GetParams, GotObject, ListParams, Method, Object, ObjectList, State,
-    OBJECTSTORE_ACTOR_NAME,
-};
 use cid::Cid;
-use fendermint_actor_blobs_shared::params::{AddBlobParams, DeleteBlobParams, GetBlobParams};
 use fendermint_actor_blobs_shared::state::Blob;
-use fendermint_actor_blobs_shared::{Method as BlobMethod, BLOBS_ACTOR_ADDR};
+use fendermint_actor_blobs_shared::{add_blob, delete_blob, get_blob};
 use fendermint_actor_machine::{ConstructorParams, MachineActor};
 use fil_actors_runtime::{
-    actor_dispatch, actor_error, deserialize_block, extract_send_result,
+    actor_dispatch, actor_error,
     runtime::{ActorCode, Runtime},
     ActorDowncast, ActorError, FIRST_EXPORTED_METHOD_NUMBER, INIT_ACTOR_ADDR,
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_ipld_hamt::BytesKey;
 use fvm_shared::{error::ExitCode, MethodNum};
+
+use crate::shared::{
+    AddParams, DeleteParams, GetParams, ListObjectsReturn, ListParams, Method, Object,
+    OBJECTSTORE_ACTOR_NAME,
+};
+use crate::state::{ObjectState, State};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
@@ -46,42 +47,32 @@ impl Actor {
 
     fn add_object(rt: &impl Runtime, params: AddParams) -> Result<Cid, ActorError> {
         Self::ensure_write_allowed(rt)?;
+
         let key = BytesKey(params.key);
-        if let Some(object) = Self::retrieve_object(rt, &key)? {
+        if let Some(object) = retrieve_object_state(rt, &key)? {
             if params.overwrite {
-                extract_send_result(rt.send_simple(
-                    &BLOBS_ACTOR_ADDR,
-                    BlobMethod::DeleteBlob as MethodNum,
-                    IpldBlock::serialize_cbor(&DeleteBlobParams(object.hash))?,
-                    rt.message().value_received(),
-                ))?;
+                delete_blob(rt, object.hash)?;
             } else {
                 return Err(ActorError::illegal_state(
-                    "asked not to overwrite".to_string(),
+                    "key exists; use overwrite to force".to_string(),
                 ));
             }
         }
 
-        let add_params = IpldBlock::serialize_cbor(&AddBlobParams {
-            from: Some(params.to),
-            source: params.source,
-            hash: params.hash,
-            size: params.size as u64,
-            expiry: rt.curr_epoch() + 100,
-        })?;
-        extract_send_result(rt.send_simple(
-            &BLOBS_ACTOR_ADDR,
-            BlobMethod::AddBlob as MethodNum,
-            add_params,
-            rt.message().value_received(),
-        ))?;
+        add_blob(
+            rt,
+            params.to,
+            params.source,
+            params.hash,
+            params.size,
+            rt.curr_epoch() + 100,
+        )?;
 
         let root = rt.transaction(|st: &mut State, rt| {
             st.add(
                 rt.store(),
                 key,
                 params.hash,
-                params.size,
                 params.metadata,
                 params.overwrite,
             )
@@ -90,69 +81,69 @@ impl Actor {
         Ok(root)
     }
 
-    // Deleting an object removes the key from the store, but not from the underlying storage.
-    // So, we can't just delete it here via syscall.
-    // Once implemented, the DA mechanism may cause the data to be entangled with other data.
-    // The retention policies will handle deleting / GC.
+    // TODO: use syscall to delete from actual storage
     fn delete_object(rt: &impl Runtime, params: DeleteParams) -> Result<Cid, ActorError> {
         Self::ensure_write_allowed(rt)?;
+
         let key = BytesKey(params.key);
-        // 1. Retrieve object CID
-        let object = Self::retrieve_object(rt, &key)?.ok_or(ActorError::unchecked(
+        let object = retrieve_object_state(rt, &key)?.ok_or(ActorError::unchecked(
             ExitCode::USR_ILLEGAL_STATE,
-            "no object stored".to_string(),
+            "object not found".to_string(),
         ))?;
-        // 2. Delete from the blobs actor
-        extract_send_result(rt.send_simple(
-            &BLOBS_ACTOR_ADDR,
-            BlobMethod::DeleteBlob as MethodNum,
-            IpldBlock::serialize_cbor(&DeleteBlobParams(object.hash))?,
-            rt.message().value_received(),
-        ))?;
-        // 3. Delete from the state
+
+        delete_blob(rt, object.hash)?;
+
         let res = rt.transaction(|st: &mut State, rt| {
             st.delete(rt.store(), &key).map_err(|e| {
                 e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to delete object")
             })
         })?;
+
         Ok(res.1)
     }
 
-    fn get_object(rt: &impl Runtime, params: GetParams) -> Result<Option<GotObject>, ActorError> {
+    fn get_object(rt: &impl Runtime, params: GetParams) -> Result<Option<Object>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        if let Some(object) = Self::retrieve_object(rt, &BytesKey(params.key))? {
-            let blob = deserialize_block::<Blob>(extract_send_result(rt.send_simple(
-                &BLOBS_ACTOR_ADDR,
-                BlobMethod::GetBlob as MethodNum,
-                IpldBlock::serialize_cbor(&GetBlobParams(object.hash))?,
-                rt.message().value_received(),
-            ))?)?;
-            Ok(Some(GotObject {
-                hash: object.hash,
-                size: blob.size as usize,
-                expiry: blob.expiry,
-                metadata: object.metadata,
-            }))
+
+        if let Some(object_state) = retrieve_object_state(rt, &BytesKey(params.key))? {
+            let blob = get_blob(rt, object_state.hash)?;
+            let object = build_object(&blob, &object_state);
+            Ok(Some(object))
         } else {
             Ok(None)
         }
     }
 
-    fn list_objects(rt: &impl Runtime, params: ListParams) -> Result<ObjectList, ActorError> {
+    fn list_objects(
+        rt: &impl Runtime,
+        params: ListParams,
+    ) -> Result<ListObjectsReturn, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
+
         let st: State = rt.state()?;
-        let objects = st
+        let mut objects = Vec::new();
+        let prefixes = st
             .list(
                 rt.store(),
                 params.prefix,
                 params.delimiter,
                 params.offset,
                 params.limit,
+                |key: Vec<u8>, object_state: ObjectState| -> anyhow::Result<()> {
+                    let blob = get_blob(rt, object_state.hash)?;
+                    let object = build_object(&blob, &object_state);
+                    objects.push((key, object));
+                    Ok(())
+                },
             )
             .map_err(|e| {
                 e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to list objects")
             })?;
-        Ok(objects)
+
+        Ok(ListObjectsReturn {
+            objects,
+            common_prefixes: prefixes,
+        })
     }
 
     /// Fallback method for unimplemented method numbers.
@@ -162,20 +153,34 @@ impl Actor {
         _: Option<IpldBlock>,
     ) -> Result<Option<IpldBlock>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
+
         if method >= FIRST_EXPORTED_METHOD_NUMBER {
             Ok(None)
         } else {
             Err(actor_error!(unhandled_message; "invalid method: {}", method))
         }
     }
+}
 
-    /// Retrieve object from the state.
-    fn retrieve_object(rt: &impl Runtime, key: &BytesKey) -> Result<Option<Object>, ActorError> {
-        let state = rt.state::<State>()?;
-        let store = rt.store();
-        state.get(store, key).map_err(|e| {
-            e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to retrieve object")
-        })
+/// Retrieve an object from the state.
+fn retrieve_object_state(
+    rt: &impl Runtime,
+    key: &BytesKey,
+) -> Result<Option<ObjectState>, ActorError> {
+    let state = rt.state::<State>()?;
+    state
+        .get(rt.store(), key)
+        .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to retrieve object"))
+}
+
+/// Build an object from its state and blob.
+fn build_object(blob: &Blob, object_state: &ObjectState) -> Object {
+    Object {
+        hash: object_state.hash,
+        size: blob.size,
+        expiry: blob.expiry,
+        metadata: object_state.metadata.clone(),
+        resolved: blob.resolved,
     }
 }
 
@@ -206,7 +211,9 @@ mod tests {
     use super::*;
 
     use cid::Cid;
+    use fendermint_actor_blobs_shared::params::{AddBlobParams, DeleteBlobParams, GetBlobParams};
     use fendermint_actor_blobs_shared::state::{Hash, PublicKey};
+    use fendermint_actor_blobs_shared::{Method as BlobMethod, BLOBS_ACTOR_ADDR};
     use fendermint_actor_machine::WriteAccess;
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::runtime::Runtime;
@@ -284,7 +291,7 @@ mod tests {
             source: new_pk(),
             key: vec![0, 1, 2],
             hash: hash.0,
-            size: hash.1 as usize,
+            size: hash.1,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -296,7 +303,7 @@ mod tests {
                 from: Some(add_params.to),
                 source: add_params.source,
                 hash: add_params.hash,
-                size: add_params.size as u64,
+                size: add_params.size,
                 expiry: 100,
             })
             .unwrap(),
@@ -337,7 +344,7 @@ mod tests {
             source: new_pk(),
             key: vec![0, 1, 2],
             hash: hash.0,
-            size: hash.1 as usize,
+            size: hash.1,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -349,7 +356,7 @@ mod tests {
                 from: Some(add_params.to),
                 source: add_params.source,
                 hash: add_params.hash,
-                size: add_params.size as u64,
+                size: add_params.size,
                 expiry: 100,
             })
             .unwrap(),
@@ -376,7 +383,7 @@ mod tests {
             source: add_params.source,
             key: add_params.key,
             hash: hash.0,
-            size: hash.1 as usize,
+            size: hash.1,
             metadata: HashMap::new(),
             overwrite: true,
         };
@@ -396,7 +403,7 @@ mod tests {
                 from: Some(add_params2.to),
                 source: add_params2.source,
                 hash: add_params2.hash,
-                size: add_params2.size as u64,
+                size: add_params2.size,
                 expiry: 100,
             })
             .unwrap(),
@@ -437,7 +444,7 @@ mod tests {
             source: new_pk(),
             key: vec![0, 1, 2],
             hash: hash.0,
-            size: hash.1 as usize,
+            size: hash.1,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -449,7 +456,7 @@ mod tests {
                 from: Some(add_params.to),
                 source: add_params.source,
                 hash: add_params.hash,
-                size: add_params.size as u64,
+                size: add_params.size,
                 expiry: 100,
             })
             .unwrap(),
@@ -476,7 +483,7 @@ mod tests {
             source: add_params.source,
             key: add_params.key,
             hash: hash.0,
-            size: hash.1 as usize,
+            size: hash.1,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -513,7 +520,7 @@ mod tests {
             source: new_pk(),
             key: key.clone(),
             hash: hash.0,
-            size: hash.1 as usize,
+            size: hash.1,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -525,7 +532,7 @@ mod tests {
                 from: Some(add_params.to),
                 source: add_params.source,
                 hash: add_params.hash,
-                size: add_params.size as u64,
+                size: add_params.size,
                 expiry: 100,
             })
             .unwrap(),
@@ -546,7 +553,7 @@ mod tests {
         assert_eq!(state.root, result_add);
         rt.verify();
 
-        // Now actually delete.
+        // Now actually delete it.
         let delete_params = DeleteParams { key: key.clone() };
         rt.expect_validate_caller_any();
         rt.expect_send_simple(
@@ -587,7 +594,7 @@ mod tests {
             )
             .unwrap()
             .unwrap()
-            .deserialize::<Option<GotObject>>();
+            .deserialize::<Option<Object>>();
         assert!(result.is_ok());
         assert_eq!(result, Ok(None));
         rt.verify();
@@ -615,7 +622,7 @@ mod tests {
             source: new_pk(),
             key: key.clone(),
             hash: hash.0,
-            size: hash.1 as usize,
+            size: hash.1,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -627,7 +634,7 @@ mod tests {
                 from: Some(add_params.to),
                 source: add_params.source,
                 hash: add_params.hash,
-                size: add_params.size as u64,
+                size: add_params.size,
                 expiry: 100,
             })
             .unwrap(),
@@ -646,7 +653,7 @@ mod tests {
         rt.verify();
 
         let blob = Blob {
-            size: add_params.size as u64,
+            size: add_params.size,
             expiry: 100 as ChainEpoch,
             source: add_params.source,
             resolved: true,
@@ -668,15 +675,16 @@ mod tests {
             )
             .unwrap()
             .unwrap()
-            .deserialize::<Option<GotObject>>();
+            .deserialize::<Option<Object>>();
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
-            Some(GotObject {
+            Some(Object {
                 hash: hash.0,
-                size: blob.size as usize,
+                size: blob.size,
                 expiry: blob.expiry,
-                metadata: add_params.metadata
+                metadata: add_params.metadata,
+                resolved: blob.resolved,
             })
         );
         rt.verify();
