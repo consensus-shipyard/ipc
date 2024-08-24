@@ -80,10 +80,10 @@ jobs:
       - name: Check clippy
         run: cargo clippy --release --tests --no-deps -- -D clippy::all
 
-      - name: Build all
+      - name: Build all (including tests, benches, examples)
         run: |
           cd fendermint && make $PWD/builtin-actors/output/bundle.car
-          cargo build --locked --release
+          cargo build --locked --release --all-targets
 
       - name: Build Docker image for e2e tests
         run: |
