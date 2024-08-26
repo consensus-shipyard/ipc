@@ -72,8 +72,9 @@ impl GenesisMetadata {
 }
 
 /// Genesis app state wrapper for cometbft
+#[repr(u8)]
 pub enum GenesisAppState {
-    V1(Vec<u8>),
+    V1(Vec<u8>) = 1,
 }
 
 impl GenesisAppState {
@@ -100,12 +101,14 @@ impl GenesisAppState {
         }
 
         match bytes[0] {
-            0 => {
-                let mut buf = vec![];
-                snap::read::FrameDecoder::new(&bytes.as_slice()[1..]).read_to_end(&mut buf)?;
+            1 => {
+                let data = &bytes.as_slice()[1..];
+                let len = snap::raw::decompress_len(data).context("failed to calculate length of decompressed app state")?;
+                let mut buf = Vec::with_capacity(len);
+                snap::read::FrameDecoder::new(data).read_to_end(&mut buf)?;
                 Ok(buf)
             }
-            _ => Err(anyhow!("not supported schema versioin")),
+            _ => Err(anyhow!("unsupported schema version")),
         }
     }
 }
