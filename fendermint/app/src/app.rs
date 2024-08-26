@@ -42,12 +42,14 @@ use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 use tendermint::abci::request::CheckTxKind;
 use tendermint::abci::{request, response};
+use tendermint_rpc::Client;
 use tracing::instrument;
 
 use crate::observe::{
     BlockCommitted, BlockProposalEvaluated, BlockProposalReceived, BlockProposalSent, Message,
     MpoolReceived,
 };
+use crate::validators::ValidatorTracker;
 use crate::AppExitCode;
 use crate::BlockHeight;
 use crate::{tmconv::*, VERSION};
@@ -116,10 +118,11 @@ pub struct AppConfig<S: KVStore> {
 
 /// Handle ABCI requests.
 #[derive(Clone)]
-pub struct App<DB, SS, S, I>
+pub struct App<DB, SS, S, I, C>
 where
     SS: Blockstore + Clone + 'static,
     S: KVStore,
+    C: Client,
 {
     /// Database backing all key-value operations.
     db: Arc<DB>,
@@ -160,9 +163,11 @@ where
     ///
     /// Zero means unlimited.
     state_hist_size: u64,
+    /// Tracks the validator
+    validators: ValidatorTracker<C>,
 }
 
-impl<DB, SS, S, I> App<DB, SS, S, I>
+impl<DB, SS, S, I, C> App<DB, SS, S, I, C>
 where
     S: KVStore
         + Codec<AppState>
@@ -171,6 +176,7 @@ where
         + Codec<FvmStateParams>,
     DB: KVWritable<S> + KVReadable<S> + Clone + 'static,
     SS: Blockstore + Clone + 'static,
+    C: Client,
 {
     pub fn new(
         config: AppConfig<S>,
@@ -179,6 +185,7 @@ where
         interpreter: I,
         chain_env: ChainEnv,
         snapshots: Option<SnapshotClient>,
+        client: C,
     ) -> Result<Self> {
         let app = Self {
             db: Arc::new(db),
@@ -193,13 +200,14 @@ where
             snapshots,
             exec_state: Arc::new(tokio::sync::Mutex::new(None)),
             check_state: Arc::new(tokio::sync::Mutex::new(None)),
+            validators: ValidatorTracker::new(client),
         };
         app.init_committed_state()?;
         Ok(app)
     }
 }
 
-impl<DB, SS, S, I> App<DB, SS, S, I>
+impl<DB, SS, S, I, C> App<DB, SS, S, I, C>
 where
     S: KVStore
         + Codec<AppState>
@@ -208,6 +216,7 @@ where
         + Codec<FvmStateParams>,
     DB: KVWritable<S> + KVReadable<S> + 'static + Clone,
     SS: Blockstore + 'static + Clone,
+    C: Client,
 {
     /// Get an owned clone of the state store.
     fn state_store_clone(&self) -> SS {
@@ -393,7 +402,7 @@ where
 // the `tower-abci` library would throw an exception when it tried to convert a
 // `Response::Exception` into a `ConsensusResponse` for example.
 #[async_trait]
-impl<DB, SS, S, I> Application for App<DB, SS, S, I>
+impl<DB, SS, S, I, C> Application for App<DB, SS, S, I, C>
 where
     S: KVStore
         + Codec<AppState>
@@ -421,6 +430,7 @@ where
         Query = BytesMessageQuery,
         Output = BytesMessageQueryRes,
     >,
+    C: Client + Sync,
 {
     /// Provide information about the ABCI application.
     async fn info(&self, _request: request::Info) -> AbciResult<response::Info> {
@@ -727,10 +737,14 @@ where
 
         state_params.timestamp = to_timestamp(request.header.time);
 
+        let validator = self
+            .validators
+            .get_validator(&request.header.proposer_address, block_height)
+            .await?;
         let state = FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
             .context("error creating new state")?
             .with_block_hash(block_hash)
-            .with_validator_id(request.header.proposer_address);
+            .with_validator(validator);
 
         tracing::debug!("initialized exec state");
 

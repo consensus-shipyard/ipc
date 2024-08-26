@@ -383,7 +383,9 @@ where
                     tracing::debug!("chain interpreter applied topdown msgs");
 
                     let local_block_height = state.block_height() as u64;
-                    let proposer = state.validator_id().map(|id| id.to_string());
+                    let proposer = state
+                        .validator_pubkey()
+                        .map(|id| hex::encode(id.serialize_compressed()));
                     let proposer_ref = proposer.as_deref();
 
                     atomically(|| {

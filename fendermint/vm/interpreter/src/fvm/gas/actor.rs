@@ -1,19 +1,26 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::fvm::gas::{Available, Gas, GasMarket};
+use crate::fvm::gas::{Available, Gas, GasMarket, GasUtilization};
 use crate::fvm::FvmMessage;
 use anyhow::Context;
 
 use crate::fvm::cometbft::ConsensusBlockUpdate;
 use fendermint_actor_gas_market::{GasMarketReading, SetConstants};
+use fendermint_crypto::PublicKey;
+use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::gas::GAS_MARKET_ACTOR_ADDR;
-use fendermint_vm_actor_interface::system;
+use fendermint_vm_actor_interface::{reward, system};
 use fvm::executor::{ApplyKind, ApplyRet, Executor};
+use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
+use fvm_shared::econ::TokenAmount;
+use fvm_shared::METHOD_SEND;
 
 #[derive(Default)]
 pub struct ActorGasMarket {
+    /// The total gas premium for the miner
+    gas_premium: TokenAmount,
     /// The block gas limit
     block_gas_limit: Gas,
     /// The accumulated gas usage so far
@@ -39,8 +46,9 @@ impl GasMarket for ActorGasMarket {
         }
     }
 
-    fn record_utilization(&mut self, gas: Gas) {
-        self.block_gas_used += gas;
+    fn record_utilization(&mut self, utilization: GasUtilization) {
+        self.gas_premium += utilization.gas_premium;
+        self.block_gas_used += utilization.gas_used;
 
         // sanity check
         if self.block_gas_used >= self.block_gas_limit {
@@ -80,6 +88,7 @@ impl ActorGasMarket {
                 .context("failed to parse gas market readying")?;
 
         Ok(Self {
+            gas_premium: TokenAmount::from_atto(0),
             block_gas_limit: reading.block_gas_limit,
             block_gas_used: 0,
             constant_update: None,
@@ -96,9 +105,43 @@ impl ActorGasMarket {
         &self,
         executor: &mut E,
         block_height: ChainEpoch,
+        validator: Option<PublicKey>,
     ) -> anyhow::Result<()> {
         self.commit_constants(executor, block_height)?;
-        self.commit_utilization(executor, block_height)
+        self.commit_utilization(executor, block_height)?;
+        self.distribute_reward(executor, block_height, validator)
+    }
+
+    fn distribute_reward<E: Executor>(
+        &self,
+        executor: &mut E,
+        block_height: ChainEpoch,
+        validator: Option<PublicKey>,
+    ) -> anyhow::Result<()> {
+        if validator.is_none() || self.gas_premium.is_zero() {
+            return Ok(());
+        }
+
+        let validator = validator.unwrap();
+        let validator = Address::from(EthAddress::new_secp256k1(&validator.serialize())?);
+
+        let msg = FvmMessage {
+            from: reward::REWARD_ACTOR_ADDR,
+            to: validator,
+            sequence: block_height as u64,
+            // exclude this from gas restriction
+            gas_limit: i64::MAX as u64,
+            method_num: METHOD_SEND,
+            params: fvm_ipld_encoding::RawBytes::default(),
+            value: self.gas_premium.clone(),
+
+            version: Default::default(),
+            gas_fee_cap: Default::default(),
+            gas_premium: Default::default(),
+        };
+        self.exec_msg_implicitly(msg, executor)?;
+
+        Ok(())
     }
 
     fn commit_constants<E: Executor>(
@@ -123,7 +166,7 @@ impl ActorGasMarket {
             gas_fee_cap: Default::default(),
             gas_premium: Default::default(),
         };
-        self.call_fvm(msg, executor)?;
+        self.exec_msg_implicitly(msg, executor)?;
 
         Ok(())
     }
@@ -152,11 +195,15 @@ impl ActorGasMarket {
             gas_premium: Default::default(),
         };
 
-        self.call_fvm(msg, executor)?;
+        self.exec_msg_implicitly(msg, executor)?;
         Ok(())
     }
 
-    fn call_fvm<E: Executor>(&self, msg: FvmMessage, executor: &mut E) -> anyhow::Result<ApplyRet> {
+    fn exec_msg_implicitly<E: Executor>(
+        &self,
+        msg: FvmMessage,
+        executor: &mut E,
+    ) -> anyhow::Result<ApplyRet> {
         let raw_length = fvm_ipld_encoding::to_vec(&msg).map(|bz| bz.len())?;
         let apply_ret = executor.execute_message(msg, ApplyKind::Implicit, raw_length)?;
 

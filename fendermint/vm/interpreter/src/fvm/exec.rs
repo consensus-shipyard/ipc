@@ -13,7 +13,7 @@ use ipc_observability::{emit, measure_time, observe::TracingError, Traceable};
 use tendermint_rpc::Client;
 
 use crate::fvm::cometbft::EndBlockUpdate;
-use crate::fvm::gas::GasMarket;
+use crate::fvm::gas::{GasMarket, GasUtilization};
 use crate::ExecInterpreter;
 
 use super::{
@@ -175,7 +175,7 @@ where
 
             state
                 .gas_market_mut()
-                .record_utilization(apply_ret.msg_receipt.gas_used);
+                .record_utilization(GasUtilization::from(&apply_ret));
 
             (apply_ret, emitters, latency)
         };

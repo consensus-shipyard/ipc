@@ -1,12 +1,20 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use fvm::executor::ApplyRet;
+use fvm_shared::econ::TokenAmount;
+
 pub mod actor;
 
 pub type Gas = u64;
 
 pub struct Available {
     pub block_gas: Gas,
+}
+
+pub struct GasUtilization {
+    gas_used: Gas,
+    gas_premium: TokenAmount,
 }
 
 /// The gas market for fendermint. This should be backed by an fvm actor.
@@ -26,5 +34,14 @@ pub trait GasMarket {
     fn available(&self) -> Available;
 
     /// Tracks the amount of gas consumed by a transaction
-    fn record_utilization(&mut self, gas: Gas);
+    fn record_utilization(&mut self, gas: GasUtilization);
+}
+
+impl From<&ApplyRet> for GasUtilization {
+    fn from(ret: &ApplyRet) -> Self {
+        Self {
+            gas_used: ret.msg_receipt.gas_used,
+            gas_premium: ret.miner_tip.clone(),
+        }
+    }
 }
