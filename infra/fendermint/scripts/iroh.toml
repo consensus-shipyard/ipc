@@ -7,7 +7,7 @@ docker run \
   --user $(id -u) \
   --network ${NETWORK_NAME} \
   --volume ${IROH_DIR}:/data/iroh \
-  --volume ${IROH_CONFIG_FOLDER}/iroh.config.toml:/etc/iroh/iroh.config.toml \
+  --volume ${IROH_CONFIG_PATH}:/etc/iroh/iroh.config.toml \
   --publish 127.0.0.1:${IROH_RPC_HOST_PORT}:4919/udp \
   --publish 127.0.0.1:${IROH_METRICS_HOST_PORT}:9090 \
   --env IROH_DATA_DIR=/data/iroh \
@@ -17,7 +17,12 @@ docker run \
   --config /etc/iroh/iroh.config.toml \
   start
 """
-dependencies = ["docker-network-create"]
+dependencies = ["docker-network-create", "iroh-config"]
+
+[tasks.iroh-config]
+script = """
+cp ${IROH_CONFIG_FOLDER}/iroh.config.toml ${IROH_CONFIG_PATH}
+"""
 
 [tasks.iroh-start]
 extend = "iroh-run"

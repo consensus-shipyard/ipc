@@ -172,11 +172,15 @@ dependencies = ["docker-network-create", "fendermint-deps"]
 
 [tasks.fendermint-tool]
 script.main = """
+
+echo fendermint-tool CMD $CMD
+echo fendermint-tool NETWORK_NAME $NETWORK_NAME
+
 docker run \
   ${FLAGS} \
   --init \
   --user $(id -u) \
-  --volume ${BASE_DIR}:/fendermint/ \
+  --volume ${BASE_DIR}:/data \
   --network=${NETWORK_NAME} \
   --env LOG_LEVEL=${FM_LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \

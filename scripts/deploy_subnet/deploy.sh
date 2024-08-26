@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -euo pipefail
+#set -euo pipefail
 
 DASHES='------'
 
@@ -39,7 +39,9 @@ if ! $local_deploy ; then
     exit 1
   fi
 else
-  SUPPLY_SOURCE_ADDRESS="TODO: what is this?"
+  # we set SUPPLY_SOURCE_ADDRESS below for the local net
+  # TODO: should this just be an empty string for local? maybe hust leave it undefined?
+  PARENT_HTTP_AUTH_TOKEN=""
 fi
 
 if [[ $local_deploy = true ]]; then
@@ -59,7 +61,7 @@ wallet_addresses=()
 public_keys=()
 CMT_P2P_HOST_PORTS=(26656 26756 26856)
 CMT_RPC_HOST_PORTS=(26657 26757 26857)
-ETHAPI_HOST_PORTS=(8545 8645 8745)
+ETHAPI_HOST_PORTS=(8645 8745 8845)
 RESOLVER_HOST_PORTS=(26655 26755 26855)
 OBJECTS_HOST_PORTS=(8001 8002 8003)
 IROH_RPC_HOST_PORTS=(4921 4922 4923)
@@ -71,6 +73,17 @@ PROMTAIL_AGENT_HOST_PORTS=(9080 9081 9082)
 PROMETHEUS_HOST_PORT=9090
 LOKI_HOST_PORT=3100
 GRAFANA_HOST_PORT=3000
+ANVIL_HOST_PORT=8545
+
+if [[ -z ${PARENT_ENDPOINT+x} ]]; then
+  if [[ $local_deploy == true ]]; then
+    echo "$DASHES using local PARENT_ENDPOINT"
+    PARENT_ENDPOINT="http://anvil:${ANVIL_HOST_PORT}"
+  else
+    echo "$DASHES using calibration PARENT_ENDPOINT"
+    PARENT_ENDPOINT="https://calibration.node.glif.io/archive/lotus/rpc/v1"
+  fi
+fi
 
 # Install build dependencies
 if [[ -z ${SKIP_BUILD+x} || "$SKIP_BUILD" == "" || "$SKIP_BUILD" == "false" ]]; then
@@ -212,14 +225,17 @@ mkdir -p "$IPC_CONFIG_FOLDER"
 # Copy configs
 # TODO: how do we know the evm_keystore.json exists?
 if ! $local_deploy ; then
+  echo "$DASHES using calibration net config $DASHES"
   cp "$HOME"/evm_keystore.json "$IPC_CONFIG_FOLDER"
-  cp "$IPC_FOLDER"/scripts/deploy_subnet/.ipc-local/config.toml "$IPC_CONFIG_FOLDER"
-else
   cp "$IPC_FOLDER"/scripts/deploy_subnet/.ipc-cal/config.toml "$IPC_CONFIG_FOLDER"
+else
+  echo "$DASHES using local net config $DASHES"
+  cp "$IPC_FOLDER"/scripts/deploy_subnet/.ipc-local/config.toml "$IPC_CONFIG_FOLDER"
 fi
 cp "$IPC_FOLDER"/infra/prometheus/prometheus.yaml "$IPC_CONFIG_FOLDER"
 cp "$IPC_FOLDER"/infra/loki/loki-config.yaml "$IPC_CONFIG_FOLDER"
 cp "$IPC_FOLDER"/infra/promtail/promtail-config.yaml "$IPC_CONFIG_FOLDER"
+cp "$IPC_FOLDER"/infra/iroh/iroh-config.yaml "$IPC_CONFIG_FOLDER"
 
 if [[ -z ${SKIP_BUILD+x} || "$SKIP_BUILD" == "" || "$SKIP_BUILD" == "false" ]]; then
   # Build contracts
@@ -235,7 +251,8 @@ fi
 
 
 if [[ $local_deploy = true ]]; then
-  subnet_id="/31337/"
+  # TODO: should we remove and recreate the docker network somewhere here?
+  subnet_id="/r31337/t410f6dl55afbyjbpupdtrmedyqrnmxdmpk7rxuduafq"
   cd "$IPC_FOLDER"
   cargo make --makefile infra/fendermint/Makefile.toml \
       -e NODE_NAME=anvil \
@@ -305,13 +322,34 @@ echo "$deploy_contracts_output"
 echo ""
 
   PARENT_GATEWAY_ADDRESS=$(echo "$deploy_contracts_output" | grep '"Gateway"' | awk -F'"' '{print $4}')
+# TODO: remove echos in this `if`` block, they are for debug
+echo "Gateway address: $PARENT_GATEWAY_ADDRESS"
+
   PARENT_REGISTRY_ADDRESS=$(echo "$deploy_contracts_output" | grep '"SubnetRegistry"' | awk -F'"' '{print $4}')
-  # TODO: SUPPLY_SOURCE_ADDRESS is in here i think
-  SUPPLY_SOURCE_ADDRESS=$(echo "$deploy_contracts_output" | grep '"SupplySource"' | awk -F'"' '{print $4}')
+echo "Registry address: $PARENT_REGISTRY_ADDRESS"
+  # TODO: for local we need to deploy the erc20 supply source token to the anvil parent
+
+  # TODO: need to decide how to handle local contracts repo. This just assumes the use has already cloned `contracts`
+  #       then run  `forge install` and `forge build`
+  cd "${IPC_FOLDER}/../contracts"
+  # need to run clean or we hit upgradeable saftey validation errors resulting from contracts with the same name
+  forge clean
+  # TODO: dockerize this command?
+  # privkey is anvil #4
+  deploy_supply_source_token_out="$(PRIVATE_KEY=0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a forge script script/Hoku.s.sol --tc DeployScript 0 --sig 'run(uint8)' --rpc-url "http://localhost:${ANVIL_HOST_PORT}" --broadcast -vv)"
+
+echo "$DASHES deploy suppply source token output $DASHES"
+echo ""
+echo "$deploy_supply_source_token_out"
+echo ""
+# 0x2910E325cf29dd912E3476B61ef12F49cb931096
+  SUPPLY_SOURCE_ADDRESS=$(echo "$deploy_supply_source_token_out" | grep -oP 'contract Hoku\s\K\w+')
+
+  cd "$IPC_FOLDER"
 fi
 echo "Gateway address: $PARENT_GATEWAY_ADDRESS"
 echo "Registry address: $PARENT_REGISTRY_ADDRESS"
-#echo "Supply source address: $SUPPLY_SOURCE_ADDRESS"
+echo "Supply source address: $SUPPLY_SOURCE_ADDRESS"
 
 # Use the parent gateway and registry address to update IPC config file
 toml set "${IPC_CONFIG_FOLDER}"/config.toml subnets[0].config.gateway_addr "$PARENT_GATEWAY_ADDRESS" > /tmp/config.toml.1
@@ -320,9 +358,9 @@ cp /tmp/config.toml.2 "${IPC_CONFIG_FOLDER}"/config.toml
 
 # Create a subnet
 echo "$DASHES Creating a child subnet..."
-root_id=$(toml get "${IPC_CONFIG_FOLDER}"/config.toml subnets[0].id)
+root_id=$(toml get "${IPC_CONFIG_FOLDER}"/config.toml subnets[0].id | tr -d '"')
 echo "Using root: $root_id"
-create_subnet_output=$(ipc-cli subnet create --from "$default_wallet_address" --parent "$root_id" --min-validators 2 --min-validator-stake 1 --bottomup-check-period 600 --active-validators-limit 3 --permission-mode federated --supply-source-kind erc20 --supply-source-address "$SUPPLY_SOURCE_ADDRESS" 2>&1)
+create_subnet_output=$(ipc-cli subnet create --from $default_wallet_address --parent $root_id --min-validators 2 --min-validator-stake 1 --bottomup-check-period 600 --active-validators-limit 3 --permission-mode federated --supply-source-kind erc20 --supply-source-address $SUPPLY_SOURCE_ADDRESS 2>&1)
 
 echo "$DASHES create subnet output $DASHES"
 echo ""
@@ -354,10 +392,12 @@ echo "Wait for 30 seconds"
 sleep 30
 echo "Finished waiting"
 cd "${IPC_FOLDER}"
+
 bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=validator-0 \
     -e PRIVATE_KEY_PATH="${IPC_CONFIG_FOLDER}"/validator_0.sk \
     -e SUBNET_ID="${subnet_id}" \
+    -e PARENT_ENDPOINT="${PARENT_ENDPOINT}" \
     -e CMT_P2P_HOST_PORT="${CMT_P2P_HOST_PORTS[0]}" \
     -e CMT_RPC_HOST_PORT="${CMT_RPC_HOST_PORTS[0]}" \
     -e ETHAPI_HOST_PORT="${ETHAPI_HOST_PORTS[0]}" \
@@ -368,6 +408,7 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e IROH_METRICS_HOST_PORT="${IROH_METRICS_HOST_PORTS[0]}" \
     -e PROMTAIL_AGENT_HOST_PORT="${PROMTAIL_AGENT_HOST_PORTS[0]}" \
     -e PROMTAIL_CONFIG_FOLDER="${IPC_CONFIG_FOLDER}" \
+    -e IROH_CONFIG_FOLDER="${IPC_FOLDER}/infra/iroh/" \
     -e PARENT_HTTP_AUTH_TOKEN="${PARENT_HTTP_AUTH_TOKEN}" \
     -e PARENT_REGISTRY="${PARENT_REGISTRY_ADDRESS}" \
     -e PARENT_GATEWAY="${PARENT_GATEWAY_ADDRESS}" \
@@ -393,6 +434,7 @@ do
       -e NODE_NAME=validator-"${i}" \
       -e PRIVATE_KEY_PATH="${IPC_CONFIG_FOLDER}"/validator_"${i}".sk \
       -e SUBNET_ID="${subnet_id}" \
+      -e PARENT_ENDPOINT="${PARENT_ENDPOINT}" \
       -e CMT_P2P_HOST_PORT="${CMT_P2P_HOST_PORTS[i]}" \
       -e CMT_RPC_HOST_PORT="${CMT_RPC_HOST_PORTS[i]}" \
       -e ETHAPI_HOST_PORT="${ETHAPI_HOST_PORTS[i]}" \
@@ -403,6 +445,7 @@ do
       -e IROH_METRICS_HOST_PORT="${IROH_METRICS_HOST_PORTS[i]}" \
       -e PROMTAIL_AGENT_HOST_PORT="${PROMTAIL_AGENT_HOST_PORTS[i]}" \
       -e PROMTAIL_CONFIG_FOLDER="${IPC_CONFIG_FOLDER}" \
+      -e IROH_CONFIG_FOLDER="${IPC_FOLDER}/infra/iroh/" \
       -e RESOLVER_BOOTSTRAPS="${bootstrap_resolver_endpoint}" \
       -e BOOTSTRAPS="${bootstrap_node_endpoint}" \
       -e PARENT_HTTP_AUTH_TOKEN="${PARENT_HTTP_AUTH_TOKEN}" \
@@ -465,7 +508,7 @@ printf "\n%s Test Prometheus endpoints of validator nodes\n" $DASHES
 curl --location http://localhost:"${PROMETHEUS_HOST_PORT}"/graph
 for i in {0..2}
 do
-  curl --location http://localhost:"${FENDERMINT_METRICS_HOST_PORTS[i]}"/metrics
+  curl --location http://localhost:"${FENDERMINT_METRICS_HOST_PORTS[i]}"/metrics | grep succes
 done
 
 # Kill existing relayer if there's one
