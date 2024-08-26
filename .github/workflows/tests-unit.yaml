@@ -33,14 +33,9 @@ jobs:
             ./contracts/cache
           key: v2-contracts-abi-${{ hashFiles('./contracts/**/*.sol') }}
 
-      - name: Cache Cargo Build
-        uses: actions/cache@v4
+      - uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            /home/runner/.cargo/registry
-            /home/runner/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          shared-key: build
 
       - name: Run unit tests
         run: make test-rust
