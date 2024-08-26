@@ -24,6 +24,7 @@ use fendermint_vm_actor_interface::{blobs, ipc, system};
 use fendermint_vm_event::ParentFinalityMissingQuorum;
 use fendermint_vm_iroh_resolver::pool::{
     ResolveKey as IrohResolveKey, ResolvePool as IrohResolvePool,
+    ResolveSource as IrohResolveSource,
 };
 use fendermint_vm_message::ipc::{Blob, ParentFinality};
 use fendermint_vm_message::{
@@ -94,10 +95,13 @@ pub struct BlobPoolItem {
 
 impl From<&BlobPoolItem> for IrohResolveKey {
     fn from(value: &BlobPoolItem) -> Self {
-        Self {
-            hash: value.hash,
-            source: value.source,
-        }
+        Self { hash: value.hash }
+    }
+}
+
+impl From<&BlobPoolItem> for IrohResolveSource {
+    fn from(value: &BlobPoolItem) -> Self {
+        Self { id: value.source }
     }
 }
 

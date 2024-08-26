@@ -124,6 +124,7 @@ impl BlobsActor {
         })
     }
 
+    // TODO: wire this to chain interpreter
     fn fail_blob(rt: &impl Runtime, params: FailBlobParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
         rt.transaction(|st: &mut State, _| {

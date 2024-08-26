@@ -2,19 +2,28 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::collections::HashSet;
+
 use async_stm::{
     queues::{tchan::TChan, TQueueLike},
     Stm, TVar,
 };
 use iroh::blobs::Hash;
 use iroh::net::{NodeAddr, NodeId};
-use std::collections::HashSet;
+
+// The maximum number of times a task can be attempted.
+const MAX_RESOLVE_ATTEMPTS: u64 = 3;
 
 /// Hashes we need to resolve.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, std::hash::Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ResolveKey {
     pub hash: Hash,
-    pub source: NodeId,
+}
+
+/// Hashes we need to resolve.
+#[derive(Debug, Copy, Clone)]
+pub struct ResolveSource {
+    pub id: NodeId,
 }
 
 /// Ongoing status of a resolution.
@@ -24,12 +33,12 @@ pub struct ResolveKey {
 /// TODO: include failure mechanism
 #[derive(Clone)]
 pub struct ResolveStatus<T> {
-    /// Indicate whether the content has been resolved.
-    ///
-    /// If needed we can expand on this to include failure states.
-    is_resolved: TVar<bool>,
     /// The collection of items that all resolve to the same hash.
     items: TVar<im::HashSet<T>>,
+    /// Indicate whether the content has been resolved.
+    is_resolved: TVar<bool>,
+    /// Counter added to by items if they fail.
+    num_failures: TVar<u64>,
 }
 
 impl<T> ResolveStatus<T>
@@ -41,12 +50,17 @@ where
         items.insert(item);
         Self {
             is_resolved: TVar::new(false),
+            num_failures: TVar::new(0),
             items: TVar::new(items),
         }
     }
 
     pub fn is_resolved(&self) -> Stm<bool> {
         self.is_resolved.read_clone()
+    }
+
+    pub fn is_failed(&self) -> Stm<bool> {
+        Ok(self.num_failures.read_clone()? == self.items.read_clone()?.len() as u64)
     }
 }
 
@@ -55,8 +69,14 @@ where
 pub struct ResolveTask {
     /// Content to resolve.
     key: ResolveKey,
+    /// Source Iroh node ID from which to resolve the content.
+    source: ResolveSource,
     /// Flag to flip when the task is done.
     is_resolved: TVar<bool>,
+    /// Current number of resolve attempts.
+    num_attempts: TVar<u64>,
+    /// Counter to add to if all attempts are used.
+    num_failures: TVar<u64>,
 }
 
 impl ResolveTask {
@@ -65,11 +85,24 @@ impl ResolveTask {
     }
 
     pub fn node_addr(&self) -> NodeAddr {
-        NodeAddr::new(self.key.source)
+        NodeAddr::new(self.source.id)
+    }
+
+    /// Adds an attempt and return whether a retry is available.
+    pub fn add_attempt(&self) -> Stm<bool> {
+        let attempts = self.num_attempts.modify(|mut a| {
+            a += 1;
+            (a, a)
+        })?;
+        Ok(attempts < MAX_RESOLVE_ATTEMPTS)
     }
 
     pub fn set_resolved(&self) -> Stm<()> {
         self.is_resolved.write(true)
+    }
+
+    pub fn set_failed(&self) -> Stm<()> {
+        self.num_failures.update(|a| a + 1)
     }
 }
 
@@ -95,6 +128,7 @@ where
 impl<T> ResolvePool<T>
 where
     for<'a> ResolveKey: From<&'a T>,
+    for<'a> ResolveSource: From<&'a T>,
     T: Sync + Send + Clone + std::hash::Hash + Eq + PartialEq + 'static,
 {
     pub fn new() -> Self {
@@ -116,14 +150,14 @@ where
     /// If the item is new, enqueue it from background resolution, otherwise just return its existing status.
     pub fn add(&self, item: T) -> Stm<ResolveStatus<T>> {
         let key = ResolveKey::from(&item);
+        let source = ResolveSource::from(&item);
         let mut items = self.items.read_clone()?;
 
         if items.contains_key(&key) {
             let status = items.get(&key).cloned().unwrap();
-            // TODO: fix to have multiple items per hash
-            // status.items.update_mut(|items| {
-            //     items.insert(item);
-            // })?;
+            status.items.update_mut(|items| {
+                items.insert(item);
+            })?;
             Ok(status)
         } else {
             let status = ResolveStatus::new(item);
@@ -131,7 +165,10 @@ where
             self.items.write(items)?;
             self.queue.write(ResolveTask {
                 key,
+                source,
                 is_resolved: status.is_resolved.clone(),
+                num_attempts: TVar::new(0),
+                num_failures: status.num_failures.clone(),
             })?;
             Ok(status)
         }
@@ -151,6 +188,7 @@ where
     /// Collect resolved items, ready for execution.
     ///
     /// The items collected are not removed, in case they need to be proposed again.
+    /// TODO: remove and return failed items
     pub fn collect_resolved(&self) -> Stm<HashSet<T>> {
         let mut resolved = HashSet::new();
         let items = self.items.read()?;
@@ -163,23 +201,19 @@ where
         Ok(resolved)
     }
 
-    /// Await the next item to be resolved.
-    pub fn next(&self) -> Stm<ResolveTask> {
-        self.queue.read()
-    }
-
     /// Remove an item from the resolution targets.
-    pub fn remove(&self, item: &T) -> Stm<Option<ResolveStatus<T>>> {
+    pub fn remove(&self, item: &T) -> Stm<()> {
         let key = ResolveKey::from(item);
-        let mut items = self.items.read_clone()?;
-        let removed = items.remove(&key);
-        self.items.write(items)?;
-        Ok(removed)
+        self.items.update_mut(|items| {
+            items.remove(&key);
+        })
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::{ResolveKey, ResolvePool, ResolveSource};
+
     use async_stm::{atomically, queues::TQueueLike};
     use iroh::base::key::SecretKey;
     use iroh::blobs::Hash;
@@ -205,14 +239,15 @@ mod tests {
 
     impl From<&TestItem> for ResolveKey {
         fn from(value: &TestItem) -> Self {
-            Self {
-                hash: value.hash,
-                source: value.source,
-            }
+            Self { hash: value.hash }
         }
     }
 
-    use super::{ResolveKey, ResolvePool};
+    impl From<&TestItem> for ResolveSource {
+        fn from(value: &TestItem) -> Self {
+            Self { id: value.source }
+        }
+    }
 
     #[tokio::test]
     async fn add_new_item() {
