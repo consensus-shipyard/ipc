@@ -14,36 +14,29 @@ jobs:
           submodules: 'recursive'
           repository: 'consensus-shipyard/fevm-contract-tests'
           path: 'fevm-contract-tests'
+
       - name: Checkout Fendermint
         uses: actions/checkout@v2
         with:
           repository: 'consensus-shipyard/ipc'
           submodules: 'recursive'
           path: 'ipc'
+
       - name: Install Node.js
         uses: actions/setup-node@v2
         with:
           node-version: 18.19.0
+
       - name: Install dependencies
         run: npm install
-        working-directory: fevm-contract-tests
+        working-directory: 'fevm-contract-tests'
+
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
-      - name: Set up Rust cargo cache
-        uses: actions/cache@v3
-        continue-on-error: false
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
+
       - name: Install cargo-make
         run: |
           if ! command -v cargo-make &> /dev/null
@@ -51,28 +44,17 @@ jobs:
               cargo install -f cargo-make
           fi
 
-      - uses: actions/cache/save@v3
-        if: always()
+      - name: Download Docker image
+        uses: actions/download-artifact@v4
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - name: Install Foundry
-        working-directory: ipc/contracts
+          name: docker-image
+          path: /tmp
+
+      - name: Load Docker image
         run: |
-          curl -L https://foundry.paradigm.xyz | bash
-          export PATH="$PATH:/home/runner/.config/.foundry/bin"
-          foundryup
-      - name: Pull latest docker build
-        id: docker-build
-        working-directory: ipc/fendermint
-        run: |
-          export PATH="$PATH:/home/runner/.config/.foundry/bin"
-          docker pull ghcr.io/consensus-shipyard/fendermint:latest
+          docker load --input /tmp/docker-image.tar
+          docker image ls -a
+
       - name: Run a testnode
         id: testnode
         working-directory: ipc/

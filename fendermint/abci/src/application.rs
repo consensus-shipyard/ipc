@@ -64,7 +64,7 @@ pub trait Application {
         &self,
         request: request::PrepareProposal,
     ) -> AbciResult<response::PrepareProposal> {
-        let txs = take_until_max_size(request.txs, request.max_tx_bytes.try_into().unwrap());
+        let (txs, _) = take_until_max_size(request.txs, request.max_tx_bytes.try_into().unwrap());
 
         Ok(response::PrepareProposal { txs })
     }

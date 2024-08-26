@@ -1,0 +1,42 @@
+name: Run unit tests
+
+# This workflow is triggered from the main CI workflow.
+on:
+  workflow_call:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    env:
+      RUST_BACKTRACE: full
+      RUSTFLAGS: -Dwarnings
+
+    steps:
+      - name: Check out the project
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Install Tools
+        uses: ./.github/actions/install-tools
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          rust: stable
+
+      - name: Cache Solidity ABI artifacts
+        uses: actions/cache@v4
+        with:
+          path: | 
+            ./contracts/out
+            ./contracts/bindings
+            ./contracts/cache
+          key: v2-contracts-abi-${{ hashFiles('./contracts/**/*.sol') }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: build
+
+      - name: Run unit tests
+        run: make test-rust
+

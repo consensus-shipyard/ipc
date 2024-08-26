@@ -23,6 +23,7 @@ use super::key::read_public_key;
 cmd! {
   GenesisArgs(self) {
     let genesis_file = self.genesis_file.clone();
+
     match &self.command {
         GenesisCommands::New(args) => args.exec(genesis_file).await,
         GenesisCommands::AddAccount(args) => args.exec(genesis_file).await,

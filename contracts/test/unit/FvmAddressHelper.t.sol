@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 
-import {FvmAddress} from "../../src/structs/FvmAddress.sol";
+import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
 import {FvmAddressHelper} from "../helpers/FvmAddressHelper.sol";
 
 contract FvmAddressHelperTest is Test {

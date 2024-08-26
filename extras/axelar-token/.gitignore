@@ -13,3 +13,6 @@ lib/
 
 # Dotenv file
 .env
+
+## Licenses are picked up from the root when packing the npm package.
+LICENSE-*

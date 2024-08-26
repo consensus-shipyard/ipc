@@ -3,8 +3,8 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 
-import "fevmate/utils/FilAddress.sol";
-import "../../src/lib/AccountHelper.sol";
+import "fevmate/contracts/utils/FilAddress.sol";
+import "../../contracts/lib/AccountHelper.sol";
 
 contract AccountHelperTest is Test {
     using AccountHelper for address;

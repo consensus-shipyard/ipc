@@ -4,6 +4,7 @@
 use crate::commands::get_subnet_config;
 use crate::{require_fil_addr_from_str, CommandLineHandler, GlobalArguments};
 use anyhow::anyhow;
+use anyhow::Context;
 use async_trait::async_trait;
 use clap::Args;
 use fvm_shared::address::Address;
@@ -12,7 +13,9 @@ use ipc_api::subnet_id::SubnetID;
 use ipc_provider::checkpoint::BottomUpCheckpointManager;
 use ipc_provider::config::Config;
 use ipc_provider::new_evm_keystore_from_config;
+use ipc_provider::observe::register_metrics as register_checkpoint_metrics;
 use ipc_wallet::EvmKeyStore;
+use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
@@ -28,6 +31,28 @@ impl CommandLineHandler for BottomUpRelayer {
 
     async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
         log::debug!("start bottom up relayer with args: {:?}", arguments);
+
+        // Prometheus metrics
+        match &arguments.metrics_address {
+            Some(addr) => {
+                use prometheus;
+                use prometheus_exporter;
+
+                let addr = SocketAddr::from_str(addr)?;
+
+                let registry = prometheus::Registry::new();
+                register_checkpoint_metrics(&registry)?;
+
+                let mut builder = prometheus_exporter::Builder::new(addr);
+                builder.with_registry(registry);
+                let _ = builder.start().context("failed to start metrics server")?;
+
+                log::info!("serving metrics on: {addr}");
+            }
+            None => {
+                log::info!("metrics disabled");
+            }
+        }
 
         let config_path = global.config_path();
         let config = Arc::new(Config::from_file(&config_path)?);
@@ -95,4 +120,10 @@ pub(crate) struct BottomUpRelayerArgs {
         help = "The max parallelism for submitting checkpoints"
     )]
     pub max_parallelism: usize,
+
+    #[arg(
+        long,
+        help = "Metrics address to listen on. Enables Prometheus metrics if set"
+    )]
+    pub metrics_address: Option<String>,
 }

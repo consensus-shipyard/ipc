@@ -1,0 +1,4 @@
+packages:
+  - 'contracts'
+  - 'extras/axelar-token'
+  - 'extras/linked-token'

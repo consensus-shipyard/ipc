@@ -65,7 +65,11 @@ RUN if [ "${TARGETARCH}" = "arm64" ]; then \
 COPY --from=stripper /app /app
 
 # Build the dependencies.
-RUN set -eux; \
+RUN \
+  --mount=type=cache,target=/root/.cargo/registry,sharing=locked \
+  --mount=type=cache,target=/root/.cargo/git,sharing=locked \
+  --mount=type=cache,target=/app/target,sharing=locked \
+  set -eux; \
   case "${TARGETARCH}" in \
   amd64) ARCH='x86_64'  ;; \
   arm64) ARCH='aarch64' ;; \
@@ -83,7 +87,11 @@ COPY . .
 RUN find . -type f \( -wholename "**/src/lib.rs" -o -wholename "**/src/main.rs" \) | xargs touch
 
 # Do the final build.
-RUN set -eux; \
+RUN \
+  --mount=type=cache,target=/root/.cargo/registry,sharing=locked \
+  --mount=type=cache,target=/root/.cargo/git,sharing=locked \
+  --mount=type=cache,target=/app/target,sharing=locked \
+  set -eux; \
   case "${TARGETARCH}" in \
   amd64) ARCH='x86_64'  ;; \
   arm64) ARCH='aarch64' ;; \
