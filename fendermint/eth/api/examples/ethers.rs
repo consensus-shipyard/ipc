@@ -61,8 +61,8 @@ const FILTERS_ENABLED: bool = true;
 // An example of what it looks like is at https://github.com/filecoin-project/ref-fvm/blob/evm-integration-tests/testing/integration/tests/evm/src/simple_coin/simple_coin.rs
 abigen!(SimpleCoin, "../../testing/contracts/SimpleCoin.abi");
 
-const SIMPLECOIN_HEX: &'static str = include_str!("../../../testing/contracts/SimpleCoin.bin");
-const SIMPLECOIN_RUNTIME_HEX: &'static str =
+const SIMPLECOIN_HEX: &str = include_str!("../../../testing/contracts/SimpleCoin.bin");
+const SIMPLECOIN_RUNTIME_HEX: &str =
     include_str!("../../../testing/contracts/SimpleCoin.bin-runtime");
 
 #[derive(Parser, Debug)]
@@ -303,7 +303,7 @@ where
         provider
             .get_block(BlockId::Number(BlockNumber::Number(bn)))
             .await,
-        |b| b.is_some() && b.as_ref().map(|b| b.number).flatten() == Some(bn),
+        |b| b.is_some() && b.as_ref().and_then(|b| b.number) == Some(bn),
     )?;
 
     let bh = b.unwrap().hash.expect("hash should be set");
@@ -312,7 +312,7 @@ where
     request(
         "eth_getBlockByHash w/o txns",
         provider.get_block(BlockId::Hash(bh)).await,
-        |b| b.is_some() && b.as_ref().map(|b| b.number).flatten() == Some(bn),
+        |b| b.is_some() && b.as_ref().and_then(|b| b.number) == Some(bn),
     )?;
 
     // Get the synthetic zero block.
@@ -330,7 +330,7 @@ where
     request(
         "eth_getBlockByHash @ zero",
         provider.get_block(BlockId::Hash(bh)).await,
-        |b| b.is_some() && b.as_ref().map(|b| b.number).flatten() == Some(U64::from(0)),
+        |b| b.is_some() && b.as_ref().and_then(|b| b.number) == Some(U64::from(0)),
     )?;
 
     // Check that block 1 points at the synthetic block 0 as parent.
@@ -400,7 +400,7 @@ where
         provider
             .get_block_with_txs(BlockId::Number(BlockNumber::Number(bn)))
             .await,
-        |b| b.is_some() && b.as_ref().map(|b| b.number).flatten() == Some(bn),
+        |b| b.is_some() && b.as_ref().and_then(|b| b.number) == Some(bn),
     )?;
 
     assert_eq!(
@@ -413,7 +413,7 @@ where
     request(
         "eth_getBlockByHash w/ txns",
         provider.get_block_with_txs(BlockId::Hash(bh)).await,
-        |b| b.is_some() && b.as_ref().map(|b| b.number).flatten() == Some(bn),
+        |b| b.is_some() && b.as_ref().and_then(|b| b.number) == Some(bn),
     )?;
 
     // By now there should be a transaction in a block.
@@ -427,7 +427,7 @@ where
             )
             .await,
         |hist| {
-            hist.base_fee_per_gas.len() > 0
+            !hist.base_fee_per_gas.is_empty()
                 && *hist.base_fee_per_gas.last().unwrap() == base_fee
                 && hist.gas_used_ratio.iter().any(|r| *r > 0.0)
         },

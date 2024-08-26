@@ -131,7 +131,7 @@ impl Application for KVStore {
             let app_hash = (self.store.read()?.len() as u64).to_be_bytes();
             self.app_hash.replace(app_hash)?;
             let retain_height = self.height.modify(|h| (h + 1, h))?;
-            Ok((retain_height.into(), app_hash.to_vec().try_into().unwrap()))
+            Ok((retain_height.into(), app_hash.to_vec().into()))
         })
         .await;
 
