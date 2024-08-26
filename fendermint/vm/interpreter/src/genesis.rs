@@ -116,16 +116,13 @@ pub async fn read_genesis_car<DB: Blockstore + 'static + Send + Sync>(
 ) -> anyhow::Result<(Vec<Validator<Power>>, FvmStateParams)> {
     let roots = load_car(store, Cursor::new(&bytes)).await?;
 
-    if roots.len() != 1 {
-        return Err(anyhow!("invalid genesis car, should have 1 root cid"));
-    }
+    let metadata_cid = roots
+        .first()
+        .ok_or_else(|| anyhow!("invalid genesis car, should have at least 1 root cid"))?;
 
-    let metadata_cid = roots[0];
-    let metadata = if let Some(metadata) = store.get_cbor::<GenesisMetadata>(&metadata_cid)? {
-        metadata
-    } else {
-        return Err(anyhow!("invalid genesis car, metadata not found"));
-    };
+    let metadata = store
+        .get_cbor::<GenesisMetadata>(&metadata_cid)?
+        .ok_or_else(|| anyhow!("invalid genesis car, metadata not found"))?;
 
     Ok((metadata.validators, metadata.state_params))
 }
