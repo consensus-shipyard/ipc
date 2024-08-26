@@ -48,7 +48,7 @@ impl Actor {
                 delete_blob(rt, object.hash)?;
             } else {
                 return Err(ActorError::illegal_state(
-                    "key exists; use overwrite to force".into(),
+                    "key exists; use overwrite".into(),
                 ));
             }
         }
@@ -489,7 +489,7 @@ mod tests {
             Method::AddObject as u64,
             IpldBlock::serialize_cbor(&add_params2).unwrap(),
         );
-        assert!(result.is_err_and(|e| { e.msg().eq("asked not to overwrite") }));
+        assert!(result.is_err_and(|e| { e.msg().eq("key exists; use overwrite") }));
         let state2 = rt.state::<State>().unwrap();
         assert_eq!(state2.root, state.root);
         rt.verify();
@@ -659,7 +659,7 @@ mod tests {
                     source: add_params.source,
                 },
             )]),
-            status: BlobStatus::Added(rt.curr_epoch()),
+            status: BlobStatus::Resolved,
         };
         rt.expect_validate_caller_any();
         rt.expect_send_simple(

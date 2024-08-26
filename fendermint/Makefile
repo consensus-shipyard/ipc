@@ -46,23 +46,27 @@ test: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 	cargo test --locked --release \
 		-p fendermint_abci \
 		-p fendermint_app \
+		-p fendermint_actor_accumulator \
+		-p fendermint_actor_machine \
+		-p fendermint_actor_blobs_shared \
 		-p fendermint_actor_objectstore \
+		-p fendermint_testing \
 		-p fendermint_app_options \
 		-p fendermint_crypto \
-		-p fendermint_testing \
 		-p fendermint_vm_actor_interface \
 		-p fendermint_vm_genesis \
 		-p fendermint_vm_core \
 		-p fendermint_vm_encoding \
+		-p fendermint_vm_message \
 		-p fendermint_app_settings \
 		-p fendermint_vm_topdown \
+		-p fendermint_tracing \
 		-p fendermint_vm_event \
 		-p fendermint_eth_api \
 		-p fendermint_rpc \
-		-p fendermint_actor_accumulator \
-		-p fendermint_vm_message \
 		-p fendermint_rocksdb \
 		-p fendermint_storage \
+		-p fendermint_actor_blobs \
 		-p fendermint_actor_chainmetadata \
 		-p fendermint_actors \
 		-p fendermint_eth_hardhat \
