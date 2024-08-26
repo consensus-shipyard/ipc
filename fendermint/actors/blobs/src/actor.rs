@@ -2,13 +2,13 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use fendermint_actor_blobs_shared::params::{
-    AddBlobParams, BuyCreditParams, DeleteBlobParams, GetAccountParams, GetBlobParams,
-    GetStatsReturn, ResolveBlobParams,
+    AddBlobParams, BuyCreditParams, DeleteBlobParams, FailBlobParams, GetAccountParams,
+    GetBlobParams, GetStatsReturn, ResolveBlobParams,
 };
-use fendermint_actor_blobs_shared::state::{Account, Blob, Hash, PublicKey};
+use fendermint_actor_blobs_shared::state::{Account, Blob, BlobStatus, Hash, PublicKey};
 use fendermint_actor_blobs_shared::Method;
 use fil_actors_runtime::runtime::builtins::Type;
 use fil_actors_runtime::{
@@ -27,47 +27,30 @@ use crate::{ext, ConstructorParams, State, BLOBS_ACTOR_NAME};
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(BlobsActor);
 
-// TODO: cron debits
-// TODO: handle expiry
-
+// TODO: cron to debit and handle expiry
 pub struct BlobsActor;
 
 impl BlobsActor {
     fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-
-        let state = State::new(params.capacity, params.debit_rate).map_err(|e| {
-            e.downcast_default(
-                ExitCode::USR_ILLEGAL_STATE,
-                "failed to construct empty store",
-            )
-        })?;
+        let state = State::new(params.capacity, params.debit_rate)
+            .map_err(to_state_error("failed to construct empty store"))?;
         rt.create(&state)
     }
 
     fn get_stats(rt: &impl Runtime) -> Result<GetStatsReturn, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-
-        let status = rt.transaction(|st: &mut State, _rt| {
-            st.get_stats(rt.current_balance()).map_err(|e| {
-                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get status")
-            })
-        })?;
-
-        Ok(status)
+        rt.state::<State>()?
+            .get_stats(rt.current_balance())
+            .map_err(to_state_error("failed to get stats"))
     }
 
     fn buy_credit(rt: &impl Runtime, params: BuyCreditParams) -> Result<Account, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-
-        let account = rt.transaction(|st: &mut State, rt| {
+        rt.transaction(|st: &mut State, rt| {
             st.buy_credit(params.0, rt.message().value_received(), rt.curr_epoch())
-                .map_err(|e| {
-                    e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to fund account")
-                })
-        })?;
-
-        Ok(account)
+                .map_err(to_state_error("failed to buy credit"))
+        })
     }
 
     fn get_account(
@@ -75,12 +58,9 @@ impl BlobsActor {
         params: GetAccountParams,
     ) -> Result<Option<Account>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-
-        let st: State = rt.state()?;
-        let account = st.get_account(params.0).map_err(|e| {
-            e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get account")
-        })?;
-        Ok(account)
+        rt.state::<State>()?
+            .get_account(params.0)
+            .map_err(to_state_error("failed to get account"))
     }
 
     fn add_blob(rt: &impl Runtime, params: AddBlobParams) -> Result<Account, ActorError> {
@@ -105,7 +85,7 @@ impl BlobsActor {
             resolve_caller_external(rt)?
         };
 
-        let account = rt.transaction(|st: &mut State, rt| {
+        rt.transaction(|st: &mut State, rt| {
             st.add_blob(
                 caller,
                 rt.curr_epoch(),
@@ -114,67 +94,62 @@ impl BlobsActor {
                 params.expiry,
                 params.source,
             )
-            .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to add blob"))
-        })?;
-        Ok(account)
-    }
-
-    // TODO: limit return via param
-    fn get_resolving_blobs(rt: &impl Runtime) -> Result<BTreeMap<Hash, PublicKey>, ActorError> {
-        rt.validate_immediate_caller_accept_any()?;
-
-        let resolving = rt.transaction(|st: &mut State, _| {
-            st.get_resolving_blobs().map_err(|e| {
-                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get resolving blobs")
-            })
-        })?;
-        Ok(resolving)
-    }
-
-    // TODO: change to returning general status about blob
-    fn is_blob_resolving(rt: &impl Runtime, params: ResolveBlobParams) -> Result<bool, ActorError> {
-        rt.validate_immediate_caller_accept_any()?;
-
-        let resolving = rt.transaction(|st: &mut State, _| {
-            st.is_blob_resolving(params.0).map_err(|e| {
-                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get blob status")
-            })
-        })?;
-        Ok(resolving)
-    }
-
-    fn resolve_blob(rt: &impl Runtime, params: ResolveBlobParams) -> Result<(), ActorError> {
-        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-
-        rt.transaction(|st: &mut State, _| {
-            st.resolve_blob(params.0).map_err(|e| {
-                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to resolve blob")
-            })
-        })?;
-        Ok(())
-    }
-
-    // // Deleting a blob removes the key from the store, but not from the underlying storage.
-    // // So, we can't just delete it here via syscall.
-    // // Once implemented, the DA mechanism may cause the data to be entangled with other data.
-    // // The retention policies will handle deleting / GC.
-    fn delete_blob(rt: &impl Runtime, params: DeleteBlobParams) -> Result<(), ActorError> {
-        rt.validate_immediate_caller_accept_any()?;
-
-        rt.transaction(|st: &mut State, _| {
-            st.delete_blob(params.0).map_err(|e| {
-                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to delete blob")
-            })
-        })?;
-        Ok(())
+            .map_err(to_state_error("failed to add blob"))
+        })
     }
 
     fn get_blob(rt: &impl Runtime, params: GetBlobParams) -> Result<Option<Blob>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
+        rt.state::<State>()?
+            .get_blob(params.0)
+            .map_err(to_state_error("failed to get blob"))
+    }
 
-        let st: State = rt.state()?;
-        st.get_blob(params.0)
-            .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get blob"))
+    fn get_blob_status(
+        rt: &impl Runtime,
+        params: ResolveBlobParams,
+    ) -> Result<Option<BlobStatus>, ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+        rt.state::<State>()?
+            .get_blob(params.0)
+            .map_err(to_state_error("failed to get blob"))
+            .map(|b| b.map(|b| b.status))
+    }
+
+    fn resolve_blob(rt: &impl Runtime, params: ResolveBlobParams) -> Result<(), ActorError> {
+        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
+        rt.transaction(|st: &mut State, _| {
+            st.resolve_blob(params.0)
+                .map_err(to_state_error("failed to resolve blob"))
+        })
+    }
+
+    // TODO: wire this to chain interpreter
+    fn fail_blob(rt: &impl Runtime, params: FailBlobParams) -> Result<(), ActorError> {
+        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
+        rt.transaction(|st: &mut State, _| {
+            st.fail_blob(params.0)
+                .map_err(to_state_error("failed to fail blob"))
+        })
+    }
+
+    // TODO: limit return via param
+    fn get_resolving_blobs(
+        rt: &impl Runtime,
+    ) -> Result<BTreeMap<Hash, HashSet<PublicKey>>, ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+        rt.state::<State>()?
+            .get_resolving_blobs()
+            .map_err(to_state_error("failed to get resolving blobs"))
+    }
+
+    // TODO: use syscall to delete from actual storage
+    fn delete_blob(rt: &impl Runtime, params: DeleteBlobParams) -> Result<(), ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+        rt.transaction(|st: &mut State, _| {
+            st.delete_blob(params.0)
+                .map_err(to_state_error("failed to delete blob"))
+        })
     }
 
     /// Fallback method for unimplemented method numbers.
@@ -192,7 +167,10 @@ impl BlobsActor {
     }
 }
 
-// TODO: record added at block epoch for resolution failure determination
+fn to_state_error(message: &'static str) -> impl FnOnce(anyhow::Error) -> ActorError {
+    move |e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, message)
+}
+
 impl ActorCode for BlobsActor {
     type Methods = Method;
 
@@ -206,11 +184,12 @@ impl ActorCode for BlobsActor {
         BuyCredit => buy_credit,
         GetAccount => get_account,
         AddBlob => add_blob,
-        GetResolvingBlobs => get_resolving_blobs,
-        IsBlobResolving => is_blob_resolving,
-        ResolveBlob => resolve_blob,
-        DeleteBlob => delete_blob,
         GetBlob => get_blob,
+        GetBlobStatus => get_blob_status,
+        ResolveBlob => resolve_blob,
+        GetResolvingBlobs => get_resolving_blobs,
+        FailBlob => fail_blob,
+        DeleteBlob => delete_blob,
         _ => fallback,
     }
 }

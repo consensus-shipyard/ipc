@@ -2,6 +2,8 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::collections::HashMap;
+
 use fendermint_actor_blobs_shared::state::{Hash, PublicKey};
 use fendermint_actor_machine::GET_METADATA_METHOD;
 use fvm_ipld_encoding::{strict_bytes, tuple::*};
@@ -9,7 +11,6 @@ use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::METHOD_CONSTRUCTOR;
 use num_derive::FromPrimitive;
-use std::collections::HashMap;
 
 pub use crate::state::State;
 
@@ -88,8 +89,6 @@ pub struct Object {
     pub expiry: ChainEpoch,
     /// User-defined object metadata (e.g., last modified timestamp, etc.).
     pub metadata: HashMap<String, String>,
-    /// Whether the object's blob has been resolved.
-    pub resolved: bool,
 }
 
 /// A list of objects and their common prefixes.
