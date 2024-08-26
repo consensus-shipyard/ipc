@@ -103,7 +103,8 @@ impl GenesisAppState {
         match bytes[0] {
             1 => {
                 let data = &bytes.as_slice()[1..];
-                let len = snap::raw::decompress_len(data).context("failed to calculate length of decompressed app state")?;
+                let len = snap::raw::decompress_len(data)
+                    .context("failed to calculate length of decompressed app state")?;
                 let mut buf = Vec::with_capacity(len);
                 snap::read::FrameDecoder::new(data).read_to_end(&mut buf)?;
                 Ok(buf)
