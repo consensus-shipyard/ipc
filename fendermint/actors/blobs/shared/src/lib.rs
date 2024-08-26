@@ -2,8 +2,12 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use fil_actors_runtime::runtime::Runtime;
+use fil_actors_runtime::{deserialize_block, extract_send_result, ActorError};
+use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::address::Address;
-use fvm_shared::{ActorID, METHOD_CONSTRUCTOR};
+use fvm_shared::clock::ChainEpoch;
+use fvm_shared::{ActorID, MethodNum, METHOD_CONSTRUCTOR};
 use num_derive::FromPrimitive;
 
 pub mod params;
@@ -17,12 +21,56 @@ pub const BLOBS_ACTOR_ADDR: Address = Address::new_id(BLOBS_ACTOR_ID);
 pub enum Method {
     Constructor = METHOD_CONSTRUCTOR,
     GetStats = frc42_dispatch::method_hash!("GetStats"),
-    BuyCredit = frc42_dispatch::method_hash!("FundAccount"),
+    BuyCredit = frc42_dispatch::method_hash!("BuyCredit"),
     GetAccount = frc42_dispatch::method_hash!("GetAccount"),
     AddBlob = frc42_dispatch::method_hash!("AddBlob"),
-    GetResolvingBlobs = frc42_dispatch::method_hash!("GetResolvingBlobs"),
-    IsBlobResolving = frc42_dispatch::method_hash!("IsBlobResolving"),
-    ResolveBlob = frc42_dispatch::method_hash!("ResolveBlob"),
-    DeleteBlob = frc42_dispatch::method_hash!("DeleteBlob"),
     GetBlob = frc42_dispatch::method_hash!("GetBlob"),
+    GetBlobStatus = frc42_dispatch::method_hash!("GetBlobStatus"),
+    ResolveBlob = frc42_dispatch::method_hash!("ResolveBlob"),
+    GetResolvingBlobs = frc42_dispatch::method_hash!("GetResolvingBlobs"),
+    FailBlob = frc42_dispatch::method_hash!("FailBlob"),
+    DeleteBlob = frc42_dispatch::method_hash!("DeleteBlob"),
+}
+
+pub fn add_blob(
+    rt: &impl Runtime,
+    from: Address,
+    source: state::PublicKey,
+    hash: state::Hash,
+    size: u64,
+    expiry: ChainEpoch,
+) -> Result<(), ActorError> {
+    let add_params = IpldBlock::serialize_cbor(&params::AddBlobParams {
+        from: Some(from),
+        source,
+        hash,
+        size,
+        expiry,
+    })?;
+    extract_send_result(rt.send_simple(
+        &BLOBS_ACTOR_ADDR,
+        Method::AddBlob as MethodNum,
+        add_params,
+        rt.message().value_received(),
+    ))?;
+    Ok(())
+}
+
+pub fn get_blob(rt: &impl Runtime, hash: state::Hash) -> Result<state::Blob, ActorError> {
+    deserialize_block::<state::Blob>(extract_send_result(rt.send_simple(
+        &BLOBS_ACTOR_ADDR,
+        Method::GetBlob as MethodNum,
+        IpldBlock::serialize_cbor(&params::GetBlobParams(hash))?,
+        rt.message().value_received(),
+    ))?)
+}
+
+pub fn delete_blob(rt: &impl Runtime, hash: state::Hash) -> Result<(), ActorError> {
+    extract_send_result(rt.send_simple(
+        &BLOBS_ACTOR_ADDR,
+        Method::DeleteBlob as MethodNum,
+        IpldBlock::serialize_cbor(&params::DeleteBlobParams(hash))?,
+        rt.message().value_received(),
+    ))?;
+    Ok(())
 }

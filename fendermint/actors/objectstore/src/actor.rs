@@ -2,23 +2,25 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::{
-    AddParams, DeleteParams, GetParams, GotObject, ListParams, Method, Object, ObjectList, State,
-    OBJECTSTORE_ACTOR_NAME,
-};
+use anyhow::anyhow;
 use cid::Cid;
-use fendermint_actor_blobs_shared::params::{AddBlobParams, DeleteBlobParams, GetBlobParams};
-use fendermint_actor_blobs_shared::state::Blob;
-use fendermint_actor_blobs_shared::{Method as BlobMethod, BLOBS_ACTOR_ADDR};
+use fendermint_actor_blobs_shared::state::{Blob, BlobStatus};
+use fendermint_actor_blobs_shared::{add_blob, delete_blob, get_blob};
 use fendermint_actor_machine::{ConstructorParams, MachineActor};
 use fil_actors_runtime::{
-    actor_dispatch, actor_error, deserialize_block, extract_send_result,
+    actor_dispatch, actor_error,
     runtime::{ActorCode, Runtime},
     ActorDowncast, ActorError, FIRST_EXPORTED_METHOD_NUMBER, INIT_ACTOR_ADDR,
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_ipld_hamt::BytesKey;
 use fvm_shared::{error::ExitCode, MethodNum};
+
+use crate::shared::{
+    AddParams, DeleteParams, GetParams, ListObjectsReturn, ListParams, Method, Object,
+    OBJECTSTORE_ACTOR_NAME,
+};
+use crate::state::{ObjectState, State};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
@@ -28,131 +30,105 @@ pub struct Actor;
 impl Actor {
     fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&INIT_ACTOR_ADDR))?;
-
         let state = State::new(
             rt.store(),
             params.creator,
             params.write_access,
             params.metadata,
         )
-        .map_err(|e| {
-            e.downcast_default(
-                ExitCode::USR_ILLEGAL_STATE,
-                "failed to construct empty store",
-            )
-        })?;
+        .map_err(to_state_error("failed to construct empty store"))?;
         rt.create(&state)
     }
 
     fn add_object(rt: &impl Runtime, params: AddParams) -> Result<Cid, ActorError> {
         Self::ensure_write_allowed(rt)?;
         let key = BytesKey(params.key);
-        if let Some(object) = Self::retrieve_object(rt, &key)? {
+        if let Some(object) = retrieve_object_state(rt, &key)? {
             if params.overwrite {
-                extract_send_result(rt.send_simple(
-                    &BLOBS_ACTOR_ADDR,
-                    BlobMethod::DeleteBlob as MethodNum,
-                    IpldBlock::serialize_cbor(&DeleteBlobParams(object.hash))?,
-                    rt.message().value_received(),
-                ))?;
+                delete_blob(rt, object.hash)?;
             } else {
                 return Err(ActorError::illegal_state(
-                    "asked not to overwrite".to_string(),
+                    "key exists; use overwrite".into(),
                 ));
             }
         }
-
-        let add_params = IpldBlock::serialize_cbor(&AddBlobParams {
-            from: Some(params.to),
-            source: params.source,
-            hash: params.hash,
-            size: params.size as u64,
-            expiry: rt.curr_epoch() + 100,
-        })?;
-        extract_send_result(rt.send_simple(
-            &BLOBS_ACTOR_ADDR,
-            BlobMethod::AddBlob as MethodNum,
-            add_params,
-            rt.message().value_received(),
-        ))?;
-
+        // Add object's blob
+        add_blob(
+            rt,
+            params.to,
+            params.source,
+            params.hash,
+            params.size,
+            rt.curr_epoch() + 100,
+        )?;
+        // Update state
         let root = rt.transaction(|st: &mut State, rt| {
             st.add(
                 rt.store(),
                 key,
                 params.hash,
-                params.size,
                 params.metadata,
                 params.overwrite,
             )
-            .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to add object"))
+            .map_err(to_state_error("failed to add object"))
         })?;
         Ok(root)
     }
 
-    // Deleting an object removes the key from the store, but not from the underlying storage.
-    // So, we can't just delete it here via syscall.
-    // Once implemented, the DA mechanism may cause the data to be entangled with other data.
-    // The retention policies will handle deleting / GC.
     fn delete_object(rt: &impl Runtime, params: DeleteParams) -> Result<Cid, ActorError> {
         Self::ensure_write_allowed(rt)?;
         let key = BytesKey(params.key);
-        // 1. Retrieve object CID
-        let object = Self::retrieve_object(rt, &key)?.ok_or(ActorError::unchecked(
-            ExitCode::USR_ILLEGAL_STATE,
-            "no object stored".to_string(),
-        ))?;
-        // 2. Delete from the blobs actor
-        extract_send_result(rt.send_simple(
-            &BLOBS_ACTOR_ADDR,
-            BlobMethod::DeleteBlob as MethodNum,
-            IpldBlock::serialize_cbor(&DeleteBlobParams(object.hash))?,
-            rt.message().value_received(),
-        ))?;
-        // 3. Delete from the state
+        let object = retrieve_object_state(rt, &key)?
+            .ok_or(ActorError::illegal_state("object not found".into()))?;
+        // Delete object's blob
+        delete_blob(rt, object.hash)?;
+        // Update state
         let res = rt.transaction(|st: &mut State, rt| {
-            st.delete(rt.store(), &key).map_err(|e| {
-                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to delete object")
-            })
+            st.delete(rt.store(), &key)
+                .map_err(to_state_error("failed to delete object"))
         })?;
         Ok(res.1)
     }
 
-    fn get_object(rt: &impl Runtime, params: GetParams) -> Result<Option<GotObject>, ActorError> {
+    fn get_object(rt: &impl Runtime, params: GetParams) -> Result<Option<Object>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        if let Some(object) = Self::retrieve_object(rt, &BytesKey(params.key))? {
-            let blob = deserialize_block::<Blob>(extract_send_result(rt.send_simple(
-                &BLOBS_ACTOR_ADDR,
-                BlobMethod::GetBlob as MethodNum,
-                IpldBlock::serialize_cbor(&GetBlobParams(object.hash))?,
-                rt.message().value_received(),
-            ))?)?;
-            Ok(Some(GotObject {
-                hash: object.hash,
-                size: blob.size as usize,
-                expiry: blob.expiry,
-                metadata: object.metadata,
-            }))
+        if let Some(object_state) = retrieve_object_state(rt, &BytesKey(params.key))? {
+            let blob = get_blob(rt, object_state.hash)?;
+            let object = build_object(&blob, &object_state)
+                .map_err(to_state_error("failed to build object"))?;
+            Ok(object)
         } else {
             Ok(None)
         }
     }
 
-    fn list_objects(rt: &impl Runtime, params: ListParams) -> Result<ObjectList, ActorError> {
+    fn list_objects(
+        rt: &impl Runtime,
+        params: ListParams,
+    ) -> Result<ListObjectsReturn, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let st: State = rt.state()?;
-        let objects = st
+        let mut objects = Vec::new();
+        let prefixes = rt
+            .state::<State>()?
             .list(
                 rt.store(),
                 params.prefix,
                 params.delimiter,
                 params.offset,
                 params.limit,
+                |key: Vec<u8>, object_state: ObjectState| -> anyhow::Result<()> {
+                    let blob = get_blob(rt, object_state.hash)?;
+                    if let Some(object) = build_object(&blob, &object_state)? {
+                        objects.push((key, object));
+                    }
+                    Ok(())
+                },
             )
-            .map_err(|e| {
-                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to list objects")
-            })?;
-        Ok(objects)
+            .map_err(to_state_error("failed to list objects"))?;
+        Ok(ListObjectsReturn {
+            objects,
+            common_prefixes: prefixes,
+        })
     }
 
     /// Fallback method for unimplemented method numbers.
@@ -168,15 +144,40 @@ impl Actor {
             Err(actor_error!(unhandled_message; "invalid method: {}", method))
         }
     }
+}
 
-    /// Retrieve object from the state.
-    fn retrieve_object(rt: &impl Runtime, key: &BytesKey) -> Result<Option<Object>, ActorError> {
-        let state = rt.state::<State>()?;
-        let store = rt.store();
-        state.get(store, key).map_err(|e| {
-            e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to retrieve object")
-        })
+/// Retrieve an object from the state.
+fn retrieve_object_state(
+    rt: &impl Runtime,
+    key: &BytesKey,
+) -> Result<Option<ObjectState>, ActorError> {
+    rt.state::<State>()?
+        .get(rt.store(), key)
+        .map_err(to_state_error("failed to retrieve object"))
+}
+
+/// Build an object from its state and blob.
+fn build_object(blob: &Blob, object_state: &ObjectState) -> anyhow::Result<Option<Object>> {
+    match blob.status {
+        BlobStatus::Resolved => {
+            let max_sub = blob
+                .subs
+                .values()
+                .max_by_key(|sub| sub.expiry)
+                .ok_or_else(|| anyhow!("blob has no subscriptions; this should not happen"))?;
+            Ok(Some(Object {
+                hash: object_state.hash,
+                size: blob.size,
+                expiry: max_sub.expiry,
+                metadata: object_state.metadata.clone(),
+            }))
+        }
+        BlobStatus::Added(_) | BlobStatus::Failed => Ok(None),
     }
+}
+
+fn to_state_error(message: &'static str) -> impl FnOnce(anyhow::Error) -> ActorError {
+    move |e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, message)
 }
 
 impl MachineActor for Actor {
@@ -205,8 +206,12 @@ impl ActorCode for Actor {
 mod tests {
     use super::*;
 
+    use std::collections::HashMap;
+
     use cid::Cid;
-    use fendermint_actor_blobs_shared::state::{Hash, PublicKey};
+    use fendermint_actor_blobs_shared::params::{AddBlobParams, DeleteBlobParams, GetBlobParams};
+    use fendermint_actor_blobs_shared::state::{BlobStatus, Hash, PublicKey, Subscription};
+    use fendermint_actor_blobs_shared::{Method as BlobMethod, BLOBS_ACTOR_ADDR};
     use fendermint_actor_machine::WriteAccess;
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::runtime::Runtime;
@@ -220,7 +225,6 @@ mod tests {
     use fvm_shared::econ::TokenAmount;
     use fvm_shared::error::ExitCode;
     use rand::RngCore;
-    use std::collections::HashMap;
 
     fn construct_and_verify(creator: Address) -> MockRuntime {
         let rt = MockRuntime {
@@ -284,7 +288,7 @@ mod tests {
             source: new_pk(),
             key: vec![0, 1, 2],
             hash: hash.0,
-            size: hash.1 as usize,
+            size: hash.1,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -296,7 +300,7 @@ mod tests {
                 from: Some(add_params.to),
                 source: add_params.source,
                 hash: add_params.hash,
-                size: add_params.size as u64,
+                size: add_params.size,
                 expiry: 100,
             })
             .unwrap(),
@@ -337,7 +341,7 @@ mod tests {
             source: new_pk(),
             key: vec![0, 1, 2],
             hash: hash.0,
-            size: hash.1 as usize,
+            size: hash.1,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -349,7 +353,7 @@ mod tests {
                 from: Some(add_params.to),
                 source: add_params.source,
                 hash: add_params.hash,
-                size: add_params.size as u64,
+                size: add_params.size,
                 expiry: 100,
             })
             .unwrap(),
@@ -376,7 +380,7 @@ mod tests {
             source: add_params.source,
             key: add_params.key,
             hash: hash.0,
-            size: hash.1 as usize,
+            size: hash.1,
             metadata: HashMap::new(),
             overwrite: true,
         };
@@ -396,7 +400,7 @@ mod tests {
                 from: Some(add_params2.to),
                 source: add_params2.source,
                 hash: add_params2.hash,
-                size: add_params2.size as u64,
+                size: add_params2.size,
                 expiry: 100,
             })
             .unwrap(),
@@ -437,7 +441,7 @@ mod tests {
             source: new_pk(),
             key: vec![0, 1, 2],
             hash: hash.0,
-            size: hash.1 as usize,
+            size: hash.1,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -449,7 +453,7 @@ mod tests {
                 from: Some(add_params.to),
                 source: add_params.source,
                 hash: add_params.hash,
-                size: add_params.size as u64,
+                size: add_params.size,
                 expiry: 100,
             })
             .unwrap(),
@@ -476,7 +480,7 @@ mod tests {
             source: add_params.source,
             key: add_params.key,
             hash: hash.0,
-            size: hash.1 as usize,
+            size: hash.1,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -485,7 +489,7 @@ mod tests {
             Method::AddObject as u64,
             IpldBlock::serialize_cbor(&add_params2).unwrap(),
         );
-        assert!(result.is_err_and(|e| { e.msg().eq("asked not to overwrite") }));
+        assert!(result.is_err_and(|e| { e.msg().eq("key exists; use overwrite") }));
         let state2 = rt.state::<State>().unwrap();
         assert_eq!(state2.root, state.root);
         rt.verify();
@@ -513,7 +517,7 @@ mod tests {
             source: new_pk(),
             key: key.clone(),
             hash: hash.0,
-            size: hash.1 as usize,
+            size: hash.1,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -525,7 +529,7 @@ mod tests {
                 from: Some(add_params.to),
                 source: add_params.source,
                 hash: add_params.hash,
-                size: add_params.size as u64,
+                size: add_params.size,
                 expiry: 100,
             })
             .unwrap(),
@@ -546,7 +550,7 @@ mod tests {
         assert_eq!(state.root, result_add);
         rt.verify();
 
-        // Now actually delete.
+        // Now actually delete it.
         let delete_params = DeleteParams { key: key.clone() };
         rt.expect_validate_caller_any();
         rt.expect_send_simple(
@@ -587,7 +591,7 @@ mod tests {
             )
             .unwrap()
             .unwrap()
-            .deserialize::<Option<GotObject>>();
+            .deserialize::<Option<Object>>();
         assert!(result.is_ok());
         assert_eq!(result, Ok(None));
         rt.verify();
@@ -608,6 +612,7 @@ mod tests {
 
         let key = vec![0, 1, 2];
         let hash = new_hash(256);
+        let expiry = ChainEpoch::from(100);
 
         // Prerequisite for a delete operation: add to have a proper state of the actor.
         let add_params: AddParams = AddParams {
@@ -615,7 +620,7 @@ mod tests {
             source: new_pk(),
             key: key.clone(),
             hash: hash.0,
-            size: hash.1 as usize,
+            size: hash.1,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -627,8 +632,8 @@ mod tests {
                 from: Some(add_params.to),
                 source: add_params.source,
                 hash: add_params.hash,
-                size: add_params.size as u64,
-                expiry: 100,
+                size: add_params.size,
+                expiry,
             })
             .unwrap(),
             TokenAmount::from_whole(0),
@@ -646,10 +651,15 @@ mod tests {
         rt.verify();
 
         let blob = Blob {
-            size: add_params.size as u64,
-            expiry: 100 as ChainEpoch,
-            source: add_params.source,
-            resolved: true,
+            size: add_params.size,
+            subs: HashMap::from([(
+                f4_eth_addr,
+                Subscription {
+                    expiry,
+                    source: add_params.source,
+                },
+            )]),
+            status: BlobStatus::Resolved,
         };
         rt.expect_validate_caller_any();
         rt.expect_send_simple(
@@ -668,15 +678,15 @@ mod tests {
             )
             .unwrap()
             .unwrap()
-            .deserialize::<Option<GotObject>>();
+            .deserialize::<Option<Object>>();
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
-            Some(GotObject {
+            Some(Object {
                 hash: hash.0,
-                size: blob.size as usize,
-                expiry: blob.expiry,
-                metadata: add_params.metadata
+                size: blob.size,
+                expiry,
+                metadata: add_params.metadata,
             })
         );
         rt.verify();

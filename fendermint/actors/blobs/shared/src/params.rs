@@ -36,20 +36,25 @@ pub struct AddBlobParams {
     pub expiry: ChainEpoch,
 }
 
+/// Params for getting a blob.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct GetBlobParams(pub Hash);
+
 /// Params for resolving a blob.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct ResolveBlobParams(pub Hash);
 
+/// Params for failing a blob.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct FailBlobParams(pub Hash);
+
 /// Params for deleting a blob.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct DeleteBlobParams(pub Hash);
-
-/// Params for getting a blob.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct GetBlobParams(pub Hash);
 
 /// The stats of the blob actor.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]

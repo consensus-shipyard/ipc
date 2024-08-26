@@ -400,12 +400,6 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
 
     match maybe_object {
         Some(object) => {
-            if !object.resolved {
-                return Err(Rejection::from(BadRequest {
-                    message: "object is not resolved".to_string(),
-                }));
-            }
-
             let hash = Hash::from_bytes(object.hash.0);
             let status = iroh.blobs().status(hash).await.map_err(|e| {
                 Rejection::from(BadRequest {

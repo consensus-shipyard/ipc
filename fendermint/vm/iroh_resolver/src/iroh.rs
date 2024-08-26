@@ -109,7 +109,7 @@ fn start_resolve<V>(
 
         match err {
             None => {
-                tracing::debug!(cid = ?task.hash(), "iroh blob resolved");
+                tracing::debug!(hash = ?task.hash(), "iroh blob resolved");
 
                 // Mark task as resolved
                 atomically(|| task.set_resolved()).await;
@@ -130,7 +130,7 @@ fn start_resolve<V>(
                         match res {
                             Ok(added) => {
                                 if added {
-                                    // Send own vote to peers
+                                    // Send our own vote to peers
                                     if let Err(e) = client.publish_vote(vote) {
                                         tracing::error!(
                                             error = e.to_string(),
@@ -151,7 +151,7 @@ fn start_resolve<V>(
             }
             Some(e) => {
                 tracing::error!(
-                    cid = ?task.hash(),
+                    hash = ?task.hash(),
                     error = e.to_string(),
                     "iroh blob resolution failed; retrying later"
                 );
@@ -163,7 +163,7 @@ fn start_resolve<V>(
 
 /// Part of error handling.
 ///
-/// In our case we enqueued the task from transaction processing,
+/// In our case, we added the task from transaction processing,
 /// which will not happen again, so there is no point further
 /// propagating this error back to the sender to deal with.
 /// Rather, we should retry until we can conclude whether it will
@@ -173,8 +173,13 @@ fn start_resolve<V>(
 /// For now, let's retry the same task later.
 fn schedule_retry(task: ResolveTask, queue: ResolveQueue, retry_delay: Duration) {
     tokio::spawn(async move {
-        tokio::time::sleep(retry_delay).await;
-        tracing::debug!(cid = ?task.hash(), "retrying blob resolution");
-        atomically(move || queue.write(task.clone())).await;
+        if atomically(|| task.add_attempt()).await {
+            tokio::time::sleep(retry_delay).await;
+            tracing::debug!(hash = ?task.hash(), "retrying blob resolution");
+            atomically(|| queue.write(task.clone())).await;
+        } else {
+            tracing::warn!(hash = ?task.hash(), "no attempts remaining; blob resolution failed");
+            atomically(|| task.set_failed()).await;
+        }
     });
 }
