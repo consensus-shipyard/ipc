@@ -5,7 +5,6 @@ use crate::fvm::gas::{Available, Gas, GasMarket, GasUtilization};
 use crate::fvm::FvmMessage;
 use anyhow::Context;
 
-use crate::fvm::cometbft::ConsensusBlockUpdate;
 use fendermint_actor_gas_market::{GasMarketReading, SetConstants};
 use fendermint_crypto::PublicKey;
 use fendermint_vm_actor_interface::eam::EthAddress;
@@ -31,10 +30,6 @@ pub struct ActorGasMarket {
 
 impl GasMarket for ActorGasMarket {
     type Constant = SetConstants;
-
-    fn get_constants(&self) -> anyhow::Result<Self::Constant> {
-        todo!()
-    }
 
     fn set_constants(&mut self, constants: Self::Constant) {
         self.constant_update = Some(constants);
@@ -95,10 +90,8 @@ impl ActorGasMarket {
         })
     }
 
-    pub fn process_consensus_update(&self, update: &mut ConsensusBlockUpdate) {
-        if let Some(ref set_constant) = self.constant_update {
-            update.process_block_size(set_constant.block_gas_limit);
-        }
+    pub fn take_constant_update(&mut self) -> Option<SetConstants> {
+        self.constant_update.take()
     }
 
     pub fn commit<E: Executor>(

@@ -1,9 +1,9 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-use crate::fvm::cometbft::EndBlockUpdate;
-use crate::fvm::gas::{Gas, GasMarket};
+use crate::fvm::gas::GasMarket;
 use crate::fvm::state::ipc::GatewayCaller;
-use crate::fvm::{topdown, FvmApplyRet};
+use crate::fvm::{topdown, FvmApplyRet, PowerUpdates};
+use crate::selector::{GasLimitSelector, MessageSelector};
 use crate::{
     fvm::state::FvmExecState,
     fvm::FvmMessage,
@@ -116,7 +116,7 @@ where
         (chain_env, state): Self::State,
         mut msgs: Vec<Self::Message>,
     ) -> anyhow::Result<Vec<Self::Message>> {
-        msgs = messages_selection(msgs, state.gas_market().available().block_gas)?;
+        msgs = messages_selection(msgs, &state)?;
 
         // Collect resolved CIDs ready to be proposed from the pool.
         let ckpts = atomically(|| chain_env.checkpoint_pool.collect_resolved()).await;
@@ -246,7 +246,7 @@ where
         Message = VerifiableMessage,
         DeliverOutput = SignedMessageApplyRes,
         State = FvmExecState<DB>,
-        EndOutput = EndBlockUpdate,
+        EndOutput = PowerUpdates,
     >,
 {
     // The state consists of the resolver pool, which this interpreter needs, and the rest of the
@@ -429,9 +429,8 @@ where
         let (state, out) = self.inner.end(state).await?;
 
         // Update any component that needs to know about changes in the power table.
-        if !out.validators.0.is_empty() {
+        if !out.0.is_empty() {
             let power_updates = out
-                .validators
                 .0
                 .iter()
                 .map(|v| {
@@ -550,135 +549,23 @@ fn relayed_bottom_up_ckpt_to_fvm(
     Ok(msg)
 }
 
-fn signed_msgs_with_gas_limit(msgs: Vec<ChainMessage>) -> anyhow::Result<Vec<(ChainMessage, Gas)>> {
-    msgs.into_iter()
+fn messages_selection<DB: Blockstore + Clone + 'static>(
+    msgs: Vec<ChainMessage>,
+    state: &FvmExecState<DB>,
+) -> anyhow::Result<Vec<ChainMessage>> {
+    let mut signed = msgs
+        .into_iter()
         .map(|msg| match msg {
-            ChainMessage::Signed(inner) => {
-                let gas_limit = inner.message.gas_limit;
-                Ok((ChainMessage::Signed(inner), gas_limit))
-            }
+            ChainMessage::Signed(inner) => Ok(inner),
             ChainMessage::Ipc(_) => Err(anyhow!("should not have ipc messages in user proposals")),
         })
-        .collect::<anyhow::Result<Vec<_>>>()
-}
+        .collect::<anyhow::Result<Vec<_>>>()?;
 
-/// Performs message selection:
-/// - Order by gas limit in descending order
-/// - Make sure total gas limit does not exceed the `total_gas_limit` parameter
-fn messages_selection(
-    msgs: Vec<ChainMessage>,
-    total_gas_limit: Gas,
-) -> anyhow::Result<Vec<ChainMessage>> {
-    let mut msgs_with_gas_limit = signed_msgs_with_gas_limit(msgs)?;
-
-    // sort by gas limit descending
-    msgs_with_gas_limit.sort_by(|a, b| b.1.cmp(&a.1));
-
-    let mut total_gas_limit_consumed = 0;
-    let mut msgs = vec![];
-    for (msg, gas_limit) in msgs_with_gas_limit {
-        if total_gas_limit_consumed + gas_limit <= total_gas_limit {
-            msgs.push(msg);
-            total_gas_limit_consumed += gas_limit;
-        } else {
-            break;
-        }
+    // currently only one selector, we can potentially extend to more selectors
+    let selectors = vec![GasLimitSelector {}];
+    for s in selectors {
+        signed = s.select_messages(state, signed)
     }
 
-    tracing::info!(
-        num_msgs = msgs.len(),
-        total_gas_limit,
-        "selected message under total gas limit"
-    );
-
-    Ok(msgs)
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::chain::messages_selection;
-    use fendermint_vm_message::chain::ChainMessage;
-    use fendermint_vm_message::signed::SignedMessage;
-    use quickcheck::Arbitrary;
-    use rand::random;
-
-    #[test]
-    fn test_message_selection_partial_selected() {
-        let mut gen = quickcheck::Gen::new(100);
-
-        let mut total = 0;
-        let msgs_len = 100;
-
-        let messages = (0..msgs_len)
-            .map(|_| {
-                let mut msg = SignedMessage::arbitrary(&mut gen);
-
-                msg.message.gas_limit = random::<u64>() % fvm_shared::BLOCK_GAS_LIMIT;
-                total += msg.message.gas_limit;
-
-                ChainMessage::Signed(msg)
-            })
-            .collect::<Vec<ChainMessage>>();
-
-        let selected = messages_selection(messages, total / 2).unwrap();
-        let selected_len = selected.len();
-        let mut selected_total = 0;
-        let mut max = u64::MAX;
-
-        for s in selected {
-            if let ChainMessage::Signed(signed) = s {
-                selected_total += signed.message.gas_limit;
-                assert!(
-                    max >= signed.message.gas_limit,
-                    "gas limit should be sorted descending"
-                );
-                max = signed.message.gas_limit;
-            } else {
-                unreachable!("should be all signed messages")
-            }
-        }
-
-        assert!(selected_total <= total / 2, "should not exceed gas limit");
-        assert!(selected_len <= msgs_len, "not full selection");
-    }
-
-    #[test]
-    fn test_message_selection_all_selected() {
-        let mut gen = quickcheck::Gen::new(100);
-
-        let mut total = 0;
-        let msgs_len = 100;
-
-        let messages = (0..msgs_len)
-            .map(|_| {
-                let mut msg = SignedMessage::arbitrary(&mut gen);
-
-                msg.message.gas_limit = random::<u64>() % fvm_shared::BLOCK_GAS_LIMIT;
-                total += msg.message.gas_limit;
-
-                ChainMessage::Signed(msg)
-            })
-            .collect::<Vec<ChainMessage>>();
-
-        let selected = messages_selection(messages, total).unwrap();
-        let selected_len = selected.len();
-        let mut selected_total = 0;
-        let mut max = u64::MAX;
-
-        for s in selected {
-            if let ChainMessage::Signed(signed) = s {
-                selected_total += signed.message.gas_limit;
-                assert!(
-                    max >= signed.message.gas_limit,
-                    "gas limit should be sorted descending"
-                );
-                max = signed.message.gas_limit;
-            } else {
-                unreachable!("should be all signed messages")
-            }
-        }
-
-        assert_eq!(selected_total, total, "should not exceed gas limit");
-        assert_eq!(selected_len, msgs_len, "not full selection");
-    }
+    Ok(signed.into_iter().map(ChainMessage::Signed).collect())
 }

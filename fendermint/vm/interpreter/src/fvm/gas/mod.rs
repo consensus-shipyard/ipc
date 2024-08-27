@@ -22,9 +22,6 @@ pub trait GasMarket {
     /// The constant parameters that determines the readings of gas market, such as block gas limit.
     type Constant;
 
-    #[allow(dead_code)]
-    fn get_constants(&self) -> anyhow::Result<Self::Constant>;
-
     /// Update the constants of the gas market. If the gas market is actor based, then it's recommended
     /// to flush at EndBlock.
     #[allow(dead_code)]

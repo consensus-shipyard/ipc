@@ -8,7 +8,7 @@ use fvm_shared::clock::ChainEpoch;
 use std::{future::Future, sync::Arc};
 
 use fendermint_vm_genesis::Genesis;
-use fendermint_vm_interpreter::fvm::cometbft::EndBlockUpdate;
+use fendermint_vm_interpreter::fvm::PowerUpdates;
 use fendermint_vm_interpreter::genesis::{create_test_genesis_state, GenesisOutput};
 use fendermint_vm_interpreter::{
     fvm::{
@@ -66,7 +66,7 @@ where
         Message = FvmMessage,
         BeginOutput = FvmApplyRet,
         DeliverOutput = FvmApplyRet,
-        EndOutput = EndBlockUpdate,
+        EndOutput = PowerUpdates,
     >,
 {
     pub async fn new(interpreter: I, genesis: Genesis) -> anyhow::Result<Self> {

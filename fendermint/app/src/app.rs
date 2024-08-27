@@ -17,13 +17,12 @@ use fendermint_vm_interpreter::bytes::{
     BytesMessageApplyRes, BytesMessageCheckRes, BytesMessageQuery, BytesMessageQueryRes,
 };
 use fendermint_vm_interpreter::chain::{ChainEnv, ChainMessageApplyRet, IllegalMessage};
-use fendermint_vm_interpreter::fvm::cometbft::{to_validator_updates, EndBlockUpdate};
 use fendermint_vm_interpreter::fvm::state::{
     empty_state_tree, CheckStateRef, FvmExecState, FvmQueryState, FvmStateParams,
     FvmUpdatableParams,
 };
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
-use fendermint_vm_interpreter::fvm::FvmApplyRet;
+use fendermint_vm_interpreter::fvm::{FvmApplyRet, PowerUpdates};
 use fendermint_vm_interpreter::genesis::{read_genesis_car, GenesisAppState};
 use fendermint_vm_interpreter::signed::InvalidSignature;
 use fendermint_vm_interpreter::{
@@ -165,6 +164,8 @@ where
     state_hist_size: u64,
     /// Tracks the validator
     validators: ValidatorTracker<C>,
+    /// The cometbft client
+    client: C,
 }
 
 impl<DB, SS, S, I, C> App<DB, SS, S, I, C>
@@ -176,7 +177,7 @@ where
         + Codec<FvmStateParams>,
     DB: KVWritable<S> + KVReadable<S> + Clone + 'static,
     SS: Blockstore + Clone + 'static,
-    C: Client,
+    C: Client + Clone,
 {
     pub fn new(
         config: AppConfig<S>,
@@ -200,7 +201,8 @@ where
             snapshots,
             exec_state: Arc::new(tokio::sync::Mutex::new(None)),
             check_state: Arc::new(tokio::sync::Mutex::new(None)),
-            validators: ValidatorTracker::new(client),
+            validators: ValidatorTracker::new(client.clone()),
+            client,
         };
         app.init_committed_state()?;
         Ok(app)
@@ -418,7 +420,7 @@ where
         Message = Vec<u8>,
         BeginOutput = FvmApplyRet,
         DeliverOutput = BytesMessageApplyRes,
-        EndOutput = EndBlockUpdate,
+        EndOutput = PowerUpdates,
     >,
     I: CheckInterpreter<
         State = FvmExecState<ReadOnlyBlockstore<SS>>,
@@ -430,7 +432,7 @@ where
         Query = BytesMessageQuery,
         Output = BytesMessageQueryRes,
     >,
-    C: Client + Sync,
+    C: Client + Sync + Clone,
 {
     /// Provide information about the ABCI application.
     async fn info(&self, _request: request::Info) -> AbciResult<response::Info> {
@@ -800,11 +802,20 @@ where
 
         // TODO: Return events from epoch transitions.
         let ret = self
-            .modify_exec_state(|s| self.interpreter.end(s))
+            .modify_exec_state(|s| async {
+                let ((chain_env, mut state), update) = self.interpreter.end(s).await?;
+
+                let mut end_block = EndBlockUpdate::new(update);
+                if let Some(gas) = state.gas_market_mut().take_constant_update() {
+                    end_block.update_gas(gas)
+                }
+
+                Ok(((chain_env, state), end_block))
+            })
             .await
             .context("end failed")?;
 
-        Ok(response::EndBlock::try_from(ret)?)
+        Ok(to_end_block(&self.client, request.height, ret).await?)
     }
 
     /// Commit the current state at the current height.
