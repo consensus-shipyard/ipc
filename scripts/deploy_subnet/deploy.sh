@@ -1,10 +1,9 @@
 #!/bin/bash
 
-#set -euo pipefail
+set -euo pipefail
 
 DASHES='------'
 
-# TODO: this script is going to be based on which root is selected, e.g. local, calibration, or other
 if (($# != 1)); then
   echo "Arguments: <Specify github remote branch name to use to deploy. Or use 'local' (without quote) to indicate using local repo instead. If not provided, will default to main branch"
   head_ref=main
@@ -27,13 +26,11 @@ if ! $local_deploy ; then
     ssh-add "${HOME}"/.ssh/id_rsa.ipc
   fi
 
-  # TODO: we won't have the supply source for local until after we deploy it
   if [[ ! -v SUPPLY_SOURCE_ADDRESS ]]; then
     echo "SUPPLY_SOURCE_ADDRESS is not set"
     exit 1
   fi
 
-  # TODO: we won't need a parent auth token for local
   if [[ ! -v PARENT_HTTP_AUTH_TOKEN ]]; then
     echo "PARENT_HTTP_AUTH_TOKEN is not set"
     exit 1
@@ -48,10 +45,11 @@ fi
 if [[ $local_deploy = true ]]; then
   dir=$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")
   IPC_FOLDER=$(readlink -f -- "$dir"/../..)
+  # we can't pass an auth token if the parent doesn't require one
   PARENT_AUTH_FLAG=""
 fi
 if [[ ! -v IPC_FOLDER ]]; then
-    IPC_FOLDER=${HOME}/ipc
+  IPC_FOLDER=${HOME}/ipc
 fi
 IPC_CONFIG_FOLDER=${HOME}/.ipc
 
@@ -169,8 +167,6 @@ fi
 
 # Prepare code repo
 if ! $local_deploy ; then
-  # TODO: this is only really needed when the machine is "brand new" e.g. gcp
-  #       we should probably add some other env or flag to check for this.
   echo "$DASHES Preparing ipc repo..."
   if ! ls "$IPC_FOLDER" ; then
     git clone --recurse-submodules -j8 git@github.com-ipc:amazingdatamachine/ipc.git "${IPC_FOLDER}"
@@ -185,7 +181,6 @@ if ! $local_deploy ; then
 fi
 
 # Stop prometheus
-echo "IPC_FOLDER" "$IPC_FOLDER"
 cd "$IPC_FOLDER"
 cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=prometheus \
@@ -223,7 +218,6 @@ rm -rf "$IPC_CONFIG_FOLDER"
 mkdir -p "$IPC_CONFIG_FOLDER"
 
 # Copy configs
-# TODO: how do we know the evm_keystore.json exists?
 if ! $local_deploy ; then
   echo "$DASHES using calibration net config $DASHES"
   cp "$HOME"/evm_keystore.json "$IPC_CONFIG_FOLDER"
@@ -235,7 +229,7 @@ fi
 cp "$IPC_FOLDER"/infra/prometheus/prometheus.yaml "$IPC_CONFIG_FOLDER"
 cp "$IPC_FOLDER"/infra/loki/loki-config.yaml "$IPC_CONFIG_FOLDER"
 cp "$IPC_FOLDER"/infra/promtail/promtail-config.yaml "$IPC_CONFIG_FOLDER"
-cp "$IPC_FOLDER"/infra/iroh/iroh-config.yaml "$IPC_CONFIG_FOLDER"
+cp "$IPC_FOLDER"/infra/iroh/iroh.config.toml "$IPC_CONFIG_FOLDER"
 
 if [[ -z ${SKIP_BUILD+x} || "$SKIP_BUILD" == "" || "$SKIP_BUILD" == "false" ]]; then
   # Build contracts
@@ -251,14 +245,13 @@ fi
 
 
 if [[ $local_deploy = true ]]; then
-  # TODO: should we remove and recreate the docker network somewhere here?
+  # note: the subnet hasn't been created yet, but it's always the same value and we need it for the docker network name
   subnet_id="/r31337/t410f6dl55afbyjbpupdtrmedyqrnmxdmpk7rxuduafq"
   cd "$IPC_FOLDER"
   cargo make --makefile infra/fendermint/Makefile.toml \
       -e NODE_NAME=anvil \
       anvil-destroy
 
-  # note: the subnet_id is used here because it's how we define the name of the docker network
   cd "$IPC_FOLDER"
   cargo make --makefile infra/fendermint/Makefile.toml \
       -e NODE_NAME=anvil \
@@ -266,6 +259,7 @@ if [[ $local_deploy = true ]]; then
       -e ANVIL_HOST_PORT="${ANVIL_HOST_PORT}" \
       anvil-start
 
+  # the first three anvil preloaded key pairs
   ipc-cli wallet import --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --wallet-type evm
   ipc-cli wallet import --private-key 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d --wallet-type evm
   ipc-cli wallet import --private-key 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a --wallet-type evm
@@ -316,35 +310,36 @@ if [[ ! -v PARENT_GATEWAY_ADDRESS || ! -v PARENT_REGISTRY_ADDRESS ]]; then
     deploy_contracts_output=$(make deploy-ipc NETWORK=localnet)
   fi
 
-echo "$DASHES deploy contracts output $DASHES"
-echo ""
-echo "$deploy_contracts_output"
-echo ""
+  echo "$DASHES deploy contracts output $DASHES"
+  echo ""
+  echo "$deploy_contracts_output"
+  echo ""
 
   PARENT_GATEWAY_ADDRESS=$(echo "$deploy_contracts_output" | grep '"Gateway"' | awk -F'"' '{print $4}')
-# TODO: remove echos in this `if`` block, they are for debug
-echo "Gateway address: $PARENT_GATEWAY_ADDRESS"
-
   PARENT_REGISTRY_ADDRESS=$(echo "$deploy_contracts_output" | grep '"SubnetRegistry"' | awk -F'"' '{print $4}')
-echo "Registry address: $PARENT_REGISTRY_ADDRESS"
-  # TODO: for local we need to deploy the erc20 supply source token to the anvil parent
 
-  # TODO: need to decide how to handle local contracts repo. This just assumes the use has already cloned `contracts`
-  #       then run  `forge install` and `forge build`
-  cd "${IPC_FOLDER}/../contracts"
-  # need to run clean or we hit upgradeable saftey validation errors resulting from contracts with the same name
-  forge clean
-  # TODO: dockerize this command?
-  # privkey is anvil #4
-  deploy_supply_source_token_out="$(PRIVATE_KEY=0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a forge script script/Hoku.s.sol --tc DeployScript 0 --sig 'run(uint8)' --rpc-url "http://localhost:${ANVIL_HOST_PORT}" --broadcast -vv)"
+  if [ $local_deploy == true ]; then
 
-echo "$DASHES deploy suppply source token output $DASHES"
-echo ""
-echo "$deploy_supply_source_token_out"
-echo ""
-# 0x2910E325cf29dd912E3476B61ef12F49cb931096
-  SUPPLY_SOURCE_ADDRESS=$(echo "$deploy_supply_source_token_out" | grep -oP 'contract Hoku\s\K\w+')
+    # TODO: need to decide how to handle local contracts repo. This just assumes the use has already cloned `contracts`
+    cd "${IPC_FOLDER}/../contracts"
+    # need to run clean or we hit upgradeable saftey validation errors resulting from contracts with the same name
+    forge clean
 
+    if [[ -z ${SKIP_BUILD+x} || "$SKIP_BUILD" == "" || "$SKIP_BUILD" == "false" ]]; then
+      forge install
+    fi
+
+    # TODO: should we dockerize this command?
+    # privkey is anvil #4
+    deploy_supply_source_token_out="$(PRIVATE_KEY=0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a forge script script/Hoku.s.sol --tc DeployScript 0 --sig 'run(uint8)' --rpc-url "http://localhost:${ANVIL_HOST_PORT}" --broadcast -vv)"
+
+    echo "$DASHES deploy suppply source token output $DASHES"
+    echo ""
+    echo "$deploy_supply_source_token_out"
+    echo ""
+    # note: this is consistently going to be 0x2910E325cf29dd912E3476B61ef12F49cb931096 for local net
+    SUPPLY_SOURCE_ADDRESS=$(echo "$deploy_supply_source_token_out" | grep -oP 'contract Hoku\s\K\w+')
+  fi
   cd "$IPC_FOLDER"
 fi
 echo "Gateway address: $PARENT_GATEWAY_ADDRESS"
@@ -420,7 +415,7 @@ echo "$bootstrap_output"
 bootstrap_node_id=$(echo "$bootstrap_output" | sed -n '/CometBFT node ID:/ {n;p;}' | tr -d "[:blank:]")
 bootstrap_peer_id=$(echo "$bootstrap_output" | sed -n '/IPLD Resolver Multiaddress:/ {n;p;}' | tr -d "[:blank:]" | sed 's/.*\/p2p\///')
 echo "Bootstrap node started. Node id ${bootstrap_node_id}, peer id ${bootstrap_peer_id}"
-# TODO: what are these endpoint?  Do they work for localnet?
+
 bootstrap_node_endpoint=${bootstrap_node_id}@validator-0-cometbft:${CMT_P2P_HOST_PORTS[0]}
 echo "Bootstrap node endpoint: ${bootstrap_node_endpoint}"
 bootstrap_resolver_endpoint="/dns/validator-0-fendermint/tcp/${RESOLVER_HOST_PORTS[0]}/p2p/${bootstrap_peer_id}"
@@ -514,10 +509,10 @@ do
 done
 
 # Kill existing relayer if there's one
-# TODO: does this kill all processes with relayer in the name?  This might have unintended side effects.
 pkill -fe "relayer" || true
 # Start relayer
 echo "$DASHES Start relayer process (in the background)"
+# TODO: should `reyaler.log` be git ignored?
 nohup ipc-cli checkpoint relayer --subnet "$subnet_id" --submitter "$default_wallet_address" > relayer.log &
 
 # Print a summary of the deployment

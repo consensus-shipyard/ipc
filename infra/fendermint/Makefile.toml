@@ -29,7 +29,6 @@ NETWORK_NAME = { script = ["echo $SUBNET_ID | sed -e 's|/|-|g' -e 's|^-||1'"] }
 CMT_P2P_EXTERNAL_ADDR = { value = "", condition = { env_not_set = [
     "CMT_P2P_EXTERNAL_ADDR",
 ] } }
-
 CMT_P2P_HOST_PORT = { value = "26656", condition = { env_not_set = [
     "CMT_P2P_HOST_PORT",
 ] } }

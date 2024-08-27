@@ -1,13 +1,11 @@
 keystore_path = "~/.ipc"
 
+# Filecoin Calibration
 [[subnets]]
-# To be replaced by deploy.sh
-# Calibration
 id = "/r314159"
 
 [subnets.config]
 network_type = "fevm"
-# To be replaced by deploy.sh
 provider_http = "https://calibration.node.glif.io/archive/lotus/rpc/v1"
 # To be replaced by deploy.sh
 auth_token = ""
