@@ -132,7 +132,7 @@ impl ActorGasMarket {
             gas_fee_cap: Default::default(),
             gas_premium: Default::default(),
         };
-        self.exec_msg_implicitly(msg, executor)?;
+        self.apply_implicit_message(msg, executor)?;
 
         Ok(())
     }
@@ -159,7 +159,7 @@ impl ActorGasMarket {
             gas_fee_cap: Default::default(),
             gas_premium: Default::default(),
         };
-        self.exec_msg_implicitly(msg, executor)?;
+        self.apply_implicit_message(msg, executor)?;
 
         Ok(())
     }
@@ -188,11 +188,11 @@ impl ActorGasMarket {
             gas_premium: Default::default(),
         };
 
-        self.exec_msg_implicitly(msg, executor)?;
+        self.apply_implicit_message(msg, executor)?;
         Ok(())
     }
 
-    fn exec_msg_implicitly<E: Executor>(
+    fn apply_implicit_message<E: Executor>(
         &self,
         msg: FvmMessage,
         executor: &mut E,
