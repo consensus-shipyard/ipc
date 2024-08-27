@@ -390,7 +390,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
         .unwrap_or(FvmQueryHeight::Committed.into());
     let path = tail.as_str();
     let key: Vec<u8> = path.into();
-    let maybe_object = os_get(client, address, GetParams { key }, height)
+    let maybe_object = os_get(client, address, GetParams(key), height)
         .await
         .map_err(|e| {
             Rejection::from(BadRequest {
@@ -706,6 +706,7 @@ mod tests {
             key: key.to_vec(),
             hash: fendermint_actor_blobs_shared::state::Hash(*hash.as_bytes()),
             size: 11,
+            ttl: 3600,
             metadata: HashMap::new(),
             overwrite: true,
         };

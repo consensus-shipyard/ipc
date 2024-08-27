@@ -2,8 +2,6 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::{BTreeMap, HashSet};
-
 use fendermint_actor_blobs_shared::params::{
     AddBlobParams, BuyCreditParams, DeleteBlobParams, FinalizeBlobParams, GetAccountParams,
     GetBlobParams, GetStatsReturn,
@@ -21,6 +19,7 @@ use fvm_shared::address::Address;
 use fvm_shared::sys::SendFlags;
 use fvm_shared::{error::ExitCode, MethodNum};
 use num_traits::Zero;
+use std::collections::{BTreeMap, HashSet};
 
 use crate::{ext, ConstructorParams, State, BLOBS_ACTOR_NAME};
 
@@ -65,33 +64,14 @@ impl BlobsActor {
 
     fn add_blob(rt: &impl Runtime, params: AddBlobParams) -> Result<Account, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-
-        // Caller must be converted to robust (non-ID) address for safe storage
-        let caller = if let Some(machine) = params.from {
-            match rt.resolve_address(&machine) {
-                Some(id) => {
-                    // Caller is always an ID address
-                    if id == rt.message().caller().id().unwrap() {
-                        machine
-                    } else {
-                        return Err(ActorError::illegal_argument(
-                            "machine address does not match caller".into(),
-                        ));
-                    }
-                }
-                None => return Err(ActorError::not_found("machine address not found".into())),
-            }
-        } else {
-            resolve_caller_external(rt)?
-        };
-
+        let caller = resolve_caller(rt, params.from)?;
         rt.transaction(|st: &mut State, rt| {
             st.add_blob(
                 caller,
                 rt.curr_epoch(),
                 params.hash,
                 params.size,
-                params.expiry,
+                params.ttl,
                 params.source,
             )
             .map_err(to_state_error("failed to add blob"))
@@ -134,13 +114,17 @@ impl BlobsActor {
         })
     }
 
-    // TODO: use syscall to delete from actual storage
-    fn delete_blob(rt: &impl Runtime, params: DeleteBlobParams) -> Result<(), ActorError> {
+    fn delete_blob(rt: &impl Runtime, params: DeleteBlobParams) -> Result<Account, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        rt.transaction(|st: &mut State, _| {
-            st.delete_blob(params.0)
+        let caller = resolve_caller(rt, params.from)?;
+        let (account, delete) = rt.transaction(|st: &mut State, _| {
+            st.delete_blob(caller, rt.curr_epoch(), params.hash)
                 .map_err(to_state_error("failed to delete blob"))
-        })
+        })?;
+        if delete {
+            // TODO: make syscall to delete blob from Iroh
+        }
+        Ok(account)
     }
 
     /// Fallback method for unimplemented method numbers.
@@ -181,6 +165,27 @@ impl ActorCode for BlobsActor {
         FinalizeBlob => finalize_blob,
         DeleteBlob => delete_blob,
         _ => fallback,
+    }
+}
+
+/// Resolves caller address to robust (non-ID) address for safe storage
+fn resolve_caller(rt: &impl Runtime, from: Option<Address>) -> Result<Address, ActorError> {
+    if let Some(machine) = from {
+        match rt.resolve_address(&machine) {
+            Some(id) => {
+                // Caller is always an ID address
+                if id == rt.message().caller().id().unwrap() {
+                    Ok(machine)
+                } else {
+                    Err(ActorError::illegal_argument(
+                        "machine address does not match caller".into(),
+                    ))
+                }
+            }
+            None => Err(ActorError::not_found("machine address not found".into())),
+        }
+    } else {
+        resolve_caller_external(rt)
     }
 }
 
@@ -379,7 +384,7 @@ mod tests {
             source: new_pk(),
             hash: hash.0,
             size: hash.1,
-            expiry: 10,
+            ttl: 3600,
         };
         let result = rt.call::<BlobsActor>(
             Method::AddBlob as u64,
@@ -415,8 +420,8 @@ mod tests {
             account,
             Account {
                 capacity_used: BigInt::from(1024),
-                credit_free: BigInt::from(999999999999989760u64),
-                credit_committed: BigInt::from(10240),
+                credit_free: BigInt::from(999999999996313600u64),
+                credit_committed: BigInt::from(3686400),
                 last_debit_epoch: 5,
             }
         );

@@ -16,6 +16,8 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use num_traits::{ToPrimitive, Zero};
 
+const MIN_TTL: ChainEpoch = 3600; // one hour
+
 /// The state represents all accounts and stored blobs.
 /// TODO: use raw HAMTs
 #[derive(Debug, Serialize_tuple, Deserialize_tuple)]
@@ -113,18 +115,21 @@ impl State {
     }
 
     // TODO: expiry should be optional, ie, pay for as long as there's credit
+    // TODO: we are currenlty charging for block bytes during blob resolution. we should
+    // probably only charge for blocks after the blob is resolved.
     pub fn add_blob(
         &mut self,
         sender: Address,
         current_epoch: ChainEpoch,
         hash: Hash,
         size: u64,
-        expiry: ChainEpoch,
+        ttl: ChainEpoch,
         source: PublicKey,
     ) -> anyhow::Result<Account> {
-        if expiry <= current_epoch {
-            return Err(anyhow!("expiry must be in the future"));
+        if ttl < MIN_TTL {
+            return Err(anyhow!("minimum blob TTL is {}", MIN_TTL));
         }
+        let expiry = current_epoch + ttl;
 
         match self.accounts.get_mut(&sender) {
             Some(account) => {
@@ -141,7 +146,7 @@ impl State {
                     if let Some(sub) = blob.subs.get(&sender) {
                         let mut sub = sub.clone();
                         // Required credit can be negative if sender is reducing expiry
-                        required_credit = (sub.expiry - expiry) as u64 * &size;
+                        required_credit = (expiry - sub.expiry) as u64 * &size;
                         sub.expiry = expiry;
                         // Overwrite source allows sender to retry resolving
                         sub.source = source;
@@ -150,7 +155,7 @@ impl State {
                         // However, we still need to reserve the full required credit from the new
                         // subscriber, as the existing account(s) may decide to change the
                         // expiry or cancel.
-                        required_credit = expiry as u64 * &size;
+                        required_credit = ttl as u64 * &size;
                         new_account_capacity = size.clone();
                         // Add new subscription
                         blob.subs.insert(sender, Subscription { expiry, source });
@@ -166,10 +171,9 @@ impl State {
                     }
                     blob
                 } else {
-                    required_credit = expiry as u64 * &size;
+                    required_credit = ttl as u64 * &size;
                     new_capacity = size.clone();
                     new_account_capacity = size.clone();
-
                     // Create new blob
                     Blob {
                         size: size.to_u64().unwrap(),
@@ -202,7 +206,7 @@ impl State {
                 account.credit_committed += &required_credit;
                 account.credit_free -= &required_credit;
 
-                // Add/update hash and its source to resolving
+                // Add/update hash and its source to pending
                 self.pending
                     .entry(hash)
                     .and_modify(|sources| {
@@ -236,14 +240,94 @@ impl State {
                 blob.status = status;
                 Ok(())
             }
-            // Don't error here in case the key was already deleted
+            // Don't error here in case the key was deleted in a past transaction
             None => Ok(()),
         }
     }
 
-    // TODO: Reverse accounting in add and return Account.
-    pub fn delete_blob(&mut self, hash: Hash) -> anyhow::Result<()> {
-        self.blobs.remove(&hash);
-        Ok(())
+    pub fn delete_blob(
+        &mut self,
+        sender: Address,
+        current_epoch: ChainEpoch,
+        hash: Hash,
+    ) -> anyhow::Result<(Account, bool)> {
+        // charge for usage up to expiry... if not failed
+        // move unspent credits from committed
+        match self.accounts.get_mut(&sender) {
+            Some(account) => {
+                let debit_epoch: ChainEpoch;
+                let mut reclaim_capacity = BigInt::zero();
+                let mut reclaim_account_capacity = BigInt::zero();
+                let mut reclaim_credit = BigInt::zero();
+                let delete_blob = if let Some(blob) = self.blobs.get(&hash) {
+                    // We could get_mut to begin with, but the logic below is simpler if we
+                    // have transactional control
+                    let mut blob = blob.clone();
+                    if let Some(sub) = blob.subs.get(&sender) {
+                        let size = BigInt::from(blob.size);
+                        // Since the charge will be for all the account's blobs, we can only
+                        // account for capacity up to _this_ blob's expiry if it is less than
+                        // the current epoch.
+                        debit_epoch = sub.expiry.min(current_epoch);
+                        // Determine if the account needs a capacity reduction
+                        match blob.status {
+                            BlobStatus::Added(_) | BlobStatus::Resolved => {
+                                reclaim_account_capacity = size.clone();
+                                if blob.subs.is_empty() {
+                                    reclaim_capacity = size.clone();
+                                }
+                                // We can refund credits if expiry is in the future
+                                if debit_epoch == current_epoch {
+                                    reclaim_credit = (sub.expiry - debit_epoch) * &size;
+                                }
+                            }
+                            BlobStatus::Failed => {
+                                // No-op, capacity and committed credits have already been returned
+                            }
+                        }
+                        // Clean up state
+                        blob.subs.remove(&sender);
+                        if blob.subs.is_empty() {
+                            self.blobs.remove(&hash);
+                            true
+                        } else {
+                            self.blobs.insert(hash, blob);
+                            false
+                        }
+                    } else {
+                        return Err(anyhow!(
+                            "sender {} is not subscribed to blob {}",
+                            sender,
+                            hash
+                        ));
+                    }
+                } else {
+                    return Err(anyhow!("blob {} not found", hash));
+                };
+
+                // Debit for existing usage
+                let debit_blocks = debit_epoch - account.last_debit_epoch;
+                let debit = debit_blocks as u64 * &account.capacity_used;
+                self.credit_debited += &debit;
+                self.credit_committed -= &debit;
+                account.credit_committed -= &debit;
+                account.last_debit_epoch = debit_epoch;
+
+                // Account for reclaimed size and move committed credit to free credit
+                self.capacity_used -= &reclaim_capacity;
+                account.capacity_used -= &reclaim_account_capacity;
+                self.credit_committed -= &reclaim_credit;
+                account.credit_committed -= &reclaim_credit;
+                account.credit_free += &reclaim_credit;
+
+                // Maybe remove hash and its source from pending
+                if delete_blob {
+                    self.pending.remove(&hash);
+                }
+
+                Ok((account.clone(), delete_blob))
+            }
+            None => Err(anyhow!("account {} not found", sender)),
+        }
     }
 }

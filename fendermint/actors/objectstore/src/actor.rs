@@ -45,21 +45,21 @@ impl Actor {
         let key = BytesKey(params.key);
         if let Some(object) = retrieve_object_state(rt, &key)? {
             if params.overwrite {
-                delete_blob(rt, object.hash)?;
+                delete_blob(rt, params.to, object.hash)?;
             } else {
                 return Err(ActorError::illegal_state(
                     "key exists; use overwrite".into(),
                 ));
             }
         }
-        // Add object's blob
+        // Add blob for object
         add_blob(
             rt,
             params.to,
             params.source,
             params.hash,
             params.size,
-            rt.curr_epoch() + 100,
+            params.ttl,
         )?;
         // Update state
         let root = rt.transaction(|st: &mut State, rt| {
@@ -80,8 +80,8 @@ impl Actor {
         let key = BytesKey(params.key);
         let object = retrieve_object_state(rt, &key)?
             .ok_or(ActorError::illegal_state("object not found".into()))?;
-        // Delete object's blob
-        delete_blob(rt, object.hash)?;
+        // Delete blob for object
+        delete_blob(rt, params.to, object.hash)?;
         // Update state
         let res = rt.transaction(|st: &mut State, rt| {
             st.delete(rt.store(), &key)
@@ -92,7 +92,7 @@ impl Actor {
 
     fn get_object(rt: &impl Runtime, params: GetParams) -> Result<Option<Object>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        if let Some(object_state) = retrieve_object_state(rt, &BytesKey(params.key))? {
+        if let Some(object_state) = retrieve_object_state(rt, &BytesKey(params.0))? {
             let blob = get_blob(rt, object_state.hash)?;
             let object = build_object(&blob, &object_state)
                 .map_err(to_state_error("failed to build object"))?;
@@ -282,13 +282,15 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
 
+        let machine_addr = Address::new_actor(&[0xde, 0xad, 0xbe, 0xef]);
         let hash = new_hash(256);
         let add_params: AddParams = AddParams {
-            to: f4_eth_addr,
+            to: machine_addr,
             source: new_pk(),
             key: vec![0, 1, 2],
             hash: hash.0,
             size: hash.1,
+            ttl: 3600,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -301,7 +303,7 @@ mod tests {
                 source: add_params.source,
                 hash: add_params.hash,
                 size: add_params.size,
-                expiry: 100,
+                ttl: add_params.ttl,
             })
             .unwrap(),
             TokenAmount::from_whole(0),
@@ -335,13 +337,15 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
 
+        let machine_addr = Address::new_actor(&[0xde, 0xad, 0xbe, 0xef]);
         let hash = new_hash(256);
         let add_params: AddParams = AddParams {
-            to: f4_eth_addr,
+            to: machine_addr,
             source: new_pk(),
             key: vec![0, 1, 2],
             hash: hash.0,
             size: hash.1,
+            ttl: 3600,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -354,7 +358,7 @@ mod tests {
                 source: add_params.source,
                 hash: add_params.hash,
                 size: add_params.size,
-                expiry: 100,
+                ttl: add_params.ttl,
             })
             .unwrap(),
             TokenAmount::from_whole(0),
@@ -381,6 +385,7 @@ mod tests {
             key: add_params.key,
             hash: hash.0,
             size: hash.1,
+            ttl: 3600,
             metadata: HashMap::new(),
             overwrite: true,
         };
@@ -388,7 +393,11 @@ mod tests {
         rt.expect_send_simple(
             BLOBS_ACTOR_ADDR,
             BlobMethod::DeleteBlob as MethodNum,
-            IpldBlock::serialize_cbor(&DeleteBlobParams(add_params.hash)).unwrap(),
+            IpldBlock::serialize_cbor(&DeleteBlobParams {
+                from: Some(add_params.to),
+                hash: add_params.hash,
+            })
+            .unwrap(),
             TokenAmount::from_whole(0),
             None,
             ExitCode::OK,
@@ -401,7 +410,7 @@ mod tests {
                 source: add_params2.source,
                 hash: add_params2.hash,
                 size: add_params2.size,
-                expiry: 100,
+                ttl: add_params2.ttl,
             })
             .unwrap(),
             TokenAmount::from_whole(0),
@@ -435,13 +444,15 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
 
+        let machine_addr = Address::new_actor(&[0xde, 0xad, 0xbe, 0xef]);
         let hash = new_hash(256);
         let add_params: AddParams = AddParams {
-            to: f4_eth_addr,
+            to: machine_addr,
             source: new_pk(),
             key: vec![0, 1, 2],
             hash: hash.0,
             size: hash.1,
+            ttl: 3600,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -454,7 +465,7 @@ mod tests {
                 source: add_params.source,
                 hash: add_params.hash,
                 size: add_params.size,
-                expiry: 100,
+                ttl: add_params.ttl,
             })
             .unwrap(),
             TokenAmount::from_whole(0),
@@ -481,6 +492,7 @@ mod tests {
             key: add_params.key,
             hash: hash.0,
             size: hash.1,
+            ttl: 3600,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -508,16 +520,18 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
 
+        let machine_addr = Address::new_actor(&[0xde, 0xad, 0xbe, 0xef]);
         let key = vec![0, 1, 2];
         let hash = new_hash(256);
 
         // Prerequisite for a delete operation: add to have a proper state of the actor.
         let add_params: AddParams = AddParams {
-            to: f4_eth_addr,
+            to: machine_addr,
             source: new_pk(),
             key: key.clone(),
             hash: hash.0,
             size: hash.1,
+            ttl: 3600,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -530,7 +544,7 @@ mod tests {
                 source: add_params.source,
                 hash: add_params.hash,
                 size: add_params.size,
-                expiry: 100,
+                ttl: add_params.ttl,
             })
             .unwrap(),
             TokenAmount::from_whole(0),
@@ -551,12 +565,19 @@ mod tests {
         rt.verify();
 
         // Now actually delete it.
-        let delete_params = DeleteParams { key: key.clone() };
+        let delete_params = DeleteParams {
+            to: machine_addr,
+            key: key.clone(),
+        };
         rt.expect_validate_caller_any();
         rt.expect_send_simple(
             BLOBS_ACTOR_ADDR,
             BlobMethod::DeleteBlob as MethodNum,
-            IpldBlock::serialize_cbor(&DeleteBlobParams(hash.0)).unwrap(),
+            IpldBlock::serialize_cbor(&DeleteBlobParams {
+                from: Some(add_params.to),
+                hash: add_params.hash,
+            })
+            .unwrap(),
             TokenAmount::from_whole(0),
             None,
             ExitCode::OK,
@@ -582,7 +603,7 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
 
-        let get_params = GetParams { key: vec![0, 1, 2] };
+        let get_params = GetParams(vec![0, 1, 2]);
         rt.expect_validate_caller_any();
         let result = rt
             .call::<Actor>(
@@ -610,17 +631,19 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
 
+        let machine_addr = Address::new_actor(&[0xde, 0xad, 0xbe, 0xef]);
         let key = vec![0, 1, 2];
         let hash = new_hash(256);
-        let expiry = ChainEpoch::from(100);
+        let ttl = ChainEpoch::from(100);
 
         // Prerequisite for a delete operation: add to have a proper state of the actor.
         let add_params: AddParams = AddParams {
-            to: f4_eth_addr,
+            to: machine_addr,
             source: new_pk(),
             key: key.clone(),
             hash: hash.0,
             size: hash.1,
+            ttl,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -633,7 +656,7 @@ mod tests {
                 source: add_params.source,
                 hash: add_params.hash,
                 size: add_params.size,
-                expiry,
+                ttl: add_params.ttl,
             })
             .unwrap(),
             TokenAmount::from_whole(0),
@@ -653,9 +676,9 @@ mod tests {
         let blob = Blob {
             size: add_params.size,
             subs: HashMap::from([(
-                f4_eth_addr,
+                machine_addr,
                 Subscription {
-                    expiry,
+                    expiry: ttl,
                     source: add_params.source,
                 },
             )]),
@@ -670,7 +693,7 @@ mod tests {
             IpldBlock::serialize_cbor(&Some(&blob)).unwrap(),
             ExitCode::OK,
         );
-        let get_params = GetParams { key };
+        let get_params = GetParams(key);
         let result = rt
             .call::<Actor>(
                 Method::GetObject as u64,
@@ -685,7 +708,7 @@ mod tests {
             Some(Object {
                 hash: hash.0,
                 size: blob.size,
-                expiry,
+                expiry: ttl,
                 metadata: add_params.metadata,
             })
         );
