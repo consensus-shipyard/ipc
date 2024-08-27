@@ -5,8 +5,8 @@
 use std::collections::{BTreeMap, HashSet};
 
 use fendermint_actor_blobs_shared::params::{
-    AddBlobParams, BuyCreditParams, DeleteBlobParams, FailBlobParams, GetAccountParams,
-    GetBlobParams, GetStatsReturn, ResolveBlobParams,
+    AddBlobParams, BuyCreditParams, DeleteBlobParams, FinalizeBlobParams, GetAccountParams,
+    GetBlobParams, GetStatsReturn,
 };
 use fendermint_actor_blobs_shared::state::{Account, Blob, BlobStatus, Hash, PublicKey};
 use fendermint_actor_blobs_shared::Method;
@@ -107,7 +107,7 @@ impl BlobsActor {
 
     fn get_blob_status(
         rt: &impl Runtime,
-        params: ResolveBlobParams,
+        params: GetBlobParams,
     ) -> Result<Option<BlobStatus>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         rt.state::<State>()?
@@ -116,31 +116,22 @@ impl BlobsActor {
             .map(|b| b.map(|b| b.status))
     }
 
-    fn resolve_blob(rt: &impl Runtime, params: ResolveBlobParams) -> Result<(), ActorError> {
-        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        rt.transaction(|st: &mut State, _| {
-            st.resolve_blob(params.0)
-                .map_err(to_state_error("failed to resolve blob"))
-        })
-    }
-
-    // TODO: wire this to chain interpreter
-    fn fail_blob(rt: &impl Runtime, params: FailBlobParams) -> Result<(), ActorError> {
-        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        rt.transaction(|st: &mut State, _| {
-            st.fail_blob(params.0)
-                .map_err(to_state_error("failed to fail blob"))
-        })
-    }
-
     // TODO: limit return via param
-    fn get_resolving_blobs(
+    fn get_pending_blobs(
         rt: &impl Runtime,
     ) -> Result<BTreeMap<Hash, HashSet<PublicKey>>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         rt.state::<State>()?
-            .get_resolving_blobs()
+            .get_pending_blobs()
             .map_err(to_state_error("failed to get resolving blobs"))
+    }
+
+    fn finalize_blob(rt: &impl Runtime, params: FinalizeBlobParams) -> Result<(), ActorError> {
+        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
+        rt.transaction(|st: &mut State, _| {
+            st.finalize_blob(params.hash, params.status)
+                .map_err(to_state_error("failed to finalize blob"))
+        })
     }
 
     // TODO: use syscall to delete from actual storage
@@ -186,9 +177,8 @@ impl ActorCode for BlobsActor {
         AddBlob => add_blob,
         GetBlob => get_blob,
         GetBlobStatus => get_blob_status,
-        ResolveBlob => resolve_blob,
-        GetResolvingBlobs => get_resolving_blobs,
-        FailBlob => fail_blob,
+        GetPendingBlobs => get_pending_blobs,
+        FinalizeBlob => finalize_blob,
         DeleteBlob => delete_blob,
         _ => fallback,
     }

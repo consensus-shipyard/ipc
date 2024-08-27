@@ -20,7 +20,7 @@ pub enum IpcMessage {
     /// or later during execution, once data availability has been confirmed.
     BottomUpResolve(SignedRelayedMessage<CertifiedMessage<BottomUpCheckpoint>>),
 
-    /// A bottom-up checkpoint proposed "for execution" by the parent subnet validators, provided that the majority of them
+    /// A bottom-up checkpoint proposed "for execution" by the parent subnet validators, if the majority of them
     /// have the data available to them, already resolved.
     ///
     /// To prove that the data is available, we can either use the ABCI++ "process proposal" mechanism,
@@ -31,8 +31,8 @@ pub enum IpcMessage {
     /// state that to be checked and voted by validators.
     TopDownExec(ParentFinality),
 
-    /// Proposed by validators when a blob has been resolved and is ready to be executed.
-    BlobResolved(Blob),
+    /// Proposed by validators when a blob has been finalized and is ready to be executed.
+    BlobFinalized(Blob),
 }
 
 /// A message relayed by a user on the current subnet.
@@ -115,6 +115,8 @@ pub struct Blob {
     pub hash: Hash,
     /// The node ID of the source node serving validators the blob.
     pub source: NodeId,
+    /// Whether the blob was resolved or failed.
+    pub succeeded: bool,
 }
 
 #[cfg(feature = "arb")]

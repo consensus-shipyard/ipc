@@ -138,17 +138,24 @@ impl Display for IPCParentFinality {
 
 /// The finality view for a blob at certain height.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct IPCBlobFinality(pub Hash);
+pub struct IPCBlobFinality {
+    pub hash: Hash,
+    pub success: bool,
+}
 
 impl IPCBlobFinality {
-    pub fn new(value: Hash) -> Self {
-        Self(value)
+    pub fn new(hash: Hash, success: bool) -> Self {
+        Self { hash, success }
     }
 }
 
 impl Display for IPCBlobFinality {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "IPCObjectFinality(value: {})", self.0)
+        write!(
+            f,
+            "IPCObjectFinality(value: {}, success: {})",
+            self.hash, self.success
+        )
     }
 }
 

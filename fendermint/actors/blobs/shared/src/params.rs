@@ -9,7 +9,7 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use serde::{Deserialize, Serialize};
 
-use crate::state::{Hash, PublicKey};
+use crate::state::{BlobStatus, Hash, PublicKey};
 
 /// Params for buying credits.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -41,15 +41,14 @@ pub struct AddBlobParams {
 #[serde(transparent)]
 pub struct GetBlobParams(pub Hash);
 
-/// Params for resolving a blob.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct ResolveBlobParams(pub Hash);
-
-/// Params for failing a blob.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct FailBlobParams(pub Hash);
+/// Params for finalizing a blob.
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct FinalizeBlobParams {
+    /// Blob blake3 hash.
+    pub hash: Hash,
+    /// The status to set as final.
+    pub status: BlobStatus,
+}
 
 /// Params for deleting a blob.
 #[derive(Clone, Debug, Serialize, Deserialize)]

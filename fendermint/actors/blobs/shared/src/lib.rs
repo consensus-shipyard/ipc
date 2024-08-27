@@ -26,9 +26,8 @@ pub enum Method {
     AddBlob = frc42_dispatch::method_hash!("AddBlob"),
     GetBlob = frc42_dispatch::method_hash!("GetBlob"),
     GetBlobStatus = frc42_dispatch::method_hash!("GetBlobStatus"),
-    ResolveBlob = frc42_dispatch::method_hash!("ResolveBlob"),
-    GetResolvingBlobs = frc42_dispatch::method_hash!("GetResolvingBlobs"),
-    FailBlob = frc42_dispatch::method_hash!("FailBlob"),
+    GetPendingBlobs = frc42_dispatch::method_hash!("GetPendingBlobs"),
+    FinalizeBlob = frc42_dispatch::method_hash!("FinalizeBlob"),
     DeleteBlob = frc42_dispatch::method_hash!("DeleteBlob"),
 }
 

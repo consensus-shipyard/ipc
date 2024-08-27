@@ -37,8 +37,8 @@ pub struct State {
     pub accounts: HashMap<Address, Account>,
     /// Map containing all blobs.
     pub blobs: HashMap<Hash, Blob>,
-    /// Map of currently resolving blob hashes to source Iroh node IDs.
-    pub resolving: BTreeMap<Hash, HashSet<PublicKey>>,
+    /// Map of currently pending blob hashes to source Iroh node IDs.
+    pub pending: BTreeMap<Hash, HashSet<PublicKey>>,
 }
 
 impl State {
@@ -52,7 +52,7 @@ impl State {
             credit_debit_rate,
             accounts: HashMap::new(),
             blobs: HashMap::new(),
-            resolving: BTreeMap::new(),
+            pending: BTreeMap::new(),
         })
     }
 
@@ -67,7 +67,7 @@ impl State {
             credit_debit_rate: self.credit_debit_rate,
             num_accounts: self.accounts.len() as u64,
             num_blobs: self.blobs.len() as u64,
-            num_resolving: self.resolving.len() as u64,
+            num_resolving: self.pending.len() as u64,
         })
     }
 
@@ -203,7 +203,7 @@ impl State {
                 account.credit_free -= &required_credit;
 
                 // Add/update hash and its source to resolving
-                self.resolving
+                self.pending
                     .entry(hash)
                     .and_modify(|sources| {
                         sources.insert(source);
@@ -224,28 +224,16 @@ impl State {
         Ok(blob)
     }
 
-    pub fn resolve_blob(&mut self, hash: Hash) -> anyhow::Result<()> {
-        self.resolving.remove(&hash);
-        match self.blobs.get_mut(&hash) {
-            Some(blob) => {
-                blob.status = BlobStatus::Resolved;
-                Ok(())
-            }
-            // Don't error here in case the key was already deleted
-            None => Ok(()),
-        }
+    pub fn get_pending_blobs(&self) -> anyhow::Result<BTreeMap<Hash, HashSet<PublicKey>>> {
+        Ok(self.pending.clone())
     }
 
-    pub fn get_resolving_blobs(&self) -> anyhow::Result<BTreeMap<Hash, HashSet<PublicKey>>> {
-        Ok(self.resolving.clone())
-    }
-
-    // TODO: give back credit and capacity
-    pub fn fail_blob(&mut self, hash: Hash) -> anyhow::Result<()> {
-        self.resolving.remove(&hash);
+    // TODO: give back credit and capacity if failed
+    pub fn finalize_blob(&mut self, hash: Hash, status: BlobStatus) -> anyhow::Result<()> {
+        self.pending.remove(&hash);
         match self.blobs.get_mut(&hash) {
             Some(blob) => {
-                blob.status = BlobStatus::Failed;
+                blob.status = status;
                 Ok(())
             }
             // Don't error here in case the key was already deleted
