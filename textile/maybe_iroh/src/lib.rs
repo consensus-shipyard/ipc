@@ -9,6 +9,13 @@ pub struct MaybeIroh {
 }
 
 impl MaybeIroh {
+    pub fn from_addr(addr: String) -> MaybeIroh {
+        Self {
+            addr: Some(addr),
+            client: None
+        }
+    }
+
     pub fn maybe_addr(addr: Option<String>) -> MaybeIroh {
         Self {
             addr,

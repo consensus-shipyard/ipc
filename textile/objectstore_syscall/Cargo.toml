@@ -19,3 +19,5 @@ num-traits = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 ipfs-api-backend-hyper = { version = "0.6.0", features = ["with-send-sync"] }
+iroh = { workspace = true }
+maybe_iroh = { path = "../maybe_iroh" }

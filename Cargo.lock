@@ -8078,6 +8078,8 @@ dependencies = [
  "fvm_ipld_blockstore",
  "fvm_shared",
  "ipfs-api-backend-hyper",
+ "iroh",
+ "maybe_iroh",
  "num-traits",
  "tokio",
  "tracing",
