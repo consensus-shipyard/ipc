@@ -5913,6 +5913,7 @@ dependencies = [
  "libsecp256k1",
  "log",
  "lru_time_cache",
+ "maybe_iroh",
  "multihash 0.18.1",
  "prometheus",
  "quickcheck",
@@ -7340,6 +7341,14 @@ name = "matchit"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e7465ac9959cc2b1404e8e2367b43684a6d13790fe23056cc8c6c5a6b7bcb94"
+
+[[package]]
+name = "maybe_iroh"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "iroh",
+]
 
 [[package]]
 name = "md-5"

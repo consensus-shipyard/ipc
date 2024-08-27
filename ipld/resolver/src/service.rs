@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 use std::collections::HashMap;
-use std::net::ToSocketAddrs;
 use std::time::Duration;
 
 use anyhow::anyhow;
@@ -32,7 +31,7 @@ use tokio::select;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot::Sender;
-
+use maybe_iroh::MaybeIroh;
 use crate::behaviour::{
     content, discovery, membership, Behaviour, BehaviourEvent, ConfigError, ContentConfig,
     DiscoveryConfig, MembershipConfig, NetworkConfig,
@@ -151,34 +150,6 @@ where
     iroh: MaybeIroh,
 }
 
-#[derive(Clone, Debug)]
-struct MaybeIroh {
-    addr: Option<String>,
-    client: Option<Iroh>,
-}
-
-impl MaybeIroh {
-    async fn client(&mut self) -> anyhow::Result<Iroh> {
-        if let Some(c) = self.client.clone() {
-            return Ok(c);
-        }
-        if let Some(addr) = self.addr.clone() {
-            let addr = addr.to_socket_addrs()?.next().ok_or(anyhow!(
-                "failed to convert iroh node address to a socket address"
-            ))?;
-            match Iroh::connect_addr(addr).await {
-                Ok(client) => {
-                    self.client = Some(client.clone());
-                    Ok(client)
-                }
-                Err(e) => Err(e),
-            }
-        } else {
-            Err(anyhow!("iroh node address is not configured"))
-        }
-    }
-}
-
 impl<P, V> Service<P, V>
 where
     P: StoreParams,
@@ -256,10 +227,7 @@ where
                 config.connection.expected_peer_count,
             ),
             max_peers_per_query: config.connection.max_peers_per_query as usize,
-            iroh: MaybeIroh {
-                addr: config.iroh_addr,
-                client: None,
-            },
+            iroh: MaybeIroh::maybe_addr(config.iroh_addr),
         };
 
         Ok(service)
