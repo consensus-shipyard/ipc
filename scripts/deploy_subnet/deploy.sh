@@ -198,7 +198,7 @@ cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=loki \
     loki-destroy
 
-# TODO: does this work for local and calibration?
+# shut down any existing validator nodes
 if [ -e "${IPC_CONFIG_FOLDER}/config.toml" ]; then
     subnet_id=$(toml get -r "${IPC_CONFIG_FOLDER}"/config.toml subnets[1].id)
     echo "Existing subnet id: $subnet_id"
@@ -320,7 +320,7 @@ if [[ ! -v PARENT_GATEWAY_ADDRESS || ! -v PARENT_REGISTRY_ADDRESS ]]; then
 
   if [ $local_deploy == true ]; then
 
-    # TODO: need to decide how to handle local contracts repo. This just assumes the use has already cloned `contracts`
+    # TODO: This just assumes the use has already cloned `contracts`, does that work?
     cd "${IPC_FOLDER}/../contracts"
     # need to run clean or we hit upgradeable saftey validation errors resulting from contracts with the same name
     forge clean
@@ -512,7 +512,6 @@ done
 pkill -fe "relayer" || true
 # Start relayer
 echo "$DASHES Start relayer process (in the background)"
-# TODO: should `reyaler.log` be git ignored?
 nohup ipc-cli checkpoint relayer --subnet "$subnet_id" --submitter "$default_wallet_address" > relayer.log &
 
 # Print a summary of the deployment
