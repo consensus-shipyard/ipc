@@ -5,6 +5,9 @@ authors.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[lib]
+crate-type = ["cdylib", "lib"]
+
 [dependencies]
 fvm_shared = { workspace = true }
 fvm_sdk = { workspace = true }

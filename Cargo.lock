@@ -3159,6 +3159,7 @@ dependencies = [
  "iroh-base",
  "log",
  "num-traits",
+ "objectstore_actor_sdk",
  "rand",
  "serde",
  "serde_tuple",

@@ -56,7 +56,7 @@ pub fn cid_rm(context: Context<'_, impl ObjectStoreOps>, cid_off: u32, cid_len: 
     }
 }
 
-pub fn hash_rm(context: Context<'_, impl ObjectStoreOps>, hash_off: u32) -> Result<()> {
+pub fn hash_rm(context: Context<'_, impl ObjectStoreOps>, hash_off: u32, hash_len: u32) -> Result<()> {
     Ok(())
     // let cid = context.memory.try_slice(cid_off, cid_len)?;
     // let cid = Cid::try_from(cid).map_err(syscall_error(CIDRM_SYSCALL_ERROR_CODE))?;
