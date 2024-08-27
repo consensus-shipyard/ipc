@@ -172,10 +172,6 @@ dependencies = ["docker-network-create", "fendermint-deps"]
 
 [tasks.fendermint-tool]
 script.main = """
-
-echo fendermint-tool CMD $CMD
-echo fendermint-tool NETWORK_NAME $NETWORK_NAME
-
 docker run \
   ${FLAGS} \
   --init \

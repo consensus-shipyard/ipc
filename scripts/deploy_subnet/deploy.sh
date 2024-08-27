@@ -38,6 +38,7 @@ if ! $local_deploy ; then
     echo "PARENT_HTTP_AUTH_TOKEN is not set"
     exit 1
   fi
+  PARENT_AUTH_FLAG=--parent-auth-token ${PARENT_HTTP_AUTH_TOKEN}
 else
   # we set SUPPLY_SOURCE_ADDRESS below for the local net
   # TODO: should this just be an empty string for local? maybe hust leave it undefined?
@@ -47,6 +48,7 @@ fi
 if [[ $local_deploy = true ]]; then
   dir=$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")
   IPC_FOLDER=$(readlink -f -- "$dir"/../..)
+  PARENT_AUTH_FLAG=""
 fi
 if [[ ! -v IPC_FOLDER ]]; then
     IPC_FOLDER=${HOME}/ipc
@@ -77,10 +79,8 @@ ANVIL_HOST_PORT=8545
 
 if [[ -z ${PARENT_ENDPOINT+x} ]]; then
   if [[ $local_deploy == true ]]; then
-    echo "$DASHES using local PARENT_ENDPOINT"
     PARENT_ENDPOINT="http://anvil:${ANVIL_HOST_PORT}"
   else
-    echo "$DASHES using calibration PARENT_ENDPOINT"
     PARENT_ENDPOINT="https://calibration.node.glif.io/archive/lotus/rpc/v1"
   fi
 fi
@@ -410,6 +410,7 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e PROMTAIL_CONFIG_FOLDER="${IPC_CONFIG_FOLDER}" \
     -e IROH_CONFIG_FOLDER="${IPC_FOLDER}/infra/iroh/" \
     -e PARENT_HTTP_AUTH_TOKEN="${PARENT_HTTP_AUTH_TOKEN}" \
+    -e PARENT_AUTH_FLAG="${PARENT_AUTH_FLAG}" \
     -e PARENT_REGISTRY="${PARENT_REGISTRY_ADDRESS}" \
     -e PARENT_GATEWAY="${PARENT_GATEWAY_ADDRESS}" \
     -e FM_PULL_SKIP=1 \
@@ -449,6 +450,7 @@ do
       -e RESOLVER_BOOTSTRAPS="${bootstrap_resolver_endpoint}" \
       -e BOOTSTRAPS="${bootstrap_node_endpoint}" \
       -e PARENT_HTTP_AUTH_TOKEN="${PARENT_HTTP_AUTH_TOKEN}" \
+      -e PARENT_AUTH_FLAG="${PARENT_AUTH_FLAG}" \
       -e PARENT_REGISTRY="${PARENT_REGISTRY_ADDRESS}" \
       -e PARENT_GATEWAY="${PARENT_GATEWAY_ADDRESS}" \
       -e FM_PULL_SKIP=1 \

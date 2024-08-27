@@ -2,9 +2,6 @@
 #--publish ${ANVIL_HOST_PORT}:8545 \
 [tasks.anvil-run]
 script = """
-
-echo NETWORK_NAME $NETWORK_NAME
-
 docker run \
   ${FLAGS} \
   --name ${ANVIL_CONTAINER_NAME} \
