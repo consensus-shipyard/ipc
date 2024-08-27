@@ -78,6 +78,11 @@ where
             crate::CIDRM_SYSCALL_FUNCTION_NAME,
             crate::cid_rm,
         )?;
+        linker.link_syscall(
+            crate::SYSCALL_MODULE_NAME,
+            crate::HASHRM_SYSCALL_FUNCTION_NAME,
+            crate::hash_rm,
+        )?;
 
         Ok(())
     }
