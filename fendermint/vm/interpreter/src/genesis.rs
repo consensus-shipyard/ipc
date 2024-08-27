@@ -125,7 +125,7 @@ pub async fn read_genesis_car<DB: Blockstore + 'static + Send + Sync>(
         .ok_or_else(|| anyhow!("invalid genesis car, should have at least 1 root cid"))?;
 
     let metadata = store
-        .get_cbor::<GenesisMetadata>(&metadata_cid)?
+        .get_cbor::<GenesisMetadata>(metadata_cid)?
         .ok_or_else(|| anyhow!("invalid genesis car, metadata not found"))?;
 
     Ok((metadata.validators, metadata.state_params))
