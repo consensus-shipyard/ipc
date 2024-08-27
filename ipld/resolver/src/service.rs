@@ -23,6 +23,7 @@ use libp2p::{identify, ping};
 use libp2p_bitswap::{BitswapResponse, BitswapStore};
 use libp2p_mplex::MplexConfig;
 use log::{debug, error, info, trace, warn};
+use maybe_iroh::MaybeIroh;
 use prometheus::Registry;
 use rand::seq::SliceRandom;
 use serde::de::DeserializeOwned;
@@ -31,7 +32,7 @@ use tokio::select;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot::Sender;
-use maybe_iroh::MaybeIroh;
+
 use crate::behaviour::{
     content, discovery, membership, Behaviour, BehaviourEvent, ConfigError, ContentConfig,
     DiscoveryConfig, MembershipConfig, NetworkConfig,
