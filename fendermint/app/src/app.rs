@@ -414,7 +414,10 @@ where
     S::Namespace: Sync + Send,
     DB: KVWritable<S> + KVReadable<S> + Clone + Send + Sync + 'static,
     SS: Blockstore + Clone + Send + Sync + 'static,
-    I: ProposalInterpreter<State = (ChainEnv, FvmExecState<SS>), Message = Vec<u8>>,
+    I: ProposalInterpreter<
+        State = (ChainEnv, FvmExecState<ReadOnlyBlockstore<Arc<SS>>>),
+        Message = Vec<u8>,
+    >,
     I: ExecInterpreter<
         State = (ChainEnv, FvmExecState<SS>),
         Message = Vec<u8>,
@@ -623,15 +626,9 @@ where
         );
         let txs = request.txs.into_iter().map(|tx| tx.to_vec()).collect();
 
-        let (state_params, block_height) =
-            self.state_params_at_height(request.height.value().into())?;
-        let state = FvmExecState::new(
-            self.state_store_clone(),
-            self.multi_engine.as_ref(),
-            block_height as ChainEpoch,
-            state_params,
-        )
-        .context("error creating new state")?;
+        let state = self
+            .new_read_only_exec_state()?
+            .ok_or_else(|| anyhow!("exec state should be present"))?;
 
         let txs = self
             .interpreter
@@ -668,15 +665,9 @@ where
         let size_txs = txs.iter().map(|tx| tx.len()).sum::<usize>();
         let num_txs = txs.len();
 
-        let (state_params, block_height) =
-            self.state_params_at_height(request.height.value().into())?;
-        let state = FvmExecState::new(
-            self.state_store_clone(),
-            self.multi_engine.as_ref(),
-            block_height as ChainEpoch,
-            state_params,
-        )
-        .context("error creating new state")?;
+        let state = self
+            .new_read_only_exec_state()?
+            .ok_or_else(|| anyhow!("exec state should be present"))?;
 
         let accept = self
             .interpreter

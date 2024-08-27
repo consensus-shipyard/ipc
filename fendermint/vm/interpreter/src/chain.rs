@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 use crate::fvm::gas::GasMarket;
 use crate::fvm::state::ipc::GatewayCaller;
+use crate::fvm::store::ReadOnlyBlockstore;
 use crate::fvm::{topdown, FvmApplyRet, PowerUpdates};
 use crate::selector::{GasLimitSelector, MessageSelector};
 use crate::{
@@ -104,7 +105,7 @@ where
     DB: Blockstore + Clone + 'static + Send + Sync,
     I: Sync + Send,
 {
-    type State = (ChainEnv, FvmExecState<DB>);
+    type State = (ChainEnv, FvmExecState<ReadOnlyBlockstore<Arc<DB>>>);
     type Message = ChainMessage;
 
     /// Check whether there are any "ready" messages in the IPLD resolution mempool which can be appended to the proposal.
