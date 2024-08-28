@@ -953,6 +953,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "blobs_syscall"
+version = "0.1.0"
+dependencies = [
+ "ambassador",
+ "anyhow",
+ "fvm",
+ "fvm_ipld_blockstore",
+ "fvm_shared",
+ "iroh",
+ "maybe_iroh",
+ "num-traits",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "block-buffer"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3723,6 +3739,7 @@ dependencies = [
  "arbitrary",
  "async-stm",
  "async-trait",
+ "blobs_syscall",
  "cid",
  "ethers",
  "fendermint_actor_accumulator",
@@ -3762,7 +3779,6 @@ dependencies = [
  "libipld",
  "multihash 0.18.1",
  "num-traits",
- "objectstore_syscall",
  "pin-project",
  "quickcheck",
  "quickcheck_macros",
@@ -7944,22 +7960,6 @@ dependencies = [
  "fvm_sdk",
  "fvm_shared",
  "num-traits",
-]
-
-[[package]]
-name = "objectstore_syscall"
-version = "0.1.0"
-dependencies = [
- "ambassador",
- "anyhow",
- "fvm",
- "fvm_ipld_blockstore",
- "fvm_shared",
- "iroh",
- "maybe_iroh",
- "num-traits",
- "tokio",
- "tracing",
 ]
 
 [[package]]
