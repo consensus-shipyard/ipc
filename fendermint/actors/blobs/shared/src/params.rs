@@ -44,6 +44,9 @@ pub struct GetBlobParams(pub Hash);
 /// Params for finalizing a blob.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct FinalizeBlobParams {
+    /// The origin address that requested the blob.
+    /// This could be a wallet or machine.
+    pub from: Address,
     /// Blob blake3 hash.
     pub hash: Hash,
     /// The status to set as final.

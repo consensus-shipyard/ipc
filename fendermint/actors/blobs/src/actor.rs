@@ -99,7 +99,7 @@ impl BlobsActor {
     // TODO: limit return via param
     fn get_pending_blobs(
         rt: &impl Runtime,
-    ) -> Result<BTreeMap<Hash, HashSet<PublicKey>>, ActorError> {
+    ) -> Result<BTreeMap<Hash, HashSet<(Address, PublicKey)>>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         rt.state::<State>()?
             .get_pending_blobs()
@@ -109,7 +109,7 @@ impl BlobsActor {
     fn finalize_blob(rt: &impl Runtime, params: FinalizeBlobParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
         rt.transaction(|st: &mut State, _| {
-            st.finalize_blob(params.hash, params.status)
+            st.finalize_blob(params.from, params.hash, params.status)
                 .map_err(to_state_error("failed to finalize blob"))
         })
     }

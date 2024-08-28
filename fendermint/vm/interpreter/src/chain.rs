@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
 use anyhow::{anyhow, bail, Context};
@@ -33,6 +33,7 @@ use fendermint_vm_topdown::{
 };
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
+use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::message::Message;
@@ -91,6 +92,7 @@ impl From<&CheckpointPoolItem> for ResolveKey {
 
 #[derive(Clone, Hash, PartialEq, Eq)]
 pub struct BlobPoolItem {
+    from: Address,
     hash: Hash,
     source: NodeId,
 }
@@ -224,9 +226,11 @@ where
             .state_tree_mut()
             .end_transaction(true)
             .expect("we just started a transaction");
-        for (hash, source) in resolving_blobs {
-            atomically(|| env.blob_pool.add(BlobPoolItem { hash, source })).await;
-            tracing::debug!(hash = ?hash, "blob added to pool");
+        for (hash, sources) in resolving_blobs {
+            for (from, source) in sources {
+                atomically(|| env.blob_pool.add(BlobPoolItem { from, hash, source })).await;
+                tracing::debug!(hash = ?hash, from = ?from, "blob added to pool");
+            }
         }
 
         // Collect locally completed blobs from the pool. We're relying on the proposer's local
@@ -260,6 +264,7 @@ where
                 if is_globally_finalized {
                     tracing::debug!(hash = ?item.hash, "blob has quorum; adding tx to chain");
                     blobs.push(ChainMessage::Ipc(IpcMessage::BlobFinalized(Blob {
+                        from: item.from,
                         hash: item.hash,
                         source: item.source,
                         succeeded,
@@ -325,18 +330,13 @@ where
                     }
                 }
                 ChainMessage::Ipc(IpcMessage::BlobFinalized(blob)) => {
-                    let item = BlobPoolItem {
-                        hash: blob.hash,
-                        source: blob.source,
-                    };
-
                     // Ensure that the blob is ready to be included on-chain.
                     // We can accept the proposal if the blob has reached a global quorum and is
                     // not yet finalized.
                     // Start a blockstore transaction that can be reverted.
                     state.state_tree_mut().begin_transaction();
-                    if !is_blob_pending(&mut state, item.hash)? {
-                        tracing::debug!(hash = ?item.hash, "blob is already finalized on chain; rejecting proposal");
+                    if !is_blob_pending(&mut state, blob.hash)? {
+                        tracing::debug!(hash = ?blob.hash, "blob is already finalized on chain; rejecting proposal");
                         return Ok(false);
                     }
                     state
@@ -346,7 +346,7 @@ where
 
                     let (is_globally_finalized, succeeded) = atomically(|| {
                         env.parent_finality_votes
-                            .find_blob_quorum(&item.hash.as_bytes().to_vec())
+                            .find_blob_quorum(&blob.hash.as_bytes().to_vec())
                     })
                     .await;
                     if !is_globally_finalized {
@@ -364,6 +364,11 @@ where
                     }
 
                     // Remove from pool if locally resolved
+                    let item = BlobPoolItem {
+                        from: blob.from,
+                        hash: blob.hash,
+                        source: blob.source,
+                    };
                     let is_locally_finalized =
                         atomically(|| match env.blob_pool.get_status(&item)? {
                             None => Ok(false),
@@ -371,10 +376,10 @@ where
                         })
                         .await;
                     if is_locally_finalized {
-                        tracing::debug!(hash = ?item.hash, "blob is locally finalized; removing from pool");
+                        tracing::debug!(hash = ?blob.hash, "blob is locally finalized; removing from pool");
                         atomically(|| env.blob_pool.remove(&item)).await;
                     } else {
-                        tracing::debug!(hash = ?item.hash, "blob is not locally finalized");
+                        tracing::debug!(hash = ?blob.hash, "blob is not locally finalized");
                     }
                 }
                 _ => {}
@@ -566,7 +571,11 @@ where
                     } else {
                         BlobStatus::Failed
                     };
-                    let params = FinalizeBlobParams { hash, status };
+                    let params = FinalizeBlobParams {
+                        from: blob.from,
+                        hash,
+                        status,
+                    };
                     let params = RawBytes::serialize(params)?;
                     let msg = Message {
                         version: Default::default(),
@@ -771,7 +780,7 @@ fn relayed_bottom_up_ckpt_to_fvm(
 /// This approach uses an implicit FVM transaction to query a read-only blockstore.
 fn get_pending_blobs<DB>(
     state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
-) -> anyhow::Result<BTreeMap<Hash, PublicKey>>
+) -> anyhow::Result<BTreeMap<Hash, HashSet<(Address, PublicKey)>>>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
@@ -790,8 +799,8 @@ where
     let (apply_ret, _) = state.execute_implicit(msg)?;
 
     let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
-    fvm_ipld_encoding::from_slice::<BTreeMap<Hash, PublicKey>>(&data)
-        .map_err(|e| anyhow!("error parsing as BTreeMap<Hash, PublicKey>: {e}"))
+    fvm_ipld_encoding::from_slice::<BTreeMap<Hash, HashSet<(Address, PublicKey)>>>(&data)
+        .map_err(|e| anyhow!("error parsing as BTreeMap<Hash, HashSet<(Address, PublicKey)>: {e}"))
 }
 
 /// Check if a blob is pending (if it is not resolved or failed), by reading its on-chain state.

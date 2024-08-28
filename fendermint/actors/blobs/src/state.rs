@@ -35,12 +35,11 @@ pub struct State {
     /// The byte-blocks per atto token rate set at genesis.
     pub credit_debit_rate: u64,
     /// Map containing all accounts by robust (non-ID) actor address.
-    /// TODO: add list of blobs to account
     pub accounts: HashMap<Address, Account>,
     /// Map containing all blobs.
     pub blobs: HashMap<Hash, Blob>,
-    /// Map of currently pending blob hashes to source Iroh node IDs.
-    pub pending: BTreeMap<Hash, HashSet<PublicKey>>,
+    /// Map of currently pending blob hashes to account and source Iroh node IDs.
+    pub pending: BTreeMap<Hash, HashSet<(Address, PublicKey)>>,
 }
 
 impl State {
@@ -114,7 +113,8 @@ impl State {
         Ok(account)
     }
 
-    // TODO: expiry should be optional, ie, pay for as long as there's credit
+    // TODO: expiry should be optional, ie, pay for as long as there's credit, but we have to
+    // keep some continuous amount of committed credit, say one month?
     // TODO: we are currenlty charging for block bytes during blob resolution. we should
     // probably only charge for blocks after the blob is resolved.
     pub fn add_blob(
@@ -139,7 +139,7 @@ impl State {
                 let mut new_capacity = BigInt::zero();
                 let mut new_account_capacity = BigInt::zero();
                 let required_credit: BigInt;
-                let blob = if let Some(blob) = self.blobs.get(&hash) {
+                let (blob, pending) = if let Some(blob) = self.blobs.get(&hash) {
                     // We could get_mut to begin with, but the logic below is simpler if we
                     // have transactional control
                     let mut blob = blob.clone();
@@ -160,26 +160,28 @@ impl State {
                         // Add new subscription
                         blob.subs.insert(sender, Subscription { expiry, source });
                     }
-                    match blob.status {
+                    let pending = match blob.status {
                         BlobStatus::Added(_) | BlobStatus::Failed => {
                             // It's pending or failed, reset with current epoch
-                            blob.status = BlobStatus::Added(current_epoch)
+                            blob.status = BlobStatus::Added(current_epoch);
+                            true
                         }
-                        BlobStatus::Resolved => {
-                            // No-op, already resolved
-                        }
-                    }
-                    blob
+                        BlobStatus::Resolved => false,
+                    };
+                    (blob, pending)
                 } else {
                     required_credit = ttl as u64 * &size;
                     new_capacity = size.clone();
                     new_account_capacity = size.clone();
                     // Create new blob
-                    Blob {
-                        size: size.to_u64().unwrap(),
-                        subs: HashMap::from([(sender, Subscription { expiry, source })]),
-                        status: BlobStatus::Added(current_epoch),
-                    }
+                    (
+                        Blob {
+                            size: size.to_u64().unwrap(),
+                            subs: HashMap::from([(sender, Subscription { expiry, source })]),
+                            status: BlobStatus::Added(current_epoch),
+                        },
+                        true,
+                    )
                 };
 
                 if account.credit_free < required_credit {
@@ -206,13 +208,15 @@ impl State {
                 account.credit_committed += &required_credit;
                 account.credit_free -= &required_credit;
 
-                // Add/update hash and its source to pending
-                self.pending
-                    .entry(hash)
-                    .and_modify(|sources| {
-                        sources.insert(source);
-                    })
-                    .or_insert(HashSet::from([source]));
+                // Add/update pending with hash and its source
+                if pending {
+                    self.pending
+                        .entry(hash)
+                        .and_modify(|sources| {
+                            sources.insert((sender, source));
+                        })
+                        .or_insert(HashSet::from([(sender, source)]));
+                }
 
                 // Add/update blob
                 self.blobs.insert(hash, blob);
@@ -228,21 +232,78 @@ impl State {
         Ok(blob)
     }
 
-    pub fn get_pending_blobs(&self) -> anyhow::Result<BTreeMap<Hash, HashSet<PublicKey>>> {
+    pub fn get_pending_blobs(
+        &self,
+    ) -> anyhow::Result<BTreeMap<Hash, HashSet<(Address, PublicKey)>>> {
         Ok(self.pending.clone())
     }
 
-    // TODO: give back credit and capacity if failed
-    pub fn finalize_blob(&mut self, hash: Hash, status: BlobStatus) -> anyhow::Result<()> {
-        self.pending.remove(&hash);
-        match self.blobs.get_mut(&hash) {
-            Some(blob) => {
-                blob.status = status;
-                Ok(())
-            }
-            // Don't error here in case the key was deleted in a past transaction
-            None => Ok(()),
+    pub fn finalize_blob(
+        &mut self,
+        from: Address,
+        hash: Hash,
+        status: BlobStatus,
+    ) -> anyhow::Result<()> {
+        if matches!(status, BlobStatus::Added(_)) {
+            return Err(anyhow!(
+                "finalized status of blob {} must be 'resolved' or 'failed'",
+                hash
+            ));
         }
+        if let Some(blob) = self.blobs.get_mut(&hash) {
+            match blob.status {
+                BlobStatus::Added(added_epoch) => {
+                    match self.accounts.get_mut(&from) {
+                        Some(account) => {
+                            if let Some(sub) = blob.subs.get(&from) {
+                                if matches!(status, BlobStatus::Failed) {
+                                    let size = BigInt::from(blob.size);
+                                    // We're not going to make a debit, but we need to refund
+                                    // any spent credits that may have been used on this
+                                    // blob in the event the last debit is later than the
+                                    // added epoch.
+                                    if account.last_debit_epoch > added_epoch {
+                                        let refund_blocks = account.last_debit_epoch - added_epoch;
+                                        let refund = refund_blocks as u64 * &size;
+                                        account.credit_free += &refund; // re-mint spent credit
+                                        self.credit_debited -= &refund;
+                                    }
+
+                                    // Account for reclaimed size and move committed credit to
+                                    // free credit
+                                    self.capacity_used -= &size;
+                                    account.capacity_used -= &size;
+                                    if sub.expiry > account.last_debit_epoch {
+                                        let reclaim_credit =
+                                            (sub.expiry - account.last_debit_epoch) * &size;
+                                        self.credit_committed -= &reclaim_credit;
+                                        account.credit_committed -= &reclaim_credit;
+                                        account.credit_free += &reclaim_credit;
+                                    }
+
+                                    // Delete subscription
+                                    blob.subs.remove(&from);
+                                }
+                            } else {
+                                return Err(anyhow!(
+                                    "finalizing address {} is not subscribed to blob {}",
+                                    from,
+                                    hash
+                                ));
+                            }
+                        }
+                        None => return Err(anyhow!("account {} not found", from)),
+                    }
+                    blob.status = status;
+                }
+                BlobStatus::Resolved | BlobStatus::Failed => {
+                    // No-op, already finalized
+                }
+            }
+        }
+        // Remove from pending
+        self.pending.remove(&hash);
+        Ok(())
     }
 
     pub fn delete_blob(
@@ -251,8 +312,6 @@ impl State {
         current_epoch: ChainEpoch,
         hash: Hash,
     ) -> anyhow::Result<(Account, bool)> {
-        // charge for usage up to expiry... if not failed
-        // move unspent credits from committed
         match self.accounts.get_mut(&sender) {
             Some(account) => {
                 let debit_epoch: ChainEpoch;
@@ -305,13 +364,17 @@ impl State {
                     return Err(anyhow!("blob {} not found", hash));
                 };
 
-                // Debit for existing usage
-                let debit_blocks = debit_epoch - account.last_debit_epoch;
-                let debit = debit_blocks as u64 * &account.capacity_used;
-                self.credit_debited += &debit;
-                self.credit_committed -= &debit;
-                account.credit_committed -= &debit;
-                account.last_debit_epoch = debit_epoch;
+                // Debit for existing usage.
+                // It could be possible that debit epoch is less than the last debit,
+                // in which case we don't need to do anything.
+                if debit_epoch > account.last_debit_epoch {
+                    let debit_blocks = debit_epoch - account.last_debit_epoch;
+                    let debit = debit_blocks as u64 * &account.capacity_used;
+                    self.credit_debited += &debit;
+                    self.credit_committed -= &debit;
+                    account.credit_committed -= &debit;
+                    account.last_debit_epoch = debit_epoch;
+                }
 
                 // Account for reclaimed size and move committed credit to free credit
                 self.capacity_used -= &reclaim_capacity;
