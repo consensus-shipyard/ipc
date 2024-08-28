@@ -1,5 +1,5 @@
 [package]
-name = "objectstore_actor_sdk"
+name = "blobs_actor_sdk"
 version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
