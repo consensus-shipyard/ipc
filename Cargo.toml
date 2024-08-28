@@ -37,7 +37,7 @@ members = [
     "fendermint/actors/blobs/shared",
     "fendermint/actors/machine",
     "fendermint/actors/objectstore",
-    "hoku/objectstore_actor_sdk",
+    "hoku/blobs_actor_sdk",
     "hoku/blobs_syscall",
     "hoku/maybe_iroh",
 ]

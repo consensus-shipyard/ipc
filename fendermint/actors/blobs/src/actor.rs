@@ -139,7 +139,7 @@ impl BlobsActor {
         rt.validate_immediate_caller_accept_any()?;
         let hash = params.0;
         let hash_bytes = hash.0;
-        objectstore_actor_sdk::hash_rm(hash_bytes)
+        blobs_actor_sdk::hash_rm(hash_bytes)
             .map_err(|en| ActorError::unspecified(format!("failed to remove hash: {:?}", en)))?;
 
         rt.transaction(|st: &mut State, _| {

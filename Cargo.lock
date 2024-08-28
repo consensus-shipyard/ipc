@@ -953,6 +953,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "blobs_actor_sdk"
+version = "0.1.0"
+dependencies = [
+ "fvm_sdk",
+ "fvm_shared",
+ "num-traits",
+]
+
+[[package]]
 name = "blobs_syscall"
 version = "0.1.0"
 dependencies = [
@@ -3129,6 +3138,7 @@ name = "fendermint_actor_blobs"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "blobs_actor_sdk",
  "fendermint_actor_blobs_shared",
  "fil_actors_evm_shared",
  "fil_actors_runtime",
@@ -3139,7 +3149,6 @@ dependencies = [
  "iroh-base",
  "log",
  "num-traits",
- "objectstore_actor_sdk",
  "rand",
  "serde",
  "serde_tuple",
@@ -7951,15 +7960,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6a622008b6e321afc04970976f62ee297fdbaa6f95318ca343e3eebb9648441"
 dependencies = [
  "memchr",
-]
-
-[[package]]
-name = "objectstore_actor_sdk"
-version = "0.1.0"
-dependencies = [
- "fvm_sdk",
- "fvm_shared",
- "num-traits",
 ]
 
 [[package]]
