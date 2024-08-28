@@ -137,8 +137,9 @@ impl BlobsActor {
     // TODO: use syscall to delete from actual storage
     fn delete_blob(rt: &impl Runtime, params: DeleteBlobParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-
-        objectstore_actor_sdk::hash_rm(params.0 .0)
+        let hash = params.0;
+        let hash_bytes = hash.0;
+        objectstore_actor_sdk::hash_rm(hash_bytes)
             .map_err(|en| ActorError::unspecified(format!("failed to remove hash: {:?}", en)))?;
 
         rt.transaction(|st: &mut State, _| {
