@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use ambassador::Delegate;
-use cid::Cid;
 use fvm::call_manager::CallManager;
 use fvm::gas::Gas;
 use fvm::kernel::prelude::*;
@@ -75,8 +74,8 @@ where
         DefaultKernel::<K::CallManager>::link_syscalls(linker)?;
         linker.link_syscall(
             crate::SYSCALL_MODULE_NAME,
-            crate::CIDRM_SYSCALL_FUNCTION_NAME,
-            crate::cid_rm,
+            crate::HASHRM_SYSCALL_FUNCTION_NAME,
+            crate::hash_rm,
         )?;
 
         Ok(())

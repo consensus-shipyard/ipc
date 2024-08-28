@@ -6,6 +6,12 @@ mod sys;
 
 use fvm_shared::error::ErrorNumber;
 
-pub fn cid_rm(cid: Vec<u8>) -> Result<(), ErrorNumber> {
-    unsafe { sys::cid_rm(cid.as_ptr(), cid.len() as u32) }
+#[cfg(feature = "fil-actor")]
+pub fn hash_rm(hash: [u8; 32]) -> Result<(), ErrorNumber> {
+    unsafe { sys::hash_rm(hash.as_ptr()) }
+}
+
+#[cfg(not(feature = "fil-actor"))]
+pub fn hash_rm(_hash: [u8; 32]) -> Result<(), ErrorNumber> {
+    Ok(())
 }

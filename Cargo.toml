@@ -39,6 +39,7 @@ members = [
     "fendermint/actors/objectstore",
     "textile/objectstore_actor_sdk",
     "textile/objectstore_syscall",
+    "textile/maybe_iroh",
 ]
 exclude = ["builtin-actors"]
 
