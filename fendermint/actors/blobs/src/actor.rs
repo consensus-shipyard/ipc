@@ -62,6 +62,18 @@ impl BlobsActor {
             .map_err(to_state_error("failed to get account"))
     }
 
+    fn debit_accounts(rt: &impl Runtime) -> Result<(), ActorError> {
+        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
+        let deletes = rt.transaction(|st: &mut State, _| {
+            st.debit_accounts(rt.curr_epoch())
+                .map_err(to_state_error("failed to debit accounts"))
+        })?;
+        for _delete in deletes {
+            // TODO: make syscall to delete blob from Iroh
+        }
+        Ok(())
+    }
+
     fn add_blob(rt: &impl Runtime, params: AddBlobParams) -> Result<Account, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let caller = resolve_caller(rt, params.from)?;
@@ -158,6 +170,7 @@ impl ActorCode for BlobsActor {
         GetStats => get_stats,
         BuyCredit => buy_credit,
         GetAccount => get_account,
+        DebitAccounts => debit_accounts,
         AddBlob => add_blob,
         GetBlob => get_blob,
         GetBlobStatus => get_blob_status,
