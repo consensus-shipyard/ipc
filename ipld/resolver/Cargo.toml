@@ -34,7 +34,7 @@ fvm_shared = { workspace = true }
 fvm_ipld_blockstore = { workspace = true, optional = true }
 
 ipc-api = { path = "../../ipc/api", default-features = false }
-maybe_iroh = { path = "../../textile/maybe_iroh" }
+maybe_iroh = { path = "../../hoku/maybe_iroh" }
 
 iroh = { workspace = true }
 
