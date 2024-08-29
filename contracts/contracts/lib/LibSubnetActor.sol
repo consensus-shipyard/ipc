@@ -5,14 +5,17 @@ import {VALIDATOR_SECP256K1_PUBLIC_KEY_LENGTH} from "../constants/Constants.sol"
 import {ERR_PERMISSIONED_AND_BOOTSTRAPPED} from "../errors/IPCErrors.sol";
 import {NotEnoughGenesisValidators, DuplicatedGenesisValidator, NotOwnerOfPublicKey, MethodNotAllowed} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
-import {Validator, ValidatorSet, PermissionMode} from "../structs/Subnet.sol";
+import {IValidatorGater} from "../interfaces/IValidatorGater.sol";
+import {Validator, ValidatorSet, PermissionMode, SubnetID} from "../structs/Subnet.sol";
 import {SubnetActorModifiers} from "../lib/LibSubnetActorStorage.sol";
 import {LibValidatorSet, LibStaking} from "../lib/LibStaking.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {LibSubnetActorStorage, SubnetActorStorage} from "./LibSubnetActorStorage.sol";
+import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 
 library LibSubnetActor {
     using EnumerableSet for EnumerableSet.AddressSet;
+    using SubnetIDHelper for SubnetID;
 
     event SubnetBootstrapped(Validator[]);
 
@@ -36,6 +39,18 @@ library LibSubnetActor {
             revert MethodNotAllowed(ERR_PERMISSIONED_AND_BOOTSTRAPPED);
         }
         return;
+    }
+
+    /// @notice Performs validator gating, i.e. checks if the validator power update is actually allowed.
+    function validatorGating(SubnetID memory id, address validator, uint256 prevPower, uint256 newPower) internal {
+        SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
+
+        // zero address means no gating needed
+        if (s.validatorGater == address(0)) {
+            return;
+        }
+
+        IValidatorGater(s.validatorGater).interceptPowerDelta(id, validator, prevPower, newPower);
     }
 
     /// @dev This function is used to bootstrap the subnet,
@@ -76,6 +91,7 @@ library LibSubnetActor {
         uint256[] calldata powers
     ) internal {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
+        SubnetID memory subnet = s.parentId.createSubnetId(address(this));
 
         uint256 length = validators.length;
 
@@ -96,6 +112,7 @@ library LibSubnetActor {
                 revert DuplicatedGenesisValidator();
             }
 
+            LibSubnetActor.validatorGating(subnet, validators[i], 0, powers[i]);
             LibStaking.setMetadataWithConfirm(validators[i], publicKeys[i]);
             LibStaking.setFederatedPowerWithConfirm(validators[i], powers[i]);
 
@@ -124,12 +141,23 @@ library LibSubnetActor {
         uint256[] calldata powers
     ) internal {
         uint256 length = validators.length;
+
+        SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
+        SubnetID memory subnet = s.parentId.createSubnetId(address(this));
+
         for (uint256 i; i < length; ) {
             // check addresses
             address convertedAddress = publicKeyToAddress(publicKeys[i]);
             if (convertedAddress != validators[i]) {
                 revert NotOwnerOfPublicKey();
             }
+
+            LibSubnetActor.validatorGating(
+                subnet,
+                validators[i],
+                LibStaking.getPower(validators[i]),
+                powers[i]
+            );
 
             // no need to do deduplication as set directly set the power, there wont be any addition of
             // federated power.
