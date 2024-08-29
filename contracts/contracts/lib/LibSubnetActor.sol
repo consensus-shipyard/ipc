@@ -42,7 +42,7 @@ library LibSubnetActor {
     }
 
     /// @notice Performs validator gating, i.e. checks if the validator power update is actually allowed.
-    function validatorGating(address validator, uint256 powerDelta, bool isIncrease) internal {
+    function gateValidatorPowerDelta(address validator, uint256 powerDelta, bool isIncrease) internal {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
 
         // zero address means no gating needed
