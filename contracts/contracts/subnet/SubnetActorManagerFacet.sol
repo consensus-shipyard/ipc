@@ -5,7 +5,8 @@ import {VALIDATOR_SECP256K1_PUBLIC_KEY_LENGTH} from "../constants/Constants.sol"
 import {ERR_VALIDATOR_JOINED, ERR_VALIDATOR_NOT_JOINED} from "../errors/IPCErrors.sol";
 import {InvalidFederationPayload, SubnetAlreadyBootstrapped, NotEnoughFunds, CollateralIsZero, CannotReleaseZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalance, NotEnoughCollateral, NotValidator, NotAllValidatorsHaveLeft, InvalidPublicKeyLength, MethodNotAllowed, SubnetNotBootstrapped} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
-import {Validator, ValidatorSet} from "../structs/Subnet.sol";
+import {Validator, ValidatorSet, SubnetID} from "../structs/Subnet.sol";
+import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {LibDiamond} from "../lib/LibDiamond.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
 import {SubnetActorModifiers} from "../lib/LibSubnetActorStorage.sol";
@@ -17,6 +18,7 @@ import {Pausable} from "../lib/LibPausable.sol";
 
 contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausable {
     using EnumerableSet for EnumerableSet.AddressSet;
+    using SubnetIDHelper for SubnetID;
     using LibValidatorSet for ValidatorSet;
     using Address for address payable;
 
@@ -134,6 +136,8 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             revert NotOwnerOfPublicKey();
         }
 
+        LibSubnetActor.validatorGating(msg.sender, msg.value, true);
+
         if (!s.bootstrapped) {
             // if the subnet has not been bootstrapped, join directly
             // without delays, and collect collateral to register
@@ -167,6 +171,8 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             revert MethodNotAllowed(ERR_VALIDATOR_NOT_JOINED);
         }
 
+        LibSubnetActor.validatorGating(msg.sender, msg.value, true);
+
         if (!s.bootstrapped) {
             LibStaking.depositWithConfirm(msg.sender, msg.value);
 
@@ -196,6 +202,9 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
         if (collateral <= amount) {
             revert NotEnoughCollateral();
         }
+
+        LibSubnetActor.validatorGating(msg.sender, amount, false);
+
         if (!s.bootstrapped) {
             LibStaking.withdrawWithConfirm(msg.sender, amount);
             return;

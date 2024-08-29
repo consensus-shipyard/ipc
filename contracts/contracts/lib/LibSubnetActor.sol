@@ -42,6 +42,27 @@ library LibSubnetActor {
     }
 
     /// @notice Performs validator gating, i.e. checks if the validator power update is actually allowed.
+    function validatorGating(address validator, uint256 powerDelta, bool isIncrease) internal {
+        SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
+
+        // zero address means no gating needed
+        if (s.validatorGater == address(0)) {
+            return;
+        }
+
+        uint256 oldPower = LibStaking.getPower(validator);
+        uint256 newPower = 0;
+        if (isIncrease) {
+            newPower = oldPower + powerDelta;
+        } else {
+            newPower = oldPower - powerDelta;
+        }
+
+        SubnetID memory id = s.parentId.createSubnetId(address(this));
+        IValidatorGater(s.validatorGater).interceptPowerDelta(id, validator, oldPower, newPower);
+    }
+
+    /// @notice Performs validator gating, i.e. checks if the validator power update is actually allowed.
     function validatorGating(SubnetID memory id, address validator, uint256 prevPower, uint256 newPower) internal {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
 
