@@ -85,7 +85,16 @@ impl GenesisAppState {
     pub fn compress_and_encode(&self) -> anyhow::Result<String> {
         let bytes = match self {
             GenesisAppState::V1(ref bytes) => {
-                let mut wtr = snap::write::FrameEncoder::new(vec![0]);
+                let mut buf = {
+                    let len = snap::raw::max_compress_len(bytes.len()) + 1; // +1 for the version discriminator
+                    Vec::with_capacity(len)
+                };
+
+                // Write version discriminator uncompressed.
+                buf.push(1);
+
+                // Snappy compress the data.
+                let mut wtr = snap::write::FrameEncoder::new(buf);
                 wtr.write_all(bytes)?;
                 wtr.into_inner()?
             }
@@ -100,7 +109,10 @@ impl GenesisAppState {
             return Err(anyhow!("empty bytes for genesis app state"));
         }
 
-        match bytes[0] {
+        // Strip the version discriminator.
+        let version = bytes[0];
+
+        match version {
             1 => {
                 let data = &bytes.as_slice()[1..];
                 let len = snap::raw::decompress_len(data)
