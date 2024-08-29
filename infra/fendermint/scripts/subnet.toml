@@ -103,6 +103,7 @@ dependencies = [
 dependencies = [
     "subnet-fetch-genesis",
     "subnet-genesis-set-eam-permissions",
+    "genesis-seal",
     "genesis-write",
     "fendermint-new-network-key",
 ]

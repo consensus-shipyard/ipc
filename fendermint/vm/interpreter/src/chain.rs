@@ -6,7 +6,7 @@ use crate::{
     fvm::state::FvmExecState,
     fvm::FvmMessage,
     signed::{SignedMessageApplyRes, SignedMessageCheckRes, SyntheticMessage, VerifiableMessage},
-    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
+    CheckInterpreter, ExecInterpreter, ProposalInterpreter, QueryInterpreter,
 };
 use anyhow::{bail, Context};
 use async_stm::atomically;
@@ -494,25 +494,6 @@ where
         qry: Self::Query,
     ) -> anyhow::Result<(Self::State, Self::Output)> {
         self.inner.query(state, qry).await
-    }
-}
-
-#[async_trait]
-impl<I, DB> GenesisInterpreter for ChainMessageInterpreter<I, DB>
-where
-    DB: Blockstore + Clone + 'static + Send + Sync,
-    I: GenesisInterpreter,
-{
-    type State = I::State;
-    type Genesis = I::Genesis;
-    type Output = I::Output;
-
-    async fn init(
-        &self,
-        state: Self::State,
-        genesis: Self::Genesis,
-    ) -> anyhow::Result<(Self::State, Self::Output)> {
-        self.inner.init(state, genesis).await
     }
 }
 

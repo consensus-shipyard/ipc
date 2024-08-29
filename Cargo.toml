@@ -144,6 +144,7 @@ serde_yaml = { version = "0.9" }
 serde_tuple = "0.5"
 serde_with = "2.3"
 serial_test = "3.0"
+snap = "1.1.0"
 strum = { version = "0.26.1", features = ["derive"] }
 tempfile = "3.7"
 thiserror = "1"
