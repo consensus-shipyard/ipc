@@ -7,45 +7,52 @@ import {SubnetID} from "../structs/Subnet.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
+/// The power range that an approved validator can have.
+struct PowerRange {
+    uint256 min;
+    uint256 max;
+}
+
 /// This is a simple implementation of `IValidatorGater`. It makes sure the exact power change 
 /// request is approved. This is a very strict requirement.
 contract SubnetValidatorGater is IValidatorGater, Ownable {
     using SubnetIDHelper for SubnetID;
 
-    address public caller;
     SubnetID public subnet;
+    mapping(address => PowerRange) public allowed;
 
-    mapping(bytes32 => bool) public allowed;
-
-    constructor(address _caller, SubnetID memory _subnet) Ownable(msg.sender) {
-        caller = _caller;
+    constructor(SubnetID memory _subnet) Ownable(msg.sender) {
         subnet = _subnet;
     }
 
-    /// Only owner can approve the validator join request
-    function approve(address validator, uint256 prevPower, uint256 newPower) external onlyOwner {
-        allowed[genKey(validator, prevPower, newPower)] = true;
+    function isAllow(address validator, uint256 power) public view returns(bool) {
+        PowerRange memory range = allowed[validator];
+        return range.min <= power && power <= range.max;
     }
 
-    function interceptPowerDelta(SubnetID memory id, address validator, uint256 prevPower, uint256 newPower) external override {
-        if (msg.sender != caller) {
-            revert NotAuthorized(msg.sender);
-        }
+    /// Only owner can approve the validator join request
+    function approve(address validator, uint256 minPower, uint256 maxPower) external onlyOwner {
+        allowed[validator] = PowerRange({ min: minPower, max: maxPower });
+    }
 
-        if (id.equals(subnet)) {
+    /// Revoke approved power range
+    function revoke(address validator) external onlyOwner {
+        delete allowed[validator];
+    }
+
+    function interceptPowerDelta(SubnetID memory id, address validator, uint256 /*prevPower*/, uint256 newPower) external view override {
+        SubnetID memory targetSubnet = subnet;
+
+        if (id.equals(targetSubnet)) {
             revert InvalidSubnet();
         }
 
-        bytes32 key = genKey(validator, prevPower, newPower);
-        if (!allowed[key]) {
-            revert PowerChangeRequestNotApproved();
+        if (msg.sender != targetSubnet.getAddress()) {
+            revert NotAuthorized(msg.sender);
         }
 
-        // remove the approved request
-        delete allowed[key];
-    }
-
-    function genKey(address validator, uint256 prevPower, uint256 newPower) internal pure returns(bytes32) {
-        return keccak256(abi.encode(validator, prevPower, newPower));
+        if (!isAllow(validator, newPower)) {
+            revert PowerChangeRequestNotApproved();
+        }
     }
 }

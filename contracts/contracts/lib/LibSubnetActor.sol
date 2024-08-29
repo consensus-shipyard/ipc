@@ -63,7 +63,7 @@ library LibSubnetActor {
     }
 
     /// @notice Performs validator gating, i.e. checks if the validator power update is actually allowed.
-    function gateValidatorPowerDelta(SubnetID memory id, address validator, uint256 prevPower, uint256 newPower) internal {
+    function gateValidatorNewPowers(address[] calldata validators, uint256[] calldata newPowers) internal {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
 
         // zero address means no gating needed
@@ -71,7 +71,14 @@ library LibSubnetActor {
             return;
         }
 
-        IValidatorGater(s.validatorGater).interceptPowerDelta(id, validator, prevPower, newPower);
+        SubnetID memory subnet = s.parentId.createSubnetId(address(this));
+        IValidatorGater gater = IValidatorGater(s.validatorGater);
+        uint256 length = validators.length;
+
+        for (uint256 i; i < length; ) {
+            uint256 oldPower = LibStaking.getPower(validators[i]);
+            gater.interceptPowerDelta(subnet, validators[i], oldPower, newPowers[i]);
+        }
     }
 
     /// @dev This function is used to bootstrap the subnet,
@@ -112,13 +119,14 @@ library LibSubnetActor {
         uint256[] calldata powers
     ) internal {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-        SubnetID memory subnet = s.parentId.createSubnetId(address(this));
 
         uint256 length = validators.length;
 
         if (length <= s.minValidators) {
             revert NotEnoughGenesisValidators();
         }
+
+        LibSubnetActor.gateValidatorNewPowers(validators, powers);
 
         for (uint256 i; i < length; ) {
             // check addresses
@@ -133,7 +141,6 @@ library LibSubnetActor {
                 revert DuplicatedGenesisValidator();
             }
 
-            LibSubnetActor.validatorGating(subnet, validators[i], 0, powers[i]);
             LibStaking.setMetadataWithConfirm(validators[i], publicKeys[i]);
             LibStaking.setFederatedPowerWithConfirm(validators[i], powers[i]);
 
@@ -164,7 +171,8 @@ library LibSubnetActor {
         uint256 length = validators.length;
 
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-        SubnetID memory subnet = s.parentId.createSubnetId(address(this));
+
+        LibSubnetActor.gateValidatorNewPowers(validators, powers);
 
         for (uint256 i; i < length; ) {
             // check addresses
@@ -172,13 +180,6 @@ library LibSubnetActor {
             if (convertedAddress != validators[i]) {
                 revert NotOwnerOfPublicKey();
             }
-
-            LibSubnetActor.validatorGating(
-                subnet,
-                validators[i],
-                LibStaking.getPower(validators[i]),
-                powers[i]
-            );
 
             // no need to do deduplication as set directly set the power, there wont be any addition of
             // federated power.

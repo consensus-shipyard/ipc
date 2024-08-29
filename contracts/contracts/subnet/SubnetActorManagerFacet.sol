@@ -136,7 +136,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             revert NotOwnerOfPublicKey();
         }
 
-        LibSubnetActor.validatorGating(msg.sender, msg.value, true);
+        LibSubnetActor.gateValidatorPowerDelta(msg.sender, msg.value, true);
 
         if (!s.bootstrapped) {
             // if the subnet has not been bootstrapped, join directly
@@ -171,7 +171,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             revert MethodNotAllowed(ERR_VALIDATOR_NOT_JOINED);
         }
 
-        LibSubnetActor.validatorGating(msg.sender, msg.value, true);
+        LibSubnetActor.gateValidatorPowerDelta(msg.sender, msg.value, true);
 
         if (!s.bootstrapped) {
             LibStaking.depositWithConfirm(msg.sender, msg.value);
@@ -203,7 +203,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             revert NotEnoughCollateral();
         }
 
-        LibSubnetActor.validatorGating(msg.sender, amount, false);
+        LibSubnetActor.gateValidatorPowerDelta(msg.sender, amount, false);
 
         if (!s.bootstrapped) {
             LibStaking.withdrawWithConfirm(msg.sender, amount);
