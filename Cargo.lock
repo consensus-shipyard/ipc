@@ -973,6 +973,7 @@ dependencies = [
  "iroh",
  "maybe_iroh",
  "num-traits",
+ "once_cell",
  "tokio",
  "tracing",
 ]

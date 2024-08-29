@@ -19,3 +19,4 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 iroh = { workspace = true }
 maybe_iroh = { path = "../maybe_iroh" }
+once_cell = "1.19.0"

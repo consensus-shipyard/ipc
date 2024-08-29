@@ -11,13 +11,23 @@ use fvm_shared::error::ErrorNumber;
 use iroh::blobs::Hash;
 use maybe_iroh::MaybeIroh;
 use num_traits::FromPrimitive;
+use once_cell::sync::Lazy;
 use std::fmt::Display;
+use std::sync::Arc;
+use tokio::spawn;
+use tokio::sync::Mutex;
 
 pub const SYSCALL_MODULE_NAME: &str = "blobs";
 pub const HASHRM_SYSCALL_FUNCTION_NAME: &str = "hash_rm";
 
 const ENV_IROH_ADDR: &str = "IROH_RPC_ADDR";
 const HASHRM_SYSCALL_ERROR_CODE: u32 = 101; // TODO(sander): Is the okay?
+
+static IROH_INSTANCE: Lazy<Arc<Mutex<MaybeIroh>>> = Lazy::new(|| {
+    let iroh_addr =
+        std::env::var(ENV_IROH_ADDR).expect("IROH_RPC_ADDR environment variable not set");
+    Arc::new(Mutex::new(MaybeIroh::from_addr(iroh_addr)))
+});
 
 fn syscall_error<D: Display>(error_number: u32) -> impl FnOnce(D) -> ExecutionError {
     move |e| {
@@ -37,21 +47,22 @@ fn hash_source(bytes: &[u8]) -> Result<[u8; 32]> {
 pub fn hash_rm(context: Context<'_, impl HokuOps>, hash_offset: u32) -> Result<()> {
     let hash_bytes = context.memory.try_slice(hash_offset, 32)?;
     let hash = Hash::from_bytes(hash_source(hash_bytes)?);
-    let iroh_addr =
-        std::env::var(ENV_IROH_ADDR).map_err(|e| syscall_error(HASHRM_SYSCALL_ERROR_CODE)(e))?;
-    let mut iroh = MaybeIroh::from_addr(iroh_addr);
+    let iroh = IROH_INSTANCE.clone();
 
     // Don't block the chain with this.
-    tokio::spawn(async move {
-        match iroh.client().await {
-            Ok(iroh) => match iroh.blobs().delete_blob(hash).await {
-                Ok(_) => tracing::debug!(hash = ?hash, "removed content from Iroh"),
-                Err(e) => {
-                    tracing::error!(hash = ?hash, error = e.to_string(), "removing content from Iroh failed")
-                }
-            },
+    spawn(async move {
+        let iroh_client = match iroh.lock().await.client().await {
+            Ok(client) => client,
             Err(e) => {
-                tracing::error!(hash = ?hash, error = e.to_string(), "removing content from Iroh failed")
+                tracing::error!(hash = ?hash, error = e.to_string(), "failed to initialize Iroh client");
+                return;
+            }
+        };
+
+        match iroh_client.blobs().delete_blob(hash).await {
+            Ok(_) => tracing::debug!(hash = ?hash, "removed content from Iroh"),
+            Err(e) => {
+                tracing::error!(hash = ?hash, error = e.to_string(), "removing content from Iroh failed");
             }
         }
     });
