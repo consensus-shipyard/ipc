@@ -2,11 +2,9 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::{BTreeMap, HashSet};
-
 use fendermint_actor_blobs_shared::params::{
-    AddBlobParams, BuyCreditParams, DeleteBlobParams, FailBlobParams, GetAccountParams,
-    GetBlobParams, GetStatsReturn, ResolveBlobParams,
+    AddBlobParams, BuyCreditParams, DeleteBlobParams, FinalizeBlobParams, GetAccountParams,
+    GetBlobParams, GetStatsReturn,
 };
 use fendermint_actor_blobs_shared::state::{Account, Blob, BlobStatus, Hash, PublicKey};
 use fendermint_actor_blobs_shared::Method;
@@ -21,13 +19,13 @@ use fvm_shared::address::Address;
 use fvm_shared::sys::SendFlags;
 use fvm_shared::{error::ExitCode, MethodNum};
 use num_traits::Zero;
+use std::collections::{BTreeMap, HashSet};
 
 use crate::{ext, ConstructorParams, State, BLOBS_ACTOR_NAME};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(BlobsActor);
 
-// TODO: cron to debit and handle expiry
 pub struct BlobsActor;
 
 impl BlobsActor {
@@ -63,35 +61,30 @@ impl BlobsActor {
             .map_err(to_state_error("failed to get account"))
     }
 
+    fn debit_accounts(rt: &impl Runtime) -> Result<(), ActorError> {
+        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
+        let deletes = rt.transaction(|st: &mut State, _| {
+            st.debit_accounts(rt.curr_epoch())
+                .map_err(to_state_error("failed to debit accounts"))
+        })?;
+        for hash in deletes {
+            blobs_actor_sdk::hash_rm(hash.0).map_err(|en| {
+                ActorError::unspecified(format!("failed to delete blob from storage: {:?}", en))
+            })?;
+        }
+        Ok(())
+    }
+
     fn add_blob(rt: &impl Runtime, params: AddBlobParams) -> Result<Account, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-
-        // Caller must be converted to robust (non-ID) address for safe storage
-        let caller = if let Some(machine) = params.from {
-            match rt.resolve_address(&machine) {
-                Some(id) => {
-                    // Caller is always an ID address
-                    if id == rt.message().caller().id().unwrap() {
-                        machine
-                    } else {
-                        return Err(ActorError::illegal_argument(
-                            "machine address does not match caller".into(),
-                        ));
-                    }
-                }
-                None => return Err(ActorError::not_found("machine address not found".into())),
-            }
-        } else {
-            resolve_caller_external(rt)?
-        };
-
+        let caller = resolve_caller(rt, params.from)?;
         rt.transaction(|st: &mut State, rt| {
             st.add_blob(
                 caller,
                 rt.curr_epoch(),
                 params.hash,
                 params.size,
-                params.expiry,
+                params.ttl,
                 params.source,
             )
             .map_err(to_state_error("failed to add blob"))
@@ -107,7 +100,7 @@ impl BlobsActor {
 
     fn get_blob_status(
         rt: &impl Runtime,
-        params: ResolveBlobParams,
+        params: GetBlobParams,
     ) -> Result<Option<BlobStatus>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         rt.state::<State>()?
@@ -116,40 +109,37 @@ impl BlobsActor {
             .map(|b| b.map(|b| b.status))
     }
 
-    fn resolve_blob(rt: &impl Runtime, params: ResolveBlobParams) -> Result<(), ActorError> {
-        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        rt.transaction(|st: &mut State, _| {
-            st.resolve_blob(params.0)
-                .map_err(to_state_error("failed to resolve blob"))
-        })
-    }
-
-    // TODO: wire this to chain interpreter
-    fn fail_blob(rt: &impl Runtime, params: FailBlobParams) -> Result<(), ActorError> {
-        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        rt.transaction(|st: &mut State, _| {
-            st.fail_blob(params.0)
-                .map_err(to_state_error("failed to fail blob"))
-        })
-    }
-
     // TODO: limit return via param
-    fn get_resolving_blobs(
+    fn get_pending_blobs(
         rt: &impl Runtime,
-    ) -> Result<BTreeMap<Hash, HashSet<PublicKey>>, ActorError> {
+    ) -> Result<BTreeMap<Hash, HashSet<(Address, PublicKey)>>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         rt.state::<State>()?
-            .get_resolving_blobs()
+            .get_pending_blobs()
             .map_err(to_state_error("failed to get resolving blobs"))
     }
 
-    // TODO: use syscall to delete from actual storage
-    fn delete_blob(rt: &impl Runtime, params: DeleteBlobParams) -> Result<(), ActorError> {
-        rt.validate_immediate_caller_accept_any()?;
+    fn finalize_blob(rt: &impl Runtime, params: FinalizeBlobParams) -> Result<(), ActorError> {
+        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
         rt.transaction(|st: &mut State, _| {
-            st.delete_blob(params.0)
-                .map_err(to_state_error("failed to delete blob"))
+            st.finalize_blob(params.from, params.hash, params.status)
+                .map_err(to_state_error("failed to finalize blob"))
         })
+    }
+
+    fn delete_blob(rt: &impl Runtime, params: DeleteBlobParams) -> Result<Account, ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+        let caller = resolve_caller(rt, params.from)?;
+        let (account, delete) = rt.transaction(|st: &mut State, _| {
+            st.delete_blob(caller, rt.curr_epoch(), params.hash)
+                .map_err(to_state_error("failed to delete blob"))
+        })?;
+        if delete {
+            blobs_actor_sdk::hash_rm(params.hash.0).map_err(|en| {
+                ActorError::unspecified(format!("failed to delete blob from storage: {:?}", en))
+            })?;
+        }
+        Ok(account)
     }
 
     /// Fallback method for unimplemented method numbers.
@@ -183,14 +173,35 @@ impl ActorCode for BlobsActor {
         GetStats => get_stats,
         BuyCredit => buy_credit,
         GetAccount => get_account,
+        DebitAccounts => debit_accounts,
         AddBlob => add_blob,
         GetBlob => get_blob,
         GetBlobStatus => get_blob_status,
-        ResolveBlob => resolve_blob,
-        GetResolvingBlobs => get_resolving_blobs,
-        FailBlob => fail_blob,
+        GetPendingBlobs => get_pending_blobs,
+        FinalizeBlob => finalize_blob,
         DeleteBlob => delete_blob,
         _ => fallback,
+    }
+}
+
+/// Resolves caller address to robust (non-ID) address for safe storage
+fn resolve_caller(rt: &impl Runtime, from: Option<Address>) -> Result<Address, ActorError> {
+    if let Some(machine) = from {
+        match rt.resolve_address(&machine) {
+            Some(id) => {
+                // Caller is always an ID address
+                if id == rt.message().caller().id().unwrap() {
+                    Ok(machine)
+                } else {
+                    Err(ActorError::illegal_argument(
+                        "machine address does not match caller".into(),
+                    ))
+                }
+            }
+            None => Err(ActorError::not_found("machine address not found".into())),
+        }
+    } else {
+        resolve_caller_external(rt)
     }
 }
 
@@ -389,7 +400,7 @@ mod tests {
             source: new_pk(),
             hash: hash.0,
             size: hash.1,
-            expiry: 10,
+            ttl: 3600,
         };
         let result = rt.call::<BlobsActor>(
             Method::AddBlob as u64,
@@ -425,8 +436,8 @@ mod tests {
             account,
             Account {
                 capacity_used: BigInt::from(1024),
-                credit_free: BigInt::from(999999999999989760u64),
-                credit_committed: BigInt::from(10240),
+                credit_free: BigInt::from(999999999996313600u64),
+                credit_committed: BigInt::from(3686400),
                 last_debit_epoch: 5,
             }
         );

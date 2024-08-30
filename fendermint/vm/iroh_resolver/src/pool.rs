@@ -11,7 +11,8 @@ use async_stm::{
 use iroh::blobs::Hash;
 use iroh::net::{NodeAddr, NodeId};
 
-// The maximum number of times a task can be attempted.
+/// The maximum number of times a task can be attempted.
+/// TODO: make configurable
 const MAX_RESOLVE_ATTEMPTS: u64 = 3;
 
 /// Hashes we need to resolve.
@@ -60,7 +61,9 @@ where
     }
 
     pub fn is_failed(&self) -> Stm<bool> {
-        Ok(self.num_failures.read_clone()? == self.items.read_clone()?.len() as u64)
+        let num_failures = self.num_failures.read_clone()?;
+        let num_tasks = self.items.read_clone()?.len() as u64;
+        Ok(num_failures == num_tasks)
     }
 }
 
@@ -88,6 +91,10 @@ impl ResolveTask {
         NodeAddr::new(self.source.id)
     }
 
+    pub fn set_resolved(&self) -> Stm<()> {
+        self.is_resolved.write(true)
+    }
+
     /// Adds an attempt and return whether a retry is available.
     pub fn add_attempt(&self) -> Stm<bool> {
         let attempts = self.num_attempts.modify(|mut a| {
@@ -97,11 +104,8 @@ impl ResolveTask {
         Ok(attempts < MAX_RESOLVE_ATTEMPTS)
     }
 
-    pub fn set_resolved(&self) -> Stm<()> {
-        self.is_resolved.write(true)
-    }
-
-    pub fn set_failed(&self) -> Stm<()> {
+    /// Increments failures on the parent status.
+    pub fn add_failure(&self) -> Stm<()> {
         self.num_failures.update(|a| a + 1)
     }
 }
@@ -185,20 +189,18 @@ where
         Ok(self.items.read()?.get(&key).cloned())
     }
 
-    /// Collect resolved items, ready for execution.
+    /// Collect resolved and failed items, ready for execution.
     ///
     /// The items collected are not removed, in case they need to be proposed again.
-    /// TODO: remove and return failed items
-    pub fn collect_resolved(&self) -> Stm<HashSet<T>> {
-        let mut resolved = HashSet::new();
+    pub fn collect_done(&self) -> Stm<HashSet<T>> {
+        let mut done = HashSet::new();
         let items = self.items.read()?;
         for item in items.values() {
-            if item.is_resolved()? {
-                let items = item.items.read()?;
-                resolved.extend(items.iter().cloned());
+            if item.is_resolved()? || item.is_failed()? {
+                done.extend(item.items.read()?.iter().cloned());
             }
         }
-        Ok(resolved)
+        Ok(done)
     }
 
     /// Remove an item from the resolution targets.
@@ -330,8 +332,8 @@ mod tests {
             let status = pool.add(item.clone())?;
             status.is_resolved.write(true)?;
 
-            let resolved1 = pool.collect_resolved()?;
-            let resolved2 = pool.collect_resolved()?;
+            let resolved1 = pool.collect_done()?;
+            let resolved2 = pool.collect_done()?;
             assert_eq!(resolved1, resolved2);
             assert!(resolved1.contains(&item));
             Ok(())

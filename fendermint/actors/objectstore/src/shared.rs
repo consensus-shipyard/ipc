@@ -11,6 +11,7 @@ use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::METHOD_CONSTRUCTOR;
 use num_derive::FromPrimitive;
+use serde::{Deserialize, Serialize};
 
 pub use crate::state::State;
 
@@ -41,6 +42,8 @@ pub struct AddParams {
     pub hash: Hash,
     /// Object size.
     pub size: u64,
+    /// Object time-to-live epochs.
+    pub ttl: ChainEpoch,
     /// Object metadata.
     pub metadata: HashMap<String, String>,
     /// Whether to overwrite a key if it already exists.
@@ -50,18 +53,17 @@ pub struct AddParams {
 /// Params for deleting an object.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct DeleteParams {
+    /// Target object store address.
+    pub to: Address,
     /// Object key.
     #[serde(with = "strict_bytes")]
     pub key: Vec<u8>,
 }
 
 /// Params for getting an object.
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct GetParams {
-    /// Object key.
-    #[serde(with = "strict_bytes")]
-    pub key: Vec<u8>,
-}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct GetParams(#[serde(with = "strict_bytes")] pub Vec<u8>);
 
 /// Params for listing objects.
 #[derive(Default, Debug, Serialize_tuple, Deserialize_tuple)]

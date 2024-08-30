@@ -47,6 +47,7 @@ cmd! {
       accounts: Vec::new(),
       eam_permission_mode: PermissionMode::Unrestricted,
       ipc: None,
+      credit_debit_interval: self.credit_debit_interval,
     };
 
     let json = serde_json::to_string_pretty(&genesis)?;
@@ -317,7 +318,7 @@ async fn new_genesis_from_parent(
         // generated deterministically by all participants
         // genesis_epoch should be a positive number, we can afford panicking
         // here if this is not the case.
-        timestamp: Timestamp(genesis_info.genesis_epoch.try_into().unwrap()),
+        timestamp: Timestamp(genesis_info.genesis_epoch.try_into()?),
         chain_name: args.subnet_id.to_string(),
         network_version: args.network_version,
         base_fee: args.base_fee.clone(),
@@ -326,6 +327,7 @@ async fn new_genesis_from_parent(
         accounts: Vec::new(),
         eam_permission_mode: PermissionMode::Unrestricted,
         ipc: Some(ipc_params),
+        credit_debit_interval: args.credit_debit_interval,
     };
 
     for v in genesis_info.validators {

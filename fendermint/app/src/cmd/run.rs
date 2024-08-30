@@ -231,7 +231,7 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
                 parent_finality_votes.clone(),
                 key,
                 own_subnet_id,
-                |value| AppVote::BlobFinality(IPCBlobFinality(value)),
+                |hash, success| AppVote::BlobFinality(IPCBlobFinality::new(hash, success)),
             );
 
             info!("starting the iroh Resolver...");
@@ -617,11 +617,14 @@ async fn dispatch_vote(
             }
         }
         AppVote::BlobFinality(f) => {
-            debug!(cid = ?f.0, "received vote for blob finality");
+            debug!(hash = ?f.hash, success = ?f.success, "received vote for blob finality");
 
             let res = atomically_or_err(|| {
-                parent_finality_votes
-                    .add_blob_vote(vote.public_key.clone(), f.0.as_bytes().to_vec())
+                parent_finality_votes.add_blob_vote(
+                    vote.public_key.clone(),
+                    f.hash.as_bytes().to_vec(),
+                    f.success,
+                )
             })
             .await;
 

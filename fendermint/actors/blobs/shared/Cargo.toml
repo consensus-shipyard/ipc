@@ -12,6 +12,7 @@ version = "0.1.0"
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
+data-encoding = { workspace = true }
 fil_actors_runtime = { workspace = true }
 frc42_dispatch = { workspace = true }
 fvm_ipld_encoding = { workspace = true }

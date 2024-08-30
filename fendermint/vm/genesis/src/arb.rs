@@ -8,6 +8,7 @@ use cid::multihash::MultihashDigest;
 use fendermint_crypto::SecretKey;
 use fendermint_testing::arb::{ArbSubnetID, ArbTokenAmount};
 use fendermint_vm_core::Timestamp;
+use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, version::NetworkVersion};
 use quickcheck::{Arbitrary, Gen};
 use rand::{rngs::StdRng, SeedableRng};
@@ -114,6 +115,7 @@ impl Arbitrary for Genesis {
             } else {
                 None
             },
+            credit_debit_interval: ChainEpoch::arbitrary(g),
         }
     }
 }

@@ -48,7 +48,10 @@
   ],
   "eam_permission_mode": {
     "mode": "allowlist",
-    "addresses": ["f1rai3wqribaieprywdv55jh5psggh2vmvoyg2a2a", "f14mqisvkx7rpkcwlwjidldtbp57c7zyp6ds2bkuq"]
+    "addresses": [
+      "f1rai3wqribaieprywdv55jh5psggh2vmvoyg2a2a",
+      "f14mqisvkx7rpkcwlwjidldtbp57c7zyp6ds2bkuq"
+    ]
   },
   "accounts": [
     {
@@ -74,5 +77,6 @@
       },
       "balance": "11228563589977199064736433241216043389"
     }
-  ]
+  ],
+  "credit_debit_interval": 3600
 }
