@@ -27,7 +27,7 @@ use crate::fvm::externs::FendermintExterns;
 use fendermint_vm_core::{chainid::HasChainID, Timestamp};
 use fendermint_vm_encoding::IsHumanReadable;
 
-use objectstore_syscall::objectstore_kernel::ObjectStoreKernel;
+use blobs_syscall::hoku_kernel::HokuKernel;
 
 pub type BlockHash = [u8; 32];
 
@@ -102,9 +102,8 @@ where
     DB: Blockstore + Clone + 'static,
 {
     #[allow(clippy::type_complexity)]
-    executor: DefaultExecutor<
-        ObjectStoreKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>,
-    >,
+    executor:
+        DefaultExecutor<HokuKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>>,
 
     /// Hash of the block currently being executed. For queries and checks this is empty.
     ///

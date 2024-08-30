@@ -13,6 +13,7 @@ base64 = { workspace = true }
 blake2b_simd = { workspace = true }
 bloom = { workspace = true }
 gcra = { workspace = true }
+iroh = { workspace = true }
 lazy_static = { workspace = true }
 libipld = { workspace = true }
 libp2p = { workspace = true }
@@ -34,8 +35,7 @@ fvm_shared = { workspace = true }
 fvm_ipld_blockstore = { workspace = true, optional = true }
 
 ipc-api = { path = "../../ipc/api", default-features = false }
-
-iroh = { workspace = true }
+maybe_iroh = { path = "../../hoku/maybe_iroh" }
 
 [dev-dependencies]
 cid = { workspace = true }

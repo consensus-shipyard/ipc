@@ -67,8 +67,10 @@ impl BlobsActor {
             st.debit_accounts(rt.curr_epoch())
                 .map_err(to_state_error("failed to debit accounts"))
         })?;
-        for _delete in deletes {
-            // TODO: make syscall to delete blob from Iroh
+        for hash in deletes {
+            blobs_actor_sdk::hash_rm(hash.0).map_err(|en| {
+                ActorError::unspecified(format!("failed to delete blob from storage: {:?}", en))
+            })?;
         }
         Ok(())
     }
@@ -133,7 +135,9 @@ impl BlobsActor {
                 .map_err(to_state_error("failed to delete blob"))
         })?;
         if delete {
-            // TODO: make syscall to delete blob from Iroh
+            blobs_actor_sdk::hash_rm(params.hash.0).map_err(|en| {
+                ActorError::unspecified(format!("failed to delete blob from storage: {:?}", en))
+            })?;
         }
         Ok(account)
     }
