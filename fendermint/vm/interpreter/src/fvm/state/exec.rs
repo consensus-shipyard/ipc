@@ -67,6 +67,8 @@ pub struct FvmStateParams {
     /// The application protocol version.
     #[serde(default)]
     pub app_version: u64,
+    /// Block interval at which to debit all credit accounts.
+    pub credit_debit_interval: ChainEpoch,
 }
 
 /// Parts of the state which can be updated by message execution, apart from the actor state.
@@ -88,6 +90,8 @@ pub struct FvmUpdatableParams {
     /// Doesn't change at the moment but in theory it could,
     /// and it doesn't have a place within the FVM.
     pub power_scale: PowerScale,
+    /// Block interval at which to debit all credit accounts.
+    pub credit_debit_interval: ChainEpoch,
 }
 
 pub type MachineBlockstore<DB> = <DefaultMachine<DB, FendermintExterns<DB>> as Machine>::Blockstore;
@@ -161,6 +165,7 @@ where
                 base_fee: params.base_fee,
                 circ_supply: params.circ_supply,
                 power_scale: params.power_scale,
+                credit_debit_interval: params.credit_debit_interval,
             },
             params_dirty: false,
         })
@@ -239,6 +244,10 @@ where
 
     pub fn app_version(&self) -> u64 {
         self.params.app_version
+    }
+
+    pub fn credit_debit_interval(&self) -> ChainEpoch {
+        self.params.credit_debit_interval
     }
 
     /// Get a mutable reference to the underlying [StateTree].

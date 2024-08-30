@@ -23,6 +23,7 @@ pub enum Method {
     GetStats = frc42_dispatch::method_hash!("GetStats"),
     BuyCredit = frc42_dispatch::method_hash!("BuyCredit"),
     GetAccount = frc42_dispatch::method_hash!("GetAccount"),
+    DebitAccounts = frc42_dispatch::method_hash!("DebitAccounts"),
     AddBlob = frc42_dispatch::method_hash!("AddBlob"),
     GetBlob = frc42_dispatch::method_hash!("GetBlob"),
     GetBlobStatus = frc42_dispatch::method_hash!("GetBlobStatus"),

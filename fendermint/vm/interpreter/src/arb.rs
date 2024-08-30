@@ -3,6 +3,7 @@
 
 use fendermint_testing::arb::{ArbCid, ArbTokenAmount};
 use fendermint_vm_core::{chainid, Timestamp};
+use fvm_shared::clock::ChainEpoch;
 use fvm_shared::version::NetworkVersion;
 use quickcheck::{Arbitrary, Gen};
 
@@ -21,6 +22,7 @@ impl Arbitrary for FvmStateParams {
                 .into(),
             power_scale: *g.choose(&[-1, 0, 3]).unwrap(),
             app_version: *g.choose(&[0, 1, 2]).unwrap(),
+            credit_debit_interval: ChainEpoch::arbitrary(g),
         }
     }
 }

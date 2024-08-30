@@ -221,6 +221,7 @@ async fn test_applying_upgrades() {
         }],
         eam_permission_mode: PermissionMode::Unrestricted,
         ipc: None,
+        credit_debit_interval: 0,
     };
 
     tester.init(genesis).await.unwrap();

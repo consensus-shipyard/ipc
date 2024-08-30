@@ -16,6 +16,7 @@ use fendermint_vm_genesis::{
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::bigint::Integer;
+use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{econ::TokenAmount, version::NetworkVersion};
 use ipc_api::subnet_id::SubnetID;
 use rand::rngs::StdRng;
@@ -569,8 +570,8 @@ impl arbitrary::Arbitrary<'_> for StakingState {
             },
         };
 
-        // We cannot actually use this value because the real ID will only be
-        // apparent once the subnet is deployed.
+        // We cannot use this value because the real ID will only be
+        // available once the subnet is deployed.
         let child_subnet_id = SubnetID::new_from_parent(
             &parent_ipc.gateway.subnet_id,
             ArbSubnetAddress::arbitrary(u)?.0,
@@ -586,6 +587,7 @@ impl arbitrary::Arbitrary<'_> for StakingState {
             accounts: parent_actors,
             eam_permission_mode: PermissionMode::Unrestricted,
             ipc: Some(parent_ipc),
+            credit_debit_interval: ChainEpoch::arbitrary(u)?,
         };
 
         let child_ipc = IpcParams {
@@ -607,6 +609,7 @@ impl arbitrary::Arbitrary<'_> for StakingState {
             accounts: Vec::new(),
             eam_permission_mode: PermissionMode::Unrestricted,
             ipc: Some(child_ipc),
+            credit_debit_interval: ChainEpoch::arbitrary(u)?,
         };
 
         Ok(StakingState::new(accounts, parent_genesis, child_genesis))

@@ -33,6 +33,9 @@ pub enum IpcMessage {
 
     /// Proposed by validators when a blob has been finalized and is ready to be executed.
     BlobFinalized(Blob),
+
+    /// Proposed by validators at the credit debit interval set at genesis.
+    DebitCreditAccounts,
 }
 
 /// A message relayed by a user on the current subnet.

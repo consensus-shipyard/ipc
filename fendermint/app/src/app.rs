@@ -243,6 +243,7 @@ where
                     chain_id: 0,
                     power_scale: 0,
                     app_version: 0,
+                    credit_debit_interval: 0,
                 },
             };
             self.set_committed_state(state)?;
@@ -514,6 +515,7 @@ where
                 chain_id: out.chain_id.into(),
                 power_scale: out.power_scale,
                 app_version: 0,
+                credit_debit_interval: out.credit_debit_interval,
             },
         };
 
@@ -824,6 +826,7 @@ where
                 base_fee,
                 circ_supply,
                 power_scale,
+                credit_debit_interval,
             },
             _,
         ) = exec_state.commit().context("failed to commit FVM")?;
@@ -833,6 +836,7 @@ where
         state.state_params.base_fee = base_fee;
         state.state_params.circ_supply = circ_supply;
         state.state_params.power_scale = power_scale;
+        state.state_params.credit_debit_interval = credit_debit_interval;
 
         let app_hash = state.app_hash();
         let block_height = state.block_height;
@@ -912,6 +916,54 @@ where
         }
     }
 
+    /// Decide whether to start downloading a snapshot from peers.
+    ///
+    /// This method is also called when a download is aborted and a new snapshot is offered,
+    /// so potentially we have to clean up previous resources and start a new one.
+    async fn offer_snapshot(
+        &self,
+        request: request::OfferSnapshot,
+    ) -> AbciResult<response::OfferSnapshot> {
+        if let Some(ref client) = self.snapshots {
+            tracing::info!(
+                height = request.snapshot.height.value(),
+                "received snapshot offer"
+            );
+
+            return match from_snapshot(request).context("failed to parse snapshot") {
+                Ok(manifest) => {
+                    tracing::info!(?manifest, "received snapshot offer");
+                    // We can look at the version, but currently there's only one.
+                    match atomically_or_err(|| client.offer_snapshot(manifest.clone())).await {
+                        Ok(path) => {
+                            tracing::info!(
+                                download_dir = path.to_string_lossy().to_string(),
+                                height = manifest.block_height,
+                                size = manifest.size,
+                                chunks = manifest.chunks,
+                                "downloading snapshot"
+                            );
+                            Ok(response::OfferSnapshot::Accept)
+                        }
+                        Err(SnapshotError::IncompatibleVersion(version)) => {
+                            tracing::warn!(version, "rejecting offered snapshot version");
+                            Ok(response::OfferSnapshot::RejectFormat)
+                        }
+                        Err(e) => {
+                            tracing::error!(error = ?e, "failed to start snapshot download");
+                            Ok(response::OfferSnapshot::Abort)
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("failed to parse snapshot offer: {e:#}");
+                    Ok(response::OfferSnapshot::Reject)
+                }
+            };
+        }
+        Ok(Default::default())
+    }
+
     /// Load a particular snapshot chunk a remote peer is asking for.
     async fn load_snapshot_chunk(
         &self,
@@ -930,54 +982,6 @@ where
                     Err(e) => {
                         tracing::warn!("failed to load chunk: {e:#}");
                     }
-                }
-            }
-        }
-        Ok(Default::default())
-    }
-
-    /// Decide whether to start downloading a snapshot from peers.
-    ///
-    /// This method is also called when a download is aborted and a new snapshot is offered,
-    /// so potentially we have to clean up previous resources and start a new one.
-    async fn offer_snapshot(
-        &self,
-        request: request::OfferSnapshot,
-    ) -> AbciResult<response::OfferSnapshot> {
-        if let Some(ref client) = self.snapshots {
-            tracing::info!(
-                height = request.snapshot.height.value(),
-                "received snapshot offer"
-            );
-
-            match from_snapshot(request).context("failed to parse snapshot") {
-                Ok(manifest) => {
-                    tracing::info!(?manifest, "received snapshot offer");
-                    // We can look at the version but currently there's only one.
-                    match atomically_or_err(|| client.offer_snapshot(manifest.clone())).await {
-                        Ok(path) => {
-                            tracing::info!(
-                                download_dir = path.to_string_lossy().to_string(),
-                                height = manifest.block_height,
-                                size = manifest.size,
-                                chunks = manifest.chunks,
-                                "downloading snapshot"
-                            );
-                            return Ok(response::OfferSnapshot::Accept);
-                        }
-                        Err(SnapshotError::IncompatibleVersion(version)) => {
-                            tracing::warn!(version, "rejecting offered snapshot version");
-                            return Ok(response::OfferSnapshot::RejectFormat);
-                        }
-                        Err(e) => {
-                            tracing::error!(error = ?e, "failed to start snapshot download");
-                            return Ok(response::OfferSnapshot::Abort);
-                        }
-                    };
-                }
-                Err(e) => {
-                    tracing::warn!("failed to parse snapshot offer: {e:#}");
-                    return Ok(response::OfferSnapshot::Reject);
                 }
             }
         }
