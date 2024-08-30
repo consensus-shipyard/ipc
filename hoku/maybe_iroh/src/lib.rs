@@ -3,8 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use std::net::ToSocketAddrs;
-use iroh::client::Iroh;
+
 use anyhow::anyhow;
+use iroh::client::Iroh;
 
 #[derive(Clone, Debug)]
 pub struct MaybeIroh {
@@ -16,15 +17,12 @@ impl MaybeIroh {
     pub fn from_addr(addr: String) -> MaybeIroh {
         Self {
             addr: Some(addr),
-            client: None
+            client: None,
         }
     }
 
     pub fn maybe_addr(addr: Option<String>) -> MaybeIroh {
-        Self {
-            addr,
-            client: None
-        }
+        Self { addr, client: None }
     }
 
     pub async fn client(&mut self) -> anyhow::Result<Iroh> {

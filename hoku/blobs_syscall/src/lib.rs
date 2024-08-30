@@ -2,9 +2,9 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-pub mod hoku_kernel;
+use std::fmt::Display;
+use std::sync::Arc;
 
-use crate::hoku_kernel::HokuOps;
 use fvm::kernel::{ExecutionError, Result, SyscallError};
 use fvm::syscalls::Context;
 use fvm_shared::error::ErrorNumber;
@@ -12,10 +12,12 @@ use iroh::blobs::Hash;
 use maybe_iroh::MaybeIroh;
 use num_traits::FromPrimitive;
 use once_cell::sync::Lazy;
-use std::fmt::Display;
-use std::sync::Arc;
 use tokio::spawn;
 use tokio::sync::Mutex;
+
+use crate::hoku_kernel::HokuOps;
+
+pub mod hoku_kernel;
 
 pub const SYSCALL_MODULE_NAME: &str = "blobs";
 pub const HASHRM_SYSCALL_FUNCTION_NAME: &str = "hash_rm";
