@@ -18,8 +18,6 @@ LIB_OUTPUT="libraries.out"
 GATEWAY_OUTPUT="gateway.out"
 NETWORK=$1
 
-echo "deploying to network $NETWORK"
-
 if [ "$NETWORK" = "auto" ]; then
   echo "[*] Automatically getting chainID for network"
   source ops/chain-id.sh
