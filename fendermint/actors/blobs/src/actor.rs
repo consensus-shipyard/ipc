@@ -68,9 +68,7 @@ impl BlobsActor {
                 .map_err(to_state_error("failed to debit accounts"))
         })?;
         for hash in deletes {
-            blobs_actor_sdk::hash_rm(hash.0).map_err(|en| {
-                ActorError::unspecified(format!("failed to delete blob from storage: {:?}", en))
-            })?;
+            delete_from_disc(hash)?;
         }
         Ok(())
     }
@@ -135,9 +133,7 @@ impl BlobsActor {
                 .map_err(to_state_error("failed to delete blob"))
         })?;
         if delete {
-            blobs_actor_sdk::hash_rm(params.hash.0).map_err(|en| {
-                ActorError::unspecified(format!("failed to delete blob from storage: {:?}", en))
-            })?;
+            delete_from_disc(params.hash)?;
         }
         Ok(account)
     }
@@ -159,6 +155,20 @@ impl BlobsActor {
 
 fn to_state_error(message: &'static str) -> impl FnOnce(anyhow::Error) -> ActorError {
     move |e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, message)
+}
+
+fn delete_from_disc(hash: Hash) -> Result<(), ActorError> {
+    #[cfg(feature = "fil-actor")]
+    {
+        blobs_actor_sdk::hash_rm(hash.0).map_err(|en| {
+            ActorError::unspecified(format!("failed to delete blob from storage: {:?}", en))
+        })
+    }
+    #[cfg(not(feature = "fil-actor"))]
+    {
+        log::debug!("mock deletion from disc (hash={})", hash);
+        Ok(())
+    }
 }
 
 impl ActorCode for BlobsActor {

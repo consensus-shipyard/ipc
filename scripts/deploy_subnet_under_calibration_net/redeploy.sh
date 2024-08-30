@@ -147,7 +147,7 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e PARENT_REGISTRY="${parent_registry_address}" \
     -e PARENT_GATEWAY="${parent_gateway_address}" \
     -e FM_PULL_SKIP=1 \
-    -e FM_LOG_LEVEL="info" \
+    -e FM_LOG_LEVEL="info,fendermint=debug" \
     child-validator-restart 2>&1)
 echo "$bootstrap_output"
 bootstrap_node_id=$(echo "$bootstrap_output" | sed -n '/CometBFT node ID:/ {n;p;}' | tr -d "[:blank:]")
@@ -183,7 +183,7 @@ do
       -e PARENT_REGISTRY="${parent_registry_address}" \
       -e PARENT_GATEWAY="${parent_gateway_address}" \
       -e FM_PULL_SKIP=1 \
-      -e FM_LOG_LEVEL="info" \
+      -e FM_LOG_LEVEL="info,fendermint=debug" \
       child-validator-restart
 done
 

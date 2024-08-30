@@ -151,7 +151,7 @@ where
 
     /// Add an item to the resolution targets.
     ///
-    /// If the item is new, enqueue it from background resolution, otherwise just return its existing status.
+    /// If the item is new, enqueue it from background resolution, otherwise return its existing status.
     pub fn add(&self, item: T) -> Stm<ResolveStatus<T>> {
         let key = ResolveKey::from(&item);
         let source = ResolveSource::from(&item);

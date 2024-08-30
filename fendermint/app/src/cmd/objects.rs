@@ -133,6 +133,7 @@ struct ObjectParser {
     signed_msg: Option<SignedMessage>,
     chain_id: ChainID,
     hash: Option<Hash>,
+    size: Option<u64>,
     source: Option<NodeAddr>,
 }
 
@@ -142,6 +143,7 @@ impl Default for ObjectParser {
             signed_msg: None,
             chain_id: ChainID::from(0),
             hash: None,
+            size: None,
             source: None,
         }
     }
@@ -169,12 +171,16 @@ impl ObjectParser {
         Ok(())
     }
 
-    async fn read_source(&mut self, form_part: Part) -> anyhow::Result<()> {
+    async fn read_msg(&mut self, form_part: Part) -> anyhow::Result<()> {
         let value = self.read_part(form_part).await?;
-        let text = String::from_utf8(value).map_err(|_| anyhow!("cannot parse source"))?;
-        let source: NodeAddr =
-            serde_json::from_str(&text).map_err(|_| anyhow!("cannot parse source"))?;
-        self.source = Some(source);
+        let signed_msg = general_purpose::URL_SAFE
+            .decode(value)
+            .map_err(|e| anyhow!("Failed to decode b64 encoded message: {}", e))
+            .and_then(|b64_decoded| {
+                fvm_ipld_encoding::from_slice::<SignedMessage>(&b64_decoded)
+                    .map_err(|e| anyhow!("Failed to deserialize signed message: {}", e))
+            })?;
+        self.signed_msg = Some(signed_msg);
         Ok(())
     }
 
@@ -186,16 +192,20 @@ impl ObjectParser {
         Ok(())
     }
 
-    async fn read_msg(&mut self, form_part: Part) -> anyhow::Result<()> {
+    async fn read_size(&mut self, form_part: Part) -> anyhow::Result<()> {
         let value = self.read_part(form_part).await?;
-        let signed_msg = general_purpose::URL_SAFE
-            .decode(value)
-            .map_err(|e| anyhow!("Failed to decode b64 encoded message: {}", e))
-            .and_then(|b64_decoded| {
-                fvm_ipld_encoding::from_slice::<SignedMessage>(&b64_decoded)
-                    .map_err(|e| anyhow!("Failed to deserialize signed message: {}", e))
-            })?;
-        self.signed_msg = Some(signed_msg);
+        let text = String::from_utf8(value).map_err(|_| anyhow!("cannot parse size"))?;
+        let size: u64 = text.parse().map_err(|_| anyhow!("cannot parse size"))?;
+        self.size = Some(size);
+        Ok(())
+    }
+
+    async fn read_source(&mut self, form_part: Part) -> anyhow::Result<()> {
+        let value = self.read_part(form_part).await?;
+        let text = String::from_utf8(value).map_err(|_| anyhow!("cannot parse source"))?;
+        let source: NodeAddr =
+            serde_json::from_str(&text).map_err(|_| anyhow!("cannot parse source"))?;
+        self.source = Some(source);
         Ok(())
     }
 
@@ -216,9 +226,9 @@ impl ObjectParser {
                 "hash" => {
                     object_parser.read_hash(part).await?;
                 }
-                // "size" => {
-                //     object_parser.read_size(part).await?;
-                // }
+                "size" => {
+                    object_parser.read_size(part).await?;
+                }
                 "source" => {
                     object_parser.read_source(part).await?;
                 }
@@ -231,6 +241,7 @@ impl ObjectParser {
     }
 }
 
+// TODO: we can remove this, payment is now in credits, which gets checked during txn processing
 async fn ensure_balance<F: QueryClient>(client: &F, from: Address) -> anyhow::Result<()> {
     let actor_state = client.actor_state(&from, FvmQueryHeight::Committed).await?;
     let balance = match actor_state.value {
@@ -288,7 +299,7 @@ async fn handle_object_upload<F: QueryClient>(
         })
     })?;
 
-    // Ensure the sender has enough balance, and fetch the data through iroh
+    // Ensure the sender has enough credits, and fetch the data through iroh
     let SignedMessage { message, .. } = signed_msg;
     ensure_balance(&client, message.from).await.map_err(|e| {
         Rejection::from(BadRequest {
@@ -311,6 +322,14 @@ async fn handle_object_upload<F: QueryClient>(
             }))
         }
     };
+    let size = match parser.size {
+        Some(size) => size,
+        None => {
+            return Err(Rejection::from(BadRequest {
+                message: "missing size in form".to_string(),
+            }))
+        }
+    };
     let source = match parser.source {
         Some(source) => source,
         None => {
@@ -325,11 +344,22 @@ async fn handle_object_upload<F: QueryClient>(
             message: format!("failed to fetch file: {} {}", hash, e),
         })
     })?;
-    progress.finish().await.map_err(|e| {
+    let outcome = progress.finish().await.map_err(|e| {
         Rejection::from(BadRequest {
             message: format!("failed to fetch file: {} {}", hash, e),
         })
     })?;
+
+    let blob_size = outcome.downloaded_size + outcome.local_size;
+    if size != blob_size {
+        // TODO: delete blob?
+        return Err(Rejection::from(BadRequest {
+            message: format!(
+                "provided size {} does not match blob {} size {}",
+                size, hash, blob_size
+            ),
+        }));
+    }
 
     Ok(hash.to_string())
 }
@@ -452,7 +482,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
                 }
             };
 
-            // If it is a HEAD request, we don't need to send the body
+            // If it is a HEAD request, we don't need to send the body,
             // but we still need to send the Content-Length header
             if method == "HEAD" {
                 let mut response = warp::reply::Response::new(Body::empty());

@@ -11,8 +11,5 @@ crate-type = ["cdylib", "lib"]
 [dependencies]
 fvm_shared = { workspace = true }
 fvm_sdk = { workspace = true }
+log = { workspace = true }
 num-traits = { workspace = true }
-
-[features]
-default = []
-fil-actor = []

@@ -390,10 +390,15 @@ where
         for (vk, resolved) in votes_for_blob {
             if voters.insert(vk.clone()).is_none() {
                 // New voter, get their current weight; it might be 0 if they have been removed.
-                if *resolved {
-                    resolved_weight += power_table.get(vk).cloned().unwrap_or_default();
+                let power = if power_table.is_empty() {
+                    1
                 } else {
-                    failed_weight += power_table.get(vk).cloned().unwrap_or_default();
+                    power_table.get(vk).cloned().unwrap_or_default()
+                };
+                if *resolved {
+                    resolved_weight += power;
+                } else {
+                    failed_weight += power;
                 }
             }
         }
