@@ -4,11 +4,21 @@
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
+use crate::fvm::state::ipc::GatewayCaller;
+use crate::fvm::{topdown, FvmApplyRet, PowerUpdates};
+use crate::{
+    fvm::state::FvmExecState,
+    fvm::store::ReadOnlyBlockstore,
+    fvm::FvmMessage,
+    signed::{SignedMessageApplyRes, SignedMessageCheckRes, SyntheticMessage, VerifiableMessage},
+    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
+};
 use anyhow::{anyhow, bail, Context};
 use async_stm::atomically;
 use async_trait::async_trait;
 use fendermint_actor_blobs_shared::params::GetBlobParams;
 use fendermint_actor_blobs_shared::state::BlobStatus;
+use fendermint_actor_blobs_shared::Method::DebitAccounts;
 use fendermint_actor_blobs_shared::{
     params::FinalizeBlobParams,
     Method::{FinalizeBlob, GetBlobStatus, GetPendingBlobs},
@@ -42,16 +52,6 @@ use iroh::blobs::Hash;
 use iroh::net::NodeId;
 use num_traits::Zero;
 use tokio_util::bytes;
-
-use crate::fvm::state::ipc::GatewayCaller;
-use crate::fvm::{topdown, FvmApplyRet, PowerUpdates};
-use crate::{
-    fvm::state::FvmExecState,
-    fvm::store::ReadOnlyBlockstore,
-    fvm::FvmMessage,
-    signed::{SignedMessageApplyRes, SignedMessageCheckRes, SyntheticMessage, VerifiableMessage},
-    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
-};
 
 /// A resolution pool for bottom-up and top-down checkpoints.
 pub type CheckpointPool = ResolvePool<CheckpointPoolItem>;
@@ -233,6 +233,13 @@ where
             }
         }
 
+        // Maybe debit all credit accounts
+        let current_height = state.block_height();
+        let debit_interval = state.credit_debit_interval();
+        if current_height > 0 && debit_interval > 0 && current_height % debit_interval == 0 {
+            msgs.push(ChainMessage::Ipc(IpcMessage::DebitCreditAccounts));
+        }
+
         // Collect locally completed blobs from the pool. We're relying on the proposer's local
         // view of blob resolution, rather than considering those that _might_ have a quorum,
         // but have not yet been resolved by _this_ proposer. However, a blob like this will get
@@ -380,6 +387,22 @@ where
                         atomically(|| env.blob_pool.remove(&item)).await;
                     } else {
                         tracing::debug!(hash = ?blob.hash, "blob is not locally finalized");
+                    }
+                }
+                ChainMessage::Ipc(IpcMessage::DebitCreditAccounts) => {
+                    // Ensure that this is a valid height to debit accounts
+                    let current_height = state.block_height();
+                    let debit_interval = state.credit_debit_interval();
+                    if !(current_height > 0
+                        && debit_interval > 0
+                        && current_height % debit_interval == 0)
+                    {
+                        tracing::debug!(
+                            interval = ?debit_interval,
+                            height = ?current_height,
+                            "invalid height for credit debit; rejecting proposal"
+                        );
+                        return Ok(false);
                     }
                 }
                 _ => {}
@@ -624,6 +647,56 @@ where
 
                     Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
                 }
+                IpcMessage::DebitCreditAccounts => {
+                    let from = system::SYSTEM_ACTOR_ADDR;
+                    let to = blobs::BLOBS_ACTOR_ADDR;
+                    let method_num = DebitAccounts as u64;
+                    let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
+
+                    let msg = Message {
+                        version: Default::default(),
+                        from,
+                        to,
+                        sequence: 0, // We will use implicit execution which doesn't check or modify this.
+                        value: Default::default(),
+                        method_num,
+                        params: Default::default(),
+                        gas_limit,
+                        gas_fee_cap: Default::default(),
+                        gas_premium: Default::default(),
+                    };
+
+                    let (apply_ret, emitters) = state.execute_implicit(msg)?;
+
+                    let info = apply_ret
+                        .failure_info
+                        .clone()
+                        .map(|i| i.to_string())
+                        .filter(|s| !s.is_empty());
+                    tracing::info!(
+                        exit_code = apply_ret.msg_receipt.exit_code.value(),
+                        from = from.to_string(),
+                        to = to.to_string(),
+                        method_num = method_num,
+                        gas_limit = gas_limit,
+                        gas_used = apply_ret.msg_receipt.gas_used,
+                        info = info.unwrap_or_default(),
+                        "implicit tx delivered"
+                    );
+
+                    tracing::debug!("chain interpreter debited accounts");
+
+                    let ret = FvmApplyRet {
+                        apply_ret,
+                        from: system::SYSTEM_ACTOR_ADDR,
+                        to,
+                        method_num,
+                        gas_limit,
+                        emitters,
+                    };
+
+                    Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
+                }
             },
         }
     }
@@ -698,7 +771,8 @@ where
                     }
                     IpcMessage::TopDownExec(_)
                     | IpcMessage::BottomUpExec(_)
-                    | IpcMessage::BlobFinalized(_) => {
+                    | IpcMessage::BlobFinalized(_)
+                    | IpcMessage::DebitCreditAccounts => {
                         // Users cannot send these messages, only validators can propose them in blocks.
                         Ok((state, Err(IllegalMessage)))
                     }

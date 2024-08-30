@@ -26,7 +26,6 @@ use crate::{ext, ConstructorParams, State, BLOBS_ACTOR_NAME};
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(BlobsActor);
 
-// TODO: cron to debit and handle expiry
 pub struct BlobsActor;
 
 impl BlobsActor {

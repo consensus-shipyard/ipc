@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Context};
 use byteorder::{BigEndian, WriteBytesExt};
 use cid::Cid;
 use fendermint_vm_core::Timestamp;
@@ -113,6 +113,7 @@ where
                 chain_id: 0,
                 power_scale: 0,
                 app_version: 0,
+                credit_debit_interval: 0,
             },
         }
     }
@@ -157,6 +158,7 @@ where
             chain_id: out.chain_id.into(),
             power_scale: out.power_scale,
             app_version: 0,
+            credit_debit_interval: out.credit_debit_interval,
         };
 
         Ok(())
@@ -166,7 +168,7 @@ where
     async fn modify_exec_state<T, F, R>(&self, f: F) -> anyhow::Result<T>
     where
         F: FnOnce(FvmExecState<MemoryBlockstore>) -> R,
-        R: Future<Output = Result<(FvmExecState<MemoryBlockstore>, T)>>,
+        R: Future<Output = anyhow::Result<(FvmExecState<MemoryBlockstore>, T)>>,
     {
         let mut guard = self.exec_state.lock().await;
         let state = guard.take().expect("exec state empty");
@@ -191,7 +193,7 @@ where
         guard.take().expect("exec state empty")
     }
 
-    pub async fn begin_block(&self, block_height: ChainEpoch) -> Result<()> {
+    pub async fn begin_block(&self, block_height: ChainEpoch) -> anyhow::Result<()> {
         let mut block_hash: [u8; 32] = [0; 32];
         let _ = block_hash.as_mut().write_i64::<BigEndian>(block_height);
 
@@ -207,13 +209,12 @@ where
 
         let _res = self
             .modify_exec_state(|s| self.interpreter.begin(s))
-            .await
-            .unwrap();
+            .await?;
 
         Ok(())
     }
 
-    pub async fn end_block(&self, _block_height: ChainEpoch) -> Result<()> {
+    pub async fn end_block(&self, _block_height: ChainEpoch) -> anyhow::Result<()> {
         let _ret = self
             .modify_exec_state(|s| self.interpreter.end(s))
             .await
@@ -222,7 +223,7 @@ where
         Ok(())
     }
 
-    pub async fn commit(&mut self) -> Result<()> {
+    pub async fn commit(&mut self) -> anyhow::Result<()> {
         let exec_state = self.take_exec_state().await;
 
         let (
@@ -232,6 +233,7 @@ where
                 base_fee,
                 circ_supply,
                 power_scale,
+                credit_debit_interval,
             },
             _,
         ) = exec_state.commit().context("failed to commit FVM")?;
@@ -241,6 +243,7 @@ where
         self.state_params.base_fee = base_fee;
         self.state_params.circ_supply = circ_supply;
         self.state_params.power_scale = power_scale;
+        self.state_params.credit_debit_interval = credit_debit_interval;
 
         eprintln!("self.state_params: {:?}", self.state_params);
 

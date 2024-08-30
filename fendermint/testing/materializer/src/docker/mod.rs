@@ -696,6 +696,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
                         active_validators_limit: 100,
                     },
                 }),
+                credit_debit_interval: 3600,
             };
             Ok(genesis)
         })
