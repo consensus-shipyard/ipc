@@ -40,6 +40,7 @@ import {IntegrationTestBase} from "../IntegrationTestBase.sol";
 
 import {SubnetActorFacetsHelper} from "../helpers/SubnetActorFacetsHelper.sol";
 import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
+import {SubnetValidatorGater} from "../../contracts/examples/SubnetValidatorGater.sol";
 
 contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
@@ -1782,6 +1783,120 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.expectRevert(Pausable.ExpectedPause.selector);
         saDiamond.pauser().unpause();
         require(!saDiamond.pauser().paused(), "paused");
+    }
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // Tests for validator gater
+    // -----------------------------------------------------------------------------------------------------------------
+    function subnet_id(address baseRoute) internal view returns (SubnetID memory id) {
+        address[] memory route = new address[](1);
+        route[0] = baseRoute;
+
+        SubnetID memory parent = saDiamond.getter().getParent();
+        id = SubnetID({root: parent.root, route: route});
+    }
+
+    function testSubnetActorDiamond_ValidatorGater_set_works() public {
+        saDiamond.manager().setValidatorGater(address(1));
+
+        vm.prank(address(0));
+        vm.expectRevert();
+        saDiamond.manager().setValidatorGater(address(1));
+    }
+
+    function testSubnetActorDiamond_ValidatorGater_collateralLiftCycle() public {
+        SubnetID memory id = subnet_id(address(saDiamond));
+        address owner = address(1);
+
+        vm.prank(owner);
+        SubnetValidatorGater gater = new SubnetValidatorGater(id);
+
+        saDiamond.manager().setValidatorGater(address(gater));
+
+        (address validator, , bytes memory publicKey) = TestUtils.newValidator(100);
+
+        vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE * 3);
+        vm.prank(validator);
+        vm.expectRevert(PowerChangeRequestNotApproved.selector);
+        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey);
+
+        // now approve the join
+        vm.prank(owner);
+        gater.approve(validator, 2, DEFAULT_MIN_VALIDATOR_STAKE * 2);
+
+        // should be able to join
+        vm.prank(validator);
+        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey);
+
+        // add stake not allowed exceed allowed range
+        vm.prank(validator);
+        vm.expectRevert(PowerChangeRequestNotApproved.selector);
+        saDiamond.manager().stake{value: DEFAULT_MIN_VALIDATOR_STAKE + 1}();
+
+        // add stake should be ok
+        vm.prank(validator);
+        saDiamond.manager().stake{value: DEFAULT_MIN_VALIDATOR_STAKE}();
+
+        // unstake not allowed as below allowed range
+        vm.prank(validator);
+        vm.expectRevert(PowerChangeRequestNotApproved.selector);
+        saDiamond.manager().unstake(DEFAULT_MIN_VALIDATOR_STAKE * 2 - 1);
+
+        // unstake ok because within range
+        vm.prank(validator);
+        saDiamond.manager().unstake(DEFAULT_MIN_VALIDATOR_STAKE - 1);
+
+        // leave not allowed as below allowed range
+        vm.prank(validator);
+        vm.expectRevert(PowerChangeRequestNotApproved.selector);
+        saDiamond.manager().leave();
+
+        // update allowed range
+        vm.prank(owner);
+        gater.approve(validator, 0, DEFAULT_MIN_VALIDATOR_STAKE * 2);
+
+        // leave ok
+        vm.prank(validator);
+        saDiamond.manager().leave();
+    }
+
+    function testSubnetActorDiamond_ValidatorGater_federatedLiftCycle() public {
+        gatewayAddress = address(gatewayDiamond);
+        createSubnetActor(
+            gatewayAddress,
+            ConsensusType.Fendermint,
+            DEFAULT_MIN_VALIDATOR_STAKE,
+            DEFAULT_MIN_VALIDATORS,
+            DEFAULT_CHECKPOINT_PERIOD,
+            DEFAULT_MAJORITY_PERCENTAGE,
+            PermissionMode.Federated,
+            2
+        );
+
+        SubnetID memory id = subnet_id(address(saDiamond));
+        address owner = address(1);
+
+        vm.prank(owner);
+        SubnetValidatorGater gater = new SubnetValidatorGater(id);
+        saDiamond.manager().setValidatorGater(address(gater));
+
+        (address[] memory validators, , bytes[] memory publicKeys) = TestUtils.newValidators(3);
+        uint256[] memory powers = new uint256[](3);
+        powers[0] = 10000;
+        powers[1] = 20000;
+        powers[2] = 5000; // we only have 2 active validators, validator 2 does not have enough power
+
+        vm.expectRevert(PowerChangeRequestNotApproved.selector);
+        saDiamond.manager().setFederatedPower(validators, publicKeys, powers);
+
+        vm.prank(owner);
+        gater.approve(validators[0], 0, powers[0]);
+        vm.prank(owner);
+        gater.approve(validators[1], 0, powers[1]);
+        vm.prank(owner);
+        gater.approve(validators[2], 0, powers[2]);
+
+        saDiamond.manager().setFederatedPower(validators, publicKeys, powers);
     }
 
     function submitCheckpointInternal(

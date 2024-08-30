@@ -8,7 +8,7 @@ import {SubnetID} from "../structs/Subnet.sol";
 /// come from staking, unstaking, and explicit validator membership adjustments (federated membership). With this interface,
 /// it introduces an extra layer of checking to directly allow or deny the action, according to a user-defined policy.
 interface IValidatorGater {
-    /// This intercepts the power update call. 
+    /// This intercepts the power update call.
     /// @notice This method should revert if the power update is not allowed.
     function interceptPowerDelta(SubnetID memory id, address validator, uint256 prevPower, uint256 newPower) external;
 }

@@ -13,7 +13,7 @@ struct PowerRange {
     uint256 max;
 }
 
-/// This is a simple implementation of `IValidatorGater`. It makes sure the exact power change 
+/// This is a simple implementation of `IValidatorGater`. It makes sure the exact power change
 /// request is approved. This is a very strict requirement.
 contract SubnetValidatorGater is IValidatorGater, Ownable {
     using SubnetIDHelper for SubnetID;
@@ -25,14 +25,14 @@ contract SubnetValidatorGater is IValidatorGater, Ownable {
         subnet = _subnet;
     }
 
-    function isAllow(address validator, uint256 power) public view returns(bool) {
+    function isAllow(address validator, uint256 power) public view returns (bool) {
         PowerRange memory range = allowed[validator];
         return range.min <= power && power <= range.max;
     }
 
     /// Only owner can approve the validator join request
     function approve(address validator, uint256 minPower, uint256 maxPower) external onlyOwner {
-        allowed[validator] = PowerRange({ min: minPower, max: maxPower });
+        allowed[validator] = PowerRange({min: minPower, max: maxPower});
     }
 
     /// Revoke approved power range
@@ -40,10 +40,15 @@ contract SubnetValidatorGater is IValidatorGater, Ownable {
         delete allowed[validator];
     }
 
-    function interceptPowerDelta(SubnetID memory id, address validator, uint256 /*prevPower*/, uint256 newPower) external view override {
+    function interceptPowerDelta(
+        SubnetID memory id,
+        address validator,
+        uint256 /*prevPower*/,
+        uint256 newPower
+    ) external view override {
         SubnetID memory targetSubnet = subnet;
 
-        if (id.equals(targetSubnet)) {
+        if (!id.equals(targetSubnet)) {
             revert InvalidSubnet();
         }
 

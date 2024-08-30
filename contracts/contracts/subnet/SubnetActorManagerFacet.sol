@@ -69,6 +69,11 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
         payable(msg.sender).sendValue(amount);
     }
 
+    function setValidatorGater(address gater) external notKilled {
+        LibDiamond.enforceIsContractOwner();
+        s.validatorGater = gater;
+    }
+
     /// @notice Sets the federated power of validators.
     /// @dev method that allows the contract owner to set the validators' federated power.
     /// @param validators The addresses of validators.
@@ -136,7 +141,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             revert NotOwnerOfPublicKey();
         }
 
-        LibSubnetActor.gateValidatorPowerDelta(msg.sender, msg.value, true);
+        LibSubnetActor.gateValidatorPowerDelta(msg.sender, 0, msg.value);
 
         if (!s.bootstrapped) {
             // if the subnet has not been bootstrapped, join directly
@@ -171,7 +176,8 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             revert MethodNotAllowed(ERR_VALIDATOR_NOT_JOINED);
         }
 
-        LibSubnetActor.gateValidatorPowerDelta(msg.sender, msg.value, true);
+        uint256 collateral = LibStaking.totalValidatorCollateral(msg.sender);
+        LibSubnetActor.gateValidatorPowerDelta(msg.sender, collateral, collateral + msg.value);
 
         if (!s.bootstrapped) {
             LibStaking.depositWithConfirm(msg.sender, msg.value);
@@ -203,7 +209,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             revert NotEnoughCollateral();
         }
 
-        LibSubnetActor.gateValidatorPowerDelta(msg.sender, amount, false);
+        LibSubnetActor.gateValidatorPowerDelta(msg.sender, collateral, collateral - amount);
 
         if (!s.bootstrapped) {
             LibStaking.withdrawWithConfirm(msg.sender, amount);
@@ -229,6 +235,8 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
         if (amount == 0) {
             revert NotValidator(msg.sender);
         }
+
+        LibSubnetActor.gateValidatorPowerDelta(msg.sender, amount, 0);
 
         // slither-disable-next-line unused-return
         s.bootstrapOwners.remove(msg.sender);
