@@ -3075,6 +3075,7 @@ dependencies = [
  "fendermint_vm_core",
  "fendermint_vm_encoding",
  "fendermint_vm_genesis",
+ "fendermint_vm_interpreter",
  "fendermint_vm_message",
  "futures",
  "fvm_shared",
@@ -3299,6 +3300,7 @@ dependencies = [
  "arbitrary",
  "async-stm",
  "async-trait",
+ "base64 0.21.7",
  "cid",
  "ethers",
  "fendermint_actor_chainmetadata",
@@ -3340,6 +3342,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with 2.3.3",
+ "snap",
  "strum",
  "tempfile",
  "tendermint 0.31.1",
@@ -8774,6 +8777,12 @@ name = "smallvec"
 version = "1.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"
+
+[[package]]
+name = "snap"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b6b67fb9a61334225b5b790716f609cd58395f895b3fe8b328786812a40bc3b"
 
 [[package]]
 name = "snow"

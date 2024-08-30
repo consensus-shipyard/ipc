@@ -3,72 +3,52 @@
 
 use anyhow::{anyhow, Context, Result};
 use byteorder::{BigEndian, WriteBytesExt};
-use cid::Cid;
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_interpreter::fvm::PowerUpdates;
-use fvm_shared::{bigint::Zero, clock::ChainEpoch, econ::TokenAmount, version::NetworkVersion};
+use fvm_shared::clock::ChainEpoch;
 use std::{future::Future, sync::Arc};
 
 use fendermint_vm_genesis::Genesis;
+use fendermint_vm_interpreter::genesis::{create_test_genesis_state, GenesisOutput};
 use fendermint_vm_interpreter::{
     fvm::{
         bundle::{bundle_path, contracts_path, custom_actors_bundle_path},
-        state::{FvmExecState, FvmGenesisState, FvmStateParams, FvmUpdatableParams},
+        state::{FvmExecState, FvmStateParams, FvmUpdatableParams},
         store::memory::MemoryBlockstore,
-        upgrades::UpgradeScheduler,
-        FvmApplyRet, FvmGenesisOutput, FvmMessage, FvmMessageInterpreter,
+        FvmApplyRet, FvmMessage,
     },
-    ExecInterpreter, GenesisInterpreter,
+    ExecInterpreter,
 };
 use fvm::engine::MultiEngine;
 
 pub mod ipc;
 
-pub async fn init_exec_state(
-    multi_engine: Arc<MultiEngine>,
+pub async fn create_test_exec_state(
     genesis: Genesis,
-) -> anyhow::Result<(FvmExecState<MemoryBlockstore>, FvmGenesisOutput)> {
+) -> Result<(
+    FvmExecState<MemoryBlockstore>,
+    GenesisOutput,
+    MemoryBlockstore,
+)> {
     let bundle_path = bundle_path();
-    let bundle = std::fs::read(&bundle_path)
-        .with_context(|| format!("failed to read bundle: {}", bundle_path.to_string_lossy()))?;
-
     let custom_actors_bundle_path = custom_actors_bundle_path();
-    let custom_actors_bundle = std::fs::read(&custom_actors_bundle_path).with_context(|| {
-        format!(
-            "failed to read custom actors_bundle: {}",
-            custom_actors_bundle_path.to_string_lossy()
-        )
-    })?;
+    let maybe_contract_path = genesis.ipc.as_ref().map(|_| contracts_path());
 
-    let store = MemoryBlockstore::new();
-
-    let state = FvmGenesisState::new(store, multi_engine, &bundle, &custom_actors_bundle)
-        .await
-        .context("failed to create state")?;
-
-    let (client, _) =
-        tendermint_rpc::MockClient::new(tendermint_rpc::MockRequestMethodMatcher::default());
-
-    let interpreter = FvmMessageInterpreter::new(
-        client,
-        None,
-        contracts_path(),
-        1.05,
-        1.05,
-        false,
-        UpgradeScheduler::new(),
-    );
-
-    let (state, out) = interpreter
-        .init(state, genesis)
-        .await
-        .context("failed to create actors")?;
-
-    let state = state
-        .into_exec_state()
-        .map_err(|_| anyhow!("should be in exec stage"))?;
-
-    Ok((state, out))
+    let (state, out) = create_test_genesis_state(
+        bundle_path,
+        custom_actors_bundle_path,
+        genesis,
+        maybe_contract_path,
+    )
+    .await?;
+    let store = state.store().clone();
+    Ok((
+        state
+            .into_exec_state()
+            .map_err(|_| anyhow!("cannot parse state"))?,
+        out,
+        store,
+    ))
 }
 
 pub struct Tester<I> {
@@ -81,11 +61,6 @@ pub struct Tester<I> {
 
 impl<I> Tester<I>
 where
-    I: GenesisInterpreter<
-        State = FvmGenesisState<MemoryBlockstore>,
-        Genesis = Genesis,
-        Output = FvmGenesisOutput,
-    >,
     I: ExecInterpreter<
         State = FvmExecState<MemoryBlockstore>,
         Message = FvmMessage,
@@ -94,61 +69,13 @@ where
         EndOutput = PowerUpdates,
     >,
 {
-    fn state_store_clone(&self) -> MemoryBlockstore {
-        self.state_store.as_ref().clone()
-    }
+    pub async fn new(interpreter: I, genesis: Genesis) -> anyhow::Result<Self> {
+        let (exec_state, out, store) = create_test_exec_state(genesis).await?;
+        let (state_root, _, _) = exec_state
+            .commit()
+            .context("failed to commit genesis state")?;
 
-    pub fn new(interpreter: I, state_store: MemoryBlockstore) -> Self {
-        Self {
-            interpreter: Arc::new(interpreter),
-            state_store: Arc::new(state_store),
-            multi_engine: Arc::new(MultiEngine::new(1)),
-            exec_state: Arc::new(tokio::sync::Mutex::new(None)),
-            state_params: FvmStateParams {
-                timestamp: Timestamp(0),
-                state_root: Cid::default(),
-                network_version: NetworkVersion::V21,
-                base_fee: TokenAmount::zero(),
-                circ_supply: TokenAmount::zero(),
-                chain_id: 0,
-                power_scale: 0,
-                app_version: 0,
-            },
-        }
-    }
-
-    pub async fn init(&mut self, genesis: Genesis) -> anyhow::Result<()> {
-        let bundle_path = bundle_path();
-        let bundle = std::fs::read(&bundle_path)
-            .with_context(|| format!("failed to read bundle: {}", bundle_path.to_string_lossy()))?;
-
-        let custom_actors_bundle_path = custom_actors_bundle_path();
-        let custom_actors_bundle =
-            std::fs::read(&custom_actors_bundle_path).with_context(|| {
-                format!(
-                    "failed to read custom actors_bundle: {}",
-                    custom_actors_bundle_path.to_string_lossy()
-                )
-            })?;
-
-        let state = FvmGenesisState::new(
-            self.state_store_clone(),
-            self.multi_engine.clone(),
-            &bundle,
-            &custom_actors_bundle,
-        )
-        .await
-        .context("failed to create genesis state")?;
-
-        let (state, out) = self
-            .interpreter
-            .init(state, genesis)
-            .await
-            .context("failed to init from genesis")?;
-
-        let state_root = state.commit().context("failed to commit genesis state")?;
-
-        self.state_params = FvmStateParams {
+        let state_params = FvmStateParams {
             state_root,
             timestamp: out.timestamp,
             network_version: out.network_version,
@@ -159,7 +86,13 @@ where
             app_version: 0,
         };
 
-        Ok(())
+        Ok(Self {
+            interpreter: Arc::new(interpreter),
+            state_store: Arc::new(store),
+            multi_engine: Arc::new(MultiEngine::new(1)),
+            exec_state: Arc::new(tokio::sync::Mutex::new(None)),
+            state_params,
+        })
     }
 
     /// Take the execution state, update it, put it back, return the output.

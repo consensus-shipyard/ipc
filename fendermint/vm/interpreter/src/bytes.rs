@@ -1,16 +1,15 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-use anyhow::{anyhow, Context};
+use anyhow::Context;
 use async_trait::async_trait;
 use cid::Cid;
-use fendermint_vm_genesis::Genesis;
 use fendermint_vm_message::chain::ChainMessage;
 use fvm_ipld_encoding::Error as IpldError;
 
 use crate::{
     chain::{ChainMessageApplyRet, ChainMessageCheckRes},
     fvm::{FvmQuery, FvmQueryRet},
-    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
+    CheckInterpreter, ExecInterpreter, ProposalInterpreter, QueryInterpreter,
 };
 
 pub type BytesMessageApplyRes = Result<ChainMessageApplyRet, IpldError>;
@@ -275,43 +274,4 @@ where
 
         Ok((state, Ok(ret)))
     }
-}
-
-#[async_trait]
-impl<I> GenesisInterpreter for BytesMessageInterpreter<I>
-where
-    I: GenesisInterpreter<Genesis = Genesis>,
-{
-    type State = I::State;
-    type Genesis = Vec<u8>;
-    type Output = I::Output;
-
-    async fn init(
-        &self,
-        state: Self::State,
-        genesis: Self::Genesis,
-    ) -> anyhow::Result<(Self::State, Self::Output)> {
-        // TODO (IPC-44): Handle the serialized application state as well as `Genesis`.
-        let genesis: Genesis = parse_genesis(&genesis)?;
-        self.inner.init(state, genesis).await
-    }
-}
-
-/// Parse the initial genesis either as JSON or CBOR.
-fn parse_genesis(bytes: &[u8]) -> anyhow::Result<Genesis> {
-    try_parse_genesis_json(bytes).or_else(|e1| {
-        try_parse_genesis_cbor(bytes)
-            .map_err(|e2| anyhow!("failed to deserialize genesis as JSON or CBOR: {e1}; {e2}"))
-    })
-}
-
-fn try_parse_genesis_json(bytes: &[u8]) -> anyhow::Result<Genesis> {
-    let json = String::from_utf8(bytes.to_vec())?;
-    let genesis = serde_json::from_str(&json)?;
-    Ok(genesis)
-}
-
-fn try_parse_genesis_cbor(bytes: &[u8]) -> anyhow::Result<Genesis> {
-    let genesis = fvm_ipld_encoding::from_slice(bytes)?;
-    Ok(genesis)
 }

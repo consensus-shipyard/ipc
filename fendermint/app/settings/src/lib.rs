@@ -263,10 +263,6 @@ pub struct Settings {
     snapshots_dir: PathBuf,
     /// Solidity contracts.
     contracts_dir: PathBuf,
-    /// Builtin-actors CAR file.
-    builtin_actors_bundle: PathBuf,
-    /// Custom actors CAR file.
-    custom_actors_bundle: PathBuf,
 
     /// Where to reach CometBFT for queries or broadcasting transactions.
     tendermint_rpc_url: Url,
@@ -291,13 +287,7 @@ pub struct Settings {
 }
 
 impl Settings {
-    home_relative!(
-        data_dir,
-        snapshots_dir,
-        contracts_dir,
-        builtin_actors_bundle,
-        custom_actors_bundle
-    );
+    home_relative!(data_dir, snapshots_dir, contracts_dir);
 
     /// Load the default configuration from a directory,
     /// then potential overrides specific to the run mode,
