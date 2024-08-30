@@ -71,6 +71,16 @@ pub enum BlobStatus {
     Failed,
 }
 
+impl fmt::Display for BlobStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BlobStatus::Added(epoch) => write!(f, "added({})", epoch),
+            BlobStatus::Resolved => write!(f, "resolved"),
+            BlobStatus::Failed => write!(f, "failed"),
+        }
+    }
+}
+
 /// An object used to determine what [`Account`](s) are accountable for a blob, and for how long.
 /// Subscriptions allow us to distribute the cost of a blob across multiple accounts that
 /// have added the same blob.   

@@ -15,7 +15,7 @@ use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
-use num_traits::{ToPrimitive, Zero};
+use num_traits::{Signed, ToPrimitive, Zero};
 
 const MIN_TTL: ChainEpoch = 3600; // one hour
 
@@ -137,6 +137,7 @@ impl State {
             .range((Unbounded, Included(current_epoch)))
             .map(|(expiry, subs)| (*expiry, subs.clone()))
             .collect();
+        let num_expiries = expiries.len();
         for (_, subs) in expiries {
             for (subscriber, hash) in subs {
                 let (_, delete) = self.delete_blob(subscriber, current_epoch, hash)?;
@@ -145,6 +146,8 @@ impl State {
                 }
             }
         }
+        log::debug!("deleted {} expired subscriptions", num_expiries);
+        log::debug!("{} blobs marked for deletion", delete_blobs.len());
         // Debit for existing usage
         for (address, account) in self.accounts.iter_mut() {
             let debit_blocks = current_epoch - account.last_debit_epoch;
@@ -153,7 +156,7 @@ impl State {
             self.credit_committed -= &debit;
             account.credit_committed -= &debit;
             account.last_debit_epoch = current_epoch;
-            log::debug!("account {} was debited {}", address, debit);
+            log::debug!("debited {} credits from {}", debit, address);
         }
         Ok(delete_blobs)
     }
@@ -201,6 +204,7 @@ impl State {
                 sub.expiry = expiry;
                 // Overwrite source allows sender to retry resolving
                 sub.source = source;
+                log::debug!("updated subscription to {} for {}", hash, sender);
             } else {
                 // One or more accounts have already committed credit.
                 // However, we still need to reserve the full required credit from the new
@@ -211,6 +215,7 @@ impl State {
                 new_account_capacity = size.clone();
                 // Add new subscription
                 blob.subs.insert(sender, Subscription { expiry, source });
+                log::debug!("created new subscription to {} for {}", hash, sender);
                 // Update expiry index
                 update_expiry_index(&mut self.expiries, sender, hash, Some(expiry), None)?;
             }
@@ -238,6 +243,8 @@ impl State {
                 status: BlobStatus::Added(current_epoch),
             };
             self.blobs.insert(hash, blob);
+            log::debug!("created new blob {}", hash);
+            log::debug!("created new subscription to {} for {}", hash, sender);
             // Update expiry index
             update_expiry_index(&mut self.expiries, sender, hash, Some(expiry), None)?;
             // Add to pending
@@ -250,12 +257,24 @@ impl State {
         self.credit_committed -= &debit;
         account.credit_committed -= &debit;
         account.last_debit_epoch = current_epoch;
+        log::debug!("debited {} credits from {}", debit, sender);
         // Account for new size and move free credit to committed credit
         self.capacity_used += &new_capacity;
+        log::debug!("used {} bytes from subnet", new_account_capacity);
         account.capacity_used += &new_account_capacity;
+        log::debug!("used {} bytes from {}", new_account_capacity, sender);
         self.credit_committed += &credit_required;
         account.credit_committed += &credit_required;
         account.credit_free -= &credit_required;
+        if credit_required.is_positive() {
+            log::debug!("committed {} credits from {}", credit_required, sender);
+        } else {
+            log::debug!(
+                "released {} credits to {}",
+                credit_required.magnitude(),
+                sender
+            );
+        }
         // We're done with the account, clone it for return
         let account = account.clone();
         Ok(account)
@@ -294,6 +313,8 @@ impl State {
             // The blob may have been deleted before it was finalized.
             return Ok(());
         };
+        // TODO: Hrm, we need to move `added_epoch` to the subscription there may be two pending
+        // adds, and currently only the second on will get refunded.
         let added_epoch = if let BlobStatus::Added(added_epoch) = blob.status {
             added_epoch
         } else {
@@ -307,6 +328,7 @@ impl State {
         ))?;
         // Update blob status
         blob.status = status;
+        log::debug!("finalized blob {} to status {}", hash, blob.status);
         if matches!(blob.status, BlobStatus::Failed) {
             let size = BigInt::from(blob.size);
             // We're not going to make a debit, but we need to refund
@@ -318,16 +340,20 @@ impl State {
                 let refund = refund_blocks as u64 * &size;
                 account.credit_free += &refund; // re-mint spent credit
                 self.credit_debited -= &refund;
+                log::debug!("refunded {} credits to {}", refund, from);
             }
             // Account for reclaimed size and move committed credit to
             // free credit
             self.capacity_used -= &size;
+            log::debug!("released {} bytes to subnet", size);
             account.capacity_used -= &size;
+            log::debug!("released {} bytes to {}", size, from);
             if sub.expiry > account.last_debit_epoch {
-                let credit_reclaimed = (sub.expiry - account.last_debit_epoch) * &size;
-                self.credit_committed -= &credit_reclaimed;
-                account.credit_committed -= &credit_reclaimed;
-                account.credit_free += &credit_reclaimed;
+                let reclaim = (sub.expiry - account.last_debit_epoch) * &size;
+                self.credit_committed -= &reclaim;
+                account.credit_committed -= &reclaim;
+                account.credit_free += &reclaim;
+                log::debug!("released {} credits to {}", reclaim, from);
             }
         }
         // Remove from pending
@@ -368,6 +394,7 @@ impl State {
             self.credit_committed -= &debit;
             account.credit_committed -= &debit;
             account.last_debit_epoch = debit_epoch;
+            log::debug!("debited {} credits from {}", debit, sender);
         }
         // Account for reclaimed size and move committed credit to free credit
         // If blob failed, capacity and committed credits have already been returned
@@ -376,13 +403,16 @@ impl State {
             account.capacity_used -= &size;
             if blob.subs.is_empty() {
                 self.capacity_used -= &size;
+                log::debug!("released {} bytes to subnet", size);
             }
-            // We can refund credits if expiry is in the future
+            log::debug!("released {} bytes to {}", size, sender);
+            // We can release credits if expiry is in the future
             if debit_epoch == current_epoch {
-                let credit_reclaimed = (sub.expiry - debit_epoch) * &size;
-                self.credit_committed -= &credit_reclaimed;
-                account.credit_committed -= &credit_reclaimed;
-                account.credit_free += &credit_reclaimed;
+                let reclaim = (sub.expiry - debit_epoch) * &size;
+                self.credit_committed -= &reclaim;
+                account.credit_committed -= &reclaim;
+                account.credit_free += &reclaim;
+                log::debug!("released {} credits to {}", reclaim, sender);
             }
         }
         // We're done with the account, clone it for return
@@ -391,10 +421,12 @@ impl State {
         update_expiry_index(&mut self.expiries, sender, hash, None, Some(sub.expiry))?;
         // Delete subscription
         blob.subs.remove(&sender);
+        log::debug!("deleted subscription to {} for {}", hash, sender);
         // Delete or update blob
         let delete_blob = blob.subs.is_empty();
         if delete_blob {
             self.blobs.remove(&hash);
+            log::debug!("deleted blob {}", hash);
             // Remove from pending
             self.pending.remove(&hash);
         }
