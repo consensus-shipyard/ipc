@@ -33,6 +33,9 @@ pub enum IpcMessage {
 
     /// Proposed by validators when a blob has been finalized and is ready to be executed.
     BlobFinalized(Blob),
+
+    /// Proposed by validators at the credit debit interval set at genesis.
+    DebitCreditAccounts,
 }
 
 /// A message relayed by a user on the current subnet.
@@ -111,6 +114,8 @@ pub struct ParentFinality {
 /// A blob resolution target that the validators will be voting on.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct Blob {
+    /// The address that requested the blob.
+    pub from: Address,
     /// The blake3 hash of the blob.
     pub hash: Hash,
     /// The node ID of the source node serving validators the blob.

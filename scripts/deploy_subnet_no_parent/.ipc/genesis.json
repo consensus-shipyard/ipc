@@ -39,6 +39,7 @@
     "network_version": 21,
     "power_scale": 3,
     "timestamp": 1412713,
-    "validators": []
+    "validators": [],
+    "credit_debit_interval": 10
   }
 }

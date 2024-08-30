@@ -1,14 +1,24 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
+use crate::fvm::state::ipc::GatewayCaller;
+use crate::fvm::{topdown, FvmApplyRet, PowerUpdates};
+use crate::{
+    fvm::state::FvmExecState,
+    fvm::store::ReadOnlyBlockstore,
+    fvm::FvmMessage,
+    signed::{SignedMessageApplyRes, SignedMessageCheckRes, SyntheticMessage, VerifiableMessage},
+    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
+};
 use anyhow::{anyhow, bail, Context};
 use async_stm::atomically;
 use async_trait::async_trait;
 use fendermint_actor_blobs_shared::params::GetBlobParams;
 use fendermint_actor_blobs_shared::state::BlobStatus;
+use fendermint_actor_blobs_shared::Method::DebitAccounts;
 use fendermint_actor_blobs_shared::{
     params::FinalizeBlobParams,
     Method::{FinalizeBlob, GetBlobStatus, GetPendingBlobs},
@@ -33,6 +43,7 @@ use fendermint_vm_topdown::{
 };
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
+use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::message::Message;
@@ -41,16 +52,6 @@ use iroh::blobs::Hash;
 use iroh::net::NodeId;
 use num_traits::Zero;
 use tokio_util::bytes;
-
-use crate::fvm::state::ipc::GatewayCaller;
-use crate::fvm::{topdown, FvmApplyRet, PowerUpdates};
-use crate::{
-    fvm::state::FvmExecState,
-    fvm::store::ReadOnlyBlockstore,
-    fvm::FvmMessage,
-    signed::{SignedMessageApplyRes, SignedMessageCheckRes, SyntheticMessage, VerifiableMessage},
-    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
-};
 
 /// A resolution pool for bottom-up and top-down checkpoints.
 pub type CheckpointPool = ResolvePool<CheckpointPoolItem>;
@@ -91,6 +92,7 @@ impl From<&CheckpointPoolItem> for ResolveKey {
 
 #[derive(Clone, Hash, PartialEq, Eq)]
 pub struct BlobPoolItem {
+    from: Address,
     hash: Hash,
     source: NodeId,
 }
@@ -224,9 +226,18 @@ where
             .state_tree_mut()
             .end_transaction(true)
             .expect("we just started a transaction");
-        for (hash, source) in resolving_blobs {
-            atomically(|| env.blob_pool.add(BlobPoolItem { hash, source })).await;
-            tracing::debug!(hash = ?hash, "blob added to pool");
+        for (hash, sources) in resolving_blobs {
+            for (from, source) in sources {
+                atomically(|| env.blob_pool.add(BlobPoolItem { from, hash, source })).await;
+                tracing::debug!(hash = ?hash, from = ?from, "blob added to pool");
+            }
+        }
+
+        // Maybe debit all credit accounts
+        let current_height = state.block_height();
+        let debit_interval = state.credit_debit_interval();
+        if current_height > 0 && debit_interval > 0 && current_height % debit_interval == 0 {
+            msgs.push(ChainMessage::Ipc(IpcMessage::DebitCreditAccounts));
         }
 
         // Collect locally completed blobs from the pool. We're relying on the proposer's local
@@ -260,6 +271,7 @@ where
                 if is_globally_finalized {
                     tracing::debug!(hash = ?item.hash, "blob has quorum; adding tx to chain");
                     blobs.push(ChainMessage::Ipc(IpcMessage::BlobFinalized(Blob {
+                        from: item.from,
                         hash: item.hash,
                         source: item.source,
                         succeeded,
@@ -325,18 +337,13 @@ where
                     }
                 }
                 ChainMessage::Ipc(IpcMessage::BlobFinalized(blob)) => {
-                    let item = BlobPoolItem {
-                        hash: blob.hash,
-                        source: blob.source,
-                    };
-
                     // Ensure that the blob is ready to be included on-chain.
                     // We can accept the proposal if the blob has reached a global quorum and is
                     // not yet finalized.
                     // Start a blockstore transaction that can be reverted.
                     state.state_tree_mut().begin_transaction();
-                    if !is_blob_pending(&mut state, item.hash)? {
-                        tracing::debug!(hash = ?item.hash, "blob is already finalized on chain; rejecting proposal");
+                    if !is_blob_pending(&mut state, blob.hash)? {
+                        tracing::debug!(hash = ?blob.hash, "blob is already finalized on chain; rejecting proposal");
                         return Ok(false);
                     }
                     state
@@ -346,7 +353,7 @@ where
 
                     let (is_globally_finalized, succeeded) = atomically(|| {
                         env.parent_finality_votes
-                            .find_blob_quorum(&item.hash.as_bytes().to_vec())
+                            .find_blob_quorum(&blob.hash.as_bytes().to_vec())
                     })
                     .await;
                     if !is_globally_finalized {
@@ -364,6 +371,11 @@ where
                     }
 
                     // Remove from pool if locally resolved
+                    let item = BlobPoolItem {
+                        from: blob.from,
+                        hash: blob.hash,
+                        source: blob.source,
+                    };
                     let is_locally_finalized =
                         atomically(|| match env.blob_pool.get_status(&item)? {
                             None => Ok(false),
@@ -371,10 +383,26 @@ where
                         })
                         .await;
                     if is_locally_finalized {
-                        tracing::debug!(hash = ?item.hash, "blob is locally finalized; removing from pool");
+                        tracing::debug!(hash = ?blob.hash, "blob is locally finalized; removing from pool");
                         atomically(|| env.blob_pool.remove(&item)).await;
                     } else {
-                        tracing::debug!(hash = ?item.hash, "blob is not locally finalized");
+                        tracing::debug!(hash = ?blob.hash, "blob is not locally finalized");
+                    }
+                }
+                ChainMessage::Ipc(IpcMessage::DebitCreditAccounts) => {
+                    // Ensure that this is a valid height to debit accounts
+                    let current_height = state.block_height();
+                    let debit_interval = state.credit_debit_interval();
+                    if !(current_height > 0
+                        && debit_interval > 0
+                        && current_height % debit_interval == 0)
+                    {
+                        tracing::debug!(
+                            interval = ?debit_interval,
+                            height = ?current_height,
+                            "invalid height for credit debit; rejecting proposal"
+                        );
+                        return Ok(false);
                     }
                 }
                 _ => {}
@@ -566,7 +594,11 @@ where
                     } else {
                         BlobStatus::Failed
                     };
-                    let params = FinalizeBlobParams { hash, status };
+                    let params = FinalizeBlobParams {
+                        from: blob.from,
+                        hash,
+                        status,
+                    };
                     let params = RawBytes::serialize(params)?;
                     let msg = Message {
                         version: Default::default(),
@@ -603,6 +635,56 @@ where
                         hash = ?blob.hash,
                         "chain interpreter has finalized blob"
                     );
+
+                    let ret = FvmApplyRet {
+                        apply_ret,
+                        from: system::SYSTEM_ACTOR_ADDR,
+                        to,
+                        method_num,
+                        gas_limit,
+                        emitters,
+                    };
+
+                    Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
+                }
+                IpcMessage::DebitCreditAccounts => {
+                    let from = system::SYSTEM_ACTOR_ADDR;
+                    let to = blobs::BLOBS_ACTOR_ADDR;
+                    let method_num = DebitAccounts as u64;
+                    let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
+
+                    let msg = Message {
+                        version: Default::default(),
+                        from,
+                        to,
+                        sequence: 0, // We will use implicit execution which doesn't check or modify this.
+                        value: Default::default(),
+                        method_num,
+                        params: Default::default(),
+                        gas_limit,
+                        gas_fee_cap: Default::default(),
+                        gas_premium: Default::default(),
+                    };
+
+                    let (apply_ret, emitters) = state.execute_implicit(msg)?;
+
+                    let info = apply_ret
+                        .failure_info
+                        .clone()
+                        .map(|i| i.to_string())
+                        .filter(|s| !s.is_empty());
+                    tracing::info!(
+                        exit_code = apply_ret.msg_receipt.exit_code.value(),
+                        from = from.to_string(),
+                        to = to.to_string(),
+                        method_num = method_num,
+                        gas_limit = gas_limit,
+                        gas_used = apply_ret.msg_receipt.gas_used,
+                        info = info.unwrap_or_default(),
+                        "implicit tx delivered"
+                    );
+
+                    tracing::debug!("chain interpreter debited accounts");
 
                     let ret = FvmApplyRet {
                         apply_ret,
@@ -689,7 +771,8 @@ where
                     }
                     IpcMessage::TopDownExec(_)
                     | IpcMessage::BottomUpExec(_)
-                    | IpcMessage::BlobFinalized(_) => {
+                    | IpcMessage::BlobFinalized(_)
+                    | IpcMessage::DebitCreditAccounts => {
                         // Users cannot send these messages, only validators can propose them in blocks.
                         Ok((state, Err(IllegalMessage)))
                     }
@@ -771,7 +854,7 @@ fn relayed_bottom_up_ckpt_to_fvm(
 /// This approach uses an implicit FVM transaction to query a read-only blockstore.
 fn get_pending_blobs<DB>(
     state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
-) -> anyhow::Result<BTreeMap<Hash, PublicKey>>
+) -> anyhow::Result<BTreeMap<Hash, HashSet<(Address, PublicKey)>>>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
@@ -790,8 +873,8 @@ where
     let (apply_ret, _) = state.execute_implicit(msg)?;
 
     let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
-    fvm_ipld_encoding::from_slice::<BTreeMap<Hash, PublicKey>>(&data)
-        .map_err(|e| anyhow!("error parsing as BTreeMap<Hash, PublicKey>: {e}"))
+    fvm_ipld_encoding::from_slice::<BTreeMap<Hash, HashSet<(Address, PublicKey)>>>(&data)
+        .map_err(|e| anyhow!("error parsing as BTreeMap<Hash, HashSet<(Address, PublicKey)>: {e}"))
 }
 
 /// Check if a blob is pending (if it is not resolved or failed), by reading its on-chain state.

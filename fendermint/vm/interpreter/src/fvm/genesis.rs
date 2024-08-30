@@ -22,6 +22,7 @@ use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Genesis, Power, PowerScale, Validator};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::chainid::ChainID;
+use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
 use ipc_actors_abis::i_diamond::FacetCut;
@@ -41,6 +42,7 @@ pub struct FvmGenesisOutput {
     pub power_scale: PowerScale,
     pub circ_supply: TokenAmount,
     pub validators: Vec<Validator<Power>>,
+    pub credit_debit_interval: ChainEpoch,
 }
 
 #[async_trait]
@@ -108,6 +110,7 @@ where
             base_fee: genesis.base_fee,
             power_scale: genesis.power_scale,
             validators,
+            credit_debit_interval: genesis.credit_debit_interval,
         };
 
         // STAGE 0: Declare the built-in EVM contracts we'll have to deploy.
@@ -340,6 +343,7 @@ where
                 out.circ_supply.clone(),
                 out.chain_id.into(),
                 out.power_scale,
+                out.credit_debit_interval,
             )
             .context("failed to init exec state")?;
 

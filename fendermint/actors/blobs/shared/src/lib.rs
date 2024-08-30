@@ -23,6 +23,7 @@ pub enum Method {
     GetStats = frc42_dispatch::method_hash!("GetStats"),
     BuyCredit = frc42_dispatch::method_hash!("BuyCredit"),
     GetAccount = frc42_dispatch::method_hash!("GetAccount"),
+    DebitAccounts = frc42_dispatch::method_hash!("DebitAccounts"),
     AddBlob = frc42_dispatch::method_hash!("AddBlob"),
     GetBlob = frc42_dispatch::method_hash!("GetBlob"),
     GetBlobStatus = frc42_dispatch::method_hash!("GetBlobStatus"),
@@ -37,14 +38,14 @@ pub fn add_blob(
     source: state::PublicKey,
     hash: state::Hash,
     size: u64,
-    expiry: ChainEpoch,
+    ttl: ChainEpoch,
 ) -> Result<(), ActorError> {
     let add_params = IpldBlock::serialize_cbor(&params::AddBlobParams {
         from: Some(from),
         source,
         hash,
         size,
-        expiry,
+        ttl,
     })?;
     extract_send_result(rt.send_simple(
         &BLOBS_ACTOR_ADDR,
@@ -64,11 +65,14 @@ pub fn get_blob(rt: &impl Runtime, hash: state::Hash) -> Result<state::Blob, Act
     ))?)
 }
 
-pub fn delete_blob(rt: &impl Runtime, hash: state::Hash) -> Result<(), ActorError> {
+pub fn delete_blob(rt: &impl Runtime, from: Address, hash: state::Hash) -> Result<(), ActorError> {
     extract_send_result(rt.send_simple(
         &BLOBS_ACTOR_ADDR,
         Method::DeleteBlob as MethodNum,
-        IpldBlock::serialize_cbor(&params::DeleteBlobParams(hash))?,
+        IpldBlock::serialize_cbor(&params::DeleteBlobParams {
+            from: Some(from),
+            hash,
+        })?,
         rt.message().value_received(),
     ))?;
     Ok(())

@@ -32,8 +32,8 @@ pub struct AddBlobParams {
     pub hash: Hash,
     /// Blob size.
     pub size: u64,
-    /// Blob expiry epoch.
-    pub expiry: ChainEpoch,
+    /// Blob time-to-live epochs.
+    pub ttl: ChainEpoch,
 }
 
 /// Params for getting a blob.
@@ -44,6 +44,9 @@ pub struct GetBlobParams(pub Hash);
 /// Params for finalizing a blob.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct FinalizeBlobParams {
+    /// The origin address that requested the blob.
+    /// This could be a wallet or machine.
+    pub from: Address,
     /// Blob blake3 hash.
     pub hash: Hash,
     /// The status to set as final.
@@ -51,9 +54,13 @@ pub struct FinalizeBlobParams {
 }
 
 /// Params for deleting a blob.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct DeleteBlobParams(pub Hash);
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct DeleteBlobParams {
+    /// Robust address of caller. Required if the caller is a machine.
+    pub from: Option<Address>,
+    /// Blob blake3 hash.
+    pub hash: Hash,
+}
 
 /// The stats of the blob actor.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
