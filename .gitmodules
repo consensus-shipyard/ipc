@@ -36,4 +36,4 @@
 	url = https://github.com/openzeppelin/openzeppelin-contracts-upgradeable
 [submodule "builtin-actors"]
 	path = builtin-actors
-	url = git@github.com:amazingdatamachine/builtin-actors.git
+	url = git@github.com:hokunet/builtin-actors.git
