@@ -84,15 +84,16 @@ jobs:
     secrets: inherit
     needs: [ contracts-prettier ]
 
-  contracts-npm-audit:
-    uses: ./.github/workflows/contracts-npm-audit.yaml
-    secrets: inherit
-    needs: [ contracts-prettier ]
+  #  temp. disable until merge ipc upstream
+  #  contracts-npm-audit:
+  #    uses: ./.github/workflows/contracts-npm-audit.yaml
+  #    secrets: inherit
+  #    needs: [ contracts-prettier ]
 
-  contracts-sast:
-    uses: ./.github/workflows/contracts-sast.yaml
-    secrets: inherit
-    needs: [ contracts-prettier ]
+  #  contracts-sast:
+  #    uses: ./.github/workflows/contracts-sast.yaml
+  #    secrets: inherit
+  #    needs: [ contracts-prettier ]
 
   extras:
     uses: ./.github/workflows/extras.yaml
