@@ -211,6 +211,19 @@ $ cat test-network/genesis.json | jq .ipc
 }
 ```
 
+### Seal Genesis State
+After the genesis file has been created, seal the genesis state and dump to a car file.
+
+```shell
+cargo run -p fendermint_app --release -- \
+  genesis --genesis-file test-network/genesis.json \
+  ipc \
+    seal-genesis \
+      --builtin-actors-path fendermint/builtin-actors/output/bundle.car \
+      --custom-actors-path fendermint/actors/output/custom_actors_bundle.car \
+      --output-path test-network/sealed.car
+```
+
 ### Configure CometBFT
 
 First, follow the instructions in [getting started with CometBFT](./tendermint.md) to install the binary,
@@ -238,7 +251,8 @@ file we created earlier to the format CometBFT accepts. Start with the genesis f
 mv ~/.cometbft/config/genesis.json ~/.cometbft/config/genesis.json.orig
 cargo run -p fendermint_app --release -- \
   genesis --genesis-file test-network/genesis.json \
-  into-tendermint --out ~/.cometbft/config/genesis.json
+  into-tendermint --out ~/.cometbft/config/genesis.json \
+  --app-state test-network/sealed.car
 ```
 
 Check the contents of the created Comet BFT Genesis file:
