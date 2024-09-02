@@ -337,7 +337,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
                 activeValidatorsLimit: 100,
                 powerScale: 12,
                 permissionMode: PermissionMode.Collateral,
-                supplySource: native
+                supplySource: native,
+                validatorGater: address(0)
             }),
             address(saDupGetterFaucet),
             address(saDupMangerFaucet),
@@ -1809,7 +1810,9 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         address owner = address(1);
 
         vm.prank(owner);
-        SubnetValidatorGater gater = new SubnetValidatorGater(id);
+        SubnetValidatorGater gater = new SubnetValidatorGater();
+        vm.prank(owner);
+        gater.setSubnet(id);
 
         saDiamond.manager().setValidatorGater(address(gater));
 
@@ -1817,7 +1820,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE * 3);
         vm.prank(validator);
-        vm.expectRevert(PowerChangeRequestNotApproved.selector);
+        vm.expectRevert(ValidatorPowerChangeDenied.selector);
         saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey);
 
         // now approve the join
@@ -1830,7 +1833,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         // add stake not allowed exceed allowed range
         vm.prank(validator);
-        vm.expectRevert(PowerChangeRequestNotApproved.selector);
+        vm.expectRevert(ValidatorPowerChangeDenied.selector);
         saDiamond.manager().stake{value: DEFAULT_MIN_VALIDATOR_STAKE + 1}();
 
         // add stake should be ok
@@ -1839,7 +1842,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         // unstake not allowed as below allowed range
         vm.prank(validator);
-        vm.expectRevert(PowerChangeRequestNotApproved.selector);
+        vm.expectRevert(ValidatorPowerChangeDenied.selector);
         saDiamond.manager().unstake(DEFAULT_MIN_VALIDATOR_STAKE * 2 - 1);
 
         // unstake ok because within range
@@ -1848,7 +1851,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         // leave not allowed as below allowed range
         vm.prank(validator);
-        vm.expectRevert(PowerChangeRequestNotApproved.selector);
+        vm.expectRevert(ValidatorPowerChangeDenied.selector);
         saDiamond.manager().leave();
 
         // update allowed range
@@ -1861,6 +1864,11 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testSubnetActorDiamond_ValidatorGater_federatedLiftCycle() public {
+        address owner = address(1);
+
+        vm.prank(owner);
+        SubnetValidatorGater gater = new SubnetValidatorGater();
+
         gatewayAddress = address(gatewayDiamond);
         createSubnetActor(
             gatewayAddress,
@@ -1870,15 +1878,13 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             DEFAULT_CHECKPOINT_PERIOD,
             DEFAULT_MAJORITY_PERCENTAGE,
             PermissionMode.Federated,
-            2
+            2,
+            address(gater)
         );
 
         SubnetID memory id = subnet_id(address(saDiamond));
-        address owner = address(1);
-
         vm.prank(owner);
-        SubnetValidatorGater gater = new SubnetValidatorGater(id);
-        saDiamond.manager().setValidatorGater(address(gater));
+        gater.setSubnet(id);
 
         (address[] memory validators, , bytes[] memory publicKeys) = TestUtils.newValidators(3);
         uint256[] memory powers = new uint256[](3);
@@ -1886,7 +1892,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         powers[1] = 20000;
         powers[2] = 5000; // we only have 2 active validators, validator 2 does not have enough power
 
-        vm.expectRevert(PowerChangeRequestNotApproved.selector);
+        vm.expectRevert(ValidatorPowerChangeDenied.selector);
         saDiamond.manager().setFederatedPower(validators, publicKeys, powers);
 
         vm.prank(owner);

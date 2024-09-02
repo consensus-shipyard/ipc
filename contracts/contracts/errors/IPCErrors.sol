@@ -79,7 +79,7 @@ error MethodNotAllowed(string reason);
 error InvalidFederationPayload();
 error DuplicatedGenesisValidator();
 error NotEnoughGenesisValidators();
-error PowerChangeRequestNotApproved();
+error ValidatorPowerChangeDenied();
 
 enum InvalidXnetMessageReason {
     Sender,

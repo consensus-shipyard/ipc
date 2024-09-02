@@ -4,11 +4,11 @@ pragma solidity ^0.8.23;
 import {Test} from "forge-std/Test.sol";
 
 import {SubnetID} from "../../contracts/structs/Subnet.sol";
-import {SubnetValidatorGater, InvalidSubnet, PowerChangeRequestNotApproved, NotAuthorized} from "../../contracts/examples/SubnetValidatorGater.sol";
+import {SubnetValidatorGater, InvalidSubnet, ValidatorPowerChangeDenied, NotAuthorized} from "../../contracts/examples/SubnetValidatorGater.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract SubnetValidatorGaterTest is Test {
-    function subnet_id(address baseRoute) internal view returns (SubnetID memory id) {
+    function subnet_id(address baseRoute) internal pure returns (SubnetID memory id) {
         address[] memory route = new address[](1);
         route[0] = baseRoute;
 
@@ -18,7 +18,8 @@ contract SubnetValidatorGaterTest is Test {
     function test_gater_approve_works() public {
         SubnetID memory id = subnet_id(address(this));
 
-        SubnetValidatorGater gater = new SubnetValidatorGater(id);
+        SubnetValidatorGater gater = new SubnetValidatorGater();
+        gater.setSubnet(id);
 
         address validator = address(1);
         uint256 minPower = 100;
@@ -30,7 +31,8 @@ contract SubnetValidatorGaterTest is Test {
     function test_gater_approve_not_owner() public {
         SubnetID memory id = subnet_id(address(this));
 
-        SubnetValidatorGater gater = new SubnetValidatorGater(id);
+        SubnetValidatorGater gater = new SubnetValidatorGater();
+        gater.setSubnet(id);
 
         address validator = address(1);
         uint256 minPower = 100;
@@ -47,7 +49,8 @@ contract SubnetValidatorGaterTest is Test {
     function test_gater_intercept_ok() public {
         SubnetID memory id = subnet_id(address(this));
 
-        SubnetValidatorGater gater = new SubnetValidatorGater(id);
+        SubnetValidatorGater gater = new SubnetValidatorGater();
+        gater.setSubnet(id);
 
         address validator = address(1);
         uint256 minPower = 100;
@@ -58,14 +61,15 @@ contract SubnetValidatorGaterTest is Test {
 
         gater.interceptPowerDelta(id, validator, 0, 110);
 
-        vm.expectRevert(PowerChangeRequestNotApproved.selector);
+        vm.expectRevert(ValidatorPowerChangeDenied.selector);
         gater.interceptPowerDelta(id, validator, 0, 210);
     }
 
     function test_gater_intercept_invalid_subnet() public {
         SubnetID memory id = subnet_id(address(this));
 
-        SubnetValidatorGater gater = new SubnetValidatorGater(id);
+        SubnetValidatorGater gater = new SubnetValidatorGater();
+        gater.setSubnet(id);
 
         address validator = address(1);
         uint256 minPower = 100;
@@ -81,7 +85,8 @@ contract SubnetValidatorGaterTest is Test {
     function test_gater_intercept_not_authorized() public {
         SubnetID memory id = subnet_id(address(this));
 
-        SubnetValidatorGater gater = new SubnetValidatorGater(id);
+        SubnetValidatorGater gater = new SubnetValidatorGater();
+        gater.setSubnet(id);
 
         address validator = address(1);
         uint256 minPower = 100;

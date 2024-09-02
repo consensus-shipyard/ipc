@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {IValidatorGater} from "../interfaces/IValidatorGater.sol";
-import {InvalidSubnet, NotAuthorized, PowerChangeRequestNotApproved} from "../errors/IPCErrors.sol";
+import {InvalidSubnet, NotAuthorized, ValidatorPowerChangeDenied} from "../errors/IPCErrors.sol";
 import {SubnetID} from "../structs/Subnet.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
@@ -21,8 +21,10 @@ contract SubnetValidatorGater is IValidatorGater, Ownable {
     SubnetID public subnet;
     mapping(address => PowerRange) public allowed;
 
-    constructor(SubnetID memory _subnet) Ownable(msg.sender) {
-        subnet = _subnet;
+    constructor() Ownable(msg.sender) {}
+
+    function setSubnet(SubnetID calldata id) external onlyOwner {
+        subnet = id;
     }
 
     function isAllow(address validator, uint256 power) public view returns (bool) {
@@ -57,7 +59,7 @@ contract SubnetValidatorGater is IValidatorGater, Ownable {
         }
 
         if (!isAllow(validator, newPower)) {
-            revert PowerChangeRequestNotApproved();
+            revert ValidatorPowerChangeDenied();
         }
     }
 }
