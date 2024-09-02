@@ -254,6 +254,7 @@ impl IpcProvider {
         min_cross_msg_fee: TokenAmount,
         permission_mode: PermissionMode,
         supply_source: SupplySource,
+        validator_gater: Address,
     ) -> anyhow::Result<Address> {
         let conn = self.get_connection(&parent)?;
 
@@ -271,6 +272,7 @@ impl IpcProvider {
             min_cross_msg_fee,
             permission_mode,
             supply_source,
+            validator_gater,
         };
 
         conn.manager()

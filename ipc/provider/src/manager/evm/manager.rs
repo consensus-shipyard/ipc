@@ -276,6 +276,7 @@ impl SubnetManager for EthSubnetManager {
             power_scale: 3,
             permission_mode: params.permission_mode as u8,
             supply_source: register_subnet_facet::SupplySource::try_from(params.supply_source)?,
+            validator_gater: payload_to_evm_address(params.validator_gater.payload())?,
         };
 
         tracing::info!("creating subnet on evm with params: {params:?}");
