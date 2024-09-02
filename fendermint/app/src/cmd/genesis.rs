@@ -36,24 +36,25 @@ cmd! {
 }
 
 cmd! {
-  GenesisNewArgs(self, genesis_file: PathBuf) {
-    let genesis = Genesis {
-      timestamp: Timestamp(self.timestamp),
-      chain_name: self.chain_name.clone(),
-      network_version: self.network_version,
-      base_fee: self.base_fee.clone(),
-      power_scale: self.power_scale,
-      validators: Vec::new(),
-      accounts: Vec::new(),
-      eam_permission_mode: PermissionMode::Unrestricted,
-      ipc: None,
-      credit_debit_interval: self.credit_debit_interval,
-    };
+    GenesisNewArgs(self, genesis_file: PathBuf) {
+        let genesis = Genesis {
+            timestamp: Timestamp(self.timestamp),
+            chain_name: self.chain_name.clone(),
+            network_version: self.network_version,
+            base_fee: self.base_fee.clone(),
+            power_scale: self.power_scale,
+            validators: Vec::new(),
+            accounts: Vec::new(),
+            eam_permission_mode: PermissionMode::Unrestricted,
+            ipc: None,
+            credit_debit_interval: self.credit_debit_interval,
+            blob_storage_capacity: self.blob_storage_capacity,
+            blob_debit_rate: self.blob_debit_rate,
+        };
 
-    let json = serde_json::to_string_pretty(&genesis)?;
-    std::fs::write(genesis_file, json)?;
-
-    Ok(())
+        let json = serde_json::to_string_pretty(&genesis)?;
+        std::fs::write(genesis_file, json)?;
+        Ok(())
   }
 }
 
@@ -328,6 +329,8 @@ async fn new_genesis_from_parent(
         eam_permission_mode: PermissionMode::Unrestricted,
         ipc: Some(ipc_params),
         credit_debit_interval: args.credit_debit_interval,
+        blob_storage_capacity: args.blob_storage_capacity,
+        blob_debit_rate: args.blob_debit_rate,
     };
 
     for v in genesis_info.validators {

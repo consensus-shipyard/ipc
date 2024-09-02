@@ -43,6 +43,8 @@ pub struct FvmGenesisOutput {
     pub circ_supply: TokenAmount,
     pub validators: Vec<Validator<Power>>,
     pub credit_debit_interval: ChainEpoch,
+    pub blob_storage_capacity: u64,
+    pub blob_debit_rate: u64,
 }
 
 #[async_trait]
@@ -111,6 +113,8 @@ where
             power_scale: genesis.power_scale,
             validators,
             credit_debit_interval: genesis.credit_debit_interval,
+            blob_storage_capacity: genesis.blob_storage_capacity,
+            blob_debit_rate: genesis.blob_debit_rate,
         };
 
         // STAGE 0: Declare the built-in EVM contracts we'll have to deploy.
@@ -280,11 +284,10 @@ where
             .context("failed to create chainmetadata actor")?;
 
         // Initialize the blobs actor.
-        // Make rate a config?
-        // Currently using 1e18, i.e., one atto token (1e-18 tokens) buys you one byte-block,
-        // i.e., you can store one byte for one block.
-        let capacity = 1024 * 1024 * 1024u64;
-        let blobs_state = fendermint_actor_blobs::State::new(capacity, 1)?;
+        let blobs_state = fendermint_actor_blobs::State::new(
+            genesis.blob_storage_capacity,
+            genesis.blob_debit_rate,
+        )?;
         state
             .create_custom_actor(
                 fendermint_actor_blobs::BLOBS_ACTOR_NAME,
@@ -344,6 +347,8 @@ where
                 out.chain_id.into(),
                 out.power_scale,
                 out.credit_debit_interval,
+                out.blob_storage_capacity,
+                out.blob_debit_rate,
             )
             .context("failed to init exec state")?;
 
