@@ -12,7 +12,7 @@ use fil_actors_runtime::runtime::builtins::Type;
 use fil_actors_runtime::{
     actor_dispatch, actor_error, deserialize_block,
     runtime::{ActorCode, Runtime},
-    ActorDowncast, ActorError, AsActorError, FIRST_EXPORTED_METHOD_NUMBER, SYSTEM_ACTOR_ADDR,
+    ActorError, AsActorError, FIRST_EXPORTED_METHOD_NUMBER, SYSTEM_ACTOR_ADDR,
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::address::Address;
@@ -31,23 +31,20 @@ pub struct BlobsActor;
 impl BlobsActor {
     fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        let state = State::new(params.capacity, params.debit_rate)
-            .map_err(to_state_error("failed to construct empty store"))?;
+        let state = State::new(params.capacity, params.debit_rate);
         rt.create(&state)
     }
 
     fn get_stats(rt: &impl Runtime) -> Result<GetStatsReturn, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        rt.state::<State>()?
-            .get_stats(rt.current_balance())
-            .map_err(to_state_error("failed to get stats"))
+        let stats = rt.state::<State>()?.get_stats(rt.current_balance());
+        Ok(stats)
     }
 
     fn buy_credit(rt: &impl Runtime, params: BuyCreditParams) -> Result<Account, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         rt.transaction(|st: &mut State, rt| {
             st.buy_credit(params.0, rt.message().value_received(), rt.curr_epoch())
-                .map_err(to_state_error("failed to buy credit"))
         })
     }
 
@@ -56,17 +53,13 @@ impl BlobsActor {
         params: GetAccountParams,
     ) -> Result<Option<Account>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        rt.state::<State>()?
-            .get_account(params.0)
-            .map_err(to_state_error("failed to get account"))
+        let account = rt.state::<State>()?.get_account(params.0);
+        Ok(account)
     }
 
     fn debit_accounts(rt: &impl Runtime) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        let deletes = rt.transaction(|st: &mut State, _| {
-            st.debit_accounts(rt.curr_epoch())
-                .map_err(to_state_error("failed to debit accounts"))
-        })?;
+        let deletes = rt.transaction(|st: &mut State, _| st.debit_accounts(rt.curr_epoch()))?;
         for hash in deletes {
             delete_from_disc(hash)?;
         }
@@ -85,15 +78,13 @@ impl BlobsActor {
                 params.ttl,
                 params.source,
             )
-            .map_err(to_state_error("failed to add blob"))
         })
     }
 
     fn get_blob(rt: &impl Runtime, params: GetBlobParams) -> Result<Option<Blob>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        rt.state::<State>()?
-            .get_blob(params.0)
-            .map_err(to_state_error("failed to get blob"))
+        let blob = rt.state::<State>()?.get_blob(params.0);
+        Ok(blob)
     }
 
     fn get_blob_status(
@@ -101,10 +92,8 @@ impl BlobsActor {
         params: GetBlobParams,
     ) -> Result<Option<BlobStatus>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        rt.state::<State>()?
-            .get_blob(params.0)
-            .map_err(to_state_error("failed to get blob"))
-            .map(|b| b.map(|b| b.status))
+        let status = rt.state::<State>()?.get_blob(params.0).map(|b| b.status);
+        Ok(status)
     }
 
     // TODO: limit return via param
@@ -112,16 +101,14 @@ impl BlobsActor {
         rt: &impl Runtime,
     ) -> Result<BTreeMap<Hash, HashSet<(Address, PublicKey)>>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        rt.state::<State>()?
-            .get_pending_blobs()
-            .map_err(to_state_error("failed to get resolving blobs"))
+        let pending = rt.state::<State>()?.get_pending_blobs();
+        Ok(pending)
     }
 
     fn finalize_blob(rt: &impl Runtime, params: FinalizeBlobParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
         rt.transaction(|st: &mut State, _| {
             st.finalize_blob(params.from, params.hash, params.status)
-                .map_err(to_state_error("failed to finalize blob"))
         })
     }
 
@@ -130,7 +117,6 @@ impl BlobsActor {
         let caller = resolve_caller(rt, params.from)?;
         let (account, delete) = rt.transaction(|st: &mut State, _| {
             st.delete_blob(caller, rt.curr_epoch(), params.hash)
-                .map_err(to_state_error("failed to delete blob"))
         })?;
         if delete {
             delete_from_disc(params.hash)?;
@@ -151,10 +137,6 @@ impl BlobsActor {
             Err(actor_error!(unhandled_message; "invalid method: {}", method))
         }
     }
-}
-
-fn to_state_error(message: &'static str) -> impl FnOnce(anyhow::Error) -> ActorError {
-    move |e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, message)
 }
 
 fn delete_from_disc(hash: Hash) -> Result<(), ActorError> {

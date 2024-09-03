@@ -97,7 +97,7 @@ pub struct Object {
 #[derive(Default, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ListObjectsReturn {
     /// List of key-values matching the list query.
-    pub objects: Vec<(Vec<u8>, Object)>,
+    pub objects: Vec<(Vec<u8>, Option<Object>)>,
     /// When a delimiter is used in the list query, this contains common key prefixes.
     pub common_prefixes: Vec<Vec<u8>>,
 }

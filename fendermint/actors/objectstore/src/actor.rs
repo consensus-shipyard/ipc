@@ -93,10 +93,13 @@ impl Actor {
     fn get_object(rt: &impl Runtime, params: GetParams) -> Result<Option<Object>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         if let Some(object_state) = retrieve_object_state(rt, &BytesKey(params.0))? {
-            let blob = get_blob(rt, object_state.hash)?;
-            let object = build_object(&blob, &object_state)
-                .map_err(to_state_error("failed to build object"))?;
-            Ok(object)
+            if let Some(blob) = get_blob(rt, object_state.hash)? {
+                let object = build_object(&blob, &object_state)
+                    .map_err(to_state_error("failed to build object"))?;
+                Ok(object)
+            } else {
+                Ok(None)
+            }
         } else {
             Ok(None)
         }
@@ -117,9 +120,12 @@ impl Actor {
                 params.offset,
                 params.limit,
                 |key: Vec<u8>, object_state: ObjectState| -> anyhow::Result<()> {
-                    let blob = get_blob(rt, object_state.hash)?;
-                    if let Some(object) = build_object(&blob, &object_state)? {
-                        objects.push((key, object));
+                    if let Some(blob) = get_blob(rt, object_state.hash)? {
+                        if let Some(object) = build_object(&blob, &object_state)? {
+                            objects.push((key, Some(object)));
+                        }
+                    } else {
+                        objects.push((key, None));
                     }
                     Ok(())
                 },
