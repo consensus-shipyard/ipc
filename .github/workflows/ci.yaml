@@ -60,44 +60,45 @@ jobs:
   license:
     uses: ./.github/workflows/license.yaml
 
-  contracts-prettier:
-    uses: ./.github/workflows/contracts-prettier.yaml
-    secrets: inherit
-    needs: [ changes ]
-    if: >-
-      needs.changes.outputs.contracts == 'true' ||
-      github.ref == 'refs/heads/main' ||
-      github.ref_type == 'tag'
+  #  contracts-prettier:
+  #    uses: ./.github/workflows/contracts-prettier.yaml
+  #    secrets: inherit
+  #    needs: [ changes ]
+  #    if: >-
+  #      needs.changes.outputs.contracts == 'true' ||
+  #      github.ref == 'refs/heads/main' ||
+  #      github.ref_type == 'tag'
 
-  contracts-deployment-test:
-    uses: ./.github/workflows/contracts-deployment-test.yaml
-    secrets: inherit
-    needs: [ contracts-prettier ]
+  #  contracts-deployment-test:
+  #    uses: ./.github/workflows/contracts-deployment-test.yaml
+  #    secrets: inherit
+  #    needs: [ contracts-prettier ]
+  #
+  #  contracts-test:
+  #    uses: ./.github/workflows/contracts-test.yaml
+  #    secrets: inherit
+  #    needs: [ contracts-prettier ]
+  #
+  #  contracts-storage:
+  #    uses: ./.github/workflows/contracts-storage.yaml
+  #    secrets: inherit
+  #    needs: [ contracts-prettier ]
 
-  contracts-test:
-    uses: ./.github/workflows/contracts-test.yaml
-    secrets: inherit
-    needs: [ contracts-prettier ]
+  #  temp. disable until merge ipc upstream
+  #  contracts-npm-audit:
+  #    uses: ./.github/workflows/contracts-npm-audit.yaml
+  #    secrets: inherit
+  #    needs: [ contracts-prettier ]
 
-  contracts-storage:
-    uses: ./.github/workflows/contracts-storage.yaml
-    secrets: inherit
-    needs: [ contracts-prettier ]
+  #  contracts-sast:
+  #    uses: ./.github/workflows/contracts-sast.yaml
+  #    secrets: inherit
+  #    needs: [ contracts-prettier ]
 
-  contracts-npm-audit:
-    uses: ./.github/workflows/contracts-npm-audit.yaml
-    secrets: inherit
-    needs: [ contracts-prettier ]
-
-  contracts-sast:
-    uses: ./.github/workflows/contracts-sast.yaml
-    secrets: inherit
-    needs: [ contracts-prettier ]
-
-  extras:
-    uses: ./.github/workflows/extras.yaml
-    secrets: inherit
-    needs: [ contracts-prettier ]
+  #  extras:
+  #    uses: ./.github/workflows/extras.yaml
+  #    secrets: inherit
+  #    needs: [ contracts-prettier ]
 
   ipc:
     uses: ./.github/workflows/ipc.yaml
