@@ -31,9 +31,9 @@ task('deploy-registry')
                 name: 'SubnetActorGetterFacet',
                 libraries: ['SubnetIDHelper'],
             },
-            { 
+            {
                 name: 'SubnetActorManagerFacet',
-                libraries: ['SubnetIDHelper'], 
+                libraries: ['SubnetIDHelper'],
             },
             { name: 'SubnetActorPauseFacet' },
             { name: 'SubnetActorRewardFacet' },
