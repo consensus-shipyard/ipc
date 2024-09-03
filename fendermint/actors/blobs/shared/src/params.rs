@@ -41,12 +41,22 @@ pub struct AddBlobParams {
 #[serde(transparent)]
 pub struct GetBlobParams(pub Hash);
 
+/// Params for getting blob status.
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct GetBlobStatusParams {
+    /// The origin address that requested the blob.
+    /// This could be a wallet or machine.
+    pub origin: Address,
+    /// Blob blake3 hash.
+    pub hash: Hash,
+}
+
 /// Params for finalizing a blob.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct FinalizeBlobParams {
     /// The origin address that requested the blob.
     /// This could be a wallet or machine.
-    pub from: Address,
+    pub origin: Address,
     /// Blob blake3 hash.
     pub hash: Hash,
     /// The status to set as final.

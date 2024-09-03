@@ -63,8 +63,8 @@ pub struct Blob {
 /// The status of a blob.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum BlobStatus {
-    /// Blob was added at [`ChainEpoch`].
-    Added(ChainEpoch),
+    /// Blob is pending resolve.
+    Pending,
     /// Blob was successfully resolved.
     Resolved,
     /// Blob resolution failed.
@@ -74,7 +74,7 @@ pub enum BlobStatus {
 impl fmt::Display for BlobStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BlobStatus::Added(epoch) => write!(f, "added({})", epoch),
+            BlobStatus::Pending => write!(f, "pending"),
             BlobStatus::Resolved => write!(f, "resolved"),
             BlobStatus::Failed => write!(f, "failed"),
         }
@@ -86,6 +86,8 @@ impl fmt::Display for BlobStatus {
 /// have added the same blob.   
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct Subscription {
+    /// Added block.
+    pub added: ChainEpoch,
     /// Expiry block.
     pub expiry: ChainEpoch,
     /// Source Iroh node ID used for ingestion.
