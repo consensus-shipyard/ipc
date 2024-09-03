@@ -2,7 +2,6 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::anyhow;
 use cid::Cid;
 use fendermint_actor_blobs_shared::state::{Blob, BlobStatus};
 use fendermint_actor_blobs_shared::{add_blob, delete_blob, get_blob};
@@ -10,11 +9,11 @@ use fendermint_actor_machine::{ConstructorParams, MachineActor};
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
     runtime::{ActorCode, Runtime},
-    ActorDowncast, ActorError, FIRST_EXPORTED_METHOD_NUMBER, INIT_ACTOR_ADDR,
+    ActorError, FIRST_EXPORTED_METHOD_NUMBER, INIT_ACTOR_ADDR,
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_ipld_hamt::BytesKey;
-use fvm_shared::{error::ExitCode, MethodNum};
+use fvm_shared::MethodNum;
 
 use crate::shared::{
     AddParams, DeleteParams, GetParams, ListObjectsReturn, ListParams, Method, Object,
@@ -35,8 +34,7 @@ impl Actor {
             params.creator,
             params.write_access,
             params.metadata,
-        )
-        .map_err(to_state_error("failed to construct empty store"))?;
+        )?;
         rt.create(&state)
     }
 
@@ -70,7 +68,6 @@ impl Actor {
                 params.metadata,
                 params.overwrite,
             )
-            .map_err(to_state_error("failed to add object"))
         })?;
         Ok(root)
     }
@@ -83,10 +80,7 @@ impl Actor {
         // Delete blob for object
         delete_blob(rt, params.to, object.hash)?;
         // Update state
-        let res = rt.transaction(|st: &mut State, rt| {
-            st.delete(rt.store(), &key)
-                .map_err(to_state_error("failed to delete object"))
-        })?;
+        let res = rt.transaction(|st: &mut State, rt| st.delete(rt.store(), &key))?;
         Ok(res.1)
     }
 
@@ -94,8 +88,7 @@ impl Actor {
         rt.validate_immediate_caller_accept_any()?;
         if let Some(object_state) = retrieve_object_state(rt, &BytesKey(params.0))? {
             if let Some(blob) = get_blob(rt, object_state.hash)? {
-                let object = build_object(&blob, &object_state)
-                    .map_err(to_state_error("failed to build object"))?;
+                let object = build_object(&blob, &object_state)?;
                 Ok(object)
             } else {
                 Ok(None)
@@ -111,26 +104,23 @@ impl Actor {
     ) -> Result<ListObjectsReturn, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let mut objects = Vec::new();
-        let prefixes = rt
-            .state::<State>()?
-            .list(
-                rt.store(),
-                params.prefix,
-                params.delimiter,
-                params.offset,
-                params.limit,
-                |key: Vec<u8>, object_state: ObjectState| -> anyhow::Result<()> {
-                    if let Some(blob) = get_blob(rt, object_state.hash)? {
-                        if let Some(object) = build_object(&blob, &object_state)? {
-                            objects.push((key, Some(object)));
-                        }
-                    } else {
-                        objects.push((key, None));
+        let prefixes = rt.state::<State>()?.list(
+            rt.store(),
+            params.prefix,
+            params.delimiter,
+            params.offset,
+            params.limit,
+            |key: Vec<u8>, object_state: ObjectState| -> anyhow::Result<(), ActorError> {
+                if let Some(blob) = get_blob(rt, object_state.hash)? {
+                    if let Some(object) = build_object(&blob, &object_state)? {
+                        objects.push((key, Some(object)));
                     }
-                    Ok(())
-                },
-            )
-            .map_err(to_state_error("failed to list objects"))?;
+                } else {
+                    objects.push((key, None));
+                }
+                Ok(())
+            },
+        )?;
         Ok(ListObjectsReturn {
             objects,
             common_prefixes: prefixes,
@@ -157,20 +147,25 @@ fn retrieve_object_state(
     rt: &impl Runtime,
     key: &BytesKey,
 ) -> Result<Option<ObjectState>, ActorError> {
-    rt.state::<State>()?
-        .get(rt.store(), key)
-        .map_err(to_state_error("failed to retrieve object"))
+    rt.state::<State>()?.get(rt.store(), key)
 }
 
 /// Build an object from its state and blob.
-fn build_object(blob: &Blob, object_state: &ObjectState) -> anyhow::Result<Option<Object>> {
+fn build_object(
+    blob: &Blob,
+    object_state: &ObjectState,
+) -> anyhow::Result<Option<Object>, ActorError> {
     match blob.status {
         BlobStatus::Resolved => {
             let max_sub = blob
                 .subs
                 .values()
                 .max_by_key(|sub| sub.expiry)
-                .ok_or_else(|| anyhow!("blob has no subscriptions; this should not happen"))?;
+                .ok_or_else(|| {
+                    ActorError::illegal_state(
+                        "blob has no subscriptions; this should not happen".into(),
+                    )
+                })?;
             Ok(Some(Object {
                 hash: object_state.hash,
                 size: blob.size,
@@ -180,10 +175,6 @@ fn build_object(blob: &Blob, object_state: &ObjectState) -> anyhow::Result<Optio
         }
         BlobStatus::Added(_) | BlobStatus::Failed => Ok(None),
     }
-}
-
-fn to_state_error(message: &'static str) -> impl FnOnce(anyhow::Error) -> ActorError {
-    move |e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, message)
 }
 
 impl MachineActor for Actor {

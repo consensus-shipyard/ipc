@@ -287,7 +287,7 @@ where
         let blobs_state = fendermint_actor_blobs::State::new(
             genesis.blob_storage_capacity,
             genesis.blob_debit_rate,
-        )?;
+        );
         state
             .create_custom_actor(
                 fendermint_actor_blobs::BLOBS_ACTOR_NAME,

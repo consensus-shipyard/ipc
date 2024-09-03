@@ -7,10 +7,10 @@ use fendermint_actor_machine::{ConstructorParams, MachineActor};
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
     runtime::{ActorCode, Runtime},
-    ActorDowncast, ActorError, FIRST_EXPORTED_METHOD_NUMBER, INIT_ACTOR_ADDR,
+    ActorError, FIRST_EXPORTED_METHOD_NUMBER, INIT_ACTOR_ADDR,
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
-use fvm_shared::{error::ExitCode, MethodNum};
+use fvm_shared::MethodNum;
 
 use crate::{Method, PushParams, PushReturn, State, ACCUMULATOR_ACTOR_NAME};
 
@@ -27,44 +27,31 @@ impl Actor {
             params.creator,
             params.write_access,
             params.metadata,
-        )
-        .map_err(|e| {
-            e.downcast_default(
-                ExitCode::USR_ILLEGAL_STATE,
-                "failed to construct empty store",
-            )
-        })?;
+        )?;
         rt.create(&state)
     }
 
     fn push(rt: &impl Runtime, params: PushParams) -> Result<PushReturn, ActorError> {
         Self::ensure_write_allowed(rt)?;
-        rt.transaction(|st: &mut State, rt| {
-            st.push(rt.store(), params.0).map_err(|e| {
-                e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to push object")
-            })
-        })
+        rt.transaction(|st: &mut State, rt| st.push(rt.store(), params.0))
     }
 
     fn get_leaf_at(rt: &impl Runtime, index: u64) -> Result<Option<Vec<u8>>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let st: State = rt.state()?;
         st.get_leaf_at(rt.store(), index)
-            .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get leaf"))
     }
 
     fn get_root(rt: &impl Runtime) -> Result<Cid, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let st: State = rt.state()?;
         st.get_root(rt.store())
-            .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to bag peaks"))
     }
 
     fn get_peaks(rt: &impl Runtime) -> Result<Vec<Cid>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let st: State = rt.state()?;
         st.get_peaks(rt.store())
-            .map_err(|e| e.downcast_default(ExitCode::USR_ILLEGAL_STATE, "failed to get peaks"))
     }
 
     fn get_count(rt: &impl Runtime) -> Result<u64, ActorError> {
