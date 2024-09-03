@@ -15,6 +15,7 @@ struct PowerRange {
 
 /// This is a simple implementation of `IValidatorGater`. It makes sure the exact power change
 /// request is approved. This is a very strict requirement.
+/// See sample cli usage in tasks/validator-gater.ts
 contract SubnetValidatorGater is IValidatorGater, Ownable {
     using SubnetIDHelper for SubnetID;
 
