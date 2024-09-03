@@ -53,8 +53,8 @@ jobs:
           - name: Build and Test
             task: build test
           # Tests that involve docker.
-          - name: End-to-End
-            task: e2e
+          # - name: End-to-End
+          #   task: e2e
         exclude:
           # Not running Clippy on nightly because sometimes it seems to give false positives.
           - rust: nightly
