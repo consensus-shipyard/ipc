@@ -115,6 +115,7 @@ impl StateMachine for StakingMachine {
                 kind: 0, // native token
                 token_address: ethers::types::Address::zero(),
             },
+            validator_gater: EthAddress::from(ethers::types::Address::zero()).into(),
         };
 
         eprintln!("\n> PARENT IPC: {parent_ipc:?}");
