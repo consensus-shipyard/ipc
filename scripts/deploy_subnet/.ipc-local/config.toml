@@ -1,0 +1,21 @@
+keystore_path = "~/.ipc"
+
+# Anvil root
+[[subnets]]
+id = "/r31337"
+
+[subnets.config]
+network_type = "fevm"
+provider_http = "http://127.0.0.1:8545"
+gateway_addr = "0x9A676e781A523b5d0C0e43731313A708CB607508"
+registry_addr = "0xc5a5C42992dECbae36851359345FE25997F5C42d"
+
+# Local subnet
+[[subnets]]
+id = "/r31337/t410f6dl55afbyjbpupdtrmedyqrnmxdmpk7rxuduafq"
+
+[subnets.config]
+network_type = "fevm"
+provider_http = "http://127.0.0.1:8845"
+gateway_addr = "0x9A676e781A523b5d0C0e43731313A708CB607508"
+registry_addr = "0xc5a5C42992dECbae36851359345FE25997F5C42d"

@@ -25,6 +25,8 @@ export async function deploy(libs: { [key in string]: string }) {
         chainId = 314159
     } else if (process.env.NETWORK == 'mainnet') {
         chainId = 314
+    } else if (process.env.NETWORK == 'localnet') {
+        chainId = 31337
     } else if (process.env.NETWORK == 'auto') {
         chainId = parseInt(process.env.CHAIN_ID!, 16)
     }
