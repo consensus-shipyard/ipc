@@ -22,7 +22,7 @@ jobs:
           host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
           username: textile
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
-          source: "scripts/deploy_subnet_under_calibration_net/deploy.sh"
+          source: "scripts/deploy_subnet/deploy.sh"
           target: "/home/textile"
       - name: Create wallet file locally
         run: |
