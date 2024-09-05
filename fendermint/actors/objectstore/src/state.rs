@@ -2,20 +2,29 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::HashMap;
-
 use cid::Cid;
 use fendermint_actor_blobs_shared::state::Hash;
 use fendermint_actor_machine::{Kind, MachineState, WriteAccess};
+use fil_actors_runtime::ActorError;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::tuple::*;
 use fvm_ipld_hamt::{BytesKey, Hamt};
 use fvm_shared::address::Address;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::string::FromUtf8Error;
 
 const BIT_WIDTH: u32 = 8;
 
 const MAX_LIST_LIMIT: usize = 10000;
+
+fn state_error(e: fvm_ipld_hamt::Error) -> ActorError {
+    ActorError::illegal_state(e.to_string())
+}
+
+fn utf8_error(e: FromUtf8Error) -> ActorError {
+    ActorError::illegal_argument(e.to_string())
+}
 
 /// The state represents an object store backed by a Hamt.
 #[derive(Serialize_tuple, Deserialize_tuple)]
@@ -72,14 +81,14 @@ impl State {
         creator: Address,
         write_access: WriteAccess,
         metadata: HashMap<String, String>,
-    ) -> anyhow::Result<Self> {
+    ) -> anyhow::Result<Self, ActorError> {
         let root = match Hamt::<_, ObjectState>::new_with_bit_width(store, BIT_WIDTH).flush() {
             Ok(cid) => cid,
             Err(e) => {
-                return Err(anyhow::anyhow!(
+                return Err(ActorError::illegal_state(format!(
                     "objectstore actor failed to create empty Hamt: {}",
                     e
-                ));
+                )));
             }
         };
         Ok(Self {
@@ -97,15 +106,16 @@ impl State {
         hash: Hash,
         metadata: HashMap<String, String>,
         overwrite: bool,
-    ) -> anyhow::Result<Cid> {
-        let mut hamt = Hamt::<_, ObjectState>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
+    ) -> anyhow::Result<Cid, ActorError> {
+        let mut hamt = Hamt::<_, ObjectState>::load_with_bit_width(&self.root, store, BIT_WIDTH)
+            .map_err(state_error)?;
         let object = ObjectState { hash, metadata };
         if overwrite {
-            hamt.set(key, object)?;
+            hamt.set(key, object).map_err(state_error)?;
         } else {
-            hamt.set_if_absent(key, object)?;
+            hamt.set_if_absent(key, object).map_err(state_error)?;
         }
-        self.root = hamt.flush()?;
+        self.root = hamt.flush().map_err(state_error)?;
         Ok(self.root)
     }
 
@@ -113,13 +123,15 @@ impl State {
         &mut self,
         store: &BS,
         key: &BytesKey,
-    ) -> anyhow::Result<(ObjectState, Cid)> {
-        let mut hamt = Hamt::<_, ObjectState>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
+    ) -> anyhow::Result<(ObjectState, Cid), ActorError> {
+        let mut hamt = Hamt::<_, ObjectState>::load_with_bit_width(&self.root, store, BIT_WIDTH)
+            .map_err(state_error)?;
         let object = hamt
-            .delete(key)?
+            .delete(key)
+            .map_err(state_error)?
             .map(|o| o.1)
-            .ok_or(anyhow::anyhow!("key not found"))?;
-        self.root = hamt.flush()?;
+            .ok_or(ActorError::not_found("key not found".into()))?;
+        self.root = hamt.flush().map_err(state_error)?;
         Ok((object, self.root))
     }
 
@@ -127,9 +139,10 @@ impl State {
         &self,
         store: &BS,
         key: &BytesKey,
-    ) -> anyhow::Result<Option<ObjectState>> {
-        let hamt = Hamt::<_, ObjectState>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
-        let object = hamt.get(key).map(|v| v.cloned())?;
+    ) -> anyhow::Result<Option<ObjectState>, ActorError> {
+        let hamt = Hamt::<_, ObjectState>::load_with_bit_width(&self.root, store, BIT_WIDTH)
+            .map_err(state_error)?;
+        let object = hamt.get(key).map(|v| v.cloned()).map_err(state_error)?;
         Ok(object)
     }
 
@@ -141,11 +154,12 @@ impl State {
         offset: u64,
         limit: u64,
         mut collector: F,
-    ) -> anyhow::Result<Vec<Vec<u8>>>
+    ) -> anyhow::Result<Vec<Vec<u8>>, ActorError>
     where
-        F: FnMut(Vec<u8>, ObjectState) -> anyhow::Result<()>,
+        F: FnMut(Vec<u8>, ObjectState) -> anyhow::Result<(), ActorError>,
     {
-        let hamt = Hamt::<_, ObjectState>::load_with_bit_width(&self.root, store, BIT_WIDTH)?;
+        let hamt = Hamt::<_, ObjectState>::load_with_bit_width(&self.root, store, BIT_WIDTH)
+            .map_err(state_error)?;
         let mut common_prefixes = std::collections::BTreeSet::<Vec<u8>>::new();
         let limit = if limit == 0 {
             MAX_LIST_LIMIT
@@ -155,16 +169,16 @@ impl State {
         let mut count = 0;
         let mut collected: usize = 0;
         for pair in &hamt {
-            let (k, v) = pair?;
+            let (k, v) = pair.map_err(state_error)?;
             let key = k.0.clone();
             if !prefix.is_empty() && !key.starts_with(&prefix) {
                 continue;
             }
             if !delimiter.is_empty() {
-                let utf8_prefix = String::from_utf8(prefix.clone())?;
+                let utf8_prefix = String::from_utf8(prefix.clone()).map_err(utf8_error)?;
                 let prefix_length = utf8_prefix.len();
-                let utf8_key = String::from_utf8(key.clone())?;
-                let utf8_delimiter = String::from_utf8(delimiter.clone())?;
+                let utf8_key = String::from_utf8(key.clone()).map_err(utf8_error)?;
+                let utf8_delimiter = String::from_utf8(delimiter.clone()).map_err(utf8_error)?;
                 if let Some(index) = utf8_key[prefix_length..].find(&utf8_delimiter) {
                     let subset = utf8_key[..=(index + prefix_length)].as_bytes().to_owned();
                     common_prefixes.insert(subset);
@@ -262,7 +276,7 @@ mod tests {
         delimiter: Vec<u8>,
         offset: u64,
         limit: u64,
-    ) -> anyhow::Result<(Vec<(Vec<u8>, ObjectState)>, Vec<Vec<u8>>)> {
+    ) -> anyhow::Result<(Vec<(Vec<u8>, ObjectState)>, Vec<Vec<u8>>), ActorError> {
         let mut objects = Vec::new();
         let prefixes = state.list(
             store,
@@ -270,7 +284,7 @@ mod tests {
             delimiter,
             offset,
             limit,
-            |key: Vec<u8>, object: ObjectState| -> anyhow::Result<()> {
+            |key: Vec<u8>, object: ObjectState| -> anyhow::Result<(), ActorError> {
                 objects.push((key, object));
                 Ok(())
             },

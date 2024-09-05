@@ -5,11 +5,11 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Bound::{Included, Unbounded};
 
-use anyhow::anyhow;
 use fendermint_actor_blobs_shared::params::GetStatsReturn;
 use fendermint_actor_blobs_shared::state::{
     Account, Blob, BlobStatus, Hash, PublicKey, Subscription,
 };
+use fil_actors_runtime::ActorError;
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
@@ -24,14 +24,12 @@ fn ensure_credit(
     sender: Address,
     credit_free: &BigInt,
     required_credit: &BigInt,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<(), ActorError> {
     if credit_free < required_credit {
-        return Err(anyhow!(
+        return Err(ActorError::insufficient_funds(format!(
             "account {} has insufficient credit (available: {}; required: {})",
-            sender,
-            credit_free,
-            required_credit
-        ));
+            sender, credit_free, required_credit
+        )));
     }
     Ok(())
 }
@@ -63,8 +61,8 @@ pub struct State {
 }
 
 impl State {
-    pub fn new(capacity: u64, credit_debit_rate: u64) -> anyhow::Result<Self> {
-        Ok(Self {
+    pub fn new(capacity: u64, credit_debit_rate: u64) -> Self {
+        Self {
             capacity_free: BigInt::from(capacity),
             capacity_used: BigInt::zero(),
             credit_sold: BigInt::zero(),
@@ -75,11 +73,11 @@ impl State {
             blobs: HashMap::new(),
             expiries: BTreeMap::new(),
             pending: BTreeMap::new(),
-        })
+        }
     }
 
-    pub fn get_stats(&self, balance: TokenAmount) -> anyhow::Result<GetStatsReturn> {
-        Ok(GetStatsReturn {
+    pub fn get_stats(&self, balance: TokenAmount) -> GetStatsReturn {
+        GetStatsReturn {
             balance,
             capacity_free: self.capacity_free.clone(),
             capacity_used: self.capacity_used.clone(),
@@ -90,7 +88,7 @@ impl State {
             num_accounts: self.accounts.len() as u64,
             num_blobs: self.blobs.len() as u64,
             num_resolving: self.pending.len() as u64,
-        })
+        }
     }
 
     pub fn buy_credit(
@@ -98,7 +96,7 @@ impl State {
         address: Address,
         amount: TokenAmount,
         current_epoch: ChainEpoch,
-    ) -> anyhow::Result<Account> {
+    ) -> anyhow::Result<Account, ActorError> {
         let credits = self.credit_debit_rate * amount.atto();
         // Don't sell credits if we're at storage capacity
         // TODO: This should be more nuanced, i.e., pick some min block duration and storage amount
@@ -106,7 +104,9 @@ impl State {
         // we don't want to sell a bunch of credits even though they could be used if the account
         // wants to store 1 byte at a time, which is unlikely :)
         if self.capacity_used == self.capacity_free {
-            return Err(anyhow!("credits not available (subnet has reach capacity)"));
+            return Err(ActorError::forbidden(
+                "credits not available (subnet has reach capacity)".into(),
+            ));
         }
         self.credit_sold += &credits;
         if let Some(account) = self.accounts.get_mut(&address) {
@@ -124,12 +124,14 @@ impl State {
         }
     }
 
-    pub fn get_account(&self, address: Address) -> anyhow::Result<Option<Account>> {
-        let account = self.accounts.get(&address).cloned();
-        Ok(account)
+    pub fn get_account(&self, address: Address) -> Option<Account> {
+        self.accounts.get(&address).cloned()
     }
 
-    pub fn debit_accounts(&mut self, current_epoch: ChainEpoch) -> anyhow::Result<HashSet<Hash>> {
+    pub fn debit_accounts(
+        &mut self,
+        current_epoch: ChainEpoch,
+    ) -> anyhow::Result<HashSet<Hash>, ActorError> {
         // Delete expired subscriptions
         let mut delete_blobs = HashSet::new();
         let expiries: Vec<(ChainEpoch, HashMap<Address, Hash>)> = self
@@ -171,15 +173,21 @@ impl State {
         size: u64,
         ttl: ChainEpoch,
         source: PublicKey,
-    ) -> anyhow::Result<Account> {
+    ) -> anyhow::Result<Account, ActorError> {
         if ttl < MIN_TTL {
-            return Err(anyhow!("minimum blob TTL is {}", MIN_TTL));
+            return Err(ActorError::illegal_argument(format!(
+                "minimum blob TTL is {}",
+                MIN_TTL
+            )));
         }
         let expiry = current_epoch + ttl;
         let account = self
             .accounts
             .get_mut(&sender)
-            .ok_or(anyhow!("account {} not found", sender))?;
+            .ok_or(ActorError::not_found(format!(
+                "account {} not found",
+                sender
+            )))?;
         let size = BigInt::from(size);
         // Capacity updates and required credit depend on whether the sender is already
         // subcribing to this blob
@@ -199,7 +207,7 @@ impl State {
                         hash,
                         Some(expiry),
                         Some(sub.expiry),
-                    )?;
+                    );
                 }
                 sub.expiry = expiry;
                 // Overwrite source allows sender to retry resolving
@@ -217,7 +225,7 @@ impl State {
                 blob.subs.insert(sender, Subscription { expiry, source });
                 log::debug!("created new subscription to {} for {}", hash, sender);
                 // Update expiry index
-                update_expiry_index(&mut self.expiries, sender, hash, Some(expiry), None)?;
+                update_expiry_index(&mut self.expiries, sender, hash, Some(expiry), None);
             }
             if !matches!(blob.status, BlobStatus::Failed) {
                 // It's pending or failed, reset with current epoch
@@ -246,7 +254,7 @@ impl State {
             log::debug!("created new blob {}", hash);
             log::debug!("created new subscription to {} for {}", hash, sender);
             // Update expiry index
-            update_expiry_index(&mut self.expiries, sender, hash, Some(expiry), None)?;
+            update_expiry_index(&mut self.expiries, sender, hash, Some(expiry), None);
             // Add to pending
             self.pending.insert(hash, HashSet::from([(sender, source)]));
         };
@@ -280,15 +288,12 @@ impl State {
         Ok(account)
     }
 
-    pub fn get_blob(&self, hash: Hash) -> anyhow::Result<Option<Blob>> {
-        let blob = self.blobs.get(&hash).cloned();
-        Ok(blob)
+    pub fn get_blob(&self, hash: Hash) -> Option<Blob> {
+        self.blobs.get(&hash).cloned()
     }
 
-    pub fn get_pending_blobs(
-        &self,
-    ) -> anyhow::Result<BTreeMap<Hash, HashSet<(Address, PublicKey)>>> {
-        Ok(self.pending.clone())
+    pub fn get_pending_blobs(&self) -> BTreeMap<Hash, HashSet<(Address, PublicKey)>> {
+        self.pending.clone()
     }
 
     pub fn finalize_blob(
@@ -296,17 +301,17 @@ impl State {
         from: Address,
         hash: Hash,
         status: BlobStatus,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<(), ActorError> {
         if matches!(status, BlobStatus::Added(_)) {
-            return Err(anyhow!(
+            return Err(ActorError::illegal_argument(format!(
                 "finalized status of blob {} must be 'resolved' or 'failed'",
                 hash
-            ));
+            )));
         }
         let account = self
             .accounts
             .get_mut(&from)
-            .ok_or(anyhow!("account {} not found", from))?;
+            .ok_or(ActorError::not_found(format!("account {} not found", from)))?;
         let blob = if let Some(blob) = self.blobs.get_mut(&hash) {
             blob
         } else {
@@ -321,11 +326,10 @@ impl State {
             // Blob is already finalized (resolved/failed)
             return Ok(());
         };
-        let sub = blob.subs.get(&from).ok_or(anyhow!(
+        let sub = blob.subs.get(&from).ok_or(ActorError::forbidden(format!(
             "finalizing address {} is not subscribed to blob {}",
-            from,
-            hash
-        ))?;
+            from, hash
+        )))?;
         // Update blob status
         blob.status = status;
         log::debug!("finalized blob {} to status {}", hash, blob.status);
@@ -366,20 +370,30 @@ impl State {
         sender: Address,
         current_epoch: ChainEpoch,
         hash: Hash,
-    ) -> anyhow::Result<(Account, bool)> {
+    ) -> anyhow::Result<(Account, bool), ActorError> {
         let account = self
             .accounts
             .get_mut(&sender)
-            .ok_or(anyhow!("account {} not found", sender))?;
-        let blob = self
-            .blobs
-            .get_mut(&hash)
-            .ok_or(anyhow!("blob {} not found", hash))?;
-        let sub = blob.subs.get(&sender).ok_or(anyhow!(
+            .ok_or(ActorError::not_found(format!(
+                "account {} not found",
+                sender
+            )))?;
+        let blob = if let Some(blob) = self.blobs.get_mut(&hash) {
+            blob
+        } else {
+            // We could error here, but since this method is called from other actors,
+            // they would need to be able to identify this specific case.
+            // For example, the bucket actor may need to delete a blob while overwriting
+            // an existing key.
+            // However, the system may have already deleted the blob due to expiration or
+            // insufficient funds.
+            // We could use a custom error code, but this is easier.
+            return Ok((account.clone(), false));
+        };
+        let sub = blob.subs.get(&sender).ok_or(ActorError::forbidden(format!(
             "sender {} is not subscribed to blob {}",
-            sender,
-            hash
-        ))?;
+            sender, hash
+        )))?;
         // Since the charge will be for all the account's blobs, we can only
         // account for capacity up to _this_ blob's expiry if it is less than
         // the current epoch.
@@ -418,7 +432,7 @@ impl State {
         // We're done with the account, clone it for return
         let account = account.clone();
         // Update expiry index
-        update_expiry_index(&mut self.expiries, sender, hash, None, Some(sub.expiry))?;
+        update_expiry_index(&mut self.expiries, sender, hash, None, Some(sub.expiry));
         // Delete subscription
         blob.subs.remove(&sender);
         log::debug!("deleted subscription to {} for {}", hash, sender);
@@ -440,7 +454,7 @@ fn update_expiry_index(
     hash: Hash,
     add: Option<ChainEpoch>,
     remove: Option<ChainEpoch>,
-) -> anyhow::Result<()> {
+) {
     if let Some(add) = add {
         expiries
             .entry(add)
@@ -457,5 +471,4 @@ fn update_expiry_index(
             }
         }
     }
-    Ok(())
 }

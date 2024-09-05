@@ -56,8 +56,8 @@ pub fn add_blob(
     Ok(())
 }
 
-pub fn get_blob(rt: &impl Runtime, hash: state::Hash) -> Result<state::Blob, ActorError> {
-    deserialize_block::<state::Blob>(extract_send_result(rt.send_simple(
+pub fn get_blob(rt: &impl Runtime, hash: state::Hash) -> Result<Option<state::Blob>, ActorError> {
+    deserialize_block(extract_send_result(rt.send_simple(
         &BLOBS_ACTOR_ADDR,
         Method::GetBlob as MethodNum,
         IpldBlock::serialize_cbor(&params::GetBlobParams(hash))?,
