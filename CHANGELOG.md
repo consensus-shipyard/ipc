@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [axon-r03] - 2024-09-06
+
+_Full changelog below._
+
+### ⭐ HIGHLIGHT | Consistent Genesis 🧬🚀
+
+The Consistent Genesis feature introduces an additional step of sealing the genesis, ensuring the inclusion of the genesis state, including both custom and built-in actors. This step prevents inconsistencies during node initialization. Previously, the genesis process required certain actors to be deployed at runtime when the node started, which could result in a panic and prevent the node from starting. With the Consistent Genesis update, actor code is directly incorporated into the genesis as part of the state tree, ensuring stability and consistency across all node starts.
+
+### 🚀 Features
+
+- _(node)_ Consistent Genesis (#1016)
+- _(contracts)_ Improvements to contract deployment scripts (#1108)
+
+### 🐛 Bug Fixes
+
+- _(core)_ Set the default Fendermint log level to INFO (#1123)
+- _(ci)_ CI speed-up improvements (#1124)
+
+### 📚 Documentation
+
+- _(docs)_ Moved documentation to monorepo (#1014)
+- _(specs)_ Subnet Genesis v2 spec (#1113)
+- _(node)_ Updated running docs with Consistent Genesis (#1128)
+
+### ⚙️ Miscellaneous Tasks
+
+- Fixed typos and updated dependencies (#1087, #1106, #1089)
+- Fixed clippy/fmt and improved cache usage (#1125)
+- Applied Prettier formatting to contracts (#1111)
+
 ## [axon-r02] - 2024-07-23
 
 _Full changelog below._
@@ -20,7 +50,7 @@ Refer to full observability documentation [here](./docs/fendermint/observability
 ### New events and metrics
 
 | Domain    | Event                             | Description                                                               | Metric(s) derived                                                                                                                                                                                        |
-|:----------|-----------------------------------|---------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| :-------- | --------------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Consensus | `BlockProposalReceived`           | Tracks block proposal reception                                           | `consensus_block_proposal_received_height` (IntGauge)                                                                                                                                                    |
 | Consensus | `BlockProposalSent`               | Tracks block proposal sending                                             | `consensus_block_proposal_sent_height` (IntGauge)                                                                                                                                                        |
 | Consensus | `BlockProposalEvaluated`          | Records the result from evaluating block proposals                        | `consensus_block_proposal_accepted_height` (IntGauge), `consensus_block_proposal_rejected_height` (IntGauge)                                                                                             |
@@ -39,23 +69,23 @@ Refer to full observability documentation [here](./docs/fendermint/observability
 
 ### 🚀 Features
 
-- *(node)* New observability architecture + events (#1053)
-- *(node)* New observability bottom up tracing/metrics (#1061)
-- *(ethapi)* Add eth cors settings (#1021)
-- *(node)* File-based observability configuration (#1078)
-- *(node)* Observability docs and changelog section (#1083)
+- _(node)_ New observability architecture + events (#1053)
+- _(node)_ New observability bottom up tracing/metrics (#1061)
+- _(ethapi)_ Add eth cors settings (#1021)
+- _(node)_ File-based observability configuration (#1078)
+- _(node)_ Observability docs and changelog section (#1083)
 
 ### 🐛 Bug Fixes
 
-- *(ethapi)* Make `eth_getTransactionReceipt` null for unexecuted/unknown transactions (#1006)
+- _(ethapi)_ Make `eth_getTransactionReceipt` null for unexecuted/unknown transactions (#1006)
 
 ### 🚜 Refactor
 
-- *(node)* Observability refinements. (#1085)
+- _(node)_ Observability refinements. (#1085)
 
 ### 📚 Documentation
 
-- *(specs)* Ethereum JSON-RPC API (#913)
+- _(specs)_ Ethereum JSON-RPC API (#913)
 
 ### ⚙️ Miscellaneous Tasks
 
