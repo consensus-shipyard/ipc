@@ -16,7 +16,7 @@ use crate::{
 use anyhow::{anyhow, bail, Context};
 use async_stm::atomically;
 use async_trait::async_trait;
-use fendermint_actor_blobs_shared::params::GetBlobParams;
+use fendermint_actor_blobs_shared::params::GetBlobStatusParams;
 use fendermint_actor_blobs_shared::state::BlobStatus;
 use fendermint_actor_blobs_shared::Method::DebitAccounts;
 use fendermint_actor_blobs_shared::{
@@ -92,7 +92,7 @@ impl From<&CheckpointPoolItem> for ResolveKey {
 
 #[derive(Clone, Hash, PartialEq, Eq)]
 pub struct BlobPoolItem {
-    from: Address,
+    origin: Address,
     hash: Hash,
     source: NodeId,
 }
@@ -227,9 +227,16 @@ where
             .end_transaction(true)
             .expect("we just started a transaction");
         for (hash, sources) in resolving_blobs {
-            for (from, source) in sources {
-                atomically(|| env.blob_pool.add(BlobPoolItem { from, hash, source })).await;
-                tracing::debug!(hash = ?hash, from = ?from, "blob added to pool");
+            for (origin, source) in sources {
+                atomically(|| {
+                    env.blob_pool.add(BlobPoolItem {
+                        origin,
+                        hash,
+                        source,
+                    })
+                })
+                .await;
+                tracing::debug!(hash = ?hash, origin = ?origin, "blob added to pool");
             }
         }
 
@@ -257,7 +264,7 @@ where
             // We start a blockstore transaction that can be reverted
             state.state_tree_mut().begin_transaction();
             for item in local_finalized_blobs.iter() {
-                if !is_blob_pending(&mut state, item.hash)? {
+                if !is_blob_pending(&mut state, item.hash, item.origin)? {
                     tracing::debug!(hash = ?item.hash, "blob already finalized on chain; removing from pool");
                     atomically(|| env.blob_pool.remove(item)).await;
                     continue;
@@ -271,7 +278,7 @@ where
                 if is_globally_finalized {
                     tracing::debug!(hash = ?item.hash, "blob has quorum; adding tx to chain");
                     blobs.push(ChainMessage::Ipc(IpcMessage::BlobFinalized(Blob {
-                        from: item.from,
+                        origin: item.origin,
                         hash: item.hash,
                         source: item.source,
                         succeeded,
@@ -342,7 +349,7 @@ where
                     // not yet finalized.
                     // Start a blockstore transaction that can be reverted.
                     state.state_tree_mut().begin_transaction();
-                    if !is_blob_pending(&mut state, blob.hash)? {
+                    if !is_blob_pending(&mut state, blob.hash, blob.origin)? {
                         tracing::debug!(hash = ?blob.hash, "blob is already finalized on chain; rejecting proposal");
                         return Ok(false);
                     }
@@ -372,7 +379,7 @@ where
 
                     // Remove from pool if locally resolved
                     let item = BlobPoolItem {
-                        from: blob.from,
+                        origin: blob.origin,
                         hash: blob.hash,
                         source: blob.source,
                     };
@@ -595,7 +602,7 @@ where
                         BlobStatus::Failed
                     };
                     let params = FinalizeBlobParams {
-                        from: blob.from,
+                        origin: blob.origin,
                         hash,
                         status,
                     };
@@ -882,12 +889,13 @@ where
 fn is_blob_pending<DB>(
     state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
     hash: Hash,
+    origin: Address,
 ) -> anyhow::Result<bool>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
     let hash = fendermint_actor_blobs_shared::state::Hash(*hash.as_bytes());
-    let params = GetBlobParams(hash);
+    let params = GetBlobStatusParams { hash, origin };
     let params = RawBytes::serialize(params)?;
     let msg = FvmMessage {
         version: 0,
@@ -908,7 +916,7 @@ where
         .map_err(|e| anyhow!("error parsing as Option<BlobStatus>: {e}"))?;
     let pending = if let Some(status) = status {
         match status {
-            BlobStatus::Added(_) => true,
+            BlobStatus::Pending => true,
             BlobStatus::Resolved | BlobStatus::Failed => false,
         }
     } else {

@@ -222,14 +222,21 @@ impl State {
                 ensure_credit(sender, &account.credit_free, &credit_required)?;
                 new_account_capacity = size.clone();
                 // Add new subscription
-                blob.subs.insert(sender, Subscription { expiry, source });
+                blob.subs.insert(
+                    sender,
+                    Subscription {
+                        added: current_epoch,
+                        expiry,
+                        source,
+                    },
+                );
                 log::debug!("created new subscription to {} for {}", hash, sender);
                 // Update expiry index
                 update_expiry_index(&mut self.expiries, sender, hash, Some(expiry), None);
             }
             if !matches!(blob.status, BlobStatus::Failed) {
-                // It's pending or failed, reset with current epoch
-                blob.status = BlobStatus::Added(current_epoch);
+                // It's pending or failed, reset to pending
+                blob.status = BlobStatus::Pending;
                 // Add/update pending with hash and its source
                 self.pending
                     .entry(hash)
@@ -247,8 +254,15 @@ impl State {
             // Create new blob
             let blob = Blob {
                 size: size.to_u64().unwrap(),
-                subs: HashMap::from([(sender, Subscription { expiry, source })]),
-                status: BlobStatus::Added(current_epoch),
+                subs: HashMap::from([(
+                    sender,
+                    Subscription {
+                        added: current_epoch,
+                        expiry,
+                        source,
+                    },
+                )]),
+                status: BlobStatus::Pending,
             };
             self.blobs.insert(hash, blob);
             log::debug!("created new blob {}", hash);
@@ -292,17 +306,33 @@ impl State {
         self.blobs.get(&hash).cloned()
     }
 
+    pub fn get_blob_status(&self, hash: Hash, origin: Address) -> Option<BlobStatus> {
+        let blob = self.blobs.get(&hash)?;
+        if blob.subs.contains_key(&origin) {
+            if matches!(blob.status, BlobStatus::Resolved) {
+                Some(BlobStatus::Resolved)
+            } else {
+                // The blob state's status may have been finalized as failed by another
+                // subscription, but since this one exists, there must be another pending
+                // resolution task in the queue.
+                Some(BlobStatus::Pending)
+            }
+        } else {
+            None
+        }
+    }
+
     pub fn get_pending_blobs(&self) -> BTreeMap<Hash, HashSet<(Address, PublicKey)>> {
         self.pending.clone()
     }
 
     pub fn finalize_blob(
         &mut self,
-        from: Address,
+        owner: Address,
         hash: Hash,
         status: BlobStatus,
     ) -> anyhow::Result<(), ActorError> {
-        if matches!(status, BlobStatus::Added(_)) {
+        if matches!(status, BlobStatus::Pending) {
             return Err(ActorError::illegal_argument(format!(
                 "finalized status of blob {} must be 'resolved' or 'failed'",
                 hash
@@ -310,25 +340,25 @@ impl State {
         }
         let account = self
             .accounts
-            .get_mut(&from)
-            .ok_or(ActorError::not_found(format!("account {} not found", from)))?;
+            .get_mut(&owner)
+            .ok_or(ActorError::not_found(format!(
+                "account {} not found",
+                owner
+            )))?;
         let blob = if let Some(blob) = self.blobs.get_mut(&hash) {
             blob
         } else {
-            // The blob may have been deleted before it was finalized.
+            // The blob may have been deleted before it was finalized
             return Ok(());
         };
-        // TODO: Hrm, we need to move `added_epoch` to the subscription there may be two pending
-        // adds, and currently only the second on will get refunded.
-        let added_epoch = if let BlobStatus::Added(added_epoch) = blob.status {
-            added_epoch
-        } else {
-            // Blob is already finalized (resolved/failed)
+        if matches!(blob.status, BlobStatus::Resolved) {
+            // Blob is already finalized as resolved.
+            // We can ignore later finalizations, even if they are failed.
             return Ok(());
-        };
-        let sub = blob.subs.get(&from).ok_or(ActorError::forbidden(format!(
+        }
+        let sub = blob.subs.get(&owner).ok_or(ActorError::forbidden(format!(
             "finalizing address {} is not subscribed to blob {}",
-            from, hash
+            owner, hash
         )))?;
         // Update blob status
         blob.status = status;
@@ -339,29 +369,34 @@ impl State {
             // any spent credits that may have been used on this
             // blob in the event the last debit is later than the
             // added epoch.
-            if account.last_debit_epoch > added_epoch {
-                let refund_blocks = account.last_debit_epoch - added_epoch;
+            if account.last_debit_epoch > sub.added {
+                let refund_blocks = account.last_debit_epoch - sub.added;
                 let refund = refund_blocks as u64 * &size;
                 account.credit_free += &refund; // re-mint spent credit
                 self.credit_debited -= &refund;
-                log::debug!("refunded {} credits to {}", refund, from);
+                log::debug!("refunded {} credits to {}", refund, owner);
             }
             // Account for reclaimed size and move committed credit to
             // free credit
             self.capacity_used -= &size;
             log::debug!("released {} bytes to subnet", size);
             account.capacity_used -= &size;
-            log::debug!("released {} bytes to {}", size, from);
+            log::debug!("released {} bytes to {}", size, owner);
             if sub.expiry > account.last_debit_epoch {
                 let reclaim = (sub.expiry - account.last_debit_epoch) * &size;
                 self.credit_committed -= &reclaim;
                 account.credit_committed -= &reclaim;
                 account.credit_free += &reclaim;
-                log::debug!("released {} credits to {}", reclaim, from);
+                log::debug!("released {} credits to {}", reclaim, owner);
             }
         }
-        // Remove from pending
-        self.pending.remove(&hash);
+        // Remove entry from pending
+        if let Some(entry) = self.pending.get_mut(&hash) {
+            entry.remove(&(owner, sub.source));
+            if entry.is_empty() {
+                self.pending.remove(&hash);
+            }
+        }
         Ok(())
     }
 
@@ -433,6 +468,13 @@ impl State {
         let account = account.clone();
         // Update expiry index
         update_expiry_index(&mut self.expiries, sender, hash, None, Some(sub.expiry));
+        // Remove entry from pending
+        if let Some(entry) = self.pending.get_mut(&hash) {
+            entry.remove(&(sender, sub.source));
+            if entry.is_empty() {
+                self.pending.remove(&hash);
+            }
+        }
         // Delete subscription
         blob.subs.remove(&sender);
         log::debug!("deleted subscription to {} for {}", hash, sender);
@@ -441,8 +483,6 @@ impl State {
         if delete_blob {
             self.blobs.remove(&hash);
             log::debug!("deleted blob {}", hash);
-            // Remove from pending
-            self.pending.remove(&hash);
         }
         Ok((account, delete_blob))
     }

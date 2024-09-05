@@ -173,7 +173,7 @@ fn build_object(
                 metadata: object_state.metadata.clone(),
             }))
         }
-        BlobStatus::Added(_) | BlobStatus::Failed => Ok(None),
+        BlobStatus::Pending | BlobStatus::Failed => Ok(None),
     }
 }
 
@@ -675,6 +675,7 @@ mod tests {
             subs: HashMap::from([(
                 machine_addr,
                 Subscription {
+                    added: 0,
                     expiry: ttl,
                     source: add_params.source,
                 },

@@ -4,7 +4,7 @@
 
 use fendermint_actor_blobs_shared::params::{
     AddBlobParams, BuyCreditParams, DeleteBlobParams, FinalizeBlobParams, GetAccountParams,
-    GetBlobParams, GetStatsReturn,
+    GetBlobParams, GetBlobStatusParams, GetStatsReturn,
 };
 use fendermint_actor_blobs_shared::state::{Account, Blob, BlobStatus, Hash, PublicKey};
 use fendermint_actor_blobs_shared::Method;
@@ -89,10 +89,12 @@ impl BlobsActor {
 
     fn get_blob_status(
         rt: &impl Runtime,
-        params: GetBlobParams,
+        params: GetBlobStatusParams,
     ) -> Result<Option<BlobStatus>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let status = rt.state::<State>()?.get_blob(params.0).map(|b| b.status);
+        let status = rt
+            .state::<State>()?
+            .get_blob_status(params.hash, params.origin);
         Ok(status)
     }
 
@@ -108,7 +110,7 @@ impl BlobsActor {
     fn finalize_blob(rt: &impl Runtime, params: FinalizeBlobParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
         rt.transaction(|st: &mut State, _| {
-            st.finalize_blob(params.from, params.hash, params.status)
+            st.finalize_blob(params.origin, params.hash, params.status)
         })
     }
 
