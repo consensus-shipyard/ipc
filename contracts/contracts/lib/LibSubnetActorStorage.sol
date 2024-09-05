@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 import {ConsensusType} from "../enums/ConsensusType.sol";
 import {NotGateway, SubnetAlreadyKilled} from "../errors/IPCErrors.sol";
 import {BottomUpCheckpoint, BottomUpMsgBatchInfo} from "../structs/CrossNet.sol";
-import {SubnetID, ValidatorSet, StakingChangeLog, StakingReleaseQueue, SupplySource, Validator, PermissionMode} from "../structs/Subnet.sol";
+import {SubnetID, ValidatorSet, StakingChangeLog, StakingReleaseQueue, GenericToken, Validator, PermissionMode} from "../structs/Subnet.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
     struct SubnetActorStorage {
@@ -38,7 +38,9 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
         /// @notice Determines if the subnet has been successfully killed
         bool killed;
         /// @notice subnet supply strategy.
-        SupplySource supplySource;
+        GenericToken supplySource;
+        /// @notice subnet collateral token strategy, only used for collateral based permission mode.
+        GenericToken collateralSource;
         /// @notice ID of the parent subnet
         SubnetID parentId;
         // =========== Staking ===========

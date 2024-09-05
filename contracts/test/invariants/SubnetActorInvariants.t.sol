@@ -15,7 +15,7 @@ import {SubnetActorHandler, ETH_SUPPLY} from "./handlers/SubnetActorHandler.sol"
 import {SubnetActorMock} from "../mocks/SubnetActorMock.sol";
 import {SubnetActorGetterFacet} from "../../contracts/subnet/SubnetActorGetterFacet.sol";
 import {IntegrationTestBase} from "../IntegrationTestBase.sol";
-import {SupplySourceHelper} from "../../contracts/lib/SupplySourceHelper.sol";
+import {GenericTokenHelper} from "../../contracts/lib/GenericTokenHelper.sol";
 import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 import {SubnetActorFacetsHelper} from "../helpers/SubnetActorFacetsHelper.sol";
 import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";

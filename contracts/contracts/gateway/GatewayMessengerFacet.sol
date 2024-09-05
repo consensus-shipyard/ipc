@@ -4,12 +4,12 @@ pragma solidity ^0.8.23;
 import {GatewayActorModifiers} from "../lib/LibGatewayActorStorage.sol";
 import {IpcEnvelope, CallMsg, IpcMsgKind} from "../structs/CrossNet.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
-import {SubnetID, SupplyKind, IPCAddress} from "../structs/Subnet.sol";
+import {SubnetID, GenericTokenKind, IPCAddress} from "../structs/Subnet.sol";
 import {InvalidXnetMessage, InvalidXnetMessageReason, CannotSendCrossMsgToItself, MethodNotAllowed} from "../errors/IPCErrors.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
-import {SupplySourceHelper} from "../lib/SupplySourceHelper.sol";
+import {GenericTokenHelper} from "../lib/GenericTokenHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
 

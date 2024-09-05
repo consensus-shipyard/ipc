@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {GatewayActorStorage, LibGatewayActorStorage} from "../lib/LibGatewayActorStorage.sol";
 import {BURNT_FUNDS_ACTOR} from "../constants/Constants.sol";
-import {SubnetID, Subnet, SupplyKind, SupplySource} from "../structs/Subnet.sol";
+import {SubnetID, Subnet, GenericTokenKind, GenericToken} from "../structs/Subnet.sol";
 import {SubnetActorGetterFacet} from "../subnet/SubnetActorGetterFacet.sol";
 import {CallMsg, IpcMsgKind, IpcEnvelope, OutcomeType, BottomUpMsgBatch, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../structs/CrossNet.sol";
 import {Membership} from "../structs/Subnet.sol";
@@ -12,15 +12,15 @@ import {CannotSendCrossMsgToItself, MethodNotAllowed, MaxMsgsPerBatchExceeded, I
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
-import {SupplySourceHelper} from "../lib/SupplySourceHelper.sol";
+import {GenericTokenHelper} from "../lib/GenericTokenHelper.sol";
 
 library LibGateway {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for IpcEnvelope;
-    using SupplySourceHelper for address;
+    using GenericTokenHelper for address;
     using SubnetIDHelper for SubnetID;
     using FilAddress for address payable;
-    using SupplySourceHelper for SupplySource;
+    using GenericTokenHelper for GenericToken;
 
     event MembershipUpdated(Membership);
     /// @dev subnet refers to the next "down" subnet that the `envelope.message.to` should be forwarded to.
@@ -365,7 +365,7 @@ library LibGateway {
         // The first thing we do is to find out the directionality of this message and act accordingly,
         // incrasing the applied nonces conveniently.
         // slither-disable-next-line uninitialized-local
-        SupplySource memory supplySource;
+        GenericToken memory supplySource;
         IPCMsgType applyType = crossMsg.applyType(s.networkName);
         if (applyType == IPCMsgType.BottomUp) {
             // Load the subnet this message is coming from. Ensure that it exists and that the nonce expectation is met.
@@ -395,7 +395,7 @@ library LibGateway {
 
             // The value carried in top-down messages locally maps to the native coin, so we pass over the
             // native supply source.
-            supplySource = SupplySourceHelper.native();
+            supplySource = GenericTokenHelper.native();
         }
 
         // If the crossnet destination is NOT the current network (network where the gateway is running),
@@ -422,7 +422,7 @@ library LibGateway {
     ///      catch contract revert messages as well. We need this because in `CrossMsgHelper.execute`
     ///      there are `require` and `revert` calls, without reflexive call, the execution will
     ///      revert and block the checkpoint submission process.
-    function executeCrossMsg(IpcEnvelope memory crossMsg, SupplySource memory supplySource) internal returns (bool success, bytes memory result) {
+    function executeCrossMsg(IpcEnvelope memory crossMsg, GenericToken memory supplySource) internal returns (bool success, bytes memory result) {
         (success, result) = address(CrossMsgHelper).delegatecall(   // solhint-disable-line avoid-low-level-calls
             abi.encodeWithSelector(CrossMsgHelper.execute.selector, crossMsg, supplySource)
         );
@@ -499,11 +499,11 @@ library LibGateway {
             // We're traversing up, so if we're the first hop, we reject if the subnet was ERC20.
             // If we're not the first hop, a child propagated this to us, they made a mistake and
             // and we don't have enough info to evaluate.
-            reject = from.getParentSubnet().equals(s.networkName) && from.getActor().hasSupplyOfKind(SupplyKind.ERC20);
+            reject = from.getParentSubnet().equals(s.networkName) && from.getActor().hasSupplyOfKind(GenericTokenKind.ERC20);
         } else if (applyType == IPCMsgType.TopDown) {
             // We're traversing down.
             // Check the next subnet (which can may be the destination subnet).
-            reject = to.down(s.networkName).getActor().hasSupplyOfKind(SupplyKind.ERC20);
+            reject = to.down(s.networkName).getActor().hasSupplyOfKind(GenericTokenKind.ERC20);
         }
         if (reject) {
             if (crossMessage.kind == IpcMsgKind.Transfer) {

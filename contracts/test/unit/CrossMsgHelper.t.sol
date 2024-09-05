@@ -6,7 +6,7 @@ import "../../contracts/lib/CrossMsgHelper.sol";
 import "../../contracts/lib/SubnetIDHelper.sol";
 import "../../contracts/lib/FvmAddressHelper.sol";
 import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
-import {SupplySource} from "../../contracts/structs/Subnet.sol";
+import {GenericToken} from "../../contracts/structs/Subnet.sol";
 import {IpcMsgKind, CallMsg} from "../../contracts/structs/CrossNet.sol";
 
 import "@openzeppelin/contracts/utils/Address.sol";
@@ -156,7 +156,7 @@ contract CrossMsgHelperTest is Test {
 
         vm.deal(sender, 1 ether);
 
-        (, bytes memory result) = crossMsg.execute(SupplySourceHelper.native());
+        (, bytes memory result) = crossMsg.execute(GenericTokenHelper.native());
 
         require(keccak256(result) == keccak256(EMPTY_BYTES));
         require(recipient.balance == 1);
@@ -178,7 +178,7 @@ contract CrossMsgHelperTest is Test {
         vm.deal(sender, 1 ether);
         vm.expectCall(recipient, crossMsg.value, new bytes(0), 1);
 
-        (, bytes memory result) = crossMsg.execute(SupplySourceHelper.native());
+        (, bytes memory result) = crossMsg.execute(GenericTokenHelper.native());
 
         require(keccak256(result) == keccak256(EMPTY_BYTES));
     }
@@ -198,13 +198,13 @@ contract CrossMsgHelperTest is Test {
         vm.deal(sender, 1 ether);
         vm.expectCall(recipient, crossMsg.value, new bytes(0), 1);
 
-        (, bytes memory result) = crossMsg.execute(SupplySourceHelper.native());
+        (, bytes memory result) = crossMsg.execute(GenericTokenHelper.native());
 
         require(keccak256(result) == keccak256(EMPTY_BYTES));
     }
 
     function test_Execute_Fails_InvalidMethod() public {
-        SupplySource memory native = SupplySourceHelper.native();
+        GenericToken memory native = GenericTokenHelper.native();
 
         crossMsg.kind = IpcMsgKind.Call;
         crossMsg.to.rawAddress = FvmAddressHelper.from(address(this));

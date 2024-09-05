@@ -11,15 +11,15 @@ import {Subnet} from "../../structs/Subnet.sol";
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
 import {CrossMsgHelper} from "../../lib/CrossMsgHelper.sol";
-import {SupplySourceHelper} from "../../lib/SupplySourceHelper.sol";
-import {SupplySource} from "../../structs/Subnet.sol";
+import {GenericTokenHelper} from "../../lib/GenericTokenHelper.sol";
+import {GenericToken} from "../../structs/Subnet.sol";
 
 import {NotRegisteredSubnet} from "../../errors/IPCErrors.sol";
 
 contract XnetMessagingFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for IpcEnvelope;
-    using SupplySourceHelper for SupplySource;
+    using GenericTokenHelper for GenericToken;
 
     /// @notice Applies top-down cross-net messages locally. This is invoked by IPC nodes when drawing messages from
     ///         their parent subnet for local execution. That's why the sender is restricted to the system sender,

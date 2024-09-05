@@ -8,7 +8,7 @@ import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMs
 import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
 import {SubnetID, Subnet, IPCAddress, Validator} from "../../contracts/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
-import {SupplySourceHelper} from "../../contracts/lib/SupplySourceHelper.sol";
+import {GenericTokenHelper} from "../../contracts/lib/GenericTokenHelper.sol";
 import {FvmAddressHelper} from "../../contracts/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../../contracts/lib/CrossMsgHelper.sol";
 import {GatewayDiamond, FEATURE_MULTILEVEL_CROSSMSG} from "../../contracts/GatewayDiamond.sol";
@@ -448,7 +448,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, nilTokenSubnet.subnetActorAddr, rootSubnet.gateway);
 
         vm.prank(caller);
-        vm.expectRevert(SupplySourceHelper.NoBalanceIncrease.selector);
+        vm.expectRevert(GenericTokenHelper.NoBalanceIncrease.selector);
         rootSubnet.gateway.manager().fundWithToken(nilTokenSubnet.id, FvmAddressHelper.from(address(caller)), amount);
         assertEq(getSubnetCircSupplyGW(nilTokenSubnet.id, rootSubnet.gateway), 0);
     }
@@ -1398,7 +1398,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             vm.deal(parentValidators[i], 10 gwei);
             parentPubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(parentKeys[i]);
             vm.prank(parentValidators[i]);
-            manager.join{value: 10}(parentPubKeys[i]);
+            manager.join{value: 10}(parentPubKeys[i], 10);
         }
 
         bytes32 hash = keccak256(abi.encode(checkpoint));

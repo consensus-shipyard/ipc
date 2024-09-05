@@ -7,12 +7,12 @@ import "../../contracts/errors/IPCErrors.sol";
 import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../../contracts/constants/Constants.sol";
 import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint} from "../../contracts/structs/CrossNet.sol";
 import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
-import {IPCAddress, SubnetID, Subnet, SupplySource, SupplyKind, Validator} from "../../contracts/structs/Subnet.sol";
+import {IPCAddress, SubnetID, Subnet, GenericToken, GenericTokenKind, Validator} from "../../contracts/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../../contracts/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../../contracts/lib/CrossMsgHelper.sol";
 import {IIpcHandler} from "../../sdk/interfaces/IIpcHandler.sol";
-import {SupplySourceHelper} from "../../contracts/lib/SupplySourceHelper.sol";
+import {GenericTokenHelper} from "../../contracts/lib/GenericTokenHelper.sol";
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {GatewayDiamond} from "../../contracts/GatewayDiamond.sol";
 import {LibGateway} from "../../contracts/lib/LibGateway.sol";
@@ -57,7 +57,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         (SubnetID memory subnetId, , , , ) = getSubnet(address(saDiamond));
 
         vm.prank(caller);
-        vm.expectRevert(SupplySourceHelper.UnexpectedSupplySource.selector);
+        vm.expectRevert(GenericTokenHelper.UnexpectedGenericToken.selector);
         gatewayDiamond.manager().fundWithToken(subnetId, FvmAddressHelper.from(caller), 100);
     }
 
@@ -68,7 +68,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         Subnet memory subnet = createTokenSubnet(address(token));
 
         vm.prank(caller);
-        vm.expectRevert(SupplySourceHelper.UnexpectedSupplySource.selector);
+        vm.expectRevert(GenericTokenHelper.UnexpectedGenericToken.selector);
         gatewayDiamond.manager().fund{value: 100}(subnet.id, FvmAddressHelper.from(caller));
     }
 
@@ -243,7 +243,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         SubnetActorDiamond.ConstructorParams memory saConstructorParams = defaultSubnetActorParamsWith(
             address(gatewayDiamond)
         );
-        saConstructorParams.supplySource = SupplySource({kind: SupplyKind.ERC20, tokenAddress: tokenAddress});
+        saConstructorParams.supplySource = GenericToken({kind: GenericTokenKind.ERC20, tokenAddress: tokenAddress});
 
         // Override the state variables with the new subnet.
         saDiamond = createSubnetActor(saConstructorParams);

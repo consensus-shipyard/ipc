@@ -10,18 +10,18 @@ import {IERC165} from "./interfaces/IERC165.sol";
 import {GatewayCannotBeZero, NotGateway, InvalidSubmissionPeriod, InvalidCollateral, InvalidMajorityPercentage, InvalidPowerScale} from "./errors/IPCErrors.sol";
 import {BATCH_PERIOD, MAX_MSGS_PER_BATCH} from "./structs/CrossNet.sol";
 import {LibDiamond} from "./lib/LibDiamond.sol";
-import {PermissionMode, SubnetID, SupplyKind, SupplySource} from "./structs/Subnet.sol";
+import {PermissionMode, SubnetID, GenericTokenKind, GenericToken} from "./structs/Subnet.sol";
 import {SubnetIDHelper} from "./lib/SubnetIDHelper.sol";
 import {LibStaking} from "./lib/LibStaking.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SupplySourceHelper} from "./lib/SupplySourceHelper.sol";
+import {GenericTokenHelper} from "./lib/GenericTokenHelper.sol";
 error FunctionNotFound(bytes4 _functionSelector);
 
 contract SubnetActorDiamond {
     SubnetActorStorage internal s;
 
     using SubnetIDHelper for SubnetID;
-    using SupplySourceHelper for SupplySource;
+    using GenericTokenHelper for GenericToken;
 
     struct ConstructorParams {
         uint256 minActivationCollateral;
@@ -33,7 +33,8 @@ contract SubnetActorDiamond {
         ConsensusType consensus;
         int8 powerScale;
         PermissionMode permissionMode;
-        SupplySource supplySource;
+        GenericToken supplySource;
+        // GenericToken collateralSource;
         SubnetID parentId;
         address validatorGater;
     }

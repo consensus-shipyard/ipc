@@ -26,7 +26,7 @@ import {SubnetGetterFacet} from "../../contracts/subnetregistry/SubnetGetterFace
 import {DiamondLoupeFacet} from "../../contracts/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../../contracts/diamond/DiamondCutFacet.sol";
 import {OwnershipFacet} from "../../contracts/OwnershipFacet.sol";
-import {SupplySourceHelper} from "../../contracts/lib/SupplySourceHelper.sol";
+import {GenericTokenHelper} from "../../contracts/lib/GenericTokenHelper.sol";
 import {RegistryFacetsHelper} from "../helpers/RegistryFacetsHelper.sol";
 import {DiamondFacetsHelper} from "../helpers/DiamondFacetsHelper.sol";
 
@@ -255,7 +255,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
             activeValidatorsLimit: _activeValidatorsLimit,
             powerScale: _powerScale,
             permissionMode: PermissionMode.Collateral,
-            supplySource: SupplySourceHelper.native(),
+            supplySource: GenericTokenHelper.native(),
             validatorGater: address(0)
         });
 

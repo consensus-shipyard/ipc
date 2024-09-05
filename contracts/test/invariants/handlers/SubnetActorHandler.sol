@@ -80,7 +80,7 @@ contract SubnetActorHandler is CommonBase, StdCheats, StdUtils {
 
         _pay(validator, amount);
         vm.prank(validator);
-        managerFacet.join{value: amount}(publicKey);
+        managerFacet.join{value: amount}(publicKey, amount);
         managerFacet.confirmNextChange();
 
         ghost_stakedSum += amount;
@@ -94,7 +94,7 @@ contract SubnetActorHandler is CommonBase, StdCheats, StdUtils {
         _pay(validator, amount);
 
         vm.prank(validator);
-        managerFacet.stake{value: amount}();
+        managerFacet.stake{value: amount}(amount);
         managerFacet.confirmNextChange();
 
         ghost_stakedSum += amount;

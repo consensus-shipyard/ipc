@@ -10,7 +10,7 @@ import {SubnetActorDiamond} from "../../../contracts/SubnetActorDiamond.sol";
 import {SubnetRegistryDiamond} from "../../../contracts/SubnetRegistryDiamond.sol";
 import {ConsensusType} from "../../../contracts/enums/ConsensusType.sol";
 import {SubnetID, PermissionMode} from "../../../contracts/structs/Subnet.sol";
-import {SupplySourceHelper} from "../../../contracts/lib/SupplySourceHelper.sol";
+import {GenericTokenHelper} from "../../../contracts/lib/GenericTokenHelper.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {RegistryFacetsHelper} from "../../helpers/RegistryFacetsHelper.sol";
 
@@ -122,7 +122,7 @@ contract SubnetRegistryHandler is CommonBase, StdCheats, StdUtils {
             activeValidatorsLimit: _activeValidatorsLimit,
             powerScale: _powerScale,
             permissionMode: PermissionMode.Collateral,
-            supplySource: SupplySourceHelper.native(),
+            supplySource: GenericTokenHelper.native(),
             validatorGater: address(0)
         });
 

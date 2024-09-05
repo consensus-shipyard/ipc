@@ -506,9 +506,6 @@ library LibStaking {
         s.validatorSet.recordWithdraw(validator, amount);
         // confirm deposit that updates the confirmed collateral
         s.validatorSet.confirmWithdraw(validator, amount);
-
-        // release stake from gateway and transfer to user
-        payable(validator).sendValue(amount);
     }
 
     // ================= Operations that are queued ==============
