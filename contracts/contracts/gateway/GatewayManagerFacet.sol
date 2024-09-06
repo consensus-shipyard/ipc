@@ -30,17 +30,20 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     /// @notice register a subnet in the gateway. It is called by a subnet when it reaches the threshold stake
     /// @dev The subnet can optionally pass a genesis circulating supply that would be pre-allocated in the
     /// subnet from genesis (without having to wait for the subnet to be spawned to propagate the funds).
-    function register(uint256 genesisCircSupply) external payable {
+    function register(uint256 genesisCircSupply, uint256 collateral) external payable {
         // If L2+ support is not enabled, only allow the registration of new
         // subnets in the root
         if (s.networkName.route.length + 1 >= s.maxTreeDepth) {
             revert MethodNotAllowed(ERR_CHILD_SUBNET_NOT_ALLOWED);
         }
 
-        if (msg.value < genesisCircSupply) {
-            revert NotEnoughFunds();
+        if (genesisCircSupply > 0) {
+            SubnetActorGetterFacet(msg.sender).supplySource().lock(genesisCircSupply);
         }
-        uint256 collateral = msg.value - genesisCircSupply;
+        if (collateral > 0) {
+            SubnetActorGetterFacet(msg.sender).collateralSource().lock(collateral);
+        }
+
         SubnetID memory subnetId = s.networkName.createSubnetId(msg.sender);
 
         (bool registered, Subnet storage subnet) = LibGateway.getSubnet(subnetId);
@@ -58,10 +61,12 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     }
 
     /// @notice addStake - add collateral for an existing subnet
-    function addStake() external payable {
-        if (msg.value == 0) {
+    function addStake(uint256 amount) external payable {
+        if (amount == 0) {
             revert NotEnoughFunds();
         }
+
+        SubnetActorGetterFacet(msg.sender).collateralSource().lock(amount);
 
         (bool registered, Subnet storage subnet) = LibGateway.getSubnet(msg.sender);
 
@@ -69,7 +74,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
             revert NotRegisteredSubnet();
         }
 
-        subnet.stake += msg.value;
+        subnet.stake += amount;
     }
 
     /// @notice release collateral for an existing subnet.
@@ -90,8 +95,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         }
 
         subnet.stake -= amount;
-
-        payable(subnet.id.getActor()).sendValue(amount);
+        SubnetActorGetterFacet(msg.sender).collateralSource().transferFunds(payable(msg.sender), amount);
     }
 
     /// @notice kill an existing subnet.
@@ -114,8 +118,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         delete s.subnets[id];
 
         s.subnetKeys.remove(id);
-
-        payable(msg.sender).sendValue(stake);
+        SubnetActorGetterFacet(msg.sender).collateralSource().transferFunds(payable(msg.sender), stake);
     }
 
     /// @notice credits the received value to the specified address in the specified child subnet.

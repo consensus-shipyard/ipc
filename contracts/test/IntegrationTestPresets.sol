@@ -22,7 +22,7 @@ contract L1GatewayActorDiamond is IntegrationTestBase {
         gatewayDiamond = createGatewayDiamond(gwConstructorParams);
     }
 
-    function defaultGatewayParams() internal pure override returns (GatewayDiamond.ConstructorParams memory) {
+    function defaultGatewayParams() internal view override returns (GatewayDiamond.ConstructorParams memory) {
         address[] memory path = new address[](1);
         path[0] = CHILD_NETWORK_ADDRESS;
 
@@ -48,7 +48,7 @@ contract L2GatewayActorDiamond is IntegrationTestBase {
         gatewayDiamond = createGatewayDiamond(gwConstructorParams);
     }
 
-    function defaultGatewayParams() internal pure override returns (GatewayDiamond.ConstructorParams memory) {
+    function defaultGatewayParams() internal view override returns (GatewayDiamond.ConstructorParams memory) {
         address[] memory path = new address[](2);
         path[0] = CHILD_NETWORK_ADDRESS;
         path[1] = CHILD_NETWORK_ADDRESS_2;
@@ -77,7 +77,7 @@ contract L3GatewayActorDiamond is IntegrationTestBase {
         gatewayDiamond = createGatewayDiamond(gwConstructorParams);
     }
 
-    function defaultGatewayParams() internal pure override returns (GatewayDiamond.ConstructorParams memory) {
+    function defaultGatewayParams() internal view override returns (GatewayDiamond.ConstructorParams memory) {
         address[] memory path = new address[](3);
         path[0] = CHILD_NETWORK_ADDRESS;
         path[1] = CHILD_NETWORK_ADDRESS_2;

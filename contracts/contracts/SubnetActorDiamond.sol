@@ -34,7 +34,7 @@ contract SubnetActorDiamond {
         int8 powerScale;
         PermissionMode permissionMode;
         GenericToken supplySource;
-        // GenericToken collateralSource;
+        GenericToken collateralSource;
         SubnetID parentId;
         address validatorGater;
     }
@@ -97,6 +97,7 @@ contract SubnetActorDiamond {
         s.changeSet.startConfigurationNumber = LibStaking.INITIAL_CONFIGURATION_NUMBER;
         // Set the supply strategy.
         s.supplySource = params.supplySource;
+        s.collateralSource = params.collateralSource;
 
         if (params.validatorGater != address(0)) {
             s.validatorGater = params.validatorGater;

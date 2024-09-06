@@ -256,6 +256,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
             powerScale: _powerScale,
             permissionMode: PermissionMode.Collateral,
             supplySource: GenericTokenHelper.native(),
+            collateralSource: GenericTokenHelper.native(),
             validatorGater: address(0)
         });
 

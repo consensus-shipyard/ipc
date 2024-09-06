@@ -6,16 +6,18 @@ import {ERR_PERMISSIONED_AND_BOOTSTRAPPED} from "../errors/IPCErrors.sol";
 import {NotEnoughGenesisValidators, DuplicatedGenesisValidator, NotOwnerOfPublicKey, MethodNotAllowed} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {IValidatorGater} from "../interfaces/IValidatorGater.sol";
-import {Validator, ValidatorSet, PermissionMode, SubnetID} from "../structs/Subnet.sol";
+import {Validator, ValidatorSet, PermissionMode, SubnetID, GenericToken} from "../structs/Subnet.sol";
 import {SubnetActorModifiers} from "../lib/LibSubnetActorStorage.sol";
 import {LibValidatorSet, LibStaking} from "../lib/LibStaking.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {LibSubnetActorStorage, SubnetActorStorage} from "./LibSubnetActorStorage.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
+import {GenericTokenHelper} from "../lib/GenericTokenHelper.sol";
 
 library LibSubnetActor {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SubnetIDHelper for SubnetID;
+    using GenericTokenHelper for GenericToken;
 
     event SubnetBootstrapped(Validator[]);
 
@@ -90,7 +92,7 @@ library LibSubnetActor {
                 emit SubnetBootstrapped(s.genesisValidators);
 
                 // register adding the genesis circulating supply (if it exists)
-                IGateway(s.ipcGatewayAddr).register{value: totalCollateral + s.genesisCircSupply}(s.genesisCircSupply);
+                registerInGateway(totalCollateral);
             }
         }
     }
@@ -151,7 +153,34 @@ library LibSubnetActor {
         emit SubnetBootstrapped(s.genesisValidators);
 
         // register adding the genesis circulating supply (if it exists)
-        IGateway(s.ipcGatewayAddr).register{value: s.genesisCircSupply}(s.genesisCircSupply);
+        registerInGateway(0);
+    }
+
+    function registerInGateway(uint256 collateral) internal {
+        SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
+
+        uint256 g = s.genesisCircSupply;
+
+        bool supplySourceNative = s.supplySource.isNative();
+        bool collateralSourceNative = s.collateralSource.isNative();
+
+        // this method is unnecessarily handling different cases because subnet actor needs
+        // to "register" in gateway and different token types needs to be attached or approved.
+        // TODO: it's known that having gateway holding all subnets' funds is insecure, this 
+        // TODO: can be removed once contract redesign is in place.
+        if (supplySourceNative && collateralSourceNative) {
+            IGateway(s.ipcGatewayAddr).register{value: g + collateral}(g, collateral);   
+        } else if (!supplySourceNative && collateralSourceNative) {
+            s.supplySource.approve(s.ipcGatewayAddr, g);
+            IGateway(s.ipcGatewayAddr).register{value: collateral}(g, collateral);
+        } else if (supplySourceNative && !collateralSourceNative) {
+            s.collateralSource.approve(s.ipcGatewayAddr, collateral);
+            IGateway(s.ipcGatewayAddr).register{value: g}(g, collateral);
+        } else {
+            s.supplySource.approve(s.ipcGatewayAddr, g);
+            s.collateralSource.approve(s.ipcGatewayAddr, collateral);
+            IGateway(s.ipcGatewayAddr).register(g, collateral);
+        }
     }
 
     /// @notice method that allows the contract owner to set the validators' federated power after

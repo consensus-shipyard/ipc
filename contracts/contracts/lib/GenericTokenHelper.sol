@@ -208,4 +208,14 @@ library GenericTokenHelper {
     function native() internal pure returns (GenericToken memory) {
         return GenericToken({kind: GenericTokenKind.Native, tokenAddress: address(0)});
     }
+
+    function isNative(GenericToken memory self) internal pure returns(bool) {
+        return self.kind == GenericTokenKind.Native;
+    }
+
+    function approve(GenericToken memory self, address spender, uint256 amount) internal returns(bool) {
+        if (self.kind == GenericTokenKind.ERC20) {
+            IERC20(self.tokenAddress).approve(spender, amount);
+        }
+    }
 }

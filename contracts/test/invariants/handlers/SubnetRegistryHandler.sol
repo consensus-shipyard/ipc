@@ -123,6 +123,7 @@ contract SubnetRegistryHandler is CommonBase, StdCheats, StdUtils {
             powerScale: _powerScale,
             permissionMode: PermissionMode.Collateral,
             supplySource: GenericTokenHelper.native(),
+            collateralSource: GenericTokenHelper.native(),
             validatorGater: address(0)
         });
 

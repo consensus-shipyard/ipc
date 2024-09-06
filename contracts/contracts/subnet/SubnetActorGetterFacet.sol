@@ -216,4 +216,9 @@ contract SubnetActorGetterFacet {
     function supplySource() external view returns (GenericToken memory supply) {
         return s.supplySource;
     }
+
+    /// @notice Returns the collateral strategy for the subnet.
+    function collateralSource() external view returns (GenericToken memory supply) {
+        return s.collateralSource;
+    }
 }

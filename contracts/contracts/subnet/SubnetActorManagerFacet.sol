@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import "forge-std/console.sol";
-
 import {VALIDATOR_SECP256K1_PUBLIC_KEY_LENGTH} from "../constants/Constants.sol";
 import {ERR_VALIDATOR_JOINED, ERR_VALIDATOR_NOT_JOINED} from "../errors/IPCErrors.sol";
 import {InvalidFederationPayload, SubnetAlreadyBootstrapped, NotEnoughFunds, CollateralIsZero, CannotReleaseZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalance, NotEnoughCollateral, NotValidator, NotAllValidatorsHaveLeft, InvalidPublicKeyLength, MethodNotAllowed, SubnetNotBootstrapped} from "../errors/IPCErrors.sol";
@@ -29,8 +27,8 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
     /// @notice method to add some initial balance into a subnet that hasn't yet bootstrapped.
     /// @dev This balance is added to user addresses in genesis, and becomes part of the genesis
     /// circulating supply.
-    function preFund() external payable {
-        if (msg.value == 0) {
+    function preFund(uint256 amount) external payable {
+        if (amount == 0) {
             revert NotEnoughFunds();
         }
 
@@ -38,12 +36,14 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             revert SubnetAlreadyBootstrapped();
         }
 
+        s.supplySource.lock(amount);
+
         if (s.genesisBalance[msg.sender] == 0) {
             s.genesisBalanceKeys.push(msg.sender);
         }
 
-        s.genesisBalance[msg.sender] += msg.value;
-        s.genesisCircSupply += msg.value;
+        s.genesisBalance[msg.sender] += amount;
+        s.genesisCircSupply += amount;
     }
 
     /// @notice method to remove funds from the initial balance of a subnet.
@@ -59,6 +59,8 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             revert SubnetAlreadyBootstrapped();
         }
 
+        s.supplySource.transferFunds(payable(msg.sender), amount);
+
         if (s.genesisBalance[msg.sender] < amount) {
             revert NotEnoughBalance();
         }
@@ -69,8 +71,6 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
         if (s.genesisBalance[msg.sender] == 0) {
             LibSubnetActor.rmAddressFromBalanceKey(msg.sender);
         }
-
-        payable(msg.sender).sendValue(amount);
     }
 
     function setValidatorGater(address gater) external notKilled {
@@ -220,11 +220,9 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
 
         LibSubnetActor.gateValidatorPowerDelta(msg.sender, collateral, collateral - amount);
 
-        // transfer token first
-        s.collateralSource.transferFunds(payable(msg.sender), amount);
-
         if (!s.bootstrapped) {
             LibStaking.withdrawWithConfirm(msg.sender, amount);
+            s.collateralSource.transferFunds(payable(msg.sender), amount);
         } else {
             LibStaking.withdraw(msg.sender, amount);
         }
@@ -252,9 +250,6 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
         // slither-disable-next-line unused-return
         s.bootstrapOwners.remove(msg.sender);
         delete s.bootstrapNodes[msg.sender];
-        
-        console.log(amount, address(this).balance);
-        s.collateralSource.transferFunds(payable(msg.sender), amount);
 
         if (!s.bootstrapped) {
             // check if the validator had some initial balance and return it if not bootstrapped
@@ -263,10 +258,12 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
                 s.genesisBalance[msg.sender] == 0;
                 s.genesisCircSupply -= genesisBalance;
                 LibSubnetActor.rmAddressFromBalanceKey(msg.sender);
+                s.collateralSource.transferFunds(payable(msg.sender), genesisBalance);
             }
 
             // interaction must be performed after checks and changes
             LibStaking.withdrawWithConfirm(msg.sender, amount);
+            s.collateralSource.transferFunds(payable(msg.sender), amount);
             return;
         }
         LibStaking.withdraw(msg.sender, amount);
