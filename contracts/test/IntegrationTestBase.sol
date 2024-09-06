@@ -152,7 +152,6 @@ contract TestSubnetActor is Test, TestParams {
     bytes4[] saOwnershipSelectors;
 
     SubnetActorDiamond saDiamond;
-    SubnetActorMock saMock;
 
     constructor() {
         saGetterSelectors = SelectorLibrary.resolveSelectors("SubnetActorGetterFacet");
