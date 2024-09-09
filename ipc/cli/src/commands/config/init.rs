@@ -22,14 +22,12 @@ impl CommandLineHandler for InitConfig {
         if let Some(parent) = file_path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        let mut file = std::fs::File::create(&path).map_err(|e| {
+        let mut file = std::fs::File::create(&path).inspect_err(|_| {
             log::error!("couldn't create config file");
-            e
         })?;
         file.write_all(DEFAULT_CONFIG_TEMPLATE.as_bytes())
-            .map_err(|e| {
+            .inspect_err(|_| {
                 log::error!("error populating empty config template");
-                e
             })?;
 
         log::info!("Empty config populated successful in {}", &path);
