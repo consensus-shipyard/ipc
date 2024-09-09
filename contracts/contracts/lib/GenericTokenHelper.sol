@@ -213,7 +213,7 @@ library GenericTokenHelper {
         return self.kind == GenericTokenKind.Native;
     }
 
-    function approve(GenericToken memory self, address spender, uint256 amount) internal returns(bool) {
+    function approve(GenericToken memory self, address spender, uint256 amount) internal {
         if (self.kind == GenericTokenKind.ERC20) {
             IERC20(self.tokenAddress).approve(spender, amount);
         }
