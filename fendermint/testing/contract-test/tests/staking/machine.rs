@@ -111,7 +111,11 @@ impl StateMachine for StakingMachine {
             min_activation_collateral: to_eth_tokens(&state.min_collateral()).unwrap(),
             min_validators: state.min_validators() as u64,
             permission_mode: 0, // collateral based
-            supply_source: ipc_actors_abis::register_subnet_facet::SupplySource {
+            supply_source: ipc_actors_abis::register_subnet_facet::GenericToken {
+                kind: 0, // native token
+                token_address: ethers::types::Address::zero(),
+            },
+            collateral_source: ipc_actors_abis::register_subnet_facet::GenericToken {
                 kind: 0, // native token
                 token_address: ethers::types::Address::zero(),
             },

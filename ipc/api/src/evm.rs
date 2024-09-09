@@ -9,7 +9,7 @@ use crate::checkpoint::BottomUpMsgBatch;
 use crate::cross::{IpcEnvelope, IpcMsgKind};
 use crate::staking::StakingChange;
 use crate::staking::StakingChangeRequest;
-use crate::subnet::SupplySource;
+use crate::subnet::{GenericToken, GenericTokenKind};
 use crate::subnet_id::SubnetID;
 use crate::{eth_to_fil_amount, ethers_address_to_fil_address};
 use anyhow::anyhow;
@@ -180,6 +180,45 @@ macro_rules! bottom_up_msg_batch_conversion {
     };
 }
 
+/// The type conversion between different generic token types
+macro_rules! generic_token_conversion {
+    ($module:ident) => {
+        impl TryFrom<GenericToken> for $module::GenericToken {
+            type Error = anyhow::Error;
+
+            fn try_from(value: GenericToken) -> Result<Self, Self::Error> {
+                let token_address = if let Some(token_address) = value.token_address {
+                    payload_to_evm_address(token_address.payload())?
+                } else {
+                    ethers::types::Address::zero()
+                };
+
+                Ok(Self {
+                    kind: value.kind as u8,
+                    token_address,
+                })
+            }
+        }
+
+        impl TryFrom<$module::GenericToken> for GenericToken {
+            type Error = anyhow::Error;
+
+            fn try_from(value: $module::GenericToken) -> Result<Self, Self::Error> {
+                let token_address = if value.token_address == ethers::types::Address::zero() {
+                    None
+                } else {
+                    Some(ethers_address_to_fil_address(&value.token_address)?)
+                };
+
+                Ok(Self {
+                    kind: GenericTokenKind::try_from(value.kind)?,
+                    token_address,
+                })
+            }
+        }
+    };
+}
+
 base_type_conversion!(xnet_messaging_facet);
 base_type_conversion!(subnet_actor_getter_facet);
 base_type_conversion!(gateway_manager_facet);
@@ -198,37 +237,19 @@ bottom_up_checkpoint_conversion!(gateway_getter_facet);
 bottom_up_checkpoint_conversion!(subnet_actor_checkpointing_facet);
 bottom_up_msg_batch_conversion!(gateway_getter_facet);
 
-impl TryFrom<SupplySource> for subnet_actor_diamond::SupplySource {
+generic_token_conversion!(subnet_actor_diamond);
+generic_token_conversion!(register_subnet_facet);
+generic_token_conversion!(subnet_actor_getter_facet);
+
+impl TryFrom<u8> for GenericTokenKind {
     type Error = anyhow::Error;
 
-    fn try_from(value: SupplySource) -> Result<Self, Self::Error> {
-        let token_address = if let Some(token_address) = value.token_address {
-            payload_to_evm_address(token_address.payload())?
-        } else {
-            ethers::types::Address::zero()
-        };
-
-        Ok(Self {
-            kind: value.kind as u8,
-            token_address,
-        })
-    }
-}
-
-impl TryFrom<SupplySource> for register_subnet_facet::SupplySource {
-    type Error = anyhow::Error;
-
-    fn try_from(value: SupplySource) -> Result<Self, Self::Error> {
-        let token_address = if let Some(token_address) = value.token_address {
-            payload_to_evm_address(token_address.payload())?
-        } else {
-            ethers::types::Address::zero()
-        };
-
-        Ok(Self {
-            kind: value.kind as u8,
-            token_address,
-        })
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(GenericTokenKind::Native),
+            1 => Ok(GenericTokenKind::ERC20),
+            _ => Err(anyhow!("invalid kind {value}")),
+        }
     }
 }
 

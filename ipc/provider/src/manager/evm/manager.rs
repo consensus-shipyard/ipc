@@ -19,7 +19,7 @@ use reqwest::header::HeaderValue;
 use reqwest::Client;
 use std::net::{IpAddr, SocketAddr};
 
-use ipc_api::subnet::{PermissionMode, SupplyKind, SupplySource};
+use ipc_api::subnet::{GenericToken, GenericTokenKind, PermissionMode};
 use ipc_api::{eth_to_fil_amount, ethers_address_to_fil_address};
 
 use crate::config::subnet::SubnetConfig;
@@ -275,7 +275,10 @@ impl SubnetManager for EthSubnetManager {
             active_validators_limit: params.active_validators_limit,
             power_scale: 3,
             permission_mode: params.permission_mode as u8,
-            supply_source: register_subnet_facet::SupplySource::try_from(params.supply_source)?,
+            supply_source: register_subnet_facet::GenericToken::try_from(params.supply_source)?,
+            collateral_source: register_subnet_facet::GenericToken::try_from(
+                params.collateral_source,
+            )?,
             validator_gater: payload_to_evm_address(params.validator_gater.payload())?,
         };
 
@@ -344,8 +347,10 @@ impl SubnetManager for EthSubnetManager {
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
-        let mut txn = contract.join(ethers::types::Bytes::from(pub_key));
-        txn.tx.set_value(collateral);
+        let mut txn = contract.join(ethers::types::Bytes::from(pub_key), U256::from(collateral));
+        txn = self.handle_txn_token(&subnet, txn, collateral, 0).await?;
+        // txn.tx.set_value(collateral);
+
         let txn = call_with_premium_estimation(signer, txn).await?;
 
         // Use the pending state to get the nonce because there could have been a pre-fund. Best would be to use this for everything.
@@ -369,8 +374,10 @@ impl SubnetManager for EthSubnetManager {
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
-        let mut txn = contract.pre_fund();
-        txn.tx.set_value(balance);
+        let mut txn = contract.pre_fund(U256::from(balance));
+        txn = self.handle_txn_token(&subnet, txn, 0, balance).await?;
+        // txn.tx.set_value();
+
         let txn = call_with_premium_estimation(signer, txn).await?;
 
         txn.send().await?;
@@ -419,8 +426,10 @@ impl SubnetManager for EthSubnetManager {
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
-        let mut txn = contract.stake();
-        txn.tx.set_value(collateral);
+        let mut txn = contract.stake(U256::from(collateral));
+        txn = self.handle_txn_token(&subnet, txn, collateral, 0).await?;
+        // txn.tx.set_value();
+
         let txn = call_with_premium_estimation(signer, txn).await?;
 
         txn.send().await?.await?;
@@ -581,11 +590,17 @@ impl SubnetManager for EthSubnetManager {
         let signer = Arc::new(self.get_signer(&from)?);
 
         let subnet_supply_source = self.get_subnet_supply_source(&subnet).await?;
-        if subnet_supply_source.kind != SupplyKind::ERC20 as u8 {
+        if subnet_supply_source.kind != GenericTokenKind::ERC20 {
             return Err(anyhow!("Invalid operation: Expected the subnet's supply source to be ERC20, but found a different kind."));
         }
 
-        let token_contract = IERC20::new(subnet_supply_source.token_address, signer.clone());
+        let token_address = payload_to_evm_address(
+            subnet_supply_source
+                .token_address
+                .ok_or_else(|| anyhow!("zero adress not erc20"))?
+                .payload(),
+        )?;
+        let token_contract = IERC20::new(token_address, signer.clone());
 
         let txn = token_contract.approve(self.ipc_contract_info.gateway_addr, value);
         let txn = call_with_premium_estimation(signer, txn).await?;
@@ -755,16 +770,24 @@ impl SubnetManager for EthSubnetManager {
         Ok(commit_sha)
     }
 
-    async fn get_subnet_supply_source(
-        &self,
-        subnet: &SubnetID,
-    ) -> Result<ipc_actors_abis::subnet_actor_getter_facet::SupplySource> {
+    async fn get_subnet_supply_source(&self, subnet: &SubnetID) -> Result<GenericToken> {
         let address = contract_address_from_subnet(subnet)?;
         let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
             address,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
-        Ok(contract.supply_source().call().await?)
+        let raw = contract.collateral_source().call().await?;
+        Ok(GenericToken::try_from(raw)?)
+    }
+
+    async fn get_subnet_collateral_source(&self, subnet: &SubnetID) -> Result<GenericToken> {
+        let address = contract_address_from_subnet(subnet)?;
+        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+        let raw = contract.collateral_source().call().await?;
+        Ok(GenericToken::try_from(raw)?)
     }
 
     async fn get_genesis_info(&self, subnet: &SubnetID) -> Result<SubnetGenesisInfo> {
@@ -793,8 +816,8 @@ impl SubnetManager for EthSubnetManager {
             genesis_balances: into_genesis_balance_map(genesis_balances.0, genesis_balances.1)?,
             // TODO: fixme https://github.com/consensus-shipyard/ipc-monorepo/issues/496
             permission_mode: PermissionMode::Collateral,
-            supply_source: SupplySource {
-                kind: SupplyKind::Native,
+            supply_source: GenericToken {
+                kind: GenericTokenKind::Native,
                 token_address: None,
             },
         })
@@ -1018,6 +1041,31 @@ impl EthSubnetManager {
                 provider,
             },
         }
+    }
+
+    pub async fn handle_txn_token<B, D, M>(
+        &self,
+        subnet: &SubnetID,
+        mut txn: ethers_contract::FunctionCall<B, D, M>,
+        collateral: u128,
+        balance: u128,
+    ) -> anyhow::Result<ethers_contract::FunctionCall<B, D, M>>
+    where
+        B: std::borrow::Borrow<D>,
+        M: ethers::abi::Detokenize,
+    {
+        let supply_source = self.get_subnet_supply_source(subnet).await?;
+        let collateral_source = self.get_subnet_collateral_source(subnet).await?;
+
+        match (supply_source.kind, collateral_source.kind) {
+            (GenericTokenKind::Native, GenericTokenKind::Native) => {
+                _ = txn.tx.set_value(balance + collateral)
+            }
+            (GenericTokenKind::Native, GenericTokenKind::ERC20) => _ = txn.tx.set_value(balance),
+            (GenericTokenKind::ERC20, GenericTokenKind::Native) => _ = txn.tx.set_value(collateral),
+            _ => {}
+        }
+        Ok(txn)
     }
 
     pub fn ensure_same_gateway(&self, gateway: &Address) -> Result<()> {

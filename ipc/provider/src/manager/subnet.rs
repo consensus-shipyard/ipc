@@ -12,7 +12,7 @@ use ipc_api::checkpoint::{
 };
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::{StakingChangeRequest, ValidatorInfo};
-use ipc_api::subnet::{ConstructParams, PermissionMode, SupplySource};
+use ipc_api::subnet::{ConstructParams, GenericToken, PermissionMode};
 use ipc_api::subnet_id::SubnetID;
 use ipc_api::validator::Validator;
 
@@ -163,10 +163,10 @@ pub trait SubnetManager: Send + Sync + TopDownFinalityQuery + BottomUpCheckpoint
     async fn get_commit_sha(&self) -> Result<[u8; 32]>;
 
     /// Gets the subnet supply source
-    async fn get_subnet_supply_source(
-        &self,
-        subnet: &SubnetID,
-    ) -> Result<ipc_actors_abis::subnet_actor_getter_facet::SupplySource>;
+    async fn get_subnet_supply_source(&self, subnet: &SubnetID) -> Result<GenericToken>;
+
+    /// Gets the subnet collateral source
+    async fn get_subnet_collateral_source(&self, subnet: &SubnetID) -> Result<GenericToken>;
 
     /// Gets the genesis information required to bootstrap a child subnet
     async fn get_genesis_info(&self, subnet: &SubnetID) -> Result<SubnetGenesisInfo>;
@@ -209,7 +209,7 @@ pub struct SubnetGenesisInfo {
     pub validators: Vec<Validator>,
     pub genesis_balances: BTreeMap<Address, TokenAmount>,
     pub permission_mode: PermissionMode,
-    pub supply_source: SupplySource,
+    pub supply_source: GenericToken,
 }
 
 /// The generic payload that returns the block hash of the data returning block with the actual

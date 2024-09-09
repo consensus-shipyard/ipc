@@ -12,7 +12,7 @@ use fvm_shared::{
 use ipc_api::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
 use ipc_api::evm::payload_to_evm_address;
 use ipc_api::staking::{StakingChangeRequest, ValidatorInfo};
-use ipc_api::subnet::{PermissionMode, SupplySource};
+use ipc_api::subnet::{GenericToken, PermissionMode};
 use ipc_api::{
     cross::IpcEnvelope,
     subnet::{ConsensusType, ConstructParams},
@@ -253,7 +253,8 @@ impl IpcProvider {
         active_validators_limit: u16,
         min_cross_msg_fee: TokenAmount,
         permission_mode: PermissionMode,
-        supply_source: SupplySource,
+        supply_source: GenericToken,
+        collateral_source: GenericToken,
         validator_gater: Address,
     ) -> anyhow::Result<Address> {
         let conn = self.get_connection(&parent)?;
@@ -272,6 +273,7 @@ impl IpcProvider {
             min_cross_msg_fee,
             permission_mode,
             supply_source,
+            collateral_source,
             validator_gater,
         };
 
