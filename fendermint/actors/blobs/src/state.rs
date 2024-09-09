@@ -103,13 +103,9 @@ impl State {
     ) -> anyhow::Result<Account, ActorError> {
         let credits = self.credit_debit_rate * amount.atto();
         // Don't sell credits if we're at storage capacity
-        // TODO: This should be more nuanced, i.e., pick some min block duration and storage amount
-        // at which to stop selling credits. Say there's only 1 byte of capcity left,
-        // we don't want to sell a bunch of credits even though they could be used if the account
-        // wants to store 1 byte at a time, which is unlikely :)
         if self.capacity_used == self.capacity_free {
             return Err(ActorError::forbidden(
-                "credits not available (subnet has reach capacity)".into(),
+                "credits not available (subnet has reached storage capacity)".into(),
             ));
         }
         self.credit_sold += &credits;
@@ -236,13 +232,13 @@ impl State {
                 sub.source = source;
                 debug!("updated subscription to {} for {}", hash, subscriber);
             } else {
+                new_account_capacity = size.clone();
                 // One or more accounts have already committed credit.
                 // However, we still need to reserve the full required credit from the new
                 // subscriber, as the existing account(s) may decide to change the
                 // expiry or cancel.
                 credit_required = ttl as u64 * &size;
                 ensure_credit(subscriber, &account.credit_free, &credit_required)?;
-                new_account_capacity = size.clone();
                 // Add new subscription
                 blob.subs.insert(
                     subscriber,
@@ -275,11 +271,19 @@ impl State {
                     .or_insert(HashSet::from([(subscriber, source)]));
             }
         } else {
-            // New blob increases network capacity as well
+            new_account_capacity = size.clone();
+            // New blob increases network capacity as well.
+            // Ensure there is enough capacity available.
+            let available_capacity = &self.capacity_free - &self.capacity_used;
+            if size > available_capacity {
+                return Err(ActorError::forbidden(format!(
+                    "subnet has insufficient storage capacity (available: {}; required: {})",
+                    available_capacity, size
+                )));
+            }
+            new_capacity = size.clone();
             credit_required = ttl as u64 * &size;
             ensure_credit(subscriber, &account.credit_free, &credit_required)?;
-            new_capacity = size.clone();
-            new_account_capacity = size.clone();
             // Create new blob
             let blob = Blob {
                 size: size.to_u64().unwrap(),
