@@ -322,8 +322,12 @@ impl State {
         }
     }
 
-    pub fn get_pending_blobs(&self) -> BTreeMap<Hash, HashSet<(Address, PublicKey)>> {
-        self.pending.clone()
+    pub fn get_pending_blobs(&self, size: u32) -> Vec<(Hash, HashSet<(Address, PublicKey)>)> {
+        self.pending
+            .iter()
+            .take(size as usize)
+            .map(|element| (*element.0, element.1.clone()))
+            .collect::<Vec<_>>()
     }
 
     pub fn finalize_blob(

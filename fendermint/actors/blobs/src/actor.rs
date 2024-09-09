@@ -4,7 +4,7 @@
 
 use fendermint_actor_blobs_shared::params::{
     AddBlobParams, BuyCreditParams, DeleteBlobParams, FinalizeBlobParams, GetAccountParams,
-    GetBlobParams, GetBlobStatusParams, GetStatsReturn,
+    GetBlobParams, GetBlobStatusParams, GetPendingBlobsParams, GetStatsReturn,
 };
 use fendermint_actor_blobs_shared::state::{Account, Blob, BlobStatus, Hash, PublicKey};
 use fendermint_actor_blobs_shared::Method;
@@ -19,7 +19,7 @@ use fvm_shared::address::Address;
 use fvm_shared::sys::SendFlags;
 use fvm_shared::{error::ExitCode, MethodNum};
 use num_traits::Zero;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 
 use crate::{ext, ConstructorParams, State, BLOBS_ACTOR_NAME};
 
@@ -27,6 +27,8 @@ use crate::{ext, ConstructorParams, State, BLOBS_ACTOR_NAME};
 fil_actors_runtime::wasm_trampoline!(BlobsActor);
 
 pub struct BlobsActor;
+
+type BlobTuple = (Hash, HashSet<(Address, PublicKey)>);
 
 impl BlobsActor {
     fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
@@ -101,9 +103,10 @@ impl BlobsActor {
     // TODO: limit return via param
     fn get_pending_blobs(
         rt: &impl Runtime,
-    ) -> Result<BTreeMap<Hash, HashSet<(Address, PublicKey)>>, ActorError> {
+        params: GetPendingBlobsParams,
+    ) -> Result<Vec<BlobTuple>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let pending = rt.state::<State>()?.get_pending_blobs();
+        let pending = rt.state::<State>()?.get_pending_blobs(params.size);
         Ok(pending)
     }
 

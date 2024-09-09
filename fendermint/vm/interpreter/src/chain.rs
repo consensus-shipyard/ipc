@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use crate::fvm::state::ipc::GatewayCaller;
@@ -16,7 +16,7 @@ use crate::{
 use anyhow::{anyhow, bail, Context};
 use async_stm::atomically;
 use async_trait::async_trait;
-use fendermint_actor_blobs_shared::params::GetBlobStatusParams;
+use fendermint_actor_blobs_shared::params::{GetBlobStatusParams, GetPendingBlobsParams};
 use fendermint_actor_blobs_shared::state::BlobStatus;
 use fendermint_actor_blobs_shared::Method::DebitAccounts;
 use fendermint_actor_blobs_shared::{
@@ -58,6 +58,8 @@ pub type CheckpointPool = ResolvePool<CheckpointPoolItem>;
 pub type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProviderProxy>>>;
 pub type BlobPool = IrohResolvePool<BlobPoolItem>;
 
+type PendingBlobItem = (Hash, HashSet<(Address, PublicKey)>);
+
 /// These are the extra state items that the chain interpreter needs,
 /// a sort of "environment" supporting IPC.
 #[derive(Clone)]
@@ -69,6 +71,8 @@ pub struct ChainEnv {
     pub parent_finality_votes: VoteTally,
     /// Iroh blob resolution pool.
     pub blob_pool: BlobPool,
+    /// Number of pending blobs to process in one pass.
+    pub pending_blobs_size: u32,
 }
 
 #[derive(Clone, Hash, PartialEq, Eq)]
@@ -221,7 +225,8 @@ where
 
         // Collect and enqueue blobs that need to be resolved.
         state.state_tree_mut().begin_transaction();
-        let resolving_blobs = get_pending_blobs(&mut state)?;
+        let pending_blobs_size = env.pending_blobs_size;
+        let resolving_blobs = get_pending_blobs(&mut state, pending_blobs_size)?;
         state
             .state_tree_mut()
             .end_transaction(true)
@@ -861,10 +866,13 @@ fn relayed_bottom_up_ckpt_to_fvm(
 /// This approach uses an implicit FVM transaction to query a read-only blockstore.
 fn get_pending_blobs<DB>(
     state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
-) -> anyhow::Result<BTreeMap<Hash, HashSet<(Address, PublicKey)>>>
+    size: u32,
+) -> anyhow::Result<Vec<PendingBlobItem>>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
+    let params = GetPendingBlobsParams { size };
+    let params = RawBytes::serialize(params)?;
     let msg = FvmMessage {
         version: 0,
         from: system::SYSTEM_ACTOR_ADDR,
@@ -872,7 +880,7 @@ where
         sequence: 0,
         value: Default::default(),
         method_num: GetPendingBlobs as u64,
-        params: Default::default(),
+        params,
         gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
         gas_fee_cap: Default::default(),
         gas_premium: Default::default(),
@@ -880,7 +888,7 @@ where
     let (apply_ret, _) = state.execute_implicit(msg)?;
 
     let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
-    fvm_ipld_encoding::from_slice::<BTreeMap<Hash, HashSet<(Address, PublicKey)>>>(&data)
+    fvm_ipld_encoding::from_slice::<Vec<PendingBlobItem>>(&data)
         .map_err(|e| anyhow!("error parsing as BTreeMap<Hash, HashSet<(Address, PublicKey)>: {e}"))
 }
 

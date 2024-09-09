@@ -30,6 +30,9 @@ halt_height = 0
 # # The on-chain account kind (regular|ethereum)
 # kind =
 
+# Number of pending blobs to process in one pass
+pending_blobs_size = 1024
+
 [abci]
 # Number of concurrent requests allowed to be _submitted_ to the application.
 # Because message handling is asynhronous, this doesn't make any difference

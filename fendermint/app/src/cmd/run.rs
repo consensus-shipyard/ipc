@@ -330,6 +330,7 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
             parent_finality_provider: parent_finality_provider.clone(),
             parent_finality_votes: parent_finality_votes.clone(),
             blob_pool: iroh_pin_pool,
+            pending_blobs_size: settings.pending_blobs_size,
         },
         snapshots,
     )?;
