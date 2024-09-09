@@ -741,7 +741,7 @@ mod tests {
             key: key.to_vec(),
             hash: fendermint_actor_blobs_shared::state::Hash(*hash.as_bytes()),
             size,
-            ttl: 3600,
+            ttl: None,
             metadata: HashMap::new(),
             overwrite: true,
         };

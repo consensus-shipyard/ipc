@@ -110,7 +110,7 @@ impl BlobsActor {
     fn finalize_blob(rt: &impl Runtime, params: FinalizeBlobParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
         rt.transaction(|st: &mut State, _| {
-            st.finalize_blob(params.origin, params.hash, params.status)
+            st.finalize_blob(params.origin, rt.curr_epoch(), params.hash, params.status)
         })
     }
 
@@ -396,7 +396,7 @@ mod tests {
             source: new_pk(),
             hash: hash.0,
             size: hash.1,
-            ttl: 3600,
+            ttl: Some(3600),
         };
         let result = rt.call::<BlobsActor>(
             Method::AddBlob as u64,

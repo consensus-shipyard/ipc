@@ -43,7 +43,9 @@ pub struct AddParams {
     /// Object size.
     pub size: u64,
     /// Object time-to-live epochs.
-    pub ttl: ChainEpoch,
+    /// If not specified, the auto-debitor maintains about one hour of credits as an
+    /// ongoing commitment.
+    pub ttl: Option<ChainEpoch>,
     /// Object metadata.
     pub metadata: HashMap<String, String>,
     /// Whether to overwrite a key if it already exists.

@@ -33,7 +33,9 @@ pub struct AddBlobParams {
     /// Blob size.
     pub size: u64,
     /// Blob time-to-live epochs.
-    pub ttl: ChainEpoch,
+    /// If not specified, the auto-debitor maintains about one hour of credits as an
+    /// ongoing commitment.
+    pub ttl: Option<ChainEpoch>,
 }
 
 /// Params for getting a blob.

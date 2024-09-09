@@ -49,6 +49,17 @@ pub struct Account {
     pub last_debit_epoch: ChainEpoch,
 }
 
+impl Account {
+    pub fn new(credit_free: BigInt, current_epoch: ChainEpoch) -> Self {
+        Self {
+            capacity_used: Default::default(),
+            credit_free,
+            credit_committed: Default::default(),
+            last_debit_epoch: current_epoch,
+        }
+    }
+}
+
 /// The stored representation of a blob.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct Blob {
@@ -90,6 +101,8 @@ pub struct Subscription {
     pub added: ChainEpoch,
     /// Expiry block.
     pub expiry: ChainEpoch,
+    /// Whether to automatically renew the subscription.
+    pub auto_renew: bool,
     /// Source Iroh node ID used for ingestion.
     /// This might be unique to each instance of the same blob.
     /// It's included here for record keeping.

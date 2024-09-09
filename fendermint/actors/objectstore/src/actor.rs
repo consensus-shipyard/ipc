@@ -287,7 +287,7 @@ mod tests {
             key: vec![0, 1, 2],
             hash: hash.0,
             size: hash.1,
-            ttl: 3600,
+            ttl: None,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -342,7 +342,7 @@ mod tests {
             key: vec![0, 1, 2],
             hash: hash.0,
             size: hash.1,
-            ttl: 3600,
+            ttl: None,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -382,7 +382,7 @@ mod tests {
             key: add_params.key,
             hash: hash.0,
             size: hash.1,
-            ttl: 3600,
+            ttl: None,
             metadata: HashMap::new(),
             overwrite: true,
         };
@@ -449,7 +449,7 @@ mod tests {
             key: vec![0, 1, 2],
             hash: hash.0,
             size: hash.1,
-            ttl: 3600,
+            ttl: None,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -489,7 +489,7 @@ mod tests {
             key: add_params.key,
             hash: hash.0,
             size: hash.1,
-            ttl: 3600,
+            ttl: None,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -528,7 +528,7 @@ mod tests {
             key: key.clone(),
             hash: hash.0,
             size: hash.1,
-            ttl: 3600,
+            ttl: None,
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -631,7 +631,7 @@ mod tests {
         let machine_addr = Address::new_actor(&[0xde, 0xad, 0xbe, 0xef]);
         let key = vec![0, 1, 2];
         let hash = new_hash(256);
-        let ttl = ChainEpoch::from(100);
+        let ttl = ChainEpoch::from(3600);
 
         // Prerequisite for a delete operation: add to have a proper state of the actor.
         let add_params: AddParams = AddParams {
@@ -640,7 +640,7 @@ mod tests {
             key: key.clone(),
             hash: hash.0,
             size: hash.1,
-            ttl,
+            ttl: Some(ttl),
             metadata: HashMap::new(),
             overwrite: false,
         };
@@ -677,6 +677,7 @@ mod tests {
                 Subscription {
                     added: 0,
                     expiry: ttl,
+                    auto_renew: false,
                     source: add_params.source,
                 },
             )]),
