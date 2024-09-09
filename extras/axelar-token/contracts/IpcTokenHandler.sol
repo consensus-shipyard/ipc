@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import { InterchainTokenExecutable } from '@axelar-network/interchain-token-service/contracts/executable/InterchainTokenExecutable.sol';
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-import { SubnetID, SupplySource, SupplyKind } from "@consensus-shipyard/ipc-contracts/contracts/structs/Subnet.sol";
+import { SubnetID, GenericToken, GenericTokenKind } from "@consensus-shipyard/ipc-contracts/contracts/structs/Subnet.sol";
 import { FvmAddress } from "@consensus-shipyard/ipc-contracts/contracts/structs/FvmAddress.sol";
 import { IIpcHandler } from "@consensus-shipyard/ipc-contracts/sdk/interfaces/IIpcHandler.sol";
 import { IpcMsgKind, ResultMsg, OutcomeType, IpcEnvelope } from "@consensus-shipyard/ipc-contracts/contracts/structs/CrossNet.sol";
@@ -17,7 +17,7 @@ interface TokenFundedGateway {
 }
 
 interface SubnetActor {
-    function supplySource() external returns (SupplySource memory supply);
+    function supplySource() external returns (GenericToken memory supply);
 }
 
 // @notice The IpcTokenHandler sits in an Axelar-supported L1 housing an IPC subnet hierarchy. It is invoked by the
@@ -93,8 +93,8 @@ contract IpcTokenHandler is InterchainTokenExecutable, IIpcHandler, Ownable {
         ResultMsg memory result = abi.decode(envelope.message, (ResultMsg));
         if (result.outcome != OutcomeType.Ok) {
             // Verify that the subnet is indeed an ERC20 subnet.
-            SupplySource memory supplySource = SubnetActor(envelope.from.subnetId.getAddress()).supplySource();
-            require(supplySource.kind == SupplyKind.ERC20, "expected ERC20 supply source");
+            GenericToken memory supplySource = SubnetActor(envelope.from.subnetId.getAddress()).supplySource();
+            require(supplySource.kind == GenericTokenKind.ERC20, "expected ERC20 supply source");
 
             // Increase the allowance of the admin address so they can retrieve these otherwise lost tokens.
             IERC20(supplySource.tokenAddress).safeIncreaseAllowance(owner(), envelope.value);
