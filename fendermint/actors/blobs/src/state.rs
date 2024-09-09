@@ -623,10 +623,11 @@ fn update_expiry_index(
     if let Some((add, auto_renew)) = add {
         expiries
             .entry(add)
-            .and_modify(|subs| {
-                subs.entry(subscriber)
-                    .and_modify(|hashes| {
-                        hashes.insert(hash, auto_renew);
+            .and_modify(|entry| {
+                entry
+                    .entry(subscriber)
+                    .and_modify(|subs| {
+                        subs.insert(hash, auto_renew);
                     })
                     .or_insert(HashMap::from([(hash, auto_renew)]));
             })
@@ -636,14 +637,14 @@ fn update_expiry_index(
             )]));
     }
     if let Some(remove) = remove {
-        if let Some(subs) = expiries.get_mut(&remove) {
-            if let Some(hashes) = subs.get_mut(&subscriber) {
-                hashes.remove(&hash);
-                if hashes.is_empty() {
-                    subs.remove(&subscriber);
+        if let Some(entry) = expiries.get_mut(&remove) {
+            if let Some(subs) = entry.get_mut(&subscriber) {
+                subs.remove(&hash);
+                if subs.is_empty() {
+                    entry.remove(&subscriber);
                 }
             }
-            if subs.is_empty() {
+            if entry.is_empty() {
                 expiries.remove(&remove);
             }
         }
