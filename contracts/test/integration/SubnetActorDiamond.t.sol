@@ -1803,7 +1803,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     // ----------------------------
     function testSubnetActorDiamond_CollateralERC20_SupplyERC20_RegisteredInGateway() public {
         (address validator, uint256 privKey, bytes memory publicKey) = TestUtils.newValidator(100);
-        (address validator2, , bytes memory publicKey2) = TestUtils.newValidator(101);
+        (address validator2, , ) = TestUtils.newValidator(101);
 
         // a bit of gas for execution, should not be needed
         vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE - 100);
@@ -1942,9 +1942,132 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         require(collateralToken.balanceOf(gatewayAddress) == 0, "gateway post leave claim balance wrong");
     }
 
+    function testSubnetActorDiamond_CollateralERC20_SupplyERC20_SameToken_RegisteredInGateway() public {
+        (address validator, uint256 privKey, bytes memory publicKey) = TestUtils.newValidator(100);
+        (address validator2, , ) = TestUtils.newValidator(101);
+
+        // a bit of gas for execution, should not be needed
+        vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE - 100);
+        vm.deal(validator2, DEFAULT_MIN_VALIDATOR_STAKE - 100);
+
+        ERC20PresetFixedSupply token = new ERC20PresetFixedSupply(
+            "t",
+            "t",
+            DEFAULT_MIN_VALIDATOR_STAKE * 20,
+            validator
+        );
+
+        GenericToken memory gt = GenericToken({kind: GenericTokenKind.ERC20, tokenAddress: address(token)});
+
+        gatewayAddress = address(gatewayDiamond);
+        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(
+            gatewayAddress,
+            SubnetID(ROOTNET_CHAINID, new address[](0)),
+            gt,
+            gt
+        );
+
+        saDiamond = createSubnetActor(params);
+
+        vm.prank(validator);
+        token.transfer(validator2, DEFAULT_MIN_VALIDATOR_STAKE * 10);
+
+        vm.prank(validator2);
+        token.approve(address(saDiamond.manager()), 100);
+        vm.prank(validator2);
+        saDiamond.manager().preFund(100);
+
+        vm.prank(validator);
+        token.approve(address(saDiamond.manager()), DEFAULT_MIN_VALIDATOR_STAKE * 2);
+
+        vm.prank(validator);
+        saDiamond.manager().join(publicKey, DEFAULT_MIN_VALIDATOR_STAKE);
+        require(token.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 9);
+        require(token.balanceOf(address(saDiamond)) == 0);
+        require(token.balanceOf(gatewayAddress) == DEFAULT_MIN_VALIDATOR_STAKE + 100);
+
+        vm.prank(validator);
+        saDiamond.manager().stake(DEFAULT_MIN_VALIDATOR_STAKE);
+        require(token.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 8, "validator post stake balance wrong");
+        require(
+            token.balanceOf(address(saDiamond)) == DEFAULT_MIN_VALIDATOR_STAKE,
+            "saDiamond post stake balance wrong"
+        );
+        require(
+            token.balanceOf(gatewayAddress) == DEFAULT_MIN_VALIDATOR_STAKE + 100,
+            "gateway post stake balance wrong"
+        );
+        confirmChange(validator, privKey);
+        require(
+            token.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 8,
+            "validator post stake confirmed balance wrong"
+        );
+        require(token.balanceOf(address(saDiamond)) == 0, "saDiamond post stake confirmed balance wrong");
+        require(
+            token.balanceOf(gatewayAddress) == DEFAULT_MIN_VALIDATOR_STAKE * 2 + 100,
+            "gateway post stake confirmed balance wrong"
+        );
+
+        vm.prank(validator);
+        saDiamond.manager().unstake(DEFAULT_MIN_VALIDATOR_STAKE);
+        require(token.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 8, "validator post unstake balance wrong");
+        require(token.balanceOf(address(saDiamond)) == 0, "saDiamond post unstake balance wrong");
+        require(
+            token.balanceOf(gatewayAddress) == DEFAULT_MIN_VALIDATOR_STAKE * 2 + 100,
+            "gateway post unstake balance wrong"
+        );
+        confirmChange(validator, privKey);
+        require(token.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 8, "validator post unstake balance wrong");
+        require(
+            token.balanceOf(address(saDiamond)) == DEFAULT_MIN_VALIDATOR_STAKE,
+            "saDiamond post unstake balance wrong"
+        );
+        require(
+            token.balanceOf(gatewayAddress) == DEFAULT_MIN_VALIDATOR_STAKE + 100,
+            "gateway post unstake balance wrong"
+        );
+
+        vm.prank(validator);
+        saDiamond.rewarder().claim();
+        require(token.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 9, "validator post claim balance wrong");
+        require(token.balanceOf(address(saDiamond)) == 0, "saDiamond post claim balance wrong");
+        require(
+            token.balanceOf(gatewayAddress) == DEFAULT_MIN_VALIDATOR_STAKE + 100,
+            "gateway post claim balance wrong"
+        );
+
+        vm.prank(validator);
+        saDiamond.manager().leave();
+        require(token.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 9, "validator post leave balance wrong");
+        require(token.balanceOf(address(saDiamond)) == 0, "saDiamond post leave balance wrong");
+        require(
+            token.balanceOf(gatewayAddress) == DEFAULT_MIN_VALIDATOR_STAKE + 100,
+            "gateway post leave balance wrong"
+        );
+        confirmChange(validator, privKey);
+        require(
+            token.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 9,
+            "validator confirmed leave balance wrong"
+        );
+        require(
+            token.balanceOf(address(saDiamond)) == DEFAULT_MIN_VALIDATOR_STAKE,
+            "saDiamond confirmed leave balance wrong"
+        );
+        require(token.balanceOf(gatewayAddress) == 100, "gateway confirmed leave balance wrong");
+
+        vm.prank(validator);
+        saDiamond.rewarder().claim();
+        require(
+            token.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 10,
+            "validator post leave claim balance wrong"
+        );
+        require(token.balanceOf(address(saDiamond)) == 0, "saDiamond post claim balance wrong");
+        require(token.balanceOf(gatewayAddress) == 100, "gateway post leave claim balance wrong");
+    }
+
     function testSubnetActorDiamond_CollateralERC20_SupplyNative_RegisteredInGateway() public {
         (address validator, uint256 privKey, bytes memory publicKey) = TestUtils.newValidator(100);
-        (address validator2, , bytes memory publicKey2) = TestUtils.newValidator(101);
+        (address validator2, , ) = TestUtils.newValidator(101);
 
         // a bit of gas for execution, should not be needed
         vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE - 100);
@@ -2051,7 +2174,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
     function testSubnetActorDiamond_CollateralNative_SupplyNative_RegisteredInGateway() public {
         (address validator, uint256 privKey, bytes memory publicKey) = TestUtils.newValidator(100);
-        (address validator2, , bytes memory publicKey2) = TestUtils.newValidator(101);
+        (address validator2, , ) = TestUtils.newValidator(101);
 
         // a bit of gas for execution, should not be needed
         vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE * 10);
@@ -2122,7 +2245,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
     function testSubnetActorDiamond_CollateralNative_SupplyERC20_RegisteredInGateway() public {
         (address validator, uint256 privKey, bytes memory publicKey) = TestUtils.newValidator(100);
-        (address validator2, , bytes memory publicKey2) = TestUtils.newValidator(101);
+        (address validator2, , ) = TestUtils.newValidator(101);
 
         // a bit of gas for execution, should not be needed
         vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE * 10);

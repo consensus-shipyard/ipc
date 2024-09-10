@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.23;
 
-import {NotEnoughBalance} from "../errors/IPCErrors.sol";
+import {NotEnoughBalance, IncreaseAllowanceFailed} from "../errors/IPCErrors.sol";
 import {GenericToken, GenericTokenKind} from "../structs/Subnet.sol";
 import {EMPTY_BYTES} from "../constants/Constants.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -213,9 +213,13 @@ library GenericTokenHelper {
         return self.kind == GenericTokenKind.Native;
     }
 
-    function approve(GenericToken memory self, address spender, uint256 amount) internal {
+    function increaseAllowance(GenericToken memory self, address spender, uint256 amount) internal {
         if (self.kind == GenericTokenKind.ERC20) {
-            IERC20(self.tokenAddress).approve(spender, amount);
+            IERC20 token = IERC20(self.tokenAddress);
+            uint256 allowance = token.allowance(address(this), spender);
+            if (!token.approve(spender, allowance + amount)) {
+                revert IncreaseAllowanceFailed();
+            }
         }
     }
 }

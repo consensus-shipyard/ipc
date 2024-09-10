@@ -587,7 +587,7 @@ library LibStaking {
                     if (s.collateralSource.isNative()) {
                         IGateway(gateway).addStake{value: amount}(amount);
                     } else {
-                        s.collateralSource.approve(gateway, amount);
+                        s.collateralSource.increaseAllowance(gateway, amount);
                         IGateway(gateway).addStake(amount);
                     }
                 }

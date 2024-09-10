@@ -171,14 +171,14 @@ library LibSubnetActor {
         if (supplySourceNative && collateralSourceNative) {
             IGateway(s.ipcGatewayAddr).register{value: g + collateral}(g, collateral);   
         } else if (!supplySourceNative && collateralSourceNative) {
-            s.supplySource.approve(s.ipcGatewayAddr, g);
+            s.supplySource.increaseAllowance(s.ipcGatewayAddr, g);
             IGateway(s.ipcGatewayAddr).register{value: collateral}(g, collateral);
         } else if (supplySourceNative && !collateralSourceNative) {
-            s.collateralSource.approve(s.ipcGatewayAddr, collateral);
+            s.collateralSource.increaseAllowance(s.ipcGatewayAddr, collateral);
             IGateway(s.ipcGatewayAddr).register{value: g}(g, collateral);
         } else {
-            s.supplySource.approve(s.ipcGatewayAddr, g);
-            s.collateralSource.approve(s.ipcGatewayAddr, collateral);
+            s.supplySource.increaseAllowance(s.ipcGatewayAddr, g);
+            s.collateralSource.increaseAllowance(s.ipcGatewayAddr, collateral);
             IGateway(s.ipcGatewayAddr).register(g, collateral);
         }
     }
