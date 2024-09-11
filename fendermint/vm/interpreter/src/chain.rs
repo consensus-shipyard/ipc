@@ -71,8 +71,8 @@ pub struct ChainEnv {
     pub parent_finality_votes: VoteTally,
     /// Iroh blob resolution pool.
     pub blob_pool: BlobPool,
-    /// Number of pending blobs to process in one pass.
-    pub pending_blobs_size: u32,
+    /// Number of pending blobs to process in parallel.
+    pub blob_concurrency: u32,
 }
 
 #[derive(Clone, Hash, PartialEq, Eq)]
@@ -225,8 +225,8 @@ where
 
         // Collect and enqueue blobs that need to be resolved.
         state.state_tree_mut().begin_transaction();
-        let pending_blobs_size = env.pending_blobs_size;
-        let resolving_blobs = get_pending_blobs(&mut state, pending_blobs_size)?;
+        let blob_concurrency = env.blob_concurrency;
+        let resolving_blobs = get_pending_blobs(&mut state, blob_concurrency)?;
         state
             .state_tree_mut()
             .end_transaction(true)
@@ -871,7 +871,7 @@ fn get_pending_blobs<DB>(
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
-    let params = GetPendingBlobsParams { size };
+    let params = GetPendingBlobsParams(size);
     let params = RawBytes::serialize(params)?;
     let msg = FvmMessage {
         version: 0,
@@ -889,7 +889,7 @@ where
 
     let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
     fvm_ipld_encoding::from_slice::<Vec<PendingBlobItem>>(&data)
-        .map_err(|e| anyhow!("error parsing as BTreeMap<Hash, HashSet<(Address, PublicKey)>: {e}"))
+        .map_err(|e| anyhow!("error parsing pending blobs: {e}"))
 }
 
 /// Check if a blob is pending (if it is not resolved or failed), by reading its on-chain state.

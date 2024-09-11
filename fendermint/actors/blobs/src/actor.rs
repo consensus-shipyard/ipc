@@ -106,7 +106,7 @@ impl BlobsActor {
         params: GetPendingBlobsParams,
     ) -> Result<Vec<BlobTuple>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let pending = rt.state::<State>()?.get_pending_blobs(params.size);
+        let pending = rt.state::<State>()?.get_pending_blobs(params.0);
         Ok(pending)
     }
 

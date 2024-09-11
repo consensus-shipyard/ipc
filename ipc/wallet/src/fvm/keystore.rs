@@ -191,12 +191,11 @@ impl KeyStore {
                         // Existing cleartext JSON keystore
                         let persisted_key_info: HashMap<String, PersistentKeyInfo> =
                             serde_json::from_reader(reader)
-                                .map_err(|e| {
+                                .inspect_err(|_| {
                                     error!(
                                 "failed to deserialize keyfile, initializing new keystore at: {:?}",
                                 file_path
                             );
-                                    e
                                 })
                                 .unwrap_or_default();
 
@@ -292,9 +291,8 @@ impl KeyStore {
                                 .map_err(|error| Error::Other(error.to_string()))?;
 
                             let key_info = serde_ipld_dagcbor::from_slice(&decrypted_data)
-                                .map_err(|e| {
+                                .inspect_err(|_| {
                                     error!("Failed to deserialize keyfile, initializing new");
-                                    e
                                 })
                                 .unwrap_or_default();
 
