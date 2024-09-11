@@ -582,13 +582,6 @@ Supply source address: ${SUPPLY_SOURCE_ADDRESS}
 EOF
 
 if [[ $local_deploy = true ]]; then
-  subnet_folder=$IPC_CONFIG_FOLDER/$(echo "$subnet_id" | sed 's|^/||;s|/|-|g')
-  # TODO(dtb): the genesis.json file has zero accounts listed, so it looks like
-  # the accounts aren't getting funded. even if i use one of the validator
-  # private keys, i get an "actor cannot be found" error and cant deploy buckets
-  echo $'\nAccounts:'
-  jq -r '.accounts[] | "\(.meta.Account.owner): \(.balance) coin units"' < "$subnet_folder"/validator-0/genesis.json
-
   echo $'\nPrivate keys (use with Hoku SDK & CLI):'
   for i in {0..9}
   do
