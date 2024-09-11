@@ -37,3 +37,6 @@
 [submodule "builtin-actors"]
 	path = builtin-actors
 	url = git@github.com:hokunet/builtin-actors.git
+[submodule "hoku-contracts"]
+	path = hoku-contracts
+	url = git@github.com:hokunet/contracts.git
