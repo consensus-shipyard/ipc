@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use fendermint_actor_gas_market::{GasMarketReading, SetConstants};
 use fendermint_contract_test::Tester;
 use fendermint_crypto::{PublicKey, SecretKey};
+use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::gas::GAS_MARKET_ACTOR_ADDR;
 use fendermint_vm_actor_interface::system;
 use fendermint_vm_core::Timestamp;
@@ -27,7 +28,6 @@ use lazy_static::lazy_static;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use tendermint_rpc::Client;
-use fendermint_vm_actor_interface::eam::EthAddress;
 
 lazy_static! {
     static ref ADDR: Address =
@@ -190,11 +190,17 @@ async fn test_gas_market_premium_distribution() {
 
     // iterate over all the upgrades
     let height = 1;
-    tester.begin_block_with_validator(height, Some(validator)).await.unwrap();
+    tester
+        .begin_block_with_validator(height, Some(validator))
+        .await
+        .unwrap();
     let initial_balance = tester
         .modify_exec_state(|state| async {
             let tree = state.state_tree();
-            let balance = tree.get_actor_by_address(&evm_address)?.map(|v| v.balance).unwrap_or(TokenAmount::zero());
+            let balance = tree
+                .get_actor_by_address(&evm_address)?
+                .map(|v| v.balance)
+                .unwrap_or(TokenAmount::zero());
             Ok((state, balance))
         })
         .await
@@ -206,14 +212,20 @@ async fn test_gas_market_premium_distribution() {
     let final_balance = tester
         .modify_exec_state(|state| async {
             let tree = state.state_tree();
-            let balance = tree.get_actor_by_address(&evm_address)?.map(|v| v.balance).unwrap_or(TokenAmount::zero());
+            let balance = tree
+                .get_actor_by_address(&evm_address)?
+                .map(|v| v.balance)
+                .unwrap_or(TokenAmount::zero());
             Ok((state, balance))
         })
         .await
         .unwrap();
     tester.commit().await.unwrap();
 
-    assert!(final_balance > initial_balance, "validator balance should have increased")
+    assert!(
+        final_balance > initial_balance,
+        "validator balance should have increased"
+    )
 }
 
 pub fn current_reading(

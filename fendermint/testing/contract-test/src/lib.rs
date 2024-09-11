@@ -7,6 +7,7 @@ use fendermint_vm_core::Timestamp;
 use fvm_shared::clock::ChainEpoch;
 use std::{future::Future, sync::Arc};
 
+use fendermint_crypto::PublicKey;
 use fendermint_vm_genesis::Genesis;
 use fendermint_vm_interpreter::fvm::PowerUpdates;
 use fendermint_vm_interpreter::genesis::{create_test_genesis_state, GenesisOutput};
@@ -20,7 +21,6 @@ use fendermint_vm_interpreter::{
     ExecInterpreter,
 };
 use fvm::engine::MultiEngine;
-use fendermint_crypto::PublicKey;
 
 pub mod ipc;
 
@@ -129,7 +129,11 @@ where
         self.begin_block_with_validator(block_height, None).await
     }
 
-    pub async fn begin_block_with_validator(&self, block_height: ChainEpoch, maybe_validator: Option<PublicKey>) -> Result<()> {
+    pub async fn begin_block_with_validator(
+        &self,
+        block_height: ChainEpoch,
+        maybe_validator: Option<PublicKey>,
+    ) -> Result<()> {
         let mut block_hash: [u8; 32] = [0; 32];
         let _ = block_hash.as_mut().write_i64::<BigEndian>(block_height);
 
@@ -137,9 +141,10 @@ where
         let mut state_params = self.state_params.clone();
         state_params.timestamp = Timestamp(block_height as u64);
 
-        let mut state = FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
-            .context("error creating new state")?
-            .with_block_hash(block_hash);
+        let mut state =
+            FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
+                .context("error creating new state")?
+                .with_block_hash(block_hash);
         if let Some(validator) = maybe_validator {
             state = state.with_validator(validator);
         }
@@ -154,9 +159,8 @@ where
         Ok(())
     }
 
-
     pub async fn execute_msgs(&self, msgs: Vec<FvmMessage>) -> Result<()> {
-        let _ret = self
+        self
             .modify_exec_state(|mut s| async {
                 for msg in msgs {
                     let (a, out) = self.interpreter.deliver(s, msg).await?;
@@ -169,9 +173,7 @@ where
                 Ok((s, ()))
             })
             .await
-            .context("execute msgs failed")?;
-
-        Ok(())
+            .context("execute msgs failed")
     }
 
     pub async fn end_block(&self, _block_height: ChainEpoch) -> Result<()> {
