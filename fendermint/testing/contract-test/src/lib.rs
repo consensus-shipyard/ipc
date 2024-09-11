@@ -20,6 +20,7 @@ use fendermint_vm_interpreter::{
     ExecInterpreter,
 };
 use fvm::engine::MultiEngine;
+use fendermint_crypto::PublicKey;
 
 pub mod ipc;
 
@@ -96,7 +97,7 @@ where
     }
 
     /// Take the execution state, update it, put it back, return the output.
-    async fn modify_exec_state<T, F, R>(&self, f: F) -> anyhow::Result<T>
+    pub async fn modify_exec_state<T, F, R>(&self, f: F) -> anyhow::Result<T>
     where
         F: FnOnce(FvmExecState<MemoryBlockstore>) -> R,
         R: Future<Output = Result<(FvmExecState<MemoryBlockstore>, T)>>,
@@ -125,6 +126,10 @@ where
     }
 
     pub async fn begin_block(&self, block_height: ChainEpoch) -> Result<()> {
+        self.begin_block_with_validator(block_height, None).await
+    }
+
+    pub async fn begin_block_with_validator(&self, block_height: ChainEpoch, maybe_validator: Option<PublicKey>) -> Result<()> {
         let mut block_hash: [u8; 32] = [0; 32];
         let _ = block_hash.as_mut().write_i64::<BigEndian>(block_height);
 
@@ -132,9 +137,12 @@ where
         let mut state_params = self.state_params.clone();
         state_params.timestamp = Timestamp(block_height as u64);
 
-        let state = FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
+        let mut state = FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
             .context("error creating new state")?
             .with_block_hash(block_hash);
+        if let Some(validator) = maybe_validator {
+            state = state.with_validator(validator);
+        }
 
         self.put_exec_state(state).await;
 
@@ -142,6 +150,26 @@ where
             .modify_exec_state(|s| self.interpreter.begin(s))
             .await
             .unwrap();
+
+        Ok(())
+    }
+
+
+    pub async fn execute_msgs(&self, msgs: Vec<FvmMessage>) -> Result<()> {
+        let _ret = self
+            .modify_exec_state(|mut s| async {
+                for msg in msgs {
+                    let (a, out) = self.interpreter.deliver(s, msg).await?;
+                    if let Some(e) = out.apply_ret.failure_info {
+                        println!("failed: {}", e);
+                        return Err(anyhow!("err in msg deliver"));
+                    }
+                    s = a;
+                }
+                Ok((s, ()))
+            })
+            .await
+            .context("execute msgs failed")?;
 
         Ok(())
     }

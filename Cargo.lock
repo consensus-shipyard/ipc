@@ -2986,6 +2986,7 @@ dependencies = [
  "bytes",
  "cid",
  "ethers",
+ "fendermint_actor_gas_market",
  "fendermint_crypto",
  "fendermint_rpc",
  "fendermint_testing",

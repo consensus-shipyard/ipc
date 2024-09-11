@@ -53,10 +53,10 @@ impl GasMarket for ActorGasMarket {
 }
 
 impl ActorGasMarket {
-    pub fn create<E: Executor>(
+    pub fn current_reading<E: Executor>(
         executor: &mut E,
         block_height: ChainEpoch,
-    ) -> anyhow::Result<ActorGasMarket> {
+    ) -> anyhow::Result<GasMarketReading> {
         let msg = FvmMessage {
             from: system::SYSTEM_ACTOR_ADDR,
             to: GAS_MARKET_ACTOR_ADDR,
@@ -78,10 +78,17 @@ impl ActorGasMarket {
             anyhow::bail!("failed to read gas market state: {}", err);
         }
 
-        let reading =
+        let r =
             fvm_ipld_encoding::from_slice::<GasMarketReading>(&apply_ret.msg_receipt.return_data)
                 .context("failed to parse gas market readying")?;
+        Ok(r)
+    }
 
+    pub fn create<E: Executor>(
+        executor: &mut E,
+        block_height: ChainEpoch,
+    ) -> anyhow::Result<ActorGasMarket> {
+        let reading = Self::current_reading(executor, block_height)?;
         Ok(Self {
             gas_premium: TokenAmount::from_atto(0),
             block_gas_limit: reading.block_gas_limit,
