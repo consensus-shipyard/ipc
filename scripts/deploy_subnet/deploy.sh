@@ -26,20 +26,21 @@ if ! $local_deploy ; then
     ssh-add "${HOME}"/.ssh/id_rsa.ipc
   fi
 
-  if [[ ! -v SUPPLY_SOURCE_ADDRESS ]]; then
+  if [ -z "${SUPPLY_SOURCE_ADDRESS}" ]; then
     echo "SUPPLY_SOURCE_ADDRESS is not set"
     exit 1
   fi
 
-  if [[ ! -v PARENT_HTTP_AUTH_TOKEN ]]; then
+  if [ -z "${PARENT_HTTP_AUTH_TOKEN}" ]; then
     echo "PARENT_HTTP_AUTH_TOKEN is not set"
     exit 1
   fi
-  PARENT_AUTH_FLAG=--parent-auth-token ${PARENT_HTTP_AUTH_TOKEN}
+  PARENT_AUTH_FLAG="--parent-auth-token ${PARENT_HTTP_AUTH_TOKEN}"
 else
-  # we set SUPPLY_SOURCE_ADDRESS below for the local net
-  # TODO: should this just be an empty string for local? maybe hust leave it undefined?
+  # For local deployment, we'll set these variables later
+  SUPPLY_SOURCE_ADDRESS=""
   PARENT_HTTP_AUTH_TOKEN=""
+  PARENT_AUTH_FLAG=""
 fi
 
 if [[ $local_deploy = true ]]; then
@@ -48,7 +49,7 @@ if [[ $local_deploy = true ]]; then
   # we can't pass an auth token if the parent doesn't require one
   PARENT_AUTH_FLAG=""
 fi
-if [[ ! -v IPC_FOLDER ]]; then
+if [ -z "${IPC_FOLDER}" ]; then
   IPC_FOLDER=${HOME}/ipc
 fi
 IPC_CONFIG_FOLDER=${HOME}/.ipc
@@ -84,7 +85,7 @@ if [[ -z ${PARENT_ENDPOINT+x} ]]; then
 fi
 
 # Install build dependencies
-if [[ -z ${SKIP_BUILD+x} || "$SKIP_BUILD" == "" || "$SKIP_BUILD" == "false" ]]; then
+if [[ -z ${SKIP_DEPENDENCIES+x} || "$SKIP_DEPENDENCIES" == "" || "$SKIP_DEPENDENCIES" == "false" ]]; then
   echo "${DASHES} Installing build dependencies..."
   sudo apt update && sudo apt install build-essential libssl-dev mesa-opencl-icd ocl-icd-opencl-dev gcc git bzr jq pkg-config curl clang hwloc libhwloc-dev wget ca-certificates gnupg -y
 
@@ -162,7 +163,7 @@ if [[ -z ${SKIP_BUILD+x} || "$SKIP_BUILD" == "" || "$SKIP_BUILD" == "false" ]]; 
   source "${HOME}"/.bashrc
   set -u
 else
-  echo "$DASHES skpping dependencies install and build $DASHES"
+  echo "$DASHES skpping dependencies installation $DASHES"
 fi
 
 # Prepare code repo
@@ -200,7 +201,7 @@ cargo make --makefile infra/fendermint/Makefile.toml \
 
 # shut down any existing validator nodes
 if [ -e "${IPC_CONFIG_FOLDER}/config.toml" ]; then
-    subnet_id=$(toml get -r "${IPC_CONFIG_FOLDER}"/config.toml subnets[1].id)
+    subnet_id=$(toml get -r "${IPC_CONFIG_FOLDER}"/config.toml 'subnets[1].id')
     echo "Existing subnet id: $subnet_id"
     # Stop validators
     cd "$IPC_FOLDER"
@@ -241,6 +242,16 @@ if [[ -z ${SKIP_BUILD+x} || "$SKIP_BUILD" == "" || "$SKIP_BUILD" == "false" ]]; 
   echo "$DASHES Building ipc-cli..."
   cd "${IPC_FOLDER}"/ipc
   make install
+
+  # Pull foundry image
+  # Note: the foundry image doesn't have arm64 support, so we need to pull the
+  # x86_64 image on arm64 explicitly; otherwise, the dockerpull will fail.
+  if [[ $local_deploy = true ]]; then
+    echo "$DASHES Pulling foundry image..."
+    cd "$IPC_FOLDER"
+    cargo make --makefile infra/fendermint/Makefile.toml \
+      anvil-pull
+  fi
 fi
 
 
@@ -259,10 +270,17 @@ if [[ $local_deploy = true ]]; then
       -e ANVIL_HOST_PORT="${ANVIL_HOST_PORT}" \
       anvil-start
 
-  # the first three anvil preloaded key pairs
+  # the first ten anvil preloaded key pairs
   ipc-cli wallet import --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --wallet-type evm
   ipc-cli wallet import --private-key 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d --wallet-type evm
   ipc-cli wallet import --private-key 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a --wallet-type evm
+  ipc-cli wallet import --private-key 0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6 --wallet-type evm
+  ipc-cli wallet import --private-key 0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a --wallet-type evm
+  ipc-cli wallet import --private-key 0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba --wallet-type evm
+  ipc-cli wallet import --private-key 0x92db14e403b83dfe3df233f83dfa3a0d7096f21ca9b0d6d6b8d88b2b4ec1564e --wallet-type evm
+  ipc-cli wallet import --private-key 0x4bbbf85ce3377467afe5d46f804f221813b2bb87f24d81f60f1fcdbf7cbf4356 --wallet-type evm
+  ipc-cli wallet import --private-key 0xdbda1821b80551c9d65939329250298aa3472ba22feea921c0cf5d620ea67b97 --wallet-type evm
+  ipc-cli wallet import --private-key 0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6 --wallet-type evm
 fi
 
 # Prepare wallet by using existing wallet json file
@@ -287,11 +305,11 @@ do
 done
 
 # Update IPC config file with parent auth token
-toml set "${IPC_CONFIG_FOLDER}"/config.toml subnets[0].config.auth_token "$PARENT_HTTP_AUTH_TOKEN" > /tmp/config.toml.0
+toml set "${IPC_CONFIG_FOLDER}"/config.toml 'subnets[0].config.auth_token' "$PARENT_HTTP_AUTH_TOKEN" > /tmp/config.toml.0
 cp /tmp/config.toml.0 "${IPC_CONFIG_FOLDER}"/config.toml
 
 # Deploy IPC contracts
-if [[ ! -v PARENT_GATEWAY_ADDRESS || ! -v PARENT_REGISTRY_ADDRESS ]]; then
+if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; then
   echo "$DASHES Deploying new IPC contracts..."
   cd "${IPC_FOLDER}"/contracts
   npm install
@@ -310,6 +328,7 @@ if [[ ! -v PARENT_GATEWAY_ADDRESS || ! -v PARENT_REGISTRY_ADDRESS ]]; then
     deploy_contracts_output=$(make deploy-ipc NETWORK=localnet)
   fi
 
+  # TODO(dtb): try to capture and log these contract addresses at the very end? 
   echo "$DASHES deploy contracts output $DASHES"
   echo ""
   echo "$deploy_contracts_output"
@@ -321,7 +340,7 @@ if [[ ! -v PARENT_GATEWAY_ADDRESS || ! -v PARENT_REGISTRY_ADDRESS ]]; then
   if [ $local_deploy == true ]; then
 
     # TODO: This just assumes the use has already cloned `contracts`, does that work?
-    cd "${IPC_FOLDER}/../contracts"
+    cd "${IPC_FOLDER}/hoku-contracts"
     # need to run clean or we hit upgradeable saftey validation errors resulting from contracts with the same name
     forge clean
 
@@ -338,7 +357,7 @@ if [[ ! -v PARENT_GATEWAY_ADDRESS || ! -v PARENT_REGISTRY_ADDRESS ]]; then
     echo "$deploy_supply_source_token_out"
     echo ""
     # note: this is consistently going to be 0x2910E325cf29dd912E3476B61ef12F49cb931096 for local net
-    SUPPLY_SOURCE_ADDRESS=$(echo "$deploy_supply_source_token_out" | grep -oP 'contract Hoku\s\K\w+')
+    SUPPLY_SOURCE_ADDRESS=$(echo "$deploy_supply_source_token_out" | sed -n 's/.*contract Hoku *\([^ ]*\).*/\1/p')
   fi
   cd "$IPC_FOLDER"
 fi
@@ -347,13 +366,13 @@ echo "Registry address: $PARENT_REGISTRY_ADDRESS"
 echo "Supply source address: $SUPPLY_SOURCE_ADDRESS"
 
 # Use the parent gateway and registry address to update IPC config file
-toml set "${IPC_CONFIG_FOLDER}"/config.toml subnets[0].config.gateway_addr "$PARENT_GATEWAY_ADDRESS" > /tmp/config.toml.1
-toml set /tmp/config.toml.1 subnets[0].config.registry_addr "$PARENT_REGISTRY_ADDRESS" > /tmp/config.toml.2
+toml set "${IPC_CONFIG_FOLDER}"/config.toml 'subnets[0].config.gateway_addr' "$PARENT_GATEWAY_ADDRESS" > /tmp/config.toml.1
+toml set /tmp/config.toml.1 'subnets[0].config.registry_addr' "$PARENT_REGISTRY_ADDRESS" > /tmp/config.toml.2
 cp /tmp/config.toml.2 "${IPC_CONFIG_FOLDER}"/config.toml
 
 # Create a subnet
 echo "$DASHES Creating a child subnet..."
-root_id=$(toml get "${IPC_CONFIG_FOLDER}"/config.toml subnets[0].id | tr -d '"')
+root_id=$(toml get "${IPC_CONFIG_FOLDER}"/config.toml 'subnets[0].id' | tr -d '"')
 echo "Using root: $root_id"
 create_subnet_output=$(ipc-cli subnet create --from $default_wallet_address --parent $root_id --min-validators 2 --min-validator-stake 1 --bottomup-check-period 600 --active-validators-limit 3 --permission-mode federated --supply-source-kind erc20 --supply-source-address $SUPPLY_SOURCE_ADDRESS 2>&1)
 
@@ -367,7 +386,7 @@ subnet_id=$(echo $create_subnet_output | sed 's/.*with id: \([^ ]*\).*/\1/')
 echo "Created new subnet id: $subnet_id"
 
 # Use the new subnet ID to update IPC config file
-toml set "${IPC_CONFIG_FOLDER}"/config.toml subnets[1].id "$subnet_id" > /tmp/config.toml.3
+toml set "${IPC_CONFIG_FOLDER}"/config.toml 'subnets[1].id' "$subnet_id" > /tmp/config.toml.3
 cp /tmp/config.toml.3 "${IPC_CONFIG_FOLDER}"/config.toml
 
 # Set federated power
@@ -555,7 +574,27 @@ http://localhost:${LOKI_HOST_PORT}
 
 Grafana API:
 http://localhost:${GRAFANA_HOST_PORT}
+
+Contracts:
+Gateway address: ${PARENT_GATEWAY_ADDRESS}
+Registry address: ${PARENT_REGISTRY_ADDRESS}
+Supply source address: ${SUPPLY_SOURCE_ADDRESS}
 EOF
+
+if [[ $local_deploy = true ]]; then
+  subnet_folder=$IPC_CONFIG_FOLDER/$(echo "$subnet_id" | sed 's|^/||;s|/|-|g')
+  # TODO(dtb): the genesis.json file has zero accounts listed, so it looks like
+  # the accounts aren't getting funded. even if i use one of the validator
+  # private keys, i get an "actor cannot be found" error and cant deploy buckets
+  echo $'\nAccounts:'
+  jq -r '.accounts[] | "\(.meta.Account.owner): \(.balance) coin units"' < "$subnet_folder"/validator-0/genesis.json
+
+  echo $'\nPrivate keys (use with Hoku SDK & CLI):'
+  for i in {0..9}
+  do
+    jq --arg index "$i" '.[$index|tonumber].private_key' < "$IPC_CONFIG_FOLDER"/evm_keystore.json | tr -d '"'
+  done
+fi
 
 echo "Done"
 exit 0

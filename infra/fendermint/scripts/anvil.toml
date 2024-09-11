@@ -1,3 +1,13 @@
+[tasks.anvil-pull]
+script = """
+arch=$(uname -m)
+if [ "$arch" = "arm64" ]; then
+  docker pull --platform linux/x86_64 ${FOUNDRY_DOCKER_IMAGE}
+else
+  docker pull ${FOUNDRY_DOCKER_IMAGE}
+fi
+"""
+
 [tasks.anvil-run]
 script = """
 docker run \
