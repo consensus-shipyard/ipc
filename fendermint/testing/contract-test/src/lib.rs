@@ -160,20 +160,19 @@ where
     }
 
     pub async fn execute_msgs(&self, msgs: Vec<FvmMessage>) -> Result<()> {
-        self
-            .modify_exec_state(|mut s| async {
-                for msg in msgs {
-                    let (a, out) = self.interpreter.deliver(s, msg).await?;
-                    if let Some(e) = out.apply_ret.failure_info {
-                        println!("failed: {}", e);
-                        return Err(anyhow!("err in msg deliver"));
-                    }
-                    s = a;
+        self.modify_exec_state(|mut s| async {
+            for msg in msgs {
+                let (a, out) = self.interpreter.deliver(s, msg).await?;
+                if let Some(e) = out.apply_ret.failure_info {
+                    println!("failed: {}", e);
+                    return Err(anyhow!("err in msg deliver"));
                 }
-                Ok((s, ()))
-            })
-            .await
-            .context("execute msgs failed")
+                s = a;
+            }
+            Ok((s, ()))
+        })
+        .await
+        .context("execute msgs failed")
     }
 
     pub async fn end_block(&self, _block_height: ChainEpoch) -> Result<()> {

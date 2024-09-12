@@ -300,8 +300,11 @@ where
 
     pub fn update_gas_market(&mut self) -> anyhow::Result<()> {
         let height = self.block_height();
-        self.gas_market
-            .commit(&mut self.executor, height, self.validator_pubkey)
+        let ret = self
+            .gas_market
+            .commit(&mut self.executor, height, self.validator_pubkey)?;
+        self.params.base_fee = ret.base_fee;
+        Ok(())
     }
 
     /// Update the circulating supply, effective from the next block.
