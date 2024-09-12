@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 
 use anyhow::Ok;
 use cid::Cid;
+use fendermint_crypto::PublicKey;
 use fendermint_vm_genesis::PowerScale;
 use fvm::{
     call_manager::DefaultCallManager,
@@ -29,9 +30,6 @@ use fendermint_vm_core::{chainid::HasChainID, Timestamp};
 use fendermint_vm_encoding::IsHumanReadable;
 
 pub type BlockHash = [u8; 32];
-
-/// First 20 bytes of SHA256(PublicKey)
-pub type ValidatorId = tendermint::account::Id;
 
 pub type ActorAddressMap = HashMap<ActorID, Address>;
 
@@ -107,8 +105,8 @@ where
     /// execution interpreter without having to add yet another piece to track at the app level.
     block_hash: Option<BlockHash>,
 
-    /// ID of the validator who created this block. For queries and checks this is empty.
-    validator_id: Option<ValidatorId>,
+    /// Public key of the validator who created this block. For queries and checks this is empty.
+    validator_pubkey: Option<PublicKey>,
     /// State of parameters that are outside the control of the FVM but can change and need to be persisted.
     params: FvmUpdatableParams,
 
@@ -156,7 +154,7 @@ where
         Ok(Self {
             executor,
             block_hash: None,
-            validator_id: None,
+            validator_pubkey: None,
             params: FvmUpdatableParams {
                 app_version: params.app_version,
                 base_fee: params.base_fee,
@@ -175,8 +173,8 @@ where
     }
 
     /// Set the validator during execution.
-    pub fn with_validator_id(mut self, validator_id: ValidatorId) -> Self {
-        self.validator_id = Some(validator_id);
+    pub fn with_validator(mut self, key: PublicKey) -> Self {
+        self.validator_pubkey = Some(key);
         self
     }
 
@@ -233,8 +231,8 @@ where
     }
 
     /// Identity of the block creator, if we are indeed executing any blocks.
-    pub fn validator_id(&self) -> Option<ValidatorId> {
-        self.validator_id
+    pub fn validator_pubkey(&self) -> Option<PublicKey> {
+        self.validator_pubkey
     }
 
     /// The timestamp of the currently executing block.
@@ -302,7 +300,8 @@ where
 
     pub fn update_gas_market(&mut self) -> anyhow::Result<()> {
         let height = self.block_height();
-        self.gas_market.commit(&mut self.executor, height)
+        self.gas_market
+            .commit(&mut self.executor, height, self.validator_pubkey)
     }
 
     /// Update the circulating supply, effective from the next block.
