@@ -12,6 +12,10 @@ pub struct Available {
     pub block_gas: Gas,
 }
 
+pub struct CommitRet {
+    pub base_fee: TokenAmount,
+}
+
 pub struct GasUtilization {
     gas_used: Gas,
     gas_premium: TokenAmount,

@@ -1,11 +1,11 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::fvm::gas::{Available, Gas, GasMarket, GasUtilization};
+use crate::fvm::gas::{Available, CommitRet, Gas, GasMarket, GasUtilization};
 use crate::fvm::FvmMessage;
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 
-use fendermint_actor_gas_market::{GasMarketReading, SetConstants};
+use fendermint_actor_gas_market::{BlockGasUtilizationRet, GasMarketReading, SetConstants};
 use fendermint_crypto::PublicKey;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::gas::GAS_MARKET_ACTOR_ADDR;
@@ -18,6 +18,8 @@ use fvm_shared::METHOD_SEND;
 
 #[derive(Default)]
 pub struct ActorGasMarket {
+    /// The base fee for fvm
+    base_fee: TokenAmount,
     /// The total gas premium for the miner
     gas_premium: TokenAmount,
     /// The block gas limit
@@ -90,6 +92,7 @@ impl ActorGasMarket {
     ) -> anyhow::Result<ActorGasMarket> {
         let reading = Self::current_reading(executor, block_height)?;
         Ok(Self {
+            base_fee: reading.base_fee,
             gas_premium: TokenAmount::from_atto(0),
             block_gas_limit: reading.block_gas_limit,
             block_gas_used: 0,
@@ -106,10 +109,10 @@ impl ActorGasMarket {
         executor: &mut E,
         block_height: ChainEpoch,
         validator: Option<PublicKey>,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<CommitRet> {
+        self.distribute_reward(executor, block_height, validator)?;
         self.commit_constants(executor, block_height)?;
-        self.commit_utilization(executor, block_height)?;
-        self.distribute_reward(executor, block_height, validator)
+        self.commit_utilization(executor, block_height)
     }
 
     fn distribute_reward<E: Executor>(
@@ -175,7 +178,7 @@ impl ActorGasMarket {
         &self,
         executor: &mut E,
         block_height: ChainEpoch,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<CommitRet> {
         let block_gas_used = self.block_gas_used.min(self.block_gas_limit);
         let params = fvm_ipld_encoding::RawBytes::serialize(
             fendermint_actor_gas_market::BlockGasUtilization { block_gas_used },
@@ -195,8 +198,14 @@ impl ActorGasMarket {
             gas_premium: Default::default(),
         };
 
-        self.apply_implicit_message(msg, executor)?;
-        Ok(())
+        let apply_ret = self.apply_implicit_message(msg, executor)?;
+        let r = fvm_ipld_encoding::from_slice::<BlockGasUtilizationRet>(
+            &apply_ret.msg_receipt.return_data,
+        )
+        .context("failed to parse gas utilization result")?;
+        Ok(CommitRet {
+            base_fee: r.base_fee,
+        })
     }
 
     fn apply_implicit_message<E: Executor>(
