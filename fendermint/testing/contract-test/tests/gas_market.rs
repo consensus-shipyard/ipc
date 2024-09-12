@@ -16,7 +16,7 @@ use fendermint_vm_genesis::{Account, Actor, ActorMeta, Genesis, PermissionMode, 
 use fendermint_vm_interpreter::fvm::gas::GasMarket;
 use fendermint_vm_interpreter::fvm::state::FvmExecState;
 use fendermint_vm_interpreter::fvm::store::memory::MemoryBlockstore;
-use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
+use fendermint_vm_interpreter::fvm::upgrades::{Upgrade, UpgradeScheduler};
 use fendermint_vm_interpreter::fvm::FvmMessageInterpreter;
 use fvm_shared::address::Address;
 use fvm_shared::bigint::Zero;
@@ -45,8 +45,14 @@ fn my_secret_key() -> SecretKey {
 
 /// Creates a default tester with validator public key
 async fn default_tester() -> (Tester<I>, PublicKey) {
+    tester_with_upgrader(UpgradeScheduler::new()).await
+}
+
+/// Creates a default tester with validator public key
+async fn tester_with_upgrader(
+    upgrade_scheduler: UpgradeScheduler<MemoryBlockstore>,
+) -> (Tester<I>, PublicKey) {
     let validator = my_secret_key().public_key();
-    let upgrade_scheduler = UpgradeScheduler::new();
 
     let interpreter: FvmMessageInterpreter<MemoryBlockstore, _> =
         FvmMessageInterpreter::new(NeverCallClient, None, 1.05, 1.05, false, upgrade_scheduler);
@@ -226,6 +232,63 @@ async fn test_gas_market_premium_distribution() {
         final_balance > initial_balance,
         "validator balance should have increased"
     )
+}
+
+#[tokio::test]
+async fn test_gas_market_upgrade() {
+    let mut upgrader = UpgradeScheduler::new();
+
+    let total_gas_limit = 100;
+    upgrader
+        .add(
+            Upgrade::new(CHAIN_NAME, 1, Some(1), |state| {
+                println!(
+                    "[Upgrade at height {}] Update gas market params",
+                    state.block_height()
+                );
+
+                let mut gas_constants = SetConstants::default();
+                gas_constants.block_gas_limit = 100;
+
+                state.gas_market_mut().set_constants(gas_constants);
+
+                Ok(())
+            })
+            .unwrap(),
+        )
+        .unwrap();
+
+    let (mut tester, _) = tester_with_upgrader(upgrader).await;
+
+    let height = 1;
+    tester.begin_block(height).await.unwrap();
+    let reading = tester
+        .modify_exec_state(|mut state| async {
+            let reading = current_reading(&mut state, height)?;
+            Ok((state, reading))
+        })
+        .await
+        .unwrap();
+    assert_ne!(
+        reading.block_gas_limit, total_gas_limit,
+        "gas limit should not equal at start"
+    );
+    tester.end_block(height).await.unwrap();
+    tester.commit().await.unwrap();
+
+    let height = 2;
+    tester.begin_block(height).await.unwrap();
+    let reading = tester
+        .modify_exec_state(|mut state| async {
+            let reading = current_reading(&mut state, height)?;
+            Ok((state, reading))
+        })
+        .await
+        .unwrap();
+    assert_eq!(
+        reading.block_gas_limit, total_gas_limit,
+        "gas limit should equal after upgrade"
+    );
 }
 
 pub fn current_reading(
