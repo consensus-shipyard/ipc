@@ -277,7 +277,7 @@ if [[ $local_deploy = true ]]; then
       -e ANVIL_HOST_PORT="${ANVIL_HOST_PORT}" \
       anvil-start
 
-  # the `ipc-cli wallet import` command overwrites the file non-deterministically.
+  # the `ipc-cli wallet import` writes keys to the file non-deterministically.
   # instead, we just create the file with the predictable ordering & expected format.
   # provide the first ten anvil preloaded key pairs
   anvil_private_keys=(
@@ -368,14 +368,16 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
 
   if [ $local_deploy == true ]; then
     cd "${IPC_FOLDER}/hoku-contracts"
-    # need to run clean or we hit upgradeable saftey validation errors resulting from contracts with the same name
+    # need to run clean or we hit upgradeable saftey validation errors resulting
+    # from contracts with the same name 
     forge clean
 
     if [[ -z ${SKIP_BUILD+x} || "$SKIP_BUILD" == "" || "$SKIP_BUILD" == "false" ]]; then
       forge install
     fi
 
-    # use the same account validator 0th account to deploy contracts, but need to add hex prefix 
+    # use the same account validator 0th account to deploy contracts, but need
+    # to add hex prefix
     deployer_pk="0x${pk}"
     # TODO: should we dockerize this command?
     deploy_supply_source_token_out="$(PRIVATE_KEY=${deployer_pk} forge script script/Hoku.s.sol --tc DeployScript 0 --sig 'run(uint8)' --rpc-url "http://localhost:${ANVIL_HOST_PORT}" --broadcast -vv)"
@@ -384,14 +386,12 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
     echo ""
     echo "$deploy_supply_source_token_out"
     echo ""
-    # note: this is consistently going to be 0x2910E325cf29dd912E3476B61ef12F49cb931096 for local net
+    # note: this is consistently going to be
+    # 0x2910E325cf29dd912E3476B61ef12F49cb931096 for local net 
     SUPPLY_SOURCE_ADDRESS=$(echo "$deploy_supply_source_token_out" | sed -n 's/.*contract Hoku *\([^ ]*\).*/\1/p')
 
-    deploy_supply_source_token_out="$(PRIVATE_KEY=${deployer_pk} forge script script/Hoku.s.sol --tc DeployScript 0 --sig 'run(uint8)' --rpc-url "http://localhost:${ANVIL_HOST_PORT}" --broadcast -vv)"
-    echo "$deploy_supply_source_token_out"
-    SUPPLY_SOURCE_ADDRESS=$(echo "$deploy_supply_source_token_out" | sed -n 's/.*contract Hoku *\([^ ]*\).*/\1/p')
-
-    # fund the all anvil accounts with 1000000000000000100 HOKU (note the extra 100 HOKU)
+    # fund the all anvil accounts with 1000000000000000100 HOKU (note the extra
+    # 100 HOKU)
     token_amount="1000000000000000100"
     addresses=($(jq -r '.[].address' "${IPC_CONFIG_FOLDER}"/evm_keystore.json))
     for address in "${addresses[@]}"
@@ -571,8 +571,9 @@ done
 # Kill existing relayer if there's one
 pkill -fe "relayer" || true
 # Start relayer
-# note: this command mutates the evm_keystore.json file. to keep the accounts consistent for localnet usage
-# (e.g., logging accounts, using validator keys, etc.), we temporarily copy the file and then restore it
+# note: this command mutates the order of keys in the evm_keystore.json file. to
+# keep the accounts consistent for localnet usage (e.g., logging accounts, using
+# validator keys, etc.), we temporarily copy the file and then restore it.
 echo "$DASHES Start relayer process (in the background)"
 if [[ $local_deploy = true ]]; then
   temp_evm_keystore=$(jq . "${IPC_CONFIG_FOLDER}"/evm_keystore.json)
@@ -586,7 +587,8 @@ fi
 # move localnet funds to subnet
 if [[ $local_deploy = true ]]; then
   echo "$DASHES Move account funds into subnet"
-  # move 1000000000000000000 HOKU to subnet (i.e., leave 100 HOKU on rootnet for testing purposes)
+  # move 1000000000000000000 HOKU to subnet (i.e., leave 100 HOKU on rootnet for
+  # testing purposes)
   token_amount="1000000000000000000"
   addresses=($(jq -r '.[].address' "${IPC_CONFIG_FOLDER}"/evm_keystore.json))
   for address in "${addresses[@]}"
@@ -645,6 +647,8 @@ Parent supply source address: ${SUPPLY_SOURCE_ADDRESS}
 EOF
 
 if [[ $local_deploy = true ]]; then
+  echo $'Subnet gateway address: 0x77aa40b105843728088c0132e43fc44348881da8'
+  echo $'Subnet registry address: 0x74539671a1d2f1c8f200826baba665179f53a1b7'
   echo $'\nAvailable accounts:'
   addresses=($(jq -r '.[].address' "${IPC_CONFIG_FOLDER}"/evm_keystore.json))
   for i in "${!addresses[@]}"
