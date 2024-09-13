@@ -87,90 +87,97 @@ fi
 # Install build dependencies
 if [[ -z ${SKIP_DEPENDENCIES+x} || "$SKIP_DEPENDENCIES" == "" || "$SKIP_DEPENDENCIES" == "false" ]]; then
   echo "${DASHES} Installing build dependencies..."
-  sudo apt update && sudo apt install build-essential libssl-dev mesa-opencl-icd ocl-icd-opencl-dev gcc git bzr jq pkg-config curl clang hwloc libhwloc-dev wget ca-certificates gnupg -y
+  if [[ $(uname -s) == "Linux" ]]; then
+    sudo apt update && sudo apt install build-essential libssl-dev mesa-opencl-icd ocl-icd-opencl-dev gcc git bzr jq pkg-config curl clang hwloc libhwloc-dev wget ca-certificates gnupg -y
 
-  # Install rust + cargo
-  echo "$DASHES Check rustc & cargo..."
-  if which cargo ; then
-    echo "$DASHES rustc & cargo already installed."
-  else
-    echo "$DASHES Need to install rustc & cargo"
-    curl https://sh.rustup.rs -sSf | sh -s -- -y
-    # Refresh env
+    # Install rust + cargo
+    echo "$DASHES Check rustc & cargo..."
+    if which cargo ; then
+      echo "$DASHES rustc & cargo already installed."
+    else
+      echo "$DASHES Need to install rustc & cargo"
+      curl https://sh.rustup.rs -sSf | sh -s -- -y
+      # Refresh env
+      source "${HOME}"/.bashrc
+    fi
+
+    # Install cargo make
+    echo "$DASHES Installing cargo-make"
+    cargo install cargo-make
+    # Install toml-cli
+    echo "$DASHES Installing toml-cli"
+    cargo install toml-cli
+
+    # Install Foundry
+    echo "$DASHES Check foundry..."
+    if which foundryup ; then
+      echo "$DASHES foundry is already installed."
+    else
+      echo "$DASHES Need to install foundry"
+      curl -L https://foundry.paradigm.xyz | bash
+      foundryup
+    fi
+
+    # Install node
+    echo "$DASHES Check node..."
+    if which node ; then
+      echo "$DASHES node is already installed."
+    else
+      echo "$DASHES Need to install node"
+      curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
+      source "$HOME/.bashrc"
+      nvm install --default lts/*
+    fi
+
+    # Install docker
+    echo "$DASHES check docker"
+    if which docker ; then
+      echo "$DASHES docker is already installed."
+    else
+      echo "$DASHES Need to install docker"
+      # Add Docker's official GPG key:
+      sudo apt-get update
+      sudo apt-get install ca-certificates curl
+      sudo install -m 0755 -d /etc/apt/keyrings
+      sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+      sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+      # Add the repository to Apt sources:
+      echo \
+        "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+        $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+        sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+      sudo apt-get update
+      sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+      # Remove the need to use sudo
+      getent group docker || sudo groupadd docker
+      sudo usermod -aG docker "$USER"
+      newgrp docker
+
+      # Test running docker without sudo
+      docker ps
+    fi
+    # Make sure we re-read the latest env before finishing dependency installation.
+    set +u
     source "${HOME}"/.bashrc
-  fi
-
-  # Install cargo make
-  echo "$DASHES Installing cargo-make"
-  cargo install cargo-make
-  # Install toml-cli
-  echo "$DASHES Installing toml-cli"
-  cargo install toml-cli
-
-  # Install Foundry
-  echo "$DASHES Check foundry..."
-  if which foundryup ; then
-    echo "$DASHES foundry is already installed."
+    set -u
+  elif [[ $(uname -s) == "Darwin" ]]; then
+    # TODO: check and/or install dependencies for MacOS. also, do we assume bash? zsh? etc.
+    echo "WARNING: Build dependency installation not supported for MacOS, skipping..."
   else
-    echo "$DASHES Need to install foundry"
-    curl -L https://foundry.paradigm.xyz | bash
-    foundryup
+    echo "${DASHES} Unsupported OS: $(uname -s)"
+    exit 1
   fi
-
-  # Install node
-  echo "$DASHES Check node..."
-  if which node ; then
-    echo "$DASHES node is already installed."
-  else
-    echo "$DASHES Need to install node"
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
-    source "$HOME/.bashrc"
-    nvm install --default lts/*
-  fi
-
-  # Install docker
-  echo "$DASHES check docker"
-  if which docker ; then
-    echo "$DASHES docker is already installed."
-  else
-    echo "$DASHES Need to install docker"
-    # Add Docker's official GPG key:
-    sudo apt-get update
-    sudo apt-get install ca-certificates curl
-    sudo install -m 0755 -d /etc/apt/keyrings
-    sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-    sudo chmod a+r /etc/apt/keyrings/docker.asc
-
-    # Add the repository to Apt sources:
-    echo \
-      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-      $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-      sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-    sudo apt-get update
-    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-    # Remove the need to use sudo
-    getent group docker || sudo groupadd docker
-    sudo usermod -aG docker "$USER"
-    newgrp docker
-
-    # Test running docker without sudo
-    docker ps
-  fi
-
-  # Make sure we re-read the latest env before finishing dependency installation.
-  set +u
-  source "${HOME}"/.bashrc
-  set -u
 else
-  echo "$DASHES skpping dependencies installation $DASHES"
+  echo "$DASHES skipping dependencies installation $DASHES"
 fi
 
 # Prepare code repo
 if ! $local_deploy ; then
   echo "$DASHES Preparing ipc repo..."
   if ! ls "$IPC_FOLDER" ; then
-    git clone --recurse-submodules -j8 git@github.com-ipc:amazingdatamachine/ipc.git "${IPC_FOLDER}"
+    git clone --recurse-submodules -j8 git@github.com-ipc:hokunet/ipc.git "${IPC_FOLDER}"
   fi
   cd "${IPC_FOLDER}"
   git fetch
@@ -285,7 +292,7 @@ if [[ $local_deploy = true ]]; then
     dbda1821b80551c9d65939329250298aa3472ba22feea921c0cf5d620ea67b97
     2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6
   )
-  # lowercased addresses in matching order ()
+  # lowercased addresses in matching order (`ipc-cli` expects lowercase)
   anvil_public_keys=(
     0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
     0x70997970c51812dc3a010c7d01b50e0d17dc79c8
@@ -351,7 +358,6 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
     deploy_contracts_output=$(make deploy-ipc NETWORK=localnet)
   fi
 
-  # TODO(dtb): try to capture and log these contract addresses at the very end? 
   echo "$DASHES deploy contracts output $DASHES"
   echo ""
   echo "$deploy_contracts_output"
@@ -565,8 +571,17 @@ done
 # Kill existing relayer if there's one
 pkill -fe "relayer" || true
 # Start relayer
+# note: this command mutates the evm_keystore.json file. to keep the accounts consistent for localnet usage
+# (e.g., logging accounts, using validator keys, etc.), we temporarily copy the file and then restore it
 echo "$DASHES Start relayer process (in the background)"
-nohup ipc-cli checkpoint relayer --subnet "$subnet_id" --submitter "$default_wallet_address" > relayer.log &
+if [[ $local_deploy = true ]]; then
+  temp_evm_keystore=$(jq . "${IPC_CONFIG_FOLDER}"/evm_keystore.json)
+  nohup ipc-cli checkpoint relayer --subnet "$subnet_id" --submitter "$default_wallet_address" > relayer.log &
+  sleep 3
+  echo "$temp_evm_keystore" > "${IPC_CONFIG_FOLDER}"/evm_keystore.json
+else
+  nohup ipc-cli checkpoint relayer --subnet "$subnet_id" --submitter "$default_wallet_address" > relayer.log &
+fi
 
 # move localnet funds to subnet
 if [[ $local_deploy = true ]]; then
@@ -578,7 +593,7 @@ if [[ $local_deploy = true ]]; then
   do
     ipc-cli cross-msg fund-with-token --subnet ${subnet_id} --from ${address} --approve ${token_amount}
   done
-  echo $'\nDeposited HOKU for anvil accounts\n'
+  echo $'\nDeposited HOKU for test accounts\n'
 fi
 
 # Print a summary of the deployment
@@ -630,10 +645,17 @@ Parent supply source address: ${SUPPLY_SOURCE_ADDRESS}
 EOF
 
 if [[ $local_deploy = true ]]; then
-  echo $'\nPrivate keys (use with Hoku SDK & CLI):'
-  for i in {0..9}
+  echo $'\nAvailable accounts:'
+  addresses=($(jq -r '.[].address' "${IPC_CONFIG_FOLDER}"/evm_keystore.json))
+  for i in "${!addresses[@]}"
   do
-    jq --arg index "$i" '.[$index|tonumber].private_key' < "$IPC_CONFIG_FOLDER"/evm_keystore.json | tr -d '"'
+    echo "($i) ${addresses[$i]}"
+  done
+  echo $'\nPrivate keys:'
+  private_keys=($(jq -r '.[].private_key' "${IPC_CONFIG_FOLDER}"/evm_keystore.json))
+  for i in "${!private_keys[@]}"
+  do
+    echo "($i) ${private_keys[$i]}"
   done
 fi
 
