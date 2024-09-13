@@ -115,7 +115,7 @@ pub struct ParentFinality {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct Blob {
     /// The address that requested the blob.
-    pub origin: Address,
+    pub subscriber: Address,
     /// The blake3 hash of the blob.
     pub hash: Hash,
     /// The node ID of the source node serving validators the blob.

@@ -68,10 +68,17 @@ impl BlobsActor {
 
     fn add_blob(rt: &impl Runtime, params: AddBlobParams) -> Result<Account, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let caller = resolve_caller(rt, params.from)?;
+        let caller = resolve_external(rt, rt.message().caller())?;
+        // The sponsor will be subscriber if specified by the caller
+        let subscriber = if let Some(sponsor) = params.sponsor {
+            resolve_external(rt, sponsor)?
+        } else {
+            caller
+        };
         rt.transaction(|st: &mut State, rt| {
             st.add_blob(
                 caller,
+                subscriber,
                 rt.curr_epoch(),
                 params.hash,
                 params.size,
@@ -94,7 +101,7 @@ impl BlobsActor {
         rt.validate_immediate_caller_accept_any()?;
         let status = rt
             .state::<State>()?
-            .get_blob_status(params.hash, params.origin);
+            .get_blob_status(params.hash, params.subscriber);
         Ok(status)
     }
 
@@ -110,15 +117,26 @@ impl BlobsActor {
     fn finalize_blob(rt: &impl Runtime, params: FinalizeBlobParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
         rt.transaction(|st: &mut State, _| {
-            st.finalize_blob(params.origin, rt.curr_epoch(), params.hash, params.status)
+            st.finalize_blob(
+                params.subscriber,
+                rt.curr_epoch(),
+                params.hash,
+                params.status,
+            )
         })
     }
 
     fn delete_blob(rt: &impl Runtime, params: DeleteBlobParams) -> Result<Account, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let caller = resolve_caller(rt, params.from)?;
+        let caller = resolve_external(rt, rt.message().caller())?;
+        // The sponsor will be subscriber if specified by the caller
+        let subscriber = if let Some(sponsor) = params.sponsor {
+            resolve_external(rt, sponsor)?
+        } else {
+            caller
+        };
         let (account, delete) = rt.transaction(|st: &mut State, _| {
-            st.delete_blob(caller, rt.curr_epoch(), params.hash)
+            st.delete_blob(caller, subscriber, rt.curr_epoch(), params.hash)
         })?;
         if delete {
             delete_from_disc(params.hash)?;
@@ -180,38 +198,21 @@ impl ActorCode for BlobsActor {
     }
 }
 
-/// Resolves caller address to robust (non-ID) address for safe storage
-fn resolve_caller(rt: &impl Runtime, from: Option<Address>) -> Result<Address, ActorError> {
-    if let Some(machine) = from {
-        match rt.resolve_address(&machine) {
-            Some(id) => {
-                // Caller is always an ID address
-                if id == rt.message().caller().id().unwrap() {
-                    Ok(machine)
-                } else {
-                    Err(ActorError::illegal_argument(
-                        "machine address does not match caller".into(),
-                    ))
-                }
-            }
-            None => Err(ActorError::not_found("machine address not found".into())),
-        }
+// Resolves robust address of an actor.
+fn resolve_external(rt: &impl Runtime, address: Address) -> Result<Address, ActorError> {
+    let actor_id = if let Ok(id) = address.id() {
+        id
     } else {
-        resolve_caller_external(rt)
-    }
-}
-
-fn resolve_caller_external(rt: &impl Runtime) -> Result<Address, ActorError> {
-    let caller = rt.message().caller();
-    let caller_id = caller.id().unwrap();
-    let caller_code_cid = rt
-        .get_actor_code_cid(&caller_id)
+        return Ok(address);
+    };
+    let code_cid = rt
+        .get_actor_code_cid(&actor_id)
         .expect("failed to lookup caller code");
-    match rt.resolve_builtin_actor_type(&caller_code_cid) {
+    match rt.resolve_builtin_actor_type(&code_cid) {
         Some(Type::Account) => {
             let result = rt
                 .send(
-                    &caller,
+                    &address,
                     ext::account::PUBKEY_ADDRESS_METHOD,
                     None,
                     Zero::zero(),
@@ -234,22 +235,42 @@ fn resolve_caller_external(rt: &impl Runtime) -> Result<Address, ActorError> {
 
             Ok(robust_addr)
         }
-        Some(Type::EthAccount) => {
-            if let Some(delegated_addr) = rt.lookup_delegated_address(caller_id) {
-                Ok(delegated_addr)
-            } else {
-                Err(ActorError::forbidden(format!(
+        Some(Type::EthAccount) | Some(Type::EVM) => {
+            rt.lookup_delegated_address(actor_id)
+                .ok_or(ActorError::forbidden(format!(
                     "actor {} does not have delegated address",
-                    caller_id
+                    actor_id
                 )))
-            }
         }
-        Some(t) => Err(ActorError::forbidden(format!(
-            "disallowed caller type {}",
-            t.name()
-        ))),
+        Some(_) => {
+            // The caller might be a machine
+            let result = rt
+                .send(
+                    &address,
+                    fendermint_actor_machine::GET_ADDRESS_METHOD,
+                    None,
+                    Zero::zero(),
+                    None,
+                    SendFlags::READ_ONLY,
+                )
+                .context_code(
+                    ExitCode::USR_ASSERTION_FAILED,
+                    "machine failed to return its key address",
+                )?;
+
+            if !result.exit_code.is_success() {
+                return Err(ActorError::checked(
+                    result.exit_code,
+                    "failed to retrieve machine robust address".to_string(),
+                    None,
+                ));
+            }
+            let robust_addr: Address = deserialize_block(result.return_data)?;
+
+            Ok(robust_addr)
+        }
         None => Err(ActorError::forbidden(format!(
-            "disallowed caller code {caller_code_cid}"
+            "disallowed caller code {code_cid}"
         ))),
     }
 }
@@ -392,7 +413,7 @@ mod tests {
         rt.expect_validate_caller_any();
         let hash = new_hash(1024);
         let add_params = AddBlobParams {
-            from: None,
+            sponsor: None,
             source: new_pk(),
             hash: hash.0,
             size: hash.1,
@@ -435,6 +456,7 @@ mod tests {
                 credit_free: BigInt::from(999999999996313600u64),
                 credit_committed: BigInt::from(3686400),
                 last_debit_epoch: 5,
+                sponsor: None,
             }
         );
         rt.verify();

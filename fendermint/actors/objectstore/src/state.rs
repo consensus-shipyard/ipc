@@ -2,20 +2,20 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::collections::HashMap;
+use std::string::FromUtf8Error;
+
 use cid::Cid;
 use fendermint_actor_blobs_shared::state::Hash;
-use fendermint_actor_machine::{Kind, MachineState, WriteAccess};
+use fendermint_actor_machine::{Kind, MachineAddress, MachineState, WriteAccess};
 use fil_actors_runtime::ActorError;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::tuple::*;
 use fvm_ipld_hamt::{BytesKey, Hamt};
 use fvm_shared::address::Address;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::string::FromUtf8Error;
 
 const BIT_WIDTH: u32 = 8;
-
 const MAX_LIST_LIMIT: usize = 10000;
 
 fn state_error(e: fvm_ipld_hamt::Error) -> ActorError {
@@ -29,8 +29,15 @@ fn utf8_error(e: FromUtf8Error) -> ActorError {
 /// The state represents an object store backed by a Hamt.
 #[derive(Serialize_tuple, Deserialize_tuple)]
 pub struct State {
+    /// The machine address set by the init actor.
+    pub address: MachineAddress,
     /// The machine robust owner address.
     pub owner: Address,
+    /// Default credits sponsor.
+    /// If specified, the sponsor must delegate credits to the object store.
+    /// If not specified, the caller adding objects acts as the sponsor and
+    /// must have delegated credits to the object store.
+    pub sponsor: Option<Address>,
     /// Write access dictates who can write to the machine.
     pub write_access: WriteAccess,
     /// The root cid of the Hamt.
@@ -40,6 +47,39 @@ pub struct State {
 }
 
 impl MachineState for State {
+    fn new<BS: Blockstore>(
+        store: &BS,
+        creator: Address,
+        write_access: WriteAccess,
+        metadata: HashMap<String, String>,
+    ) -> anyhow::Result<Self, ActorError> {
+        let root = match Hamt::<_, ObjectState>::new_with_bit_width(store, BIT_WIDTH).flush() {
+            Ok(cid) => cid,
+            Err(e) => {
+                return Err(ActorError::illegal_state(format!(
+                    "objectstore actor failed to create empty Hamt: {}",
+                    e
+                )));
+            }
+        };
+        Ok(Self {
+            address: Default::default(),
+            owner: creator,
+            sponsor: None,
+            write_access,
+            root,
+            metadata,
+        })
+    }
+
+    fn init(&mut self, address: Address) -> anyhow::Result<(), ActorError> {
+        self.address.set(address)
+    }
+
+    fn address(&self) -> MachineAddress {
+        self.address.clone()
+    }
+
     fn kind(&self) -> Kind {
         Kind::ObjectStore
     }
@@ -76,27 +116,8 @@ pub struct ObjectList {
 }
 
 impl State {
-    pub fn new<BS: Blockstore>(
-        store: &BS,
-        creator: Address,
-        write_access: WriteAccess,
-        metadata: HashMap<String, String>,
-    ) -> anyhow::Result<Self, ActorError> {
-        let root = match Hamt::<_, ObjectState>::new_with_bit_width(store, BIT_WIDTH).flush() {
-            Ok(cid) => cid,
-            Err(e) => {
-                return Err(ActorError::illegal_state(format!(
-                    "objectstore actor failed to create empty Hamt: {}",
-                    e
-                )));
-            }
-        };
-        Ok(Self {
-            owner: creator,
-            write_access,
-            root,
-            metadata,
-        })
+    pub fn set_sponsor(&mut self, sponsor: Address) {
+        self.sponsor = Some(sponsor);
     }
 
     pub fn add<BS: Blockstore>(

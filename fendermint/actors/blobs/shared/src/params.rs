@@ -24,8 +24,9 @@ pub struct GetAccountParams(pub Address);
 /// Params for adding a blob.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct AddBlobParams {
-    /// Robust address of caller. Required if the caller is a machine.
-    pub from: Option<Address>,
+    /// Optional sponsor address.
+    /// Caller must have a delegation from sponsor.
+    pub sponsor: Option<Address>,
     /// Source Iroh node ID used for ingestion.
     pub source: PublicKey,
     /// Blob blake3 hash.
@@ -48,7 +49,7 @@ pub struct GetBlobParams(pub Hash);
 pub struct GetBlobStatusParams {
     /// The origin address that requested the blob.
     /// This could be a wallet or machine.
-    pub origin: Address,
+    pub subscriber: Address,
     /// Blob blake3 hash.
     pub hash: Hash,
 }
@@ -56,9 +57,9 @@ pub struct GetBlobStatusParams {
 /// Params for finalizing a blob.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct FinalizeBlobParams {
-    /// The origin address that requested the blob.
+    /// The address that requested the blob.
     /// This could be a wallet or machine.
-    pub origin: Address,
+    pub subscriber: Address,
     /// Blob blake3 hash.
     pub hash: Hash,
     /// The status to set as final.
@@ -68,8 +69,10 @@ pub struct FinalizeBlobParams {
 /// Params for deleting a blob.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct DeleteBlobParams {
-    /// Robust address of caller. Required if the caller is a machine.
-    pub from: Option<Address>,
+    /// Optional sponsor address.
+    /// Caller must still have a delegation from sponsor.
+    /// Must be used if the caller is the delegate who added the blob.
+    pub sponsor: Option<Address>,
     /// Blob blake3 hash.
     pub hash: Hash,
 }

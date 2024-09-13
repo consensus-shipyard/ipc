@@ -34,14 +34,14 @@ pub enum Method {
 
 pub fn add_blob(
     rt: &impl Runtime,
-    from: Address,
+    sponsor: Option<Address>,
     source: state::PublicKey,
     hash: state::Hash,
     size: u64,
     ttl: Option<ChainEpoch>,
 ) -> Result<(), ActorError> {
     let add_params = IpldBlock::serialize_cbor(&params::AddBlobParams {
-        from: Some(from),
+        sponsor,
         source,
         hash,
         size,
@@ -65,14 +65,15 @@ pub fn get_blob(rt: &impl Runtime, hash: state::Hash) -> Result<Option<state::Bl
     ))?)
 }
 
-pub fn delete_blob(rt: &impl Runtime, from: Address, hash: state::Hash) -> Result<(), ActorError> {
+pub fn delete_blob(
+    rt: &impl Runtime,
+    sponsor: Option<Address>,
+    hash: state::Hash,
+) -> Result<(), ActorError> {
     extract_send_result(rt.send_simple(
         &BLOBS_ACTOR_ADDR,
         Method::DeleteBlob as MethodNum,
-        IpldBlock::serialize_cbor(&params::DeleteBlobParams {
-            from: Some(from),
-            hash,
-        })?,
+        IpldBlock::serialize_cbor(&params::DeleteBlobParams { sponsor, hash })?,
         rt.message().value_received(),
     ))?;
     Ok(())

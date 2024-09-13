@@ -3,14 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use cid::Cid;
-use fendermint_actor_machine::{ConstructorParams, MachineActor};
+use fendermint_actor_machine::MachineActor;
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
     runtime::{ActorCode, Runtime},
-    ActorError, FIRST_EXPORTED_METHOD_NUMBER, INIT_ACTOR_ADDR,
+    ActorError,
 };
-use fvm_ipld_encoding::ipld_block::IpldBlock;
-use fvm_shared::MethodNum;
 
 use crate::{Method, PushParams, PushReturn, State, ACCUMULATOR_ACTOR_NAME};
 
@@ -20,17 +18,6 @@ fil_actors_runtime::wasm_trampoline!(Actor);
 pub struct Actor;
 
 impl Actor {
-    fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
-        rt.validate_immediate_caller_is(std::iter::once(&INIT_ACTOR_ADDR))?;
-        let state = State::new(
-            rt.store(),
-            params.creator,
-            params.write_access,
-            params.metadata,
-        )?;
-        rt.create(&state)
-    }
-
     fn push(rt: &impl Runtime, params: PushParams) -> Result<PushReturn, ActorError> {
         Self::ensure_write_allowed(rt)?;
         rt.transaction(|st: &mut State, rt| st.push(rt.store(), params.0))
@@ -59,20 +46,6 @@ impl Actor {
         let st: State = rt.state()?;
         Ok(st.leaf_count)
     }
-
-    /// Fallback method for unimplemented method numbers.
-    pub fn fallback(
-        rt: &impl Runtime,
-        method: MethodNum,
-        _: Option<IpldBlock>,
-    ) -> Result<Option<IpldBlock>, ActorError> {
-        rt.validate_immediate_caller_accept_any()?;
-        if method >= FIRST_EXPORTED_METHOD_NUMBER {
-            Ok(None)
-        } else {
-            Err(actor_error!(unhandled_message; "invalid method: {}", method))
-        }
-    }
 }
 
 impl MachineActor for Actor {
@@ -88,6 +61,8 @@ impl ActorCode for Actor {
 
     actor_dispatch! {
         Constructor => constructor,
+        Init => init,
+        GetAddress => get_address,
         GetMetadata => get_metadata,
         Push => push,
         Get => get_leaf_at,

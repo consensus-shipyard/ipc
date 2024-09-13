@@ -5,21 +5,20 @@
 use cid::Cid;
 use fendermint_actor_blobs_shared::state::{Blob, BlobStatus};
 use fendermint_actor_blobs_shared::{add_blob, delete_blob, get_blob};
-use fendermint_actor_machine::{ConstructorParams, MachineActor};
+use fendermint_actor_machine::MachineActor;
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
     runtime::{ActorCode, Runtime},
-    ActorError, FIRST_EXPORTED_METHOD_NUMBER, INIT_ACTOR_ADDR,
+    ActorError,
 };
-use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_ipld_hamt::BytesKey;
-use fvm_shared::MethodNum;
 
 use crate::shared::{
     AddParams, DeleteParams, GetParams, ListObjectsReturn, ListParams, Method, Object,
     OBJECTSTORE_ACTOR_NAME,
 };
 use crate::state::{ObjectState, State};
+use crate::SetSponsorParams;
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
@@ -27,23 +26,19 @@ fil_actors_runtime::wasm_trampoline!(Actor);
 pub struct Actor;
 
 impl Actor {
-    fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
-        rt.validate_immediate_caller_is(std::iter::once(&INIT_ACTOR_ADDR))?;
-        let state = State::new(
-            rt.store(),
-            params.creator,
-            params.write_access,
-            params.metadata,
-        )?;
-        rt.create(&state)
+    fn set_sponsor(rt: &impl Runtime, params: SetSponsorParams) -> Result<(), ActorError> {
+        Self::ensure_write_allowed(rt)?;
+        // create delegation from sponsor to caller
+        Ok(())
     }
 
     fn add_object(rt: &impl Runtime, params: AddParams) -> Result<Cid, ActorError> {
         Self::ensure_write_allowed(rt)?;
+        let state = rt.state::<State>()?;
         let key = BytesKey(params.key);
-        if let Some(object) = retrieve_object_state(rt, &key)? {
+        if let Some(object) = state.get(rt.store(), &key)? {
             if params.overwrite {
-                delete_blob(rt, params.to, object.hash)?;
+                delete_blob(rt, state.sponsor, object.hash)?;
             } else {
                 return Err(ActorError::illegal_state(
                     "key exists; use overwrite".into(),
@@ -53,7 +48,7 @@ impl Actor {
         // Add blob for object
         add_blob(
             rt,
-            params.to,
+            state.sponsor,
             params.source,
             params.hash,
             params.size,
@@ -74,11 +69,13 @@ impl Actor {
 
     fn delete_object(rt: &impl Runtime, params: DeleteParams) -> Result<Cid, ActorError> {
         Self::ensure_write_allowed(rt)?;
-        let key = BytesKey(params.key);
-        let object = retrieve_object_state(rt, &key)?
+        let state = rt.state::<State>()?;
+        let key = BytesKey(params.0);
+        let object = state
+            .get(rt.store(), &key)?
             .ok_or(ActorError::illegal_state("object not found".into()))?;
         // Delete blob for object
-        delete_blob(rt, params.to, object.hash)?;
+        delete_blob(rt, state.sponsor, object.hash)?;
         // Update state
         let res = rt.transaction(|st: &mut State, rt| st.delete(rt.store(), &key))?;
         Ok(res.1)
@@ -86,7 +83,9 @@ impl Actor {
 
     fn get_object(rt: &impl Runtime, params: GetParams) -> Result<Option<Object>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        if let Some(object_state) = retrieve_object_state(rt, &BytesKey(params.0))? {
+        let state = rt.state::<State>()?;
+        let key = BytesKey(params.0);
+        if let Some(object_state) = state.get(rt.store(), &key)? {
             if let Some(blob) = get_blob(rt, object_state.hash)? {
                 let object = build_object(&blob, &object_state)?;
                 Ok(object)
@@ -126,28 +125,6 @@ impl Actor {
             common_prefixes: prefixes,
         })
     }
-
-    /// Fallback method for unimplemented method numbers.
-    pub fn fallback(
-        rt: &impl Runtime,
-        method: MethodNum,
-        _: Option<IpldBlock>,
-    ) -> Result<Option<IpldBlock>, ActorError> {
-        rt.validate_immediate_caller_accept_any()?;
-        if method >= FIRST_EXPORTED_METHOD_NUMBER {
-            Ok(None)
-        } else {
-            Err(actor_error!(unhandled_message; "invalid method: {}", method))
-        }
-    }
-}
-
-/// Retrieve an object from the state.
-fn retrieve_object_state(
-    rt: &impl Runtime,
-    key: &BytesKey,
-) -> Result<Option<ObjectState>, ActorError> {
-    rt.state::<State>()?.get(rt.store(), key)
 }
 
 /// Build an object from its state and blob.
@@ -190,7 +167,10 @@ impl ActorCode for Actor {
 
     actor_dispatch! {
         Constructor => constructor,
+        Init => init,
+        GetAddress => get_address,
         GetMetadata => get_metadata,
+        SetSponsor => set_sponsor,
         AddObject => add_object,
         DeleteObject => delete_object,
         GetObject => get_object,
@@ -209,7 +189,7 @@ mod tests {
     use fendermint_actor_blobs_shared::params::{AddBlobParams, DeleteBlobParams, GetBlobParams};
     use fendermint_actor_blobs_shared::state::{BlobStatus, Hash, PublicKey, Subscription};
     use fendermint_actor_blobs_shared::{Method as BlobMethod, BLOBS_ACTOR_ADDR};
-    use fendermint_actor_machine::WriteAccess;
+    use fendermint_actor_machine::{ConstructorParams, WriteAccess};
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::runtime::Runtime;
     use fil_actors_runtime::test_utils::{
@@ -221,6 +201,7 @@ mod tests {
     use fvm_shared::clock::ChainEpoch;
     use fvm_shared::econ::TokenAmount;
     use fvm_shared::error::ExitCode;
+    use fvm_shared::MethodNum;
     use rand::RngCore;
 
     fn construct_and_verify(creator: Address) -> MockRuntime {
@@ -279,10 +260,8 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
 
-        let machine_addr = Address::new_actor(&[0xde, 0xad, 0xbe, 0xef]);
         let hash = new_hash(256);
         let add_params: AddParams = AddParams {
-            to: machine_addr,
             source: new_pk(),
             key: vec![0, 1, 2],
             hash: hash.0,
@@ -296,7 +275,7 @@ mod tests {
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
             IpldBlock::serialize_cbor(&AddBlobParams {
-                from: Some(add_params.to),
+                sponsor: None,
                 source: add_params.source,
                 hash: add_params.hash,
                 size: add_params.size,
@@ -334,10 +313,8 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
 
-        let machine_addr = Address::new_actor(&[0xde, 0xad, 0xbe, 0xef]);
         let hash = new_hash(256);
         let add_params: AddParams = AddParams {
-            to: machine_addr,
             source: new_pk(),
             key: vec![0, 1, 2],
             hash: hash.0,
@@ -351,7 +328,7 @@ mod tests {
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
             IpldBlock::serialize_cbor(&AddBlobParams {
-                from: Some(add_params.to),
+                sponsor: None,
                 source: add_params.source,
                 hash: add_params.hash,
                 size: add_params.size,
@@ -377,7 +354,6 @@ mod tests {
 
         let hash = new_hash(256);
         let add_params2 = AddParams {
-            to: add_params.to,
             source: add_params.source,
             key: add_params.key,
             hash: hash.0,
@@ -391,7 +367,7 @@ mod tests {
             BLOBS_ACTOR_ADDR,
             BlobMethod::DeleteBlob as MethodNum,
             IpldBlock::serialize_cbor(&DeleteBlobParams {
-                from: Some(add_params.to),
+                sponsor: None,
                 hash: add_params.hash,
             })
             .unwrap(),
@@ -403,7 +379,7 @@ mod tests {
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
             IpldBlock::serialize_cbor(&AddBlobParams {
-                from: Some(add_params2.to),
+                sponsor: None,
                 source: add_params2.source,
                 hash: add_params2.hash,
                 size: add_params2.size,
@@ -441,10 +417,8 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
 
-        let machine_addr = Address::new_actor(&[0xde, 0xad, 0xbe, 0xef]);
         let hash = new_hash(256);
         let add_params: AddParams = AddParams {
-            to: machine_addr,
             source: new_pk(),
             key: vec![0, 1, 2],
             hash: hash.0,
@@ -458,7 +432,7 @@ mod tests {
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
             IpldBlock::serialize_cbor(&AddBlobParams {
-                from: Some(add_params.to),
+                sponsor: None,
                 source: add_params.source,
                 hash: add_params.hash,
                 size: add_params.size,
@@ -484,7 +458,6 @@ mod tests {
 
         let hash = new_hash(256);
         let add_params2 = AddParams {
-            to: add_params.to,
             source: add_params.source,
             key: add_params.key,
             hash: hash.0,
@@ -517,13 +490,11 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
 
-        let machine_addr = Address::new_actor(&[0xde, 0xad, 0xbe, 0xef]);
         let key = vec![0, 1, 2];
         let hash = new_hash(256);
 
         // Prerequisite for a delete operation: add to have a proper state of the actor.
         let add_params: AddParams = AddParams {
-            to: machine_addr,
             source: new_pk(),
             key: key.clone(),
             hash: hash.0,
@@ -537,7 +508,7 @@ mod tests {
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
             IpldBlock::serialize_cbor(&AddBlobParams {
-                from: Some(add_params.to),
+                sponsor: None,
                 source: add_params.source,
                 hash: add_params.hash,
                 size: add_params.size,
@@ -562,16 +533,13 @@ mod tests {
         rt.verify();
 
         // Now actually delete it.
-        let delete_params = DeleteParams {
-            to: machine_addr,
-            key: key.clone(),
-        };
+        let delete_params = DeleteParams(key.clone());
         rt.expect_validate_caller_any();
         rt.expect_send_simple(
             BLOBS_ACTOR_ADDR,
             BlobMethod::DeleteBlob as MethodNum,
             IpldBlock::serialize_cbor(&DeleteBlobParams {
-                from: Some(add_params.to),
+                sponsor: None,
                 hash: add_params.hash,
             })
             .unwrap(),
@@ -628,14 +596,13 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
 
-        let machine_addr = Address::new_actor(&[0xde, 0xad, 0xbe, 0xef]);
+        let sponsor = Address::new_id(111);
         let key = vec![0, 1, 2];
         let hash = new_hash(256);
         let ttl = ChainEpoch::from(3600);
 
         // Prerequisite for a delete operation: add to have a proper state of the actor.
         let add_params: AddParams = AddParams {
-            to: machine_addr,
             source: new_pk(),
             key: key.clone(),
             hash: hash.0,
@@ -649,7 +616,7 @@ mod tests {
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
             IpldBlock::serialize_cbor(&AddBlobParams {
-                from: Some(add_params.to),
+                sponsor: Some(sponsor),
                 source: add_params.source,
                 hash: add_params.hash,
                 size: add_params.size,
@@ -673,12 +640,13 @@ mod tests {
         let blob = Blob {
             size: add_params.size,
             subs: HashMap::from([(
-                machine_addr,
+                sponsor,
                 Subscription {
                     added: 0,
                     expiry: ttl,
                     auto_renew: false,
                     source: add_params.source,
+                    delegate: Some(f4_eth_addr),
                 },
             )]),
             status: BlobStatus::Resolved,
