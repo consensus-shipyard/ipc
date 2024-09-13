@@ -22,16 +22,16 @@ fi
 if ! $local_deploy ; then
   eval "$(ssh-agent -s)"
   ssh-add
-  if [ -e "${HOME}"/.ssh/id_rsa.ipc ]; then
+  if [[ -e "${HOME}"/.ssh/id_rsa.ipc ]]; then
     ssh-add "${HOME}"/.ssh/id_rsa.ipc
   fi
 
-  if [ -z "${SUPPLY_SOURCE_ADDRESS}" ]; then
+  if [[ -z "${SUPPLY_SOURCE_ADDRESS:-}" ]]; then
     echo "SUPPLY_SOURCE_ADDRESS is not set"
     exit 1
   fi
 
-  if [ -z "${PARENT_HTTP_AUTH_TOKEN}" ]; then
+  if [[ -z "${PARENT_HTTP_AUTH_TOKEN:-}" ]]; then
     echo "PARENT_HTTP_AUTH_TOKEN is not set"
     exit 1
   fi
@@ -55,8 +55,8 @@ fi
 IPC_CONFIG_FOLDER=${HOME}/.ipc
 
 echo "$DASHES starting with env $DASHES"
-echo IPC_FOLDER $IPC_FOLDER
-echo IPC_CONFIG_FOLDER $IPC_CONFIG_FOLDER
+echo "IPC_FOLDER $IPC_FOLDER"
+echo "IPC_CONFIG_FOLDER $IPC_CONFIG_FOLDER"
 
 wallet_addresses=()
 public_keys=()
@@ -387,13 +387,18 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
     echo "$deploy_supply_source_token_out"
     echo ""
     # note: this is consistently going to be
-    # 0x2910E325cf29dd912E3476B61ef12F49cb931096 for local net 
+    # 0xE6E340D132b5f46d1e472DebcD681B2aBc16e57E for localnet 
     SUPPLY_SOURCE_ADDRESS=$(echo "$deploy_supply_source_token_out" | sed -n 's/.*contract Hoku *\([^ ]*\).*/\1/p')
 
     # fund the all anvil accounts with 1000000000000000100 HOKU (note the extra
     # 100 HOKU)
     token_amount="1000000000000000100"
-    addresses=($(jq -r '.[].address' "${IPC_CONFIG_FOLDER}"/evm_keystore.json))
+    addresses=()
+    for i in {0..9}
+    do
+      addr=$(jq .["$i"].address < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
+      addresses+=("$addr")
+    done
     for address in "${addresses[@]}"
     do
       cast send "$SUPPLY_SOURCE_ADDRESS" "mint(address,uint256)" "$address" "$token_amount" --rpc-url "http://localhost:${ANVIL_HOST_PORT}" --private-key "$pk"
@@ -415,15 +420,14 @@ cp /tmp/config.toml.2 "${IPC_CONFIG_FOLDER}"/config.toml
 echo "$DASHES Creating a child subnet..."
 root_id=$(toml get "${IPC_CONFIG_FOLDER}"/config.toml 'subnets[0].id' | tr -d '"')
 echo "Using root: $root_id"
-create_subnet_output=$(ipc-cli subnet create --from $default_wallet_address --parent $root_id --min-validators 2 --min-validator-stake 1 --bottomup-check-period 600 --active-validators-limit 3 --permission-mode federated --supply-source-kind erc20 --supply-source-address $SUPPLY_SOURCE_ADDRESS 2>&1)
+create_subnet_output=$(ipc-cli subnet create --from "$default_wallet_address" --parent "$root_id" --min-validators 2 --min-validator-stake 1 --bottomup-check-period 600 --active-validators-limit 3 --permission-mode federated --supply-source-kind erc20 --supply-source-address "$SUPPLY_SOURCE_ADDRESS" 2>&1)
 
 echo "$DASHES create subnet output $DASHES"
-echo ""
+echo
 echo "$create_subnet_output"
-echo ""
+echo
 
-# shellcheck disable=SC2086
-subnet_id=$(echo $create_subnet_output | sed 's/.*with id: \([^ ]*\).*/\1/')
+subnet_id=$(echo "$create_subnet_output" | sed -n 's/.*with id: *\([^ ]*\).*/\1/p')
 echo "Created new subnet id: $subnet_id"
 
 # Use the new subnet ID to update IPC config file
@@ -554,6 +558,7 @@ do
 done
 
 # Test Object API endpoint
+echo
 echo "$DASHES Test Object API endpoints of validator nodes"
 for i in {0..2}
 do
@@ -561,7 +566,9 @@ do
 done
 
 # Test Prometheus endpoints
-printf "\n%s Test Prometheus endpoints of validator nodes\n" $DASHES
+echo
+echo "$DASHES Test Prometheus endpoints of validator nodes"
+echo
 curl --location http://localhost:"${PROMETHEUS_HOST_PORT}"/graph
 for i in {0..2}
 do
@@ -569,7 +576,7 @@ do
 done
 
 # Kill existing relayer if there's one
-pkill -fe "relayer" || true
+pkill -fe "relayer" 2>/dev/null || pgrep -f "relayer" | xargs kill 2>/dev/null || true
 # Start relayer
 # note: this command mutates the order of keys in the evm_keystore.json file. to
 # keep the accounts consistent for localnet usage (e.g., logging accounts, using
@@ -590,21 +597,29 @@ if [[ $local_deploy = true ]]; then
   # move 1000000000000000000 HOKU to subnet (i.e., leave 100 HOKU on rootnet for
   # testing purposes)
   token_amount="1000000000000000000"
-  addresses=($(jq -r '.[].address' "${IPC_CONFIG_FOLDER}"/evm_keystore.json))
+  addresses=()
+  for i in {0..9}
+  do
+    addr=$(jq .["$i"].address < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
+    addresses+=("$addr")
+  done
   for address in "${addresses[@]}"
   do
-    ipc-cli cross-msg fund-with-token --subnet ${subnet_id} --from ${address} --approve ${token_amount}
+    ipc-cli cross-msg fund-with-token --subnet "${subnet_id}" --from "${address}" --approve "${token_amount}"
   done
-  echo $'\nDeposited HOKU for test accounts\n'
+  echo "Deposited HOKU for test accounts"
+  echo
+  echo "${DASHES} Subnet setup complete ${DASHES}"
+  echo
 fi
 
 # Print a summary of the deployment
 cat << EOF
-############################
-#                          #
-# IPC deployment ready! 🚀 #
-#                          #
-############################
+#############################
+#                           #
+# Hoku deployment ready! 🚀 #
+#                           #
+#############################
 Subnet ID:
 $subnet_id
 
@@ -641,25 +656,27 @@ Grafana API:
 http://localhost:${GRAFANA_HOST_PORT}
 
 Contracts:
-Parent gateway address: ${PARENT_GATEWAY_ADDRESS}
-Parent registry address: ${PARENT_REGISTRY_ADDRESS}
-Parent supply source address: ${SUPPLY_SOURCE_ADDRESS}
+Parent gateway:       ${PARENT_GATEWAY_ADDRESS}
+Parent registry:      ${PARENT_REGISTRY_ADDRESS}
+Parent supply source: ${SUPPLY_SOURCE_ADDRESS}
+Subnet gateway:       0x77aa40b105843728088c0132e43fc44348881da8
+Subnet registry:      0x74539671a1d2f1c8f200826baba665179f53a1b7
 EOF
 
 if [[ $local_deploy = true ]]; then
-  echo $'Subnet gateway address: 0x77aa40b105843728088c0132e43fc44348881da8'
-  echo $'Subnet registry address: 0x74539671a1d2f1c8f200826baba665179f53a1b7'
-  echo $'\nAvailable accounts:'
-  addresses=($(jq -r '.[].address' "${IPC_CONFIG_FOLDER}"/evm_keystore.json))
-  for i in "${!addresses[@]}"
+  echo
+  echo "Available accounts:"
+  for i in {0..9}
   do
-    echo "($i) ${addresses[$i]}"
+    addr=$(jq .["$i"].address < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
+    echo "($i) $addr"
   done
-  echo $'\nPrivate keys:'
-  private_keys=($(jq -r '.[].private_key' "${IPC_CONFIG_FOLDER}"/evm_keystore.json))
-  for i in "${!private_keys[@]}"
+  echo
+  echo "Private keys:"
+  for i in {0..9}
   do
-    echo "($i) ${private_keys[$i]}"
+    private_key=$(jq .["$i"].private_key < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
+    echo "($i) $private_key"
   done
 fi
 
