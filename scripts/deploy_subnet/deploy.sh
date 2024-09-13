@@ -270,17 +270,40 @@ if [[ $local_deploy = true ]]; then
       -e ANVIL_HOST_PORT="${ANVIL_HOST_PORT}" \
       anvil-start
 
-  # the first ten anvil preloaded key pairs
-  ipc-cli wallet import --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --wallet-type evm
-  ipc-cli wallet import --private-key 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d --wallet-type evm
-  ipc-cli wallet import --private-key 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a --wallet-type evm
-  ipc-cli wallet import --private-key 0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6 --wallet-type evm
-  ipc-cli wallet import --private-key 0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a --wallet-type evm
-  ipc-cli wallet import --private-key 0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba --wallet-type evm
-  ipc-cli wallet import --private-key 0x92db14e403b83dfe3df233f83dfa3a0d7096f21ca9b0d6d6b8d88b2b4ec1564e --wallet-type evm
-  ipc-cli wallet import --private-key 0x4bbbf85ce3377467afe5d46f804f221813b2bb87f24d81f60f1fcdbf7cbf4356 --wallet-type evm
-  ipc-cli wallet import --private-key 0xdbda1821b80551c9d65939329250298aa3472ba22feea921c0cf5d620ea67b97 --wallet-type evm
-  ipc-cli wallet import --private-key 0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6 --wallet-type evm
+  # the `ipc-cli wallet import` command overwrites the file non-deterministically.
+  # instead, we just create the file with the predictable ordering & expected format.
+  # provide the first ten anvil preloaded key pairs
+  anvil_private_keys=(
+    ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+    59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
+    5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a
+    7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6
+    47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a
+    8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba
+    92db14e403b83dfe3df233f83dfa3a0d7096f21ca9b0d6d6b8d88b2b4ec1564e
+    4bbbf85ce3377467afe5d46f804f221813b2bb87f24d81f60f1fcdbf7cbf4356
+    dbda1821b80551c9d65939329250298aa3472ba22feea921c0cf5d620ea67b97
+    2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6
+  )
+  # lowercased addresses in matching order ()
+  anvil_public_keys=(
+    0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+    0x70997970c51812dc3a010c7d01b50e0d17dc79c8
+    0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc
+    0x90f79bf6eb2c4f870365e785982e1f101e93b906
+    0x15d34aaf54267db7d7c367839aaf71a00a2c6a65
+    0x9965507d1a55bcc2695c58ba16fb37d819b0a4dc
+    0x976ea74026e726554db657fa54763abd0c3a0aa9
+    0x14dc79964da2c08b23698b3d3cc7ca32193d9955
+    0x23618e81e3f5cdf7f54c3d65f7fbc0abf5b21e8f
+    0xa0ee7a142d267c1f36714e4a8f75612f20a79720  
+  )
+  evm_keystore_json=$(jq -n '[]')
+  for ((i=0; i<${#anvil_private_keys[@]}; i++))
+  do
+    evm_keystore_json=$(echo "$evm_keystore_json" | jq --arg address "${anvil_public_keys[i]}" --arg private_key "${anvil_private_keys[i]}" '. += [{address: $address, private_key: $private_key}]')
+  done
+  echo "$evm_keystore_json" > "${IPC_CONFIG_FOLDER}/evm_keystore.json"
 fi
 
 # Prepare wallet by using existing wallet json file
@@ -338,8 +361,6 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
   PARENT_REGISTRY_ADDRESS=$(echo "$deploy_contracts_output" | grep '"SubnetRegistry"' | awk -F'"' '{print $4}')
 
   if [ $local_deploy == true ]; then
-
-    # TODO: This just assumes the use has already cloned `contracts`, does that work?
     cd "${IPC_FOLDER}/hoku-contracts"
     # need to run clean or we hit upgradeable saftey validation errors resulting from contracts with the same name
     forge clean
@@ -348,9 +369,10 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
       forge install
     fi
 
+    # use the same account validator 0th account to deploy contracts, but need to add hex prefix 
+    deployer_pk="0x${pk}"
     # TODO: should we dockerize this command?
-    # privkey is anvil #4
-    deploy_supply_source_token_out="$(PRIVATE_KEY=0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a forge script script/Hoku.s.sol --tc DeployScript 0 --sig 'run(uint8)' --rpc-url "http://localhost:${ANVIL_HOST_PORT}" --broadcast -vv)"
+    deploy_supply_source_token_out="$(PRIVATE_KEY=${deployer_pk} forge script script/Hoku.s.sol --tc DeployScript 0 --sig 'run(uint8)' --rpc-url "http://localhost:${ANVIL_HOST_PORT}" --broadcast -vv)"
 
     echo "$DASHES deploy suppply source token output $DASHES"
     echo ""
@@ -358,12 +380,25 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
     echo ""
     # note: this is consistently going to be 0x2910E325cf29dd912E3476B61ef12F49cb931096 for local net
     SUPPLY_SOURCE_ADDRESS=$(echo "$deploy_supply_source_token_out" | sed -n 's/.*contract Hoku *\([^ ]*\).*/\1/p')
+
+    deploy_supply_source_token_out="$(PRIVATE_KEY=${deployer_pk} forge script script/Hoku.s.sol --tc DeployScript 0 --sig 'run(uint8)' --rpc-url "http://localhost:${ANVIL_HOST_PORT}" --broadcast -vv)"
+    echo "$deploy_supply_source_token_out"
+    SUPPLY_SOURCE_ADDRESS=$(echo "$deploy_supply_source_token_out" | sed -n 's/.*contract Hoku *\([^ ]*\).*/\1/p')
+
+    # fund the all anvil accounts with 1000000000000000100 HOKU (note the extra 100 HOKU)
+    token_amount="1000000000000000100"
+    addresses=($(jq -r '.[].address' "${IPC_CONFIG_FOLDER}"/evm_keystore.json))
+    for address in "${addresses[@]}"
+    do
+      cast send "$SUPPLY_SOURCE_ADDRESS" "mint(address,uint256)" "$address" "$token_amount" --rpc-url "http://localhost:${ANVIL_HOST_PORT}" --private-key "$pk"
+    done
+    echo "Funded accounts with HOKU on anvil rootnet"
   fi
   cd "$IPC_FOLDER"
 fi
-echo "Gateway address: $PARENT_GATEWAY_ADDRESS"
-echo "Registry address: $PARENT_REGISTRY_ADDRESS"
-echo "Supply source address: $SUPPLY_SOURCE_ADDRESS"
+echo "Parent gateway address: $PARENT_GATEWAY_ADDRESS"
+echo "Parent registry address: $PARENT_REGISTRY_ADDRESS"
+echo "Parent supply source address: $SUPPLY_SOURCE_ADDRESS"
 
 # Use the parent gateway and registry address to update IPC config file
 toml set "${IPC_CONFIG_FOLDER}"/config.toml 'subnets[0].config.gateway_addr' "$PARENT_GATEWAY_ADDRESS" > /tmp/config.toml.1
@@ -533,6 +568,19 @@ pkill -fe "relayer" || true
 echo "$DASHES Start relayer process (in the background)"
 nohup ipc-cli checkpoint relayer --subnet "$subnet_id" --submitter "$default_wallet_address" > relayer.log &
 
+# move localnet funds to subnet
+if [[ $local_deploy = true ]]; then
+  echo "$DASHES Move account funds into subnet"
+  # move 1000000000000000000 HOKU to subnet (i.e., leave 100 HOKU on rootnet for testing purposes)
+  token_amount="1000000000000000000"
+  addresses=($(jq -r '.[].address' "${IPC_CONFIG_FOLDER}"/evm_keystore.json))
+  for address in "${addresses[@]}"
+  do
+    ipc-cli cross-msg fund-with-token --subnet ${subnet_id} --from ${address} --approve ${token_amount}
+  done
+  echo $'\nDeposited HOKU for anvil accounts\n'
+fi
+
 # Print a summary of the deployment
 cat << EOF
 ############################
@@ -576,9 +624,9 @@ Grafana API:
 http://localhost:${GRAFANA_HOST_PORT}
 
 Contracts:
-Gateway address: ${PARENT_GATEWAY_ADDRESS}
-Registry address: ${PARENT_REGISTRY_ADDRESS}
-Supply source address: ${SUPPLY_SOURCE_ADDRESS}
+Parent gateway address: ${PARENT_GATEWAY_ADDRESS}
+Parent registry address: ${PARENT_REGISTRY_ADDRESS}
+Parent supply source address: ${SUPPLY_SOURCE_ADDRESS}
 EOF
 
 if [[ $local_deploy = true ]]; then
