@@ -22,6 +22,7 @@ pub enum Method {
     Constructor = METHOD_CONSTRUCTOR,
     GetStats = frc42_dispatch::method_hash!("GetStats"),
     BuyCredit = frc42_dispatch::method_hash!("BuyCredit"),
+    ApproveCredit = frc42_dispatch::method_hash!("ApproveCredit"),
     GetAccount = frc42_dispatch::method_hash!("GetAccount"),
     DebitAccounts = frc42_dispatch::method_hash!("DebitAccounts"),
     AddBlob = frc42_dispatch::method_hash!("AddBlob"),

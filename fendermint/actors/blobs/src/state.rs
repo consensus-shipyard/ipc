@@ -42,7 +42,7 @@ pub struct State {
     /// Map containing all accounts by robust (non-ID) actor address.
     pub accounts: HashMap<Address, Account>,
     /// Delegations from an account to anothers.
-    pub delegations: HashMap<Address, HashMap<Address, CreditDelegation>>,
+    pub approvals: HashMap<Address, HashMap<Address, HashMap<Address, CreditApproval>>>,
     /// Map containing all blobs.
     pub blobs: HashMap<Hash, Blob>,
     /// Map of expiries to blob hashes.
@@ -51,9 +51,9 @@ pub struct State {
     pub pending: BTreeMap<Hash, HashSet<(Address, PublicKey)>>,
 }
 
-/// Object representing a credit approval from one account to another.
+/// A credit approval from one account to another.
 #[derive(Debug, Clone, Serialize_tuple, Deserialize_tuple)]
-pub struct CreditDelegation {
+pub struct CreditApproval {
     /// Optional credit approval limit.
     pub limit: Option<BigInt>,
     /// Optional credit approval expiry epoch.
@@ -65,11 +65,11 @@ pub struct CreditDelegation {
 /// Helper for handling credit approvals.
 enum CreditDelegate<'a> {
     IsNone,
-    IsSome(Address, &'a mut CreditDelegation),
+    IsSome((Address, Address), &'a mut CreditApproval),
 }
 
 impl CreditDelegate<'_> {
-    fn address(&self) -> Option<Address> {
+    fn addresses(&self) -> Option<(Address, Address)> {
         match self {
             Self::IsNone => None,
             Self::IsSome(a, _) => Some(*a),
@@ -87,7 +87,7 @@ impl State {
             credit_debited: BigInt::zero(),
             credit_debit_rate,
             accounts: HashMap::new(),
-            delegations: HashMap::new(),
+            approvals: HashMap::new(),
             blobs: HashMap::new(),
             expiries: BTreeMap::new(),
             pending: BTreeMap::new(),
@@ -135,6 +135,7 @@ impl State {
         &mut self,
         from: Address,
         to: Address,
+        require_caller: Option<Address>,
         current_epoch: ChainEpoch,
         limit: Option<BigInt>,
         ttl: Option<ChainEpoch>,
@@ -142,34 +143,37 @@ impl State {
         if let Some(ttl) = ttl {
             if ttl < MIN_TTL {
                 return Err(ActorError::illegal_argument(format!(
-                    "minimum delegate TTL is {}",
+                    "minimum approval TTL is {}",
                     MIN_TTL
                 )));
             }
         }
         let expiry = ttl.map(|t| t + current_epoch);
-        // Get or add a new delegation
-        let delegation = self
-            .delegations
+        // Get or add a new approval
+        let caller = require_caller.unwrap_or(to);
+        let approval = self
+            .approvals
             .entry(from)
             .or_default()
             .entry(to)
-            .or_insert(CreditDelegation {
+            .or_default()
+            .entry(caller)
+            .or_insert(CreditApproval {
                 limit: limit.clone(),
                 committed: BigInt::zero(),
                 expiry,
             });
-        // Validate delegation changes
+        // Validate approval changes
         if let Some(limit) = limit.clone() {
-            if delegation.committed > limit {
+            if approval.committed > limit {
                 return Err(ActorError::illegal_argument(format!(
                     "limit cannot be less than amount of already spent credits ({})",
-                    delegation.committed
+                    approval.committed
                 )));
             }
         }
-        delegation.limit = limit;
-        delegation.expiry = expiry;
+        approval.limit = limit;
+        approval.expiry = expiry;
         Ok(())
     }
 
@@ -203,7 +207,8 @@ impl State {
                             continue;
                         }
                     }
-                    match self.delete_blob(subscriber, subscriber, current_epoch, hash) {
+                    match self.delete_blob(subscriber, subscriber, subscriber, current_epoch, hash)
+                    {
                         Ok((_, from_disc)) => {
                             num_deleted += 1;
                             if from_disc {
@@ -239,6 +244,7 @@ impl State {
     #[allow(clippy::too_many_arguments)]
     pub fn add_blob(
         &mut self,
+        origin: Address,
         caller: Address,
         subscriber: Address,
         current_epoch: ChainEpoch,
@@ -247,20 +253,20 @@ impl State {
         ttl: Option<ChainEpoch>,
         source: PublicKey,
     ) -> anyhow::Result<Account, ActorError> {
-        let delegate = if caller != subscriber {
-            let delegation = self
-                .delegations
+        let delegate = if origin != subscriber {
+            let approval = self
+                .approvals
                 .get_mut(&subscriber)
+                .and_then(|approval| {
+                    approval
+                        .get_mut(&origin)
+                        .and_then(|approval| approval.get_mut(&caller))
+                })
                 .ok_or(ActorError::forbidden(format!(
-                    "delegation from {} to {} not found",
-                    subscriber, caller
-                )))?
-                .get_mut(&caller)
-                .ok_or(ActorError::forbidden(format!(
-                    "delegation from {} to {} not found",
-                    subscriber, caller
+                    "approval from {} to {} via caller {} not found",
+                    subscriber, origin, caller
                 )))?;
-            CreditDelegate::IsSome(caller, delegation)
+            CreditDelegate::IsSome((origin, caller), approval)
         } else {
             CreditDelegate::IsNone
         };
@@ -311,7 +317,7 @@ impl State {
                 sub.auto_renew = auto_renew;
                 // Overwrite source allows subscriber to retry resolving
                 sub.source = source;
-                sub.delegate = delegate.address();
+                sub.delegate = delegate.addresses();
                 debug!("updated subscription to {} for {}", hash, subscriber);
             } else {
                 new_account_capacity = size.clone();
@@ -335,7 +341,7 @@ impl State {
                         expiry,
                         auto_renew,
                         source,
-                        delegate: delegate.address(),
+                        delegate: delegate.addresses(),
                     },
                 );
                 debug!("created new subscription to {} for {}", hash, subscriber);
@@ -389,7 +395,7 @@ impl State {
                         expiry,
                         auto_renew,
                         source,
-                        delegate: delegate.address(),
+                        delegate: delegate.addresses(),
                     },
                 )]),
                 status: BlobStatus::Pending,
@@ -425,7 +431,7 @@ impl State {
         self.credit_committed += &credit_required;
         account.credit_committed += &credit_required;
         account.credit_free -= &credit_required;
-        // Update credit delegation
+        // Update credit approval
         if let CreditDelegate::IsSome(_, delegation) = delegate {
             delegation.committed += &credit_required;
         }
@@ -469,20 +475,20 @@ impl State {
                 "subscriber {} is not subscribed to blob {}",
                 subscriber, hash
             )))?;
-        let delegate = if let Some(delegate) = sub.delegate {
-            let delegation = self
-                .delegations
+        let delegate = if let Some((origin, caller)) = sub.delegate {
+            let approval = self
+                .approvals
                 .get_mut(&subscriber)
+                .and_then(|approval| {
+                    approval
+                        .get_mut(&origin)
+                        .and_then(|approval| approval.get_mut(&caller))
+                })
                 .ok_or(ActorError::forbidden(format!(
-                    "delegation from {} to {} not found",
-                    subscriber, delegate
-                )))?
-                .get_mut(&delegate)
-                .ok_or(ActorError::forbidden(format!(
-                    "delegation from {} to {} not found",
-                    subscriber, delegate
+                    "approval from {} to {} via caller {} not found",
+                    subscriber, origin, caller
                 )))?;
-            CreditDelegate::IsSome(delegate, delegation)
+            CreditDelegate::IsSome((origin, caller), approval)
         } else {
             CreditDelegate::IsNone
         };
@@ -538,7 +544,7 @@ impl State {
         self.credit_committed += &credit_required;
         account.credit_committed += &credit_required;
         account.credit_free -= &credit_required;
-        // Update credit delegation
+        // Update credit approval
         if let CreditDelegate::IsSome(_, delegation) = delegate {
             delegation.committed += &credit_required;
         }
@@ -605,14 +611,14 @@ impl State {
                 "subscriber {} is not subscribed to blob {}",
                 subscriber, hash
             )))?;
-        // Do not error if the delegation was removed while this blob was pending
-        let delegate = if let Some(delegate) = sub.delegate {
-            if let Some(entry) = self.delegations.get_mut(&subscriber) {
-                if let Some(delegation) = entry.get_mut(&delegate) {
-                    CreditDelegate::IsSome(delegate, delegation)
-                } else {
-                    CreditDelegate::IsNone
-                }
+        // Do not error if the approval was removed while this blob was pending
+        let delegate = if let Some((origin, caller)) = sub.delegate {
+            if let Some(approval) = self.approvals.get_mut(&subscriber).and_then(|approval| {
+                approval
+                    .get_mut(&origin)
+                    .and_then(|approval| approval.get_mut(&caller))
+            }) {
+                CreditDelegate::IsSome((origin, caller), approval)
             } else {
                 CreditDelegate::IsNone
             }
@@ -646,7 +652,7 @@ impl State {
                 self.credit_committed -= &reclaim;
                 account.credit_committed -= &reclaim;
                 account.credit_free += &reclaim;
-                // Update credit delegation
+                // Update credit approval
                 if let CreditDelegate::IsSome(_, delegation) = delegate {
                     delegation.committed -= &reclaim;
                 }
@@ -665,6 +671,7 @@ impl State {
 
     pub fn delete_blob(
         &mut self,
+        origin: Address,
         caller: Address,
         subscriber: Address,
         current_epoch: ChainEpoch,
@@ -693,20 +700,24 @@ impl State {
                 "subscriber {} is not subscribed to blob {}",
                 subscriber, hash
             )))?;
-        let delegate = if let Some(delegate) = sub.delegate {
-            let delegation = self
-                .delegations
-                .get_mut(&subscriber)
-                .ok_or(ActorError::forbidden(format!(
-                    "delegation from {} to {} not found",
-                    subscriber, delegate
-                )))?
-                .get_mut(&delegate)
-                .ok_or(ActorError::forbidden(format!(
-                    "delegation from {} to {} not found",
-                    subscriber, delegate
-                )))?;
-            CreditDelegate::IsSome(delegate, delegation)
+        let delegate = if let Some((origin, caller)) = sub.delegate {
+            if let Some(approval) = self.approvals.get_mut(&subscriber).and_then(|approval| {
+                approval
+                    .get_mut(&origin)
+                    .and_then(|approval| approval.get_mut(&caller))
+            }) {
+                CreditDelegate::IsSome((origin, caller), approval)
+            } else {
+                // Approval may have been removed, or this is a call from the system actor,
+                // in which case the origin will be supplied as the subscriber
+                if origin != subscriber {
+                    return Err(ActorError::forbidden(format!(
+                        "approval from {} to {} via caller {} not found",
+                        subscriber, origin, caller
+                    )));
+                }
+                CreditDelegate::IsNone
+            }
         } else {
             CreditDelegate::IsNone
         };
@@ -715,25 +726,27 @@ impl State {
         // caller must be the subscriber.
         match &delegate {
             CreditDelegate::IsNone => {
-                if caller != subscriber {
+                if origin != subscriber {
                     return Err(ActorError::forbidden(format!(
-                        "caller {} is not subscriber {} for blob {}",
+                        "origin {} is not subscriber {} for blob {}",
                         caller, subscriber, hash
                     )));
                 }
             }
-            CreditDelegate::IsSome(address, delegation) => {
-                if !(caller == *address || caller == subscriber) {
+            CreditDelegate::IsSome((delegate_origin, delegate_caller), delegation) => {
+                if !(origin == *delegate_origin && caller == *delegate_caller)
+                    && origin != subscriber
+                {
                     return Err(ActorError::forbidden(format!(
-                        "caller {} is not delegate {} or subscriber {} for blob {}",
-                        caller, address, subscriber, hash
+                        "origin {} is not delegate origin {} or caller {} is not delegate caller {} or subscriber {} for blob {}",
+                        origin, delegate_origin, caller, delegate_caller, subscriber, hash
                     )));
                 }
                 if let Some(expiry) = delegation.expiry {
                     if expiry <= current_epoch {
                         return Err(ActorError::forbidden(format!(
-                            "delegation from {} to {} expired",
-                            subscriber, address
+                            "approval from {} to {} via caller {} expired",
+                            subscriber, delegate_origin, delegate_caller
                         )));
                     }
                 }
@@ -778,7 +791,7 @@ impl State {
                 self.credit_committed -= &reclaim;
                 account.credit_committed -= &reclaim;
                 account.credit_free += &reclaim;
-                // Update credit delegation
+                // Update credit approval
                 if let CreditDelegate::IsSome(_, delegation) = delegate {
                     delegation.committed -= &reclaim;
                 }
@@ -822,21 +835,21 @@ fn ensure_credit(
             subscriber, credit_free, required_credit
         )));
     }
-    if let CreditDelegate::IsSome(address, delegation) = delegate {
+    if let CreditDelegate::IsSome((origin, caller), delegation) = delegate {
         if let Some(limit) = &delegation.limit {
             let uncommitted = &(limit - &delegation.committed);
             if uncommitted < required_credit {
                 return Err(ActorError::insufficient_funds(format!(
-                    "delegate {} has insufficient credit (available: {}; required: {})",
-                    address, uncommitted, required_credit
+                    "approval from {} to {} via caller {} has insufficient credit (available: {}; required: {})",
+                    subscriber, origin, caller, uncommitted, required_credit
                 )));
             }
         }
         if let Some(expiry) = delegation.expiry {
             if expiry <= current_epoch {
                 return Err(ActorError::forbidden(format!(
-                    "delegation from {} to {} expired",
-                    subscriber, address
+                    "approval from {} to {} via caller {} expired",
+                    subscriber, origin, caller
                 )));
             }
         }

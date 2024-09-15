@@ -16,6 +16,23 @@ use crate::state::{BlobStatus, Hash, PublicKey};
 #[serde(transparent)]
 pub struct BuyCreditParams(pub Address);
 
+/// Params for approving credit.
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct ApproveCreditParams {
+    /// Account address that is receiving the approval.
+    pub receiver: Address,
+    /// Optional restriction on caller address, e.g., an object store.
+    /// This allows the origin of a transaction to use an approval limited to the caller.   
+    pub required_caller: Option<Address>,
+    /// Optional credit approval limit.
+    /// If specified, the approval will be invalid after being used to commit credits
+    /// up to this limit.
+    pub limit: Option<BigInt>,
+    /// Optional credit approval time-to-live epochs.
+    /// If specified, the approval will be invalid after this duration.
+    pub ttl: Option<ChainEpoch>,
+}
+
 /// Params for getting an account.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]

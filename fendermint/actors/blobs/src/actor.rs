@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use fendermint_actor_blobs_shared::params::{
-    AddBlobParams, BuyCreditParams, DeleteBlobParams, FinalizeBlobParams, GetAccountParams,
-    GetBlobParams, GetBlobStatusParams, GetStatsReturn,
+    AddBlobParams, ApproveCreditParams, BuyCreditParams, DeleteBlobParams, FinalizeBlobParams,
+    GetAccountParams, GetBlobParams, GetBlobStatusParams, GetStatsReturn,
 };
 use fendermint_actor_blobs_shared::state::{Account, Blob, BlobStatus, Hash, PublicKey};
 use fendermint_actor_blobs_shared::Method;
@@ -48,6 +48,21 @@ impl BlobsActor {
         })
     }
 
+    fn approve_credit(rt: &impl Runtime, params: ApproveCreditParams) -> Result<(), ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+        let caller = resolve_external(rt, rt.message().caller())?;
+        rt.transaction(|st: &mut State, rt| {
+            st.approve_credit(
+                caller,
+                params.receiver,
+                params.required_caller,
+                rt.curr_epoch(),
+                params.limit,
+                params.ttl,
+            )
+        })
+    }
+
     fn get_account(
         rt: &impl Runtime,
         params: GetAccountParams,
@@ -68,15 +83,17 @@ impl BlobsActor {
 
     fn add_blob(rt: &impl Runtime, params: AddBlobParams) -> Result<Account, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
+        let origin = resolve_external(rt, rt.message().origin())?;
         let caller = resolve_external(rt, rt.message().caller())?;
-        // The sponsor will be subscriber if specified by the caller
+        // The blob subscriber will be the sponsor if specified and approved
         let subscriber = if let Some(sponsor) = params.sponsor {
             resolve_external(rt, sponsor)?
         } else {
-            caller
+            origin
         };
         rt.transaction(|st: &mut State, rt| {
             st.add_blob(
+                origin,
                 caller,
                 subscriber,
                 rt.curr_epoch(),
@@ -128,15 +145,16 @@ impl BlobsActor {
 
     fn delete_blob(rt: &impl Runtime, params: DeleteBlobParams) -> Result<Account, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
+        let origin = resolve_external(rt, rt.message().origin())?;
         let caller = resolve_external(rt, rt.message().caller())?;
-        // The sponsor will be subscriber if specified by the caller
+        // The blob subscriber will be the sponsor if specified and approved
         let subscriber = if let Some(sponsor) = params.sponsor {
             resolve_external(rt, sponsor)?
         } else {
-            caller
+            origin
         };
         let (account, delete) = rt.transaction(|st: &mut State, _| {
-            st.delete_blob(caller, subscriber, rt.curr_epoch(), params.hash)
+            st.delete_blob(origin, caller, subscriber, rt.curr_epoch(), params.hash)
         })?;
         if delete {
             delete_from_disc(params.hash)?;
@@ -186,6 +204,7 @@ impl ActorCode for BlobsActor {
         Constructor => constructor,
         GetStats => get_stats,
         BuyCredit => buy_credit,
+        ApproveCredit => approve_credit,
         GetAccount => get_account,
         DebitAccounts => debit_accounts,
         AddBlob => add_blob,
@@ -456,7 +475,6 @@ mod tests {
                 credit_free: BigInt::from(999999999996313600u64),
                 credit_committed: BigInt::from(3686400),
                 last_debit_epoch: 5,
-                sponsor: None,
             }
         );
         rt.verify();

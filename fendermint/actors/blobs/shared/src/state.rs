@@ -47,7 +47,6 @@ pub struct Account {
     pub credit_committed: BigInt,
     /// The chain epoch of the last debit.
     pub last_debit_epoch: ChainEpoch,
-    pub sponsor: Option<Address>,
 }
 
 impl Account {
@@ -57,7 +56,6 @@ impl Account {
             credit_free,
             credit_committed: Default::default(),
             last_debit_epoch: current_epoch,
-            sponsor: None,
         }
     }
 }
@@ -109,6 +107,6 @@ pub struct Subscription {
     /// This might be unique to each instance of the same blob.
     /// It's included here for record keeping.
     pub source: PublicKey,
-    /// The delegate caller that may have created the subscription.
-    pub delegate: Option<Address>,
+    /// The delegate origin and caller that may have created the subscription via a credit approval.
+    pub delegate: Option<(Address, Address)>,
 }
