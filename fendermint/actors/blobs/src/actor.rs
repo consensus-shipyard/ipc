@@ -41,7 +41,7 @@ impl BlobsActor {
         Ok(stats)
     }
 
-    fn buy_credit(rt: &impl Runtime, params: BuyCreditParams) -> Result<Account, ActorError> {
+    fn buy_credit(rt: &impl Runtime, params: BuyCreditParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         rt.transaction(|st: &mut State, rt| {
             st.buy_credit(params.0, rt.message().value_received(), rt.curr_epoch())
@@ -81,7 +81,7 @@ impl BlobsActor {
         Ok(())
     }
 
-    fn add_blob(rt: &impl Runtime, params: AddBlobParams) -> Result<Account, ActorError> {
+    fn add_blob(rt: &impl Runtime, params: AddBlobParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let origin = resolve_external(rt, rt.message().origin())?;
         let caller = resolve_external(rt, rt.message().caller())?;
@@ -143,7 +143,7 @@ impl BlobsActor {
         })
     }
 
-    fn delete_blob(rt: &impl Runtime, params: DeleteBlobParams) -> Result<Account, ActorError> {
+    fn delete_blob(rt: &impl Runtime, params: DeleteBlobParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let origin = resolve_external(rt, rt.message().origin())?;
         let caller = resolve_external(rt, rt.message().caller())?;
@@ -153,13 +153,13 @@ impl BlobsActor {
         } else {
             origin
         };
-        let (account, delete) = rt.transaction(|st: &mut State, _| {
+        let delete = rt.transaction(|st: &mut State, _| {
             st.delete_blob(origin, caller, subscriber, rt.curr_epoch(), params.hash)
         })?;
         if delete {
             delete_from_disc(params.hash)?;
         }
-        Ok(account)
+        Ok(())
     }
 
     /// Fallback method for unimplemented method numbers.
@@ -475,6 +475,7 @@ mod tests {
                 credit_free: BigInt::from(999999999996313600u64),
                 credit_committed: BigInt::from(3686400),
                 last_debit_epoch: 5,
+                approvals: Default::default(),
             }
         );
         rt.verify();

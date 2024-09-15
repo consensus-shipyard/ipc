@@ -100,7 +100,7 @@ impl State {
         recipient: Address,
         amount: TokenAmount,
         current_epoch: ChainEpoch,
-    ) -> anyhow::Result<Account, ActorError> {
+    ) -> anyhow::Result<(), ActorError> {
         let credits = self.credit_debit_rate * amount.atto();
         // Don't sell credits if we're at storage capacity
         if self.capacity_used == self.capacity_free {
@@ -109,12 +109,11 @@ impl State {
             ));
         }
         self.credit_sold += &credits;
-        let account = self
-            .accounts
+        self.accounts
             .entry(recipient)
             .and_modify(|a| a.credit_free += &credits)
             .or_insert(Account::new(credits.clone(), current_epoch));
-        Ok(account.clone())
+        Ok(())
     }
 
     pub fn approve_credit(
@@ -197,7 +196,7 @@ impl State {
                     }
                     match self.delete_blob(subscriber, subscriber, subscriber, current_epoch, hash)
                     {
-                        Ok((_, from_disc)) => {
+                        Ok(from_disc) => {
                             num_deleted += 1;
                             if from_disc {
                                 delete_from_disc.insert(hash);
@@ -240,7 +239,7 @@ impl State {
         size: u64,
         ttl: Option<ChainEpoch>,
         source: PublicKey,
-    ) -> anyhow::Result<Account, ActorError> {
+    ) -> anyhow::Result<(), ActorError> {
         let (ttl, auto_renew) = if let Some(ttl) = ttl {
             (ttl, false)
         } else {
@@ -428,7 +427,7 @@ impl State {
                 subscriber
             );
         }
-        Ok(account.clone())
+        Ok(())
     }
 
     fn renew_blob(
@@ -656,7 +655,7 @@ impl State {
         subscriber: Address,
         current_epoch: ChainEpoch,
         hash: Hash,
-    ) -> anyhow::Result<(Account, bool), ActorError> {
+    ) -> anyhow::Result<bool, ActorError> {
         let account = self
             .accounts
             .entry(subscriber)
@@ -671,7 +670,7 @@ impl State {
             // However, the system may have already deleted the blob due to expiration or
             // insufficient funds.
             // We could use a custom error code, but this is easier.
-            return Ok((account.clone(), false));
+            return Ok(false);
         };
         let sub = blob
             .subs
@@ -778,8 +777,6 @@ impl State {
                 debug!("released {} credits to {}", reclaim, subscriber);
             }
         }
-        // We're done with the account, clone it for return
-        let account = account.clone();
         // Update expiry index
         update_expiry_index(&mut self.expiries, subscriber, hash, None, Some(sub.expiry));
         // Remove entry from pending
@@ -798,7 +795,7 @@ impl State {
             self.blobs.remove(&hash);
             debug!("deleted blob {}", hash);
         }
-        Ok((account, delete_blob))
+        Ok(delete_blob)
     }
 }
 

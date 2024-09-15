@@ -33,11 +33,6 @@ pub struct State {
     pub address: MachineAddress,
     /// The machine robust owner address.
     pub owner: Address,
-    /// Default credits sponsor.
-    /// If specified, the sponsor must delegate credits to the object store.
-    /// If not specified, the caller adding objects acts as the sponsor and
-    /// must have delegated credits to the object store.
-    pub sponsor: Option<Address>,
     /// Write access dictates who can write to the machine.
     pub write_access: WriteAccess,
     /// The root cid of the Hamt.
@@ -65,7 +60,6 @@ impl MachineState for State {
         Ok(Self {
             address: Default::default(),
             owner: creator,
-            sponsor: None,
             write_access,
             root,
             metadata,
@@ -116,10 +110,6 @@ pub struct ObjectList {
 }
 
 impl State {
-    pub fn set_sponsor(&mut self, sponsor: Address) {
-        self.sponsor = Some(sponsor);
-    }
-
     pub fn add<BS: Blockstore>(
         &mut self,
         store: &BS,

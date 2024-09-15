@@ -18,7 +18,6 @@ use crate::shared::{
     OBJECTSTORE_ACTOR_NAME,
 };
 use crate::state::{ObjectState, State};
-use crate::SetSponsorParams;
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
@@ -26,19 +25,13 @@ fil_actors_runtime::wasm_trampoline!(Actor);
 pub struct Actor;
 
 impl Actor {
-    fn set_sponsor(rt: &impl Runtime, params: SetSponsorParams) -> Result<(), ActorError> {
-        Self::ensure_write_allowed(rt)?;
-        // create delegation from sponsor to caller
-        Ok(())
-    }
-
     fn add_object(rt: &impl Runtime, params: AddParams) -> Result<Cid, ActorError> {
         Self::ensure_write_allowed(rt)?;
         let state = rt.state::<State>()?;
         let key = BytesKey(params.key);
         if let Some(object) = state.get(rt.store(), &key)? {
             if params.overwrite {
-                delete_blob(rt, state.sponsor, object.hash)?;
+                delete_blob(rt, Some(state.owner), object.hash)?;
             } else {
                 return Err(ActorError::illegal_state(
                     "key exists; use overwrite".into(),
@@ -48,7 +41,7 @@ impl Actor {
         // Add blob for object
         add_blob(
             rt,
-            state.sponsor,
+            Some(state.owner),
             params.source,
             params.hash,
             params.size,
@@ -75,7 +68,7 @@ impl Actor {
             .get(rt.store(), &key)?
             .ok_or(ActorError::illegal_state("object not found".into()))?;
         // Delete blob for object
-        delete_blob(rt, state.sponsor, object.hash)?;
+        delete_blob(rt, Some(state.owner), object.hash)?;
         // Update state
         let res = rt.transaction(|st: &mut State, rt| st.delete(rt.store(), &key))?;
         Ok(res.1)
@@ -170,7 +163,6 @@ impl ActorCode for Actor {
         Init => init,
         GetAddress => get_address,
         GetMetadata => get_metadata,
-        SetSponsor => set_sponsor,
         AddObject => add_object,
         DeleteObject => delete_object,
         GetObject => get_object,
@@ -646,7 +638,7 @@ mod tests {
                     expiry: ttl,
                     auto_renew: false,
                     source: add_params.source,
-                    delegate: Some(f4_eth_addr),
+                    delegate: Some((f4_eth_addr, f4_eth_addr)),
                 },
             )]),
             status: BlobStatus::Resolved,
