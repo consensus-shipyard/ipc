@@ -47,6 +47,8 @@ pub struct Account {
     pub credit_committed: BigInt,
     /// The chain epoch of the last debit.
     pub last_debit_epoch: ChainEpoch,
+    /// Credit approvals to other accounts.
+    pub approvals: HashMap<Address, HashMap<Address, CreditApproval>>,
 }
 
 impl Account {
@@ -56,8 +58,20 @@ impl Account {
             credit_free,
             credit_committed: Default::default(),
             last_debit_epoch: current_epoch,
+            approvals: Default::default(),
         }
     }
+}
+
+/// A credit approval from one account to another.
+#[derive(Debug, Clone, PartialEq, Serialize_tuple, Deserialize_tuple)]
+pub struct CreditApproval {
+    /// Optional credit approval limit.
+    pub limit: Option<BigInt>,
+    /// Optional credit approval expiry epoch.
+    pub expiry: Option<ChainEpoch>,
+    /// Counter for how much credit has been committed via this approval.
+    pub committed: BigInt,
 }
 
 /// The stored representation of a blob.

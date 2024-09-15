@@ -7,7 +7,7 @@ use std::ops::Bound::{Included, Unbounded};
 
 use fendermint_actor_blobs_shared::params::GetStatsReturn;
 use fendermint_actor_blobs_shared::state::{
-    Account, Blob, BlobStatus, Hash, PublicKey, Subscription,
+    Account, Blob, BlobStatus, CreditApproval, Hash, PublicKey, Subscription,
 };
 use fil_actors_runtime::ActorError;
 use fvm_ipld_encoding::tuple::*;
@@ -41,25 +41,12 @@ pub struct State {
     pub credit_debit_rate: u64,
     /// Map containing all accounts by robust (non-ID) actor address.
     pub accounts: HashMap<Address, Account>,
-    /// Delegations from an account to anothers.
-    pub approvals: HashMap<Address, HashMap<Address, HashMap<Address, CreditApproval>>>,
     /// Map containing all blobs.
     pub blobs: HashMap<Hash, Blob>,
     /// Map of expiries to blob hashes.
     pub expiries: BTreeMap<ChainEpoch, HashMap<Address, HashMap<Hash, bool>>>,
     /// Map of currently pending blob hashes to account and source Iroh node IDs.
     pub pending: BTreeMap<Hash, HashSet<(Address, PublicKey)>>,
-}
-
-/// A credit approval from one account to another.
-#[derive(Debug, Clone, Serialize_tuple, Deserialize_tuple)]
-pub struct CreditApproval {
-    /// Optional credit approval limit.
-    pub limit: Option<BigInt>,
-    /// Optional credit approval expiry epoch.
-    pub expiry: Option<ChainEpoch>,
-    /// Counter for how much credit has been committed via this approval.
-    pub committed: BigInt,
 }
 
 /// Helper for handling credit approvals.
@@ -87,7 +74,6 @@ impl State {
             credit_debited: BigInt::zero(),
             credit_debit_rate,
             accounts: HashMap::new(),
-            approvals: HashMap::new(),
             blobs: HashMap::new(),
             expiries: BTreeMap::new(),
             pending: BTreeMap::new(),
@@ -149,12 +135,14 @@ impl State {
             }
         }
         let expiry = ttl.map(|t| t + current_epoch);
+        let account = self
+            .accounts
+            .entry(from)
+            .or_insert(Account::new(BigInt::zero(), current_epoch));
         // Get or add a new approval
         let caller = require_caller.unwrap_or(to);
-        let approval = self
+        let approval = account
             .approvals
-            .entry(from)
-            .or_default()
             .entry(to)
             .or_default()
             .entry(caller)
@@ -253,23 +241,6 @@ impl State {
         ttl: Option<ChainEpoch>,
         source: PublicKey,
     ) -> anyhow::Result<Account, ActorError> {
-        let delegate = if origin != subscriber {
-            let approval = self
-                .approvals
-                .get_mut(&subscriber)
-                .and_then(|approval| {
-                    approval
-                        .get_mut(&origin)
-                        .and_then(|approval| approval.get_mut(&caller))
-                })
-                .ok_or(ActorError::forbidden(format!(
-                    "approval from {} to {} via caller {} not found",
-                    subscriber, origin, caller
-                )))?;
-            CreditDelegate::IsSome((origin, caller), approval)
-        } else {
-            CreditDelegate::IsNone
-        };
         let (ttl, auto_renew) = if let Some(ttl) = ttl {
             (ttl, false)
         } else {
@@ -285,6 +256,19 @@ impl State {
             .accounts
             .entry(subscriber)
             .or_insert(Account::new(BigInt::zero(), current_epoch));
+        let delegate = if origin != subscriber {
+            let approval = account
+                .approvals
+                .get_mut(&origin)
+                .and_then(|approval| approval.get_mut(&caller))
+                .ok_or(ActorError::forbidden(format!(
+                    "approval from {} to {} via caller {} not found",
+                    subscriber, origin, caller
+                )))?;
+            CreditDelegate::IsSome((origin, caller), approval)
+        } else {
+            CreditDelegate::IsNone
+        };
         // Capacity updates and required credit depend on whether the subscriber is already
         // subcribing to this blob
         let size = BigInt::from(size);
@@ -476,14 +460,10 @@ impl State {
                 subscriber, hash
             )))?;
         let delegate = if let Some((origin, caller)) = sub.delegate {
-            let approval = self
+            let approval = account
                 .approvals
-                .get_mut(&subscriber)
-                .and_then(|approval| {
-                    approval
-                        .get_mut(&origin)
-                        .and_then(|approval| approval.get_mut(&caller))
-                })
+                .get_mut(&origin)
+                .and_then(|approval| approval.get_mut(&caller))
                 .ok_or(ActorError::forbidden(format!(
                     "approval from {} to {} via caller {} not found",
                     subscriber, origin, caller
@@ -613,11 +593,11 @@ impl State {
             )))?;
         // Do not error if the approval was removed while this blob was pending
         let delegate = if let Some((origin, caller)) = sub.delegate {
-            if let Some(approval) = self.approvals.get_mut(&subscriber).and_then(|approval| {
-                approval
-                    .get_mut(&origin)
-                    .and_then(|approval| approval.get_mut(&caller))
-            }) {
+            if let Some(approval) = account
+                .approvals
+                .get_mut(&origin)
+                .and_then(|approval| approval.get_mut(&caller))
+            {
                 CreditDelegate::IsSome((origin, caller), approval)
             } else {
                 CreditDelegate::IsNone
@@ -701,11 +681,11 @@ impl State {
                 subscriber, hash
             )))?;
         let delegate = if let Some((origin, caller)) = sub.delegate {
-            if let Some(approval) = self.approvals.get_mut(&subscriber).and_then(|approval| {
-                approval
-                    .get_mut(&origin)
-                    .and_then(|approval| approval.get_mut(&caller))
-            }) {
+            if let Some(approval) = account
+                .approvals
+                .get_mut(&origin)
+                .and_then(|approval| approval.get_mut(&caller))
+            {
                 CreditDelegate::IsSome((origin, caller), approval)
             } else {
                 // Approval may have been removed, or this is a call from the system actor,
