@@ -65,7 +65,7 @@ LOKI_HOST_PORT = { value = "3100", condition = { env_not_set = [
 PROMETHEUS_HOST_PORT = { value = "9090", condition = { env_not_set = [
     "PROMETHEUS_HOST_PORT",
 ] } }
-ANVIL_HOST_PORT = { value = "8544", condition = { env_not_set = [
+ANVIL_HOST_PORT = { value = "8545", condition = { env_not_set = [
     "ANVIL_HOST_PORT",
 ] } }
 
