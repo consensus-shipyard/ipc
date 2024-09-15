@@ -251,8 +251,6 @@ if [[ -z ${SKIP_BUILD+x} || "$SKIP_BUILD" == "" || "$SKIP_BUILD" == "false" ]]; 
   make install
 
   # Pull foundry image
-  # Note: the foundry image doesn't have arm64 support, so we need to pull the
-  # x86_64 image on arm64 explicitly; otherwise, the dockerpull will fail.
   if [[ $local_deploy = true ]]; then
     echo "$DASHES Pulling foundry image..."
     cd "$IPC_FOLDER"
@@ -376,11 +374,9 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
       forge install
     fi
 
-    # use the same account validator 0th account to deploy contracts, but need
-    # to add hex prefix
-    deployer_pk="0x${pk}"
+    # use the same account validator 0th account to deploy contracts
     # TODO: should we dockerize this command?
-    deploy_supply_source_token_out="$(PRIVATE_KEY=${deployer_pk} forge script script/Hoku.s.sol --tc DeployScript 0 --sig 'run(uint8)' --rpc-url "http://localhost:${ANVIL_HOST_PORT}" --broadcast -vv)"
+    deploy_supply_source_token_out="$(PRIVATE_KEY="0x${pk}" forge script script/Hoku.s.sol --tc DeployScript 0 --sig 'run(uint8)' --rpc-url "http://localhost:${ANVIL_HOST_PORT}" --broadcast -vv)"
 
     echo "$DASHES deploy suppply source token output $DASHES"
     echo ""
@@ -390,18 +386,17 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
     # 0xE6E340D132b5f46d1e472DebcD681B2aBc16e57E for localnet 
     SUPPLY_SOURCE_ADDRESS=$(echo "$deploy_supply_source_token_out" | sed -n 's/.*contract Hoku *\([^ ]*\).*/\1/p')
 
-    # fund the all anvil accounts with 1000000000000000100 HOKU (note the extra
-    # 100 HOKU)
-    token_amount="1000000000000000100"
-    addresses=()
+    # fund the all anvil accounts with 10100 HOKU (note the extra 100 HOKU)
+    # TODO: the `ipc-cli` appears to require a 10**18 HOKU to map to 1 sHOKU. this isn't ideal because
+    # that means we need to mint 10**18 more HOKU than we want. the `hoku` CLI does something a 
+    # bit similarly—but it converts the amount internally. for example, these are the same:
+    # `hoku account deposit 10000` vs `ipc-cli cross-msg ... 10000000000000000000000`
+    # but in reality, we shouldn't assume 10**18 (explicitly or implicity) for erc20 supply source
+    token_amount="10100000000000000000000"
     for i in {0..9}
     do
       addr=$(jq .["$i"].address < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
-      addresses+=("$addr")
-    done
-    for address in "${addresses[@]}"
-    do
-      cast send "$SUPPLY_SOURCE_ADDRESS" "mint(address,uint256)" "$address" "$token_amount" --rpc-url "http://localhost:${ANVIL_HOST_PORT}" --private-key "$pk"
+      cast send "$SUPPLY_SOURCE_ADDRESS" "mint(address,uint256)" "$addr" "$token_amount" --rpc-url "http://localhost:${ANVIL_HOST_PORT}" --private-key "$pk"
     done
     echo "Funded accounts with HOKU on anvil rootnet"
   fi
@@ -420,7 +415,11 @@ cp /tmp/config.toml.2 "${IPC_CONFIG_FOLDER}"/config.toml
 echo "$DASHES Creating a child subnet..."
 root_id=$(toml get "${IPC_CONFIG_FOLDER}"/config.toml 'subnets[0].id' | tr -d '"')
 echo "Using root: $root_id"
-create_subnet_output=$(ipc-cli subnet create --from "$default_wallet_address" --parent "$root_id" --min-validators 2 --min-validator-stake 1 --bottomup-check-period 600 --active-validators-limit 3 --permission-mode federated --supply-source-kind erc20 --supply-source-address "$SUPPLY_SOURCE_ADDRESS" 2>&1)
+bottomup_check_period=600
+if [[ $local_deploy = true ]]; then
+  bottomup_check_period=10 # ~15 seconds on localnet
+fi
+create_subnet_output=$(ipc-cli subnet create --from "$default_wallet_address" --parent "$root_id" --min-validators 2 --min-validator-stake 1 --bottomup-check-period "${bottomup_check_period}" --active-validators-limit 3 --permission-mode federated --supply-source-kind erc20 --supply-source-address "$SUPPLY_SOURCE_ADDRESS" 2>&1)
 
 echo "$DASHES create subnet output $DASHES"
 echo
@@ -585,7 +584,7 @@ echo "$DASHES Start relayer process (in the background)"
 if [[ $local_deploy = true ]]; then
   temp_evm_keystore=$(jq . "${IPC_CONFIG_FOLDER}"/evm_keystore.json)
   nohup ipc-cli checkpoint relayer --subnet "$subnet_id" --submitter "$default_wallet_address" > relayer.log &
-  sleep 3
+  sleep 3 # briefly wait for the relayer to start
   echo "$temp_evm_keystore" > "${IPC_CONFIG_FOLDER}"/evm_keystore.json
 else
   nohup ipc-cli checkpoint relayer --subnet "$subnet_id" --submitter "$default_wallet_address" > relayer.log &
@@ -594,18 +593,27 @@ fi
 # move localnet funds to subnet
 if [[ $local_deploy = true ]]; then
   echo "$DASHES Move account funds into subnet"
-  # move 1000000000000000000 HOKU to subnet (i.e., leave 100 HOKU on rootnet for
+  # move 10000 HOKU to subnet (i.e., leave 100 HOKU on rootnet for
   # testing purposes)
-  token_amount="1000000000000000000"
-  addresses=()
+  # TODO: see comment above about why we're using 10**18 due 
+  # to `ipc-cli` & `hoku` CLI's atto assumption
+  token_amount="10000000000000000000000"
   for i in {0..9}
   do
     addr=$(jq .["$i"].address < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
-    addresses+=("$addr")
+    ipc-cli cross-msg fund-with-token --subnet "${subnet_id}" --from "${addr}" --approve "${token_amount}"
   done
-  for address in "${addresses[@]}"
-  do
-    ipc-cli cross-msg fund-with-token --subnet "${subnet_id}" --from "${address}" --approve "${token_amount}"
+  echo "Waiting for deposits to process..."
+  # TODO: this takes ~2 minutes for the topdown messages to propagate. need to reduce this for 
+  # localnet (i.e., ideally is seconds, not minutes)
+  while true; do
+    # validate accounts have subnet balance (the last account will be final deposit tx)
+    addr=$(jq .[9].address < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
+    balance=$(cast balance --rpc-url http://localhost:8645 --ether "${addr}" | awk '{printf "%.0f", $1}')
+    if [[ $balance != 0 ]]; then
+      break
+    fi
+    sleep 5
   done
   echo "Deposited HOKU for test accounts"
   echo
@@ -665,11 +673,25 @@ EOF
 
 if [[ $local_deploy = true ]]; then
   echo
-  echo "Available accounts:"
+  echo "Account balances:"
+  addr=$(jq .[0].address < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
+  parent_native=$(cast balance --rpc-url http://localhost:"${ANVIL_HOST_PORT}" --ether "${addr}" | awk '{printf "%.2f", $1}')
+  parent_hoku=$(cast balance --rpc-url http://localhost:"${ANVIL_HOST_PORT}" --erc20 "${SUPPLY_SOURCE_ADDRESS}" "${addr}" | awk '{print $1}')
+  subnet_native=$(cast balance --rpc-url http://localhost:"${ETHAPI_HOST_PORTS[0]}" --ether "${addr}" | awk '{printf "%.2f", $1}')
+  echo "Parent native: ${parent_native%.*} ETH"
+  echo "Parent HOKU:   ${parent_hoku%.*} HOKU"
+  echo "Subnet native: ${subnet_native%.*} sHOKU"
+  echo
+  echo "Accounts:"
   for i in {0..9}
   do
     addr=$(jq .["$i"].address < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
-    echo "($i) $addr"
+    # validator accounts should *not* be used by devs to avoid nonce race conditions
+    type="available"
+    if [[ $i -eq 0 || $i -eq 1 || $i -eq 2 ]]; then
+      type="reserved"
+    fi
+    echo "($i) $addr ($type)"
   done
   echo
   echo "Private keys:"
@@ -678,6 +700,7 @@ if [[ $local_deploy = true ]]; then
     private_key=$(jq .["$i"].private_key < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
     echo "($i) $private_key"
   done
+  echo
 fi
 
 echo "Done"
