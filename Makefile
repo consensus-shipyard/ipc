@@ -22,3 +22,21 @@ license:
 	./scripts/add_license.sh
 
 lint: license $(patsubst %, lint/%, $(SUBTREES))
+
+install:
+	cd fendermint && make install && cargo install iroh-cli
+
+config-local:
+	./scripts/setup.sh
+
+run-local-iroh:
+	iroh --rpc-addr 0.0.0.0:4919 start
+
+run-local-fendermint:
+	./scripts/run_fendermint.sh
+
+run-local-cometbft:
+	./scripts/run_cometbft.sh
+
+run-local-ethrpc:
+  fendermint eth run

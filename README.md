@@ -45,6 +45,30 @@ make
 ./target/release/fendermint --version
 ```
 
+## Run local network
+
+First build and install,
+
+```
+make && make install
+```
+
+Next configure the local network,
+
+```
+make config-local
+```
+
+Finally, start all the services in separate terminal windows,
+
+```
+make run-local-iroh
+make run-local-fendermint
+make run-local-cometbft
+make run-local-ethrpc
+```
+
+
 ## Run tests
 
 ```
