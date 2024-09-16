@@ -47,7 +47,16 @@ make
 
 ## Run local network
 
-First build and install,
+First install cometbft,
+
+```
+git clone https://github.com/cometbft/cometbft.git
+cd cometbft
+git checkout v0.37.1
+make install
+```
+
+Build and install hoku
 
 ```
 make && make install
