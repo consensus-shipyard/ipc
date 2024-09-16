@@ -26,7 +26,8 @@ pub struct Actor;
 
 impl Actor {
     fn add_object(rt: &impl Runtime, params: AddParams) -> Result<Cid, ActorError> {
-        Self::ensure_write_allowed(rt)?;
+        // Self::ensure_write_allowed(rt)?;
+        rt.validate_immediate_caller_accept_any()?;
         let state = rt.state::<State>()?;
         let key = BytesKey(params.key);
         if let Some(object) = state.get(rt.store(), &key)? {
@@ -61,7 +62,8 @@ impl Actor {
     }
 
     fn delete_object(rt: &impl Runtime, params: DeleteParams) -> Result<Cid, ActorError> {
-        Self::ensure_write_allowed(rt)?;
+        // Self::ensure_write_allowed(rt)?;
+        rt.validate_immediate_caller_accept_any()?;
         let state = rt.state::<State>()?;
         let key = BytesKey(params.0);
         let object = state
@@ -196,7 +198,7 @@ mod tests {
     use fvm_shared::MethodNum;
     use rand::RngCore;
 
-    fn construct_and_verify(creator: Address) -> MockRuntime {
+    fn construct_and_verify(owner: Address) -> MockRuntime {
         let rt = MockRuntime {
             receiver: Address::new_id(10),
             ..Default::default()
@@ -209,7 +211,7 @@ mod tests {
             .call::<Actor>(
                 Method::Constructor as u64,
                 IpldBlock::serialize_cbor(&ConstructorParams {
-                    creator,
+                    owner,
                     write_access,
                     metadata,
                 })

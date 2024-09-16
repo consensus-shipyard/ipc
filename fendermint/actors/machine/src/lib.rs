@@ -21,8 +21,8 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 /// Params for creating a machine.
 #[derive(Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ConstructorParams {
-    /// The machine creator robust address.
-    pub creator: Address,
+    /// The machine owner robust address.
+    pub owner: Address,
     /// Write access dictates who can write to the machine.
     pub write_access: WriteAccess,
     /// User-defined metadata.
@@ -83,7 +83,7 @@ pub trait MachineActor {
         rt.validate_immediate_caller_is(std::iter::once(&INIT_ACTOR_ADDR))?;
         let state = Self::State::new(
             rt.store(),
-            params.creator,
+            params.owner,
             params.write_access,
             params.metadata,
         )?;
@@ -170,7 +170,7 @@ pub struct Metadata {
 pub trait MachineState {
     fn new<BS: Blockstore>(
         store: &BS,
-        creator: Address,
+        owner: Address,
         write_access: WriteAccess,
         metadata: HashMap<String, String>,
     ) -> Result<Self, ActorError>

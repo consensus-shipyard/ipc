@@ -265,7 +265,7 @@ pub struct State {
 impl MachineState for State {
     fn new<BS: Blockstore>(
         store: &BS,
-        creator: Address,
+        owner: Address,
         write_access: WriteAccess,
         metadata: HashMap<String, String>,
     ) -> anyhow::Result<Self, ActorError> {
@@ -280,7 +280,7 @@ impl MachineState for State {
         };
         Ok(Self {
             address: Default::default(),
-            owner: creator,
+            owner,
             write_access,
             peaks,
             leaf_count: 0,
