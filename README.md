@@ -74,7 +74,6 @@ Finally, start all the services in separate terminal windows,
 make run-local-iroh
 make run-local-fendermint
 make run-local-cometbft
-make run-local-ethrpc
 ```
 
 

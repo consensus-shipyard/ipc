@@ -37,6 +37,3 @@ run-local-fendermint:
 
 run-local-cometbft:
 	./scripts/run_cometbft.sh
-
-run-local-ethrpc:
-  fendermint eth run
