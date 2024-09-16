@@ -43,19 +43,26 @@ impl BlobsActor {
 
     fn buy_credit(rt: &impl Runtime, params: BuyCreditParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
+        let recipient = resolve_external(rt, params.0)?;
         rt.transaction(|st: &mut State, rt| {
-            st.buy_credit(params.0, rt.message().value_received(), rt.curr_epoch())
+            st.buy_credit(recipient, rt.message().value_received(), rt.curr_epoch())
         })
     }
 
     fn approve_credit(rt: &impl Runtime, params: ApproveCreditParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let caller = resolve_external(rt, rt.message().caller())?;
+        let receiver = resolve_external(rt, params.receiver)?;
+        let required_caller = if let Some(required_caller) = params.required_caller {
+            Some(resolve_external(rt, required_caller)?)
+        } else {
+            None
+        };
         rt.transaction(|st: &mut State, rt| {
             st.approve_credit(
                 caller,
-                params.receiver,
-                params.required_caller,
+                receiver,
+                required_caller,
                 rt.curr_epoch(),
                 params.limit,
                 params.ttl,
@@ -66,9 +73,13 @@ impl BlobsActor {
     fn revoke_credit(rt: &impl Runtime, params: RevokeCreditParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let caller = resolve_external(rt, rt.message().caller())?;
-        rt.transaction(|st: &mut State, _| {
-            st.revoke_credit(caller, params.receiver, params.required_caller)
-        })
+        let receiver = resolve_external(rt, params.receiver)?;
+        let required_caller = if let Some(required_caller) = params.required_caller {
+            Some(resolve_external(rt, required_caller)?)
+        } else {
+            None
+        };
+        rt.transaction(|st: &mut State, _| st.revoke_credit(caller, receiver, required_caller))
     }
 
     fn get_account(
@@ -141,13 +152,9 @@ impl BlobsActor {
 
     fn finalize_blob(rt: &impl Runtime, params: FinalizeBlobParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
+        let subscriber = resolve_external(rt, params.subscriber)?;
         rt.transaction(|st: &mut State, _| {
-            st.finalize_blob(
-                params.subscriber,
-                rt.curr_epoch(),
-                params.hash,
-                params.status,
-            )
+            st.finalize_blob(subscriber, rt.curr_epoch(), params.hash, params.status)
         })
     }
 
