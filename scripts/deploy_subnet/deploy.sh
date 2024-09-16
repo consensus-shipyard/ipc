@@ -5,12 +5,12 @@ set -euo pipefail
 DASHES='------'
 
 if (($# != 1)); then
-  echo "Arguments: <Specify github remote branch name to use to deploy. Or use 'local' (without quote) to indicate using local repo instead. If not provided, will default to main branch"
-  head_ref=main
+  echo "Arguments: <Specify GitHub remote branch name to use to deploy. Or use 'local' (without quote) to indicate using local repo instead. If not provided, will default to develop branch"
+  head_ref=develop
   local_deploy=false
 else
-  if [ "$1" = "local" ]; then
-    echo "$DASHES deploying to local net $DASHES"
+  if [[ "$1" = "local" || "$1" = "localnet" ]]; then
+    echo "$DASHES deploying to localnet $DASHES"
     local_deploy=true
   else
     local_deploy=false
@@ -163,8 +163,63 @@ if [[ -z ${SKIP_DEPENDENCIES+x} || "$SKIP_DEPENDENCIES" == "" || "$SKIP_DEPENDEN
     source "${HOME}"/.bashrc
     set -u
   elif [[ $(uname -s) == "Darwin" ]]; then
-    # TODO: check and/or install dependencies for MacOS. also, do we assume bash? zsh? etc.
-    echo "WARNING: Build dependency installation not supported for MacOS, skipping..."
+    echo "WARNING: Installing build dependencies not supported for MacOS"
+    echo "$DASHES Checking if dependencies already installed..."
+    missing_dependencies=()
+    # Check rust + cargo
+    echo "$DASHES Check rustc & cargo..."
+    if which cargo &> /dev/null ; then
+      echo "$DASHES rustc & cargo already installed."
+    else
+      echo "$DASHES Need to install rustc & cargo"
+      missing_dependencies+=("rustc & cargo")
+    fi
+    # Check Foundry
+    echo "$DASHES Check foundry..."
+    if which foundryup &> /dev/null ; then
+      echo "$DASHES foundry is already installed."
+    else
+      echo "$DASHES Need to install foundry"
+      missing_dependencies+=("foundry")
+    fi
+    # Check node
+    echo "$DASHES Check node..."
+    if which node &> /dev/null ; then
+      echo "$DASHES node is already installed."
+    else
+      echo "$DASHES Need to install node"
+      missing_dependencies+=("node")
+    fi
+    # Check docker
+    echo "$DASHES check docker"
+    if which docker &> /dev/null ; then
+      echo "$DASHES docker is already installed."
+    else
+      echo "$DASHES Need to install docker"
+      missing_dependencies+=("docker")
+    fi  
+    # Check jq
+    echo "$DASHES Check jq..."
+    if which jq &> /dev/null ; then
+      echo "$DASHES jq is already installed."
+    else
+      echo "$DASHES Need to install jq"
+      missing_dependencies+=("jq")
+    fi
+    # Check `toml`
+    echo "$DASHES Check toml..."
+    if which toml &> /dev/null ; then
+      echo "$DASHES toml-cli is already installed."
+    else
+      echo "$DASHES Need to install toml-cli"
+      missing_dependencies+=("toml-cli")
+    fi
+    if [ ${#missing_dependencies[@]} -gt 0 ]; then
+      echo "$DASHES Missing dependencies: ${missing_dependencies[*]}"
+      exit 1
+    else
+      echo "$DASHES All dependencies are installed"
+    fi
   else
     echo "${DASHES} Unsupported OS: $(uname -s)"
     exit 1
@@ -445,8 +500,8 @@ fi
 
 # Start the bootstrap validator node
 echo "$DASHES Start the first validator node as bootstrap"
-echo "First we need to force a wait to make sure the subnet is confirmed as created in the parent contracts"
-echo "Wait for 30 seconds"
+# Force a wait to make sure the subnet is confirmed as created in the parent contracts
+echo "Wait for deployment..."
 sleep 30
 echo "Finished waiting"
 cd "${IPC_FOLDER}"
