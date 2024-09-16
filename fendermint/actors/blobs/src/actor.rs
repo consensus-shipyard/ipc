@@ -4,7 +4,7 @@
 
 use fendermint_actor_blobs_shared::params::{
     AddBlobParams, ApproveCreditParams, BuyCreditParams, DeleteBlobParams, FinalizeBlobParams,
-    GetAccountParams, GetBlobParams, GetBlobStatusParams, GetStatsReturn,
+    GetAccountParams, GetBlobParams, GetBlobStatusParams, GetStatsReturn, RevokeCreditParams,
 };
 use fendermint_actor_blobs_shared::state::{Account, Blob, BlobStatus, Hash, PublicKey};
 use fendermint_actor_blobs_shared::Method;
@@ -63,7 +63,7 @@ impl BlobsActor {
         })
     }
 
-    fn revoke_credit(rt: &impl Runtime, params: ApproveCreditParams) -> Result<(), ActorError> {
+    fn revoke_credit(rt: &impl Runtime, params: RevokeCreditParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let caller = resolve_external(rt, rt.message().caller())?;
         rt.transaction(|st: &mut State, _| {
