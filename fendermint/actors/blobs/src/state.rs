@@ -164,6 +164,26 @@ impl State {
         Ok(())
     }
 
+    pub fn revoke_credit(
+        &mut self,
+        from: Address,
+        to: Address,
+        require_caller: Option<Address>,
+    ) -> anyhow::Result<(), ActorError> {
+        let account = self
+            .accounts
+            .get_mut(&from)
+            .ok_or(ActorError::not_found(format!("account {} not found", from)))?;
+        let caller = require_caller.unwrap_or(to);
+        if let Some(approvals) = account.approvals.get_mut(&to) {
+            approvals.remove(&caller);
+            if approvals.is_empty() {
+                account.approvals.remove(&to);
+            }
+        }
+        Ok(())
+    }
+
     pub fn get_account(&self, address: Address) -> Option<Account> {
         self.accounts.get(&address).cloned()
     }
@@ -256,14 +276,22 @@ impl State {
             .entry(subscriber)
             .or_insert(Account::new(BigInt::zero(), current_epoch));
         let delegate = if origin != subscriber {
-            let approval = account
-                .approvals
-                .get_mut(&origin)
-                .and_then(|approval| approval.get_mut(&caller))
-                .ok_or(ActorError::forbidden(format!(
-                    "approval from {} to {} via caller {} not found",
-                    subscriber, origin, caller
-                )))?;
+            // First look for an approval for origin keyed by origin, which denotes it's valid for
+            // any caller.
+            // Second look for an approval for the supplied caller.
+            let approval = if let Some(approvals) = account.approvals.get_mut(&origin) {
+                if let Some(approval) = approvals.get_mut(&origin) {
+                    Some(approval)
+                } else {
+                    approvals.get_mut(&caller)
+                }
+            } else {
+                None
+            };
+            let approval = approval.ok_or(ActorError::forbidden(format!(
+                "approval from {} to {} via caller {} not found",
+                subscriber, origin, caller
+            )))?;
             CreditDelegate::IsSome((origin, caller), approval)
         } else {
             CreditDelegate::IsNone
@@ -459,14 +487,22 @@ impl State {
                 subscriber, hash
             )))?;
         let delegate = if let Some((origin, caller)) = sub.delegate {
-            let approval = account
-                .approvals
-                .get_mut(&origin)
-                .and_then(|approval| approval.get_mut(&caller))
-                .ok_or(ActorError::forbidden(format!(
-                    "approval from {} to {} via caller {} not found",
-                    subscriber, origin, caller
-                )))?;
+            // First look for an approval for origin keyed by origin, which denotes it's valid for
+            // any caller.
+            // Second look for an approval for the supplied caller.
+            let approval = if let Some(approvals) = account.approvals.get_mut(&origin) {
+                if let Some(approval) = approvals.get_mut(&origin) {
+                    Some(approval)
+                } else {
+                    approvals.get_mut(&caller)
+                }
+            } else {
+                None
+            };
+            let approval = approval.ok_or(ActorError::forbidden(format!(
+                "approval from {} to {} via caller {} not found",
+                subscriber, origin, caller
+            )))?;
             CreditDelegate::IsSome((origin, caller), approval)
         } else {
             CreditDelegate::IsNone
@@ -592,11 +628,19 @@ impl State {
             )))?;
         // Do not error if the approval was removed while this blob was pending
         let delegate = if let Some((origin, caller)) = sub.delegate {
-            if let Some(approval) = account
-                .approvals
-                .get_mut(&origin)
-                .and_then(|approval| approval.get_mut(&caller))
-            {
+            // First look for an approval for origin keyed by origin, which denotes it's valid for
+            // any caller.
+            // Second look for an approval for the supplied caller.
+            let approval = if let Some(approvals) = account.approvals.get_mut(&origin) {
+                if let Some(approval) = approvals.get_mut(&origin) {
+                    Some(approval)
+                } else {
+                    approvals.get_mut(&caller)
+                }
+            } else {
+                None
+            };
+            if let Some(approval) = approval {
                 CreditDelegate::IsSome((origin, caller), approval)
             } else {
                 CreditDelegate::IsNone
@@ -680,11 +724,19 @@ impl State {
                 subscriber, hash
             )))?;
         let delegate = if let Some((origin, caller)) = sub.delegate {
-            if let Some(approval) = account
-                .approvals
-                .get_mut(&origin)
-                .and_then(|approval| approval.get_mut(&caller))
-            {
+            // First look for an approval for origin keyed by origin, which denotes it's valid for
+            // any caller.
+            // Second look for an approval for the supplied caller.
+            let approval = if let Some(approvals) = account.approvals.get_mut(&origin) {
+                if let Some(approval) = approvals.get_mut(&origin) {
+                    Some(approval)
+                } else {
+                    approvals.get_mut(&caller)
+                }
+            } else {
+                None
+            };
+            if let Some(approval) = approval {
                 CreditDelegate::IsSome((origin, caller), approval)
             } else {
                 // Approval may have been removed, or this is a call from the system actor,

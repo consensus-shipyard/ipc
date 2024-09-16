@@ -63,6 +63,14 @@ impl BlobsActor {
         })
     }
 
+    fn revoke_credit(rt: &impl Runtime, params: ApproveCreditParams) -> Result<(), ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+        let caller = resolve_external(rt, rt.message().caller())?;
+        rt.transaction(|st: &mut State, _| {
+            st.revoke_credit(caller, params.receiver, params.required_caller)
+        })
+    }
+
     fn get_account(
         rt: &impl Runtime,
         params: GetAccountParams,
@@ -205,6 +213,7 @@ impl ActorCode for BlobsActor {
         GetStats => get_stats,
         BuyCredit => buy_credit,
         ApproveCredit => approve_credit,
+        RevokeCredit => revoke_credit,
         GetAccount => get_account,
         DebitAccounts => debit_accounts,
         AddBlob => add_blob,

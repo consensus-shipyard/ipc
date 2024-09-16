@@ -49,6 +49,11 @@ pub struct Account {
     pub last_debit_epoch: ChainEpoch,
     /// Credit approvals to other accounts, keyed by receiver, keyed by caller,
     /// which could be the receiver or a specific contract, like an object store.
+    /// This allows for limiting approvals to interactions from a specific contract.
+    /// For example, an approval for Alice might be valid for any contract caller, so long as
+    /// the origin is Alice.
+    /// An approval for Bob might be valid from only one contract caller, so long as
+    /// the origin is Bob.
     pub approvals: HashMap<Address, HashMap<Address, CreditApproval>>,
 }
 
