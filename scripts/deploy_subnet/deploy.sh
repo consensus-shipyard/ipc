@@ -5,12 +5,12 @@ set -euo pipefail
 DASHES='------'
 
 if (($# != 1)); then
-  echo "Arguments: <Specify github remote branch name to use to deploy. Or use 'local' (without quote) to indicate using local repo instead. If not provided, will default to main branch"
-  head_ref=main
+  echo "Arguments: <Specify GitHub remote branch name to use to deploy. Or use 'local' (without quote) to indicate using local repo instead. If not provided, will default to develop branch"
+  head_ref=develop
   local_deploy=false
 else
-  if [ "$1" = "local" ]; then
-    echo "$DASHES deploying to local net $DASHES"
+  if [[ "$1" = "local" || "$1" = "localnet" ]]; then
+    echo "$DASHES deploying to localnet $DASHES"
     local_deploy=true
   else
     local_deploy=false
@@ -22,16 +22,16 @@ fi
 if ! $local_deploy ; then
   eval "$(ssh-agent -s)"
   ssh-add
-  if [ -e "${HOME}"/.ssh/id_rsa.ipc ]; then
+  if [[ -e "${HOME}"/.ssh/id_rsa.ipc ]]; then
     ssh-add "${HOME}"/.ssh/id_rsa.ipc
   fi
 
-  if [ -z "${SUPPLY_SOURCE_ADDRESS}" ]; then
+  if [[ -z "${SUPPLY_SOURCE_ADDRESS:-}" ]]; then
     echo "SUPPLY_SOURCE_ADDRESS is not set"
     exit 1
   fi
 
-  if [ -z "${PARENT_HTTP_AUTH_TOKEN}" ]; then
+  if [[ -z "${PARENT_HTTP_AUTH_TOKEN:-}" ]]; then
     echo "PARENT_HTTP_AUTH_TOKEN is not set"
     exit 1
   fi
@@ -55,8 +55,8 @@ fi
 IPC_CONFIG_FOLDER=${HOME}/.ipc
 
 echo "$DASHES starting with env $DASHES"
-echo IPC_FOLDER $IPC_FOLDER
-echo IPC_CONFIG_FOLDER $IPC_CONFIG_FOLDER
+echo "IPC_FOLDER $IPC_FOLDER"
+echo "IPC_CONFIG_FOLDER $IPC_CONFIG_FOLDER"
 
 wallet_addresses=()
 public_keys=()
@@ -87,90 +87,152 @@ fi
 # Install build dependencies
 if [[ -z ${SKIP_DEPENDENCIES+x} || "$SKIP_DEPENDENCIES" == "" || "$SKIP_DEPENDENCIES" == "false" ]]; then
   echo "${DASHES} Installing build dependencies..."
-  sudo apt update && sudo apt install build-essential libssl-dev mesa-opencl-icd ocl-icd-opencl-dev gcc git bzr jq pkg-config curl clang hwloc libhwloc-dev wget ca-certificates gnupg -y
+  if [[ $(uname -s) == "Linux" ]]; then
+    sudo apt update && sudo apt install build-essential libssl-dev mesa-opencl-icd ocl-icd-opencl-dev gcc git bzr jq pkg-config curl clang hwloc libhwloc-dev wget ca-certificates gnupg -y
 
-  # Install rust + cargo
-  echo "$DASHES Check rustc & cargo..."
-  if which cargo ; then
-    echo "$DASHES rustc & cargo already installed."
-  else
-    echo "$DASHES Need to install rustc & cargo"
-    curl https://sh.rustup.rs -sSf | sh -s -- -y
-    # Refresh env
+    # Install rust + cargo
+    echo "$DASHES Check rustc & cargo..."
+    if which cargo ; then
+      echo "$DASHES rustc & cargo already installed."
+    else
+      echo "$DASHES Need to install rustc & cargo"
+      curl https://sh.rustup.rs -sSf | sh -s -- -y
+      # Refresh env
+      source "${HOME}"/.bashrc
+    fi
+
+    # Install cargo make
+    echo "$DASHES Installing cargo-make"
+    cargo install cargo-make
+    # Install toml-cli
+    echo "$DASHES Installing toml-cli"
+    cargo install toml-cli
+
+    # Install Foundry
+    echo "$DASHES Check foundry..."
+    if which foundryup ; then
+      echo "$DASHES foundry is already installed."
+    else
+      echo "$DASHES Need to install foundry"
+      curl -L https://foundry.paradigm.xyz | bash
+      foundryup
+    fi
+
+    # Install node
+    echo "$DASHES Check node..."
+    if which node ; then
+      echo "$DASHES node is already installed."
+    else
+      echo "$DASHES Need to install node"
+      curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
+      source "$HOME/.bashrc"
+      nvm install --default lts/*
+    fi
+
+    # Install docker
+    echo "$DASHES check docker"
+    if which docker ; then
+      echo "$DASHES docker is already installed."
+    else
+      echo "$DASHES Need to install docker"
+      # Add Docker's official GPG key:
+      sudo apt-get update
+      sudo apt-get install ca-certificates curl
+      sudo install -m 0755 -d /etc/apt/keyrings
+      sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+      sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+      # Add the repository to Apt sources:
+      echo \
+        "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+        $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+        sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+      sudo apt-get update
+      sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+      # Remove the need to use sudo
+      getent group docker || sudo groupadd docker
+      sudo usermod -aG docker "$USER"
+      newgrp docker
+
+      # Test running docker without sudo
+      docker ps
+    fi
+    # Make sure we re-read the latest env before finishing dependency installation.
+    set +u
     source "${HOME}"/.bashrc
-  fi
-
-  # Install cargo make
-  echo "$DASHES Installing cargo-make"
-  cargo install cargo-make
-  # Install toml-cli
-  echo "$DASHES Installing toml-cli"
-  cargo install toml-cli
-
-  # Install Foundry
-  echo "$DASHES Check foundry..."
-  if which foundryup ; then
-    echo "$DASHES foundry is already installed."
+    set -u
+  elif [[ $(uname -s) == "Darwin" ]]; then
+    echo "WARNING: Installing build dependencies not supported for MacOS"
+    echo "$DASHES Checking if dependencies already installed..."
+    missing_dependencies=()
+    # Check rust + cargo
+    echo "$DASHES Check rustc & cargo..."
+    if which cargo &> /dev/null ; then
+      echo "$DASHES rustc & cargo already installed."
+    else
+      echo "$DASHES Need to install rustc & cargo"
+      missing_dependencies+=("rustc & cargo")
+    fi
+    # Check Foundry
+    echo "$DASHES Check foundry..."
+    if which foundryup &> /dev/null ; then
+      echo "$DASHES foundry is already installed."
+    else
+      echo "$DASHES Need to install foundry"
+      missing_dependencies+=("foundry")
+    fi
+    # Check node
+    echo "$DASHES Check node..."
+    if which node &> /dev/null ; then
+      echo "$DASHES node is already installed."
+    else
+      echo "$DASHES Need to install node"
+      missing_dependencies+=("node")
+    fi
+    # Check docker
+    echo "$DASHES check docker"
+    if which docker &> /dev/null ; then
+      echo "$DASHES docker is already installed."
+    else
+      echo "$DASHES Need to install docker"
+      missing_dependencies+=("docker")
+    fi  
+    # Check jq
+    echo "$DASHES Check jq..."
+    if which jq &> /dev/null ; then
+      echo "$DASHES jq is already installed."
+    else
+      echo "$DASHES Need to install jq"
+      missing_dependencies+=("jq")
+    fi
+    # Check `toml`
+    echo "$DASHES Check toml..."
+    if which toml &> /dev/null ; then
+      echo "$DASHES toml-cli is already installed."
+    else
+      echo "$DASHES Need to install toml-cli"
+      missing_dependencies+=("toml-cli")
+    fi
+    if [ ${#missing_dependencies[@]} -gt 0 ]; then
+      echo "$DASHES Missing dependencies: ${missing_dependencies[*]}"
+      exit 1
+    else
+      echo "$DASHES All dependencies are installed"
+    fi
   else
-    echo "$DASHES Need to install foundry"
-    curl -L https://foundry.paradigm.xyz | bash
-    foundryup
+    echo "${DASHES} Unsupported OS: $(uname -s)"
+    exit 1
   fi
-
-  # Install node
-  echo "$DASHES Check node..."
-  if which node ; then
-    echo "$DASHES node is already installed."
-  else
-    echo "$DASHES Need to install node"
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
-    source "$HOME/.bashrc"
-    nvm install --default lts/*
-  fi
-
-  # Install docker
-  echo "$DASHES check docker"
-  if which docker ; then
-    echo "$DASHES docker is already installed."
-  else
-    echo "$DASHES Need to install docker"
-    # Add Docker's official GPG key:
-    sudo apt-get update
-    sudo apt-get install ca-certificates curl
-    sudo install -m 0755 -d /etc/apt/keyrings
-    sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-    sudo chmod a+r /etc/apt/keyrings/docker.asc
-
-    # Add the repository to Apt sources:
-    echo \
-      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-      $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-      sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-    sudo apt-get update
-    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-    # Remove the need to use sudo
-    getent group docker || sudo groupadd docker
-    sudo usermod -aG docker "$USER"
-    newgrp docker
-
-    # Test running docker without sudo
-    docker ps
-  fi
-
-  # Make sure we re-read the latest env before finishing dependency installation.
-  set +u
-  source "${HOME}"/.bashrc
-  set -u
 else
-  echo "$DASHES skpping dependencies installation $DASHES"
+  echo "$DASHES skipping dependencies installation $DASHES"
 fi
 
 # Prepare code repo
 if ! $local_deploy ; then
   echo "$DASHES Preparing ipc repo..."
   if ! ls "$IPC_FOLDER" ; then
-    git clone --recurse-submodules -j8 git@github.com-ipc:amazingdatamachine/ipc.git "${IPC_FOLDER}"
+    git clone --recurse-submodules -j8 git@github.com-ipc:hokunet/ipc.git "${IPC_FOLDER}"
   fi
   cd "${IPC_FOLDER}"
   git fetch
@@ -244,8 +306,6 @@ if [[ -z ${SKIP_BUILD+x} || "$SKIP_BUILD" == "" || "$SKIP_BUILD" == "false" ]]; 
   make install
 
   # Pull foundry image
-  # Note: the foundry image doesn't have arm64 support, so we need to pull the
-  # x86_64 image on arm64 explicitly; otherwise, the dockerpull will fail.
   if [[ $local_deploy = true ]]; then
     echo "$DASHES Pulling foundry image..."
     cd "$IPC_FOLDER"
@@ -270,17 +330,40 @@ if [[ $local_deploy = true ]]; then
       -e ANVIL_HOST_PORT="${ANVIL_HOST_PORT}" \
       anvil-start
 
-  # the first ten anvil preloaded key pairs
-  ipc-cli wallet import --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --wallet-type evm
-  ipc-cli wallet import --private-key 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d --wallet-type evm
-  ipc-cli wallet import --private-key 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a --wallet-type evm
-  ipc-cli wallet import --private-key 0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6 --wallet-type evm
-  ipc-cli wallet import --private-key 0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a --wallet-type evm
-  ipc-cli wallet import --private-key 0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba --wallet-type evm
-  ipc-cli wallet import --private-key 0x92db14e403b83dfe3df233f83dfa3a0d7096f21ca9b0d6d6b8d88b2b4ec1564e --wallet-type evm
-  ipc-cli wallet import --private-key 0x4bbbf85ce3377467afe5d46f804f221813b2bb87f24d81f60f1fcdbf7cbf4356 --wallet-type evm
-  ipc-cli wallet import --private-key 0xdbda1821b80551c9d65939329250298aa3472ba22feea921c0cf5d620ea67b97 --wallet-type evm
-  ipc-cli wallet import --private-key 0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6 --wallet-type evm
+  # the `ipc-cli wallet import` writes keys to the file non-deterministically.
+  # instead, we just create the file with the predictable ordering & expected format.
+  # provide the first ten anvil preloaded key pairs
+  anvil_private_keys=(
+    ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+    59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
+    5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a
+    7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6
+    47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a
+    8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba
+    92db14e403b83dfe3df233f83dfa3a0d7096f21ca9b0d6d6b8d88b2b4ec1564e
+    4bbbf85ce3377467afe5d46f804f221813b2bb87f24d81f60f1fcdbf7cbf4356
+    dbda1821b80551c9d65939329250298aa3472ba22feea921c0cf5d620ea67b97
+    2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6
+  )
+  # lowercased addresses in matching order (`ipc-cli` expects lowercase)
+  anvil_public_keys=(
+    0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+    0x70997970c51812dc3a010c7d01b50e0d17dc79c8
+    0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc
+    0x90f79bf6eb2c4f870365e785982e1f101e93b906
+    0x15d34aaf54267db7d7c367839aaf71a00a2c6a65
+    0x9965507d1a55bcc2695c58ba16fb37d819b0a4dc
+    0x976ea74026e726554db657fa54763abd0c3a0aa9
+    0x14dc79964da2c08b23698b3d3cc7ca32193d9955
+    0x23618e81e3f5cdf7f54c3d65f7fbc0abf5b21e8f
+    0xa0ee7a142d267c1f36714e4a8f75612f20a79720  
+  )
+  evm_keystore_json=$(jq -n '[]')
+  for ((i=0; i<${#anvil_private_keys[@]}; i++))
+  do
+    evm_keystore_json=$(echo "$evm_keystore_json" | jq --arg address "${anvil_public_keys[i]}" --arg private_key "${anvil_private_keys[i]}" '. += [{address: $address, private_key: $private_key}]')
+  done
+  echo "$evm_keystore_json" > "${IPC_CONFIG_FOLDER}/evm_keystore.json"
 fi
 
 # Prepare wallet by using existing wallet json file
@@ -328,7 +411,6 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
     deploy_contracts_output=$(make deploy-ipc NETWORK=localnet)
   fi
 
-  # TODO(dtb): try to capture and log these contract addresses at the very end? 
   echo "$DASHES deploy contracts output $DASHES"
   echo ""
   echo "$deploy_contracts_output"
@@ -338,32 +420,46 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
   PARENT_REGISTRY_ADDRESS=$(echo "$deploy_contracts_output" | grep '"SubnetRegistry"' | awk -F'"' '{print $4}')
 
   if [ $local_deploy == true ]; then
-
-    # TODO: This just assumes the use has already cloned `contracts`, does that work?
     cd "${IPC_FOLDER}/hoku-contracts"
-    # need to run clean or we hit upgradeable saftey validation errors resulting from contracts with the same name
+    # need to run clean or we hit upgradeable saftey validation errors resulting
+    # from contracts with the same name 
     forge clean
 
     if [[ -z ${SKIP_BUILD+x} || "$SKIP_BUILD" == "" || "$SKIP_BUILD" == "false" ]]; then
       forge install
     fi
 
+    # use the same account validator 0th account to deploy contracts
     # TODO: should we dockerize this command?
-    # privkey is anvil #4
-    deploy_supply_source_token_out="$(PRIVATE_KEY=0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a forge script script/Hoku.s.sol --tc DeployScript 0 --sig 'run(uint8)' --rpc-url "http://localhost:${ANVIL_HOST_PORT}" --broadcast -vv)"
+    deploy_supply_source_token_out="$(PRIVATE_KEY="0x${pk}" forge script script/Hoku.s.sol --tc DeployScript 0 --sig 'run(uint8)' --rpc-url "http://localhost:${ANVIL_HOST_PORT}" --broadcast -vv)"
 
     echo "$DASHES deploy suppply source token output $DASHES"
     echo ""
     echo "$deploy_supply_source_token_out"
     echo ""
-    # note: this is consistently going to be 0x2910E325cf29dd912E3476B61ef12F49cb931096 for local net
+    # note: this is consistently going to be
+    # 0xE6E340D132b5f46d1e472DebcD681B2aBc16e57E for localnet 
     SUPPLY_SOURCE_ADDRESS=$(echo "$deploy_supply_source_token_out" | sed -n 's/.*contract Hoku *\([^ ]*\).*/\1/p')
+
+    # fund the all anvil accounts with 10100 HOKU (note the extra 100 HOKU)
+    # TODO: the `ipc-cli` appears to require a 10**18 HOKU to map to 1 sHOKU. this isn't ideal because
+    # that means we need to mint 10**18 more HOKU than we want. the `hoku` CLI does something a 
+    # bit similarly—but it converts the amount internally. for example, these are the same:
+    # `hoku account deposit 10000` vs `ipc-cli cross-msg ... 10000000000000000000000`
+    # but in reality, we shouldn't assume 10**18 (explicitly or implicity) for erc20 supply source
+    token_amount="10100000000000000000000"
+    for i in {0..9}
+    do
+      addr=$(jq .["$i"].address < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
+      cast send "$SUPPLY_SOURCE_ADDRESS" "mint(address,uint256)" "$addr" "$token_amount" --rpc-url "http://localhost:${ANVIL_HOST_PORT}" --private-key "$pk"
+    done
+    echo "Funded accounts with HOKU on anvil rootnet"
   fi
   cd "$IPC_FOLDER"
 fi
-echo "Gateway address: $PARENT_GATEWAY_ADDRESS"
-echo "Registry address: $PARENT_REGISTRY_ADDRESS"
-echo "Supply source address: $SUPPLY_SOURCE_ADDRESS"
+echo "Parent gateway address: $PARENT_GATEWAY_ADDRESS"
+echo "Parent registry address: $PARENT_REGISTRY_ADDRESS"
+echo "Parent supply source address: $SUPPLY_SOURCE_ADDRESS"
 
 # Use the parent gateway and registry address to update IPC config file
 toml set "${IPC_CONFIG_FOLDER}"/config.toml 'subnets[0].config.gateway_addr' "$PARENT_GATEWAY_ADDRESS" > /tmp/config.toml.1
@@ -374,15 +470,18 @@ cp /tmp/config.toml.2 "${IPC_CONFIG_FOLDER}"/config.toml
 echo "$DASHES Creating a child subnet..."
 root_id=$(toml get "${IPC_CONFIG_FOLDER}"/config.toml 'subnets[0].id' | tr -d '"')
 echo "Using root: $root_id"
-create_subnet_output=$(ipc-cli subnet create --from $default_wallet_address --parent $root_id --min-validators 2 --min-validator-stake 1 --bottomup-check-period 600 --active-validators-limit 3 --permission-mode federated --supply-source-kind erc20 --supply-source-address $SUPPLY_SOURCE_ADDRESS 2>&1)
+bottomup_check_period=600
+if [[ $local_deploy = true ]]; then
+  bottomup_check_period=10 # ~15 seconds on localnet
+fi
+create_subnet_output=$(ipc-cli subnet create --from "$default_wallet_address" --parent "$root_id" --min-validators 2 --min-validator-stake 1 --bottomup-check-period "${bottomup_check_period}" --active-validators-limit 3 --permission-mode federated --supply-source-kind erc20 --supply-source-address "$SUPPLY_SOURCE_ADDRESS" 2>&1)
 
 echo "$DASHES create subnet output $DASHES"
-echo ""
+echo
 echo "$create_subnet_output"
-echo ""
+echo
 
-# shellcheck disable=SC2086
-subnet_id=$(echo $create_subnet_output | sed 's/.*with id: \([^ ]*\).*/\1/')
+subnet_id=$(echo "$create_subnet_output" | sed -n 's/.*with id: *\([^ ]*\).*/\1/p')
 echo "Created new subnet id: $subnet_id"
 
 # Use the new subnet ID to update IPC config file
@@ -401,8 +500,8 @@ fi
 
 # Start the bootstrap validator node
 echo "$DASHES Start the first validator node as bootstrap"
-echo "First we need to force a wait to make sure the subnet is confirmed as created in the parent contracts"
-echo "Wait for 30 seconds"
+# Force a wait to make sure the subnet is confirmed as created in the parent contracts
+echo "Wait for deployment..."
 sleep 30
 echo "Finished waiting"
 cd "${IPC_FOLDER}"
@@ -513,6 +612,7 @@ do
 done
 
 # Test Object API endpoint
+echo
 echo "$DASHES Test Object API endpoints of validator nodes"
 for i in {0..2}
 do
@@ -520,7 +620,9 @@ do
 done
 
 # Test Prometheus endpoints
-printf "\n%s Test Prometheus endpoints of validator nodes\n" $DASHES
+echo
+echo "$DASHES Test Prometheus endpoints of validator nodes"
+echo
 curl --location http://localhost:"${PROMETHEUS_HOST_PORT}"/graph
 for i in {0..2}
 do
@@ -528,18 +630,59 @@ do
 done
 
 # Kill existing relayer if there's one
-pkill -fe "relayer" || true
+pkill -fe "relayer" 2>/dev/null || pgrep -f "relayer" | xargs kill 2>/dev/null || true
 # Start relayer
+# note: this command mutates the order of keys in the evm_keystore.json file. to
+# keep the accounts consistent for localnet usage (e.g., logging accounts, using
+# validator keys, etc.), we temporarily copy the file and then restore it.
 echo "$DASHES Start relayer process (in the background)"
-nohup ipc-cli checkpoint relayer --subnet "$subnet_id" --submitter "$default_wallet_address" > relayer.log &
+if [[ $local_deploy = true ]]; then
+  temp_evm_keystore=$(jq . "${IPC_CONFIG_FOLDER}"/evm_keystore.json)
+  nohup ipc-cli checkpoint relayer --subnet "$subnet_id" --submitter "$default_wallet_address" > relayer.log &
+  sleep 3 # briefly wait for the relayer to start
+  echo "$temp_evm_keystore" > "${IPC_CONFIG_FOLDER}"/evm_keystore.json
+else
+  nohup ipc-cli checkpoint relayer --subnet "$subnet_id" --submitter "$default_wallet_address" > relayer.log &
+fi
+
+# move localnet funds to subnet
+if [[ $local_deploy = true ]]; then
+  echo "$DASHES Move account funds into subnet"
+  # move 10000 HOKU to subnet (i.e., leave 100 HOKU on rootnet for
+  # testing purposes)
+  # TODO: see comment above about why we're using 10**18 due 
+  # to `ipc-cli` & `hoku` CLI's atto assumption
+  token_amount="10000000000000000000000"
+  for i in {0..9}
+  do
+    addr=$(jq .["$i"].address < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
+    ipc-cli cross-msg fund-with-token --subnet "${subnet_id}" --from "${addr}" --approve "${token_amount}"
+  done
+  echo "Waiting for deposits to process..."
+  # TODO: this takes ~2 minutes for the topdown messages to propagate. need to reduce this for 
+  # localnet (i.e., ideally is seconds, not minutes)
+  while true; do
+    # validate accounts have subnet balance (the last account will be final deposit tx)
+    addr=$(jq .[9].address < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
+    balance=$(cast balance --rpc-url http://localhost:8645 --ether "${addr}" | awk '{printf "%.0f", $1}')
+    if [[ $balance != 0 ]]; then
+      break
+    fi
+    sleep 5
+  done
+  echo "Deposited HOKU for test accounts"
+  echo
+  echo "${DASHES} Subnet setup complete ${DASHES}"
+  echo
+fi
 
 # Print a summary of the deployment
 cat << EOF
-############################
-#                          #
-# IPC deployment ready! 🚀 #
-#                          #
-############################
+#############################
+#                           #
+# Hoku deployment ready! 🚀 #
+#                           #
+#############################
 Subnet ID:
 $subnet_id
 
@@ -576,17 +719,43 @@ Grafana API:
 http://localhost:${GRAFANA_HOST_PORT}
 
 Contracts:
-Gateway address: ${PARENT_GATEWAY_ADDRESS}
-Registry address: ${PARENT_REGISTRY_ADDRESS}
-Supply source address: ${SUPPLY_SOURCE_ADDRESS}
+Parent gateway:       ${PARENT_GATEWAY_ADDRESS}
+Parent registry:      ${PARENT_REGISTRY_ADDRESS}
+Parent supply source: ${SUPPLY_SOURCE_ADDRESS}
+Subnet gateway:       0x77aa40b105843728088c0132e43fc44348881da8
+Subnet registry:      0x74539671a1d2f1c8f200826baba665179f53a1b7
 EOF
 
 if [[ $local_deploy = true ]]; then
-  echo $'\nPrivate keys (use with Hoku SDK & CLI):'
+  echo
+  echo "Account balances:"
+  addr=$(jq .[0].address < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
+  parent_native=$(cast balance --rpc-url http://localhost:"${ANVIL_HOST_PORT}" --ether "${addr}" | awk '{printf "%.2f", $1}')
+  parent_hoku=$(cast balance --rpc-url http://localhost:"${ANVIL_HOST_PORT}" --erc20 "${SUPPLY_SOURCE_ADDRESS}" "${addr}" | awk '{print $1}')
+  subnet_native=$(cast balance --rpc-url http://localhost:"${ETHAPI_HOST_PORTS[0]}" --ether "${addr}" | awk '{printf "%.2f", $1}')
+  echo "Parent native: ${parent_native%.*} ETH"
+  echo "Parent HOKU:   ${parent_hoku%.*} HOKU"
+  echo "Subnet native: ${subnet_native%.*} sHOKU"
+  echo
+  echo "Accounts:"
   for i in {0..9}
   do
-    jq --arg index "$i" '.[$index|tonumber].private_key' < "$IPC_CONFIG_FOLDER"/evm_keystore.json | tr -d '"'
+    addr=$(jq .["$i"].address < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
+    # validator accounts should *not* be used by devs to avoid nonce race conditions
+    type="available"
+    if [[ $i -eq 0 || $i -eq 1 || $i -eq 2 ]]; then
+      type="reserved"
+    fi
+    echo "($i) $addr ($type)"
   done
+  echo
+  echo "Private keys:"
+  for i in {0..9}
+  do
+    private_key=$(jq .["$i"].private_key < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
+    echo "($i) $private_key"
+  done
+  echo
 fi
 
 echo "Done"
