@@ -40,6 +40,8 @@
     "power_scale": 3,
     "timestamp": 1412713,
     "validators": [],
-    "credit_debit_interval": 10
+    "credit_debit_interval": 10,
+    "blob_storage_capacity": 4294967296,
+    "blob_debit_rate": 1
   }
 }

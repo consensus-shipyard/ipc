@@ -9,7 +9,8 @@ use std::str::FromStr;
 use anyhow::anyhow;
 pub use fil_actor_adm::Kind;
 use fil_actors_runtime::{
-    actor_error, runtime::Runtime, ActorError, FIRST_EXPORTED_METHOD_NUMBER, INIT_ACTOR_ADDR,
+    actor_error, runtime::Runtime, ActorError, ADM_ACTOR_ADDR, FIRST_EXPORTED_METHOD_NUMBER,
+    INIT_ACTOR_ADDR,
 };
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::ipld_block::IpldBlock;
@@ -68,7 +69,7 @@ impl Display for WriteAccess {
 }
 
 /// Machine initialization method number.
-pub const INIT_METHOD: MethodNum = frc42_dispatch::method_hash!("Init");
+pub const INIT_METHOD: MethodNum = 2;
 /// Get machine address method number.
 pub const GET_ADDRESS_METHOD: MethodNum = frc42_dispatch::method_hash!("GetAddress");
 /// Get machine metadata method number.
@@ -92,7 +93,7 @@ pub trait MachineActor {
 
     /// Initializes the machine with a robust address.
     fn init(rt: &impl Runtime, params: InitParams) -> Result<(), ActorError> {
-        rt.validate_immediate_caller_is(std::iter::once(&INIT_ACTOR_ADDR))?;
+        rt.validate_immediate_caller_is(std::iter::once(&ADM_ACTOR_ADDR))?;
         rt.transaction(|st: &mut Self::State, _| st.init(params.robust_address))
     }
 

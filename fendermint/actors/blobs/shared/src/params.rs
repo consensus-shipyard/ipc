@@ -4,7 +4,7 @@
 
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
-use fvm_shared::bigint::BigInt;
+use fvm_shared::bigint::{BigInt, BigUint};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use serde::{Deserialize, Serialize};
@@ -22,14 +22,14 @@ pub struct ApproveCreditParams {
     /// Account address that is receiving the approval.
     pub receiver: Address,
     /// Optional restriction on caller address, e.g., an object store.
-    /// This allows the origin of a transaction to use an approval limited to the caller.
+    /// The receiver will only be able to use the approval via a caller contract.
     pub required_caller: Option<Address>,
     /// Optional credit approval limit.
-    /// If specified, the approval will be invalid after being used to commit credits
-    /// up to this limit.
-    pub limit: Option<BigInt>,
+    /// If specified, the approval becomes invalid once the committed credits reach the
+    /// specified limit.
+    pub limit: Option<BigUint>,
     /// Optional credit approval time-to-live epochs.
-    /// If specified, the approval will be invalid after this duration.
+    /// If specified, the approval becomes invalid after this duration.
     pub ttl: Option<ChainEpoch>,
 }
 

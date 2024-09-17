@@ -6,7 +6,7 @@ use fil_actors_runtime::runtime::Runtime;
 use fil_actors_runtime::{deserialize_block, extract_send_result, ActorError};
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::address::Address;
-use fvm_shared::bigint::BigInt;
+use fvm_shared::bigint::BigUint;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::sys::SendFlags;
 use fvm_shared::{ActorID, MethodNum, METHOD_CONSTRUCTOR};
@@ -50,7 +50,7 @@ pub fn approve_credit(
     rt: &impl Runtime,
     receiver: Address,
     required_caller: Option<Address>,
-    limit: Option<BigInt>,
+    limit: Option<BigUint>,
     ttl: Option<ChainEpoch>,
 ) -> Result<(), ActorError> {
     extract_send_result(rt.send_simple(

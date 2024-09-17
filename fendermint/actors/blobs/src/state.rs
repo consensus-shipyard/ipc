@@ -12,7 +12,7 @@ use fendermint_actor_blobs_shared::state::{
 use fil_actors_runtime::ActorError;
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
-use fvm_shared::bigint::BigInt;
+use fvm_shared::bigint::{BigInt, BigUint};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use log::{debug, warn};
@@ -100,7 +100,7 @@ impl State {
         recipient: Address,
         amount: TokenAmount,
         current_epoch: ChainEpoch,
-    ) -> anyhow::Result<(), ActorError> {
+    ) -> anyhow::Result<Account, ActorError> {
         let credits = self.credit_debit_rate * amount.atto();
         // Don't sell credits if we're at storage capacity
         if self.capacity_used == self.capacity_free {
@@ -109,11 +109,12 @@ impl State {
             ));
         }
         self.credit_sold += &credits;
-        self.accounts
+        let account = self
+            .accounts
             .entry(recipient)
             .and_modify(|a| a.credit_free += &credits)
             .or_insert(Account::new(credits.clone(), current_epoch));
-        Ok(())
+        Ok(account.clone())
     }
 
     pub fn approve_credit(
@@ -122,9 +123,10 @@ impl State {
         to: Address,
         require_caller: Option<Address>,
         current_epoch: ChainEpoch,
-        limit: Option<BigInt>,
+        limit: Option<BigUint>,
         ttl: Option<ChainEpoch>,
-    ) -> anyhow::Result<(), ActorError> {
+    ) -> anyhow::Result<CreditApproval, ActorError> {
+        let limit = limit.map(|l| BigInt::from(l));
         if let Some(ttl) = ttl {
             if ttl < MIN_TTL {
                 return Err(ActorError::illegal_argument(format!(
@@ -161,7 +163,7 @@ impl State {
         }
         approval.limit = limit;
         approval.expiry = expiry;
-        Ok(())
+        Ok(approval.clone())
     }
 
     pub fn revoke_credit(
@@ -259,7 +261,7 @@ impl State {
         size: u64,
         ttl: Option<ChainEpoch>,
         source: PublicKey,
-    ) -> anyhow::Result<(), ActorError> {
+    ) -> anyhow::Result<Subscription, ActorError> {
         let (ttl, auto_renew) = if let Some(ttl) = ttl {
             (ttl, false)
         } else {
@@ -303,8 +305,8 @@ impl State {
         let mut new_capacity = BigInt::zero();
         let mut new_account_capacity = BigInt::zero();
         let credit_required: BigInt;
-        if let Some(blob) = self.blobs.get_mut(&hash) {
-            if let Some(sub) = blob.subs.get_mut(&subscriber) {
+        let sub = if let Some(blob) = self.blobs.get_mut(&hash) {
+            let sub = if let Some(sub) = blob.subs.get_mut(&subscriber) {
                 // Required credit can be negative if subscriber is reducing expiry
                 credit_required = (expiry - sub.expiry) as u64 * &size;
                 ensure_credit(
@@ -330,6 +332,7 @@ impl State {
                 sub.source = source;
                 sub.delegate = delegate.addresses();
                 debug!("updated subscription to {} for {}", hash, subscriber);
+                sub.clone()
             } else {
                 new_account_capacity = size.clone();
                 // One or more accounts have already committed credit.
@@ -345,16 +348,14 @@ impl State {
                     &delegate,
                 )?;
                 // Add new subscription
-                blob.subs.insert(
-                    subscriber,
-                    Subscription {
-                        added: current_epoch,
-                        expiry,
-                        auto_renew,
-                        source,
-                        delegate: delegate.addresses(),
-                    },
-                );
+                let sub = Subscription {
+                    added: current_epoch,
+                    expiry,
+                    auto_renew,
+                    source,
+                    delegate: delegate.addresses(),
+                };
+                blob.subs.insert(subscriber, sub.clone());
                 debug!("created new subscription to {} for {}", hash, subscriber);
                 // Update expiry index
                 update_expiry_index(
@@ -364,7 +365,8 @@ impl State {
                     Some((expiry, auto_renew)),
                     None,
                 );
-            }
+                sub
+            };
             if !matches!(blob.status, BlobStatus::Failed) {
                 // It's pending or failed, reset to pending
                 blob.status = BlobStatus::Pending;
@@ -376,6 +378,7 @@ impl State {
                     })
                     .or_insert(HashSet::from([(subscriber, source)]));
             }
+            sub
         } else {
             new_account_capacity = size.clone();
             // New blob increases network capacity as well.
@@ -397,18 +400,16 @@ impl State {
                 &delegate,
             )?;
             // Create new blob
+            let sub = Subscription {
+                added: current_epoch,
+                expiry,
+                auto_renew,
+                source,
+                delegate: delegate.addresses(),
+            };
             let blob = Blob {
                 size: size.to_u64().unwrap(),
-                subs: HashMap::from([(
-                    subscriber,
-                    Subscription {
-                        added: current_epoch,
-                        expiry,
-                        auto_renew,
-                        source,
-                        delegate: delegate.addresses(),
-                    },
-                )]),
+                subs: HashMap::from([(subscriber, sub.clone())]),
                 status: BlobStatus::Pending,
             };
             self.blobs.insert(hash, blob);
@@ -425,6 +426,7 @@ impl State {
             // Add to pending
             self.pending
                 .insert(hash, HashSet::from([(subscriber, source)]));
+            sub
         };
         // Account capacity is changing, debit for existing usage
         let debit_blocks = current_epoch - account.last_debit_epoch;
@@ -455,7 +457,7 @@ impl State {
                 subscriber
             );
         }
-        Ok(())
+        Ok(sub)
     }
 
     fn renew_blob(

@@ -6,7 +6,9 @@ use fendermint_actor_blobs_shared::params::{
     AddBlobParams, ApproveCreditParams, BuyCreditParams, DeleteBlobParams, FinalizeBlobParams,
     GetAccountParams, GetBlobParams, GetBlobStatusParams, GetStatsReturn, RevokeCreditParams,
 };
-use fendermint_actor_blobs_shared::state::{Account, Blob, BlobStatus, Hash, PublicKey};
+use fendermint_actor_blobs_shared::state::{
+    Account, Blob, BlobStatus, CreditApproval, Hash, PublicKey, Subscription,
+};
 use fendermint_actor_blobs_shared::Method;
 use fil_actors_runtime::runtime::builtins::Type;
 use fil_actors_runtime::{
@@ -41,7 +43,7 @@ impl BlobsActor {
         Ok(stats)
     }
 
-    fn buy_credit(rt: &impl Runtime, params: BuyCreditParams) -> Result<(), ActorError> {
+    fn buy_credit(rt: &impl Runtime, params: BuyCreditParams) -> Result<Account, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let recipient = resolve_external(rt, params.0)?;
         rt.transaction(|st: &mut State, rt| {
@@ -49,7 +51,10 @@ impl BlobsActor {
         })
     }
 
-    fn approve_credit(rt: &impl Runtime, params: ApproveCreditParams) -> Result<(), ActorError> {
+    fn approve_credit(
+        rt: &impl Runtime,
+        params: ApproveCreditParams,
+    ) -> Result<CreditApproval, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let caller = resolve_external(rt, rt.message().caller())?;
         let receiver = resolve_external(rt, params.receiver)?;
@@ -100,7 +105,7 @@ impl BlobsActor {
         Ok(())
     }
 
-    fn add_blob(rt: &impl Runtime, params: AddBlobParams) -> Result<(), ActorError> {
+    fn add_blob(rt: &impl Runtime, params: AddBlobParams) -> Result<Subscription, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let origin = resolve_external(rt, rt.message().origin())?;
         let caller = resolve_external(rt, rt.message().caller())?;
@@ -277,7 +282,11 @@ fn resolve_external(rt: &impl Runtime, address: Address) -> Result<Address, Acto
                     actor_id
                 )))
         }
-        Some(_) => {
+        Some(t) => Err(ActorError::forbidden(format!(
+            "disallowed caller type {}",
+            t.name()
+        ))),
+        None => {
             // The caller might be a machine
             let result = rt
                 .send(
@@ -292,21 +301,14 @@ fn resolve_external(rt: &impl Runtime, address: Address) -> Result<Address, Acto
                     ExitCode::USR_ASSERTION_FAILED,
                     "machine failed to return its key address",
                 )?;
-
             if !result.exit_code.is_success() {
-                return Err(ActorError::checked(
-                    result.exit_code,
-                    "failed to retrieve machine robust address".to_string(),
-                    None,
-                ));
+                return Err(ActorError::forbidden(format!(
+                    "disallowed caller code {code_cid}"
+                )));
             }
             let robust_addr: Address = deserialize_block(result.return_data)?;
-
             Ok(robust_addr)
         }
-        None => Err(ActorError::forbidden(format!(
-            "disallowed caller code {code_cid}"
-        ))),
     }
 }
 
@@ -475,25 +477,19 @@ mod tests {
         // Try with sufficient balance
         rt.set_epoch(ChainEpoch::from(5));
         rt.expect_validate_caller_any();
-        let account = rt
+        let subscription = rt
             .call::<BlobsActor>(
                 Method::AddBlob as u64,
                 IpldBlock::serialize_cbor(&add_params).unwrap(),
             )
             .unwrap()
             .unwrap()
-            .deserialize::<Account>()
+            .deserialize::<Subscription>()
             .unwrap();
-        assert_eq!(
-            account,
-            Account {
-                capacity_used: BigInt::from(1024),
-                credit_free: BigInt::from(999999999996313600u64),
-                credit_committed: BigInt::from(3686400),
-                last_debit_epoch: 5,
-                approvals: Default::default(),
-            }
-        );
+        assert_eq!(subscription.added, 5);
+        assert_eq!(subscription.expiry, 3605);
+        assert_eq!(subscription.auto_renew, false);
+        assert_eq!(subscription.delegate, None);
         rt.verify();
     }
 }

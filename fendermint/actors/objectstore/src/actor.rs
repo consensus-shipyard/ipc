@@ -195,6 +195,7 @@ mod tests {
     use fvm_shared::clock::ChainEpoch;
     use fvm_shared::econ::TokenAmount;
     use fvm_shared::error::ExitCode;
+    use fvm_shared::sys::SendFlags;
     use fvm_shared::MethodNum;
     use rand::RngCore;
 
@@ -269,7 +270,7 @@ mod tests {
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
             IpldBlock::serialize_cbor(&AddBlobParams {
-                sponsor: None,
+                sponsor: Some(f4_eth_addr),
                 source: add_params.source,
                 hash: add_params.hash,
                 size: add_params.size,
@@ -322,7 +323,7 @@ mod tests {
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
             IpldBlock::serialize_cbor(&AddBlobParams {
-                sponsor: None,
+                sponsor: Some(f4_eth_addr),
                 source: add_params.source,
                 hash: add_params.hash,
                 size: add_params.size,
@@ -361,7 +362,7 @@ mod tests {
             BLOBS_ACTOR_ADDR,
             BlobMethod::DeleteBlob as MethodNum,
             IpldBlock::serialize_cbor(&DeleteBlobParams {
-                sponsor: None,
+                sponsor: Some(f4_eth_addr),
                 hash: add_params.hash,
             })
             .unwrap(),
@@ -373,7 +374,7 @@ mod tests {
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
             IpldBlock::serialize_cbor(&AddBlobParams {
-                sponsor: None,
+                sponsor: Some(f4_eth_addr),
                 source: add_params2.source,
                 hash: add_params2.hash,
                 size: add_params2.size,
@@ -426,7 +427,7 @@ mod tests {
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
             IpldBlock::serialize_cbor(&AddBlobParams {
-                sponsor: None,
+                sponsor: Some(f4_eth_addr),
                 source: add_params.source,
                 hash: add_params.hash,
                 size: add_params.size,
@@ -502,7 +503,7 @@ mod tests {
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
             IpldBlock::serialize_cbor(&AddBlobParams {
-                sponsor: None,
+                sponsor: Some(f4_eth_addr),
                 source: add_params.source,
                 hash: add_params.hash,
                 size: add_params.size,
@@ -533,7 +534,7 @@ mod tests {
             BLOBS_ACTOR_ADDR,
             BlobMethod::DeleteBlob as MethodNum,
             IpldBlock::serialize_cbor(&DeleteBlobParams {
-                sponsor: None,
+                sponsor: Some(f4_eth_addr),
                 hash: add_params.hash,
             })
             .unwrap(),
@@ -590,7 +591,6 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
 
-        let sponsor = Address::new_id(111);
         let key = vec![0, 1, 2];
         let hash = new_hash(256);
         let ttl = ChainEpoch::from(3600);
@@ -610,7 +610,7 @@ mod tests {
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
             IpldBlock::serialize_cbor(&AddBlobParams {
-                sponsor: Some(sponsor),
+                sponsor: Some(f4_eth_addr),
                 source: add_params.source,
                 hash: add_params.hash,
                 size: add_params.size,
@@ -634,7 +634,7 @@ mod tests {
         let blob = Blob {
             size: add_params.size,
             subs: HashMap::from([(
-                sponsor,
+                f4_eth_addr,
                 Subscription {
                     added: 0,
                     expiry: ttl,
@@ -646,13 +646,16 @@ mod tests {
             status: BlobStatus::Resolved,
         };
         rt.expect_validate_caller_any();
-        rt.expect_send_simple(
+        rt.expect_send(
             BLOBS_ACTOR_ADDR,
             BlobMethod::GetBlob as MethodNum,
             IpldBlock::serialize_cbor(&GetBlobParams(add_params.hash)).unwrap(),
             TokenAmount::from_whole(0),
+            None,
+            SendFlags::READ_ONLY,
             IpldBlock::serialize_cbor(&Some(&blob)).unwrap(),
             ExitCode::OK,
+            None,
         );
         let get_params = GetParams(key);
         let result = rt
