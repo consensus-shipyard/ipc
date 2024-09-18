@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [axon-r04] - 2024-09-18
+
+_Full changelog below._
+
+### ⭐ HIGHLIGHT | Validator Gating 🌁🌉
+
+The Validator Gater feature allows the interception of validator-related actions, such as staking, unstaking, and explicit validator membership adjustments (federated membership), based on user-defined policies. By implementing a custom smart contract that adheres to the `IValidatorGater` interface, developers can enforce custom logic to either permit or deny these actions.
+
+This feature is designed to support both federated and collateral-based networks, providing flexibility to manage validator permissions and validator power assignments through an external gating contract.
+
+### 🚀 Features
+
+- _(contracts)_ Validator gating (#1127)
+
+### 📚 Documentation
+
+- _(docs)_ Validator gating docs (#1127)
+
+### ⚙️ Miscellaneous Tasks
+
+- Fixed typos (#1137)
+- Fixed clippy (#1133)
+
 ## [axon-r03] - 2024-09-06
 
 _Full changelog below._
