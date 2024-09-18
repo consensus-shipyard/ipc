@@ -12,6 +12,8 @@ use fvm_shared::sys::SendFlags;
 use fvm_shared::{ActorID, MethodNum, METHOD_CONSTRUCTOR};
 use num_derive::FromPrimitive;
 
+use crate::state::{Account, CreditApproval, Subscription};
+
 pub mod params;
 pub mod state;
 
@@ -36,14 +38,13 @@ pub enum Method {
     DeleteBlob = frc42_dispatch::method_hash!("DeleteBlob"),
 }
 
-pub fn buy_credit(rt: &impl Runtime, recipient: Address) -> Result<(), ActorError> {
-    extract_send_result(rt.send_simple(
+pub fn buy_credit(rt: &impl Runtime, recipient: Address) -> Result<Account, ActorError> {
+    deserialize_block(extract_send_result(rt.send_simple(
         &BLOBS_ACTOR_ADDR,
         Method::BuyCredit as MethodNum,
         IpldBlock::serialize_cbor(&params::BuyCreditParams(recipient))?,
         rt.message().value_received(),
-    ))?;
-    Ok(())
+    ))?)
 }
 
 pub fn approve_credit(
@@ -52,8 +53,8 @@ pub fn approve_credit(
     required_caller: Option<Address>,
     limit: Option<BigUint>,
     ttl: Option<ChainEpoch>,
-) -> Result<(), ActorError> {
-    extract_send_result(rt.send_simple(
+) -> Result<CreditApproval, ActorError> {
+    deserialize_block(extract_send_result(rt.send_simple(
         &BLOBS_ACTOR_ADDR,
         Method::ApproveCredit as MethodNum,
         IpldBlock::serialize_cbor(&params::ApproveCreditParams {
@@ -63,8 +64,7 @@ pub fn approve_credit(
             ttl,
         })?,
         rt.message().value_received(),
-    ))?;
-    Ok(())
+    ))?)
 }
 
 pub fn revoke_credit(
@@ -91,7 +91,7 @@ pub fn add_blob(
     hash: state::Hash,
     size: u64,
     ttl: Option<ChainEpoch>,
-) -> Result<(), ActorError> {
+) -> Result<Subscription, ActorError> {
     let params = IpldBlock::serialize_cbor(&params::AddBlobParams {
         sponsor,
         source,
@@ -99,13 +99,12 @@ pub fn add_blob(
         size,
         ttl,
     })?;
-    extract_send_result(rt.send_simple(
+    deserialize_block(extract_send_result(rt.send_simple(
         &BLOBS_ACTOR_ADDR,
         Method::AddBlob as MethodNum,
         params,
         rt.message().value_received(),
-    ))?;
-    Ok(())
+    ))?)
 }
 
 pub fn get_blob(rt: &impl Runtime, hash: state::Hash) -> Result<Option<state::Blob>, ActorError> {
