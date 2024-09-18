@@ -2,6 +2,8 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::collections::{BTreeMap, HashSet};
+
 use fendermint_actor_blobs_shared::params::{
     AddBlobParams, ApproveCreditParams, BuyCreditParams, DeleteBlobParams, FinalizeBlobParams,
     GetAccountParams, GetBlobParams, GetBlobStatusParams, GetStatsReturn, RevokeCreditParams,
@@ -21,7 +23,6 @@ use fvm_shared::address::Address;
 use fvm_shared::sys::SendFlags;
 use fvm_shared::{error::ExitCode, MethodNum};
 use num_traits::Zero;
-use std::collections::{BTreeMap, HashSet};
 
 use crate::{ext, ConstructorParams, State, BLOBS_ACTOR_NAME};
 
@@ -45,7 +46,14 @@ impl BlobsActor {
 
     fn buy_credit(rt: &impl Runtime, params: BuyCreditParams) -> Result<Account, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let recipient = resolve_external(rt, params.0)?;
+        let (recipient, actor_type) = resolve_external(rt, params.0)?;
+        // Recipient cannot be a machine
+        if matches!(actor_type, ActorType::Machine) {
+            return Err(ActorError::illegal_argument(format!(
+                "recipient {} cannot be a machine",
+                recipient
+            )));
+        }
         rt.transaction(|st: &mut State, rt| {
             st.buy_credit(recipient, rt.message().value_received(), rt.curr_epoch())
         })
@@ -56,10 +64,25 @@ impl BlobsActor {
         params: ApproveCreditParams,
     ) -> Result<CreditApproval, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let caller = resolve_external(rt, rt.message().caller())?;
-        let receiver = resolve_external(rt, params.receiver)?;
+        let (caller, actor_type) = resolve_external(rt, rt.message().caller())?;
+        // Caller cannot be a machine
+        if matches!(actor_type, ActorType::Machine) {
+            return Err(ActorError::illegal_argument(format!(
+                "caller {} cannot be a machine",
+                caller
+            )));
+        }
+        let (receiver, actor_type) = resolve_external(rt, params.receiver)?;
+        // Receiver cannot be a machine
+        if matches!(actor_type, ActorType::Machine) {
+            return Err(ActorError::illegal_argument(format!(
+                "receiver {} cannot be a machine",
+                receiver
+            )));
+        }
         let required_caller = if let Some(required_caller) = params.required_caller {
-            Some(resolve_external(rt, required_caller)?)
+            let (required_caller, _) = resolve_external(rt, required_caller)?;
+            Some(required_caller)
         } else {
             None
         };
@@ -77,10 +100,25 @@ impl BlobsActor {
 
     fn revoke_credit(rt: &impl Runtime, params: RevokeCreditParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let caller = resolve_external(rt, rt.message().caller())?;
-        let receiver = resolve_external(rt, params.receiver)?;
+        let (caller, actor_type) = resolve_external(rt, rt.message().caller())?;
+        // Caller cannot be a machine
+        if matches!(actor_type, ActorType::Machine) {
+            return Err(ActorError::illegal_argument(format!(
+                "caller {} cannot be a machine",
+                caller
+            )));
+        }
+        let (receiver, actor_type) = resolve_external(rt, params.receiver)?;
+        // Receiver cannot be a machine
+        if matches!(actor_type, ActorType::Machine) {
+            return Err(ActorError::illegal_argument(format!(
+                "receiver {} cannot be a machine",
+                receiver
+            )));
+        }
         let required_caller = if let Some(required_caller) = params.required_caller {
-            Some(resolve_external(rt, required_caller)?)
+            let (required_caller, _) = resolve_external(rt, required_caller)?;
+            Some(required_caller)
         } else {
             None
         };
@@ -107,11 +145,19 @@ impl BlobsActor {
 
     fn add_blob(rt: &impl Runtime, params: AddBlobParams) -> Result<Subscription, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let origin = resolve_external(rt, rt.message().origin())?;
-        let caller = resolve_external(rt, rt.message().caller())?;
+        let (origin, _) = resolve_external(rt, rt.message().origin())?;
+        let (caller, _) = resolve_external(rt, rt.message().caller())?;
         // The blob subscriber will be the sponsor if specified and approved
         let subscriber = if let Some(sponsor) = params.sponsor {
-            resolve_external(rt, sponsor)?
+            let (sponsor, actor_type) = resolve_external(rt, sponsor)?;
+            // Sponsor cannot be a machine
+            if matches!(actor_type, ActorType::Machine) {
+                return Err(ActorError::illegal_argument(format!(
+                    "sponsor {} cannot be a machine",
+                    sponsor
+                )));
+            }
+            sponsor
         } else {
             origin
         };
@@ -157,19 +203,33 @@ impl BlobsActor {
 
     fn finalize_blob(rt: &impl Runtime, params: FinalizeBlobParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        let subscriber = resolve_external(rt, params.subscriber)?;
+        // We control this method call and can guarantee subscriber is an external address,
+        // i.e., no need to resolve its external address.
         rt.transaction(|st: &mut State, _| {
-            st.finalize_blob(subscriber, rt.curr_epoch(), params.hash, params.status)
+            st.finalize_blob(
+                params.subscriber,
+                rt.curr_epoch(),
+                params.hash,
+                params.status,
+            )
         })
     }
 
     fn delete_blob(rt: &impl Runtime, params: DeleteBlobParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let origin = resolve_external(rt, rt.message().origin())?;
-        let caller = resolve_external(rt, rt.message().caller())?;
+        let (origin, _) = resolve_external(rt, rt.message().origin())?;
+        let (caller, _) = resolve_external(rt, rt.message().caller())?;
         // The blob subscriber will be the sponsor if specified and approved
         let subscriber = if let Some(sponsor) = params.sponsor {
-            resolve_external(rt, sponsor)?
+            let (sponsor, actor_type) = resolve_external(rt, sponsor)?;
+            // Sponsor cannot be a machine
+            if matches!(actor_type, ActorType::Machine) {
+                return Err(ActorError::illegal_argument(format!(
+                    "sponsor {} cannot be a machine",
+                    sponsor
+                )));
+            }
+            sponsor
         } else {
             origin
         };
@@ -238,13 +298,24 @@ impl ActorCode for BlobsActor {
     }
 }
 
+enum ActorType {
+    Account,
+    EthAccount,
+    Evm,
+    Machine,
+}
+
 // Resolves robust address of an actor.
-fn resolve_external(rt: &impl Runtime, address: Address) -> Result<Address, ActorError> {
-    let actor_id = if let Ok(id) = address.id() {
-        id
-    } else {
-        return Ok(address);
-    };
+fn resolve_external(
+    rt: &impl Runtime,
+    address: Address,
+) -> Result<(Address, ActorType), ActorError> {
+    let actor_id = rt
+        .resolve_address(&address)
+        .ok_or(ActorError::not_found(format!(
+            "actor {} not found",
+            address
+        )))?;
     let code_cid = rt
         .get_actor_code_cid(&actor_id)
         .expect("failed to lookup caller code");
@@ -263,7 +334,6 @@ fn resolve_external(rt: &impl Runtime, address: Address) -> Result<Address, Acto
                     ExitCode::USR_ASSERTION_FAILED,
                     "account failed to return its key address",
                 )?;
-
             if !result.exit_code.is_success() {
                 return Err(ActorError::checked(
                     result.exit_code,
@@ -272,15 +342,25 @@ fn resolve_external(rt: &impl Runtime, address: Address) -> Result<Address, Acto
                 ));
             }
             let robust_addr: Address = deserialize_block(result.return_data)?;
-
-            Ok(robust_addr)
+            Ok((robust_addr, ActorType::Account))
         }
-        Some(Type::EthAccount) | Some(Type::EVM) => {
-            rt.lookup_delegated_address(actor_id)
-                .ok_or(ActorError::forbidden(format!(
-                    "actor {} does not have delegated address",
-                    actor_id
-                )))
+        Some(Type::EthAccount) => {
+            let delegated_addr =
+                rt.lookup_delegated_address(actor_id)
+                    .ok_or(ActorError::forbidden(format!(
+                        "actor {} does not have delegated address",
+                        actor_id
+                    )))?;
+            Ok((delegated_addr, ActorType::EthAccount))
+        }
+        Some(Type::EVM) => {
+            let delegated_addr =
+                rt.lookup_delegated_address(actor_id)
+                    .ok_or(ActorError::forbidden(format!(
+                        "actor {} does not have delegated address",
+                        actor_id
+                    )))?;
+            Ok((delegated_addr, ActorType::Evm))
         }
         Some(t) => Err(ActorError::forbidden(format!(
             "disallowed caller type {}",
@@ -307,7 +387,7 @@ fn resolve_external(rt: &impl Runtime, address: Address) -> Result<Address, Acto
                 )));
             }
             let robust_addr: Address = deserialize_block(result.return_data)?;
-            Ok(robust_addr)
+            Ok((robust_addr, ActorType::Machine))
         }
     }
 }
@@ -488,7 +568,7 @@ mod tests {
             .unwrap();
         assert_eq!(subscription.added, 5);
         assert_eq!(subscription.expiry, 3605);
-        assert_eq!(subscription.auto_renew, false);
+        assert!(!subscription.auto_renew);
         assert_eq!(subscription.delegate, None);
         rt.verify();
     }

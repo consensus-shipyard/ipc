@@ -126,7 +126,7 @@ impl State {
         limit: Option<BigUint>,
         ttl: Option<ChainEpoch>,
     ) -> anyhow::Result<CreditApproval, ActorError> {
-        let limit = limit.map(|l| BigInt::from(l));
+        let limit = limit.map(BigInt::from);
         if let Some(ttl) = ttl {
             if ttl < MIN_TTL {
                 return Err(ActorError::illegal_argument(format!(
