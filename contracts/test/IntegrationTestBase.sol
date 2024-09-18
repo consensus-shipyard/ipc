@@ -190,7 +190,8 @@ contract TestSubnetActor is Test, TestParams {
             activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
             powerScale: DEFAULT_POWER_SCALE,
             permissionMode: PermissionMode.Collateral,
-            supplySource: source
+            supplySource: source,
+            validatorGater: address(0)
         });
         return params;
     }
@@ -222,7 +223,8 @@ contract TestSubnetActor is Test, TestParams {
             activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
             powerScale: DEFAULT_POWER_SCALE,
             permissionMode: PermissionMode.Collateral,
-            supplySource: SupplySource({kind: SupplyKind.ERC20, tokenAddress: tokenAddress})
+            supplySource: SupplySource({kind: SupplyKind.ERC20, tokenAddress: tokenAddress}),
+            validatorGater: address(0)
         });
         return params;
     }
@@ -563,7 +565,38 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             activeValidatorsLimit: _activeValidatorsLimit,
             powerScale: 12,
             permissionMode: _permissionMode,
-            supplySource: SupplySourceHelper.native()
+            supplySource: SupplySourceHelper.native(),
+            validatorGater: address(0)
+        });
+        saDiamond = createSubnetActor(params);
+    }
+
+    function createSubnetActor(
+        address _ipcGatewayAddr,
+        ConsensusType _consensus,
+        uint256 _minActivationCollateral,
+        uint64 _minValidators,
+        uint64 _checkPeriod,
+        uint8 _majorityPercentage,
+        PermissionMode _permissionMode,
+        uint16 _activeValidatorsLimit,
+        address _validatorGater
+    ) public {
+        SubnetID memory _parentId = SubnetID(ROOTNET_CHAINID, new address[](0));
+
+        SubnetActorDiamond.ConstructorParams memory params = SubnetActorDiamond.ConstructorParams({
+            parentId: _parentId,
+            ipcGatewayAddr: _ipcGatewayAddr,
+            consensus: _consensus,
+            minActivationCollateral: _minActivationCollateral,
+            minValidators: _minValidators,
+            bottomUpCheckPeriod: _checkPeriod,
+            majorityPercentage: _majorityPercentage,
+            activeValidatorsLimit: _activeValidatorsLimit,
+            powerScale: 12,
+            permissionMode: _permissionMode,
+            supplySource: SupplySourceHelper.native(),
+            validatorGater: _validatorGater
         });
         saDiamond = createSubnetActor(params);
     }

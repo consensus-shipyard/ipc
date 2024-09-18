@@ -77,6 +77,7 @@ pub struct ConstructParams {
     pub min_cross_msg_fee: TokenAmount,
     pub permission_mode: PermissionMode,
     pub supply_source: SupplySource,
+    pub validator_gater: Address,
 }
 
 /// Consensus types supported by hierarchical consensus

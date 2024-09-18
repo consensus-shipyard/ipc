@@ -61,6 +61,8 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
         mapping(address => uint256) genesisBalance;
         /// @notice genesis balance addresses
         address[] genesisBalanceKeys;
+        /// @notice The validator gater, if address(0), no validator gating is performed
+        address validatorGater;
     }
 
 library LibSubnetActorStorage {
