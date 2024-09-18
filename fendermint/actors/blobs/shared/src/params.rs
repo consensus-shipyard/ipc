@@ -53,6 +53,11 @@ pub struct GetBlobStatusParams {
     pub hash: Hash,
 }
 
+/// Params for getting pending blobs.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct GetPendingBlobsParams(pub u32);
+
 /// Params for finalizing a blob.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct FinalizeBlobParams {
