@@ -32,7 +32,7 @@ interface IValidatorGater {
 
 Any action that modifies validator power (whether through staking, unstaking, or explicit validator assignment) will trigger a call to this method, allowing the contract to validate or reject the action.
 
-See [the interface definition](../contracts/contracts/interfaces/IValidatorGater.sol) and an [example implementation](contracts/contracts/examples/SubnetValidatorGater.sol).
+See [the interface definition](../../contracts/contracts/interfaces/IValidatorGater.sol) and an [example implementation](../../contracts/contracts/examples/SubnetValidatorGater.sol).
 
 ---
 
