@@ -144,3 +144,18 @@ pub fn delete_blob(
     ))?;
     Ok(())
 }
+
+pub fn get_blob_bytes(
+    rt: &impl Runtime,
+    hash: state::Hash,
+    offset: u32,
+) -> Result<Vec<u8>, ActorError> {
+    let params = IpldBlock::serialize_cbor(&params::GetBlobBytesParams { hash, offset })?;
+    let result = extract_send_result(rt.send_simple(
+        &BLOBS_ACTOR_ADDR,
+        Method::GetBlobBytes as MethodNum,
+        params,
+        rt.message().value_received(),
+    ))?;
+    Ok(deserialize_block(result)?)
+}
