@@ -6,3 +6,4 @@ nohup*
 .DS_Store
 node_modules/
 .env
+relayer.log

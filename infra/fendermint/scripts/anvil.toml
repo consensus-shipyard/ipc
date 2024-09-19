@@ -1,0 +1,39 @@
+[tasks.anvil-pull]
+# Note: the foundry image doesn't have arm64 support, so we need to pull the
+# x86_64 image on arm64 explicitly; otherwise, the dockerpull will fail
+script = """
+arch=$(uname -m)
+if [ "$arch" = "arm64" ]; then
+  docker pull --platform linux/x86_64 ${FOUNDRY_DOCKER_IMAGE}
+else
+  docker pull ${FOUNDRY_DOCKER_IMAGE}
+fi
+"""
+
+[tasks.anvil-run]
+script = """
+docker run \
+  ${FLAGS} \
+  --name ${ANVIL_CONTAINER_NAME} \
+  --network ${NETWORK_NAME} \
+  --publish ${ANVIL_HOST_PORT}:8545 \
+  ${FOUNDRY_DOCKER_IMAGE} "anvil --host 0.0.0.0"
+"""
+dependencies = ["docker-network-create"]
+
+[tasks.anvil-start]
+extend = "anvil-run"
+env = { "FLAGS" = "-d" }
+
+[tasks.anvil-restart]
+extend = "anvil-run"
+env = { "FLAGS" = "-d" }
+dependencies = ["anvil-destroy"]
+
+[tasks.anvil-stop]
+env = { "CONTAINER_NAME" = "${ANVIL_CONTAINER_NAME}" }
+run_task = "docker-stop"
+
+[tasks.anvil-destroy]
+env = { "CONTAINER_NAME" = "${ANVIL_CONTAINER_NAME}" }
+run_task = "docker-destroy"
