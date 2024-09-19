@@ -193,9 +193,9 @@ impl KeyStore {
                             serde_json::from_reader(reader)
                                 .inspect_err(|_| {
                                     error!(
-                                "failed to deserialize keyfile, initializing new keystore at: {:?}",
-                                file_path
-                            );
+                                        "failed to deserialize keyfile, initializing new keystore at: {:?}",
+                                        file_path
+                                    );
                                 })
                                 .unwrap_or_default();
 
@@ -610,10 +610,7 @@ mod test {
     impl quickcheck::Arbitrary for KeyInfo {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
             let sigtype = g
-                .choose(&[
-                    fvm_shared::crypto::signature::SignatureType::BLS,
-                    fvm_shared::crypto::signature::SignatureType::Secp256k1,
-                ])
+                .choose(&[SignatureType::BLS, SignatureType::Secp256k1])
                 .unwrap();
             KeyInfo {
                 key_type: *sigtype,

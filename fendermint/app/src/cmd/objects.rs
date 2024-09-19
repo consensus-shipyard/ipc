@@ -7,14 +7,12 @@ use std::{convert::Infallible, net::ToSocketAddrs, num::ParseIntError};
 use anyhow::anyhow;
 use base64::{engine::general_purpose, Engine};
 use bytes::Buf;
-use ethers::core::types::{self as et};
 use fendermint_actor_objectstore::GetParams;
 use fendermint_actor_objectstore::Object;
 use fendermint_app_settings::objects::ObjectsSettings;
 use fendermint_rpc::client::FendermintClient;
 use fendermint_rpc::message::GasParams;
 use fendermint_rpc::QueryClient;
-use fendermint_vm_message::conv::from_fvm::to_eth_tokens;
 use fendermint_vm_message::query::FvmQueryHeight;
 use fendermint_vm_message::signed::SignedMessage;
 use futures_util::StreamExt;
@@ -241,25 +239,6 @@ impl ObjectParser {
     }
 }
 
-// TODO: we can remove this, payment is now in credits, which gets checked during txn processing
-async fn ensure_balance<F: QueryClient>(client: &F, from: Address) -> anyhow::Result<()> {
-    let actor_state = client.actor_state(&from, FvmQueryHeight::Committed).await?;
-    let balance = match actor_state.value {
-        Some((_, state)) => to_eth_tokens(&state.balance)?,
-        None => et::U256::zero(),
-    };
-
-    // TODO: make cost_per_byte a configurable constant
-    // TODO: uncomment it when we decide the pricing logic
-    // let cost_per_byte = et::U256::from(1_000_000_000u128);
-    // let required_balance = cost_per_byte * self.size;
-    if balance <= et::U256::zero() {
-        return Err(anyhow!("insufficient balance"));
-    }
-
-    Ok(())
-}
-
 async fn handle_health() -> Result<impl Reply, Rejection> {
     Ok(warp::reply::reply())
 }
@@ -301,11 +280,6 @@ async fn handle_object_upload<F: QueryClient>(
 
     // Ensure the sender has enough credits, and fetch the data through iroh
     let SignedMessage { message, .. } = signed_msg;
-    ensure_balance(&client, message.from).await.map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("failed to ensure balance: {}", e),
-        })
-    })?;
     ensure_objectstore_exists(client, message.to)
         .await
         .map_err(|e| {
@@ -341,18 +315,27 @@ async fn handle_object_upload<F: QueryClient>(
 
     let progress = iroh.blobs().download(hash, source).await.map_err(|e| {
         Rejection::from(BadRequest {
-            message: format!("failed to fetch file: {} {}", hash, e),
+            message: format!("failed to fetch blob {}: {}", hash, e),
         })
     })?;
     let outcome = progress.finish().await.map_err(|e| {
         Rejection::from(BadRequest {
-            message: format!("failed to fetch file: {} {}", hash, e),
+            message: format!("failed to fetch blob {}: {}", hash, e),
         })
     })?;
 
     let blob_size = outcome.downloaded_size + outcome.local_size;
     if size != blob_size {
-        // TODO: delete blob?
+        // Blob might be identical to an existing blob secured by the chain,
+        // but we can delete it if it's made of entirely new data.
+        // TODO: We need to use Iroh tags to differentiate between staged and secured data.
+        if blob_size == outcome.downloaded_size {
+            iroh.blobs().delete_blob(hash).await.map_err(|e| {
+                Rejection::from(BadRequest {
+                    message: format!("failed to delete invalid blob {}: {}", hash, e),
+                })
+            })?;
+        }
         return Err(Rejection::from(BadRequest {
             message: format!(
                 "provided size {} does not match blob {} size {}",
@@ -741,7 +724,7 @@ mod tests {
             key: key.to_vec(),
             hash: fendermint_actor_blobs_shared::state::Hash(*hash.as_bytes()),
             size,
-            ttl: 3600,
+            ttl: None,
             metadata: HashMap::new(),
             overwrite: true,
         };

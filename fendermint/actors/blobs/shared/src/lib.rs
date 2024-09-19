@@ -38,7 +38,7 @@ pub fn add_blob(
     source: state::PublicKey,
     hash: state::Hash,
     size: u64,
-    ttl: ChainEpoch,
+    ttl: Option<ChainEpoch>,
 ) -> Result<(), ActorError> {
     let add_params = IpldBlock::serialize_cbor(&params::AddBlobParams {
         from: Some(from),
