@@ -7,4 +7,8 @@ use fvm_sdk::sys::fvm_syscalls;
 fvm_syscalls! {
     module = "blobs";
     pub fn hash_rm(hash_ptr: *const u8) -> Result<()>;
+    pub fn hash_get(
+        hash_ptr: *const u8,
+        offset: u32,
+    ) -> Result<[u8; 65536]>;
 }

@@ -155,6 +155,15 @@ pub struct DeleteBlobParams {
     pub id: SubscriptionId,
 }
 
+/// Params for getting blob bytes.
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct GetBlobBytesParams {
+    /// Blob blake3 hash.
+    pub hash: Hash,
+    /// The offset to start reading from.
+    pub offset: u32,
+}
+
 /// The stats of the blob actor.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct GetStatsReturn {
