@@ -166,10 +166,10 @@ library LibSubnetActor {
 
         // this method is unnecessarily handling different cases because subnet actor needs
         // to "register" in gateway and different token types needs to be attached or approved.
-        // TODO: it's known that having gateway holding all subnets' funds is insecure, this 
+        // TODO: it's known that having gateway holding all subnets' funds is insecure, this
         // TODO: can be removed once contract redesign is in place.
         if (supplySourceNative && collateralSourceNative) {
-            IGateway(s.ipcGatewayAddr).register{value: g + collateral}(g, collateral);   
+            IGateway(s.ipcGatewayAddr).register{value: g + collateral}(g, collateral);
         } else if (!supplySourceNative && collateralSourceNative) {
             s.supplySource.increaseAllowance(s.ipcGatewayAddr, g);
             IGateway(s.ipcGatewayAddr).register{value: collateral}(g, collateral);

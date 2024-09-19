@@ -88,6 +88,7 @@ pub struct ConstructParams {
     pub supply_source: GenericToken,
     pub collateral_source: GenericToken,
     pub validator_gater: Address,
+    pub validator_gater: Address,
 }
 
 /// Consensus types supported by hierarchical consensus
