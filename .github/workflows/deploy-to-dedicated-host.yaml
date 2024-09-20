@@ -24,6 +24,14 @@ jobs:
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
           source: "scripts/deploy_subnet/deploy.sh"
           target: "/home/textile"
+      - name: Copy ssh util script to the host
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
+          username: textile
+          key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
+          source: "scripts/deploy_subnet/ssh_util.sh"
+          target: "/home/textile"
       - name: Create wallet file locally
         run: |
           echo '${{ secrets.CI_TEST_WALLET_JSON }}' > evm_keystore.json
@@ -41,5 +49,5 @@ jobs:
           host: ${{ secrets.DEDICATED_SERVER_IP_ADDRESS }}
           username: textile
           key: ${{ secrets.DEDICATED_SERVER_PRIVATE_KEY }}
-          script: PARENT_GATEWAY_ADDRESS=${{ secrets.PARENT_GATEWAY_ADDRESS }} PARENT_REGISTRY_ADDRESS=${{ secrets.PARENT_REGISTRY_ADDRESS }} SUPPLY_SOURCE_ADDRESS=${{ secrets.SUPPLY_SOURCE_ADDRESS }} PARENT_HTTP_AUTH_TOKEN=${{ secrets.PARENT_HTTP_AUTH_TOKEN }} bash -il /home/textile/scripts/deploy_subnet_under_calibration_net/deploy.sh ${{ github.ref_name }}
+          script: FM_LOG_LEVEL=${{ secrets.FM_LOG_LEVEL }} PARENT_GATEWAY_ADDRESS=${{ secrets.PARENT_GATEWAY_ADDRESS }} PARENT_REGISTRY_ADDRESS=${{ secrets.PARENT_REGISTRY_ADDRESS }} SUPPLY_SOURCE_ADDRESS=${{ secrets.SUPPLY_SOURCE_ADDRESS }} PARENT_HTTP_AUTH_TOKEN=${{ secrets.PARENT_HTTP_AUTH_TOKEN }} bash -il /home/textile/scripts/deploy_subnet/deploy.sh ${{ github.ref_name }}
           command_timeout: 120m

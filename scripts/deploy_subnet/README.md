@@ -3,14 +3,13 @@
 > Start a three-node network for remote or local development.
 
 <!-- omit from toc -->
-
 ## Table of Contents
 
 - [Background](#background)
 - [Usage](#usage)
   - [Build dependencies](#build-dependencies)
     - [Linux](#linux)
-    - [MacOS](#macos)
+    - [macOS](#macos)
   - [Environment variables](#environment-variables)
   - [Deploying \& stopping a subnet](#deploying--stopping-a-subnet)
     - [Testnet](#testnet)
@@ -24,17 +23,19 @@
 
 These scripts handle deploying Hoku subnets. There are two target environments:
 
-- Testnet: Deploy to a live network (Filecoin Calibration) as a fresh instance or attach to an existing one (i.e.,
-  pre-existing registry and gateway contracts).
+- Testnet: Deploy to a live network (Filecoin Calibration) as a fresh instance or attach to an
+  existing one (i.e., pre-existing registry and gateway contracts).
 - Localnet: Deploy to a local network as a fresh instance.
 
-The scripts are designed to work for either a Linux or MacOS machine. Other operating systems are not supported.
+The scripts are designed to work for either a Linux or macOS machine. Other operating systems are
+not supported.
 
 ## Usage
 
-Regardless of the target environment, a three node network is started with a single entrypoint script. All of the
-dependencies and Dockerized node startup logic is handled in the `deploy.sh` script, which you can pass a `local`
-argument to run a localnet. Before getting started, you'll need to install the build dependencies for your OS.
+Regardless of the target environment, a three-node network is started with a single entrypoint
+script. All the dependencies and Dockerized node startup logic are handled in the `deploy.sh`
+script, which you can pass a `local` argument to run a localnet. Before getting started, you'll need
+to install the build dependencies for your OS.
 
 ### Build dependencies
 
@@ -48,33 +49,35 @@ You'll need the following dependencies installed on your machine:
 - `docker`
 - `jq`
 
-When you run `deploy.sh`, it _will_ check for the existence of these dependencies. For Linux machines, the script _will
-also_ handle installation for all build dependencies. For MacOS, it _will not_ automatically install them. Instead,
-you'll have to do this manually, but the script _will_ log and let you know what you're missing before proceeding. The
-section below outlines how to do this for MacOS.
+When you run `deploy.sh`, it _will_ check for the existence of these dependencies. For Linux
+machines, the script _will also_ handle installation for all build dependencies. For macOS, it _will
+not_ automatically install them. Instead, you'll have to do this manually, but the script _will_ log
+and let you know what you're missing before proceeding. The section below outlines how to do this
+for macOS.
 
-Optionally, you can pass the `SKIP_DEPENDENCIES=true` environment variable to `deploy.sh` to skip this entirely (e.g.,
-if you already have these installed).
+Optionally, you can pass the `SKIP_DEPENDENCIES=true` environment variable to `deploy.sh` to skip
+this entirely (e.g., if you already have these installed).
 
 #### Linux
 
-The `deploy.sh` will handle all of the build dependencies for a Linux machine.
+The `deploy.sh` will handle all the build dependencies for a Linux machine.
 
-#### MacOS
+#### macOS
 
-You'll need to install the following dependencies, if they are not already available:
+You'll need to install the following dependencies if they are not already available:
 
 - Xcode from App Store or terminal: `xcode-select --install`
-- Homebrew: Required for installing `jq` and possibly other dependencies. See the official Homebrew docs
-  [here](https://brew.sh/) (but it's probably already installed).
+- Homebrew: Required for installing `jq` and possibly other dependencies. See the official Homebrew
+  docs [here](https://brew.sh/) (but it's probably already installed).
 - `docker`: Required to run the Dockerized nodes. See the official Docker docs
   [here](https://docs.docker.com/desktop/install/mac-install).
 - `jq`: Needed for much of the JSON parsing logic when working with configuration files.
   ```shell
   brew install jq
   ```
-- `rustup`: Required for building the Docker images (i.e., most of the stack is written in Rust). See the official Rust
-  docs [here](https://www.rust-lang.org/tools/install) and make sure `cargo` gets installed.
+- `rustup`: Required for building the Docker images (i.e., most of the stack is written in Rust).
+  See the official Rust docs [here](https://www.rust-lang.org/tools/install) and make sure `cargo`
+  gets installed.
   ```shell
   curl https://sh.rustup.rs -sSf | sh -s -- -y
   ```
@@ -87,14 +90,15 @@ You'll need to install the following dependencies, if they are not already avail
   cargo install toml-cli
   ```
 - `foundryup`: Used for various onchain operations. See the official Foundry docs
-  [here](https://book.getfoundry.sh/getting-started/installation) and make sure `cast` gets installed.
+  [here](https://book.getfoundry.sh/getting-started/installation) and make sure `cast` gets
+  installed.
   ```shell
   curl -L https://foundry.paradigm.xyz | bash
   foundryup
   ```
 - Node.js: Needed for compiling and deploying contracts with Hardhat. See the official Node.js docs
-  [here](https://nodejs.org/en/download)—or use [nvm](https://github.com/nvm-sh/nvm) (described below for `bash`
-  shells).
+  [here](https://nodejs.org/en/download)—or use [nvm](https://github.com/nvm-sh/nvm) (described
+  below for `bash` shells).
   ```shell
   curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
   source "$HOME/.bashrc" # This step will vary by OS
@@ -103,26 +107,31 @@ You'll need to install the following dependencies, if they are not already avail
 
 ### Environment variables
 
-All logic handled in the `deploy.sh` script uses the following environment variables, which are defined in the
-`env.example` file. They are all optional but, for example, dictate what contracts are deployed during the deployment
-flow:
+All logic handled in the `deploy.sh` script uses the following environment variables, which are
+defined in the `env.example` file. They are all optional but, for example, dictate what contracts
+are deployed during the deployment flow:
 
-- `IPC_FOLDER`: The path to the IPC folder (defaults to `~/.ipc`).
-- `PARENT_GATEWAY_ADDRESS`: The EVM address of the parent gateway contract (default defined in `.ipc-cal/config.toml` or
-  `.ipc-local/config.toml`).
-- `PARENT_REGISTRY_ADDRESS`: The EVM address of the parent registry contract (default defined in `.ipc-cal/config.toml`
-  or `.ipc-local/config.toml`).
-- `PARENT_HTTP_AUTH_TOKEN`: An auth token for RPC calls to a [Glif.io](https://api.node.glif.io/) archive node for the
-  rootnet (Filecoin Calibration)—only used if you are deploying to testnet.
+- `IPC_FOLDER`: The path to the IPC folder (defaults to `${HOME}/ipc`). Not used for localnet
+  deployments.
+- `PARENT_GATEWAY_ADDRESS`: The EVM address of the parent gateway contract (default defined in
+  `.ipc-cal/config.toml` or `.ipc-local/config.toml`).
+- `PARENT_REGISTRY_ADDRESS`: The EVM address of the parent registry contract (default defined in
+  `.ipc-cal/config.toml` or `.ipc-local/config.toml`).
+- `PARENT_HTTP_AUTH_TOKEN`: An auth token for RPC calls to a [Glif.io](https://api.node.glif.io/)
+  archive node for the rootnet (Filecoin Calibration)—only used if you are deploying to testnet.
 - `SUPPLY_SOURCE_ADDRESS`: The address of the supply source (ERC20) for all deployed subnets.
+- `FM_LOG_LEVEL`: Fendermint log level. This follows `RUST_LOG` conventions, e.g., use
+  `info,fendermint=debug` to get debug logs from the `fendermint` application (default is `info`).
 
-For localnet deployments, you won't need to set any of the above. There are also two additional optional variables:
+For localnet deployments, you won't need to set any of the above. There are also two additional
+optional variables:
 
-- `SKIP_DEPENDENCIES`: Skips the installation of build dependencies (see [Build dependencies](#build-dependencies)).
-- `SKIP_BUILD`: Skips the build step for the entire stack. You **MUST** run this at least once before starting the
-  network. Notably, this also installs the `ipc-cli` binary that is used heavily during the deployment script. After
-  doing so, future `deploy.sh` invocations will use the existing build artifacts, so you can set `SKIP_BUILD=true` to
-  save time.
+- `SKIP_DEPENDENCIES`: Skips the installation of build dependencies (see
+  [Build dependencies](#build-dependencies)).
+- `SKIP_BUILD`: Skips the build step for the entire stack. You **MUST** run this at least once
+  before starting the network. Notably, this also installs the `ipc-cli` binary that is used heavily
+  during the deployment script. After doing so, future `deploy.sh` invocations will use the existing
+  build artifacts, so you can set `SKIP_BUILD=true` to save time.
 
 Create a `.env` file with your desired values and source it in your shell:
 
@@ -138,21 +147,22 @@ source ${HOME}/.bashrc
 
 ### Deploying & stopping a subnet
 
-All scripts use `cargo make` to start docker containers, volumes, and a docker network. You can use `docker ps` to check
-the status of each container. Also, you **must** run the scripts from the root of the repo!
+All scripts use `cargo make` to start docker containers, volumes, and a docker network. You can use
+`docker ps` to check the status of each container. Also, you **must** run the scripts from the root
+of the repo!
 
 #### Testnet
 
-Testnet deployments will create a subnet with Filecoin Calibration as the rootnet (parent). The `deploy.sh` script will
-create new validator private keys and a `genesis.json` config, and move them to the config folder (defaults to
-`~/.ipc`).
+Testnet deployments will create a subnet with Filecoin Calibration as the rootnet (parent). The
+`deploy.sh` script will create new validator private keys and a `genesis.json` config, and move them
+to the config folder (defaults to `~/.ipc`).
 
 ```shell
 ./scripts/deploy_subnet/deploy.sh
 ```
 
-By default, the script will deploy the latest `develop` branch. If you want to deploy a specific branch, you can pass
-the branch name as an argument:
+By default, the script will deploy the latest `develop` branch. If you want to deploy a specific
+branch, you can pass the branch name as an argument:
 
 ```shell
 ./scripts/deploy_subnet/deploy.sh <branch-name>
@@ -160,11 +170,11 @@ the branch name as an argument:
 
 #### Localnet
 
-A localnet deployments will create a subnet with `anvil` as the rootnet (parent). Similarly, the `deploy.sh` script will
-handle localnet validator keys (using the standard `anvil` accounts) and configs in the config folder (defaults to
-`~/.ipc`). The key callout here is that you **must** specify `localnet` (or `local`) as the argument, and it's _not_
-possible to pass a specific branch as an argument (i.e., it uses whatever branch is currently checked out in the local
-repo).
+A localnet deployments will create a subnet with `anvil` as the rootnet (parent). Similarly, the
+`deploy.sh` script will handle localnet validator keys (using the standard `anvil` accounts) and
+configs in the config folder (defaults to `~/.ipc`). The key callout here is that you **must**
+specify `localnet` (or `local`) as the argument, and it's _not_ possible to pass a specific branch
+as an argument (i.e., it uses whatever branch is currently checked out in the local repo).
 
 ```shell
 ./scripts/deploy_subnet/deploy.sh localnet
@@ -176,35 +186,38 @@ If you want to, for example, skip the build and dependency installation steps, y
 SKIP_BUILD=true SKIP_DEPENDENCIES=true ./scripts/deploy_subnet/deploy.sh localnet
 ```
 
-Lastly, if you're ready to stop the network, you can run `stop-local.sh`:
+Lastly, if you're ready to stop the network, you can run `stop_local.sh`:
 
 ```shell
-./scripts/deploy_subnet/stop-local.sh
+./scripts/deploy_subnet/stop_local.sh
 ```
 
-The following outlines general observations for how long the localnet deployment process takes and various metrics:
+The following outlines general observations for how long the localnet deployment process takes and
+various metrics:
 
 - Deploy + build images: ~7 minutes
 - Deploy with prebuilt images: ~5 minutes (i.e., `SKIP_BUILD=true`)
 - Blocks: ~1 per second
 - Topdown messages: ~2 minutes (e.g., depositing funds from the rootnet)
 - Bottomup messages: ~15 seconds
-- Stopping the network: ~40-45 seconds
+- Stopping the network: ~40–45 seconds
 
 ### Logging
 
 #### Deployment
 
-Deploying a network will log various steps and summary information to the console, including the RPC URLs and contracts.
-If you're running a localnet, it'll also show the available accounts, private keys, and respective balances.
+Deploying a network will log various steps and summary information to the console, including the RPC
+URLs and contracts. If you're running a localnet, it'll also show the available accounts, private
+keys, and respective balances.
 
 #### Validators & network
 
-Use `docker ps` to list the network's containers. Each validator has six containers, and there are a few others used
-across the full network.
+Use `docker ps` to list the network's containers. Each validator has six containers, and there are a
+few others used across the full network.
 
-You can check a validator's logs with `docker logs <container-name>`. The following containers are created (as shown for
-validator `0`), and you can replace the `0` with `1` or `2` to inspect the other validators:
+You can check a validator's logs with `docker logs <container-name>`. The following containers are
+created (as shown for validator `0`), and you can replace the `0` with `1` or `2` to inspect the
+other validators:
 
 - `validator-0-fendermint`
 - `validator-0-cometbft`
@@ -219,10 +232,11 @@ validator `0`), and you can replace the `0` with `1` or `2` to inspect the other
 
 ## Development
 
-You can test using the subnet with the [`hoku` SDK & CLI](https://github.com/hokunet/rust-hoku). Keys _are not_ logged
-if you're running a testnet. For localnet, keys _are_ logged with their corresponding balances. You'll notice the first
-three accounts correspond to the validators and marked as reserved. If you're trying to do non-validator actions (e.g.,
-create a bucket or accumulator), it's best to avoid these accounts since nonce race conditions can occur.
+You can test using the subnet with the [`hoku` SDK & CLI](https://github.com/hokunet/rust-hoku).
+Keys _are not_ logged if you're running a testnet. For localnet, keys _are_ logged with their
+corresponding balances. You'll notice the first three accounts correspond to the validators and
+marked as reserved. If you're trying to do non-validator actions (e.g., create a bucket or
+accumulator), it's best to avoid these accounts since nonce race conditions can occur.
 
 ```txt
 Account balances:
@@ -246,8 +260,8 @@ Private keys:
 ...
 ```
 
-You can use then these keys with the `hoku` SDK and CLI by creating an `.env` file and sourcing it, or by setting the
-variable in your shell:
+You can use then these keys with the `hoku` SDK and CLI by creating an `.env` file and sourcing it,
+or by setting the variable in your shell:
 
 ```dotenv
 export NETWORK=localnet
