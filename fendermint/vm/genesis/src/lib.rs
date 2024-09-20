@@ -9,18 +9,23 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
 use fendermint_actor_eam::PermissionModeParams;
-use fvm_shared::version::NetworkVersion;
-use fvm_shared::{address::Address, econ::TokenAmount};
-
 use fendermint_crypto::{normalize_public_key, PublicKey};
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_encoding::IsHumanReadable;
+use fvm_shared::clock::ChainEpoch;
+use fvm_shared::version::NetworkVersion;
+use fvm_shared::{address::Address, econ::TokenAmount};
 
 #[cfg(feature = "arb")]
 mod arb;
 
 /// Power conversion decimal points, e.g. 3 decimals means 1 power per milliFIL.
 pub type PowerScale = i8;
+
+/// FIXME SU Temporary fix
+fn default_blob_storage_capacity() -> u64 {
+    4294967296
+}
 
 /// The genesis data structure we serialize to JSON and start the chain with.
 #[serde_as]
@@ -47,6 +52,13 @@ pub struct Genesis {
     /// IPC related configuration, if enabled.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ipc: Option<ipc::IpcParams>,
+    /// Block interval at which to debit all credit accounts.
+    pub credit_debit_interval: ChainEpoch,
+    /// Subnet capacity
+    #[serde(default = "default_blob_storage_capacity")]
+    pub blob_storage_capacity: u64,
+    /// Subnet debit rate
+    pub blob_debit_rate: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

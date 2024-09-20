@@ -7,15 +7,18 @@ use std::{convert::Infallible, net::ToSocketAddrs, num::ParseIntError};
 use anyhow::anyhow;
 use base64::{engine::general_purpose, Engine};
 use bytes::Buf;
-use cid::Cid;
-use ethers::core::types::{self as et};
+use fendermint_actor_objectstore::GetParams;
 use fendermint_actor_objectstore::Object;
+use fendermint_app_settings::objects::ObjectsSettings;
+use fendermint_rpc::client::FendermintClient;
 use fendermint_rpc::message::GasParams;
 use fendermint_rpc::QueryClient;
-use fendermint_vm_message::conv::from_fvm::to_eth_tokens;
+use fendermint_vm_message::query::FvmQueryHeight;
 use fendermint_vm_message::signed::SignedMessage;
 use futures_util::StreamExt;
+use fvm_shared::chainid::ChainID;
 use fvm_shared::{address::Address, econ::TokenAmount};
+use iroh::blobs::Hash;
 use iroh::client::blobs::BlobStatus;
 use iroh::net::NodeAddr;
 use serde::{Deserialize, Serialize};
@@ -30,11 +33,6 @@ use warp::{
 
 use crate::cmd;
 use crate::options::objects::{ObjectsArgs, ObjectsCommands};
-use fendermint_actor_objectstore::GetParams;
-use fendermint_app_settings::objects::ObjectsSettings;
-use fendermint_rpc::client::FendermintClient;
-use fendermint_vm_message::query::FvmQueryHeight;
-use fvm_shared::chainid::ChainID;
 
 const MAX_OBJECT_LENGTH: u64 = 1024 * 1024 * 1024;
 
@@ -132,7 +130,8 @@ impl From<ParseIntError> for ObjectsError {
 struct ObjectParser {
     signed_msg: Option<SignedMessage>,
     chain_id: ChainID,
-    cid: Option<Cid>,
+    hash: Option<Hash>,
+    size: Option<u64>,
     source: Option<NodeAddr>,
 }
 
@@ -141,7 +140,8 @@ impl Default for ObjectParser {
         ObjectParser {
             signed_msg: None,
             chain_id: ChainID::from(0),
-            cid: None,
+            hash: None,
+            size: None,
             source: None,
         }
     }
@@ -169,23 +169,6 @@ impl ObjectParser {
         Ok(())
     }
 
-    async fn read_source(&mut self, form_part: Part) -> anyhow::Result<()> {
-        let value = self.read_part(form_part).await?;
-        let text = String::from_utf8(value).map_err(|_| anyhow!("cannot parse source"))?;
-        let source: NodeAddr =
-            serde_json::from_str(&text).map_err(|_| anyhow!("cannot parse source"))?;
-        self.source = Some(source);
-        Ok(())
-    }
-
-    async fn read_cid(&mut self, form_part: Part) -> anyhow::Result<()> {
-        let value = self.read_part(form_part).await?;
-        let text = String::from_utf8(value).map_err(|_| anyhow!("cannot parse cid"))?;
-        let cid: Cid = text.parse().map_err(|_| anyhow!("cannot parse cid"))?;
-        self.cid = Some(cid);
-        Ok(())
-    }
-
     async fn read_msg(&mut self, form_part: Part) -> anyhow::Result<()> {
         let value = self.read_part(form_part).await?;
         let signed_msg = general_purpose::URL_SAFE
@@ -196,6 +179,31 @@ impl ObjectParser {
                     .map_err(|e| anyhow!("Failed to deserialize signed message: {}", e))
             })?;
         self.signed_msg = Some(signed_msg);
+        Ok(())
+    }
+
+    async fn read_hash(&mut self, form_part: Part) -> anyhow::Result<()> {
+        let value = self.read_part(form_part).await?;
+        let text = String::from_utf8(value).map_err(|_| anyhow!("cannot parse hash"))?;
+        let hash: Hash = text.parse().map_err(|_| anyhow!("cannot parse hash"))?;
+        self.hash = Some(hash);
+        Ok(())
+    }
+
+    async fn read_size(&mut self, form_part: Part) -> anyhow::Result<()> {
+        let value = self.read_part(form_part).await?;
+        let text = String::from_utf8(value).map_err(|_| anyhow!("cannot parse size"))?;
+        let size: u64 = text.parse().map_err(|_| anyhow!("cannot parse size"))?;
+        self.size = Some(size);
+        Ok(())
+    }
+
+    async fn read_source(&mut self, form_part: Part) -> anyhow::Result<()> {
+        let value = self.read_part(form_part).await?;
+        let text = String::from_utf8(value).map_err(|_| anyhow!("cannot parse source"))?;
+        let source: NodeAddr =
+            serde_json::from_str(&text).map_err(|_| anyhow!("cannot parse source"))?;
+        self.source = Some(source);
         Ok(())
     }
 
@@ -213,8 +221,11 @@ impl ObjectParser {
                 "msg" => {
                     object_parser.read_msg(part).await?;
                 }
-                "cid" => {
-                    object_parser.read_cid(part).await?;
+                "hash" => {
+                    object_parser.read_hash(part).await?;
+                }
+                "size" => {
+                    object_parser.read_size(part).await?;
                 }
                 "source" => {
                     object_parser.read_source(part).await?;
@@ -226,24 +237,6 @@ impl ObjectParser {
         }
         Ok(object_parser)
     }
-}
-
-async fn ensure_balance<F: QueryClient>(client: &F, from: Address) -> anyhow::Result<()> {
-    let actor_state = client.actor_state(&from, FvmQueryHeight::Committed).await?;
-    let balance = match actor_state.value {
-        Some((_, state)) => to_eth_tokens(&state.balance)?,
-        None => et::U256::zero(),
-    };
-
-    // TODO: make cost_per_byte a configurable constant
-    // TODO: uncomment it when we decide the pricing logic
-    // let cost_per_byte = et::U256::from(1_000_000_000u128);
-    // let required_balance = cost_per_byte * self.size;
-    if balance <= et::U256::zero() {
-        return Err(anyhow!("insufficient balance"));
-    }
-
-    Ok(())
 }
 
 async fn handle_health() -> Result<impl Reply, Rejection> {
@@ -285,15 +278,8 @@ async fn handle_object_upload<F: QueryClient>(
         })
     })?;
 
-    // Ensure the sender has enough balance, and fetch the data through iroh
-    let SignedMessage {
-        object, message, ..
-    } = signed_msg;
-    ensure_balance(&client, message.from).await.map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("failed to ensure balance: {}", e),
-        })
-    })?;
+    // Ensure the sender has enough credits, and fetch the data through iroh
+    let SignedMessage { message, .. } = signed_msg;
     ensure_objectstore_exists(client, message.to)
         .await
         .map_err(|e| {
@@ -301,20 +287,20 @@ async fn handle_object_upload<F: QueryClient>(
                 message: format!("failed to connect with objectstore: {}", e),
             })
         })?;
-    let client_cid = match object {
-        Some(object) => object.cid,
+
+    let hash = match parser.hash {
+        Some(hash) => hash,
         None => {
             return Err(Rejection::from(BadRequest {
-                message: "missing CID in signed message".to_string(),
+                message: "missing hash in form".to_string(),
             }))
         }
     };
-
-    let cid = match parser.cid {
-        Some(cid) => cid,
+    let size = match parser.size {
+        Some(size) => size,
         None => {
             return Err(Rejection::from(BadRequest {
-                message: "missing cid in form".to_string(),
+                message: "missing size in form".to_string(),
             }))
         }
     };
@@ -327,29 +313,38 @@ async fn handle_object_upload<F: QueryClient>(
         }
     };
 
-    if client_cid != cid {
+    let progress = iroh.blobs().download(hash, source).await.map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("failed to fetch blob {}: {}", hash, e),
+        })
+    })?;
+    let outcome = progress.finish().await.map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("failed to fetch blob {}: {}", hash, e),
+        })
+    })?;
+
+    let blob_size = outcome.downloaded_size + outcome.local_size;
+    if size != blob_size {
+        // Blob might be identical to an existing blob secured by the chain,
+        // but we can delete it if it's made of entirely new data.
+        // TODO: We need to use Iroh tags to differentiate between staged and secured data.
+        if blob_size == outcome.downloaded_size {
+            iroh.blobs().delete_blob(hash).await.map_err(|e| {
+                Rejection::from(BadRequest {
+                    message: format!("failed to delete invalid blob {}: {}", hash, e),
+                })
+            })?;
+        }
         return Err(Rejection::from(BadRequest {
-            message: "missmatched cids".to_string(),
+            message: format!(
+                "provided size {} does not match blob {} size {}",
+                size, hash, blob_size
+            ),
         }));
     }
 
-    debug_assert_eq!(
-        cid.hash().code(),
-        u64::from(cid::multihash::Code::Blake3_256)
-    );
-    let hash = iroh::blobs::Hash::from_bytes(cid.hash().digest().try_into().unwrap());
-    let progress = iroh.blobs().download(hash, source).await.map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("failed to fetch file: {} {}", hash, e),
-        })
-    })?;
-    progress.finish().await.map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("failed to fetch file: {} {}", hash, e),
-        })
-    })?;
-
-    Ok(cid.to_string())
+    Ok(hash.to_string())
 }
 
 async fn ensure_objectstore_exists<F: QueryClient>(client: F, to: Address) -> anyhow::Result<()> {
@@ -408,7 +403,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
         .unwrap_or(FvmQueryHeight::Committed.into());
     let path = tail.as_str();
     let key: Vec<u8> = path.into();
-    let maybe_object = os_get(client, address, GetParams { key }, height)
+    let maybe_object = os_get(client, address, GetParams(key), height)
         .await
         .map_err(|e| {
             Rejection::from(BadRequest {
@@ -418,18 +413,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
 
     match maybe_object {
         Some(object) => {
-            let cid = Cid::try_from(object.cid.0).map_err(|e| {
-                Rejection::from(BadRequest {
-                    message: format!("failed to decode cid: {}", e),
-                })
-            })?;
-            if !object.resolved {
-                return Err(Rejection::from(BadRequest {
-                    message: "object is not resolved".to_string(),
-                }));
-            }
-
-            let hash = iroh::blobs::Hash::from_bytes(cid.hash().digest().try_into().unwrap());
+            let hash = Hash::from_bytes(object.hash.0);
             let status = iroh.blobs().status(hash).await.map_err(|e| {
                 Rejection::from(BadRequest {
                     message: format!("failed to read object: {} {}", hash, e),
@@ -481,7 +465,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
                 }
             };
 
-            // If it is a HEAD request, we don't need to send the body
+            // If it is a HEAD request, we don't need to send the body,
             // but we still need to send the Content-Length header
             if method == "HEAD" {
                 let mut response = warp::reply::Response::new(Body::empty());
@@ -587,13 +571,13 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
-    use cid::multihash::Code;
     use ethers::core::k256::ecdsa::SigningKey;
     use ethers::core::rand::{rngs::StdRng, SeedableRng};
     use fendermint_actor_objectstore::AddParams;
     use fendermint_rpc::FendermintClient;
     use fendermint_vm_message::conv::from_eth::to_fvm_address;
     use fvm_ipld_encoding::RawBytes;
+    use iroh::blobs::Hash;
     use iroh::net::NodeAddr;
     use tendermint_rpc::{Method, MockClient, MockRequestMethodMatcher};
 
@@ -637,13 +621,13 @@ mod tests {
     fn form_body(
         boundary: &str,
         serialized_signed_message_b64: &str,
-        cid: Cid,
+        hash: Hash,
         source: NodeAddr,
+        size: u64,
     ) -> Vec<u8> {
         let mut body = Vec::new();
-        body.extend_from_slice(
-            format!(
-                "\
+        let form_data = format!(
+            "\
             --{0}\r\n\
             content-disposition: form-data; name=\"chain_id\"\r\n\r\n\
             314159\r\n\
@@ -651,20 +635,23 @@ mod tests {
             content-disposition: form-data; name=\"msg\"\r\n\r\n\
             {1}\r\n\
             --{0}\r\n\
-            content-disposition: form-data; name=\"cid\"\r\n\r\n\
+            content-disposition: form-data; name=\"hash\"\r\n\r\n\
             {2}\r\n\
             --{0}\r\n\
-            content-disposition: form-data; name=\"source\"\r\n\r\n\
+            content-disposition: form-data; name=\"size\"\r\n\r\n\
             {3}\r\n\
+            --{0}\r\n\
+            content-disposition: form-data; name=\"source\"\r\n\r\n\
+            {4}\r\n\
             --{0}--\r\n\
             ",
-                boundary,
-                serialized_signed_message_b64,
-                cid,
-                serde_json::to_string_pretty(&source).unwrap(),
-            )
-            .as_bytes(),
+            boundary,
+            serialized_signed_message_b64,
+            hash,
+            size,
+            serde_json::to_string_pretty(&source).unwrap(),
         );
+        body.extend_from_slice(form_data.as_bytes());
 
         dbg!(std::str::from_utf8(&body)).unwrap();
         body
@@ -672,11 +659,12 @@ mod tests {
 
     async fn multipart_form(
         serialized_signed_message_b64: &str,
-        cid: Cid,
+        hash: Hash,
         source: NodeAddr,
+        size: u64,
     ) -> warp::multipart::FormData {
         let boundary = "--abcdef1234--";
-        let body = form_body(boundary, serialized_signed_message_b64, cid, source);
+        let body = form_body(boundary, serialized_signed_message_b64, hash, source, size);
         warp::test::request()
             .method("POST")
             .header("content-length", body.len())
@@ -717,36 +705,30 @@ mod tests {
         let client = FendermintClient::new(MockClient::new(matcher).0);
         let iroh = iroh::node::Node::memory().spawn().await.unwrap();
 
-        // source iroh node
-        let iroh2 = iroh::node::Node::memory().spawn().await.unwrap();
-        let hash = iroh2
+        // client iroh node
+        let client_iroh = iroh::node::Node::memory().spawn().await.unwrap();
+        let hash = client_iroh
             .blobs()
             .add_bytes(&b"hello world"[..])
             .await
             .unwrap()
             .hash;
-        let source = iroh2.net().node_addr().await.unwrap();
+        let client_node_addr = client_iroh.net().node_addr().await.unwrap();
 
+        let store = Address::new_id(90);
         let key = b"key";
-        let digest =
-            cid::multihash::Multihash::wrap(Code::Blake3_256.into(), hash.as_ref()).unwrap();
-        let object_cid = Cid::new_v1(fvm_ipld_encoding::IPLD_RAW, digest);
-        dbg!(object_cid, hash);
+        let size = 11;
         let params = AddParams {
+            to: store,
+            source: fendermint_actor_blobs_shared::state::PublicKey(*iroh.node_id().as_bytes()),
             key: key.to_vec(),
-            cid: object_cid,
-            size: 11,
+            hash: fendermint_actor_blobs_shared::state::Hash(*hash.as_bytes()),
+            size,
+            ttl: None,
             metadata: HashMap::new(),
             overwrite: true,
         };
         let params = RawBytes::serialize(params).unwrap();
-        let store = Address::new_id(90);
-        let object = fendermint_vm_message::signed::Object::new(
-            key.to_vec(),
-            object_cid,
-            store,
-            source.node_id,
-        );
 
         let sk = fendermint_crypto::SecretKey::random(&mut StdRng::from_entropy());
         let signing_key = SigningKey::from_slice(sk.serialize().as_ref()).unwrap();
@@ -764,14 +746,14 @@ mod tests {
             gas_premium: TokenAmount::from_atto(0),
         };
         let chain_id = fvm_shared::chainid::ChainID::from(314159);
-        let signed = SignedMessage::new_secp256k1(message, Some(object), &sk, &chain_id).unwrap();
+        let signed = SignedMessage::new_secp256k1(message, &sk, &chain_id).unwrap();
 
         let serialized_signed_message = fvm_ipld_encoding::to_vec(&signed).unwrap();
         let serialized_signed_message_b64 =
             general_purpose::URL_SAFE.encode(&serialized_signed_message);
 
         let multipart_form =
-            multipart_form(&serialized_signed_message_b64, object_cid, source).await;
+            multipart_form(&serialized_signed_message_b64, hash, client_node_addr, size).await;
 
         let reply = handle_object_upload(client, iroh.client().clone(), multipart_form)
             .await
@@ -893,17 +875,5 @@ mod tests {
         let response = result.unwrap().into_response();
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(response.headers().get("Content-Length").unwrap(), "11");
-    }
-
-    #[test]
-    fn test_cid_hash() {
-        let hash = iroh::blobs::Hash::new(b"hello world");
-        let digest =
-            cid::multihash::Multihash::wrap(Code::Blake3_256.into(), hash.as_ref()).unwrap();
-        let cid = Cid::new_v1(fvm_ipld_encoding::IPLD_RAW, digest);
-        assert_eq!(
-            iroh::blobs::Hash::from_bytes(cid.hash().digest().try_into().unwrap()),
-            hash
-        );
     }
 }

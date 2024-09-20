@@ -12,7 +12,7 @@ arbitrary = { workspace = true, optional = true }
 blake2b_simd = { workspace = true }
 cid = { workspace = true }
 ethers-core = { workspace = true }
-iroh = { workspace = true }
+iroh-base = { workspace = true, features = ["key"] }
 lazy_static = { workspace = true }
 num-traits = { workspace = true }
 quickcheck = { workspace = true, optional = true }

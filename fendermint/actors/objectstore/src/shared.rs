@@ -2,58 +2,70 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use cid::Cid;
-use fendermint_actor_machine::GET_METADATA_METHOD;
-use fvm_ipld_encoding::{strict_bytes, tuple::*};
-use fvm_shared::METHOD_CONSTRUCTOR;
-use num_derive::FromPrimitive;
 use std::collections::HashMap;
 
-pub use crate::state::{Object, ObjectList, State};
+use fendermint_actor_blobs_shared::state::{Hash, PublicKey};
+use fendermint_actor_machine::GET_METADATA_METHOD;
+use fvm_ipld_encoding::{strict_bytes, tuple::*};
+use fvm_shared::address::Address;
+use fvm_shared::clock::ChainEpoch;
+use fvm_shared::METHOD_CONSTRUCTOR;
+use num_derive::FromPrimitive;
+use serde::{Deserialize, Serialize};
+
+pub use crate::state::State;
 
 pub const OBJECTSTORE_ACTOR_NAME: &str = "objectstore";
 
-/// Params for putting an object.
+#[derive(FromPrimitive)]
+#[repr(u64)]
+pub enum Method {
+    Constructor = METHOD_CONSTRUCTOR,
+    GetMetadata = GET_METADATA_METHOD,
+    AddObject = frc42_dispatch::method_hash!("AddObject"),
+    DeleteObject = frc42_dispatch::method_hash!("DeleteObject"),
+    GetObject = frc42_dispatch::method_hash!("GetObject"),
+    ListObjects = frc42_dispatch::method_hash!("ListObjects"),
+}
+
+/// Params for adding an object.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct AddParams {
+    /// Target object store address.
+    pub to: Address,
+    /// Source Iroh node ID used for ingestion.
+    pub source: PublicKey,
     /// Object key.
     #[serde(with = "strict_bytes")]
     pub key: Vec<u8>,
-    /// Object value.
-    pub cid: Cid,
+    /// Object blake3 hash.
+    pub hash: Hash,
     /// Object size.
-    pub size: usize,
+    pub size: u64,
+    /// Object time-to-live epochs.
+    /// If not specified, the auto-debitor maintains about one hour of credits as an
+    /// ongoing commitment.
+    pub ttl: Option<ChainEpoch>,
     /// Object metadata.
     pub metadata: HashMap<String, String>,
     /// Whether to overwrite a key if it already exists.
     pub overwrite: bool,
 }
 
-/// Params for resolving an object.
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct ResolveParams {
-    /// Object key.
-    #[serde(with = "strict_bytes")]
-    pub key: Vec<u8>,
-    /// Object value.
-    pub value: Cid,
-}
-
 /// Params for deleting an object.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct DeleteParams {
+    /// Target object store address.
+    pub to: Address,
     /// Object key.
     #[serde(with = "strict_bytes")]
     pub key: Vec<u8>,
 }
 
 /// Params for getting an object.
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct GetParams {
-    /// Object key.
-    #[serde(with = "strict_bytes")]
-    pub key: Vec<u8>,
-}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct GetParams(#[serde(with = "strict_bytes")] pub Vec<u8>);
 
 /// Params for listing objects.
 #[derive(Default, Debug, Serialize_tuple, Deserialize_tuple)]
@@ -70,14 +82,24 @@ pub struct ListParams {
     pub limit: u64,
 }
 
-#[derive(FromPrimitive)]
-#[repr(u64)]
-pub enum Method {
-    Constructor = METHOD_CONSTRUCTOR,
-    GetMetadata = GET_METADATA_METHOD,
-    AddObject = frc42_dispatch::method_hash!("AddObject"),
-    ResolveObject = frc42_dispatch::method_hash!("ResolveObject"),
-    DeleteObject = frc42_dispatch::method_hash!("DeleteObject"),
-    GetObject = frc42_dispatch::method_hash!("GetObject"),
-    ListObjects = frc42_dispatch::method_hash!("ListObjects"),
+/// The stored representation of an object in the object store.
+#[derive(Clone, Debug, PartialEq, Serialize_tuple, Deserialize_tuple)]
+pub struct Object {
+    /// The object blake3 hash.
+    pub hash: Hash,
+    /// The object size.
+    pub size: u64,
+    /// Expiry block.
+    pub expiry: ChainEpoch,
+    /// User-defined object metadata (e.g., last modified timestamp, etc.).
+    pub metadata: HashMap<String, String>,
+}
+
+/// A list of objects and their common prefixes.
+#[derive(Default, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct ListObjectsReturn {
+    /// List of key-values matching the list query.
+    pub objects: Vec<(Vec<u8>, Option<Object>)>,
+    /// When a delimiter is used in the list query, this contains common key prefixes.
+    pub common_prefixes: Vec<Vec<u8>>,
 }

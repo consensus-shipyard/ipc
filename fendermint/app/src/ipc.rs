@@ -10,7 +10,7 @@ use fendermint_vm_interpreter::fvm::state::ipc::GatewayCaller;
 use fendermint_vm_interpreter::fvm::state::{FvmExecState, FvmStateParams};
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
 use fendermint_vm_topdown::sync::ParentFinalityStateQuery;
-use fendermint_vm_topdown::{IPCObjectFinality, IPCParentFinality};
+use fendermint_vm_topdown::{IPCBlobFinality, IPCParentFinality};
 use fvm_ipld_blockstore::Blockstore;
 use std::sync::Arc;
 
@@ -21,8 +21,8 @@ use serde::{Deserialize, Serialize};
 pub enum AppVote {
     /// The validator considers a certain block final on the parent chain.
     ParentFinality(IPCParentFinality),
-    /// The validator considers a certain object final.
-    ObjectFinality(IPCObjectFinality),
+    /// The validator considers a certain blob final.
+    BlobFinality(IPCBlobFinality),
 }
 
 /// Queries the LATEST COMMITTED parent finality from the storage

@@ -633,7 +633,6 @@ where
     let msg = SignedMessage {
         message: msg,
         signature: Signature::new_secp256k1(sig.to_vec()),
-        object: None,
     };
     let msg = ChainMessage::Signed(msg);
     let bz: Vec<u8> = SignedMessageFactory::serialize(&msg)?;

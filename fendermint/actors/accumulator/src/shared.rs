@@ -5,6 +5,7 @@
 use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
 use fendermint_actor_machine::{Kind, MachineState, WriteAccess, GET_METADATA_METHOD};
+use fil_actors_runtime::ActorError;
 use fvm_ipld_amt::Amt;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::{strict_bytes, to_vec, tuple::*, CborStore, DAG_CBOR};
@@ -16,6 +17,14 @@ use std::collections::HashMap;
 
 pub const ACCUMULATOR_ACTOR_NAME: &str = "accumulator";
 const BIT_WIDTH: u32 = 3;
+
+fn state_error(e: fvm_ipld_amt::Error) -> ActorError {
+    ActorError::illegal_state(e.to_string())
+}
+
+fn store_error(e: anyhow::Error) -> ActorError {
+    ActorError::illegal_state(e.to_string())
+}
 
 #[derive(FromPrimitive)]
 #[repr(u64)]
@@ -44,7 +53,7 @@ pub struct PushReturn {
 /// Compute the hash of a pair of CIDs.
 /// The hash is the CID of a new block containing the concatenation of the two CIDs.
 /// We do not include the index of the element(s) because incoming data should already be "nonced".
-fn hash_pair(left: Option<&Cid>, right: Option<&Cid>) -> anyhow::Result<Cid> {
+fn hash_pair(left: Option<&Cid>, right: Option<&Cid>) -> anyhow::Result<Cid, ActorError> {
     if let (Some(left), Some(right)) = (left, right) {
         // Encode the CIDs into a binary format
         let data = to_vec(&[left, right])?;
@@ -54,7 +63,9 @@ fn hash_pair(left: Option<&Cid>, right: Option<&Cid>) -> anyhow::Result<Cid> {
         let cid = Cid::new_v1(DAG_CBOR, mh);
         Ok(cid)
     } else {
-        Err(anyhow::anyhow!("hash_pair requires two CIDs"))
+        Err(ActorError::illegal_argument(
+            "hash_pair requires two CIDs".into(),
+        ))
     }
 }
 
@@ -65,12 +76,16 @@ fn hash_and_put_pair<BS: Blockstore>(
     store: &BS,
     left: Option<&Cid>,
     right: Option<&Cid>,
-) -> anyhow::Result<Cid> {
+) -> anyhow::Result<Cid, ActorError> {
     if let (Some(left), Some(right)) = (left, right) {
         // Compute the CID for the block
-        store.put_cbor(&[left, right], Code::Blake2b256)
+        store
+            .put_cbor(&[left, right], Code::Blake2b256)
+            .map_err(store_error)
     } else {
-        Err(anyhow::anyhow!("hash_pair requires two CIDs"))
+        Err(ActorError::illegal_argument(
+            "hash_pair requires two CIDs".into(),
+        ))
     }
 }
 
@@ -80,11 +95,13 @@ fn push<BS: Blockstore, S: DeserializeOwned + Serialize>(
     leaf_count: u64,
     peaks: &mut Amt<Cid, &BS>,
     obj: S,
-) -> anyhow::Result<Cid> {
+) -> anyhow::Result<Cid, ActorError> {
     // Create new leaf
-    let leaf = store.put_cbor(&obj, Code::Blake2b256)?;
+    let leaf = store
+        .put_cbor(&obj, Code::Blake2b256)
+        .map_err(store_error)?;
     // Push the new leaf onto the peaks
-    peaks.set(peaks.count(), leaf)?;
+    peaks.set(peaks.count(), leaf).map_err(state_error)?;
     // Count trailing ones in binary representation of the previous leaf_count
     // This works because adding a leaf fills the next available spot,
     // and the binary representation of this index will have trailing ones
@@ -92,20 +109,22 @@ fn push<BS: Blockstore, S: DeserializeOwned + Serialize>(
     let mut new_peaks = (!leaf_count).trailing_zeros();
     while new_peaks > 0 {
         // Pop the last two peaks and push their hash
-        let right = peaks.delete(peaks.count() - 1)?;
-        let left = peaks.delete(peaks.count() - 1)?;
-        // Push the new peak onto the peaks array
-        peaks.set(
-            peaks.count(),
-            hash_and_put_pair(store, left.as_ref(), right.as_ref())?,
-        )?;
+        let right = peaks.delete(peaks.count() - 1).map_err(state_error)?;
+        let left = peaks.delete(peaks.count() - 1).map_err(state_error)?;
+        // Push the new peak onto the peak array
+        peaks
+            .set(
+                peaks.count(),
+                hash_and_put_pair(store, left.as_ref(), right.as_ref())?,
+            )
+            .map_err(state_error)?;
         new_peaks -= 1;
     }
-    Ok(peaks.flush()?)
+    peaks.flush().map_err(state_error)
 }
 
 /// Collect the peaks and combine to compute the root commitment.
-fn bag_peaks<BS: Blockstore>(peaks: &Amt<Cid, &BS>) -> anyhow::Result<Cid> {
+fn bag_peaks<BS: Blockstore>(peaks: &Amt<Cid, &BS>) -> anyhow::Result<Cid, ActorError> {
     let peaks_count = peaks.count();
     // Handle special cases where we have no peaks or only one peak
     if peaks_count == 0 {
@@ -113,12 +132,18 @@ fn bag_peaks<BS: Blockstore>(peaks: &Amt<Cid, &BS>) -> anyhow::Result<Cid> {
     }
     // If there is only one leaf element, we simply "promote" that to the root peak
     if peaks_count == 1 {
-        return Ok(peaks.get(0)?.unwrap().to_owned());
+        return Ok(peaks.get(0).map_err(state_error)?.unwrap().to_owned());
     }
     // Walk backward through the peaks, combining them pairwise
-    let mut root = hash_pair(peaks.get(peaks_count - 2)?, peaks.get(peaks_count - 1)?)?;
+    let mut root = hash_pair(
+        peaks.get(peaks_count - 2).map_err(state_error)?,
+        peaks.get(peaks_count - 1).map_err(state_error)?,
+    )?;
     for i in 2..peaks_count {
-        root = hash_pair(peaks.get(peaks_count - 1 - i)?, Some(&root))?;
+        root = hash_pair(
+            peaks.get(peaks_count - 1 - i).map_err(state_error)?,
+            Some(&root),
+        )?;
     }
     Ok(root)
 }
@@ -142,7 +167,7 @@ fn path_for_eigen_root(leaf_index: u64, leaf_count: u64) -> anyhow::Result<(u64,
     let bitmask = merge_height - 1;
     // The Hamming weight of leaf_count is the number of eigentrees in the structure.
     let eigentree_count = leaf_count.count_ones();
-    // Isolates the lower bits of leaf_count up to the merge_height, and count the one bits.
+    // Isolates the lower bits of leaf_count up to the merge_height, and count the one-bits.
     // This is essentially the offset to the eigentree containing leaf_index
     let offset = (leaf_count & bitmask).count_ones();
     // The index is simply the total eigentree count minus the offset (minus one)
@@ -170,7 +195,7 @@ fn get_at<BS: Blockstore, S: DeserializeOwned + Serialize>(
             ))
         }
     };
-    // Special case where eigentree has height of one
+    // Special case where eigentree has a height of one
     if path == 1 {
         return match store.get_cbor::<S>(cid)? {
             Some(value) => Ok(value),
@@ -254,14 +279,14 @@ impl State {
         creator: Address,
         write_access: WriteAccess,
         metadata: HashMap<String, String>,
-    ) -> anyhow::Result<Self> {
+    ) -> anyhow::Result<Self, ActorError> {
         let peaks = match Amt::<(), _>::new_with_bit_width(store, BIT_WIDTH).flush() {
             Ok(cid) => cid,
             Err(e) => {
-                return Err(anyhow::anyhow!(
+                return Err(ActorError::illegal_state(format!(
                     "accumulator actor failed to create empty Amt: {}",
                     e
-                ));
+                )));
             }
         };
         Ok(Self {
@@ -285,8 +310,8 @@ impl State {
         &mut self,
         store: &BS,
         obj: S,
-    ) -> anyhow::Result<PushReturn> {
-        let mut amt = Amt::<Cid, &BS>::load(&self.peaks, store)?;
+    ) -> anyhow::Result<PushReturn, ActorError> {
+        let mut amt = Amt::<Cid, &BS>::load(&self.peaks, store).map_err(state_error)?;
         self.peaks = push(store, self.leaf_count, &mut amt, obj)?;
         self.leaf_count += 1;
 
@@ -297,18 +322,19 @@ impl State {
         })
     }
 
-    pub fn get_root<BS: Blockstore>(&self, store: &BS) -> anyhow::Result<Cid> {
-        let amt = Amt::<Cid, &BS>::load(&self.peaks, store)?;
+    pub fn get_root<BS: Blockstore>(&self, store: &BS) -> anyhow::Result<Cid, ActorError> {
+        let amt = Amt::<Cid, &BS>::load(&self.peaks, store).map_err(state_error)?;
         bag_peaks(&amt)
     }
 
-    pub fn get_peaks<BS: Blockstore>(&self, store: &BS) -> anyhow::Result<Vec<Cid>> {
-        let amt = Amt::<Cid, &BS>::load(&self.peaks, store)?;
+    pub fn get_peaks<BS: Blockstore>(&self, store: &BS) -> anyhow::Result<Vec<Cid>, ActorError> {
+        let amt = Amt::<Cid, &BS>::load(&self.peaks, store).map_err(state_error)?;
         let mut peaks = Vec::new();
         amt.for_each(|_, cid| {
             peaks.push(cid.to_owned());
             Ok(())
-        })?;
+        })
+        .map_err(state_error)?;
         Ok(peaks)
     }
 
@@ -316,8 +342,8 @@ impl State {
         &self,
         store: &BS,
         index: u64,
-    ) -> anyhow::Result<Option<S>> {
-        let amt = Amt::<Cid, &BS>::load(&self.peaks, store)?;
+    ) -> anyhow::Result<Option<S>, ActorError> {
+        let amt = Amt::<Cid, &BS>::load(&self.peaks, store).map_err(state_error)?;
         let leaf = match get_at::<BS, S>(store, index, self.leaf_count, &amt) {
             Ok(leaf) => Some(leaf),
             Err(_) => None,

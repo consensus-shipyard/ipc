@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: MIT
 
 use std::collections::HashMap;
-use std::net::SocketAddr;
 use std::time::Duration;
 
 use anyhow::anyhow;
 use bloom::{BloomFilter, ASMS};
 use ipc_api::subnet_id::SubnetID;
+use iroh::blobs::Hash;
+use iroh::client::Iroh;
 use iroh::net::NodeAddr;
 use libipld::store::StoreParams;
 use libipld::Cid;
@@ -22,6 +23,7 @@ use libp2p::{identify, ping};
 use libp2p_bitswap::{BitswapResponse, BitswapStore};
 use libp2p_mplex::MplexConfig;
 use log::{debug, error, info, trace, warn};
+use maybe_iroh::MaybeIroh;
 use prometheus::Registry;
 use rand::seq::SliceRandom;
 use serde::de::DeserializeOwned;
@@ -96,7 +98,7 @@ pub struct Config {
     pub membership: MembershipConfig,
     pub connection: ConnectionConfig,
     pub content: ContentConfig,
-    pub iroh_addr: Option<SocketAddr>,
+    pub iroh_addr: Option<String>,
 }
 
 /// Internal requests to enqueue to the [`Service`]
@@ -109,7 +111,7 @@ pub(crate) enum Request<V> {
     PinSubnet(SubnetID),
     UnpinSubnet(SubnetID),
     Resolve(Cid, SubnetID, ResponseChannel),
-    ResolveIroh(Cid, NodeAddr, ResponseChannel),
+    ResolveIroh(Hash, NodeAddr, ResponseChannel),
     RateLimitUsed(PeerId, usize),
     UpdateRateLimit(u32),
 }
@@ -146,7 +148,7 @@ where
     /// To limit the number of peers contacted in a Bitswap resolution attempt.
     max_peers_per_query: usize,
     /// Iroh client
-    iroh: Option<iroh::client::Iroh>,
+    iroh: MaybeIroh,
 }
 
 impl<P, V> Service<P, V>
@@ -213,12 +215,6 @@ where
         let (request_tx, request_rx) = mpsc::unbounded_channel();
         let (event_tx, _) = broadcast::channel(config.connection.event_buffer_capacity as usize);
 
-        let iroh = if let Some(addr) = config.iroh_addr {
-            Some(iroh::client::Iroh::connect_addr(addr).await?)
-        } else {
-            None
-        };
-
         let service = Self {
             peer_id,
             listen_addr: config.connection.listen_addr,
@@ -232,7 +228,7 @@ where
                 config.connection.expected_peer_count,
             ),
             max_peers_per_query: config.connection.max_peers_per_query as usize,
-            iroh,
+            iroh: MaybeIroh::maybe_addr(config.iroh_addr),
         };
 
         Ok(service)
@@ -486,8 +482,8 @@ where
             Request::Resolve(cid, subnet_id, response_channel) => {
                 self.start_query(cid, subnet_id, response_channel)
             }
-            Request::ResolveIroh(cid, node_addr, response_channel) => {
-                self.start_iroh_query(cid, node_addr, response_channel)
+            Request::ResolveIroh(hash, node_addr, response_channel) => {
+                self.start_iroh_query(hash, node_addr, response_channel)
             }
             Request::RateLimitUsed(peer_id, bytes) => {
                 self.content_mut().rate_limit_used(peer_id, bytes)
@@ -535,21 +531,26 @@ where
     /// Start a CID resolution using iorh.
     fn start_iroh_query(
         &mut self,
-        cid: Cid,
+        hash: Hash,
         node_addr: NodeAddr,
         response_channel: ResponseChannel,
     ) {
-        if let Some(iroh) = self.iroh.clone() {
-            tokio::spawn(async move {
-                let res = download_blob(iroh, cid, node_addr).await;
-                match res {
-                    Ok(_) => send_resolve_result(response_channel, Ok(())),
-                    Err(e) => send_resolve_result(response_channel, Err(anyhow!(e))),
+        let mut iroh = self.iroh.clone();
+        tokio::spawn(async move {
+            match iroh.client().await {
+                Ok(client) => {
+                    let res = download_blob(client, hash, node_addr).await;
+                    match res {
+                        Ok(_) => send_resolve_result(response_channel, Ok(())),
+                        Err(e) => send_resolve_result(response_channel, Err(anyhow!(e))),
+                    }
                 }
-            });
-        } else {
-            warn!("cannot resolve {}; iroh is not configured", cid);
-        }
+                Err(e) => warn!(
+                    "cannot resolve {}; failed to create iroh client ({})",
+                    hash, e
+                ),
+            }
+        });
     }
 
     /// Handle the results from a resolve attempt. If it succeeded, notify the
@@ -644,15 +645,8 @@ pub fn build_transport(local_key: Keypair) -> Boxed<(PeerId, StreamMuxerBox)> {
         .boxed()
 }
 
-async fn download_blob(
-    iroh: iroh::client::Iroh,
-    cid: Cid,
-    node_addr: NodeAddr,
-) -> anyhow::Result<()> {
-    let hash: [u8; 32] = cid.hash().digest().try_into()?;
-    let hash = iroh::blobs::Hash::from_bytes(hash);
+async fn download_blob(iroh: Iroh, hash: Hash, node_addr: NodeAddr) -> anyhow::Result<()> {
     let res = iroh.blobs().download(hash, node_addr).await?.await?;
-    info!("downloaded {}: {:?}", cid, res);
-
+    debug!("downloaded blob {}: {:?}", hash, res);
     Ok(())
 }

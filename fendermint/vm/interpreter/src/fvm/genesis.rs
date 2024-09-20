@@ -16,12 +16,13 @@ use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
 use fendermint_vm_actor_interface::{
-    account, adm, burntfunds, chainmetadata, cron, eam, init, ipc, reward, system, EMPTY_ARR,
+    account, adm, blobs, burntfunds, chainmetadata, cron, eam, init, ipc, reward, system, EMPTY_ARR,
 };
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Genesis, Power, PowerScale, Validator};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::chainid::ChainID;
+use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
 use ipc_actors_abis::i_diamond::FacetCut;
@@ -41,6 +42,9 @@ pub struct FvmGenesisOutput {
     pub power_scale: PowerScale,
     pub circ_supply: TokenAmount,
     pub validators: Vec<Validator<Power>>,
+    pub credit_debit_interval: ChainEpoch,
+    pub blob_storage_capacity: u64,
+    pub blob_debit_rate: u64,
 }
 
 #[async_trait]
@@ -108,6 +112,9 @@ where
             base_fee: genesis.base_fee,
             power_scale: genesis.power_scale,
             validators,
+            credit_debit_interval: genesis.credit_debit_interval,
+            blob_storage_capacity: genesis.blob_storage_capacity,
+            blob_debit_rate: genesis.blob_debit_rate,
         };
 
         // STAGE 0: Declare the built-in EVM contracts we'll have to deploy.
@@ -276,6 +283,21 @@ where
             )
             .context("failed to create chainmetadata actor")?;
 
+        // Initialize the blobs actor.
+        let blobs_state = fendermint_actor_blobs::State::new(
+            genesis.blob_storage_capacity,
+            genesis.blob_debit_rate,
+        );
+        state
+            .create_custom_actor(
+                fendermint_actor_blobs::BLOBS_ACTOR_NAME,
+                blobs::BLOBS_ACTOR_ID,
+                &blobs_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create blobs actor")?;
+
         let eam_state = fendermint_actor_eam::State::new(
             state.store(),
             PermissionModeParams::from(genesis.eam_permission_mode),
@@ -324,6 +346,9 @@ where
                 out.circ_supply.clone(),
                 out.chain_id.into(),
                 out.power_scale,
+                out.credit_debit_interval,
+                out.blob_storage_capacity,
+                out.blob_debit_rate,
             )
             .context("failed to init exec state")?;
 

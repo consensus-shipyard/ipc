@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use ambassador::Delegate;
-use cid::Cid;
 use fvm::call_manager::CallManager;
 use fvm::gas::Gas;
 use fvm::kernel::prelude::*;
@@ -33,13 +32,13 @@ use fvm_shared::{address::Address, econ::TokenAmount, ActorID, MethodNum};
 #[delegate(NetworkOps, where = "C: CallManager")]
 #[delegate(RandomnessOps, where = "C: CallManager")]
 #[delegate(SelfOps, where = "C: CallManager")]
-pub struct ObjectStoreKernel<C>(pub DefaultKernel<C>);
+pub struct HokuKernel<C>(pub DefaultKernel<C>);
 
-pub trait ObjectStoreOps {
+pub trait HokuOps {
     fn block_add(&mut self, cid: Cid, data: &[u8]) -> Result<()>;
 }
 
-impl<C> ObjectStoreOps for ObjectStoreKernel<C>
+impl<C> HokuOps for HokuKernel<C>
 where
     C: CallManager,
 {
@@ -55,7 +54,7 @@ where
     }
 }
 
-impl<K> SyscallHandler<K> for ObjectStoreKernel<K::CallManager>
+impl<K> SyscallHandler<K> for HokuKernel<K::CallManager>
 where
     K: Kernel
         + ActorOps
@@ -69,21 +68,21 @@ where
         + NetworkOps
         + RandomnessOps
         + SelfOps
-        + ObjectStoreOps,
+        + HokuOps,
 {
     fn link_syscalls(linker: &mut Linker<K>) -> anyhow::Result<()> {
         DefaultKernel::<K::CallManager>::link_syscalls(linker)?;
         linker.link_syscall(
             crate::SYSCALL_MODULE_NAME,
-            crate::CIDRM_SYSCALL_FUNCTION_NAME,
-            crate::cid_rm,
+            crate::HASHRM_SYSCALL_FUNCTION_NAME,
+            crate::hash_rm,
         )?;
 
         Ok(())
     }
 }
 
-impl<C> Kernel for ObjectStoreKernel<C>
+impl<C> Kernel for HokuKernel<C>
 where
     C: CallManager,
 {
@@ -106,7 +105,7 @@ where
         value_received: TokenAmount,
         read_only: bool,
     ) -> Self {
-        ObjectStoreKernel(DefaultKernel::new(
+        HokuKernel(DefaultKernel::new(
             mgr,
             blocks,
             caller,

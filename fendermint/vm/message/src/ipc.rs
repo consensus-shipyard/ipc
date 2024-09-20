@@ -1,12 +1,13 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::signed::Object;
 use cid::Cid;
 use fvm_shared::{
     address::Address, clock::ChainEpoch, crypto::signature::Signature, econ::TokenAmount,
 };
 use ipc_api::subnet_id::SubnetID;
+use iroh_base::hash::Hash;
+use iroh_base::key::NodeId;
 use serde::{Deserialize, Serialize};
 
 /// Messages involved in InterPlanetary Consensus.
@@ -19,7 +20,7 @@ pub enum IpcMessage {
     /// or later during execution, once data availability has been confirmed.
     BottomUpResolve(SignedRelayedMessage<CertifiedMessage<BottomUpCheckpoint>>),
 
-    /// A bottom-up checkpoint proposed "for execution" by the parent subnet validators, provided that the majority of them
+    /// A bottom-up checkpoint proposed "for execution" by the parent subnet validators, if the majority of them
     /// have the data available to them, already resolved.
     ///
     /// To prove that the data is available, we can either use the ABCI++ "process proposal" mechanism,
@@ -30,8 +31,11 @@ pub enum IpcMessage {
     /// state that to be checked and voted by validators.
     TopDownExec(ParentFinality),
 
-    /// Proposed by validators when an object accompanying a message has been resolved and is ready to be executed.
-    ObjectResolved(Object),
+    /// Proposed by validators when a blob has been finalized and is ready to be executed.
+    BlobFinalized(Blob),
+
+    /// Proposed by validators at the credit debit interval set at genesis.
+    DebitCreditAccounts,
 }
 
 /// A message relayed by a user on the current subnet.
@@ -105,6 +109,19 @@ pub struct ParentFinality {
     pub height: ChainEpoch,
     /// The block hash of the parent, expressed as bytes
     pub block_hash: Vec<u8>,
+}
+
+/// A blob resolution target that the validators will be voting on.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct Blob {
+    /// The address that requested the blob.
+    pub origin: Address,
+    /// The blake3 hash of the blob.
+    pub hash: Hash,
+    /// The node ID of the source node serving validators the blob.
+    pub source: NodeId,
+    /// Whether the blob was resolved or failed.
+    pub succeeded: bool,
 }
 
 #[cfg(feature = "arb")]

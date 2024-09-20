@@ -130,6 +130,7 @@ where
     /// Instantiate the execution state, once the basic genesis parameters are known.
     ///
     /// This must be called before we try to instantiate any EVM actors in genesis.
+    #[allow(clippy::too_many_arguments)]
     pub fn init_exec_state(
         &mut self,
         timestamp: Timestamp,
@@ -138,6 +139,9 @@ where
         circ_supply: TokenAmount,
         chain_id: u64,
         power_scale: PowerScale,
+        credit_debit_interval: ChainEpoch,
+        blob_storage_capacity: u64,
+        blob_debit_rate: u64,
     ) -> anyhow::Result<()> {
         self.stage = match self.stage {
             Stage::Exec(_) => bail!("execution engine already initialized"),
@@ -154,6 +158,9 @@ where
                     chain_id,
                     power_scale,
                     app_version: 0,
+                    credit_debit_interval,
+                    blob_storage_capacity,
+                    blob_debit_rate,
                 };
 
                 let exec_state =
@@ -490,7 +497,7 @@ where
 
         let addr: [u8; 20] = match f4_addr.payload() {
             Payload::Delegated(addr) => addr.subaddress().try_into().expect("hash is 20 bytes"),
-            other => panic!("not an f4 address: {other:?}"),
+            _other => panic!("not an f4 address: {_other:?}"),
         };
 
         Ok(EthAddress(addr))

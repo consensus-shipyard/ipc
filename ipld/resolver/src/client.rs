@@ -3,6 +3,7 @@
 use anyhow::anyhow;
 use async_trait::async_trait;
 use ipc_api::subnet_id::SubnetID;
+use iroh::blobs::Hash;
 use iroh::net::NodeAddr;
 use libipld::Cid;
 use tokio::sync::mpsc::UnboundedSender;
@@ -117,9 +118,9 @@ where
 /// Trait to limit the capabilities to resolving CIDs from Iroh.
 #[async_trait]
 pub trait ResolverIroh {
-    /// Send a CID for resolution from an iroh node, await its completion,
+    /// Send a hash for resolution from an Iroh node, await its completion,
     /// then return the result, to be inspected by the caller.
-    async fn resolve_iroh(&self, cid: Cid, node_addr: NodeAddr) -> anyhow::Result<ResolveResult>;
+    async fn resolve_iroh(&self, hash: Hash, node_addr: NodeAddr) -> anyhow::Result<ResolveResult>;
 }
 
 #[async_trait]
@@ -127,9 +128,9 @@ impl<V> ResolverIroh for Client<V>
 where
     V: Sync + Send + 'static,
 {
-    async fn resolve_iroh(&self, cid: Cid, node_addr: NodeAddr) -> anyhow::Result<ResolveResult> {
+    async fn resolve_iroh(&self, hash: Hash, node_addr: NodeAddr) -> anyhow::Result<ResolveResult> {
         let (tx, rx) = oneshot::channel();
-        let req = Request::ResolveIroh(cid, node_addr, tx);
+        let req = Request::ResolveIroh(hash, node_addr, tx);
         self.send_request(req)?;
         let res = rx.await?;
         Ok(res)

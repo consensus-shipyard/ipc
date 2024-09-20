@@ -941,15 +941,42 @@ dependencies = [
 
 [[package]]
 name = "blake3"
-version = "1.5.1"
+version = "1.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30cca6d3674597c30ddf2c587bf8d9d65c9a84d2326d941cc79c9842dfe0ef52"
+checksum = "e9ec96fe9a81b5e365f9db71fe00edc4fe4ca2cc7dcb7861f0603012a7caa210"
 dependencies = [
  "arrayref",
  "arrayvec 0.7.4",
  "cc",
  "cfg-if",
  "constant_time_eq 0.3.0",
+]
+
+[[package]]
+name = "blobs_actor_sdk"
+version = "0.1.0"
+dependencies = [
+ "fvm_sdk",
+ "fvm_shared",
+ "log",
+ "num-traits",
+]
+
+[[package]]
+name = "blobs_syscall"
+version = "0.1.0"
+dependencies = [
+ "ambassador",
+ "anyhow",
+ "fvm",
+ "fvm_ipld_blockstore",
+ "fvm_shared",
+ "iroh",
+ "maybe_iroh",
+ "num-traits",
+ "once_cell",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -1480,22 +1507,6 @@ name = "colorchoice"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "acbf1af155f9b9ef647e42cdc158db4b64a1b61f743629225fde6f3e0be2a7c7"
-
-[[package]]
-name = "common-multipart-rfc7578"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5baee326bc603965b0f26583e1ecd7c111c41b49bd92a344897476a352798869"
-dependencies = [
- "bytes",
- "futures-core",
- "futures-util",
- "http 0.2.12",
- "mime",
- "mime_guess",
- "rand",
- "thiserror",
-]
 
 [[package]]
 name = "concurrent-queue"
@@ -2212,20 +2223,11 @@ dependencies = [
 
 [[package]]
 name = "dirs"
-version = "4.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca3aa72a6f96ea37bbc5aa912f6788242832f75369bdfdadcb0e38423f100059"
-dependencies = [
- "dirs-sys 0.3.7",
-]
-
-[[package]]
-name = "dirs"
 version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "44c45a9d03d6676652bcb5e724c7e988de1acad23a711b5217ab9cbecbec2225"
 dependencies = [
- "dirs-sys 0.4.1",
+ "dirs-sys",
 ]
 
 [[package]]
@@ -2236,17 +2238,6 @@ checksum = "b98cf8ebf19c3d1b223e151f99a4f9f0690dca41414773390fc824184ac833e1"
 dependencies = [
  "cfg-if",
  "dirs-sys-next",
-]
-
-[[package]]
-name = "dirs-sys"
-version = "0.3.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b1d1d91c932ef41c0f2663aa8b0ca0342d444d842c06914aa0a7e352d0bada6"
-dependencies = [
- "libc",
- "redox_users",
- "winapi",
 ]
 
 [[package]]
@@ -2938,7 +2929,7 @@ checksum = "66244a771d9163282646dbeffe0e6eca4dda4146b6498644e678ac6089b11edd"
 dependencies = [
  "cfg-if",
  "const-hex",
- "dirs 5.0.1",
+ "dirs",
  "dunce",
  "ethers-core",
  "glob",
@@ -3145,6 +3136,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_actor_blobs"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "blobs_actor_sdk",
+ "fendermint_actor_blobs_shared",
+ "fil_actors_evm_shared",
+ "fil_actors_runtime",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
+ "fvm_shared",
+ "hex-literal 0.4.1",
+ "iroh-base",
+ "log",
+ "num-traits",
+ "rand",
+ "serde",
+ "serde_tuple",
+]
+
+[[package]]
+name = "fendermint_actor_blobs_shared"
+version = "0.1.0"
+dependencies = [
+ "data-encoding",
+ "fil_actors_runtime",
+ "frc42_dispatch",
+ "fvm_ipld_encoding",
+ "fvm_shared",
+ "num-derive 0.3.3",
+ "num-traits",
+ "serde",
+ "serde_tuple",
+]
+
+[[package]]
 name = "fendermint_actor_chainmetadata"
 version = "0.1.0"
 dependencies = [
@@ -3203,18 +3230,24 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid",
+ "fendermint_actor_blobs_shared",
  "fendermint_actor_machine",
  "fendermint_testing",
+ "fil_actors_evm_shared",
  "fil_actors_runtime",
  "frc42_dispatch",
  "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
  "fvm_ipld_hamt 0.9.0",
  "fvm_shared",
+ "hex-literal 0.4.1",
+ "iroh-base",
+ "log",
  "num-derive 0.3.3",
  "num-traits",
  "quickcheck",
  "quickcheck_macros",
+ "rand",
  "serde",
  "serde_tuple",
 ]
@@ -3226,6 +3259,7 @@ dependencies = [
  "anyhow",
  "cid",
  "fendermint_actor_accumulator",
+ "fendermint_actor_blobs",
  "fendermint_actor_chainmetadata",
  "fendermint_actor_eam",
  "fendermint_actor_objectstore",
@@ -3250,6 +3284,7 @@ dependencies = [
  "ethers",
  "fendermint_abci",
  "fendermint_actor_accumulator",
+ "fendermint_actor_blobs_shared",
  "fendermint_actor_machine",
  "fendermint_actor_objectstore",
  "fendermint_app_options",
@@ -3289,7 +3324,7 @@ dependencies = [
  "libp2p",
  "libp2p-bitswap",
  "literally",
- "multiaddr 0.18.1",
+ "multiaddr",
  "num-traits",
  "openssl",
  "paste",
@@ -3348,7 +3383,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "config 0.13.4",
- "dirs 5.0.1",
+ "dirs",
  "fendermint_vm_encoding",
  "fendermint_vm_topdown",
  "fvm_ipld_encoding",
@@ -3356,7 +3391,7 @@ dependencies = [
  "ipc-api",
  "ipc-provider",
  "lazy_static",
- "multiaddr 0.18.1",
+ "multiaddr",
  "regex",
  "serde",
  "serde_json",
@@ -3716,9 +3751,12 @@ dependencies = [
  "arbitrary",
  "async-stm",
  "async-trait",
+ "blobs_syscall",
  "cid",
  "ethers",
  "fendermint_actor_accumulator",
+ "fendermint_actor_blobs",
+ "fendermint_actor_blobs_shared",
  "fendermint_actor_chainmetadata",
  "fendermint_actor_eam",
  "fendermint_actor_objectstore",
@@ -3749,10 +3787,10 @@ dependencies = [
  "hex",
  "ipc-api",
  "ipc_actors_abis",
+ "iroh",
  "libipld",
  "multihash 0.18.1",
  "num-traits",
- "objectstore_syscall",
  "pin-project",
  "quickcheck",
  "quickcheck_macros",
@@ -3775,13 +3813,13 @@ name = "fendermint_vm_iroh_resolver"
 version = "0.1.0"
 dependencies = [
  "async-stm",
- "cid",
  "fendermint_vm_topdown",
  "im",
  "ipc-api",
  "ipc_ipld_resolver",
  "iroh",
  "libp2p",
+ "rand",
  "serde",
  "tokio",
  "tracing",
@@ -3806,7 +3844,7 @@ dependencies = [
  "fvm_shared",
  "hex",
  "ipc-api",
- "iroh",
+ "iroh-base",
  "lazy_static",
  "num-traits",
  "quickcheck",
@@ -3876,7 +3914,6 @@ dependencies = [
  "async-stm",
  "async-trait",
  "bytes",
- "cid",
  "clap 4.5.4",
  "ethers",
  "fendermint_crypto",
@@ -3892,6 +3929,7 @@ dependencies = [
  "ipc-provider",
  "ipc_actors_abis",
  "ipc_ipld_resolver",
+ "iroh-base",
  "libp2p",
  "num-traits",
  "rand",
@@ -5295,19 +5333,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hyper-multipart-rfc7578"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0eb2cf73e96e9925f4bed948e763aa2901c2f1a3a5f713ee41917433ced6671"
-dependencies = [
- "bytes",
- "common-multipart-rfc7578",
- "futures-core",
- "http 0.2.12",
- "hyper 0.14.28",
-]
-
-[[package]]
 name = "hyper-proxy"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5743,7 +5768,7 @@ dependencies = [
  "base64 0.21.7",
  "bytes",
  "cid",
- "dirs 5.0.1",
+ "dirs",
  "ethers",
  "ethers-contract",
  "fil_actors_runtime",
@@ -5868,6 +5893,7 @@ dependencies = [
  "libsecp256k1",
  "log",
  "lru_time_cache",
+ "maybe_iroh",
  "multihash 0.18.1",
  "prometheus",
  "quickcheck",
@@ -5889,48 +5915,6 @@ dependencies = [
  "widestring",
  "windows-sys 0.48.0",
  "winreg 0.50.0",
-]
-
-[[package]]
-name = "ipfs-api-backend-hyper"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a9d131b408b4caafe1e7c00d410a09ad3eb7e3ab68690cf668e86904b2176b4"
-dependencies = [
- "async-trait",
- "base64 0.13.1",
- "bytes",
- "futures",
- "http 0.2.12",
- "hyper 0.14.28",
- "hyper-multipart-rfc7578",
- "ipfs-api-prelude",
- "thiserror",
-]
-
-[[package]]
-name = "ipfs-api-prelude"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b74065805db266ba2c6edbd670b23c4714824a955628472b2e46cc9f3a869cb"
-dependencies = [
- "async-trait",
- "bytes",
- "cfg-if",
- "common-multipart-rfc7578",
- "dirs 4.0.0",
- "futures",
- "http 0.2.12",
- "multiaddr 0.17.1",
- "multibase",
- "serde",
- "serde_json",
- "serde_urlencoded",
- "thiserror",
- "tokio",
- "tokio-util 0.7.10",
- "tracing",
- "walkdir",
 ]
 
 [[package]]
@@ -6615,7 +6599,7 @@ dependencies = [
  "libp2p-tcp",
  "libp2p-upnp",
  "libp2p-yamux",
- "multiaddr 0.18.1",
+ "multiaddr",
  "pin-project",
  "rw-stream-sink",
  "thiserror",
@@ -6674,7 +6658,7 @@ dependencies = [
  "futures-timer",
  "instant",
  "libp2p-identity",
- "multiaddr 0.18.1",
+ "multiaddr",
  "multihash 0.19.1",
  "multistream-select",
  "once_cell",
@@ -6884,7 +6868,7 @@ dependencies = [
  "futures",
  "libp2p-core",
  "libp2p-identity",
- "multiaddr 0.18.1",
+ "multiaddr",
  "multihash 0.19.1",
  "once_cell",
  "quick-protobuf",
@@ -7297,6 +7281,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e7465ac9959cc2b1404e8e2367b43684a6d13790fe23056cc8c6c5a6b7bcb94"
 
 [[package]]
+name = "maybe_iroh"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "iroh",
+]
+
+[[package]]
 name = "md-5"
 version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7452,25 +7444,6 @@ dependencies = [
 
 [[package]]
 name = "multiaddr"
-version = "0.17.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b36f567c7099511fa8612bbbb52dda2419ce0bdbacf31714e3a5ffdb766d3bd"
-dependencies = [
- "arrayref",
- "byteorder",
- "data-encoding",
- "log",
- "multibase",
- "multihash 0.17.0",
- "percent-encoding",
- "serde",
- "static_assertions",
- "unsigned-varint 0.7.2",
- "url",
-]
-
-[[package]]
-name = "multiaddr"
 version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b852bc02a2da5feed68cd14fa50d0774b92790a5bdbfa932a813926c8472070"
@@ -7497,17 +7470,6 @@ dependencies = [
  "base-x",
  "data-encoding",
  "data-encoding-macro",
-]
-
-[[package]]
-name = "multihash"
-version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "835d6ff01d610179fbce3de1694d007e500bf33a7f29689838941d6bf783ae40"
-dependencies = [
- "core2",
- "multihash-derive",
- "unsigned-varint 0.7.2",
 ]
 
 [[package]]
@@ -8001,31 +7963,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6a622008b6e321afc04970976f62ee297fdbaa6f95318ca343e3eebb9648441"
 dependencies = [
  "memchr",
-]
-
-[[package]]
-name = "objectstore_actor_sdk"
-version = "0.1.0"
-dependencies = [
- "fvm_sdk",
- "fvm_shared",
- "num-traits",
-]
-
-[[package]]
-name = "objectstore_syscall"
-version = "0.1.0"
-dependencies = [
- "ambassador",
- "anyhow",
- "cid",
- "fvm",
- "fvm_ipld_blockstore",
- "fvm_shared",
- "ipfs-api-backend-hyper",
- "num-traits",
- "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -11158,7 +11095,7 @@ version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "11297baafe5fa0c99d5722458eac6a5e25c01eb1b8e5cd137f54079093daa7a4"
 dependencies = [
- "dirs 5.0.1",
+ "dirs",
  "fs2",
  "hex",
  "once_cell",

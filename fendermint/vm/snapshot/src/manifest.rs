@@ -166,7 +166,7 @@ mod arb {
 
     use super::SnapshotManifest;
 
-    impl quickcheck::Arbitrary for SnapshotManifest {
+    impl Arbitrary for SnapshotManifest {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
             let checksum: [u8; 32] = std::array::from_fn(|_| u8::arbitrary(g));
 
@@ -190,6 +190,9 @@ mod arb {
                         .into(),
                     power_scale: *g.choose(&[-1, 0, 3]).unwrap(),
                     app_version: 0,
+                    credit_debit_interval: 0,
+                    blob_storage_capacity: u64::arbitrary(g),
+                    blob_debit_rate: u64::arbitrary(g),
                 },
                 version: Arbitrary::arbitrary(g),
             }
@@ -215,7 +218,7 @@ mod tests {
         let file_path = file.into_temp_path();
         let file_digest = file_checksum(file_path).expect("checksum");
 
-        let content_digest = cid::multihash::Code::Sha2_256.digest(content);
+        let content_digest = multihash::Code::Sha2_256.digest(content);
         let content_digest = content_digest.digest();
 
         assert_eq!(file_digest.as_bytes(), content_digest)

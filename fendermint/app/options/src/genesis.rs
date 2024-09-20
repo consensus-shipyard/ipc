@@ -11,6 +11,7 @@ use super::parse::{
     parse_token_amount,
 };
 use fendermint_vm_genesis::SignerAddr;
+use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount, version::NetworkVersion};
 
 #[derive(Debug, Clone, ValueEnum)]
@@ -87,6 +88,15 @@ pub struct GenesisNewArgs {
     /// Number of decimals to use during converting FIL to Power.
     #[arg(long, short)]
     pub power_scale: i8,
+    /// Block interval at which to debit all credit accounts.
+    #[arg(long, default_value = "3600")]
+    pub credit_debit_interval: ChainEpoch,
+    /// Subnet capacity
+    #[arg(long, default_value = "4294967296")]
+    pub blob_storage_capacity: u64,
+    /// Subnet debit rate
+    #[arg(long, default_value = "1")]
+    pub blob_debit_rate: u64,
 }
 
 #[derive(Args, Debug)]
@@ -204,4 +214,16 @@ pub struct GenesisFromParentArgs {
     /// Number of decimals to use during converting FIL to Power.
     #[arg(long, default_value = "3")]
     pub power_scale: i8,
+
+    /// Block interval at which to debit all credit accounts.
+    #[arg(long, default_value = "3600")]
+    pub credit_debit_interval: ChainEpoch,
+
+    /// Subnet capacity in bytes.
+    #[arg(long, default_value = "4294967296")]
+    pub blob_storage_capacity: u64,
+
+    /// Subnet debit rate
+    #[arg(long, default_value = "1")]
+    pub blob_debit_rate: u64,
 }

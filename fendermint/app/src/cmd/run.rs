@@ -1,7 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::net::ToSocketAddrs;
 use std::sync::Arc;
 
 use anyhow::{anyhow, bail, Context};
@@ -19,7 +18,7 @@ use fendermint_vm_interpreter::chain::ChainEnv;
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
 use fendermint_vm_interpreter::{
     bytes::{BytesMessageInterpreter, ProposalPrepareMode},
-    chain::{ChainMessageInterpreter, CheckpointPool, ObjectPool},
+    chain::{BlobPool, ChainMessageInterpreter, CheckpointPool},
     fvm::{Broadcaster, FvmMessageInterpreter, ValidatorContext},
     signed::SignedMessageInterpreter,
 };
@@ -29,7 +28,7 @@ use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::proxy::IPCProviderProxy;
 use fendermint_vm_topdown::sync::launch_polling_syncer;
 use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
-use fendermint_vm_topdown::{CachedFinalityProvider, IPCObjectFinality, IPCParentFinality, Toggle};
+use fendermint_vm_topdown::{CachedFinalityProvider, IPCBlobFinality, IPCParentFinality, Toggle};
 use fvm_shared::address::{current_network, Address, Network};
 use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
@@ -158,7 +157,7 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
         NamespaceBlockstore::new(db.clone(), ns.state_store).context("error creating state DB")?;
 
     let checkpoint_pool = CheckpointPool::new();
-    let iroh_pin_pool = ObjectPool::new();
+    let iroh_pin_pool = BlobPool::new();
     let parent_finality_votes = VoteTally::empty();
 
     let topdown_enabled = settings.topdown_enabled();
@@ -232,7 +231,7 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
                 parent_finality_votes.clone(),
                 key,
                 own_subnet_id,
-                |value| AppVote::ObjectFinality(IPCObjectFinality { object: value }),
+                |hash, success| AppVote::BlobFinality(IPCBlobFinality::new(hash, success)),
             );
 
             info!("starting the iroh Resolver...");
@@ -330,7 +329,8 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
             checkpoint_pool,
             parent_finality_provider: parent_finality_provider.clone(),
             parent_finality_votes: parent_finality_votes.clone(),
-            object_pool: iroh_pin_pool,
+            blob_pool: iroh_pin_pool,
+            blob_concurrency: settings.blob_concurrency,
         },
         snapshots,
     )?;
@@ -452,11 +452,7 @@ fn make_ipc_provider_proxy(settings: &Settings) -> anyhow::Result<IPCProviderPro
             .parent()
             .ok_or_else(|| anyhow!("subnet has no parent"))?,
         config: SubnetConfig::Fevm(EVMSubnet {
-            provider_http: topdown_config
-                .parent_http_endpoint
-                .to_string()
-                .parse()
-                .unwrap(),
+            provider_http: topdown_config.parent_http_endpoint.to_string().parse()?,
             provider_timeout: topdown_config.parent_http_timeout,
             auth_token: topdown_config.parent_http_auth_token.as_ref().cloned(),
             registry_addr: topdown_config.parent_registry,
@@ -491,11 +487,6 @@ fn to_resolver_config(
         settings.ipc.subnet_id.root_id(),
         r.network.network_name
     );
-
-    let iroh_addr = iroh_addr
-        .to_socket_addrs()?
-        .next()
-        .ok_or(anyhow!("failed to convert iroh_addr to a socket address"))?;
 
     let config = Config {
         connection: ConnectionConfig {
@@ -626,11 +617,15 @@ async fn dispatch_vote(
                 )
             }
         }
-        AppVote::ObjectFinality(f) => {
-            debug!(cid = ?f.object, "received vote for object finality");
+        AppVote::BlobFinality(f) => {
+            debug!(hash = ?f.hash, success = ?f.success, "received vote for blob finality");
 
             let res = atomically_or_err(|| {
-                parent_finality_votes.add_object_vote(vote.public_key.clone(), f.object.to_bytes())
+                parent_finality_votes.add_blob_vote(
+                    vote.public_key.clone(),
+                    f.hash.as_bytes().to_vec(),
+                    f.success,
+                )
             })
             .await;
 

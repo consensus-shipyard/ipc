@@ -7,7 +7,7 @@ export FM_NETWORK=test
 # Create a new Genesis file
 rm -rf test-network
 mkdir test-network
-fendermint genesis --genesis-file test-network/genesis.json new --chain-name test --base-fee 1000 --timestamp 1680101412 --power-scale 0
+fendermint genesis --genesis-file test-network/genesis.json new --chain-name test --base-fee 1000 --timestamp 1680101412 --power-scale 3 --credit-debit-interval 10
 
 # Create some keys
 mkdir test-network/keys
