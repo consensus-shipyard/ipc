@@ -42,6 +42,12 @@ impl CreateSubnet {
             .clone()
             .unwrap_or(ZERO_ADDRESS.to_string());
         let validator_gater = require_fil_addr_from_str(&raw_addr)?;
+
+        let raw_addr = arguments
+            .validator_gater
+            .clone()
+            .unwrap_or(ZERO_ADDRESS.to_string());
+        let validator_gater = require_fil_addr_from_str(&raw_addr)?;
         let addr = provider
             .create_subnet(
                 from,
@@ -164,6 +170,7 @@ pub struct CreateSubnetArgs {
         long,
         help = "The address of validator gating contract. None if validator gating is disabled"
     )]
+    pub validator_gater: Option<String>,
     #[arg(
         long,
         help = "The kind of collateral source of a subnet on its parent subnet: native or erc20",
@@ -175,5 +182,4 @@ pub struct CreateSubnetArgs {
         help = "The address of collateral source of a subnet on its parent subnet. None if kind is native"
     )]
     pub collateral_source_address: Option<String>,
-    pub validator_gater: Option<String>,
 }

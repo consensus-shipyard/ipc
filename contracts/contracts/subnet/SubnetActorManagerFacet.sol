@@ -201,7 +201,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
     /// @dev `leave` must be used to unstake the entire stake.
     /// @param amount The amount to unstake.
     function unstake(uint256 amount) external nonReentrant whenNotPaused notKilled {
-        // disbling validator changes for federated validation subnets (at least for now
+        // disabling validator changes for federated validation subnets (at least for now
         // until a more complex mechanism is implemented).
         LibSubnetActor.enforceCollateralValidation();
 
@@ -230,7 +230,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
 
     /// @notice method that allows a validator to leave the subnet.
     function leave() external nonReentrant whenNotPaused notKilled {
-        // disbling validator changes for federated subnets (at least for now
+        // disabling validator changes for federated subnets (at least for now
         // until a more complex mechanism is implemented).
         // This means that initial validators won't be able to recover
         // their collateral ever (worth noting in the docs if this ends

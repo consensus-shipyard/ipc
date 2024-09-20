@@ -27,7 +27,7 @@ impl CommandLineHandler for InitConfig {
         })?;
         file.write_all(DEFAULT_CONFIG_TEMPLATE.as_bytes())
             .inspect_err(|e| {
-                log::error!("error populating empty config template {e}");
+                log::error!("error populating empty config template: {e}");
             })?;
 
         log::info!("Empty config populated successful in {}", &path);
