@@ -9,7 +9,7 @@ use crate::checkpoint::BottomUpMsgBatch;
 use crate::cross::{IpcEnvelope, IpcMsgKind};
 use crate::staking::StakingChange;
 use crate::staking::StakingChangeRequest;
-use crate::subnet::{GenericToken, GenericTokenKind};
+use crate::subnet::{Asset, AssetKind};
 use crate::subnet_id::SubnetID;
 use crate::{eth_to_fil_amount, ethers_address_to_fil_address};
 use anyhow::anyhow;
@@ -183,10 +183,10 @@ macro_rules! bottom_up_msg_batch_conversion {
 /// The type conversion between different generic token types
 macro_rules! generic_token_conversion {
     ($module:ident) => {
-        impl TryFrom<GenericToken> for $module::GenericToken {
+        impl TryFrom<Asset> for $module::Asset {
             type Error = anyhow::Error;
 
-            fn try_from(value: GenericToken) -> Result<Self, Self::Error> {
+            fn try_from(value: Asset) -> Result<Self, Self::Error> {
                 let token_address = if let Some(token_address) = value.token_address {
                     payload_to_evm_address(token_address.payload())?
                 } else {
@@ -200,10 +200,10 @@ macro_rules! generic_token_conversion {
             }
         }
 
-        impl TryFrom<$module::GenericToken> for GenericToken {
+        impl TryFrom<$module::Asset> for Asset {
             type Error = anyhow::Error;
 
-            fn try_from(value: $module::GenericToken) -> Result<Self, Self::Error> {
+            fn try_from(value: $module::Asset) -> Result<Self, Self::Error> {
                 let token_address = if value.token_address == ethers::types::Address::zero() {
                     None
                 } else {
@@ -211,7 +211,7 @@ macro_rules! generic_token_conversion {
                 };
 
                 Ok(Self {
-                    kind: GenericTokenKind::try_from(value.kind)?,
+                    kind: AssetKind::try_from(value.kind)?,
                     token_address,
                 })
             }
@@ -241,13 +241,13 @@ generic_token_conversion!(subnet_actor_diamond);
 generic_token_conversion!(register_subnet_facet);
 generic_token_conversion!(subnet_actor_getter_facet);
 
-impl TryFrom<u8> for GenericTokenKind {
+impl TryFrom<u8> for AssetKind {
     type Error = anyhow::Error;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            0 => Ok(GenericTokenKind::Native),
-            1 => Ok(GenericTokenKind::ERC20),
+            0 => Ok(AssetKind::Native),
+            1 => Ok(AssetKind::ERC20),
             _ => Err(anyhow!("invalid kind {value}")),
         }
     }

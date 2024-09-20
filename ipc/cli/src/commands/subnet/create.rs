@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use clap::Args;
 use fvm_shared::clock::ChainEpoch;
 
-use ipc_api::subnet::{GenericToken, GenericTokenKind, PermissionMode};
+use ipc_api::subnet::{Asset, AssetKind, PermissionMode};
 use ipc_api::subnet_id::SubnetID;
 
 use crate::commands::get_ipc_provider;
@@ -42,12 +42,6 @@ impl CreateSubnet {
             .clone()
             .unwrap_or(ZERO_ADDRESS.to_string());
         let validator_gater = require_fil_addr_from_str(&raw_addr)?;
-
-        let raw_addr = arguments
-            .validator_gater
-            .clone()
-            .unwrap_or(ZERO_ADDRESS.to_string());
-        let validator_gater = require_fil_addr_from_str(&raw_addr)?;
         let addr = provider
             .create_subnet(
                 from,
@@ -70,21 +64,21 @@ impl CreateSubnet {
     }
 }
 
-fn parse_supply_source(arguments: &CreateSubnetArgs) -> anyhow::Result<GenericToken> {
+fn parse_supply_source(arguments: &CreateSubnetArgs) -> anyhow::Result<Asset> {
     let token_address = if let Some(addr) = &arguments.supply_source_address {
         Some(require_fil_addr_from_str(addr)?)
     } else {
         None
     };
-    Ok(GenericToken {
+    Ok(Asset {
         kind: arguments.supply_source_kind,
         token_address,
     })
 }
 
-fn parse_collateral_source(arguments: &CreateSubnetArgs) -> anyhow::Result<GenericToken> {
+fn parse_collateral_source(arguments: &CreateSubnetArgs) -> anyhow::Result<Asset> {
     let Some(ref kind) = arguments.collateral_source_kind else {
-        return Ok(GenericToken::default());
+        return Ok(Asset::default());
     };
 
     let token_address = if let Some(addr) = &arguments.collateral_source_address {
@@ -93,7 +87,7 @@ fn parse_collateral_source(arguments: &CreateSubnetArgs) -> anyhow::Result<Gener
         None
     };
 
-    Ok(GenericToken {
+    Ok(Asset {
         kind: *kind,
         token_address,
     })
@@ -156,11 +150,11 @@ pub struct CreateSubnetArgs {
     #[arg(
         long,
         help = "The kind of supply source of a subnet on its parent subnet: native or erc20",
-        value_parser = GenericTokenKind::from_str,
+        value_parser = AssetKind::from_str,
     )]
-    // TODO figure out a way to use a newtype + ValueEnum, or reference GenericTokenKind::VARIANTS to
+    // TODO figure out a way to use a newtype + ValueEnum, or reference AssetKind::VARIANTS to
     //  enumerate all variants
-    pub supply_source_kind: GenericTokenKind,
+    pub supply_source_kind: AssetKind,
     #[arg(
         long,
         help = "The address of supply source of a subnet on its parent subnet. None if kind is native"
@@ -174,9 +168,9 @@ pub struct CreateSubnetArgs {
     #[arg(
         long,
         help = "The kind of collateral source of a subnet on its parent subnet: native or erc20",
-        value_parser = GenericTokenKind::from_str,
+        value_parser = AssetKind::from_str,
     )]
-    pub collateral_source_kind: Option<GenericTokenKind>,
+    pub collateral_source_kind: Option<AssetKind>,
     #[arg(
         long,
         help = "The address of collateral source of a subnet on its parent subnet. None if kind is native"

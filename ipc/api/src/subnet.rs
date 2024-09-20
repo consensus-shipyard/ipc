@@ -39,17 +39,17 @@ pub enum PermissionMode {
 
 /// Defines a generic token of a subnet on its parent subnet.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct GenericToken {
+pub struct Asset {
     /// The kind of supply.
-    pub kind: GenericTokenKind,
+    pub kind: AssetKind,
     /// The address of the ERC20 token if that supply kind is selected.
     pub token_address: Option<Address>,
 }
 
-impl Default for GenericToken {
+impl Default for Asset {
     fn default() -> Self {
         Self {
-            kind: GenericTokenKind::Native,
+            kind: AssetKind::Native,
             token_address: None,
         }
     }
@@ -69,7 +69,7 @@ impl Default for GenericToken {
     strum::VariantNames,
 )]
 #[strum(serialize_all = "snake_case")]
-pub enum GenericTokenKind {
+pub enum AssetKind {
     Native,
     ERC20,
 }
@@ -85,9 +85,8 @@ pub struct ConstructParams {
     pub active_validators_limit: u16,
     pub min_cross_msg_fee: TokenAmount,
     pub permission_mode: PermissionMode,
-    pub supply_source: GenericToken,
-    pub collateral_source: GenericToken,
-    pub validator_gater: Address,
+    pub supply_source: Asset,
+    pub collateral_source: Asset,
     pub validator_gater: Address,
 }
 
