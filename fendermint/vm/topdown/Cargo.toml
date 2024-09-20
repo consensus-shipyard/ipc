@@ -34,8 +34,10 @@ prometheus = { workspace = true }
 fendermint_vm_genesis = { path = "../genesis" }
 fendermint_vm_event = { path = "../event" }
 fendermint_tracing = { path = "../../tracing" }
+fendermint_crypto = { path = "../../crypto" }
 
 ipc-observability = { workspace = true }
+secp256k1 = { workspace = true, features = ["recovery", "bitcoin_hashes"] }
 
 [dev-dependencies]
 arbitrary = { workspace = true }
@@ -43,5 +45,4 @@ clap = { workspace = true }
 rand = { workspace = true }
 tracing-subscriber = { workspace = true }
 
-fendermint_crypto = { path = "../../crypto" }
 fendermint_testing = { path = "../../testing", features = ["smt"] }

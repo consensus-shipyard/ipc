@@ -2,16 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 mod operation;
+mod payload;
+mod store;
+mod tally;
 
 use crate::sync::TopDownSyncEvent;
 use crate::vote::operation::{OperationMetrics, OperationStateMachine};
+use crate::vote::payload::Vote;
 use crate::BlockHeight;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::sync::{broadcast, mpsc};
 
-#[derive(Clone)]
-pub struct VoteRecord {}
+pub type Weight = u64;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
@@ -31,8 +34,8 @@ pub struct VoteReactorClient {
 
 pub fn start_vote_reactor(
     config: Config,
-    gossip_rx: broadcast::Receiver<VoteRecord>,
-    gossip_tx: mpsc::Sender<VoteRecord>,
+    gossip_rx: broadcast::Receiver<Vote>,
+    gossip_tx: mpsc::Sender<Vote>,
     internal_event_listener: broadcast::Receiver<TopDownSyncEvent>,
 ) -> VoteReactorClient {
     let (tx, rx) = mpsc::channel(config.req_channel_buffer_size);
@@ -57,6 +60,27 @@ pub fn start_vote_reactor(
     VoteReactorClient { tx }
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("the last finalized block has not been set")]
+    Uninitialized,
+
+    #[error("failed to extend chain; height going backwards, current height {0}, got {1}")]
+    UnexpectedBlock(BlockHeight, BlockHeight),
+
+    #[error("validator unknown or has no power")]
+    UnpoweredValidator,
+
+    #[error("equivocation by validator")]
+    Equivocation,
+
+    #[error("validator vote is invalidated")]
+    VoteCannotBeValidated,
+
+    #[error("validator cannot sign vote")]
+    CannotSignVote,
+}
+
 enum VoteReactorRequest {
     QueryOperationMode,
     QueryVotes(BlockHeight),
@@ -67,8 +91,8 @@ struct VotingHandler {
     /// vote tally status and etc.
     req_rx: mpsc::Receiver<VoteReactorRequest>,
     /// Receiver from gossip pub/sub, mostly listening to incoming votes
-    gossip_rx: broadcast::Receiver<VoteRecord>,
-    gossip_tx: mpsc::Sender<VoteRecord>,
+    gossip_rx: broadcast::Receiver<Vote>,
+    gossip_tx: mpsc::Sender<Vote>,
     /// Listens to internal events and handles the events accordingly
     internal_event_listener: broadcast::Receiver<TopDownSyncEvent>,
     config: Config,
@@ -77,10 +101,11 @@ struct VotingHandler {
 impl VotingHandler {
     fn handle_request(&self, _req: VoteReactorRequest) {}
 
-    fn record_vote(&self, _vote: VoteRecord) {}
+    fn record_vote(&self, _vote: Vote) {}
 
     fn handle_event(&self, _event: TopDownSyncEvent) {}
 
+    /// Process external request, such as RPC queries for debugging and status tracking.
     fn process_external_request(&mut self, _metrics: &OperationMetrics) -> usize {
         let mut n = 0;
         while n < self.config.req_batch_processing_size {
@@ -99,6 +124,7 @@ impl VotingHandler {
         n
     }
 
+    /// Handles vote tally gossip pab/sub incoming votes from other peers
     fn process_gossip_subscription_votes(&mut self) -> usize {
         let mut n = 0;
         while n < self.config.gossip_req_processing_size {
@@ -117,6 +143,7 @@ impl VotingHandler {
         n
     }
 
+    /// Poll internal topdown syncer event broadcasted.
     fn poll_internal_event(&mut self) -> Option<TopDownSyncEvent> {
         match self.internal_event_listener.try_recv() {
             Ok(event) => Some(event),

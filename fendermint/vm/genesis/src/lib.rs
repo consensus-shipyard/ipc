@@ -3,6 +3,8 @@
 //! A Genesis data structure similar to [genesis.Template](https://github.com/filecoin-project/lotus/blob/v1.20.4/genesis/types.go)
 //! in Lotus, which is used to [initialize](https://github.com/filecoin-project/lotus/blob/v1.20.4/chain/gen/genesis/genesis.go) the state tree.
 
+use std::fmt::{Display, Formatter};
+use std::hash::{Hash, Hasher};
 use anyhow::anyhow;
 use fvm_shared::bigint::{BigInt, Integer};
 use serde::{Deserialize, Serialize};
@@ -150,6 +152,12 @@ impl ValidatorKey {
         Self(normalize_public_key(key))
     }
 
+    pub fn from_compressed_pubkey(compress: &[u8; 33]) -> anyhow::Result<Self> {
+        Ok(Self(
+            PublicKey::parse_compressed(compress)?
+        ))
+    }
+
     pub fn public_key(&self) -> &PublicKey {
         &self.0
     }
@@ -243,6 +251,19 @@ pub mod ipc {
         pub bottom_up_check_period: u64,
         pub majority_percentage: u8,
         pub active_validators_limit: u16,
+    }
+}
+
+impl Display for ValidatorKey {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Validator({})", hex::encode(self.0.serialize()))
+    }
+}
+
+impl Hash for ValidatorKey {
+    fn hash<H: Hasher>(&self, h: &mut H) {
+        let bytes = self.0.serialize();
+        Hash::hash(&bytes, h);
     }
 }
 
