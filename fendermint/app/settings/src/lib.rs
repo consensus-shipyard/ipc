@@ -278,6 +278,9 @@ pub struct Settings {
     /// Secp256k1 private key used for signing transactions sent in the validator's name. Leave empty if not validating.
     pub validator_key: Option<SigningKey>,
 
+    /// Number of pending blobs to process in parallel.
+    pub blob_concurrency: u32,
+
     pub abci: AbciSettings,
     pub db: DbSettings,
     pub metrics: MetricsSettings,

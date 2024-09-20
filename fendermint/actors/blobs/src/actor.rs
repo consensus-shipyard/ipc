@@ -2,11 +2,12 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 
 use fendermint_actor_blobs_shared::params::{
     AddBlobParams, ApproveCreditParams, BuyCreditParams, DeleteBlobParams, FinalizeBlobParams,
-    GetAccountParams, GetBlobParams, GetBlobStatusParams, GetStatsReturn, RevokeCreditParams,
+    GetAccountParams, GetBlobParams, GetBlobStatusParams, GetPendingBlobsParams, GetStatsReturn,
+    RevokeCreditParams,
 };
 use fendermint_actor_blobs_shared::state::{
     Account, Blob, BlobStatus, CreditApproval, Hash, PublicKey, Subscription,
@@ -30,6 +31,8 @@ use crate::{ext, ConstructorParams, State, BLOBS_ACTOR_NAME};
 fil_actors_runtime::wasm_trampoline!(BlobsActor);
 
 pub struct BlobsActor;
+
+type BlobTuple = (Hash, HashSet<(Address, PublicKey)>);
 
 impl BlobsActor {
     fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
@@ -192,12 +195,12 @@ impl BlobsActor {
         Ok(status)
     }
 
-    // TODO: limit return via param
     fn get_pending_blobs(
         rt: &impl Runtime,
-    ) -> Result<BTreeMap<Hash, HashSet<(Address, PublicKey)>>, ActorError> {
+        params: GetPendingBlobsParams,
+    ) -> Result<Vec<BlobTuple>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let pending = rt.state::<State>()?.get_pending_blobs();
+        let pending = rt.state::<State>()?.get_pending_blobs(params.0);
         Ok(pending)
     }
 

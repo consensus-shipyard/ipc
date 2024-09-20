@@ -181,7 +181,7 @@ mkdir -p "$IPC_CONFIG_FOLDER"
 
 # Copy configs
 cp "$HOME"/evm_keystore.json "$IPC_CONFIG_FOLDER"
-cp "$IPC_FOLDER"/scripts/deploy_subnet_under_calibration_net/.ipc/config.toml "$IPC_CONFIG_FOLDER"
+cp "$IPC_FOLDER"/scripts/deploy_subnet/.ipc-cal/config.toml "$IPC_CONFIG_FOLDER"
 cp "$IPC_FOLDER"/infra/prometheus/prometheus.yaml "$IPC_CONFIG_FOLDER"
 cp "$IPC_FOLDER"/infra/loki/loki-config.yaml "$IPC_CONFIG_FOLDER"
 cp "$IPC_FOLDER"/infra/promtail/promtail-config.yaml "$IPC_CONFIG_FOLDER"
