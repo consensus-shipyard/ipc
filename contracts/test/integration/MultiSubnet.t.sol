@@ -8,7 +8,7 @@ import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMs
 import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
 import {SubnetID, Subnet, IPCAddress, Validator} from "../../contracts/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
-import {GenericTokenHelper} from "../../contracts/lib/GenericTokenHelper.sol";
+import {AssetHelper} from "../../contracts/lib/AssetHelper.sol";
 import {FvmAddressHelper} from "../../contracts/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../../contracts/lib/CrossMsgHelper.sol";
 import {GatewayDiamond, FEATURE_MULTILEVEL_CROSSMSG} from "../../contracts/GatewayDiamond.sol";
@@ -448,7 +448,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, nilTokenSubnet.subnetActorAddr, rootSubnet.gateway);
 
         vm.prank(caller);
-        vm.expectRevert(GenericTokenHelper.NoBalanceIncrease.selector);
+        vm.expectRevert(AssetHelper.NoBalanceIncrease.selector);
         rootSubnet.gateway.manager().fundWithToken(nilTokenSubnet.id, FvmAddressHelper.from(address(caller)), amount);
         assertEq(getSubnetCircSupplyGW(nilTokenSubnet.id, rootSubnet.gateway), 0);
     }

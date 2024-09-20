@@ -2,32 +2,32 @@
 pragma solidity ^0.8.23;
 
 import {NotEnoughBalance, IncreaseAllowanceFailed} from "../errors/IPCErrors.sol";
-import {GenericToken, GenericTokenKind} from "../structs/Subnet.sol";
+import {Asset, AssetKind} from "../structs/Subnet.sol";
 import {EMPTY_BYTES} from "../constants/Constants.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {SubnetActorGetterFacet} from "../subnet/SubnetActorGetterFacet.sol";
 
 /// @notice Helpers to deal with a supply source.
-library GenericTokenHelper {
+library AssetHelper {
     using SafeERC20 for IERC20;
 
     error InvalidERC20Address();
     error NoBalanceIncrease();
-    error UnexpectedGenericToken();
-    error UnknownGenericToken();
+    error UnexpectedAsset();
+    error UnknownAsset();
 
     /// @notice Assumes that the address provided belongs to a subnet rooted on this network,
     ///         and checks if its supply kind matches the provided one.
     ///         It reverts if the address does not correspond to a subnet actor.
-    function hasSupplyOfKind(address subnetActor, GenericTokenKind compare) internal view returns (bool) {
+    function hasSupplyOfKind(address subnetActor, AssetKind compare) internal view returns (bool) {
         return SubnetActorGetterFacet(subnetActor).supplySource().kind == compare;
     }
 
     /// @notice Checks that a given supply strategy is correctly formed and its preconditions are met.
     ///         It reverts if conditions are not met.
-    function validate(GenericToken memory genericToken) internal view {
-        if (genericToken.kind == GenericTokenKind.ERC20) {
+    function validate(Asset memory genericToken) internal view {
+        if (genericToken.kind == AssetKind.ERC20) {
             if (genericToken.tokenAddress == address(0)) {
                 revert InvalidERC20Address();
             }
@@ -40,17 +40,17 @@ library GenericTokenHelper {
     }
 
     /// @notice Asserts that the supply strategy is of the given kind. If not, it reverts.
-    function expect(GenericToken memory genericToken, GenericTokenKind kind) internal pure {
+    function expect(Asset memory genericToken, AssetKind kind) internal pure {
         if (genericToken.kind != kind) {
-            revert UnexpectedGenericToken();
+            revert UnexpectedAsset();
         }
     }
 
     /// @notice Locks the specified amount from msg.sender into custody.
     ///         Reverts with NoBalanceIncrease if the token balance does not increase.
     ///         May return more than requested for inflationary tokens due to balance rise.
-    function lock(GenericToken memory genericToken, uint256 value) internal returns (uint256) {
-        if (genericToken.kind == GenericTokenKind.ERC20) {
+    function lock(Asset memory genericToken, uint256 value) internal returns (uint256) {
+        if (genericToken.kind == AssetKind.ERC20) {
             IERC20 token = IERC20(genericToken.tokenAddress);
             uint256 initialBalance = token.balanceOf(address(this));
             token.safeTransferFrom({from: msg.sender, to: address(this), value: value});
@@ -71,14 +71,14 @@ library GenericTokenHelper {
     }
 
     /// @notice Transfers the specified amount out of our treasury to the recipient address.
-    function transferFunds(GenericToken memory genericToken,
+    function transferFunds(Asset memory genericToken,
         address payable recipient,
         uint256 value
     ) internal returns (bool success, bytes memory ret) {
-        if (genericToken.kind == GenericTokenKind.Native) {
+        if (genericToken.kind == AssetKind.Native) {
             success = sendValue(payable(recipient), value);
             return (success, EMPTY_BYTES);
-        } else if (genericToken.kind == GenericTokenKind.ERC20) {
+        } else if (genericToken.kind == AssetKind.ERC20) {
             return ierc20Transfer(genericToken, recipient, value);
         }
     }
@@ -88,7 +88,7 @@ library GenericTokenHelper {
     /// triggered from the execution.
     /// This function is the same as `safeTransfer` function used before.
     function ierc20Transfer(
-        GenericToken memory genericToken,
+        Asset memory genericToken,
         address recipient,
         uint256 value
     ) internal returns (bool success, bytes memory ret) {
@@ -103,7 +103,7 @@ library GenericTokenHelper {
 
     /// @notice Calls the target with the specified data, ensuring it receives the specified value.
     function performCall(
-        GenericToken memory genericToken,
+        Asset memory genericToken,
         address payable target,
         bytes memory data,
         uint256 value
@@ -114,10 +114,10 @@ library GenericTokenHelper {
         }
 
         // Otherwise, we need to do something different.
-        if (genericToken.kind == GenericTokenKind.Native) {
+        if (genericToken.kind == AssetKind.Native) {
             // Use the optimized path to send value along with the call.
             (success, ret) = functionCallWithValue({target: target, data: data, value: value});
-        } else if (genericToken.kind == GenericTokenKind.ERC20) {
+        } else if (genericToken.kind == AssetKind.ERC20) {
             (success, ret) = functionCallWithERC20Value({genericToken: genericToken, target: target, data: data, value: value});
         }
         return (success, ret);
@@ -125,7 +125,7 @@ library GenericTokenHelper {
 
     /// @dev Performs the function call with ERC20 value atomically
     function functionCallWithERC20Value(
-        GenericToken memory genericToken,
+        Asset memory genericToken,
         address target,
         bytes memory data,
         uint256 value
@@ -197,24 +197,24 @@ library GenericTokenHelper {
     }
 
     /// @notice Gets the balance in our treasury.
-    function balance(GenericToken memory genericToken) internal view returns (uint256 ret) {
-        if (genericToken.kind == GenericTokenKind.Native) {
+    function balance(Asset memory genericToken) internal view returns (uint256 ret) {
+        if (genericToken.kind == AssetKind.Native) {
             ret = address(this).balance;
-        } else if (genericToken.kind == GenericTokenKind.ERC20) {
+        } else if (genericToken.kind == AssetKind.ERC20) {
             ret = IERC20(genericToken.tokenAddress).balanceOf(address(this));
         }
     }
 
-    function native() internal pure returns (GenericToken memory) {
-        return GenericToken({kind: GenericTokenKind.Native, tokenAddress: address(0)});
+    function native() internal pure returns (Asset memory) {
+        return Asset({kind: AssetKind.Native, tokenAddress: address(0)});
     }
 
-    function isNative(GenericToken memory self) internal pure returns(bool) {
-        return self.kind == GenericTokenKind.Native;
+    function isNative(Asset memory self) internal pure returns(bool) {
+        return self.kind == AssetKind.Native;
     }
 
-    function increaseAllowance(GenericToken memory self, address spender, uint256 amount) internal {
-        if (self.kind == GenericTokenKind.ERC20) {
+    function increaseAllowance(Asset memory self, address spender, uint256 amount) internal {
+        if (self.kind == AssetKind.ERC20) {
             IERC20 token = IERC20(self.tokenAddress);
             uint256 allowance = token.allowance(address(this), spender);
             if (!token.approve(spender, allowance + amount)) {
