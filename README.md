@@ -45,6 +45,38 @@ make
 ./target/release/fendermint --version
 ```
 
+## Run local network
+
+First install cometbft,
+
+```
+git clone https://github.com/cometbft/cometbft.git
+cd cometbft
+git checkout v0.37.1
+make install
+```
+
+Build and install hoku
+
+```
+make && make install
+```
+
+Next configure the local network,
+
+```
+make config-local
+```
+
+Finally, start all the services in separate terminal windows,
+
+```
+make run-local-iroh
+make run-local-fendermint
+make run-local-cometbft
+```
+
+
 ## Run tests
 
 ```
