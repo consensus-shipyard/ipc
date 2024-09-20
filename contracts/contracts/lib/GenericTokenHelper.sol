@@ -86,7 +86,7 @@ library GenericTokenHelper {
     /// @notice Wrapper for an IERC20 transfer that bubbles up the success or failure
     /// and the return value instead of reverting so a cross-message receipt can be
     /// triggered from the execution.
-    /// This function the `safeTransfer` function used before.
+    /// This function is the same as `safeTransfer` function used before.
     function ierc20Transfer(
         GenericToken memory genericToken,
         address recipient,
