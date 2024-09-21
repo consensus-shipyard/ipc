@@ -4,8 +4,9 @@ set -euo pipefail
 
 dir=$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")
 IPC_FOLDER=$(readlink -f -- "$dir"/../..)
-IPC_CONFIG_FOLDER=${HOME}/.ipc
 subnet_id="/r31337/t410f6dl55afbyjbpupdtrmedyqrnmxdmpk7rxuduafq"
+
+pkill -fe "relayer" 2>/dev/null || pgrep -f "relayer" | xargs kill 2>/dev/null || true
 
 cd "$IPC_FOLDER"
 cargo make --makefile infra/fendermint/Makefile.toml \
