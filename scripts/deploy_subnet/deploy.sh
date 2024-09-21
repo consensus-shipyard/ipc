@@ -18,14 +18,7 @@ else
   fi
 fi
 
-# don't need ssh-add etc for local
 if ! $local_deploy ; then
-  eval "$(ssh-agent -s)"
-  ssh-add
-  if [[ -e "${HOME}"/.ssh/id_rsa.ipc ]]; then
-    ssh-add "${HOME}"/.ssh/id_rsa.ipc
-  fi
-
   if [[ -z "${SUPPLY_SOURCE_ADDRESS:-}" ]]; then
     echo "SUPPLY_SOURCE_ADDRESS is not set"
     exit 1
@@ -49,14 +42,18 @@ if [[ $local_deploy = true ]]; then
   # we can't pass an auth token if the parent doesn't require one
   PARENT_AUTH_FLAG=""
 fi
-if [ -z "${IPC_FOLDER}" ]; then
+if [[ -z "${IPC_FOLDER:-}" ]]; then
   IPC_FOLDER=${HOME}/ipc
 fi
 IPC_CONFIG_FOLDER=${HOME}/.ipc
+if [[ -z "${FM_LOG_LEVEL:-}" ]]; then
+  FM_LOG_LEVEL="info"
+fi
 
 echo "$DASHES starting with env $DASHES"
 echo "IPC_FOLDER $IPC_FOLDER"
 echo "IPC_CONFIG_FOLDER $IPC_CONFIG_FOLDER"
+echo "FM_LOG_LEVEL $FM_LOG_LEVEL"
 
 wallet_addresses=()
 public_keys=()
@@ -231,16 +228,22 @@ fi
 # Prepare code repo
 if ! $local_deploy ; then
   echo "$DASHES Preparing ipc repo..."
+  dir=$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")
+  source "$dir/ssh_util.sh"
+  setup_ssh_config
+  add_ssh_keys
   if ! ls "$IPC_FOLDER" ; then
-    git clone --recurse-submodules -j8 git@github.com-ipc:hokunet/ipc.git "${IPC_FOLDER}"
+    git clone git@github.com-ipc:hokunet/ipc.git "${IPC_FOLDER}"
   fi
   cd "${IPC_FOLDER}"
   git fetch
   git stash
   git checkout "$head_ref"
   git pull --rebase origin "$head_ref"
+  update_gitmodules
   git submodule sync
   git submodule update --init --recursive
+  revert_gitmodules
 fi
 
 # Stop prometheus
@@ -527,7 +530,7 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e PARENT_REGISTRY="${PARENT_REGISTRY_ADDRESS}" \
     -e PARENT_GATEWAY="${PARENT_GATEWAY_ADDRESS}" \
     -e FM_PULL_SKIP=1 \
-    -e FM_LOG_LEVEL="info" \
+    -e FM_LOG_LEVEL="${FM_LOG_LEVEL}" \
     child-validator 2>&1)
 echo "$bootstrap_output"
 bootstrap_node_id=$(echo "$bootstrap_output" | sed -n '/CometBFT node ID:/ {n;p;}' | tr -d "[:blank:]")
@@ -567,7 +570,7 @@ do
       -e PARENT_REGISTRY="${PARENT_REGISTRY_ADDRESS}" \
       -e PARENT_GATEWAY="${PARENT_GATEWAY_ADDRESS}" \
       -e FM_PULL_SKIP=1 \
-      -e FM_LOG_LEVEL="info" \
+      -e FM_LOG_LEVEL="${FM_LOG_LEVEL}" \
       child-validator
 done
 
