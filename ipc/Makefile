@@ -29,7 +29,9 @@ lint: \
 
 check-fmt:
 	@# `nightly` is required to support ignore list in rustfmt.toml
-	cargo +nightly fmt $(PACKAGE) --check
+	rustup install nightly-2024-09-20
+	rustup component add --toolchain nightly-2024-09-20 rustfmt
+	cargo +nightly-2024-09-20 fmt $(PACKAGE) --check
 
 check-clippy:
 	cargo clippy $(PACKAGE) --tests --no-deps -- -D clippy::all
