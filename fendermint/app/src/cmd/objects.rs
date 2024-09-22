@@ -313,6 +313,7 @@ async fn handle_object_upload<F: QueryClient>(
         }
     };
 
+    // TODO: What to do with downloaded data if there's a failure below?
     let progress = iroh.blobs().download(hash, source).await.map_err(|e| {
         Rejection::from(BadRequest {
             message: format!("failed to fetch blob {}: {}", hash, e),
@@ -324,25 +325,14 @@ async fn handle_object_upload<F: QueryClient>(
         })
     })?;
 
-    let blob_size = outcome.downloaded_size + outcome.local_size;
-    if size != blob_size {
-        // Blob might be identical to an existing blob secured by the chain,
-        // but we can delete it if it's made of entirely new data.
-        // TODO: We need to use Iroh tags to differentiate between staged and secured data.
-        if blob_size == outcome.downloaded_size {
-            iroh.blobs().delete_blob(hash).await.map_err(|e| {
-                Rejection::from(BadRequest {
-                    message: format!("failed to delete invalid blob {}: {}", hash, e),
-                })
-            })?;
-        }
-        return Err(Rejection::from(BadRequest {
-            message: format!(
-                "provided size {} does not match blob {} size {}",
-                size, hash, blob_size
-            ),
-        }));
-    }
+    tracing::info!(
+        "downloaded blob {} in {:?} (size: {}; local_size: {}; downloaded_size: {})",
+        hash,
+        outcome.stats.elapsed,
+        size,
+        outcome.local_size,
+        outcome.downloaded_size,
+    );
 
     Ok(hash.to_string())
 }
