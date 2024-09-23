@@ -6,8 +6,8 @@ import {LibSubnetActorStorage, SubnetActorStorage} from "./LibSubnetActorStorage
 import {LibMaxPQ, MaxPQ} from "./priority/LibMaxPQ.sol";
 import {LibMinPQ, MinPQ} from "./priority/LibMinPQ.sol";
 import {LibStakingChangeLog} from "./LibStakingChangeLog.sol";
-import {GenericTokenHelper} from "./GenericTokenHelper.sol";
-import {PermissionMode, StakingReleaseQueue, StakingChangeLog, StakingChange, StakingChangeRequest, StakingOperation, StakingRelease, ValidatorSet, AddressStakingReleases, ParentValidatorsTracker, Validator, GenericToken} from "../structs/Subnet.sol";
+import {AssetHelper} from "./AssetHelper.sol";
+import {PermissionMode, StakingReleaseQueue, StakingChangeLog, StakingChange, StakingChangeRequest, StakingOperation, StakingRelease, ValidatorSet, AddressStakingReleases, ParentValidatorsTracker, Validator, Asset} from "../structs/Subnet.sol";
 import {WithdrawExceedingCollateral, NotValidator, CannotConfirmFutureChanges, NoCollateralToWithdraw, AddressShouldBeValidator, InvalidConfigurationNumber} from "../errors/IPCErrors.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
@@ -373,7 +373,7 @@ library LibStaking {
     using LibStakingReleaseQueue for StakingReleaseQueue;
     using LibStakingChangeLog for StakingChangeLog;
     using LibValidatorSet for ValidatorSet;
-    using GenericTokenHelper for GenericToken;
+    using AssetHelper for Asset;
     using LibMaxPQ for MaxPQ;
     using LibMinPQ for MinPQ;
     using Address for address payable;

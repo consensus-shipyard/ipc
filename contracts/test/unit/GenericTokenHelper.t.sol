@@ -5,10 +5,10 @@ import "forge-std/Test.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "../../contracts/lib/SubnetIDHelper.sol";
 
-import {GenericToken, GenericTokenKind} from "../../contracts/structs/Subnet.sol";
-import {GenericTokenHelper} from "../../contracts/lib/GenericTokenHelper.sol";
+import {Asset, AssetKind} from "../../contracts/structs/Subnet.sol";
+import {AssetHelper} from "../../contracts/lib/AssetHelper.sol";
 
-import {GenericTokenHelperMock} from "../mocks/GenericTokenHelperMock.sol";
+import {AssetHelperMock} from "../mocks/AssetHelperMock.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -22,15 +22,15 @@ contract FailingContract {
     }
 }
 
-contract GenericTokenHelperTest is Test {
+contract AssetHelperTest is Test {
     /// Call fails but send value works, both should fail
     function test_revert_atomicity_no_ret() public {
         uint256 balance = 1_000_000;
-        GenericTokenHelperMock mock = new GenericTokenHelperMock();
+        AssetHelperMock mock = new AssetHelperMock();
 
         IERC20 token = new ERC20PresetFixedSupply("TestToken", "TEST", balance, address(mock));
 
-        GenericToken memory source = GenericToken({kind: GenericTokenKind.ERC20, tokenAddress: address(token)});
+        Asset memory source = Asset({kind: AssetKind.ERC20, tokenAddress: address(token)});
 
         bytes memory params = bytes("hello");
 
@@ -42,11 +42,11 @@ contract GenericTokenHelperTest is Test {
 
     function test_revert_atomicity_with_ret() public {
         uint256 balance = 1_000_000;
-        GenericTokenHelperMock mock = new GenericTokenHelperMock();
+        AssetHelperMock mock = new AssetHelperMock();
 
         IERC20 token = new ERC20PresetFixedSupply("TestToken", "TEST", balance, address(mock));
 
-        GenericToken memory source = GenericToken({kind: GenericTokenKind.ERC20, tokenAddress: address(token)});
+        Asset memory source = Asset({kind: AssetKind.ERC20, tokenAddress: address(token)});
 
         bytes memory params = abi.encodeWithSelector(FailingContract.failing.selector);
 
@@ -60,11 +60,11 @@ contract GenericTokenHelperTest is Test {
     function test_call_with_erc20_ok() public {
         uint256 balance = 1_000_000;
         uint256 value = 100;
-        GenericTokenHelperMock mock = new GenericTokenHelperMock();
+        AssetHelperMock mock = new AssetHelperMock();
 
         IERC20 token = new ERC20PresetFixedSupply("TestToken", "TEST", balance, address(mock));
 
-        GenericToken memory source = GenericToken({kind: GenericTokenKind.ERC20, tokenAddress: address(token)});
+        Asset memory source = Asset({kind: AssetKind.ERC20, tokenAddress: address(token)});
 
         bytes memory params = bytes("hello");
 
@@ -76,9 +76,9 @@ contract GenericTokenHelperTest is Test {
 
     function test_call_with_native_zero_balance_ok() public {
         uint256 value = 0;
-        GenericTokenHelperMock mock = new GenericTokenHelperMock();
+        AssetHelperMock mock = new AssetHelperMock();
 
-        GenericToken memory source = GenericToken({kind: GenericTokenKind.Native, tokenAddress: address(0)});
+        Asset memory source = Asset({kind: AssetKind.Native, tokenAddress: address(0)});
 
         bytes memory params = bytes("hello");
 
@@ -88,11 +88,11 @@ contract GenericTokenHelperTest is Test {
 
     function test_call_with_native_ok() public {
         uint256 value = 10;
-        GenericTokenHelperMock mock = new GenericTokenHelperMock();
+        AssetHelperMock mock = new AssetHelperMock();
 
         vm.deal(address(mock), 1 ether);
 
-        GenericToken memory source = GenericToken({kind: GenericTokenKind.Native, tokenAddress: address(0)});
+        Asset memory source = Asset({kind: AssetKind.Native, tokenAddress: address(0)});
 
         bytes memory params = bytes("hello");
 
@@ -102,11 +102,11 @@ contract GenericTokenHelperTest is Test {
 
     function test_call_with_native_reverts() public {
         uint256 value = 10;
-        GenericTokenHelperMock mock = new GenericTokenHelperMock();
+        AssetHelperMock mock = new AssetHelperMock();
 
         vm.deal(address(mock), 1 ether);
 
-        GenericToken memory source = GenericToken({kind: GenericTokenKind.Native, tokenAddress: address(0)});
+        Asset memory source = Asset({kind: AssetKind.Native, tokenAddress: address(0)});
 
         bytes memory params = bytes("hello");
 

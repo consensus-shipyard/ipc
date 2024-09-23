@@ -7,11 +7,11 @@ import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
 import {SubnetActorModifiers} from "../lib/LibSubnetActorStorage.sol";
 import {LibStaking} from "../lib/LibStaking.sol";
 import {LibSubnetActor} from "../lib/LibSubnetActor.sol";
-import {GenericTokenHelper} from "../lib/GenericTokenHelper.sol";
-import {GenericToken} from "../structs/Subnet.sol";
+import {AssetHelper} from "../lib/AssetHelper.sol";
+import {Asset} from "../structs/Subnet.sol";
 
 contract SubnetActorRewardFacet is SubnetActorModifiers, ReentrancyGuard, Pausable {
-    using GenericTokenHelper for GenericToken;
+    using AssetHelper for Asset;
 
     /// @notice Validator claims their released collateral.
     function claim() external nonReentrant whenNotPaused {

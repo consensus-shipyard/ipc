@@ -67,7 +67,10 @@ impl<S: KVStore> KVReadable<S> for InMemoryBackend<S>
 where
     S::Repr: Hash + Eq,
 {
-    type Tx<'a> = Transaction<'a, S, Read> where Self: 'a;
+    type Tx<'a>
+        = Transaction<'a, S, Read>
+    where
+        Self: 'a;
 
     /// Take a fresh snapshot, to isolate the effects of any further writes
     /// to the datastore from this read transaction.
@@ -86,7 +89,7 @@ where
     S::Repr: Hash + Eq,
 {
     type Tx<'a>
-    = Transaction<'a, S, Write>
+        = Transaction<'a, S, Write>
     where
         Self: 'a;
 

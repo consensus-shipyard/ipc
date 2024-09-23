@@ -9,7 +9,7 @@ import {ConsensusType} from "../contracts/enums/ConsensusType.sol";
 import {IDiamond} from "../contracts/interfaces/IDiamond.sol";
 import {IpcEnvelope, BottomUpCheckpoint, IpcMsgKind, ParentFinality, CallMsg} from "../contracts/structs/CrossNet.sol";
 import {FvmAddress} from "../contracts/structs/FvmAddress.sol";
-import {SubnetID, GenericTokenKind, PermissionMode, PermissionMode, Subnet, GenericToken, IPCAddress, Validator} from "../contracts/structs/Subnet.sol";
+import {SubnetID, AssetKind, PermissionMode, PermissionMode, Subnet, Asset, IPCAddress, Validator} from "../contracts/structs/Subnet.sol";
 import {SubnetIDHelper} from "../contracts/lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../contracts/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../contracts/lib/CrossMsgHelper.sol";
@@ -39,7 +39,7 @@ import {OwnershipFacet} from "../contracts/OwnershipFacet.sol";
 
 import {DiamondLoupeFacet} from "../contracts/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../contracts/diamond/DiamondCutFacet.sol";
-import {GenericTokenHelper} from "../contracts/lib/GenericTokenHelper.sol";
+import {AssetHelper} from "../contracts/lib/AssetHelper.sol";
 import {TestUtils} from "./helpers/TestUtils.sol";
 import {SelectorLibrary} from "./helpers/SelectorLibrary.sol";
 import {GatewayFacetsHelper} from "./helpers/GatewayFacetsHelper.sol";
@@ -62,11 +62,11 @@ struct RootSubnetDefinition {
 }
 
 contract SubnetWithNativeTokenMock {
-    function supplySource() public pure returns (GenericToken memory t) {
+    function supplySource() public pure returns (Asset memory t) {
         return t;
     }
 
-    function collateralSource() public pure returns (GenericToken memory t) {
+    function collateralSource() public pure returns (Asset memory t) {
         return t;
     }
 
@@ -183,14 +183,14 @@ contract TestSubnetActor is Test, TestParams {
         address gw,
         SubnetID memory parentID
     ) internal pure returns (SubnetActorDiamond.ConstructorParams memory) {
-        GenericToken memory native = GenericTokenHelper.native();
+        Asset memory native = AssetHelper.native();
         return defaultSubnetActorParamsWith(gw, parentID, native);
     }
 
     function defaultSubnetActorParamsWith(
         address gw,
         SubnetID memory parentID,
-        GenericToken memory source
+        Asset memory source
     ) internal pure returns (SubnetActorDiamond.ConstructorParams memory) {
         SubnetActorDiamond.ConstructorParams memory params = SubnetActorDiamond.ConstructorParams({
             parentId: parentID,
@@ -204,7 +204,7 @@ contract TestSubnetActor is Test, TestParams {
             powerScale: DEFAULT_POWER_SCALE,
             permissionMode: PermissionMode.Collateral,
             supplySource: source,
-            collateralSource: GenericTokenHelper.native(),
+            collateralSource: AssetHelper.native(),
             validatorGater: address(0)
         });
         return params;
@@ -213,8 +213,8 @@ contract TestSubnetActor is Test, TestParams {
     function defaultSubnetActorParamsWith(
         address gw,
         SubnetID memory parentID,
-        GenericToken memory source,
-        GenericToken memory collateral
+        Asset memory source,
+        Asset memory collateral
     ) internal pure returns (SubnetActorDiamond.ConstructorParams memory) {
         SubnetActorDiamond.ConstructorParams memory params = SubnetActorDiamond.ConstructorParams({
             parentId: parentID,
@@ -241,7 +241,7 @@ contract TestSubnetActor is Test, TestParams {
             defaultSubnetActorParamsWith(
                 gw,
                 SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-                GenericTokenHelper.native()
+                AssetHelper.native()
             );
     }
 
@@ -261,8 +261,8 @@ contract TestSubnetActor is Test, TestParams {
             activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
             powerScale: DEFAULT_POWER_SCALE,
             permissionMode: PermissionMode.Collateral,
-            supplySource: GenericToken({kind: GenericTokenKind.ERC20, tokenAddress: tokenAddress}),
-            collateralSource: GenericTokenHelper.native(),
+            supplySource: Asset({kind: AssetKind.ERC20, tokenAddress: tokenAddress}),
+            collateralSource: AssetHelper.native(),
             validatorGater: address(0)
         });
         return params;
@@ -271,7 +271,7 @@ contract TestSubnetActor is Test, TestParams {
 
 contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor, TestGatewayActor {
     using SubnetIDHelper for SubnetID;
-    using GenericTokenHelper for GenericToken;
+    using AssetHelper for Asset;
     using CrossMsgHelper for IpcEnvelope;
     using FvmAddressHelper for FvmAddress;
     using GatewayFacetsHelper for address;
@@ -604,8 +604,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             activeValidatorsLimit: _activeValidatorsLimit,
             powerScale: 12,
             permissionMode: _permissionMode,
-            supplySource: GenericTokenHelper.native(),
-            collateralSource: GenericTokenHelper.native(),
+            supplySource: AssetHelper.native(),
+            collateralSource: AssetHelper.native(),
             validatorGater: address(0)
         });
         saDiamond = createSubnetActor(params);
@@ -635,8 +635,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             activeValidatorsLimit: _activeValidatorsLimit,
             powerScale: 12,
             permissionMode: _permissionMode,
-            supplySource: GenericTokenHelper.native(),
-            collateralSource: GenericTokenHelper.native(),
+            supplySource: AssetHelper.native(),
+            collateralSource: AssetHelper.native(),
             validatorGater: _validatorGater
         });
         saDiamond = createSubnetActor(params);
@@ -822,10 +822,10 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     }
 
     function fund(address funderAddress, uint256 fundAmount) public {
-        fund(funderAddress, fundAmount, GenericTokenKind.Native);
+        fund(funderAddress, fundAmount, AssetKind.Native);
     }
 
-    function fund(address funderAddress, uint256 fundAmount, GenericTokenKind mode) public {
+    function fund(address funderAddress, uint256 fundAmount, AssetKind mode) public {
         // funding subnets is free, we do not need cross msg fee
         (SubnetID memory subnetId, , uint256 nonceBefore, , uint256 circSupplyBefore) = getSubnet(address(saDiamond));
 
@@ -833,9 +833,9 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         uint256 expectedNonce = nonceBefore + 1;
         uint256 expectedCircSupply = circSupplyBefore + fundAmount;
 
-        if (mode == GenericTokenKind.Native) {
+        if (mode == AssetKind.Native) {
             gatewayDiamond.manager().fund{value: fundAmount}(subnetId, FvmAddressHelper.from(funderAddress));
-        } else if (mode == GenericTokenKind.ERC20) {
+        } else if (mode == AssetKind.ERC20) {
             gatewayDiamond.manager().fundWithToken(subnetId, FvmAddressHelper.from(funderAddress), fundAmount);
         }
 
