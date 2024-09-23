@@ -180,8 +180,8 @@ macro_rules! bottom_up_msg_batch_conversion {
     };
 }
 
-/// The type conversion between different generic token types
-macro_rules! generic_token_conversion {
+/// The type conversion between different asset token types
+macro_rules! asset_conversion {
     ($module:ident) => {
         impl TryFrom<Asset> for $module::Asset {
             type Error = anyhow::Error;
@@ -237,9 +237,9 @@ bottom_up_checkpoint_conversion!(gateway_getter_facet);
 bottom_up_checkpoint_conversion!(subnet_actor_checkpointing_facet);
 bottom_up_msg_batch_conversion!(gateway_getter_facet);
 
-generic_token_conversion!(subnet_actor_diamond);
-generic_token_conversion!(register_subnet_facet);
-generic_token_conversion!(subnet_actor_getter_facet);
+asset_conversion!(subnet_actor_diamond);
+asset_conversion!(register_subnet_facet);
+asset_conversion!(subnet_actor_getter_facet);
 
 impl TryFrom<u8> for AssetKind {
     type Error = anyhow::Error;

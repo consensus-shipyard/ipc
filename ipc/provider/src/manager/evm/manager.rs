@@ -347,7 +347,6 @@ impl SubnetManager for EthSubnetManager {
 
         let mut txn = contract.join(ethers::types::Bytes::from(pub_key), U256::from(collateral));
         txn = self.handle_txn_token(&subnet, txn, collateral, 0).await?;
-        // txn.tx.set_value(collateral);
 
         let txn = call_with_premium_estimation(signer, txn).await?;
 
@@ -374,7 +373,6 @@ impl SubnetManager for EthSubnetManager {
 
         let mut txn = contract.pre_fund(U256::from(balance));
         txn = self.handle_txn_token(&subnet, txn, 0, balance).await?;
-        // txn.tx.set_value();
 
         let txn = call_with_premium_estimation(signer, txn).await?;
 
@@ -426,7 +424,6 @@ impl SubnetManager for EthSubnetManager {
 
         let mut txn = contract.stake(U256::from(collateral));
         txn = self.handle_txn_token(&subnet, txn, collateral, 0).await?;
-        // txn.tx.set_value();
 
         let txn = call_with_premium_estimation(signer, txn).await?;
 
