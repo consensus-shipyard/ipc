@@ -6,8 +6,8 @@ import {SubnetActorGetterFacet} from "../subnet/SubnetActorGetterFacet.sol";
 import {BURNT_FUNDS_ACTOR} from "../constants/Constants.sol";
 import {IpcEnvelope} from "../structs/CrossNet.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
-import {SubnetID, Subnet, GenericToken} from "../structs/Subnet.sol";
-import {Membership, GenericTokenKind} from "../structs/Subnet.sol";
+import {SubnetID, Subnet, Asset} from "../structs/Subnet.sol";
+import {Membership, AssetKind} from "../structs/Subnet.sol";
 import {AlreadyRegisteredSubnet, CannotReleaseZero, MethodNotAllowed, NotEnoughFunds, NotEnoughFundsToRelease, NotEnoughCollateral, NotEmptySubnetCircSupply, NotRegisteredSubnet, InvalidXnetMessage, InvalidXnetMessageReason} from "../errors/IPCErrors.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
@@ -16,7 +16,7 @@ import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
-import {GenericTokenHelper} from "../lib/GenericTokenHelper.sol";
+import {AssetHelper} from "../lib/AssetHelper.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 string constant ERR_CHILD_SUBNET_NOT_ALLOWED = "Subnet does not allow child subnets";
@@ -24,7 +24,7 @@ string constant ERR_CHILD_SUBNET_NOT_ALLOWED = "Subnet does not allow child subn
 contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     using FilAddress for address payable;
     using SubnetIDHelper for SubnetID;
-    using GenericTokenHelper for GenericToken;
+    using AssetHelper for Asset;
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
     /// @notice register a subnet in the gateway. It is called by a subnet when it reaches the threshold stake
@@ -140,8 +140,8 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         }
 
         // Validate that the supply strategy is native.
-        GenericToken memory supplySource = SubnetActorGetterFacet(subnetId.getActor()).supplySource();
-        supplySource.expect(GenericTokenKind.Native);
+        Asset memory supplySource = SubnetActorGetterFacet(subnetId.getActor()).supplySource();
+        supplySource.expect(AssetKind.Native);
 
         IpcEnvelope memory crossMsg = CrossMsgHelper.createFundMsg({
             subnet: subnetId,
@@ -175,8 +175,8 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         // Check that the supply strategy is ERC20.
         // There is no need to check whether the subnet exists. If it doesn't exist, the call to getter will revert.
         // LibGateway.commitTopDownMsg will also revert if the subnet doesn't exist.
-        GenericToken memory supplySource = SubnetActorGetterFacet(subnetId.getActor()).supplySource();
-        supplySource.expect(GenericTokenKind.ERC20);
+        Asset memory supplySource = SubnetActorGetterFacet(subnetId.getActor()).supplySource();
+        supplySource.expect(AssetKind.ERC20);
 
         // Locks a specified amount into custody, adjusting for tokens with transfer fees. This operation
         // accommodates inflationary tokens, potentially reflecting a higher effective locked amount.

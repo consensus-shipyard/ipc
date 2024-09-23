@@ -12,7 +12,7 @@ import {METHOD_SEND} from "../../contracts/constants/Constants.sol";
 import {ConsensusType} from "../../contracts/enums/ConsensusType.sol";
 import {BottomUpMsgBatch, IpcEnvelope, BottomUpCheckpoint, MAX_MSGS_PER_BATCH} from "../../contracts/structs/CrossNet.sol";
 import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
-import {SubnetID, PermissionMode, IPCAddress, Subnet, GenericToken, ValidatorInfo, GenericTokenKind} from "../../contracts/structs/Subnet.sol";
+import {SubnetID, PermissionMode, IPCAddress, Subnet, Asset, ValidatorInfo, AssetKind} from "../../contracts/structs/Subnet.sol";
 import {IERC165} from "../../contracts/interfaces/IERC165.sol";
 import {IGateway} from "../../contracts/interfaces/IGateway.sol";
 import {IDiamond} from "../../contracts/interfaces/IDiamond.sol";
@@ -34,7 +34,7 @@ import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {LibStaking} from "../../contracts/lib/LibStaking.sol";
 import {LibDiamond} from "../../contracts/lib/LibDiamond.sol";
 import {Pausable} from "../../contracts/lib/LibPausable.sol";
-import {GenericTokenHelper} from "../../contracts/lib/GenericTokenHelper.sol";
+import {AssetHelper} from "../../contracts/lib/AssetHelper.sol";
 
 import {IntegrationTestBase} from "../IntegrationTestBase.sol";
 
@@ -323,7 +323,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         SubnetActorCheckpointingFacet saDupCheckpointerFaucet = new SubnetActorCheckpointingFacet();
         OwnershipFacet saOwnershipFacet = new OwnershipFacet();
 
-        GenericToken memory native = GenericTokenHelper.native();
+        Asset memory native = AssetHelper.native();
 
         vm.expectRevert(GatewayCannotBeZero.selector);
         createSubnetActorDiamondWithFaucets(
@@ -339,7 +339,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
                 powerScale: 12,
                 permissionMode: PermissionMode.Collateral,
                 supplySource: native,
-                collateralSource: GenericTokenHelper.native(),
+                collateralSource: AssetHelper.native(),
                 validatorGater: address(0)
             }),
             address(saDupGetterFaucet),
@@ -1817,11 +1817,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             validator
         );
 
-        GenericToken memory source = GenericToken({kind: GenericTokenKind.ERC20, tokenAddress: address(sourceToken)});
-        GenericToken memory collateral = GenericToken({
-            kind: GenericTokenKind.ERC20,
-            tokenAddress: address(collateralToken)
-        });
+        Asset memory source = Asset({kind: AssetKind.ERC20, tokenAddress: address(sourceToken)});
+        Asset memory collateral = Asset({kind: AssetKind.ERC20, tokenAddress: address(collateralToken)});
 
         gatewayAddress = address(gatewayDiamond);
         SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(
@@ -1957,7 +1954,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             validator
         );
 
-        GenericToken memory gt = GenericToken({kind: GenericTokenKind.ERC20, tokenAddress: address(token)});
+        Asset memory gt = Asset({kind: AssetKind.ERC20, tokenAddress: address(token)});
 
         gatewayAddress = address(gatewayDiamond);
         SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(
@@ -2080,11 +2077,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             validator
         );
 
-        GenericToken memory source = GenericTokenHelper.native();
-        GenericToken memory collateral = GenericToken({
-            kind: GenericTokenKind.ERC20,
-            tokenAddress: address(collateralToken)
-        });
+        Asset memory source = AssetHelper.native();
+        Asset memory collateral = Asset({kind: AssetKind.ERC20, tokenAddress: address(collateralToken)});
 
         gatewayAddress = address(gatewayDiamond);
         SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(
@@ -2184,8 +2178,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(
             gatewayAddress,
             SubnetID(ROOTNET_CHAINID, new address[](0)),
-            GenericTokenHelper.native(),
-            GenericTokenHelper.native()
+            AssetHelper.native(),
+            AssetHelper.native()
         );
 
         saDiamond = createSubnetActor(params);
@@ -2257,14 +2251,14 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             DEFAULT_MIN_VALIDATOR_STAKE * 10,
             validator2
         );
-        GenericToken memory source = GenericToken({kind: GenericTokenKind.ERC20, tokenAddress: address(sourceToken)});
+        Asset memory source = Asset({kind: AssetKind.ERC20, tokenAddress: address(sourceToken)});
 
         gatewayAddress = address(gatewayDiamond);
         SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(
             gatewayAddress,
             SubnetID(ROOTNET_CHAINID, new address[](0)),
             source,
-            GenericTokenHelper.native()
+            AssetHelper.native()
         );
 
         saDiamond = createSubnetActor(params);

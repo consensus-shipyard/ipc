@@ -14,7 +14,7 @@ import {IDiamondCut} from "../../contracts/interfaces/IDiamondCut.sol";
 import {QuorumInfo} from "../../contracts/structs/Quorum.sol";
 import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../../contracts/structs/CrossNet.sol";
 import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
-import {SubnetID, Subnet, IPCAddress, Validator, StakingChange, StakingChangeRequest, GenericToken, StakingOperation} from "../../contracts/structs/Subnet.sol";
+import {SubnetID, Subnet, IPCAddress, Validator, StakingChange, StakingChangeRequest, Asset, StakingOperation} from "../../contracts/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../../contracts/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../../contracts/lib/CrossMsgHelper.sol";

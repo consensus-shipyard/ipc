@@ -166,15 +166,15 @@ struct Membership {
 
 /// @notice Defines a more general representation of a token in subnet. Using the same set of interfaces
 /// @notice for handling token operations.
-struct GenericToken {
+struct Asset {
     /// @notice The kind of token.
-    GenericTokenKind kind;
+    AssetKind kind;
     /// @notice The address of the ERC20 token if that supply kind is selected.
     address tokenAddress;
 }
 
 /// @notice Determines the type of the token used in the subnet.
-enum GenericTokenKind {
+enum AssetKind {
     Native,
     ERC20
 }
