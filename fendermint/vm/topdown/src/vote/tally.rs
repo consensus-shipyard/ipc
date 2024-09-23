@@ -123,7 +123,7 @@ impl<S: VoteStore> VoteTally<S> {
             return Ok(None);
         };
 
-        for h in ((self.last_finalized_height + 1)..max_height).rev() {
+        for h in ((self.last_finalized_height + 1)..=max_height).rev() {
             let votes = self.votes.get_votes_at_height(h)?;
 
             for (ballot, weight) in votes.ballot_weights(&self.power_table) {
@@ -186,159 +186,197 @@ impl<S: VoteStore> VoteTally<S> {
 
 #[cfg(test)]
 mod tests {
-    use crate::BlockHeight;
-    use ipc_ipld_resolver::ValidatorKey;
-    use libp2p::identity::Keypair;
-    use crate::vote::payload::Vote;
+    use crate::vote::payload::{CertifiedObservation, Observation, Vote};
+    use crate::vote::store::InMemoryVoteStore;
+    use crate::vote::tally::VoteTally;
+    use crate::vote::Error;
+    use arbitrary::{Arbitrary, Unstructured};
+    use fendermint_crypto::SecretKey;
+    use fendermint_vm_genesis::ValidatorKey;
+    use rand::RngCore;
 
-    fn convert_key(key: &Keypair) -> libp2p::identity::secp256k1::Keypair {
-        let key = key.clone();
-        key.try_into_secp256k1().unwrap()
+    fn random_validator_key() -> (SecretKey, ValidatorKey) {
+        let mut rng = rand::thread_rng();
+        let sk = SecretKey::random(&mut rng);
+        let public_key = sk.public_key();
+        (sk, ValidatorKey::new(public_key))
     }
 
-    fn random_validator_key() -> (Keypair, ValidatorKey) {
-        let key_pair = Keypair::generate_secp256k1();
-        let public_key = key_pair.public();
-        (key_pair, ValidatorKey::from(public_key))
+    fn random_observation() -> Observation {
+        let mut bytes = [0; 100];
+        let mut rng = rand::thread_rng();
+        rng.fill_bytes(&mut bytes);
+
+        let mut unstructured = Unstructured::new(&bytes);
+        Observation::arbitrary(&mut unstructured).unwrap()
     }
 
-    fn random_vote(height: BlockHeight) -> Vote {
-        let rand_bytes = |u: usize| {
-            let mut v = vec![];
-            for _ in 0..u {
-                v.push(rand::random::<u8>());
-            }
-            v
-        };
-        let hash = rand_bytes(32);
-        let commitment = rand_bytes(64);
+    #[test]
+    fn duplicated_vote_not_allowed() {
+        let validators = (0..3)
+            .map(|_| random_validator_key())
+            .collect::<Vec<(SecretKey, ValidatorKey)>>();
+        let powers = validators
+            .iter()
+            .map(|v| (v.1.clone(), 1))
+            .collect::<Vec<_>>();
+        let mut vote_tally =
+            VoteTally::new(powers.clone(), 0, InMemoryVoteStore::default()).unwrap();
 
+        let obs = random_observation();
+        let vote =
+            Vote::v1(CertifiedObservation::sign(obs.clone(), &validators[0].0).unwrap()).unwrap();
+        vote_tally.add_vote(vote).unwrap();
 
-        Vote::v1(height, hash, commitment)
+        let mut obs2 = random_observation();
+        obs2.ballot.parent_height = obs.ballot.parent_height();
+        let vote = Vote::v1(CertifiedObservation::sign(obs2, &validators[0].0).unwrap()).unwrap();
+        assert_eq!(vote_tally.add_vote(vote), Err(Error::Equivocation));
+    }
+
+    #[test]
+    fn quorum_formed_ok() {
+        let validators = (0..3)
+            .map(|_| random_validator_key())
+            .collect::<Vec<(SecretKey, ValidatorKey)>>();
+        let powers = validators
+            .iter()
+            .map(|v| (v.1.clone(), 1))
+            .collect::<Vec<_>>();
+        let mut vote_tally =
+            VoteTally::new(powers.clone(), 0, InMemoryVoteStore::default()).unwrap();
+
+        let observation = random_observation();
+
+        vote_tally
+            .set_finalized(observation.ballot.parent_height() - 1)
+            .unwrap();
+
+        for validator in validators {
+            let certified = CertifiedObservation::sign(observation.clone(), &validator.0).unwrap();
+            let vote = Vote::v1(certified).unwrap();
+            vote_tally.add_vote(vote).unwrap();
+        }
+
+        let ballot = vote_tally.find_quorum().unwrap().unwrap();
+        assert_eq!(ballot, observation.ballot);
+    }
+
+    #[test]
+    fn no_quorum_formed() {
+        let validators_grp1 = (0..2)
+            .map(|_| random_validator_key())
+            .collect::<Vec<(SecretKey, ValidatorKey)>>();
+        let validators_grp2 = (0..2)
+            .map(|_| random_validator_key())
+            .collect::<Vec<(SecretKey, ValidatorKey)>>();
+        let validators = [validators_grp1.as_slice(), validators_grp2.as_slice()]
+            .concat()
+            .to_vec();
+
+        let powers = validators
+            .iter()
+            .map(|v| (v.1.clone(), 1))
+            .collect::<Vec<_>>();
+
+        let mut vote_tally =
+            VoteTally::new(powers.clone(), 0, InMemoryVoteStore::default()).unwrap();
+
+        let observation1 = random_observation();
+        let mut observation2 = observation1.clone();
+        observation2.ballot.parent_hash = vec![1];
+
+        vote_tally
+            .set_finalized(observation1.ballot.parent_height() - 1)
+            .unwrap();
+
+        for validator in validators_grp1 {
+            let certified = CertifiedObservation::sign(observation1.clone(), &validator.0).unwrap();
+            let vote = Vote::v1(certified).unwrap();
+            vote_tally.add_vote(vote).unwrap();
+        }
+        assert!(vote_tally.find_quorum().unwrap().is_none());
+
+        for validator in validators_grp2 {
+            let certified = CertifiedObservation::sign(observation2.clone(), &validator.0).unwrap();
+            let vote = Vote::v1(certified).unwrap();
+            vote_tally.add_vote(vote).unwrap();
+        }
+
+        assert!(vote_tally.find_quorum().unwrap().is_none());
     }
 
     #[test]
     fn new_validators_joined_void_previous_quorum() {
-        atomically_or_err(|| {
-            let validators = (0..3)
-                .map(|_| random_validator_key())
-                .collect::<Vec<(Keypair, ValidatorKey)>>();
-            let powers = validators
-                .iter()
-                .map(|v| (v.1.clone(), 1))
-                .collect::<Vec<_>>();
+        let validators = (0..3)
+            .map(|_| random_validator_key())
+            .collect::<Vec<(SecretKey, ValidatorKey)>>();
+        let powers = validators
+            .iter()
+            .map(|v| (v.1.clone(), 1))
+            .collect::<Vec<_>>();
+        let mut vote_tally =
+            VoteTally::new(powers.clone(), 0, InMemoryVoteStore::default()).unwrap();
 
-            let vote_tally = VoteTally::new(powers.clone(), 0);
+        let observation = random_observation();
 
-            let votes = (11..15).map(random_vote).collect::<Vec<_>>();
-
-            for v in votes.clone() {
-                vote_tally.add_block(v)?;
-            }
-
-            for validator in validators {
-                for v in votes.iter() {
-                    let signed = SignedVote::signed(&convert_key(&validator.0), v).unwrap();
-                    assert!(vote_tally.add_vote(signed)?);
-                }
-            }
-
-            let (vote, cert) = vote_tally.find_quorum()?.unwrap();
-            assert_eq!(vote, votes[votes.len() - 1]);
-            cert.validate_power_table::<3, 2>(&vote.ballot().unwrap(), im::HashMap::from(powers))
-                .unwrap();
-
-            let new_powers = (0..3)
-                .map(|_| (random_validator_key().1.clone(), 1))
-                .collect::<Vec<_>>();
-            vote_tally.update_power_table(new_powers)?;
-            assert_eq!(vote_tally.find_quorum()?, None);
-            Ok(())
-        })
-            .await
+        vote_tally
+            .set_finalized(observation.ballot.parent_height() - 1)
             .unwrap();
+
+        for validator in validators {
+            let certified = CertifiedObservation::sign(observation.clone(), &validator.0).unwrap();
+            let vote = Vote::v1(certified).unwrap();
+            vote_tally.add_vote(vote).unwrap();
+        }
+
+        let ballot = vote_tally.find_quorum().unwrap().unwrap();
+        assert_eq!(ballot, observation.ballot);
+
+        let new_powers = (0..3)
+            .map(|_| (random_validator_key().1.clone(), 1))
+            .collect::<Vec<_>>();
+        vote_tally.update_power_table(new_powers);
+        assert_eq!(vote_tally.find_quorum().unwrap(), None);
     }
 
-    #[tokio::test]
-    async fn new_validators_left_formed_quorum() {
-        atomically_or_err(|| {
-            let validators = (0..3)
-                .map(|_| random_validator_key())
-                .collect::<Vec<(Keypair, ValidatorKey)>>();
-            let mut powers = validators
-                .iter()
-                .map(|v| (v.1.clone(), 1))
-                .collect::<Vec<_>>();
-            let extra_validators = (0..3)
-                .map(|_| random_validator_key())
-                .collect::<Vec<(Keypair, ValidatorKey)>>();
-            for v in extra_validators.iter() {
-                powers.push((v.1.clone(), 1));
-            }
+    #[test]
+    fn new_validators_left_formed_quorum() {
+        let validators = (0..5)
+            .map(|_| random_validator_key())
+            .collect::<Vec<(SecretKey, ValidatorKey)>>();
+        let powers = validators
+            .iter()
+            .map(|v| (v.1.clone(), 1))
+            .collect::<Vec<_>>();
+        let mut vote_tally =
+            VoteTally::new(powers.clone(), 0, InMemoryVoteStore::default()).unwrap();
 
-            let vote_tally = VoteTally::new(powers.clone(), 0);
+        let observation = random_observation();
 
-            let votes = (11..15).map(random_vote).collect::<Vec<_>>();
-
-            for v in votes.clone() {
-                vote_tally.add_block(v)?;
-            }
-
-            for validator in validators {
-                for v in votes.iter() {
-                    let signed = SignedVote::signed(&convert_key(&validator.0), v).unwrap();
-                    assert!(vote_tally.add_vote(signed)?);
-                }
-            }
-
-            assert_eq!(vote_tally.find_quorum()?, None);
-
-            let new_powers = extra_validators
-                .into_iter()
-                .map(|v| (v.1.clone(), 0))
-                .collect::<Vec<_>>();
-            vote_tally.update_power_table(new_powers)?;
-            let powers = vote_tally.power_table()?;
-            let (vote, cert) = vote_tally.find_quorum()?.unwrap();
-            assert_eq!(vote, votes[votes.len() - 1]);
-            cert.validate_power_table::<3, 2>(&vote.ballot().unwrap(), powers)
-                .unwrap();
-
-            Ok(())
-        })
-            .await
+        vote_tally
+            .set_finalized(observation.ballot.parent_height() - 1)
             .unwrap();
-    }
 
-    #[tokio::test]
-    async fn simple_3_validators_no_quorum() {
-        atomically_or_err(|| {
-            let validators = (0..3)
-                .map(|_| random_validator_key())
-                .collect::<Vec<(Keypair, ValidatorKey)>>();
-            let powers = validators
-                .iter()
-                .map(|v| (v.1.clone(), 1))
-                .collect::<Vec<_>>();
+        let mut count = 0;
+        for validator in &validators {
+            let certified = CertifiedObservation::sign(observation.clone(), &validator.0).unwrap();
+            let vote = Vote::v1(certified).unwrap();
+            vote_tally.add_vote(vote).unwrap();
 
-            let vote_tally = VoteTally::new(powers.clone(), 0);
+            if count == 2 {
+                break;
+            }
+            count += 1;
+        }
+        assert!(vote_tally.find_quorum().unwrap().is_none());
 
-            let votes = [random_vote(10), random_vote(10)];
+        vote_tally.update_power_table(vec![
+            (validators[3].1.clone(), 0),
+            (validators[4].1.clone(), 0),
+        ]);
 
-            vote_tally.add_block(votes[0].clone())?;
-
-            let signed = SignedVote::signed(&convert_key(&validators[0].0), &votes[0]).unwrap();
-            assert!(vote_tally.add_vote(signed)?);
-            let signed = SignedVote::signed(&convert_key(&validators[1].0), &votes[0]).unwrap();
-            assert!(vote_tally.add_vote(signed)?);
-            let signed = SignedVote::signed(&convert_key(&validators[2].0), &votes[1]).unwrap();
-            assert!(vote_tally.add_vote(signed)?);
-
-            assert!(vote_tally.find_quorum()?.is_none());
-
-            Ok(())
-        })
-            .await
-            .unwrap();
+        let ballot = vote_tally.find_quorum().unwrap().unwrap();
+        assert_eq!(ballot, observation.ballot);
     }
 }

@@ -3,12 +3,12 @@
 //! A Genesis data structure similar to [genesis.Template](https://github.com/filecoin-project/lotus/blob/v1.20.4/genesis/types.go)
 //! in Lotus, which is used to [initialize](https://github.com/filecoin-project/lotus/blob/v1.20.4/chain/gen/genesis/genesis.go) the state tree.
 
-use std::fmt::{Display, Formatter};
-use std::hash::{Hash, Hasher};
 use anyhow::anyhow;
 use fvm_shared::bigint::{BigInt, Integer};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
+use std::fmt::{Display, Formatter};
+use std::hash::{Hash, Hasher};
 
 use fendermint_actor_eam::PermissionModeParams;
 use fvm_shared::version::NetworkVersion;
@@ -153,9 +153,7 @@ impl ValidatorKey {
     }
 
     pub fn from_compressed_pubkey(compress: &[u8; 33]) -> anyhow::Result<Self> {
-        Ok(Self(
-            PublicKey::parse_compressed(compress)?
-        ))
+        Ok(Self(PublicKey::parse_compressed(compress)?))
     }
 
     pub fn public_key(&self) -> &PublicKey {

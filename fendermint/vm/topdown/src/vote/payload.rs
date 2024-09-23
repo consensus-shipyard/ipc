@@ -4,14 +4,14 @@
 use crate::vote::Weight;
 use crate::{BlockHash, BlockHeight, Bytes};
 use anyhow::anyhow;
+use arbitrary::Arbitrary;
+use ethers::core::k256::sha2;
+use fendermint_crypto::secp::RecoverableECDSASignature;
+use fendermint_crypto::SecretKey;
 use fendermint_vm_genesis::ValidatorKey;
-use secp256k1::ecdsa::{RecoverableSignature, RecoveryId};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-
-pub type Signature = Bytes;
-pub type RecoverableECDSASignature = (i32, Vec<u8>);
 
 pub type PowerTable = HashMap<ValidatorKey, Weight>;
 
@@ -26,29 +26,29 @@ pub enum Vote {
 
 /// The actual content that validators should agree upon, or put in another way the content
 /// that a quorum should be formed upon
-#[derive(Serialize, Deserialize, Hash, Debug, Clone, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Hash, Debug, Clone, Eq, PartialEq, Arbitrary)]
 pub struct Ballot {
-    parent_height: u64,
+    pub(crate) parent_height: u64,
     /// The hash of the chain unit at that height. Usually a block hash, but could
     /// be another entity (e.g. tipset CID), depending on the parent chain
     /// and our interface to it. For example, if the parent is a Filecoin network,
     /// this would be a tipset CID coerced into a block hash if queried through
     /// the Eth API, or the tipset CID as-is if accessed through the Filecoin API.
-    parent_hash: Bytes,
+    pub(crate) parent_hash: Bytes,
     /// A rolling/cumulative commitment to topdown effects since the beginning of
     /// time, including the ones in this block.
-    cumulative_effects_comm: Bytes,
+    pub(crate) cumulative_effects_comm: Bytes,
 }
 
 /// The content that validators gossip among each other
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Arbitrary)]
 pub struct Observation {
     /// The hash of the subnet's last committed block when this observation was made.
     /// Used to discard stale observations that are, e.g. replayed by an attacker
     /// at a later time. Also used to detect nodes that might be wrongly gossiping
     /// whilst being out of sync.
     local_hash: BlockHash,
-    ballot: Ballot,
+    pub(crate) ballot: Ballot,
 }
 
 /// A self-certified observation made by a validator.
@@ -63,9 +63,10 @@ pub struct CertifiedObservation {
 impl Vote {
     pub fn v1(obs: CertifiedObservation) -> anyhow::Result<Self> {
         let to_sign = fvm_ipld_encoding::to_vec(&obs.observed)?;
-        let (validator, _) = recover_ecdsa_sig(&to_sign, obs.signature.0, &obs.signature.1)?;
+        let (pk, _) = obs.signature.clone().recover::<sha2::Sha256>(&to_sign)?;
+
         Ok(Self::V1 {
-            validator,
+            validator: ValidatorKey::new(pk),
             payload: obs,
         })
     }
@@ -105,30 +106,15 @@ impl TryFrom<&[u8]> for CertifiedObservation {
     }
 }
 
-fn sign_recoverable_ecdsa() -> anyhow::Result<RecoverableECDSASignature> {
-
-}
-
-fn recover_ecdsa_sig(
-    payload: &[u8],
-    rec_id: i32,
-    sig: &[u8],
-) -> anyhow::Result<(ValidatorKey, Signature)> {
-    let secp = secp256k1::Secp256k1::new();
-
-    let message = secp256k1::Message::from_hashed_data::<secp256k1::hashes::sha256::Hash>(payload);
-    let pubkey = secp.recover_ecdsa(
-        &message,
-        &RecoverableSignature::from_compact(sig, RecoveryId::from_i32(rec_id)?)?,
-    )?;
-    let signature = secp256k1::ecdsa::Signature::from_compact(sig)?
-        .serialize_der()
-        .to_vec();
-
-    Ok((
-        ValidatorKey::from_compressed_pubkey(&pubkey.serialize())?,
-        signature,
-    ))
+impl CertifiedObservation {
+    pub fn sign(ob: Observation, sk: &SecretKey) -> anyhow::Result<Self> {
+        let to_sign = fvm_ipld_encoding::to_vec(&ob)?;
+        let sig = RecoverableECDSASignature::sign::<sha2::Sha256>(sk, to_sign.as_slice())?;
+        Ok(Self {
+            observed: ob,
+            signature: sig,
+        })
+    }
 }
 
 impl Display for Ballot {

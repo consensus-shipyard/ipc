@@ -37,7 +37,6 @@ fendermint_tracing = { path = "../../tracing" }
 fendermint_crypto = { path = "../../crypto" }
 
 ipc-observability = { workspace = true }
-secp256k1 = { workspace = true, features = ["recovery", "bitcoin_hashes"] }
 
 [dev-dependencies]
 arbitrary = { workspace = true }

@@ -60,7 +60,7 @@ pub fn start_vote_reactor(
     VoteReactorClient { tx }
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum Error {
     #[error("the last finalized block has not been set")]
     Uninitialized,

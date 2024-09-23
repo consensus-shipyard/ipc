@@ -1,13 +1,15 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+pub mod secp;
+
 use base64::engine::GeneralPurpose;
 use base64::engine::{DecodePaddingMode, GeneralPurposeConfig};
 use base64::{alphabet, Engine};
 use rand::Rng;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
-pub use libsecp256k1::{PublicKey, RecoveryId, Signature};
+pub use libsecp256k1::PublicKey;
 
 /// A [`GeneralPurpose`] engine using the [`alphabet::STANDARD`] base64 alphabet
 /// padding bytes when writing but requireing no padding when reading.

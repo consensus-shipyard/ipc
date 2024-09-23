@@ -29,6 +29,7 @@ pub(crate) trait VoteStore {
     fn purge_votes_at_height(&mut self, height: BlockHeight) -> Result<(), Error>;
 }
 
+#[derive(Default)]
 pub(crate) struct InMemoryVoteStore {
     votes: BTreeMap<BlockHeight, HashMap<ValidatorKey, Vote>>,
 }
@@ -106,5 +107,67 @@ impl<'a> VoteAgg<'a> {
         }
 
         votes
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::vote::payload::{CertifiedObservation, Observation, Vote};
+    use crate::vote::store::VoteAgg;
+    use arbitrary::{Arbitrary, Unstructured};
+    use fendermint_crypto::SecretKey;
+    use fendermint_vm_genesis::ValidatorKey;
+    use rand::RngCore;
+    use std::collections::HashMap;
+
+    fn random_validator_key() -> (SecretKey, ValidatorKey) {
+        let mut rng = rand::thread_rng();
+        let sk = SecretKey::random(&mut rng);
+        let public_key = sk.public_key();
+        (sk, ValidatorKey::new(public_key))
+    }
+
+    fn random_observation() -> Observation {
+        let mut bytes = [0; 100];
+        let mut rng = rand::thread_rng();
+        rng.fill_bytes(&mut bytes);
+
+        let mut unstructured = Unstructured::new(&bytes);
+        Observation::arbitrary(&mut unstructured).unwrap()
+    }
+
+    #[test]
+    fn test_works() {
+        let validators = (0..3)
+            .map(|_| random_validator_key())
+            .collect::<Vec<(SecretKey, ValidatorKey)>>();
+        let powers = validators
+            .iter()
+            .map(|v| (v.1.clone(), 1))
+            .collect::<Vec<_>>();
+        let mut votes = vec![];
+
+        let observation1 = random_observation();
+        votes.push(
+            Vote::v1(CertifiedObservation::sign(observation1.clone(), &validators[0].0).unwrap())
+                .unwrap(),
+        );
+
+        let observation2 = random_observation();
+        votes.push(
+            Vote::v1(CertifiedObservation::sign(observation2.clone(), &validators[1].0).unwrap())
+                .unwrap(),
+        );
+        votes.push(
+            Vote::v1(CertifiedObservation::sign(observation2.clone(), &validators[2].0).unwrap())
+                .unwrap(),
+        );
+
+        let agg = VoteAgg(votes.iter().collect());
+        let weights = agg.ballot_weights(&HashMap::from_iter(powers));
+        assert_eq!(
+            weights,
+            vec![(&observation1.ballot, 1), (&observation2.ballot, 2),]
+        )
     }
 }
