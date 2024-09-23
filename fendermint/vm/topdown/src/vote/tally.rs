@@ -184,199 +184,161 @@ impl<S: VoteStore> VoteTally<S> {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use crate::voting::payload::{SignedVote, TopdownVote};
-//     use crate::voting::VoteTally;
-//     use crate::BlockHeight;
-//     use async_stm::atomically_or_err;
-//     use ipc_ipld_resolver::ValidatorKey;
-//     use libp2p::identity::Keypair;
-//
-//     fn convert_key(key: &Keypair) -> libp2p::identity::secp256k1::Keypair {
-//         let key = key.clone();
-//         key.try_into_secp256k1().unwrap()
-//     }
-//
-//     fn random_validator_key() -> (Keypair, ValidatorKey) {
-//         let key_pair = Keypair::generate_secp256k1();
-//         let public_key = key_pair.public();
-//         (key_pair, ValidatorKey::from(public_key))
-//     }
-//
-//     fn random_vote(height: BlockHeight) -> TopdownVote {
-//         let rand_bytes = |u: usize| {
-//             let mut v = vec![];
-//             for _ in 0..u {
-//                 v.push(rand::random::<u8>());
-//             }
-//             v
-//         };
-//         let hash = rand_bytes(32);
-//         let commitment = rand_bytes(64);
-//
-//         TopdownVote::v1(height, hash, commitment)
-//     }
-//
-//     #[tokio::test]
-//     async fn simple_3_validators_vote() {
-//         atomically_or_err(|| {
-//             let validators = (0..3)
-//                 .map(|_| random_validator_key())
-//                 .collect::<Vec<(Keypair, ValidatorKey)>>();
-//             let powers = validators
-//                 .iter()
-//                 .map(|v| (v.1.clone(), 1))
-//                 .collect::<Vec<_>>();
-//
-//             let vote_tally = VoteTally::new(powers.clone(), 0);
-//
-//             let votes = (11..15).map(random_vote).collect::<Vec<_>>();
-//
-//             for v in votes.clone() {
-//                 vote_tally.add_block(v)?;
-//             }
-//
-//             for validator in validators {
-//                 for v in votes.iter() {
-//                     let signed = SignedVote::signed(&convert_key(&validator.0), v).unwrap();
-//                     assert!(vote_tally.add_vote(signed)?);
-//                 }
-//             }
-//
-//             let (vote, cert) = vote_tally.find_quorum()?.unwrap();
-//             assert_eq!(vote, votes[votes.len() - 1]);
-//             cert.validate_power_table::<3, 2>(&vote.ballot().unwrap(), im::HashMap::from(powers))
-//                 .unwrap();
-//
-//             Ok(())
-//         })
-//             .await
-//             .unwrap();
-//     }
-//
-//     #[tokio::test]
-//     async fn new_validators_joined_void_previous_quorum() {
-//         atomically_or_err(|| {
-//             let validators = (0..3)
-//                 .map(|_| random_validator_key())
-//                 .collect::<Vec<(Keypair, ValidatorKey)>>();
-//             let powers = validators
-//                 .iter()
-//                 .map(|v| (v.1.clone(), 1))
-//                 .collect::<Vec<_>>();
-//
-//             let vote_tally = VoteTally::new(powers.clone(), 0);
-//
-//             let votes = (11..15).map(random_vote).collect::<Vec<_>>();
-//
-//             for v in votes.clone() {
-//                 vote_tally.add_block(v)?;
-//             }
-//
-//             for validator in validators {
-//                 for v in votes.iter() {
-//                     let signed = SignedVote::signed(&convert_key(&validator.0), v).unwrap();
-//                     assert!(vote_tally.add_vote(signed)?);
-//                 }
-//             }
-//
-//             let (vote, cert) = vote_tally.find_quorum()?.unwrap();
-//             assert_eq!(vote, votes[votes.len() - 1]);
-//             cert.validate_power_table::<3, 2>(&vote.ballot().unwrap(), im::HashMap::from(powers))
-//                 .unwrap();
-//
-//             let new_powers = (0..3)
-//                 .map(|_| (random_validator_key().1.clone(), 1))
-//                 .collect::<Vec<_>>();
-//             vote_tally.update_power_table(new_powers)?;
-//             assert_eq!(vote_tally.find_quorum()?, None);
-//             Ok(())
-//         })
-//             .await
-//             .unwrap();
-//     }
-//
-//     #[tokio::test]
-//     async fn new_validators_left_formed_quorum() {
-//         atomically_or_err(|| {
-//             let validators = (0..3)
-//                 .map(|_| random_validator_key())
-//                 .collect::<Vec<(Keypair, ValidatorKey)>>();
-//             let mut powers = validators
-//                 .iter()
-//                 .map(|v| (v.1.clone(), 1))
-//                 .collect::<Vec<_>>();
-//             let extra_validators = (0..3)
-//                 .map(|_| random_validator_key())
-//                 .collect::<Vec<(Keypair, ValidatorKey)>>();
-//             for v in extra_validators.iter() {
-//                 powers.push((v.1.clone(), 1));
-//             }
-//
-//             let vote_tally = VoteTally::new(powers.clone(), 0);
-//
-//             let votes = (11..15).map(random_vote).collect::<Vec<_>>();
-//
-//             for v in votes.clone() {
-//                 vote_tally.add_block(v)?;
-//             }
-//
-//             for validator in validators {
-//                 for v in votes.iter() {
-//                     let signed = SignedVote::signed(&convert_key(&validator.0), v).unwrap();
-//                     assert!(vote_tally.add_vote(signed)?);
-//                 }
-//             }
-//
-//             assert_eq!(vote_tally.find_quorum()?, None);
-//
-//             let new_powers = extra_validators
-//                 .into_iter()
-//                 .map(|v| (v.1.clone(), 0))
-//                 .collect::<Vec<_>>();
-//             vote_tally.update_power_table(new_powers)?;
-//             let powers = vote_tally.power_table()?;
-//             let (vote, cert) = vote_tally.find_quorum()?.unwrap();
-//             assert_eq!(vote, votes[votes.len() - 1]);
-//             cert.validate_power_table::<3, 2>(&vote.ballot().unwrap(), powers)
-//                 .unwrap();
-//
-//             Ok(())
-//         })
-//             .await
-//             .unwrap();
-//     }
-//
-//     #[tokio::test]
-//     async fn simple_3_validators_no_quorum() {
-//         atomically_or_err(|| {
-//             let validators = (0..3)
-//                 .map(|_| random_validator_key())
-//                 .collect::<Vec<(Keypair, ValidatorKey)>>();
-//             let powers = validators
-//                 .iter()
-//                 .map(|v| (v.1.clone(), 1))
-//                 .collect::<Vec<_>>();
-//
-//             let vote_tally = VoteTally::new(powers.clone(), 0);
-//
-//             let votes = [random_vote(10), random_vote(10)];
-//
-//             vote_tally.add_block(votes[0].clone())?;
-//
-//             let signed = SignedVote::signed(&convert_key(&validators[0].0), &votes[0]).unwrap();
-//             assert!(vote_tally.add_vote(signed)?);
-//             let signed = SignedVote::signed(&convert_key(&validators[1].0), &votes[0]).unwrap();
-//             assert!(vote_tally.add_vote(signed)?);
-//             let signed = SignedVote::signed(&convert_key(&validators[2].0), &votes[1]).unwrap();
-//             assert!(vote_tally.add_vote(signed)?);
-//
-//             assert!(vote_tally.find_quorum()?.is_none());
-//
-//             Ok(())
-//         })
-//             .await
-//             .unwrap();
-//     }
-// }
+#[cfg(test)]
+mod tests {
+    use crate::BlockHeight;
+    use ipc_ipld_resolver::ValidatorKey;
+    use libp2p::identity::Keypair;
+    use crate::vote::payload::Vote;
+
+    fn convert_key(key: &Keypair) -> libp2p::identity::secp256k1::Keypair {
+        let key = key.clone();
+        key.try_into_secp256k1().unwrap()
+    }
+
+    fn random_validator_key() -> (Keypair, ValidatorKey) {
+        let key_pair = Keypair::generate_secp256k1();
+        let public_key = key_pair.public();
+        (key_pair, ValidatorKey::from(public_key))
+    }
+
+    fn random_vote(height: BlockHeight) -> Vote {
+        let rand_bytes = |u: usize| {
+            let mut v = vec![];
+            for _ in 0..u {
+                v.push(rand::random::<u8>());
+            }
+            v
+        };
+        let hash = rand_bytes(32);
+        let commitment = rand_bytes(64);
+
+
+        Vote::v1(height, hash, commitment)
+    }
+
+    #[test]
+    fn new_validators_joined_void_previous_quorum() {
+        atomically_or_err(|| {
+            let validators = (0..3)
+                .map(|_| random_validator_key())
+                .collect::<Vec<(Keypair, ValidatorKey)>>();
+            let powers = validators
+                .iter()
+                .map(|v| (v.1.clone(), 1))
+                .collect::<Vec<_>>();
+
+            let vote_tally = VoteTally::new(powers.clone(), 0);
+
+            let votes = (11..15).map(random_vote).collect::<Vec<_>>();
+
+            for v in votes.clone() {
+                vote_tally.add_block(v)?;
+            }
+
+            for validator in validators {
+                for v in votes.iter() {
+                    let signed = SignedVote::signed(&convert_key(&validator.0), v).unwrap();
+                    assert!(vote_tally.add_vote(signed)?);
+                }
+            }
+
+            let (vote, cert) = vote_tally.find_quorum()?.unwrap();
+            assert_eq!(vote, votes[votes.len() - 1]);
+            cert.validate_power_table::<3, 2>(&vote.ballot().unwrap(), im::HashMap::from(powers))
+                .unwrap();
+
+            let new_powers = (0..3)
+                .map(|_| (random_validator_key().1.clone(), 1))
+                .collect::<Vec<_>>();
+            vote_tally.update_power_table(new_powers)?;
+            assert_eq!(vote_tally.find_quorum()?, None);
+            Ok(())
+        })
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn new_validators_left_formed_quorum() {
+        atomically_or_err(|| {
+            let validators = (0..3)
+                .map(|_| random_validator_key())
+                .collect::<Vec<(Keypair, ValidatorKey)>>();
+            let mut powers = validators
+                .iter()
+                .map(|v| (v.1.clone(), 1))
+                .collect::<Vec<_>>();
+            let extra_validators = (0..3)
+                .map(|_| random_validator_key())
+                .collect::<Vec<(Keypair, ValidatorKey)>>();
+            for v in extra_validators.iter() {
+                powers.push((v.1.clone(), 1));
+            }
+
+            let vote_tally = VoteTally::new(powers.clone(), 0);
+
+            let votes = (11..15).map(random_vote).collect::<Vec<_>>();
+
+            for v in votes.clone() {
+                vote_tally.add_block(v)?;
+            }
+
+            for validator in validators {
+                for v in votes.iter() {
+                    let signed = SignedVote::signed(&convert_key(&validator.0), v).unwrap();
+                    assert!(vote_tally.add_vote(signed)?);
+                }
+            }
+
+            assert_eq!(vote_tally.find_quorum()?, None);
+
+            let new_powers = extra_validators
+                .into_iter()
+                .map(|v| (v.1.clone(), 0))
+                .collect::<Vec<_>>();
+            vote_tally.update_power_table(new_powers)?;
+            let powers = vote_tally.power_table()?;
+            let (vote, cert) = vote_tally.find_quorum()?.unwrap();
+            assert_eq!(vote, votes[votes.len() - 1]);
+            cert.validate_power_table::<3, 2>(&vote.ballot().unwrap(), powers)
+                .unwrap();
+
+            Ok(())
+        })
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn simple_3_validators_no_quorum() {
+        atomically_or_err(|| {
+            let validators = (0..3)
+                .map(|_| random_validator_key())
+                .collect::<Vec<(Keypair, ValidatorKey)>>();
+            let powers = validators
+                .iter()
+                .map(|v| (v.1.clone(), 1))
+                .collect::<Vec<_>>();
+
+            let vote_tally = VoteTally::new(powers.clone(), 0);
+
+            let votes = [random_vote(10), random_vote(10)];
+
+            vote_tally.add_block(votes[0].clone())?;
+
+            let signed = SignedVote::signed(&convert_key(&validators[0].0), &votes[0]).unwrap();
+            assert!(vote_tally.add_vote(signed)?);
+            let signed = SignedVote::signed(&convert_key(&validators[1].0), &votes[0]).unwrap();
+            assert!(vote_tally.add_vote(signed)?);
+            let signed = SignedVote::signed(&convert_key(&validators[2].0), &votes[1]).unwrap();
+            assert!(vote_tally.add_vote(signed)?);
+
+            assert!(vote_tally.find_quorum()?.is_none());
+
+            Ok(())
+        })
+            .await
+            .unwrap();
+    }
+}

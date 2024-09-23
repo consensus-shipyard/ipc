@@ -61,6 +61,15 @@ pub struct CertifiedObservation {
 }
 
 impl Vote {
+    pub fn v1(obs: CertifiedObservation) -> anyhow::Result<Self> {
+        let to_sign = fvm_ipld_encoding::to_vec(&obs.observed)?;
+        let (validator, _) = recover_ecdsa_sig(&to_sign, obs.signature.0, &obs.signature.1)?;
+        Ok(Self::V1 {
+            validator,
+            payload: obs,
+        })
+    }
+
     pub fn voter(&self) -> ValidatorKey {
         match self {
             Self::V1 { validator, .. } => validator.clone(),
@@ -81,13 +90,7 @@ impl TryFrom<&[u8]> for Vote {
         let version = bytes[0];
 
         if version == 0 {
-            let obs = CertifiedObservation::try_from(&bytes[1..])?;
-            let to_sign = fvm_ipld_encoding::to_vec(&obs.observed)?;
-            let (validator, _) = recover_ecdsa_sig(&to_sign, obs.signature.0, &obs.signature.1)?;
-            return Ok(Self::V1 {
-                validator,
-                payload: obs,
-            });
+            return Self::v1(CertifiedObservation::try_from(&bytes[1..])?);
         }
 
         Err(anyhow!("invalid vote version"))
@@ -100,6 +103,10 @@ impl TryFrom<&[u8]> for CertifiedObservation {
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
         Ok(fvm_ipld_encoding::from_slice(bytes)?)
     }
+}
+
+fn sign_recoverable_ecdsa() -> anyhow::Result<RecoverableECDSASignature> {
+
 }
 
 fn recover_ecdsa_sig(
