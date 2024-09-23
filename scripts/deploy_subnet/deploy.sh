@@ -226,8 +226,8 @@ else
 fi
 
 # Prepare code repo
+echo "$DASHES Preparing ipc repo..."
 if ! $local_deploy ; then
-  echo "$DASHES Preparing ipc repo..."
   dir=$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")
   source "$dir/ssh_util.sh"
   setup_ssh_config
@@ -244,6 +244,9 @@ if ! $local_deploy ; then
   git submodule sync
   git submodule update --init --recursive
   revert_gitmodules
+else
+  git submodule sync
+  git submodule update --init --recursive
 fi
 
 # Stop prometheus
@@ -263,6 +266,9 @@ cd "$IPC_FOLDER"
 cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=loki \
     loki-destroy
+
+# Kill existing relayer if there's one
+pkill -fe "relayer" 2>/dev/null || pgrep -f "relayer" | xargs kill 2>/dev/null || true
 
 # shut down any existing validator nodes
 if [ -e "${IPC_CONFIG_FOLDER}/config.toml" ]; then
@@ -289,7 +295,7 @@ if ! $local_deploy ; then
   cp "$HOME"/evm_keystore.json "$IPC_CONFIG_FOLDER"
   cp "$IPC_FOLDER"/scripts/deploy_subnet/.ipc-cal/config.toml "$IPC_CONFIG_FOLDER"
 else
-  echo "$DASHES using local net config $DASHES"
+  echo "$DASHES using localnet config $DASHES"
   cp "$IPC_FOLDER"/scripts/deploy_subnet/.ipc-local/config.toml "$IPC_CONFIG_FOLDER"
 fi
 cp "$IPC_FOLDER"/infra/prometheus/prometheus.yaml "$IPC_CONFIG_FOLDER"
@@ -632,8 +638,6 @@ do
   curl --location http://localhost:"${FENDERMINT_METRICS_HOST_PORTS[i]}"/metrics | grep succes
 done
 
-# Kill existing relayer if there's one
-pkill -fe "relayer" 2>/dev/null || pgrep -f "relayer" | xargs kill 2>/dev/null || true
 # Start relayer
 # note: this command mutates the order of keys in the evm_keystore.json file. to
 # keep the accounts consistent for localnet usage (e.g., logging accounts, using
