@@ -66,8 +66,8 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
             revert NotEnoughFunds();
         }
 
-        // The fund flow for stake is from Validator -> SubnetActor -> Gateway. 
-        // Because msg.sender is actually the subnet actor, this method sends the fund from 
+        // The fund flow for stake is from Validator -> SubnetActor -> Gateway.
+        // Because msg.sender is actually the subnet actor, this method sends the fund from
         // the subnet actor caller the gateway.
         SubnetActorGetterFacet(msg.sender).collateralSource().lock(amount);
 
