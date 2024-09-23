@@ -66,6 +66,9 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
             revert NotEnoughFunds();
         }
 
+        // The fund flow for stake is from Validator -> SubnetActor -> Gateway. 
+        // Because msg.sender is actually the subnet actor, this method sends the fund from 
+        // the subnet actor caller the gateway.
         SubnetActorGetterFacet(msg.sender).collateralSource().lock(amount);
 
         (bool registered, Subnet storage subnet) = LibGateway.getSubnet(msg.sender);
@@ -95,6 +98,10 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         }
 
         subnet.stake -= amount;
+
+        // Release fund flows from Gateway -> SubnetActor -> ReleaseQueue (Locking) -> Validator.
+        // Because msg.sender is actually the subnet actor, this method sends the fund back to
+        // the subnet actor caller.
         SubnetActorGetterFacet(msg.sender).collateralSource().transferFunds(payable(msg.sender), amount);
     }
 
