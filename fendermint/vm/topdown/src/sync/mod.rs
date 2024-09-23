@@ -19,14 +19,13 @@ use std::time::Duration;
 
 use fendermint_vm_genesis::{Power, Validator};
 
+use crate::vote::payload::Vote;
 pub use syncer::fetch_topdown_events;
 
 #[derive(Clone)]
 pub enum TopDownSyncEvent {
     NodeSyncing,
-    NewParentView,
-    NewParentChainHead,
-    NewProposal,
+    NewProposal(Box<Vote>),
 }
 
 /// Query the parent finality from the block chain state.

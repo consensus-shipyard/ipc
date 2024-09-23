@@ -4,10 +4,11 @@
 mod active;
 mod paused;
 
+use crate::vote::gossip::GossipClient;
 use crate::vote::operation::active::ActiveOperationMode;
 use crate::vote::operation::paused::PausedOperationMode;
+use crate::vote::store::VoteStore;
 use crate::vote::VotingHandler;
-use std::fmt::Display;
 
 pub type OperationMode = &'static str;
 pub const INITIALIZED: &str = "init";
@@ -34,24 +35,25 @@ pub const ACTIVE: &str = "active";
 ///     HardRecovery --> [*] : New checkpoints
 ///   }
 /// TODO: Soft and Hard recovery mode to be added
-pub enum OperationStateMachine {
-    Paused(PausedOperationMode),
-    Active(ActiveOperationMode),
+pub enum OperationStateMachine<G, S> {
+    Paused(PausedOperationMode<G, S>),
+    Active(ActiveOperationMode<G, S>),
 }
 
 /// Tracks the operation mdoe metrics for the voting system
-pub(crate) struct OperationMetrics {
+#[derive(Clone, Debug)]
+pub struct OperationMetrics {
     current_mode: OperationMode,
     previous_mode: OperationMode,
 }
 
-pub(crate) trait OperationModeHandler: Display {
-    fn advance(self) -> OperationStateMachine;
-}
-
-impl OperationStateMachine {
+impl<G, S> OperationStateMachine<G, S>
+where
+    G: GossipClient + Send + Sync + 'static,
+    S: VoteStore + Send + Sync + 'static,
+{
     /// Always start with Paused operation mode, one needs to know the exact status from syncer.
-    pub fn new(handler: VotingHandler) -> OperationStateMachine {
+    pub fn new(handler: VotingHandler<G, S>) -> OperationStateMachine<G, S> {
         let metrics = OperationMetrics {
             current_mode: PAUSED,
             previous_mode: INITIALIZED,
@@ -59,10 +61,10 @@ impl OperationStateMachine {
         Self::Paused(PausedOperationMode { metrics, handler })
     }
 
-    pub fn step(self) -> Self {
+    pub async fn step(self) -> Self {
         match self {
-            OperationStateMachine::Paused(p) => p.advance(),
-            OperationStateMachine::Active(p) => p.advance(),
+            OperationStateMachine::Paused(p) => p.advance().await,
+            OperationStateMachine::Active(p) => p.advance().await,
         }
     }
 }

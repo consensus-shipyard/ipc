@@ -1,9 +1,10 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::vote::payload::{Ballot, PowerTable, Vote};
+use crate::vote::error::Error;
+use crate::vote::payload::{Ballot, PowerTable, PowerUpdates, Vote};
 use crate::vote::store::VoteStore;
-use crate::vote::{Error, Weight};
+use crate::vote::Weight;
 use crate::BlockHeight;
 use fendermint_vm_genesis::ValidatorKey;
 use std::collections::HashMap;
@@ -72,6 +73,12 @@ impl<S: VoteStore> VoteTally<S> {
     /// This is the block that was finalized *in the ledger*.
     fn last_finalized_height(&self) -> BlockHeight {
         self.last_finalized_height
+    }
+
+    /// Returns the votes collected in the network at the target height
+    pub fn get_votes_at_height(&self, height: BlockHeight) -> Result<Vec<Vote>, Error> {
+        let votes = self.votes.get_votes_at_height(height)?;
+        Ok(votes.into_owned())
     }
 
     /// Add a vote we received.
@@ -158,7 +165,7 @@ impl<S: VoteStore> VoteTally<S> {
     /// Overwrite the power table after it has changed to a new snapshot.
     ///
     /// This method expects absolute values, it completely replaces the existing powers.
-    pub fn set_power_table(&mut self, power_table: Vec<(ValidatorKey, Weight)>) {
+    pub fn set_power_table(&mut self, power_table: PowerUpdates) {
         let power_table = HashMap::from_iter(power_table);
         // We don't actually have to remove the votes of anyone who is no longer a validator,
         // we just have to make sure to handle the case when they are not in the power table.
@@ -168,7 +175,7 @@ impl<S: VoteStore> VoteTally<S> {
     /// Update the power table after it has changed with changes.
     ///
     /// This method expects only the updated values, leaving everyone who isn't in it untouched
-    pub fn update_power_table(&mut self, power_updates: Vec<(ValidatorKey, Weight)>) {
+    pub fn update_power_table(&mut self, power_updates: PowerUpdates) {
         if power_updates.is_empty() {
             return;
         }
@@ -186,10 +193,10 @@ impl<S: VoteStore> VoteTally<S> {
 
 #[cfg(test)]
 mod tests {
+    use crate::vote::error::Error;
     use crate::vote::payload::{CertifiedObservation, Observation, Vote};
     use crate::vote::store::InMemoryVoteStore;
     use crate::vote::tally::VoteTally;
-    use crate::vote::Error;
     use arbitrary::{Arbitrary, Unstructured};
     use fendermint_crypto::SecretKey;
     use fendermint_vm_genesis::ValidatorKey;

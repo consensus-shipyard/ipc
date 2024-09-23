@@ -1,14 +1,15 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::vote::error::Error;
 use crate::vote::payload::{Ballot, PowerTable, Vote};
-use crate::vote::{Error, Weight};
+use crate::vote::Weight;
 use crate::BlockHeight;
 use fendermint_vm_genesis::ValidatorKey;
 use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, HashMap};
 
-pub(crate) trait VoteStore {
+pub trait VoteStore {
     /// Get the earliest block height of the votes stored
     fn earliest_vote_height(&self) -> Result<Option<BlockHeight>, Error>;
 
@@ -30,7 +31,7 @@ pub(crate) trait VoteStore {
 }
 
 #[derive(Default)]
-pub(crate) struct InMemoryVoteStore {
+pub struct InMemoryVoteStore {
     votes: BTreeMap<BlockHeight, HashMap<ValidatorKey, Vote>>,
 }
 
@@ -81,11 +82,15 @@ impl VoteStore for InMemoryVoteStore {
 }
 
 /// The aggregated votes  from different validators.
-pub(crate) struct VoteAgg<'a>(Vec<&'a Vote>);
+pub struct VoteAgg<'a>(Vec<&'a Vote>);
 
 impl<'a> VoteAgg<'a> {
     pub fn new(votes: Vec<&'a Vote>) -> Self {
         Self(votes)
+    }
+
+    pub fn into_owned(self) -> Vec<Vote> {
+        self.0.into_iter().cloned().collect()
     }
 
     pub fn ballot_weights(&self, power_table: &PowerTable) -> Vec<(&Ballot, Weight)> {

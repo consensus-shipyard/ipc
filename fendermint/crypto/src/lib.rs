@@ -9,7 +9,7 @@ use base64::{alphabet, Engine};
 use rand::Rng;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
-pub use libsecp256k1::PublicKey;
+pub use libsecp256k1::{PublicKey, RecoveryId, Signature};
 
 /// A [`GeneralPurpose`] engine using the [`alphabet::STANDARD`] base64 alphabet
 /// padding bytes when writing but requireing no padding when reading.

@@ -14,6 +14,7 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
 pub type PowerTable = HashMap<ValidatorKey, Weight>;
+pub type PowerUpdates = Vec<(ValidatorKey, Weight)>;
 
 /// The different versions of vote casted in topdown gossip pub-sub channel
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]

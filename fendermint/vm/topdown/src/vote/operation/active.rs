@@ -3,28 +3,33 @@
 
 use crate::vote::operation::paused::PausedOperationMode;
 use crate::vote::operation::{
-    OperationMetrics, OperationModeHandler, OperationStateMachine, PAUSED,
+    OperationMetrics, OperationStateMachine, ACTIVE, PAUSED,
 };
 use crate::vote::TopDownSyncEvent;
 use crate::vote::VotingHandler;
 use std::fmt::{Display, Formatter};
+use crate::vote::gossip::GossipClient;
+use crate::vote::store::VoteStore;
 
 /// In active mode, we observe a steady rate of topdown checkpoint commitments on chain.
 /// Our lookahead buffer is sliding continuously. As we acquire new finalised parent blocks,
 /// we broadcast individual signed votes for every epoch.
-pub(crate) struct ActiveOperationMode {
+pub(crate) struct ActiveOperationMode<G, S> {
     pub(crate) metrics: OperationMetrics,
-    pub(crate) handler: VotingHandler,
+    pub(crate) handler: VotingHandler<G, S>,
 }
 
-impl Display for ActiveOperationMode {
+impl<G, S> Display for ActiveOperationMode<G, S> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "active")
+        write!(f, "{}", ACTIVE)
     }
 }
 
-impl OperationModeHandler for ActiveOperationMode {
-    fn advance(mut self) -> OperationStateMachine {
+impl<G, S> ActiveOperationMode<G, S> where
+    G: GossipClient + Send + Sync + 'static,
+    S: VoteStore + Send + Sync + 'static,
+{
+    pub(crate) async fn advance(mut self) -> OperationStateMachine<G, S> {
         let mut n = self.handler.process_external_request(&self.metrics);
         tracing::debug!(
             num = n,
@@ -50,7 +55,7 @@ impl OperationModeHandler for ActiveOperationMode {
             }
 
             // handle the polled event
-            self.handler.handle_event(v);
+            self.handler.handle_event(v).await;
         }
 
         OperationStateMachine::Active(self)
