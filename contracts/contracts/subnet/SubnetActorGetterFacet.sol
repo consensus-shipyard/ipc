@@ -217,7 +217,7 @@ contract SubnetActorGetterFacet {
         return s.supplySource;
     }
 
-    /// @notice Returns the collateral strategy for the subnet.
+    /// @notice Returns the collateral asset kind for the subnet.
     function collateralSource() external view returns (Asset memory supply) {
         return s.collateralSource;
     }
