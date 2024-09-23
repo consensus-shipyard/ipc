@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 import "elliptic-curve-solidity/contracts/EllipticCurve.sol";
-import {IPCAddress, GenericToken} from "../../contracts/structs/Subnet.sol";
+import {IPCAddress, Asset} from "../../contracts/structs/Subnet.sol";
 import {CallMsg, IpcMsgKind, IpcEnvelope} from "../../contracts/structs/CrossNet.sol";
 import {IIpcHandler} from "../../sdk/interfaces/IIpcHandler.sol";
 import {METHOD_SEND, EMPTY_BYTES} from "../../contracts/constants/Constants.sol";
@@ -178,11 +178,11 @@ contract MockIpcContract is IIpcHandler {
         return EMPTY_BYTES;
     }
 
-    function supplySource() public pure returns (GenericToken memory t) {
+    function supplySource() public pure returns (Asset memory t) {
         return t;
     }
 
-    function collateralSource() public pure returns (GenericToken memory t) {
+    function collateralSource() public pure returns (Asset memory t) {
         return t;
     }
 

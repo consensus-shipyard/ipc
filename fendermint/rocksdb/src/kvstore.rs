@@ -85,7 +85,8 @@ where
     S: KVStore<Repr = Vec<u8>>,
     S::Namespace: AsRef<str>,
 {
-    type Tx<'a> = RocksDbReadTx<'a>
+    type Tx<'a>
+        = RocksDbReadTx<'a>
     where
         Self: 'a;
 
@@ -103,7 +104,8 @@ where
     S: KVStore<Repr = Vec<u8>>,
     S::Namespace: AsRef<str>,
 {
-    type Tx<'a> = RocksDbWriteTx<'a>
+    type Tx<'a>
+        = RocksDbWriteTx<'a>
     where
         Self: 'a;
 
