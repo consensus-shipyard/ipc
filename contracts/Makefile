@@ -1,13 +1,13 @@
 # Targets that are commands.
 COMMANDS :=  deploy-stack gen compile-abi rust-binding slither lint fmt deps build \
              test install-dev install-npm-package install-eth-abi storage clean coverage \
-             prepare build-selector-library forge
+             prepare forge
 
 # Targets that are prerequisite commands.
 PREREQ_COMMANDS := pnpm
 
 # Targets that are not commands.
-NON_COMMANDS := node_modules
+NON_COMMANDS := node_modules test/helpers/SelectorLibrary.sol
 
 # Declare commands and prerequisite commands as phony targets.
 .PHONY: $(COMMANDS) $(PREREQ_COMMANDS)
@@ -77,16 +77,8 @@ build: node_modules | forge
 	forge build
 	FOUNDRY_SRC=sdk forge build
 
-test: node_modules | forge
+test: node_modules test/helpers/SelectorLibrary.sol | forge
 	forge test -vvv --ffi
-
-install-dev: install-npm-package install-eth-abi
-
-install-npm-package: node_modules
-	pnpm install --save-dev
-
-install-eth-abi:
-	curl -sSL https://bootstrap.pypa.io/get-pip.py -o get-pip.py && python3 get-pip.py && rm get-pip.py && python3 -m pip install eth_abi
 
 storage:
 	rm -rf ./cache
@@ -108,10 +100,10 @@ coverage: node_modules | forge
 	fi
 	./tools/check_coverage.sh
 
-prepare: build-selector-library fmt lint test slither
+prepare: test/helpers/SelectorLibrary.sol fmt lint test slither
 
-build-selector-library: | forge
-	python3 scripts/python/build_selector_library.py
+test/helpers/SelectorLibrary.sol: | forge
+	pnpm exec hardhat gen-selector-library
 	pnpm exec prettier -w test/helpers/SelectorLibrary.sol
 
 # Forge is used by the ipc-solidity-actors compilation steps.

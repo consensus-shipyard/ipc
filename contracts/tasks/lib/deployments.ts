@@ -105,7 +105,7 @@ export class Deployments {
             (contract: Contract) => contract.address,
         )
     }
-
+    
     get contracts(): { [key: string]: Contract } {
         return this._contracts
     }
