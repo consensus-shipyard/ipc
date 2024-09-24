@@ -31,6 +31,9 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 prometheus = { workspace = true }
 
+
+multihash = { workspace = true }
+
 fendermint_vm_genesis = { path = "../genesis" }
 fendermint_vm_event = { path = "../event" }
 fendermint_tracing = { path = "../../tracing" }
