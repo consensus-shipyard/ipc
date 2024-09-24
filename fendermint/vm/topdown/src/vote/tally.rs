@@ -365,16 +365,15 @@ mod tests {
             .set_finalized(observation.ballot.parent_height() - 1)
             .unwrap();
 
-        let mut count = 0;
-        for validator in &validators {
+        for (count, validator) in validators.iter().enumerate() {
             let certified = CertifiedObservation::sign(observation.clone(), &validator.0).unwrap();
             let vote = Vote::v1(certified).unwrap();
             vote_tally.add_vote(vote).unwrap();
 
+            // only 3 validators vote
             if count == 2 {
                 break;
             }
-            count += 1;
         }
         assert!(vote_tally.find_quorum().unwrap().is_none());
 
