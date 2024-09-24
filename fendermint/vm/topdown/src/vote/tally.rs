@@ -46,10 +46,6 @@ impl<S: VoteStore> VoteTally<S> {
         })
     }
 
-    fn power_table(&self) -> &HashMap<ValidatorKey, Weight> {
-        &self.power_table
-    }
-
     /// Check that a validator key is currently part of the power table.
     fn has_power(&self, validator_key: &ValidatorKey) -> bool {
         // For consistency consider validators without power unknown.
@@ -59,11 +55,15 @@ impl<S: VoteStore> VoteTally<S> {
         }
     }
 
+    pub fn power_table(&self) -> &HashMap<ValidatorKey, Weight> {
+        &self.power_table
+    }
+
     /// Calculate the minimum weight needed for a proposal to pass with the current membership.
     ///
     /// This is inclusive, that is, if the sum of weight is greater or equal to this, it should pass.
     /// The equivalent formula can be found in CometBFT [here](https://github.com/cometbft/cometbft/blob/a8991d63e5aad8be82b90329b55413e3a4933dc0/types/vote_set.go#L307).
-    fn quorum_threshold(&self) -> Weight {
+    pub fn quorum_threshold(&self) -> Weight {
         let total_weight: Weight = self.power_table.values().sum();
         total_weight * 2 / 3 + 1
     }
@@ -71,7 +71,7 @@ impl<S: VoteStore> VoteTally<S> {
     /// Return the height of the first entry in the chain.
     ///
     /// This is the block that was finalized *in the ledger*.
-    fn last_finalized_height(&self) -> BlockHeight {
+    pub fn last_finalized_height(&self) -> BlockHeight {
         self.last_finalized_height
     }
 

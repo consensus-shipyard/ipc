@@ -11,7 +11,7 @@ mod tally;
 use crate::sync::TopDownSyncEvent;
 use crate::vote::gossip::GossipClient;
 use crate::vote::operation::{OperationMetrics, OperationStateMachine};
-use crate::vote::payload::{PowerUpdates, Vote};
+use crate::vote::payload::{Ballot, PowerUpdates, Vote, VoteTallyState};
 use crate::vote::store::VoteStore;
 use crate::vote::tally::VoteTally;
 use crate::BlockHeight;
@@ -39,7 +39,10 @@ pub struct VoteReactorClient {
     tx: mpsc::Sender<VoteReactorRequest>,
 }
 
-pub fn start_vote_reactor<G: GossipClient + Send+ Sync + 'static, V: VoteStore + Send + Sync + 'static>(
+pub fn start_vote_reactor<
+    G: GossipClient + Send + Sync + 'static,
+    V: VoteStore + Send + Sync + 'static,
+>(
     config: Config,
     power_table: PowerUpdates,
     last_finalized_height: BlockHeight,
@@ -71,49 +74,89 @@ pub fn start_vote_reactor<G: GossipClient + Send+ Sync + 'static, V: VoteStore +
 }
 
 impl VoteReactorClient {
-    pub async fn query_operation_mode(&self) -> anyhow::Result<OperationMetrics> {
+    async fn request<T, F: FnOnce(oneshot::Sender<T>) -> VoteReactorRequest>(
+        &self,
+        f: F,
+    ) -> anyhow::Result<T> {
         let (tx, rx) = oneshot::channel();
-        self.tx
-            .send(VoteReactorRequest::QueryOperationMode(tx))
-            .await?;
+        self.tx.send(f(tx)).await?;
         Ok(rx.await?)
     }
 
+    /// Query the current operation mode of the vote tally state machine
+    pub async fn query_operation_mode(&self) -> anyhow::Result<OperationMetrics> {
+        self.request(VoteReactorRequest::QueryOperationMode).await
+    }
+
+    /// Query the current validator votes at the target block height
     pub async fn query_votes(
         &self,
         height: BlockHeight,
     ) -> anyhow::Result<Result<Vec<Vote>, Error>> {
-        let (tx, rx) = oneshot::channel();
-        self.tx
-            .send(VoteReactorRequest::QueryVotes {
-                height,
-                reply_tx: tx,
-            })
-            .await?;
-        Ok(rx.await?)
+        self.request(|tx| VoteReactorRequest::QueryVotes { height, tx })
+            .await
     }
 
+    /// Queries the vote tally to see if there are new quorum formed
+    pub async fn find_quorum(&self) -> anyhow::Result<Option<Ballot>> {
+        self.request(VoteReactorRequest::FindQuorum).await
+    }
+
+    /// Get the current vote tally state variables in vote tally
+    pub async fn query_vote_tally_state(&self) -> anyhow::Result<VoteTallyState> {
+        self.request(VoteReactorRequest::QueryState).await
+    }
+
+    /// Update power of some validators. If the weight is zero, the validator is removed
+    /// from the power table.
     pub async fn update_power_table(&self, updates: PowerUpdates) -> anyhow::Result<()> {
-        let (tx, rx) = oneshot::channel();
-        self.tx
-            .send(VoteReactorRequest::UpdatePowerTable {
-                updates,
-                reply_tx: tx,
-            })
-            .await?;
-        Ok(rx.await?)
+        self.request(|tx| VoteReactorRequest::UpdatePowerTable { updates, tx })
+            .await
+    }
+
+    /// Completely over-write existing power table
+    pub async fn set_power_table(&self, updates: PowerUpdates) -> anyhow::Result<()> {
+        self.request(|tx| VoteReactorRequest::SetPowerTable { updates, tx })
+            .await
+    }
+
+    /// Signals that a new quorum is finalized and executed in the interpreter
+    pub async fn set_quorum_finalized(
+        &self,
+        height: BlockHeight,
+    ) -> anyhow::Result<Result<(), Error>> {
+        self.request(|tx| VoteReactorRequest::SetQuorumFinalized { height, tx })
+            .await
     }
 }
 
 enum VoteReactorRequest {
+    /// Query the current operation mode of the vote tally state machine
     QueryOperationMode(oneshot::Sender<OperationMetrics>),
+    /// Query the current validator votes at the target block height
     QueryVotes {
         height: BlockHeight,
-        reply_tx: oneshot::Sender<Result<Vec<Vote>, Error>>,
+        tx: oneshot::Sender<Result<Vec<Vote>, Error>>,
     },
+    /// Get the current vote tally state variables in vote tally
+    QueryState(oneshot::Sender<VoteTallyState>),
+    /// Queries the vote tally to see if there are new quorum formed
+    FindQuorum(oneshot::Sender<Option<Ballot>>),
+    /// Update power of some validators. If the weight is zero, the validator is removed
+    /// from the power table.
     UpdatePowerTable {
         updates: PowerUpdates,
-        reply_tx: oneshot::Sender<()>,
+        tx: oneshot::Sender<()>,
+    },
+    /// Completely over-write existing power table
+    SetPowerTable {
+        updates: PowerUpdates,
+        tx: oneshot::Sender<()>,
+    },
+    /// Signals that a new quorum is finalized and executed in the interpreter
+    SetQuorumFinalized {
+        height: BlockHeight,
+        tx: oneshot::Sender<Result<(), Error>>,
     },
 }
 
@@ -137,16 +180,38 @@ where
 {
     fn handle_request(&mut self, req: VoteReactorRequest, metrics: &OperationMetrics) {
         match req {
-            VoteReactorRequest::QueryOperationMode(req_tx) => {
+            VoteReactorRequest::QueryOperationMode(tx) => {
                 // ignore error
-                let _ = req_tx.send(metrics.clone());
+                let _ = tx.send(metrics.clone());
             }
-            VoteReactorRequest::QueryVotes { height, reply_tx } => {
-                let _ = reply_tx.send(self.vote_tally.get_votes_at_height(height));
+            VoteReactorRequest::QueryVotes { height, tx } => {
+                let _ = tx.send(self.vote_tally.get_votes_at_height(height));
             }
-            VoteReactorRequest::UpdatePowerTable { updates, reply_tx } => {
+            VoteReactorRequest::UpdatePowerTable { updates, tx } => {
                 self.vote_tally.update_power_table(updates);
-                let _ = reply_tx.send(());
+                let _ = tx.send(());
+            }
+            VoteReactorRequest::FindQuorum(tx) => {
+                let quorum = self
+                    .vote_tally
+                    .find_quorum()
+                    .inspect_err(|e| tracing::error!(err = e.to_string(), "cannot find quorum"))
+                    .unwrap_or_default();
+                let _ = tx.send(quorum);
+            }
+            VoteReactorRequest::SetPowerTable { updates, tx } => {
+                self.vote_tally.set_power_table(updates);
+                let _ = tx.send(());
+            }
+            VoteReactorRequest::SetQuorumFinalized { height, tx } => {
+                let _ = tx.send(self.vote_tally.set_finalized(height));
+            }
+            VoteReactorRequest::QueryState(tx) => {
+                let _ = tx.send(VoteTallyState {
+                    last_finalized_height: self.vote_tally.last_finalized_height(),
+                    quorum_threshold: self.vote_tally.quorum_threshold(),
+                    power_table: self.vote_tally.power_table().clone(),
+                });
             }
         }
     }
@@ -212,7 +277,7 @@ where
                 Err(e) => {
                     tracing::warn!(err = e.to_string(), "cannot poll gossip vote");
                     break;
-                },
+                }
                 _ => {}
             }
         }
