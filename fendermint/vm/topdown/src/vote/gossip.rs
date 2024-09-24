@@ -11,7 +11,7 @@ use async_trait::async_trait;
 pub trait GossipClient {
     /// Attempts to poll if there are available vote. This method returns immediately.
     /// If there is no vote, it returns None
-    fn try_poll_vote(&self) -> Result<Option<Vote>, Error>;
+    fn try_poll_vote(&mut self) -> Result<Option<Vote>, Error>;
 
     async fn publish_vote(&self, vote: Vote) -> Result<(), Error>;
 }

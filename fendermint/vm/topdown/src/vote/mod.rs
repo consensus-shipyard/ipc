@@ -25,13 +25,13 @@ pub type Weight = u64;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
     /// The reactor request channel buffer size
-    req_channel_buffer_size: usize,
+    pub req_channel_buffer_size: usize,
     /// The number of requests the reactor should process per run before handling other tasks
-    req_batch_processing_size: usize,
+    pub req_batch_processing_size: usize,
     /// The number of vote recording requests the reactor should process per run before handling other tasks
-    gossip_req_processing_size: usize,
+    pub gossip_req_processing_size: usize,
     /// The time to sleep for voting loop if nothing happens
-    voting_sleep_interval_sec: u64,
+    pub voting_sleep_interval_sec: u64,
 }
 
 /// The client to interact with the vote reactor
