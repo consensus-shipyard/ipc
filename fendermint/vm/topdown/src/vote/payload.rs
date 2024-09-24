@@ -5,7 +5,6 @@ use crate::vote::Weight;
 use crate::{BlockHash, BlockHeight, Bytes};
 use anyhow::anyhow;
 use arbitrary::Arbitrary;
-use ethers::core::k256::sha2;
 use fendermint_crypto::secp::RecoverableECDSASignature;
 use fendermint_crypto::SecretKey;
 use fendermint_vm_genesis::ValidatorKey;
@@ -71,10 +70,7 @@ pub struct CertifiedObservation {
 impl Vote {
     pub fn v1(obs: CertifiedObservation) -> anyhow::Result<Self> {
         let to_sign = fvm_ipld_encoding::to_vec(&obs.observed)?;
-        let (pk, _) = obs
-            .signature
-            .clone()
-            .recover(&to_sign)?;
+        let (pk, _) = obs.signature.clone().recover(&to_sign)?;
 
         Ok(Self::V1 {
             validator: ValidatorKey::new(pk),
