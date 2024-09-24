@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.23;
 
-import {NotEnoughBalance, IncreaseAllowanceFailed} from "../errors/IPCErrors.sol";
+import {NotEnoughBalance} from "../errors/IPCErrors.sol";
 import {Asset, AssetKind} from "../structs/Subnet.sol";
 import {EMPTY_BYTES} from "../constants/Constants.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -205,21 +205,22 @@ library AssetHelper {
         }
     }
 
+    // @notice Makes the asset available for spending by the given spender, without actually sending it.
+    // @return msgValue The amount of msg.value that needs to be sent along with the subsequent call that will _actually_ spend that asset.
+    //                  Will be 0 if the asset is a token, since no native coins are to be sent.
+    function makeAvailable(Asset memory self, address spender, uint256 amount) internal returns (uint256 msgValue) {
+        if (self.kind == AssetKind.Native) {
+            msgValue = amount;
+        } else if (self.kind == AssetKind.ERC20) {
+            IERC20 token = IERC20(self.tokenAddress);
+            token.safeIncreaseAllowance(spender, amount);
+            msgValue = 0;
+        }
+        return msgValue;
+    }
+
     function native() internal pure returns (Asset memory) {
         return Asset({kind: AssetKind.Native, tokenAddress: address(0)});
     }
 
-    function isNative(Asset memory self) internal pure returns(bool) {
-        return self.kind == AssetKind.Native;
-    }
-
-    function increaseAllowance(Asset memory self, address spender, uint256 amount) internal {
-        if (self.kind == AssetKind.ERC20) {
-            IERC20 token = IERC20(self.tokenAddress);
-            uint256 allowance = token.allowance(address(this), spender);
-            if (!token.approve(spender, allowance + amount)) {
-                revert IncreaseAllowanceFailed();
-            }
-        }
-    }
 }
