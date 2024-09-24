@@ -71,7 +71,10 @@ pub struct CertifiedObservation {
 impl Vote {
     pub fn v1(obs: CertifiedObservation) -> anyhow::Result<Self> {
         let to_sign = fvm_ipld_encoding::to_vec(&obs.observed)?;
-        let (pk, _) = obs.signature.clone().recover::<sha2::Sha256>(&to_sign)?;
+        let (pk, _) = obs
+            .signature
+            .clone()
+            .recover(&to_sign)?;
 
         Ok(Self::V1 {
             validator: ValidatorKey::new(pk),
@@ -117,7 +120,7 @@ impl TryFrom<&[u8]> for CertifiedObservation {
 impl CertifiedObservation {
     pub fn sign(ob: Observation, sk: &SecretKey) -> anyhow::Result<Self> {
         let to_sign = fvm_ipld_encoding::to_vec(&ob)?;
-        let sig = RecoverableECDSASignature::sign::<sha2::Sha256>(sk, to_sign.as_slice())?;
+        let sig = RecoverableECDSASignature::sign(sk, to_sign.as_slice())?;
         Ok(Self {
             observed: ob,
             signature: sig,
