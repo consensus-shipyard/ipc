@@ -8,7 +8,7 @@ import {LibMinPQ, MinPQ} from "./priority/LibMinPQ.sol";
 import {LibStakingChangeLog} from "./LibStakingChangeLog.sol";
 import {AssetHelper} from "./AssetHelper.sol";
 import {PermissionMode, StakingReleaseQueue, StakingChangeLog, StakingChange, StakingChangeRequest, StakingOperation, StakingRelease, ValidatorSet, AddressStakingReleases, ParentValidatorsTracker, Validator, Asset} from "../structs/Subnet.sol";
-import {WithdrawExceedingCollateral, NotValidator, CannotConfirmFutureChanges, NoCollateralToWithdraw, AddressShouldBeValidator, InvalidConfigurationNumber, Unreachable} from "../errors/IPCErrors.sol";
+import {WithdrawExceedingCollateral, NotValidator, CannotConfirmFutureChanges, NoCollateralToWithdraw, AddressShouldBeValidator, InvalidConfigurationNumber} from "../errors/IPCErrors.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
 library LibAddressStakingReleases {
@@ -586,7 +586,7 @@ library LibStaking {
                     uint256 msgValue = s.collateralSource.makeAvailable(gateway, amount);
                     IGateway(gateway).addStake{value: amount}(amount);
                 } else {
-                    revert Unreachable();
+                    revert("Unknown staking operation");
                 }
             }
 
