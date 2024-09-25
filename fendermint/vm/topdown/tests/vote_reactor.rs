@@ -13,7 +13,8 @@ use fendermint_vm_topdown::vote::error::Error;
 use fendermint_vm_topdown::vote::gossip::GossipClient;
 use fendermint_vm_topdown::vote::payload::{Observation, PowerUpdates, Vote};
 use fendermint_vm_topdown::vote::store::InMemoryVoteStore;
-use fendermint_vm_topdown::vote::{start_vote_reactor, Config, Weight};
+use fendermint_vm_topdown::vote::{start_vote_reactor, Config, VoteReactorClient, Weight};
+use fendermint_vm_topdown::BlockHeight;
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::error::TryRecvError;
 
@@ -104,6 +105,17 @@ fn gen_power_updates(validators: &[Validator]) -> PowerUpdates {
         .collect()
 }
 
+async fn ensure_votes_received(
+    clients: &[VoteReactorClient],
+    height_votes: Vec<(BlockHeight, usize)>,
+) {
+    for client in clients {
+        for (height, votes) in &height_votes {
+            while client.query_votes(*height).await.unwrap().unwrap().len() != *votes {}
+        }
+    }
+}
+
 #[tokio::test]
 async fn simple_lifecycle() {
     let config = default_config();
@@ -144,23 +156,45 @@ async fn simple_lifecycle() {
     let r = client.query_votes(parent_height).await.unwrap().unwrap();
     assert_eq!(r.len(), 1);
 
+    // now push another observation
+    let parent_height2 = 101;
+    let obs2 = Observation::new(vec![100], parent_height2, vec![1, 2, 3], vec![2, 3, 4]);
+    internal_event_tx
+        .send(TopDownSyncEvent::NewProposal(Box::new(obs2)))
+        .unwrap();
+
     client
         .set_quorum_finalized(parent_height)
         .await
         .unwrap()
         .unwrap();
 
-    // now votes are cleared
-    assert_eq!(client.find_quorum().await.unwrap(), None);
     let state = client.query_vote_tally_state().await.unwrap();
     assert_eq!(state.last_finalized_height, parent_height);
+
+    let votes = client.query_votes(parent_height2).await.unwrap().unwrap();
+    assert_eq!(votes.len(), 1);
+    let r = client.find_quorum().await.unwrap().unwrap();
+    assert_eq!(r.parent_height(), parent_height2);
+
+    client
+        .set_quorum_finalized(parent_height2)
+        .await
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(client.find_quorum().await.unwrap(), None);
+    assert!(
+        client.dump_votes().await.unwrap().unwrap().is_empty(),
+        "should have no votes left"
+    );
 }
 
+/// This tests votes coming in the wrong block height order and it still works
 #[tokio::test]
 async fn waiting_for_quorum() {
     let config = default_config();
 
-    // 21 validators equal 100 weight
     let (validators, mut gossips) = gen_validators(vec![100; 5]);
     let power_updates = gen_power_updates(&validators);
     let initial_finalized_height = 10;
@@ -211,33 +245,15 @@ async fn waiting_for_quorum() {
         .send(TopDownSyncEvent::NewProposal(Box::new(obs3.clone())))
         .unwrap();
 
-    // ensure votes are received
-    for client in &clients {
-        while client
-            .query_votes(parent_height1)
-            .await
-            .unwrap()
-            .unwrap()
-            .len()
-            != 2
-        {}
-        while client
-            .query_votes(parent_height2)
-            .await
-            .unwrap()
-            .unwrap()
-            .len()
-            != 2
-        {}
-        while client
-            .query_votes(parent_height3)
-            .await
-            .unwrap()
-            .unwrap()
-            .len()
-            != 1
-        {}
-    }
+    ensure_votes_received(
+        &clients,
+        vec![
+            (parent_height1, 2),
+            (parent_height2, 2),
+            (parent_height3, 1),
+        ],
+    )
+    .await;
 
     // at this moment, no quorum should have ever formed
     for client in &clients {
@@ -258,17 +274,7 @@ async fn waiting_for_quorum() {
         .send(TopDownSyncEvent::NewProposal(Box::new(obs3.clone())))
         .unwrap();
 
-    // ensure every client receives the votes
-    for client in &clients {
-        while client
-            .query_votes(parent_height3)
-            .await
-            .unwrap()
-            .unwrap()
-            .len()
-            != 4
-        {}
-    }
+    ensure_votes_received(&clients, vec![(parent_height3, 4)]).await;
 
     for client in &clients {
         let r = client.find_quorum().await.unwrap().unwrap();
@@ -284,16 +290,7 @@ async fn waiting_for_quorum() {
         .unwrap();
 
     // ensure every client receives the votes
-    for client in &clients {
-        while client
-            .query_votes(parent_height1)
-            .await
-            .unwrap()
-            .unwrap()
-            .len()
-            != 4
-        {}
-    }
+    ensure_votes_received(&clients, vec![(parent_height1, 4)]).await;
 
     // but larger parent height wins
     for client in &clients {
@@ -331,10 +328,10 @@ async fn all_validator_in_sync() {
     let (internal_event_tx, _) = broadcast::channel(validators.len() + 1);
 
     let mut node_clients = vec![];
-    for i in 0..validators.len() {
+    for validator in &validators {
         let r = start_vote_reactor(
             config.clone(),
-            validators[i].sk.clone(),
+            validator.sk.clone(),
             power_updates.clone(),
             initial_finalized_height,
             gossips.pop().unwrap(),
