@@ -1,9 +1,9 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::BlockHeight;
 use crate::syncer::error::Error;
 use crate::syncer::payload::ParentView;
+use crate::BlockHeight;
 
 /// Stores the parent view observed of the current node
 pub trait ParentViewStore {

@@ -2,21 +2,21 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! The inner type of parent syncer
 
-use anyhow::anyhow;
-use libp2p::futures::TryFutureExt;
-use tokio::sync::broadcast;
-use ipc_observability::emit;
-use ipc_observability::serde::HexEncodableBlockHash;
-use crate::{BlockHash, BlockHeight, IPCParentFinality, is_null_round_str};
 use crate::observe::ParentFinalityAcquired;
 use crate::proxy::ParentQueryProxy;
 use crate::syncer::error::Error;
-use crate::syncer::{ParentSyncerConfig, TopDownSyncEvent};
 use crate::syncer::payload::ParentView;
 use crate::syncer::store::ParentViewStore;
+use crate::syncer::{ParentSyncerConfig, TopDownSyncEvent};
+use crate::{is_null_round_str, BlockHash, BlockHeight, IPCParentFinality};
+use anyhow::anyhow;
+use ipc_observability::emit;
+use ipc_observability::serde::HexEncodableBlockHash;
+use libp2p::futures::TryFutureExt;
+use tokio::sync::broadcast;
 use tracing::instrument;
 
-struct ParentSyncerReactor<P, S> {
+pub(crate) struct ParentPoll<P, S> {
     config: ParentSyncerConfig,
     parent_proxy: P,
     store: S,
@@ -24,24 +24,45 @@ struct ParentSyncerReactor<P, S> {
     last_finalized: IPCParentFinality,
 }
 
-impl <P, S> ParentSyncerReactor<P, S>
+impl<P, S> ParentPoll<P, S>
 where
     S: ParentViewStore + Send + Sync + 'static,
-    P: Send + Sync + 'static + ParentQueryProxy
+    P: Send + Sync + 'static + ParentQueryProxy,
 {
-    async fn run(&mut self) {
-        loop {
-            if let Err(e) = self.sync().await {
-                tracing::error!(err = e.to_string(), "cannot sync with parent");
-            }
-            tokio::time::sleep(self.config.polling_interval).await;
+    pub fn new(
+        config: ParentSyncerConfig,
+        proxy: P,
+        store: S,
+        last_finalized: IPCParentFinality,
+    ) -> Self {
+        let (tx, _) = broadcast::channel(config.broadcast_channel_size);
+        Self {
+            config,
+            parent_proxy: proxy,
+            store,
+            event_broadcast: tx,
+            last_finalized,
         }
+    }
+
+    /// The target block height is finalized
+    pub fn finalize(&mut self, height: BlockHeight) -> Result<(), Error> {
+        let Some(min_height) = self.store.minimal_parent_view_height()? else {
+            return Ok(());
+        };
+        for h in min_height..=height {
+            self.store.purge(h)?;
+        }
+        Ok(())
     }
 
     /// Get the latest non null block data stored
     async fn latest_nonnull_data(&self) -> anyhow::Result<(BlockHeight, BlockHash)> {
         let Some(latest_height) = self.store.max_parent_view_height()? else {
-            return Ok((self.last_finalized.height, self.last_finalized.block_hash.clone()));
+            return Ok((
+                self.last_finalized.height,
+                self.last_finalized.block_hash.clone(),
+            ));
         };
 
         let start = self.last_finalized.height + 1;
@@ -54,20 +75,24 @@ where
                 continue;
             };
 
-            return Ok((h, payload.parent_hash))
+            return Ok((h, payload.parent_hash));
         }
 
         // this means the votes stored are all null blocks, return last committed finality
-        Ok((self.last_finalized.height, self.last_finalized.block_hash.clone()))
+        Ok((
+            self.last_finalized.height,
+            self.last_finalized.block_hash.clone(),
+        ))
     }
 
     /// Insert the height into cache when we see a new non null block
-    async fn sync(&mut self) -> anyhow::Result<()> {
+    pub async fn try_poll(&mut self) -> anyhow::Result<()> {
         let Some(chain_head) = self.finalized_chain_head().await? else {
             return Ok(());
         };
 
-        let (mut latest_height_fetched, mut first_non_null_parent_hash) = self.latest_nonnull_data().await?;
+        let (mut latest_height_fetched, mut first_non_null_parent_hash) =
+            self.latest_nonnull_data().await?;
         tracing::debug!(chain_head, latest_height_fetched, "syncing heights");
 
         if latest_height_fetched > chain_head {
@@ -76,7 +101,7 @@ where
                 latest_height_fetched,
                 "chain head went backwards, potential reorg detected from height"
             );
-           todo!("handle reorg, maybe just a warning???")
+            todo!("handle reorg, maybe just a warning???")
         }
 
         if latest_height_fetched == chain_head {
@@ -91,7 +116,9 @@ where
         loop {
             if self.store_full()? {
                 tracing::debug!("exceeded cache size limit");
-                let _ = self.event_broadcast.send(TopDownSyncEvent::ParentViewStoreFull);
+                let _ = self
+                    .event_broadcast
+                    .send(TopDownSyncEvent::ParentViewStoreFull);
                 break;
             }
 
@@ -123,7 +150,7 @@ where
 
     fn store_full(&self) -> anyhow::Result<bool> {
         let Some(h) = self.store.max_parent_view_height()? else {
-            return Ok(false)
+            return Ok(false);
         };
         Ok(h - self.last_finalized.height > self.config.max_store_blocks)
     }
@@ -214,7 +241,6 @@ where
 
         Ok(view.payload.unwrap().parent_hash)
     }
-
 }
 
 #[instrument(skip(parent_proxy))]
@@ -223,8 +249,8 @@ async fn fetch_data<P>(
     height: BlockHeight,
     block_hash: BlockHash,
 ) -> Result<ParentView, Error>
-    where
-        P: ParentQueryProxy + Send + Sync + 'static,
+where
+    P: ParentQueryProxy + Send + Sync + 'static,
 {
     let changes_res = parent_proxy
         .get_validator_changes(height)
@@ -257,5 +283,10 @@ async fn fetch_data<P>(
         return Err(Error::ParentChainReorgDetected);
     }
 
-    Ok(ParentView::nonnull_block(height, block_hash, topdown_msgs_res.value, changes_res.value))
+    Ok(ParentView::nonnull_block(
+        height,
+        block_hash,
+        topdown_msgs_res.value,
+        changes_res.value,
+    ))
 }

@@ -1,15 +1,19 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::time::Duration;
-use tokio::sync::mpsc;
-use crate::BlockHeight;
+use crate::proxy::ParentQueryProxy;
+use crate::syncer::poll::ParentPoll;
+use crate::syncer::store::ParentViewStore;
 use crate::vote::payload::Observation;
+use crate::{BlockHeight, IPCParentFinality};
+use std::time::Duration;
+use tokio::select;
+use tokio::sync::mpsc;
 
-pub mod payload;
-pub mod reactor;
-pub mod store;
 pub mod error;
+pub mod payload;
+pub mod poll;
+pub mod store;
 
 #[derive(Clone, Debug)]
 pub enum TopDownSyncEvent {
@@ -22,6 +26,8 @@ pub enum TopDownSyncEvent {
 
 pub struct ParentSyncerConfig {
     pub request_channel_size: usize,
+    /// The event broadcast channel buffer size
+    pub broadcast_channel_size: usize,
     /// The number of blocks to delay before reporting a height as final on the parent chain.
     /// To propose a certain number of epochs delayed from the latest height, we see to be
     /// conservative and avoid other from rejecting the proposal because they don't see the
@@ -39,15 +45,61 @@ pub struct ParentSyncerConfig {
     pub sync_many: bool,
 }
 
+#[derive(Clone)]
 pub struct ParentSyncerReactorClient {
-    tx: mpsc::Sender<()>,
-
+    tx: mpsc::Sender<ParentSyncerRequest>,
 }
 
-pub fn start_parent_syncer(config: ParentSyncerConfig) -> anyhow::Result<ParentSyncerReactorClient> {
-    let (tx, rx) = mpsc::channel(config.request_channel_size);
+pub fn start_parent_syncer<P, S>(
+    config: ParentSyncerConfig,
+    proxy: P,
+    store: S,
+    last_finalized: IPCParentFinality,
+) -> anyhow::Result<ParentSyncerReactorClient>
+where
+    S: ParentViewStore + Send + Sync + 'static,
+    P: Send + Sync + 'static + ParentQueryProxy,
+{
+    let (tx, mut rx) = mpsc::channel(config.request_channel_size);
 
     tokio::spawn(async move {
+        let polling_interval = config.polling_interval;
+        let mut poller = ParentPoll::new(config, proxy, store, last_finalized);
+
+        loop {
+            select! {
+                _ = tokio::time::sleep(polling_interval) => {
+                    if let Err(e) = poller.try_poll().await {
+                        tracing::error!(err = e.to_string(), "cannot sync with parent");
+                    }
+                }
+                req = rx.recv() => {
+                    let Some(req) = req else { break };
+                    handle_request(req, &mut poller);
+                }
+            }
+        }
+
+        tracing::warn!("parent syncer stopped")
     });
     Ok(ParentSyncerReactorClient { tx })
+}
+
+enum ParentSyncerRequest {
+    /// A new parent height is finalized
+    Finalized(BlockHeight),
+}
+
+fn handle_request<P, S>(req: ParentSyncerRequest, poller: &mut ParentPoll<P, S>)
+    where
+        S: ParentViewStore + Send + Sync + 'static,
+        P: Send + Sync + 'static + ParentQueryProxy
+{
+    match req {
+        ParentSyncerRequest::Finalized(h) => {
+            if let Err(e) = poller.finalize(h) {
+                tracing::error!(height = h, err = e.to_string(), "cannot finalize parent viewer");
+            }
+        },
+    }
 }

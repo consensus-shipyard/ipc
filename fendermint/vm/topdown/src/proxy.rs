@@ -1,7 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::sync::Arc;
 use crate::observe::ParentRpcCalled;
 use crate::BlockHeight;
 use anyhow::anyhow;
@@ -14,6 +13,7 @@ use ipc_api::subnet_id::SubnetID;
 use ipc_observability::emit;
 use ipc_provider::manager::{GetBlockHashResult, TopDownQueryPayload};
 use ipc_provider::IpcProvider;
+use std::sync::Arc;
 use std::time::Instant;
 use tracing::instrument;
 
@@ -44,7 +44,7 @@ pub trait ParentQueryProxy {
 }
 
 #[async_trait]
-impl <P: Send + Sync + 'static + ParentQueryProxy> ParentQueryProxy for Arc<P> {
+impl<P: Send + Sync + 'static + ParentQueryProxy> ParentQueryProxy for Arc<P> {
     async fn get_chain_head_height(&self) -> Result<BlockHeight> {
         self.as_ref().get_chain_head_height().await
     }
@@ -57,11 +57,17 @@ impl <P: Send + Sync + 'static + ParentQueryProxy> ParentQueryProxy for Arc<P> {
         self.as_ref().get_block_hash(height).await
     }
 
-    async fn get_top_down_msgs(&self, height: BlockHeight) -> Result<TopDownQueryPayload<Vec<IpcEnvelope>>> {
+    async fn get_top_down_msgs(
+        &self,
+        height: BlockHeight,
+    ) -> Result<TopDownQueryPayload<Vec<IpcEnvelope>>> {
         self.as_ref().get_top_down_msgs(height).await
     }
 
-    async fn get_validator_changes(&self, height: BlockHeight) -> Result<TopDownQueryPayload<Vec<StakingChangeRequest>>> {
+    async fn get_validator_changes(
+        &self,
+        height: BlockHeight,
+    ) -> Result<TopDownQueryPayload<Vec<StakingChangeRequest>>> {
         self.as_ref().get_validator_changes(height).await
     }
 }

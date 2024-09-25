@@ -1,9 +1,9 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::{BlockHash, BlockHeight};
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
-use crate::{BlockHash, BlockHeight};
 
 #[derive(Clone, Debug)]
 pub struct ParentViewPayload {
@@ -23,16 +23,25 @@ pub struct ParentView {
 
 impl ParentView {
     pub fn null_block(h: BlockHeight) -> Self {
-        Self { parent_height: h, payload: None }
+        Self {
+            parent_height: h,
+            payload: None,
+        }
     }
 
     pub fn nonnull_block(
         h: BlockHeight,
         parent_hash: BlockHash,
         xnet_msgs: Vec<IpcEnvelope>,
-        validator_changes: Vec<StakingChangeRequest>
+        validator_changes: Vec<StakingChangeRequest>,
     ) -> Self {
-        Self { parent_height: h, payload: Some(ParentViewPayload { parent_hash, xnet_msgs, validator_changes }) }
+        Self {
+            parent_height: h,
+            payload: Some(ParentViewPayload {
+                parent_hash,
+                xnet_msgs,
+                validator_changes,
+            }),
+        }
     }
 }
-

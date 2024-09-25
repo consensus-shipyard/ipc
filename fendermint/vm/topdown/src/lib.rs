@@ -12,8 +12,8 @@ mod toggle;
 pub mod voting;
 
 pub mod observe;
-pub mod vote;
 pub mod syncer;
+pub mod vote;
 
 use async_stm::Stm;
 use async_trait::async_trait;

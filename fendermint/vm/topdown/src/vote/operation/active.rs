@@ -1,11 +1,11 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::syncer::TopDownSyncEvent;
 use crate::vote::gossip::GossipClient;
 use crate::vote::operation::paused::PausedOperationMode;
 use crate::vote::operation::{OperationMetrics, OperationStateMachine, ACTIVE, PAUSED};
 use crate::vote::store::VoteStore;
-use crate::syncer::TopDownSyncEvent;
 use crate::vote::VotingHandler;
 use std::fmt::{Display, Formatter};
 
