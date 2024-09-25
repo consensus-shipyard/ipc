@@ -39,10 +39,6 @@ where
         n = self.handler.process_gossip_subscription_votes();
         tracing::debug!(num = n, status = self.to_string(), "handled gossip votes");
 
-        if n == 0 {
-            todo!("handle transition to soft recover")
-        }
-
         while let Some(v) = self.handler.poll_internal_event() {
             // top down is now syncing, pause everything
             if matches!(v, TopDownSyncEvent::NodeSyncing) {

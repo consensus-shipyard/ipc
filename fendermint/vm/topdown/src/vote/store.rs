@@ -89,6 +89,8 @@ impl<'a> VoteAgg<'a> {
         Self(votes)
     }
 
+    pub fn is_empty(&self) -> bool { self.0.is_empty() }
+
     pub fn into_owned(self) -> Vec<Vote> {
         self.0.into_iter().cloned().collect()
     }
@@ -154,17 +156,17 @@ mod tests {
 
         let observation1 = random_observation();
         votes.push(
-            Vote::v1(CertifiedObservation::sign(observation1.clone(), &validators[0].0).unwrap())
+            Vote::v1_checked(CertifiedObservation::sign(observation1.clone(), &validators[0].0).unwrap())
                 .unwrap(),
         );
 
         let observation2 = random_observation();
         votes.push(
-            Vote::v1(CertifiedObservation::sign(observation2.clone(), &validators[1].0).unwrap())
+            Vote::v1_checked(CertifiedObservation::sign(observation2.clone(), &validators[1].0).unwrap())
                 .unwrap(),
         );
         votes.push(
-            Vote::v1(CertifiedObservation::sign(observation2.clone(), &validators[2].0).unwrap())
+            Vote::v1_checked(CertifiedObservation::sign(observation2.clone(), &validators[2].0).unwrap())
                 .unwrap(),
         );
 

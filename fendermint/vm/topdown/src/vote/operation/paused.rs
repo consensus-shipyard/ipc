@@ -17,7 +17,7 @@ use std::fmt::{Display, Formatter};
 /// so we refrain from watching the parent chain, and from gossiping
 /// any certified observations until we switch to active mode.
 pub(crate) struct PausedOperationMode<G, S> {
-    pub(crate) metrics: OperationMetrics,
+    pub metrics: OperationMetrics,
     pub(crate) handler: VotingHandler<G, S>,
 }
 

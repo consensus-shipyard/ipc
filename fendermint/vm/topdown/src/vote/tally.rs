@@ -81,6 +81,25 @@ impl<S: VoteStore> VoteTally<S> {
         Ok(votes.into_owned())
     }
 
+    /// Dump all the votes that is currently stored in the vote tally.
+    /// This is generally a very expensive operation, but good for debugging, use with care
+    pub fn dump_votes(&self) -> Result<HashMap<BlockHeight, Vec<Vote>>, Error> {
+        let mut r = HashMap::new();
+
+        let Some(latest) = self.votes.latest_vote_height()? else {
+            return Ok(r);
+        };
+
+        for h in self.last_finalized_height+1..=latest {
+            let votes = self.votes.get_votes_at_height(h)?;
+            if votes.is_empty() {
+                continue;
+            }
+            r.insert(h, votes.into_owned());
+        }
+        Ok(r)
+    }
+
     /// Add a vote we received.
     ///
     /// Returns `true` if this vote was added, `false` if it was ignored as a
@@ -232,12 +251,12 @@ mod tests {
 
         let obs = random_observation();
         let vote =
-            Vote::v1(CertifiedObservation::sign(obs.clone(), &validators[0].0).unwrap()).unwrap();
+            Vote::v1_checked(CertifiedObservation::sign(obs.clone(), &validators[0].0).unwrap()).unwrap();
         vote_tally.add_vote(vote).unwrap();
 
         let mut obs2 = random_observation();
         obs2.ballot.parent_height = obs.ballot.parent_height();
-        let vote = Vote::v1(CertifiedObservation::sign(obs2, &validators[0].0).unwrap()).unwrap();
+        let vote = Vote::v1_checked(CertifiedObservation::sign(obs2, &validators[0].0).unwrap()).unwrap();
         assert_eq!(vote_tally.add_vote(vote), Err(Error::Equivocation));
     }
 
@@ -261,7 +280,7 @@ mod tests {
 
         for validator in validators {
             let certified = CertifiedObservation::sign(observation.clone(), &validator.0).unwrap();
-            let vote = Vote::v1(certified).unwrap();
+            let vote = Vote::v1_checked(certified).unwrap();
             vote_tally.add_vote(vote).unwrap();
         }
 
@@ -299,14 +318,14 @@ mod tests {
 
         for validator in validators_grp1 {
             let certified = CertifiedObservation::sign(observation1.clone(), &validator.0).unwrap();
-            let vote = Vote::v1(certified).unwrap();
+            let vote = Vote::v1_checked(certified).unwrap();
             vote_tally.add_vote(vote).unwrap();
         }
         assert!(vote_tally.find_quorum().unwrap().is_none());
 
         for validator in validators_grp2 {
             let certified = CertifiedObservation::sign(observation2.clone(), &validator.0).unwrap();
-            let vote = Vote::v1(certified).unwrap();
+            let vote = Vote::v1_checked(certified).unwrap();
             vote_tally.add_vote(vote).unwrap();
         }
 
@@ -333,7 +352,7 @@ mod tests {
 
         for validator in validators {
             let certified = CertifiedObservation::sign(observation.clone(), &validator.0).unwrap();
-            let vote = Vote::v1(certified).unwrap();
+            let vote = Vote::v1_checked(certified).unwrap();
             vote_tally.add_vote(vote).unwrap();
         }
 
@@ -367,7 +386,7 @@ mod tests {
 
         for (count, validator) in validators.iter().enumerate() {
             let certified = CertifiedObservation::sign(observation.clone(), &validator.0).unwrap();
-            let vote = Vote::v1(certified).unwrap();
+            let vote = Vote::v1_checked(certified).unwrap();
             vote_tally.add_vote(vote).unwrap();
 
             // only 3 validators vote

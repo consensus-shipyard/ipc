@@ -68,7 +68,11 @@ pub struct CertifiedObservation {
 }
 
 impl Vote {
-    pub fn v1(obs: CertifiedObservation) -> anyhow::Result<Self> {
+    pub fn v1(validator_key: ValidatorKey, obs: CertifiedObservation) -> Self {
+        Self::V1 {validator: validator_key, payload: obs }
+    }
+
+    pub fn v1_checked(obs: CertifiedObservation) -> anyhow::Result<Self> {
         let to_sign = fvm_ipld_encoding::to_vec(&obs.observed)?;
         let (pk, _) = obs.signature.clone().recover(&to_sign)?;
 
@@ -98,7 +102,7 @@ impl TryFrom<&[u8]> for Vote {
         let version = bytes[0];
 
         if version == 0 {
-            return Self::v1(CertifiedObservation::try_from(&bytes[1..])?);
+            return Self::v1_checked(CertifiedObservation::try_from(&bytes[1..])?);
         }
 
         Err(anyhow!("invalid vote version"))
@@ -121,6 +125,19 @@ impl CertifiedObservation {
             observed: ob,
             signature: sig,
         })
+    }
+}
+
+impl Observation {
+    pub fn new(local_hash: Bytes, parent_height: BlockHeight, parent_hash: Bytes, commitment: Bytes) -> Self {
+        Self {
+            local_hash,
+            ballot: Ballot {
+                parent_height,
+                parent_hash,
+                cumulative_effects_comm: commitment,
+            },
+        }
     }
 }
 

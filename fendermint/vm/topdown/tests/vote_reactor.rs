@@ -2,18 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 //! ```text
-//! cargo test --release -p fendermint_vm_topdown --test smt_vote_reactor
+//! cargo test --release -p fendermint_vm_topdown --test vote_reactor
 //! ```
 
 use async_trait::async_trait;
-use libp2p::futures::AsyncReadExt;
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::error::TryRecvError;
 use fendermint_crypto::SecretKey;
 use fendermint_vm_genesis::ValidatorKey;
+use fendermint_vm_topdown::sync::TopDownSyncEvent;
 use fendermint_vm_topdown::vote::error::Error;
 use fendermint_vm_topdown::vote::gossip::GossipClient;
-use fendermint_vm_topdown::vote::payload::{PowerTable, PowerUpdates, Vote};
+use fendermint_vm_topdown::vote::payload::{Observation, PowerUpdates, Vote};
 use fendermint_vm_topdown::vote::{Config, start_vote_reactor, Weight};
 use fendermint_vm_topdown::vote::store::InMemoryVoteStore;
 
@@ -39,7 +39,7 @@ impl GossipClient for ChannelGossipClient {
         for rx in self.rxs.iter_mut() {
             match rx.try_recv() {
                 Ok(v) => return Ok(Some(v)),
-                Err(broadcast::error::TryRecvError::Empty) => continue,
+                Err(TryRecvError::Empty) => continue,
                 _ => panic!("should not happen")
             }
         }
@@ -48,7 +48,7 @@ impl GossipClient for ChannelGossipClient {
     }
 
     async fn publish_vote(&self, vote: Vote) -> Result<(), Error> {
-        self.tx.send(vote).unwrap();
+        let _ = self.tx.send(vote);
         Ok(())
     }
 }
@@ -67,7 +67,7 @@ fn gen_validators(weights: Vec<Weight>) -> (Vec<Validator>, Vec<ChannelGossipCli
 
     let mut gossips: Vec<ChannelGossipClient> = vec![];
     for _ in 0..weights.len() {
-        let (tx, rx) = broadcast::channel(100);
+        let (tx, _) = broadcast::channel(100);
 
         let mut g = ChannelGossipClient{ tx, rxs: vec![] };
 
@@ -99,28 +99,177 @@ fn gen_power_updates(validators: &[Validator]) -> PowerUpdates {
 }
 
 #[tokio::test]
-async fn all_validators_active_mode() {
+async fn simple_lifecycle() {
     let config = default_config();
 
     // 21 validators equal 100 weight
-    let (validators, gossips) = gen_validators(vec![100; 21]);
+    let (validators, mut gossips) = gen_validators(vec![100; 1]);
     let power_updates = gen_power_updates(&validators);
     let initial_finalized_height = 10;
 
-    let (internal_event_tx, _) = broadcast::channel(1024);
+    let (internal_event_tx, _) = broadcast::channel(validators.len() + 1);
 
-    let node_clients = gossips
-        .into_iter()
-        .map(|gossip| {
-            start_vote_reactor(
-                config.clone(),
-                power_updates.clone(),
-                initial_finalized_height,
-                gossip,
-                InMemoryVoteStore::default(),
-                internal_event_tx.subscribe(),
-            )
-                .unwrap()
-        })
-        .collect::<Vec<_>>();
+    let client = start_vote_reactor(
+        config.clone(),
+        validators[0].sk.clone(),
+        power_updates.clone(),
+        initial_finalized_height,
+        gossips.pop().unwrap(),
+        InMemoryVoteStore::default(),
+        internal_event_tx.subscribe(),
+    ).unwrap();
+
+    assert_eq!(client.find_quorum().await.unwrap(), None);
+
+    // now topdown sync published a new observation on parent height 100
+    let parent_height = 100;
+    let obs = Observation::new(vec![100], parent_height, vec![1, 2, 3], vec![2,3,4]);
+    internal_event_tx.send(TopDownSyncEvent::NewProposal(Box::new(obs))).unwrap();
+
+    // wait for vote to be casted
+    while client.find_quorum().await.unwrap().is_none() {}
+
+    let r = client.find_quorum().await.unwrap().unwrap();
+    assert_eq!(r.parent_height(), parent_height);
+
+    let r = client.query_votes(parent_height).await.unwrap().unwrap();
+    assert_eq!(r.len(), 1);
+
+    client.set_quorum_finalized(parent_height).await.unwrap().unwrap();
+
+    // now votes are cleared
+    assert_eq!(client.find_quorum().await.unwrap(), None);
+    let state = client.query_vote_tally_state().await.unwrap();
+    assert_eq!(state.last_finalized_height, parent_height);
+}
+
+#[tokio::test]
+async fn waiting_for_quorum() {
+    let config = default_config();
+
+    // 21 validators equal 100 weight
+    let (validators, mut gossips) = gen_validators(vec![100; 5]);
+    let power_updates = gen_power_updates(&validators);
+    let initial_finalized_height = 10;
+
+    let mut clients = vec![];
+    let mut internal_txs = vec![];
+    for i in 0..validators.len() {
+        let (internal_event_tx, _) = broadcast::channel(validators.len() + 1);
+
+        let client = start_vote_reactor(
+            config.clone(),
+            validators[i].sk.clone(),
+            power_updates.clone(),
+            initial_finalized_height,
+            gossips.pop().unwrap(),
+            InMemoryVoteStore::default(),
+            internal_event_tx.subscribe(),
+        ).unwrap();
+
+        clients.push(client);
+        internal_txs.push(internal_event_tx);
+    }
+
+    // now topdown sync published a new observation on parent height 100
+    let parent_height1 = 100;
+    let obs1 = Observation::new(vec![100], parent_height1, vec![1, 2, 3], vec![2,3,4]);
+    let parent_height2 = 110;
+    let obs2 = Observation::new(vec![100], parent_height2, vec![1, 2, 3], vec![2,3,4]);
+    let parent_height3 = 120;
+    let obs3 = Observation::new(vec![100], parent_height3, vec![1, 2, 3], vec![2,3,4]);
+
+    internal_txs[0].send(TopDownSyncEvent::NewProposal(Box::new(obs1.clone()))).unwrap();
+    internal_txs[1].send(TopDownSyncEvent::NewProposal(Box::new(obs1.clone()))).unwrap();
+
+    internal_txs[2].send(TopDownSyncEvent::NewProposal(Box::new(obs2.clone()))).unwrap();
+    internal_txs[3].send(TopDownSyncEvent::NewProposal(Box::new(obs2.clone()))).unwrap();
+
+    internal_txs[4].send(TopDownSyncEvent::NewProposal(Box::new(obs3.clone()))).unwrap();
+
+    // ensure votes are received
+    for client in &clients {
+        while client.query_votes(parent_height1).await.unwrap().unwrap().len() != 2 {}
+        while client.query_votes(parent_height2).await.unwrap().unwrap().len() != 2 {}
+        while client.query_votes(parent_height3).await.unwrap().unwrap().len() != 1 {}
+    }
+
+    // at this moment, no quorum should have ever formed
+    for client in &clients {
+        assert!(client.find_quorum().await.unwrap().is_none(), "should have no quorum");
+    }
+
+    // new observations made
+    internal_txs[3].send(TopDownSyncEvent::NewProposal(Box::new(obs3.clone()))).unwrap();
+    internal_txs[0].send(TopDownSyncEvent::NewProposal(Box::new(obs3.clone()))).unwrap();
+    internal_txs[1].send(TopDownSyncEvent::NewProposal(Box::new(obs3.clone()))).unwrap();
+
+    // ensure every client receives the votes
+    for client in &clients {
+        while client.query_votes(parent_height3).await.unwrap().unwrap().len() != 4 {}
+    }
+
+    for client in &clients {
+        let r = client.find_quorum().await.unwrap().unwrap();
+        assert_eq!(r.parent_height(), parent_height3, "should have quorum");
+    }
+
+    // make observation on previous heights
+    internal_txs[3].send(TopDownSyncEvent::NewProposal(Box::new(obs1.clone()))).unwrap();
+    internal_txs[2].send(TopDownSyncEvent::NewProposal(Box::new(obs1.clone()))).unwrap();
+
+    // ensure every client receives the votes
+    for client in &clients {
+        while client.query_votes(parent_height1).await.unwrap().unwrap().len() != 4 {}
+    }
+
+    // but larger parent height wins
+    for client in &clients {
+        let r = client.find_quorum().await.unwrap().unwrap();
+        assert_eq!(r.parent_height(), parent_height3, "should have formed quorum on larger height");
+    }
+
+    // finalize parent height 3
+    for client in &clients {
+        client.set_quorum_finalized(parent_height3).await.unwrap().unwrap();
+        assert!(client.dump_votes().await.unwrap().unwrap().is_empty(), "should have empty votes");
+    }
+}
+
+#[tokio::test]
+async fn all_validator_in_sync() {
+    let config = default_config();
+
+    // 21 validators equal 100 weight
+    let (validators, mut gossips) = gen_validators(vec![100; 10]);
+    let power_updates = gen_power_updates(&validators);
+    let initial_finalized_height = 10;
+
+    let (internal_event_tx, _) = broadcast::channel(validators.len() + 1);
+
+    let mut node_clients = vec![];
+    for i in 0..validators.len() {
+        let r = start_vote_reactor(
+            config.clone(),
+            validators[i].sk.clone(),
+            power_updates.clone(),
+            initial_finalized_height,
+            gossips.pop().unwrap(),
+            InMemoryVoteStore::default(),
+            internal_event_tx.subscribe(),
+        )
+            .unwrap();
+        node_clients.push(r);
+    }
+
+    let parent_height = 100;
+    let obs = Observation::new(vec![100], parent_height, vec![1, 2, 3], vec![2,3,4]);
+    internal_event_tx.send(TopDownSyncEvent::NewProposal(Box::new(obs))).unwrap();
+
+    for n in node_clients {
+        while n.find_quorum().await.unwrap().is_none() {}
+
+        let r = n.find_quorum().await.unwrap().unwrap();
+        assert_eq!(r.parent_height(), parent_height)
+    }
 }

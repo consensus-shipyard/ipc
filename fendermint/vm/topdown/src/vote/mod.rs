@@ -8,10 +8,11 @@ pub mod payload;
 pub mod store;
 mod tally;
 
+use std::collections::HashMap;
 use crate::sync::TopDownSyncEvent;
 use crate::vote::gossip::GossipClient;
 use crate::vote::operation::{OperationMetrics, OperationStateMachine};
-use crate::vote::payload::{Ballot, PowerUpdates, Vote, VoteTallyState};
+use crate::vote::payload::{Ballot, CertifiedObservation, PowerUpdates, Vote, VoteTallyState};
 use crate::vote::store::VoteStore;
 use crate::vote::tally::VoteTally;
 use crate::BlockHeight;
@@ -19,6 +20,8 @@ use error::Error;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::sync::{broadcast, mpsc, oneshot};
+use fendermint_crypto::SecretKey;
+use fendermint_vm_genesis::ValidatorKey;
 
 pub type Weight = u64;
 
@@ -44,6 +47,7 @@ pub fn start_vote_reactor<
     V: VoteStore + Send + Sync + 'static,
 >(
     config: Config,
+    validator_key: SecretKey,
     power_table: PowerUpdates,
     last_finalized_height: BlockHeight,
     gossip: G,
@@ -57,6 +61,7 @@ pub fn start_vote_reactor<
         let sleep = Duration::new(config.voting_sleep_interval_sec, 0);
 
         let inner = VotingHandler {
+            validator_key,
             req_rx: rx,
             internal_event_listener,
             vote_tally,
@@ -80,7 +85,8 @@ impl VoteReactorClient {
     ) -> anyhow::Result<T> {
         let (tx, rx) = oneshot::channel();
         self.tx.send(f(tx)).await?;
-        Ok(rx.await?)
+        let r = rx.await?;
+        Ok(r)
     }
 
     /// Query the current operation mode of the vote tally state machine
@@ -128,6 +134,12 @@ impl VoteReactorClient {
         self.request(|tx| VoteReactorRequest::SetQuorumFinalized { height, tx })
             .await
     }
+
+    pub async fn dump_votes(
+        &self,
+    ) -> anyhow::Result<Result<HashMap<BlockHeight, Vec<Vote>>, Error>> {
+        self.request(VoteReactorRequest::DumpAllVotes).await
+    }
 }
 
 enum VoteReactorRequest {
@@ -138,6 +150,9 @@ enum VoteReactorRequest {
         height: BlockHeight,
         tx: oneshot::Sender<Result<Vec<Vote>, Error>>,
     },
+    /// Dump all the votes that is currently stored in the vote tally.
+    /// This is generally a very expensive operation, but good for debugging, use with care
+    DumpAllVotes(oneshot::Sender<Result<HashMap<BlockHeight, Vec<Vote>>, Error>>),
     /// Get the current vote tally state variables in vote tally
     QueryState(oneshot::Sender<VoteTallyState>),
     /// Queries the vote tally to see if there are new quorum formed
@@ -161,6 +176,8 @@ enum VoteReactorRequest {
 }
 
 struct VotingHandler<Gossip, VoteStore> {
+    /// The validator key that is used to sign proposal produced for broadcasting
+    validator_key: SecretKey,
     /// Handles the requests targeting the vote reactor, could be querying the
     /// vote tally status and etc.
     req_rx: mpsc::Receiver<VoteReactorRequest>,
@@ -213,18 +230,29 @@ where
                     power_table: self.vote_tally.power_table().clone(),
                 });
             }
+            VoteReactorRequest::DumpAllVotes(tx) => {
+                let _ = tx.send(self.vote_tally.dump_votes());
+            }
         }
     }
 
     async fn handle_event(&mut self, event: TopDownSyncEvent) {
         match event {
-            TopDownSyncEvent::NewProposal(vote) => {
-                if let Err(e) = self.vote_tally.add_vote(*vote.clone()) {
+            TopDownSyncEvent::NewProposal(observation) => {
+                let vote = match CertifiedObservation::sign(*observation, &self.validator_key) {
+                    Ok(v) => Vote::v1(ValidatorKey::new(self.validator_key.public_key()), v),
+                    Err(e) => {
+                        tracing::error!(err = e.to_string(), "cannot sign received proposal");
+                        return
+                    }
+                };
+
+                if let Err(e) = self.vote_tally.add_vote(vote.clone()) {
                     tracing::error!(err = e.to_string(), "cannot self vote to tally");
                     return;
                 }
 
-                match self.gossip.publish_vote(*vote).await {
+                match self.gossip.publish_vote(vote).await {
                     Ok(_) => {}
                     Err(e) => {
                         tracing::error!(
@@ -278,7 +306,7 @@ where
                     tracing::warn!(err = e.to_string(), "cannot poll gossip vote");
                     break;
                 }
-                _ => {}
+                _ => break,
             }
         }
         vote_processed

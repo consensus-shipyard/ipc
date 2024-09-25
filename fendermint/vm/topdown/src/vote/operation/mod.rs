@@ -43,8 +43,8 @@ pub enum OperationStateMachine<G, S> {
 /// Tracks the operation mdoe metrics for the voting system
 #[derive(Clone, Debug)]
 pub struct OperationMetrics {
-    current_mode: OperationMode,
-    previous_mode: OperationMode,
+    pub current_mode: OperationMode,
+    pub previous_mode: OperationMode,
 }
 
 impl<G, S> OperationStateMachine<G, S>
