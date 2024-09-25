@@ -32,10 +32,11 @@ not supported.
 
 ## Usage
 
-Regardless of the target environment, a three-node network is started with a single entrypoint
+Regardless of the target environment, a three node network is started with a single entrypoint
 script. All the dependencies and Dockerized node startup logic are handled in the `deploy.sh`
-script, which you can pass a `local` argument to run a localnet. Before getting started, you'll need
-to install the build dependencies for your OS.
+script, which you can pass a `localnet` argument to run a localnet—or run `make run-localnet` from
+the root of this repo. Before getting started, you'll need to install the build dependencies for
+your OS.
 
 ### Build dependencies
 
@@ -123,6 +124,14 @@ are deployed during the deployment flow:
 - `FM_LOG_LEVEL`: Fendermint log level. This follows `RUST_LOG` conventions, e.g., use
   `info,fendermint=debug` to get debug logs from the `fendermint` application (default is `info`).
 
+> [!CAUTION]
+> Note that the `fendermint`, `ipc-cli`, and `hoku` binaries all use a `NETWORK` flag with
+> varying values. The scripts properly manage this, but if you run `deploy.sh` with a `NETWORK`
+> variable already exported, it'll override the value set in the scripts. Namely, if you have the
+> `NETWORK` set before running the deployment (e.g., via the `hoku` CLI), it'll fail due to a
+> mismatch with the `ipc-cli`'s expected flag. Be sure to open a new terminal window for the
+> deployment and working in other shells if you're developing against it.
+
 For localnet deployments, you won't need to set any of the above. There are also two additional
 optional variables:
 
@@ -170,9 +179,16 @@ branch, you can pass the branch name as an argument:
 
 #### Localnet
 
-A localnet deployments will create a subnet with `anvil` as the rootnet (parent). Similarly, the
-`deploy.sh` script will handle localnet validator keys (using the standard `anvil` accounts) and
-configs in the config folder (defaults to `~/.ipc`). The key callout here is that you **must**
+A localnet deployments will create a subnet with `anvil` as the rootnet (parent). The scripts will
+handle localnet validator keys (using the standard `anvil` accounts) and configs in the config
+folder (defaults to `~/.ipc`). In the root of the `ipc` repo, you can run the localnet with the
+following `Makefile` command:
+
+```shell
+make run-localnet
+```
+
+Alternatively, the `deploy.sh` can be ran directly. The key callout here is that you **must**
 specify `localnet` (or `local`) as the argument, and it's _not_ possible to pass a specific branch
 as an argument (i.e., it uses whatever branch is currently checked out in the local repo).
 
@@ -241,8 +257,8 @@ accumulator), it's best to avoid these accounts since nonce race conditions can 
 ```txt
 Account balances:
 Parent native: 9999 ETH
-Parent HOKU:   100000000000000000000 HOKU
-Subnet native: 10000 sHOKU
+Parent HOKU:   100 HOKU
+Subnet native: 10000 HOKU
 
 Accounts:
 (0) 0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266 (reserved)
@@ -261,11 +277,15 @@ Private keys:
 ```
 
 You can use then these keys with the `hoku` SDK and CLI by creating an `.env` file and sourcing it,
-or by setting the variable in your shell:
+or by setting the variables in your shell. Keep in mind a `NETWORK` variable is used by
+`fendermint` and `ipc-cli` but with a different value, so it's best to use separate terminal
+windows when using the `hoku` CLI.
 
 ```dotenv
 export NETWORK=localnet
 export PRIVATE_KEY=<private_key>
 ```
 
-You can now use `hoku` as normal, e.g., `hoku account deposit`, `hoku os create`, etc.
+You can now use `hoku` as normal, e.g., `hoku account deposit`, `hoku os create`, etc. Similarly,
+the SDK lets you use the `localnet` by explicitly initializing it with
+`hoku_sdk::network::Network::Localnet.init()`.

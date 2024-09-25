@@ -26,14 +26,23 @@ lint: license $(patsubst %, lint/%, $(SUBTREES))
 install:
 	cd fendermint && make install && cargo install iroh-cli
 
-config-local:
+config-devnet:
 	./scripts/setup.sh
 
-run-local-iroh:
-	iroh --rpc-addr 0.0.0.0:4919 start
+run-devnet-iroh:
+	iroh --rpc-addr 127.0.0.0:4919 start
 
-run-local-fendermint:
+run-devnet-fendermint:
 	./scripts/run_fendermint.sh
 
-run-local-cometbft:
+run-devnet-cometbft:
 	./scripts/run_cometbft.sh
+
+run-devnet-objects:
+	./scripts/run_objects.sh
+
+run-devnet-evm:
+	fendermint eth run
+
+run-localnet:
+	./scripts/deploy_subnet/deploy.sh localnet
