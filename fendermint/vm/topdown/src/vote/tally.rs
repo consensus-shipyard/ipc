@@ -90,7 +90,7 @@ impl<S: VoteStore> VoteTally<S> {
             return Ok(r);
         };
 
-        for h in self.last_finalized_height+1..=latest {
+        for h in self.last_finalized_height + 1..=latest {
             let votes = self.votes.get_votes_at_height(h)?;
             if votes.is_empty() {
                 continue;
@@ -251,12 +251,14 @@ mod tests {
 
         let obs = random_observation();
         let vote =
-            Vote::v1_checked(CertifiedObservation::sign(obs.clone(), &validators[0].0).unwrap()).unwrap();
+            Vote::v1_checked(CertifiedObservation::sign(obs.clone(), &validators[0].0).unwrap())
+                .unwrap();
         vote_tally.add_vote(vote).unwrap();
 
         let mut obs2 = random_observation();
         obs2.ballot.parent_height = obs.ballot.parent_height();
-        let vote = Vote::v1_checked(CertifiedObservation::sign(obs2, &validators[0].0).unwrap()).unwrap();
+        let vote =
+            Vote::v1_checked(CertifiedObservation::sign(obs2, &validators[0].0).unwrap()).unwrap();
         assert_eq!(vote_tally.add_vote(vote), Err(Error::Equivocation));
     }
 

@@ -6,16 +6,16 @@
 //! ```
 
 use async_trait::async_trait;
-use tokio::sync::broadcast;
-use tokio::sync::broadcast::error::TryRecvError;
 use fendermint_crypto::SecretKey;
 use fendermint_vm_genesis::ValidatorKey;
 use fendermint_vm_topdown::sync::TopDownSyncEvent;
 use fendermint_vm_topdown::vote::error::Error;
 use fendermint_vm_topdown::vote::gossip::GossipClient;
 use fendermint_vm_topdown::vote::payload::{Observation, PowerUpdates, Vote};
-use fendermint_vm_topdown::vote::{Config, start_vote_reactor, Weight};
 use fendermint_vm_topdown::vote::store::InMemoryVoteStore;
+use fendermint_vm_topdown::vote::{start_vote_reactor, Config, Weight};
+use tokio::sync::broadcast;
+use tokio::sync::broadcast::error::TryRecvError;
 
 struct Validator {
     sk: SecretKey,
@@ -40,7 +40,7 @@ impl GossipClient for ChannelGossipClient {
             match rx.try_recv() {
                 Ok(v) => return Ok(Some(v)),
                 Err(TryRecvError::Empty) => continue,
-                _ => panic!("should not happen")
+                _ => panic!("should not happen"),
             }
         }
 
@@ -54,7 +54,7 @@ impl GossipClient for ChannelGossipClient {
 }
 
 fn default_config() -> Config {
-    Config{
+    Config {
         req_channel_buffer_size: 1024,
         req_batch_processing_size: 10,
         gossip_req_processing_size: 10,
@@ -69,7 +69,7 @@ fn gen_validators(weights: Vec<Weight>) -> (Vec<Validator>, Vec<ChannelGossipCli
     for _ in 0..weights.len() {
         let (tx, _) = broadcast::channel(100);
 
-        let mut g = ChannelGossipClient{ tx, rxs: vec![] };
+        let mut g = ChannelGossipClient { tx, rxs: vec![] };
 
         for existing in gossips.iter() {
             g.rxs.push(existing.tx.subscribe())
@@ -84,7 +84,10 @@ fn gen_validators(weights: Vec<Weight>) -> (Vec<Validator>, Vec<ChannelGossipCli
 
     let validators = weights
         .into_iter()
-        .map(|w| Validator { sk: SecretKey::random(&mut rng), weight: w })
+        .map(|w| Validator {
+            sk: SecretKey::random(&mut rng),
+            weight: w,
+        })
         .collect::<Vec<_>>();
 
     (validators, gossips)
@@ -95,7 +98,10 @@ fn gen_validators(weights: Vec<Weight>) -> (Vec<Validator>, Vec<ChannelGossipCli
 // }
 
 fn gen_power_updates(validators: &[Validator]) -> PowerUpdates {
-    validators.iter().map(|v| (v.validator_key(), v.weight)).collect()
+    validators
+        .iter()
+        .map(|v| (v.validator_key(), v.weight))
+        .collect()
 }
 
 #[tokio::test]
@@ -117,14 +123,17 @@ async fn simple_lifecycle() {
         gossips.pop().unwrap(),
         InMemoryVoteStore::default(),
         internal_event_tx.subscribe(),
-    ).unwrap();
+    )
+    .unwrap();
 
     assert_eq!(client.find_quorum().await.unwrap(), None);
 
     // now topdown sync published a new observation on parent height 100
     let parent_height = 100;
-    let obs = Observation::new(vec![100], parent_height, vec![1, 2, 3], vec![2,3,4]);
-    internal_event_tx.send(TopDownSyncEvent::NewProposal(Box::new(obs))).unwrap();
+    let obs = Observation::new(vec![100], parent_height, vec![1, 2, 3], vec![2, 3, 4]);
+    internal_event_tx
+        .send(TopDownSyncEvent::NewProposal(Box::new(obs)))
+        .unwrap();
 
     // wait for vote to be casted
     while client.find_quorum().await.unwrap().is_none() {}
@@ -135,7 +144,11 @@ async fn simple_lifecycle() {
     let r = client.query_votes(parent_height).await.unwrap().unwrap();
     assert_eq!(r.len(), 1);
 
-    client.set_quorum_finalized(parent_height).await.unwrap().unwrap();
+    client
+        .set_quorum_finalized(parent_height)
+        .await
+        .unwrap()
+        .unwrap();
 
     // now votes are cleared
     assert_eq!(client.find_quorum().await.unwrap(), None);
@@ -165,7 +178,8 @@ async fn waiting_for_quorum() {
             gossips.pop().unwrap(),
             InMemoryVoteStore::default(),
             internal_event_tx.subscribe(),
-        ).unwrap();
+        )
+        .unwrap();
 
         clients.push(client);
         internal_txs.push(internal_event_tx);
@@ -173,40 +187,87 @@ async fn waiting_for_quorum() {
 
     // now topdown sync published a new observation on parent height 100
     let parent_height1 = 100;
-    let obs1 = Observation::new(vec![100], parent_height1, vec![1, 2, 3], vec![2,3,4]);
+    let obs1 = Observation::new(vec![100], parent_height1, vec![1, 2, 3], vec![2, 3, 4]);
     let parent_height2 = 110;
-    let obs2 = Observation::new(vec![100], parent_height2, vec![1, 2, 3], vec![2,3,4]);
+    let obs2 = Observation::new(vec![100], parent_height2, vec![1, 2, 3], vec![2, 3, 4]);
     let parent_height3 = 120;
-    let obs3 = Observation::new(vec![100], parent_height3, vec![1, 2, 3], vec![2,3,4]);
+    let obs3 = Observation::new(vec![100], parent_height3, vec![1, 2, 3], vec![2, 3, 4]);
 
-    internal_txs[0].send(TopDownSyncEvent::NewProposal(Box::new(obs1.clone()))).unwrap();
-    internal_txs[1].send(TopDownSyncEvent::NewProposal(Box::new(obs1.clone()))).unwrap();
+    internal_txs[0]
+        .send(TopDownSyncEvent::NewProposal(Box::new(obs1.clone())))
+        .unwrap();
+    internal_txs[1]
+        .send(TopDownSyncEvent::NewProposal(Box::new(obs1.clone())))
+        .unwrap();
 
-    internal_txs[2].send(TopDownSyncEvent::NewProposal(Box::new(obs2.clone()))).unwrap();
-    internal_txs[3].send(TopDownSyncEvent::NewProposal(Box::new(obs2.clone()))).unwrap();
+    internal_txs[2]
+        .send(TopDownSyncEvent::NewProposal(Box::new(obs2.clone())))
+        .unwrap();
+    internal_txs[3]
+        .send(TopDownSyncEvent::NewProposal(Box::new(obs2.clone())))
+        .unwrap();
 
-    internal_txs[4].send(TopDownSyncEvent::NewProposal(Box::new(obs3.clone()))).unwrap();
+    internal_txs[4]
+        .send(TopDownSyncEvent::NewProposal(Box::new(obs3.clone())))
+        .unwrap();
 
     // ensure votes are received
     for client in &clients {
-        while client.query_votes(parent_height1).await.unwrap().unwrap().len() != 2 {}
-        while client.query_votes(parent_height2).await.unwrap().unwrap().len() != 2 {}
-        while client.query_votes(parent_height3).await.unwrap().unwrap().len() != 1 {}
+        while client
+            .query_votes(parent_height1)
+            .await
+            .unwrap()
+            .unwrap()
+            .len()
+            != 2
+        {}
+        while client
+            .query_votes(parent_height2)
+            .await
+            .unwrap()
+            .unwrap()
+            .len()
+            != 2
+        {}
+        while client
+            .query_votes(parent_height3)
+            .await
+            .unwrap()
+            .unwrap()
+            .len()
+            != 1
+        {}
     }
 
     // at this moment, no quorum should have ever formed
     for client in &clients {
-        assert!(client.find_quorum().await.unwrap().is_none(), "should have no quorum");
+        assert!(
+            client.find_quorum().await.unwrap().is_none(),
+            "should have no quorum"
+        );
     }
 
     // new observations made
-    internal_txs[3].send(TopDownSyncEvent::NewProposal(Box::new(obs3.clone()))).unwrap();
-    internal_txs[0].send(TopDownSyncEvent::NewProposal(Box::new(obs3.clone()))).unwrap();
-    internal_txs[1].send(TopDownSyncEvent::NewProposal(Box::new(obs3.clone()))).unwrap();
+    internal_txs[3]
+        .send(TopDownSyncEvent::NewProposal(Box::new(obs3.clone())))
+        .unwrap();
+    internal_txs[0]
+        .send(TopDownSyncEvent::NewProposal(Box::new(obs3.clone())))
+        .unwrap();
+    internal_txs[1]
+        .send(TopDownSyncEvent::NewProposal(Box::new(obs3.clone())))
+        .unwrap();
 
     // ensure every client receives the votes
     for client in &clients {
-        while client.query_votes(parent_height3).await.unwrap().unwrap().len() != 4 {}
+        while client
+            .query_votes(parent_height3)
+            .await
+            .unwrap()
+            .unwrap()
+            .len()
+            != 4
+        {}
     }
 
     for client in &clients {
@@ -215,24 +276,46 @@ async fn waiting_for_quorum() {
     }
 
     // make observation on previous heights
-    internal_txs[3].send(TopDownSyncEvent::NewProposal(Box::new(obs1.clone()))).unwrap();
-    internal_txs[2].send(TopDownSyncEvent::NewProposal(Box::new(obs1.clone()))).unwrap();
+    internal_txs[3]
+        .send(TopDownSyncEvent::NewProposal(Box::new(obs1.clone())))
+        .unwrap();
+    internal_txs[2]
+        .send(TopDownSyncEvent::NewProposal(Box::new(obs1.clone())))
+        .unwrap();
 
     // ensure every client receives the votes
     for client in &clients {
-        while client.query_votes(parent_height1).await.unwrap().unwrap().len() != 4 {}
+        while client
+            .query_votes(parent_height1)
+            .await
+            .unwrap()
+            .unwrap()
+            .len()
+            != 4
+        {}
     }
 
     // but larger parent height wins
     for client in &clients {
         let r = client.find_quorum().await.unwrap().unwrap();
-        assert_eq!(r.parent_height(), parent_height3, "should have formed quorum on larger height");
+        assert_eq!(
+            r.parent_height(),
+            parent_height3,
+            "should have formed quorum on larger height"
+        );
     }
 
     // finalize parent height 3
     for client in &clients {
-        client.set_quorum_finalized(parent_height3).await.unwrap().unwrap();
-        assert!(client.dump_votes().await.unwrap().unwrap().is_empty(), "should have empty votes");
+        client
+            .set_quorum_finalized(parent_height3)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(
+            client.dump_votes().await.unwrap().unwrap().is_empty(),
+            "should have empty votes"
+        );
     }
 }
 
@@ -258,13 +341,15 @@ async fn all_validator_in_sync() {
             InMemoryVoteStore::default(),
             internal_event_tx.subscribe(),
         )
-            .unwrap();
+        .unwrap();
         node_clients.push(r);
     }
 
     let parent_height = 100;
-    let obs = Observation::new(vec![100], parent_height, vec![1, 2, 3], vec![2,3,4]);
-    internal_event_tx.send(TopDownSyncEvent::NewProposal(Box::new(obs))).unwrap();
+    let obs = Observation::new(vec![100], parent_height, vec![1, 2, 3], vec![2, 3, 4]);
+    internal_event_tx
+        .send(TopDownSyncEvent::NewProposal(Box::new(obs)))
+        .unwrap();
 
     for n in node_clients {
         while n.find_quorum().await.unwrap().is_none() {}

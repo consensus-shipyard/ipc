@@ -69,7 +69,10 @@ pub struct CertifiedObservation {
 
 impl Vote {
     pub fn v1(validator_key: ValidatorKey, obs: CertifiedObservation) -> Self {
-        Self::V1 {validator: validator_key, payload: obs }
+        Self::V1 {
+            validator: validator_key,
+            payload: obs,
+        }
     }
 
     pub fn v1_checked(obs: CertifiedObservation) -> anyhow::Result<Self> {
@@ -129,7 +132,12 @@ impl CertifiedObservation {
 }
 
 impl Observation {
-    pub fn new(local_hash: Bytes, parent_height: BlockHeight, parent_hash: Bytes, commitment: Bytes) -> Self {
+    pub fn new(
+        local_hash: Bytes,
+        parent_height: BlockHeight,
+        parent_hash: Bytes,
+        commitment: Bytes,
+    ) -> Self {
         Self {
             local_hash,
             ballot: Ballot {

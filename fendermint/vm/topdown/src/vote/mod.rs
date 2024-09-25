@@ -8,7 +8,6 @@ pub mod payload;
 pub mod store;
 mod tally;
 
-use std::collections::HashMap;
 use crate::sync::TopDownSyncEvent;
 use crate::vote::gossip::GossipClient;
 use crate::vote::operation::{OperationMetrics, OperationStateMachine};
@@ -17,11 +16,12 @@ use crate::vote::store::VoteStore;
 use crate::vote::tally::VoteTally;
 use crate::BlockHeight;
 use error::Error;
-use serde::{Deserialize, Serialize};
-use std::time::Duration;
-use tokio::sync::{broadcast, mpsc, oneshot};
 use fendermint_crypto::SecretKey;
 use fendermint_vm_genesis::ValidatorKey;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::time::Duration;
+use tokio::sync::{broadcast, mpsc, oneshot};
 
 pub type Weight = u64;
 
@@ -243,7 +243,7 @@ where
                     Ok(v) => Vote::v1(ValidatorKey::new(self.validator_key.public_key()), v),
                     Err(e) => {
                         tracing::error!(err = e.to_string(), "cannot sign received proposal");
-                        return
+                        return;
                     }
                 };
 
