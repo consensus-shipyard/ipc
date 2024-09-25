@@ -584,7 +584,7 @@ library LibStaking {
                 } else if (change.op == StakingOperation.Deposit)  {
                     s.validatorSet.confirmDeposit(validator, amount);
                     uint256 msgValue = s.collateralSource.makeAvailable(gateway, amount);
-                    IGateway(gateway).addStake{value: amount}(amount);
+                    IGateway(gateway).addStake{value: msgValue}(amount);
                 } else {
                     revert("Unknown staking operation");
                 }
