@@ -8,7 +8,7 @@ pub mod payload;
 pub mod store;
 mod tally;
 
-use crate::sync::TopDownSyncEvent;
+use crate::syncer::TopDownSyncEvent;
 use crate::vote::gossip::GossipClient;
 use crate::vote::operation::{OperationMetrics, OperationStateMachine};
 use crate::vote::payload::{Ballot, CertifiedObservation, PowerUpdates, Vote, VoteTallyState};

@@ -5,7 +5,7 @@ use crate::vote::gossip::GossipClient;
 use crate::vote::operation::paused::PausedOperationMode;
 use crate::vote::operation::{OperationMetrics, OperationStateMachine, ACTIVE, PAUSED};
 use crate::vote::store::VoteStore;
-use crate::vote::TopDownSyncEvent;
+use crate::syncer::TopDownSyncEvent;
 use crate::vote::VotingHandler;
 use std::fmt::{Display, Formatter};
 

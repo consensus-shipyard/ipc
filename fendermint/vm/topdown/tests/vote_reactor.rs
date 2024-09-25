@@ -8,7 +8,7 @@
 use async_trait::async_trait;
 use fendermint_crypto::SecretKey;
 use fendermint_vm_genesis::ValidatorKey;
-use fendermint_vm_topdown::sync::TopDownSyncEvent;
+use fendermint_vm_topdown::syncer::TopDownSyncEvent;
 use fendermint_vm_topdown::vote::error::Error;
 use fendermint_vm_topdown::vote::gossip::GossipClient;
 use fendermint_vm_topdown::vote::payload::{Observation, PowerUpdates, Vote};
