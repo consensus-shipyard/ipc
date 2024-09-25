@@ -24,12 +24,12 @@ contract GatewayActorHandler is CommonBase, StdCheats, StdUtils {
 
     function register(uint256 amount) public {
         amount = bound(amount, 0, 3 * DEFAULT_MIN_VALIDATOR_STAKE);
-        managerFacet.register(amount);
+        managerFacet.register(amount, 0);
     }
 
     function stake(uint256 amount) public {
         amount = bound(amount, 0, 3 * DEFAULT_MIN_VALIDATOR_STAKE);
-        managerFacet.addStake{value: amount}();
+        managerFacet.addStake{value: amount}(amount);
     }
 
     function _pay(address to, uint256 amount) internal {

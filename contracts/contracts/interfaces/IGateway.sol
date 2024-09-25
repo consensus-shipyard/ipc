@@ -10,10 +10,10 @@ import {FvmAddress} from "../structs/FvmAddress.sol";
 interface IGateway {
     /// @notice Register is called by subnet actors to put the required collateral
     /// and register the subnet to the hierarchy.
-    function register(uint256 genesisCircSupply) external payable;
+    function register(uint256 genesisCircSupply, uint256 collateral) external payable;
 
     /// @notice AddStake adds stake to the collateral of a subnet.
-    function addStake() external payable;
+    function addStake(uint256 amount) external payable;
 
     /// @notice Release stake recovers some collateral of the subnet
     function releaseStake(uint256 amount) external;
@@ -31,7 +31,7 @@ interface IGateway {
     /// This functions ends up minting supply in the subnet equal to the value of the transaction. It does so by
     /// committing the relevant top-down message, updating the top-down nonce along the way.
     ///
-    /// Calling this method on a subnet whose supply source is not 'native' will revert with UnexpectedSupplySource().
+    /// Calling this method on a subnet whose supply source is not 'native' will revert with UnexpectedAsset().
     function fund(SubnetID calldata subnetId, FvmAddress calldata to) external payable;
 
     /// @notice fundWithToken locks the specified amount of tokens in the ERC20 contract linked to the subnet, and
@@ -45,7 +45,7 @@ interface IGateway {
     /// It's possible to call this method from an EOA or a contract. Regardless, it's recommended to approve strictly
     /// the amount that will subsequently be deposited into the subnet. Keeping outstanding approvals is not recommended.
     ///
-    /// Calling this method on a subnet whose supply source is not 'ERC20' will revert with UnexpectedSupplySource().
+    /// Calling this method on a subnet whose supply source is not 'ERC20' will revert with UnexpectedAsset().
     function fundWithToken(SubnetID calldata subnetId, FvmAddress calldata to, uint256 amount) external;
 
     /// @notice Release creates a new check message to release funds in parent chain

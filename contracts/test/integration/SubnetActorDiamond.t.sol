@@ -12,7 +12,7 @@ import {METHOD_SEND} from "../../contracts/constants/Constants.sol";
 import {ConsensusType} from "../../contracts/enums/ConsensusType.sol";
 import {BottomUpMsgBatch, IpcEnvelope, BottomUpCheckpoint, MAX_MSGS_PER_BATCH} from "../../contracts/structs/CrossNet.sol";
 import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
-import {SubnetID, PermissionMode, IPCAddress, Subnet, SupplySource, ValidatorInfo} from "../../contracts/structs/Subnet.sol";
+import {SubnetID, PermissionMode, IPCAddress, Subnet, Asset, ValidatorInfo, AssetKind} from "../../contracts/structs/Subnet.sol";
 import {IERC165} from "../../contracts/interfaces/IERC165.sol";
 import {IGateway} from "../../contracts/interfaces/IGateway.sol";
 import {IDiamond} from "../../contracts/interfaces/IDiamond.sol";
@@ -34,12 +34,13 @@ import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {LibStaking} from "../../contracts/lib/LibStaking.sol";
 import {LibDiamond} from "../../contracts/lib/LibDiamond.sol";
 import {Pausable} from "../../contracts/lib/LibPausable.sol";
-import {SupplySourceHelper} from "../../contracts/lib/SupplySourceHelper.sol";
+import {AssetHelper} from "../../contracts/lib/AssetHelper.sol";
 
 import {IntegrationTestBase} from "../IntegrationTestBase.sol";
 
 import {SubnetActorFacetsHelper} from "../helpers/SubnetActorFacetsHelper.sol";
 import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
+import {ERC20PresetFixedSupply} from "../helpers/ERC20PresetFixedSupply.sol";
 import {SubnetValidatorGater} from "../../contracts/examples/SubnetValidatorGater.sol";
 
 contract SubnetActorDiamondTest is Test, IntegrationTestBase {
@@ -114,7 +115,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.deal(validator2, DEFAULT_MIN_VALIDATOR_STAKE);
 
         vm.startPrank(validator1);
-        saDiamond.manager().join{value: validator1Stake}(publicKey1);
+        saDiamond.manager().join{value: validator1Stake}(publicKey1, validator1Stake);
         collateral = validator1Stake;
 
         require(gatewayAddress.balance == collateral, "gw balance is incorrect after validator1 joining");
@@ -141,7 +142,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         // subnet bootstrapped and should go through queue
         // second and third validators join
         vm.startPrank(validator2);
-        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey2);
+        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey2, DEFAULT_MIN_VALIDATOR_STAKE);
 
         // collateral not confirmed yet
         v = saDiamond.getter().getValidator(validator2);
@@ -191,7 +192,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.startPrank(validator1);
         vm.deal(validator1, stake);
 
-        saDiamond.manager().stake{value: stake}();
+        saDiamond.manager().stake{value: stake}(stake);
 
         v = saDiamond.getter().getValidator(validator1);
         require(v.totalCollateral == validator1Stake + stake, "unexpected total collateral after stake");
@@ -322,7 +323,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         SubnetActorCheckpointingFacet saDupCheckpointerFaucet = new SubnetActorCheckpointingFacet();
         OwnershipFacet saOwnershipFacet = new OwnershipFacet();
 
-        SupplySource memory native = SupplySourceHelper.native();
+        Asset memory native = AssetHelper.native();
 
         vm.expectRevert(GatewayCannotBeZero.selector);
         createSubnetActorDiamondWithFaucets(
@@ -338,6 +339,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
                 powerScale: 12,
                 permissionMode: PermissionMode.Collateral,
                 supplySource: native,
+                collateralSource: AssetHelper.native(),
                 validatorGater: address(0)
             }),
             address(saDupGetterFaucet),
@@ -356,7 +358,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.prank(validator);
         vm.expectRevert(NotOwnerOfPublicKey.selector);
 
-        saDiamond.manager().join{value: 10}(new bytes(65));
+        saDiamond.manager().join{value: 10}(new bytes(65), 10);
     }
 
     function testSubnetActorDiamond_Join_Fail_InvalidPublicKeyLength() public {
@@ -366,7 +368,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.prank(validator);
         vm.expectRevert(InvalidPublicKeyLength.selector);
 
-        saDiamond.manager().join{value: 10}(new bytes(64));
+        saDiamond.manager().join{value: 10}(new bytes(64), 10);
     }
 
     function testSubnetActorDiamond_Join_Fail_ZeroColalteral() public {
@@ -376,7 +378,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.prank(validator);
         vm.expectRevert(CollateralIsZero.selector);
 
-        saDiamond.manager().join(publicKey);
+        saDiamond.manager().join(publicKey, 0);
     }
 
     function testSubnetActorDiamond_Bootstrap_Node() public {
@@ -384,7 +386,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE);
         vm.prank(validator);
-        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey);
+        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey, DEFAULT_MIN_VALIDATOR_STAKE);
 
         // validator adds empty node
         vm.prank(validator);
@@ -434,13 +436,13 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.deal(validator3, DEFAULT_MIN_VALIDATOR_STAKE);
 
         vm.prank(validator1);
-        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey1);
+        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey1, DEFAULT_MIN_VALIDATOR_STAKE);
 
         vm.prank(validator2);
-        saDiamond.manager().join{value: 3 * DEFAULT_MIN_VALIDATOR_STAKE}(publicKey2);
+        saDiamond.manager().join{value: 3 * DEFAULT_MIN_VALIDATOR_STAKE}(publicKey2, 3 * DEFAULT_MIN_VALIDATOR_STAKE);
 
         vm.prank(validator3);
-        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey3);
+        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey3, DEFAULT_MIN_VALIDATOR_STAKE);
 
         confirmChange(validator1, privKey1);
 
@@ -480,14 +482,14 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         vm.prank(validator);
         vm.expectRevert(CollateralIsZero.selector);
-        saDiamond.manager().stake();
+        saDiamond.manager().stake(0);
 
         vm.prank(validator);
         vm.expectRevert((abi.encodeWithSelector(MethodNotAllowed.selector, ERR_VALIDATOR_NOT_JOINED)));
-        saDiamond.manager().stake{value: 10}();
+        saDiamond.manager().stake{value: 10}(10);
 
         vm.prank(validator);
-        saDiamond.manager().join{value: 3}(publicKey);
+        saDiamond.manager().join{value: 3}(publicKey, 3);
 
         ValidatorInfo memory info = saDiamond.getter().getValidator(validator);
         require(info.totalCollateral == 3);
@@ -518,7 +520,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
             vm.deal(validators[i], 10 gwei);
             vm.prank(validators[i]);
-            saDiamond.manager().join{value: 10}(pubKeys[i]);
+            saDiamond.manager().join{value: 10}(pubKeys[i], 10);
         }
 
         saDiamond.checkpointer().validateActiveQuorumSignatures(validators, hash, signatures);
@@ -537,7 +539,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
             vm.deal(validators[i], 10 gwei);
             vm.prank(validators[i]);
-            saDiamond.manager().join{value: 10}(pubKeys[i]);
+            saDiamond.manager().join{value: 10}(pubKeys[i], 10);
         }
 
         // this should trigger `WeightsSumLessThanThreshold` error since the signature weight will be just 100.
@@ -572,7 +574,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
             vm.deal(validators[i], 10 gwei);
             vm.prank(validators[i]);
-            saDiamond.manager().join{value: 10}(pubKeys[i]);
+            saDiamond.manager().join{value: 10}(pubKeys[i], 10);
         }
 
         vm.expectRevert(
@@ -592,7 +594,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
             vm.deal(validators[i], 10 gwei);
             vm.prank(validators[i]);
-            saDiamond.manager().join{value: 10}(pubKeys[i]);
+            saDiamond.manager().join{value: 10}(pubKeys[i], 10);
         }
 
         require(signatures.length == 0, "signatures are not empty");
@@ -613,7 +615,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
             vm.deal(validators[i], 10 gwei);
             vm.prank(validators[i]);
-            saDiamond.manager().join{value: 10}(pubKeys[i]);
+            saDiamond.manager().join{value: 10}(pubKeys[i], 10);
         }
 
         require(signatures.length == 1, "signatures are not empty");
@@ -640,7 +642,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
             vm.deal(validators[i], 10 gwei);
             vm.prank(validators[i]);
-            saDiamond.manager().join{value: 10}(pubKeys[i]);
+            saDiamond.manager().join{value: 10}(pubKeys[i], 10);
         }
 
         // swap validators to trigger `InvalidSignatory` error;
@@ -664,7 +666,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             vm.deal(validators[i], 10 gwei);
             pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
             vm.prank(validators[i]);
-            saDiamond.manager().join{value: 10}(pubKeys[i]);
+            saDiamond.manager().join{value: 10}(pubKeys[i], 10);
         }
 
         SubnetID memory localSubnetID = saDiamond.getter().getParent().createSubnetId(address(saDiamond));
@@ -700,7 +702,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.deal(address(saDiamond), 100 ether);
         vm.prank(address(saDiamond));
         gatewayDiamond.manager().register{value: DEFAULT_MIN_VALIDATOR_STAKE + 3 * DEFAULT_CROSS_MSG_FEE}(
-            3 * DEFAULT_CROSS_MSG_FEE
+            3 * DEFAULT_CROSS_MSG_FEE,
+            DEFAULT_MIN_VALIDATOR_STAKE
         );
 
         bytes32 hash = keccak256(abi.encode(checkpoint));
@@ -769,7 +772,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             vm.deal(validators[i], 10 gwei);
             pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
             vm.prank(validators[i]);
-            saDiamond.manager().join{value: 10}(pubKeys[i]);
+            saDiamond.manager().join{value: 10}(pubKeys[i], 10);
         }
 
         SubnetID memory localSubnetID = saDiamond.getter().getParent().createSubnetId(address(saDiamond));
@@ -807,7 +810,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.deal(address(saDiamond), 100 ether);
         vm.prank(address(saDiamond));
         gatewayDiamond.manager().register{value: DEFAULT_MIN_VALIDATOR_STAKE + 3 * DEFAULT_CROSS_MSG_FEE}(
-            3 * DEFAULT_CROSS_MSG_FEE
+            3 * DEFAULT_CROSS_MSG_FEE,
+            DEFAULT_MIN_VALIDATOR_STAKE
         );
 
         bytes32 hash = keccak256(abi.encode(checkpoint));
@@ -850,13 +854,14 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             vm.deal(validators[i], 10 gwei);
             pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
             vm.prank(validators[i]);
-            saDiamond.manager().join{value: 10}(pubKeys[i]);
+            saDiamond.manager().join{value: 10}(pubKeys[i], 10);
         }
 
         vm.deal(address(saDiamond), 100 ether);
         vm.prank(address(saDiamond));
         gatewayDiamond.manager().register{value: DEFAULT_MIN_VALIDATOR_STAKE + 3 * DEFAULT_CROSS_MSG_FEE}(
-            3 * DEFAULT_CROSS_MSG_FEE
+            3 * DEFAULT_CROSS_MSG_FEE,
+            DEFAULT_MIN_VALIDATOR_STAKE
         );
 
         SubnetID memory localSubnetID = saDiamond.getter().getParent().createSubnetId(address(saDiamond));
@@ -1007,7 +1012,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             vm.deal(validators[i], 10 gwei);
             pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
             vm.prank(validators[i]);
-            saDiamond.manager().join{value: 10}(pubKeys[i]);
+            saDiamond.manager().join{value: 10}(pubKeys[i], 10);
         }
 
         SubnetID memory localSubnetID = saDiamond.getter().getParent().createSubnetId(address(saDiamond));
@@ -1036,7 +1041,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.deal(address(saDiamond), 100 ether);
         vm.prank(address(saDiamond));
         gatewayDiamond.manager().register{value: DEFAULT_MIN_VALIDATOR_STAKE + 6 * DEFAULT_CROSS_MSG_FEE}(
-            6 * DEFAULT_CROSS_MSG_FEE
+            6 * DEFAULT_CROSS_MSG_FEE,
+            DEFAULT_MIN_VALIDATOR_STAKE
         );
 
         bytes32 hash = keccak256(abi.encode(checkpoint));
@@ -1171,7 +1177,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE);
         vm.prank(validator);
-        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey);
+        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey, DEFAULT_MIN_VALIDATOR_STAKE);
         require(
             saDiamond.getter().getValidator(validator).totalCollateral == DEFAULT_MIN_VALIDATOR_STAKE,
             "initial collateral correct"
@@ -1210,7 +1216,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         // pre-fund and pre-release from same address
         vm.startPrank(preReleaser);
         vm.deal(preReleaser, 2 * fundAmount);
-        saDiamond.manager().preFund{value: 2 * fundAmount}();
+        saDiamond.manager().preFund{value: 2 * fundAmount}(2 * fundAmount);
         require(saDiamond.getter().genesisCircSupply() == 2 * fundAmount, "genesis circ supply not correct");
         saDiamond.manager().preRelease(fundAmount);
         require(saDiamond.getter().genesisCircSupply() == fundAmount, "genesis circ supply not correct");
@@ -1229,19 +1235,19 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         // pre-fund from validator and from pre-funder
         vm.startPrank(validator1);
         vm.deal(validator1, fundAmount);
-        saDiamond.manager().preFund{value: fundAmount}();
+        saDiamond.manager().preFund{value: fundAmount}(fundAmount);
         vm.stopPrank();
 
         vm.startPrank(preFunder);
         vm.deal(preFunder, fundAmount);
-        saDiamond.manager().preFund{value: fundAmount}();
+        saDiamond.manager().preFund{value: fundAmount}(fundAmount);
         vm.stopPrank();
 
         // initial validator joins
         vm.deal(validator1, DEFAULT_MIN_VALIDATOR_STAKE);
 
         vm.startPrank(validator1);
-        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey1);
+        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey1, DEFAULT_MIN_VALIDATOR_STAKE);
         vm.stopPrank();
         collateral = DEFAULT_MIN_VALIDATOR_STAKE;
 
@@ -1273,7 +1279,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.startPrank(preFunder);
         vm.expectRevert(SubnetAlreadyBootstrapped.selector);
         vm.deal(preFunder, fundAmount);
-        saDiamond.manager().preFund{value: fundAmount}();
+        saDiamond.manager().preFund{value: fundAmount}(fundAmount);
         vm.stopPrank();
     }
 
@@ -1287,13 +1293,13 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         // pre-fund from validator
         vm.startPrank(validator1);
         vm.deal(validator1, fundAmount);
-        saDiamond.manager().preFund{value: fundAmount}();
+        saDiamond.manager().preFund{value: fundAmount}(fundAmount);
         vm.stopPrank();
 
         // initial validator joins but doesn't bootstrap the subnet
         vm.deal(validator1, collateral);
         vm.startPrank(validator1);
-        saDiamond.manager().join{value: collateral}(publicKey1);
+        saDiamond.manager().join{value: collateral}(publicKey1, collateral);
         require(
             address(saDiamond).balance == collateral + fundAmount,
             "subnet balance is incorrect after validator1 joining"
@@ -1314,7 +1320,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.deal(validator1, DEFAULT_MIN_VALIDATOR_STAKE);
 
         vm.startPrank(validator1);
-        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey1);
+        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey1, DEFAULT_MIN_VALIDATOR_STAKE);
         vm.stopPrank();
 
         // pre-release not allowed with bootstrapped subnet
@@ -1336,11 +1342,14 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         }
 
         vm.prank(validators[0]);
-        saDiamond.manager().join{value: 100 * DEFAULT_MIN_VALIDATOR_STAKE}(publicKeys[0]);
+        saDiamond.manager().join{value: 100 * DEFAULT_MIN_VALIDATOR_STAKE}(
+            publicKeys[0],
+            100 * DEFAULT_MIN_VALIDATOR_STAKE
+        );
 
         for (uint i = 1; i < n; i++) {
             vm.prank(validators[i]);
-            saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKeys[i]);
+            saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKeys[i], DEFAULT_MIN_VALIDATOR_STAKE);
         }
 
         confirmChange(validators[0], privKeys[0]);
@@ -1363,11 +1372,14 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         }
 
         vm.prank(validators[0]);
-        saDiamond.manager().join{value: 100 * DEFAULT_MIN_VALIDATOR_STAKE}(publicKeys[0]);
+        saDiamond.manager().join{value: 100 * DEFAULT_MIN_VALIDATOR_STAKE}(
+            publicKeys[0],
+            100 * DEFAULT_MIN_VALIDATOR_STAKE
+        );
 
         for (uint i = 1; i < n; i++) {
             vm.prank(validators[i]);
-            saDiamond.manager().join{value: 1}(publicKeys[i]);
+            saDiamond.manager().join{value: 1}(publicKeys[i], 1);
         }
 
         confirmChange(validators[0], privKeys[0]);
@@ -1385,7 +1397,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         for (uint i = 0; i < n; i++) {
             vm.deal(validators[i], 1);
             vm.prank(validators[i]);
-            saDiamond.manager().join{value: 1}(publicKeys[i]);
+            saDiamond.manager().join{value: 1}(publicKeys[i], 1);
         }
 
         require(!saDiamond.getter().bootstrapped());
@@ -1427,12 +1439,12 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         (address validator1, bytes memory publicKey1) = TestUtils.deriveValidatorAddress(100);
         vm.deal(validator1, DEFAULT_MIN_VALIDATOR_STAKE * 2);
         vm.prank(validator1);
-        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}(publicKey1);
+        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}(publicKey1, DEFAULT_MIN_VALIDATOR_STAKE / 2);
 
         (address validator2, bytes memory publicKey2) = TestUtils.deriveValidatorAddress(101);
         vm.deal(validator2, DEFAULT_MIN_VALIDATOR_STAKE * 2);
         vm.prank(validator2);
-        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}(publicKey2);
+        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}(publicKey2, DEFAULT_MIN_VALIDATOR_STAKE / 2);
 
         require(saDiamond.getter().isActiveValidator(validator1), "not active validator 1");
         require(saDiamond.getter().isActiveValidator(validator2), "not active validator 2");
@@ -1441,7 +1453,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_PERMISSIONED_AND_BOOTSTRAPPED));
         vm.prank(validator1);
-        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey1);
+        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey1, DEFAULT_MIN_VALIDATOR_STAKE);
 
         vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_PERMISSIONED_AND_BOOTSTRAPPED));
         (address[] memory validators, , bytes[] memory publicKeys) = TestUtils.newValidators(3);
@@ -1458,27 +1470,27 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_VALIDATOR_NOT_JOINED));
         vm.prank(validator1);
-        saDiamond.manager().stake{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}();
+        saDiamond.manager().stake{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}(DEFAULT_MIN_VALIDATOR_STAKE / 2);
 
         vm.prank(validator1);
-        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}(publicKey1);
+        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}(publicKey1, DEFAULT_MIN_VALIDATOR_STAKE / 2);
 
         require(saDiamond.getter().isActiveValidator(validator1), "active validator 1");
         require(!saDiamond.getter().bootstrapped(), "subnet bootstrapped");
 
         vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_VALIDATOR_JOINED));
         vm.prank(validator1);
-        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}(publicKey1);
+        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}(publicKey1, DEFAULT_MIN_VALIDATOR_STAKE / 2);
 
         vm.prank(validator1);
-        saDiamond.manager().stake{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}();
+        saDiamond.manager().stake{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}(DEFAULT_MIN_VALIDATOR_STAKE / 2);
 
         require(saDiamond.getter().isActiveValidator(validator1), "active validator 1");
 
         (address validator2, bytes memory publicKey2) = TestUtils.deriveValidatorAddress(101);
         vm.deal(validator2, DEFAULT_MIN_VALIDATOR_STAKE * 2);
         vm.prank(validator2);
-        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}(publicKey2);
+        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE / 2}(publicKey2, DEFAULT_MIN_VALIDATOR_STAKE / 2);
 
         require(saDiamond.getter().isActiveValidator(validator1), "not active validator 1");
         require(saDiamond.getter().bootstrapped(), "subnet not bootstrapped");
@@ -1607,7 +1619,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.deal(validators[0], DEFAULT_MIN_VALIDATOR_STAKE * 2);
         vm.startPrank(validators[0]);
         vm.expectRevert(abi.encodeWithSelector(MethodNotAllowed.selector, ERR_PERMISSIONED_AND_BOOTSTRAPPED));
-        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKeys[0]);
+        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKeys[0], DEFAULT_MIN_VALIDATOR_STAKE);
     }
 
     function testSubnetActorDiamond_FederatedValidation_works() public {
@@ -1737,11 +1749,11 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         vm.prank(validators[0]);
         vm.expectRevert(Pausable.EnforcedPause.selector);
-        saDiamond.manager().join{value: 10}(publicKeys[0]);
+        saDiamond.manager().join{value: 10}(publicKeys[0], 10);
 
         vm.prank(validators[0]);
         vm.expectRevert(Pausable.EnforcedPause.selector);
-        saDiamond.manager().stake{value: 10}();
+        saDiamond.manager().stake{value: 10}(10);
 
         vm.prank(validators[0]);
         vm.expectRevert(Pausable.EnforcedPause.selector);
@@ -1789,6 +1801,515 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         require(!saDiamond.pauser().paused(), "paused");
     }
 
+    // ----------------------------
+    // Tests for collateral token
+    // ----------------------------
+    function testSubnetActorDiamond_CollateralERC20_SupplyERC20_RegisteredInGateway() public {
+        (address validator, uint256 privKey, bytes memory publicKey) = TestUtils.newValidator(100);
+        (address validator2, , ) = TestUtils.newValidator(101);
+
+        // a bit of gas for execution, should not be needed
+        vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE - 100);
+        vm.deal(validator2, DEFAULT_MIN_VALIDATOR_STAKE - 100);
+
+        ERC20PresetFixedSupply sourceToken = new ERC20PresetFixedSupply("t", "t", 100000000000, validator2);
+        ERC20PresetFixedSupply collateralToken = new ERC20PresetFixedSupply(
+            "t",
+            "t",
+            DEFAULT_MIN_VALIDATOR_STAKE * 10,
+            validator
+        );
+
+        Asset memory source = Asset({kind: AssetKind.ERC20, tokenAddress: address(sourceToken)});
+        Asset memory collateral = Asset({kind: AssetKind.ERC20, tokenAddress: address(collateralToken)});
+
+        gatewayAddress = address(gatewayDiamond);
+        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(
+            gatewayAddress,
+            SubnetID(ROOTNET_CHAINID, new address[](0)),
+            source,
+            collateral
+        );
+
+        saDiamond = createSubnetActor(params);
+
+        vm.prank(validator2);
+        sourceToken.approve(address(saDiamond.manager()), 100);
+        vm.prank(validator2);
+        saDiamond.manager().preFund(100);
+
+        vm.prank(validator);
+        collateralToken.approve(address(saDiamond.manager()), DEFAULT_MIN_VALIDATOR_STAKE * 2);
+
+        vm.prank(validator);
+        saDiamond.manager().join(publicKey, DEFAULT_MIN_VALIDATOR_STAKE);
+        require(collateralToken.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 9);
+        require(collateralToken.balanceOf(address(saDiamond)) == 0);
+        require(collateralToken.balanceOf(gatewayAddress) == DEFAULT_MIN_VALIDATOR_STAKE);
+        require(sourceToken.balanceOf(gatewayAddress) == 100);
+
+        vm.prank(validator);
+        saDiamond.manager().stake(DEFAULT_MIN_VALIDATOR_STAKE);
+        require(
+            collateralToken.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 8,
+            "validator post stake balance wrong"
+        );
+        require(
+            collateralToken.balanceOf(address(saDiamond)) == DEFAULT_MIN_VALIDATOR_STAKE,
+            "saDiamond post stake balance wrong"
+        );
+        require(
+            collateralToken.balanceOf(gatewayAddress) == DEFAULT_MIN_VALIDATOR_STAKE,
+            "gateway post stake balance wrong"
+        );
+        confirmChange(validator, privKey);
+        require(
+            collateralToken.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 8,
+            "validator post stake confirmed balance wrong"
+        );
+        require(collateralToken.balanceOf(address(saDiamond)) == 0, "saDiamond post stake confirmed balance wrong");
+        require(
+            collateralToken.balanceOf(gatewayAddress) == DEFAULT_MIN_VALIDATOR_STAKE * 2,
+            "gateway post stake confirmed balance wrong"
+        );
+
+        vm.prank(validator);
+        saDiamond.manager().unstake(DEFAULT_MIN_VALIDATOR_STAKE);
+        require(
+            collateralToken.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 8,
+            "validator post unstake balance wrong"
+        );
+        require(collateralToken.balanceOf(address(saDiamond)) == 0, "saDiamond post unstake balance wrong");
+        require(
+            collateralToken.balanceOf(gatewayAddress) == DEFAULT_MIN_VALIDATOR_STAKE * 2,
+            "gateway post unstake balance wrong"
+        );
+        confirmChange(validator, privKey);
+        require(
+            collateralToken.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 8,
+            "validator post unstake balance wrong"
+        );
+        require(
+            collateralToken.balanceOf(address(saDiamond)) == DEFAULT_MIN_VALIDATOR_STAKE,
+            "saDiamond post unstake balance wrong"
+        );
+        require(
+            collateralToken.balanceOf(gatewayAddress) == DEFAULT_MIN_VALIDATOR_STAKE,
+            "gateway post unstake balance wrong"
+        );
+
+        vm.prank(validator);
+        saDiamond.rewarder().claim();
+        require(
+            collateralToken.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 9,
+            "validator post claim balance wrong"
+        );
+        require(collateralToken.balanceOf(address(saDiamond)) == 0, "saDiamond post claim balance wrong");
+        require(
+            collateralToken.balanceOf(gatewayAddress) == DEFAULT_MIN_VALIDATOR_STAKE,
+            "gateway post claim balance wrong"
+        );
+
+        vm.prank(validator);
+        saDiamond.manager().leave();
+        require(
+            collateralToken.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 9,
+            "validator post leave balance wrong"
+        );
+        require(collateralToken.balanceOf(address(saDiamond)) == 0, "saDiamond post leave balance wrong");
+        require(
+            collateralToken.balanceOf(gatewayAddress) == DEFAULT_MIN_VALIDATOR_STAKE,
+            "gateway post leave balance wrong"
+        );
+        confirmChange(validator, privKey);
+        require(
+            collateralToken.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 9,
+            "validator confirmed leave balance wrong"
+        );
+        require(
+            collateralToken.balanceOf(address(saDiamond)) == DEFAULT_MIN_VALIDATOR_STAKE,
+            "saDiamond confirmed leave balance wrong"
+        );
+        require(collateralToken.balanceOf(gatewayAddress) == 0, "gateway confirmed leave balance wrong");
+
+        vm.prank(validator);
+        saDiamond.rewarder().claim();
+        require(
+            collateralToken.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 10,
+            "validator post leave claim balance wrong"
+        );
+        require(collateralToken.balanceOf(address(saDiamond)) == 0, "saDiamond post claim balance wrong");
+        require(collateralToken.balanceOf(gatewayAddress) == 0, "gateway post leave claim balance wrong");
+    }
+
+    function testSubnetActorDiamond_CollateralERC20_SupplyERC20_SameToken_RegisteredInGateway() public {
+        (address validator, uint256 privKey, bytes memory publicKey) = TestUtils.newValidator(100);
+        (address validator2, , ) = TestUtils.newValidator(101);
+
+        // a bit of gas for execution, should not be needed
+        vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE - 100);
+        vm.deal(validator2, DEFAULT_MIN_VALIDATOR_STAKE - 100);
+
+        ERC20PresetFixedSupply token = new ERC20PresetFixedSupply(
+            "t",
+            "t",
+            DEFAULT_MIN_VALIDATOR_STAKE * 20,
+            validator
+        );
+
+        Asset memory gt = Asset({kind: AssetKind.ERC20, tokenAddress: address(token)});
+
+        gatewayAddress = address(gatewayDiamond);
+        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(
+            gatewayAddress,
+            SubnetID(ROOTNET_CHAINID, new address[](0)),
+            gt,
+            gt
+        );
+
+        saDiamond = createSubnetActor(params);
+
+        vm.prank(validator);
+        token.transfer(validator2, DEFAULT_MIN_VALIDATOR_STAKE * 10);
+
+        vm.prank(validator2);
+        token.approve(address(saDiamond.manager()), 100);
+        vm.prank(validator2);
+        saDiamond.manager().preFund(100);
+
+        vm.prank(validator);
+        token.approve(address(saDiamond.manager()), DEFAULT_MIN_VALIDATOR_STAKE * 2);
+
+        vm.prank(validator);
+        saDiamond.manager().join(publicKey, DEFAULT_MIN_VALIDATOR_STAKE);
+        require(token.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 9);
+        require(token.balanceOf(address(saDiamond)) == 0);
+        require(token.balanceOf(gatewayAddress) == DEFAULT_MIN_VALIDATOR_STAKE + 100);
+
+        vm.prank(validator);
+        saDiamond.manager().stake(DEFAULT_MIN_VALIDATOR_STAKE);
+        require(token.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 8, "validator post stake balance wrong");
+        require(
+            token.balanceOf(address(saDiamond)) == DEFAULT_MIN_VALIDATOR_STAKE,
+            "saDiamond post stake balance wrong"
+        );
+        require(
+            token.balanceOf(gatewayAddress) == DEFAULT_MIN_VALIDATOR_STAKE + 100,
+            "gateway post stake balance wrong"
+        );
+        confirmChange(validator, privKey);
+        require(
+            token.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 8,
+            "validator post stake confirmed balance wrong"
+        );
+        require(token.balanceOf(address(saDiamond)) == 0, "saDiamond post stake confirmed balance wrong");
+        require(
+            token.balanceOf(gatewayAddress) == DEFAULT_MIN_VALIDATOR_STAKE * 2 + 100,
+            "gateway post stake confirmed balance wrong"
+        );
+
+        vm.prank(validator);
+        saDiamond.manager().unstake(DEFAULT_MIN_VALIDATOR_STAKE);
+        require(token.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 8, "validator post unstake balance wrong");
+        require(token.balanceOf(address(saDiamond)) == 0, "saDiamond post unstake balance wrong");
+        require(
+            token.balanceOf(gatewayAddress) == DEFAULT_MIN_VALIDATOR_STAKE * 2 + 100,
+            "gateway post unstake balance wrong"
+        );
+        confirmChange(validator, privKey);
+        require(token.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 8, "validator post unstake balance wrong");
+        require(
+            token.balanceOf(address(saDiamond)) == DEFAULT_MIN_VALIDATOR_STAKE,
+            "saDiamond post unstake balance wrong"
+        );
+        require(
+            token.balanceOf(gatewayAddress) == DEFAULT_MIN_VALIDATOR_STAKE + 100,
+            "gateway post unstake balance wrong"
+        );
+
+        vm.prank(validator);
+        saDiamond.rewarder().claim();
+        require(token.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 9, "validator post claim balance wrong");
+        require(token.balanceOf(address(saDiamond)) == 0, "saDiamond post claim balance wrong");
+        require(
+            token.balanceOf(gatewayAddress) == DEFAULT_MIN_VALIDATOR_STAKE + 100,
+            "gateway post claim balance wrong"
+        );
+
+        vm.prank(validator);
+        saDiamond.manager().leave();
+        require(token.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 9, "validator post leave balance wrong");
+        require(token.balanceOf(address(saDiamond)) == 0, "saDiamond post leave balance wrong");
+        require(
+            token.balanceOf(gatewayAddress) == DEFAULT_MIN_VALIDATOR_STAKE + 100,
+            "gateway post leave balance wrong"
+        );
+        confirmChange(validator, privKey);
+        require(
+            token.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 9,
+            "validator confirmed leave balance wrong"
+        );
+        require(
+            token.balanceOf(address(saDiamond)) == DEFAULT_MIN_VALIDATOR_STAKE,
+            "saDiamond confirmed leave balance wrong"
+        );
+        require(token.balanceOf(gatewayAddress) == 100, "gateway confirmed leave balance wrong");
+
+        vm.prank(validator);
+        saDiamond.rewarder().claim();
+        require(
+            token.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 10,
+            "validator post leave claim balance wrong"
+        );
+        require(token.balanceOf(address(saDiamond)) == 0, "saDiamond post claim balance wrong");
+        require(token.balanceOf(gatewayAddress) == 100, "gateway post leave claim balance wrong");
+    }
+
+    function testSubnetActorDiamond_CollateralERC20_SupplyNative_RegisteredInGateway() public {
+        (address validator, uint256 privKey, bytes memory publicKey) = TestUtils.newValidator(100);
+        (address validator2, , ) = TestUtils.newValidator(101);
+
+        // a bit of gas for execution, should not be needed
+        vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE - 100);
+        vm.deal(validator2, DEFAULT_MIN_VALIDATOR_STAKE - 100);
+
+        ERC20PresetFixedSupply collateralToken = new ERC20PresetFixedSupply(
+            "t",
+            "t",
+            DEFAULT_MIN_VALIDATOR_STAKE * 10,
+            validator
+        );
+
+        Asset memory source = AssetHelper.native();
+        Asset memory collateral = Asset({kind: AssetKind.ERC20, tokenAddress: address(collateralToken)});
+
+        gatewayAddress = address(gatewayDiamond);
+        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(
+            gatewayAddress,
+            SubnetID(ROOTNET_CHAINID, new address[](0)),
+            source,
+            collateral
+        );
+
+        saDiamond = createSubnetActor(params);
+
+        vm.prank(validator2);
+        saDiamond.manager().preFund{value: 100}(100);
+
+        vm.prank(validator);
+        collateralToken.approve(address(saDiamond.manager()), DEFAULT_MIN_VALIDATOR_STAKE * 2);
+
+        vm.prank(validator);
+        saDiamond.manager().join(publicKey, DEFAULT_MIN_VALIDATOR_STAKE);
+        require(collateralToken.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 9);
+        require(collateralToken.balanceOf(address(saDiamond)) == 0);
+        require(collateralToken.balanceOf(gatewayAddress) == DEFAULT_MIN_VALIDATOR_STAKE);
+        require(address(gatewayAddress).balance == 100);
+
+        vm.prank(validator);
+        saDiamond.manager().stake(DEFAULT_MIN_VALIDATOR_STAKE);
+        require(
+            collateralToken.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 8,
+            "validator post stake balance wrong"
+        );
+        require(
+            collateralToken.balanceOf(address(saDiamond)) == DEFAULT_MIN_VALIDATOR_STAKE,
+            "saDiamond post stake balance wrong"
+        );
+        require(
+            collateralToken.balanceOf(gatewayAddress) == DEFAULT_MIN_VALIDATOR_STAKE,
+            "gateway post stake balance wrong"
+        );
+        confirmChange(validator, privKey);
+        require(
+            collateralToken.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 8,
+            "validator post stake confirmed balance wrong"
+        );
+        require(collateralToken.balanceOf(address(saDiamond)) == 0, "saDiamond post stake confirmed balance wrong");
+        require(
+            collateralToken.balanceOf(gatewayAddress) == DEFAULT_MIN_VALIDATOR_STAKE * 2,
+            "gateway post stake confirmed balance wrong"
+        );
+
+        vm.prank(validator);
+        saDiamond.manager().unstake(DEFAULT_MIN_VALIDATOR_STAKE);
+        require(
+            collateralToken.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 8,
+            "validator post unstake balance wrong"
+        );
+        require(collateralToken.balanceOf(address(saDiamond)) == 0, "saDiamond post unstake balance wrong");
+        require(
+            collateralToken.balanceOf(gatewayAddress) == DEFAULT_MIN_VALIDATOR_STAKE * 2,
+            "gateway post unstake balance wrong"
+        );
+        confirmChange(validator, privKey);
+        require(
+            collateralToken.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 8,
+            "validator post unstake balance wrong"
+        );
+        require(
+            collateralToken.balanceOf(address(saDiamond)) == DEFAULT_MIN_VALIDATOR_STAKE,
+            "saDiamond post unstake balance wrong"
+        );
+        require(
+            collateralToken.balanceOf(gatewayAddress) == DEFAULT_MIN_VALIDATOR_STAKE,
+            "gateway post unstake balance wrong"
+        );
+
+        vm.prank(validator);
+        saDiamond.rewarder().claim();
+        require(
+            collateralToken.balanceOf(validator) == DEFAULT_MIN_VALIDATOR_STAKE * 9,
+            "validator post claim balance wrong"
+        );
+        require(collateralToken.balanceOf(address(saDiamond)) == 0, "saDiamond post claim balance wrong");
+        require(
+            collateralToken.balanceOf(gatewayAddress) == DEFAULT_MIN_VALIDATOR_STAKE,
+            "gateway post claim balance wrong"
+        );
+    }
+
+    function testSubnetActorDiamond_CollateralNative_SupplyNative_RegisteredInGateway() public {
+        (address validator, uint256 privKey, bytes memory publicKey) = TestUtils.newValidator(100);
+        (address validator2, , ) = TestUtils.newValidator(101);
+
+        // a bit of gas for execution, should not be needed
+        vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE * 10);
+        vm.deal(validator2, DEFAULT_MIN_VALIDATOR_STAKE - 100);
+
+        gatewayAddress = address(gatewayDiamond);
+        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(
+            gatewayAddress,
+            SubnetID(ROOTNET_CHAINID, new address[](0)),
+            AssetHelper.native(),
+            AssetHelper.native()
+        );
+
+        saDiamond = createSubnetActor(params);
+
+        vm.prank(validator2);
+        saDiamond.manager().preFund{value: 100}(100);
+
+        vm.prank(validator);
+        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey, DEFAULT_MIN_VALIDATOR_STAKE);
+        require(address(validator).balance == DEFAULT_MIN_VALIDATOR_STAKE * 9, "validator post join balance wrong");
+        require(address(saDiamond).balance == 0, "saDiamond post join balance wrong");
+        require(
+            address(gatewayAddress).balance == 100 + DEFAULT_MIN_VALIDATOR_STAKE,
+            "gateway post join balance wrong"
+        );
+
+        vm.prank(validator);
+        saDiamond.manager().stake{value: DEFAULT_MIN_VALIDATOR_STAKE}(DEFAULT_MIN_VALIDATOR_STAKE);
+        require(address(validator).balance == DEFAULT_MIN_VALIDATOR_STAKE * 8, "validator post stake balance wrong");
+        require(address(saDiamond).balance == DEFAULT_MIN_VALIDATOR_STAKE, "saDiamond post stake balance wrong");
+        require(
+            address(gatewayAddress).balance == DEFAULT_MIN_VALIDATOR_STAKE + 100,
+            "gateway post stake balance wrong"
+        );
+        confirmChange(validator, privKey);
+        require(
+            address(validator).balance == DEFAULT_MIN_VALIDATOR_STAKE * 8,
+            "validator post stake confirmed balance wrong"
+        );
+        require(
+            address(gatewayAddress).balance == DEFAULT_MIN_VALIDATOR_STAKE * 2 + 100,
+            "gateway post stake confirmed balance wrong"
+        );
+
+        vm.prank(validator);
+        saDiamond.manager().unstake(DEFAULT_MIN_VALIDATOR_STAKE);
+        require(address(validator).balance == DEFAULT_MIN_VALIDATOR_STAKE * 8, "validator post unstake balance wrong");
+        require(
+            address(gatewayAddress).balance == DEFAULT_MIN_VALIDATOR_STAKE * 2 + 100,
+            "gateway post unstake balance wrong"
+        );
+        confirmChange(validator, privKey);
+        require(address(validator).balance == DEFAULT_MIN_VALIDATOR_STAKE * 8, "validator post unstake balance wrong");
+        require(
+            address(gatewayAddress).balance == DEFAULT_MIN_VALIDATOR_STAKE + 100,
+            "gateway post unstake balance wrong"
+        );
+
+        vm.prank(validator);
+        saDiamond.rewarder().claim();
+        require(address(validator).balance == DEFAULT_MIN_VALIDATOR_STAKE * 9, "validator post claim balance wrong");
+        require(
+            address(gatewayAddress).balance == DEFAULT_MIN_VALIDATOR_STAKE + 100,
+            "gateway post claim balance wrong"
+        );
+    }
+
+    function testSubnetActorDiamond_CollateralNative_SupplyERC20_RegisteredInGateway() public {
+        (address validator, uint256 privKey, bytes memory publicKey) = TestUtils.newValidator(100);
+        (address validator2, , ) = TestUtils.newValidator(101);
+
+        // a bit of gas for execution, should not be needed
+        vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE * 10);
+        vm.deal(validator2, DEFAULT_MIN_VALIDATOR_STAKE - 100);
+
+        ERC20PresetFixedSupply sourceToken = new ERC20PresetFixedSupply(
+            "t",
+            "t",
+            DEFAULT_MIN_VALIDATOR_STAKE * 10,
+            validator2
+        );
+        Asset memory source = Asset({kind: AssetKind.ERC20, tokenAddress: address(sourceToken)});
+
+        gatewayAddress = address(gatewayDiamond);
+        SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(
+            gatewayAddress,
+            SubnetID(ROOTNET_CHAINID, new address[](0)),
+            source,
+            AssetHelper.native()
+        );
+
+        saDiamond = createSubnetActor(params);
+
+        vm.prank(validator2);
+        sourceToken.approve(address(saDiamond.manager()), 100);
+        vm.prank(validator2);
+        saDiamond.manager().preFund(100);
+
+        vm.prank(validator);
+        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey, DEFAULT_MIN_VALIDATOR_STAKE);
+        require(address(validator).balance == DEFAULT_MIN_VALIDATOR_STAKE * 9, "validator post join balance wrong");
+        require(address(saDiamond).balance == 0, "saDiamond post join balance wrong");
+        require(address(gatewayAddress).balance == DEFAULT_MIN_VALIDATOR_STAKE, "gateway post join balance wrong");
+        require(sourceToken.balanceOf(gatewayAddress) == 100, "saDiamond post join balance wrong");
+
+        vm.prank(validator);
+        saDiamond.manager().stake{value: DEFAULT_MIN_VALIDATOR_STAKE}(DEFAULT_MIN_VALIDATOR_STAKE);
+        require(address(validator).balance == DEFAULT_MIN_VALIDATOR_STAKE * 8, "validator post stake balance wrong");
+        require(address(saDiamond).balance == DEFAULT_MIN_VALIDATOR_STAKE, "saDiamond post stake balance wrong");
+        require(address(gatewayAddress).balance == DEFAULT_MIN_VALIDATOR_STAKE, "gateway post stake balance wrong");
+        confirmChange(validator, privKey);
+        require(
+            address(validator).balance == DEFAULT_MIN_VALIDATOR_STAKE * 8,
+            "validator post stake confirmed balance wrong"
+        );
+        require(
+            address(gatewayAddress).balance == DEFAULT_MIN_VALIDATOR_STAKE * 2,
+            "gateway post stake confirmed balance wrong"
+        );
+
+        vm.prank(validator);
+        saDiamond.manager().unstake(DEFAULT_MIN_VALIDATOR_STAKE);
+        require(address(validator).balance == DEFAULT_MIN_VALIDATOR_STAKE * 8, "validator post unstake balance wrong");
+        require(
+            address(gatewayAddress).balance == DEFAULT_MIN_VALIDATOR_STAKE * 2,
+            "gateway post unstake balance wrong"
+        );
+        confirmChange(validator, privKey);
+        require(address(validator).balance == DEFAULT_MIN_VALIDATOR_STAKE * 8, "validator post unstake balance wrong");
+        require(address(gatewayAddress).balance == DEFAULT_MIN_VALIDATOR_STAKE, "gateway post unstake balance wrong");
+
+        vm.prank(validator);
+        saDiamond.rewarder().claim();
+        require(address(validator).balance == DEFAULT_MIN_VALIDATOR_STAKE * 9, "validator post claim balance wrong");
+        require(address(gatewayAddress).balance == DEFAULT_MIN_VALIDATOR_STAKE, "gateway post claim balance wrong");
+    }
+
     // -----------------------------------------------------------------------------------------------------------------
     // Tests for validator gater
     // -----------------------------------------------------------------------------------------------------------------
@@ -1824,7 +2345,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE * 3);
         vm.prank(validator);
         vm.expectRevert(ValidatorPowerChangeDenied.selector);
-        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey);
+        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey, DEFAULT_MIN_VALIDATOR_STAKE);
 
         // now approve the join
         vm.prank(owner);
@@ -1832,16 +2353,16 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         // should be able to join
         vm.prank(validator);
-        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey);
+        saDiamond.manager().join{value: DEFAULT_MIN_VALIDATOR_STAKE}(publicKey, DEFAULT_MIN_VALIDATOR_STAKE);
 
         // add stake not allowed exceed allowed range
         vm.prank(validator);
         vm.expectRevert(ValidatorPowerChangeDenied.selector);
-        saDiamond.manager().stake{value: DEFAULT_MIN_VALIDATOR_STAKE + 1}();
+        saDiamond.manager().stake{value: DEFAULT_MIN_VALIDATOR_STAKE + 1}(DEFAULT_MIN_VALIDATOR_STAKE + 1);
 
         // add stake should be ok
         vm.prank(validator);
-        saDiamond.manager().stake{value: DEFAULT_MIN_VALIDATOR_STAKE}();
+        saDiamond.manager().stake{value: DEFAULT_MIN_VALIDATOR_STAKE}(DEFAULT_MIN_VALIDATOR_STAKE);
 
         // unstake not allowed as below allowed range
         vm.prank(validator);

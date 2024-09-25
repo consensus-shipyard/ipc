@@ -5,7 +5,7 @@ import {VALIDATOR_SECP256K1_PUBLIC_KEY_LENGTH} from "../constants/Constants.sol"
 import {ERR_VALIDATOR_JOINED, ERR_VALIDATOR_NOT_JOINED} from "../errors/IPCErrors.sol";
 import {InvalidFederationPayload, SubnetAlreadyBootstrapped, NotEnoughFunds, CollateralIsZero, CannotReleaseZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalance, NotEnoughCollateral, NotValidator, NotAllValidatorsHaveLeft, InvalidPublicKeyLength, MethodNotAllowed, SubnetNotBootstrapped} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
-import {Validator, ValidatorSet, SubnetID} from "../structs/Subnet.sol";
+import {Validator, ValidatorSet, Asset, SubnetID} from "../structs/Subnet.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {LibDiamond} from "../lib/LibDiamond.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
@@ -15,18 +15,20 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {LibSubnetActor} from "../lib/LibSubnetActor.sol";
 import {Pausable} from "../lib/LibPausable.sol";
+import {AssetHelper} from "../lib/AssetHelper.sol";
 
 contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausable {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SubnetIDHelper for SubnetID;
+    using AssetHelper for Asset;
     using LibValidatorSet for ValidatorSet;
     using Address for address payable;
 
     /// @notice method to add some initial balance into a subnet that hasn't yet bootstrapped.
     /// @dev This balance is added to user addresses in genesis, and becomes part of the genesis
     /// circulating supply.
-    function preFund() external payable {
-        if (msg.value == 0) {
+    function preFund(uint256 amount) external payable {
+        if (amount == 0) {
             revert NotEnoughFunds();
         }
 
@@ -34,12 +36,14 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             revert SubnetAlreadyBootstrapped();
         }
 
+        s.supplySource.lock(amount);
+
         if (s.genesisBalance[msg.sender] == 0) {
             s.genesisBalanceKeys.push(msg.sender);
         }
 
-        s.genesisBalance[msg.sender] += msg.value;
-        s.genesisCircSupply += msg.value;
+        s.genesisBalance[msg.sender] += amount;
+        s.genesisCircSupply += amount;
     }
 
     /// @notice method to remove funds from the initial balance of a subnet.
@@ -55,6 +59,8 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             revert SubnetAlreadyBootstrapped();
         }
 
+        s.supplySource.transferFunds(payable(msg.sender), amount);
+
         if (s.genesisBalance[msg.sender] < amount) {
             revert NotEnoughBalance();
         }
@@ -65,8 +71,6 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
         if (s.genesisBalance[msg.sender] == 0) {
             LibSubnetActor.rmAddressFromBalanceKey(msg.sender);
         }
-
-        payable(msg.sender).sendValue(amount);
     }
 
     function setValidatorGater(address gater) external notKilled {
@@ -116,14 +120,15 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
     ///         or equal to minimum activation collateral as a result of this operation,
     ///         then  subnet will be registered.
     /// @param publicKey The off-chain 65 byte public key that should be associated with the validator
-    function join(bytes calldata publicKey) external payable nonReentrant whenNotPaused notKilled {
+    /// @param amount The amount of collateral provided as stake
+    function join(bytes calldata publicKey, uint256 amount) external payable nonReentrant whenNotPaused notKilled {
         // Adding this check to prevent new validators from joining
         // after the subnet has been bootstrapped, if the subnet mode is not Collateral.
         // We will increase the functionality in the future to support explicit permissioning.
         if (s.bootstrapped) {
             LibSubnetActor.enforceCollateralValidation();
         }
-        if (msg.value == 0) {
+        if (amount == 0) {
             revert CollateralIsZero();
         }
 
@@ -141,7 +146,9 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             revert NotOwnerOfPublicKey();
         }
 
-        LibSubnetActor.gateValidatorPowerDelta(msg.sender, 0, msg.value);
+        LibSubnetActor.gateValidatorPowerDelta(msg.sender, 0, amount);
+
+        s.collateralSource.lock(amount);
 
         if (!s.bootstrapped) {
             // if the subnet has not been bootstrapped, join directly
@@ -150,13 +157,13 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
 
             // confirm validators deposit immediately
             LibStaking.setMetadataWithConfirm(msg.sender, publicKey);
-            LibStaking.depositWithConfirm(msg.sender, msg.value);
+            LibStaking.depositWithConfirm(msg.sender, amount);
 
             LibSubnetActor.bootstrapSubnetIfNeeded();
         } else {
             // if the subnet has been bootstrapped, join with postponed confirmation.
             LibStaking.setValidatorMetadata(msg.sender, publicKey);
-            LibStaking.deposit(msg.sender, msg.value);
+            LibStaking.deposit(msg.sender, amount);
         }
     }
 
@@ -164,11 +171,12 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
     ///         If the total confirmed collateral of the subnet is greater
     ///         or equal to minimum activation collateral as a result of this operation,
     ///         then  subnet will be registered.
-    function stake() external payable whenNotPaused notKilled {
+    /// @param amount The amount of collateral provided as stake
+    function stake(uint256 amount) external payable whenNotPaused notKilled {
         // disabling validator changes for federated subnets (at least for now
         // until a more complex mechanism is implemented).
         LibSubnetActor.enforceCollateralValidation();
-        if (msg.value == 0) {
+        if (amount == 0) {
             revert CollateralIsZero();
         }
 
@@ -177,14 +185,15 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
         }
 
         uint256 collateral = LibStaking.totalValidatorCollateral(msg.sender);
-        LibSubnetActor.gateValidatorPowerDelta(msg.sender, collateral, collateral + msg.value);
+        LibSubnetActor.gateValidatorPowerDelta(msg.sender, collateral, collateral + amount);
+
+        s.collateralSource.lock(amount);
 
         if (!s.bootstrapped) {
-            LibStaking.depositWithConfirm(msg.sender, msg.value);
-
+            LibStaking.depositWithConfirm(msg.sender, amount);
             LibSubnetActor.bootstrapSubnetIfNeeded();
         } else {
-            LibStaking.deposit(msg.sender, msg.value);
+            LibStaking.deposit(msg.sender, amount);
         }
     }
 
@@ -213,10 +222,10 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
 
         if (!s.bootstrapped) {
             LibStaking.withdrawWithConfirm(msg.sender, amount);
-            return;
+            s.collateralSource.transferFunds(payable(msg.sender), amount);
+        } else {
+            LibStaking.withdraw(msg.sender, amount);
         }
-
-        LibStaking.withdraw(msg.sender, amount);
     }
 
     /// @notice method that allows a validator to leave the subnet.
@@ -249,11 +258,12 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
                 s.genesisBalance[msg.sender] == 0;
                 s.genesisCircSupply -= genesisBalance;
                 LibSubnetActor.rmAddressFromBalanceKey(msg.sender);
-                payable(msg.sender).sendValue(genesisBalance);
+                s.collateralSource.transferFunds(payable(msg.sender), genesisBalance);
             }
 
             // interaction must be performed after checks and changes
             LibStaking.withdrawWithConfirm(msg.sender, amount);
+            s.collateralSource.transferFunds(payable(msg.sender), amount);
             return;
         }
         LibStaking.withdraw(msg.sender, amount);

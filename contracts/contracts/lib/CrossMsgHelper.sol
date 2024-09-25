@@ -10,8 +10,8 @@ import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
-import {SupplySource} from "../structs/Subnet.sol";
-import {SupplySourceHelper} from "./SupplySourceHelper.sol";
+import {Asset} from "../structs/Subnet.sol";
+import {AssetHelper} from "./AssetHelper.sol";
 import {IIpcHandler} from "../../sdk/interfaces/IIpcHandler.sol";
 
 /// @title Helper library for manipulating IpcEnvelope-related structs
@@ -19,7 +19,7 @@ library CrossMsgHelper {
     using SubnetIDHelper for SubnetID;
     using FilAddress for address;
     using FvmAddressHelper for FvmAddress;
-    using SupplySourceHelper for SupplySource;
+    using AssetHelper for Asset;
 
     error CannotExecuteEmptyEnvelope();
 
@@ -154,7 +154,7 @@ library CrossMsgHelper {
     /// forwarded message, or the receipt in the case of failure.
     function execute(
         IpcEnvelope calldata crossMsg,
-        SupplySource memory supplySource
+        Asset memory supplySource
     ) public returns (bool success, bytes memory ret) {
         if (isEmpty(crossMsg)) {
             revert CannotExecuteEmptyEnvelope();

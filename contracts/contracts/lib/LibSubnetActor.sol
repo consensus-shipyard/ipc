@@ -6,16 +6,18 @@ import {ERR_PERMISSIONED_AND_BOOTSTRAPPED} from "../errors/IPCErrors.sol";
 import {NotEnoughGenesisValidators, DuplicatedGenesisValidator, NotOwnerOfPublicKey, MethodNotAllowed} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {IValidatorGater} from "../interfaces/IValidatorGater.sol";
-import {Validator, ValidatorSet, PermissionMode, SubnetID} from "../structs/Subnet.sol";
+import {Validator, ValidatorSet, PermissionMode, SubnetID, Asset} from "../structs/Subnet.sol";
 import {SubnetActorModifiers} from "../lib/LibSubnetActorStorage.sol";
 import {LibValidatorSet, LibStaking} from "../lib/LibStaking.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {LibSubnetActorStorage, SubnetActorStorage} from "./LibSubnetActorStorage.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
+import {AssetHelper} from "../lib/AssetHelper.sol";
 
 library LibSubnetActor {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SubnetIDHelper for SubnetID;
+    using AssetHelper for Asset;
 
     event SubnetBootstrapped(Validator[]);
 
@@ -90,7 +92,7 @@ library LibSubnetActor {
                 emit SubnetBootstrapped(s.genesisValidators);
 
                 // register adding the genesis circulating supply (if it exists)
-                IGateway(s.ipcGatewayAddr).register{value: totalCollateral + s.genesisCircSupply}(s.genesisCircSupply);
+                registerInGateway(totalCollateral);
             }
         }
     }
@@ -151,7 +153,19 @@ library LibSubnetActor {
         emit SubnetBootstrapped(s.genesisValidators);
 
         // register adding the genesis circulating supply (if it exists)
-        IGateway(s.ipcGatewayAddr).register{value: s.genesisCircSupply}(s.genesisCircSupply);
+        registerInGateway(0);
+    }
+
+    function registerInGateway(uint256 collateral) internal {
+        SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
+
+        uint256 genesisCircSupply = s.genesisCircSupply;
+
+        uint256 msgValue = 0;
+        msgValue += s.supplySource.makeAvailable(s.ipcGatewayAddr, genesisCircSupply);
+        msgValue += s.collateralSource.makeAvailable(s.ipcGatewayAddr, collateral);
+
+        IGateway(s.ipcGatewayAddr).register{value: msgValue}(genesisCircSupply, collateral);
     }
 
     /// @notice method that allows the contract owner to set the validators' federated power after

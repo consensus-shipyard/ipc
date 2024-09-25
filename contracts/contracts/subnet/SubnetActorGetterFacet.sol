@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import {ConsensusType} from "../enums/ConsensusType.sol";
 import {BottomUpCheckpoint, IpcEnvelope} from "../structs/CrossNet.sol";
-import {SubnetID, SupplySource} from "../structs/Subnet.sol";
+import {SubnetID, Asset} from "../structs/Subnet.sol";
 import {SubnetID, ValidatorInfo, Validator, PermissionMode} from "../structs/Subnet.sol";
 import {SubnetActorStorage} from "../lib/LibSubnetActorStorage.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
@@ -213,7 +213,12 @@ contract SubnetActorGetterFacet {
     }
 
     /// @notice Returns the supply strategy for the subnet.
-    function supplySource() external view returns (SupplySource memory supply) {
+    function supplySource() external view returns (Asset memory supply) {
         return s.supplySource;
+    }
+
+    /// @notice Returns the collateral asset kind for the subnet.
+    function collateralSource() external view returns (Asset memory supply) {
+        return s.collateralSource;
     }
 }

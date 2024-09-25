@@ -6,8 +6,8 @@ import {SubnetActorGetterFacet} from "../subnet/SubnetActorGetterFacet.sol";
 import {BURNT_FUNDS_ACTOR} from "../constants/Constants.sol";
 import {IpcEnvelope} from "../structs/CrossNet.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
-import {SubnetID, Subnet, SupplySource} from "../structs/Subnet.sol";
-import {Membership, SupplyKind} from "../structs/Subnet.sol";
+import {SubnetID, Subnet, Asset} from "../structs/Subnet.sol";
+import {Membership, AssetKind} from "../structs/Subnet.sol";
 import {AlreadyRegisteredSubnet, CannotReleaseZero, MethodNotAllowed, NotEnoughFunds, NotEnoughFundsToRelease, NotEnoughCollateral, NotEmptySubnetCircSupply, NotRegisteredSubnet, InvalidXnetMessage, InvalidXnetMessageReason} from "../errors/IPCErrors.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
@@ -16,7 +16,7 @@ import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
-import {SupplySourceHelper} from "../lib/SupplySourceHelper.sol";
+import {AssetHelper} from "../lib/AssetHelper.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 string constant ERR_CHILD_SUBNET_NOT_ALLOWED = "Subnet does not allow child subnets";
@@ -24,23 +24,26 @@ string constant ERR_CHILD_SUBNET_NOT_ALLOWED = "Subnet does not allow child subn
 contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     using FilAddress for address payable;
     using SubnetIDHelper for SubnetID;
-    using SupplySourceHelper for SupplySource;
+    using AssetHelper for Asset;
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
     /// @notice register a subnet in the gateway. It is called by a subnet when it reaches the threshold stake
     /// @dev The subnet can optionally pass a genesis circulating supply that would be pre-allocated in the
     /// subnet from genesis (without having to wait for the subnet to be spawned to propagate the funds).
-    function register(uint256 genesisCircSupply) external payable {
+    function register(uint256 genesisCircSupply, uint256 collateral) external payable {
         // If L2+ support is not enabled, only allow the registration of new
         // subnets in the root
         if (s.networkName.route.length + 1 >= s.maxTreeDepth) {
             revert MethodNotAllowed(ERR_CHILD_SUBNET_NOT_ALLOWED);
         }
 
-        if (msg.value < genesisCircSupply) {
-            revert NotEnoughFunds();
+        if (genesisCircSupply > 0) {
+            SubnetActorGetterFacet(msg.sender).supplySource().lock(genesisCircSupply);
         }
-        uint256 collateral = msg.value - genesisCircSupply;
+        if (collateral > 0) {
+            SubnetActorGetterFacet(msg.sender).collateralSource().lock(collateral);
+        }
+
         SubnetID memory subnetId = s.networkName.createSubnetId(msg.sender);
 
         (bool registered, Subnet storage subnet) = LibGateway.getSubnet(subnetId);
@@ -58,10 +61,15 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     }
 
     /// @notice addStake - add collateral for an existing subnet
-    function addStake() external payable {
-        if (msg.value == 0) {
+    function addStake(uint256 amount) external payable {
+        if (amount == 0) {
             revert NotEnoughFunds();
         }
+
+        // The fund flow for stake is from Validator -> SubnetActor -> Gateway.
+        // Because msg.sender is actually the subnet actor, this method sends the fund from
+        // the subnet actor caller the gateway.
+        SubnetActorGetterFacet(msg.sender).collateralSource().lock(amount);
 
         (bool registered, Subnet storage subnet) = LibGateway.getSubnet(msg.sender);
 
@@ -69,7 +77,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
             revert NotRegisteredSubnet();
         }
 
-        subnet.stake += msg.value;
+        subnet.stake += amount;
     }
 
     /// @notice release collateral for an existing subnet.
@@ -91,7 +99,10 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
 
         subnet.stake -= amount;
 
-        payable(subnet.id.getActor()).sendValue(amount);
+        // Release fund flows from Gateway -> SubnetActor -> ReleaseQueue (Locking) -> Validator.
+        // Because msg.sender is actually the subnet actor, this method sends the fund back to
+        // the subnet actor caller.
+        SubnetActorGetterFacet(msg.sender).collateralSource().transferFunds(payable(msg.sender), amount);
     }
 
     /// @notice kill an existing subnet.
@@ -114,8 +125,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         delete s.subnets[id];
 
         s.subnetKeys.remove(id);
-
-        payable(msg.sender).sendValue(stake);
+        SubnetActorGetterFacet(msg.sender).collateralSource().transferFunds(payable(msg.sender), stake);
     }
 
     /// @notice credits the received value to the specified address in the specified child subnet.
@@ -137,8 +147,8 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         }
 
         // Validate that the supply strategy is native.
-        SupplySource memory supplySource = SubnetActorGetterFacet(subnetId.getActor()).supplySource();
-        supplySource.expect(SupplyKind.Native);
+        Asset memory supplySource = SubnetActorGetterFacet(subnetId.getActor()).supplySource();
+        supplySource.expect(AssetKind.Native);
 
         IpcEnvelope memory crossMsg = CrossMsgHelper.createFundMsg({
             subnet: subnetId,
@@ -172,8 +182,8 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         // Check that the supply strategy is ERC20.
         // There is no need to check whether the subnet exists. If it doesn't exist, the call to getter will revert.
         // LibGateway.commitTopDownMsg will also revert if the subnet doesn't exist.
-        SupplySource memory supplySource = SubnetActorGetterFacet(subnetId.getActor()).supplySource();
-        supplySource.expect(SupplyKind.ERC20);
+        Asset memory supplySource = SubnetActorGetterFacet(subnetId.getActor()).supplySource();
+        supplySource.expect(AssetKind.ERC20);
 
         // Locks a specified amount into custody, adjusting for tokens with transfer fees. This operation
         // accommodates inflationary tokens, potentially reflecting a higher effective locked amount.
