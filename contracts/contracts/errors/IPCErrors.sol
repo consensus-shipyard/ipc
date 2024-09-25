@@ -80,8 +80,6 @@ error InvalidFederationPayload();
 error DuplicatedGenesisValidator();
 error NotEnoughGenesisValidators();
 error ValidatorPowerChangeDenied();
-error IncreaseAllowanceFailed();
-error Unreachable();
 
 enum InvalidXnetMessageReason {
     Sender,

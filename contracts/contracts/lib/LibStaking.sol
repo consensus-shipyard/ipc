@@ -8,7 +8,7 @@ import {LibMinPQ, MinPQ} from "./priority/LibMinPQ.sol";
 import {LibStakingChangeLog} from "./LibStakingChangeLog.sol";
 import {AssetHelper} from "./AssetHelper.sol";
 import {PermissionMode, StakingReleaseQueue, StakingChangeLog, StakingChange, StakingChangeRequest, StakingOperation, StakingRelease, ValidatorSet, AddressStakingReleases, ParentValidatorsTracker, Validator, Asset} from "../structs/Subnet.sol";
-import {WithdrawExceedingCollateral, NotValidator, CannotConfirmFutureChanges, NoCollateralToWithdraw, AddressShouldBeValidator, InvalidConfigurationNumber, Unreachable} from "../errors/IPCErrors.sol";
+import {WithdrawExceedingCollateral, NotValidator, CannotConfirmFutureChanges, NoCollateralToWithdraw, AddressShouldBeValidator, InvalidConfigurationNumber} from "../errors/IPCErrors.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
 library LibAddressStakingReleases {
@@ -583,15 +583,10 @@ library LibStaking {
                     IGateway(gateway).releaseStake(amount);
                 } else if (change.op == StakingOperation.Deposit)  {
                     s.validatorSet.confirmDeposit(validator, amount);
-
-                    if (s.collateralSource.isNative()) {
-                        IGateway(gateway).addStake{value: amount}(amount);
-                    } else {
-                        s.collateralSource.increaseAllowance(gateway, amount);
-                        IGateway(gateway).addStake(amount);
-                    }
+                    uint256 msgValue = s.collateralSource.makeAvailable(gateway, amount);
+                    IGateway(gateway).addStake{value: msgValue}(amount);
                 } else {
-                    revert Unreachable();
+                    revert("Unknown staking operation");
                 }
             }
 

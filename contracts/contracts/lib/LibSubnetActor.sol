@@ -161,26 +161,9 @@ library LibSubnetActor {
 
         uint256 genesisCircSupply = s.genesisCircSupply;
 
-        bool supplySourceNative = s.supplySource.isNative();
-        bool collateralSourceNative = s.collateralSource.isNative();
-
-        // this method is unnecessarily handling different cases because subnet actor needs
-        // to "register" in gateway and different token types needs to be attached or approved.
-        // TODO: it's known that having gateway holding all subnets' funds is insecure, this
-        // TODO: can be removed once contract redesign is in place.
         uint256 msgValue = 0;
-
-        if (!supplySourceNative) {
-            s.supplySource.increaseAllowance(s.ipcGatewayAddr, genesisCircSupply);
-        } else {
-            msgValue += genesisCircSupply;
-        }
-
-        if (!collateralSourceNative) {
-            s.collateralSource.increaseAllowance(s.ipcGatewayAddr, collateral);
-        } else {
-            msgValue += collateral;
-        }
+        msgValue += s.supplySource.makeAvailable(s.ipcGatewayAddr, genesisCircSupply);
+        msgValue += s.collateralSource.makeAvailable(s.ipcGatewayAddr, collateral);
 
         IGateway(s.ipcGatewayAddr).register{value: msgValue}(genesisCircSupply, collateral);
     }
