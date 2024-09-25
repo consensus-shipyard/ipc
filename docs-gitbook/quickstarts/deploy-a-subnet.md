@@ -132,17 +132,17 @@ registry_addr = "<REGISTRY_ADDR>"
 
   [![Registry Address](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fconsensus-shipyard%2Fipc%2Fcd%2Fcontracts%2Fdeployments%2Fr314159.json&query=%24.registry_addr&label=Registry%20Address)](https://github.com/consensus-shipyard/ipc/blob/cd/contracts/deployments/r314159.json)
 
-If you want to deploy custom ipc subnet on mainnet, you will need your own ipc stack of contracts deployed.
+If you want to deploy your own custom ipc stack of contracts:
 
 ```bash
 cd contracts
 ```
 
 - Populate `.env` file with your `PRIVATE_KEY` and `RPC_URL`.
-- Set your `NETWORK` variable to `mainnet` value.
+- Set your `NETWORK` variable to `calibrationnet` value.
 
 ```
-export NETWORK = mainnet
+export NETWORK = calibrationnet
 ```
 
 - Run the following command to deploy the contracts:
@@ -159,11 +159,11 @@ make deploy-stack
 keystore_path = "~/.ipc"
 
 [[subnets]]
-id = "/r314"
+id = "/r314159"
 
 [subnets.config]
 network_type = "fevm"
-provider_http = "https://api.node.glif.io/rpc/v1"
+provider_http = "https://api.calibration.node.glif.io/rpc/v1"
 gateway_addr = "<GATEWAY_ADDR>"
 registry_addr = "<REGISTRY_ADDR>"
 ```
@@ -207,12 +207,6 @@ TIP: If you'd like to import an EVM account into Metamask, you can use export th
 
 ```
 ipc-cli subnet create --parent /r314159 --min-validator-stake 1 --min-validators 4 --bottomup-check-period 300 --from <PLEASE PUT ACCOUNT ADDRESS> --permission-mode collateral --supply-source-kind native
-```
-
-- If you intend to deploy on the mainnet, simply replace the `--parent` flag value from `/r314159` to `/r314`.
-
-```
-ipc-cli subnet create --parent /r314 --min-validator-stake 1 --min-validators 4 --bottomup-check-period 300 --from <PLEASE PUT ACCOUNT ADDRESS> --permission-mode collateral --supply-source-kind native
 ```
 
 This will output your subnet ID, similar to the following:
@@ -261,7 +255,7 @@ cargo make --makefile infra/fendermint/Makefile.toml \
     child-validator
 ```
 
-To start a validator on mainnet, use the addresses of the previously deployed contracts in the `PARENT_GATEWAY` and `PARENT_REGISTRY` fields:
+To start a validator with your own ipc stack, use the addresses of the previously deployed contracts in the `PARENT_GATEWAY` and `PARENT_REGISTRY` fields:
 
 ```
 cargo make --makefile infra/fendermint/Makefile.toml \
