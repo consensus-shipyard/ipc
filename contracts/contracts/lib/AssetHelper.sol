@@ -14,8 +14,8 @@ library AssetHelper {
 
     error InvalidERC20Address();
     error NoBalanceIncrease();
+    error InsufficientFunds();
     error UnexpectedAsset();
-    error UnknownAsset();
 
     /// @notice Assumes that the address provided belongs to a subnet rooted on this network,
     ///         and checks if its supply kind matches the provided one.
@@ -52,6 +52,8 @@ library AssetHelper {
     function lock(Asset memory asset, uint256 value) internal returns (uint256) {
         if (asset.kind == AssetKind.ERC20) {
             IERC20 token = IERC20(asset.tokenAddress);
+
+            // Dealing with deflationary tokens.
             uint256 initialBalance = token.balanceOf(address(this));
             token.safeTransferFrom({from: msg.sender, to: address(this), value: value});
             uint256 finalBalance = token.balanceOf(address(this));
@@ -61,11 +63,11 @@ library AssetHelper {
             // Safe arithmetic is not necessary because underflow is not possible due to the check above
             return finalBalance - initialBalance;
         } else {
-            // now we are handling native coin.
-            // msg.value might have coins not just locked, say msg.value = valueToLock + transfer to other contracts
-            // this helper can only enforce the msg.value is not less than value.
+            // Ensure we have received enough funds to cover the value.
+            // msg.value might have coins in excess of the amount that we need to lock (e.g. when contributing both native collateral and supply at the same time).
+            // That's why we can't do a strict equality check.
             if (msg.value < value) {
-                revert NoBalanceIncrease();
+                revert InsufficientFunds();
             }
         }
         // Do nothing for native.
