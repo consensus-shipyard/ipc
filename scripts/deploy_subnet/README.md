@@ -59,6 +59,10 @@ for macOS.
 Optionally, you can pass the `SKIP_DEPENDENCIES=true` environment variable to `deploy.sh` to skip
 this entirely (e.g., if you already have these installed).
 
+Also optional is the `hoku` CLI, which (if installed) will pre-buy credits for all accounts in the
+localnet subnet setup. Follow the instructions in the `rust-hoku` repo to install it:
+[here](https://github.com/hokunet/rust-hoku).
+
 #### Linux
 
 The `deploy.sh` will handle all the build dependencies for a Linux machine.
@@ -128,9 +132,9 @@ are deployed during the deployment flow:
 > Note that the `fendermint`, `ipc-cli`, and `hoku` binaries all use a `NETWORK` flag with
 > varying values. The scripts properly manage this, but if you run `deploy.sh` with a `NETWORK`
 > variable already exported, it'll override the value set in the scripts. Namely, if you have the
-> `NETWORK` set before running the deployment (e.g., via the `hoku` CLI), it'll fail due to a
+> `NETWORK` set from using the `hoku` CLI prior to running the deployment, it'll fail due to a
 > mismatch with the `ipc-cli`'s expected flag. Be sure to open a new terminal window for the
-> deployment and working in other shells if you're developing against it.
+> deployment and work in other shells if you're developing against it.
 
 For localnet deployments, you won't need to set any of the above. There are also two additional
 optional variables:
@@ -258,7 +262,8 @@ accumulator), it's best to avoid these accounts since nonce race conditions can 
 Account balances:
 Parent native: 9999 ETH
 Parent HOKU:   100 HOKU
-Subnet native: 10000 HOKU
+Subnet native: 5000 HOKU
+Subnet credits: 5000000000000000000000
 
 Accounts:
 (0) 0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266 (reserved)
@@ -272,14 +277,13 @@ Private keys:
 (1) 59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
 (2) 5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a
 (3) 7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6
-(4) 47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a
 ...
 ```
 
 You can use then these keys with the `hoku` SDK and CLI by creating an `.env` file and sourcing it,
 or by setting the variables in your shell. Keep in mind a `NETWORK` variable is used by
 `fendermint` and `ipc-cli` but with a different value, so it's best to use separate terminal
-windows when using the `hoku` CLI.
+windows when using the `hoku` CLI alongside the others.
 
 ```dotenv
 export NETWORK=localnet

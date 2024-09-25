@@ -406,18 +406,13 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
   cd "${IPC_FOLDER}"/contracts
   npm install
 
-  if ! $local_deploy ; then
-    export RPC_URL=https://calibration.filfox.info/rpc/v1
-  else 
-    export RPC_URL=http://localhost:8545
-  fi
+  rpc_url=$(if $local_deploy; then echo "http://localhost:8545"; else echo "https://calibration.filfox.info/rpc/v1"; fi)
   pk=$(cat "${IPC_CONFIG_FOLDER}"/validator_0.sk)
-  export PRIVATE_KEY=$pk
 
   if ! $local_deploy ; then
-    deploy_contracts_output=$(make deploy-ipc NETWORK=calibrationnet)
+    deploy_contracts_output=$(PRIVATE_KEY="${pk}" RPC_URL="${rpc_url}" make deploy-ipc NETWORK=calibrationnet)
   else
-    deploy_contracts_output=$(make deploy-ipc NETWORK=localnet)
+    deploy_contracts_output=$(PRIVATE_KEY="${pk}" RPC_URL="${rpc_url}" make deploy-ipc NETWORK=localnet)
   fi
 
   echo "$DASHES deploy contracts output $DASHES"
@@ -676,6 +671,19 @@ if [[ $local_deploy = true ]]; then
     sleep 5
   done
   echo "Deposited HOKU for test accounts"
+  # buy 5000 credits if the hoku CLI is installed
+  if [[ -n $(which hoku) ]]; then
+    echo "Buying credits for test accounts..."
+    credit_amount="5000"
+    for i in {0..9}
+    do
+      private_key=$(jq .["$i"].private_key < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
+      PRIVATE_KEY="${private_key}" NETWORK=localnet hoku credit buy "${credit_amount}"
+    done
+    echo "Bought subnet credits for test accounts"
+  else
+    echo "Hoku CLI not installed...skipping credit funding"
+  fi
   echo
   echo "${DASHES} Subnet setup complete ${DASHES}"
   echo
@@ -741,6 +749,10 @@ if [[ $local_deploy = true ]]; then
   echo "Parent native: ${parent_native%.*} ETH"
   echo "Parent HOKU:   ${parent_hoku%.*} HOKU"
   echo "Subnet native: ${subnet_native%.*} HOKU"
+  if [[ -n $(which hoku) ]]; then
+    credit_balance=$(NETWORK=localnet hoku credit balance --address "${addr}" | jq '.credit_free' | tr -d '"')
+    echo "Subnet credits: ${credit_balance}"
+  fi
   echo
   echo "Accounts:"
   for i in {0..9}

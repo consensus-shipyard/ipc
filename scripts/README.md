@@ -142,8 +142,9 @@ you'll need to make sure you rebuild everything and install via the `make instal
 follow the steps outlined above to get the devnet up and running.
 
 If you're using the `rust-hoku` CLI, you must set the `NETWORK` environment variable to `devnet` in
-order to use it. Note that both `fendermint`, `ipc-cli`, and `hoku` use the same flag, so be sure to
-open a new terminal window to avoid conflicts.
+order to use it. Note that `fendermint`, `ipc-cli`, and `hoku` use the same `NETWORK` flag but with
+varying values, so be sure to open a new terminal window to avoid conflicts if you're using any of
+them simultaneously.
 
 ```
 export NETWORK=devnet
