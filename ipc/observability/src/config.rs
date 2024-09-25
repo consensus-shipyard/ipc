@@ -39,8 +39,8 @@ pub enum RotationKind {
     Never,
 }
 
-impl From<RotationKind> for tracing_appender::rolling::Rotation {
-    fn from(kind: RotationKind) -> tracing_appender::rolling::Rotation {
+impl From<&RotationKind> for tracing_appender::rolling::Rotation {
+    fn from(kind: &RotationKind) -> tracing_appender::rolling::Rotation {
         match kind {
             RotationKind::Minutely => tracing_appender::rolling::Rotation::MINUTELY,
             RotationKind::Hourly => tracing_appender::rolling::Rotation::HOURLY,
