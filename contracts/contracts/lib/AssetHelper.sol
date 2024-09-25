@@ -61,7 +61,9 @@ library AssetHelper {
             // Safe arithmetic is not necessary because underflow is not possible due to the check above
             return finalBalance - initialBalance;
         } else {
-            // now we are handling native token
+            // now we are handling native coin.
+            // msg.value might have coins not just locked, say msg.value = valueToLock + transfer to other contracts
+            // this helper can only enforce the msg.value is not less than value.
             if (msg.value < value) {
                 revert NoBalanceIncrease();
             }
