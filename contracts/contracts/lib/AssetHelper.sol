@@ -12,11 +12,6 @@ import {SubnetActorGetterFacet} from "../subnet/SubnetActorGetterFacet.sol";
 library AssetHelper {
     using SafeERC20 for IERC20;
 
-    error InvalidERC20Address();
-    error NoBalanceIncrease();
-    error InsufficientFunds();
-    error UnexpectedAsset();
-
     /// @notice Assumes that the address provided belongs to a subnet rooted on this network,
     ///         and checks if its supply kind matches the provided one.
     ///         It reverts if the address does not correspond to a subnet actor.
@@ -28,9 +23,7 @@ library AssetHelper {
     ///         It reverts if conditions are not met.
     function validate(Asset memory asset) internal view {
         if (asset.kind == AssetKind.ERC20) {
-            if (asset.tokenAddress == address(0)) {
-                revert InvalidERC20Address();
-            }
+            require(asset.tokenAddress != address(0), "Invalid ERC20 address");
             // We require that the ERC20 token contract exists beforehand.
             // The call to balanceOf will revert if the supplied address does not exist, or if it's not an ERC20 contract.
             // Ideally we'd use ERC165 to check if the contract implements the ERC20 standard, but the latter does not support supportsInterface().
@@ -41,9 +34,7 @@ library AssetHelper {
 
     /// @notice Asserts that the supply strategy is of the given kind. If not, it reverts.
     function expect(Asset memory asset, AssetKind kind) internal pure {
-        if (asset.kind != kind) {
-            revert UnexpectedAsset();
-        }
+        require(asset.kind == kind, "Unexpected asset");
     }
 
     /// @notice Locks the specified amount from msg.sender into custody.
@@ -57,18 +48,14 @@ library AssetHelper {
             uint256 initialBalance = token.balanceOf(address(this));
             token.safeTransferFrom({from: msg.sender, to: address(this), value: value});
             uint256 finalBalance = token.balanceOf(address(this));
-            if (finalBalance <= initialBalance) {
-                revert NoBalanceIncrease();
-            }
-            // Safe arithmetic is not necessary because underflow is not possible due to the check above
+            require(finalBalance > initialBalance, "No balance increase");
+            // Safe arithmetic is not necessary because underflow is not possible due to the assert above
             return finalBalance - initialBalance;
         } else {
             // Ensure we have received enough funds to cover the value.
             // msg.value might have coins in excess of the amount that we need to lock (e.g. when contributing both native collateral and supply at the same time).
             // That's why we can't do a strict equality check.
-            if (msg.value < value) {
-                revert InsufficientFunds();
-            }
+            require(msg.value >= value, "Insufficient funds");
         }
         // Do nothing for native.
         return value;
@@ -98,11 +85,11 @@ library AssetHelper {
     ) internal returns (bool success, bytes memory ret) {
         return
             asset.tokenAddress.call(
-                // using IERC20 transfer instead of safe transfer so we can
-                // bubble-up the failure instead of reverting on failure so we
-                // can send the receipt.
-                abi.encodePacked(IERC20.transfer.selector, abi.encode(recipient, value))
-            );
+        // using IERC20 transfer instead of safe transfer so we can
+        // bubble-up the failure instead of reverting on failure so we
+        // can send the receipt.
+            abi.encodePacked(IERC20.transfer.selector, abi.encode(recipient, value))
+        );
     }
 
     /// @notice Calls the target with the specified data, ensuring it receives the specified value.
@@ -147,7 +134,7 @@ library AssetHelper {
             if (ret.length > 0) {
                 assembly {
                     let returndata_size := mload(ret)
-                    // see https://ethereum.stackexchange.com/questions/133748/trying-to-understand-solidity-assemblys-revert-function
+                // see https://ethereum.stackexchange.com/questions/133748/trying-to-understand-solidity-assemblys-revert-function
                     revert(add(32, ret), returndata_size)
                 }
             }
@@ -196,7 +183,7 @@ library AssetHelper {
         if (address(this).balance < value) {
             revert NotEnoughBalance();
         }
-        (bool success, ) = recipient.call{value: value}("");
+        (bool success,) = recipient.call{value: value}("");
         return success;
     }
 
