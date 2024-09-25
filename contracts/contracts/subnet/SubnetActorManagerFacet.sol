@@ -5,7 +5,8 @@ import {VALIDATOR_SECP256K1_PUBLIC_KEY_LENGTH} from "../constants/Constants.sol"
 import {ERR_VALIDATOR_JOINED, ERR_VALIDATOR_NOT_JOINED} from "../errors/IPCErrors.sol";
 import {InvalidFederationPayload, SubnetAlreadyBootstrapped, NotEnoughFunds, CollateralIsZero, CannotReleaseZero, NotOwnerOfPublicKey, EmptyAddress, NotEnoughBalance, NotEnoughCollateral, NotValidator, NotAllValidatorsHaveLeft, InvalidPublicKeyLength, MethodNotAllowed, SubnetNotBootstrapped} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
-import {Validator, ValidatorSet} from "../structs/Subnet.sol";
+import {Validator, ValidatorSet, SubnetID} from "../structs/Subnet.sol";
+import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {LibDiamond} from "../lib/LibDiamond.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
 import {SubnetActorModifiers} from "../lib/LibSubnetActorStorage.sol";
@@ -17,6 +18,7 @@ import {Pausable} from "../lib/LibPausable.sol";
 
 contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausable {
     using EnumerableSet for EnumerableSet.AddressSet;
+    using SubnetIDHelper for SubnetID;
     using LibValidatorSet for ValidatorSet;
     using Address for address payable;
 
@@ -65,6 +67,11 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
         }
 
         payable(msg.sender).sendValue(amount);
+    }
+
+    function setValidatorGater(address gater) external notKilled {
+        LibDiamond.enforceIsContractOwner();
+        s.validatorGater = gater;
     }
 
     /// @notice Sets the federated power of validators.
@@ -134,6 +141,8 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             revert NotOwnerOfPublicKey();
         }
 
+        LibSubnetActor.gateValidatorPowerDelta(msg.sender, 0, msg.value);
+
         if (!s.bootstrapped) {
             // if the subnet has not been bootstrapped, join directly
             // without delays, and collect collateral to register
@@ -167,6 +176,9 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             revert MethodNotAllowed(ERR_VALIDATOR_NOT_JOINED);
         }
 
+        uint256 collateral = LibStaking.totalValidatorCollateral(msg.sender);
+        LibSubnetActor.gateValidatorPowerDelta(msg.sender, collateral, collateral + msg.value);
+
         if (!s.bootstrapped) {
             LibStaking.depositWithConfirm(msg.sender, msg.value);
 
@@ -180,7 +192,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
     /// @dev `leave` must be used to unstake the entire stake.
     /// @param amount The amount to unstake.
     function unstake(uint256 amount) external nonReentrant whenNotPaused notKilled {
-        // disbling validator changes for federated validation subnets (at least for now
+        // disabling validator changes for federated validation subnets (at least for now
         // until a more complex mechanism is implemented).
         LibSubnetActor.enforceCollateralValidation();
 
@@ -196,6 +208,9 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
         if (collateral <= amount) {
             revert NotEnoughCollateral();
         }
+
+        LibSubnetActor.gateValidatorPowerDelta(msg.sender, collateral, collateral - amount);
+
         if (!s.bootstrapped) {
             LibStaking.withdrawWithConfirm(msg.sender, amount);
             return;
@@ -206,7 +221,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
 
     /// @notice method that allows a validator to leave the subnet.
     function leave() external nonReentrant whenNotPaused notKilled {
-        // disbling validator changes for federated subnets (at least for now
+        // disabling validator changes for federated subnets (at least for now
         // until a more complex mechanism is implemented).
         // This means that initial validators won't be able to recover
         // their collateral ever (worth noting in the docs if this ends
@@ -220,6 +235,8 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
         if (amount == 0) {
             revert NotValidator(msg.sender);
         }
+
+        LibSubnetActor.gateValidatorPowerDelta(msg.sender, amount, 0);
 
         // slither-disable-next-line unused-return
         s.bootstrapOwners.remove(msg.sender);

@@ -4,7 +4,6 @@
 #[macro_export]
 macro_rules! register_metrics {
   ($($name:ident : $type:ty = $make:expr);* $(;)?) => {
-
       $(
         lazy_static! {
           pub static ref $name: $type = $make.unwrap();

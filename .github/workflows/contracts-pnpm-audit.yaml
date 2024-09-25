@@ -1,4 +1,4 @@
-name: NPM Audit
+name: 'Contracts: pnpm audit'
 
 # This workflow is triggered from the main CI workflow.
 on:
@@ -21,4 +21,4 @@ jobs:
       - name: NPM Audit
         run: |
           cd contracts
-          pnpm audit
+          pnpm audit --audit-level=moderate

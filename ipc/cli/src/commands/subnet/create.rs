@@ -13,6 +13,7 @@ use ipc_api::subnet::{PermissionMode, SupplyKind, SupplySource};
 use ipc_api::subnet_id::SubnetID;
 
 use crate::commands::get_ipc_provider;
+use crate::commands::subnet::ZERO_ADDRESS;
 use crate::{f64_to_token_amount, require_fil_addr_from_str, CommandLineHandler, GlobalArguments};
 
 const DEFAULT_ACTIVE_VALIDATORS: u16 = 100;
@@ -42,6 +43,12 @@ impl CreateSubnet {
             kind: arguments.supply_source_kind,
             token_address,
         };
+
+        let raw_addr = arguments
+            .validator_gater
+            .clone()
+            .unwrap_or(ZERO_ADDRESS.to_string());
+        let validator_gater = require_fil_addr_from_str(&raw_addr)?;
         let addr = provider
             .create_subnet(
                 from,
@@ -55,6 +62,7 @@ impl CreateSubnet {
                 f64_to_token_amount(arguments.min_cross_msg_fee)?,
                 arguments.permission_mode,
                 supply_source,
+                validator_gater,
             )
             .await?;
 
@@ -129,4 +137,9 @@ pub struct CreateSubnetArgs {
         help = "The address of supply source of a subnet on its parent subnet. None if kind is native"
     )]
     pub supply_source_address: Option<String>,
+    #[arg(
+        long,
+        help = "The address of validator gating contract. None if validator gating is disabled"
+    )]
+    pub validator_gater: Option<String>,
 }

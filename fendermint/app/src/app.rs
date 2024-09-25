@@ -1,7 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use std::future::Future;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Context, Result};
@@ -19,14 +18,15 @@ use fendermint_vm_interpreter::bytes::{
 };
 use fendermint_vm_interpreter::chain::{ChainEnv, ChainMessageApplyRet, IllegalMessage};
 use fendermint_vm_interpreter::fvm::state::{
-    empty_state_tree, CheckStateRef, FvmExecState, FvmGenesisState, FvmQueryState, FvmStateParams,
+    empty_state_tree, CheckStateRef, FvmExecState, FvmQueryState, FvmStateParams,
     FvmUpdatableParams,
 };
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
-use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmGenesisOutput, PowerUpdates};
+use fendermint_vm_interpreter::fvm::{FvmApplyRet, PowerUpdates};
+use fendermint_vm_interpreter::genesis::{read_genesis_car, GenesisAppState};
 use fendermint_vm_interpreter::signed::InvalidSignature;
 use fendermint_vm_interpreter::{
-    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
+    CheckInterpreter, ExecInterpreter, ProposalInterpreter, QueryInterpreter,
 };
 use fendermint_vm_message::query::FvmQueryHeight;
 use fendermint_vm_snapshot::{SnapshotClient, SnapshotError};
@@ -109,12 +109,6 @@ pub struct AppConfig<S: KVStore> {
     pub state_hist_namespace: S::Namespace,
     /// Size of state history to keep; 0 means unlimited.
     pub state_hist_size: u64,
-    /// Path to the Wasm bundle.
-    ///
-    /// Only loaded once during genesis; later comes from the [`StateTree`].
-    pub builtin_actors_bundle: PathBuf,
-    /// Path to the custom actor WASM bundle.
-    pub custom_actors_bundle: PathBuf,
     /// Block height where we should gracefully stop the node
     pub halt_height: i64,
 }
@@ -136,12 +130,6 @@ where
     state_store: Arc<SS>,
     /// Wasm engine cache.
     multi_engine: Arc<MultiEngine>,
-    /// Path to the Wasm bundle.
-    ///
-    /// Only loaded once during genesis; later comes from the [`StateTree`].
-    builtin_actors_bundle: PathBuf,
-    /// Path to the custom actor WASM bundle.
-    custom_actors_bundle: PathBuf,
     /// Block height where we should gracefully stop the node
     halt_height: i64,
     /// Namespace to store app state.
@@ -195,8 +183,6 @@ where
             db: Arc::new(db),
             state_store: Arc::new(state_store),
             multi_engine: Arc::new(MultiEngine::new(1)),
-            builtin_actors_bundle: config.builtin_actors_bundle,
-            custom_actors_bundle: config.custom_actors_bundle,
             halt_height: config.halt_height,
             namespace: config.app_namespace,
             state_hist: KVCollection::new(config.state_hist_namespace),
@@ -390,6 +376,14 @@ where
         // It's really the empty state tree that would be the best indicator.
         !(height == 0 && params.timestamp.0 == 0 && params.network_version == NetworkVersion::V0)
     }
+
+    fn parse_genesis_app_bytes(bytes: &[u8]) -> Result<Vec<u8>> {
+        // cometbft serves data in json format, convert from json string
+        match serde_json::from_slice(bytes)? {
+            serde_json::Value::String(s) => Ok(GenesisAppState::decode_and_decompress(&s)?),
+            _ => Err(anyhow!("invalid app state json")),
+        }
+    }
 }
 
 // NOTE: The `Application` interface doesn't allow failures at the moment. The protobuf
@@ -408,11 +402,6 @@ where
     S::Namespace: Sync + Send,
     DB: KVWritable<S> + KVReadable<S> + Clone + Send + Sync + 'static,
     SS: Blockstore + Clone + Send + Sync + 'static,
-    I: GenesisInterpreter<
-        State = FvmGenesisState<SS>,
-        Genesis = Vec<u8>,
-        Output = FvmGenesisOutput,
-    >,
     I: ProposalInterpreter<State = ChainEnv, Message = Vec<u8>>,
     I: ExecInterpreter<
         State = (ChainEnv, FvmExecState<SS>),
@@ -450,45 +439,18 @@ where
 
     /// Called once upon genesis.
     async fn init_chain(&self, request: request::InitChain) -> AbciResult<response::InitChain> {
-        let bundle = &self.builtin_actors_bundle;
-        let bundle = std::fs::read(bundle)
-            .map_err(|e| anyhow!("failed to load builtin bundle CAR from {bundle:?}: {e}"))?;
-
-        let custom_actors_bundle = &self.custom_actors_bundle;
-        let custom_actors_bundle = std::fs::read(custom_actors_bundle).map_err(|e| {
-            anyhow!("failed to load custom actor bundle CAR from {custom_actors_bundle:?}: {e}")
-        })?;
-
-        let state = FvmGenesisState::new(
-            self.state_store_clone(),
-            self.multi_engine.clone(),
-            &bundle,
-            &custom_actors_bundle,
-        )
-        .await
-        .context("failed to create genesis state")?;
-
-        tracing::info!(
-            manifest_root = format!("{}", state.manifest_data_cid),
-            "pre-genesis state created"
-        );
-
-        let genesis_bytes = request.app_state_bytes.to_vec();
+        let genesis_bytes = Self::parse_genesis_app_bytes(&request.app_state_bytes)?;
         let genesis_hash =
             fendermint_vm_message::cid(&genesis_bytes).context("failed to compute genesis CID")?;
 
         // Make it easy to spot any discrepancies between nodes.
         tracing::info!(genesis_hash = genesis_hash.to_string(), "genesis");
 
-        let (state, out) = self
-            .interpreter
-            .init(state, genesis_bytes)
-            .await
-            .context("failed to init from genesis")?;
-
-        let state_root = state.commit().context("failed to commit genesis state")?;
+        let (validators, state_params) = read_genesis_car(genesis_bytes, &self.state_store).await?;
         let validators =
-            to_validator_updates(out.validators).context("failed to convert validators")?;
+            to_validator_updates(validators).context("failed to convert validators")?;
+
+        tracing::info!(state_params = serde_json::to_string(&state_params)?);
 
         // Let's pretend that the genesis state is that of a fictive block at height 0.
         // The record will be stored under height 1, and the record after the application
@@ -505,16 +467,7 @@ where
         let app_state = AppState {
             block_height: height,
             oldest_state_height: height,
-            state_params: FvmStateParams {
-                state_root,
-                timestamp: out.timestamp,
-                network_version: out.network_version,
-                base_fee: out.base_fee,
-                circ_supply: out.circ_supply,
-                chain_id: out.chain_id.into(),
-                power_scale: out.power_scale,
-                app_version: 0,
-            },
+            state_params,
         };
 
         let response = response::InitChain {

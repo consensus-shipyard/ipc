@@ -48,6 +48,7 @@ license-file = "LICENSE-APACHE"
 ## dummy trigger ci
 
 [workspace.dependencies]
+time = "0.3.33"
 anyhow = "1"
 arbitrary = { version = "1", features = ["derive"] }
 arbtest = "0.2"
@@ -65,7 +66,7 @@ clap = { version = "4.1", features = ["derive", "env", "string"] }
 byteorder = "1.5.0"
 config = "0.13"
 dirs = "5.0"
-dircpy = "0.3"
+dircpy = "0.3.19"
 either = "1.10"
 env_logger = "0.10"
 erased-serde = "0.3"
@@ -79,6 +80,7 @@ futures-util = "0.3"
 gcra = "0.4"
 hex = "0.4"
 hex-literal = "0.4.1"
+http = "0.2.12"
 im = "15.1.0"
 integer-encoding = { version = "3.0.3", default-features = false }
 jsonrpc-v2 = { version = "0.11", default-features = false, features = [
@@ -142,6 +144,7 @@ serde_yaml = { version = "0.9" }
 serde_tuple = "0.5"
 serde_with = "2.3"
 serial_test = "3.0"
+snap = "1.1.0"
 strum = { version = "0.26.1", features = ["derive"] }
 tempfile = "3.7"
 thiserror = "1"
@@ -153,6 +156,7 @@ tokio = { version = "1", features = [
   "io-std",
   "sync",
 ] }
+tower-http = { version = "0.4.0", features = ["cors"] }
 tokio-stream = "0.1.14"
 tokio-util = { version = "0.7.8", features = ["compat"] }
 tokio-tungstenite = { version = "0.18.0", features = ["native-tls"] }

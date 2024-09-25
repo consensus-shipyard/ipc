@@ -24,11 +24,6 @@ impl MemoryBlockstore {
 }
 
 impl Blockstore for MemoryBlockstore {
-    fn has(&self, k: &Cid) -> Result<bool> {
-        let guard = self.blocks.read().unwrap();
-        Ok(guard.contains_key(k))
-    }
-
     fn get(&self, k: &Cid) -> Result<Option<Vec<u8>>> {
         let guard = self.blocks.read().unwrap();
         Ok(guard.get(k).cloned())
@@ -38,5 +33,10 @@ impl Blockstore for MemoryBlockstore {
         let mut guard = self.blocks.write().unwrap();
         guard.insert(*k, block.into());
         Ok(())
+    }
+
+    fn has(&self, k: &Cid) -> Result<bool> {
+        let guard = self.blocks.read().unwrap();
+        Ok(guard.contains_key(k))
     }
 }

@@ -36,6 +36,7 @@
         "@nomiclabs/hardhat-ethers": "^2.2.3",
         "@typechain/ethers-v5": "^11.1.2",
         "@typechain/hardhat": "^7.0.0",
+        "@types/lodash": "^4.17.7",
         "dotenv": "^16.0.1",
         "ethers": "^5.7.0",
         "fs-extra": "^11.2.0",
@@ -62,7 +63,8 @@
         "@solidity-parser/parser": "^0.18.0",
         "diamond-util": "^1.1.1",
         "elliptic-curve-solidity": "github:witnet/elliptic-curve-solidity#3475478",
-        "fevmate": "github:wadealexc/fevmate#6a80e98"
+        "fevmate": "github:wadealexc/fevmate#6a80e98",
+        "lodash": "^4.17.21"
     },
     "lint-staged": {
         "*.{js,jsx,ts,tsx,json,css,md,sol}": "prettier --write"

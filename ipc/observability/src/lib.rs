@@ -5,6 +5,7 @@ pub mod macros;
 pub mod traces;
 mod tracing_layers;
 pub use lazy_static::lazy_static;
+pub mod config;
 pub mod observe;
 pub mod serde;
 

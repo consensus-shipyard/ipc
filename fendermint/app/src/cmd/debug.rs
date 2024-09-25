@@ -23,9 +23,11 @@ cmd! {
 
 cmd! {
   DebugIpcCommands(self) {
+
     match self {
-        DebugIpcCommands::ExportTopDownEvents(args) =>
+        DebugIpcCommands::ExportTopDownEvents(args) => {
             export_topdown_events(args).await
+        }
     }
   }
 }

@@ -383,7 +383,7 @@ mod tests {
             .map(|v| v.iter().map(|v| v.to_string()).collect())
             .collect();
 
-        let leaves_array = vec![
+        let leaves_array = [
             vec![],
             vec![0, 1],
             vec![0, 1, 5],

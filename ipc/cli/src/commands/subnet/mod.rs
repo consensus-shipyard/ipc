@@ -35,6 +35,8 @@ mod set_federated_power;
 pub mod show_gateway_contract_commit_sha;
 mod validator;
 
+pub(crate) const ZERO_ADDRESS: &str = "0000000000000000000000000000000000000000";
+
 #[derive(Debug, Args)]
 #[command(
     name = "subnet",

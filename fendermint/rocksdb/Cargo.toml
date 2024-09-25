@@ -12,7 +12,9 @@ license.workspace = true
 num_cpus = "1.14"
 rocksdb = { version = "0.21", features = ["multi-threaded-cf"] }
 anyhow = { workspace = true }
-fendermint_storage = { path = "../storage", optional = true, features = ["testing"] }
+fendermint_storage = { path = "../storage", optional = true, features = [
+    "testing",
+] }
 serde = { workspace = true }
 thiserror = { workspace = true }
 
@@ -30,7 +32,7 @@ blockstore = ["fvm_ipld_blockstore", "cid"]
 kvstore = ["fendermint_storage"]
 
 lz4 = ["rocksdb/lz4"]
-# snappy = ["rocksdb/snappy"]
-# zlib = ["rocksdb/zlib"]
-# bzip2 = ["rocksdb/bzip2"]
-# zstd = ["rocksdb/zstd"]
+snappy = ["rocksdb/snappy"]
+zlib = ["rocksdb/zlib"]
+bzip2 = ["rocksdb/bzip2"]
+zstd = ["rocksdb/zstd"]

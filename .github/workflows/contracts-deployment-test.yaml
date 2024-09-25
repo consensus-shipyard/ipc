@@ -1,4 +1,4 @@
-name: Deployment Test
+name: 'Contracts: Smoke test deployment'
 
 # This workflow is triggered from the main CI workflow.
 on:
@@ -38,4 +38,4 @@ jobs:
         export PATH="$PATH:/home/runner/.config/.foundry/bin"
         pnpm exec ganache-cli -g0 -p1337 --account 0x$PRIVATE_KEY,1001901919191919191  &
         sleep 5
-        make deploy-ipc
+        make deploy-stack

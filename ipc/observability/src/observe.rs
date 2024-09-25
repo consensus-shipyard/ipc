@@ -13,7 +13,7 @@ register_metrics! {
         = register_int_counter_vec!("tracing_errors", "Number of tracing errors", &["event"]);
 }
 
-impl_traceables!(TraceLevel::Error, "TracingError", TracingError<'a>);
+impl_traceables!(TraceLevel::Error, "System", TracingError<'a>);
 
 #[derive(Debug)]
 pub struct TracingError<'a> {

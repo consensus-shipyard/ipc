@@ -35,6 +35,7 @@ contract SubnetActorDiamond {
         PermissionMode permissionMode;
         SupplySource supplySource;
         SubnetID parentId;
+        address validatorGater;
     }
 
     constructor(IDiamond.FacetCut[] memory _diamondCut, ConstructorParams memory params, address owner) {
@@ -95,6 +96,10 @@ contract SubnetActorDiamond {
         s.changeSet.startConfigurationNumber = LibStaking.INITIAL_CONFIGURATION_NUMBER;
         // Set the supply strategy.
         s.supplySource = params.supplySource;
+
+        if (params.validatorGater != address(0)) {
+            s.validatorGater = params.validatorGater;
+        }
     }
 
     function _fallback() internal {

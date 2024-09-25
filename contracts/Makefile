@@ -1,14 +1,13 @@
 # Targets that are commands.
-COMMANDS :=  deploy-ipc deploy-subnet-registry deploy-subnet upgrade-gw-diamond upgrade-sa-diamond \
-             upgrade-sr-diamond gen compile-abi rust-binding slither lint fmt deps build \
+COMMANDS :=  deploy-stack gen compile-abi rust-binding slither lint fmt deps build \
              test install-dev install-npm-package install-eth-abi storage clean coverage \
-             prepare build-selector-library forge
+             prepare forge
 
 # Targets that are prerequisite commands.
 PREREQ_COMMANDS := pnpm
 
 # Targets that are not commands.
-NON_COMMANDS := node_modules
+NON_COMMANDS := node_modules test/helpers/SelectorLibrary.sol
 
 # Declare commands and prerequisite commands as phony targets.
 .PHONY: $(COMMANDS) $(PREREQ_COMMANDS)
@@ -32,23 +31,8 @@ NETWORK ?= auto
 # It is required by docker builds, but shouldn't be checked into git.
 OUTPUT ?= out
 
-deploy-ipc:
-	./ops/deploy.sh $(NETWORK)
-
-deploy-subnet-registry:
-	./ops/deploy-subnet-registry.sh $(NETWORK)
-
-deploy-subnet:
-	./ops/deploy-subnet.sh $(NETWORK)
-
-upgrade-gw-diamond:
-	./ops/upgrade-gw-diamond.sh $(NETWORK)
-
-upgrade-sa-diamond:
-	./ops/upgrade-sa-diamond.sh $(NETWORK) $(SUBNET_ACTOR_ADDRESS)
-
-upgrade-sr-diamond:
-	./ops/upgrade-sr-diamond.sh $(NETWORK)
+deploy-stack:
+	pnpm exec hardhat deploy-stack --network $(NETWORK)
 
 # ==============================================================================
 # Code generation
@@ -93,16 +77,8 @@ build: node_modules | forge
 	forge build
 	FOUNDRY_SRC=sdk forge build
 
-test: node_modules | forge
+test: node_modules test/helpers/SelectorLibrary.sol | forge
 	forge test -vvv --ffi
-
-install-dev: install-npm-package install-eth-abi
-
-install-npm-package: node_modules
-	pnpm install --save-dev
-
-install-eth-abi:
-	curl -sSL https://bootstrap.pypa.io/get-pip.py -o get-pip.py && python3 get-pip.py && rm get-pip.py && python3 -m pip install eth_abi
 
 storage:
 	rm -rf ./cache
@@ -124,10 +100,10 @@ coverage: node_modules | forge
 	fi
 	./tools/check_coverage.sh
 
-prepare: build-selector-library fmt lint test slither
+prepare: test/helpers/SelectorLibrary.sol fmt lint test slither
 
-build-selector-library: | forge
-	python3 scripts/python/build_selector_library.py
+test/helpers/SelectorLibrary.sol: | forge
+	pnpm exec hardhat gen-selector-library
 	pnpm exec prettier -w test/helpers/SelectorLibrary.sol
 
 # Forge is used by the ipc-solidity-actors compilation steps.
