@@ -13,6 +13,7 @@ import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {AssetHelper} from "../lib/AssetHelper.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 library LibGateway {
     using SubnetIDHelper for SubnetID;
@@ -21,6 +22,7 @@ library LibGateway {
     using SubnetIDHelper for SubnetID;
     using FilAddress for address payable;
     using AssetHelper for Asset;
+    using EnumerableSet for EnumerableSet.Bytes32Set;
 
     event MembershipUpdated(Membership);
     /// @dev subnet refers to the next "down" subnet that the `envelope.message.to` should be forwarded to.
@@ -405,6 +407,7 @@ library LibGateway {
         // of the batch (this is way we have this after the nonce logic).
         if (!crossMsg.to.subnetId.equals(s.networkName)) {
             bytes32 cid = crossMsg.toHash();
+            s.postboxKeys.add(cid);
             s.postbox[cid] = crossMsg;
             return;
         }

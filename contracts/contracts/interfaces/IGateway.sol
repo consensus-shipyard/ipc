@@ -64,6 +64,9 @@ interface IGateway {
     /// @notice Propagates the stored postbox item for the given cid
     function propagate(bytes32 msgCid) external payable;
 
+    /// @notice Propagates all the stored postbox items
+    function propagateAll() external payable;
+
     /// @notice commit the ipc parent finality into storage
     function commitParentFinality(ParentFinality calldata finality) external;
 
