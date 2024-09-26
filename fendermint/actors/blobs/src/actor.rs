@@ -10,7 +10,7 @@ use fendermint_actor_blobs_shared::params::{
     RevokeCreditParams,
 };
 use fendermint_actor_blobs_shared::state::{
-    Account, Blob, BlobStatus, CreditApproval, Hash, PublicKey, Subscription,
+    Account, Blob, BlobStatus, CreditApproval, Hash, PublicKey, Subscription, SubscriptionId,
 };
 use fendermint_actor_blobs_shared::Method;
 use fil_actors_runtime::runtime::builtins::Type;
@@ -32,7 +32,7 @@ fil_actors_runtime::wasm_trampoline!(BlobsActor);
 
 pub struct BlobsActor;
 
-type BlobTuple = (Hash, HashSet<(Address, PublicKey)>);
+type BlobTuple = (Hash, HashSet<(Address, SubscriptionId, PublicKey)>);
 
 impl BlobsActor {
     fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
@@ -201,6 +201,7 @@ impl BlobsActor {
                 subscriber,
                 rt.curr_epoch(),
                 params.hash,
+                params.id,
                 params.size,
                 params.ttl,
                 params.source,
@@ -243,6 +244,7 @@ impl BlobsActor {
                 params.subscriber,
                 rt.curr_epoch(),
                 params.hash,
+                params.id,
                 params.status,
             )
         })
@@ -267,7 +269,14 @@ impl BlobsActor {
             origin
         };
         let delete = rt.transaction(|st: &mut State, _| {
-            st.delete_blob(origin, caller, subscriber, rt.curr_epoch(), params.hash)
+            st.delete_blob(
+                origin,
+                caller,
+                subscriber,
+                rt.curr_epoch(),
+                params.hash,
+                params.id,
+            )
         })?;
         if delete {
             delete_from_disc(params.hash)?;
@@ -757,6 +766,7 @@ mod tests {
             sponsor: None,
             source: new_pk(),
             hash: hash.0,
+            id: SubscriptionId::Default,
             size: hash.1,
             ttl: Some(3600),
         };

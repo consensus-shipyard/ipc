@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use cid::Cid;
-use fendermint_actor_blobs_shared::state::{Blob, BlobStatus};
+use fendermint_actor_blobs_shared::state::{Blob, BlobStatus, SubscriptionId};
 use fendermint_actor_blobs_shared::{add_blob, delete_blob, get_blob};
 use fendermint_actor_machine::MachineActor;
 use fil_actors_runtime::{
@@ -12,6 +12,7 @@ use fil_actors_runtime::{
     ActorError,
 };
 use fvm_ipld_hamt::BytesKey;
+use fvm_shared::address::Address;
 
 use crate::shared::{
     AddParams, DeleteParams, GetParams, ListObjectsReturn, ListParams, Method, Object,
@@ -26,13 +27,15 @@ pub struct Actor;
 
 impl Actor {
     fn add_object(rt: &impl Runtime, params: AddParams) -> Result<Cid, ActorError> {
+        // TODO: Remove object store access control
         // Self::ensure_write_allowed(rt)?;
         rt.validate_immediate_caller_accept_any()?;
         let state = rt.state::<State>()?;
-        let key = BytesKey(params.key);
+        let key = BytesKey(params.key.clone());
+        let sub_id = SubscriptionId::from(params.key);
         if let Some(object) = state.get(rt.store(), &key)? {
             if params.overwrite {
-                delete_blob(rt, Some(state.owner), object.hash)?;
+                delete_blob(rt, Some(state.owner), object.hash, sub_id.clone())?;
             } else {
                 return Err(ActorError::illegal_state(
                     "key exists; use overwrite".into(),
@@ -45,6 +48,7 @@ impl Actor {
             Some(state.owner),
             params.source,
             params.hash,
+            sub_id,
             params.size,
             params.ttl,
         )?;
@@ -65,12 +69,12 @@ impl Actor {
         // Self::ensure_write_allowed(rt)?;
         rt.validate_immediate_caller_accept_any()?;
         let state = rt.state::<State>()?;
-        let key = BytesKey(params.0);
+        let key = BytesKey(params.0.clone());
         let object = state
             .get(rt.store(), &key)?
             .ok_or(ActorError::illegal_state("object not found".into()))?;
         // Delete blob for object
-        delete_blob(rt, Some(state.owner), object.hash)?;
+        delete_blob(rt, Some(state.owner), object.hash, params.0.into())?;
         // Update state
         let res = rt.transaction(|st: &mut State, rt| st.delete(rt.store(), &key))?;
         Ok(res.1)
@@ -79,10 +83,11 @@ impl Actor {
     fn get_object(rt: &impl Runtime, params: GetParams) -> Result<Option<Object>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let state = rt.state::<State>()?;
-        let key = BytesKey(params.0);
+        let owner = state.owner;
+        let key = BytesKey(params.0.clone());
         if let Some(object_state) = state.get(rt.store(), &key)? {
             if let Some(blob) = get_blob(rt, object_state.hash)? {
-                let object = build_object(&blob, &object_state)?;
+                let object = build_object(&blob, &object_state, params.0, owner)?;
                 Ok(object)
             } else {
                 Ok(None)
@@ -98,7 +103,9 @@ impl Actor {
     ) -> Result<ListObjectsReturn, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let mut objects = Vec::new();
-        let prefixes = rt.state::<State>()?.list(
+        let state = rt.state::<State>()?;
+        let owner = state.owner;
+        let prefixes = state.list(
             rt.store(),
             params.prefix,
             params.delimiter,
@@ -106,7 +113,7 @@ impl Actor {
             params.limit,
             |key: Vec<u8>, object_state: ObjectState| -> anyhow::Result<(), ActorError> {
                 if let Some(blob) = get_blob(rt, object_state.hash)? {
-                    if let Some(object) = build_object(&blob, &object_state)? {
+                    if let Some(object) = build_object(&blob, &object_state, key.clone(), owner)? {
                         objects.push((key, Some(object)));
                     }
                 } else {
@@ -126,24 +133,32 @@ impl Actor {
 fn build_object(
     blob: &Blob,
     object_state: &ObjectState,
+    object_key: Vec<u8>,
+    subscriber: Address,
 ) -> anyhow::Result<Option<Object>, ActorError> {
     match blob.status {
         BlobStatus::Resolved => {
-            let max_sub = blob
-                .subs
-                .values()
-                .max_by_key(|sub| sub.expiry)
-                .ok_or_else(|| {
-                    ActorError::illegal_state(
-                        "blob has no subscriptions; this should not happen".into(),
-                    )
-                })?;
-            Ok(Some(Object {
-                hash: object_state.hash,
-                size: blob.size,
-                expiry: max_sub.expiry,
-                metadata: object_state.metadata.clone(),
-            }))
+            let group = blob.subscribers.get(&subscriber).ok_or_else(|| {
+                ActorError::illegal_state(format!(
+                    "object store {} is not subscribed to blob {}; this should not happen",
+                    object_state.hash, subscriber,
+                ))
+            })?;
+            let id = SubscriptionId::from(object_key);
+            let (expiry, _) = group.max_expiries(&id, None);
+            if let Some(expiry) = expiry {
+                Ok(Some(Object {
+                    hash: object_state.hash,
+                    size: blob.size,
+                    expiry,
+                    metadata: object_state.metadata.clone(),
+                }))
+            } else {
+                Err(ActorError::illegal_state(format!(
+                    "subscription group is empty for blob {}; this should not happen",
+                    object_state.hash,
+                )))
+            }
         }
         BlobStatus::Pending | BlobStatus::Failed => Ok(None),
     }
@@ -181,15 +196,15 @@ mod tests {
 
     use cid::Cid;
     use fendermint_actor_blobs_shared::params::{AddBlobParams, DeleteBlobParams, GetBlobParams};
-    use fendermint_actor_blobs_shared::state::{BlobStatus, Hash, PublicKey, Subscription};
+    use fendermint_actor_blobs_shared::state::{Hash, PublicKey, Subscription, SubscriptionGroup};
     use fendermint_actor_blobs_shared::{Method as BlobMethod, BLOBS_ACTOR_ADDR};
-    use fendermint_actor_machine::{ConstructorParams, WriteAccess};
+    use fendermint_actor_machine::{ConstructorParams, InitParams, WriteAccess};
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::runtime::Runtime;
     use fil_actors_runtime::test_utils::{
-        expect_empty, MockRuntime, ETHACCOUNT_ACTOR_CODE_ID, SYSTEM_ACTOR_CODE_ID,
+        expect_empty, MockRuntime, ADM_ACTOR_CODE_ID, ETHACCOUNT_ACTOR_CODE_ID, INIT_ACTOR_CODE_ID,
     };
-    use fil_actors_runtime::INIT_ACTOR_ADDR;
+    use fil_actors_runtime::{ADM_ACTOR_ADDR, INIT_ACTOR_ADDR};
     use fvm_ipld_encoding::ipld_block::IpldBlock;
     use fvm_shared::address::Address;
     use fvm_shared::clock::ChainEpoch;
@@ -200,11 +215,12 @@ mod tests {
     use rand::RngCore;
 
     fn construct_and_verify(owner: Address) -> MockRuntime {
+        let receiver = new_machine_address();
         let rt = MockRuntime {
-            receiver: Address::new_id(10),
+            receiver,
             ..Default::default()
         };
-        rt.set_caller(*SYSTEM_ACTOR_CODE_ID, INIT_ACTOR_ADDR);
+        rt.set_caller(*INIT_ACTOR_CODE_ID, INIT_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![INIT_ACTOR_ADDR]);
         let write_access: WriteAccess = WriteAccess::Public;
         let metadata = HashMap::new();
@@ -221,8 +237,28 @@ mod tests {
             .unwrap();
         expect_empty(actor_construction);
         rt.verify();
+        rt.set_caller(*ADM_ACTOR_CODE_ID, ADM_ACTOR_ADDR);
+        rt.expect_validate_caller_addr(vec![ADM_ACTOR_ADDR]);
+        let actor_init = rt
+            .call::<Actor>(
+                Method::Init as u64,
+                IpldBlock::serialize_cbor(&InitParams {
+                    robust_address: receiver,
+                })
+                .unwrap(),
+            )
+            .unwrap();
+        expect_empty(actor_init);
+        rt.verify();
         rt.reset();
         rt
+    }
+
+    pub fn new_machine_address() -> Address {
+        let mut rng = rand::thread_rng();
+        let mut data = [0u8; 32];
+        rng.fill_bytes(&mut data);
+        Address::new_actor(&data)
     }
 
     pub fn new_hash(size: usize) -> (Hash, u64) {
@@ -255,10 +291,12 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
 
+        // Add object
         let hash = new_hash(256);
+        let key = vec![0, 1, 2];
         let add_params: AddParams = AddParams {
             source: new_pk(),
-            key: vec![0, 1, 2],
+            key: key.clone(),
             hash: hash.0,
             size: hash.1,
             ttl: None,
@@ -273,6 +311,7 @@ mod tests {
                 sponsor: Some(f4_eth_addr),
                 source: add_params.source,
                 hash: add_params.hash,
+                id: SubscriptionId::Key(key),
                 size: add_params.size,
                 ttl: add_params.ttl,
             })
@@ -308,10 +347,12 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
 
+        // Add object
         let hash = new_hash(256);
+        let key = vec![0, 1, 2];
         let add_params: AddParams = AddParams {
             source: new_pk(),
-            key: vec![0, 1, 2],
+            key: key.clone(),
             hash: hash.0,
             size: hash.1,
             ttl: None,
@@ -326,6 +367,7 @@ mod tests {
                 sponsor: Some(f4_eth_addr),
                 source: add_params.source,
                 hash: add_params.hash,
+                id: SubscriptionId::Key(key.clone()),
                 size: add_params.size,
                 ttl: add_params.ttl,
             })
@@ -347,6 +389,7 @@ mod tests {
         assert_eq!(state.root, result);
         rt.verify();
 
+        // Overwrite object (old blob is deleted)
         let hash = new_hash(256);
         let add_params2 = AddParams {
             source: add_params.source,
@@ -364,6 +407,7 @@ mod tests {
             IpldBlock::serialize_cbor(&DeleteBlobParams {
                 sponsor: Some(f4_eth_addr),
                 hash: add_params.hash,
+                id: SubscriptionId::Key(key.clone()),
             })
             .unwrap(),
             TokenAmount::from_whole(0),
@@ -377,6 +421,7 @@ mod tests {
                 sponsor: Some(f4_eth_addr),
                 source: add_params2.source,
                 hash: add_params2.hash,
+                id: SubscriptionId::Key(key),
                 size: add_params2.size,
                 ttl: add_params2.ttl,
             })
@@ -412,10 +457,12 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
 
+        // Add object
         let hash = new_hash(256);
+        let key = vec![0, 1, 2];
         let add_params: AddParams = AddParams {
             source: new_pk(),
-            key: vec![0, 1, 2],
+            key: key.clone(),
             hash: hash.0,
             size: hash.1,
             ttl: None,
@@ -430,6 +477,7 @@ mod tests {
                 sponsor: Some(f4_eth_addr),
                 source: add_params.source,
                 hash: add_params.hash,
+                id: SubscriptionId::Key(key),
                 size: add_params.size,
                 ttl: add_params.ttl,
             })
@@ -451,6 +499,7 @@ mod tests {
         assert_eq!(state.root, result);
         rt.verify();
 
+        // Try to overwrite
         let hash = new_hash(256);
         let add_params2 = AddParams {
             source: add_params.source,
@@ -485,10 +534,9 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
 
+        // Add object
         let key = vec![0, 1, 2];
         let hash = new_hash(256);
-
-        // Prerequisite for a delete operation: add to have a proper state of the actor.
         let add_params: AddParams = AddParams {
             source: new_pk(),
             key: key.clone(),
@@ -506,6 +554,7 @@ mod tests {
                 sponsor: Some(f4_eth_addr),
                 source: add_params.source,
                 hash: add_params.hash,
+                id: SubscriptionId::Key(key.clone()),
                 size: add_params.size,
                 ttl: add_params.ttl,
             })
@@ -527,7 +576,7 @@ mod tests {
         assert_eq!(state.root, result_add);
         rt.verify();
 
-        // Now actually delete it.
+        // Delete object
         let delete_params = DeleteParams(key.clone());
         rt.expect_validate_caller_any();
         rt.expect_send_simple(
@@ -536,6 +585,7 @@ mod tests {
             IpldBlock::serialize_cbor(&DeleteBlobParams {
                 sponsor: Some(f4_eth_addr),
                 hash: add_params.hash,
+                id: SubscriptionId::Key(key),
             })
             .unwrap(),
             TokenAmount::from_whole(0),
@@ -591,11 +641,10 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
 
+        // Add object
         let key = vec![0, 1, 2];
         let hash = new_hash(256);
         let ttl = ChainEpoch::from(3600);
-
-        // Prerequisite for a delete operation: add to have a proper state of the actor.
         let add_params: AddParams = AddParams {
             source: new_pk(),
             key: key.clone(),
@@ -613,6 +662,7 @@ mod tests {
                 sponsor: Some(f4_eth_addr),
                 source: add_params.source,
                 hash: add_params.hash,
+                id: SubscriptionId::Key(key.clone()),
                 size: add_params.size,
                 ttl: add_params.ttl,
             })
@@ -631,16 +681,23 @@ mod tests {
         .unwrap();
         rt.verify();
 
+        // Get object
         let blob = Blob {
             size: add_params.size,
-            subs: HashMap::from([(
+            subscribers: HashMap::from([(
                 f4_eth_addr,
-                Subscription {
-                    added: 0,
-                    expiry: ttl,
-                    auto_renew: false,
-                    source: add_params.source,
-                    delegate: Some((f4_eth_addr, f4_eth_addr)),
+                SubscriptionGroup {
+                    subscriptions: HashMap::from([(
+                        SubscriptionId::Key(key.clone()),
+                        Subscription {
+                            added: 0,
+                            expiry: ttl,
+                            auto_renew: false,
+                            source: add_params.source,
+                            delegate: Some((f4_eth_addr, f4_eth_addr)),
+                            failed: false,
+                        },
+                    )]),
                 },
             )]),
             status: BlobStatus::Resolved,
@@ -653,7 +710,7 @@ mod tests {
             TokenAmount::from_whole(0),
             None,
             SendFlags::READ_ONLY,
-            IpldBlock::serialize_cbor(&Some(&blob)).unwrap(),
+            IpldBlock::serialize_cbor(&Some(blob)).unwrap(),
             ExitCode::OK,
             None,
         );
@@ -671,7 +728,7 @@ mod tests {
             result.unwrap(),
             Some(Object {
                 hash: hash.0,
-                size: blob.size,
+                size: add_params.size,
                 expiry: ttl,
                 metadata: add_params.metadata,
             })

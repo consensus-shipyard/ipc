@@ -93,6 +93,7 @@ pub fn add_blob(
     sponsor: Option<Address>,
     source: state::PublicKey,
     hash: state::Hash,
+    id: state::SubscriptionId,
     size: u64,
     ttl: Option<ChainEpoch>,
 ) -> Result<Subscription, ActorError> {
@@ -100,6 +101,7 @@ pub fn add_blob(
         sponsor,
         source,
         hash,
+        id,
         size,
         ttl,
     })?;
@@ -126,11 +128,12 @@ pub fn delete_blob(
     rt: &impl Runtime,
     sponsor: Option<Address>,
     hash: state::Hash,
+    id: state::SubscriptionId,
 ) -> Result<(), ActorError> {
     extract_send_result(rt.send_simple(
         &BLOBS_ACTOR_ADDR,
         Method::DeleteBlob as MethodNum,
-        IpldBlock::serialize_cbor(&params::DeleteBlobParams { sponsor, hash })?,
+        IpldBlock::serialize_cbor(&params::DeleteBlobParams { sponsor, hash, id })?,
         rt.message().value_received(),
     ))?;
     Ok(())

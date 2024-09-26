@@ -17,12 +17,10 @@ use crate::{
 use anyhow::{anyhow, bail, Context};
 use async_stm::atomically;
 use async_trait::async_trait;
-use fendermint_actor_blobs_shared::params::{GetBlobStatusParams, GetPendingBlobsParams};
-use fendermint_actor_blobs_shared::state::BlobStatus;
-use fendermint_actor_blobs_shared::Method::DebitAccounts;
 use fendermint_actor_blobs_shared::{
-    params::FinalizeBlobParams,
-    Method::{FinalizeBlob, GetBlobStatus, GetPendingBlobs},
+    params::{FinalizeBlobParams, GetBlobStatusParams, GetPendingBlobsParams},
+    state::{BlobStatus, SubscriptionId},
+    Method::{DebitAccounts, FinalizeBlob, GetBlobStatus, GetPendingBlobs},
 };
 use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::{blobs, ipc, system};
@@ -59,7 +57,7 @@ pub type CheckpointPool = ResolvePool<CheckpointPoolItem>;
 pub type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProviderProxyWithLatency>>>;
 pub type BlobPool = IrohResolvePool<BlobPoolItem>;
 
-type PendingBlobItem = (Hash, HashSet<(Address, PublicKey)>);
+type PendingBlobItem = (Hash, HashSet<(Address, SubscriptionId, PublicKey)>);
 
 /// These are the extra state items that the chain interpreter needs,
 /// a sort of "environment" supporting IPC.
@@ -99,6 +97,7 @@ impl From<&CheckpointPoolItem> for ResolveKey {
 pub struct BlobPoolItem {
     subscriber: Address,
     hash: Hash,
+    id: SubscriptionId,
     source: NodeId,
 }
 
@@ -238,11 +237,12 @@ where
             .end_transaction(true)
             .expect("we just started a transaction");
         for (hash, sources) in pending_blobs {
-            for (subscriber, source) in sources {
+            for (subscriber, id, source) in sources {
                 atomically(|| {
                     chain_env.blob_pool.add(BlobPoolItem {
                         subscriber,
                         hash,
+                        id: id.clone(),
                         source,
                     })
                 })
@@ -292,6 +292,7 @@ where
                     blobs.push(ChainMessage::Ipc(IpcMessage::BlobFinalized(Blob {
                         subscriber: item.subscriber,
                         hash: item.hash,
+                        id: item.id.clone().into(),
                         source: item.source,
                         succeeded,
                     })));
@@ -396,6 +397,7 @@ where
                     let item = BlobPoolItem {
                         subscriber: blob.subscriber,
                         hash: blob.hash,
+                        id: blob.id.into(),
                         source: blob.source,
                     };
                     let is_locally_finalized =
@@ -638,6 +640,7 @@ where
                     let params = FinalizeBlobParams {
                         subscriber: blob.subscriber,
                         hash,
+                        id: blob.id.into(),
                         status,
                     };
                     let params = RawBytes::serialize(params)?;

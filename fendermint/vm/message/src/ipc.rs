@@ -118,6 +118,8 @@ pub struct Blob {
     pub subscriber: Address,
     /// The blake3 hash of the blob.
     pub hash: Hash,
+    /// Identifier used to differentiate blob additions for the same subscriber.
+    pub id: Vec<u8>,
     /// The node ID of the source node serving validators the blob.
     pub source: NodeId,
     /// Whether the blob was resolved or failed.

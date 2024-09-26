@@ -9,7 +9,7 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use serde::{Deserialize, Serialize};
 
-use crate::state::{BlobStatus, Hash, PublicKey};
+use crate::state::{BlobStatus, Hash, PublicKey, SubscriptionId};
 
 /// Params for buying credits.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -64,6 +64,8 @@ pub struct AddBlobParams {
     pub source: PublicKey,
     /// Blob blake3 hash.
     pub hash: Hash,
+    /// Identifier used to differentiate blob additions for the same subscriber.
+    pub id: SubscriptionId,
     /// Blob size.
     pub size: u64,
     /// Blob time-to-live epochs.
@@ -100,6 +102,8 @@ pub struct FinalizeBlobParams {
     pub subscriber: Address,
     /// Blob blake3 hash.
     pub hash: Hash,
+    /// Identifier used to differentiate blob additions for the same subscriber.
+    pub id: SubscriptionId,
     /// The status to set as final.
     pub status: BlobStatus,
 }
@@ -113,6 +117,8 @@ pub struct DeleteBlobParams {
     pub sponsor: Option<Address>,
     /// Blob blake3 hash.
     pub hash: Hash,
+    /// Identifier used to differentiate blob additions for the same subscriber.
+    pub id: SubscriptionId,
 }
 
 /// The stats of the blob actor.
