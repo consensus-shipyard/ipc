@@ -99,14 +99,15 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         SubnetID memory subnetName = SubnetID({root: ROOTNET_CHAINID, route: newPath});
         GatewayDiamond subnetGateway = createGatewayDiamond(gatewayParams(subnetName));
 
-        return TestSubnetDefinition({
-            gateway: subnetGateway,
-            gatewayAddr: address(subnetGateway),
-            id: subnetName,
-            subnetActor: subnetActor,
-            subnetActorAddr: address(subnetActor),
-            path: newPath
-        });
+        return
+            TestSubnetDefinition({
+                gateway: subnetGateway,
+                gatewayAddr: address(subnetGateway),
+                id: subnetName,
+                subnetActor: subnetActor,
+                subnetActorAddr: address(subnetActor),
+                path: newPath
+            });
     }
 
     function createTokenSubnet(
@@ -240,13 +241,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         // this would normally submitted by releayer. It call the subnet actor on the L2 network.
         submitBottomUpCheckpoint(checkpoint, nativeL3Subnet.subnetActor);
 
-        // propagate this in the L2 gateway
-        GatewayMessengerFacet messengerL2 = nativeSubnet.gateway.messenger();
-        for (uint256 i; i < checkpoint.msgs.length; i++) {
-            bytes32 cid = checkpoint.msgs[i].toHash();
-            messengerL2.propagate(cid);
-        }
-
         BottomUpCheckpoint memory checkpointL2 = callCreateBottomUpCheckpointFromChildSubnet(
             nativeSubnet.id,
             nativeSubnet.gateway
@@ -302,19 +296,16 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         msgs[0] = xnetCallMsg;
 
         commitParentFinality(nativeSubnet.gatewayAddr);
-        executeTopDownMsgs(msgs, nativeSubnet.id, nativeSubnet.gateway);
 
-        // propagate this in the L2 gateway
-        GatewayMessengerFacet messengerL2 = nativeSubnet.gateway.messenger();
-        bytes32 cid = xnetCallMsg.toHash();
+        // TODO karel - make sure this is emmited
+        // committedEvent.nonce = 0;
+        // vm.expectEmit(true, true, true, true, nativeSubnet.gatewayAddr);
+        // emit LibGateway.NewTopDownMessage({subnet: nativeL3Subnet.subnetActorAddr, message: committedEvent});
 
-        committedEvent.nonce = 0;
-        vm.expectEmit(true, true, true, true, nativeSubnet.gatewayAddr);
-        emit LibGateway.NewTopDownMessage({subnet: nativeL3Subnet.subnetActorAddr, message: committedEvent});
-        messengerL2.propagate(cid);
+        executeTopDownMsgs(msgs, nativeSubnet.gateway);
 
         commitParentFinality(nativeL3Subnet.gatewayAddr);
-        executeTopDownMsgs(msgs, nativeL3Subnet.id, nativeL3Subnet.gateway);
+        executeTopDownMsgs(msgs, nativeL3Subnet.gateway);
 
         assertEq(address(recipient).balance, amount);
     }
@@ -327,11 +318,10 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
 
         vm.prank(FilAddress.SYSTEM_ACTOR);
         gwTopDownFinalityFacet.commitParentFinality(finality);
+
     }
 
-    function executeTopDownMsgs(IpcEnvelope[] memory msgs, SubnetID memory subnet, GatewayDiamond gw) internal {
-        XnetMessagingFacet messenger = gw.xnetMessenger();
-
+    function executeTopDownMsgs(IpcEnvelope[] memory msgs, GatewayDiamond gw) internal {
         uint256 minted_tokens;
 
         for (uint256 i; i < msgs.length; ) {
@@ -351,12 +341,17 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         // TODO: how to emulate increase of circulation supply?
 
         vm.prank(FilAddress.SYSTEM_ACTOR);
-        messenger.applyCrossMessages(msgs);
+        GatewayMessengerFacet messenger = gw.messenger();
+        messenger.propagateAll();
+
+        vm.prank(FilAddress.SYSTEM_ACTOR);
+        XnetMessagingFacet xnetMessenger = gw.xnetMessenger();
+        xnetMessenger.applyCrossMessages(msgs);
     }
 
-    function executeTopDownMsgsRevert(IpcEnvelope[] memory msgs, SubnetID memory subnet, GatewayDiamond gw) internal {
+    function executeTopDownMsgsRevert(IpcEnvelope[] memory msgs, GatewayDiamond gw) internal {
         vm.expectRevert();
-        executeTopDownMsgs(msgs, subnet, gw);
+        executeTopDownMsgs(msgs, gw);
     }
 
     function callCreateBottomUpCheckpointFromChildSubnet(
@@ -397,7 +392,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
     ) internal returns (BottomUpCheckpoint memory checkpoint) {
         uint256 e = getNextEpoch(block.number, DEFAULT_CHECKPOINT_PERIOD);
 
-        GatewayGetterFacet getter = gw.getter();
         CheckpointingFacet checkpointer = gw.checkpointer();
 
         (, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);

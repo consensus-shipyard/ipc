@@ -47,6 +47,8 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
         IGateway(s.ipcGatewayAddr).commitCheckpoint(checkpoint);
 
         LibActivity.recordActivityRollup(checkpoint.subnetID, uint64(checkpoint.blockHeight), checkpoint.activity);
+        // Propagate the checkpoint to the parent
+        IGateway(s.ipcGatewayAddr).propagateAll();
 
         // confirming the changes in membership in the child
         LibStaking.confirmChange(checkpoint.nextConfigurationNumber);
