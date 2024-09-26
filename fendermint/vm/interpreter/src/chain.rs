@@ -25,6 +25,11 @@ use fendermint_actor_blobs_shared::{
     state::{BlobStatus, SubscriptionId},
     Method::{DebitAccounts, FinalizeBlob, GetAddedBlobs, GetBlobStatus, GetStats, SetBlobPending},
 };
+use fendermint_actor_readreq::{
+    CloseReadRequestParams, GetOpenReadRequestsParams, GetReadRequestStatusParams,
+    Method::{CloseReadRequest, GetOpenReadRequests, GetReadRequestStatus, SetReadRequestPending},
+    ReadRequestStatus, SetReadRequestPendingParams,
+};
 use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::{blobs, ipc, readreq, system};
 use fendermint_vm_event::ParentFinalityMissingQuorum;
@@ -323,8 +328,6 @@ where
                 if is_blob_finalized(&mut state, item.subscriber, item.hash, item.id.clone())? {
                     tracing::debug!(hash = ?item.hash, "blob already finalized on chain; removing from pool");
                     atomically(|| chain_env.blob_pool.remove_task(item)).await;
-                    // Remove the result from the pool
-                    atomically(|| chain_env.blob_pool.remove_result(item)).await;
                     continue;
                 }
 
@@ -562,8 +565,6 @@ where
                     if is_locally_finalized {
                         tracing::debug!(hash = ?blob.hash, "blob is locally finalized; removing from pool");
                         atomically(|| chain_env.blob_pool.remove_task(&item)).await;
-                        // Remove the result from the pool
-                        atomically(|| chain_env.blob_pool.remove_result(&item)).await;
                     } else {
                         tracing::debug!(hash = ?blob.hash, "blob is not locally finalized");
                     }
@@ -923,7 +924,7 @@ where
                     let params = FinalizeBlobParams {
                         subscriber: blob.subscriber,
                         hash,
-                        id: blob.id,
+                        id: blob.id.into(),
                         status,
                     };
                     let params = RawBytes::serialize(params)?;
@@ -1029,18 +1030,7 @@ where
                         gas_limit,
                         emitters,
                     };
-                    // enqueue "added" blobs to the pool for resolution
-                    {
-                        atomically(|| {
-                            env.blob_pool.add(BlobPoolItem {
-                                subscriber: blob.subscriber,
-                                hash: blob.hash,
-                                source: blob.source,
-                            })
-                        })
-                        .await;
-                        tracing::info!(hash = ?blob.hash, subscriber = ?blob.subscriber, source = ?blob.source, "blob added to pool");
-                    }
+
                     Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
                 }
                 IpcMessage::ReadRequestClosed(read_request) => {
