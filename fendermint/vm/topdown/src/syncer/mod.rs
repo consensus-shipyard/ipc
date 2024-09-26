@@ -5,7 +5,7 @@ use crate::proxy::ParentQueryProxy;
 use crate::syncer::poll::ParentPoll;
 use crate::syncer::store::ParentViewStore;
 use crate::vote::payload::Observation;
-use crate::{BlockHeight, IPCParentFinality};
+use crate::{BlockHeight, Checkpoint, IPCParentFinality};
 use std::time::Duration;
 use tokio::select;
 use tokio::sync::mpsc;
@@ -19,8 +19,6 @@ pub mod store;
 pub enum TopDownSyncEvent {
     /// The fendermint node is syncing with peers
     NodeSyncing,
-    /// The parent view store is full, this will pause the parent syncer
-    ParentViewStoreFull,
     NewProposal(Box<Observation>),
 }
 
@@ -85,21 +83,34 @@ where
     Ok(ParentSyncerReactorClient { tx })
 }
 
+impl ParentSyncerReactorClient {
+    /// Marks the height as finalized.
+    /// There is no need to wait for ack from the reactor
+    pub async fn finalize_parent_height(&self, height: BlockHeight) -> anyhow::Result<()> {
+        self.tx.send(ParentSyncerRequest::Finalized(height)).await?;
+        Ok(())
+    }
+}
+
 enum ParentSyncerRequest {
     /// A new parent height is finalized
-    Finalized(BlockHeight),
+    Finalized(Checkpoint),
 }
 
 fn handle_request<P, S>(req: ParentSyncerRequest, poller: &mut ParentPoll<P, S>)
-    where
-        S: ParentViewStore + Send + Sync + 'static,
-        P: Send + Sync + 'static + ParentQueryProxy
+where
+    S: ParentViewStore + Send + Sync + 'static,
+    P: Send + Sync + 'static + ParentQueryProxy,
 {
     match req {
         ParentSyncerRequest::Finalized(h) => {
             if let Err(e) = poller.finalize(h) {
-                tracing::error!(height = h, err = e.to_string(), "cannot finalize parent viewer");
+                tracing::error!(
+                    height = h,
+                    err = e.to_string(),
+                    "cannot finalize parent viewer"
+                );
             }
-        },
+        }
     }
 }

@@ -1,6 +1,5 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-//! The inner type of parent syncer
 
 use crate::observe::ParentFinalityAcquired;
 use crate::proxy::ParentQueryProxy;
@@ -8,7 +7,7 @@ use crate::syncer::error::Error;
 use crate::syncer::payload::ParentView;
 use crate::syncer::store::ParentViewStore;
 use crate::syncer::{ParentSyncerConfig, TopDownSyncEvent};
-use crate::{is_null_round_str, BlockHash, BlockHeight, IPCParentFinality};
+use crate::{is_null_round_str, BlockHash, BlockHeight, IPCParentFinality, Checkpoint};
 use anyhow::anyhow;
 use ipc_observability::emit;
 use ipc_observability::serde::HexEncodableBlockHash;
@@ -45,12 +44,14 @@ where
         }
     }
 
-    /// The target block height is finalized
-    pub fn finalize(&mut self, height: BlockHeight) -> Result<(), Error> {
-        let Some(min_height) = self.store.minimal_parent_view_height()? else {
+    /// The target block height is finalized, purge all the parent view before the target height
+    pub fn finalize(&mut self, checkpoint: Checkpoint) -> Result<(), Error> {
+
+
+        let Some(min_height) = self.store.min_parent_view_height()? else {
             return Ok(());
         };
-        for h in min_height..=height {
+        for h in min_height..=checkpoint.target_height {
             self.store.purge(h)?;
         }
         Ok(())
@@ -116,9 +117,6 @@ where
         loop {
             if self.store_full()? {
                 tracing::debug!("exceeded cache size limit");
-                let _ = self
-                    .event_broadcast
-                    .send(TopDownSyncEvent::ParentViewStoreFull);
                 break;
             }
 
@@ -191,7 +189,9 @@ where
                         "detected null round at height, inserted None to cache"
                     );
 
-                    self.store.store(ParentView::null_block(height))?;
+                    self.proposal.new_view(ParentView::null_block(height))?;
+
+                    // self.store.store(ParentView::null_block(height))?;
 
                     emit(ParentFinalityAcquired {
                         source: "Parent syncer",
@@ -225,7 +225,9 @@ where
         }
 
         let view = fetch_data(&self.parent_proxy, height, block_hash_res.block_hash).await?;
-        self.store.store(view.clone())?;
+        self.proposal.new_view(view.clone())?;
+
+        // self.store.store(view.clone())?;
 
         let payload = view.payload.as_ref().unwrap();
         emit(ParentFinalityAcquired {

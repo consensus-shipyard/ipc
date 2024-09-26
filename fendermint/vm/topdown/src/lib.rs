@@ -14,6 +14,7 @@ pub mod voting;
 pub mod observe;
 pub mod syncer;
 pub mod vote;
+pub(crate) mod proposal;
 
 use async_stm::Stm;
 use async_trait::async_trait;
@@ -106,6 +107,25 @@ impl Config {
     pub fn max_cache_blocks(&self) -> BlockHeight {
         self.max_cache_blocks.unwrap_or(DEFAULT_MAX_CACHE_BLOCK)
     }
+}
+
+/// On-chain data structure representing a topdown checkpoint agreed to by a
+/// majority of subnet validators. DAG-CBOR encoded, embedded in CertifiedCheckpoint.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Checkpoint {
+    /// Checkpoint version, expected to increment with schema changes.
+    version: u8,
+    /// The parent height we are forwarding our parent crosslink to.
+    target_height: u64,
+    /// The hash of the chain unit at that height. Usually a block hash, but could
+    /// be a different entity (e.g. tipset CID), depending on the parent chain
+    /// and our interface to it (e.g. if the parent is a Filecoin network, this
+    /// would be a tipset CID coerced into a block hash if we use the Eth API,
+    /// or the tipset CID as-is if we use the Filecoin API.
+    target_hash: [u8],
+    /// The commitment is an accumulated hash of all topdown effects since the genesis epoch
+    /// in the parent till the current parent block height(inclusive).
+    effects_commitment: Bytes,
 }
 
 /// The finality view for IPC parent at certain height.

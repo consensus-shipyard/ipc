@@ -8,7 +8,7 @@ use crate::BlockHeight;
 /// Stores the parent view observed of the current node
 pub trait ParentViewStore {
     /// Store a newly observed parent view
-    fn store(&mut self, view: ParentView) -> Result<(), Error>;
+    fn store(&mut self, view: ParentView) -> Result<(), Error> {}
 
     /// Get the parent view at the specified height
     fn get(&self, height: BlockHeight) -> Result<Option<ParentView>, Error>;
@@ -16,7 +16,7 @@ pub trait ParentViewStore {
     /// Purge the parent view at the target height
     fn purge(&mut self, height: BlockHeight) -> Result<(), Error>;
 
-    fn minimal_parent_view_height(&self) -> Result<Option<BlockHeight>, Error>;
+    fn min_parent_view_height(&self) -> Result<Option<BlockHeight>, Error>;
 
     fn max_parent_view_height(&self) -> Result<Option<BlockHeight>, Error>;
 }
