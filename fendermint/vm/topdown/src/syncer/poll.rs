@@ -1,13 +1,14 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::observation::deduce_new_observation;
 use crate::observe::ParentFinalityAcquired;
 use crate::proxy::ParentQueryProxy;
 use crate::syncer::error::Error;
-use crate::syncer::payload::ParentView;
+use crate::syncer::payload::ParentBlockView;
 use crate::syncer::store::ParentViewStore;
 use crate::syncer::{ParentSyncerConfig, TopDownSyncEvent};
-use crate::{is_null_round_str, BlockHash, BlockHeight, IPCParentFinality, Checkpoint};
+use crate::{is_null_round_str, BlockHash, BlockHeight, Checkpoint};
 use anyhow::anyhow;
 use ipc_observability::emit;
 use ipc_observability::serde::HexEncodableBlockHash;
@@ -20,7 +21,7 @@ pub(crate) struct ParentPoll<P, S> {
     parent_proxy: P,
     store: S,
     event_broadcast: broadcast::Sender<TopDownSyncEvent>,
-    last_finalized: IPCParentFinality,
+    last_finalized: Checkpoint,
 }
 
 impl<P, S> ParentPoll<P, S>
@@ -28,12 +29,7 @@ where
     S: ParentViewStore + Send + Sync + 'static,
     P: Send + Sync + 'static + ParentQueryProxy,
 {
-    pub fn new(
-        config: ParentSyncerConfig,
-        proxy: P,
-        store: S,
-        last_finalized: IPCParentFinality,
-    ) -> Self {
+    pub fn new(config: ParentSyncerConfig, proxy: P, store: S, last_finalized: Checkpoint) -> Self {
         let (tx, _) = broadcast::channel(config.broadcast_channel_size);
         Self {
             config,
@@ -46,8 +42,6 @@ where
 
     /// The target block height is finalized, purge all the parent view before the target height
     pub fn finalize(&mut self, checkpoint: Checkpoint) -> Result<(), Error> {
-
-
         let Some(min_height) = self.store.min_parent_view_height()? else {
             return Ok(());
         };
@@ -61,28 +55,29 @@ where
     async fn latest_nonnull_data(&self) -> anyhow::Result<(BlockHeight, BlockHash)> {
         let Some(latest_height) = self.store.max_parent_view_height()? else {
             return Ok((
-                self.last_finalized.height,
-                self.last_finalized.block_hash.clone(),
+                self.last_finalized.target_height,
+                self.last_finalized.target_hash.clone(),
             ));
         };
 
-        let start = self.last_finalized.height + 1;
+        let start = self.last_finalized.target_height + 1;
         for h in (start..=latest_height).rev() {
-            let Some(view) = self.store.get(h)? else {
+            let Some(p) = self.store.get(h)? else {
                 continue;
             };
 
-            let Some(payload) = view.payload else {
+            // if parent hash of the proposal is null, it means the
+            let Some(p) = p.payload else {
                 continue;
             };
 
-            return Ok((h, payload.parent_hash));
+            return Ok((h, p.parent_hash));
         }
 
         // this means the votes stored are all null blocks, return last committed finality
         Ok((
-            self.last_finalized.height,
-            self.last_finalized.block_hash.clone(),
+            self.last_finalized.target_height,
+            self.last_finalized.target_hash.clone(),
         ))
     }
 
@@ -150,7 +145,7 @@ where
         let Some(h) = self.store.max_parent_view_height()? else {
             return Ok(false);
         };
-        Ok(h - self.last_finalized.height > self.config.max_store_blocks)
+        Ok(h - self.last_finalized.target_height > self.config.max_store_blocks)
     }
 
     async fn finalized_chain_head(&self) -> anyhow::Result<Option<BlockHeight>> {
@@ -189,7 +184,7 @@ where
                         "detected null round at height, inserted None to cache"
                     );
 
-                    self.proposal.new_view(ParentView::null_block(height))?;
+                    self.store.store(ParentBlockView::null_block(height))?;
 
                     // self.store.store(ParentView::null_block(height))?;
 
@@ -225,9 +220,13 @@ where
         }
 
         let view = fetch_data(&self.parent_proxy, height, block_hash_res.block_hash).await?;
-        self.proposal.new_view(view.clone())?;
 
-        // self.store.store(view.clone())?;
+        self.store.store(view.clone())?;
+        let commitment = deduce_new_observation(&self.store, &self.last_finalized)?;
+        // if there is an error, ignore, we can always try next loop
+        let _ = self
+            .event_broadcast
+            .send(TopDownSyncEvent::NewProposal(Box::new(commitment)));
 
         let payload = view.payload.as_ref().unwrap();
         emit(ParentFinalityAcquired {
@@ -250,7 +249,7 @@ async fn fetch_data<P>(
     parent_proxy: &P,
     height: BlockHeight,
     block_hash: BlockHash,
-) -> Result<ParentView, Error>
+) -> Result<ParentBlockView, Error>
 where
     P: ParentQueryProxy + Send + Sync + 'static,
 {
@@ -285,7 +284,7 @@ where
         return Err(Error::ParentChainReorgDetected);
     }
 
-    Ok(ParentView::nonnull_block(
+    Ok(ParentBlockView::nonnull_block(
         height,
         block_hash,
         topdown_msgs_res.value,

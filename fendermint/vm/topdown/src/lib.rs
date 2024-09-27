@@ -11,10 +11,10 @@ pub mod proxy;
 mod toggle;
 pub mod voting;
 
+pub(crate) mod observation;
 pub mod observe;
 pub mod syncer;
 pub mod vote;
-pub(crate) mod proposal;
 
 use async_stm::Stm;
 use async_trait::async_trait;
@@ -122,7 +122,7 @@ pub struct Checkpoint {
     /// and our interface to it (e.g. if the parent is a Filecoin network, this
     /// would be a tipset CID coerced into a block hash if we use the Eth API,
     /// or the tipset CID as-is if we use the Filecoin API.
-    target_hash: [u8],
+    target_hash: BlockHash,
     /// The commitment is an accumulated hash of all topdown effects since the genesis epoch
     /// in the parent till the current parent block height(inclusive).
     effects_commitment: Bytes,

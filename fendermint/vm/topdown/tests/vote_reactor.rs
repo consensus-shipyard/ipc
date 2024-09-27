@@ -8,10 +8,11 @@
 use async_trait::async_trait;
 use fendermint_crypto::SecretKey;
 use fendermint_vm_genesis::ValidatorKey;
+use fendermint_vm_topdown::observation::ObservationCommitment;
 use fendermint_vm_topdown::syncer::TopDownSyncEvent;
 use fendermint_vm_topdown::vote::error::Error;
 use fendermint_vm_topdown::vote::gossip::GossipClient;
-use fendermint_vm_topdown::vote::payload::{Observation, PowerUpdates, Vote};
+use fendermint_vm_topdown::vote::payload::{PowerUpdates, Vote};
 use fendermint_vm_topdown::vote::store::InMemoryVoteStore;
 use fendermint_vm_topdown::vote::{start_vote_reactor, Config, VoteReactorClient, Weight};
 use fendermint_vm_topdown::BlockHeight;
@@ -142,7 +143,7 @@ async fn simple_lifecycle() {
 
     // now topdown sync published a new observation on parent height 100
     let parent_height = 100;
-    let obs = Observation::new(vec![100], parent_height, vec![1, 2, 3], vec![2, 3, 4]);
+    let obs = ObservationCommitment::new(vec![100], parent_height, vec![1, 2, 3], vec![2, 3, 4]);
     internal_event_tx
         .send(TopDownSyncEvent::NewProposal(Box::new(obs)))
         .unwrap();
@@ -158,7 +159,7 @@ async fn simple_lifecycle() {
 
     // now push another observation
     let parent_height2 = 101;
-    let obs2 = Observation::new(vec![100], parent_height2, vec![1, 2, 3], vec![2, 3, 4]);
+    let obs2 = ObservationCommitment::new(vec![100], parent_height2, vec![1, 2, 3], vec![2, 3, 4]);
     internal_event_tx
         .send(TopDownSyncEvent::NewProposal(Box::new(obs2)))
         .unwrap();
@@ -221,11 +222,11 @@ async fn waiting_for_quorum() {
 
     // now topdown sync published a new observation on parent height 100
     let parent_height1 = 100;
-    let obs1 = Observation::new(vec![100], parent_height1, vec![1, 2, 3], vec![2, 3, 4]);
+    let obs1 = ObservationCommitment::new(vec![100], parent_height1, vec![1, 2, 3], vec![2, 3, 4]);
     let parent_height2 = 110;
-    let obs2 = Observation::new(vec![100], parent_height2, vec![1, 2, 3], vec![2, 3, 4]);
+    let obs2 = ObservationCommitment::new(vec![100], parent_height2, vec![1, 2, 3], vec![2, 3, 4]);
     let parent_height3 = 120;
-    let obs3 = Observation::new(vec![100], parent_height3, vec![1, 2, 3], vec![2, 3, 4]);
+    let obs3 = ObservationCommitment::new(vec![100], parent_height3, vec![1, 2, 3], vec![2, 3, 4]);
 
     internal_txs[0]
         .send(TopDownSyncEvent::NewProposal(Box::new(obs1.clone())))
@@ -343,7 +344,7 @@ async fn all_validator_in_sync() {
     }
 
     let parent_height = 100;
-    let obs = Observation::new(vec![100], parent_height, vec![1, 2, 3], vec![2, 3, 4]);
+    let obs = ObservationCommitment::new(vec![100], parent_height, vec![1, 2, 3], vec![2, 3, 4]);
     internal_event_tx
         .send(TopDownSyncEvent::NewProposal(Box::new(obs)))
         .unwrap();

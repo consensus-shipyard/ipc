@@ -2,16 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use crate::syncer::error::Error;
-use crate::syncer::payload::ParentView;
+use crate::syncer::payload::ParentBlockView;
 use crate::BlockHeight;
 
 /// Stores the parent view observed of the current node
 pub trait ParentViewStore {
     /// Store a newly observed parent view
-    fn store(&mut self, view: ParentView) -> Result<(), Error> {}
+    fn store(&mut self, view: ParentBlockView) -> Result<(), Error>;
 
     /// Get the parent view at the specified height
-    fn get(&self, height: BlockHeight) -> Result<Option<ParentView>, Error>;
+    fn get(&self, height: BlockHeight) -> Result<Option<ParentBlockView>, Error>;
 
     /// Purge the parent view at the target height
     fn purge(&mut self, height: BlockHeight) -> Result<(), Error>;

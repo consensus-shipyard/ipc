@@ -6,7 +6,7 @@ use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
 
 #[derive(Clone, Debug)]
-pub struct ParentViewPayload {
+pub struct ParentBlockViewPayload {
     pub parent_hash: BlockHash,
     /// Encodes cross-net messages.
     pub xnet_msgs: Vec<IpcEnvelope>,
@@ -15,13 +15,13 @@ pub struct ParentViewPayload {
 }
 
 #[derive(Clone, Debug)]
-pub struct ParentView {
+pub struct ParentBlockView {
     pub parent_height: BlockHeight,
     /// If the payload is None, this means the parent height is a null block
-    pub payload: Option<ParentViewPayload>,
+    pub payload: Option<ParentBlockViewPayload>,
 }
 
-impl ParentView {
+impl ParentBlockView {
     pub fn null_block(h: BlockHeight) -> Self {
         Self {
             parent_height: h,
@@ -37,7 +37,7 @@ impl ParentView {
     ) -> Self {
         Self {
             parent_height: h,
-            payload: Some(ParentViewPayload {
+            payload: Some(ParentBlockViewPayload {
                 parent_hash,
                 xnet_msgs,
                 validator_changes,

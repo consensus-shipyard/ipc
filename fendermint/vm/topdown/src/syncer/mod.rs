@@ -1,11 +1,11 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::observation::ObservationCommitment;
 use crate::proxy::ParentQueryProxy;
 use crate::syncer::poll::ParentPoll;
 use crate::syncer::store::ParentViewStore;
-use crate::vote::payload::Observation;
-use crate::{BlockHeight, Checkpoint, IPCParentFinality};
+use crate::{BlockHeight, Checkpoint};
 use std::time::Duration;
 use tokio::select;
 use tokio::sync::mpsc;
@@ -19,7 +19,7 @@ pub mod store;
 pub enum TopDownSyncEvent {
     /// The fendermint node is syncing with peers
     NodeSyncing,
-    NewProposal(Box<Observation>),
+    NewProposal(Box<ObservationCommitment>),
 }
 
 pub struct ParentSyncerConfig {
@@ -52,7 +52,7 @@ pub fn start_parent_syncer<P, S>(
     config: ParentSyncerConfig,
     proxy: P,
     store: S,
-    last_finalized: IPCParentFinality,
+    last_finalized: Checkpoint,
 ) -> anyhow::Result<ParentSyncerReactorClient>
 where
     S: ParentViewStore + Send + Sync + 'static,
@@ -86,8 +86,8 @@ where
 impl ParentSyncerReactorClient {
     /// Marks the height as finalized.
     /// There is no need to wait for ack from the reactor
-    pub async fn finalize_parent_height(&self, height: BlockHeight) -> anyhow::Result<()> {
-        self.tx.send(ParentSyncerRequest::Finalized(height)).await?;
+    pub async fn finalize_parent_height(&self, cp: Checkpoint) -> anyhow::Result<()> {
+        self.tx.send(ParentSyncerRequest::Finalized(cp)).await?;
         Ok(())
     }
 }
@@ -103,13 +103,10 @@ where
     P: Send + Sync + 'static + ParentQueryProxy,
 {
     match req {
-        ParentSyncerRequest::Finalized(h) => {
-            if let Err(e) = poller.finalize(h) {
-                tracing::error!(
-                    height = h,
-                    err = e.to_string(),
-                    "cannot finalize parent viewer"
-                );
+        ParentSyncerRequest::Finalized(c) => {
+            let height = c.target_height;
+            if let Err(e) = poller.finalize(c) {
+                tracing::error!(height, err = e.to_string(), "cannot finalize parent viewer");
             }
         }
     }

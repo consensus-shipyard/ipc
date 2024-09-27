@@ -1,8 +1,9 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::observation::Ballot;
 use crate::vote::error::Error;
-use crate::vote::payload::{Ballot, PowerTable, PowerUpdates, Vote};
+use crate::vote::payload::{PowerTable, PowerUpdates, Vote};
 use crate::vote::store::VoteStore;
 use crate::vote::Weight;
 use crate::BlockHeight;
@@ -212,8 +213,9 @@ impl<S: VoteStore> VoteTally<S> {
 
 #[cfg(test)]
 mod tests {
+    use crate::observation::ObservationCommitment;
     use crate::vote::error::Error;
-    use crate::vote::payload::{CertifiedObservation, Observation, Vote};
+    use crate::vote::payload::{CertifiedObservation, Vote};
     use crate::vote::store::InMemoryVoteStore;
     use crate::vote::tally::VoteTally;
     use arbitrary::{Arbitrary, Unstructured};
@@ -228,13 +230,13 @@ mod tests {
         (sk, ValidatorKey::new(public_key))
     }
 
-    fn random_observation() -> Observation {
+    fn random_observation() -> ObservationCommitment {
         let mut bytes = [0; 100];
         let mut rng = rand::thread_rng();
         rng.fill_bytes(&mut bytes);
 
         let mut unstructured = Unstructured::new(&bytes);
-        Observation::arbitrary(&mut unstructured).unwrap()
+        ObservationCommitment::arbitrary(&mut unstructured).unwrap()
     }
 
     #[test]

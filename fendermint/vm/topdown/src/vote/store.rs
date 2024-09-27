@@ -1,8 +1,9 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::observation::Ballot;
 use crate::vote::error::Error;
-use crate::vote::payload::{Ballot, PowerTable, Vote};
+use crate::vote::payload::{PowerTable, Vote};
 use crate::vote::Weight;
 use crate::BlockHeight;
 use fendermint_vm_genesis::ValidatorKey;
@@ -121,7 +122,8 @@ impl<'a> VoteAgg<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::vote::payload::{CertifiedObservation, Observation, Vote};
+    use crate::observation::ObservationCommitment;
+    use crate::vote::payload::{CertifiedObservation, Vote};
     use crate::vote::store::VoteAgg;
     use arbitrary::{Arbitrary, Unstructured};
     use fendermint_crypto::SecretKey;
@@ -136,13 +138,13 @@ mod tests {
         (sk, ValidatorKey::new(public_key))
     }
 
-    fn random_observation() -> Observation {
+    fn random_observation() -> ObservationCommitment {
         let mut bytes = [0; 100];
         let mut rng = rand::thread_rng();
         rng.fill_bytes(&mut bytes);
 
         let mut unstructured = Unstructured::new(&bytes);
-        Observation::arbitrary(&mut unstructured).unwrap()
+        ObservationCommitment::arbitrary(&mut unstructured).unwrap()
     }
 
     #[test]
