@@ -30,7 +30,7 @@ config-devnet:
 	./scripts/setup.sh
 
 run-devnet-iroh:
-	iroh --rpc-addr 127.0.0.0:4919 start
+	iroh --rpc-addr 127.0.0.1:4919 start
 
 run-devnet-fendermint:
 	./scripts/run_fendermint.sh
