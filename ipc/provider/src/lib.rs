@@ -12,7 +12,7 @@ use fvm_shared::{
 use ipc_api::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
 use ipc_api::evm::payload_to_evm_address;
 use ipc_api::staking::{StakingChangeRequest, ValidatorInfo};
-use ipc_api::subnet::{PermissionMode, SupplySource};
+use ipc_api::subnet::{Asset, PermissionMode};
 use ipc_api::{
     cross::IpcEnvelope,
     subnet::{ConsensusType, ConstructParams},
@@ -38,6 +38,7 @@ pub mod config;
 pub mod jsonrpc;
 pub mod lotus;
 pub mod manager;
+pub mod observe;
 
 const DEFAULT_REPO_PATH: &str = ".ipc";
 const DEFAULT_CONFIG_NAME: &str = "config.toml";
@@ -252,7 +253,9 @@ impl IpcProvider {
         active_validators_limit: u16,
         min_cross_msg_fee: TokenAmount,
         permission_mode: PermissionMode,
-        supply_source: SupplySource,
+        supply_source: Asset,
+        collateral_source: Asset,
+        validator_gater: Address,
     ) -> anyhow::Result<Address> {
         let conn = self.get_connection(&parent)?;
 
@@ -270,6 +273,8 @@ impl IpcProvider {
             min_cross_msg_fee,
             permission_mode,
             supply_source,
+            collateral_source,
+            validator_gater,
         };
 
         conn.manager()
@@ -813,8 +818,7 @@ impl IpcProvider {
         let private_key = if !private_key.starts_with("0x") {
             hex::decode(private_key)?
         } else {
-            hex::decode(&private_key[2..])
-                .or_else(|_| base64::engine::general_purpose::STANDARD.decode(private_key))?
+            hex::decode(&private_key[2..])?
         };
         keystore.put(ipc_wallet::EvmKeyInfo::new(private_key))
     }

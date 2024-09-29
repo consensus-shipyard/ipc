@@ -1,0 +1,53 @@
+name: "Lint PR"
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+
+permissions:
+  pull-requests: read
+
+jobs:
+  main:
+    name: Validate PR follows Conventional Commits
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          ## A non-comprehensive list of scopes. Scope is not required, but strongly encouraged, as it brings
+          ## structure to changelogs.
+          ## Note: releases are committed with "chore(release): <version or [module@version]> ".
+          scopes: |
+            actors
+            bottomup
+            cli
+            contracts
+            core
+            ci
+            deps
+            docker
+            ethapi
+            ext
+            extras
+            infra
+            ipld
+            misc
+            node
+            relayer
+            release
+            repo
+            scripts
+            specs
+            topdown
+          requireScope: false
+          subjectPattern: ^(?![A-Z]).+$
+          subjectPatternError: |
+            The subject "{subject}" found in the pull request title "{title}"
+            didn't match the configured pattern. Please ensure that the subject
+            doesn't start with an uppercase character.

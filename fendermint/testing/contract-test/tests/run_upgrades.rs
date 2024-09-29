@@ -26,7 +26,7 @@ use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Account, Actor, ActorMeta, Genesis, PermissionMode, SignerAddr};
 use fendermint_vm_interpreter::fvm::store::memory::MemoryBlockstore;
 use fendermint_vm_interpreter::fvm::upgrades::{Upgrade, UpgradeScheduler};
-use fendermint_vm_interpreter::fvm::{bundle::contracts_path, FvmMessageInterpreter};
+use fendermint_vm_interpreter::fvm::FvmMessageInterpreter;
 
 // returns a seeded secret key which is guaranteed to be the same every time
 fn my_secret_key() -> SecretKey {
@@ -194,17 +194,8 @@ async fn test_applying_upgrades() {
         )
         .unwrap();
 
-    let interpreter: FvmMessageInterpreter<MemoryBlockstore, _> = FvmMessageInterpreter::new(
-        NeverCallClient,
-        None,
-        contracts_path(),
-        1.05,
-        1.05,
-        false,
-        upgrade_scheduler,
-    );
-
-    let mut tester = Tester::new(interpreter, MemoryBlockstore::new());
+    let interpreter: FvmMessageInterpreter<MemoryBlockstore, _> =
+        FvmMessageInterpreter::new(NeverCallClient, None, 1.05, 1.05, false, upgrade_scheduler);
 
     let genesis = Genesis {
         chain_name: CHAIN_NAME.to_string(),
@@ -226,7 +217,7 @@ async fn test_applying_upgrades() {
         blob_debit_rate: 1,
     };
 
-    tester.init(genesis).await.unwrap();
+    let mut tester = Tester::new(interpreter, genesis).await.unwrap();
 
     // check that the app version is 0
     assert_eq!(tester.state_params().app_version, 0);

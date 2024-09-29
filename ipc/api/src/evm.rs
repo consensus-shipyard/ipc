@@ -9,7 +9,7 @@ use crate::checkpoint::BottomUpMsgBatch;
 use crate::cross::{IpcEnvelope, IpcMsgKind};
 use crate::staking::StakingChange;
 use crate::staking::StakingChangeRequest;
-use crate::subnet::SupplySource;
+use crate::subnet::{Asset, AssetKind};
 use crate::subnet_id::SubnetID;
 use crate::{eth_to_fil_amount, ethers_address_to_fil_address};
 use anyhow::anyhow;
@@ -180,6 +180,45 @@ macro_rules! bottom_up_msg_batch_conversion {
     };
 }
 
+/// The type conversion between different asset token types
+macro_rules! asset_conversion {
+    ($module:ident) => {
+        impl TryFrom<Asset> for $module::Asset {
+            type Error = anyhow::Error;
+
+            fn try_from(value: Asset) -> Result<Self, Self::Error> {
+                let token_address = if let Some(token_address) = value.token_address {
+                    payload_to_evm_address(token_address.payload())?
+                } else {
+                    ethers::types::Address::zero()
+                };
+
+                Ok(Self {
+                    kind: value.kind as u8,
+                    token_address,
+                })
+            }
+        }
+
+        impl TryFrom<$module::Asset> for Asset {
+            type Error = anyhow::Error;
+
+            fn try_from(value: $module::Asset) -> Result<Self, Self::Error> {
+                let token_address = if value.token_address == ethers::types::Address::zero() {
+                    None
+                } else {
+                    Some(ethers_address_to_fil_address(&value.token_address)?)
+                };
+
+                Ok(Self {
+                    kind: AssetKind::try_from(value.kind)?,
+                    token_address,
+                })
+            }
+        }
+    };
+}
+
 base_type_conversion!(xnet_messaging_facet);
 base_type_conversion!(subnet_actor_getter_facet);
 base_type_conversion!(gateway_manager_facet);
@@ -198,37 +237,19 @@ bottom_up_checkpoint_conversion!(gateway_getter_facet);
 bottom_up_checkpoint_conversion!(subnet_actor_checkpointing_facet);
 bottom_up_msg_batch_conversion!(gateway_getter_facet);
 
-impl TryFrom<SupplySource> for subnet_actor_diamond::SupplySource {
+asset_conversion!(subnet_actor_diamond);
+asset_conversion!(register_subnet_facet);
+asset_conversion!(subnet_actor_getter_facet);
+
+impl TryFrom<u8> for AssetKind {
     type Error = anyhow::Error;
 
-    fn try_from(value: SupplySource) -> Result<Self, Self::Error> {
-        let token_address = if let Some(token_address) = value.token_address {
-            payload_to_evm_address(token_address.payload())?
-        } else {
-            ethers::types::Address::zero()
-        };
-
-        Ok(Self {
-            kind: value.kind as u8,
-            token_address,
-        })
-    }
-}
-
-impl TryFrom<SupplySource> for register_subnet_facet::SupplySource {
-    type Error = anyhow::Error;
-
-    fn try_from(value: SupplySource) -> Result<Self, Self::Error> {
-        let token_address = if let Some(token_address) = value.token_address {
-            payload_to_evm_address(token_address.payload())?
-        } else {
-            ethers::types::Address::zero()
-        };
-
-        Ok(Self {
-            kind: value.kind as u8,
-            token_address,
-        })
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(AssetKind::Native),
+            1 => Ok(AssetKind::ERC20),
+            _ => Err(anyhow!("invalid kind {value}")),
+        }
     }
 }
 

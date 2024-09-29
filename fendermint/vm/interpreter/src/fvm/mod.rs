@@ -1,13 +1,12 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-use std::path::PathBuf;
 
 mod broadcast;
 mod check;
 mod checkpoint;
 mod exec;
 mod externs;
-mod genesis;
+pub mod observe;
 mod query;
 pub mod state;
 pub mod store;
@@ -21,10 +20,8 @@ pub use check::FvmCheckRet;
 pub use checkpoint::PowerUpdates;
 pub use exec::FvmApplyRet;
 use fendermint_crypto::{PublicKey, SecretKey};
-use fendermint_eth_hardhat::Hardhat;
 pub use fendermint_vm_message::query::FvmQuery;
 use fvm_ipld_blockstore::Blockstore;
-pub use genesis::FvmGenesisOutput;
 pub use query::FvmQueryRet;
 use tendermint_rpc::Client;
 
@@ -62,7 +59,6 @@ pub struct FvmMessageInterpreter<DB, C>
 where
     DB: Blockstore + 'static + Clone,
 {
-    contracts: Hardhat,
     /// Tendermint client for querying the RPC.
     client: C,
     /// If this is a validator node, this should be the key we can use to sign transactions.
@@ -90,7 +86,6 @@ where
     pub fn new(
         client: C,
         validator_ctx: Option<ValidatorContext<C>>,
-        contracts_dir: PathBuf,
         gas_overestimation_rate: f64,
         gas_search_step: f64,
         exec_in_check: bool,
@@ -99,7 +94,6 @@ where
         Self {
             client,
             validator_ctx,
-            contracts: Hardhat::new(contracts_dir),
             gas_overestimation_rate,
             gas_search_step,
             exec_in_check,

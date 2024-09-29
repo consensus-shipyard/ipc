@@ -12,18 +12,17 @@ fvm_ipld_hamt = { workspace = true }
 fvm_shared = { workspace = true }
 
 anyhow = { workspace = true }
-cid = { workspace = true, default-features = false, features = ["serde-codec"]}
+cid = { workspace = true, default-features = false, features = ["serde-codec"] }
 hex = { workspace = true }
-indexmap = {version = "1.8.0", features = ["serde-1"]}
-integer-encoding =  { workspace = true, default-features = false}
-lazy_static =  { workspace = true }
-log =  { workspace = true }
-num-derive =  { workspace = true }
-num-traits =  { workspace = true }
-serde =  { workspace = true, features = ["derive"]}
-uint = {version = "0.9.3", default-features = false}
+indexmap = { version = "1.8.0", features = ["serde-1"] }
+integer-encoding = { workspace = true, default-features = false }
+lazy_static = { workspace = true }
+log = { workspace = true }
+num-derive = { workspace = true }
+num-traits = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+uint = { version = "0.9.3", default-features = false }
 thiserror = { workspace = true }
 
 [features]
-default = []
 fil-actor = []

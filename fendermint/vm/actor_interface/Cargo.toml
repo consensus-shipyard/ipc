@@ -49,5 +49,4 @@ rand = { workspace = true }
 fendermint_vm_genesis = { path = "../genesis", features = ["arb"] }
 
 [features]
-default = []
 m2-native = []

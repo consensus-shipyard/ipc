@@ -32,10 +32,10 @@ ENV FM_OBJECTS__LISTEN__HOST=0.0.0.0
 RUN mkdir /fendermint/logs
 RUN chmod 777 /fendermint/logs
 
-COPY fendermint/docker/.artifacts/bundle.car $FM_HOME_DIR/bundle.car
-COPY fendermint/docker/.artifacts/custom_actors_bundle.car $FM_HOME_DIR/custom_actors_bundle.car
-COPY fendermint/docker/.artifacts/contracts $FM_HOME_DIR/contracts
 COPY fendermint/docker/docker-entry.sh /usr/local/bin/docker-entry.sh
+COPY fendermint/builtin-actors/output/bundle.car $FM_HOME_DIR/bundle.car
+COPY fendermint/actors/output/custom_actors_bundle.car $FM_HOME_DIR/custom_actors_bundle.car
+COPY contracts/out $FM_HOME_DIR/contracts
 COPY --from=builder /app/fendermint/app/config $FM_HOME_DIR/config
 COPY --from=builder /app/output/bin/fendermint /usr/local/bin/fendermint
 COPY --from=builder /app/output/bin/ipc-cli /usr/local/bin/ipc-cli

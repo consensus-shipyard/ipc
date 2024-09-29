@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {SubnetActorManagerFacet} from "../../src/subnet/SubnetActorManagerFacet.sol";
-import {LibStaking} from "../../src/lib/LibStaking.sol";
-import {SubnetActorPauseFacet} from "../../src/subnet/SubnetActorPauseFacet.sol";
-import {SubnetActorRewardFacet} from "../../src/subnet/SubnetActorRewardFacet.sol";
-import {SubnetActorCheckpointingFacet} from "../../src/subnet/SubnetActorCheckpointingFacet.sol";
+import {SubnetActorManagerFacet} from "../../contracts/subnet/SubnetActorManagerFacet.sol";
+import {LibStaking} from "../../contracts/lib/LibStaking.sol";
+import {SubnetActorPauseFacet} from "../../contracts/subnet/SubnetActorPauseFacet.sol";
+import {SubnetActorRewardFacet} from "../../contracts/subnet/SubnetActorRewardFacet.sol";
+import {SubnetActorCheckpointingFacet} from "../../contracts/subnet/SubnetActorCheckpointingFacet.sol";
 
 contract SubnetActorMock is
     SubnetActorPauseFacet,

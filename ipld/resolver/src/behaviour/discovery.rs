@@ -36,8 +36,7 @@ use super::NetworkConfig;
 pub enum Event {
     /// Event emitted when a peer is added or updated in the routing table,
     /// which means if we later ask for its addresses, they should be known.
-    #[allow(dead_code)]
-    Added(PeerId, Vec<Multiaddr>),
+    Added(PeerId),
 
     /// Event emitted when a peer is removed from the routing table.
     Removed(PeerId),
@@ -156,8 +155,8 @@ impl Behaviour {
         } else {
             // It would be nice to use `.group_by` here but it's unstable.
             // Make sure static peers are reported as routable.
-            for (peer_id, addr) in static_addresses.iter() {
-                outbox.push_back(Event::Added(*peer_id, vec![addr.clone()]))
+            for (peer_id, _) in static_addresses.iter() {
+                outbox.push_back(Event::Added(*peer_id))
             }
             None
         };
@@ -395,17 +394,12 @@ impl NetworkBehaviour for Behaviour {
                         }
                         // Unfortunately, looking at the Kademlia behaviour, it looks like when it goes from pending to active,
                         // it won't emit another event, so we might as well tentatively emit an event here.
-                        kad::Event::PendingRoutablePeer { peer, address } => {
+                        kad::Event::PendingRoutablePeer { peer, .. } => {
                             debug!("{peer} pending to the routing table of {}", self.peer_id);
-                            self.outbox.push_back(Event::Added(peer, vec![address]))
+                            self.outbox.push_back(Event::Added(peer))
                         }
                         // This event should ensure that we will be able to answer address lookups later.
-                        kad::Event::RoutingUpdated {
-                            peer,
-                            addresses,
-                            old_peer,
-                            ..
-                        } => {
+                        kad::Event::RoutingUpdated { peer, old_peer, .. } => {
                             debug!("{peer} added to the routing table of {}", self.peer_id);
                             // There are two events here; we can only return one, so let's defer them to the outbox.
                             if let Some(peer_id) = old_peer {
@@ -413,8 +407,7 @@ impl NetworkBehaviour for Behaviour {
                                     self.outbox.push_back(Event::Removed(peer_id))
                                 }
                             }
-                            self.outbox
-                                .push_back(Event::Added(peer, addresses.into_vec()))
+                            self.outbox.push_back(Event::Added(peer))
                         }
                     }
                 }

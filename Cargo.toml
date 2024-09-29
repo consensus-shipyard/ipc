@@ -11,6 +11,7 @@ members = [
     "ipc/provider",
     "ipc/api",
     "ipc/types",
+    "ipc/observability",
     # ipld
     "ipld/resolver",
     # fendermint
@@ -31,7 +32,7 @@ members = [
     "fendermint/actors",
     "fendermint/actors/chainmetadata",
     "fendermint/actors/eam",
-    # adm
+    # hoku
     "fendermint/actors/accumulator",
     "fendermint/actors/blobs",
     "fendermint/actors/blobs/shared",
@@ -56,7 +57,7 @@ arbitrary = { version = "1", features = ["derive"] }
 arbtest = "0.2"
 async-recursion = "1"
 async-stm = "0.4"
-async-tempfile = "0.5.0"
+async-tempfile = "0.6.0"
 async-trait = "0.1"
 async-channel = "1.8.0"
 axum = { version = "0.6", features = ["ws"] }
@@ -74,7 +75,7 @@ clap = { version = "4.1", features = ["derive", "env", "string"] }
 config = "0.13"
 data-encoding = { version = "2.3.3" }
 dirs = "5.0"
-dircpy = "0.3"
+dircpy = "0.3.19"
 either = "1.10"
 env_logger = "0.10"
 erased-serde = "0.3"
@@ -156,9 +157,11 @@ serde_yaml = { version = "0.9" }
 serde_tuple = "0.5"
 serde_with = "2.3"
 serial_test = "3.0"
+snap = "1.1.0"
 strum = { version = "0.26.1", features = ["derive"] }
 tempfile = "3.7"
 thiserror = "1"
+time = "0.3.33"
 tokio = { version = "1", features = [
     "rt-multi-thread",
     "macros",
@@ -173,7 +176,7 @@ tokio-tungstenite = { version = "0.18.0", features = ["native-tls"] }
 toml = "0.8"
 tower-http = { version = "0.4.0", features = ["cors"] }
 tracing = "0.1"
-tracing-subscriber = { version = "0.3.18", features = [
+tracing-subscriber = { version = "0.3", features = [
     "env-filter",
     "json",
     "registry",
@@ -189,6 +192,7 @@ ipc-provider = { path = "ipc/provider" }
 ipc-wallet = { path = "ipc/wallet", features = ["with-ethers"] }
 ipc_ipld_resolver = { path = "ipld/resolver" }
 ipc-types = { path = "ipc/types" }
+ipc-observability = { path = "ipc/observability" }
 ipc_actors_abis = { path = "contracts/binding" }
 
 # Vendored for cross-compilation, see https://github.com/cross-rs/cross/wiki/Recipes#openssl

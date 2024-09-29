@@ -11,7 +11,7 @@ use crate::{
     fvm::store::ReadOnlyBlockstore,
     fvm::FvmMessage,
     signed::{SignedMessageApplyRes, SignedMessageCheckRes, SyntheticMessage, VerifiableMessage},
-    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
+    CheckInterpreter, ExecInterpreter, ProposalInterpreter, QueryInterpreter,
 };
 use anyhow::{anyhow, bail, Context};
 use async_stm::atomically;
@@ -36,7 +36,7 @@ use fendermint_vm_message::{
     ipc::{BottomUpCheckpoint, CertifiedMessage, IpcMessage, SignedRelayedMessage},
 };
 use fendermint_vm_resolver::pool::{ResolveKey, ResolvePool};
-use fendermint_vm_topdown::proxy::IPCProviderProxy;
+use fendermint_vm_topdown::proxy::IPCProviderProxyWithLatency;
 use fendermint_vm_topdown::voting::{ValidatorKey, VoteTally};
 use fendermint_vm_topdown::{
     CachedFinalityProvider, IPCParentFinality, ParentFinalityProvider, ParentViewProvider, Toggle,
@@ -55,7 +55,7 @@ use tokio_util::bytes;
 
 /// A resolution pool for bottom-up and top-down checkpoints.
 pub type CheckpointPool = ResolvePool<CheckpointPoolItem>;
-pub type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProviderProxy>>>;
+pub type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProviderProxyWithLatency>>>;
 pub type BlobPool = IrohResolvePool<BlobPoolItem>;
 
 type PendingBlobItem = (Hash, HashSet<(Address, PublicKey)>);
@@ -531,12 +531,17 @@ where
                         "chain interpreter committed topdown finality",
                     );
 
-                    // The commitment of the finality for block `N` triggers
-                    // the execution of all side effects up till `N-1`, as for
-                    // deferred execution chains, this is the latest state that
-                    // we know for sure that we have available.
-                    let execution_fr = prev_height;
-                    let execution_to = finality.height - 1;
+                    // The height range we pull top-down effects from. This _includes_ the proposed
+                    // finality, as we assume that the interface we query publishes only fully
+                    // executed blocks as the head of the chain. This is certainly the case for
+                    // Ethereum-compatible JSON-RPC APIs, like Filecoin's. It should be the case
+                    // too for future Filecoin light clients.
+                    //
+                    // Another factor to take into account is the chain_head_delay, which must be
+                    // non-zero. So even in the case where deferred execution leaks through our
+                    // query mechanism, it should not be problematic because we're guaranteed to
+                    // be _at least_ 1 height behind.
+                    let (execution_fr, execution_to) = (prev_height + 1, finality.height);
 
                     // error happens if we cannot get the validator set from ipc agent after retries
                     let validator_changes = env
@@ -576,12 +581,20 @@ where
 
                     tracing::debug!("chain interpreter applied topdown msgs");
 
+                    let local_block_height = state.block_height() as u64;
+                    let proposer = state.validator_id().map(|id| id.to_string());
+                    let proposer_ref = proposer.as_deref();
+
                     atomically(|| {
                         env.parent_finality_provider
                             .set_new_finality(finality.clone(), prev_finality.clone())?;
 
-                        env.parent_finality_votes
-                            .set_finalized(finality.height, finality.block_hash.clone())?;
+                        env.parent_finality_votes.set_finalized(
+                            finality.height,
+                            finality.block_hash.clone(),
+                            proposer_ref,
+                            Some(local_block_height),
+                        )?;
 
                         Ok(())
                     })
@@ -810,25 +823,6 @@ where
         qry: Self::Query,
     ) -> anyhow::Result<(Self::State, Self::Output)> {
         self.inner.query(state, qry).await
-    }
-}
-
-#[async_trait]
-impl<I, DB> GenesisInterpreter for ChainMessageInterpreter<I, DB>
-where
-    DB: Blockstore + Clone + 'static + Send + Sync,
-    I: GenesisInterpreter,
-{
-    type State = I::State;
-    type Genesis = I::Genesis;
-    type Output = I::Output;
-
-    async fn init(
-        &self,
-        state: Self::State,
-        genesis: Self::Genesis,
-    ) -> anyhow::Result<(Self::State, Self::Output)> {
-        self.inner.init(state, genesis).await
     }
 }
 

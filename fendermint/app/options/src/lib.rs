@@ -8,7 +8,6 @@ use config::ConfigArgs;
 use debug::DebugArgs;
 use fvm_shared::address::Network;
 use lazy_static::lazy_static;
-use tracing_subscriber::EnvFilter;
 
 use self::{
     eth::EthArgs, genesis::GenesisArgs, key::KeyArgs, materializer::MaterializerArgs,
@@ -25,10 +24,8 @@ pub mod objects;
 pub mod rpc;
 pub mod run;
 
-mod log;
 mod parse;
 
-use log::{parse_log_level, LogLevel};
 use parse::parse_network;
 
 lazy_static! {
@@ -103,38 +100,9 @@ pub struct Options {
     #[arg(long, env = "FM_CONFIG_DIR")]
     config_dir: Option<PathBuf>,
 
-    /// Set a custom directory for ipc log files.
-    #[arg(long, env = "FM_LOG_DIR")]
-    pub log_dir: Option<PathBuf>,
-
-    /// Set a custom prefix for ipc log files.
-    #[arg(long, env = "FM_LOG_FILE_PREFIX")]
-    pub log_file_prefix: Option<String>,
-
     /// Optionally override the default configuration.
     #[arg(short, long, default_value = "dev")]
     pub mode: String,
-
-    /// Set the logging level of the console.
-    #[arg(
-        short = 'l',
-        long,
-        default_value = "info",
-        value_enum,
-        env = "FM_LOG_LEVEL",
-        help = "Standard log levels, or a comma separated list of filters, e.g. 'debug,tower_abci=warn,libp2p::gossipsub=info'",
-        value_parser = parse_log_level,
-    )]
-    log_level: LogLevel,
-
-    /// Set the logging level of the log file. If missing, it defaults to the same level as the console.
-    #[arg(
-        long,
-        value_enum,
-        env = "FM_LOG_FILE_LEVEL",
-        value_parser = parse_log_level,
-    )]
-    log_file_level: Option<LogLevel>,
 
     /// Global options repeated here for discoverability, so they show up in `--help` among the others.
     #[command(flatten)]
@@ -145,24 +113,6 @@ pub struct Options {
 }
 
 impl Options {
-    /// Tracing filter for the console.
-    ///
-    /// Coalescing everything into a filter instead of either a level or a filter
-    /// because the `tracing_subscriber` setup methods like `with_filter` and `with_level`
-    /// produce different static types and it's not obvious how to use them as alternatives.
-    pub fn log_console_filter(&self) -> anyhow::Result<EnvFilter> {
-        self.log_level.to_filter()
-    }
-
-    /// Tracing filter for the log file.
-    pub fn log_file_filter(&self) -> anyhow::Result<EnvFilter> {
-        if let Some(ref level) = self.log_file_level {
-            level.to_filter()
-        } else {
-            self.log_console_filter()
-        }
-    }
-
     /// Path to the configuration directories.
     ///
     /// If not specified then returns the default under the home directory.
@@ -208,7 +158,6 @@ mod tests {
     use crate::*;
     use clap::Parser;
     use fvm_shared::address::Network;
-    use tracing::level_filters::LevelFilter;
 
     /// Set some env vars, run a fallible piece of code, then unset the variables otherwise they would affect the next test.
     pub fn with_env_vars<F, T>(vars: &[(&str, &str)], f: F) -> T
@@ -276,27 +225,6 @@ mod tests {
             .expect_err("--help is not Options");
 
         assert!(e.to_string().contains("Usage:"), "unexpected help: {e}");
-    }
-
-    #[test]
-    fn parse_log_level() {
-        let parse_filter = |cmd: &str| {
-            let opts: Options = Options::parse_from(cmd.split_ascii_whitespace());
-            opts.log_console_filter().expect("filter should parse")
-        };
-
-        let assert_level = |cmd: &str, level: LevelFilter| {
-            let filter = parse_filter(cmd);
-            assert_eq!(filter.max_level_hint(), Some(level))
-        };
-
-        assert_level("fendermint --log-level debug run", LevelFilter::DEBUG);
-        assert_level("fendermint --log-level off run", LevelFilter::OFF);
-        assert_level(
-            "fendermint --log-level libp2p=warn,error run",
-            LevelFilter::WARN,
-        );
-        assert_level("fendermint --log-level info run", LevelFilter::INFO);
     }
 
     #[test]

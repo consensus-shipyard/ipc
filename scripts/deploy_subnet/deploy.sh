@@ -307,7 +307,7 @@ if [[ -z ${SKIP_BUILD+x} || "$SKIP_BUILD" == "" || "$SKIP_BUILD" == "false" ]]; 
   # Build contracts
   echo "$DASHES Building ipc contracts..."
   cd "${IPC_FOLDER}"/contracts
-  make build
+  make gen
 
   # Build ipc-cli
   echo "$DASHES Building ipc-cli..."
@@ -323,10 +323,9 @@ if [[ -z ${SKIP_BUILD+x} || "$SKIP_BUILD" == "" || "$SKIP_BUILD" == "false" ]]; 
   fi
 fi
 
-
 if [[ $local_deploy = true ]]; then
   # note: the subnet hasn't been created yet, but it's always the same value and we need it for the docker network name
-  subnet_id="/r31337/t410f6dl55afbyjbpupdtrmedyqrnmxdmpk7rxuduafq"
+  subnet_id="/r31337/t410fkzrz3mlkyufisiuae3scumllgalzuu3wxlxa2ly"
   cd "$IPC_FOLDER"
   cargo make --makefile infra/fendermint/Makefile.toml \
       -e NODE_NAME=anvil \
@@ -397,27 +396,29 @@ do
 done
 
 # Update IPC config file with parent auth token
-toml set "${IPC_CONFIG_FOLDER}"/config.toml 'subnets[0].config.auth_token' "$PARENT_HTTP_AUTH_TOKEN" > /tmp/config.toml.0
-cp /tmp/config.toml.0 "${IPC_CONFIG_FOLDER}"/config.toml
+if ! $local_deploy ; then
+  toml set "${IPC_CONFIG_FOLDER}"/config.toml 'subnets[0].config.auth_token' "$PARENT_HTTP_AUTH_TOKEN" > /tmp/config.toml.0
+  cp /tmp/config.toml.0 "${IPC_CONFIG_FOLDER}"/config.toml
+fi
 
 # Deploy IPC contracts
 if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; then
   echo "$DASHES Deploying new IPC contracts..."
   cd "${IPC_FOLDER}"/contracts
-  npm install
+  rm -rf deployments/localnet
 
   if ! $local_deploy ; then
     export RPC_URL=https://calibration.filfox.info/rpc/v1
-  else 
+  else
     export RPC_URL=http://localhost:8545
   fi
   pk=$(cat "${IPC_CONFIG_FOLDER}"/validator_0.sk)
   export PRIVATE_KEY=$pk
 
   if ! $local_deploy ; then
-    deploy_contracts_output=$(make deploy-ipc NETWORK=calibrationnet)
+    deploy_contracts_output=$(make deploy-stack NETWORK=calibrationnet)
   else
-    deploy_contracts_output=$(make deploy-ipc NETWORK=localnet)
+    deploy_contracts_output=$(make deploy-stack NETWORK=localnet)
   fi
 
   echo "$DASHES deploy contracts output $DASHES"
@@ -425,12 +426,12 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
   echo "$deploy_contracts_output"
   echo ""
 
-  PARENT_GATEWAY_ADDRESS=$(echo "$deploy_contracts_output" | grep '"Gateway"' | awk -F'"' '{print $4}')
-  PARENT_REGISTRY_ADDRESS=$(echo "$deploy_contracts_output" | grep '"SubnetRegistry"' | awk -F'"' '{print $4}')
+  PARENT_GATEWAY_ADDRESS=$(echo "$deploy_contracts_output" | grep 'GatewayDiamond' | awk 'NR==2 {printf "%s", $NF}')
+  PARENT_REGISTRY_ADDRESS=$(echo "$deploy_contracts_output" | grep 'SubnetRegistryDiamond' | awk 'NR==2 {printf "%s", $NF}')
 
   if [ $local_deploy == true ]; then
     cd "${IPC_FOLDER}/hoku-contracts"
-    # need to run clean or we hit upgradeable saftey validation errors resulting
+    # need to run clean or we hit upgradeable safety validation errors resulting
     # from contracts with the same name 
     forge clean
 
@@ -483,7 +484,7 @@ bottomup_check_period=600
 if [[ $local_deploy = true ]]; then
   bottomup_check_period=10 # ~15 seconds on localnet
 fi
-create_subnet_output=$(ipc-cli subnet create --from "$default_wallet_address" --parent "$root_id" --min-validators 2 --min-validator-stake 1 --bottomup-check-period "${bottomup_check_period}" --active-validators-limit 3 --permission-mode federated --supply-source-kind erc20 --supply-source-address "$SUPPLY_SOURCE_ADDRESS" 2>&1)
+create_subnet_output=$(ipc-cli subnet create --from "$default_wallet_address" --parent "$root_id" --min-validators 2 --min-validator-stake 1 --bottomup-check-period "${bottomup_check_period}" --active-validators-limit 3 --permission-mode federated --supply-source-kind erc20 --supply-source-address "$SUPPLY_SOURCE_ADDRESS" --collateral-source-kind erc20 --collateral-source-address "$SUPPLY_SOURCE_ADDRESS" 2>&1)
 
 echo "$DASHES create subnet output $DASHES"
 echo
@@ -632,10 +633,10 @@ done
 echo
 echo "$DASHES Test Prometheus endpoints of validator nodes"
 echo
-curl --location http://localhost:"${PROMETHEUS_HOST_PORT}"/graph
+curl -s -o /dev/null -w "%{http_code}" --location http://localhost:"${PROMETHEUS_HOST_PORT}"/graph
 for i in {0..2}
 do
-  curl --location http://localhost:"${FENDERMINT_METRICS_HOST_PORTS[i]}"/metrics | grep succes
+  curl -s -o /dev/null -w "%{http_code}" --location http://localhost:"${FENDERMINT_METRICS_HOST_PORTS[i]}"/metrics
 done
 
 # Start relayer

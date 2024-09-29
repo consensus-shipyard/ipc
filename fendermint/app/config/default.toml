@@ -66,6 +66,14 @@ host = "127.0.0.1"
 # The default port where the Prometheus exporter makes the metrics available.
 port = 9184
 
+[tracing]
+
+[tracing.console]
+enabled = true
+
+[tracing.file]
+enabled = false
+
 [snapshots]
 # Enable the export and import of snapshots.
 enabled = false
@@ -141,6 +149,16 @@ host = "127.0.0.1"
 # JSON-RPC (POST) and WebSockets (GET) requests.
 port = 8545
 
+[eth.metrics]
+# Enable the export of metrics over HTTP.
+enabled = true
+
+[eth.metrics.listen]
+# Only accept connections from a Prometheus scraper, assumed to be running locally.
+host = "127.0.0.1"
+# The default port where the Prometheus exporter makes the metrics available.
+port = 9185
+
 [eth.cors]
 # A list of origins a cross-domain request can be executed from
 # Default value '[]' disables cors support
@@ -153,6 +171,14 @@ allowed_methods = []
 # Suggested headers if allowing origins: "Accept", "Authorization", "Content-Type", "Origin"
 allowed_headers = []
 
+[eth.tracing]
+
+[eth.tracing.console]
+enabled = true
+
+[eth.tracing.file]
+enabled = false
+
 # Object API facade
 [objects]
 
@@ -160,6 +186,14 @@ allowed_headers = []
 # Only accept local connections by default.
 host = "127.0.0.1"
 port = 8001
+
+[objects.tracing]
+
+[objects.tracing.console]
+enabled = true
+
+[objects.tracing.file]
+enabled = false
 
 # IPLD Resolver Configuration
 [resolver]

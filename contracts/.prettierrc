@@ -1,21 +1,22 @@
 {
-    semi: false,
-    singleQuote: true,
-    printWidth: 80,
-    endOfLine: 'auto',
-    tabWidth: 4,
-    trailingComma: 'all',
-    overrides: [
+    "semi": false,
+    "singleQuote": true,
+    "printWidth": 120,
+    "endOfLine": "auto",
+    "tabWidth": 4,
+    "trailingComma": "all",
+    "plugins": ["prettier-plugin-solidity"],
+    "overrides": [
         {
-            files: '*.sol',
-            options: {
-                parser: 'solidity-parse',
-                printWidth: 120,
-                tabWidth: 4,
-                useTabs: false,
-                singleQuote: false,
-                bracketSpacing: false,
-            },
-        },
-    ],
+            "files": "*.sol",
+            "options": {
+                "parser": "solidity-parse",
+                "printWidth": 120,
+                "tabWidth": 4,
+                "useTabs": false,
+                "singleQuote": false,
+                "bracketSpacing": false
+            }
+        }
+    ]
 }

@@ -19,7 +19,13 @@ pub mod gateway_manager_facet {
                     ::std::borrow::ToOwned::to_owned("addStake"),
                     ::std::vec![::ethers::core::abi::ethabi::Function {
                         name: ::std::borrow::ToOwned::to_owned("addStake"),
-                        inputs: ::std::vec![],
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::borrow::ToOwned::to_owned("amount"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("uint256"),
+                            ),
+                        },],
                         outputs: ::std::vec![],
                         constant: ::core::option::Option::None,
                         state_mutability: ::ethers::core::abi::ethabi::StateMutability::Payable,
@@ -116,13 +122,22 @@ pub mod gateway_manager_facet {
                     ::std::borrow::ToOwned::to_owned("register"),
                     ::std::vec![::ethers::core::abi::ethabi::Function {
                         name: ::std::borrow::ToOwned::to_owned("register"),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::borrow::ToOwned::to_owned("genesisCircSupply"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("uint256"),
-                            ),
-                        },],
+                        inputs: ::std::vec![
+                            ::ethers::core::abi::ethabi::Param {
+                                name: ::std::borrow::ToOwned::to_owned("genesisCircSupply"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
+                                internal_type: ::core::option::Option::Some(
+                                    ::std::borrow::ToOwned::to_owned("uint256"),
+                                ),
+                            },
+                            ::ethers::core::abi::ethabi::Param {
+                                name: ::std::borrow::ToOwned::to_owned("collateral"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
+                                internal_type: ::core::option::Option::Some(
+                                    ::std::borrow::ToOwned::to_owned("uint256"),
+                                ),
+                            },
+                        ],
                         outputs: ::std::vec![],
                         constant: ::core::option::Option::None,
                         state_mutability: ::ethers::core::abi::ethabi::StateMutability::Payable,
@@ -326,16 +341,16 @@ pub mod gateway_manager_facet {
                     },],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("NoBalanceIncrease"),
+                    ::std::borrow::ToOwned::to_owned("NotEmptySubnetCircSupply"),
                     ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("NoBalanceIncrease"),
+                        name: ::std::borrow::ToOwned::to_owned("NotEmptySubnetCircSupply",),
                         inputs: ::std::vec![],
                     },],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("NotEmptySubnetCircSupply"),
+                    ::std::borrow::ToOwned::to_owned("NotEnoughBalance"),
                     ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("NotEmptySubnetCircSupply",),
+                        name: ::std::borrow::ToOwned::to_owned("NotEnoughBalance"),
                         inputs: ::std::vec![],
                     },],
                 ),
@@ -378,13 +393,6 @@ pub mod gateway_manager_facet {
                                 ::std::borrow::ToOwned::to_owned("address"),
                             ),
                         },],
-                    },],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("UnexpectedSupplySource"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("UnexpectedSupplySource",),
-                        inputs: ::std::vec![],
                     },],
                 ),
             ]),
@@ -432,10 +440,13 @@ pub mod gateway_manager_facet {
                 client,
             ))
         }
-        ///Calls the contract's `addStake` (0x5a627dbc) function
-        pub fn add_stake(&self) -> ::ethers::contract::builders::ContractCall<M, ()> {
+        ///Calls the contract's `addStake` (0xeb4f16b5) function
+        pub fn add_stake(
+            &self,
+            amount: ::ethers::core::types::U256,
+        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
-                .method_hash([90, 98, 125, 188], ())
+                .method_hash([235, 79, 22, 181], amount)
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `fund` (0x18f44b70) function
@@ -465,13 +476,14 @@ pub mod gateway_manager_facet {
                 .method_hash([65, 192, 225, 181], ())
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `register` (0xf207564e) function
+        ///Calls the contract's `register` (0xd66d6c10) function
         pub fn register(
             &self,
             genesis_circ_supply: ::ethers::core::types::U256,
+            collateral: ::ethers::core::types::U256,
         ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
-                .method_hash([242, 7, 86, 78], genesis_circ_supply)
+                .method_hash([214, 109, 108, 16], (genesis_circ_supply, collateral))
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `release` (0x6b2c1eef) function
@@ -660,19 +672,6 @@ pub mod gateway_manager_facet {
     pub struct MethodNotAllowed {
         pub reason: ::std::string::String,
     }
-    ///Custom Error type `NoBalanceIncrease` with signature `NoBalanceIncrease()` and selector `0x12c4d4d4`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[etherror(name = "NoBalanceIncrease", abi = "NoBalanceIncrease()")]
-    pub struct NoBalanceIncrease;
     ///Custom Error type `NotEmptySubnetCircSupply` with signature `NotEmptySubnetCircSupply()` and selector `0xf8cf8e02`
     #[derive(
         Clone,
@@ -686,6 +685,19 @@ pub mod gateway_manager_facet {
     )]
     #[etherror(name = "NotEmptySubnetCircSupply", abi = "NotEmptySubnetCircSupply()")]
     pub struct NotEmptySubnetCircSupply;
+    ///Custom Error type `NotEnoughBalance` with signature `NotEnoughBalance()` and selector `0xad3a8b9e`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[etherror(name = "NotEnoughBalance", abi = "NotEnoughBalance()")]
+    pub struct NotEnoughBalance;
     ///Custom Error type `NotEnoughFunds` with signature `NotEnoughFunds()` and selector `0x81b5ad68`
     #[derive(
         Clone,
@@ -756,19 +768,6 @@ pub mod gateway_manager_facet {
     pub struct SafeERC20FailedOperation {
         pub token: ::ethers::core::types::Address,
     }
-    ///Custom Error type `UnexpectedSupplySource` with signature `UnexpectedSupplySource()` and selector `0x80ee5966`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[etherror(name = "UnexpectedSupplySource", abi = "UnexpectedSupplySource()")]
-    pub struct UnexpectedSupplySource;
     ///Container type for all of the contract's custom errors
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum GatewayManagerFacetErrors {
@@ -782,14 +781,13 @@ pub mod gateway_manager_facet {
         InvalidActorAddress(InvalidActorAddress),
         InvalidXnetMessage(InvalidXnetMessage),
         MethodNotAllowed(MethodNotAllowed),
-        NoBalanceIncrease(NoBalanceIncrease),
         NotEmptySubnetCircSupply(NotEmptySubnetCircSupply),
+        NotEnoughBalance(NotEnoughBalance),
         NotEnoughFunds(NotEnoughFunds),
         NotEnoughFundsToRelease(NotEnoughFundsToRelease),
         NotRegisteredSubnet(NotRegisteredSubnet),
         ReentrancyError(ReentrancyError),
         SafeERC20FailedOperation(SafeERC20FailedOperation),
-        UnexpectedSupplySource(UnexpectedSupplySource),
         /// The standard solidity revert string, with selector
         /// Error(string) -- 0x08c379a0
         RevertString(::std::string::String),
@@ -846,14 +844,14 @@ pub mod gateway_manager_facet {
             {
                 return Ok(Self::MethodNotAllowed(decoded));
             }
-            if let Ok(decoded) = <NoBalanceIncrease as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::NoBalanceIncrease(decoded));
-            }
             if let Ok(decoded) =
                 <NotEmptySubnetCircSupply as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::NotEmptySubnetCircSupply(decoded));
+            }
+            if let Ok(decoded) = <NotEnoughBalance as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::NotEnoughBalance(decoded));
             }
             if let Ok(decoded) = <NotEnoughFunds as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::NotEnoughFunds(decoded));
@@ -875,11 +873,6 @@ pub mod gateway_manager_facet {
                 <SafeERC20FailedOperation as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::SafeERC20FailedOperation(decoded));
-            }
-            if let Ok(decoded) =
-                <UnexpectedSupplySource as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::UnexpectedSupplySource(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
         }
@@ -905,10 +898,10 @@ pub mod gateway_manager_facet {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::MethodNotAllowed(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::NoBalanceIncrease(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::NotEmptySubnetCircSupply(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::NotEnoughBalance(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::NotEnoughFunds(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::NotEnoughFundsToRelease(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
@@ -918,9 +911,6 @@ pub mod gateway_manager_facet {
                 }
                 Self::ReentrancyError(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::SafeERC20FailedOperation(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::UnexpectedSupplySource(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::RevertString(s) => ::ethers::core::abi::AbiEncode::encode(s),
@@ -972,13 +962,11 @@ pub mod gateway_manager_facet {
                     true
                 }
                 _ if selector
-                    == <NoBalanceIncrease as ::ethers::contract::EthError>::selector() =>
+                    == <NotEmptySubnetCircSupply as ::ethers::contract::EthError>::selector() =>
                 {
                     true
                 }
-                _ if selector
-                    == <NotEmptySubnetCircSupply as ::ethers::contract::EthError>::selector() =>
-                {
+                _ if selector == <NotEnoughBalance as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector == <NotEnoughFunds as ::ethers::contract::EthError>::selector() => {
@@ -1002,11 +990,6 @@ pub mod gateway_manager_facet {
                 {
                     true
                 }
-                _ if selector
-                    == <UnexpectedSupplySource as ::ethers::contract::EthError>::selector() =>
-                {
-                    true
-                }
                 _ => false,
             }
         }
@@ -1024,14 +1007,13 @@ pub mod gateway_manager_facet {
                 Self::InvalidActorAddress(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidXnetMessage(element) => ::core::fmt::Display::fmt(element, f),
                 Self::MethodNotAllowed(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NoBalanceIncrease(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotEmptySubnetCircSupply(element) => ::core::fmt::Display::fmt(element, f),
+                Self::NotEnoughBalance(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotEnoughFunds(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotEnoughFundsToRelease(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotRegisteredSubnet(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ReentrancyError(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SafeERC20FailedOperation(element) => ::core::fmt::Display::fmt(element, f),
-                Self::UnexpectedSupplySource(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RevertString(s) => ::core::fmt::Display::fmt(s, f),
             }
         }
@@ -1091,14 +1073,14 @@ pub mod gateway_manager_facet {
             Self::MethodNotAllowed(value)
         }
     }
-    impl ::core::convert::From<NoBalanceIncrease> for GatewayManagerFacetErrors {
-        fn from(value: NoBalanceIncrease) -> Self {
-            Self::NoBalanceIncrease(value)
-        }
-    }
     impl ::core::convert::From<NotEmptySubnetCircSupply> for GatewayManagerFacetErrors {
         fn from(value: NotEmptySubnetCircSupply) -> Self {
             Self::NotEmptySubnetCircSupply(value)
+        }
+    }
+    impl ::core::convert::From<NotEnoughBalance> for GatewayManagerFacetErrors {
+        fn from(value: NotEnoughBalance) -> Self {
+            Self::NotEnoughBalance(value)
         }
     }
     impl ::core::convert::From<NotEnoughFunds> for GatewayManagerFacetErrors {
@@ -1124,11 +1106,6 @@ pub mod gateway_manager_facet {
     impl ::core::convert::From<SafeERC20FailedOperation> for GatewayManagerFacetErrors {
         fn from(value: SafeERC20FailedOperation) -> Self {
             Self::SafeERC20FailedOperation(value)
-        }
-    }
-    impl ::core::convert::From<UnexpectedSupplySource> for GatewayManagerFacetErrors {
-        fn from(value: UnexpectedSupplySource) -> Self {
-            Self::UnexpectedSupplySource(value)
         }
     }
     #[derive(
@@ -1204,7 +1181,7 @@ pub mod gateway_manager_facet {
             Self::NewTopDownMessageFilter(value)
         }
     }
-    ///Container type for all input parameters for the `addStake` function with signature `addStake()` and selector `0x5a627dbc`
+    ///Container type for all input parameters for the `addStake` function with signature `addStake(uint256)` and selector `0xeb4f16b5`
     #[derive(
         Clone,
         ::ethers::contract::EthCall,
@@ -1215,8 +1192,10 @@ pub mod gateway_manager_facet {
         Eq,
         Hash,
     )]
-    #[ethcall(name = "addStake", abi = "addStake()")]
-    pub struct AddStakeCall;
+    #[ethcall(name = "addStake", abi = "addStake(uint256)")]
+    pub struct AddStakeCall {
+        pub amount: ::ethers::core::types::U256,
+    }
     ///Container type for all input parameters for the `fund` function with signature `fund((uint64,address[]),(uint8,bytes))` and selector `0x18f44b70`
     #[derive(
         Clone,
@@ -1266,7 +1245,7 @@ pub mod gateway_manager_facet {
     )]
     #[ethcall(name = "kill", abi = "kill()")]
     pub struct KillCall;
-    ///Container type for all input parameters for the `register` function with signature `register(uint256)` and selector `0xf207564e`
+    ///Container type for all input parameters for the `register` function with signature `register(uint256,uint256)` and selector `0xd66d6c10`
     #[derive(
         Clone,
         ::ethers::contract::EthCall,
@@ -1277,9 +1256,10 @@ pub mod gateway_manager_facet {
         Eq,
         Hash,
     )]
-    #[ethcall(name = "register", abi = "register(uint256)")]
+    #[ethcall(name = "register", abi = "register(uint256,uint256)")]
     pub struct RegisterCall {
         pub genesis_circ_supply: ::ethers::core::types::U256,
+        pub collateral: ::ethers::core::types::U256,
     }
     ///Container type for all input parameters for the `release` function with signature `release((uint8,bytes))` and selector `0x6b2c1eef`
     #[derive(

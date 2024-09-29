@@ -1,7 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use std::future::Future;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Context, Result};
@@ -13,21 +12,21 @@ use fendermint_abci::{AbciResult, Application};
 use fendermint_storage::{
     Codec, Encode, KVCollection, KVRead, KVReadable, KVStore, KVWritable, KVWrite,
 };
-use fendermint_tracing::emit;
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_interpreter::bytes::{
     BytesMessageApplyRes, BytesMessageCheckRes, BytesMessageQuery, BytesMessageQueryRes,
 };
 use fendermint_vm_interpreter::chain::{ChainEnv, ChainMessageApplyRet, IllegalMessage};
 use fendermint_vm_interpreter::fvm::state::{
-    empty_state_tree, CheckStateRef, FvmExecState, FvmGenesisState, FvmQueryState, FvmStateParams,
+    empty_state_tree, CheckStateRef, FvmExecState, FvmQueryState, FvmStateParams,
     FvmUpdatableParams,
 };
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
-use fendermint_vm_interpreter::fvm::{FvmApplyRet, FvmGenesisOutput, PowerUpdates};
+use fendermint_vm_interpreter::fvm::{FvmApplyRet, PowerUpdates};
+use fendermint_vm_interpreter::genesis::{read_genesis_car, GenesisAppState};
 use fendermint_vm_interpreter::signed::InvalidSignature;
 use fendermint_vm_interpreter::{
-    CheckInterpreter, ExecInterpreter, GenesisInterpreter, ProposalInterpreter, QueryInterpreter,
+    CheckInterpreter, ExecInterpreter, ProposalInterpreter, QueryInterpreter,
 };
 use fendermint_vm_message::query::FvmQueryHeight;
 use fendermint_vm_snapshot::{SnapshotClient, SnapshotError};
@@ -37,13 +36,17 @@ use fvm_shared::chainid::ChainID;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
+use ipc_observability::{emit, serde::HexEncodableBlockHash};
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 use tendermint::abci::request::CheckTxKind;
 use tendermint::abci::{request, response};
 use tracing::instrument;
 
-use crate::events::{NewBlock, ProposalProcessed};
+use crate::observe::{
+    BlockCommitted, BlockProposalEvaluated, BlockProposalReceived, BlockProposalSent, Message,
+    MpoolReceived,
+};
 use crate::AppExitCode;
 use crate::BlockHeight;
 use crate::{tmconv::*, VERSION};
@@ -106,12 +109,6 @@ pub struct AppConfig<S: KVStore> {
     pub state_hist_namespace: S::Namespace,
     /// Size of state history to keep; 0 means unlimited.
     pub state_hist_size: u64,
-    /// Path to the Wasm bundle.
-    ///
-    /// Only loaded once during genesis; later comes from the [`StateTree`].
-    pub builtin_actors_bundle: PathBuf,
-    /// Path to the custom actor WASM bundle.
-    pub custom_actors_bundle: PathBuf,
     /// Block height where we should gracefully stop the node
     pub halt_height: i64,
 }
@@ -133,12 +130,6 @@ where
     state_store: Arc<SS>,
     /// Wasm engine cache.
     multi_engine: Arc<MultiEngine>,
-    /// Path to the Wasm bundle.
-    ///
-    /// Only loaded once during genesis; later comes from the [`StateTree`].
-    builtin_actors_bundle: PathBuf,
-    /// Path to the custom actor WASM bundle.
-    custom_actors_bundle: PathBuf,
     /// Block height where we should gracefully stop the node
     halt_height: i64,
     /// Namespace to store app state.
@@ -192,8 +183,6 @@ where
             db: Arc::new(db),
             state_store: Arc::new(state_store),
             multi_engine: Arc::new(MultiEngine::new(1)),
-            builtin_actors_bundle: config.builtin_actors_bundle,
-            custom_actors_bundle: config.custom_actors_bundle,
             halt_height: config.halt_height,
             namespace: config.app_namespace,
             state_hist: KVCollection::new(config.state_hist_namespace),
@@ -390,6 +379,14 @@ where
         // It's really the empty state tree that would be the best indicator.
         !(height == 0 && params.timestamp.0 == 0 && params.network_version == NetworkVersion::V0)
     }
+
+    fn parse_genesis_app_bytes(bytes: &[u8]) -> Result<Vec<u8>> {
+        // cometbft serves data in json format, convert from json string
+        match serde_json::from_slice(bytes)? {
+            serde_json::Value::String(s) => Ok(GenesisAppState::decode_and_decompress(&s)?),
+            _ => Err(anyhow!("invalid app state json")),
+        }
+    }
 }
 
 // NOTE: The `Application` interface doesn't allow failures at the moment. The protobuf
@@ -408,11 +405,6 @@ where
     S::Namespace: Sync + Send,
     DB: KVWritable<S> + KVReadable<S> + Clone + Send + Sync + 'static,
     SS: Blockstore + Clone + Send + Sync + 'static,
-    I: GenesisInterpreter<
-        State = FvmGenesisState<SS>,
-        Genesis = Vec<u8>,
-        Output = FvmGenesisOutput,
-    >,
     I: ProposalInterpreter<
         State = (ChainEnv, FvmExecState<ReadOnlyBlockstore<SS>>),
         Message = Vec<u8>,
@@ -453,45 +445,18 @@ where
 
     /// Called once upon genesis.
     async fn init_chain(&self, request: request::InitChain) -> AbciResult<response::InitChain> {
-        let bundle = &self.builtin_actors_bundle;
-        let bundle = std::fs::read(bundle)
-            .map_err(|e| anyhow!("failed to load builtin bundle CAR from {bundle:?}: {e}"))?;
-
-        let custom_actors_bundle = &self.custom_actors_bundle;
-        let custom_actors_bundle = std::fs::read(custom_actors_bundle).map_err(|e| {
-            anyhow!("failed to load custom actor bundle CAR from {custom_actors_bundle:?}: {e}")
-        })?;
-
-        let state = FvmGenesisState::new(
-            self.state_store_clone(),
-            self.multi_engine.clone(),
-            &bundle,
-            &custom_actors_bundle,
-        )
-        .await
-        .context("failed to create genesis state")?;
-
-        tracing::info!(
-            manifest_root = format!("{}", state.manifest_data_cid),
-            "pre-genesis state created"
-        );
-
-        let genesis_bytes = request.app_state_bytes.to_vec();
+        let genesis_bytes = Self::parse_genesis_app_bytes(&request.app_state_bytes)?;
         let genesis_hash =
             fendermint_vm_message::cid(&genesis_bytes).context("failed to compute genesis CID")?;
 
         // Make it easy to spot any discrepancies between nodes.
         tracing::info!(genesis_hash = genesis_hash.to_string(), "genesis");
 
-        let (state, out) = self
-            .interpreter
-            .init(state, genesis_bytes)
-            .await
-            .context("failed to init from genesis")?;
-
-        let state_root = state.commit().context("failed to commit genesis state")?;
+        let (validators, state_params) = read_genesis_car(genesis_bytes, &self.state_store).await?;
         let validators =
-            to_validator_updates(out.validators).context("failed to convert validators")?;
+            to_validator_updates(validators).context("failed to convert validators")?;
+
+        tracing::info!(state_params = serde_json::to_string(&state_params)?);
 
         // Let's pretend that the genesis state is that of a fictive block at height 0.
         // The record will be stored under height 1, and the record after the application
@@ -508,19 +473,7 @@ where
         let app_state = AppState {
             block_height: height,
             oldest_state_height: height,
-            state_params: FvmStateParams {
-                state_root,
-                timestamp: out.timestamp,
-                network_version: out.network_version,
-                base_fee: out.base_fee,
-                circ_supply: out.circ_supply,
-                chain_id: out.chain_id.into(),
-                power_scale: out.power_scale,
-                app_version: 0,
-                credit_debit_interval: out.credit_debit_interval,
-                blob_storage_capacity: out.blob_storage_capacity,
-                blob_debit_rate: out.blob_debit_rate,
-            },
+            state_params,
         };
 
         let response = response::InitChain {
@@ -628,15 +581,26 @@ where
         // Update the check state.
         *guard = Some(state);
 
+        let mut mpool_received_trace = MpoolReceived::default();
+
         let response = match result {
             Err(e) => invalid_check_tx(AppError::InvalidEncoding, e.description),
             Ok(result) => match result {
                 Err(IllegalMessage) => invalid_check_tx(AppError::IllegalMessage, "".to_owned()),
                 Ok(Err(InvalidSignature(d))) => invalid_check_tx(AppError::InvalidSignature, d),
-                Ok(Ok(ret)) => to_check_tx(ret),
+                Ok(Ok(ret)) => {
+                    mpool_received_trace.message = Some(Message::from(&ret.message));
+                    to_check_tx(ret)
+                }
             },
         };
 
+        mpool_received_trace.accept = response.code.is_ok();
+        if !mpool_received_trace.accept {
+            mpool_received_trace.reason = Some(format!("{:?} - {}", response.code, response.info));
+        }
+
+        emit(mpool_received_trace);
         Ok(response)
     }
 
@@ -668,7 +632,14 @@ where
             .context("failed to prepare proposal")?;
 
         let txs = txs.into_iter().map(bytes::Bytes::from).collect();
-        let txs = take_until_max_size(txs, request.max_tx_bytes.try_into().unwrap());
+        let (txs, size) = take_until_max_size(txs, request.max_tx_bytes.try_into().unwrap());
+
+        emit(BlockProposalSent {
+            validator: &request.proposer_address,
+            height: request.height.value(),
+            tx_count: txs.len(),
+            size,
+        });
 
         Ok(response::PrepareProposal { txs })
     }
@@ -693,6 +664,7 @@ where
         .context("error creating execution state")?;
 
         let txs: Vec<_> = request.txs.into_iter().map(|tx| tx.to_vec()).collect();
+        let size_txs = txs.iter().map(|tx| tx.len()).sum::<usize>();
         let num_txs = txs.len();
 
         let accept = self
@@ -701,12 +673,22 @@ where
             .await
             .context("failed to process proposal")?;
 
-        emit!(ProposalProcessed {
-            is_accepted: accept,
-            block_height: request.height.value(),
-            block_hash: request.hash.to_string().as_str(),
-            num_txs,
-            proposer: request.proposer_address.to_string().as_str()
+        emit(BlockProposalReceived {
+            height: request.height.value(),
+            hash: HexEncodableBlockHash(request.hash.into()),
+            size: size_txs,
+            tx_count: num_txs,
+            validator: &request.proposer_address,
+        });
+
+        emit(BlockProposalEvaluated {
+            height: request.height.value(),
+            hash: HexEncodableBlockHash(request.hash.into()),
+            size: size_txs,
+            tx_count: num_txs,
+            validator: &request.proposer_address,
+            accept,
+            reason: None,
         });
 
         if accept {
@@ -831,6 +813,8 @@ where
                 circ_supply,
                 power_scale,
                 credit_debit_interval,
+                blob_storage_capacity,
+                blob_debit_rate,
             },
             _,
         ) = exec_state.commit().context("failed to commit FVM")?;
@@ -841,6 +825,8 @@ where
         state.state_params.circ_supply = circ_supply;
         state.state_params.power_scale = power_scale;
         state.state_params.credit_debit_interval = credit_debit_interval;
+        state.state_params.blob_storage_capacity = blob_storage_capacity;
+        state.state_params.blob_debit_rate = blob_debit_rate;
 
         let app_hash = state.app_hash();
         let block_height = state.block_height;
@@ -896,11 +882,14 @@ where
         // Commit app state to the datastore.
         self.set_committed_state(state)?;
 
-        emit!(NewBlock { block_height });
-
         // Reset check state.
         let mut guard = self.check_state.lock().await;
         *guard = None;
+
+        emit(BlockCommitted {
+            height: block_height,
+            app_hash: HexEncodableBlockHash(app_hash.clone().into()),
+        });
 
         Ok(response::Commit {
             data: app_hash.into(),
