@@ -15,4 +15,14 @@ pub enum Error {
     ParentChainReorgDetected,
     #[error("Cannot query parent at height {1}: {0}")]
     CannotQueryParent(String, BlockHeight),
+    #[error("Parent block view store is empty")]
+    BlockStoreEmpty,
+    #[error("Committed block height not purged yet")]
+    CommittedParentHeightNotPurged,
+    #[error("Cannot serialize parent block view payload to bytes")]
+    CannotSerializeParentBlockView,
+    #[error("Cannot create commitment at null parent block {0}")]
+    CannotCommitObservationAtNullBlock(BlockHeight),
+    #[error("Missing block view at height {0} for target observation height {0}")]
+    MissingBlockView(BlockHeight, BlockHeight),
 }

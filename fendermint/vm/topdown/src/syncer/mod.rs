@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::observation::ObservationCommitment;
+use crate::observation::{ObservationCommitment, ObservationConfig};
 use crate::proxy::ParentQueryProxy;
 use crate::syncer::poll::ParentPoll;
 use crate::syncer::store::ParentViewStore;
@@ -41,6 +41,8 @@ pub struct ParentSyncerConfig {
     pub max_store_blocks: BlockHeight,
     /// Attempts to sync as many block as possible till the finalized chain head
     pub sync_many: bool,
+
+    pub observation: ObservationConfig,
 }
 
 #[derive(Clone)]
@@ -104,7 +106,7 @@ where
 {
     match req {
         ParentSyncerRequest::Finalized(c) => {
-            let height = c.target_height;
+            let height = c.target_height();
             if let Err(e) = poller.finalize(c) {
                 tracing::error!(height, err = e.to_string(), "cannot finalize parent viewer");
             }

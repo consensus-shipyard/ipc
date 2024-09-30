@@ -1,9 +1,14 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::{BlockHash, BlockHeight};
+use cid::Cid;
+use fvm_ipld_encoding::DAG_CBOR;
+use multihash::Code;
+use crate::{BlockHash, BlockHeight, Bytes};
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
+use multihash::MultihashDigest;
+use crate::syncer::error::Error;
 
 #[derive(Clone, Debug)]
 pub struct ParentBlockViewPayload {
@@ -43,5 +48,19 @@ impl ParentBlockView {
                 validator_changes,
             }),
         }
+    }
+
+    pub fn effects_commitment(&self) -> Result<Bytes, Error> {
+        let Some(ref p) = self.payload else {
+            return Ok(Cid::default().to_bytes());
+        };
+
+        let bytes = fvm_ipld_encoding::to_vec(&(&p.xnet_msgs, &p.validator_changes))
+            .map_err(|e| {
+                tracing::error!(err = e.to_string(), "cannot serialize parent block view");
+                Error::CannotSerializeParentBlockView
+            })?;
+        let cid = Cid::new_v1(DAG_CBOR, Code::Blake2b256.digest(&bytes));
+        Ok(cid.to_bytes())
     }
 }

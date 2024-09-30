@@ -29,6 +29,7 @@ use std::time::Duration;
 pub use crate::cache::{SequentialAppendError, SequentialKeyCache, ValueIter};
 pub use crate::error::Error;
 pub use crate::finality::CachedFinalityProvider;
+use crate::observation::Ballot;
 pub use crate::toggle::Toggle;
 
 pub type BlockHeight = u64;
@@ -112,20 +113,8 @@ impl Config {
 /// On-chain data structure representing a topdown checkpoint agreed to by a
 /// majority of subnet validators. DAG-CBOR encoded, embedded in CertifiedCheckpoint.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Checkpoint {
-    /// Checkpoint version, expected to increment with schema changes.
-    version: u8,
-    /// The parent height we are forwarding our parent crosslink to.
-    target_height: u64,
-    /// The hash of the chain unit at that height. Usually a block hash, but could
-    /// be a different entity (e.g. tipset CID), depending on the parent chain
-    /// and our interface to it (e.g. if the parent is a Filecoin network, this
-    /// would be a tipset CID coerced into a block hash if we use the Eth API,
-    /// or the tipset CID as-is if we use the Filecoin API.
-    target_hash: BlockHash,
-    /// The commitment is an accumulated hash of all topdown effects since the genesis epoch
-    /// in the parent till the current parent block height(inclusive).
-    effects_commitment: Bytes,
+pub enum Checkpoint {
+    V1(Ballot)
 }
 
 /// The finality view for IPC parent at certain height.
@@ -212,4 +201,24 @@ pub(crate) fn is_null_round_error(err: &anyhow::Error) -> bool {
 
 pub(crate) fn is_null_round_str(s: &str) -> bool {
     s.contains(NULL_ROUND_ERR_MSG)
+}
+
+impl Checkpoint {
+    pub fn target_height(&self) -> BlockHeight {
+        match self {
+            Checkpoint::V1(b) => b.parent_height
+        }
+    }
+
+    pub fn target_hash(&self) -> &Bytes {
+        match self {
+            Checkpoint::V1(b) => &b.parent_hash
+        }
+    }
+
+    pub fn cumulative_effects_comm(&self) -> &Bytes {
+        match self {
+            Checkpoint::V1(b) => &b.cumulative_effects_comm
+        }
+    }
 }

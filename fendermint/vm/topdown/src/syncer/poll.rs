@@ -45,7 +45,7 @@ where
         let Some(min_height) = self.store.min_parent_view_height()? else {
             return Ok(());
         };
-        for h in min_height..=checkpoint.target_height {
+        for h in min_height..=checkpoint.target_height() {
             self.store.purge(h)?;
         }
         Ok(())
@@ -55,12 +55,12 @@ where
     async fn latest_nonnull_data(&self) -> anyhow::Result<(BlockHeight, BlockHash)> {
         let Some(latest_height) = self.store.max_parent_view_height()? else {
             return Ok((
-                self.last_finalized.target_height,
-                self.last_finalized.target_hash.clone(),
+                self.last_finalized.target_height(),
+                self.last_finalized.target_hash().clone(),
             ));
         };
 
-        let start = self.last_finalized.target_height + 1;
+        let start = self.last_finalized.target_height() + 1;
         for h in (start..=latest_height).rev() {
             let Some(p) = self.store.get(h)? else {
                 continue;
@@ -76,8 +76,8 @@ where
 
         // this means the votes stored are all null blocks, return last committed finality
         Ok((
-            self.last_finalized.target_height,
-            self.last_finalized.target_hash.clone(),
+            self.last_finalized.target_height(),
+            self.last_finalized.target_hash().clone(),
         ))
     }
 
@@ -145,7 +145,7 @@ where
         let Some(h) = self.store.max_parent_view_height()? else {
             return Ok(false);
         };
-        Ok(h - self.last_finalized.target_height > self.config.max_store_blocks)
+        Ok(h - self.last_finalized.target_height() > self.config.max_store_blocks)
     }
 
     async fn finalized_chain_head(&self) -> anyhow::Result<Option<BlockHeight>> {
@@ -222,7 +222,7 @@ where
         let view = fetch_data(&self.parent_proxy, height, block_hash_res.block_hash).await?;
 
         self.store.store(view.clone())?;
-        let commitment = deduce_new_observation(&self.store, &self.last_finalized)?;
+        let commitment = deduce_new_observation(&self.store, &self.last_finalized, &self.config.observation)?;
         // if there is an error, ignore, we can always try next loop
         let _ = self
             .event_broadcast
