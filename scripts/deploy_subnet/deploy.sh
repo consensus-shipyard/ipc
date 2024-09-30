@@ -270,7 +270,7 @@ cargo make --makefile infra/fendermint/Makefile.toml \
 # Kill existing relayer if there's one
 pkill -fe "relayer" 2>/dev/null || pgrep -f "relayer" | xargs kill 2>/dev/null || true
 
-# shut down any existing validator nodes
+# Shut down any existing validator nodes
 if [ -e "${IPC_CONFIG_FOLDER}/config.toml" ]; then
     subnet_id=$(toml get -r "${IPC_CONFIG_FOLDER}"/config.toml 'subnets[1].id')
     echo "Existing subnet id: $subnet_id"

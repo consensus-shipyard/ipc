@@ -1,1 +1,10 @@
 metrics_addr = "0.0.0.0:9090"
+
+[gc_policy]
+enabled = true
+interval = 300
+
+[file_logs]
+rust_log = "info"
+max_files = 4
+rotation = "hourly"
