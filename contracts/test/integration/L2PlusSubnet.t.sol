@@ -203,17 +203,34 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             rootNetwork.gatewayAddr
         );
 
-        assertEq(recipient.balance, 3);
+        // apply the result message in the L2 subnet and expect another top down message to be emitted
+        resultMessage.nonce = 0;
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
+        msgs[0] = resultMessage;
+        
+        commitParentFinality(nativeSubnet.gatewayAddr);
+        executeTopDownMsgs(msgs, nativeSubnet.gateway);
+
+        resultMessage.nonce = 1;
+        propagateAllAndExpectTopDownMessageEvent(
+            nativeSubnet.gateway,
+            resultMessage,
+            nativeL3Subnet.subnetActorAddr,
+            nativeSubnet.gatewayAddr
+        );
+
+        assertEq(recipient.balance, amount);
     }
 
     function testL2PlusSubnet_Native_SendCrossMessageFromParentToChild() public {
         address caller = address(new MockIpcContract());
-        address recipient = address(new MockIpcContract());
+        address recipient = address(new MockIpcContractPayable());
         uint256 amount = 3;
 
         vm.deal(nativeSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT);
         vm.deal(caller, 1 ether);
 
+         // register L2 into root network
         vm.prank(nativeSubnet.subnetActorAddr);
         registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, nativeSubnet.subnetActorAddr, rootNetwork.gateway);
 
@@ -225,37 +242,53 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, nativeL3Subnet.subnetActorAddr, nativeSubnet.gateway);
 
         vm.prank(caller);
+        // Fund account in the L2 subnet
         rootNetwork.gateway.manager().fund{value: 100000}(nativeSubnet.id, FvmAddressHelper.from(address(caller)));
 
-        IpcEnvelope memory xnetCallMsg = TestUtils.newXnetCallMsg(
+        IpcEnvelope memory crossMessage = TestUtils.newXnetCallMsg(
             IPCAddress({subnetId: rootNetwork.id, rawAddress: FvmAddressHelper.from(caller)}),
             IPCAddress({subnetId: nativeL3Subnet.id, rawAddress: FvmAddressHelper.from(recipient)}),
             amount,
             0
         );
 
-        IpcEnvelope memory committedEvent = IpcEnvelope({
+        IpcEnvelope memory expectedMessage = IpcEnvelope({
             kind: IpcMsgKind.Call,
-            from: IPCAddress({subnetId: rootNetwork.id, rawAddress: FvmAddressHelper.from(caller)}),
-            to: xnetCallMsg.to,
-            value: xnetCallMsg.value,
-            message: xnetCallMsg.message,
+            from: crossMessage.from,
+            to: crossMessage.to,
+            value: crossMessage.value,
+            message: crossMessage.message,
             nonce: 1
         });
 
+        // send the cross message from the root network to the L3 subnet
         vm.prank(address(caller));
         vm.expectEmit(true, true, true, true, rootNetwork.gatewayAddr);
-        emit LibGateway.NewTopDownMessage({subnet: nativeSubnet.subnetActorAddr, message: committedEvent});
-        rootNetwork.gateway.messenger().sendContractXnetMessage{value: amount}(xnetCallMsg);
+        emit LibGateway.NewTopDownMessage({subnet: nativeSubnet.subnetActorAddr, message: expectedMessage});
+        rootNetwork.gateway.messenger().sendContractXnetMessage{value: amount}(crossMessage);
 
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
-        msgs[0] = xnetCallMsg;
+        msgs[0] = crossMessage;
 
+
+        // propagate the message from the L2 to the L3 subnet
         commitParentFinality(nativeSubnet.gatewayAddr);
         executeTopDownMsgs(msgs, nativeSubnet.gateway);
 
+        // check that the cross message is propagated to the L3 subnet
+        expectedMessage.nonce = 0;
+        propagateAllAndExpectTopDownMessageEvent(
+            nativeSubnet.gateway,
+            expectedMessage,
+            nativeL3Subnet.subnetActorAddr,
+            nativeSubnet.gatewayAddr
+        );
+
+        // apply the cross message in the L3 subnet
         commitParentFinality(nativeL3Subnet.gatewayAddr);
         executeTopDownMsgs(msgs, nativeL3Subnet.gateway);
+
+        // TODO Karel - check the bottom up path for result message
 
         assertEq(address(recipient).balance, amount);
     }
@@ -315,6 +348,8 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
 
         commitParentFinality(nativeL3Subnets[1].gatewayAddr);
         executeTopDownMsgs(msgs, nativeL3Subnets[1].gateway);
+        
+        // TODO Karel - check the path for result message
 
         assertEq(recipient.balance, 3);
     }
@@ -327,7 +362,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
 
         vm.prank(FilAddress.SYSTEM_ACTOR);
         gwTopDownFinalityFacet.commitParentFinality(finality);
-
     }
 
     function executeTopDownMsgs(IpcEnvelope[] memory msgs, GatewayDiamond gw) internal {
@@ -350,12 +384,21 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         // TODO: how to emulate increase of circulation supply?
 
         vm.prank(FilAddress.SYSTEM_ACTOR);
-        GatewayMessengerFacet messenger = gw.messenger();
-        messenger.propagateAll();
-
-        vm.prank(FilAddress.SYSTEM_ACTOR);
         XnetMessagingFacet xnetMessenger = gw.xnetMessenger();
         xnetMessenger.applyCrossMessages(msgs);
+    }
+
+    function propagateAllAndExpectTopDownMessageEvent(
+        GatewayDiamond gw,
+        IpcEnvelope memory expectedMessage,
+        address expectedSubnetAddr,
+        address expectedGatewayAddr
+    ) internal {
+        vm.prank(FilAddress.SYSTEM_ACTOR);
+        vm.expectEmit(true, true, true, true, expectedGatewayAddr);
+        emit LibGateway.NewTopDownMessage({subnet: expectedSubnetAddr, message: expectedMessage});
+        GatewayMessengerFacet messenger = gw.messenger();
+        messenger.propagateAll();
     }
 
     function executeTopDownMsgsRevert(IpcEnvelope[] memory msgs, GatewayDiamond gw) internal {
