@@ -486,9 +486,6 @@ library LibGateway {
         SubnetID memory from = crossMessage.from.subnetId;
         IPCMsgType applyType = crossMessage.applyType(s.networkName);
 
-        // Are we the LCA? (Lowest Common Ancestor)
-        bool isLCA = to.commonParent(from).equals(s.networkName);
-
         // Even if multi-level messaging is enabled, we reject the xnet message
         // as soon as we learn that one of the networks involved use an ERC20 supply source.
         // This will block propagation on the first step, or the last step.
@@ -497,6 +494,8 @@ library LibGateway {
         //  to propagate, the user won't be able to reclaim funds. That's one of the
         //  reasons xnet messages are disabled by default.
 
+        // TODO Karel - this needs to be fixed. It is possible now to have supply kind of ERC20.
+        // only in case of a mismatch we want make sure we result the message with system error.
         bool reject = false;
         if (applyType == IPCMsgType.BottomUp) {
             // We're traversing up, so if we're the first hop, we reject if the subnet was ERC20.
@@ -513,6 +512,9 @@ library LibGateway {
                 revert MethodNotAllowed("propagation of `Transfer` messages not suppported for subnets with ERC20 supply");
             }
         }
+
+        // Are we the LCA? (Lowest Common Ancestor)
+        bool isLCA = to.commonParent(from).equals(s.networkName);
 
         // If the directionality is top-down, or if we're inverting the direction
         // because we're the LCA, commit a top-down message.

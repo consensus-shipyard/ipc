@@ -67,6 +67,7 @@ library CrossMsgHelper {
         bytes memory ret
     ) public pure returns (IpcEnvelope memory) {
         ResultMsg memory message = ResultMsg({id: toHash(crossMsg), outcome: outcome, ret: ret});
+
         uint256 value = crossMsg.value;
         if (outcome == OutcomeType.Ok) {
             // if the message was executed successfully, the value stayed
@@ -84,6 +85,7 @@ library CrossMsgHelper {
             });
     }
 
+    // creates transfer message from the child subnet to the parent subnet
     function createReleaseMsg(
         SubnetID calldata subnet,
         address signer,
@@ -98,6 +100,7 @@ library CrossMsgHelper {
             );
     }
 
+    // creates transfer message from the parent subnet to the child subnet
     function createFundMsg(
         SubnetID calldata subnet,
         address signer,
