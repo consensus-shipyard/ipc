@@ -1,8 +1,9 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::observation::Observation;
 use crate::vote::error::Error;
-use crate::vote::payload::{Observation, PowerTable, PowerUpdates, Vote};
+use crate::vote::payload::{PowerTable, PowerUpdates, Vote};
 use crate::vote::store::VoteStore;
 use crate::vote::Weight;
 use crate::BlockHeight;
@@ -212,8 +213,9 @@ impl<S: VoteStore> VoteTally<S> {
 
 #[cfg(test)]
 mod tests {
+    use crate::observation::{CertifiedObservation, Observation};
     use crate::vote::error::Error;
-    use crate::vote::payload::{CertifiedObservation, Observation, Vote};
+    use crate::vote::payload::Vote;
     use crate::vote::store::InMemoryVoteStore;
     use crate::vote::tally::VoteTally;
     use arbitrary::{Arbitrary, Unstructured};

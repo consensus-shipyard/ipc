@@ -11,7 +11,7 @@ pub mod proxy;
 mod toggle;
 pub mod voting;
 
-pub(crate) mod observation;
+pub mod observation;
 pub mod observe;
 pub mod syncer;
 pub mod vote;
