@@ -14,6 +14,7 @@ import './extensions'
 
 // Load environment variables from .env file.
 import { config as dotenvConfig } from 'dotenv'
+
 dotenvConfig({ path: './.env' })
 
 // Import our tasks.
@@ -29,17 +30,7 @@ const networkDefinition = (chainId: number, url: string) => ({
     saveDeployments: true,
 })
 
-const config: HardhatUserConfig = {
-    defaultNetwork: 'calibrationnet',
-    networks: {
-        // Static networks.
-        mainnet: networkDefinition(314, 'https://api.node.glif.io/rpc/v1'),
-        calibrationnet: networkDefinition(314159, 'https://api.calibration.node.glif.io/rpc/v1'),
-        localnet: networkDefinition(31415926, 'http://localhost:8545'),
-        // Auto uses RPC_URL provided by the user, and an optional CHAIN_ID.
-        // If provided, Hardhat will assert that the chain ID matches the one returned by the RPC.
-        auto: networkDefinition(parseInt(process.env.CHAIN_ID, 10), process.env.RPC_URL!),
-    },
+let config: HardhatUserConfig = {
     solidity: {
         compilers: [
             {
@@ -65,6 +56,23 @@ const config: HardhatUserConfig = {
         contracts: ['GatewayDiamond', 'SubnetActorDiamond', 'GatewayActorModifiers', 'SubnetActorModifiers'],
         fullPath: false,
     },
+}
+
+// Only add the network configurations if we have a private key.
+// Some targets don't require networks, e.g. gen-selector-library.
+if (process.env.PRIVATE_KEY) {
+    config = Object.assign(config, {
+        defaultNetwork: 'calibrationnet',
+        networks: {
+            // Static networks.
+            mainnet: networkDefinition(314, 'https://api.node.glif.io/rpc/v1'),
+            calibrationnet: networkDefinition(314159, 'https://api.calibration.node.glif.io/rpc/v1'),
+            localnet: networkDefinition(31415926, 'http://localhost:8545'),
+            // Auto uses RPC_URL provided by the user, and an optional CHAIN_ID.
+            // If provided, Hardhat will assert that the chain ID matches the one returned by the RPC.
+            auto: networkDefinition(parseInt(process.env.CHAIN_ID, 10), process.env.RPC_URL!),
+        },
+    })
 }
 
 export default config

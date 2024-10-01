@@ -6,8 +6,8 @@ import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 import {TestUtils} from "../helpers/TestUtils.sol";
 import {SelectorLibrary} from "../helpers/SelectorLibrary.sol";
-import {NumberContractFacetSeven} from "../helpers/NumberContractFacetSeven.sol";
-import {NumberContractFacetEight} from "../helpers/NumberContractFacetEight.sol";
+import {NumberContractFacetSeven} from "../helpers/contracts/NumberContractFacetSeven.sol";
+import {NumberContractFacetEight} from "../helpers/contracts/NumberContractFacetEight.sol";
 import {METHOD_SEND} from "../../contracts/constants/Constants.sol";
 import {ConsensusType} from "../../contracts/enums/ConsensusType.sol";
 import {BottomUpMsgBatch, IpcEnvelope, BottomUpCheckpoint, MAX_MSGS_PER_BATCH} from "../../contracts/structs/CrossNet.sol";
@@ -1103,7 +1103,9 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         DiamondCutFacet saDiamondCutter = DiamondCutFacet(address(saDiamond));
         IDiamond.FacetCut[] memory saDiamondCut = new IDiamond.FacetCut[](1);
-        bytes4[] memory ncGetterSelectors = SelectorLibrary.resolveSelectors("NumberContractFacetSeven");
+
+        bytes4[] memory ncGetterSelectors = new bytes4[](1);
+        ncGetterSelectors[0] = NumberContractFacetSeven.getNum.selector;
 
         saDiamondCut[0] = (
             IDiamond.FacetCut({
@@ -1122,7 +1124,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         NumberContractFacetSeven saNumberContract = NumberContractFacetSeven(address(saDiamond));
         assert(saNumberContract.getNum() == 7);
 
-        ncGetterSelectors = SelectorLibrary.resolveSelectors("NumberContractFacetEight");
+        ncGetterSelectors = new bytes4[](1);
+        ncGetterSelectors[0] = NumberContractFacetEight.getNum.selector;
         saDiamondCut[0] = (
             IDiamond.FacetCut({
                 facetAddress: address(ncFacetB),
