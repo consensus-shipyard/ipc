@@ -5,7 +5,6 @@ use crate::vote::Weight;
 use crate::{BlockHash, BlockHeight, Bytes};
 use anyhow::anyhow;
 use arbitrary::Arbitrary;
-use ethers::core::k256::sha2;
 use fendermint_crypto::secp::RecoverableECDSASignature;
 use fendermint_crypto::SecretKey;
 use fendermint_vm_genesis::ValidatorKey;
@@ -14,6 +13,14 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
 pub type PowerTable = HashMap<ValidatorKey, Weight>;
+pub type PowerUpdates = Vec<(ValidatorKey, Weight)>;
+
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+pub struct VoteTallyState {
+    pub last_finalized_height: BlockHeight,
+    pub quorum_threshold: Weight,
+    pub power_table: PowerTable,
+}
 
 /// The different versions of vote casted in topdown gossip pub-sub channel
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -61,12 +68,16 @@ pub struct CertifiedObservation {
 }
 
 impl Vote {
-    pub fn v1(obs: CertifiedObservation) -> anyhow::Result<Self> {
+    pub fn v1(validator_key: ValidatorKey, obs: CertifiedObservation) -> Self {
+        Self::V1 {
+            validator: validator_key,
+            payload: obs,
+        }
+    }
+
+    pub fn v1_checked(obs: CertifiedObservation) -> anyhow::Result<Self> {
         let to_sign = fvm_ipld_encoding::to_vec(&obs.observed)?;
-        let (pk, _) = obs
-            .signature
-            .clone()
-            .recover(&to_sign)?;
+        let (pk, _) = obs.signature.clone().recover(&to_sign)?;
 
         Ok(Self::V1 {
             validator: ValidatorKey::new(pk),
@@ -94,7 +105,7 @@ impl TryFrom<&[u8]> for Vote {
         let version = bytes[0];
 
         if version == 0 {
-            return Self::v1(CertifiedObservation::try_from(&bytes[1..])?);
+            return Self::v1_checked(CertifiedObservation::try_from(&bytes[1..])?);
         }
 
         Err(anyhow!("invalid vote version"))
@@ -117,6 +128,24 @@ impl CertifiedObservation {
             observed: ob,
             signature: sig,
         })
+    }
+}
+
+impl Observation {
+    pub fn new(
+        local_hash: Bytes,
+        parent_height: BlockHeight,
+        parent_hash: Bytes,
+        commitment: Bytes,
+    ) -> Self {
+        Self {
+            local_hash,
+            ballot: Ballot {
+                parent_height,
+                parent_hash,
+                cumulative_effects_comm: commitment,
+            },
+        }
     }
 }
 

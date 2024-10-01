@@ -1,9 +1,10 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::vote::payload::{Ballot, PowerTable, Vote};
+use crate::vote::error::Error;
+use crate::vote::payload::{Ballot, PowerTable, PowerUpdates, Vote};
 use crate::vote::store::VoteStore;
-use crate::vote::{Error, Weight};
+use crate::vote::Weight;
 use crate::BlockHeight;
 use fendermint_vm_genesis::ValidatorKey;
 use std::collections::HashMap;
@@ -45,10 +46,6 @@ impl<S: VoteStore> VoteTally<S> {
         })
     }
 
-    fn power_table(&self) -> &HashMap<ValidatorKey, Weight> {
-        &self.power_table
-    }
-
     /// Check that a validator key is currently part of the power table.
     fn has_power(&self, validator_key: &ValidatorKey) -> bool {
         // For consistency consider validators without power unknown.
@@ -58,11 +55,15 @@ impl<S: VoteStore> VoteTally<S> {
         }
     }
 
+    pub fn power_table(&self) -> &HashMap<ValidatorKey, Weight> {
+        &self.power_table
+    }
+
     /// Calculate the minimum weight needed for a proposal to pass with the current membership.
     ///
     /// This is inclusive, that is, if the sum of weight is greater or equal to this, it should pass.
     /// The equivalent formula can be found in CometBFT [here](https://github.com/cometbft/cometbft/blob/a8991d63e5aad8be82b90329b55413e3a4933dc0/types/vote_set.go#L307).
-    fn quorum_threshold(&self) -> Weight {
+    pub fn quorum_threshold(&self) -> Weight {
         let total_weight: Weight = self.power_table.values().sum();
         total_weight * 2 / 3 + 1
     }
@@ -70,8 +71,33 @@ impl<S: VoteStore> VoteTally<S> {
     /// Return the height of the first entry in the chain.
     ///
     /// This is the block that was finalized *in the ledger*.
-    fn last_finalized_height(&self) -> BlockHeight {
+    pub fn last_finalized_height(&self) -> BlockHeight {
         self.last_finalized_height
+    }
+
+    /// Returns the votes collected in the network at the target height
+    pub fn get_votes_at_height(&self, height: BlockHeight) -> Result<Vec<Vote>, Error> {
+        let votes = self.votes.get_votes_at_height(height)?;
+        Ok(votes.into_owned())
+    }
+
+    /// Dump all the votes that is currently stored in the vote tally.
+    /// This is generally a very expensive operation, but good for debugging, use with care
+    pub fn dump_votes(&self) -> Result<HashMap<BlockHeight, Vec<Vote>>, Error> {
+        let mut r = HashMap::new();
+
+        let Some(latest) = self.votes.latest_vote_height()? else {
+            return Ok(r);
+        };
+
+        for h in self.last_finalized_height + 1..=latest {
+            let votes = self.votes.get_votes_at_height(h)?;
+            if votes.is_empty() {
+                continue;
+            }
+            r.insert(h, votes.into_owned());
+        }
+        Ok(r)
     }
 
     /// Add a vote we received.
@@ -158,7 +184,7 @@ impl<S: VoteStore> VoteTally<S> {
     /// Overwrite the power table after it has changed to a new snapshot.
     ///
     /// This method expects absolute values, it completely replaces the existing powers.
-    pub fn set_power_table(&mut self, power_table: Vec<(ValidatorKey, Weight)>) {
+    pub fn set_power_table(&mut self, power_table: PowerUpdates) {
         let power_table = HashMap::from_iter(power_table);
         // We don't actually have to remove the votes of anyone who is no longer a validator,
         // we just have to make sure to handle the case when they are not in the power table.
@@ -168,7 +194,7 @@ impl<S: VoteStore> VoteTally<S> {
     /// Update the power table after it has changed with changes.
     ///
     /// This method expects only the updated values, leaving everyone who isn't in it untouched
-    pub fn update_power_table(&mut self, power_updates: Vec<(ValidatorKey, Weight)>) {
+    pub fn update_power_table(&mut self, power_updates: PowerUpdates) {
         if power_updates.is_empty() {
             return;
         }
@@ -186,10 +212,10 @@ impl<S: VoteStore> VoteTally<S> {
 
 #[cfg(test)]
 mod tests {
+    use crate::vote::error::Error;
     use crate::vote::payload::{CertifiedObservation, Observation, Vote};
     use crate::vote::store::InMemoryVoteStore;
     use crate::vote::tally::VoteTally;
-    use crate::vote::Error;
     use arbitrary::{Arbitrary, Unstructured};
     use fendermint_crypto::SecretKey;
     use fendermint_vm_genesis::ValidatorKey;
@@ -225,12 +251,14 @@ mod tests {
 
         let obs = random_observation();
         let vote =
-            Vote::v1(CertifiedObservation::sign(obs.clone(), &validators[0].0).unwrap()).unwrap();
+            Vote::v1_checked(CertifiedObservation::sign(obs.clone(), &validators[0].0).unwrap())
+                .unwrap();
         vote_tally.add_vote(vote).unwrap();
 
         let mut obs2 = random_observation();
         obs2.ballot.parent_height = obs.ballot.parent_height();
-        let vote = Vote::v1(CertifiedObservation::sign(obs2, &validators[0].0).unwrap()).unwrap();
+        let vote =
+            Vote::v1_checked(CertifiedObservation::sign(obs2, &validators[0].0).unwrap()).unwrap();
         assert_eq!(vote_tally.add_vote(vote), Err(Error::Equivocation));
     }
 
@@ -254,7 +282,7 @@ mod tests {
 
         for validator in validators {
             let certified = CertifiedObservation::sign(observation.clone(), &validator.0).unwrap();
-            let vote = Vote::v1(certified).unwrap();
+            let vote = Vote::v1_checked(certified).unwrap();
             vote_tally.add_vote(vote).unwrap();
         }
 
@@ -292,14 +320,14 @@ mod tests {
 
         for validator in validators_grp1 {
             let certified = CertifiedObservation::sign(observation1.clone(), &validator.0).unwrap();
-            let vote = Vote::v1(certified).unwrap();
+            let vote = Vote::v1_checked(certified).unwrap();
             vote_tally.add_vote(vote).unwrap();
         }
         assert!(vote_tally.find_quorum().unwrap().is_none());
 
         for validator in validators_grp2 {
             let certified = CertifiedObservation::sign(observation2.clone(), &validator.0).unwrap();
-            let vote = Vote::v1(certified).unwrap();
+            let vote = Vote::v1_checked(certified).unwrap();
             vote_tally.add_vote(vote).unwrap();
         }
 
@@ -326,7 +354,7 @@ mod tests {
 
         for validator in validators {
             let certified = CertifiedObservation::sign(observation.clone(), &validator.0).unwrap();
-            let vote = Vote::v1(certified).unwrap();
+            let vote = Vote::v1_checked(certified).unwrap();
             vote_tally.add_vote(vote).unwrap();
         }
 
@@ -358,16 +386,15 @@ mod tests {
             .set_finalized(observation.ballot.parent_height() - 1)
             .unwrap();
 
-        let mut count = 0;
-        for validator in &validators {
+        for (count, validator) in validators.iter().enumerate() {
             let certified = CertifiedObservation::sign(observation.clone(), &validator.0).unwrap();
-            let vote = Vote::v1(certified).unwrap();
+            let vote = Vote::v1_checked(certified).unwrap();
             vote_tally.add_vote(vote).unwrap();
 
+            // only 3 validators vote
             if count == 2 {
                 break;
             }
-            count += 1;
         }
         assert!(vote_tally.find_quorum().unwrap().is_none());
 

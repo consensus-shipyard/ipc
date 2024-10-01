@@ -30,6 +30,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 prometheus = { workspace = true }
+arbitrary = { workspace = true }
 
 
 multihash = { workspace = true }
@@ -42,7 +43,7 @@ fendermint_crypto = { path = "../../crypto" }
 ipc-observability = { workspace = true }
 
 [dev-dependencies]
-arbitrary = { workspace = true }
+
 clap = { workspace = true }
 rand = { workspace = true }
 tracing-subscriber = { workspace = true }

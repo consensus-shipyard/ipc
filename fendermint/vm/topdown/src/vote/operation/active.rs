@@ -1,10 +1,10 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::vote::gossip::GossipClient;
 use crate::vote::operation::paused::PausedOperationMode;
-use crate::vote::operation::{
-    OperationMetrics, OperationModeHandler, OperationStateMachine, PAUSED,
-};
+use crate::vote::operation::{OperationMetrics, OperationStateMachine, ACTIVE, PAUSED};
+use crate::vote::store::VoteStore;
 use crate::vote::TopDownSyncEvent;
 use crate::vote::VotingHandler;
 use std::fmt::{Display, Formatter};
@@ -12,19 +12,23 @@ use std::fmt::{Display, Formatter};
 /// In active mode, we observe a steady rate of topdown checkpoint commitments on chain.
 /// Our lookahead buffer is sliding continuously. As we acquire new finalised parent blocks,
 /// we broadcast individual signed votes for every epoch.
-pub(crate) struct ActiveOperationMode {
+pub(crate) struct ActiveOperationMode<G, S> {
     pub(crate) metrics: OperationMetrics,
-    pub(crate) handler: VotingHandler,
+    pub(crate) handler: VotingHandler<G, S>,
 }
 
-impl Display for ActiveOperationMode {
+impl<G, S> Display for ActiveOperationMode<G, S> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "active")
+        write!(f, "{}", ACTIVE)
     }
 }
 
-impl OperationModeHandler for ActiveOperationMode {
-    fn advance(mut self) -> OperationStateMachine {
+impl<G, S> ActiveOperationMode<G, S>
+where
+    G: GossipClient + Send + Sync + 'static,
+    S: VoteStore + Send + Sync + 'static,
+{
+    pub(crate) async fn advance(mut self) -> OperationStateMachine<G, S> {
         let mut n = self.handler.process_external_request(&self.metrics);
         tracing::debug!(
             num = n,
@@ -34,10 +38,6 @@ impl OperationModeHandler for ActiveOperationMode {
 
         n = self.handler.process_gossip_subscription_votes();
         tracing::debug!(num = n, status = self.to_string(), "handled gossip votes");
-
-        if n == 0 {
-            todo!("handle transition to soft recover")
-        }
 
         while let Some(v) = self.handler.poll_internal_event() {
             // top down is now syncing, pause everything
@@ -50,7 +50,7 @@ impl OperationModeHandler for ActiveOperationMode {
             }
 
             // handle the polled event
-            self.handler.handle_event(v);
+            self.handler.handle_event(v).await;
         }
 
         OperationStateMachine::Active(self)
