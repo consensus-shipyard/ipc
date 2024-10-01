@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use crate::vote::Weight;
-use crate::{BlockHash, BlockHeight, Bytes};
+use crate::{BlockHeight, Bytes};
 use anyhow::anyhow;
 use arbitrary::Arbitrary;
 use fendermint_crypto::secp::RecoverableECDSASignature;
@@ -31,10 +31,9 @@ pub enum Vote {
     },
 }
 
-/// The actual content that validators should agree upon, or put in another way the content
-/// that a quorum should be formed upon
+/// The content that validators gossip among each other.
 #[derive(Serialize, Deserialize, Hash, Debug, Clone, Eq, PartialEq, Arbitrary)]
-pub struct Ballot {
+pub struct Observation {
     pub(crate) parent_height: u64,
     /// The hash of the chain unit at that height. Usually a block hash, but could
     /// be another entity (e.g. tipset CID), depending on the parent chain
@@ -47,21 +46,17 @@ pub struct Ballot {
     pub(crate) cumulative_effects_comm: Bytes,
 }
 
-/// The content that validators gossip among each other
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Arbitrary)]
-pub struct Observation {
+/// A self-certified observation made by a validator.
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+pub struct CertifiedObservation {
+    observation: Observation,
+    /// The signature for the observation only
+    observation_signature: RecoverableECDSASignature,
     /// The hash of the subnet's last committed block when this observation was made.
     /// Used to discard stale observations that are, e.g. replayed by an attacker
     /// at a later time. Also used to detect nodes that might be wrongly gossiping
     /// whilst being out of sync.
-    local_hash: BlockHash,
-    pub(crate) ballot: Ballot,
-}
-
-/// A self-certified observation made by a validator.
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
-pub struct CertifiedObservation {
-    observed: Observation,
+    certified_at: BlockHeight,
     /// A "recoverable" ECDSA signature with the validator's secp256k1 private key over the
     /// CID of the DAG-CBOR encoded observation using a BLAKE2b-256 multihash.
     signature: RecoverableECDSASignature,
@@ -76,11 +71,8 @@ impl Vote {
     }
 
     pub fn v1_checked(obs: CertifiedObservation) -> anyhow::Result<Self> {
-        let to_sign = fvm_ipld_encoding::to_vec(&obs.observed)?;
-        let (pk, _) = obs.signature.clone().recover(&to_sign)?;
-
         Ok(Self::V1 {
-            validator: ValidatorKey::new(pk),
+            validator: obs.ensure_valid()?,
             payload: obs,
         })
     }
@@ -91,9 +83,9 @@ impl Vote {
         }
     }
 
-    pub fn ballot(&self) -> &Ballot {
+    pub fn observation(&self) -> &Observation {
         match self {
-            Self::V1 { payload, .. } => &payload.observed.ballot,
+            Self::V1 { payload, .. } => &payload.observation,
         }
     }
 }
@@ -121,39 +113,61 @@ impl TryFrom<&[u8]> for CertifiedObservation {
 }
 
 impl CertifiedObservation {
-    pub fn sign(ob: Observation, sk: &SecretKey) -> anyhow::Result<Self> {
-        let to_sign = fvm_ipld_encoding::to_vec(&ob)?;
-        let sig = RecoverableECDSASignature::sign(sk, to_sign.as_slice())?;
+    pub fn ensure_valid(&self) -> anyhow::Result<ValidatorKey> {
+        let to_sign = fvm_ipld_encoding::to_vec(&self.observation)?;
+        let (pk1, _) = self.observation_signature.recover(&to_sign)?;
+
+        let p = Self::envelop_payload(&self.observation_signature, self.certified_at)?;
+        let (pk2, _) = self.signature.recover(p.as_slice())?;
+
+        if pk1 != pk2 {
+            return Err(anyhow!("public keys not aligned"));
+        }
+
+        Ok(ValidatorKey::new(pk1))
+    }
+
+    fn envelop_payload(
+        observation_sig: &RecoverableECDSASignature,
+        certified_at: BlockHeight,
+    ) -> anyhow::Result<Bytes> {
+        Ok(fvm_ipld_encoding::to_vec(&(observation_sig, certified_at))?)
+    }
+
+    pub fn sign(
+        ob: Observation,
+        certified_at: BlockHeight,
+        sk: &SecretKey,
+    ) -> anyhow::Result<Self> {
+        let obs_payload = fvm_ipld_encoding::to_vec(&ob)?;
+        let obs_sig = RecoverableECDSASignature::sign(sk, obs_payload.as_slice())?;
+
+        let p = Self::envelop_payload(&obs_sig, certified_at)?;
+        let sig = RecoverableECDSASignature::sign(sk, p.as_slice())?;
         Ok(Self {
-            observed: ob,
+            observation: ob,
+            observation_signature: obs_sig,
+            certified_at,
             signature: sig,
         })
     }
 }
 
 impl Observation {
-    pub fn new(
-        local_hash: Bytes,
-        parent_height: BlockHeight,
-        parent_hash: Bytes,
-        commitment: Bytes,
-    ) -> Self {
+    pub fn new(parent_height: BlockHeight, parent_hash: Bytes, commitment: Bytes) -> Self {
         Self {
-            local_hash,
-            ballot: Ballot {
-                parent_height,
-                parent_hash,
-                cumulative_effects_comm: commitment,
-            },
+            parent_height,
+            parent_hash,
+            cumulative_effects_comm: commitment,
         }
     }
 }
 
-impl Display for Ballot {
+impl Display for Observation {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Ballot(parent_height={}, parent_hash={}, commitment={})",
+            "Observation(parent_height={}, parent_hash={}, commitment={})",
             self.parent_height,
             hex::encode(&self.parent_hash),
             hex::encode(&self.cumulative_effects_comm),
@@ -161,7 +175,7 @@ impl Display for Ballot {
     }
 }
 
-impl Ballot {
+impl Observation {
     pub fn parent_height(&self) -> BlockHeight {
         self.parent_height
     }
