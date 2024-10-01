@@ -74,6 +74,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         nativeSubnet = createNativeSubnet(nativeSubnetPath, rootNetwork.gatewayAddr, rootNetwork.id);
 
         nativeL3Subnets.push(createNativeSubnet(nativeSubnet.path, nativeSubnet.gatewayAddr, nativeSubnet.id));
+        nativeL3Subnets.push(createNativeSubnet(nativeSubnet.path, nativeSubnet.gatewayAddr, nativeSubnet.id));
 
         token = new ERC20PresetFixedSupply("TestToken", "TEST", 1_000_000, address(this));
 
@@ -137,68 +138,9 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
     // Call flow tests.
     //---------------------
 
-    function testL2PlusSubnet_Native_CallResultRevertsFromChildToParent() public {
-        address caller = address(new MockIpcContractRevert());
-        address recipient = address(new MockIpcContractRevert());
-        uint256 amount = 3;
-
-        uint256 initialBalance = 1 ether;
-
-        vm.deal(nativeSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT);
-        vm.deal(caller, initialBalance);
-
-        vm.prank(nativeSubnet.subnetActorAddr);
-        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, nativeSubnet.subnetActorAddr, rootNetwork.gateway);
-
-        require(rootNetwork.gatewayAddr.balance == initialBalance, "initial balance not correct");
-
-        uint256 fundToSend = 100000;
-
-        vm.prank(caller);
-        rootNetwork.gateway.manager().fund{value: fundToSend}(nativeSubnet.id, FvmAddressHelper.from(address(caller)));
-
-        require(
-            address(rootNetwork.gateway.manager()).balance == initialBalance + fundToSend,
-            "fund not locked in gateway"
-        );
-
-        // a cross network message from parent caller to child recipient
-        IpcEnvelope memory crossMsg = TestUtils.newXnetCallMsg(
-            IPCAddress({subnetId: rootNetwork.id, rawAddress: FvmAddressHelper.from(caller)}),
-            IPCAddress({subnetId: nativeSubnet.id, rawAddress: FvmAddressHelper.from(recipient)}),
-            amount,
-            0
-        );
-        // result in child is ActorErr, resultMsg should be a bottom up message
-        // from child recipient to the parent caller
-        IpcEnvelope memory resultMsg = CrossMsgHelper.createResultMsg(crossMsg, OutcomeType.ActorErr, new bytes(0));
-        IpcEnvelope[] memory crossMsgs = new IpcEnvelope[](1);
-        crossMsgs[0] = resultMsg;
-
-        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
-            nativeSubnet.id,
-            nativeSubnet.gateway,
-            crossMsgs
-        );
-
-        // execution should be in the root native subnet, in the parent
-        // note that the result msg is sent to the caller in the parent,
-        // but the caller is MockIpcContractRevert, which reverts whatever
-        // call made to `handleIpcMessage`, we should make sure:
-        // 1. The submission of checkpoint is never blocked
-        // 2. The fund is locked in the gateway as execution is rejected
-        submitBottomUpCheckpoint(checkpoint, nativeSubnet.subnetActor);
-
-        require(
-            address(rootNetwork.gateway.manager()).balance == initialBalance + fundToSend,
-            "fund should still be locked in gateway"
-        );
-        require(caller.balance == initialBalance - fundToSend, "fund should still be locked in gateway");
-    }
-
-    function testL2PlusSubnet_Native_SendCrossMessageFromChildToParent() public {
+    function testL2PlusSubnet_Native_SendCrossMessageFromChildToParentWithResult() public {
         address caller = address(new MockIpcContract());
-        address recipient = address(new MockIpcContract());
+        address recipient = address(new MockIpcContractPayable());
         uint256 amount = 3;
 
         // register L2 into root nerwork
@@ -206,9 +148,9 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         vm.prank(nativeSubnet.subnetActorAddr);
         registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, nativeSubnet.subnetActorAddr, rootNetwork.gateway);
 
-        // register L3 into L2 subnet
         TestSubnetDefinition memory nativeL3Subnet = nativeL3Subnets[0];
 
+        // register L3 into L2 subnet
         vm.deal(nativeL3Subnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT);
         vm.prank(nativeL3Subnet.subnetActorAddr);
         registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, nativeL3Subnet.subnetActorAddr, nativeSubnet.gateway);
@@ -217,20 +159,22 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         vm.prank(caller);
         // fund from root network to L2
         rootNetwork.gateway.manager().fund{value: 100000}(nativeSubnet.id, FvmAddressHelper.from(address(caller)));
+
         // fund from L2 to L3
         nativeSubnet.gateway.manager().fund{value: 100000}(nativeL3Subnet.id, FvmAddressHelper.from(address(caller)));
 
         // create the xnet message on the subnet L3 - it's local gateway
         GatewayMessengerFacet messenger = nativeL3Subnet.gateway.messenger();
         vm.prank(address(caller));
-        messenger.sendContractXnetMessage{value: amount}(
-            TestUtils.newXnetCallMsg(
-                IPCAddress({subnetId: nativeL3Subnet.id, rawAddress: FvmAddressHelper.from(caller)}),
-                IPCAddress({subnetId: rootNetwork.id, rawAddress: FvmAddressHelper.from(recipient)}),
-                amount,
-                0
-            )
+
+        IpcEnvelope memory crossMessage = TestUtils.newXnetCallMsg(
+            IPCAddress({subnetId: nativeL3Subnet.id, rawAddress: FvmAddressHelper.from(caller)}),
+            IPCAddress({subnetId: rootNetwork.id, rawAddress: FvmAddressHelper.from(recipient)}),
+            amount,
+            0
         );
+
+        messenger.sendContractXnetMessage{value: amount}(crossMessage);
 
         // this would normally be done by Fendermint. It call the local gateway and creates checkpoint.
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
@@ -241,13 +185,25 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         // this would normally submitted by releayer. It call the subnet actor on the L2 network.
         submitBottomUpCheckpoint(checkpoint, nativeL3Subnet.subnetActor);
 
+        // create checkpoint in L2 and submit it to the root network (L2 subnet actor)
         BottomUpCheckpoint memory checkpointL2 = callCreateBottomUpCheckpointFromChildSubnet(
             nativeSubnet.id,
             nativeSubnet.gateway
         );
-        submitBottomUpCheckpoint(checkpointL2, nativeSubnet.subnetActor);
 
-        assertEq(recipient.balance, amount);
+        // expected result top down message from root to L2. This is a response to the xnet call.
+        IpcEnvelope memory resultMessage = crossMessage.createResultMsg(OutcomeType.Ok, abi.encode(EMPTY_BYTES));
+        resultMessage.nonce = 1;
+
+        submitBottomUpCheckpointAndExpectTopDownMessageEvent(
+            checkpointL2,
+            nativeSubnet.subnetActor,
+            resultMessage,
+            nativeSubnet.subnetActorAddr,
+            rootNetwork.gatewayAddr
+        );
+
+        assertEq(recipient.balance, 3);
     }
 
     function testL2PlusSubnet_Native_SendCrossMessageFromParentToChild() public {
@@ -296,18 +252,71 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         msgs[0] = xnetCallMsg;
 
         commitParentFinality(nativeSubnet.gatewayAddr);
-
-        // TODO karel - make sure this is emmited
-        // committedEvent.nonce = 0;
-        // vm.expectEmit(true, true, true, true, nativeSubnet.gatewayAddr);
-        // emit LibGateway.NewTopDownMessage({subnet: nativeL3Subnet.subnetActorAddr, message: committedEvent});
-
         executeTopDownMsgs(msgs, nativeSubnet.gateway);
 
         commitParentFinality(nativeL3Subnet.gatewayAddr);
         executeTopDownMsgs(msgs, nativeL3Subnet.gateway);
 
         assertEq(address(recipient).balance, amount);
+    }
+
+    function testL2PlusSubnet_Native_SendCrossMessageFromSiblingToSibling() public {
+        address caller = address(new MockIpcContract());
+        address recipient = address(new MockIpcContract());
+        uint256 amount = 3;
+
+        vm.deal(nativeSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT);
+        vm.deal(caller, 1 ether);
+
+        // register L2 into root nerwork
+        vm.prank(nativeSubnet.subnetActorAddr);
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, nativeSubnet.subnetActorAddr, rootNetwork.gateway);
+
+        // register L3s into L2 subnet
+        for (uint256 i; i < nativeL3Subnets.length; i++) {
+            vm.deal(nativeL3Subnets[i].subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT);
+            vm.prank(nativeL3Subnets[i].subnetActorAddr);
+            registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, nativeL3Subnets[i].subnetActorAddr, nativeSubnet.gateway);
+        }
+
+        // fund account in the L3-0 subnet
+        vm.prank(caller);
+        nativeSubnet.gateway.manager().fund{value: 100000}(nativeL3Subnets[0].id, FvmAddressHelper.from(address(caller)));
+
+        // create the xnet message to send fund from L3-0 to L3-1
+        IpcEnvelope memory xnetCallMsg = TestUtils.newXnetCallMsg(
+            IPCAddress({subnetId: nativeL3Subnets[0].id, rawAddress: FvmAddressHelper.from(caller)}),
+            IPCAddress({subnetId: nativeL3Subnets[1].id, rawAddress: FvmAddressHelper.from(recipient)}),
+            amount,
+            0
+        );
+
+        GatewayMessengerFacet messenger = nativeL3Subnets[0].gateway.messenger();
+        vm.prank(address(caller));
+        messenger.sendContractXnetMessage{value: amount}(xnetCallMsg);
+
+        // this would normally be done by Fendermint. It call the local gateway and creates checkpoint.
+        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+            nativeL3Subnets[0].id,
+            nativeL3Subnets[0].gateway
+        );
+
+        submitBottomUpCheckpointAndExpectTopDownMessageEvent(
+            checkpoint,
+            nativeL3Subnets[0].subnetActor,
+            xnetCallMsg,
+            nativeL3Subnets[1].subnetActorAddr,
+            nativeSubnet.gatewayAddr
+        );
+
+        // mimics the execution of the top down messages in the L3-1 subnet
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
+        msgs[0] = xnetCallMsg;
+
+        commitParentFinality(nativeL3Subnets[1].gatewayAddr);
+        executeTopDownMsgs(msgs, nativeL3Subnets[1].gateway);
+
+        assertEq(recipient.balance, 3);
     }
 
     function commitParentFinality(address gateway) internal {
@@ -413,7 +422,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         return checkpoint;
     }
 
-    function submitBottomUpCheckpoint(BottomUpCheckpoint memory checkpoint, SubnetActorDiamond sa) internal {
+    function prepareValidatorsSignatures(BottomUpCheckpoint memory checkpoint, SubnetActorDiamond sa) internal returns (address[] memory, bytes[] memory) {
         (uint256[] memory parentKeys, address[] memory parentValidators, ) = TestUtils.getThreeValidators(vm);
         bytes[] memory parentPubKeys = new bytes[](3);
         bytes[] memory parentSignatures = new bytes[](3);
@@ -434,9 +443,33 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             parentSignatures[i] = abi.encodePacked(r, s, v);
         }
 
+        return (parentValidators, parentSignatures);
+    }
+
+    function submitBottomUpCheckpoint(BottomUpCheckpoint memory checkpoint, SubnetActorDiamond sa) internal {
+        (address[] memory parentValidators, bytes[] memory parentSignatures) = prepareValidatorsSignatures(checkpoint,sa);
+
         SubnetActorCheckpointingFacet checkpointer = sa.checkpointer();
 
         vm.startPrank(address(sa));
+        checkpointer.submitCheckpoint(checkpoint, parentValidators, parentSignatures);
+        vm.stopPrank();
+    }
+
+    function submitBottomUpCheckpointAndExpectTopDownMessageEvent(
+        BottomUpCheckpoint memory checkpoint,
+        SubnetActorDiamond subnetActor,
+        IpcEnvelope memory expectedMessage,
+        address expectedSubnetAddr,
+        address expectedGatewayAddr
+    ) internal {
+        (address[] memory parentValidators, bytes[] memory parentSignatures) = prepareValidatorsSignatures(checkpoint,subnetActor);
+
+        SubnetActorCheckpointingFacet checkpointer = subnetActor.checkpointer();
+
+        vm.startPrank(address(subnetActor));
+        vm.expectEmit(true, true, true, true, expectedGatewayAddr);
+        emit LibGateway.NewTopDownMessage({subnet: expectedSubnetAddr, message: expectedMessage});
         checkpointer.submitCheckpoint(checkpoint, parentValidators, parentSignatures);
         vm.stopPrank();
     }
