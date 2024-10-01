@@ -1,6 +1,6 @@
 [package]
 name = "fendermint_actor_gas_market"
-description = "Builtin transaction gas tracking actor for IPC"
+description = "IPC system actor representing a subnet's gas market"
 license.workspace = true
 edition.workspace = true
 authors.workspace = true
