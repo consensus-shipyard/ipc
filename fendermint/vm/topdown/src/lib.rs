@@ -11,7 +11,7 @@ pub mod proxy;
 mod toggle;
 pub mod voting;
 
-pub(crate) mod observation;
+pub mod observation;
 pub mod observe;
 pub mod syncer;
 pub mod vote;
@@ -29,7 +29,7 @@ use std::time::Duration;
 pub use crate::cache::{SequentialAppendError, SequentialKeyCache, ValueIter};
 pub use crate::error::Error;
 pub use crate::finality::CachedFinalityProvider;
-use crate::observation::Ballot;
+use crate::observation::Observation;
 pub use crate::toggle::Toggle;
 
 pub type BlockHeight = u64;
@@ -114,7 +114,7 @@ impl Config {
 /// majority of subnet validators. DAG-CBOR encoded, embedded in CertifiedCheckpoint.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Checkpoint {
-    V1(Ballot),
+    V1(Observation),
 }
 
 /// The finality view for IPC parent at certain height.

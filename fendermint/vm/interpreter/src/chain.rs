@@ -317,12 +317,17 @@ where
                         "chain interpreter committed topdown finality",
                     );
 
-                    // The commitment of the finality for block `N` triggers
-                    // the execution of all side-effects up till `N-1`, as for
-                    // deferred execution chains, this is the latest state that
-                    // we know for sure that we have available.
-                    let execution_fr = prev_height;
-                    let execution_to = finality.height - 1;
+                    // The height range we pull top-down effects from. This _includes_ the proposed
+                    // finality, as we assume that the interface we query publishes only fully
+                    // executed blocks as the head of the chain. This is certainly the case for
+                    // Ethereum-compatible JSON-RPC APIs, like Filecoin's. It should be the case
+                    // too for future Filecoin light clients.
+                    //
+                    // Another factor to take into account is the chain_head_delay, which must be
+                    // non-zero. So even in the case where deferred execution leaks through our
+                    // query mechanism, it should not be problematic because we're guaranteed to
+                    // be _at least_ 1 height behind.
+                    let (execution_fr, execution_to) = (prev_height + 1, finality.height);
 
                     // error happens if we cannot get the validator set from ipc agent after retries
                     let validator_changes = env

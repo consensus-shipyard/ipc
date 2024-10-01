@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.23;
 
-import {NotEnoughBalance, IncreaseAllowanceFailed} from "../errors/IPCErrors.sol";
+import {NotEnoughBalance} from "../errors/IPCErrors.sol";
 import {Asset, AssetKind} from "../structs/Subnet.sol";
 import {EMPTY_BYTES} from "../constants/Constants.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -11,11 +11,6 @@ import {SubnetActorGetterFacet} from "../subnet/SubnetActorGetterFacet.sol";
 /// @notice Helpers to deal with a supply source.
 library AssetHelper {
     using SafeERC20 for IERC20;
-
-    error InvalidERC20Address();
-    error NoBalanceIncrease();
-    error UnexpectedAsset();
-    error UnknownAsset();
 
     /// @notice Assumes that the address provided belongs to a subnet rooted on this network,
     ///         and checks if its supply kind matches the provided one.
@@ -28,9 +23,7 @@ library AssetHelper {
     ///         It reverts if conditions are not met.
     function validate(Asset memory asset) internal view {
         if (asset.kind == AssetKind.ERC20) {
-            if (asset.tokenAddress == address(0)) {
-                revert InvalidERC20Address();
-            }
+            require(asset.tokenAddress != address(0), "Invalid ERC20 address");
             // We require that the ERC20 token contract exists beforehand.
             // The call to balanceOf will revert if the supplied address does not exist, or if it's not an ERC20 contract.
             // Ideally we'd use ERC165 to check if the contract implements the ERC20 standard, but the latter does not support supportsInterface().
@@ -41,9 +34,7 @@ library AssetHelper {
 
     /// @notice Asserts that the supply strategy is of the given kind. If not, it reverts.
     function expect(Asset memory asset, AssetKind kind) internal pure {
-        if (asset.kind != kind) {
-            revert UnexpectedAsset();
-        }
+        require(asset.kind == kind, "Unexpected asset");
     }
 
     /// @notice Locks the specified amount from msg.sender into custody.
@@ -52,19 +43,19 @@ library AssetHelper {
     function lock(Asset memory asset, uint256 value) internal returns (uint256) {
         if (asset.kind == AssetKind.ERC20) {
             IERC20 token = IERC20(asset.tokenAddress);
+
+            // Dealing with deflationary tokens.
             uint256 initialBalance = token.balanceOf(address(this));
             token.safeTransferFrom({from: msg.sender, to: address(this), value: value});
             uint256 finalBalance = token.balanceOf(address(this));
-            if (finalBalance <= initialBalance) {
-                revert NoBalanceIncrease();
-            }
-            // Safe arithmetic is not necessary because underflow is not possible due to the check above
+            require(finalBalance > initialBalance, "No balance increase");
+            // Safe arithmetic is not necessary because underflow is not possible due to the assert above
             return finalBalance - initialBalance;
         } else {
-            // now we are handling native token
-            if (msg.value < value) {
-                revert NoBalanceIncrease();
-            }
+            // Ensure we have received enough funds to cover the value.
+            // msg.value might have coins in excess of the amount that we need to lock (e.g. when contributing both native collateral and supply at the same time).
+            // That's why we can't do a strict equality check.
+            require(msg.value >= value, "Insufficient funds");
         }
         // Do nothing for native.
         return value;
@@ -94,11 +85,11 @@ library AssetHelper {
     ) internal returns (bool success, bytes memory ret) {
         return
             asset.tokenAddress.call(
-                // using IERC20 transfer instead of safe transfer so we can
-                // bubble-up the failure instead of reverting on failure so we
-                // can send the receipt.
-                abi.encodePacked(IERC20.transfer.selector, abi.encode(recipient, value))
-            );
+        // using IERC20 transfer instead of safe transfer so we can
+        // bubble-up the failure instead of reverting on failure so we
+        // can send the receipt.
+            abi.encodePacked(IERC20.transfer.selector, abi.encode(recipient, value))
+        );
     }
 
     /// @notice Calls the target with the specified data, ensuring it receives the specified value.
@@ -143,7 +134,7 @@ library AssetHelper {
             if (ret.length > 0) {
                 assembly {
                     let returndata_size := mload(ret)
-                    // see https://ethereum.stackexchange.com/questions/133748/trying-to-understand-solidity-assemblys-revert-function
+                // see https://ethereum.stackexchange.com/questions/133748/trying-to-understand-solidity-assemblys-revert-function
                     revert(add(32, ret), returndata_size)
                 }
             }
@@ -192,7 +183,7 @@ library AssetHelper {
         if (address(this).balance < value) {
             revert NotEnoughBalance();
         }
-        (bool success, ) = recipient.call{value: value}("");
+        (bool success,) = recipient.call{value: value}("");
         return success;
     }
 
@@ -205,21 +196,22 @@ library AssetHelper {
         }
     }
 
+    // @notice Makes the asset available for spending by the given spender, without actually sending it.
+    // @return msgValue The amount of msg.value that needs to be sent along with the subsequent call that will _actually_ spend that asset.
+    //                  Will be 0 if the asset is a token, since no native coins are to be sent.
+    function makeAvailable(Asset memory self, address spender, uint256 amount) internal returns (uint256 msgValue) {
+        if (self.kind == AssetKind.Native) {
+            msgValue = amount;
+        } else if (self.kind == AssetKind.ERC20) {
+            IERC20 token = IERC20(self.tokenAddress);
+            token.safeIncreaseAllowance(spender, amount);
+            msgValue = 0;
+        }
+        return msgValue;
+    }
+
     function native() internal pure returns (Asset memory) {
         return Asset({kind: AssetKind.Native, tokenAddress: address(0)});
     }
 
-    function isNative(Asset memory self) internal pure returns(bool) {
-        return self.kind == AssetKind.Native;
-    }
-
-    function increaseAllowance(Asset memory self, address spender, uint256 amount) internal {
-        if (self.kind == AssetKind.ERC20) {
-            IERC20 token = IERC20(self.tokenAddress);
-            uint256 allowance = token.allowance(address(this), spender);
-            if (!token.approve(spender, allowance + amount)) {
-                revert IncreaseAllowanceFailed();
-            }
-        }
-    }
 }
