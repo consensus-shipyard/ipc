@@ -19,6 +19,7 @@ pub mod vote;
 use async_stm::Stm;
 use async_trait::async_trait;
 use ethers::utils::hex;
+use fendermint_crypto::quorum::ECDSACertificate;
 use fvm_shared::clock::ChainEpoch;
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
@@ -29,8 +30,10 @@ use std::time::Duration;
 pub use crate::cache::{SequentialAppendError, SequentialKeyCache, ValueIter};
 pub use crate::error::Error;
 pub use crate::finality::CachedFinalityProvider;
-use crate::observation::Observation;
+use crate::observation::{LinearizedParentBlockView, Observation};
+use crate::syncer::ParentSyncerReactorClient;
 pub use crate::toggle::Toggle;
+use crate::vote::VoteReactorClient;
 
 pub type BlockHeight = u64;
 pub type Bytes = Vec<u8>;
@@ -115,6 +118,94 @@ impl Config {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Checkpoint {
     V1(Observation),
+}
+
+/// Topdown proposal as part of fendermint proposal execution
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TopdownProposal {
+    cert: ECDSACertificate<Observation>,
+    effects: (Vec<IpcEnvelope>, Vec<StakingChangeRequest>),
+}
+
+pub struct TopdownClient {
+    syncer: ParentSyncerReactorClient,
+    voting: VoteReactorClient,
+}
+
+impl TopdownClient {
+    pub async fn find_topdown_proposal(&self) -> anyhow::Result<Option<TopdownProposal>> {
+        let Some(quorum_cert) = self.voting.find_quorum().await? else {
+            return Ok(None);
+        };
+
+        let Ok(views) = self
+            .syncer
+            .query_parent_block_view(quorum_cert.payload().parent_height)
+            .await?
+        else {
+            // absorb the error, dont alert the caller
+            return Ok(None);
+        };
+
+        let mut linear = LinearizedParentBlockView::from(quorum_cert.payload());
+
+        let mut xnet_msgs = vec![];
+        let mut validator_changes = vec![];
+
+        for maybe_view in views {
+            let Some(v) = maybe_view else {
+                tracing::error!(
+                    till = quorum_cert.payload().parent_height,
+                    "parent block view does not have all the data"
+                );
+                return Ok(None);
+            };
+
+            if let Err(e) = linear.append(v.clone()) {
+                tracing::error!(err = e.to_string(), "parent block view cannot be appended");
+                return Ok(None);
+            }
+
+            if let Some(payload) = v.payload {
+                xnet_msgs.extend(payload.xnet_msgs);
+                validator_changes.extend(payload.validator_changes);
+            }
+        }
+
+        let ob = match linear.into_observation() {
+            Ok(ob) => ob,
+            Err(e) => {
+                tracing::error!(
+                    err = e.to_string(),
+                    "cannot convert linearized parent view into observation"
+                );
+                return Ok(None);
+            }
+        };
+
+        if ob != *quorum_cert.payload() {
+            // could be due to the minor quorum, just return no proposal
+            tracing::warn!(
+                created = ob.to_string(),
+                expected = quorum_cert.payload().to_string(),
+                "block view observation created not match quorum cert"
+            );
+            return Ok(None);
+        }
+
+        Ok(Some(TopdownProposal {
+            cert: quorum_cert,
+            effects: (xnet_msgs, validator_changes),
+        }))
+    }
+
+    pub async fn parent_finalized(&self, checkpoint: Checkpoint) -> anyhow::Result<()> {
+        self.voting
+            .set_quorum_finalized(checkpoint.target_height())
+            .await??;
+        self.syncer.finalize_parent_height(checkpoint).await?;
+        Ok(())
+    }
 }
 
 /// The finality view for IPC parent at certain height.

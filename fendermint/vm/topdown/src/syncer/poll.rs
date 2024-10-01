@@ -40,6 +40,14 @@ where
         }
     }
 
+    pub fn store(&self) -> &S {
+        &self.store
+    }
+
+    pub fn last_checkpoint(&self) -> &Checkpoint {
+        &self.last_finalized
+    }
+
     /// The target block height is finalized, purge all the parent view before the target height
     pub fn finalize(&mut self, checkpoint: Checkpoint) -> Result<(), Error> {
         let Some(min_height) = self.store.min_parent_view_height()? else {

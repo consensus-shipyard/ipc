@@ -199,7 +199,7 @@ impl ObservationConfig {
     }
 }
 
-struct LinearizedParentBlockView {
+pub(crate) struct LinearizedParentBlockView {
     parent_height: u64,
     parent_hash: Option<BlockHash>,
     cumulative_effects_comm: Bytes,
@@ -211,6 +211,16 @@ impl From<&Checkpoint> for LinearizedParentBlockView {
             parent_height: value.target_height(),
             parent_hash: Some(value.target_hash().clone()),
             cumulative_effects_comm: value.cumulative_effects_comm().clone(),
+        }
+    }
+}
+
+impl From<&Observation> for LinearizedParentBlockView {
+    fn from(value: &Observation) -> Self {
+        LinearizedParentBlockView {
+            parent_height: value.parent_height,
+            parent_hash: Some(value.parent_hash.clone()),
+            cumulative_effects_comm: value.cumulative_effects_comm.clone(),
         }
     }
 }
@@ -242,7 +252,7 @@ impl LinearizedParentBlockView {
         Ok(())
     }
 
-    fn into_observation(self) -> Result<Observation, Error> {
+    pub fn into_observation(self) -> Result<Observation, Error> {
         let Some(hash) = self.parent_hash else {
             return Err(Error::CannotCommitObservationAtNullBlock(
                 self.parent_height,

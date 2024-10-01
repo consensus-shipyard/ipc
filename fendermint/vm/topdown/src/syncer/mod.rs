@@ -3,12 +3,14 @@
 
 use crate::observation::{Observation, ObservationConfig};
 use crate::proxy::ParentQueryProxy;
+use crate::syncer::error::Error;
+use crate::syncer::payload::ParentBlockView;
 use crate::syncer::poll::ParentPoll;
 use crate::syncer::store::ParentViewStore;
 use crate::{BlockHeight, Checkpoint};
 use std::time::Duration;
 use tokio::select;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 
 pub mod error;
 pub mod payload;
@@ -92,11 +94,26 @@ impl ParentSyncerReactorClient {
         self.tx.send(ParentSyncerRequest::Finalized(cp)).await?;
         Ok(())
     }
+
+    pub async fn query_parent_block_view(
+        &self,
+        to: BlockHeight,
+    ) -> anyhow::Result<Result<Vec<Option<ParentBlockView>>, Error>> {
+        let (tx, rx) = oneshot::channel();
+        self.tx
+            .send(ParentSyncerRequest::QueryParentBlockViews { to, tx })
+            .await?;
+        Ok(rx.await?)
+    }
 }
 
 enum ParentSyncerRequest {
     /// A new parent height is finalized
     Finalized(Checkpoint),
+    QueryParentBlockViews {
+        to: BlockHeight,
+        tx: oneshot::Sender<Result<Vec<Option<ParentBlockView>>, Error>>,
+    },
 }
 
 fn handle_request<P, S>(req: ParentSyncerRequest, poller: &mut ParentPoll<P, S>)
@@ -110,6 +127,29 @@ where
             if let Err(e) = poller.finalize(c) {
                 tracing::error!(height, err = e.to_string(), "cannot finalize parent viewer");
             }
+        }
+        ParentSyncerRequest::QueryParentBlockViews { to, tx } => {
+            let store = poller.store();
+
+            let mut r = vec![];
+
+            let start = poller.last_checkpoint().target_height() + 1;
+            for h in start..=to {
+                match store.get(h) {
+                    Ok(v) => r.push(v),
+                    Err(e) => {
+                        tracing::error!(
+                            height = h,
+                            err = e.to_string(),
+                            "cannot query parent block view"
+                        );
+                        let _ = tx.send(Err(e));
+                        return;
+                    }
+                }
+            }
+
+            let _ = tx.send(Ok(r));
         }
     }
 }
