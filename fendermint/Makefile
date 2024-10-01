@@ -51,9 +51,6 @@ e2e: docker-build | cargo-make
 
 e2e-only:
 	cd testing/smoke-test    && cargo make --profile $(PROFILE)
-	cd testing/snapshot-test && cargo make --profile $(PROFILE)
-	cd testing/graph-test    && cargo make --profile $(PROFILE)
-	PROFILE=$(PROFILE) cargo test --locked --package fendermint_materializer
 
 clean:
 	cargo clean

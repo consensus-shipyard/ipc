@@ -102,7 +102,7 @@ abstract contract IpcExchangeUpgradeable is Initializable, IIpcHandler, OwnableU
 
     function dropMessages(bytes32[] calldata ids) public onlyOwner {
         uint256 length = ids.length;
-        for (uint256 i; i < length;) {
+        for (uint256 i; i < length; ) {
             delete inflightMsgs[ids[i]];
             unchecked {
                 ++i;

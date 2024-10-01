@@ -78,6 +78,11 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ !github.event.pull_request.draft }}
     steps:
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: |
+            ${{ secrets.BUILTIN_ACTORS_DEPLOY_KEY }}
+            ${{ secrets.CONTRACTS_DEPLOY_KEY }}
       - uses: actions/checkout@v3
       - uses: pnpm/action-setup@v2
       - name: Setup Node

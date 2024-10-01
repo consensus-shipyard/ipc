@@ -7,12 +7,18 @@ on:
 jobs:
   build:
     name: Build IPC
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     env:
       RUST_BACKTRACE: full
       RUSTFLAGS: -Dwarnings
 
     steps:
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: |
+            ${{ secrets.BUILTIN_ACTORS_DEPLOY_KEY }}
+            ${{ secrets.CONTRACTS_DEPLOY_KEY }}
+
       # https://github.com/marketplace/actions/free-disk-space-ubuntu
       - name: Free Disk Space (Ubuntu)
         uses: jlumbroso/free-disk-space@main
@@ -59,26 +65,8 @@ jobs:
       - name: Generate ABI and bindings
         run: cd contracts && make gen
 
-      - name: Install Rust nightly
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: nightly
-          components: rustfmt,clippy
-
-      - name: Print Rust toolchain default versions
-        run: |
-          echo "rustup show:"
-          rustup show
-          echo "rustc version:"
-          rustc --version
-          echo "cargo version:"
-          cargo -V
-
-      - name: Check fmt (nightly)
-        run: cargo +nightly fmt --check --all
-
-      - name: Check clippy
-        run: cargo clippy --release --tests --no-deps -- -D clippy::all
+      - name: Check fmt and clippy
+        run: make lint
 
       - name: Build all (including tests, benches, examples)
         run: |

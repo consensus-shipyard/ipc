@@ -13,9 +13,10 @@
 extend = [{ path = "../scripts/common.toml" }]
 
 env_files = [
-  { path = "./scripts/smoke.env" },
-  { path = "../scripts/common.env" },
-  { path = "../scripts/ci.env", profile = "ci" },
+    { path = "./scripts/smoke.env" },
+    { path = "../scripts/common.env" },
+    { path = "./scripts/overrides.env" },
+    { path = "../scripts/ci.env", profile = "ci" },
 ]
 
 [env]
@@ -32,10 +33,10 @@ EOF
 [tasks.test]
 clear = true
 dependencies = [
-  "simplecoin-example",
-  "transfer-example",
-  "ethers-example",
-  "query-blockhash-example",
+    "simplecoin-example",
+    "transfer-example",
+    "ethers-example",
+    "query-blockhash-example",
 ]
 
 

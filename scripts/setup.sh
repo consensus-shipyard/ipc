@@ -4,6 +4,8 @@ set -eu
 GOPATH="${GOPATH:-$HOME/go}"
 export FM_NETWORK=test
 
+(cd fendermint && make install)
+
 # Create a new Genesis file
 rm -rf test-network
 mkdir test-network
