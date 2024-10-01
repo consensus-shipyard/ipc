@@ -138,13 +138,13 @@ mod tests {
         (sk, ValidatorKey::new(public_key))
     }
 
-    fn random_observation() -> ObservationCommitment {
+    fn random_observation() -> Observation {
         let mut bytes = [0; 100];
         let mut rng = rand::thread_rng();
         rng.fill_bytes(&mut bytes);
 
         let mut unstructured = Unstructured::new(&bytes);
-        ObservationCommitment::arbitrary(&mut unstructured).unwrap()
+        Observation::arbitrary(&mut unstructured).unwrap()
     }
 
     #[test]

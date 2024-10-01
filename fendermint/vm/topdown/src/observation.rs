@@ -1,7 +1,9 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::{BlockHeight, Bytes};
+use crate::syncer::error::Error;
+use crate::syncer::store::ParentViewStore;
+use crate::{BlockHeight, Bytes, Checkpoint};
 use anyhow::anyhow;
 use arbitrary::Arbitrary;
 use fendermint_crypto::secp::RecoverableECDSASignature;
@@ -39,6 +41,14 @@ pub struct CertifiedObservation {
     /// A "recoverable" ECDSA signature with the validator's secp256k1 private key over the
     /// CID of the DAG-CBOR encoded observation using a BLAKE2b-256 multihash.
     signature: RecoverableECDSASignature,
+}
+
+/// check in the store to see if there is a new observation available
+pub fn deduce_new_observation<S: ParentViewStore>(
+    _store: &S,
+    _checkpoint: &Checkpoint,
+) -> Result<Observation, Error> {
+    todo!()
 }
 
 impl TryFrom<&[u8]> for CertifiedObservation {
