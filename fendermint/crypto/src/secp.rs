@@ -20,7 +20,7 @@ impl RecoverableECDSASignature {
         Ok(Self((rec_id.serialize(), sig.serialize())))
     }
 
-    pub fn recover(self, raw_message: &[u8]) -> anyhow::Result<(PublicKey, [u8; 64])> {
+    pub fn recover(&self, raw_message: &[u8]) -> anyhow::Result<(PublicKey, &[u8; 64])> {
         let v = Code::Blake2b256.digest(raw_message);
 
         let message = libsecp256k1::Message::parse_slice(v.digest())?;
@@ -30,10 +30,10 @@ impl RecoverableECDSASignature {
         let rec_id = RecoveryId::parse(self.0 .0)?;
 
         let pk = recover(&message, &signature, &rec_id)?;
-        Ok((pk, self.0 .1))
+        Ok((pk, &self.0 .1))
     }
 
-    pub fn verify(self, raw_message: &[u8], pk: &PublicKey) -> anyhow::Result<bool> {
+    pub fn verify(&self, raw_message: &[u8], pk: &PublicKey) -> anyhow::Result<bool> {
         let (recovered_pk, _) = self.recover(raw_message)?;
         Ok(recovered_pk == *pk)
     }

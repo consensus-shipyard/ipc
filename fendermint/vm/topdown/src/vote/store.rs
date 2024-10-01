@@ -1,9 +1,8 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::observation::Ballot;
 use crate::vote::error::Error;
-use crate::vote::payload::{PowerTable, Vote};
+use crate::vote::payload::{Observation, PowerTable, Vote};
 use crate::vote::Weight;
 use crate::BlockHeight;
 use fendermint_vm_genesis::ValidatorKey;
@@ -98,8 +97,8 @@ impl<'a> VoteAgg<'a> {
         self.0.into_iter().cloned().collect()
     }
 
-    pub fn ballot_weights(&self, power_table: &PowerTable) -> Vec<(&Ballot, Weight)> {
-        let mut votes: Vec<(&Ballot, Weight)> = Vec::new();
+    pub fn observation_weights(&self, power_table: &PowerTable) -> Vec<(&Observation, Weight)> {
+        let mut votes: Vec<(&Observation, Weight)> = Vec::new();
 
         for v in self.0.iter() {
             let validator = v.voter();
@@ -109,10 +108,10 @@ impl<'a> VoteAgg<'a> {
                 continue;
             }
 
-            if let Some(w) = votes.iter_mut().find(|w| w.0 == v.ballot()) {
+            if let Some(w) = votes.iter_mut().find(|w| w.0 == v.observation()) {
                 w.1 += power;
             } else {
-                votes.push((v.ballot(), power))
+                votes.push((v.observation(), power))
             }
         }
 
@@ -161,7 +160,7 @@ mod tests {
         let observation1 = random_observation();
         votes.push(
             Vote::v1_checked(
-                CertifiedObservation::sign(observation1.clone(), &validators[0].0).unwrap(),
+                CertifiedObservation::sign(observation1.clone(), 100, &validators[0].0).unwrap(),
             )
             .unwrap(),
         );
@@ -169,22 +168,19 @@ mod tests {
         let observation2 = random_observation();
         votes.push(
             Vote::v1_checked(
-                CertifiedObservation::sign(observation2.clone(), &validators[1].0).unwrap(),
+                CertifiedObservation::sign(observation2.clone(), 100, &validators[1].0).unwrap(),
             )
             .unwrap(),
         );
         votes.push(
             Vote::v1_checked(
-                CertifiedObservation::sign(observation2.clone(), &validators[2].0).unwrap(),
+                CertifiedObservation::sign(observation2.clone(), 100, &validators[2].0).unwrap(),
             )
             .unwrap(),
         );
 
         let agg = VoteAgg(votes.iter().collect());
-        let weights = agg.ballot_weights(&HashMap::from_iter(powers));
-        assert_eq!(
-            weights,
-            vec![(&observation1.ballot, 1), (&observation2.ballot, 2),]
-        )
+        let weights = agg.observation_weights(&HashMap::from_iter(powers));
+        assert_eq!(weights, vec![(&observation1, 1), (&observation2, 2),])
     }
 }

@@ -4,8 +4,8 @@ pragma solidity ^0.8.23;
 import "forge-std/Test.sol";
 
 import "../../contracts/errors/IPCErrors.sol";
-import {NumberContractFacetSeven} from "../helpers/NumberContractFacetSeven.sol";
-import {NumberContractFacetEight} from "../helpers/NumberContractFacetEight.sol";
+import {NumberContractFacetSeven} from "../helpers/contracts/NumberContractFacetSeven.sol";
+import {NumberContractFacetEight} from "../helpers/contracts/NumberContractFacetEight.sol";
 import {EMPTY_BYTES, METHOD_SEND} from "../../contracts/constants/Constants.sol";
 import {IERC165} from "../../contracts/interfaces/IERC165.sol";
 import {IDiamond} from "../../contracts/interfaces/IDiamond.sol";
@@ -127,7 +127,9 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
 
         DiamondCutFacet gwDiamondCutter = DiamondCutFacet(address(gatewayDiamond));
         IDiamond.FacetCut[] memory gwDiamondCut = new IDiamond.FacetCut[](1);
-        bytes4[] memory ncGetterSelectors = SelectorLibrary.resolveSelectors("NumberContractFacetSeven");
+
+        bytes4[] memory ncGetterSelectors = new bytes4[](1);
+        ncGetterSelectors[0] = NumberContractFacetSeven.getNum.selector;
 
         gwDiamondCut[0] = (
             IDiamond.FacetCut({
@@ -146,7 +148,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         NumberContractFacetSeven gwNumberContract = NumberContractFacetSeven(address(gatewayDiamond));
         assert(gwNumberContract.getNum() == 7);
 
-        ncGetterSelectors = SelectorLibrary.resolveSelectors("NumberContractFacetEight");
+        ncGetterSelectors = new bytes4[](1);
+        ncGetterSelectors[0] = NumberContractFacetEight.getNum.selector;
 
         gwDiamondCut[0] = (
             IDiamond.FacetCut({

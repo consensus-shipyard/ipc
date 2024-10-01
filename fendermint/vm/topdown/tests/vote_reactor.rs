@@ -8,13 +8,14 @@
 use async_trait::async_trait;
 use fendermint_crypto::SecretKey;
 use fendermint_vm_genesis::ValidatorKey;
-use fendermint_vm_topdown::observation::ObservationCommitment;
-use fendermint_vm_topdown::syncer::TopDownSyncEvent;
+use fendermint_vm_topdown::sync::TopDownSyncEvent;
 use fendermint_vm_topdown::vote::error::Error;
 use fendermint_vm_topdown::vote::gossip::GossipClient;
-use fendermint_vm_topdown::vote::payload::{PowerUpdates, Vote};
+use fendermint_vm_topdown::vote::payload::{Observation, PowerUpdates, Vote};
 use fendermint_vm_topdown::vote::store::InMemoryVoteStore;
-use fendermint_vm_topdown::vote::{start_vote_reactor, Config, VoteReactorClient, Weight};
+use fendermint_vm_topdown::vote::{
+    start_vote_reactor, Config, StartVoteReactorParams, VoteReactorClient, Weight,
+};
 use fendermint_vm_topdown::BlockHeight;
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::error::TryRecvError;
@@ -128,22 +129,23 @@ async fn simple_lifecycle() {
 
     let (internal_event_tx, _) = broadcast::channel(validators.len() + 1);
 
-    let client = start_vote_reactor(
-        config.clone(),
-        validators[0].sk.clone(),
-        power_updates.clone(),
-        initial_finalized_height,
-        gossips.pop().unwrap(),
-        InMemoryVoteStore::default(),
-        internal_event_tx.subscribe(),
-    )
+    let client = start_vote_reactor(StartVoteReactorParams {
+        config: config.clone(),
+        validator_key: validators[0].sk.clone(),
+        power_table: power_updates.clone(),
+        last_finalized_height: initial_finalized_height,
+        latest_child_block: 100,
+        gossip: gossips.pop().unwrap(),
+        vote_store: InMemoryVoteStore::default(),
+        internal_event_listener: internal_event_tx.subscribe(),
+    })
     .unwrap();
 
     assert_eq!(client.find_quorum().await.unwrap(), None);
 
     // now topdown sync published a new observation on parent height 100
     let parent_height = 100;
-    let obs = ObservationCommitment::new(vec![100], parent_height, vec![1, 2, 3], vec![2, 3, 4]);
+    let obs = Observation::new(parent_height, vec![1, 2, 3], vec![2, 3, 4]);
     internal_event_tx
         .send(TopDownSyncEvent::NewProposal(Box::new(obs)))
         .unwrap();
@@ -159,7 +161,7 @@ async fn simple_lifecycle() {
 
     // now push another observation
     let parent_height2 = 101;
-    let obs2 = ObservationCommitment::new(vec![100], parent_height2, vec![1, 2, 3], vec![2, 3, 4]);
+    let obs2 = Observation::new(parent_height2, vec![1, 2, 3], vec![2, 3, 4]);
     internal_event_tx
         .send(TopDownSyncEvent::NewProposal(Box::new(obs2)))
         .unwrap();
@@ -205,15 +207,16 @@ async fn waiting_for_quorum() {
     for i in 0..validators.len() {
         let (internal_event_tx, _) = broadcast::channel(validators.len() + 1);
 
-        let client = start_vote_reactor(
-            config.clone(),
-            validators[i].sk.clone(),
-            power_updates.clone(),
-            initial_finalized_height,
-            gossips.pop().unwrap(),
-            InMemoryVoteStore::default(),
-            internal_event_tx.subscribe(),
-        )
+        let client = start_vote_reactor(StartVoteReactorParams {
+            config: config.clone(),
+            validator_key: validators[i].sk.clone(),
+            power_table: power_updates.clone(),
+            last_finalized_height: initial_finalized_height,
+            latest_child_block: 100,
+            gossip: gossips.pop().unwrap(),
+            vote_store: InMemoryVoteStore::default(),
+            internal_event_listener: internal_event_tx.subscribe(),
+        })
         .unwrap();
 
         clients.push(client);
@@ -222,11 +225,11 @@ async fn waiting_for_quorum() {
 
     // now topdown sync published a new observation on parent height 100
     let parent_height1 = 100;
-    let obs1 = ObservationCommitment::new(vec![100], parent_height1, vec![1, 2, 3], vec![2, 3, 4]);
+    let obs1 = Observation::new(parent_height1, vec![1, 2, 3], vec![2, 3, 4]);
     let parent_height2 = 110;
-    let obs2 = ObservationCommitment::new(vec![100], parent_height2, vec![1, 2, 3], vec![2, 3, 4]);
+    let obs2 = Observation::new(parent_height2, vec![1, 2, 3], vec![2, 3, 4]);
     let parent_height3 = 120;
-    let obs3 = ObservationCommitment::new(vec![100], parent_height3, vec![1, 2, 3], vec![2, 3, 4]);
+    let obs3 = Observation::new(parent_height3, vec![1, 2, 3], vec![2, 3, 4]);
 
     internal_txs[0]
         .send(TopDownSyncEvent::NewProposal(Box::new(obs1.clone())))
@@ -330,21 +333,23 @@ async fn all_validator_in_sync() {
 
     let mut node_clients = vec![];
     for validator in &validators {
-        let r = start_vote_reactor(
-            config.clone(),
-            validator.sk.clone(),
-            power_updates.clone(),
-            initial_finalized_height,
-            gossips.pop().unwrap(),
-            InMemoryVoteStore::default(),
-            internal_event_tx.subscribe(),
-        )
+        let r = start_vote_reactor(StartVoteReactorParams {
+            config: config.clone(),
+            validator_key: validator.sk.clone(),
+            power_table: power_updates.clone(),
+            last_finalized_height: initial_finalized_height,
+            latest_child_block: 100,
+            gossip: gossips.pop().unwrap(),
+            vote_store: InMemoryVoteStore::default(),
+            internal_event_listener: internal_event_tx.subscribe(),
+        })
         .unwrap();
+
         node_clients.push(r);
     }
 
     let parent_height = 100;
-    let obs = ObservationCommitment::new(vec![100], parent_height, vec![1, 2, 3], vec![2, 3, 4]);
+    let obs = Observation::new(parent_height, vec![1, 2, 3], vec![2, 3, 4]);
     internal_event_tx
         .send(TopDownSyncEvent::NewProposal(Box::new(obs)))
         .unwrap();

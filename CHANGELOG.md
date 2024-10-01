@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [axon-r05] - 2024-09-24
+
+_Full changelog below._
+
+### ⭐ HIGHLIGHT | Token-bound validator collateral 🪙🔐
+
+Token-bound validator collateral enables subnets to designate an `ERC20` token as the staking collateral for consensus validators, rather than being limited to the parent chain's native token (e.g., `FIL`).
+
+This feature provides subnet operators with the flexibility to use their own tokens for staking, aligning network security with the native token economy. As subnets grow and evolve, this capability becomes increasingly important for subnet autonomy. Validators can stake the subnet’s native token, simplifying participation and reinforcing the subnet's economic model.
+
+By decoupling consensus security from the parent token, subnet operators gain greater control over their own cryptoeconomics, making it easier to integrate staking, rewards, and penalties with their native token. This is essential for future subnet development, ensuring that staking mechanisms can evolve alongside the growth of specialized token economies.
+
+### 🚀 Features
+
+- _(contracts)_ Token-bound validator collateral (#1130)
+
+### 🐛 Bug Fixes
+
+- _(topdown)_ Pull effects up until committed finality. (#887)
+
+### ⚙️ Miscellaneous Tasks
+
+- Remove Python requirement for contracts development (#1144)
+
 ## [axon-r04] - 2024-09-18
 
 _Full changelog below._

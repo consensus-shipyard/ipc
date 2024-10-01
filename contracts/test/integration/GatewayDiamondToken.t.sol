@@ -57,7 +57,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         (SubnetID memory subnetId, , , , ) = getSubnet(address(saDiamond));
 
         vm.prank(caller);
-        vm.expectRevert(AssetHelper.UnexpectedAsset.selector);
+        vm.expectRevert("Unexpected asset");
         gatewayDiamond.manager().fundWithToken(subnetId, FvmAddressHelper.from(caller), 100);
     }
 
@@ -68,7 +68,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         Subnet memory subnet = createTokenSubnet(address(token));
 
         vm.prank(caller);
-        vm.expectRevert(AssetHelper.UnexpectedAsset.selector);
+        vm.expectRevert("Unexpected asset");
         gatewayDiamond.manager().fund{value: 100}(subnet.id, FvmAddressHelper.from(caller));
     }
 
