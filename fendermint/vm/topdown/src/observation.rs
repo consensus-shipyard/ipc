@@ -1,17 +1,17 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::cmp::min;
 use crate::syncer::error::Error;
 use crate::syncer::store::ParentViewStore;
 use crate::{BlockHash, BlockHeight, Bytes, Checkpoint};
 use arbitrary::Arbitrary;
-use serde::{Deserialize, Serialize};
-use std::fmt::{Display, Formatter};
 use cid::Cid;
 use fvm_ipld_encoding::DAG_CBOR;
 use multihash::Code;
 use multihash::MultihashDigest;
+use serde::{Deserialize, Serialize};
+use std::cmp::min;
+use std::fmt::{Display, Formatter};
 
 use crate::syncer::payload::ParentBlockView;
 
@@ -68,16 +68,20 @@ pub fn deduce_new_observation<S: ParentViewStore>(
 
     if latest_height < checkpoint.target_height() {
         tracing::info!("committed vote height more than latest parent view");
-        return Err(Error::CommittedParentHeightNotPurged)
+        return Err(Error::CommittedParentHeightNotPurged);
     }
 
     let max_observation_height = checkpoint.target_height() + config.max_observation_range();
     let candidate_height = min(max_observation_height, latest_height);
-    tracing::debug!(max_observation_height, candidate_height, "propose observation height");
+    tracing::debug!(
+        max_observation_height,
+        candidate_height,
+        "propose observation height"
+    );
 
     // aggregate commitment for the observation
     let mut agg = LinearizedParentBlockView::from(checkpoint);
-    for h in checkpoint.target_height()+1..=candidate_height {
+    for h in checkpoint.target_height() + 1..=candidate_height {
         let Some(p) = store.get(h)? else {
             tracing::debug!(height = h, "not parent block view");
             return Err(Error::MissingBlockView(h, candidate_height));
@@ -88,7 +92,10 @@ pub fn deduce_new_observation<S: ParentViewStore>(
 
     // TODO: integrate local hash
     let observation = agg.into_commitment(vec![])?;
-    tracing::info!(height = observation.ballot.parent_height, "new observation derived");
+    tracing::info!(
+        height = observation.ballot.parent_height,
+        "new observation derived"
+    );
 
     Ok(observation)
 }
@@ -102,6 +109,12 @@ impl Display for Ballot {
             hex::encode(&self.parent_hash),
             hex::encode(&self.cumulative_effects_comm),
         )
+    }
+}
+
+impl AsRef<[u8]> for Ballot {
+    fn as_ref(&self) -> &[u8] {
+        todo!()
     }
 }
 
@@ -131,7 +144,8 @@ impl ObservationCommitment {
 
 impl ObservationConfig {
     pub fn max_observation_range(&self) -> BlockHeight {
-        self.max_observation_range.unwrap_or(DEFAULT_MAX_OBSERVATION_RANGE)
+        self.max_observation_range
+            .unwrap_or(DEFAULT_MAX_OBSERVATION_RANGE)
     }
 }
 
@@ -153,14 +167,18 @@ impl From<&Checkpoint> for LinearizedParentBlockView {
 
 impl LinearizedParentBlockView {
     fn new_commitment(&mut self, to_append: Bytes) {
-        let bytes = [self.cumulative_effects_comm.as_slice(), to_append.as_slice()].concat();
+        let bytes = [
+            self.cumulative_effects_comm.as_slice(),
+            to_append.as_slice(),
+        ]
+        .concat();
         let cid = Cid::new_v1(DAG_CBOR, Code::Blake2b256.digest(&bytes));
         self.cumulative_effects_comm = cid.to_bytes();
     }
 
-    pub fn append(&mut self, view: ParentBlockView) -> Result<(), Error>{
+    pub fn append(&mut self, view: ParentBlockView) -> Result<(), Error> {
         if self.parent_height + 1 != view.parent_height {
-            return Err(Error::NotSequential)
+            return Err(Error::NotSequential);
         }
 
         self.parent_height += 1;
@@ -176,8 +194,15 @@ impl LinearizedParentBlockView {
 
     fn into_commitment(self, local_hash: BlockHash) -> Result<ObservationCommitment, Error> {
         let Some(hash) = self.parent_hash else {
-            return Err(Error::CannotCommitObservationAtNullBlock(self.parent_height));
+            return Err(Error::CannotCommitObservationAtNullBlock(
+                self.parent_height,
+            ));
         };
-        Ok(ObservationCommitment::new(local_hash, self.parent_height, hash, self.cumulative_effects_comm))
+        Ok(ObservationCommitment::new(
+            local_hash,
+            self.parent_height,
+            hash,
+            self.cumulative_effects_comm,
+        ))
     }
 }

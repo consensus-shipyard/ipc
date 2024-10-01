@@ -222,7 +222,8 @@ where
         let view = fetch_data(&self.parent_proxy, height, block_hash_res.block_hash).await?;
 
         self.store.store(view.clone())?;
-        let commitment = deduce_new_observation(&self.store, &self.last_finalized, &self.config.observation)?;
+        let commitment =
+            deduce_new_observation(&self.store, &self.last_finalized, &self.config.observation)?;
         // if there is an error, ignore, we can always try next loop
         let _ = self
             .event_broadcast

@@ -3,7 +3,7 @@
 
 use crate::observation::{Ballot, ObservationCommitment};
 use crate::vote::Weight;
-use crate::BlockHeight;
+use crate::{BlockHeight, Bytes};
 use anyhow::anyhow;
 use fendermint_crypto::secp::RecoverableECDSASignature;
 use fendermint_crypto::SecretKey;
@@ -49,7 +49,7 @@ impl Vote {
 
     pub fn v1_checked(obs: CertifiedObservation) -> anyhow::Result<Self> {
         let to_sign = fvm_ipld_encoding::to_vec(&obs.observed)?;
-        let (pk, _) = obs.signature.clone().recover(&to_sign)?;
+        let (pk, _) = obs.signature.recover(&to_sign)?;
 
         Ok(Self::V1 {
             validator: ValidatorKey::new(pk),
@@ -66,6 +66,12 @@ impl Vote {
     pub fn ballot(&self) -> &Ballot {
         match self {
             Self::V1 { payload, .. } => &payload.observed.ballot,
+        }
+    }
+
+    pub fn ballot_sig(&self) -> &RecoverableECDSASignature {
+        match self {
+            Self::V1 { payload, .. } => &payload.signature,
         }
     }
 }

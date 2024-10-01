@@ -7,7 +7,10 @@ use crate::vote::payload::{PowerTable, PowerUpdates, Vote};
 use crate::vote::store::VoteStore;
 use crate::vote::Weight;
 use crate::BlockHeight;
+use fendermint_crypto::quorum::ECDSACertificate;
 use fendermint_vm_genesis::ValidatorKey;
+use num_rational::Ratio;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 
 /// VoteTally aggregates different votes received from various validators in the network
@@ -24,6 +27,9 @@ pub(crate) struct VoteTally<S> {
 
     /// The latest height that was voted to be finalized and committed to child blockchian
     last_finalized_height: BlockHeight,
+
+    /// The quorum threshold ratio required for a quorum
+    quorum_ratio: Ratio<Weight>,
 }
 
 impl<S: VoteStore> VoteTally<S> {
@@ -44,6 +50,7 @@ impl<S: VoteStore> VoteTally<S> {
             power_table: HashMap::from_iter(power_table),
             votes: store,
             last_finalized_height,
+            quorum_ratio: Ratio::new(2, 3),
         })
     }
 
@@ -66,7 +73,7 @@ impl<S: VoteStore> VoteTally<S> {
     /// The equivalent formula can be found in CometBFT [here](https://github.com/cometbft/cometbft/blob/a8991d63e5aad8be82b90329b55413e3a4933dc0/types/vote_set.go#L307).
     pub fn quorum_threshold(&self) -> Weight {
         let total_weight: Weight = self.power_table.values().sum();
-        total_weight * 2 / 3 + 1
+        total_weight * self.quorum_ratio.numer() / self.quorum_ratio.denom()
     }
 
     /// Return the height of the first entry in the chain.
@@ -143,7 +150,7 @@ impl<S: VoteStore> VoteTally<S> {
     }
 
     /// Find a block on the (from our perspective) finalized chain that gathered enough votes from validators.
-    pub fn find_quorum(&self) -> Result<Option<Ballot>, Error> {
+    pub fn find_quorum(&self) -> Result<Option<ECDSACertificate<Ballot>>, Error> {
         let quorum_threshold = self.quorum_threshold();
         let Some(max_height) = self.votes.latest_vote_height()? else {
             tracing::info!("vote store has no vote yet, skip finding quorum");
@@ -163,7 +170,8 @@ impl<S: VoteStore> VoteTally<S> {
                 );
 
                 if weight >= quorum_threshold {
-                    return Ok(Some(ballot.clone()));
+                    let cert = votes.generate_cert(self.ordered_validators(), ballot)?;
+                    return Ok(Some(cert));
                 }
             }
 
@@ -208,6 +216,21 @@ impl<S: VoteStore> VoteTally<S> {
                 *self.power_table.entry(vk).or_default() = w;
             }
         }
+    }
+
+    fn ordered_validators(&self) -> Vec<(&ValidatorKey, &Weight)> {
+        let mut sorted_powers = self.power_table.iter().collect::<Vec<_>>();
+
+        sorted_powers.sort_by(|(a, b)| {
+            let cmp = b.1.cmp(a.1);
+            if cmp != Ordering::Equal {
+                cmp
+            } else {
+                b.0.cmp(a.0)
+            }
+        });
+
+        sorted_powers
     }
 }
 

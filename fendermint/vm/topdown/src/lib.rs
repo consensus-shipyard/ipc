@@ -114,7 +114,7 @@ impl Config {
 /// majority of subnet validators. DAG-CBOR encoded, embedded in CertifiedCheckpoint.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Checkpoint {
-    V1(Ballot)
+    V1(Ballot),
 }
 
 /// The finality view for IPC parent at certain height.
@@ -206,19 +206,19 @@ pub(crate) fn is_null_round_str(s: &str) -> bool {
 impl Checkpoint {
     pub fn target_height(&self) -> BlockHeight {
         match self {
-            Checkpoint::V1(b) => b.parent_height
+            Checkpoint::V1(b) => b.parent_height,
         }
     }
 
     pub fn target_hash(&self) -> &Bytes {
         match self {
-            Checkpoint::V1(b) => &b.parent_hash
+            Checkpoint::V1(b) => &b.parent_hash,
         }
     }
 
     pub fn cumulative_effects_comm(&self) -> &Bytes {
         match self {
-            Checkpoint::V1(b) => &b.cumulative_effects_comm
+            Checkpoint::V1(b) => &b.cumulative_effects_comm,
         }
     }
 }

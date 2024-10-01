@@ -6,6 +6,7 @@ use crate::vote::error::Error;
 use crate::vote::payload::{PowerTable, Vote};
 use crate::vote::Weight;
 use crate::BlockHeight;
+use fendermint_crypto::quorum::ECDSACertificate;
 use fendermint_vm_genesis::ValidatorKey;
 use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, HashMap};
@@ -83,11 +84,15 @@ impl VoteStore for InMemoryVoteStore {
 }
 
 /// The aggregated votes  from different validators.
-pub struct VoteAgg<'a>(Vec<&'a Vote>);
+pub struct VoteAgg<'a>(HashMap<ValidatorKey, &'a Vote>);
 
 impl<'a> VoteAgg<'a> {
     pub fn new(votes: Vec<&'a Vote>) -> Self {
-        Self(votes)
+        let mut map = HashMap::new();
+        for v in votes {
+            map.insert(v.voter(), v);
+        }
+        Self(map)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -95,16 +100,14 @@ impl<'a> VoteAgg<'a> {
     }
 
     pub fn into_owned(self) -> Vec<Vote> {
-        self.0.into_iter().cloned().collect()
+        self.0.into_values().cloned().collect()
     }
 
     pub fn ballot_weights(&self, power_table: &PowerTable) -> Vec<(&Ballot, Weight)> {
         let mut votes: Vec<(&Ballot, Weight)> = Vec::new();
 
-        for v in self.0.iter() {
-            let validator = v.voter();
-
-            let power = power_table.get(&validator).cloned().unwrap_or(0);
+        for (validator, v) in self.0.iter() {
+            let power = power_table.get(validator).cloned().unwrap_or(0);
             if power == 0 {
                 continue;
             }
@@ -117,6 +120,36 @@ impl<'a> VoteAgg<'a> {
         }
 
         votes
+    }
+
+    /// Generate a cert from the ordered validator keys and the target observation as payload
+    pub fn generate_cert(
+        &self,
+        ordered_validators: Vec<(&ValidatorKey, &Weight)>,
+        ballot: &Ballot,
+    ) -> Result<ECDSACertificate<Ballot>, Error> {
+        let mut cert = ECDSACertificate::new_of_size(ballot.clone(), ordered_validators.len());
+
+        for (idx, (validator, _)) in ordered_validators.into_iter().enumerate() {
+            let Some(vote) = self.0.get(validator) else {
+                continue;
+            };
+
+            if vote.ballot() == *ballot {
+                cert.set_signature(
+                    idx,
+                    ballot,
+                    validator.public_key(),
+                    vote.ballot_sig().clone(),
+                )
+                .map_err(|e| {
+                    tracing::error!(err = e.to_string(), "cannot verify signature");
+                    Error::VoteCannotBeValidated
+                })?;
+            }
+        }
+
+        Ok(cert)
     }
 }
 

@@ -1,14 +1,14 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::syncer::error::Error;
+use crate::{BlockHash, BlockHeight, Bytes};
 use cid::Cid;
 use fvm_ipld_encoding::DAG_CBOR;
-use multihash::Code;
-use crate::{BlockHash, BlockHeight, Bytes};
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
+use multihash::Code;
 use multihash::MultihashDigest;
-use crate::syncer::error::Error;
 
 #[derive(Clone, Debug)]
 pub struct ParentBlockViewPayload {
@@ -55,8 +55,8 @@ impl ParentBlockView {
             return Ok(Cid::default().to_bytes());
         };
 
-        let bytes = fvm_ipld_encoding::to_vec(&(&p.xnet_msgs, &p.validator_changes))
-            .map_err(|e| {
+        let bytes =
+            fvm_ipld_encoding::to_vec(&(&p.xnet_msgs, &p.validator_changes)).map_err(|e| {
                 tracing::error!(err = e.to_string(), "cannot serialize parent block view");
                 Error::CannotSerializeParentBlockView
             })?;
