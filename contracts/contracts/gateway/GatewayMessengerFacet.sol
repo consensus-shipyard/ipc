@@ -15,6 +15,8 @@ import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
 
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
+import "forge-std/console.sol";
+
 string constant ERR_GENERAL_CROSS_MSG_DISABLED = "Support for general-purpose cross-net messages is disabled";
 string constant ERR_MULTILEVEL_CROSS_MSG_DISABLED = "Support for multi-level cross-net messages is disabled";
 
@@ -22,6 +24,8 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
     using FilAddress for address payable;
     using SubnetIDHelper for SubnetID;
     using EnumerableSet for EnumerableSet.Bytes32Set;
+    
+    event MessagePropagated(bytes32 indexed msgCid, uint256 value, bool shouldBurn);
 
     /**
      * @dev Sends a general-purpose cross-message from the local subnet to the destination subnet.
@@ -81,7 +85,8 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
      * @dev Propagates all the populated cross-net messages for the given `cid`.
      */
     function propagateAll() external payable {
-        uint256 keysLength = s.postboxKeys.length(); // Cache length for gas efficiency
+        uint256 keysLength = s.postboxKeys.length();
+        console.log("keysLength: ", keysLength);
         for (uint256 i = 0; i < keysLength; ) {
             bytes32 msgCid = s.postboxKeys.at(i);
             _propagate(msgCid);
@@ -107,8 +112,6 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
     function _propagate(bytes32 msgCid) internal {
         IpcEnvelope storage crossMsg = s.postbox[msgCid];
 
-        require(crossMsg.value > 0, "Invalid message CID or message");
-
         bool shouldBurn = LibGateway.commitCrossMessage(crossMsg);
 
         // Cache value before deletion to avoid re-entrancy
@@ -122,6 +125,6 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
         LibGateway.crossMsgSideEffects({v: v, shouldBurn: shouldBurn});
 
         // Emit an event for off-chain monitoring
-        // emit MessagePropagated(msgCid, v, shouldBurn);
+        emit MessagePropagated(msgCid, v, shouldBurn);
     }
 }

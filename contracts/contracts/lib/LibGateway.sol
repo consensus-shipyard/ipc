@@ -15,6 +15,8 @@ import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {AssetHelper} from "../lib/AssetHelper.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
+import "forge-std/console.sol";
+
 library LibGateway {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for IpcEnvelope;
@@ -357,6 +359,7 @@ library LibGateway {
     /// @param arrivingFrom - the immediate subnet from which this message is arriving
     /// @param crossMsg - the cross message to be executed
     function applyMsg(SubnetID memory arrivingFrom, IpcEnvelope memory crossMsg) internal {
+        console.log("--------- applyMsg");
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
 
         if (crossMsg.to.subnetId.isEmpty()) {
@@ -370,6 +373,7 @@ library LibGateway {
         Asset memory supplySource;
         IPCMsgType applyType = crossMsg.applyType(s.networkName);
         if (applyType == IPCMsgType.BottomUp) {
+            console.log("--------- applyMsg - bottom up");
             // Load the subnet this message is coming from. Ensure that it exists and that the nonce expectation is met.
             (bool registered, Subnet storage subnet) = LibGateway.getSubnet(arrivingFrom);
             if (!registered) {
@@ -379,6 +383,7 @@ library LibGateway {
                 return;
             }
             if (subnet.appliedBottomUpNonce != crossMsg.nonce) {
+                console.log("--------- applyMsg - failed nonce");
                 sendReceipt(crossMsg, OutcomeType.SystemErr, abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Nonce));
                 return;
             }
@@ -388,8 +393,10 @@ library LibGateway {
             // configuration of the subnet.
             supplySource = SubnetActorGetterFacet(subnet.id.getActor()).supplySource();
         } else if (applyType == IPCMsgType.TopDown) {
+            console.log("--------- applyMsg - top down");
             // Note: there is no need to load the subnet, as a top-down application means that _we_ are the subnet.
             if (s.appliedTopDownNonce != crossMsg.nonce) {
+            console.log("--------- applyMsg - failed nonce. Want: %d, Got: %d", s.appliedTopDownNonce, crossMsg.nonce);
                 sendReceipt(crossMsg, OutcomeType.SystemErr, abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Nonce));
                 return;
             }
@@ -400,12 +407,17 @@ library LibGateway {
             supplySource = AssetHelper.native();
         }
 
+        console.log("crossMsg.to.subnetId: %s", crossMsg.to.subnetId.toString());
+        console.log("s.networkName: %s", s.networkName.toString());
+
         // If the crossnet destination is NOT the current network (network where the gateway is running),
         // we add it to the postbox for further propagation.
         // Even if we send for propagation, the execution of every message
         // should increase the appliedNonce to allow the execution of the next message
         // of the batch (this is way we have this after the nonce logic).
         if (!crossMsg.to.subnetId.equals(s.networkName)) {
+            console.log("--------- applyMsg - postbox");
+            console.log("--------- applyMsg address: %s", address(this));
             bytes32 cid = crossMsg.toHash();
             s.postboxKeys.add(cid);
             s.postbox[cid] = crossMsg;
@@ -485,6 +497,8 @@ library LibGateway {
 
         SubnetID memory from = crossMessage.from.subnetId;
         IPCMsgType applyType = crossMessage.applyType(s.networkName);
+        
+        console.log("--- commitCrossMessage");
 
         // Even if multi-level messaging is enabled, we reject the xnet message
         // as soon as we learn that one of the networks involved use an ERC20 supply source.
@@ -516,14 +530,18 @@ library LibGateway {
         // Are we the LCA? (Lowest Common Ancestor)
         bool isLCA = to.commonParent(from).equals(s.networkName);
 
+        console.log("--- commitCrossMessage no reject");
+
         // If the directionality is top-down, or if we're inverting the direction
         // because we're the LCA, commit a top-down message.
         if (applyType == IPCMsgType.TopDown || isLCA) {
+            console.log("--- commitCrossMessage top down");
             ++s.appliedTopDownNonce;
             LibGateway.commitTopDownMsg(crossMessage);
             return (shouldBurn = false);
         }
 
+        console.log("--- commitCrossMessage bottom up");
         // Else, commit a bottom up message.
         LibGateway.commitBottomUpMsg(crossMessage);
         // gas-opt: original check: value > 0
