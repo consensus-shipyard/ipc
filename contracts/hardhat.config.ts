@@ -66,7 +66,9 @@ if (process.env.PRIVATE_KEY) {
         networks: {
             // Static networks.
             mainnet: networkDefinition(314, 'https://api.node.glif.io/rpc/v1', [process.env.PRIVATE_KEY!]),
-            calibrationnet: networkDefinition(314159, 'https://api.calibration.node.glif.io/rpc/v1', [process.env.PRIVATE_KEY!]),
+            calibrationnet: networkDefinition(314159, 'https://api.calibration.node.glif.io/rpc/v1', [
+                process.env.PRIVATE_KEY!,
+            ]),
             localnet: networkDefinition(31337, 'http://localhost:8545', [
                 '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
                 '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d',
@@ -81,7 +83,9 @@ if (process.env.PRIVATE_KEY) {
             ]),
             // Auto uses RPC_URL provided by the user, and an optional CHAIN_ID.
             // If provided, Hardhat will assert that the chain ID matches the one returned by the RPC.
-            auto: networkDefinition(parseInt(process.env.CHAIN_ID, 10), process.env.RPC_URL!, [process.env.PRIVATE_KEY!]),
+            auto: networkDefinition(parseInt(process.env.CHAIN_ID, 10), process.env.RPC_URL!, [
+                process.env.PRIVATE_KEY!,
+            ]),
         },
     })
 }

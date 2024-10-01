@@ -27,6 +27,7 @@ abstract contract IpcExchangeUpgradeable is Initializable, IIpcHandler, OwnableU
         _disableInitializers();
     }
 
+    // solhint-disable-next-line func-name-mixedcase
     function __IpcExchangeUpgradeable_init(address gatewayAddr_) public onlyInitializing {
         gatewayAddr = gatewayAddr_;
         __Ownable_init(msg.sender);
@@ -101,7 +102,7 @@ abstract contract IpcExchangeUpgradeable is Initializable, IIpcHandler, OwnableU
 
     function dropMessages(bytes32[] calldata ids) public onlyOwner {
         uint256 length = ids.length;
-        for (uint256 i; i < length; ) {
+        for (uint256 i; i < length;) {
             delete inflightMsgs[ids[i]];
             unchecked {
                 ++i;
