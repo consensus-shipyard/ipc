@@ -19,7 +19,7 @@ use std::time::Duration;
 
 use fendermint_vm_genesis::{Power, Validator};
 
-use crate::vote::payload::Observation;
+use crate::observation::Observation;
 pub use syncer::fetch_topdown_events;
 
 #[derive(Clone, Debug)]

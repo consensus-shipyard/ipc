@@ -1,8 +1,9 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::observation::Observation;
 use crate::vote::error::Error;
-use crate::vote::payload::{Observation, PowerTable, Vote};
+use crate::vote::payload::{PowerTable, Vote};
 use crate::vote::Weight;
 use crate::BlockHeight;
 use fendermint_vm_genesis::ValidatorKey;
@@ -121,7 +122,8 @@ impl<'a> VoteAgg<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::vote::payload::{CertifiedObservation, Observation, Vote};
+    use crate::observation::{CertifiedObservation, Observation};
+    use crate::vote::payload::Vote;
     use crate::vote::store::VoteAgg;
     use arbitrary::{Arbitrary, Unstructured};
     use fendermint_crypto::SecretKey;
