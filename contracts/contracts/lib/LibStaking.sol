@@ -581,15 +581,12 @@ library LibStaking {
                     s.validatorSet.confirmWithdraw(validator, amount);
                     s.releaseQueue.addNewRelease(validator, amount);
                     IGateway(gateway).releaseStake(amount);
-                } else {
+                } else if (change.op == StakingOperation.Deposit)  {
                     s.validatorSet.confirmDeposit(validator, amount);
-
-                    if (s.collateralSource.isNative()) {
-                        IGateway(gateway).addStake{value: amount}(amount);
-                    } else {
-                        s.collateralSource.increaseAllowance(gateway, amount);
-                        IGateway(gateway).addStake(amount);
-                    }
+                    uint256 msgValue = s.collateralSource.makeAvailable(gateway, amount);
+                    IGateway(gateway).addStake{value: msgValue}(amount);
+                } else {
+                    revert("Unknown staking operation");
                 }
             }
 
