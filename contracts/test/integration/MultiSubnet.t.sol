@@ -448,7 +448,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, nilTokenSubnet.subnetActorAddr, rootSubnet.gateway);
 
         vm.prank(caller);
-        vm.expectRevert(AssetHelper.NoBalanceIncrease.selector);
+        vm.expectRevert("No balance increase");
         rootSubnet.gateway.manager().fundWithToken(nilTokenSubnet.id, FvmAddressHelper.from(address(caller)), amount);
         assertEq(getSubnetCircSupplyGW(nilTokenSubnet.id, rootSubnet.gateway), 0);
     }

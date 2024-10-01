@@ -1038,6 +1038,8 @@ impl EthSubnetManager {
         }
     }
 
+    /// This method handles the "msg.value" based on different collateral/supply source
+    /// asset kind.
     pub async fn handle_txn_token<B, D, M>(
         &self,
         subnet: &SubnetID,

@@ -27,7 +27,8 @@ pub struct InMemoryParentViewStore {
 
 impl ParentViewStore for InMemoryParentViewStore {
     fn store(&mut self, view: ParentBlockView) -> Result<(), Error> {
-        self.inner.append(view.parent_height, view)
+        self.inner
+            .append(view.parent_height, view)
             .map_err(|_| Error::NonSequentialParentViewInsert)
     }
 

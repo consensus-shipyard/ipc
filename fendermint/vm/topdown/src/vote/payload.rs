@@ -1,12 +1,10 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::observation::{Ballot, ObservationCommitment};
+use crate::observation::{CertifiedObservation, Observation};
 use crate::vote::Weight;
 use crate::BlockHeight;
 use anyhow::anyhow;
-use fendermint_crypto::secp::RecoverableECDSASignature;
-use fendermint_crypto::SecretKey;
 use fendermint_vm_genesis::ValidatorKey;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -30,15 +28,6 @@ pub enum Vote {
     },
 }
 
-/// A self-certified observation made by a validator.
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
-pub struct CertifiedObservation {
-    observed: ObservationCommitment,
-    /// A "recoverable" ECDSA signature with the validator's secp256k1 private key over the
-    /// CID of the DAG-CBOR encoded observation using a BLAKE2b-256 multihash.
-    signature: RecoverableECDSASignature,
-}
-
 impl Vote {
     pub fn v1(validator_key: ValidatorKey, obs: CertifiedObservation) -> Self {
         Self::V1 {
@@ -48,11 +37,8 @@ impl Vote {
     }
 
     pub fn v1_checked(obs: CertifiedObservation) -> anyhow::Result<Self> {
-        let to_sign = fvm_ipld_encoding::to_vec(&obs.observed)?;
-        let (pk, _) = obs.signature.clone().recover(&to_sign)?;
-
         Ok(Self::V1 {
-            validator: ValidatorKey::new(pk),
+            validator: obs.ensure_valid()?,
             payload: obs,
         })
     }
@@ -63,9 +49,9 @@ impl Vote {
         }
     }
 
-    pub fn ballot(&self) -> &Ballot {
+    pub fn observation(&self) -> &Observation {
         match self {
-            Self::V1 { payload, .. } => &payload.observed.ballot,
+            Self::V1 { payload, .. } => payload.observation(),
         }
     }
 }
@@ -81,24 +67,5 @@ impl TryFrom<&[u8]> for Vote {
         }
 
         Err(anyhow!("invalid vote version"))
-    }
-}
-
-impl TryFrom<&[u8]> for CertifiedObservation {
-    type Error = anyhow::Error;
-
-    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        Ok(fvm_ipld_encoding::from_slice(bytes)?)
-    }
-}
-
-impl CertifiedObservation {
-    pub fn sign(ob: ObservationCommitment, sk: &SecretKey) -> anyhow::Result<Self> {
-        let to_sign = fvm_ipld_encoding::to_vec(&ob)?;
-        let sig = RecoverableECDSASignature::sign(sk, to_sign.as_slice())?;
-        Ok(Self {
-            observed: ob,
-            signature: sig,
-        })
     }
 }

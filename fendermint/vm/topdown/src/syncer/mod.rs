@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::observation::{ObservationCommitment, ObservationConfig};
+use crate::observation::{Observation, ObservationConfig};
 use crate::proxy::ParentQueryProxy;
 use crate::syncer::poll::ParentPoll;
 use crate::syncer::store::ParentViewStore;
@@ -19,7 +19,7 @@ pub mod store;
 pub enum TopDownSyncEvent {
     /// The fendermint node is syncing with peers
     NodeSyncing,
-    NewProposal(Box<ObservationCommitment>),
+    NewProposal(Box<Observation>),
 }
 
 pub struct ParentSyncerConfig {

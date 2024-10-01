@@ -159,28 +159,13 @@ library LibSubnetActor {
     function registerInGateway(uint256 collateral) internal {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
 
-        uint256 g = s.genesisCircSupply;
+        uint256 genesisCircSupply = s.genesisCircSupply;
 
-        bool supplySourceNative = s.supplySource.isNative();
-        bool collateralSourceNative = s.collateralSource.isNative();
+        uint256 msgValue = 0;
+        msgValue += s.supplySource.makeAvailable(s.ipcGatewayAddr, genesisCircSupply);
+        msgValue += s.collateralSource.makeAvailable(s.ipcGatewayAddr, collateral);
 
-        // this method is unnecessarily handling different cases because subnet actor needs
-        // to "register" in gateway and different token types needs to be attached or approved.
-        // TODO: it's known that having gateway holding all subnets' funds is insecure, this
-        // TODO: can be removed once contract redesign is in place.
-        if (supplySourceNative && collateralSourceNative) {
-            IGateway(s.ipcGatewayAddr).register{value: g + collateral}(g, collateral);
-        } else if (!supplySourceNative && collateralSourceNative) {
-            s.supplySource.increaseAllowance(s.ipcGatewayAddr, g);
-            IGateway(s.ipcGatewayAddr).register{value: collateral}(g, collateral);
-        } else if (supplySourceNative && !collateralSourceNative) {
-            s.collateralSource.increaseAllowance(s.ipcGatewayAddr, collateral);
-            IGateway(s.ipcGatewayAddr).register{value: g}(g, collateral);
-        } else {
-            s.supplySource.increaseAllowance(s.ipcGatewayAddr, g);
-            s.collateralSource.increaseAllowance(s.ipcGatewayAddr, collateral);
-            IGateway(s.ipcGatewayAddr).register(g, collateral);
-        }
+        IGateway(s.ipcGatewayAddr).register{value: msgValue}(genesisCircSupply, collateral);
     }
 
     /// @notice method that allows the contract owner to set the validators' federated power after

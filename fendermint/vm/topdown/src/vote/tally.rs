@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::observation::Ballot;
+use crate::observation::Observation;
 use crate::vote::error::Error;
 use crate::vote::payload::{PowerTable, PowerUpdates, Vote};
 use crate::vote::store::VoteStore;
@@ -108,7 +108,7 @@ impl<S: VoteStore> VoteTally<S> {
     /// equivocation or from a validator we don't know.
     pub fn add_vote(&mut self, vote: Vote) -> Result<bool, Error> {
         let validator = vote.voter();
-        let parent_height = vote.ballot().parent_height();
+        let parent_height = vote.observation().parent_height();
 
         if !self.has_power(&validator) {
             tracing::error!(
@@ -143,7 +143,7 @@ impl<S: VoteStore> VoteTally<S> {
     }
 
     /// Find a block on the (from our perspective) finalized chain that gathered enough votes from validators.
-    pub fn find_quorum(&self) -> Result<Option<Ballot>, Error> {
+    pub fn find_quorum(&self) -> Result<Option<Observation>, Error> {
         let quorum_threshold = self.quorum_threshold();
         let Some(max_height) = self.votes.latest_vote_height()? else {
             tracing::info!("vote store has no vote yet, skip finding quorum");
@@ -153,17 +153,17 @@ impl<S: VoteStore> VoteTally<S> {
         for h in ((self.last_finalized_height + 1)..=max_height).rev() {
             let votes = self.votes.get_votes_at_height(h)?;
 
-            for (ballot, weight) in votes.ballot_weights(&self.power_table) {
+            for (observation, weight) in votes.observation_weights(&self.power_table) {
                 tracing::info!(
                     height = h,
-                    ballot = ballot.to_string(),
+                    observation = observation.to_string(),
                     weight,
                     quorum_threshold,
-                    "ballot and weight"
+                    "observation and weight"
                 );
 
                 if weight >= quorum_threshold {
-                    return Ok(Some(ballot.clone()));
+                    return Ok(Some(observation.clone()));
                 }
             }
 
@@ -213,9 +213,9 @@ impl<S: VoteStore> VoteTally<S> {
 
 #[cfg(test)]
 mod tests {
-    use crate::observation::ObservationCommitment;
+    use crate::observation::{CertifiedObservation, Observation};
     use crate::vote::error::Error;
-    use crate::vote::payload::{CertifiedObservation, Vote};
+    use crate::vote::payload::Vote;
     use crate::vote::store::InMemoryVoteStore;
     use crate::vote::tally::VoteTally;
     use arbitrary::{Arbitrary, Unstructured};
@@ -230,13 +230,13 @@ mod tests {
         (sk, ValidatorKey::new(public_key))
     }
 
-    fn random_observation() -> ObservationCommitment {
+    fn random_observation() -> Observation {
         let mut bytes = [0; 100];
         let mut rng = rand::thread_rng();
         rng.fill_bytes(&mut bytes);
 
         let mut unstructured = Unstructured::new(&bytes);
-        ObservationCommitment::arbitrary(&mut unstructured).unwrap()
+        Observation::arbitrary(&mut unstructured).unwrap()
     }
 
     #[test]
@@ -252,15 +252,17 @@ mod tests {
             VoteTally::new(powers.clone(), 0, InMemoryVoteStore::default()).unwrap();
 
         let obs = random_observation();
-        let vote =
-            Vote::v1_checked(CertifiedObservation::sign(obs.clone(), &validators[0].0).unwrap())
-                .unwrap();
+        let vote = Vote::v1_checked(
+            CertifiedObservation::sign(obs.clone(), 100, &validators[0].0).unwrap(),
+        )
+        .unwrap();
         vote_tally.add_vote(vote).unwrap();
 
         let mut obs2 = random_observation();
-        obs2.ballot.parent_height = obs.ballot.parent_height();
+        obs2.parent_height = obs.parent_height;
         let vote =
-            Vote::v1_checked(CertifiedObservation::sign(obs2, &validators[0].0).unwrap()).unwrap();
+            Vote::v1_checked(CertifiedObservation::sign(obs2, 100, &validators[0].0).unwrap())
+                .unwrap();
         assert_eq!(vote_tally.add_vote(vote), Err(Error::Equivocation));
     }
 
@@ -279,17 +281,18 @@ mod tests {
         let observation = random_observation();
 
         vote_tally
-            .set_finalized(observation.ballot.parent_height() - 1)
+            .set_finalized(observation.parent_height - 1)
             .unwrap();
 
         for validator in validators {
-            let certified = CertifiedObservation::sign(observation.clone(), &validator.0).unwrap();
+            let certified =
+                CertifiedObservation::sign(observation.clone(), 100, &validator.0).unwrap();
             let vote = Vote::v1_checked(certified).unwrap();
             vote_tally.add_vote(vote).unwrap();
         }
 
-        let ballot = vote_tally.find_quorum().unwrap().unwrap();
-        assert_eq!(ballot, observation.ballot);
+        let ob = vote_tally.find_quorum().unwrap().unwrap();
+        assert_eq!(ob, observation);
     }
 
     #[test]
@@ -314,21 +317,23 @@ mod tests {
 
         let observation1 = random_observation();
         let mut observation2 = observation1.clone();
-        observation2.ballot.parent_hash = vec![1];
+        observation2.parent_hash = vec![1];
 
         vote_tally
-            .set_finalized(observation1.ballot.parent_height() - 1)
+            .set_finalized(observation1.parent_height - 1)
             .unwrap();
 
         for validator in validators_grp1 {
-            let certified = CertifiedObservation::sign(observation1.clone(), &validator.0).unwrap();
+            let certified =
+                CertifiedObservation::sign(observation1.clone(), 100, &validator.0).unwrap();
             let vote = Vote::v1_checked(certified).unwrap();
             vote_tally.add_vote(vote).unwrap();
         }
         assert!(vote_tally.find_quorum().unwrap().is_none());
 
         for validator in validators_grp2 {
-            let certified = CertifiedObservation::sign(observation2.clone(), &validator.0).unwrap();
+            let certified =
+                CertifiedObservation::sign(observation2.clone(), 100, &validator.0).unwrap();
             let vote = Vote::v1_checked(certified).unwrap();
             vote_tally.add_vote(vote).unwrap();
         }
@@ -351,17 +356,18 @@ mod tests {
         let observation = random_observation();
 
         vote_tally
-            .set_finalized(observation.ballot.parent_height() - 1)
+            .set_finalized(observation.parent_height - 1)
             .unwrap();
 
         for validator in validators {
-            let certified = CertifiedObservation::sign(observation.clone(), &validator.0).unwrap();
+            let certified =
+                CertifiedObservation::sign(observation.clone(), 100, &validator.0).unwrap();
             let vote = Vote::v1_checked(certified).unwrap();
             vote_tally.add_vote(vote).unwrap();
         }
 
-        let ballot = vote_tally.find_quorum().unwrap().unwrap();
-        assert_eq!(ballot, observation.ballot);
+        let ob = vote_tally.find_quorum().unwrap().unwrap();
+        assert_eq!(ob, observation);
 
         let new_powers = (0..3)
             .map(|_| (random_validator_key().1.clone(), 1))
@@ -385,11 +391,12 @@ mod tests {
         let observation = random_observation();
 
         vote_tally
-            .set_finalized(observation.ballot.parent_height() - 1)
+            .set_finalized(observation.parent_height - 1)
             .unwrap();
 
         for (count, validator) in validators.iter().enumerate() {
-            let certified = CertifiedObservation::sign(observation.clone(), &validator.0).unwrap();
+            let certified =
+                CertifiedObservation::sign(observation.clone(), 100, &validator.0).unwrap();
             let vote = Vote::v1_checked(certified).unwrap();
             vote_tally.add_vote(vote).unwrap();
 
@@ -405,7 +412,7 @@ mod tests {
             (validators[4].1.clone(), 0),
         ]);
 
-        let ballot = vote_tally.find_quorum().unwrap().unwrap();
-        assert_eq!(ballot, observation.ballot);
+        let ob = vote_tally.find_quorum().unwrap().unwrap();
+        assert_eq!(ob, observation);
     }
 }
