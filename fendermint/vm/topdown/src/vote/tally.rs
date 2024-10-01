@@ -150,7 +150,7 @@ impl<S: VoteStore> VoteTally<S> {
     }
 
     /// Find a block on the (from our perspective) finalized chain that gathered enough votes from validators.
-    pub fn find_quorum(&self) -> Result<Option<Observation>, Error> {
+    pub fn find_quorum(&self) -> Result<Option<ECDSACertificate<Observation>>, Error> {
         let quorum_threshold = self.quorum_threshold();
         let Some(max_height) = self.votes.latest_vote_height()? else {
             tracing::info!("vote store has no vote yet, skip finding quorum");
@@ -170,7 +170,8 @@ impl<S: VoteStore> VoteTally<S> {
                 );
 
                 if weight >= quorum_threshold {
-                    return Ok(Some(observation.clone()));
+                    let cert = votes.generate_cert(self.ordered_validators(), observation)?;
+                    return Ok(Some(cert));
                 }
             }
 
@@ -220,7 +221,7 @@ impl<S: VoteStore> VoteTally<S> {
     fn ordered_validators(&self) -> Vec<(&ValidatorKey, &Weight)> {
         let mut sorted_powers = self.power_table.iter().collect::<Vec<_>>();
 
-        sorted_powers.sort_by(|(a, b)| {
+        sorted_powers.sort_by(|a, b| {
             let cmp = b.1.cmp(a.1);
             if cmp != Ordering::Equal {
                 cmp
@@ -389,7 +390,7 @@ mod tests {
         }
 
         let ob = vote_tally.find_quorum().unwrap().unwrap();
-        assert_eq!(ob, observation);
+        assert_eq!(ob.payload(), observation);
 
         let new_powers = (0..3)
             .map(|_| (random_validator_key().1.clone(), 1))
@@ -435,6 +436,6 @@ mod tests {
         ]);
 
         let ob = vote_tally.find_quorum().unwrap().unwrap();
-        assert_eq!(ob, observation);
+        assert_eq!(ob.payload(), observation);
     }
 }

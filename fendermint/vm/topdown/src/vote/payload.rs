@@ -3,8 +3,9 @@
 
 use crate::observation::{CertifiedObservation, Observation};
 use crate::vote::Weight;
-use crate::{BlockHeight, Bytes};
+use crate::BlockHeight;
 use anyhow::anyhow;
+use fendermint_crypto::secp::RecoverableECDSASignature;
 use fendermint_vm_genesis::ValidatorKey;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -55,9 +56,9 @@ impl Vote {
         }
     }
 
-    pub fn ballot_sig(&self) -> &RecoverableECDSASignature {
+    pub fn observation_signature(&self) -> &RecoverableECDSASignature {
         match self {
-            Self::V1 { payload, .. } => &payload.signature,
+            Self::V1 { payload, .. } => payload.observation_signature(),
         }
     }
 }

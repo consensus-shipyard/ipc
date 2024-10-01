@@ -162,6 +162,20 @@ impl ValidatorKey {
     }
 }
 
+impl PartialOrd for ValidatorKey {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for ValidatorKey {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0
+            .serialize_compressed()
+            .cmp(&other.0.serialize_compressed())
+    }
+}
+
 impl TryFrom<ValidatorKey> for tendermint::PublicKey {
     type Error = anyhow::Error;
 

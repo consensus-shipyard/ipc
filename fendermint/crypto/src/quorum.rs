@@ -30,26 +30,22 @@ impl<T> ECDSACertificate<T> {
 
     #[inline]
     fn quorum_threshold<W>(total: W, threshold_ratio: Ratio<W>) -> W
-        where
-            W: Unsigned + Copy,
+    where
+        W: Unsigned + Copy,
     {
         total * *threshold_ratio.numer() / *threshold_ratio.denom() + W::one()
     }
 }
 
-impl<T: AsRef<[u8]> + PartialEq> ECDSACertificate<T> {
+#[cfg(feature = "with_serde")]
+impl<T: serde::Serialize + PartialEq> ECDSACertificate<T> {
     pub fn set_signature(
         &mut self,
         idx: usize,
-        payload: &T,
         pk: &PublicKey,
         sig: RecoverableECDSASignature,
     ) -> anyhow::Result<()> {
-        if self.payload != *payload {
-            return Err(anyhow!("invalid payload"));
-        }
-
-        if !sig.verify(payload.as_ref(), pk)? {
+        if !sig.verify(&fvm_ipld_encoding::to_vec(&self.payload)?, pk)? {
             return Err(anyhow!("signature not match publick key"));
         }
 
@@ -82,7 +78,7 @@ impl<T: AsRef<[u8]> + PartialEq> ECDSACertificate<T> {
 
         let mut signed_weight = W::zero();
 
-        let payload_bytes = self.payload.as_ref();
+        let payload_bytes = fvm_ipld_encoding::to_vec(&self.payload)?;
 
         for ((pk, weight), maybe_sig) in power_table.zip(self.signatures.iter()) {
             total_weight = total_weight + weight;
@@ -92,7 +88,7 @@ impl<T: AsRef<[u8]> + PartialEq> ECDSACertificate<T> {
                 continue;
             };
 
-            let (rec_pk, _) = sig.recover(payload_bytes)?;
+            let (rec_pk, _) = sig.recover(payload_bytes.as_slice())?;
             if *pk != rec_pk {
                 return Err(anyhow!("signature not signed by the public key"));
             }
@@ -135,9 +131,7 @@ mod tests {
         let ratio = Ratio::new(2, 3);
         for (i, sk) in sks.iter().enumerate() {
             let sig = RecoverableECDSASignature::sign(sk, &payload).unwrap();
-            quorum
-                .set_signature(i, &payload, &sk.public_key(), sig)
-                .unwrap();
+            quorum.set_signature(i, &sk.public_key(), sig).unwrap();
         }
 
         let weights = sks
@@ -161,9 +155,7 @@ mod tests {
         for (i, sk) in sks.iter().enumerate() {
             let sig = RecoverableECDSASignature::sign(sk, &payload).unwrap();
             if i % 3 == 0 {
-                quorum
-                    .set_signature(i, &payload, &sk.public_key(), sig)
-                    .unwrap();
+                quorum.set_signature(i, &sk.public_key(), sig).unwrap();
             }
         }
 
@@ -186,9 +178,7 @@ mod tests {
         let mut quorum = ECDSACertificate::new_of_size(payload.clone(), sks.len());
         for (i, sk) in sks.iter().enumerate() {
             let sig = RecoverableECDSASignature::sign(sk, &payload).unwrap();
-            quorum
-                .set_signature(i, &payload, &sk.public_key(), sig)
-                .unwrap();
+            quorum.set_signature(i, &sk.public_key(), sig).unwrap();
         }
 
         let mut total_expected = 0;
@@ -221,9 +211,7 @@ mod tests {
 
             let should_sign = random::<bool>();
             if should_sign {
-                quorum
-                    .set_signature(i, &payload, &sk.public_key(), sig)
-                    .unwrap();
+                quorum.set_signature(i, &sk.public_key(), sig).unwrap();
             }
             should_signs.push(should_sign);
         }

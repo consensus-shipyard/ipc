@@ -17,6 +17,7 @@ use crate::vote::store::VoteStore;
 use crate::vote::tally::VoteTally;
 use crate::BlockHeight;
 use error::Error;
+use fendermint_crypto::quorum::ECDSACertificate;
 use fendermint_crypto::SecretKey;
 use fendermint_vm_genesis::ValidatorKey;
 use serde::{Deserialize, Serialize};
@@ -121,7 +122,7 @@ impl VoteReactorClient {
     }
 
     /// Queries the vote tally to see if there are new quorum formed
-    pub async fn find_quorum(&self) -> anyhow::Result<Option<Observation>> {
+    pub async fn find_quorum(&self) -> anyhow::Result<Option<ECDSACertificate<Observation>>> {
         self.request(VoteReactorRequest::FindQuorum).await
     }
 
@@ -183,7 +184,7 @@ enum VoteReactorRequest {
     /// Get the current vote tally state variables in vote tally
     QueryState(oneshot::Sender<VoteTallyState>),
     /// Queries the vote tally to see if there are new quorum formed
-    FindQuorum(oneshot::Sender<Option<Observation>>),
+    FindQuorum(oneshot::Sender<Option<ECDSACertificate<Observation>>>),
     /// Update power of some validators. If the weight is zero, the validator is removed
     /// from the power table.
     UpdatePowerTable {

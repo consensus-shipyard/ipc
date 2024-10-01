@@ -126,21 +126,20 @@ impl<'a> VoteAgg<'a> {
     pub fn generate_cert(
         &self,
         ordered_validators: Vec<(&ValidatorKey, &Weight)>,
-        ballot: &Ballot,
-    ) -> Result<ECDSACertificate<Ballot>, Error> {
-        let mut cert = ECDSACertificate::new_of_size(ballot.clone(), ordered_validators.len());
+        observation: &Observation,
+    ) -> Result<ECDSACertificate<Observation>, Error> {
+        let mut cert = ECDSACertificate::new_of_size(observation.clone(), ordered_validators.len());
 
         for (idx, (validator, _)) in ordered_validators.into_iter().enumerate() {
             let Some(vote) = self.0.get(validator) else {
                 continue;
             };
 
-            if vote.ballot() == *ballot {
+            if *vote.observation() == *observation {
                 cert.set_signature(
                     idx,
-                    ballot,
                     validator.public_key(),
-                    vote.ballot_sig().clone(),
+                    vote.observation_signature().clone(),
                 )
                 .map_err(|e| {
                     tracing::error!(err = e.to_string(), "cannot verify signature");

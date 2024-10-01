@@ -120,6 +120,10 @@ impl CertifiedObservation {
         &self.observation
     }
 
+    pub fn observation_signature(&self) -> &RecoverableECDSASignature {
+        &self.observation_signature
+    }
+
     pub fn ensure_valid(&self) -> anyhow::Result<ValidatorKey> {
         let to_sign = fvm_ipld_encoding::to_vec(&self.observation)?;
         let (pk1, _) = self.observation_signature.recover(&to_sign)?;
