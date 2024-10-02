@@ -143,6 +143,9 @@ pub struct GenesisAddValidatorArgs {
 
 #[derive(Args, Debug)]
 pub struct GenesisIntoTendermintArgs {
+    /// The initial app bytes path for cometbft
+    #[arg(long, short)]
+    pub app_state: Option<PathBuf>,
     /// Output file name for the Tendermint genesis JSON file.
     #[arg(long, short)]
     pub out: PathBuf,
@@ -157,6 +160,28 @@ pub enum GenesisIpcCommands {
     Gateway(GenesisIpcGatewayArgs),
     /// Fetch the genesis parameters of a subnet from the parent.
     FromParent(Box<GenesisFromParentArgs>),
+    /// Seal the genesis state from the genesis parameter file
+    SealGenesis(SealGenesisArgs),
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct SealGenesisArgs {
+    /// The built in actors bundle path
+    #[arg(long, short)]
+    pub builtin_actors_path: PathBuf,
+
+    /// The custom actors bundle path
+    #[arg(long, short)]
+    pub custom_actors_path: PathBuf,
+
+    /// The solidity artifacts output path. If you are using ipc-monorepo, it should be the `out` folder
+    /// of `make build`
+    #[arg(long, short)]
+    pub artifacts_path: Option<PathBuf>,
+
+    /// The sealed genesis state output path, i.e. finalized genesis state CAR file dump path
+    #[arg(long, short)]
+    pub output_path: PathBuf,
 }
 
 #[derive(Args, Debug, Clone)]

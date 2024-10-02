@@ -35,6 +35,10 @@ pub mod register_subnet_facet {
                                 ::ethers::core::abi::ethabi::ParamType::Address,
                             ],),
                             ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                ::ethers::core::abi::ethabi::ParamType::Address,
+                            ],),
+                            ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
                                 ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                 ::ethers::core::abi::ethabi::ParamType::Array(
                                     ::std::boxed::Box::new(
@@ -42,6 +46,7 @@ pub mod register_subnet_facet {
                                     ),
                                 ),
                             ],),
+                            ::ethers::core::abi::ethabi::ParamType::Address,
                         ],),
                         internal_type: ::core::option::Option::Some(
                             ::std::borrow::ToOwned::to_owned(
@@ -139,13 +144,13 @@ pub mod register_subnet_facet {
                 client,
             ))
         }
-        ///Calls the contract's `newSubnetActor` (0xfc3b0ad3) function
+        ///Calls the contract's `newSubnetActor` (0x84716146) function
         pub fn new_subnet_actor(
             &self,
             params: ConstructorParams,
         ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
-                .method_hash([252, 59, 10, 211], (params,))
+                .method_hash([132, 113, 97, 70], (params,))
                 .expect("method not found (this should never happen)")
         }
         ///Gets the contract's `SubnetDeployed` event
@@ -309,25 +314,16 @@ pub mod register_subnet_facet {
     pub struct SubnetDeployedFilter {
         pub subnet_addr: ::ethers::core::types::Address,
     }
-    ///Container type for all input parameters for the `newSubnetActor` function with signature `newSubnetActor((uint256,uint64,uint64,address,uint16,uint8,uint8,int8,uint8,(uint8,address),(uint64,address[])))` and selector `0xfc3b0ad3`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
+    ///Container type for all input parameters for the `newSubnetActor` function with signature `newSubnetActor((uint256,uint64,uint64,address,uint16,uint8,uint8,int8,uint8,(uint8,address),(uint8,address),(uint64,address[]),address))` and selector `0x84716146`
+    #[derive(Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay)]
     #[ethcall(
         name = "newSubnetActor",
-        abi = "newSubnetActor((uint256,uint64,uint64,address,uint16,uint8,uint8,int8,uint8,(uint8,address),(uint64,address[])))"
+        abi = "newSubnetActor((uint256,uint64,uint64,address,uint16,uint8,uint8,int8,uint8,(uint8,address),(uint8,address),(uint64,address[]),address))"
     )]
     pub struct NewSubnetActorCall {
         pub params: ConstructorParams,
     }
-    ///Container type for all return fields from the `newSubnetActor` function with signature `newSubnetActor((uint256,uint64,uint64,address,uint16,uint8,uint8,int8,uint8,(uint8,address),(uint64,address[])))` and selector `0xfc3b0ad3`
+    ///Container type for all return fields from the `newSubnetActor` function with signature `newSubnetActor((uint256,uint64,uint64,address,uint16,uint8,uint8,int8,uint8,(uint8,address),(uint8,address),(uint64,address[]),address))` and selector `0x84716146`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -341,7 +337,22 @@ pub mod register_subnet_facet {
     pub struct NewSubnetActorReturn {
         pub subnet_addr: ::ethers::core::types::Address,
     }
-    ///`ConstructorParams(uint256,uint64,uint64,address,uint16,uint8,uint8,int8,uint8,(uint8,address),(uint64,address[]))`
+    ///`Asset(uint8,address)`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct Asset {
+        pub kind: u8,
+        pub token_address: ::ethers::core::types::Address,
+    }
+    ///`ConstructorParams(uint256,uint64,uint64,address,uint16,uint8,uint8,int8,uint8,(uint8,address),(uint8,address),(uint64,address[]),address)`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -362,8 +373,10 @@ pub mod register_subnet_facet {
         pub consensus: u8,
         pub power_scale: i8,
         pub permission_mode: u8,
-        pub supply_source: SupplySource,
+        pub supply_source: Asset,
+        pub collateral_source: Asset,
         pub parent_id: SubnetID,
+        pub validator_gater: ::ethers::core::types::Address,
     }
     ///`SubnetID(uint64,address[])`
     #[derive(
@@ -379,20 +392,5 @@ pub mod register_subnet_facet {
     pub struct SubnetID {
         pub root: u64,
         pub route: ::std::vec::Vec<::ethers::core::types::Address>,
-    }
-    ///`SupplySource(uint8,address)`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    pub struct SupplySource {
-        pub kind: u8,
-        pub token_address: ::ethers::core::types::Address,
     }
 }

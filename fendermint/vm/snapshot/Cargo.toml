@@ -43,7 +43,7 @@ fendermint_testing = { path = "../../testing", features = ["arb"], optional = tr
 [dev-dependencies]
 fvm = { workspace = true }
 fendermint_testing = { path = "../../testing", features = ["golden"] }
-fendermint_vm_interpreter = { path = "../interpreter", features = ["bundle"] }
+fendermint_vm_interpreter = { path = "../interpreter", features = ["bundle", "test-util"] }
 fendermint_vm_genesis = { path = "../genesis", features = ["arb"] }
 fendermint_vm_snapshot = { path = ".", features = ["arb"] }
 

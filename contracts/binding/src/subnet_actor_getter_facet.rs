@@ -232,6 +232,31 @@ pub mod subnet_actor_getter_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("collateralSource"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("collateralSource"),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("supply"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                        ::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Address,
+                                        ],
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("struct Asset"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("consensus"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::Function {
@@ -928,7 +953,7 @@ pub mod subnet_actor_getter_facet {
                                         ],
                                     ),
                                     internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("struct SupplySource"),
+                                        ::std::borrow::ToOwned::to_owned("struct Asset"),
                                     ),
                                 },
                             ],
@@ -1022,6 +1047,12 @@ pub mod subnet_actor_getter_facet {
         ) -> ::ethers::contract::builders::ContractCall<M, (bool, [u8; 32])> {
             self.0
                 .method_hash([75, 6, 148, 226], epoch)
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `collateralSource` (0xb6797d3c) function
+        pub fn collateral_source(&self) -> ::ethers::contract::builders::ContractCall<M, Asset> {
+            self.0
+                .method_hash([182, 121, 125, 60], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `consensus` (0x8ef3f761) function
@@ -1224,7 +1255,7 @@ pub mod subnet_actor_getter_facet {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `supplySource` (0x80875df7) function
-        pub fn supply_source(&self) -> ::ethers::contract::builders::ContractCall<M, SupplySource> {
+        pub fn supply_source(&self) -> ::ethers::contract::builders::ContractCall<M, Asset> {
             self.0
                 .method_hash([128, 135, 93, 247], ())
                 .expect("method not found (this should never happen)")
@@ -1312,6 +1343,19 @@ pub mod subnet_actor_getter_facet {
     pub struct BottomUpCheckpointHashAtEpochCall {
         pub epoch: ::ethers::core::types::U256,
     }
+    ///Container type for all input parameters for the `collateralSource` function with signature `collateralSource()` and selector `0xb6797d3c`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(name = "collateralSource", abi = "collateralSource()")]
+    pub struct CollateralSourceCall;
     ///Container type for all input parameters for the `consensus` function with signature `consensus()` and selector `0x8ef3f761`
     #[derive(
         Clone,
@@ -1685,6 +1729,7 @@ pub mod subnet_actor_getter_facet {
         BottomUpCheckPeriod(BottomUpCheckPeriodCall),
         BottomUpCheckpointAtEpoch(BottomUpCheckpointAtEpochCall),
         BottomUpCheckpointHashAtEpoch(BottomUpCheckpointHashAtEpochCall),
+        CollateralSource(CollateralSourceCall),
         Consensus(ConsensusCall),
         CrossMsgsHash(CrossMsgsHashCall),
         GenesisBalances(GenesisBalancesCall),
@@ -1740,6 +1785,11 @@ pub mod subnet_actor_getter_facet {
                 <BottomUpCheckpointHashAtEpochCall as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::BottomUpCheckpointHashAtEpoch(decoded));
+            }
+            if let Ok(decoded) =
+                <CollateralSourceCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::CollateralSource(decoded));
             }
             if let Ok(decoded) = <ConsensusCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Consensus(decoded));
@@ -1876,6 +1926,7 @@ pub mod subnet_actor_getter_facet {
                 Self::BottomUpCheckpointHashAtEpoch(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::CollateralSource(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Consensus(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::CrossMsgsHash(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::GenesisBalances(element) => ::ethers::core::abi::AbiEncode::encode(element),
@@ -1935,6 +1986,7 @@ pub mod subnet_actor_getter_facet {
                 Self::BottomUpCheckpointHashAtEpoch(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
+                Self::CollateralSource(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Consensus(element) => ::core::fmt::Display::fmt(element, f),
                 Self::CrossMsgsHash(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GenesisBalances(element) => ::core::fmt::Display::fmt(element, f),
@@ -1989,6 +2041,11 @@ pub mod subnet_actor_getter_facet {
     impl ::core::convert::From<BottomUpCheckpointHashAtEpochCall> for SubnetActorGetterFacetCalls {
         fn from(value: BottomUpCheckpointHashAtEpochCall) -> Self {
             Self::BottomUpCheckpointHashAtEpoch(value)
+        }
+    }
+    impl ::core::convert::From<CollateralSourceCall> for SubnetActorGetterFacetCalls {
+        fn from(value: CollateralSourceCall) -> Self {
+            Self::CollateralSource(value)
         }
     }
     impl ::core::convert::From<ConsensusCall> for SubnetActorGetterFacetCalls {
@@ -2184,6 +2241,20 @@ pub mod subnet_actor_getter_facet {
         Hash,
     )]
     pub struct BottomUpCheckpointHashAtEpochReturn(pub bool, pub [u8; 32]);
+    ///Container type for all return fields from the `collateralSource` function with signature `collateralSource()` and selector `0xb6797d3c`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct CollateralSourceReturn {
+        pub supply: Asset,
+    }
     ///Container type for all return fields from the `consensus` function with signature `consensus()` and selector `0x8ef3f761`
     #[derive(
         Clone,
@@ -2501,7 +2572,22 @@ pub mod subnet_actor_getter_facet {
         Hash,
     )]
     pub struct SupplySourceReturn {
-        pub supply: SupplySource,
+        pub supply: Asset,
+    }
+    ///`Asset(uint8,address)`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct Asset {
+        pub kind: u8,
+        pub token_address: ::ethers::core::types::Address,
     }
     ///`BottomUpCheckpoint((uint64,address[]),uint256,bytes32,uint64,(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes)[])`
     #[derive(
@@ -2584,21 +2670,6 @@ pub mod subnet_actor_getter_facet {
     pub struct SubnetID {
         pub root: u64,
         pub route: ::std::vec::Vec<::ethers::core::types::Address>,
-    }
-    ///`SupplySource(uint8,address)`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    pub struct SupplySource {
-        pub kind: u8,
-        pub token_address: ::ethers::core::types::Address,
     }
     ///`Validator(uint256,address,bytes)`
     #[derive(

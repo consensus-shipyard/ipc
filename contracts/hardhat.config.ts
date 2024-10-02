@@ -1,347 +1,36 @@
 import '@nomicfoundation/hardhat-foundry'
 import '@nomiclabs/hardhat-ethers'
 import '@typechain/hardhat'
-import * as fs from 'fs'
 import 'hardhat-contract-sizer'
-import 'hardhat-deploy'
 import 'hardhat-storage-layout-changes'
-import { HardhatUserConfig, task } from 'hardhat/config'
-import { HardhatRuntimeEnvironment } from 'hardhat/types'
+import { HardhatUserConfig } from 'hardhat/config'
 
-const lazyImport = async (module: any) => {
-    return await import(module)
-}
+// Hardhat deploy stuff.
+import 'hardhat-deploy'
+import 'hardhat-deploy-ethers'
 
-async function saveDeployments(
-    env: string,
-    deploymentData: { [key in string]: string },
-    branch?: string,
-) {
-    const deploymentsJsonPath = `${process.cwd()}/deployments.json`
+// Import our extensions.
+import './extensions'
 
-    let deploymentsJson = { [env]: {} }
-    if (fs.existsSync(deploymentsJsonPath)) {
-        deploymentsJson = JSON.parse(
-            fs.readFileSync(deploymentsJsonPath).toString(),
-        )
-    }
+// Load environment variables from .env file.
+import { config as dotenvConfig } from 'dotenv'
 
-    if (branch) {
-        deploymentsJson[env] = {
-            ...deploymentsJson[env],
-            [branch]: deploymentData,
-        }
-    } else {
-        deploymentsJson[env] = { ...deploymentsJson[env], ...deploymentData }
-    }
+dotenvConfig({ path: './.env' })
 
-    fs.writeFileSync(deploymentsJsonPath, JSON.stringify(deploymentsJson))
-}
+// Import our tasks.
+import './tasks'
 
-async function saveDeploymentsFacets(
-    filename: string,
-    env: string,
-    updatedFacets: { [key: string]: string },
-    branch?: string,
-) {
-    const deploymentsJsonPath = `${process.cwd()}/${filename}`
-    let deploymentsJson = { [env]: {} }
-    if (fs.existsSync(deploymentsJsonPath)) {
-        deploymentsJson = JSON.parse(
-            fs.readFileSync(deploymentsJsonPath).toString(),
-        )
-    }
-    const facets = deploymentsJson[env]['Facets']
-    for (const facetIndex in facets) {
-        const facetName = facets[facetIndex].name
-        if (updatedFacets[facetName]) {
-            facets[facetIndex].address = updatedFacets[facetName]
-        }
-    }
-    fs.writeFileSync(deploymentsJsonPath, JSON.stringify(deploymentsJson))
-}
-async function saveSubnetRegistry(
-    env: string,
-    subnetRegistryData: { [key in string]: string },
-) {
-    const subnetRegistryJsonPath = `${process.cwd()}/subnet.registry.json`
+// Define network configurations.
+const networkDefinition = (chainId: number, url: string, accounts: string[]) => ({
+    chainId,
+    url: url,
+    accounts,
+    // timeout to support also slow networks (like calibration/mainnet)
+    timeout: 1000000,
+    saveDeployments: true,
+})
 
-    let subnetRegistryJson = { [env]: {} }
-    if (fs.existsSync(subnetRegistryJsonPath)) {
-        subnetRegistryJson = JSON.parse(
-            fs.readFileSync(subnetRegistryJsonPath).toString(),
-        )
-    }
-
-    subnetRegistryJson[env] = {
-        ...subnetRegistryJson[env],
-        ...subnetRegistryData,
-    }
-
-    fs.writeFileSync(subnetRegistryJsonPath, JSON.stringify(subnetRegistryJson))
-}
-
-async function readSubnetActor(subnetActorAddress, network) {
-    const subnetActorJsonPath = `${process.cwd()}/subnet.actor-${subnetActorAddress}.json`
-    if (fs.existsSync(subnetActorJsonPath)) {
-        const subnetActor = JSON.parse(
-            fs.readFileSync(subnetActorJsonPath).toString(),
-        )
-        return subnetActor
-    }
-    const subnetRegistry = await getSubnetRegistry(network)
-    const deployments = {
-        SubnetActorDiamond: subnetActorAddress,
-        Facets: subnetRegistry.SubnetActorFacets,
-    }
-    return deployments
-}
-
-async function saveSubnetActor(
-    deployments,
-    updatedFacets: { [key in string]: string },
-) {
-    const subnetActorJsonPath = `${process.cwd()}/subnet.actor-${
-        deployments.SubnetActorDiamond
-    }.json`
-    for (const facetIndex in deployments.Facets) {
-        const facetName = deployments.Facets[facetIndex].name
-        if (updatedFacets[facetName]) {
-            deployments.Facets[facetIndex].address = updatedFacets[facetName]
-        }
-    }
-    fs.writeFileSync(subnetActorJsonPath, JSON.stringify(deployments))
-}
-
-async function getSubnetRegistry(
-    env: string,
-): Promise<{ [key in string]: string }> {
-    const subnetRegistryJsonPath = `${process.cwd()}/subnet.registry.json`
-
-    let subnetRegistry = {}
-    if (fs.existsSync(subnetRegistryJsonPath)) {
-        subnetRegistry = JSON.parse(
-            fs.readFileSync(subnetRegistryJsonPath).toString(),
-        )[env]
-    }
-
-    return subnetRegistry
-}
-
-async function getSubnetActor(
-    env: string,
-): Promise<{ [key in string]: string }> {
-    const subnetRegistryJsonPath = `${process.cwd()}/subnet.actor.json`
-
-    let subnetRegistry = {}
-    if (fs.existsSync(subnetRegistryJsonPath)) {
-        subnetRegistry = JSON.parse(
-            fs.readFileSync(subnetRegistryJsonPath).toString(),
-        )[env]
-    }
-
-    return subnetRegistry
-}
-
-async function getDeployments(
-    env: string,
-): Promise<{ [key in string]: string }> {
-    const deploymentsJsonPath = `${process.cwd()}/deployments.json`
-
-    let deployments = {}
-    if (fs.existsSync(deploymentsJsonPath)) {
-        deployments = JSON.parse(
-            fs.readFileSync(deploymentsJsonPath).toString(),
-        )[env]
-    }
-
-    return deployments
-}
-
-task(
-    'deploy-libraries',
-    'Build and deploys all libraries on the selected network',
-    async (args, hre: HardhatRuntimeEnvironment) => {
-        const { deploy } = await lazyImport('./scripts/deploy-libraries')
-        const libsDeployment = await deploy()
-        console.log(libsDeployment)
-        await saveDeployments(hre.network.name, libsDeployment, 'libs')
-    },
-)
-
-task(
-    'deploy-gateway',
-    'Builds and deploys the Gateway contract on the selected network',
-    async (args, hre: HardhatRuntimeEnvironment) => {
-        const network = hre.network.name
-
-        const deployments = await getDeployments(network)
-        const { deploy } = await lazyImport('./scripts/deploy-gateway')
-        const gatewayDeployment = await deploy(deployments.libs)
-
-        console.log(JSON.stringify(gatewayDeployment, null, 2))
-
-        await saveDeployments(network, gatewayDeployment)
-    },
-)
-
-task(
-    'deploy-subnet-registry',
-    'Builds and deploys the Registry contract on the selected network',
-    async (args, hre: HardhatRuntimeEnvironment) => {
-        const network = hre.network.name
-        const { deploy } = await lazyImport('./scripts/deploy-registry')
-        const subnetRegistryDeployment = await deploy()
-
-        console.log(JSON.stringify(subnetRegistryDeployment, null, 2))
-
-        await saveSubnetRegistry(network, subnetRegistryDeployment)
-    },
-)
-
-task(
-    'deploy-gw-diamond-and-facets',
-    'Builds and deploys Gateway Actor diamond and its facets',
-    async (args, hre: HardhatRuntimeEnvironment) => {
-        const network = hre.network.name
-        const deployments = await getDeployments(network)
-        const { deployDiamond } = await lazyImport(
-            './scripts/deploy-gw-diamond',
-        )
-        const gatewayActorDiamond = await deployDiamond(deployments.libs)
-        await saveDeployments(network, gatewayActorDiamond)
-    },
-)
-
-task(
-    'deploy',
-    'Builds and deploys all contracts on the selected network',
-    async (args, hre: HardhatRuntimeEnvironment) => {
-        await hre.run('compile')
-        await hre.run('deploy-libraries')
-        await hre.run('deploy-gateway')
-    },
-)
-
-task(
-    'deploy-gw-diamond',
-    'Builds and deploys Gateway Actor diamond',
-    async (args, hre: HardhatRuntimeEnvironment) => {
-        await hre.run('compile')
-        await hre.run('deploy-libraries')
-        await hre.run('deploy-gw-diamond-and-facets')
-    },
-)
-
-task(
-    'deploy-sa-diamond',
-    'Builds and deploys Subnet Actor diamond',
-    async (args, hre: HardhatRuntimeEnvironment) => {
-        await hre.run('compile')
-        await hre.run('deploy-libraries')
-        await hre.run('deploy-sa-diamond-and-facets')
-    },
-)
-
-task(
-    'upgrade-gw-diamond',
-    'Upgrades IPC Gateway Actor Diamond Facets on an EVM-compatible subnet using hardhat',
-    async (args, hre: HardhatRuntimeEnvironment) => {
-        await hre.run('compile')
-        const network = hre.network.name
-        const deployments = await getDeployments(network)
-        const { upgradeDiamond } = await lazyImport(
-            './scripts/upgrade-gw-diamond',
-        )
-        const updatedFacets = await upgradeDiamond(deployments)
-        await saveDeploymentsFacets('deployments.json', network, updatedFacets)
-    },
-)
-
-task(
-    'upgrade-sr-diamond',
-    'Upgrades IPC Subnet Registry Diamond Facets on an EVM-compatible subnet using hardhat',
-    async (args, hre: HardhatRuntimeEnvironment) => {
-        await hre.run('compile')
-        const network = hre.network.name
-        const subnetRegistry = await getSubnetRegistry(network)
-        const { upgradeDiamond } = await lazyImport(
-            './scripts/upgrade-sr-diamond',
-        )
-        const updatedFacets = await upgradeDiamond(subnetRegistry)
-        await saveDeploymentsFacets(
-            'subnet.registry.json',
-            network,
-            updatedFacets,
-        )
-    },
-)
-
-task(
-    'upgrade-sa-diamond',
-    'Upgrades IPC Subnet Actor Diamond Facets on an EVM-compatible subnet using hardhat',
-    async (args, hre: HardhatRuntimeEnvironment) => {
-        await hre.run('compile')
-        const network = hre.network.name
-        if (!args.address) {
-            console.error(
-                'No address provided. Usage: npx hardhat upgrade-sa-diamond --address 0x80afa...',
-            )
-            process.exit(1)
-        }
-
-        const deployments = await readSubnetActor(args.address, network)
-
-        const { upgradeDiamond } = await lazyImport(
-            './scripts/upgrade-sa-diamond',
-        )
-        const updatedFacets = await upgradeDiamond(deployments)
-        await saveSubnetActor(deployments, updatedFacets)
-    },
-).addParam('address', 'The address to upgrade', undefined, types.string, false)
-
-/** @type import('hardhat/config').HardhatUserConfig */
-const config: HardhatUserConfig = {
-    defaultNetwork: 'calibrationnet',
-    networks: {
-        mainnet: {
-            chainId: 314,
-            url: process.env.RPC_URL!,
-            accounts: [process.env.PRIVATE_KEY!],
-            timeout: 1000000,
-        },
-        calibrationnet: {
-            chainId: 314159,
-            url: process.env.RPC_URL!,
-            accounts: [process.env.PRIVATE_KEY!],
-            timeout: 1000000,
-        },
-        localnet: {
-            chainId: 31337,
-            url: process.env.RPC_URL!,
-            // the anvil chain has some standardized accounts that are prefunded
-            accounts: [
-                '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
-                '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d',
-                '0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a',
-                '0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6',
-                '0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a',
-                '0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba',
-                '0x92db14e403b83dfe3df233f83dfa3a0d7096f21ca9b0d6d6b8d88b2b4ec1564e',
-                '0x4bbbf85ce3377467afe5d46f804f221813b2bb87f24d81f60f1fcdbf7cbf4356',
-                '0xdbda1821b80551c9d65939329250298aa3472ba22feea921c0cf5d620ea67b97',
-                '0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6',
-            ],
-        },
-        // automatically fetch chainID for network
-        auto: {
-            chainId: parseInt(process.env.CHAIN_ID!, 16),
-            url: process.env.RPC_URL!,
-            accounts: [process.env.PRIVATE_KEY!],
-            // timeout to support also slow networks (like calibration/mainnet)
-            timeout: 1000000,
-        },
-    },
+let config: HardhatUserConfig = {
     solidity: {
         compilers: [
             {
@@ -364,14 +53,41 @@ const config: HardhatUserConfig = {
         storageLayouts: '.storage-layouts',
     },
     storageLayoutChanges: {
-        contracts: [
-            'GatewayDiamond',
-            'SubnetActorDiamond',
-            'GatewayActorModifiers',
-            'SubnetActorModifiers',
-        ],
+        contracts: ['GatewayDiamond', 'SubnetActorDiamond', 'GatewayActorModifiers', 'SubnetActorModifiers'],
         fullPath: false,
     },
+}
+
+// Only add the network configurations if we have a private key.
+// Some targets don't require networks, e.g. gen-selector-library.
+if (process.env.PRIVATE_KEY) {
+    config = Object.assign(config, {
+        defaultNetwork: 'calibrationnet',
+        networks: {
+            // Static networks.
+            mainnet: networkDefinition(314, 'https://api.node.glif.io/rpc/v1', [process.env.PRIVATE_KEY!]),
+            calibrationnet: networkDefinition(314159, 'https://api.calibration.node.glif.io/rpc/v1', [
+                process.env.PRIVATE_KEY!,
+            ]),
+            localnet: networkDefinition(31337, 'http://localhost:8545', [
+                '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
+                '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d',
+                '0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a',
+                '0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6',
+                '0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a',
+                '0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba',
+                '0x92db14e403b83dfe3df233f83dfa3a0d7096f21ca9b0d6d6b8d88b2b4ec1564e',
+                '0x4bbbf85ce3377467afe5d46f804f221813b2bb87f24d81f60f1fcdbf7cbf4356',
+                '0xdbda1821b80551c9d65939329250298aa3472ba22feea921c0cf5d620ea67b97',
+                '0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6',
+            ]),
+            // Auto uses RPC_URL provided by the user, and an optional CHAIN_ID.
+            // If provided, Hardhat will assert that the chain ID matches the one returned by the RPC.
+            auto: networkDefinition(parseInt(process.env.CHAIN_ID, 10), process.env.RPC_URL!, [
+                process.env.PRIVATE_KEY!,
+            ]),
+        },
+    })
 }
 
 export default config

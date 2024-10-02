@@ -1,9 +1,14 @@
 target/
 .idea
+node_modules/
+.DS_Store
+
+# we migrated from npm to pnpm.
+package-lock.json
+.vscode
+
+# hoku
 test-network
 nohup*
-.vscode
-.DS_Store
-node_modules/
 .env
 relayer.log

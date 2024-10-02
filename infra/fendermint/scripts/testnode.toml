@@ -6,7 +6,6 @@ workspace = false
 dependencies = [
     "create-log-volume",
     "testnode-down",
-    "fendermint-pull",
     "testnode-init",
     "docker-network-create",
     "cometbft-init",
@@ -74,6 +73,7 @@ dependencies = [
     "genesis-new-accounts",
     "genesis-add-validator",
     "genesis-new-gateway",
+    "genesis-seal",
     "genesis-write",
     "testnode-export-keys",
 ]

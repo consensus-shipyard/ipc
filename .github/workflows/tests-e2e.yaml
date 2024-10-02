@@ -1,0 +1,59 @@
+name: Run e2e tests
+
+# This workflow is triggered from the main CI workflow.
+on:
+  workflow_call:
+
+jobs:
+  run:
+    runs-on: self-hosted
+
+    env:
+      RUST_BACKTRACE: full
+      RUSTFLAGS: -Dwarnings
+
+    steps:
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: |
+            ${{ secrets.BUILTIN_ACTORS_DEPLOY_KEY }}
+            ${{ secrets.CONTRACTS_DEPLOY_KEY }}
+
+      - name: Check out the project
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Install Tools
+        uses: ./.github/actions/install-tools
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          rust: stable
+
+      - name: Download Docker image
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp
+
+      - name: Load Docker image
+        run: |
+          docker load --input /tmp/docker-image.tar
+          docker image ls -a
+
+      - name: Cache Solidity ABI artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ./contracts/out
+            ./contracts/bindings
+            ./contracts/cache
+          key: v2-contracts-abi-${{ hashFiles('./contracts/**/*.sol') }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: build
+
+      - name: Run e2e tests
+        run: cd fendermint && PROFILE=release make e2e-only
+

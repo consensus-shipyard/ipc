@@ -66,28 +66,6 @@ dependencies = [
     "node-report",
 ]
 
-[tasks.child-validator-no-parent-init]
-workspace = false
-dependencies = ["testnode-down", "fendermint-pull", "node-init"]
-
-[tasks.child-validator-no-parent]
-workspace = false
-dependencies = [
-    "docker-network-create",
-    "cometbft-config",
-    "fendermint-deps",
-    "validator-no-parent-config",
-    "iroh-start",
-    "iroh-wait",
-    "fendermint-start-validator-no-parent",
-    "cometbft-start",
-    "cometbft-wait",
-    "ethapi-start",
-    "objects-start",
-    "promtail-start",
-    "node-report",
-]
-
 [tasks.child-validator-restart]
 run_task = { name = [
     "cometbft-destroy",
@@ -99,25 +77,6 @@ run_task = { name = [
     "iroh-start",
     "iroh-wait",
     "fendermint-start-validator",
-    "cometbft-start",
-    "cometbft-wait",
-    "ethapi-start",
-    "objects-start",
-    "promtail-start",
-    "node-report",
-] }
-
-[tasks.child-validator-restart-no-parent]
-run_task = { name = [
-    "cometbft-destroy",
-    "fendermint-destroy",
-    "ethapi-destroy",
-    "objects-destroy",
-    "promtail-destroy",
-    "iroh-destroy",
-    "iroh-start",
-    "iroh-wait",
-    "fendermint-start-validator-no-parent",
     "cometbft-start",
     "cometbft-wait",
     "ethapi-start",
@@ -157,6 +116,7 @@ dependencies = [
 dependencies = [
     "subnet-fetch-genesis",
     "subnet-genesis-set-eam-permissions",
+    "genesis-seal",
     "genesis-write",
     "fendermint-new-network-key",
 ]
@@ -164,14 +124,6 @@ dependencies = [
 [tasks.validator-config]
 dependencies = [
     "subnet-config",
-    "subnet-convert-eth-key",
-    "testnode-export-keys",
-]
-
-[tasks.validator-no-parent-config]
-dependencies = [
-    "genesis-copy",
-    "fendermint-new-network-key",
     "subnet-convert-eth-key",
     "testnode-export-keys",
 ]

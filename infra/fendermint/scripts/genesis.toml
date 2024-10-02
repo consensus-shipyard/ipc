@@ -35,9 +35,13 @@ env = { "CMD" = """genesis --genesis-file /data/genesis.json ipc gateway --subne
     --majority-percentage 67 \
     """ }
 
+[tasks.genesis-seal]
+extend = "fendermint-tool"
+env = { "CMD" = "genesis --genesis-file /data/genesis.json ipc seal-genesis --builtin-actors-path /fendermint/bundle.car --custom-actors-path /fendermint/custom_actors_bundle.car --artifacts-path /fendermint/contracts --output-path ${SEALED_GENESIS}" }
+
 [tasks.genesis-write]
 extend = "fendermint-tool"
-env = { "CMD" = "genesis --genesis-file /data/genesis.json into-tendermint --out /data/genesis.committed.json" }
+env = { "CMD" = "genesis --genesis-file /data/genesis.json into-tendermint --app-state ${SEALED_GENESIS} --out /data/genesis.committed.json" }
 script.post = "cp ${BASE_DIR}/genesis.committed.json ${CMT_DIR}/config/genesis.json"
 
 [tasks.genesis-copy]

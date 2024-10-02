@@ -125,8 +125,8 @@ are deployed during the deployment flow:
 - `PARENT_HTTP_AUTH_TOKEN`: An auth token for RPC calls to a [Glif.io](https://api.node.glif.io/)
   archive node for the rootnet (Filecoin Calibration)—only used if you are deploying to testnet.
 - `SUPPLY_SOURCE_ADDRESS`: The address of the supply source (ERC20) for all deployed subnets.
-- `FM_LOG_LEVEL`: Fendermint log level. This follows `RUST_LOG` conventions, e.g., use
-  `info,fendermint=debug` to get debug logs from the `fendermint` application (default is `info`).
+- `FM_LOG_LEVEL`: Fendermint log level. One of `off`, `error`, `warn`, `info`, `debug`, or `trace`
+  (default is `info`).
 
 > [!CAUTION]
 > Note that the `fendermint`, `ipc-cli`, and `hoku` binaries all use a `NETWORK` flag with

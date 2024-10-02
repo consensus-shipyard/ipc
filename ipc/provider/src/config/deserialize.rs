@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 //! Deserialization utils for config mod.
 
+use crate::config::Subnet;
 use anyhow::anyhow;
 use fvm_shared::address::Address;
 use http::HeaderValue;
@@ -14,8 +15,6 @@ use std::fmt::Formatter;
 use std::str::FromStr;
 use tower_http::cors::{AllowHeaders, AllowMethods, AllowOrigin};
 use url::Url;
-
-use crate::config::Subnet;
 
 /// A serde deserialization method to deserialize a hashmap of subnets with subnet id as key and
 /// Subnet struct as value from a vec of subnets

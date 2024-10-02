@@ -1,8 +1,9 @@
 {
     "name": "@consensus-shipyard/ipc-contracts",
-    "version": "1.0.0-alpha.0",
+    "version": "1.0.0-alpha.1",
     "description": "This repository includes the reference implementation of all the actors (i.e. smart contracts) responsible for the operation of the IPC (i.e. Inter-Planetary Consensus) protocol. These actors are written in Solidity and target FileCoin’s FEVM.",
     "author": "ConsensusLab, Protocol Labs, Filecoin Core Devs, Limechain",
+    "packageManager": "pnpm@9.3.0",
     "directories": {
         "lib": "lib",
         "test": "test"
@@ -11,13 +12,12 @@
         "contracts",
         "sdk",
         "README.md",
-        "LICENSE-APACHE",
-        "LICENSE-MIT"
+        "LICENSE-*"
     ],
     "scripts": {
-        "prepack": "node scripts/npm-prepack.js",
-        "postpack": "node scripts/npm-postpack.js",
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "prepack": "sh -c 'cp ../LICENSE-* .'",
+        "preinstall": "git submodule update --init --recursive",
+        "postpack": "sh -c 'rm -f LICENSE-*'"
     },
     "repository": {
         "type": "git",
@@ -34,33 +34,37 @@
     "devDependencies": {
         "@nomicfoundation/hardhat-foundry": "^1.0.1",
         "@nomiclabs/hardhat-ethers": "^2.2.3",
-        "@openzeppelin/contracts": "5.0.1",
         "@typechain/ethers-v5": "^11.1.2",
         "@typechain/hardhat": "^7.0.0",
+        "@types/lodash": "^4.17.7",
         "dotenv": "^16.0.1",
-        "elliptic-curve-solidity": "github:witnet/elliptic-curve-solidity#3475478",
         "ethers": "^5.7.0",
-        "fevmate": "github:wadealexc/fevmate#6a80e98",
         "fs-extra": "^11.2.0",
+        "ganache": "^7.9.2",
+        "hardhat": "^2.22.5",
         "hardhat-contract-sizer": "^2.6.1",
-        "hardhat-deploy": "^0.11.14",
+        "hardhat-deploy": "^0.12.4",
         "hardhat-deploy-ethers": "^0.3.0-beta.13",
+        "hardhat-storage-layout-changes": "^0.1.2",
         "husky": "^8.0.3",
         "lint-staged": "^15.0.2",
-        "prettier": "^2.8.8",
-        "prettier-plugin-solidity": "^1.2.0",
+        "prettier": "^3.3.2",
+        "prettier-plugin-solidity": "^1.3.1",
         "solhint": "^3.5.1",
-        "solhint-plugin-prettier": "^0.0.5",
-        "ts-node": "^10.9.1",
+        "solhint-plugin-prettier": "^0.1.0",
+        "ts-node": ">=8.0.0",
         "typechain": "^8.3.2",
-        "typescript": "^4.8.3"
+        "typescript": ">=4.5.0",
+        "utf-8-validate": "^5.0.10"
     },
     "dependencies": {
-        "@solidity-parser/parser": "^0.16.2",
+        "@openzeppelin/contracts": "5.0.2",
+        "@openzeppelin/contracts-upgradeable": "5.0.2",
+        "@solidity-parser/parser": "^0.18.0",
         "diamond-util": "^1.1.1",
-        "ganache": "^7.9.2",
-        "hardhat": "^2.19.4",
-        "hardhat-storage-layout-changes": "^0.1.2"
+        "elliptic-curve-solidity": "github:witnet/elliptic-curve-solidity#3475478",
+        "fevmate": "github:wadealexc/fevmate#6a80e98",
+        "lodash": "^4.17.21"
     },
     "lint-staged": {
         "*.{js,jsx,ts,tsx,json,css,md,sol}": "prettier --write"

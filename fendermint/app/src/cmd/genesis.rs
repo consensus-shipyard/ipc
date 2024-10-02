@@ -14,6 +14,7 @@ use fendermint_vm_genesis::{
     ipc, Account, Actor, ActorMeta, Collateral, Genesis, Multisig, PermissionMode, SignerAddr,
     Validator, ValidatorKey,
 };
+use fendermint_vm_interpreter::genesis::{GenesisAppState, GenesisBuilder};
 
 use crate::cmd;
 use crate::options::genesis::*;
@@ -23,6 +24,7 @@ use super::key::read_public_key;
 cmd! {
   GenesisArgs(self) {
     let genesis_file = self.genesis_file.clone();
+
     match &self.command {
         GenesisCommands::New(args) => args.exec(genesis_file).await,
         GenesisCommands::AddAccount(args) => args.exec(genesis_file).await,
@@ -95,6 +97,8 @@ cmd! {
             set_ipc_gateway(&genesis_file, args),
         GenesisIpcCommands::FromParent(args) =>
             new_genesis_from_parent(&genesis_file, args).await,
+        GenesisIpcCommands::SealGenesis(args) =>
+            seal_genesis(&genesis_file, args).await,
     }
   }
 }
@@ -214,7 +218,12 @@ fn set_eam_permissions(
 
 fn into_tendermint(genesis_file: &PathBuf, args: &GenesisIntoTendermintArgs) -> anyhow::Result<()> {
     let genesis = read_genesis(genesis_file)?;
-    let genesis_json = serde_json::to_value(&genesis)?;
+    let app_state: Option<String> = match args.app_state {
+        Some(ref path) if path.exists() => {
+            Some(GenesisAppState::v1(std::fs::read(path)?).compress_and_encode()?)
+        }
+        _ => None,
+    };
 
     let chain_id: u64 = chainid::from_str_hashed(&genesis.chain_name)?.into();
     let chain_id = chain_id.to_string();
@@ -249,7 +258,8 @@ fn into_tendermint(genesis_file: &PathBuf, args: &GenesisIntoTendermintArgs) -> 
         // Hopefully leaving this empty will skip validation,
         // otherwise we have to run the genesis in memory here and now.
         app_hash: tendermint::AppHash::default(),
-        app_state: genesis_json,
+        // cometbft serves data in json format, convert to string to be specific
+        app_state,
     };
     let tmg_json = serde_json::to_string_pretty(&tmg)?;
     std::fs::write(&args.out, tmg_json)?;
@@ -279,6 +289,22 @@ fn set_ipc_gateway(genesis_file: &PathBuf, args: &GenesisIpcGatewayArgs) -> anyh
 
         Ok(genesis)
     })
+}
+
+async fn seal_genesis(genesis_file: &PathBuf, args: &SealGenesisArgs) -> anyhow::Result<()> {
+    let genesis_params = read_genesis(genesis_file)?;
+
+    let mut builder = GenesisBuilder::new(
+        args.builtin_actors_path.clone(),
+        args.custom_actors_path.clone(),
+        genesis_params,
+    );
+
+    if let Some(ref ipc_system_artifacts) = args.artifacts_path {
+        builder = builder.with_ipc_system_contracts(ipc_system_artifacts.clone());
+    }
+
+    builder.write_to(args.output_path.clone()).await
 }
 
 async fn new_genesis_from_parent(

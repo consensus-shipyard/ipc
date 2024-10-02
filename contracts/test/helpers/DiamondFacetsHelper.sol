@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {GatewayDiamond} from "../../src/GatewayDiamond.sol";
-import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
-import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
-import {SubnetActorDiamond} from "../../src/SubnetActorDiamond.sol";
-import {SubnetRegistryDiamond} from "../../src/SubnetRegistryDiamond.sol";
+import {GatewayDiamond} from "../../contracts/GatewayDiamond.sol";
+import {DiamondLoupeFacet} from "../../contracts/diamond/DiamondLoupeFacet.sol";
+import {DiamondCutFacet} from "../../contracts/diamond/DiamondCutFacet.sol";
+import {SubnetActorDiamond} from "../../contracts/SubnetActorDiamond.sol";
+import {SubnetRegistryDiamond} from "../../contracts/SubnetRegistryDiamond.sol";
 
 library DiamondFacetsHelper {
     function diamondLouper(address a) internal pure returns (DiamondLoupeFacet) {

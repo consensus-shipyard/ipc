@@ -4,15 +4,15 @@ pragma solidity ^0.8.23;
 import "forge-std/Test.sol";
 
 import {LibGatewayMock} from "../mocks/LibGatewayMock.sol";
-import {LibGateway} from "../../src/lib/LibGateway.sol";
-import {IpcEnvelope, IpcMsgKind, ResultMsg, OutcomeType, BottomUpMsgBatch} from "../../src/structs/CrossNet.sol";
-import {SubnetID, IPCAddress} from "../../src/structs/Subnet.sol";
-import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
-import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
-import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
-import {InvalidXnetMessage, InvalidXnetMessageReason} from "../../src/errors/IPCErrors.sol";
+import {LibGateway} from "../../contracts/lib/LibGateway.sol";
+import {IpcEnvelope, IpcMsgKind, ResultMsg, OutcomeType, BottomUpMsgBatch} from "../../contracts/structs/CrossNet.sol";
+import {SubnetID, IPCAddress} from "../../contracts/structs/Subnet.sol";
+import {FvmAddressHelper} from "../../contracts/lib/FvmAddressHelper.sol";
+import {CrossMsgHelper} from "../../contracts/lib/CrossMsgHelper.sol";
+import {SubnetActorGetterFacet} from "../../contracts/subnet/SubnetActorGetterFacet.sol";
+import {InvalidXnetMessage, InvalidXnetMessageReason} from "../../contracts/errors/IPCErrors.sol";
 import {MockIpcContract} from "../helpers/TestUtils.sol";
-import {EMPTY_BYTES} from "../../src/constants/Constants.sol";
+import {EMPTY_BYTES} from "../../contracts/constants/Constants.sol";
 
 contract GatewayDummyContract {
     function reverts() public pure {

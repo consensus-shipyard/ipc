@@ -179,7 +179,7 @@ where
             if msg.sequence.is_zero() {
                 let state_tree = s.state_tree_mut();
                 if let Some(id) = state_tree.lookup_id(&msg.from)? {
-                    state_tree.get_actor(id)?.iter().for_each(|st| {
+                    state_tree.get_actor(id)?.inspect(|st| {
                         msg.sequence = st.sequence;
                     });
                 }
