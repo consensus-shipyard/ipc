@@ -29,6 +29,8 @@ library LibGateway {
     event MembershipUpdated(Membership);
     /// @dev subnet refers to the next "down" subnet that the `envelope.message.to` should be forwarded to.
     event NewTopDownMessage(address indexed subnet, IpcEnvelope message);
+    /// @dev event emitted when there is a new bottom-up message added to the batch.
+    event NewBottomUpMsg(uint256 indexed epoch);
     /// @dev event emitted when there is a new bottom-up message batch to be signed.
     event NewBottomUpMsgBatch(uint256 indexed epoch);
 
@@ -423,9 +425,10 @@ library LibGateway {
             s.postbox[cid] = crossMsg;
             return;
         }
-
+    
         // execute the message and get the receipt.
         (bool success, bytes memory ret) = executeCrossMsg(crossMsg, supplySource);
+        console.log("--------- applyMsg - success: %s", success);
         if (success) {
             sendReceipt(crossMsg, OutcomeType.Ok, ret);
         } else {
