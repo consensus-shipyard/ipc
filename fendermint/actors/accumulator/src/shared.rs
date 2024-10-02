@@ -157,10 +157,10 @@ fn bag_peaks<BS: Blockstore>(peaks: &Amt<Cid, &BS>) -> anyhow::Result<Cid, Actor
 /// represents the path through the subtree that the leaf node lives in.
 /// The second element represents the index of the peak containing the subtree that the leaf node
 /// lives in.
-fn path_for_eigen_root(leaf_index: u64, leaf_count: u64) -> anyhow::Result<(u64, u64)> {
+fn path_for_eigen_root(leaf_index: u64, leaf_count: u64) -> anyhow::Result<Option<(u64, u64)>> {
     // Ensure `leaf_index` is within bounds.
     if leaf_index >= leaf_count {
-        return Err(anyhow::anyhow!("`leaf_index` must less than `leaf_count`"));
+        return Ok(None);
     }
     // XOR turns matching bits into zeros and differing bits into ones, so to determine when
     // the two "paths" converge, we simply look for the most significant 1 bit...
@@ -181,41 +181,34 @@ fn path_for_eigen_root(leaf_index: u64, leaf_count: u64) -> anyhow::Result<(u64,
     let local_offset = leaf_index & bitmask;
     // The local_index is the local_offset plus the merge_height for the local eigentree
     let local_path = local_offset + merge_height;
-    Ok((local_path, eigen_index as u64))
+    Ok(Some((local_path, eigen_index as u64)))
 }
 
+/// Returns None when the index doesn't point to a leaf. if the index is valid, it will return a value or error
 fn get_at<BS: Blockstore, S: DeserializeOwned + Serialize>(
     store: &BS,
     leaf_index: u64,
     leaf_count: u64,
     peaks: &Amt<Cid, &BS>,
-) -> anyhow::Result<S> {
-    let (path, eigen_index) = path_for_eigen_root(leaf_index, leaf_count)?;
+) -> anyhow::Result<Option<S>> {
+    let (path, eigen_index) = match path_for_eigen_root(leaf_index, leaf_count)? {
+        None => {return Ok(None)}
+        Some(res) => {res}
+    };
     let cid = match peaks.get(eigen_index)? {
         Some(cid) => cid,
-        None => {
-            return Err(anyhow::anyhow!(
-                "failed to get peak at index {}",
-                eigen_index
-            ))
-        }
+        None => return Ok(None),
     };
     // Special case where eigentree has a height of one
     if path == 1 {
-        return match store.get_cbor::<S>(cid)? {
-            Some(value) => Ok(value),
-            None => Err(anyhow::anyhow!("failed to get leaf for cid {}", cid)),
-        };
+        return Ok(Some(store.get_cbor::<S>(cid)?.ok_or_else(|| {
+            anyhow::anyhow!("failed to get leaf for cid {}", cid)
+        })?));
     }
 
     let mut pair = match store.get_cbor::<[Cid; 2]>(cid)? {
         Some(value) => value,
-        None => {
-            return Err(anyhow::anyhow!(
-                "failed to get eigentree root node for cid {}",
-                cid
-            ))
-        }
+        None => anyhow::bail!("failed to get eigentree root node for cid {}", cid),
     };
 
     let leading_zeros = path.leading_zeros();
@@ -225,24 +218,18 @@ fn get_at<BS: Blockstore, S: DeserializeOwned + Serialize>(
     for i in 1..(significant_bits - 1) {
         let bit = ((path >> (significant_bits - i - 1)) & 1) as usize;
         let cid = &pair[bit];
-        pair = match store.get_cbor(cid)? {
-            Some(root) => root,
-            None => {
-                return Err(anyhow::anyhow!(
-                    "failed to get eigentree intermediate node for cid {}",
-                    cid
-                ))
-            }
-        };
+        pair = store.get_cbor(cid)?.ok_or_else(|| {
+            anyhow::anyhow!("failed to get eigentree intermediate node for cid {}", cid)
+        })?;
     }
 
     let bit = (path & 1) as usize;
     let cid = &pair[bit];
-    let leaf = match store.get_cbor::<S>(cid)? {
-        Some(root) => root,
-        None => return Err(anyhow::anyhow!("failed to get leaf for cid {}", cid)),
-    };
-    Ok(leaf)
+    let leaf = store
+        .get_cbor::<S>(cid)?
+        .ok_or_else(|| anyhow::anyhow!("failed to get leaf for cid {}", cid))?;
+
+    Ok(Some(leaf))
 }
 
 /// The state represents an MMR with peaks stored in an AMT
@@ -360,11 +347,8 @@ impl State {
         index: u64,
     ) -> anyhow::Result<Option<S>, ActorError> {
         let amt = Amt::<Cid, &BS>::load(&self.peaks, store).map_err(state_error)?;
-        let leaf = match get_at::<BS, S>(store, index, self.leaf_count, &amt) {
-            Ok(leaf) => Some(leaf),
-            Err(e) => return Err(ActorError::serialization(e.to_string())),
-        };
-        Ok(leaf)
+        get_at::<BS, S>(store, index, self.leaf_count, &amt)
+            .map_err(|e| ActorError::serialization(e.to_string()))
     }
 }
 
