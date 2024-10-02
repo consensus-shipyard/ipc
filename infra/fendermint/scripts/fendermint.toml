@@ -57,7 +57,7 @@ docker run \
   --publish 127.0.0.1:${FENDERMINT_METRICS_HOST_PORT}:9184 \
   --env FM_DATA_DIR=/data/${NODE_NAME}/fendermint/data \
   --env FM_TRACING__CONSOLE__LEVEL=${FM_LOG_LEVEL} \
-  --env FM_TRACING__FILE__ENABLED=false \
+  --env FM_TRACING__FILE__ENABLED=true \
   --env FM_TRACING__FILE__LEVEL=${FM_LOG_LEVEL} \
   --env FM_TRACING__FILE__DIRECTORY=/data/${NODE_NAME}/fendermint/data/logs \
   --env FM_TRACING__FILE__MAX_LOG_FILES=4 \

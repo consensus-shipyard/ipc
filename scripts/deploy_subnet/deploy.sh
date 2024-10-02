@@ -503,10 +503,12 @@ fi
 
 # Start the bootstrap validator node
 echo "$DASHES Start the first validator node as bootstrap"
-# Force a wait to make sure the subnet is confirmed as created in the parent contracts
-echo "Wait for deployment..."
-sleep 30
-echo "Finished waiting"
+if ! $local_deploy ; then
+  # Force a wait to make sure the subnet is confirmed as created in the parent contracts
+  echo "Wait for deployment..."
+  sleep 30
+  echo "Finished waiting"
+fi
 cd "${IPC_FOLDER}"
 
 bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \

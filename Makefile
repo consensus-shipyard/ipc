@@ -54,3 +54,6 @@ run-devnet-evm:
 
 run-localnet:
 	./scripts/deploy_subnet/deploy.sh localnet
+
+stop-localnet:
+	./scripts/deploy_subnet/stop_local.sh
