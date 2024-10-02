@@ -357,7 +357,7 @@ directory = "/path/to/log/directory"
 max_log_files = 5 # Number of files to keep after rotation
 rotation = "daily" # Options: minutely, hourly, daily, never
 ## Optional: filter events by domain
-domain_filter = ["Bottomup", "Consenesus", "Mpool", "Execution", "Topdown", "System"]
+domain_filter = ["Bottomup", "Consensus", "Mpool", "Execution", "Topdown", "System"]
 ## Optional: filter events by event name
 events_filter = ["ParentFinalityAcquired", "ParentRpcCalled"]
 ```
