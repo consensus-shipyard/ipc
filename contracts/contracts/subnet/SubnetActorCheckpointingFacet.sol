@@ -15,6 +15,8 @@ import {Pausable} from "../lib/LibPausable.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {LibActivity} from "../lib/LibActivity.sol";
 
+import "forge-std/Console.sol";
+
 contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard, Pausable {
     using EnumerableSet for EnumerableSet.AddressSet;
     using LibValidatorSet for ValidatorSet;
@@ -97,12 +99,18 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
         uint256 lastBottomUpCheckpointHeight = s.lastBottomUpCheckpointHeight;
         uint256 bottomUpCheckPeriod = s.bottomUpCheckPeriod;
 
+        console.log("lastBottomUpCheckpointHeight: %d", lastBottomUpCheckpointHeight);
+        console.log("bottomUpCheckPeriod: %d", bottomUpCheckPeriod);
+
         // cannot submit past bottom up checkpoint
         if (checkpoint.blockHeight <= lastBottomUpCheckpointHeight) {
             revert BottomUpCheckpointAlreadySubmitted();
         }
 
         uint256 nextCheckpointHeight = LibGateway.getNextEpoch(lastBottomUpCheckpointHeight, bottomUpCheckPeriod);
+
+        console.log("nextCheckpointHeight: %d", nextCheckpointHeight);
+        console.log("checkpoint.blockHeight: %d", checkpoint.blockHeight);
 
         if (checkpoint.blockHeight > nextCheckpointHeight) {
             revert CannotSubmitFutureCheckpoint();
