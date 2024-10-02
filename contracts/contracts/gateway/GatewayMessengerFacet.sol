@@ -25,7 +25,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
     using EnumerableSet for EnumerableSet.Bytes32Set;
     
-    event MessagePropagated(bytes32 indexed msgCid, uint256 value, bool shouldBurn);
+    event MessagesPropagated(bytes32[] msgCids);
 
     /**
      * @dev Sends a general-purpose cross-message from the local subnet to the destination subnet.
@@ -86,15 +86,19 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
      */
     function propagateAll() external payable {
         uint256 keysLength = s.postboxKeys.length();
-        console.log("keysLength: ", keysLength);
+        bytes32[] memory msgCids = new bytes32[](keysLength);
         for (uint256 i = 0; i < keysLength; ) {
             bytes32 msgCid = s.postboxKeys.at(i);
+            msgCids[i] = msgCid;
             _propagate(msgCid);
 
             unchecked {
                 ++i;
             }
         }
+
+        // Emit an event for off-chain monitoring
+        emit MessagesPropagated(msgCids);
     }
 
     /**
@@ -123,8 +127,5 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
 
         // Execute side effects
         LibGateway.crossMsgSideEffects({v: v, shouldBurn: shouldBurn});
-
-        // Emit an event for off-chain monitoring
-        emit MessagePropagated(msgCid, v, shouldBurn);
     }
 }
