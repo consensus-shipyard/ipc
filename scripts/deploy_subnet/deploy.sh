@@ -406,18 +406,13 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
   cd "${IPC_FOLDER}"/contracts
   npm install
 
-  if ! $local_deploy ; then
-    export RPC_URL=https://calibration.filfox.info/rpc/v1
-  else 
-    export RPC_URL=http://localhost:8545
-  fi
+  rpc_url=$(if $local_deploy; then echo "http://localhost:8545"; else echo "https://calibration.filfox.info/rpc/v1"; fi)
   pk=$(cat "${IPC_CONFIG_FOLDER}"/validator_0.sk)
-  export PRIVATE_KEY=$pk
 
   if ! $local_deploy ; then
-    deploy_contracts_output=$(make deploy-ipc NETWORK=calibrationnet)
+    deploy_contracts_output=$(PRIVATE_KEY="${pk}" RPC_URL="${rpc_url}" make deploy-ipc NETWORK=calibrationnet)
   else
-    deploy_contracts_output=$(make deploy-ipc NETWORK=localnet)
+    deploy_contracts_output=$(PRIVATE_KEY="${pk}" RPC_URL="${rpc_url}" make deploy-ipc NETWORK=localnet)
   fi
 
   echo "$DASHES deploy contracts output $DASHES"
@@ -451,11 +446,9 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
     SUPPLY_SOURCE_ADDRESS=$(echo "$deploy_supply_source_token_out" | sed -n 's/.*contract Hoku *\([^ ]*\).*/\1/p')
 
     # fund the all anvil accounts with 10100 HOKU (note the extra 100 HOKU)
-    # TODO: the `ipc-cli` appears to require a 10**18 HOKU to map to 1 sHOKU. this isn't ideal because
-    # that means we need to mint 10**18 more HOKU than we want. the `hoku` CLI does something a 
+    # note: the `ipc-cli` uses 10**18 HOKU to map to 1 subnet HOKU. the `hoku` CLI does something a 
     # bit similarly—but it converts the amount internally. for example, these are the same:
     # `hoku account deposit 10000` vs `ipc-cli cross-msg ... 10000000000000000000000`
-    # but in reality, we shouldn't assume 10**18 (explicitly or implicity) for erc20 supply source
     token_amount="10100000000000000000000"
     for i in {0..9}
     do
@@ -657,7 +650,7 @@ if [[ $local_deploy = true ]]; then
   echo "$DASHES Move account funds into subnet"
   # move 10000 HOKU to subnet (i.e., leave 100 HOKU on rootnet for
   # testing purposes)
-  # TODO: see comment above about why we're using 10**18 due 
+  # note: see comment above about why we're using 10**18 due 
   # to `ipc-cli` & `hoku` CLI's atto assumption
   token_amount="10000000000000000000000"
   for i in {0..9}
@@ -678,6 +671,19 @@ if [[ $local_deploy = true ]]; then
     sleep 5
   done
   echo "Deposited HOKU for test accounts"
+  # buy 5000 credits if the hoku CLI is installed
+  if [[ -n $(which hoku) ]]; then
+    echo "Buying credits for test accounts..."
+    credit_amount="5000"
+    for i in {0..9}
+    do
+      private_key=$(jq .["$i"].private_key < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
+      PRIVATE_KEY="${private_key}" NETWORK=localnet hoku credit buy "${credit_amount}"
+    done
+    echo "Bought subnet credits for test accounts"
+  else
+    echo "Hoku CLI not installed...skipping credit funding"
+  fi
   echo
   echo "${DASHES} Subnet setup complete ${DASHES}"
   echo
@@ -738,11 +744,15 @@ if [[ $local_deploy = true ]]; then
   echo "Account balances:"
   addr=$(jq .[0].address < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
   parent_native=$(cast balance --rpc-url http://localhost:"${ANVIL_HOST_PORT}" --ether "${addr}" | awk '{printf "%.2f", $1}')
-  parent_hoku=$(cast balance --rpc-url http://localhost:"${ANVIL_HOST_PORT}" --erc20 "${SUPPLY_SOURCE_ADDRESS}" "${addr}" | awk '{print $1}')
+  parent_hoku=$(cast balance --rpc-url http://localhost:"${ANVIL_HOST_PORT}" --erc20 "${SUPPLY_SOURCE_ADDRESS}" "${addr}" | awk '{printf "%.0f", $1 / 1000000000000000000}')
   subnet_native=$(cast balance --rpc-url http://localhost:"${ETHAPI_HOST_PORTS[0]}" --ether "${addr}" | awk '{printf "%.2f", $1}')
   echo "Parent native: ${parent_native%.*} ETH"
   echo "Parent HOKU:   ${parent_hoku%.*} HOKU"
-  echo "Subnet native: ${subnet_native%.*} sHOKU"
+  echo "Subnet native: ${subnet_native%.*} HOKU"
+  if [[ -n $(which hoku) ]]; then
+    credit_balance=$(NETWORK=localnet hoku credit balance --address "${addr}" | jq '.credit_free' | tr -d '"')
+    echo "Subnet credits: ${credit_balance}"
+  fi
   echo
   echo "Accounts:"
   for i in {0..9}
