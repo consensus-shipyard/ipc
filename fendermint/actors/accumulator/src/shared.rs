@@ -362,7 +362,7 @@ impl State {
         let amt = Amt::<Cid, &BS>::load(&self.peaks, store).map_err(state_error)?;
         let leaf = match get_at::<BS, S>(store, index, self.leaf_count, &amt) {
             Ok(leaf) => Some(leaf),
-            Err(_) => None,
+            Err(e) => return Err(ActorError::serialization(e.to_string())),
         };
         Ok(leaf)
     }
