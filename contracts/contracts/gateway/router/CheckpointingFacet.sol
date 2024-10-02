@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {GatewayActorModifiers} from "../../lib/LibGatewayActorStorage.sol";
-import {BottomUpCheckpoint} from "../../structs/CrossNet.sol";
+import {BottomUpCheckpoint, ActivitySummary, ActivitySummaryCommitted} from "../../structs/CrossNet.sol";
 import {LibGateway} from "../../lib/LibGateway.sol";
 import {LibQuorum} from "../../lib/LibQuorum.sol";
 import {Subnet} from "../../structs/Subnet.sol";
@@ -49,12 +49,16 @@ contract CheckpointingFacet is GatewayActorModifiers {
     /// @param membershipWeight - the total weight of the membership
     function createBottomUpCheckpoint(
         BottomUpCheckpoint calldata checkpoint,
+        // TODO(rewarder) ActivitySummary calldata summary,
         bytes32 membershipRootHash,
         uint256 membershipWeight
     ) external systemActorOnly {
         if (LibGateway.bottomUpCheckpointExists(checkpoint.blockHeight)) {
             revert CheckpointAlreadyExists();
         }
+
+        // TODO(rewarder): compute the commitment to the summary and set it in the checkpoint.
+        //  Collect summaries to relay and put them in the checkpoint. Reset the pending summaries map.
 
         LibQuorum.createQuorumInfo({
             self: s.checkpointQuorumMap,
@@ -64,6 +68,9 @@ contract CheckpointingFacet is GatewayActorModifiers {
             membershipWeight: membershipWeight,
             majorityPercentage: s.majorityPercentage
         });
+
+        // TODO(rewarder): emit an ActivitySummaryCommittedevent so relayers can pick it up.
+
         LibGateway.storeBottomUpCheckpoint(checkpoint);
     }
 

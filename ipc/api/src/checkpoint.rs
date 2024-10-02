@@ -94,6 +94,7 @@ pub struct BottomUpCheckpoint {
     pub next_configuration_number: u64,
     /// The list of messages for execution
     pub msgs: Vec<IpcEnvelope>,
+    // TODO(rewards): add new fields and data types for summaries and commitments.
 }
 
 pub fn serialize_vec_bytes_to_vec_hex<T: AsRef<[u8]>, S>(
