@@ -15,6 +15,7 @@ use ipc_observability::emit;
 use ipc_observability::serde::HexEncodableBlockHash;
 use libp2p::futures::TryFutureExt;
 use tokio::sync::broadcast;
+use tokio::sync::broadcast::Receiver;
 use tracing::instrument;
 
 pub struct ParentPoll<P, S> {
@@ -31,6 +32,10 @@ where
     S: ParentViewStore + Send + Sync + 'static,
     P: Send + Sync + 'static + ParentQueryProxy,
 {
+    fn subscribe(&self) -> Receiver<TopDownSyncEvent> {
+        self.event_broadcast.subscribe()
+    }
+
     fn last_checkpoint(&self) -> &Checkpoint {
         &self.last_finalized
     }

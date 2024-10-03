@@ -38,7 +38,6 @@ pub async fn run_topdown<CheckpointQuery, Gossip, Poller, ParentClient>(
         &Checkpoint,
         ParentClient,
         ParentSyncerConfig,
-        broadcast::Sender<TopDownSyncEvent>,
     ) -> Poller,
 ) -> anyhow::Result<TopdownClient>
 where
@@ -60,15 +59,13 @@ where
         })
         .collect::<Vec<_>>();
 
-    let (internal_event_tx, internal_event_rx) =
-        broadcast::channel(config.syncer.broadcast_channel_size);
-
     let poller = poller_fn(
         &checkpoint,
         parent_client,
         config.syncer.clone(),
-        internal_event_tx,
     );
+    let internal_event_rx = poller.subscribe();
+
     let syncer_client = start_parent_syncer(config.syncer, poller)?;
 
     let voting_client = start_vote_reactor(StartVoteReactorParams {

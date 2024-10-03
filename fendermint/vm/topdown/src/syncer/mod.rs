@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use serde::Deserialize;
 use std::time::Duration;
 use tokio::select;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{broadcast, mpsc, oneshot};
 
 pub mod error;
 pub mod payload;
@@ -51,6 +51,8 @@ pub struct ParentSyncerReactorClient {
 /// Polls the parent block view
 #[async_trait]
 pub trait ParentPoller {
+    fn subscribe(&self) -> broadcast::Receiver<TopDownSyncEvent>;
+
     /// The previous checkpoint committed
     fn last_checkpoint(&self) -> &Checkpoint;
 

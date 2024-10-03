@@ -65,14 +65,6 @@ where
         Ok(signed_record)
     }
 
-    pub fn record(&self) -> &R {
-        &self.record
-    }
-
-    pub fn envelope(&self) -> &SignedEnvelope {
-        &self.envelope
-    }
-
     pub fn into_record(self) -> R {
         self.record
     }

@@ -314,7 +314,7 @@ where
         Ok(ret)
     }
 
-    pub async fn enable_topdown(&mut self, topdown: TopdownClient) {
+    pub fn enable_topdown(&mut self, topdown: TopdownClient) {
         self.chain_env.topdown_client = Toggle::enable(topdown);
     }
 

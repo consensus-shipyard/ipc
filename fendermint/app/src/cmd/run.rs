@@ -34,7 +34,7 @@ use fendermint_vm_topdown::proxy::{
 use fendermint_vm_topdown::syncer::payload::ParentBlockView;
 use fendermint_vm_topdown::syncer::poll::ParentPoll;
 use fendermint_vm_topdown::syncer::store::{InMemoryParentViewStore, ParentViewStore};
-use fendermint_vm_topdown::syncer::{start_parent_syncer, ParentPoller, ParentSyncerConfig};
+use fendermint_vm_topdown::syncer::{start_parent_syncer, ParentPoller, ParentSyncerConfig, TopDownSyncEvent};
 use fendermint_vm_topdown::vote::error::Error;
 use fendermint_vm_topdown::vote::gossip::GossipClient;
 use fendermint_vm_topdown::vote::payload::Vote;
@@ -52,6 +52,7 @@ use std::sync::Arc;
 use tendermint_rpc::Client;
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::error::{RecvError, TryRecvError};
+use tokio::sync::broadcast::Receiver;
 use tower::ServiceBuilder;
 use tracing::info;
 
@@ -267,7 +268,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         let app_parent_finality_query = AppParentFinalityQuery::new(app.clone());
 
         let topdown_config = settings.ipc.topdown_config()?;
-        let mut config = fendermint_vm_topdown::Config {
+        let config = fendermint_vm_topdown::Config {
             syncer: ParentSyncerConfig {
                 request_channel_size: 1024,
                 broadcast_channel_size: 1024,
@@ -304,7 +305,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
                 .0,
             gossip_client,
             parent_proxy,
-            move |checkpoint, proxy, config, rx| {
+            move |checkpoint, proxy, config| {
                 let poller_inner =
                     ParentPoll::new(config, proxy, parent_view_store, checkpoint.clone());
                 TendermintAwareParentPoller {
@@ -540,6 +541,10 @@ where
     S: ParentViewStore + Send + Sync + 'static,
     P: Send + Sync + 'static + ParentQueryProxy,
 {
+    fn subscribe(&self) -> Receiver<TopDownSyncEvent> {
+        self.inner.subscribe()
+    }
+
     fn last_checkpoint(&self) -> &Checkpoint {
         self.inner.last_checkpoint()
     }
