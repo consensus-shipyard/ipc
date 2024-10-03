@@ -326,7 +326,7 @@ mod tests {
         }
 
         let ob = vote_tally.find_quorum().unwrap().unwrap();
-        assert_eq!(ob, observation);
+        assert_eq!(*ob.payload(), observation);
     }
 
     #[test]
@@ -401,7 +401,7 @@ mod tests {
         }
 
         let ob = vote_tally.find_quorum().unwrap().unwrap();
-        assert_eq!(ob.payload(), observation);
+        assert_eq!(*ob.payload(), observation);
 
         let new_powers = (0..3)
             .map(|_| (random_validator_key().1.clone(), 1))
@@ -447,6 +447,6 @@ mod tests {
         ]);
 
         let ob = vote_tally.find_quorum().unwrap().unwrap();
-        assert_eq!(ob.payload(), observation);
+        assert_eq!(*ob.payload(), observation);
     }
 }

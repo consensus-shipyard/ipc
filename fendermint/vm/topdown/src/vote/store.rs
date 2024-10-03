@@ -212,7 +212,7 @@ mod tests {
             .unwrap(),
         );
 
-        let agg = VoteAgg(votes.iter().collect());
+        let agg = VoteAgg(HashMap::from_iter(votes.iter().map(|v| (v.voter(), v))));
         let weights = agg.observation_weights(&HashMap::from_iter(powers));
         assert_eq!(weights, vec![(&observation1, 1), (&observation2, 2),])
     }

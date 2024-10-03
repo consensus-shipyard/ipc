@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use fendermint_crypto::SecretKey;
 use fendermint_vm_genesis::ValidatorKey;
 use fendermint_vm_topdown::observation::Observation;
-use fendermint_vm_topdown::sync::TopDownSyncEvent;
+use fendermint_vm_topdown::syncer::TopDownSyncEvent;
 use fendermint_vm_topdown::vote::error::Error;
 use fendermint_vm_topdown::vote::gossip::GossipClient;
 use fendermint_vm_topdown::vote::payload::{PowerUpdates, Vote};
@@ -155,7 +155,7 @@ async fn simple_lifecycle() {
     while client.find_quorum().await.unwrap().is_none() {}
 
     let r = client.find_quorum().await.unwrap().unwrap();
-    assert_eq!(r.parent_height(), parent_height);
+    assert_eq!(r.payload().parent_height(), parent_height);
 
     let r = client.query_votes(parent_height).await.unwrap().unwrap();
     assert_eq!(r.len(), 1);
@@ -179,7 +179,7 @@ async fn simple_lifecycle() {
     let votes = client.query_votes(parent_height2).await.unwrap().unwrap();
     assert_eq!(votes.len(), 1);
     let r = client.find_quorum().await.unwrap().unwrap();
-    assert_eq!(r.parent_height(), parent_height2);
+    assert_eq!(r.payload().parent_height(), parent_height2);
 
     client
         .set_quorum_finalized(parent_height2)
@@ -283,7 +283,7 @@ async fn waiting_for_quorum() {
 
     for client in &clients {
         let r = client.find_quorum().await.unwrap().unwrap();
-        assert_eq!(r.parent_height(), parent_height3, "should have quorum");
+        assert_eq!(r.payload().parent_height(), parent_height3, "should have quorum");
     }
 
     // make observation on previous heights
@@ -301,7 +301,7 @@ async fn waiting_for_quorum() {
     for client in &clients {
         let r = client.find_quorum().await.unwrap().unwrap();
         assert_eq!(
-            r.parent_height(),
+            r.payload().parent_height(),
             parent_height3,
             "should have formed quorum on larger height"
         );
@@ -359,6 +359,6 @@ async fn all_validator_in_sync() {
         while n.find_quorum().await.unwrap().is_none() {}
 
         let r = n.find_quorum().await.unwrap().unwrap();
-        assert_eq!(r.parent_height(), parent_height)
+        assert_eq!(r.payload().parent_height(), parent_height)
     }
 }

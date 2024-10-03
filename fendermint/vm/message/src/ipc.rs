@@ -95,19 +95,8 @@ pub struct BottomUpCheckpoint {
     pub bottom_up_messages: Cid, // TODO: Use TCid
 }
 
-/// A proposal of the parent view that validators will be voting on.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub struct ParentFinality {
-    /// Block height of this proposal.
-    pub height: ChainEpoch,
-    /// The block hash of the parent, expressed as bytes
-    pub block_hash: Vec<u8>,
-}
-
 #[cfg(feature = "arb")]
 mod arb {
-
-    use crate::ipc::ParentFinality;
     use fendermint_testing::arb::{ArbAddress, ArbCid, ArbSubnetID, ArbTokenAmount};
     use fvm_shared::crypto::signature::Signature;
     use quickcheck::{Arbitrary, Gen};
@@ -184,15 +173,6 @@ mod arb {
                 height: u32::arbitrary(g).into(),
                 next_validator_set_id: Arbitrary::arbitrary(g),
                 bottom_up_messages: ArbCid::arbitrary(g).0,
-            }
-        }
-    }
-
-    impl Arbitrary for ParentFinality {
-        fn arbitrary(g: &mut Gen) -> Self {
-            Self {
-                height: u32::arbitrary(g).into(),
-                block_hash: Vec::arbitrary(g),
             }
         }
     }
