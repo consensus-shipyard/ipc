@@ -2817,6 +2817,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_actor_gas_market"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cid",
+ "fil_actors_evm_shared",
+ "fil_actors_runtime",
+ "frc42_dispatch",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
+ "fvm_shared",
+ "hex-literal 0.4.1",
+ "log",
+ "multihash 0.18.1",
+ "num-derive 0.3.3",
+ "num-traits",
+ "serde",
+]
+
+[[package]]
 name = "fendermint_actors"
 version = "0.1.0"
 dependencies = [
@@ -3305,6 +3325,7 @@ dependencies = [
  "ethers",
  "fendermint_actor_chainmetadata",
  "fendermint_actor_eam",
+ "fendermint_actor_gas_market",
  "fendermint_actors",
  "fendermint_crypto",
  "fendermint_eth_hardhat",
@@ -8777,6 +8798,12 @@ name = "smallvec"
 version = "1.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"
+
+[[package]]
+name = "snap"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b6b67fb9a61334225b5b790716f609cd58395f895b3fe8b328786812a40bc3b"
 
 [[package]]
 name = "snap"

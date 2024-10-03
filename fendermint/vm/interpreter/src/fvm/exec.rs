@@ -12,6 +12,7 @@ use fvm_shared::{address::Address, ActorID, MethodNum, BLOCK_GAS_LIMIT};
 use ipc_observability::{emit, measure_time, observe::TracingError, Traceable};
 use tendermint_rpc::Client;
 
+use crate::fvm::gas::GasMarket;
 use crate::ExecInterpreter;
 
 use super::{
@@ -56,6 +57,8 @@ where
     ) -> anyhow::Result<(Self::State, Self::BeginOutput)> {
         // Block height (FVM epoch) as sequence is intentional
         let height = state.block_height();
+
+        self.gas.load(&mut state)?;
 
         // check for upgrades in the upgrade_scheduler
         let chain_id = state.chain_id();
@@ -149,7 +152,7 @@ where
     async fn deliver(
         &self,
         mut state: Self::State,
-        msg: Self::Message,
+        mut msg: Self::Message,
     ) -> anyhow::Result<(Self::State, Self::DeliverOutput)> {
         let (apply_ret, emitters, latency) = if msg.from == system::SYSTEM_ACTOR_ADDR {
             let (execution_result, latency) = measure_time(|| state.execute_implicit(msg.clone()));
@@ -157,8 +160,13 @@ where
 
             (apply_ret, emitters, latency)
         } else {
+            // TODO: maybe compare the gas limits is better?
+            msg.gas_limit = msg.gas_limit.min(self.gas.available_block_gas());
+
             let (execution_result, latency) = measure_time(|| state.execute_explicit(msg.clone()));
             let (apply_ret, emitters) = execution_result?;
+
+            self.gas.consume_gas(apply_ret.msg_receipt.gas_used)?;
 
             (apply_ret, emitters, latency)
         };
@@ -186,6 +194,8 @@ where
     }
 
     async fn end(&self, mut state: Self::State) -> anyhow::Result<(Self::State, Self::EndOutput)> {
+        self.gas.update_params(&mut state)?;
+
         // TODO: Consider doing this async, since it's purely informational and not consensus-critical.
         let _ = checkpoint::emit_trace_if_check_checkpoint_finalized(&self.gateway, &mut state)
             .inspect_err(|e| {
