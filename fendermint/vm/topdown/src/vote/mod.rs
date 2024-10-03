@@ -21,7 +21,7 @@ use error::Error;
 use fendermint_crypto::quorum::ECDSACertificate;
 use fendermint_crypto::SecretKey;
 use fendermint_vm_genesis::ValidatorKey;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::time::Duration;

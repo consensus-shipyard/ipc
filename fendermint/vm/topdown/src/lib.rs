@@ -13,23 +13,18 @@ pub mod observe;
 pub mod syncer;
 pub mod vote;
 
-use async_stm::Stm;
-use async_trait::async_trait;
 use ethers::utils::hex;
 use fendermint_crypto::quorum::ECDSACertificate;
-use fvm_shared::clock::ChainEpoch;
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use std::sync::Arc;
-use std::time::Duration;
 
 pub use crate::cache::{SequentialAppendError, SequentialKeyCache, ValueIter};
 pub use crate::error::Error;
 use crate::observation::{LinearizedParentBlockView, Observation};
 use crate::syncer::{ParentSyncerConfig, ParentSyncerReactorClient};
-use crate::vote::payload::{PowerTable, PowerUpdates};
+use crate::vote::payload::PowerUpdates;
 use crate::vote::{VoteConfig, VoteReactorClient};
 
 pub type BlockHeight = u64;
@@ -38,10 +33,6 @@ pub type BlockHash = Bytes;
 
 /// The null round error message
 pub(crate) const NULL_ROUND_ERR_MSG: &str = "requested epoch was a null round";
-/// Default topdown proposal height range
-pub(crate) const DEFAULT_MAX_PROPOSAL_RANGE: BlockHeight = 100;
-pub(crate) const DEFAULT_MAX_CACHE_BLOCK: BlockHeight = 500;
-pub(crate) const DEFAULT_PROPOSAL_DELAY: BlockHeight = 2;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
@@ -151,27 +142,6 @@ impl TopdownClient {
     pub async fn update_power_table(&self, updates: PowerUpdates) -> anyhow::Result<()> {
         self.voting.update_power_table(updates).await
     }
-}
-
-/// If res is null round error, returns the default value from f()
-pub(crate) fn handle_null_round<T, F: FnOnce() -> T>(
-    res: anyhow::Result<T>,
-    f: F,
-) -> anyhow::Result<T> {
-    match res {
-        Ok(t) => Ok(t),
-        Err(e) => {
-            if is_null_round_error(&e) {
-                Ok(f())
-            } else {
-                Err(e)
-            }
-        }
-    }
-}
-
-pub(crate) fn is_null_round_error(err: &anyhow::Error) -> bool {
-    is_null_round_str(&err.to_string())
 }
 
 pub(crate) fn is_null_round_str(s: &str) -> bool {

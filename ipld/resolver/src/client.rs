@@ -8,10 +8,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::oneshot;
 
 use crate::vote_record::SubnetVoteRecord;
-use crate::{
-    service::{Request, ResolveResult},
-    vote_record::SignedVoteRecord,
-};
+use crate::service::{Request, ResolveResult};
 
 /// A facade to the [`Service`] to provide a nicer interface than message passing would allow on its own.
 #[derive(Clone)]

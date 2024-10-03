@@ -2,11 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use crate::observation::{Observation, ObservationConfig};
-use crate::proxy::ParentQueryProxy;
-use crate::syncer::error::Error;
 use crate::syncer::payload::ParentBlockView;
-use crate::syncer::poll::ParentPoll;
-use crate::syncer::store::ParentViewStore;
 use crate::{BlockHeight, Checkpoint};
 use anyhow::anyhow;
 use async_trait::async_trait;

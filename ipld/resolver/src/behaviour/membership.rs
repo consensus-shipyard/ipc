@@ -27,7 +27,7 @@ use tokio::time::{Instant, Interval};
 use crate::hash::blake2b_256;
 use crate::provider_cache::{ProviderDelta, SubnetProviderCache};
 use crate::provider_record::{ProviderRecord, SignedProviderRecord};
-use crate::vote_record::{SignedVoteRecord, SubnetVoteRecord, VoteRecord};
+use crate::vote_record::SubnetVoteRecord;
 use crate::{stats, Timestamp};
 
 use super::NetworkConfig;
