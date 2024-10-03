@@ -196,11 +196,7 @@ impl Checkpoint {
 
 impl quickcheck::Arbitrary for TopdownProposal {
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
-        let observation = Observation::new(
-            u64::arbitrary(g),
-            Vec::arbitrary(g),
-            Vec::arbitrary(g)
-        );
+        let observation = Observation::new(u64::arbitrary(g), Vec::arbitrary(g), Vec::arbitrary(g));
         let cert = ECDSACertificate::new_of_size(observation, 1);
 
         Self {

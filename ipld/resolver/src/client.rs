@@ -7,8 +7,8 @@ use libipld::Cid;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::oneshot;
 
-use crate::vote_record::SubnetVoteRecord;
 use crate::service::{Request, ResolveResult};
+use crate::vote_record::SubnetVoteRecord;
 
 /// A facade to the [`Service`] to provide a nicer interface than message passing would allow on its own.
 #[derive(Clone)]

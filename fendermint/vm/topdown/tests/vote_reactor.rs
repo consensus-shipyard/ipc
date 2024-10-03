@@ -283,7 +283,11 @@ async fn waiting_for_quorum() {
 
     for client in &clients {
         let r = client.find_quorum().await.unwrap().unwrap();
-        assert_eq!(r.payload().parent_height(), parent_height3, "should have quorum");
+        assert_eq!(
+            r.payload().parent_height(),
+            parent_height3,
+            "should have quorum"
+        );
     }
 
     // make observation on previous heights

@@ -33,11 +33,7 @@ pub async fn run_topdown<CheckpointQuery, Gossip, Poller, ParentClient>(
     validator_key: SecretKey,
     gossip_client: Gossip,
     parent_client: ParentClient,
-    poller_fn: impl FnOnce(
-        &Checkpoint,
-        ParentClient,
-        ParentSyncerConfig,
-    ) -> Poller,
+    poller_fn: impl FnOnce(&Checkpoint, ParentClient, ParentSyncerConfig) -> Poller,
 ) -> anyhow::Result<TopdownClient>
 where
     CheckpointQuery: LaunchQuery + Send + Sync + 'static,
@@ -58,11 +54,7 @@ where
         })
         .collect::<Vec<_>>();
 
-    let poller = poller_fn(
-        &checkpoint,
-        parent_client,
-        config.syncer.clone(),
-    );
+    let poller = poller_fn(&checkpoint, parent_client, config.syncer.clone());
     let internal_event_rx = poller.subscribe();
 
     let syncer_client = start_parent_syncer(config.syncer, poller)?;

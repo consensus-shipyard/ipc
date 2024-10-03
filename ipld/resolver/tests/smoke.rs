@@ -28,7 +28,10 @@ use fvm_ipld_encoding::IPLD_RAW;
 use fvm_ipld_hamt::Hamt;
 use fvm_shared::{address::Address, ActorID};
 use ipc_api::subnet_id::SubnetID;
-use ipc_ipld_resolver::{Client, Config, ConnectionConfig, ContentConfig, DiscoveryConfig, Event, MembershipConfig, NetworkConfig, Resolver, Service, SubnetVoteRecord};
+use ipc_ipld_resolver::{
+    Client, Config, ConnectionConfig, ContentConfig, DiscoveryConfig, Event, MembershipConfig,
+    NetworkConfig, Resolver, Service, SubnetVoteRecord,
+};
 use libp2p::{
     core::{
         muxing::StreamMuxerBox,
@@ -224,7 +227,10 @@ async fn single_bootstrap_publish_receive_vote() {
     // Pubilish vote
     cluster.agents[0]
         .client
-        .publish_vote(SubnetVoteRecord {vote: vote.clone(), subnet: subnet_id.clone() })
+        .publish_vote(SubnetVoteRecord {
+            vote: vote.clone(),
+            subnet: subnet_id.clone(),
+        })
         .expect("failed to send vote");
 
     // Receive vote.
