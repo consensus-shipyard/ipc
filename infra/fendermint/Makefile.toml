@@ -201,6 +201,10 @@ FM_LOG_LEVEL = { value = "${LOG_LEVEL}", condition = { env_not_set = [
 OBJECTS_LOG_LEVEL = { value = "${LOG_LEVEL}", condition = { env_not_set = [
     "OBJECTS_LOG_LEVEL",
 ] } }
+LOG_DOMAINS = "Bottomup,Consensus,Execution,Mpool,System,Topdown"
+FM_LOG_DOMAINS = { value = "${LOG_DOMAINS}", condition = { env_not_set = [
+    "FM_LOG_DOMAINS",
+] } }
 
 [tasks.info]
 script = """
