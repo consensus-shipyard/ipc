@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use crate::proxy::ParentQueryProxy;
-use crate::syncer::{start_parent_syncer, ParentPoller, ParentSyncerConfig, TopDownSyncEvent};
+use crate::syncer::{start_parent_syncer, ParentPoller, ParentSyncerConfig};
 use crate::vote::gossip::GossipClient;
 use crate::vote::payload::PowerUpdates;
 use crate::vote::store::InMemoryVoteStore;
@@ -15,7 +15,6 @@ use fendermint_vm_genesis::{Power, Validator, ValidatorKey};
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::broadcast;
 
 /// Run the topdown checkpointing in the background. This consists of two processes:
 /// - syncer:
