@@ -1,0 +1,1 @@
+Ipc(TopDownExec(TopdownProposal { cert: ECDSACertificate { payload: Observation { parent_height: 18446744073709551615, parent_hash: [159, 57, 249, 139, 53], cumulative_effects_comm: [1, 58, 96, 167, 78, 47, 28, 58] }, signatures: [None] }, effects: ([], []) }))

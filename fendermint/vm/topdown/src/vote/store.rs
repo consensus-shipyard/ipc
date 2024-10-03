@@ -213,7 +213,9 @@ mod tests {
         );
 
         let agg = VoteAgg(HashMap::from_iter(votes.iter().map(|v| (v.voter(), v))));
-        let weights = agg.observation_weights(&HashMap::from_iter(powers));
+        let mut weights = agg.observation_weights(&HashMap::from_iter(powers));
+        weights.sort_by(|a, b| a.1.cmp(&b.1));
+
         assert_eq!(weights, vec![(&observation1, 1), (&observation2, 2),])
     }
 }

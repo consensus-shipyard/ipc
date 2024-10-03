@@ -73,7 +73,7 @@ impl<S: VoteStore> VoteTally<S> {
     /// The equivalent formula can be found in CometBFT [here](https://github.com/cometbft/cometbft/blob/a8991d63e5aad8be82b90329b55413e3a4933dc0/types/vote_set.go#L307).
     pub fn quorum_threshold(&self) -> Weight {
         let total_weight: Weight = self.power_table.values().sum();
-        total_weight * self.quorum_ratio.numer() / self.quorum_ratio.denom()
+        total_weight * self.quorum_ratio.numer() / self.quorum_ratio.denom() + 1
     }
 
     /// Return the height of the first entry in the chain.

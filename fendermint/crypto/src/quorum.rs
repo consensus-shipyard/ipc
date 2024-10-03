@@ -130,7 +130,9 @@ mod tests {
         let mut quorum = ECDSACertificate::new_of_size(payload.clone(), sks.len());
         let ratio = Ratio::new(2, 3);
         for (i, sk) in sks.iter().enumerate() {
-            let sig = RecoverableECDSASignature::sign(sk, &payload).unwrap();
+            let sig =
+                RecoverableECDSASignature::sign(sk, &fvm_ipld_encoding::to_vec(&payload).unwrap())
+                    .unwrap();
             quorum.set_signature(i, &sk.public_key(), sig).unwrap();
         }
 
@@ -153,7 +155,9 @@ mod tests {
 
         let mut quorum = ECDSACertificate::new_of_size(payload.clone(), sks.len());
         for (i, sk) in sks.iter().enumerate() {
-            let sig = RecoverableECDSASignature::sign(sk, &payload).unwrap();
+            let sig =
+                RecoverableECDSASignature::sign(sk, &fvm_ipld_encoding::to_vec(&payload).unwrap())
+                    .unwrap();
             if i % 3 == 0 {
                 quorum.set_signature(i, &sk.public_key(), sig).unwrap();
             }
@@ -177,7 +181,9 @@ mod tests {
 
         let mut quorum = ECDSACertificate::new_of_size(payload.clone(), sks.len());
         for (i, sk) in sks.iter().enumerate() {
-            let sig = RecoverableECDSASignature::sign(sk, &payload).unwrap();
+            let sig =
+                RecoverableECDSASignature::sign(sk, &fvm_ipld_encoding::to_vec(&payload).unwrap())
+                    .unwrap();
             quorum.set_signature(i, &sk.public_key(), sig).unwrap();
         }
 
@@ -207,7 +213,9 @@ mod tests {
         let mut quorum = ECDSACertificate::new_of_size(payload.clone(), sks.len());
         let mut should_signs = vec![];
         for (i, sk) in sks.iter().enumerate() {
-            let sig = RecoverableECDSASignature::sign(sk, &payload).unwrap();
+            let sig =
+                RecoverableECDSASignature::sign(sk, &fvm_ipld_encoding::to_vec(&payload).unwrap())
+                    .unwrap();
 
             let should_sign = random::<bool>();
             if should_sign {
