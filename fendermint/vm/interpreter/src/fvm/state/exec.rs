@@ -151,7 +151,7 @@ where
         let externs = FendermintExterns::new(blockstore.clone(), params.state_root);
         let machine = DefaultMachine::new(&mc, blockstore, externs)?;
         let mut executor = DefaultExecutor::new(engine, machine)?;
-        let gas_market = ActorGasMarket::new(&mut executor, block_height)?;
+        let gas_market = ActorGasMarket::create(&mut executor, block_height)?;
 
         Ok(Self {
             executor,
