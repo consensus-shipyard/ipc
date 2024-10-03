@@ -25,6 +25,14 @@ pub struct InMemoryParentViewStore {
     inner: SequentialKeyCache<BlockHeight, ParentBlockView>,
 }
 
+impl InMemoryParentViewStore {
+    pub fn new() -> Self {
+        Self {
+            inner: SequentialKeyCache::sequential(),
+        }
+    }
+}
+
 impl ParentViewStore for InMemoryParentViewStore {
     fn store(&mut self, view: ParentBlockView) -> Result<(), Error> {
         self.inner

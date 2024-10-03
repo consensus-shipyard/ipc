@@ -3374,6 +3374,7 @@ dependencies = [
  "fendermint_vm_actor_interface",
  "fendermint_vm_encoding",
  "fendermint_vm_message",
+ "fendermint_vm_topdown",
  "fvm_ipld_encoding",
  "fvm_shared",
  "hex",

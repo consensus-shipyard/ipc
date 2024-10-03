@@ -9,26 +9,28 @@ pub mod store;
 mod tally;
 
 use crate::observation::{CertifiedObservation, Observation};
-use crate::sync::TopDownSyncEvent;
+use crate::syncer::TopDownSyncEvent;
 use crate::vote::gossip::GossipClient;
 use crate::vote::operation::{OperationMetrics, OperationStateMachine};
 use crate::vote::payload::{PowerUpdates, Vote, VoteTallyState};
 use crate::vote::store::VoteStore;
 use crate::vote::tally::VoteTally;
 use crate::BlockHeight;
+use anyhow::anyhow;
 use error::Error;
 use fendermint_crypto::quorum::ECDSACertificate;
 use fendermint_crypto::SecretKey;
 use fendermint_vm_genesis::ValidatorKey;
 use serde::{Deserialize, Serialize};
+use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::time::Duration;
 use tokio::sync::{broadcast, mpsc, oneshot};
 
 pub type Weight = u64;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Config {
+#[derive(Deserialize, Debug, Clone)]
+pub struct VoteConfig {
     /// The reactor request channel buffer size
     pub req_channel_buffer_size: usize,
     /// The number of requests the reactor should process per run before handling other tasks
@@ -40,12 +42,13 @@ pub struct Config {
 }
 
 /// The client to interact with the vote reactor
+#[derive(Clone)]
 pub struct VoteReactorClient {
     tx: mpsc::Sender<VoteReactorRequest>,
 }
 
 pub struct StartVoteReactorParams<G, V> {
-    pub config: Config,
+    pub config: VoteConfig,
     pub validator_key: SecretKey,
     pub power_table: PowerUpdates,
     pub last_finalized_height: BlockHeight,
@@ -166,6 +169,19 @@ impl VoteReactorClient {
             .await?;
         Ok(())
     }
+
+    pub async fn check_quorum_cert(
+        &self,
+        cert: Box<ECDSACertificate<Observation>>,
+    ) -> anyhow::Result<()> {
+        let is_reached = self
+            .request(|tx| VoteReactorRequest::CheckQuorumCert { tx, cert })
+            .await?;
+        if !is_reached {
+            return Err(anyhow!("quorum not reached"));
+        }
+        Ok(())
+    }
 }
 
 enum VoteReactorRequest {
@@ -183,6 +199,10 @@ enum VoteReactorRequest {
     DumpAllVotes(oneshot::Sender<Result<HashMap<BlockHeight, Vec<Vote>>, Error>>),
     /// Get the current vote tally state variables in vote tally
     QueryState(oneshot::Sender<VoteTallyState>),
+    CheckQuorumCert {
+        cert: Box<ECDSACertificate<Observation>>,
+        tx: oneshot::Sender<bool>,
+    },
     /// Queries the vote tally to see if there are new quorum formed
     FindQuorum(oneshot::Sender<Option<ECDSACertificate<Observation>>>),
     /// Update power of some validators. If the weight is zero, the validator is removed
@@ -215,7 +235,7 @@ struct VotingHandler<Gossip, VoteStore> {
     internal_event_listener: broadcast::Receiver<TopDownSyncEvent>,
     vote_tally: VoteTally<VoteStore>,
     latest_child_block: BlockHeight,
-    config: Config,
+    config: VoteConfig,
 }
 
 impl<G, V> VotingHandler<G, V>
@@ -263,6 +283,15 @@ where
             }
             VoteReactorRequest::NewLocalBlockMined(n) => {
                 self.latest_child_block = n;
+            }
+            VoteReactorRequest::CheckQuorumCert { cert, tx } => {
+                if !self.vote_tally.check_quorum_cert(cert.borrow()) {
+                    let _ = tx.send(false);
+                } else {
+                    let _ = tx.send(
+                        self.vote_tally.last_finalized_height() + 1 == cert.payload().parent_height,
+                    );
+                }
             }
         }
     }

@@ -89,6 +89,17 @@ impl<S: VoteStore> VoteTally<S> {
         Ok(votes.into_owned())
     }
 
+    pub fn check_quorum_cert(&self, cert: &ECDSACertificate<Observation>) -> bool {
+        let power_table = self.power_table.iter().map(|(v, w)| (v.public_key(), *w));
+        match cert.quorum_reached(power_table, self.quorum_ratio) {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::error!(err = e.to_string(), "check quorum encountered error");
+                false
+            }
+        }
+    }
+
     /// Dump all the votes that is currently stored in the vote tally.
     /// This is generally a very expensive operation, but good for debugging, use with care
     pub fn dump_votes(&self) -> Result<HashMap<BlockHeight, Vec<Vote>>, Error> {

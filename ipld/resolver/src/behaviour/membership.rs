@@ -27,7 +27,7 @@ use tokio::time::{Instant, Interval};
 use crate::hash::blake2b_256;
 use crate::provider_cache::{ProviderDelta, SubnetProviderCache};
 use crate::provider_record::{ProviderRecord, SignedProviderRecord};
-use crate::vote_record::{SignedVoteRecord, VoteRecord};
+use crate::vote_record::{SignedVoteRecord, SubnetVoteRecord, VoteRecord};
 use crate::{stats, Timestamp};
 
 use super::NetworkConfig;
@@ -53,8 +53,8 @@ pub enum Event<V> {
     /// to trigger a lookup by the discovery module to learn the address.
     Skipped(PeerId),
 
-    /// We received a [`VoteRecord`] in one of the subnets we are providing data for.
-    ReceivedVote(Box<VoteRecord<V>>),
+    /// We received a vote in one of the subnets we are providing data for.
+    ReceivedVote(Box<V>),
 
     /// We received preemptive data published in a subnet we were interested in.
     ReceivedPreemptive(SubnetID, Vec<u8>),
@@ -341,9 +341,9 @@ where
     }
 
     /// Publish the vote of the validator running the agent about a CID to a subnet.
-    pub fn publish_vote(&mut self, vote: SignedVoteRecord<V>) -> anyhow::Result<()> {
-        let topic = self.voting_topic(&vote.record().subnet_id);
-        let data = vote.into_envelope().into_protobuf_encoding();
+    pub fn publish_vote(&mut self, vote: SubnetVoteRecord<V>) -> anyhow::Result<()> {
+        let topic = self.voting_topic(&vote.subnet);
+        let data = fvm_ipld_encoding::to_vec(&vote.vote)?;
         match self.inner.publish(topic, data) {
             Err(e) => {
                 stats::MEMBERSHIP_PUBLISH_FAILURE.inc();
@@ -415,7 +415,7 @@ where
                 }
             }
         } else if self.voting_topics.contains(&msg.topic) {
-            match SignedVoteRecord::from_bytes(&msg.data).map(|r| r.into_record()) {
+            match fvm_ipld_encoding::from_slice(&msg.data) {
                 Ok(record) => self.handle_vote_record(record),
                 Err(e) => {
                     stats::MEMBERSHIP_INVALID_MESSAGE.inc();
@@ -465,7 +465,7 @@ where
     }
 
     /// Raise an event to tell we received a new vote.
-    fn handle_vote_record(&mut self, record: VoteRecord<V>) {
+    fn handle_vote_record(&mut self, record: V) {
         self.outbox.push_back(Event::ReceivedVote(Box::new(record)))
     }
 

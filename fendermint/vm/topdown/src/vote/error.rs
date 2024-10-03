@@ -22,4 +22,7 @@ pub enum Error {
 
     #[error("validator cannot sign vote")]
     CannotSignVote,
+
+    #[error("cannot publish vote {0}")]
+    CannotPublishVote(String),
 }

@@ -30,6 +30,8 @@ use fendermint_vm_interpreter::{
 };
 use fendermint_vm_message::query::FvmQueryHeight;
 use fendermint_vm_snapshot::{SnapshotClient, SnapshotError};
+use fendermint_vm_topdown::launch::Toggle;
+use fendermint_vm_topdown::TopdownClient;
 use fvm::engine::MultiEngine;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::chainid::ChainID;
@@ -310,6 +312,10 @@ where
         *guard = Some(state);
 
         Ok(ret)
+    }
+
+    pub async fn enable_topdown(&mut self, topdown: TopdownClient) {
+        self.chain_env.topdown_client = Toggle::enable(topdown);
     }
 
     /// Get a read only fvm execution state. This is useful to perform query commands targeting

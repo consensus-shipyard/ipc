@@ -7,6 +7,7 @@ use libipld::Cid;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::oneshot;
 
+use crate::vote_record::SubnetVoteRecord;
 use crate::{
     service::{Request, ResolveResult},
     vote_record::SignedVoteRecord,
@@ -71,7 +72,7 @@ impl<V> Client<V> {
     }
 
     /// Publish a signed vote into a topic based on its subnet.
-    pub fn publish_vote(&self, vote: SignedVoteRecord<V>) -> anyhow::Result<()> {
+    pub fn publish_vote(&self, vote: SubnetVoteRecord<V>) -> anyhow::Result<()> {
         let req = Request::PublishVote(Box::new(vote));
         self.send_request(req)
     }

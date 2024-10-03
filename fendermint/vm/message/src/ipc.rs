@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use cid::Cid;
+use fendermint_vm_topdown::TopdownProposal;
 use fvm_shared::{
     address::Address, clock::ChainEpoch, crypto::signature::Signature, econ::TokenAmount,
 };
@@ -27,7 +28,7 @@ pub enum IpcMessage {
 
     /// A top-down checkpoint parent finality proposal. This proposal should contain the latest parent
     /// state that to be checked and voted by validators.
-    TopDownExec(ParentFinality),
+    TopDownExec(TopdownProposal),
 }
 
 /// A message relayed by a user on the current subnet.

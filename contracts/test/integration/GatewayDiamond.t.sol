@@ -12,7 +12,7 @@ import {IDiamond} from "../../contracts/interfaces/IDiamond.sol";
 import {IDiamondLoupe} from "../../contracts/interfaces/IDiamondLoupe.sol";
 import {IDiamondCut} from "../../contracts/interfaces/IDiamondCut.sol";
 import {QuorumInfo} from "../../contracts/structs/Quorum.sol";
-import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../../contracts/structs/CrossNet.sol";
+import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, TopdownCheckpoint} from "../../contracts/structs/CrossNet.sol";
 import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
 import {SubnetID, Subnet, IPCAddress, Validator, StakingChange, StakingChangeRequest, Asset, StakingOperation} from "../../contracts/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
@@ -948,7 +948,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         );
     }
 
-    function testGatewayDiamond_CommitParentFinality_Fails_NotSystemActor() public {
+    function testGatewayDiamond_CommitTopdownCheckpoint_Fails_NotSystemActor() public {
         address caller = vm.addr(100);
 
         FvmAddress[] memory validators = new FvmAddress[](1);
@@ -959,9 +959,9 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         vm.prank(caller);
         vm.expectRevert(NotSystemActor.selector);
 
-        ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
+        TopdownCheckpoint memory finality = TopdownCheckpoint({height: block.number, blockHash: bytes32(0), effectsCommitment: new bytes(0)});
 
-        gatewayDiamond.topDownFinalizer().commitParentFinality(finality);
+        gatewayDiamond.topDownFinalizer().commitTopdownCheckpoint(finality);
     }
 
     function testGatewayDiamond_applyFinality_works() public {
@@ -1032,7 +1032,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         vm.stopPrank();
     }
 
-    function testGatewayDiamond_CommitParentFinality_Works_WithQuery() public {
+    function testGatewayDiamond_CommitTopdownCheckpoint_Works_WithQuery() public {
         FvmAddress[] memory validators = new FvmAddress[](2);
         validators[0] = FvmAddressHelper.from(vm.addr(100));
         validators[1] = FvmAddressHelper.from(vm.addr(101));
@@ -1045,14 +1045,14 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         // not the same as init committed parent finality height
         vm.roll(10);
 
-        ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
+        TopdownCheckpoint memory finality = TopdownCheckpoint({height: block.number, blockHash: bytes32(0), effectsCommitment: new bytes(0)});
 
-        gatewayDiamond.topDownFinalizer().commitParentFinality(finality);
-        ParentFinality memory committedFinality = gatewayDiamond.getter().getParentFinality(block.number);
+        gatewayDiamond.topDownFinalizer().commitTopdownCheckpoint(finality);
+        TopdownCheckpoint memory committedFinality = gatewayDiamond.getter().getTopdownCheckpoint(block.number);
 
         require(committedFinality.height == finality.height, "heights are not equal");
         require(committedFinality.blockHash == finality.blockHash, "blockHash is not equal");
-        require(gatewayDiamond.getter().getLatestParentFinality().height == block.number, "finality height not equal");
+        require(gatewayDiamond.getter().getLatestTopdownCheckpoint().height == block.number, "finality height not equal");
 
         vm.stopPrank();
     }

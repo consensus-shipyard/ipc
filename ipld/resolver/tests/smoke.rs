@@ -221,10 +221,8 @@ async fn single_bootstrap_publish_receive_vote() {
     tokio::time::sleep(Duration::from_secs(2)).await;
 
     // Vote on some random CID.
-    let validator_key = Keypair::generate_secp256k1();
     let cid = Cid::new_v1(IPLD_RAW, Code::Sha2_256.digest(b"foo"));
-    let vote =
-        VoteRecord::signed(&validator_key, subnet_id, TestVote(cid)).expect("failed to sign vote");
+    let vote = TestVote(cid);
 
     // Pubilish vote
     cluster.agents[0]
@@ -239,7 +237,7 @@ async fn single_bootstrap_publish_receive_vote() {
         .expect("error receiving vote");
 
     if let Event::ReceivedVote(v) = event {
-        assert_eq!(&*v, vote.record());
+        assert_eq!(&*v, vote);
     } else {
         panic!("unexpected {event:?}")
     }

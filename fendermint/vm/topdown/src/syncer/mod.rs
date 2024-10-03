@@ -8,6 +8,9 @@ use crate::syncer::payload::ParentBlockView;
 use crate::syncer::poll::ParentPoll;
 use crate::syncer::store::ParentViewStore;
 use crate::{BlockHeight, Checkpoint};
+use anyhow::anyhow;
+use async_trait::async_trait;
+use serde::Deserialize;
 use std::time::Duration;
 use tokio::select;
 use tokio::sync::{mpsc, oneshot};
@@ -24,6 +27,7 @@ pub enum TopDownSyncEvent {
     NewProposal(Box<Observation>),
 }
 
+#[derive(Debug, Clone, Deserialize)]
 pub struct ParentSyncerConfig {
     pub request_channel_size: usize,
     /// The event broadcast channel buffer size
@@ -35,10 +39,6 @@ pub struct ParentSyncerConfig {
     pub chain_head_delay: BlockHeight,
     /// Parent syncing cron period, in seconds
     pub polling_interval: Duration,
-    /// Top down exponential back off retry base
-    pub exponential_back_off: Duration,
-    /// The max number of retries for exponential backoff before giving up
-    pub exponential_retry_limit: usize,
     /// Max number of un-finalized parent blocks that should be stored in the store
     pub max_store_blocks: BlockHeight,
     /// Attempts to sync as many block as possible till the finalized chain head
@@ -52,21 +52,33 @@ pub struct ParentSyncerReactorClient {
     tx: mpsc::Sender<ParentSyncerRequest>,
 }
 
-pub fn start_parent_syncer<P, S>(
+/// Polls the parent block view
+#[async_trait]
+pub trait ParentPoller {
+    /// The previous checkpoint committed
+    fn last_checkpoint(&self) -> &Checkpoint;
+
+    /// The target block height is finalized, purge all the parent view before the target height
+    fn finalize(&mut self, checkpoint: Checkpoint) -> anyhow::Result<()>;
+
+    /// Try to poll the next parent height
+    async fn try_poll(&mut self) -> anyhow::Result<()>;
+
+    /// Dump the parent block view from the height after the last committed checkpoint to the `to` height
+    fn dump_parent_block_views(
+        &self,
+        to: BlockHeight,
+    ) -> anyhow::Result<Vec<Option<ParentBlockView>>>;
+}
+
+pub fn start_parent_syncer<P: Send + Sync + 'static + ParentPoller>(
     config: ParentSyncerConfig,
-    proxy: P,
-    store: S,
-    last_finalized: Checkpoint,
-) -> anyhow::Result<ParentSyncerReactorClient>
-where
-    S: ParentViewStore + Send + Sync + 'static,
-    P: Send + Sync + 'static + ParentQueryProxy,
-{
+    mut poller: P,
+) -> anyhow::Result<ParentSyncerReactorClient> {
     let (tx, mut rx) = mpsc::channel(config.request_channel_size);
 
     tokio::spawn(async move {
         let polling_interval = config.polling_interval;
-        let mut poller = ParentPoll::new(config, proxy, store, last_finalized);
 
         loop {
             select! {
@@ -98,7 +110,7 @@ impl ParentSyncerReactorClient {
     pub async fn query_parent_block_view(
         &self,
         to: BlockHeight,
-    ) -> anyhow::Result<Result<Vec<Option<ParentBlockView>>, Error>> {
+    ) -> anyhow::Result<anyhow::Result<Vec<Option<ParentBlockView>>>> {
         let (tx, rx) = oneshot::channel();
         self.tx
             .send(ParentSyncerRequest::QueryParentBlockViews { to, tx })
@@ -112,15 +124,14 @@ enum ParentSyncerRequest {
     Finalized(Checkpoint),
     QueryParentBlockViews {
         to: BlockHeight,
-        tx: oneshot::Sender<Result<Vec<Option<ParentBlockView>>, Error>>,
+        tx: oneshot::Sender<anyhow::Result<Vec<Option<ParentBlockView>>>>,
     },
 }
 
-fn handle_request<P, S>(req: ParentSyncerRequest, poller: &mut ParentPoll<P, S>)
-where
-    S: ParentViewStore + Send + Sync + 'static,
-    P: Send + Sync + 'static + ParentQueryProxy,
-{
+fn handle_request<P: Send + Sync + 'static + ParentPoller>(
+    req: ParentSyncerRequest,
+    poller: &mut P,
+) {
     match req {
         ParentSyncerRequest::Finalized(c) => {
             let height = c.target_height();
@@ -129,27 +140,15 @@ where
             }
         }
         ParentSyncerRequest::QueryParentBlockViews { to, tx } => {
-            let store = poller.store();
-
-            let mut r = vec![];
-
-            let start = poller.last_checkpoint().target_height() + 1;
-            for h in start..=to {
-                match store.get(h) {
-                    Ok(v) => r.push(v),
-                    Err(e) => {
-                        tracing::error!(
-                            height = h,
-                            err = e.to_string(),
-                            "cannot query parent block view"
-                        );
-                        let _ = tx.send(Err(e));
-                        return;
-                    }
-                }
-            }
-
-            let _ = tx.send(Ok(r));
+            let r = poller.dump_parent_block_views(to).map_err(|e| {
+                tracing::error!(
+                    height = to,
+                    err = e.to_string(),
+                    "cannot query parent block view"
+                );
+                anyhow!("cannot read parent block view: {}", e)
+            });
+            let _ = tx.send(r);
         }
     }
 }

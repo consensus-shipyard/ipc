@@ -15,7 +15,7 @@ use fendermint_vm_topdown::vote::gossip::GossipClient;
 use fendermint_vm_topdown::vote::payload::{PowerUpdates, Vote};
 use fendermint_vm_topdown::vote::store::InMemoryVoteStore;
 use fendermint_vm_topdown::vote::{
-    start_vote_reactor, Config, StartVoteReactorParams, VoteReactorClient, Weight,
+    start_vote_reactor, StartVoteReactorParams, VoteConfig, VoteReactorClient, Weight,
 };
 use fendermint_vm_topdown::BlockHeight;
 use tokio::sync::broadcast;
@@ -57,8 +57,8 @@ impl GossipClient for ChannelGossipClient {
     }
 }
 
-fn default_config() -> Config {
-    Config {
+fn default_config() -> VoteConfig {
+    VoteConfig {
         req_channel_buffer_size: 1024,
         req_batch_processing_size: 10,
         gossip_req_processing_size: 10,
