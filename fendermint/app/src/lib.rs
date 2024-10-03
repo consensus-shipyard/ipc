@@ -8,6 +8,7 @@ pub mod metrics;
 pub mod observe;
 mod store;
 mod tmconv;
+mod validators;
 
 pub use app::{App, AppConfig};
 pub use store::{AppStore, BitswapBlockstore};

@@ -294,7 +294,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         None
     };
 
-    let app: App<_, _, AppStore, _> = App::new(
+    let app: App<_, _, AppStore, _, _> = App::new(
         AppConfig {
             app_namespace: ns.app,
             state_hist_namespace: ns.state_hist,
@@ -310,6 +310,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             parent_finality_votes: parent_finality_votes.clone(),
         },
         snapshots,
+        tendermint_client.clone(),
     )?;
 
     if let Some((agent_proxy, config)) = ipc_tuple {

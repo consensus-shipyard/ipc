@@ -14,7 +14,7 @@ pub mod upgrades;
 
 #[cfg(any(test, feature = "bundle"))]
 pub mod bundle;
-pub(crate) mod gas;
+pub mod gas;
 pub(crate) mod topdown;
 
 pub use check::FvmCheckRet;
