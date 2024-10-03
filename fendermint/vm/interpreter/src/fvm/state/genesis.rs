@@ -177,17 +177,6 @@ where
         }
     }
 
-    /// Flush the data to the block store. Returns the state root cid and the underlying state store.
-    pub fn finalize(self) -> anyhow::Result<(Cid, DB)> {
-        match self.stage {
-            Stage::Tree(_) => Err(anyhow!("invalid finalize state")),
-            Stage::Exec(exec_state) => match exec_state.commit()? {
-                (_, _, true) => bail!("FVM parameters are not expected to be updated in genesis"),
-                (cid, _, _) => Ok((cid, self.store)),
-            },
-        }
-    }
-
     /// Replaces the built in actor with custom actor. This assumes the system actor is already
     /// created, else it would throw an error.
     pub fn replace_builtin_actor(
@@ -274,6 +263,23 @@ where
     }
 
     pub fn create_custom_actor(
+        &mut self,
+        name: &str,
+        id: ActorID,
+        state: &impl Serialize,
+        balance: TokenAmount,
+        delegated_address: Option<Address>,
+    ) -> anyhow::Result<()> {
+        // Retrieve the CID of the actor code by the numeric ID.
+        let code_cid = *self
+            .custom_actor_manifest
+            .code_by_name(name)
+            .ok_or_else(|| anyhow!("can't find actor: {name} in the custom actor manifest"))?;
+
+        self.create_actor_internal(code_cid, id, state, balance, delegated_address)
+    }
+
+    pub fn construct_custom_actor(
         &mut self,
         name: &str,
         id: ActorID,
