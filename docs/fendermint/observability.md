@@ -357,9 +357,9 @@ directory = "/path/to/log/directory"
 max_log_files = 5 # Number of files to keep after rotation
 rotation = "daily" # Options: minutely, hourly, daily, never
 ## Optional: filter events by domain
-domain_filter = "Bottomup, Consenesus, Mpool, Execution, Topdown, TracingError"
+domain_filter = ["Bottomup", "Consensus", "Mpool", "Execution", "Topdown", "System"]
 ## Optional: filter events by event name
-events_filter = "ParentFinalityAcquired, ParentRpcCalled"
+events_filter = ["ParentFinalityAcquired", "ParentRpcCalled"]
 ```
 
 By configuring these options, you can control the behavior of metrics and tracing, enabling fine-grained monitoring and logging for your application.
