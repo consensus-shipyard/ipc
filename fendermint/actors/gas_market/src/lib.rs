@@ -53,6 +53,11 @@ pub struct BlockGasUtilization {
     pub block_gas_used: Gas,
 }
 
+#[derive(Serialize_tuple, Deserialize_tuple, Debug, Clone)]
+pub struct BlockGasUtilizationRet {
+    pub base_fee: TokenAmount,
+}
+
 pub struct EIP1559GasMarketActor {}
 
 #[derive(FromPrimitive)]
@@ -108,12 +113,14 @@ impl EIP1559GasMarketActor {
     fn update_utilization(
         rt: &impl Runtime,
         utilization: BlockGasUtilization,
-    ) -> Result<(), ActorError> {
+    ) -> Result<BlockGasUtilizationRet, ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
         rt.transaction(|st: &mut EIP1559GasState, _rt| {
             st.base_fee = st.next_base_fee(utilization.block_gas_used);
-            Ok(())
+            Ok(BlockGasUtilizationRet {
+                base_fee: st.base_fee.clone(),
+            })
         })
     }
 }
