@@ -7,7 +7,7 @@ use crate::fvm::state::ipc::GatewayCaller;
 use crate::fvm::state::FvmExecState;
 use crate::fvm::FvmApplyRet;
 use anyhow::Context;
-use fendermint_vm_topdown::{BlockHeight, Checkpoint};
+use fendermint_vm_topdown::Checkpoint;
 use fvm_ipld_blockstore::Blockstore;
 use ipc_api::cross::IpcEnvelope;
 
@@ -23,13 +23,7 @@ pub async fn commit_checkpoint<DB>(
 where
     DB: Blockstore + Sync + Send + Clone + 'static,
 {
-    let prev_checkpoint = if let Some(prev_checkpoint) =
-        gateway_caller.commit_topdown_checkpoint(state, checkpoint)?
-    {
-        Some(prev_checkpoint)
-    } else {
-        None
-    };
+    let prev_checkpoint = gateway_caller.commit_topdown_checkpoint(state, checkpoint)?;
 
     tracing::debug!("commit checkpoint parsed, prev_checkpoint: {prev_checkpoint:?}");
 

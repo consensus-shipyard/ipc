@@ -8,12 +8,10 @@ use crate::{
     signed::{SignedMessageApplyRes, SignedMessageCheckRes, SyntheticMessage, VerifiableMessage},
     CheckInterpreter, ExecInterpreter, ProposalInterpreter, QueryInterpreter,
 };
-use anyhow::{bail, Context};
+use anyhow::Context;
 use async_stm::atomically;
 use async_trait::async_trait;
-use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::ipc;
-use fendermint_vm_event::ParentFinalityMissingQuorum;
 use fendermint_vm_genesis::ValidatorKey;
 use fendermint_vm_message::{
     chain::ChainMessage,
@@ -21,13 +19,11 @@ use fendermint_vm_message::{
 };
 use fendermint_vm_resolver::pool::{ResolveKey, ResolvePool};
 use fendermint_vm_topdown::launch::Toggle;
-use fendermint_vm_topdown::proxy::IPCProviderProxyWithLatency;
 use fendermint_vm_topdown::{Checkpoint, TopdownClient};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::econ::TokenAmount;
 use num_traits::Zero;
-use std::sync::Arc;
 
 /// A resolution pool for bottom-up and top-down checkpoints.
 pub type CheckpointPool = ResolvePool<CheckpointPoolItem>;

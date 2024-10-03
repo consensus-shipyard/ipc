@@ -1,14 +1,8 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::{anyhow, Context};
 use fendermint_app_options::debug::{
     DebugArgs, DebugCommands, DebugExportTopDownEventsArgs, DebugIpcCommands,
-};
-use fendermint_vm_topdown::proxy::IPCProviderProxy;
-use ipc_provider::{
-    config::subnet::{EVMSubnet, SubnetConfig},
-    IpcProvider,
 };
 
 use crate::cmd;
