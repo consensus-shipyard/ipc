@@ -17,7 +17,7 @@ jobs:
   # Publish Docker image on the main branch
   publish:
     name: Publish artifacts
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
 
     permissions:
       packages: write

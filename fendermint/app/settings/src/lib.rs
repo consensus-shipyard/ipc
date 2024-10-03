@@ -332,12 +332,16 @@ impl Settings {
                     .ignore_empty(true) // otherwise "" will be parsed as a list item
                     .try_parsing(true) // required for list separator
                     .list_separator(",") // need to list keys explicitly below otherwise it can't pase simple `String` type
+                    .with_list_parse_key("tracing.file.domain_filter")
+                    .with_list_parse_key("tracing.file.events_filter")
                     .with_list_parse_key("resolver.connection.external_addresses")
                     .with_list_parse_key("resolver.discovery.static_addresses")
                     .with_list_parse_key("resolver.membership.static_subnets")
                     .with_list_parse_key("eth.cors.allowed_origins")
                     .with_list_parse_key("eth.cors.allowed_methods")
-                    .with_list_parse_key("eth.cors.allowed_headers"),
+                    .with_list_parse_key("eth.cors.allowed_headers")
+                    .with_list_parse_key("eth.tracing.file.domain_filter")
+                    .with_list_parse_key("eth.tracing.file.events_filter"),
             ))
             // Set the home directory based on what was passed to the CLI,
             // so everything in the config can be relative to it.
