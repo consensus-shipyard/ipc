@@ -9,11 +9,11 @@ use crate::hoku_kernel::HokuOps;
 use fvm::kernel::{ExecutionError, Result, SyscallError};
 use fvm::syscalls::Context;
 use fvm_shared::error::ErrorNumber;
-use iroh::blobs::Hash;
+use iroh::{blobs::Hash, client::blobs::ReadAtLen};
 use maybe_iroh::MaybeIroh;
 use num_traits::FromPrimitive;
 use once_cell::sync::Lazy;
-use tokio::{spawn, sync::Mutex};
+use tokio::{runtime::Handle, spawn, sync::Mutex, task::block_in_place};
 
 pub mod hoku_kernel;
 
@@ -81,8 +81,8 @@ pub fn hash_get(
     let hash = Hash::from_bytes(hash_source(hash_bytes)?);
     let iroh = IROH_INSTANCE.clone();
 
-    let blob_bytes = tokio::task::block_in_place(|| {
-        tokio::runtime::Handle::current().block_on(async {
+    let blob_bytes = block_in_place(|| {
+        Handle::current().block_on(async {
             let iroh_client = match iroh.lock().await.client().await {
                 Ok(client) => client,
                 Err(e) => {
@@ -90,19 +90,7 @@ pub fn hash_get(
                     return Err(syscall_error(HASHGET_SYSCALL_ERROR_CODE)(e));
                 }
             };
-
-            let blob = match iroh_client.blobs().read(hash).await {
-                Ok(blob) => blob,
-                Err(e) => {
-                    tracing::error!(hash = ?hash, error = e.to_string(), "failed to read blob");
-                    return Err(syscall_error(HASHGET_SYSCALL_ERROR_CODE)(e));
-                }
-            };
-
-            let size = blob.size();
-            let length = std::cmp::min(size, 65536) as usize;
-
-            match iroh_client.blobs().read_at_to_bytes(hash, offset as u64, Some(length - offset as usize)).await {
+            match iroh_client.blobs().read_at_to_bytes(hash, offset as u64, ReadAtLen::AtMost(65536)).await {
                 Ok(bytes) => Ok(bytes),
                 Err(e) => {
                     tracing::error!(hash = ?hash, error = e.to_string(), "failed to read blob bytes");
