@@ -20,6 +20,27 @@ extend = [
     { path = "./fendermint.toml" },
 ]
 
+[env]
+CMT_P2P_HOST_PORT = { script = ["${ROOT_SCRIPTS_DIR}/get_port.sh 30000"], condition = { env_not_set = [
+    "CMT_P2P_HOST_PORT",
+] } }
+CMT_RPC_HOST_PORT = { script = ["${ROOT_SCRIPTS_DIR}/get_port.sh $((CMT_P2P_HOST_PORT+1))"], condition = { env_not_set = [
+    "CMT_RPC_HOST_PORT",
+] } }
+ETHAPI_HOST_PORT = { script = ["${ROOT_SCRIPTS_DIR}/get_port.sh $((CMT_RPC_HOST_PORT+1))"], condition = { env_not_set = [
+    "ETHAPI_HOST_PORT",
+] } }
+FENDERMINT_METRICS_HOST_PORT = { script = ["${ROOT_SCRIPTS_DIR}/get_port.sh $((ETHAPI_HOST_PORT+1))"], condition = { env_not_set = [
+    "FENDERMINT_METRICS_HOST_PORT",
+] } }
+IROH_RPC_HOST_PORT = { script = ["${ROOT_SCRIPTS_DIR}/get_port.sh $((FENDERMINT_METRICS_HOST_PORT+1))"], condition = { env_not_set = [
+    "IROH_RPC_HOST_PORT",
+] } }
+IROH_METRICS_HOST_PORT = { script = ["${ROOT_SCRIPTS_DIR}/get_port.sh $((IROH_RPC_HOST_PORT+1))"], condition = { env_not_set = [
+    "IROH_METRICS_HOST_PORT",
+] } }
+TENDERMINT_RPC_URL = "http://127.0.0.1:${CMT_RPC_HOST_PORT}"
+FM_ETH__LISTEN__PORT = "${ETHAPI_HOST_PORT}"
 
 # Define the following in test specific `Makefile.toml` files,
 # where `env.env` defines `NETWORK_NAME` and `TEST_DIR`, expected by `common.env`:
@@ -29,10 +50,10 @@ extend = [
 #   { path = "../Makefile/ci.env", profile = "ci" },
 # ]
 
-
 [tasks.default]
 clear = true
 run_task = { name = [
+    "echo-ports",
     "setup",
     "test",
 ], fork = true, cleanup_task = "teardown" }
@@ -59,8 +80,19 @@ dependencies = [
     "ethapi-logs",
 ]
 
+[tasks.echo-ports]
+script = """
+echo "CMT_P2P_HOST_PORT: $CMT_P2P_HOST_PORT"
+echo "CMT_RPC_HOST_PORT: $CMT_RPC_HOST_PORT"
+echo "ETHAPI_HOST_PORT: $ETHAPI_HOST_PORT"
+echo "FENDERMINT_METRICS_HOST_PORT: $FENDERMINT_METRICS_HOST_PORT"
+echo "IROH_RPC_HOST_PORT: $IROH_RPC_HOST_PORT"
+echo "IROH_METRICS_HOST_PORT: $IROH_METRICS_HOST_PORT"
+echo "TENDERMINT_RPC_URL: $TENDERMINT_RPC_URL"
+echo "FM_ETH__LISTEN__PORT: $FM_ETH__LISTEN__PORT"
+"""
+
 [tasks.test]
-clear = true
 dependencies = []
 
 [tasks.teardown]
@@ -75,7 +107,6 @@ run_task = { name = [
     "test-data-dir-rm",
     "destroy-log-volume",
 ] }
-
 
 [tasks.test-data-dir]
 script = """

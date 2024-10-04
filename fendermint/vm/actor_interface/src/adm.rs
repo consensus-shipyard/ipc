@@ -57,6 +57,7 @@ pub struct Metadata {
 /// Helper for machine creation.
 #[derive(Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct CreateExternalParams {
+    pub owner: Address,
     pub kind: Kind,
     pub write_access: WriteAccess,
     pub metadata: HashMap<String, String>,

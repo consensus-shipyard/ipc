@@ -4,7 +4,7 @@
 
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
-use fvm_shared::bigint::BigInt;
+use fvm_shared::bigint::{BigInt, BigUint};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use serde::{Deserialize, Serialize};
@@ -16,6 +16,33 @@ use crate::state::{BlobStatus, Hash, PublicKey};
 #[serde(transparent)]
 pub struct BuyCreditParams(pub Address);
 
+/// Params for approving credit.
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct ApproveCreditParams {
+    /// Account address that is receiving the approval.
+    pub receiver: Address,
+    /// Optional restriction on caller address, e.g., an object store.
+    /// The receiver will only be able to use the approval via a caller contract.
+    pub required_caller: Option<Address>,
+    /// Optional credit approval limit.
+    /// If specified, the approval becomes invalid once the committed credits reach the
+    /// specified limit.
+    pub limit: Option<BigUint>,
+    /// Optional credit approval time-to-live epochs.
+    /// If specified, the approval becomes invalid after this duration.
+    pub ttl: Option<ChainEpoch>,
+}
+
+/// Params for revoking credit.
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct RevokeCreditParams {
+    /// Account address that is receiving the approval.
+    pub receiver: Address,
+    /// Optional restriction on caller address, e.g., an object store.
+    /// This allows the origin of a transaction to use an approval limited to the caller.
+    pub required_caller: Option<Address>,
+}
+
 /// Params for getting an account.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -24,8 +51,9 @@ pub struct GetAccountParams(pub Address);
 /// Params for adding a blob.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct AddBlobParams {
-    /// Robust address of caller. Required if the caller is a machine.
-    pub from: Option<Address>,
+    /// Optional sponsor address.
+    /// Caller must have a delegation from sponsor.
+    pub sponsor: Option<Address>,
     /// Source Iroh node ID used for ingestion.
     pub source: PublicKey,
     /// Blob blake3 hash.
@@ -48,7 +76,7 @@ pub struct GetBlobParams(pub Hash);
 pub struct GetBlobStatusParams {
     /// The origin address that requested the blob.
     /// This could be a wallet or machine.
-    pub origin: Address,
+    pub subscriber: Address,
     /// Blob blake3 hash.
     pub hash: Hash,
 }
@@ -61,9 +89,9 @@ pub struct GetPendingBlobsParams(pub u32);
 /// Params for finalizing a blob.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct FinalizeBlobParams {
-    /// The origin address that requested the blob.
+    /// The address that requested the blob.
     /// This could be a wallet or machine.
-    pub origin: Address,
+    pub subscriber: Address,
     /// Blob blake3 hash.
     pub hash: Hash,
     /// The status to set as final.
@@ -73,8 +101,10 @@ pub struct FinalizeBlobParams {
 /// Params for deleting a blob.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct DeleteBlobParams {
-    /// Robust address of caller. Required if the caller is a machine.
-    pub from: Option<Address>,
+    /// Optional sponsor address.
+    /// Caller must still have a delegation from sponsor.
+    /// Must be used if the caller is the delegate who added the blob.
+    pub sponsor: Option<Address>,
     /// Blob blake3 hash.
     pub hash: Hash,
 }

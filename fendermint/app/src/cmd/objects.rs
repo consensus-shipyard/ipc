@@ -709,7 +709,6 @@ mod tests {
         let key = b"key";
         let size = 11;
         let params = AddParams {
-            to: store,
             source: fendermint_actor_blobs_shared::state::PublicKey(*iroh.node_id().as_bytes()),
             key: key.to_vec(),
             hash: fendermint_actor_blobs_shared::state::Hash(*hash.as_bytes()),

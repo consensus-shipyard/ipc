@@ -5,11 +5,11 @@
 use std::collections::HashMap;
 
 use fendermint_actor_blobs_shared::state::{Hash, PublicKey};
-use fendermint_actor_machine::GET_METADATA_METHOD;
+use fendermint_actor_machine::{
+    GET_ADDRESS_METHOD, GET_METADATA_METHOD, INIT_METHOD, METHOD_CONSTRUCTOR,
+};
 use fvm_ipld_encoding::{strict_bytes, tuple::*};
-use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
-use fvm_shared::METHOD_CONSTRUCTOR;
 use num_derive::FromPrimitive;
 use serde::{Deserialize, Serialize};
 
@@ -21,6 +21,8 @@ pub const OBJECTSTORE_ACTOR_NAME: &str = "objectstore";
 #[repr(u64)]
 pub enum Method {
     Constructor = METHOD_CONSTRUCTOR,
+    Init = INIT_METHOD,
+    GetAddress = GET_ADDRESS_METHOD,
     GetMetadata = GET_METADATA_METHOD,
     AddObject = frc42_dispatch::method_hash!("AddObject"),
     DeleteObject = frc42_dispatch::method_hash!("DeleteObject"),
@@ -31,8 +33,6 @@ pub enum Method {
 /// Params for adding an object.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct AddParams {
-    /// Target object store address.
-    pub to: Address,
     /// Source Iroh node ID used for ingestion.
     pub source: PublicKey,
     /// Object key.
@@ -53,14 +53,9 @@ pub struct AddParams {
 }
 
 /// Params for deleting an object.
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct DeleteParams {
-    /// Target object store address.
-    pub to: Address,
-    /// Object key.
-    #[serde(with = "strict_bytes")]
-    pub key: Vec<u8>,
-}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct DeleteParams(#[serde(with = "strict_bytes")] pub Vec<u8>);
 
 /// Params for getting an object.
 #[derive(Clone, Debug, Serialize, Deserialize)]

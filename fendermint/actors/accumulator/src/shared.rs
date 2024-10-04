@@ -2,18 +2,21 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::collections::HashMap;
+
 use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
-use fendermint_actor_machine::{Kind, MachineState, WriteAccess, GET_METADATA_METHOD};
+use fendermint_actor_machine::{
+    Kind, MachineAddress, MachineState, WriteAccess, GET_ADDRESS_METHOD, GET_METADATA_METHOD,
+    INIT_METHOD, METHOD_CONSTRUCTOR,
+};
 use fil_actors_runtime::ActorError;
 use fvm_ipld_amt::Amt;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::{strict_bytes, to_vec, tuple::*, CborStore, DAG_CBOR};
 use fvm_shared::address::Address;
-use fvm_shared::METHOD_CONSTRUCTOR;
 use num_derive::FromPrimitive;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::collections::HashMap;
 
 pub const ACCUMULATOR_ACTOR_NAME: &str = "accumulator";
 const BIT_WIDTH: u32 = 3;
@@ -30,6 +33,8 @@ fn store_error(e: anyhow::Error) -> ActorError {
 #[repr(u64)]
 pub enum Method {
     Constructor = METHOD_CONSTRUCTOR,
+    Init = INIT_METHOD,
+    GetAddress = GET_ADDRESS_METHOD,
     GetMetadata = GET_METADATA_METHOD,
     Push = frc42_dispatch::method_hash!("Push"),
     Get = frc42_dispatch::method_hash!("Get"),
@@ -243,6 +248,8 @@ fn get_at<BS: Blockstore, S: DeserializeOwned + Serialize>(
 /// The state represents an MMR with peaks stored in an AMT
 #[derive(Serialize_tuple, Deserialize_tuple)]
 pub struct State {
+    /// The machine address set by the init actor.
+    pub address: MachineAddress,
     /// The machine rubust owner address.
     pub owner: Address,
     /// Write access dictates who can write to the machine.
@@ -256,6 +263,39 @@ pub struct State {
 }
 
 impl MachineState for State {
+    fn new<BS: Blockstore>(
+        store: &BS,
+        owner: Address,
+        write_access: WriteAccess,
+        metadata: HashMap<String, String>,
+    ) -> anyhow::Result<Self, ActorError> {
+        let peaks = match Amt::<(), _>::new_with_bit_width(store, BIT_WIDTH).flush() {
+            Ok(cid) => cid,
+            Err(e) => {
+                return Err(ActorError::illegal_state(format!(
+                    "accumulator actor failed to create empty Amt: {}",
+                    e
+                )));
+            }
+        };
+        Ok(Self {
+            address: Default::default(),
+            owner,
+            write_access,
+            peaks,
+            leaf_count: 0,
+            metadata,
+        })
+    }
+
+    fn init(&mut self, address: Address) -> anyhow::Result<(), ActorError> {
+        self.address.set(address)
+    }
+
+    fn address(&self) -> MachineAddress {
+        self.address.clone()
+    }
+
     fn kind(&self) -> Kind {
         Kind::Accumulator
     }
@@ -274,30 +314,6 @@ impl MachineState for State {
 }
 
 impl State {
-    pub fn new<BS: Blockstore>(
-        store: &BS,
-        creator: Address,
-        write_access: WriteAccess,
-        metadata: HashMap<String, String>,
-    ) -> anyhow::Result<Self, ActorError> {
-        let peaks = match Amt::<(), _>::new_with_bit_width(store, BIT_WIDTH).flush() {
-            Ok(cid) => cid,
-            Err(e) => {
-                return Err(ActorError::illegal_state(format!(
-                    "accumulator actor failed to create empty Amt: {}",
-                    e
-                )));
-            }
-        };
-        Ok(Self {
-            owner: creator,
-            write_access,
-            peaks,
-            leaf_count: 0,
-            metadata,
-        })
-    }
-
     pub fn peak_count(&self) -> u32 {
         self.leaf_count.count_ones()
     }

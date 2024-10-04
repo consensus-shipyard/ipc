@@ -32,7 +32,9 @@ impl fmt::Display for Hash {
 }
 
 /// Iroh node public key.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Ord, PartialOrd, Hash, Serialize, Deserialize,
+)]
 #[serde(transparent)]
 pub struct PublicKey(pub [u8; 32]);
 
@@ -47,6 +49,14 @@ pub struct Account {
     pub credit_committed: BigInt,
     /// The chain epoch of the last debit.
     pub last_debit_epoch: ChainEpoch,
+    /// Credit approvals to other accounts, keyed by receiver, keyed by caller,
+    /// which could be the receiver or a specific contract, like an object store.
+    /// This allows for limiting approvals to interactions from a specific contract.
+    /// For example, an approval for Alice might be valid for any contract caller, so long as
+    /// the origin is Alice.
+    /// An approval for Bob might be valid from only one contract caller, so long as
+    /// the origin is Bob.
+    pub approvals: HashMap<Address, HashMap<Address, CreditApproval>>,
 }
 
 impl Account {
@@ -56,8 +66,20 @@ impl Account {
             credit_free,
             credit_committed: Default::default(),
             last_debit_epoch: current_epoch,
+            approvals: Default::default(),
         }
     }
+}
+
+/// A credit approval from one account to another.
+#[derive(Debug, Clone, PartialEq, Serialize_tuple, Deserialize_tuple)]
+pub struct CreditApproval {
+    /// Optional credit approval limit.
+    pub limit: Option<BigInt>,
+    /// Optional credit approval expiry epoch.
+    pub expiry: Option<ChainEpoch>,
+    /// Counter for how much credit has been committed via this approval.
+    pub committed: BigInt,
 }
 
 /// The stored representation of a blob.
@@ -95,7 +117,7 @@ impl fmt::Display for BlobStatus {
 /// An object used to determine what [`Account`](s) are accountable for a blob, and for how long.
 /// Subscriptions allow us to distribute the cost of a blob across multiple accounts that
 /// have added the same blob.   
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+#[derive(Clone, Debug, Default, Serialize_tuple, Deserialize_tuple)]
 pub struct Subscription {
     /// Added block.
     pub added: ChainEpoch,
@@ -107,4 +129,6 @@ pub struct Subscription {
     /// This might be unique to each instance of the same blob.
     /// It's included here for record keeping.
     pub source: PublicKey,
+    /// The delegate origin and caller that may have created the subscription via a credit approval.
+    pub delegate: Option<(Address, Address)>,
 }

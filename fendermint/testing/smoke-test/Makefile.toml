@@ -15,7 +15,6 @@ extend = [{ path = "../scripts/common.toml" }]
 env_files = [
     { path = "./scripts/smoke.env" },
     { path = "../scripts/common.env" },
-    { path = "./scripts/overrides.env" },
     { path = "../scripts/ci.env", profile = "ci" },
 ]
 
@@ -31,14 +30,12 @@ EOF
 """
 
 [tasks.test]
-clear = true
 dependencies = [
     "simplecoin-example",
     "transfer-example",
     "ethers-example",
     "query-blockhash-example",
 ]
-
 
 [tasks.simplecoin-example]
 script = """
@@ -48,7 +45,6 @@ cargo run --profile ${PROFILE} -p fendermint_rpc --example simplecoin -- \
   ${VERBOSITY}
 """
 
-
 [tasks.transfer-example]
 script = """
 cd ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/fendermint
@@ -56,7 +52,6 @@ cargo run --profile ${PROFILE} -p fendermint_rpc --example transfer -- \
   --secret-key testing/smoke-test/test-data/keys/eric.sk \
   ${VERBOSITY}
 """
-
 
 [tasks.ethers-example]
 script = """

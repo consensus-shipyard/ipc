@@ -43,12 +43,26 @@ dependencies = [
 ]
 
 [tasks.child-validator-down]
-run_task = "testnode-down"
+run_task = { name = [
+    "cometbft-destroy",
+    "fendermint-destroy",
+    "ethapi-destroy",
+    "objects-destroy",
+    "promtail-destroy",
+    "iroh-destroy",
+    "docker-network-rm",
+] }
 
 [tasks.child-validator]
 workspace = false
 dependencies = [
-    "testnode-down",
+    "cometbft-destroy",
+    "fendermint-destroy",
+    "ethapi-destroy",
+    "objects-destroy",
+    "promtail-destroy",
+    "iroh-destroy",
+    "docker-network-rm",
     "fendermint-pull",
     "node-init",
     "docker-network-create",

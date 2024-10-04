@@ -96,7 +96,7 @@ impl From<&CheckpointPoolItem> for ResolveKey {
 
 #[derive(Clone, Hash, PartialEq, Eq)]
 pub struct BlobPoolItem {
-    origin: Address,
+    subscriber: Address,
     hash: Hash,
     source: NodeId,
 }
@@ -225,23 +225,22 @@ where
 
         // Collect and enqueue blobs that need to be resolved.
         state.state_tree_mut().begin_transaction();
-        let blob_concurrency = env.blob_concurrency;
-        let resolving_blobs = get_pending_blobs(&mut state, blob_concurrency)?;
+        let pending_blobs = get_pending_blobs(&mut state, env.blob_concurrency)?;
         state
             .state_tree_mut()
             .end_transaction(true)
             .expect("we just started a transaction");
-        for (hash, sources) in resolving_blobs {
-            for (origin, source) in sources {
+        for (hash, sources) in pending_blobs {
+            for (subscriber, source) in sources {
                 atomically(|| {
                     env.blob_pool.add(BlobPoolItem {
-                        origin,
+                        subscriber,
                         hash,
                         source,
                     })
                 })
                 .await;
-                tracing::debug!(hash = ?hash, origin = ?origin, "blob added to pool");
+                tracing::debug!(hash = ?hash, subscriber = ?subscriber, "blob added to pool");
             }
         }
 
@@ -269,7 +268,7 @@ where
             // We start a blockstore transaction that can be reverted
             state.state_tree_mut().begin_transaction();
             for item in local_finalized_blobs.iter() {
-                if !is_blob_pending(&mut state, item.hash, item.origin)? {
+                if !is_blob_pending(&mut state, item.hash, item.subscriber)? {
                     tracing::debug!(hash = ?item.hash, "blob already finalized on chain; removing from pool");
                     atomically(|| env.blob_pool.remove(item)).await;
                     continue;
@@ -283,7 +282,7 @@ where
                 if is_globally_finalized {
                     tracing::debug!(hash = ?item.hash, "blob has quorum; adding tx to chain");
                     blobs.push(ChainMessage::Ipc(IpcMessage::BlobFinalized(Blob {
-                        origin: item.origin,
+                        subscriber: item.subscriber,
                         hash: item.hash,
                         source: item.source,
                         succeeded,
@@ -354,7 +353,7 @@ where
                     // not yet finalized.
                     // Start a blockstore transaction that can be reverted.
                     state.state_tree_mut().begin_transaction();
-                    if !is_blob_pending(&mut state, blob.hash, blob.origin)? {
+                    if !is_blob_pending(&mut state, blob.hash, blob.subscriber)? {
                         tracing::debug!(hash = ?blob.hash, "blob is already finalized on chain; rejecting proposal");
                         return Ok(false);
                     }
@@ -384,7 +383,7 @@ where
 
                     // Remove from pool if locally resolved
                     let item = BlobPoolItem {
-                        origin: blob.origin,
+                        subscriber: blob.subscriber,
                         hash: blob.hash,
                         source: blob.source,
                     };
@@ -620,7 +619,7 @@ where
                         BlobStatus::Failed
                     };
                     let params = FinalizeBlobParams {
-                        origin: blob.origin,
+                        subscriber: blob.subscriber,
                         hash,
                         status,
                     };
@@ -891,13 +890,13 @@ where
 fn is_blob_pending<DB>(
     state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
     hash: Hash,
-    origin: Address,
+    subscriber: Address,
 ) -> anyhow::Result<bool>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
     let hash = fendermint_actor_blobs_shared::state::Hash(*hash.as_bytes());
-    let params = GetBlobStatusParams { hash, origin };
+    let params = GetBlobStatusParams { hash, subscriber };
     let params = RawBytes::serialize(params)?;
     let msg = FvmMessage {
         version: 0,
