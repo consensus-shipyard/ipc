@@ -278,7 +278,7 @@ mod tests {
             })
             .unwrap(),
             TokenAmount::from_whole(0),
-            None,
+            IpldBlock::serialize_cbor(&Subscription::default()).unwrap(),
             ExitCode::OK,
         );
         let result = rt
@@ -331,7 +331,7 @@ mod tests {
             })
             .unwrap(),
             TokenAmount::from_whole(0),
-            None,
+            IpldBlock::serialize_cbor(&Subscription::default()).unwrap(),
             ExitCode::OK,
         );
         let result = rt
@@ -382,7 +382,7 @@ mod tests {
             })
             .unwrap(),
             TokenAmount::from_whole(0),
-            None,
+            IpldBlock::serialize_cbor(&Subscription::default()).unwrap(),
             ExitCode::OK,
         );
         let result = rt
@@ -435,7 +435,7 @@ mod tests {
             })
             .unwrap(),
             TokenAmount::from_whole(0),
-            None,
+            IpldBlock::serialize_cbor(&Subscription::default()).unwrap(),
             ExitCode::OK,
         );
         let result = rt
@@ -511,7 +511,7 @@ mod tests {
             })
             .unwrap(),
             TokenAmount::from_whole(0),
-            None,
+            IpldBlock::serialize_cbor(&Subscription::default()).unwrap(),
             ExitCode::OK,
         );
         let result_add = rt
@@ -618,7 +618,7 @@ mod tests {
             })
             .unwrap(),
             TokenAmount::from_whole(0),
-            None,
+            IpldBlock::serialize_cbor(&Subscription::default()).unwrap(),
             ExitCode::OK,
         );
         rt.call::<Actor>(

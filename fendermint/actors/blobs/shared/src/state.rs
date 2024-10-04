@@ -32,7 +32,9 @@ impl fmt::Display for Hash {
 }
 
 /// Iroh node public key.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Ord, PartialOrd, Hash, Serialize, Deserialize,
+)]
 #[serde(transparent)]
 pub struct PublicKey(pub [u8; 32]);
 
@@ -115,7 +117,7 @@ impl fmt::Display for BlobStatus {
 /// An object used to determine what [`Account`](s) are accountable for a blob, and for how long.
 /// Subscriptions allow us to distribute the cost of a blob across multiple accounts that
 /// have added the same blob.   
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+#[derive(Clone, Debug, Default, Serialize_tuple, Deserialize_tuple)]
 pub struct Subscription {
     /// Added block.
     pub added: ChainEpoch,
