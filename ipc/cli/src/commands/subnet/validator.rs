@@ -41,6 +41,9 @@ impl CommandLineHandler for ValidatorInfo {
 pub(crate) struct ValidatorInfoArgs {
     #[arg(long, help = "The subnet id to query validator info")]
     pub subnet: String,
-    #[arg(long, help = "The validator address, in 0x Eth format or Filecoin address format")]
+    #[arg(
+        long,
+        help = "The validator address, in 0x Eth format or Filecoin address format"
+    )]
     pub validator: String,
 }
