@@ -49,11 +49,15 @@ IPC_CONFIG_FOLDER=${HOME}/.ipc
 if [[ -z "${FM_LOG_LEVEL:-}" ]]; then
   FM_LOG_LEVEL="info"
 fi
+if [[ -z "${FM_LOG_DOMAINS:-}" ]]; then
+  FM_LOG_DOMAINS=Bottomup,Consensus,Execution,Mpool,System,Topdown
+fi
 
 echo "$DASHES starting with env $DASHES"
 echo "IPC_FOLDER $IPC_FOLDER"
 echo "IPC_CONFIG_FOLDER $IPC_CONFIG_FOLDER"
 echo "FM_LOG_LEVEL $FM_LOG_LEVEL"
+echo "FM_LOG_DOMAINS $FM_LOG_DOMAINS"
 
 wallet_addresses=()
 public_keys=()
