@@ -21,22 +21,22 @@ extend = [
 ]
 
 [env]
-CMT_P2P_HOST_PORT = { script = ["${ROOT_SCRIPTS_DIR}/get_port.sh 26656"], condition = { env_not_set = [
+CMT_P2P_HOST_PORT = { script = ["${ROOT_SCRIPTS_DIR}/get_port.sh 30000"], condition = { env_not_set = [
     "CMT_P2P_HOST_PORT",
 ] } }
-CMT_RPC_HOST_PORT = { script = ["${ROOT_SCRIPTS_DIR}/get_port.sh 26657"], condition = { env_not_set = [
+CMT_RPC_HOST_PORT = { script = ["${ROOT_SCRIPTS_DIR}/get_port.sh $((CMT_P2P_HOST_PORT+1))"], condition = { env_not_set = [
     "CMT_RPC_HOST_PORT",
 ] } }
-ETHAPI_HOST_PORT = { script = ["${ROOT_SCRIPTS_DIR}/get_port.sh 8545"], condition = { env_not_set = [
+ETHAPI_HOST_PORT = { script = ["${ROOT_SCRIPTS_DIR}/get_port.sh $((CMT_RPC_HOST_PORT+1))"], condition = { env_not_set = [
     "ETHAPI_HOST_PORT",
 ] } }
-FENDERMINT_METRICS_HOST_PORT = { script = ["${ROOT_SCRIPTS_DIR}/get_port.sh 9184"], condition = { env_not_set = [
+FENDERMINT_METRICS_HOST_PORT = { script = ["${ROOT_SCRIPTS_DIR}/get_port.sh $((ETHAPI_HOST_PORT+1))"], condition = { env_not_set = [
     "FENDERMINT_METRICS_HOST_PORT",
 ] } }
-IROH_RPC_HOST_PORT = { script = ["${ROOT_SCRIPTS_DIR}/get_port.sh 4919"], condition = { env_not_set = [
+IROH_RPC_HOST_PORT = { script = ["${ROOT_SCRIPTS_DIR}/get_port.sh $((FENDERMINT_METRICS_HOST_PORT+1))"], condition = { env_not_set = [
     "IROH_RPC_HOST_PORT",
 ] } }
-IROH_METRICS_HOST_PORT = { script = ["${ROOT_SCRIPTS_DIR}/get_port.sh 9090"], condition = { env_not_set = [
+IROH_METRICS_HOST_PORT = { script = ["${ROOT_SCRIPTS_DIR}/get_port.sh $((IROH_RPC_HOST_PORT+1))"], condition = { env_not_set = [
     "IROH_METRICS_HOST_PORT",
 ] } }
 TENDERMINT_RPC_URL = "http://127.0.0.1:${CMT_RPC_HOST_PORT}"
