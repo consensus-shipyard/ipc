@@ -25,13 +25,15 @@ docker run \
   --env-file ${ENV_FILE} \
   --env NODE_NAME=${NODE_NAME} \
   --env FM_DATA_DIR=/data/${NODE_NAME}/fendermint/data \
-  --env FM_LOG_DIR=/fendermint/logs \
-  --env FM_LOG_FILE_PREFIX=${NETWORK_NAME}-${NODE_NAME} \
+  --env FM_TRACING__CONSOLE__LEVEL=${FM_LOG_LEVEL} \
+  --env FM_TRACING__FILE__ENABLED=true \
+  --env FM_TRACING__FILE__LEVEL=${FM_LOG_LEVEL} \
+  --env FM_TRACING__FILE__DIRECTORY=/fendermint/logs \
+  --env FM_TRACING__FILE__DOMAIN_FILTER=${FM_LOG_DOMAINS} \
   --env FM_SNAPSHOTS_DIR=/data/${NODE_NAME}/fendermint/snapshots \
   --env FM_CHAIN_NAME=${NETWORK_NAME} \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
   --env IROH_RPC_ADDR=${IROH_CONTAINER_NAME}:4919 \
-  --env LOG_LEVEL=${FM_LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
   --entrypoint ${ENTRY} \
   ${FM_DOCKER_IMAGE} \
@@ -61,7 +63,8 @@ docker run \
   --env FM_TRACING__FILE__LEVEL=${FM_LOG_LEVEL} \
   --env FM_TRACING__FILE__DIRECTORY=/data/${NODE_NAME}/fendermint/data/logs \
   --env FM_TRACING__FILE__MAX_LOG_FILES=4 \
-  --env FM_TRACING__FILE__ROTATION=Hourly \
+  --env FM_TRACING__FILE__ROTATION=hourly \
+  --env FM_TRACING__FILE__DOMAIN_FILTER=${FM_LOG_DOMAINS} \
   --env FM_SNAPSHOTS_DIR=/data/${NODE_NAME}/fendermint/snapshots \
   --env FM_CHAIN_NAME=${NETWORK_NAME} \
   --env FM_IPC__SUBNET_ID=${SUBNET_ID} \
@@ -110,7 +113,11 @@ docker run \
   --publish ${RESOLVER_HOST_PORT}:${RESOLVER_HOST_PORT} \
   --publish 127.0.0.1:${FENDERMINT_METRICS_HOST_PORT}:9184 \
   --env FM_DATA_DIR=/data/${NODE_NAME}/fendermint/data \
-  --env FM_LOG_DIR=/data/${NODE_NAME}/fendermint/data/logs \
+  --env FM_TRACING__CONSOLE__LEVEL=${FM_LOG_LEVEL} \
+  --env FM_TRACING__FILE__ENABLED=true \
+  --env FM_TRACING__FILE__LEVEL=${FM_LOG_LEVEL} \
+  --env FM_TRACING__FILE__DIRECTORY=/data/${NODE_NAME}/fendermint/data/logs \
+  --env FM_TRACING__FILE__DOMAIN_FILTER=${FM_LOG_DOMAINS} \
   --env FM_SNAPSHOTS_DIR=/data/${NODE_NAME}/fendermint/snapshots \
   --env FM_CHAIN_NAME=${NETWORK_NAME} \
   --env FM_IPC__SUBNET_ID=${SUBNET_ID} \
@@ -130,7 +137,6 @@ docker run \
   --env FM_TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
   --env IROH_RPC_ADDR=${IROH_CONTAINER_NAME}:4919 \
-  --env LOG_LEVEL=${FM_LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
   ${FM_DOCKER_IMAGE} \
   --network=${FM_NETWORK} \
@@ -146,7 +152,6 @@ docker run \
   --user $(id -u) \
   --volume ${BASE_DIR}:/data \
   --network=${NETWORK_NAME} \
-  --env LOG_LEVEL=${FM_LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
   ${FM_DOCKER_IMAGE} \
   --network=${FM_NETWORK} \
