@@ -371,7 +371,7 @@ where
 
     fn handle_discovery_event(&mut self, event: discovery::Event) {
         match event {
-            discovery::Event::Added(peer_id, _) => {
+            discovery::Event::Added(peer_id) => {
                 debug!("adding routable peer {peer_id} to {}", self.peer_id);
                 self.membership_mut().set_routable(peer_id)
             }
@@ -395,8 +395,12 @@ where
                     self.discovery_mut().background_lookup(peer_id)
                 }
             }
-            membership::Event::Updated(_, _) => {}
-            membership::Event::Removed(_) => {}
+            membership::Event::Updated(p, delta) => {
+                debug!("peer updated: {} with {:?}", p, delta.added);
+            }
+            membership::Event::Removed(p) => {
+                debug!("removed peer {}", p);
+            }
             membership::Event::ReceivedVote(vote) => {
                 let event = Event::ReceivedVote(vote);
                 if self.event_tx.send(event).is_err() {

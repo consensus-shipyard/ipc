@@ -205,6 +205,21 @@ impl DockerNode {
 
         export_file(keys_dir.join(COMETBFT_NODE_ID), cometbft_node_id)?;
 
+        fendermint_runner
+            .run_cmd(
+                "genesis \
+                    --genesis-file /fendermint/genesis.json \
+                    ipc \
+                        seal-genesis \
+                        --builtin-actors-path /fendermint/bundle.car \
+                        --custom-actors-path /fendermint/custom_actors_bundle.car \
+                        --artifacts-path /fendermint/contracts \
+                        --output-path /cometbft/config/sealed.json \
+                    ",
+            )
+            .await
+            .context("failed to seal genesis state")?;
+
         // Convert fendermint genesis to cometbft.
         fendermint_runner
             .run_cmd(
@@ -212,6 +227,7 @@ impl DockerNode {
                     --genesis-file /fendermint/genesis.json \
                     into-tendermint \
                     --out /cometbft/config/genesis.json \
+                    --app-state /cometbft/config/sealed.json \
                     ",
             )
             .await
@@ -511,7 +527,7 @@ impl DockerNode {
             }
 
             if let Some(client) = self.ethapi_http_provider()? {
-                if let Err(e) = client.get_chainid().await {
+                if let Err(e) = client.get_block(1).await {
                     continue;
                 }
             }

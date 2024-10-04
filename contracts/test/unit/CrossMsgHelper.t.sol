@@ -2,14 +2,14 @@
 pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
-import "../../src/lib/CrossMsgHelper.sol";
-import "../../src/lib/SubnetIDHelper.sol";
-import "../../src/lib/FvmAddressHelper.sol";
-import {FvmAddress} from "../../src/structs/FvmAddress.sol";
-import {SupplySource} from "../../src/structs/Subnet.sol";
-import {IpcMsgKind, CallMsg} from "../../src/structs/CrossNet.sol";
+import "../../contracts/lib/CrossMsgHelper.sol";
+import "../../contracts/lib/SubnetIDHelper.sol";
+import "../../contracts/lib/FvmAddressHelper.sol";
+import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
+import {Asset} from "../../contracts/structs/Subnet.sol";
+import {IpcMsgKind, CallMsg} from "../../contracts/structs/CrossNet.sol";
 
-import "openzeppelin-contracts/utils/Address.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 
 contract CrossMsgHelperTest is Test {
     using SubnetIDHelper for SubnetID;
@@ -156,7 +156,7 @@ contract CrossMsgHelperTest is Test {
 
         vm.deal(sender, 1 ether);
 
-        (, bytes memory result) = crossMsg.execute(SupplySourceHelper.native());
+        (, bytes memory result) = crossMsg.execute(AssetHelper.native());
 
         require(keccak256(result) == keccak256(EMPTY_BYTES));
         require(recipient.balance == 1);
@@ -178,7 +178,7 @@ contract CrossMsgHelperTest is Test {
         vm.deal(sender, 1 ether);
         vm.expectCall(recipient, crossMsg.value, new bytes(0), 1);
 
-        (, bytes memory result) = crossMsg.execute(SupplySourceHelper.native());
+        (, bytes memory result) = crossMsg.execute(AssetHelper.native());
 
         require(keccak256(result) == keccak256(EMPTY_BYTES));
     }
@@ -198,13 +198,13 @@ contract CrossMsgHelperTest is Test {
         vm.deal(sender, 1 ether);
         vm.expectCall(recipient, crossMsg.value, new bytes(0), 1);
 
-        (, bytes memory result) = crossMsg.execute(SupplySourceHelper.native());
+        (, bytes memory result) = crossMsg.execute(AssetHelper.native());
 
         require(keccak256(result) == keccak256(EMPTY_BYTES));
     }
 
     function test_Execute_Fails_InvalidMethod() public {
-        SupplySource memory native = SupplySourceHelper.native();
+        Asset memory native = AssetHelper.native();
 
         crossMsg.kind = IpcMsgKind.Call;
         crossMsg.to.rawAddress = FvmAddressHelper.from(address(this));

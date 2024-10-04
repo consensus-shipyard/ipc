@@ -22,12 +22,13 @@ serde_with = { workspace = true }
 serial_test = { workspace = true }
 tendermint-rpc = { workspace = true }
 tower-http = { workspace = true }
+tracing = { workspace = true }
 
 fvm_shared = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 ipc-api = { workspace = true }
 ipc-provider = { workspace = true }
-tracing = { workspace = true }
+ipc-observability = { workspace = true }
 
 fendermint_vm_encoding = { path = "../../vm/encoding" }
 fendermint_vm_topdown = { path = "../../vm/topdown" }

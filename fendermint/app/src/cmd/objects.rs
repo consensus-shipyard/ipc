@@ -19,7 +19,7 @@ use futures_util::StreamExt;
 use fvm_shared::chainid::ChainID;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use iroh::blobs::Hash;
-use iroh::client::blobs::BlobStatus;
+use iroh::client::blobs::{BlobStatus, ReadAtLen};
 use iroh::net::NodeAddr;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -422,7 +422,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
                     let len = (end - start) + 1;
                     let reader = iroh
                         .blobs()
-                        .read_at(hash, start, Some(len as usize))
+                        .read_at(hash, start, ReadAtLen::AtMost(len))
                         .await
                         .map_err(|e| {
                             Rejection::from(BadRequest {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
-import "../src/USDCTest.sol";
+import "../contracts/USDCTest.sol";
 import "./ConfigManager.sol";
 
 contract DeployUSDCTest is ConfigManager {

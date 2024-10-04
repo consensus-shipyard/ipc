@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {SubnetActorManagerFacet} from "../../src/subnet/SubnetActorManagerFacet.sol";
-import {SubnetActorPauseFacet} from "../../src/subnet/SubnetActorPauseFacet.sol";
-import {SubnetActorCheckpointingFacet} from "../../src/subnet/SubnetActorCheckpointingFacet.sol";
-import {SubnetActorRewardFacet} from "../../src/subnet/SubnetActorRewardFacet.sol";
-import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
-import {SubnetActorDiamond} from "../../src/SubnetActorDiamond.sol";
-import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
-import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
+import {SubnetActorManagerFacet} from "../../contracts/subnet/SubnetActorManagerFacet.sol";
+import {SubnetActorPauseFacet} from "../../contracts/subnet/SubnetActorPauseFacet.sol";
+import {SubnetActorCheckpointingFacet} from "../../contracts/subnet/SubnetActorCheckpointingFacet.sol";
+import {SubnetActorRewardFacet} from "../../contracts/subnet/SubnetActorRewardFacet.sol";
+import {SubnetActorGetterFacet} from "../../contracts/subnet/SubnetActorGetterFacet.sol";
+import {SubnetActorDiamond} from "../../contracts/SubnetActorDiamond.sol";
+import {DiamondLoupeFacet} from "../../contracts/diamond/DiamondLoupeFacet.sol";
+import {DiamondCutFacet} from "../../contracts/diamond/DiamondCutFacet.sol";
 
 library SubnetActorFacetsHelper {
     function manager(address sa) internal pure returns (SubnetActorManagerFacet) {

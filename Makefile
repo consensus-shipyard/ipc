@@ -7,9 +7,15 @@ default:
 	./target/release/ipc-cli --version
 	./target/release/fendermint --version
 
-SUBTREES := fendermint ipc ipld/resolver contracts
+SUBTREES_RUST := fendermint ipc ipld/resolver
+SUBTREES_CONTRACTS := contracts
+SUBTREES_ALL := $(SUBTREES_RUST) $(SUBTREES_CONTRACTS)
 
-test: $(patsubst %, test/%, $(SUBTREES))
+test: test-rust test-contracts
+
+test-rust: $(patsubst %, test/%, $(SUBTREES_RUST))
+
+test-contracts: $(patsubst %, test/%, $(SUBTREES_CONTRACTS))
 
 # Using `cd` instead of `-C` so $(PWD) is correct.
 test/%:
@@ -21,19 +27,39 @@ lint/%:
 license:
 	./scripts/add_license.sh
 
-lint: license $(patsubst %, lint/%, $(SUBTREES))
+lint: license $(patsubst %, lint/%, $(SUBTREES_ALL))
 
-install:
-	cd fendermint && make install && cargo install iroh-cli
+## Hoku
 
-config-local:
+config-devnet:
+	PATH=$(PATH):./target/release \
 	./scripts/setup.sh
 
-run-local-iroh:
-	iroh --rpc-addr 0.0.0.0:4919 start
+run-devnet-iroh:
+	cargo install iroh-cli --version 0.26.0
+	iroh --rpc-addr 127.0.0.1:4919 start
 
-run-local-fendermint:
-	./scripts/run_fendermint.sh
+run-devnet-fendermint:
+	rm -rf ~/.fendermint/data/rocksdb
+	FM_NETWORK=test \
+	FM_TRACING__CONSOLE__LEVEL=info \
+	FM_VALIDATOR_KEY__PATH=keys/validator.sk \
+	FM_VALIDATOR_KEY__KIND=regular \
+	FM_RESOLVER__CONNECTION__LISTEN_ADDR=/ip4/127.0.0.1/tcp/3001 \
+	./target/release/fendermint run
 
-run-local-cometbft:
-	./scripts/run_cometbft.sh
+run-devnet-cometbft:
+	cometbft unsafe-reset-all
+	cometbft start
+
+run-devnet-objects:
+	FM_NETWORK=test ./target/release/fendermint objects run
+
+run-devnet-evm:
+	./target/release/fendermint eth run
+
+run-localnet:
+	./scripts/deploy_subnet/deploy.sh localnet
+
+stop-localnet:
+	./scripts/deploy_subnet/stop_local.sh

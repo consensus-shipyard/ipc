@@ -5,27 +5,11 @@ use async_trait::async_trait;
 pub mod bytes;
 pub mod chain;
 pub mod fvm;
+pub mod genesis;
 pub mod signed;
 
 #[cfg(feature = "arb")]
 mod arb;
-
-/// Initialize the chain state.
-///
-/// This could be from the original genesis file, or perhaps a checkpointed snapshot.
-#[async_trait]
-pub trait GenesisInterpreter: Sync + Send {
-    type State: Send;
-    type Genesis: Send;
-    type Output;
-
-    /// Initialize the chain.
-    async fn init(
-        &self,
-        state: Self::State,
-        genesis: Self::Genesis,
-    ) -> anyhow::Result<(Self::State, Self::Output)>;
-}
 
 /// Prepare and process transaction proposals.
 #[async_trait]

@@ -10,7 +10,9 @@ use serde_with::{serde_as, DurationSeconds};
 use std::time::Duration;
 use tower_http::cors::{AllowHeaders, AllowMethods, AllowOrigin};
 
-use crate::{IsHumanReadable, SocketAddress};
+use ipc_observability::config::TracingSettings;
+
+use crate::{IsHumanReadable, MetricsSettings, SocketAddress};
 
 /// Ethereum API facade settings.
 #[serde_as]
@@ -22,7 +24,9 @@ pub struct EthSettings {
     pub cache_capacity: usize,
     pub gas: GasOpt,
     pub max_nonce_gap: u64,
+    pub metrics: MetricsSettings,
     pub cors: CorsOpt,
+    pub tracing: TracingSettings,
 }
 
 #[serde_as]

@@ -9,12 +9,14 @@ use fendermint_vm_actor_interface::{chainmetadata, cron, system};
 use fvm::executor::ApplyRet;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::{address::Address, ActorID, MethodNum, BLOCK_GAS_LIMIT};
+use ipc_observability::{emit, measure_time, observe::TracingError, Traceable};
 use tendermint_rpc::Client;
 
 use crate::ExecInterpreter;
 
 use super::{
     checkpoint::{self, PowerUpdates},
+    observe::{CheckpointFinalized, MsgExec, MsgExecPurpose},
     state::FvmExecState,
     FvmMessage, FvmMessageInterpreter,
 };
@@ -149,40 +151,50 @@ where
         mut state: Self::State,
         msg: Self::Message,
     ) -> anyhow::Result<(Self::State, Self::DeliverOutput)> {
-        let from = msg.from;
-        let to = msg.to;
-        let method_num = msg.method_num;
-        let gas_limit = msg.gas_limit;
+        let (apply_ret, emitters, latency) = if msg.from == system::SYSTEM_ACTOR_ADDR {
+            let (execution_result, latency) = measure_time(|| state.execute_implicit(msg.clone()));
+            let (apply_ret, emitters) = execution_result?;
 
-        let (apply_ret, emitters) = if from == system::SYSTEM_ACTOR_ADDR {
-            state.execute_implicit(msg)?
+            (apply_ret, emitters, latency)
         } else {
-            state.execute_explicit(msg)?
+            let (execution_result, latency) = measure_time(|| state.execute_explicit(msg.clone()));
+            let (apply_ret, emitters) = execution_result?;
+
+            (apply_ret, emitters, latency)
         };
 
-        tracing::info!(
-            height = state.block_height(),
-            from = from.to_string(),
-            to = to.to_string(),
-            method_num = method_num,
-            exit_code = apply_ret.msg_receipt.exit_code.value(),
-            gas_used = apply_ret.msg_receipt.gas_used,
-            "tx delivered"
-        );
+        let exit_code = apply_ret.msg_receipt.exit_code.value();
 
         let ret = FvmApplyRet {
             apply_ret,
-            from,
-            to,
-            method_num,
-            gas_limit,
+            from: msg.from,
+            to: msg.to,
+            method_num: msg.method_num,
+            gas_limit: msg.gas_limit,
             emitters,
         };
+
+        emit(MsgExec {
+            purpose: MsgExecPurpose::Apply,
+            height: state.block_height(),
+            message: msg,
+            duration: latency.as_secs_f64(),
+            exit_code,
+        });
 
         Ok((state, ret))
     }
 
     async fn end(&self, mut state: Self::State) -> anyhow::Result<(Self::State, Self::EndOutput)> {
+        // TODO: Consider doing this async, since it's purely informational and not consensus-critical.
+        let _ = checkpoint::emit_trace_if_check_checkpoint_finalized(&self.gateway, &mut state)
+            .inspect_err(|e| {
+                emit(TracingError {
+                    affected_event: CheckpointFinalized::name(),
+                    reason: e.to_string(),
+                });
+            });
+
         let updates = if let Some((checkpoint, updates)) =
             checkpoint::maybe_create_checkpoint(&self.gateway, &mut state)
                 .context("failed to create checkpoint")?

@@ -213,7 +213,7 @@ where
 }
 
 #[pin_project::pin_project]
-struct StateTreeStreamer<BS> {
+pub(crate) struct StateTreeStreamer<BS> {
     /// The list of cids to pull from the blockstore
     #[pin]
     dfs: VecDeque<Cid>,
@@ -286,7 +286,7 @@ fn walk_ipld_cids(ipld: Ipld, dfs: &mut VecDeque<Cid>) {
     }
 }
 
-fn derive_cid<T: Serialize>(t: &T) -> anyhow::Result<(Cid, Vec<u8>)> {
+pub(crate) fn derive_cid<T: Serialize>(t: &T) -> anyhow::Result<(Cid, Vec<u8>)> {
     let bytes = fvm_ipld_encoding::to_vec(&t)?;
     let cid = Cid::new_v1(DAG_CBOR, Code::Blake2b256.digest(&bytes));
     Ok((cid, bytes))

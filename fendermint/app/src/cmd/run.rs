@@ -6,15 +6,14 @@ use std::sync::Arc;
 use anyhow::{anyhow, bail, Context};
 use async_stm::atomically_or_err;
 use fendermint_abci::ApplicationService;
-use fendermint_app::events::{ParentFinalityVoteAdded, ParentFinalityVoteIgnored};
 use fendermint_app::ipc::{AppParentFinalityQuery, AppVote};
 use fendermint_app::{App, AppConfig, AppStore, BitswapBlockstore};
 use fendermint_app_settings::AccountKind;
 use fendermint_crypto::SecretKey;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
-use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::chain::ChainEnv;
+use fendermint_vm_interpreter::fvm::observe::register_metrics as register_interpreter_metrics;
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
 use fendermint_vm_interpreter::{
     bytes::{BytesMessageInterpreter, ProposalPrepareMode},
@@ -25,12 +24,14 @@ use fendermint_vm_interpreter::{
 use fendermint_vm_iroh_resolver::iroh::IrohResolver;
 use fendermint_vm_resolver::ipld::IpldResolver;
 use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
-use fendermint_vm_topdown::proxy::IPCProviderProxy;
+use fendermint_vm_topdown::observe::register_metrics as register_topdown_metrics;
+use fendermint_vm_topdown::proxy::{IPCProviderProxy, IPCProviderProxyWithLatency};
 use fendermint_vm_topdown::sync::launch_polling_syncer;
 use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
 use fendermint_vm_topdown::{CachedFinalityProvider, IPCBlobFinality, IPCParentFinality, Toggle};
 use fvm_shared::address::{current_network, Address, Network};
 use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
+use ipc_observability::observe::register_metrics as register_default_metrics;
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
 use tokio::sync::broadcast::error::RecvError;
@@ -39,6 +40,7 @@ use tracing::{debug, error, info, warn};
 
 use crate::cmd::key::read_secret_key;
 use crate::{cmd, options::run::RunArgs, settings::Settings};
+use fendermint_app::observe::register_metrics as register_consensus_metrics;
 
 cmd! {
   RunArgs(self, settings) {
@@ -71,8 +73,11 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
     let metrics_registry = if settings.metrics.enabled {
         let registry = prometheus::Registry::new();
 
-        fendermint_app::metrics::register_app_metrics(&registry)
-            .context("failed to register metrics")?;
+        register_default_metrics(&registry).context("failed to register default metrics")?;
+        register_topdown_metrics(&registry).context("failed to register topdown metrics")?;
+        register_interpreter_metrics(&registry)
+            .context("failed to register interpreter metrics")?;
+        register_consensus_metrics(&registry).context("failed to register consensus metrics")?;
 
         Some(registry)
     } else {
@@ -132,7 +137,6 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
     let interpreter = FvmMessageInterpreter::<NamespaceBlockstore, _>::new(
         tendermint_client.clone(),
         validator_ctx,
-        settings.contracts_dir(),
         settings.fvm.gas_overestimation_rate,
         settings.fvm.gas_search_step,
         settings.fvm.exec_in_check,
@@ -277,9 +281,14 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
             config = config.with_max_cache_blocks(v);
         }
 
-        let ipc_provider = Arc::new(make_ipc_provider_proxy(&settings)?);
+        let ipc_provider = {
+            let p = make_ipc_provider_proxy(&settings)?;
+            Arc::new(IPCProviderProxyWithLatency::new(p))
+        };
+
         let finality_provider =
             CachedFinalityProvider::uninitialized(config.clone(), ipc_provider.clone()).await?;
+
         let p = Arc::new(Toggle::enabled(finality_provider));
         (p, Some((ipc_provider, config)))
     } else {
@@ -318,8 +327,6 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
             app_namespace: ns.app,
             state_hist_namespace: ns.state_hist,
             state_hist_size: settings.db.state_hist_size,
-            builtin_actors_bundle: settings.builtin_actors_bundle(),
-            custom_actors_bundle: settings.custom_actors_bundle(),
             halt_height: settings.halt_height,
         },
         db,
@@ -575,13 +582,9 @@ async fn dispatch_vote(
             })
             .await;
 
-            let added = match res {
-                Ok(added) => {
-                    added
-                }
+            match res {
                 Err(e @ VoteError::Equivocation(_, _, _, _)) => {
                     warn!(error = e.to_string(), "failed to handle vote");
-                    false
                 }
                 Err(e @ (
                 VoteError::Uninitialized // early vote, we're not ready yet
@@ -589,33 +592,11 @@ async fn dispatch_vote(
                 | VoteError::UnexpectedBlock(_, _) // won't happen here
                 )) => {
                     debug!(error = e.to_string(), "failed to handle vote");
-                    false
+                }
+                _ => {
+                    debug!("vote handled");
                 }
             };
-
-            let block_height = f.height;
-            let block_hash = &hex::encode(&f.block_hash);
-            let validator = &format!("{:?}", vote.public_key);
-
-            if added {
-                emit!(
-                    DEBUG,
-                    ParentFinalityVoteAdded {
-                        block_height,
-                        block_hash,
-                        validator,
-                    }
-                )
-            } else {
-                emit!(
-                    DEBUG,
-                    ParentFinalityVoteIgnored {
-                        block_height,
-                        block_hash,
-                        validator,
-                    }
-                )
-            }
         }
         AppVote::BlobFinality(f) => {
             debug!(hash = ?f.hash, success = ?f.success, "received vote for blob finality");

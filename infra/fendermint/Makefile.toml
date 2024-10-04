@@ -148,6 +148,7 @@ IROH_CONFIG_PATH = { value = "${IROH_DIR}/iroh.config.toml", condition = { env_n
 ENV_FILE = "${BASE_DIR}/.env"
 
 GENESIS_FILE = "${BASE_DIR}/genesis.json"
+SEALED_GENESIS = "/data/sealed_genesis.car"
 KEYS_SUBDIR = "keys"
 
 VALIDATOR_KEY_NAME = "validator_key"
@@ -176,7 +177,7 @@ CMT_DOCKER_IMAGE = "cometbft/cometbft:v0.37.x"
 FM_DOCKER_TAG = "latest"
 FM_DOCKER_IMAGE = "fendermint:${FM_DOCKER_TAG}"
 FM_REMOTE_DOCKER_IMAGE = "ghcr.io/consensus-shipyard/fendermint:${FM_DOCKER_TAG}"
-IROH_DOCKER_IMAGE = "n0computer/iroh:v0.25.0"
+IROH_DOCKER_IMAGE = "n0computer/iroh:v0.26.0"
 PROMETHEUS_DOCKER_IMAGE = "prom/prometheus:latest"
 PROMTAIL_DOCKER_IMAGE = "grafana/promtail:latest"
 LOKI_DOCKER_IMAGE = "grafana/loki:latest"
@@ -200,6 +201,10 @@ FM_LOG_LEVEL = { value = "${LOG_LEVEL}", condition = { env_not_set = [
 OBJECTS_LOG_LEVEL = { value = "${LOG_LEVEL}", condition = { env_not_set = [
     "OBJECTS_LOG_LEVEL",
 ] } }
+LOG_DOMAINS = "Bottomup,Consensus,Execution,Mpool,System,Topdown"
+FM_LOG_DOMAINS = { value = "${LOG_DOMAINS}", condition = { env_not_set = [
+    "FM_LOG_DOMAINS",
+] } }
 
 [tasks.info]
 script = """
@@ -216,6 +221,7 @@ echo - CometBFT directory: ${CMT_DIR}
 echo - Fendermint directory: ${FM_DIR}
 echo - Keys directory: ${KEYS_DIR}
 echo - Genesis file: ${GENESIS_FILE}
+echo - Sealed Genesis: ${SEALED_GENESIS}
 echo - Validator Private key: ${VALIDATOR_PRIV_KEY_PATH}
 echo - Network: ${NETWORK_NAME}
 echo - CometBFT container: ${CMT_CONTAINER_NAME}
@@ -225,6 +231,7 @@ echo
 echo 4 nodes testnet layout:
 echo - IPC directory: ${BASE_DIR}
 echo - Genesis file: ${GENESIS_FILE}
+echo - Sealed Genesis: ${SEALED_GENESIS}
 echo - Network: ${NETWORK_NAME}
 echo
 """

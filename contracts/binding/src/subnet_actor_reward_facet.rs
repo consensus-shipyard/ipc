@@ -71,19 +71,6 @@ pub mod subnet_actor_reward_facet {
             ]),
             errors: ::core::convert::From::from([
                 (
-                    ::std::borrow::ToOwned::to_owned("AddressInsufficientBalance"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("AddressInsufficientBalance",),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::borrow::ToOwned::to_owned("account"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("address"),
-                            ),
-                        },],
-                    },],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("EnforcedPause"),
                     ::std::vec![::ethers::core::abi::ethabi::AbiError {
                         name: ::std::borrow::ToOwned::to_owned("EnforcedPause"),
@@ -98,16 +85,16 @@ pub mod subnet_actor_reward_facet {
                     },],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("FailedInnerCall"),
+                    ::std::borrow::ToOwned::to_owned("NoCollateralToWithdraw"),
                     ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("FailedInnerCall"),
+                        name: ::std::borrow::ToOwned::to_owned("NoCollateralToWithdraw",),
                         inputs: ::std::vec![],
                     },],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("NoCollateralToWithdraw"),
+                    ::std::borrow::ToOwned::to_owned("NotEnoughBalance"),
                     ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("NoCollateralToWithdraw",),
+                        name: ::std::borrow::ToOwned::to_owned("NotEnoughBalance"),
                         inputs: ::std::vec![],
                     },],
                 ),
@@ -127,12 +114,12 @@ pub mod subnet_actor_reward_facet {
     pub static SUBNETACTORREWARDFACET_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
         ::ethers::contract::Lazy::new(__abi);
     #[rustfmt::skip]
-    const __BYTECODE: &[u8] = b"`\x80`@R4\x80\x15`\x0FW`\0\x80\xFD[Pa\x03\x9B\x80a\0\x1F`\09`\0\xF3\xFE`\x80`@R4\x80\x15a\0\x10W`\0\x80\xFD[P`\x046\x10a\0+W`\x005`\xE0\x1C\x80cNq\xD9-\x14a\x000W[`\0\x80\xFD[a\08a\0:V[\0[\x7Fi\x1B\xB0?\xFC\x16\xC5o\xC9k\x82\xFD\x16\xCD\x1B7\x15\xF0\xBC<\xDCd\x07\0_I\xBBb\x05\x86\0\x95\x80T`\0\x19\x01a\0~W`@Qc)\xF7E\xA7`\xE0\x1B\x81R`\x04\x01`@Q\x80\x91\x03\x90\xFD[`\x01\x81Ua\0\x8Aa\0\x99V[a\0\x933a\0\xDEV[`\0\x90UV[\x7F\xC4Q\xC9B\x9C'\xDBh\xF2\x86\xAB\x8Ah\xF3\x11\xF1\xDC\xCA\xB7\x03\xBA\x94#\xAE\xD2\x9C\xD3\x97\xAEc\xF8cT`\xFF\x16\x15a\0\xDCW`@Qc\xD9<\x06e`\xE0\x1B\x81R`\x04\x01`@Q\x80\x91\x03\x90\xFD[V[`\0\x80a\0\xEC`\x15\x84a\x016V[`@\x80Q`\x01`\x01`\xA0\x1B\x03\x86\x16\x81R` \x81\x01\x83\x90R\x91\x92P\x7F\x19|XcS\xEA\xED\n\x1CS\xE6\xE5@D[\x94\xBE\xFA\xB8\xF92\xC8\x11]\x11!\x15\xEC\xBE\xEE\xD5\x14\x91\x01`@Q\x80\x91\x03\x90\xA1PPPV[`\x01`\x01`\xA0\x1B\x03\x81\x16`\0\x90\x81R`\x01\x83\x01` R`@\x81 \x81\x90\x81\x90a\x01]\x90a\x01\xB0V[\x91P\x91P\x80a\xFF\xFF\x16`\0\x03a\x01\x93W`\x01`\x01`\xA0\x1B\x03\x84\x16`\0\x90\x81R`\x01\x86\x01` R`@\x90 \x80Tc\xFF\xFF\xFF\xFF\x19\x16\x90U[a\x01\xA6`\x01`\x01`\xA0\x1B\x03\x85\x16\x83a\x02\xA4V[P\x90P[\x92\x91PPV[\x80T`\0\x90\x81\x90a\xFF\xFF\x16\x80\x82\x03a\x01\xDBW`@Qcd\xB0U\x7F`\xE0\x1B\x81R`\x04\x01`@Q\x80\x91\x03\x90\xFD[\x83Tb\x01\0\0\x90\x04a\xFF\xFF\x16\x81`\0[\x83a\xFF\xFF\x16\x83a\xFF\xFF\x16\x10\x15a\x02yWa\xFF\xFF\x83\x16`\0\x90\x81R`\x01\x80\x89\x01` \x90\x81R`@\x92\x83\x90 \x83Q\x80\x85\x01\x90\x94R\x80T\x80\x85R\x92\x01T\x90\x83\x01RC\x10\x15a\x026WPa\x02yV[` \x81\x01Qa\x02E\x90\x83a\x03DV[a\xFF\xFF\x85\x16`\0\x90\x81R`\x01\x8A\x81\x01` R`@\x82 \x82\x81U\x81\x01\x91\x90\x91U\x90\x94\x01\x93`\0\x19\x93\x90\x93\x01\x92\x91Pa\x01\xEB\x90PV[\x86Tc\xFF\xFF\xFF\xFF\x19\x16b\x01\0\0a\xFF\xFF\x94\x85\x16\x02a\xFF\xFF\x19\x16\x17\x92\x82\x16\x92\x90\x92\x17\x90\x95U\x94\x92PPPV[\x80G\x10\x15a\x02\xCBW`@Qc\xCDx`Y`\xE0\x1B\x81R0`\x04\x82\x01R`$\x01`@Q\x80\x91\x03\x90\xFD[`\0\x82`\x01`\x01`\xA0\x1B\x03\x16\x82`@Q`\0`@Q\x80\x83\x03\x81\x85\x87Z\xF1\x92PPP=\x80`\0\x81\x14a\x03\x18W`@Q\x91P`\x1F\x19`?=\x01\x16\x82\x01`@R=\x82R=`\0` \x84\x01>a\x03\x1DV[``\x91P[PP\x90P\x80a\x03?W`@Qc\n\x12\xF5!`\xE1\x1B\x81R`\x04\x01`@Q\x80\x91\x03\x90\xFD[PPPV[\x80\x82\x01\x80\x82\x11\x15a\x01\xAAWcNH{q`\xE0\x1B`\0R`\x11`\x04R`$`\0\xFD\xFE\xA2dipfsX\"\x12 *X,n`\x1CV\x85\x0Ct\xFD'\xF0F\x13P\xF4\xC4\xE1\nXbqR\xB8\xF9P_\x94\xF3F\x10dsolcC\0\x08\x1A\x003";
+    const __BYTECODE: &[u8] = b"`\x80\x80`@R4`\x15Wa\x04\xA6\x90\x81a\0\x1B\x829\xF3[`\0\x80\xFD\xFE`\x80`@R`\x046\x10\x15a\0\x12W`\0\x80\xFD[`\x005`\xE0\x1CcNq\xD9-\x14a\0'W`\0\x80\xFD[4a\x02\xA0W`\x006`\x03\x19\x01\x12a\x02\xA0W`\x01\x7Fi\x1B\xB0?\xFC\x16\xC5o\xC9k\x82\xFD\x16\xCD\x1B7\x15\xF0\xBC<\xDCd\x07\0_I\xBBb\x05\x86\0\x95T\x14a\x02\x8FW`\x01\x7Fi\x1B\xB0?\xFC\x16\xC5o\xC9k\x82\xFD\x16\xCD\x1B7\x15\xF0\xBC<\xDCd\x07\0_I\xBBb\x05\x86\0\x95U`\xFF\x7F\xC4Q\xC9B\x9C'\xDBh\xF2\x86\xAB\x8Ah\xF3\x11\xF1\xDC\xCA\xB7\x03\xBA\x94#\xAE\xD2\x9C\xD3\x97\xAEc\xF8cT\x16a\x02~W3`\0\x90\x81R`\x17` R`@\x90 \x80Ta\xFF\xFF\x81\x16\x90\x81\x15a\x02mW\x90\x91`\0\x91`\x10\x1Ca\xFF\xFF\x16\x83`\x01\x83\x01[\x81a\xFF\xFF\x84\x16\x10a\x01\xE2W[PPc\xFF\xFF\0\0\x92\x93a\xFF\xFF\x83T\x91\x16\x93\x84\x92`\x10\x1B\x16\x90c\xFF\xFF\xFF\xFF\x19\x16\x17\x17\x90U\x15a\x01\xCDW[`@\x80Q3\x81R` \x81\x01\x83\x90R\x7F\x19|XcS\xEA\xED\n\x1CS\xE6\xE5@D[\x94\xBE\xFA\xB8\xF92\xC8\x11]\x11!\x15\xEC\xBE\xEE\xD5\x14\x91\x90\xA1\x80a\x01pW[`\0\x7Fi\x1B\xB0?\xFC\x16\xC5o\xC9k\x82\xFD\x16\xCD\x1B7\x15\xF0\xBC<\xDCd\x07\0_I\xBBb\x05\x86\0\x95U\0[`@Q\x90a\x01}\x82a\x02\xA5V[`\x08T\x91`\xFF\x83\x16\x92`\x02\x84\x10\x15a\x01\xB7W\x92\x81R`\x08\x92\x90\x92\x1C`\x01`\x01`\xA0\x1B\x03\x16` \x83\x01Ra\x01\xB1\x913\x90a\x02\xF9V[Pa\x01JV[cNH{q`\xE0\x1B`\0R`!`\x04R`$`\0\xFD[3`\0\x90\x81R`\x17` R`@\x81 Ua\x01\x12V[\x90\x91\x93` `@`\0a\xFF\xFF\x88\x16\x81R\x84\x83R `@Qa\x02\x02\x81a\x02\xA5V[`\x01\x82T\x92\x83\x83R\x01T\x92\x83\x91\x01RC\x10a\x02eW\x81\x01\x80\x91\x11a\x02OWa\xFF\xFF`\x01\x81\x92\x96`\0\x82`@\x82\x86\x85\x16\x81R\x88` R \x82\x81U\x01U\x01\x16\x95`\0\x19\x01\x16\x91\x90\x94\x91\x94a\0\xDDV[cNH{q`\xE0\x1B`\0R`\x11`\x04R`$`\0\xFD[P\x93\x91a\0\xE9V[cd\xB0U\x7F`\xE0\x1B`\0R`\x04`\0\xFD[c\xD9<\x06e`\xE0\x1B`\0R`\x04`\0\xFD[c)\xF7E\xA7`\xE0\x1B`\0R`\x04`\0\xFD[`\0\x80\xFD[`@\x81\x01\x90\x81\x10g\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x82\x11\x17a\x02\xC1W`@RV[cNH{q`\xE0\x1B`\0R`A`\x04R`$`\0\xFD[\x90`\x1F\x80\x19\x91\x01\x16\x81\x01\x90\x81\x10g\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x82\x11\x17a\x02\xC1W`@RV[\x92\x91\x90`\0``\x85Q\x95`\x02\x87\x10\x15a\x01\xB7W`\0\x96a\x03]WPPP\x81G\x10a\x03NW\x83\x91\x82\x91\x82\x91\x82\x91`\x01`\x01`\xA0\x1B\x03\x16Z\xF1a\x038a\x040V[P`@Q\x92a\x03H` \x85a\x02\xD7V[\x83R\x91\x90V[cV\x9DE\xCF`\xE1\x1B\x84R`\x04\x84\xFD[\x80\x96\x92\x96\x95\x94\x93\x91\x95Q`\x02\x81\x10\x15a\x04\x1CW`\x01\x14a\x03}WPPPPV[` \x90\x81\x01Q`@\x80Q`\x01`\x01`\xA0\x1B\x03\x94\x85\x16\x93\x81\x01\x93\x90\x93R\x82\x81\x01\x95\x90\x95R\x93\x81R\x95P\x92\x93P\x91\x16a\x03\xB5``\x85a\x02\xD7V[`@Q` \x81\x01\x90c\xA9\x05\x9C\xBB`\xE0\x1B\x82R\x85Q\x84[\x81\x81\x10a\x04\x06WP\x84\x95\x96P\x90a\x03\xF6`$\x82\x87\x94\x81\x01\x85\x83\x82\x01R\x03\x01`\x1F\x19\x81\x01\x83R\x82a\x02\xD7V[Q\x92Z\xF1\x90a\x04\x03a\x040V[\x90V[\x80` \x80\x92\x8A\x01\x01Q`$\x82\x86\x01\x01R\x01a\x03\xCBV[cNH{q`\xE0\x1B\x84R`!`\x04R`$\x84\xFD[=\x15a\x04kW=\x90g\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x82\x11a\x02\xC1W`@Q\x91a\x04_`\x1F\x82\x01`\x1F\x19\x16` \x01\x84a\x02\xD7V[\x82R=`\0` \x84\x01>V[``\x90V\xFE\xA2dipfsX\"\x12 \xF1\xB7o\x86\x04\xD1M\x17\xD9t\x98'\xCD\xE8\xF7\x08\x87\x01&\x1C-H\xA3\x14\x8B\xD1d\xE6\xFE\xF6\x10\xE5dsolcC\0\x08\x1A\x003";
     /// The bytecode of the contract.
     pub static SUBNETACTORREWARDFACET_BYTECODE: ::ethers::core::types::Bytes =
         ::ethers::core::types::Bytes::from_static(__BYTECODE);
     #[rustfmt::skip]
-    const __DEPLOYED_BYTECODE: &[u8] = b"`\x80`@R4\x80\x15a\0\x10W`\0\x80\xFD[P`\x046\x10a\0+W`\x005`\xE0\x1C\x80cNq\xD9-\x14a\x000W[`\0\x80\xFD[a\08a\0:V[\0[\x7Fi\x1B\xB0?\xFC\x16\xC5o\xC9k\x82\xFD\x16\xCD\x1B7\x15\xF0\xBC<\xDCd\x07\0_I\xBBb\x05\x86\0\x95\x80T`\0\x19\x01a\0~W`@Qc)\xF7E\xA7`\xE0\x1B\x81R`\x04\x01`@Q\x80\x91\x03\x90\xFD[`\x01\x81Ua\0\x8Aa\0\x99V[a\0\x933a\0\xDEV[`\0\x90UV[\x7F\xC4Q\xC9B\x9C'\xDBh\xF2\x86\xAB\x8Ah\xF3\x11\xF1\xDC\xCA\xB7\x03\xBA\x94#\xAE\xD2\x9C\xD3\x97\xAEc\xF8cT`\xFF\x16\x15a\0\xDCW`@Qc\xD9<\x06e`\xE0\x1B\x81R`\x04\x01`@Q\x80\x91\x03\x90\xFD[V[`\0\x80a\0\xEC`\x15\x84a\x016V[`@\x80Q`\x01`\x01`\xA0\x1B\x03\x86\x16\x81R` \x81\x01\x83\x90R\x91\x92P\x7F\x19|XcS\xEA\xED\n\x1CS\xE6\xE5@D[\x94\xBE\xFA\xB8\xF92\xC8\x11]\x11!\x15\xEC\xBE\xEE\xD5\x14\x91\x01`@Q\x80\x91\x03\x90\xA1PPPV[`\x01`\x01`\xA0\x1B\x03\x81\x16`\0\x90\x81R`\x01\x83\x01` R`@\x81 \x81\x90\x81\x90a\x01]\x90a\x01\xB0V[\x91P\x91P\x80a\xFF\xFF\x16`\0\x03a\x01\x93W`\x01`\x01`\xA0\x1B\x03\x84\x16`\0\x90\x81R`\x01\x86\x01` R`@\x90 \x80Tc\xFF\xFF\xFF\xFF\x19\x16\x90U[a\x01\xA6`\x01`\x01`\xA0\x1B\x03\x85\x16\x83a\x02\xA4V[P\x90P[\x92\x91PPV[\x80T`\0\x90\x81\x90a\xFF\xFF\x16\x80\x82\x03a\x01\xDBW`@Qcd\xB0U\x7F`\xE0\x1B\x81R`\x04\x01`@Q\x80\x91\x03\x90\xFD[\x83Tb\x01\0\0\x90\x04a\xFF\xFF\x16\x81`\0[\x83a\xFF\xFF\x16\x83a\xFF\xFF\x16\x10\x15a\x02yWa\xFF\xFF\x83\x16`\0\x90\x81R`\x01\x80\x89\x01` \x90\x81R`@\x92\x83\x90 \x83Q\x80\x85\x01\x90\x94R\x80T\x80\x85R\x92\x01T\x90\x83\x01RC\x10\x15a\x026WPa\x02yV[` \x81\x01Qa\x02E\x90\x83a\x03DV[a\xFF\xFF\x85\x16`\0\x90\x81R`\x01\x8A\x81\x01` R`@\x82 \x82\x81U\x81\x01\x91\x90\x91U\x90\x94\x01\x93`\0\x19\x93\x90\x93\x01\x92\x91Pa\x01\xEB\x90PV[\x86Tc\xFF\xFF\xFF\xFF\x19\x16b\x01\0\0a\xFF\xFF\x94\x85\x16\x02a\xFF\xFF\x19\x16\x17\x92\x82\x16\x92\x90\x92\x17\x90\x95U\x94\x92PPPV[\x80G\x10\x15a\x02\xCBW`@Qc\xCDx`Y`\xE0\x1B\x81R0`\x04\x82\x01R`$\x01`@Q\x80\x91\x03\x90\xFD[`\0\x82`\x01`\x01`\xA0\x1B\x03\x16\x82`@Q`\0`@Q\x80\x83\x03\x81\x85\x87Z\xF1\x92PPP=\x80`\0\x81\x14a\x03\x18W`@Q\x91P`\x1F\x19`?=\x01\x16\x82\x01`@R=\x82R=`\0` \x84\x01>a\x03\x1DV[``\x91P[PP\x90P\x80a\x03?W`@Qc\n\x12\xF5!`\xE1\x1B\x81R`\x04\x01`@Q\x80\x91\x03\x90\xFD[PPPV[\x80\x82\x01\x80\x82\x11\x15a\x01\xAAWcNH{q`\xE0\x1B`\0R`\x11`\x04R`$`\0\xFD\xFE\xA2dipfsX\"\x12 *X,n`\x1CV\x85\x0Ct\xFD'\xF0F\x13P\xF4\xC4\xE1\nXbqR\xB8\xF9P_\x94\xF3F\x10dsolcC\0\x08\x1A\x003";
+    const __DEPLOYED_BYTECODE: &[u8] = b"`\x80`@R`\x046\x10\x15a\0\x12W`\0\x80\xFD[`\x005`\xE0\x1CcNq\xD9-\x14a\0'W`\0\x80\xFD[4a\x02\xA0W`\x006`\x03\x19\x01\x12a\x02\xA0W`\x01\x7Fi\x1B\xB0?\xFC\x16\xC5o\xC9k\x82\xFD\x16\xCD\x1B7\x15\xF0\xBC<\xDCd\x07\0_I\xBBb\x05\x86\0\x95T\x14a\x02\x8FW`\x01\x7Fi\x1B\xB0?\xFC\x16\xC5o\xC9k\x82\xFD\x16\xCD\x1B7\x15\xF0\xBC<\xDCd\x07\0_I\xBBb\x05\x86\0\x95U`\xFF\x7F\xC4Q\xC9B\x9C'\xDBh\xF2\x86\xAB\x8Ah\xF3\x11\xF1\xDC\xCA\xB7\x03\xBA\x94#\xAE\xD2\x9C\xD3\x97\xAEc\xF8cT\x16a\x02~W3`\0\x90\x81R`\x17` R`@\x90 \x80Ta\xFF\xFF\x81\x16\x90\x81\x15a\x02mW\x90\x91`\0\x91`\x10\x1Ca\xFF\xFF\x16\x83`\x01\x83\x01[\x81a\xFF\xFF\x84\x16\x10a\x01\xE2W[PPc\xFF\xFF\0\0\x92\x93a\xFF\xFF\x83T\x91\x16\x93\x84\x92`\x10\x1B\x16\x90c\xFF\xFF\xFF\xFF\x19\x16\x17\x17\x90U\x15a\x01\xCDW[`@\x80Q3\x81R` \x81\x01\x83\x90R\x7F\x19|XcS\xEA\xED\n\x1CS\xE6\xE5@D[\x94\xBE\xFA\xB8\xF92\xC8\x11]\x11!\x15\xEC\xBE\xEE\xD5\x14\x91\x90\xA1\x80a\x01pW[`\0\x7Fi\x1B\xB0?\xFC\x16\xC5o\xC9k\x82\xFD\x16\xCD\x1B7\x15\xF0\xBC<\xDCd\x07\0_I\xBBb\x05\x86\0\x95U\0[`@Q\x90a\x01}\x82a\x02\xA5V[`\x08T\x91`\xFF\x83\x16\x92`\x02\x84\x10\x15a\x01\xB7W\x92\x81R`\x08\x92\x90\x92\x1C`\x01`\x01`\xA0\x1B\x03\x16` \x83\x01Ra\x01\xB1\x913\x90a\x02\xF9V[Pa\x01JV[cNH{q`\xE0\x1B`\0R`!`\x04R`$`\0\xFD[3`\0\x90\x81R`\x17` R`@\x81 Ua\x01\x12V[\x90\x91\x93` `@`\0a\xFF\xFF\x88\x16\x81R\x84\x83R `@Qa\x02\x02\x81a\x02\xA5V[`\x01\x82T\x92\x83\x83R\x01T\x92\x83\x91\x01RC\x10a\x02eW\x81\x01\x80\x91\x11a\x02OWa\xFF\xFF`\x01\x81\x92\x96`\0\x82`@\x82\x86\x85\x16\x81R\x88` R \x82\x81U\x01U\x01\x16\x95`\0\x19\x01\x16\x91\x90\x94\x91\x94a\0\xDDV[cNH{q`\xE0\x1B`\0R`\x11`\x04R`$`\0\xFD[P\x93\x91a\0\xE9V[cd\xB0U\x7F`\xE0\x1B`\0R`\x04`\0\xFD[c\xD9<\x06e`\xE0\x1B`\0R`\x04`\0\xFD[c)\xF7E\xA7`\xE0\x1B`\0R`\x04`\0\xFD[`\0\x80\xFD[`@\x81\x01\x90\x81\x10g\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x82\x11\x17a\x02\xC1W`@RV[cNH{q`\xE0\x1B`\0R`A`\x04R`$`\0\xFD[\x90`\x1F\x80\x19\x91\x01\x16\x81\x01\x90\x81\x10g\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x82\x11\x17a\x02\xC1W`@RV[\x92\x91\x90`\0``\x85Q\x95`\x02\x87\x10\x15a\x01\xB7W`\0\x96a\x03]WPPP\x81G\x10a\x03NW\x83\x91\x82\x91\x82\x91\x82\x91`\x01`\x01`\xA0\x1B\x03\x16Z\xF1a\x038a\x040V[P`@Q\x92a\x03H` \x85a\x02\xD7V[\x83R\x91\x90V[cV\x9DE\xCF`\xE1\x1B\x84R`\x04\x84\xFD[\x80\x96\x92\x96\x95\x94\x93\x91\x95Q`\x02\x81\x10\x15a\x04\x1CW`\x01\x14a\x03}WPPPPV[` \x90\x81\x01Q`@\x80Q`\x01`\x01`\xA0\x1B\x03\x94\x85\x16\x93\x81\x01\x93\x90\x93R\x82\x81\x01\x95\x90\x95R\x93\x81R\x95P\x92\x93P\x91\x16a\x03\xB5``\x85a\x02\xD7V[`@Q` \x81\x01\x90c\xA9\x05\x9C\xBB`\xE0\x1B\x82R\x85Q\x84[\x81\x81\x10a\x04\x06WP\x84\x95\x96P\x90a\x03\xF6`$\x82\x87\x94\x81\x01\x85\x83\x82\x01R\x03\x01`\x1F\x19\x81\x01\x83R\x82a\x02\xD7V[Q\x92Z\xF1\x90a\x04\x03a\x040V[\x90V[\x80` \x80\x92\x8A\x01\x01Q`$\x82\x86\x01\x01R\x01a\x03\xCBV[cNH{q`\xE0\x1B\x84R`!`\x04R`$\x84\xFD[=\x15a\x04kW=\x90g\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x82\x11a\x02\xC1W`@Q\x91a\x04_`\x1F\x82\x01`\x1F\x19\x16` \x01\x84a\x02\xD7V[\x82R=`\0` \x84\x01>V[``\x90V\xFE\xA2dipfsX\"\x12 \xF1\xB7o\x86\x04\xD1M\x17\xD9t\x98'\xCD\xE8\xF7\x08\x87\x01&\x1C-H\xA3\x14\x8B\xD1d\xE6\xFE\xF6\x10\xE5dsolcC\0\x08\x1A\x003";
     /// The deployed bytecode of the contract.
     pub static SUBNETACTORREWARDFACET_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes =
         ::ethers::core::types::Bytes::from_static(__DEPLOYED_BYTECODE);
@@ -253,24 +240,6 @@ pub mod subnet_actor_reward_facet {
             Self::new(contract.address(), contract.client())
         }
     }
-    ///Custom Error type `AddressInsufficientBalance` with signature `AddressInsufficientBalance(address)` and selector `0xcd786059`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[etherror(
-        name = "AddressInsufficientBalance",
-        abi = "AddressInsufficientBalance(address)"
-    )]
-    pub struct AddressInsufficientBalance {
-        pub account: ::ethers::core::types::Address,
-    }
     ///Custom Error type `EnforcedPause` with signature `EnforcedPause()` and selector `0xd93c0665`
     #[derive(
         Clone,
@@ -297,19 +266,6 @@ pub mod subnet_actor_reward_facet {
     )]
     #[etherror(name = "ExpectedPause", abi = "ExpectedPause()")]
     pub struct ExpectedPause;
-    ///Custom Error type `FailedInnerCall` with signature `FailedInnerCall()` and selector `0x1425ea42`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[etherror(name = "FailedInnerCall", abi = "FailedInnerCall()")]
-    pub struct FailedInnerCall;
     ///Custom Error type `NoCollateralToWithdraw` with signature `NoCollateralToWithdraw()` and selector `0x64b0557f`
     #[derive(
         Clone,
@@ -323,6 +279,19 @@ pub mod subnet_actor_reward_facet {
     )]
     #[etherror(name = "NoCollateralToWithdraw", abi = "NoCollateralToWithdraw()")]
     pub struct NoCollateralToWithdraw;
+    ///Custom Error type `NotEnoughBalance` with signature `NotEnoughBalance()` and selector `0xad3a8b9e`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[etherror(name = "NotEnoughBalance", abi = "NotEnoughBalance()")]
+    pub struct NotEnoughBalance;
     ///Custom Error type `ReentrancyError` with signature `ReentrancyError()` and selector `0x29f745a7`
     #[derive(
         Clone,
@@ -339,11 +308,10 @@ pub mod subnet_actor_reward_facet {
     ///Container type for all of the contract's custom errors
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum SubnetActorRewardFacetErrors {
-        AddressInsufficientBalance(AddressInsufficientBalance),
         EnforcedPause(EnforcedPause),
         ExpectedPause(ExpectedPause),
-        FailedInnerCall(FailedInnerCall),
         NoCollateralToWithdraw(NoCollateralToWithdraw),
+        NotEnoughBalance(NotEnoughBalance),
         ReentrancyError(ReentrancyError),
         /// The standard solidity revert string, with selector
         /// Error(string) -- 0x08c379a0
@@ -359,24 +327,20 @@ pub mod subnet_actor_reward_facet {
             {
                 return Ok(Self::RevertString(decoded));
             }
-            if let Ok(decoded) =
-                <AddressInsufficientBalance as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::AddressInsufficientBalance(decoded));
-            }
             if let Ok(decoded) = <EnforcedPause as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::EnforcedPause(decoded));
             }
             if let Ok(decoded) = <ExpectedPause as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ExpectedPause(decoded));
             }
-            if let Ok(decoded) = <FailedInnerCall as ::ethers::core::abi::AbiDecode>::decode(data) {
-                return Ok(Self::FailedInnerCall(decoded));
-            }
             if let Ok(decoded) =
                 <NoCollateralToWithdraw as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::NoCollateralToWithdraw(decoded));
+            }
+            if let Ok(decoded) = <NotEnoughBalance as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::NotEnoughBalance(decoded));
             }
             if let Ok(decoded) = <ReentrancyError as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ReentrancyError(decoded));
@@ -387,15 +351,12 @@ pub mod subnet_actor_reward_facet {
     impl ::ethers::core::abi::AbiEncode for SubnetActorRewardFacetErrors {
         fn encode(self) -> ::std::vec::Vec<u8> {
             match self {
-                Self::AddressInsufficientBalance(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
                 Self::EnforcedPause(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::ExpectedPause(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::FailedInnerCall(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::NoCollateralToWithdraw(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::NotEnoughBalance(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::ReentrancyError(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::RevertString(s) => ::ethers::core::abi::AbiEncode::encode(s),
             }
@@ -405,23 +366,18 @@ pub mod subnet_actor_reward_facet {
         fn valid_selector(selector: [u8; 4]) -> bool {
             match selector {
                 [0x08, 0xc3, 0x79, 0xa0] => true,
-                _ if selector
-                    == <AddressInsufficientBalance as ::ethers::contract::EthError>::selector() =>
-                {
-                    true
-                }
                 _ if selector == <EnforcedPause as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector == <ExpectedPause as ::ethers::contract::EthError>::selector() => {
                     true
                 }
-                _ if selector == <FailedInnerCall as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
                 _ if selector
                     == <NoCollateralToWithdraw as ::ethers::contract::EthError>::selector() =>
                 {
+                    true
+                }
+                _ if selector == <NotEnoughBalance as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector == <ReentrancyError as ::ethers::contract::EthError>::selector() => {
@@ -434,11 +390,10 @@ pub mod subnet_actor_reward_facet {
     impl ::core::fmt::Display for SubnetActorRewardFacetErrors {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::AddressInsufficientBalance(element) => ::core::fmt::Display::fmt(element, f),
                 Self::EnforcedPause(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ExpectedPause(element) => ::core::fmt::Display::fmt(element, f),
-                Self::FailedInnerCall(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NoCollateralToWithdraw(element) => ::core::fmt::Display::fmt(element, f),
+                Self::NotEnoughBalance(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ReentrancyError(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RevertString(s) => ::core::fmt::Display::fmt(s, f),
             }
@@ -447,11 +402,6 @@ pub mod subnet_actor_reward_facet {
     impl ::core::convert::From<::std::string::String> for SubnetActorRewardFacetErrors {
         fn from(value: String) -> Self {
             Self::RevertString(value)
-        }
-    }
-    impl ::core::convert::From<AddressInsufficientBalance> for SubnetActorRewardFacetErrors {
-        fn from(value: AddressInsufficientBalance) -> Self {
-            Self::AddressInsufficientBalance(value)
         }
     }
     impl ::core::convert::From<EnforcedPause> for SubnetActorRewardFacetErrors {
@@ -464,14 +414,14 @@ pub mod subnet_actor_reward_facet {
             Self::ExpectedPause(value)
         }
     }
-    impl ::core::convert::From<FailedInnerCall> for SubnetActorRewardFacetErrors {
-        fn from(value: FailedInnerCall) -> Self {
-            Self::FailedInnerCall(value)
-        }
-    }
     impl ::core::convert::From<NoCollateralToWithdraw> for SubnetActorRewardFacetErrors {
         fn from(value: NoCollateralToWithdraw) -> Self {
             Self::NoCollateralToWithdraw(value)
+        }
+    }
+    impl ::core::convert::From<NotEnoughBalance> for SubnetActorRewardFacetErrors {
+        fn from(value: NotEnoughBalance) -> Self {
+            Self::NotEnoughBalance(value)
         }
     }
     impl ::core::convert::From<ReentrancyError> for SubnetActorRewardFacetErrors {

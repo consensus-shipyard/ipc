@@ -226,8 +226,8 @@ else
 fi
 
 # Prepare code repo
+echo "$DASHES Preparing ipc repo..."
 if ! $local_deploy ; then
-  echo "$DASHES Preparing ipc repo..."
   dir=$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")
   source "$dir/ssh_util.sh"
   setup_ssh_config
@@ -244,6 +244,9 @@ if ! $local_deploy ; then
   git submodule sync
   git submodule update --init --recursive
   revert_gitmodules
+else
+  git submodule sync
+  git submodule update --init --recursive
 fi
 
 # Stop prometheus
@@ -264,7 +267,10 @@ cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=loki \
     loki-destroy
 
-# shut down any existing validator nodes
+# Kill existing relayer if there's one
+pkill -fe "relayer" 2>/dev/null || pgrep -f "relayer" | xargs kill 2>/dev/null || true
+
+# Shut down any existing validator nodes
 if [ -e "${IPC_CONFIG_FOLDER}/config.toml" ]; then
     subnet_id=$(toml get -r "${IPC_CONFIG_FOLDER}"/config.toml 'subnets[1].id')
     echo "Existing subnet id: $subnet_id"
@@ -289,7 +295,7 @@ if ! $local_deploy ; then
   cp "$HOME"/evm_keystore.json "$IPC_CONFIG_FOLDER"
   cp "$IPC_FOLDER"/scripts/deploy_subnet/.ipc-cal/config.toml "$IPC_CONFIG_FOLDER"
 else
-  echo "$DASHES using local net config $DASHES"
+  echo "$DASHES using localnet config $DASHES"
   cp "$IPC_FOLDER"/scripts/deploy_subnet/.ipc-local/config.toml "$IPC_CONFIG_FOLDER"
 fi
 cp "$IPC_FOLDER"/infra/prometheus/prometheus.yaml "$IPC_CONFIG_FOLDER"
@@ -301,7 +307,7 @@ if [[ -z ${SKIP_BUILD+x} || "$SKIP_BUILD" == "" || "$SKIP_BUILD" == "false" ]]; 
   # Build contracts
   echo "$DASHES Building ipc contracts..."
   cd "${IPC_FOLDER}"/contracts
-  make build
+  make gen
 
   # Build ipc-cli
   echo "$DASHES Building ipc-cli..."
@@ -317,10 +323,9 @@ if [[ -z ${SKIP_BUILD+x} || "$SKIP_BUILD" == "" || "$SKIP_BUILD" == "false" ]]; 
   fi
 fi
 
-
 if [[ $local_deploy = true ]]; then
   # note: the subnet hasn't been created yet, but it's always the same value and we need it for the docker network name
-  subnet_id="/r31337/t410f6dl55afbyjbpupdtrmedyqrnmxdmpk7rxuduafq"
+  subnet_id="/r31337/t410fkzrz3mlkyufisiuae3scumllgalzuu3wxlxa2ly"
   cd "$IPC_FOLDER"
   cargo make --makefile infra/fendermint/Makefile.toml \
       -e NODE_NAME=anvil \
@@ -391,27 +396,24 @@ do
 done
 
 # Update IPC config file with parent auth token
-toml set "${IPC_CONFIG_FOLDER}"/config.toml 'subnets[0].config.auth_token' "$PARENT_HTTP_AUTH_TOKEN" > /tmp/config.toml.0
-cp /tmp/config.toml.0 "${IPC_CONFIG_FOLDER}"/config.toml
+if ! $local_deploy ; then
+  toml set "${IPC_CONFIG_FOLDER}"/config.toml 'subnets[0].config.auth_token' "$PARENT_HTTP_AUTH_TOKEN" > /tmp/config.toml.0
+  cp /tmp/config.toml.0 "${IPC_CONFIG_FOLDER}"/config.toml
+fi
 
 # Deploy IPC contracts
 if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; then
   echo "$DASHES Deploying new IPC contracts..."
   cd "${IPC_FOLDER}"/contracts
-  npm install
+  rm -rf deployments/localnet
 
-  if ! $local_deploy ; then
-    export RPC_URL=https://calibration.filfox.info/rpc/v1
-  else 
-    export RPC_URL=http://localhost:8545
-  fi
+  rpc_url=$(if $local_deploy; then echo "http://localhost:8545"; else echo "https://calibration.filfox.info/rpc/v1"; fi)
   pk=$(cat "${IPC_CONFIG_FOLDER}"/validator_0.sk)
-  export PRIVATE_KEY=$pk
 
   if ! $local_deploy ; then
-    deploy_contracts_output=$(make deploy-ipc NETWORK=calibrationnet)
+    deploy_contracts_output=$(PRIVATE_KEY="${pk}" RPC_URL="${rpc_url}" make deploy-stack NETWORK=calibrationnet)
   else
-    deploy_contracts_output=$(make deploy-ipc NETWORK=localnet)
+    deploy_contracts_output=$(PRIVATE_KEY="${pk}" RPC_URL="${rpc_url}" make deploy-stack NETWORK=localnet)
   fi
 
   echo "$DASHES deploy contracts output $DASHES"
@@ -419,12 +421,12 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
   echo "$deploy_contracts_output"
   echo ""
 
-  PARENT_GATEWAY_ADDRESS=$(echo "$deploy_contracts_output" | grep '"Gateway"' | awk -F'"' '{print $4}')
-  PARENT_REGISTRY_ADDRESS=$(echo "$deploy_contracts_output" | grep '"SubnetRegistry"' | awk -F'"' '{print $4}')
+  PARENT_GATEWAY_ADDRESS=$(echo "$deploy_contracts_output" | grep 'GatewayDiamond' | awk 'NR==2 {printf "%s", $NF}')
+  PARENT_REGISTRY_ADDRESS=$(echo "$deploy_contracts_output" | grep 'SubnetRegistryDiamond' | awk 'NR==2 {printf "%s", $NF}')
 
   if [ $local_deploy == true ]; then
     cd "${IPC_FOLDER}/hoku-contracts"
-    # need to run clean or we hit upgradeable saftey validation errors resulting
+    # need to run clean or we hit upgradeable safety validation errors resulting
     # from contracts with the same name 
     forge clean
 
@@ -445,11 +447,9 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
     SUPPLY_SOURCE_ADDRESS=$(echo "$deploy_supply_source_token_out" | sed -n 's/.*contract Hoku *\([^ ]*\).*/\1/p')
 
     # fund the all anvil accounts with 10100 HOKU (note the extra 100 HOKU)
-    # TODO: the `ipc-cli` appears to require a 10**18 HOKU to map to 1 sHOKU. this isn't ideal because
-    # that means we need to mint 10**18 more HOKU than we want. the `hoku` CLI does something a 
+    # note: the `ipc-cli` uses 10**18 HOKU to map to 1 subnet HOKU. the `hoku` CLI does something a 
     # bit similarly—but it converts the amount internally. for example, these are the same:
     # `hoku account deposit 10000` vs `ipc-cli cross-msg ... 10000000000000000000000`
-    # but in reality, we shouldn't assume 10**18 (explicitly or implicity) for erc20 supply source
     token_amount="10100000000000000000000"
     for i in {0..9}
     do
@@ -477,7 +477,7 @@ bottomup_check_period=600
 if [[ $local_deploy = true ]]; then
   bottomup_check_period=10 # ~15 seconds on localnet
 fi
-create_subnet_output=$(ipc-cli subnet create --from "$default_wallet_address" --parent "$root_id" --min-validators 2 --min-validator-stake 1 --bottomup-check-period "${bottomup_check_period}" --active-validators-limit 3 --permission-mode federated --supply-source-kind erc20 --supply-source-address "$SUPPLY_SOURCE_ADDRESS" 2>&1)
+create_subnet_output=$(ipc-cli subnet create --from "$default_wallet_address" --parent "$root_id" --min-validators 2 --min-validator-stake 1 --bottomup-check-period "${bottomup_check_period}" --active-validators-limit 3 --permission-mode federated --supply-source-kind erc20 --supply-source-address "$SUPPLY_SOURCE_ADDRESS" --collateral-source-kind erc20 --collateral-source-address "$SUPPLY_SOURCE_ADDRESS" 2>&1)
 
 echo "$DASHES create subnet output $DASHES"
 echo
@@ -503,10 +503,12 @@ fi
 
 # Start the bootstrap validator node
 echo "$DASHES Start the first validator node as bootstrap"
-# Force a wait to make sure the subnet is confirmed as created in the parent contracts
-echo "Wait for deployment..."
-sleep 30
-echo "Finished waiting"
+if ! $local_deploy ; then
+  # Force a wait to make sure the subnet is confirmed as created in the parent contracts
+  echo "Wait for deployment..."
+  sleep 30
+  echo "Finished waiting"
+fi
 cd "${IPC_FOLDER}"
 
 bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
@@ -531,6 +533,7 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e PARENT_GATEWAY="${PARENT_GATEWAY_ADDRESS}" \
     -e FM_PULL_SKIP=1 \
     -e FM_LOG_LEVEL="${FM_LOG_LEVEL}" \
+    -e FM_LOG_DOMAINS="${FM_LOG_DOMAINS}" \
     child-validator 2>&1)
 echo "$bootstrap_output"
 bootstrap_node_id=$(echo "$bootstrap_output" | sed -n '/CometBFT node ID:/ {n;p;}' | tr -d "[:blank:]")
@@ -571,6 +574,7 @@ do
       -e PARENT_GATEWAY="${PARENT_GATEWAY_ADDRESS}" \
       -e FM_PULL_SKIP=1 \
       -e FM_LOG_LEVEL="${FM_LOG_LEVEL}" \
+      -e FM_LOG_DOMAINS="${FM_LOG_DOMAINS}" \
       child-validator
 done
 
@@ -623,17 +627,15 @@ do
 done
 
 # Test Prometheus endpoints
-echo
 echo "$DASHES Test Prometheus endpoints of validator nodes"
+curl -s -o /dev/null -w "%{http_code}" --location http://localhost:"${PROMETHEUS_HOST_PORT}"/graph
 echo
-curl --location http://localhost:"${PROMETHEUS_HOST_PORT}"/graph
 for i in {0..2}
 do
-  curl --location http://localhost:"${FENDERMINT_METRICS_HOST_PORTS[i]}"/metrics | grep succes
+  curl -s -o /dev/null -w "%{http_code}" --location http://localhost:"${FENDERMINT_METRICS_HOST_PORTS[i]}"/metrics
+  echo
 done
 
-# Kill existing relayer if there's one
-pkill -fe "relayer" 2>/dev/null || pgrep -f "relayer" | xargs kill 2>/dev/null || true
 # Start relayer
 # note: this command mutates the order of keys in the evm_keystore.json file. to
 # keep the accounts consistent for localnet usage (e.g., logging accounts, using
@@ -653,7 +655,7 @@ if [[ $local_deploy = true ]]; then
   echo "$DASHES Move account funds into subnet"
   # move 10000 HOKU to subnet (i.e., leave 100 HOKU on rootnet for
   # testing purposes)
-  # TODO: see comment above about why we're using 10**18 due 
+  # note: see comment above about why we're using 10**18 due 
   # to `ipc-cli` & `hoku` CLI's atto assumption
   token_amount="10000000000000000000000"
   for i in {0..9}
@@ -674,6 +676,19 @@ if [[ $local_deploy = true ]]; then
     sleep 5
   done
   echo "Deposited HOKU for test accounts"
+  # buy 5000 credits if the hoku CLI is installed
+  if [[ -n $(which hoku) ]]; then
+    echo "Buying credits for test accounts..."
+    credit_amount="5000"
+    for i in {0..9}
+    do
+      private_key=$(jq .["$i"].private_key < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
+      PRIVATE_KEY="${private_key}" NETWORK=localnet hoku credit buy "${credit_amount}"
+    done
+    echo "Bought subnet credits for test accounts"
+  else
+    echo "Hoku CLI not installed...skipping credit funding"
+  fi
   echo
   echo "${DASHES} Subnet setup complete ${DASHES}"
   echo
@@ -734,11 +749,15 @@ if [[ $local_deploy = true ]]; then
   echo "Account balances:"
   addr=$(jq .[0].address < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
   parent_native=$(cast balance --rpc-url http://localhost:"${ANVIL_HOST_PORT}" --ether "${addr}" | awk '{printf "%.2f", $1}')
-  parent_hoku=$(cast balance --rpc-url http://localhost:"${ANVIL_HOST_PORT}" --erc20 "${SUPPLY_SOURCE_ADDRESS}" "${addr}" | awk '{print $1}')
+  parent_hoku=$(cast balance --rpc-url http://localhost:"${ANVIL_HOST_PORT}" --erc20 "${SUPPLY_SOURCE_ADDRESS}" "${addr}" | awk '{printf "%.0f", $1 / 1000000000000000000}')
   subnet_native=$(cast balance --rpc-url http://localhost:"${ETHAPI_HOST_PORTS[0]}" --ether "${addr}" | awk '{printf "%.2f", $1}')
   echo "Parent native: ${parent_native%.*} ETH"
   echo "Parent HOKU:   ${parent_hoku%.*} HOKU"
-  echo "Subnet native: ${subnet_native%.*} sHOKU"
+  echo "Subnet native: ${subnet_native%.*} HOKU"
+  if [[ -n $(which hoku) ]]; then
+    credit_balance=$(NETWORK=localnet hoku credit balance --address "${addr}" | jq '.credit_free' | tr -d '"')
+    echo "Subnet credits: ${credit_balance}"
+  fi
   echo
   echo "Accounts:"
   for i in {0..9}

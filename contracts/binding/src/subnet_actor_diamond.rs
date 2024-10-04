@@ -59,6 +59,12 @@ pub mod subnet_actor_diamond {
                                 ),
                                 ::ethers::core::abi::ethabi::ParamType::Tuple(
                                     ::std::vec![
+                                        ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                        ::ethers::core::abi::ethabi::ParamType::Address,
+                                    ],
+                                ),
+                                ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                    ::std::vec![
                                         ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                         ::ethers::core::abi::ethabi::ParamType::Array(
                                             ::std::boxed::Box::new(
@@ -67,6 +73,7 @@ pub mod subnet_actor_diamond {
                                         ),
                                     ],
                                 ),
+                                ::ethers::core::abi::ethabi::ParamType::Address,
                             ],
                         ),
                         internal_type: ::core::option::Option::Some(
@@ -422,17 +429,6 @@ pub mod subnet_actor_diamond {
                     ],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("InvalidERC20Address"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "InvalidERC20Address",
-                            ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("InvalidMajorityPercentage"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
@@ -549,7 +545,7 @@ pub mod subnet_actor_diamond {
     pub static SUBNETACTORDIAMOND_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
         ::ethers::contract::Lazy::new(__abi);
     #[rustfmt::skip]
-    const __DEPLOYED_BYTECODE: &[u8] = b"`\x80`@R6`\x10W`\x0E`\x16V[\0[`\x0E`BV[`\x05T`\x01`\x01`\xA0\x1B\x03\x163\x14`@W`@Qc\xE7\xE6\x01\xDB`\xE0\x1B\x81R`\x04\x01`@Q\x80\x91\x03\x90\xFD[V[`\0\x805`\x01`\x01`\xE0\x1B\x03\x19\x16\x81R\x7F\x80n\x0C\xBB\x9F\xCE)k\xBC3jH\xF4+\xF1\xDB\xC6\x97\"\xD1\x8D\x90\xD6\xFEp[u\x82\xC2\xBBK\xD2` \x81\x90R`@\x90\x91 T\x81\x90`\x01`\x01`\xA0\x1B\x03\x16\x80`\xB8W`@Qc\n\x82\xDDs`\xE3\x1B\x81R`\x01`\x01`\xE0\x1B\x03\x19`\x005\x16`\x04\x82\x01R`$\x01`@Q\x80\x91\x03\x90\xFD[6`\0\x807`\0\x806`\0\x84Z\xF4=`\0\x80>\x80\x80\x15`\xD6W=`\0\xF3[=`\0\xFD\xFE\xA2dipfsX\"\x12 \x92;*@\x98\xD8\x01\xB3=\xB6B\0\x12\xA3\x8B\x7F\x88\x8D\x80=lc\xDA5\xB8hs'\xC9M\x07XdsolcC\0\x08\x1A\x003";
+    const __DEPLOYED_BYTECODE: &[u8] = b"`\x80`@R6\x15`\x87W`\0\x805`\x01`\x01`\xE0\x1B\x03\x19\x16\x80\x82R\x7F\x80n\x0C\xBB\x9F\xCE)k\xBC3jH\xF4+\xF1\xDB\xC6\x97\"\xD1\x8D\x90\xD6\xFEp[u\x82\xC2\xBBK\xD2` R`@\x90\x91 T`\x01`\x01`\xA0\x1B\x03\x16\x90\x81\x15`sW`\0\x80\x836\x82\x807\x816\x91Z\xF4=`\0\x80>\x15`nW=`\0\xF3[=`\0\xFD[c\n\x82\xDDs`\xE3\x1B`\0R`\x04R`$`\0\xFD[`\x05T`\x01`\x01`\xA0\x1B\x03\x163\x03`\x9AW\0[c\xE7\xE6\x01\xDB`\xE0\x1B`\0R`\x04`\0\xFD\xFE\xA2dipfsX\"\x12 \xA4\x92\x86k\x1F\x1B\xCD\x8C\x0B\x10\xF4\x13\x92]\x94\xE06\x0E\xA7\xD7\x89w\xC3:\xD8W(\xA8f\x0F\xB3\xBEdsolcC\0\x08\x1A\x003";
     /// The deployed bytecode of the contract.
     pub static SUBNETACTORDIAMOND_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes =
         ::ethers::core::types::Bytes::from_static(__DEPLOYED_BYTECODE);
@@ -841,19 +837,6 @@ pub mod subnet_actor_diamond {
     )]
     #[etherror(name = "InvalidCollateral", abi = "InvalidCollateral()")]
     pub struct InvalidCollateral;
-    ///Custom Error type `InvalidERC20Address` with signature `InvalidERC20Address()` and selector `0xedfc5056`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[etherror(name = "InvalidERC20Address", abi = "InvalidERC20Address()")]
-    pub struct InvalidERC20Address;
     ///Custom Error type `InvalidMajorityPercentage` with signature `InvalidMajorityPercentage()` and selector `0x75c3b427`
     #[derive(
         Clone,
@@ -984,7 +967,6 @@ pub mod subnet_actor_diamond {
         IncorrectFacetCutAction(IncorrectFacetCutAction),
         InitializationFunctionReverted(InitializationFunctionReverted),
         InvalidCollateral(InvalidCollateral),
-        InvalidERC20Address(InvalidERC20Address),
         InvalidMajorityPercentage(InvalidMajorityPercentage),
         InvalidPowerScale(InvalidPowerScale),
         InvalidSubmissionPeriod(InvalidSubmissionPeriod),
@@ -1078,11 +1060,6 @@ pub mod subnet_actor_diamond {
                 return Ok(Self::InvalidCollateral(decoded));
             }
             if let Ok(decoded) =
-                <InvalidERC20Address as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::InvalidERC20Address(decoded));
-            }
-            if let Ok(decoded) =
                 <InvalidMajorityPercentage as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::InvalidMajorityPercentage(decoded));
@@ -1157,9 +1134,6 @@ pub mod subnet_actor_diamond {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::InvalidCollateral(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::InvalidERC20Address(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
                 Self::InvalidMajorityPercentage(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1238,10 +1212,6 @@ pub mod subnet_actor_diamond {
                     true
                 }
                 _ if selector
-                    == <InvalidERC20Address as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
                     == <InvalidMajorityPercentage as ::ethers::contract::EthError>::selector() => {
                     true
                 }
@@ -1305,7 +1275,6 @@ pub mod subnet_actor_diamond {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::InvalidCollateral(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidERC20Address(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidMajorityPercentage(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidPowerScale(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidSubmissionPeriod(element) => ::core::fmt::Display::fmt(element, f),
@@ -1395,11 +1364,6 @@ pub mod subnet_actor_diamond {
     impl ::core::convert::From<InvalidCollateral> for SubnetActorDiamondErrors {
         fn from(value: InvalidCollateral) -> Self {
             Self::InvalidCollateral(value)
-        }
-    }
-    impl ::core::convert::From<InvalidERC20Address> for SubnetActorDiamondErrors {
-        fn from(value: InvalidERC20Address) -> Self {
-            Self::InvalidERC20Address(value)
         }
     }
     impl ::core::convert::From<InvalidMajorityPercentage> for SubnetActorDiamondErrors {
@@ -1513,6 +1477,21 @@ pub mod subnet_actor_diamond {
             Self::OwnershipTransferredFilter(value)
         }
     }
+    ///`Asset(uint8,address)`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct Asset {
+        pub kind: u8,
+        pub token_address: ::ethers::core::types::Address,
+    }
     ///`FacetCut(address,uint8,bytes4[])`
     #[derive(
         Clone,
@@ -1529,7 +1508,7 @@ pub mod subnet_actor_diamond {
         pub action: u8,
         pub function_selectors: ::std::vec::Vec<[u8; 4]>,
     }
-    ///`ConstructorParams(uint256,uint64,uint64,address,uint16,uint8,uint8,int8,uint8,(uint8,address),(uint64,address[]))`
+    ///`ConstructorParams(uint256,uint64,uint64,address,uint16,uint8,uint8,int8,uint8,(uint8,address),(uint8,address),(uint64,address[]),address)`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -1550,8 +1529,10 @@ pub mod subnet_actor_diamond {
         pub consensus: u8,
         pub power_scale: i8,
         pub permission_mode: u8,
-        pub supply_source: SupplySource,
+        pub supply_source: Asset,
+        pub collateral_source: Asset,
         pub parent_id: SubnetID,
+        pub validator_gater: ::ethers::core::types::Address,
     }
     ///`SubnetID(uint64,address[])`
     #[derive(
@@ -1567,20 +1548,5 @@ pub mod subnet_actor_diamond {
     pub struct SubnetID {
         pub root: u64,
         pub route: ::std::vec::Vec<::ethers::core::types::Address>,
-    }
-    ///`SupplySource(uint8,address)`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    pub struct SupplySource {
-        pub kind: u8,
-        pub token_address: ::ethers::core::types::Address,
     }
 }
