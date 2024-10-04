@@ -113,6 +113,7 @@ pub async fn launch_polling_syncer<T, C, P>(
     vote_tally: VoteTally,
     parent_client: Arc<P>,
     tendermint_client: C,
+    tx: tokio::sync::oneshot::Sender<bool>,
 ) -> anyhow::Result<()>
 where
     T: ParentFinalityStateQuery + Send + Sync + 'static,
@@ -157,6 +158,7 @@ where
         parent_client,
         query,
         tendermint_client,
+        tx,
     );
 
     Ok(())
@@ -170,6 +172,7 @@ fn start_syncing<T, C, P>(
     parent_proxy: Arc<P>,
     query: Arc<T>,
     tendermint_client: C,
+    tx: tokio::sync::oneshot::Sender<bool>,
 ) where
     T: ParentFinalityStateQuery + Send + Sync + 'static,
     C: tendermint_rpc::Client + Send + Sync + 'static,
@@ -179,11 +182,19 @@ fn start_syncing<T, C, P>(
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
     tokio::spawn(async move {
+        let max_proposal_range = config.max_proposal_range();
+
         let lotus_syncer =
             LotusParentSyncer::new(config, parent_proxy, view_provider, vote_tally, query)
                 .expect("");
 
         let mut tendermint_syncer = TendermintAwareSyncer::new(lotus_syncer, tendermint_client);
+
+        if let Err(e) = tendermint_syncer.init(max_proposal_range).await {
+            tracing::error!("cannot init tendermint syncer: {e}");
+            let _ = tx.send(false);
+            return;
+        }
 
         loop {
             interval.tick().await;
