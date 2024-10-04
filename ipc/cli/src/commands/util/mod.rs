@@ -4,7 +4,7 @@ use crate::{CommandLineHandler, GlobalArguments};
 
 use clap::{Args, Subcommand};
 
-use self::f4::{EthToF4Addr, EthToF4AddrArgs};
+use self::f4::{EthToF4Addr, EthToF4AddrArgs, F4ToEthAddr, F4ToEthAddrArgs};
 
 mod f4;
 
@@ -20,6 +20,7 @@ impl UtilCommandsArgs {
     pub async fn handle(&self, global: &GlobalArguments) -> anyhow::Result<()> {
         match &self.command {
             Commands::EthToF4Addr(args) => EthToF4Addr::handle(global, args).await,
+            Commands::F4ToEthAddr(args) => F4ToEthAddr::handle(global, args).await,
         }
     }
 }
@@ -27,4 +28,5 @@ impl UtilCommandsArgs {
 #[derive(Debug, Subcommand)]
 pub(crate) enum Commands {
     EthToF4Addr(EthToF4AddrArgs),
+    F4ToEthAddr(F4ToEthAddrArgs),
 }

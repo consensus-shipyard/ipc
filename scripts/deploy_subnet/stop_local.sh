@@ -6,7 +6,10 @@ dir=$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")
 IPC_FOLDER=$(readlink -f -- "$dir"/../..)
 subnet_id="/r31337/t410fkzrz3mlkyufisiuae3scumllgalzuu3wxlxa2ly"
 
-pkill -fe "relayer" 2>/dev/null || pgrep -f "relayer" | xargs kill 2>/dev/null || true
+cd "$IPC_FOLDER"
+cargo make --makefile infra/fendermint/Makefile.toml \
+    -e NODE_NAME=relayer \
+    relayer-destroy
 
 cd "$IPC_FOLDER"
 cargo make --makefile infra/fendermint/Makefile.toml \

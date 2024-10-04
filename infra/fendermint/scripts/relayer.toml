@@ -1,0 +1,34 @@
+[tasks.relayer-run]
+script = """
+docker run \
+  ${FLAGS} \
+  --name ${RELAYER_CONTAINER_NAME} \
+  --init \
+  --user $(id -u) \
+  --network ${NETWORK_NAME} \
+  --volume ${HOME}/.ipc:/fendermint/.ipc \
+  --publish 127.0.0.1:${RELAYER_METRICS_HOST_PORT}:9184 \
+  --env IPC_CLI_CONFIG_PATH=/fendermint/.ipc/relayer.config.toml \
+  --env RUST_BACKTRACE=1 \
+  --env RUST_LOG=${RELAYER_LOG_LEVEL} \
+  ${FM_DOCKER_IMAGE} \
+  ${CMD} \
+  checkpoint relayer --subnet ${SUBNET_ID} --submitter ${RELAYER_SUBMITTER} --metrics-address 0.0.0.0:9184
+"""
+dependencies = ["docker-network-create"]
+
+[tasks.relayer-start]
+extend = "relayer-run"
+env = { "CMD" = "ipc-cli", "FLAGS" = "-d" }
+
+[tasks.relayer-stop]
+env = { "CONTAINER_NAME" = "${RELAYER_CONTAINER_NAME}" }
+run_task = "docker-stop"
+
+[tasks.relayer-destroy]
+env = { "CONTAINER_NAME" = "${RELAYER_CONTAINER_NAME}" }
+run_task = "docker-destroy"
+
+[tasks.relayer-logs]
+extend = "docker-logs"
+env = { "CONTAINER_NAME" = "${RELAYER_CONTAINER_NAME}" }

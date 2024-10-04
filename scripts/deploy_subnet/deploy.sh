@@ -24,6 +24,11 @@ if ! $local_deploy ; then
     exit 1
   fi
 
+  if [[ -z "${VALIDATOR_GATER_ADDRESS:-}" ]]; then
+    echo "VALIDATOR_GATER_ADDRESS is not set"
+    exit 1
+  fi
+
   if [[ -z "${PARENT_HTTP_AUTH_TOKEN:-}" ]]; then
     echo "PARENT_HTTP_AUTH_TOKEN is not set"
     exit 1
@@ -32,6 +37,7 @@ if ! $local_deploy ; then
 else
   # For local deployment, we'll set these variables later
   SUPPLY_SOURCE_ADDRESS=""
+  VALIDATOR_GATER_ADDRESS=""
   PARENT_HTTP_AUTH_TOKEN=""
   PARENT_AUTH_FLAG=""
 fi
@@ -60,7 +66,6 @@ echo "FM_LOG_LEVEL $FM_LOG_LEVEL"
 echo "FM_LOG_DOMAINS $FM_LOG_DOMAINS"
 
 wallet_addresses=()
-public_keys=()
 CMT_P2P_HOST_PORTS=(26656 26756 26856)
 CMT_RPC_HOST_PORTS=(26657 26757 26857)
 ETHAPI_HOST_PORTS=(8645 8745 8845)
@@ -76,6 +81,7 @@ PROMETHEUS_HOST_PORT=9090
 LOKI_HOST_PORT=3100
 GRAFANA_HOST_PORT=3000
 ANVIL_HOST_PORT=8545
+RELAYER_METRICS_HOST_PORT=9187
 
 if [[ -z ${PARENT_ENDPOINT+x} ]]; then
   if [[ $local_deploy == true ]]; then
@@ -253,6 +259,12 @@ else
   git submodule update --init --recursive
 fi
 
+# Stop relayer
+cd "$IPC_FOLDER"
+cargo make --makefile infra/fendermint/Makefile.toml \
+    -e NODE_NAME=relayer \
+    relayer-destroy
+
 # Stop prometheus
 cd "$IPC_FOLDER"
 cargo make --makefile infra/fendermint/Makefile.toml \
@@ -270,9 +282,6 @@ cd "$IPC_FOLDER"
 cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=loki \
     loki-destroy
-
-# Kill existing relayer if there's one
-pkill -fe "relayer" 2>/dev/null || pgrep -f "relayer" | xargs kill 2>/dev/null || true
 
 # Shut down any existing validator nodes
 if [ -e "${IPC_CONFIG_FOLDER}/config.toml" ]; then
@@ -368,7 +377,7 @@ if [[ $local_deploy = true ]]; then
     0x976ea74026e726554db657fa54763abd0c3a0aa9
     0x14dc79964da2c08b23698b3d3cc7ca32193d9955
     0x23618e81e3f5cdf7f54c3d65f7fbc0abf5b21e8f
-    0xa0ee7a142d267c1f36714e4a8f75612f20a79720  
+    0xa0ee7a142d267c1f36714e4a8f75612f20a79720
   )
   evm_keystore_json=$(jq -n '[]')
   for ((i=0; i<${#anvil_private_keys[@]}; i++))
@@ -385,8 +394,6 @@ do
   addr=$(jq .["$i"].address < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
   wallet_addresses+=("$addr")
   echo "Wallet $i address: $addr"
-  pk=$(ipc-cli wallet pub-key --wallet-type evm --address "$addr" | tr -d '"')
-  public_keys+=("$pk")
 done
 
 default_wallet_address=${wallet_addresses[0]}
@@ -438,11 +445,10 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
       forge install
     fi
 
-    # use the same account validator 0th account to deploy contracts
-    # TODO: should we dockerize this command?
+    # use the same account validator 0th account to deploy supply source token
     deploy_supply_source_token_out="$(PRIVATE_KEY="0x${pk}" forge script script/Hoku.s.sol --tc DeployScript 0 --sig 'run(uint8)' --rpc-url "http://localhost:${ANVIL_HOST_PORT}" --broadcast -vv)"
 
-    echo "$DASHES deploy suppply source token output $DASHES"
+    echo "$DASHES deploy supply source token output $DASHES"
     echo ""
     echo "$deploy_supply_source_token_out"
     echo ""
@@ -461,12 +467,34 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
       cast send "$SUPPLY_SOURCE_ADDRESS" "mint(address,uint256)" "$addr" "$token_amount" --rpc-url "http://localhost:${ANVIL_HOST_PORT}" --private-key "$pk"
     done
     echo "Funded accounts with HOKU on anvil rootnet"
+
+    # the subnet address for localnet is t410fkzrz3mlkyufisiuae3scumllgalzuu3wxlxa2ly, which has the below hex value
+    subnet_route="[0x56639dB16Ac50A89228026e42a316B30179A5376]"
+    # use the same account validator 0th account to deploy validator gater
+    deploy_validator_gater_token_out="$(PRIVATE_KEY="0x${pk}" forge script script/ValidatorGater.s.sol --tc DeployScript 0 31337 "$subnet_route" --sig 'run(uint8,uint64,address[])' --rpc-url "http://localhost:${ANVIL_HOST_PORT}" --broadcast -vv)"
+
+    echo "$DASHES deploy validator gater output $DASHES"
+    echo ""
+    echo "$deploy_validator_gater_token_out"
+    echo ""
+    # note: this is consistently going to be
+    # 0x851356ae760d987E095750cCeb3bC6014560891C for localnet
+    VALIDATOR_GATER_ADDRESS=$(echo "$deploy_validator_gater_token_out" | sed -n 's/.*contract ValidatorGater *\([^ ]*\).*/\1/p')
+
+    # approve each validator to stake in the anvil rootnet
+    for i in {0..2}
+    do
+      # approved power min 1 HOKU max 10 HOKU
+      cast send "$VALIDATOR_GATER_ADDRESS" "approve(address,uint256,uint256)" "${wallet_addresses[i]}" 1000000000000000000 100000000000000000000 --rpc-url "http://localhost:${ANVIL_HOST_PORT}" --private-key "$pk"
+    done
+    echo "Approved validators to stake on anvil rootnet"
   fi
   cd "$IPC_FOLDER"
 fi
 echo "Parent gateway address: $PARENT_GATEWAY_ADDRESS"
 echo "Parent registry address: $PARENT_REGISTRY_ADDRESS"
 echo "Parent supply source address: $SUPPLY_SOURCE_ADDRESS"
+echo "Parent validator gater address: $VALIDATOR_GATER_ADDRESS"
 
 # Use the parent gateway and registry address to update IPC config file
 toml set "${IPC_CONFIG_FOLDER}"/config.toml 'subnets[0].config.gateway_addr' "$PARENT_GATEWAY_ADDRESS" > /tmp/config.toml.1
@@ -481,7 +509,19 @@ bottomup_check_period=600
 if [[ $local_deploy = true ]]; then
   bottomup_check_period=10 # ~15 seconds on localnet
 fi
-create_subnet_output=$(ipc-cli subnet create --from "$default_wallet_address" --parent "$root_id" --min-validators 2 --min-validator-stake 1 --bottomup-check-period "${bottomup_check_period}" --active-validators-limit 3 --permission-mode federated --supply-source-kind erc20 --supply-source-address "$SUPPLY_SOURCE_ADDRESS" --collateral-source-kind erc20 --collateral-source-address "$SUPPLY_SOURCE_ADDRESS" 2>&1)
+create_subnet_output=$(ipc-cli subnet create \
+    --from "$default_wallet_address" \
+    --parent "$root_id" --min-validators 3 \
+    --min-validator-stake 1 \
+    --bottomup-check-period "${bottomup_check_period}" \
+    --active-validators-limit 4 \
+    --permission-mode collateral \
+    --supply-source-kind erc20 \
+    --supply-source-address "$SUPPLY_SOURCE_ADDRESS" \
+    --validator-gater "$VALIDATOR_GATER_ADDRESS" \
+    --collateral-source-kind erc20 \
+    --collateral-source-address "$SUPPLY_SOURCE_ADDRESS" \
+    2>&1)
 
 echo "$DASHES create subnet output $DASHES"
 echo
@@ -489,16 +529,34 @@ echo "$create_subnet_output"
 echo
 
 subnet_id=$(echo "$create_subnet_output" | sed -n 's/.*with id: *\([^ ]*\).*/\1/p')
-echo "Created new subnet id: $subnet_id"
+subnet_f4_addr=$(echo "$subnet_id" | sed 's|.*/||')
+subnet_eth_addr=$(ipc-cli util f4-to-eth-addr --addr "$subnet_f4_addr" | sed -n 's/.*\(0x[0-9a-fA-F]\{40\}\).*/\1/p')
+echo "Created new subnet id: $subnet_id ($subnet_eth_addr)"
 
 # Use the new subnet ID to update IPC config file
 toml set "${IPC_CONFIG_FOLDER}"/config.toml 'subnets[1].id' "$subnet_id" > /tmp/config.toml.3
 cp /tmp/config.toml.3 "${IPC_CONFIG_FOLDER}"/config.toml
 
-# Set federated power
-ipc-cli subnet set-federated-power --from "$default_wallet_address" --subnet "$subnet_id" --validator-addresses "${wallet_addresses[@]}" --validator-pubkeys "${public_keys[@]}" --validator-power 1 1 1
+if ! $local_deploy ; then
+  # Force a wait to make sure the subnet is confirmed as created in the parent contracts
+  echo "Wait for deployment..."
+  sleep 30
+  echo "Finished waiting"
+fi
+
+echo "$DASHES Join subnet for validators $DASHES"
+for i in {0..2}
+do
+  echo "Joining subnet ${subnet_id} for validator ${wallet_addresses[i]}"
+  # Approve subnet contract to lock up to 10 HOKU from collateral contract (which is also the supply source contract)
+  vpk=$(cat "${IPC_CONFIG_FOLDER}"/validator_"$i".sk)
+  cast send "$SUPPLY_SOURCE_ADDRESS" "approve(address,uint256)" "$subnet_eth_addr" 10000000000000000000 --private-key "$vpk"
+  # Join and stake 10 HOKU
+  ipc-cli subnet join --from "${wallet_addresses[i]}" --subnet "$subnet_id" --collateral 10
+done
 
 if [[ -z ${SKIP_BUILD+x} || "$SKIP_BUILD" == "" || "$SKIP_BUILD" == "false" ]]; then
+  echo "$DASHES Building new fendermint docker image $DASHES"
   # Rebuild fendermint docker
   cd "${IPC_FOLDER}"/fendermint
   make clean
@@ -507,14 +565,7 @@ fi
 
 # Start the bootstrap validator node
 echo "$DASHES Start the first validator node as bootstrap"
-if ! $local_deploy ; then
-  # Force a wait to make sure the subnet is confirmed as created in the parent contracts
-  echo "Wait for deployment..."
-  sleep 30
-  echo "Finished waiting"
-fi
 cd "${IPC_FOLDER}"
-
 bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=validator-0 \
     -e PRIVATE_KEY_PATH="${IPC_CONFIG_FOLDER}"/validator_0.sk \
@@ -642,17 +693,20 @@ done
 
 # Start relayer
 # note: this command mutates the order of keys in the evm_keystore.json file. to
-# keep the accounts consistent for localnet usage (e.g., logging accounts, using
+# keep the accounts consistent for usage (e.g., logging accounts, using
 # validator keys, etc.), we temporarily copy the file and then restore it.
 echo "$DASHES Start relayer process (in the background)"
-if [[ $local_deploy = true ]]; then
-  temp_evm_keystore=$(jq . "${IPC_CONFIG_FOLDER}"/evm_keystore.json)
-  nohup ipc-cli checkpoint relayer --subnet "$subnet_id" --submitter "$default_wallet_address" > relayer.log &
-  sleep 3 # briefly wait for the relayer to start
-  echo "$temp_evm_keystore" > "${IPC_CONFIG_FOLDER}"/evm_keystore.json
-else
-  nohup ipc-cli checkpoint relayer --subnet "$subnet_id" --submitter "$default_wallet_address" > relayer.log &
-fi
+toml set "${IPC_CONFIG_FOLDER}"/config.toml 'subnets[0].config.provider_http' 'http://anvil:8545' > /tmp/config.toml.4
+toml set /tmp/config.toml.4 'subnets[1].config.provider_http' 'http://validator-0-ethapi:8545' > "${IPC_CONFIG_FOLDER}"/relayer.config.toml
+temp_evm_keystore=$(jq . "${IPC_CONFIG_FOLDER}"/evm_keystore.json)
+cargo make --makefile infra/fendermint/Makefile.toml \
+    -e NODE_NAME=relayer \
+    -e SUBNET_ID="$subnet_id" \
+    -e RELAYER_SUBMITTER="${default_wallet_address}" \
+    -e RELAYER_METRICS_HOST_PORT="${RELAYER_METRICS_HOST_PORT}" \
+    relayer-start
+sleep 3 # briefly wait for the relayer to start
+echo "$temp_evm_keystore" > "${IPC_CONFIG_FOLDER}"/evm_keystore.json
 
 # move localnet funds to subnet
 if [[ $local_deploy = true ]]; then
@@ -741,11 +795,12 @@ Grafana API:
 http://localhost:${GRAFANA_HOST_PORT}
 
 Contracts:
-Parent gateway:       ${PARENT_GATEWAY_ADDRESS}
-Parent registry:      ${PARENT_REGISTRY_ADDRESS}
-Parent supply source: ${SUPPLY_SOURCE_ADDRESS}
-Subnet gateway:       0x77aa40b105843728088c0132e43fc44348881da8
-Subnet registry:      0x74539671a1d2f1c8f200826baba665179f53a1b7
+Parent gateway:         ${PARENT_GATEWAY_ADDRESS}
+Parent registry:        ${PARENT_REGISTRY_ADDRESS}
+Parent supply source:   ${SUPPLY_SOURCE_ADDRESS}
+Parent validator gater: ${VALIDATOR_GATER_ADDRESS}
+Subnet gateway:         0x77aa40b105843728088c0132e43fc44348881da8
+Subnet registry:        0x74539671a1d2f1c8f200826baba665179f53a1b7
 EOF
 
 if [[ $local_deploy = true ]]; then
