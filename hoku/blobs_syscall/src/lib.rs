@@ -13,10 +13,7 @@ use iroh::blobs::Hash;
 use maybe_iroh::MaybeIroh;
 use num_traits::FromPrimitive;
 use once_cell::sync::Lazy;
-use tokio::{
-    spawn,
-    sync::{oneshot, Mutex},
-};
+use tokio::{spawn, sync::Mutex};
 
 pub mod hoku_kernel;
 
@@ -84,55 +81,36 @@ pub fn hash_get(
     let hash = Hash::from_bytes(hash_source(hash_bytes)?);
     let iroh = IROH_INSTANCE.clone();
 
-    // Create a channel to receive the result
-    let (tx, rx) = oneshot::channel();
-    spawn(async move {
-        // get the iroh client
-        let iroh_client = match iroh.lock().await.client().await {
-            Ok(client) => client,
-            Err(e) => {
-                tracing::error!(hash = ?hash, error = e.to_string(), "failed to initialize Iroh client");
-                return;
-            }
-        };
-        // get the size of the blob
-        let size = match iroh_client.blobs().read(hash).await {
-            Ok(blob) => blob.size(),
-            Err(e) => {
-                tracing::error!(hash = ?hash, error = e.to_string(), "failed to read blob size");
-                return;
-            }
-        };
-        // if blob is smaller than 65536 (max return size), return the whole blob
-        let length = std::cmp::min(size, 65536) as usize;
-        let blob_bytes = match iroh_client
-            .blobs()
-            .read_at_to_bytes(hash, offset as u64, Some(length - offset as usize))
-            .await
-        {
-            Ok(blob_bytes) => blob_bytes,
-            Err(e) => {
-                tracing::error!(hash = ?hash, error = e.to_string(), "failed to read blob");
-                return;
-            }
-        };
+    let blob_bytes = tokio::task::block_in_place(|| {
+        tokio::runtime::Handle::current().block_on(async {
+            let iroh_client = match iroh.lock().await.client().await {
+                Ok(client) => client,
+                Err(e) => {
+                    tracing::error!(hash = ?hash, error = e.to_string(), "failed to initialize Iroh client");
+                    return Err(syscall_error(HASHGET_SYSCALL_ERROR_CODE)(e));
+                }
+            };
 
-        if let Err(_) = tx.send(blob_bytes) {
-            tracing::error!(hash = ?hash, "failed to read blob bytes");
-        }
-    });
+            let blob = match iroh_client.blobs().read(hash).await {
+                Ok(blob) => blob,
+                Err(e) => {
+                    tracing::error!(hash = ?hash, error = e.to_string(), "failed to read blob");
+                    return Err(syscall_error(HASHGET_SYSCALL_ERROR_CODE)(e));
+                }
+            };
 
-    // Block and wait for the result
-    let blob_bytes = match tokio::task::block_in_place(|| rx.blocking_recv()) {
-        Ok(blob_bytes) => blob_bytes,
-        Err(e) => {
-            tracing::error!(hash = ?hash, error = e.to_string(), "failed to get blob bytes");
-            return Err(ExecutionError::Syscall(SyscallError::new(
-                ErrorNumber::from_u32(HASHGET_SYSCALL_ERROR_CODE).unwrap(),
-                e,
-            )));
-        }
-    };
+            let size = blob.size();
+            let length = std::cmp::min(size, 65536) as usize;
+
+            match iroh_client.blobs().read_at_to_bytes(hash, offset as u64, Some(length - offset as usize)).await {
+                Ok(bytes) => Ok(bytes),
+                Err(e) => {
+                    tracing::error!(hash = ?hash, error = e.to_string(), "failed to read blob bytes");
+                    Err(syscall_error(HASHGET_SYSCALL_ERROR_CODE)(e))
+                }
+            }
+        })
+    })?;
 
     // Convert Bytes to [u8; 65536], padding with zeros if necessary
     let mut result = [0u8; 65536];
