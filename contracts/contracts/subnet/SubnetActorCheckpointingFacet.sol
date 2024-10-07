@@ -47,11 +47,11 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
         // Commit in gateway to distribute rewards
         IGateway(s.ipcGatewayAddr).commitCheckpoint(checkpoint);
 
-        // Propagate the checkpoint to the parent
-        IGateway(s.ipcGatewayAddr).propagateAll();
-
         // confirming the changes in membership in the child
         LibStaking.confirmChange(checkpoint.nextConfigurationNumber);
+
+        // Propagate cross messages from checkpoint to other subnets
+        IGateway(s.ipcGatewayAddr).propagateAll();
     }
 
     /// @notice Checks whether the signatures are valid for the provided signatories and hash within the current validator set.
@@ -97,18 +97,12 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
         uint256 lastBottomUpCheckpointHeight = s.lastBottomUpCheckpointHeight;
         uint256 bottomUpCheckPeriod = s.bottomUpCheckPeriod;
 
-        console.log("lastBottomUpCheckpointHeight: %d", lastBottomUpCheckpointHeight);
-        console.log("bottomUpCheckPeriod: %d", bottomUpCheckPeriod);
-
         // cannot submit past bottom up checkpoint
         if (checkpoint.blockHeight <= lastBottomUpCheckpointHeight) {
             revert BottomUpCheckpointAlreadySubmitted();
         }
 
         uint256 nextCheckpointHeight = LibGateway.getNextEpoch(lastBottomUpCheckpointHeight, bottomUpCheckPeriod);
-
-        console.log("nextCheckpointHeight: %d", nextCheckpointHeight);
-        console.log("checkpoint.blockHeight: %d", checkpoint.blockHeight);
 
         if (checkpoint.blockHeight > nextCheckpointHeight) {
             revert CannotSubmitFutureCheckpoint();
