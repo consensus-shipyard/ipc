@@ -46,6 +46,9 @@ import {GatewayFacetsHelper} from "./helpers/GatewayFacetsHelper.sol";
 import {SubnetActorFacetsHelper} from "./helpers/SubnetActorFacetsHelper.sol";
 import {DiamondFacetsHelper} from "./helpers/DiamondFacetsHelper.sol";
 
+import {ValidatorRewardCommitment} from "../../contracts/reward/ValidatorReward.sol";
+
+
 struct TestSubnetDefinition {
     GatewayDiamond gateway;
     address gatewayAddr;
@@ -913,7 +916,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             blockHeight: h,
             blockHash: keccak256(abi.encode(h)),
             nextConfigurationNumber: nextConfigNum - 1,
-            msgs: new IpcEnvelope[](0)
+            msgs: new IpcEnvelope[](0),
+            validatorReward: ValidatorRewardCommitment({ commitment: bytes32(uint256(nextConfigNum))})
         });
 
         vm.deal(address(saDiamond), 100 ether);

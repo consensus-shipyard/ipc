@@ -3473,6 +3473,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_vm_validater_reward"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "cid",
+ "ethers",
+ "fendermint_crypto",
+ "fendermint_tracing",
+ "fendermint_vm_event",
+ "fvm_ipld_encoding",
+ "fvm_shared",
+ "hex",
+ "ipc-observability",
+ "serde",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
 name = "ff"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

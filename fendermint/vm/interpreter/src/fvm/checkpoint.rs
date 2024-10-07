@@ -110,6 +110,7 @@ where
         block_hash,
         next_configuration_number,
         msgs,
+        validatorReward: state.validator_reward().get_activities_summary()?.commitment(),
     };
 
     // Save the checkpoint in the ledger.
@@ -117,6 +118,8 @@ where
     gateway
         .create_bottom_up_checkpoint(state, checkpoint.clone(), &curr_power_table.0)
         .context("failed to store checkpoint")?;
+
+    state.validator_reward().purge_activities()?;
 
     // Figure out the power updates if there was some change in the configuration.
     let power_updates = if next_configuration_number == 0 {

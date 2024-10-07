@@ -65,25 +65,6 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
         address[] genesisBalanceKeys;
         /// @notice The validator gater, if address(0), no validator gating is performed
         address validatorGater;
-
-        /// BEGIN Validator Rewards.
-
-        /// @notice The validator rewarder.
-        /// If address(0), this subnet does not process activity summaries, but instead forwards them to the parent
-        /// network via bottom-up checkpoints.
-        /// If address(0), and this is the root network, summaries are discarded (> /dev/null).
-        /// TODO(rewarder): set this address correctly from the constructor.
-        address validatorRewarder;
-        /// @notice Summaries pending to be processed.
-        /// If the validator rewarder is non-zero, these denote summaries presentable at this level.
-        /// If the validator rewarder is zero, these summaries must be relayed upwards in the next bottom-up checkpoint.
-        /// Partitioned by subnet ID, in the sequence they must be presented.
-        /// TODO(rewarder): optimize this pair of data structures.
-        mapping(SubnetID => bytes32[]) pendingSummaries;
-        /// @notice Index over presentable summaries back to the subnet ID, so we can locate them quickly when they're presented.
-        /// Only used if the validator rewarder is non-zero.
-        /// TODO(rewarder): optimize this pair of data structures.
-        mapping(bytes32 => SubnetID) presentableSummaries;
     }
 
 library LibSubnetActorStorage {
