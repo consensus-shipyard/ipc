@@ -116,7 +116,7 @@ contract LibGatewayTest is Test {
         });
 
         vm.expectEmit(address(t));
-        emit LibGateway.NewTopDownMessage(childSubnetActor, expected);
+        emit LibGateway.NewTopDownMessage(childSubnetActor, expected, expected.toHash());
 
         t.applyMsg(childSubnet, crossMsg);
     }
@@ -371,7 +371,7 @@ contract LibGatewayTest is Test {
         });
 
         vm.expectEmit(address(t));
-        emit LibGateway.NewTopDownMessage(childSubnetActor, expected);
+        emit LibGateway.NewTopDownMessage(childSubnetActor, expected, expected.toHash());
 
         t.applyMsg(childSubnet, crossMsg);
     }
@@ -422,7 +422,7 @@ contract LibGatewayTest is Test {
 
         vm.deal(address(t), 1 ether);
         vm.expectEmit(address(t));
-        emit LibGateway.NewTopDownMessage(childSubnetActor, expected);
+        emit LibGateway.NewTopDownMessage(childSubnetActor, expected, expected.toHash());
 
         t.applyMsg(childSubnet, crossMsg);
     }
