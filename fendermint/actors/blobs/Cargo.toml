@@ -27,6 +27,7 @@ fendermint_actor_blobs_shared = { path = "./shared" }
 fendermint_actor_machine = { path = "../machine" }
 
 [dev-dependencies]
+fil_actor_eam = { workspace = true }
 fil_actors_evm_shared = { workspace = true }
 fil_actors_runtime = { workspace = true, features = [
     "test_utils",
