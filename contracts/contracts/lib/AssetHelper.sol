@@ -196,6 +196,15 @@ library AssetHelper {
         }
     }
 
+    // @notice Gets the balance of the account.
+    function balanceOf(Asset memory asset, address account) internal view returns (uint256 ret) {
+        if (asset.kind == AssetKind.Native) {
+            ret = account.balance;
+        } else if (asset.kind == AssetKind.ERC20) {
+            ret = IERC20(asset.tokenAddress).balanceOf(account);
+        }
+    }
+
     // @notice Makes the asset available for spending by the given spender, without actually sending it.
     // @return msgValue The amount of msg.value that needs to be sent along with the subsequent call that will _actually_ spend that asset.
     //                  Will be 0 if the asset is a token, since no native coins are to be sent.

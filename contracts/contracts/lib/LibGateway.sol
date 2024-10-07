@@ -28,11 +28,14 @@ library LibGateway {
 
     event MembershipUpdated(Membership);
     /// @dev subnet refers to the next "down" subnet that the `envelope.message.to` should be forwarded to.
-    event NewTopDownMessage(address indexed subnet, IpcEnvelope message);
+    event NewTopDownMessage(address indexed subnet, IpcEnvelope message, bytes32 indexed id);
     /// @dev event emitted when there is a new bottom-up message added to the batch.
-    event NewBottomUpMsg(uint256 indexed epoch);
+    /// @dev there is no need to emit the message itself, as the message is included in batch.
+    event NewBottomUpMessage(bytes32 indexed id);
     /// @dev event emitted when there is a new bottom-up message batch to be signed.
     event NewBottomUpMsgBatch(uint256 indexed epoch);
+    /// @dev event emmited when a message is stored in the postbox - to be propagated further.
+    event MessageStoredInPostbox(bytes32 indexed id);
 
     /// @notice returns the current bottom-up checkpoint
     /// @return exists - whether the checkpoint exists
@@ -250,7 +253,7 @@ library LibGateway {
         subnet.topDownNonce = topDownNonce + 1;
         subnet.circSupply += crossMessage.value;
 
-        emit NewTopDownMessage({subnet: subnetId.getAddress(), message: crossMessage});
+        emit NewTopDownMessage({subnet: subnetId.getAddress(), message: crossMessage, id: crossMessage.toHash()});
     }
 
     /// @notice Commits a new cross-net message to a message batch for execution
@@ -270,6 +273,7 @@ library LibGateway {
             batch.blockHeight = epoch;
             // we need to use push here to initialize the array.
             batch.msgs.push(crossMessage);
+            emit NewBottomUpMessage({id: crossMessage.toHash()});
             return;
         }
 
@@ -300,12 +304,14 @@ library LibGateway {
             // need to push here to avoid a copy from memory to storage
             batch.msgs.push(crossMessage);
 
-            LibGateway.storeBottomUpMsgBatch(newBatch);
+            LibGateway.storeBottomUpMsgBatch(newBatch);            
         } else {
             // we append the new message normally, and wait for the batch period
             // to trigger the cutting of the batch.
             batch.msgs.push(crossMessage);
         }
+
+        emit NewBottomUpMessage({id: crossMessage.toHash()});
     }
 
     /// @notice returns the subnet created by a validator
@@ -398,7 +404,7 @@ library LibGateway {
             console.log("--------- applyMsg - top down");
             // Note: there is no need to load the subnet, as a top-down application means that _we_ are the subnet.
             if (s.appliedTopDownNonce != crossMsg.nonce) {
-            console.log("--------- applyMsg - failed nonce. Want: %d, Got: %d", s.appliedTopDownNonce, crossMsg.nonce);
+                console.log("--------- applyMsg - failed nonce. Want: %d, Got: %d", s.appliedTopDownNonce, crossMsg.nonce);
                 sendReceipt(crossMsg, OutcomeType.SystemErr, abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Nonce));
                 return;
             }
@@ -423,6 +429,8 @@ library LibGateway {
             bytes32 cid = crossMsg.toHash();
             s.postboxKeys.add(cid);
             s.postbox[cid] = crossMsg;
+
+            emit MessageStoredInPostbox({id: cid});
             return;
         }
     

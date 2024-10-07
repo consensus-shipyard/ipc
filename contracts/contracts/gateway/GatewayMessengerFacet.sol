@@ -25,7 +25,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
     using EnumerableSet for EnumerableSet.Bytes32Set;
     
-    event MessagesPropagated(bytes32[] msgCids);
+    event MessagePropagatedFromPostbox(bytes32[] ids);
 
     /**
      * @dev Sends a general-purpose cross-message from the local subnet to the destination subnet.
@@ -86,10 +86,10 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
      */
     function propagateAll() external payable {
         uint256 keysLength = s.postboxKeys.length();
-        bytes32[] memory msgCids = new bytes32[](keysLength);
+        bytes32[] memory ids = new bytes32[](keysLength);
         for (uint256 i = 0; i < keysLength; ) {
             bytes32 msgCid = s.postboxKeys.at(i);
-            msgCids[i] = msgCid;
+            ids[i] = msgCid;
             _propagate(msgCid);
 
             unchecked {
@@ -98,7 +98,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
         }
 
         // Emit an event for off-chain monitoring
-        emit MessagesPropagated(msgCids);
+        emit MessagePropagatedFromPostbox({ids: ids});
     }
 
     /**
