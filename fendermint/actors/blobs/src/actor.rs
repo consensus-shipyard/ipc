@@ -68,8 +68,12 @@ impl BlobsActor {
     ) -> Result<CreditApproval, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let (from, actor_type) = resolve_external(rt, params.from)?;
-        let (origin, _) = resolve_external(rt, rt.message().origin())?;
-        let (caller, _) = resolve_external(rt, rt.message().caller())?;
+        let origin = resolve_external(rt, rt.message().origin())?.0;
+        let caller = if origin == rt.message().caller() {
+            origin
+        } else {
+            resolve_external(rt, rt.message().caller())?.0
+        };
         // Credit owner must be the transaction origin or caller
         if from != caller && from != origin {
             return Err(ActorError::illegal_argument(format!(
@@ -113,8 +117,12 @@ impl BlobsActor {
     fn revoke_credit(rt: &impl Runtime, params: RevokeCreditParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let (from, actor_type) = resolve_external(rt, params.from)?;
-        let (origin, _) = resolve_external(rt, rt.message().origin())?;
-        let (caller, _) = resolve_external(rt, rt.message().caller())?;
+        let origin = resolve_external(rt, rt.message().origin())?.0;
+        let caller = if origin == rt.message().caller() {
+            origin
+        } else {
+            resolve_external(rt, rt.message().caller())?.0
+        };
         // Credit owner must be the transaction origin or caller
         if from != caller && from != origin {
             return Err(ActorError::illegal_argument(format!(
@@ -586,8 +594,8 @@ mod tests {
         rt.set_origin(owner_id_addr);
         rt.expect_validate_caller_any();
         let approve_params = ApproveCreditParams {
-            from: owner_f4_eth_addr,
-            receiver: receiver_f4_eth_addr,
+            from: owner_id_addr,
+            receiver: receiver_id_addr,
             required_caller: None,
             limit: None,
             ttl: None,
