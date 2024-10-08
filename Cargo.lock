@@ -3138,7 +3138,6 @@ dependencies = [
  "blobs_actor_sdk",
  "fendermint_actor_blobs_shared",
  "fendermint_actor_machine",
- "fil_actor_eam",
  "fil_actors_evm_shared",
  "fil_actors_runtime",
  "fvm_ipld_blockstore",
