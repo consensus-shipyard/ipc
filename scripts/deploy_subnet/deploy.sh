@@ -511,7 +511,8 @@ if [[ $local_deploy = true ]]; then
 fi
 create_subnet_output=$(ipc-cli subnet create \
     --from "$default_wallet_address" \
-    --parent "$root_id" --min-validators 3 \
+    --parent "$root_id" \
+    --min-validators 2 \
     --min-validator-stake 1 \
     --bottomup-check-period "${bottomup_check_period}" \
     --active-validators-limit 4 \
