@@ -84,6 +84,7 @@ error MissingActivityCommitment();
 error ValidatorAlreadyClaimed();
 error InvalidActivityProof();
 error NotOwner();
+error CommonParentDoesNotExist();
 
 enum InvalidXnetMessageReason {
     Sender,
