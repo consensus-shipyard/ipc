@@ -96,13 +96,6 @@ where
 
     let num_msgs = msgs.len();
 
-    // TODO(rewards): query block producers for the blocks from the last checkpointed epoch to the current one.
-    // Ideally keep a live cache of block producers, append to it when new blocks are committed, and prune it when generating a checkpoint.
-    // But for now, we can try to keep it simple and query CometBFT, although that adds latency.
-    // If we do this, this method seems to be the quickest way: https://docs.cometbft.com/main/rpc/#/Info/block_search
-
-    // TODO(rewards): populate the ActivitySummary struct with the information above, and pass it to the create_bottom_up_checkpoint call.
-
     // Construct checkpoint.
     let checkpoint = BottomUpCheckpoint {
         subnet_id,

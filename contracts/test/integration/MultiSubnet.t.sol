@@ -45,7 +45,7 @@ import {SubnetActorFacetsHelper} from "../helpers/SubnetActorFacetsHelper.sol";
 
 import "forge-std/console.sol";
 
-import {ValidatorRewardCommitment} from "../../contracts/reward/ValidatorReward.sol";
+import {ActivityCommitment} from "../../contracts/activities/Activity.sol";
 
 contract MultiSubnetTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
@@ -1351,7 +1351,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: batch.msgs,
-            validatorReward: ValidatorRewardCommitment({ commitment: bytes32(0)})
+            activities: ActivityCommitment({ summary: bytes32(0)})
         });
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
@@ -1381,7 +1381,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            validatorReward: ValidatorRewardCommitment({ commitment: bytes32(0)})
+            activities: ActivityCommitment({ summary: bytes32(0)})
         });
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);

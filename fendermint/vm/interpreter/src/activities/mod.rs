@@ -1,6 +1,9 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+//! Tracks the current blockchain block mining activities and propagates to the parent subnet if
+//! needed.
+
 use std::collections::HashMap;
 use std::fmt::Debug;
 use fvm_shared::clock::ChainEpoch;

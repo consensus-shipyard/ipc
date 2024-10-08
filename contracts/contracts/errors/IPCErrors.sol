@@ -83,6 +83,7 @@ error ValidatorPowerChangeDenied();
 error CommitmentAlreadyInitialized();
 error SubnetNoTargetCommitment();
 error ValidatorAlreadyClaimed();
+error InvalidProof();
 
 
 enum InvalidXnetMessageReason {

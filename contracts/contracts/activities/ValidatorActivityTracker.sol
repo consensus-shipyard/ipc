@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-import {ValidatorSummary, ActivitySummary} from "./ValidatorReward.sol";
+import {ValidatorSummary, ActivitySummary} from "./Activity.sol";
 import {SystemContract} from "../lib/LibGatewayActorStorage.sol";
 
 
@@ -54,7 +54,7 @@ contract ValidatorActivityTracker is SystemContract {
 
     /// Reads the current validator summary and purge the data accordingly
     /// @dev Call this method only when bottom up checkpoint needs to be created
-    function purgeActivities() external systemActorOnly {
+    function purge_activities() external systemActorOnly {
         // prepare the activities
         uint256 num_validators = validators.length();
 

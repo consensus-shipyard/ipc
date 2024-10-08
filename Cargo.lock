@@ -2778,6 +2778,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_actor_activity_tracker"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cid",
+ "fil_actor_eam",
+ "fil_actors_evm_shared",
+ "fil_actors_runtime",
+ "frc42_dispatch",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
+ "fvm_shared",
+ "hex-literal 0.4.1",
+ "log",
+ "multihash 0.18.1",
+ "num-derive 0.3.3",
+ "num-traits",
+ "serde",
+]
+
+[[package]]
 name = "fendermint_actor_chainmetadata"
 version = "0.1.0"
 dependencies = [
@@ -3470,26 +3491,6 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "fendermint_vm_validater_reward"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "cid",
- "ethers",
- "fendermint_crypto",
- "fendermint_tracing",
- "fendermint_vm_event",
- "fvm_ipld_encoding",
- "fvm_shared",
- "hex",
- "ipc-observability",
- "serde",
- "thiserror",
- "tracing",
 ]
 
 [[package]]

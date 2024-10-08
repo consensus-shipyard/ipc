@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-/// The commitment for the validator rewards that child subnet submits to the parent subnet
+/// The commitments for the child subnet activities that should be submitted to the parent subnet
 /// together with a bottom up checkpoint
-struct ValidatorRewardCommitment {
-    /// The commitment for the parent subnet
-    bytes32 commitment;
+struct ActivityCommitment {
+    /// The activity summary for validators
+    bytes32 summary;
 
     // TODO: add relayed rewarder commitment
 }
