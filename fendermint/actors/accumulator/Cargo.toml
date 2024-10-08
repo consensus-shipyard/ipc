@@ -20,17 +20,17 @@ fvm_ipld_amt = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 fvm_shared = { workspace = true }
+log = { workspace = true, features = ["std"] }
 num-derive = { workspace = true }
 num-traits = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_tuple = { workspace = true }
+tracing = { workspace = true, features = ["log"] }
 
 fendermint_actor_machine = { path = "../machine" }
 
 [dev-dependencies]
-fil_actors_runtime = { workspace = true, features = [
-    "test_utils",
-] }
+fil_actors_runtime = { workspace = true, features = ["test_utils"] }
 
 [features]
 fil-actor = ["fil_actors_runtime/fil-actor"]
