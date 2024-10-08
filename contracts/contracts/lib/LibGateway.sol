@@ -8,7 +8,7 @@ import {SubnetID, Subnet, AssetKind, Asset} from "../structs/Subnet.sol";
 import {SubnetActorGetterFacet} from "../subnet/SubnetActorGetterFacet.sol";
 import {CallMsg, IpcMsgKind, IpcEnvelope, OutcomeType, BottomUpMsgBatch, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../structs/CrossNet.sol";
 import {Membership} from "../structs/Subnet.sol";
-import {CannotSendCrossMsgToItself, MethodNotAllowed, MaxMsgsPerBatchExceeded, InvalidXnetMessage ,OldConfigurationNumber, NotRegisteredSubnet, InvalidActorAddress, ParentFinalityAlreadyCommitted, InvalidXnetMessageReason} from "../errors/IPCErrors.sol";
+import {CannotSendCrossMsgToItself, MethodNotAllowed, MaxMsgsPerBatchExceeded, InvalidXnetMessage ,OldConfigurationNumber, NotRegisteredSubnet, InvalidActorAddress, ParentFinalityAlreadyCommitted, InvalidXnetMessageReason, CommonParentDoesNotExist} from "../errors/IPCErrors.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
@@ -261,6 +261,11 @@ library LibGateway {
     function commitBottomUpMsg(IpcEnvelope memory crossMessage) internal {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
         uint256 epoch = getNextEpoch(block.number, s.bottomUpCheckPeriod);
+
+        SubnetID memory commonParent = crossMessage.to.subnetId.commonParent(s.networkName);
+        if (commonParent.isEmpty()) {
+            revert CommonParentDoesNotExist();
+        }
 
         // assign nonce to the message.
         crossMessage.nonce = s.bottomUpNonce;
@@ -533,6 +538,7 @@ library LibGateway {
             reject = to.down(s.networkName).getActor().hasSupplyOfKind(AssetKind.ERC20);
         }
         if (reject) {
+            // TODO Karel - send receit here instead
             if (crossMessage.kind == IpcMsgKind.Transfer) {
                 revert MethodNotAllowed("propagation of `Transfer` messages not suppported for subnets with ERC20 supply");
             }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.23;
 
-import {NotEnoughBalance} from "../errors/IPCErrors.sol";
+import {NotEnoughBalance, InvalidSubnetActor} from "../errors/IPCErrors.sol";
 import {Asset, AssetKind} from "../structs/Subnet.sol";
 import {EMPTY_BYTES} from "../constants/Constants.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -145,6 +145,15 @@ library AssetHelper {
         return (success, ret);
     }
 
+    /// @notice Checks if the given address is a contract.
+    function isContract(address account) internal view returns (bool) {
+        uint256 size;
+        assembly {
+            size := extcodesize(account)
+        }
+        return size > 0;
+    }
+
     /// @dev Adaptation from implementation `openzeppelin-contracts/utils/Address.sol`
     /// that doesn't revert immediately in case of failure and merely notifies of the outcome.
     function functionCallWithValue(
@@ -154,6 +163,10 @@ library AssetHelper {
     ) internal returns (bool success, bytes memory) {
         if (address(this).balance < value) {
             revert NotEnoughBalance();
+        }
+
+        if (!isContract(target)) {
+            revert InvalidSubnetActor();
         }
 
         return target.call{value: value}(data);
