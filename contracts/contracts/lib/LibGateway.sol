@@ -237,23 +237,14 @@ library LibGateway {
 
     /// @notice commit topdown messages for their execution in the subnet. Adds the message to the subnet struct for future execution
     /// @param crossMessage - the cross message to be committed
-    function commitTopDownMsg(IpcEnvelope memory crossMessage) internal {
-        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
-        SubnetID memory subnetId = crossMessage.to.subnetId.down(s.networkName);
-
-        (bool registered, Subnet storage subnet) = getSubnet(subnetId);
-
-        if (!registered) {
-            revert NotRegisteredSubnet();
-        }
-
+    function commitTopDownMsg(Subnet storage subnet, IpcEnvelope memory crossMessage) internal {
         uint64 topDownNonce = subnet.topDownNonce;
 
         crossMessage.nonce = topDownNonce;
         subnet.topDownNonce = topDownNonce + 1;
         subnet.circSupply += crossMessage.value;
 
-        emit NewTopDownMessage({subnet: subnetId.getAddress(), message: crossMessage, id: crossMessage.toHash()});
+        emit NewTopDownMessage({subnet: subnet.id.getAddress(), message: crossMessage, id: crossMessage.toHash()});
     }
 
     /// @notice Commits a new cross-net message to a message batch for execution
@@ -261,11 +252,6 @@ library LibGateway {
     function commitBottomUpMsg(IpcEnvelope memory crossMessage) internal {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
         uint256 epoch = getNextEpoch(block.number, s.bottomUpCheckPeriod);
-
-        SubnetID memory commonParent = crossMessage.to.subnetId.commonParent(s.networkName);
-        if (commonParent.isEmpty()) {
-            revert CommonParentDoesNotExist();
-        }
 
         // assign nonce to the message.
         crossMessage.nonce = s.bottomUpNonce;
@@ -489,40 +475,13 @@ library LibGateway {
         commitCrossMessage(original.createResultMsg(outcomeType, ret));
     }
 
-    /**
-     * @notice Commit the cross message to storage.
-     *
-     * @dev It also validates that destination subnet ID is not empty
-     *      and not equal to the current network.
-     *      This function assumes that the funds inside `value` have been
-     *      conveniently minted or burnt already and the message is free to
-     *      use them (see execBottomUpMsgBatch for reference).
-     *  @param crossMessage The cross-network message to commit.
-     *  @return shouldBurn A Boolean that indicates if the input amount should be burned.
-     */
-    function commitCrossMessage(IpcEnvelope memory crossMessage) internal returns (bool shouldBurn) {
+    function commitCrossMessageFromCheckpoint(IpcEnvelope memory crossMessage) internal returns (bool shouldBurn) {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
         SubnetID memory to = crossMessage.to.subnetId;
-        if (to.isEmpty()) {
-            revert InvalidXnetMessage(InvalidXnetMessageReason.DstSubnet);
-        }
-        // destination is the current network, you are better off with a good old message, no cross needed
-        if (to.equals(s.networkName)) {
-            revert CannotSendCrossMsgToItself();
-        }
-
         SubnetID memory from = crossMessage.from.subnetId;
         IPCMsgType applyType = crossMessage.applyType(s.networkName);
         
         console.log("--- commitCrossMessage");
-
-        // Even if multi-level messaging is enabled, we reject the xnet message
-        // as soon as we learn that one of the networks involved use an ERC20 supply source.
-        // This will block propagation on the first step, or the last step.
-        //
-        // TODO IPC does not implement fault handling yet, so if the message fails
-        //  to propagate, the user won't be able to reclaim funds. That's one of the
-        //  reasons xnet messages are disabled by default.
 
         // TODO Karel - this needs to be fixed. It is possible now to have supply kind of ERC20.
         // only in case of a mismatch we want make sure we result the message with system error.
@@ -544,17 +503,30 @@ library LibGateway {
             }
         }
 
-        // Are we the LCA? (Lowest Common Ancestor)
-        bool isLCA = to.commonParent(from).equals(s.networkName);
+        commitCrossMessage(crossMessage);
+    }
+    
+    /**
+     * @notice Commit the cross message to storage.
+     *
+     * @dev It does not make any validations. They are assumed to be done before calling this function.
+     *  @param crossMessage The cross-network message to commit.
+     *  @return shouldBurn A Boolean that indicates if the input amount should be burned.
+     */
+    function commitCrossMessage(IpcEnvelope memory crossMessage) internal returns (bool shouldBurn) {
+        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
 
-        console.log("--- commitCrossMessage no reject");
+        SubnetID memory to = crossMessage.to.subnetId;
+        IPCMsgType applyType = crossMessage.applyType(s.networkName);
+        bool isLCA = to.commonParent(crossMessage.from.subnetId).equals(s.networkName);
 
         // If the directionality is top-down, or if we're inverting the direction
         // because we're the LCA, commit a top-down message.
         if (applyType == IPCMsgType.TopDown || isLCA) {
             console.log("--- commitCrossMessage top down");
             ++s.appliedTopDownNonce;
-            LibGateway.commitTopDownMsg(crossMessage);
+            (, Subnet storage subnet) = getSubnet(to.down(s.networkName));
+            LibGateway.commitTopDownMsg(subnet, crossMessage);
             return (shouldBurn = false);
         }
 
@@ -564,6 +536,7 @@ library LibGateway {
         // gas-opt: original check: value > 0
         return (shouldBurn = crossMessage.value != 0);
     }
+
 
     /**
      * @dev Performs transaction side-effects from the commitment of a cross-net message. Like
