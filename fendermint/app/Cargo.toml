@@ -51,7 +51,7 @@ fendermint_rocksdb = { path = "../rocksdb" }
 fendermint_rpc = { path = "../rpc" }
 fendermint_storage = { path = "../storage" }
 fendermint_tracing = { path = "../tracing" }
-fendermint_actor_gas_market = { path = "../actors/gas_market" }
+fendermint_actor_gas_market_eip1559 = { path = "../actors/gas_market/eip1559" }
 fendermint_vm_actor_interface = { path = "../vm/actor_interface" }
 fendermint_vm_core = { path = "../vm/core" }
 fendermint_vm_encoding = { path = "../vm/encoding" }

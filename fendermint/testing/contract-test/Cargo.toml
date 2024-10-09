@@ -45,4 +45,4 @@ bytes = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 multihash = { workspace = true }
 fvm = { workspace = true, features = ["testing"] }
-fendermint_actor_gas_market = { path = "../../actors/gas_market" }
+fendermint_actor_gas_market_eip1559 = { path = "../../actors/gas_market/eip1559" }

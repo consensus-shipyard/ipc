@@ -437,14 +437,14 @@ impl GenesisBuilder {
         let initial_base_fee = TokenAmount::from_atto(100);
         // We construct the actor state here for simplicity, but for better decoupling we should
         // be invoking the constructor instead.
-        let gas_market_state = fendermint_actor_gas_market::State {
+        let gas_market_state = fendermint_actor_gas_market_eip1559::State {
             base_fee: initial_base_fee,
             // If you need to customize the gas market constants, you can do so here.
-            constants: fendermint_actor_gas_market::Constants::default()
+            constants: fendermint_actor_gas_market_eip1559::Constants::default()
         };
         state
             .create_custom_actor(
-                fendermint_actor_gas_market::ACTOR_NAME,
+                fendermint_actor_gas_market_eip1559::ACTOR_NAME,
                 gas_market::GAS_MARKET_ACTOR_ID,
                 &gas_market_state,
                 TokenAmount::zero(),

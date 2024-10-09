@@ -5,7 +5,7 @@ mod staking;
 
 use anyhow::Context;
 use async_trait::async_trait;
-use fendermint_actor_gas_market::{Reading, SetConstants};
+fendermint_actor_gas_market_eip1559::{Reading, SetConstants};
 use fendermint_contract_test::Tester;
 use fendermint_crypto::{PublicKey, SecretKey};
 use fendermint_vm_actor_interface::eam::EthAddress;

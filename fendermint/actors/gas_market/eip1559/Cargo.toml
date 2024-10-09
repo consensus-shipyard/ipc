@@ -1,6 +1,6 @@
 [package]
-name = "fendermint_actor_gas_market"
-description = "Builtin transaction gas tracking actor for IPC"
+name = "fendermint_actor_gas_market_eip1559"
+description = "EIP-1559 gas market actor for IPC. Singleton actor to be deployed at ID 98."
 license.workspace = true
 edition.workspace = true
 authors.workspace = true

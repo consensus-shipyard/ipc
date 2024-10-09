@@ -3,9 +3,9 @@
 
 use crate::fvm::gas::{Available, CommitRet, Gas, GasMarket, GasUtilization};
 use crate::fvm::FvmMessage;
-use anyhow::{anyhow, Context};
+use anyhow::Context;
 
-use fendermint_actor_gas_market::{BlockGasUtilizationRet, Reading, SetConstants};
+use fendermint_actor_gas_market_eip1559::{Reading, SetConstants};
 use fendermint_crypto::PublicKey;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::gas_market::GAS_MARKET_ACTOR_ADDR;
@@ -65,7 +65,7 @@ impl ActorGasMarket {
             sequence: block_height as u64,
             // exclude this from gas restriction
             gas_limit: i64::MAX as u64,
-            method_num: fendermint_actor_gas_market::Method::CurrentReading as u64,
+            method_num: fendermint_actor_gas_market_eip1559::Method::CurrentReading as u64,
             params: fvm_ipld_encoding::RawBytes::default(),
             value: Default::default(),
             version: Default::default(),
@@ -80,9 +80,8 @@ impl ActorGasMarket {
             anyhow::bail!("failed to read gas market state: {}", err);
         }
 
-        let r =
-            fvm_ipld_encoding::from_slice::<Reading>(&apply_ret.msg_receipt.return_data)
-                .context("failed to parse gas market readying")?;
+        let r = fvm_ipld_encoding::from_slice::<Reading>(&apply_ret.msg_receipt.return_data)
+            .context("failed to parse gas market readying")?;
         Ok(r)
     }
 
@@ -162,7 +161,7 @@ impl ActorGasMarket {
             sequence: block_height as u64,
             // exclude this from gas restriction
             gas_limit: i64::MAX as u64,
-            method_num: fendermint_actor_gas_market::Method::SetConstants as u64,
+            method_num: fendermint_actor_gas_market_eip1559::Method::SetConstants as u64,
             params: fvm_ipld_encoding::RawBytes::serialize(constants)?,
             value: Default::default(),
             version: Default::default(),
@@ -181,7 +180,7 @@ impl ActorGasMarket {
     ) -> anyhow::Result<CommitRet> {
         let block_gas_used = self.block_gas_used.min(self.block_gas_limit);
         let params = fvm_ipld_encoding::RawBytes::serialize(
-            fendermint_actor_gas_market::Utilization { block_gas_used },
+            fendermint_actor_gas_market_eip1559::Utilization { block_gas_used },
         )?;
 
         let msg = FvmMessage {
@@ -190,7 +189,7 @@ impl ActorGasMarket {
             sequence: block_height as u64,
             // exclude this from gas restriction
             gas_limit: i64::MAX as u64,
-            method_num: fendermint_actor_gas_market::Method::UpdateUtilization as u64,
+            method_num: fendermint_actor_gas_market_eip1559::Method::UpdateUtilization as u64,
             params,
             value: Default::default(),
             version: Default::default(),
@@ -199,10 +198,8 @@ impl ActorGasMarket {
         };
 
         let apply_ret = self.apply_implicit_message(msg, executor)?;
-        let r = fvm_ipld_encoding::from_slice::<BlockGasUtilizationRet>(
-            &apply_ret.msg_receipt.return_data,
-        )
-        .context("failed to parse gas utilization result")?;
+        let r = fvm_ipld_encoding::from_slice::<Reading>(&apply_ret.msg_receipt.return_data)
+            .context("failed to parse gas utilization result")?;
         Ok(CommitRet {
             base_fee: r.base_fee,
         })

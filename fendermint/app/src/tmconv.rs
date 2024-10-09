@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! Conversions to Tendermint data types.
 use anyhow::{anyhow, bail, Context};
-use fendermint_actor_gas_market::SetConstants;
+use fendermint_actor_gas_market_eip1559::SetConstants;
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Power, Validator};
 use fendermint_vm_interpreter::fvm::{
