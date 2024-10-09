@@ -14,6 +14,8 @@ import {LibSubnetActor} from "../lib/LibSubnetActor.sol";
 import {Pausable} from "../lib/LibPausable.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 
+import "forge-std/Console.sol";
+
 contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard, Pausable {
     using EnumerableSet for EnumerableSet.AddressSet;
     using LibValidatorSet for ValidatorSet;
@@ -47,6 +49,9 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
 
         // confirming the changes in membership in the child
         LibStaking.confirmChange(checkpoint.nextConfigurationNumber);
+
+        // Propagate cross messages from checkpoint to other subnets
+        IGateway(s.ipcGatewayAddr).propagateAll();
     }
 
     /// @notice Checks whether the signatures are valid for the provided signatories and hash within the current validator set.

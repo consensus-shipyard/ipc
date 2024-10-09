@@ -13,12 +13,19 @@ import {AssetHelper} from "../lib/AssetHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
 
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+
+import "forge-std/console.sol";
+
 string constant ERR_GENERAL_CROSS_MSG_DISABLED = "Support for general-purpose cross-net messages is disabled";
 string constant ERR_MULTILEVEL_CROSS_MSG_DISABLED = "Support for multi-level cross-net messages is disabled";
 
 contract GatewayMessengerFacet is GatewayActorModifiers {
     using FilAddress for address payable;
     using SubnetIDHelper for SubnetID;
+    using EnumerableSet for EnumerableSet.Bytes32Set;
+    
+    event MessagePropagatedFromPostbox(bytes32[] ids);
 
     /**
      * @dev Sends a general-purpose cross-message from the local subnet to the destination subnet.
@@ -75,23 +82,50 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
     }
 
     /**
-     * @dev propagates the populated cross net message for the given cid
+     * @dev Propagates all the populated cross-net messages for the given `cid`.
+     */
+    function propagateAll() external payable {
+        uint256 keysLength = s.postboxKeys.length();
+        bytes32[] memory ids = new bytes32[](keysLength);
+        for (uint256 i = 0; i < keysLength; ) {
+            bytes32 msgCid = s.postboxKeys.at(i);
+            ids[i] = msgCid;
+            _propagate(msgCid);
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        // Emit an event for off-chain monitoring
+        emit MessagePropagatedFromPostbox({ids: ids});
+    }
+
+    /**
+     * @dev Propagates the populated cross-net message for the given `msgCid`.
      * @param msgCid - the cid of the cross-net message
      */
     function propagate(bytes32 msgCid) external payable {
-        if (!s.multiLevelCrossMsg) {
-            revert MethodNotAllowed(ERR_MULTILEVEL_CROSS_MSG_DISABLED);
-        }
+        _propagate(msgCid);
+    }
 
+    /**
+     * @dev Internal function to propagate the cross-net message.
+     * @param msgCid - the cid of the cross-net message
+     */
+    function _propagate(bytes32 msgCid) internal {
         IpcEnvelope storage crossMsg = s.postbox[msgCid];
 
         bool shouldBurn = LibGateway.commitCrossMessage(crossMsg);
-        // We must delete the message first to prevent potential re-entrancies,
-        // and as the message is deleted and we don't have a reference to the object
-        // anymore, we need to pull the data from the message to trigger the side-effects.
-        uint256 v = crossMsg.value;
-        delete s.postbox[msgCid];
 
+        // Cache value before deletion to avoid re-entrancy
+        uint256 v = crossMsg.value;
+
+        // Remove the message to prevent re-entrancy and clean up state
+        delete s.postbox[msgCid];
+        s.postboxKeys.remove(msgCid);
+
+        // Execute side effects
         LibGateway.crossMsgSideEffects({v: v, shouldBurn: shouldBurn});
     }
 }

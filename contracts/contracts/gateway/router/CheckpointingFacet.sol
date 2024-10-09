@@ -20,6 +20,9 @@ import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
 contract CheckpointingFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for IpcEnvelope;
+    
+    /// @dev Emitted when a checkpoint is committed to gateway.
+    event CheckpointCommitted(address indexed subnet, uint256 blockHeight);
 
     /// @notice submit a verified checkpoint in the gateway to trigger side-effects.
     /// @dev this method is called by the corresponding subnet actor.
@@ -41,6 +44,8 @@ contract CheckpointingFacet is GatewayActorModifiers {
         LibGateway.checkMsgLength(checkpoint.msgs);
 
         execBottomUpMsgs(checkpoint.msgs, subnet);
+
+        emit CheckpointCommitted({subnet: checkpoint.subnetID.getAddress(), blockHeight: checkpoint.blockHeight});
     }
 
     /// @notice creates a new bottom-up checkpoint
