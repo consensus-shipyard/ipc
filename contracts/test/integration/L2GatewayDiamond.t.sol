@@ -79,7 +79,7 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
 
         vm.expectCall(caller, 1 ether, new bytes(0), 1);
         vm.prank(caller);
-        gatewayDiamond.messenger().propagate{value: 1 ether}(postboxId);
+        gatewayDiamond.messenger().propagatePostboxMessage{value: 1 ether}(postboxId);
 
         require(caller.balance == 1 ether, "unexpected balance");
     }
@@ -96,7 +96,7 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
 
         vm.prank(caller);
         vm.expectCall(caller, 0, EMPTY_BYTES, 0);
-        gatewayDiamond.messenger().propagate{value: 0}(postboxId);
+        gatewayDiamond.messenger().propagatePostboxMessage{value: 0}(postboxId);
         require(caller.balance == 0, "unexpected balance");
     }
 

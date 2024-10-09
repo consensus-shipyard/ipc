@@ -141,7 +141,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
             revert InvalidXnetMessage(InvalidXnetMessageReason.Value);
         }
         // slither-disable-next-line unused-return
-        (bool registered, ) = LibGateway.getSubnet(subnetId);
+        (bool registered, Subnet storage subnet) = LibGateway.getSubnet(subnetId);
         if (!registered) {
             revert NotRegisteredSubnet();
         }
@@ -158,7 +158,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         });
 
         // commit top-down message.
-        LibGateway.commitTopDownMsg(crossMsg);
+        LibGateway.commitTopDownMsg(subnet, crossMsg);
     }
 
     /// @notice Sends funds to a specified subnet receiver using ERC20 tokens.
@@ -174,7 +174,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
             revert InvalidXnetMessage(InvalidXnetMessageReason.Value);
         }
         // slither-disable-next-line unused-return
-        (bool registered, ) = LibGateway.getSubnet(subnetId);
+        (bool registered, Subnet storage subnet) = LibGateway.getSubnet(subnetId);
         if (!registered) {
             revert NotRegisteredSubnet();
         }
@@ -199,7 +199,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         });
 
         // Commit top-down message.
-        LibGateway.commitTopDownMsg(crossMsg);
+        LibGateway.commitTopDownMsg(subnet, crossMsg);
     }
 
     /// @notice release() burns the received value locally in subnet and commits a bottom-up message to release the assets in the parent.

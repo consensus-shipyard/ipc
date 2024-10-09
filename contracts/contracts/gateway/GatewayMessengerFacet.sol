@@ -4,8 +4,8 @@ pragma solidity ^0.8.23;
 import {GatewayActorModifiers} from "../lib/LibGatewayActorStorage.sol";
 import {IpcEnvelope, CallMsg, IpcMsgKind} from "../structs/CrossNet.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
-import {SubnetID, AssetKind, IPCAddress} from "../structs/Subnet.sol";
-import {InvalidXnetMessage, InvalidXnetMessageReason, CannotSendCrossMsgToItself, MethodNotAllowed} from "../errors/IPCErrors.sol";
+import {Subnet, SubnetID, AssetKind, IPCAddress} from "../structs/Subnet.sol";
+import {InvalidXnetMessage, InvalidXnetMessageReason, CannotSendCrossMsgToItself, MethodNotAllowed, CommonParentDoesNotExist} from "../errors/IPCErrors.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
@@ -24,8 +24,9 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
     using FilAddress for address payable;
     using SubnetIDHelper for SubnetID;
     using EnumerableSet for EnumerableSet.Bytes32Set;
+    using CrossMsgHelper for IpcEnvelope;
     
-    event MessagePropagatedFromPostbox(bytes32[] ids);
+    event MessagePropagatedFromPostbox(bytes32 id);
 
     /**
      * @dev Sends a general-purpose cross-message from the local subnet to the destination subnet.
@@ -57,6 +58,32 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
             revert InvalidXnetMessage(InvalidXnetMessageReason.Kind);
         }
 
+        SubnetID memory toId = envelope.to.subnetId;
+        
+        if (toId.isEmpty()) {
+            revert InvalidXnetMessage(InvalidXnetMessageReason.DstSubnet);
+        }
+
+        // destination is the current network, you are better off with a good old message, no cross needed
+        if (toId.equals(s.networkName)) {
+            revert CannotSendCrossMsgToItself();
+        }
+
+        IPCMsgType applyType = envelope.applyType(s.networkName);
+        bool isLCA = toId.commonParent(envelope.from.subnetId).equals(s.networkName);
+
+        if (applyType == IPCMsgType.TopDown || isLCA) {
+            (bool foundSubnet,) = LibGateway.getSubnet(toId.down(s.networkName));
+            if (!foundSubnet) {
+                revert InvalidXnetMessage(InvalidXnetMessageReason.DstSubnet);
+            }
+        } else {
+            SubnetID memory commonParent = toId.commonParent(s.networkName);
+            if (commonParent.isEmpty()) {
+                revert CommonParentDoesNotExist();
+            }
+        }
+
         // Will revert if the message won't deserialize into a CallMsg.
         abi.decode(envelope.message, (CallMsg));
 
@@ -84,7 +111,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
     /**
      * @dev Propagates all the populated cross-net messages for the given `cid`.
      */
-    function propagateAll() external payable {
+    function propagateAllPostboxMessages() external payable {
         uint256 keysLength = s.postboxKeys.length();
         bytes32[] memory ids = new bytes32[](keysLength);
         for (uint256 i = 0; i < keysLength; ) {
@@ -96,16 +123,13 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
                 ++i;
             }
         }
-
-        // Emit an event for off-chain monitoring
-        emit MessagePropagatedFromPostbox({ids: ids});
     }
 
     /**
      * @dev Propagates the populated cross-net message for the given `msgCid`.
      * @param msgCid - the cid of the cross-net message
      */
-    function propagate(bytes32 msgCid) external payable {
+    function propagatePostboxMessage(bytes32 msgCid) external payable {
         _propagate(msgCid);
     }
 
@@ -127,5 +151,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
 
         // Execute side effects
         LibGateway.crossMsgSideEffects({v: v, shouldBurn: shouldBurn});
+
+        emit MessagePropagatedFromPostbox({id: msgCid});
     }
 }
