@@ -623,7 +623,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         vm.expectEmit(true, true, true, true, expectedGatewayAddr);
         emit LibGateway.NewTopDownMessage({subnet: expectedSubnetAddr, message: expectedMessage, id: expectedMessage.toHash()});
         GatewayMessengerFacet messenger = gw.messenger();
-        messenger.propagateAll();
+        messenger.propagateAllPostboxMessages();
     }
 
     function executeTopDownMsgsRevert(IpcEnvelope[] memory msgs, GatewayDiamond gw) internal {
