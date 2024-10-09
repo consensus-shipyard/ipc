@@ -67,12 +67,27 @@ impl BlobsActor {
         params: ApproveCreditParams,
     ) -> Result<CreditApproval, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let (caller, actor_type) = resolve_external(rt, rt.message().caller())?;
-        // Caller cannot be a machine
+        let (from, actor_type) = resolve_external(rt, params.from)?;
+        let (origin, caller) = if rt.message().origin() == rt.message().caller() {
+            let (origin, _) = resolve_external(rt, rt.message().origin())?;
+            (origin, origin)
+        } else {
+            let (origin, _) = resolve_external(rt, rt.message().origin())?;
+            let (caller, _) = resolve_external(rt, rt.message().caller())?;
+            (origin, caller)
+        };
+        // Credit owner must be the transaction origin or caller
+        if from != caller && from != origin {
+            return Err(ActorError::illegal_argument(format!(
+                "from {} does not match origin or caller",
+                from
+            )));
+        }
+        // Credit owner cannot be a machine
         if matches!(actor_type, ActorType::Machine) {
             return Err(ActorError::illegal_argument(format!(
-                "caller {} cannot be a machine",
-                caller
+                "from {} cannot be a machine",
+                from
             )));
         }
         let (receiver, actor_type) = resolve_external(rt, params.receiver)?;
@@ -91,7 +106,7 @@ impl BlobsActor {
         };
         rt.transaction(|st: &mut State, rt| {
             st.approve_credit(
-                caller,
+                from,
                 receiver,
                 required_caller,
                 rt.curr_epoch(),
@@ -103,12 +118,27 @@ impl BlobsActor {
 
     fn revoke_credit(rt: &impl Runtime, params: RevokeCreditParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let (caller, actor_type) = resolve_external(rt, rt.message().caller())?;
-        // Caller cannot be a machine
+        let (from, actor_type) = resolve_external(rt, params.from)?;
+        let (origin, caller) = if rt.message().origin() == rt.message().caller() {
+            let (origin, _) = resolve_external(rt, rt.message().origin())?;
+            (origin, origin)
+        } else {
+            let (origin, _) = resolve_external(rt, rt.message().origin())?;
+            let (caller, _) = resolve_external(rt, rt.message().caller())?;
+            (origin, caller)
+        };
+        // Credit owner must be the transaction origin or caller
+        if from != caller && from != origin {
+            return Err(ActorError::illegal_argument(format!(
+                "from {} does not match origin or caller",
+                from
+            )));
+        }
+        // Credit owner cannot be a machine
         if matches!(actor_type, ActorType::Machine) {
             return Err(ActorError::illegal_argument(format!(
-                "caller {} cannot be a machine",
-                caller
+                "from {} cannot be a machine",
+                from
             )));
         }
         let (receiver, actor_type) = resolve_external(rt, params.receiver)?;
@@ -125,7 +155,7 @@ impl BlobsActor {
         } else {
             None
         };
-        rt.transaction(|st: &mut State, _| st.revoke_credit(caller, receiver, required_caller))
+        rt.transaction(|st: &mut State, _| st.revoke_credit(from, receiver, required_caller))
     }
 
     fn get_account(
@@ -401,7 +431,8 @@ mod tests {
 
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::test_utils::{
-        expect_empty, MockRuntime, ETHACCOUNT_ACTOR_CODE_ID, SYSTEM_ACTOR_CODE_ID,
+        expect_empty, MockRuntime, ETHACCOUNT_ACTOR_CODE_ID, EVM_ACTOR_CODE_ID,
+        SYSTEM_ACTOR_CODE_ID,
     };
     use fil_actors_runtime::SYSTEM_ACTOR_ADDR;
     use fvm_ipld_encoding::ipld_block::IpldBlock;
@@ -511,6 +542,196 @@ mod tests {
             .deserialize::<Account>()
             .unwrap();
         assert_eq!(result.credit_free, expected_credits);
+        rt.verify();
+    }
+
+    #[test]
+    fn test_approve_credit() {
+        let rt = construct_and_verify(1024 * 1024, 1);
+
+        // Credit owner
+        let owner_id_addr = Address::new_id(110);
+        let owner_eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000000"
+        ));
+        let owner_f4_eth_addr = Address::new_delegated(10, &owner_eth_addr.0).unwrap();
+        rt.set_delegated_address(owner_id_addr.id().unwrap(), owner_f4_eth_addr);
+
+        // Credit receiver
+        let receiver_id_addr = Address::new_id(111);
+        let receiver_eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000001"
+        ));
+        let receiver_f4_eth_addr = Address::new_delegated(10, &receiver_eth_addr.0).unwrap();
+        rt.set_delegated_address(receiver_id_addr.id().unwrap(), receiver_f4_eth_addr);
+        rt.set_address_actor_type(receiver_id_addr, *ETHACCOUNT_ACTOR_CODE_ID);
+
+        // Proxy EVM contract on behalf of credit owner
+        let proxy_id_addr = Address::new_id(112);
+        let proxy_eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000002"
+        ));
+        let proxy_f4_eth_addr = Address::new_delegated(10, &proxy_eth_addr.0).unwrap();
+        rt.set_delegated_address(proxy_id_addr.id().unwrap(), proxy_f4_eth_addr);
+        rt.set_address_actor_type(proxy_id_addr, *EVM_ACTOR_CODE_ID);
+
+        // Caller/origin is the same as from (i.e., the standard case)
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, owner_id_addr);
+        rt.set_origin(owner_id_addr);
+        rt.expect_validate_caller_any();
+        let approve_params = ApproveCreditParams {
+            from: owner_id_addr,
+            receiver: receiver_id_addr,
+            required_caller: None,
+            limit: None,
+            ttl: None,
+        };
+        let result = rt.call::<BlobsActor>(
+            Method::ApproveCredit as u64,
+            IpldBlock::serialize_cbor(&approve_params).unwrap(),
+        );
+        assert!(result.is_ok());
+        rt.verify();
+
+        // Proxy caller (caller mismatch with from, but is correct origin)
+        rt.set_caller(*EVM_ACTOR_CODE_ID, proxy_id_addr);
+        rt.set_origin(owner_id_addr);
+        rt.expect_validate_caller_any();
+        let approve_params = ApproveCreditParams {
+            from: owner_id_addr,
+            receiver: receiver_id_addr,
+            required_caller: None,
+            limit: None,
+            ttl: None,
+        };
+        let result = rt.call::<BlobsActor>(
+            Method::ApproveCredit as u64,
+            IpldBlock::serialize_cbor(&approve_params).unwrap(),
+        );
+        assert!(result.is_ok());
+        rt.verify();
+
+        // Caller/origin mismatch with from
+        rt.set_caller(*EVM_ACTOR_CODE_ID, proxy_id_addr);
+        rt.set_origin(owner_id_addr);
+        rt.expect_validate_caller_any();
+        let approve_params = ApproveCreditParams {
+            from: receiver_id_addr, // mismatch
+            receiver: receiver_id_addr,
+            required_caller: None,
+            limit: None,
+            ttl: None,
+        };
+        let result = rt.call::<BlobsActor>(
+            Method::ApproveCredit as u64,
+            IpldBlock::serialize_cbor(&approve_params).unwrap(),
+        );
+        let expected_return = Err(ActorError::illegal_argument(format!(
+            "from {} does not match origin or caller",
+            receiver_f4_eth_addr
+        )));
+        assert_eq!(result, expected_return);
+        rt.verify();
+    }
+
+    #[test]
+    fn test_revoke_credit() {
+        let rt = construct_and_verify(1024 * 1024, 1);
+
+        // Credit owner
+        let owner_id_addr = Address::new_id(110);
+        let owner_eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000000"
+        ));
+        let owner_f4_eth_addr = Address::new_delegated(10, &owner_eth_addr.0).unwrap();
+        rt.set_delegated_address(owner_id_addr.id().unwrap(), owner_f4_eth_addr);
+
+        // Credit receiver
+        let receiver_id_addr = Address::new_id(111);
+        let receiver_eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000001"
+        ));
+        let receiver_f4_eth_addr = Address::new_delegated(10, &receiver_eth_addr.0).unwrap();
+        rt.set_delegated_address(receiver_id_addr.id().unwrap(), receiver_f4_eth_addr);
+        rt.set_address_actor_type(receiver_id_addr, *ETHACCOUNT_ACTOR_CODE_ID);
+
+        // Proxy EVM contract on behalf of credit owner
+        let proxy_id_addr = Address::new_id(112);
+        let proxy_eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000002"
+        ));
+        let proxy_f4_eth_addr = Address::new_delegated(10, &proxy_eth_addr.0).unwrap();
+        rt.set_delegated_address(proxy_id_addr.id().unwrap(), proxy_f4_eth_addr);
+        rt.set_address_actor_type(proxy_id_addr, *EVM_ACTOR_CODE_ID);
+
+        // Set up the approval to revoke
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, owner_id_addr);
+        rt.set_origin(owner_id_addr);
+        rt.expect_validate_caller_any();
+        let approve_params = ApproveCreditParams {
+            from: owner_id_addr,
+            receiver: receiver_id_addr,
+            required_caller: None,
+            limit: None,
+            ttl: None,
+        };
+        let result = rt.call::<BlobsActor>(
+            Method::ApproveCredit as u64,
+            IpldBlock::serialize_cbor(&approve_params).unwrap(),
+        );
+        assert!(result.is_ok());
+        rt.verify();
+
+        // Caller/origin is the same as from (i.e., the standard case)
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, owner_id_addr);
+        rt.set_origin(owner_id_addr);
+        rt.expect_validate_caller_any();
+        let revoke_params = RevokeCreditParams {
+            from: owner_id_addr,
+            receiver: receiver_id_addr,
+            required_caller: None,
+        };
+        let result = rt.call::<BlobsActor>(
+            Method::RevokeCredit as u64,
+            IpldBlock::serialize_cbor(&revoke_params).unwrap(),
+        );
+        assert!(result.is_ok());
+        rt.verify();
+
+        // Proxy caller (caller mismatch with from, but is correct origin)
+        rt.set_caller(*EVM_ACTOR_CODE_ID, proxy_id_addr);
+        rt.set_origin(owner_id_addr);
+        rt.expect_validate_caller_any();
+        let revoke_params = RevokeCreditParams {
+            from: owner_id_addr,
+            receiver: receiver_id_addr,
+            required_caller: None,
+        };
+        let result = rt.call::<BlobsActor>(
+            Method::RevokeCredit as u64,
+            IpldBlock::serialize_cbor(&revoke_params).unwrap(),
+        );
+        assert!(result.is_ok());
+        rt.verify();
+
+        // Caller/origin mismatch with from
+        rt.set_caller(*EVM_ACTOR_CODE_ID, proxy_id_addr);
+        rt.set_origin(owner_id_addr);
+        rt.expect_validate_caller_any();
+        let revoke_params = RevokeCreditParams {
+            from: receiver_id_addr, // mismatch
+            receiver: receiver_id_addr,
+            required_caller: None,
+        };
+        let result = rt.call::<BlobsActor>(
+            Method::RevokeCredit as u64,
+            IpldBlock::serialize_cbor(&revoke_params).unwrap(),
+        );
+        let expected_return = Err(ActorError::illegal_argument(format!(
+            "from {} does not match origin or caller",
+            receiver_f4_eth_addr
+        )));
+        assert_eq!(result, expected_return);
         rt.verify();
     }
 

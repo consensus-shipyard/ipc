@@ -19,6 +19,9 @@ pub struct BuyCreditParams(pub Address);
 /// Params for approving credit.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ApproveCreditParams {
+    /// Account address (credit owner) that is making the approval.
+    /// Required due to approval by proxy from an EVM contract.
+    pub from: Address,
     /// Account address that is receiving the approval.
     pub receiver: Address,
     /// Optional restriction on caller address, e.g., an object store.
@@ -36,6 +39,9 @@ pub struct ApproveCreditParams {
 /// Params for revoking credit.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct RevokeCreditParams {
+    /// Account address (credit owner) that is making the approval.
+    /// Required due to approval by proxy from an EVM contract.
+    pub from: Address,
     /// Account address that is receiving the approval.
     pub receiver: Address,
     /// Optional restriction on caller address, e.g., an object store.

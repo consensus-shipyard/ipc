@@ -49,6 +49,7 @@ pub fn buy_credit(rt: &impl Runtime, recipient: Address) -> Result<Account, Acto
 
 pub fn approve_credit(
     rt: &impl Runtime,
+    from: Address,
     receiver: Address,
     required_caller: Option<Address>,
     limit: Option<BigUint>,
@@ -58,6 +59,7 @@ pub fn approve_credit(
         &BLOBS_ACTOR_ADDR,
         Method::ApproveCredit as MethodNum,
         IpldBlock::serialize_cbor(&params::ApproveCreditParams {
+            from,
             receiver,
             required_caller,
             limit,
@@ -69,6 +71,7 @@ pub fn approve_credit(
 
 pub fn revoke_credit(
     rt: &impl Runtime,
+    from: Address,
     receiver: Address,
     required_caller: Option<Address>,
 ) -> Result<(), ActorError> {
@@ -76,6 +79,7 @@ pub fn revoke_credit(
         &BLOBS_ACTOR_ADDR,
         Method::RevokeCredit as MethodNum,
         IpldBlock::serialize_cbor(&params::RevokeCreditParams {
+            from,
             receiver,
             required_caller,
         })?,
