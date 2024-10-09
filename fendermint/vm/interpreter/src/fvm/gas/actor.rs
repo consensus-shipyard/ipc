@@ -5,10 +5,10 @@ use crate::fvm::gas::{Available, CommitRet, Gas, GasMarket, GasUtilization};
 use crate::fvm::FvmMessage;
 use anyhow::{anyhow, Context};
 
-use fendermint_actor_gas_market::{BlockGasUtilizationRet, GasMarketReading, SetConstants};
+use fendermint_actor_gas_market::{BlockGasUtilizationRet, Reading, SetConstants};
 use fendermint_crypto::PublicKey;
 use fendermint_vm_actor_interface::eam::EthAddress;
-use fendermint_vm_actor_interface::gas::GAS_MARKET_ACTOR_ADDR;
+use fendermint_vm_actor_interface::gas_market::GAS_MARKET_ACTOR_ADDR;
 use fendermint_vm_actor_interface::{reward, system};
 use fvm::executor::{ApplyKind, ApplyRet, Executor};
 use fvm_shared::address::Address;
@@ -58,7 +58,7 @@ impl ActorGasMarket {
     pub fn current_reading<E: Executor>(
         executor: &mut E,
         block_height: ChainEpoch,
-    ) -> anyhow::Result<GasMarketReading> {
+    ) -> anyhow::Result<Reading> {
         let msg = FvmMessage {
             from: system::SYSTEM_ACTOR_ADDR,
             to: GAS_MARKET_ACTOR_ADDR,
@@ -81,7 +81,7 @@ impl ActorGasMarket {
         }
 
         let r =
-            fvm_ipld_encoding::from_slice::<GasMarketReading>(&apply_ret.msg_receipt.return_data)
+            fvm_ipld_encoding::from_slice::<Reading>(&apply_ret.msg_receipt.return_data)
                 .context("failed to parse gas market readying")?;
         Ok(r)
     }
@@ -181,7 +181,7 @@ impl ActorGasMarket {
     ) -> anyhow::Result<CommitRet> {
         let block_gas_used = self.block_gas_used.min(self.block_gas_limit);
         let params = fvm_ipld_encoding::RawBytes::serialize(
-            fendermint_actor_gas_market::BlockGasUtilization { block_gas_used },
+            fendermint_actor_gas_market::Utilization { block_gas_used },
         )?;
 
         let msg = FvmMessage {

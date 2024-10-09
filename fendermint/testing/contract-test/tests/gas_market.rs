@@ -5,11 +5,11 @@ mod staking;
 
 use anyhow::Context;
 use async_trait::async_trait;
-use fendermint_actor_gas_market::{GasMarketReading, SetConstants};
+use fendermint_actor_gas_market::{Reading, SetConstants};
 use fendermint_contract_test::Tester;
 use fendermint_crypto::{PublicKey, SecretKey};
 use fendermint_vm_actor_interface::eam::EthAddress;
-use fendermint_vm_actor_interface::gas::GAS_MARKET_ACTOR_ADDR;
+use fendermint_vm_actor_interface::gas_market::GAS_MARKET_ACTOR_ADDR;
 use fendermint_vm_actor_interface::system;
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Account, Actor, ActorMeta, Genesis, PermissionMode, SignerAddr};
@@ -294,7 +294,7 @@ async fn test_gas_market_upgrade() {
 pub fn current_reading(
     state: &mut FvmExecState<MemoryBlockstore>,
     block_height: ChainEpoch,
-) -> anyhow::Result<GasMarketReading> {
+) -> anyhow::Result<Reading> {
     let msg = Message {
         from: system::SYSTEM_ACTOR_ADDR,
         to: GAS_MARKET_ACTOR_ADDR,
@@ -314,7 +314,7 @@ pub fn current_reading(
         anyhow::bail!("failed to read gas market state: {}", err);
     }
 
-    let r = fvm_ipld_encoding::from_slice::<GasMarketReading>(&apply_ret.msg_receipt.return_data)
+    let r = fvm_ipld_encoding::from_slice::<Reading>(&apply_ret.msg_receipt.return_data)
         .context("failed to parse gas market readying")?;
     Ok(r)
 }
