@@ -19,7 +19,7 @@ use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
 use fendermint_vm_actor_interface::{
-    account, burntfunds, chainmetadata, cron, eam, init, ipc, reward, system, EMPTY_ARR,
+    account, burntfunds, chainmetadata, cron, eam, gas, init, ipc, reward, system, EMPTY_ARR,
 };
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Collateral, Genesis, Power, PowerScale, Validator};
@@ -429,6 +429,23 @@ impl GenesisBuilder {
                 None,
             )
             .context("failed to replace built in eam actor")?;
+
+        // currently hard code them for now, once genesis V2 is implemented, should be taken
+        // from genesis.
+        // initial base fee as defined in [EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)
+        let initial_base_fee = TokenAmount::from_atto(1_000_000_000);
+        let gas_market_state = fendermint_actor_gas_market::EIP1559GasState::from(
+            fendermint_actor_gas_market::GasActorConstructorParams::new(initial_base_fee),
+        );
+        state
+            .create_custom_actor(
+                fendermint_actor_gas_market::IPC_GAS_MARKET_ACTOR_NAME,
+                gas::GAS_MARKET_ACTOR_ID,
+                &gas_market_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create gas market actor")?;
 
         // STAGE 2: Create non-builtin accounts which do not have a fixed ID.
 

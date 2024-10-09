@@ -4,7 +4,7 @@
 //! Type conversion for IPC Agent struct with solidity contract struct
 
 use crate::address::IPCAddress;
-use crate::checkpoint::BottomUpCheckpoint;
+use crate::checkpoint::{BottomUpCheckpoint, ActivityCommitment};
 use crate::checkpoint::BottomUpMsgBatch;
 use crate::cross::{IpcEnvelope, IpcMsgKind};
 use crate::staking::StakingChange;
@@ -21,6 +21,7 @@ use ipc_actors_abis::{
     gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet, lib_gateway,
     register_subnet_facet, subnet_actor_checkpointing_facet, subnet_actor_diamond,
     subnet_actor_getter_facet, top_down_finality_facet, xnet_messaging_facet,
+    checkpointing_facet
 };
 
 /// The type conversion for IPC structs to evm solidity contracts. We need this convenient macro because
@@ -121,6 +122,18 @@ macro_rules! cross_msg_types {
 /// The type conversion between different bottom up checkpoint definition in ethers and sdk
 macro_rules! bottom_up_checkpoint_conversion {
     ($module:ident) => {
+        impl TryFrom<ActivityCommitment> for $module::ActivityCommitment {
+            type Error = anyhow::Error;
+
+            fn try_from(c: ActivityCommitment) -> Result<Self, Self::Error> {
+                Ok(
+                    $module::ActivityCommitment {
+                        summary: c.summary.try_into().map_err(|_| anyhow!("cannot convert bytes32"))?,
+                    }
+                )
+            }
+        }
+
         impl TryFrom<BottomUpCheckpoint> for $module::BottomUpCheckpoint {
             type Error = anyhow::Error;
 
@@ -135,6 +148,7 @@ macro_rules! bottom_up_checkpoint_conversion {
                         .into_iter()
                         .map($module::IpcEnvelope::try_from)
                         .collect::<Result<Vec<_>, _>>()?,
+                    activities: checkpoint.activities.try_into()?,
                 })
             }
         }
@@ -153,6 +167,9 @@ macro_rules! bottom_up_checkpoint_conversion {
                         .into_iter()
                         .map(IpcEnvelope::try_from)
                         .collect::<Result<Vec<_>, _>>()?,
+                    activities: ActivityCommitment {
+                        summary: value.activities.summary.to_vec(),
+                    },
                 })
             }
         }
@@ -226,13 +243,16 @@ base_type_conversion!(subnet_actor_checkpointing_facet);
 base_type_conversion!(gateway_getter_facet);
 base_type_conversion!(gateway_messenger_facet);
 base_type_conversion!(lib_gateway);
+base_type_conversion!(checkpointing_facet);
 
+cross_msg_types!(checkpointing_facet);
 cross_msg_types!(gateway_getter_facet);
 cross_msg_types!(xnet_messaging_facet);
 cross_msg_types!(gateway_messenger_facet);
 cross_msg_types!(lib_gateway);
 cross_msg_types!(subnet_actor_checkpointing_facet);
 
+bottom_up_checkpoint_conversion!(checkpointing_facet);
 bottom_up_checkpoint_conversion!(gateway_getter_facet);
 bottom_up_checkpoint_conversion!(subnet_actor_checkpointing_facet);
 bottom_up_msg_batch_conversion!(gateway_getter_facet);

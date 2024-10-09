@@ -33,6 +33,7 @@ use super::{
     state::{ipc::GatewayCaller, FvmExecState},
     ValidatorContext,
 };
+use crate::fvm::activities::ValidatorActivityTracker;
 
 /// Validator voting power snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -103,7 +104,7 @@ where
         block_hash,
         next_configuration_number,
         msgs,
-        validatorReward: state.validator_reward().get_activities_summary()?.commitment(),
+        activities: state.activities_tracker().get_activities_summary()?.commitment()?.try_into()?,
     };
 
     // Save the checkpoint in the ledger.
@@ -112,7 +113,7 @@ where
         .create_bottom_up_checkpoint(state, checkpoint.clone(), &curr_power_table.0)
         .context("failed to store checkpoint")?;
 
-    state.validator_reward().purge_activities()?;
+    state.activities_tracker().purge_activities()?;
 
     // Figure out the power updates if there was some change in the configuration.
     let power_updates = if next_configuration_number == 0 {
@@ -245,6 +246,9 @@ where
                 block_hash: cp.block_hash,
                 next_configuration_number: cp.next_configuration_number,
                 msgs: convert_tokenizables(cp.msgs)?,
+                activities: checkpoint::ActivityCommitment {
+                    summary: cp.activities.summary,
+                }
             };
 
             // We mustn't do these in parallel because of how nonces are fetched.

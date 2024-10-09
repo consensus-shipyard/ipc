@@ -4,10 +4,12 @@
 use fil_actors_runtime::runtime::{ActorCode, Runtime};
 use fil_actors_runtime::{actor_dispatch, ActorError};
 use fil_actors_runtime::builtin::singletons::SYSTEM_ACTOR_ADDR;
-use fvm_ipld_blockstore::Blockstore;
+use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
-use fvm_shared::{ActorID, MethodNum};
+use fvm_shared::METHOD_CONSTRUCTOR;
+use fvm_shared::clock::ChainEpoch;
 use num_derive::FromPrimitive;
+use fil_actors_runtime::actor_error;
 
 pub use crate::state::{ValidatorSummary};
 use crate::state::State;
@@ -21,14 +23,21 @@ pub const IPC_ACTIVITY_TRACKER_ACTOR_NAME: &str = "activity";
 
 pub struct ActivityTrackerActor;
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize_tuple, Serialize_tuple, Debug, Clone)]
 pub struct BlockedMinedParams {
-    validator: Address,
+    pub validator: Address,
+}
+
+#[derive(Deserialize_tuple, Serialize_tuple, Debug, Clone)]
+pub struct GetActivitiesResult {
+    pub activities: Vec<ValidatorSummary>,
+    pub start_height: ChainEpoch,
 }
 
 #[derive(FromPrimitive)]
 #[repr(u64)]
 pub enum Method {
+    Constructor = METHOD_CONSTRUCTOR,
     BlockMined = frc42_dispatch::method_hash!("BlockMined"),
     GetActivities = frc42_dispatch::method_hash!("GetActivities"),
     PurgeActivities = frc42_dispatch::method_hash!("PurgeActivities"),
@@ -63,9 +72,12 @@ impl ActivityTrackerActor {
         Ok(())
     }
 
-    pub fn get_activities(rt: &impl Runtime) -> Result<Vec<ValidatorSummary>, ActorError> {
+    pub fn get_activities(rt: &impl Runtime) -> Result<GetActivitiesResult, ActorError> {
         let state: State = rt.state()?;
-        state.validator_activities(rt)
+        let activities = state.validator_activities(rt)?;
+        Ok(GetActivitiesResult {
+            activities, start_height: state.start_height
+        })
     }
 
 }
@@ -74,13 +86,13 @@ impl ActorCode for ActivityTrackerActor {
     type Methods = Method;
 
     fn name() -> &'static str {
-        CHAINMETADATA_ACTOR_NAME
+        IPC_ACTIVITY_TRACKER_ACTOR_NAME
     }
 
     actor_dispatch! {
         Constructor => constructor,
-        PushBlockHash => push_block_hash,
-        LookbackLen => lookback_len,
-        GetBlockHash => get_block_hash,
+        BlockMined => block_mined,
+        GetActivities => get_activities,
+        PurgeActivities => purge_activities,
     }
 }

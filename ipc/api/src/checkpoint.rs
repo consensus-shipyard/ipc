@@ -78,6 +78,17 @@ pub struct BottomUpMsgBatch {
 
 #[serde_as]
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+/// The commitments for the child subnet activities that should be submitted to the parent subnet
+/// together with a bottom up checkpoint
+pub struct ActivityCommitment {
+    /// The activity summary for validators
+    #[serde_as(as = "HumanReadable")]
+    pub summary: Vec<u8>,
+    // TODO: add relayed activity commitment
+}
+
+#[serde_as]
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
 pub struct BottomUpCheckpoint {
     /// Child subnet ID, for replay protection from other subnets where the exact same validators operate.
     /// Alternatively it can be appended to the hash before signing, similar to how we use the chain ID.
@@ -94,7 +105,8 @@ pub struct BottomUpCheckpoint {
     pub next_configuration_number: u64,
     /// The list of messages for execution
     pub msgs: Vec<IpcEnvelope>,
-    // TODO(rewards): add new fields and data types for summaries and commitments.
+    /// The activity commitment from child subnet to parent subnet
+    pub activities: ActivityCommitment,
 }
 
 pub fn serialize_vec_bytes_to_vec_hex<T: AsRef<[u8]>, S>(

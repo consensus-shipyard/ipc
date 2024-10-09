@@ -12,6 +12,7 @@ use tracing_subscriber::filter::EnvFilter;
 #[serde_as]
 #[derive(Debug, Deserialize, Clone, Default, strum::EnumString, strum::Display)]
 #[strum(serialize_all = "snake_case")]
+#[serde(rename_all = "lowercase")]
 pub enum LogLevel {
     Off,
     Error,
@@ -32,6 +33,7 @@ impl From<LogLevel> for EnvFilter {
 #[serde_as]
 #[derive(Debug, Deserialize, Clone, strum::EnumString, strum::Display)]
 #[strum(serialize_all = "snake_case")]
+#[serde(rename_all = "lowercase")]
 pub enum RotationKind {
     Minutely,
     Hourly,

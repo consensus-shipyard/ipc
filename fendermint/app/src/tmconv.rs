@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! Conversions to Tendermint data types.
 use anyhow::{anyhow, bail, Context};
+use fendermint_actor_gas_market::SetConstants;
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Power, Validator};
 use fendermint_vm_interpreter::fvm::{
@@ -10,11 +11,13 @@ use fendermint_vm_interpreter::fvm::{
 };
 use fendermint_vm_message::signed::DomainHash;
 use fendermint_vm_snapshot::{SnapshotItem, SnapshotManifest};
+use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, error::ExitCode, event::StampedEvent, ActorID};
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, num::NonZeroU32};
 use tendermint::abci::{response, Code, Event, EventAttribute};
+use tendermint_rpc::Client;
 
 use crate::{app::AppError, BlockHeight};
 
@@ -24,12 +27,56 @@ struct SnapshotMetadata {
     state_params: FvmStateParams,
 }
 
+/// The end block update for cometbft
+pub struct EndBlockUpdate {
+    pub max_gas: Option<u64>,
+    pub validators: PowerUpdates,
+}
+
+impl EndBlockUpdate {
+    pub fn new(power: PowerUpdates) -> Self {
+        Self {
+            max_gas: None,
+            validators: power,
+        }
+    }
+
+    pub fn update_gas(&mut self, constants: SetConstants) {
+        self.max_gas = Some(constants.block_gas_limit);
+    }
+}
+
 /// IPLD encoding of data types we know we must be able to encode.
 macro_rules! ipld_encode {
     ($var:ident) => {
         fvm_ipld_encoding::to_vec(&$var)
             .map_err(|e| anyhow!("error IPLD encoding {}: {}", stringify!($var), e))?
     };
+}
+
+pub(crate) async fn to_end_block<C: Client + Sync>(
+    client: &C,
+    height: ChainEpoch,
+    value: EndBlockUpdate,
+) -> anyhow::Result<response::EndBlock> {
+    let validator_updates =
+        to_validator_updates(value.validators.0).context("failed to convert validator updates")?;
+
+    let mut consensus_param_updates = None;
+    if let Some(max_gas) = value.max_gas {
+        let mut consensus_params = client
+            .consensus_params(tendermint::block::Height::try_from(height)?)
+            .await?
+            .consensus_params;
+        consensus_params.block.max_gas = max_gas as i64;
+        consensus_param_updates = Some(consensus_params);
+    }
+
+    Ok(response::EndBlock {
+        validator_updates,
+        consensus_param_updates,
+        events: Vec::new(), // TODO: Events from epoch transitions?
+    })
 }
 
 /// Response to delivery where the input was blatantly invalid.
@@ -62,6 +109,22 @@ pub fn invalid_query(err: AppError, description: String) -> response::Query {
         info: description,
         ..Default::default()
     }
+}
+
+/// Convert validator power to tendermint validator update.
+/// TODO: the import is quite strange, `Validator` and `Power` are imported from `genesis` crate,
+/// TODO: which should be from a `type` or `validator` crate.
+pub fn to_validator_updates(
+    validators: Vec<Validator<Power>>,
+) -> anyhow::Result<Vec<tendermint::validator::Update>> {
+    let mut updates = vec![];
+    for v in validators {
+        updates.push(tendermint::validator::Update {
+            pub_key: tendermint::PublicKey::try_from(v.public_key)?,
+            power: tendermint::vote::Power::try_from(v.power.0)?,
+        });
+    }
+    Ok(updates)
 }
 
 pub fn to_deliver_tx(
@@ -146,18 +209,6 @@ pub fn to_check_tx(ret: FvmCheckRet) -> response::CheckTx {
         sender: ret.sender.to_string(),
         ..Default::default()
     }
-}
-
-/// Map the return values from epoch boundary operations to validator updates.
-pub fn to_end_block(power_table: PowerUpdates) -> anyhow::Result<response::EndBlock> {
-    let validator_updates =
-        to_validator_updates(power_table.0).context("failed to convert validator updates")?;
-
-    Ok(response::EndBlock {
-        validator_updates,
-        consensus_param_updates: None,
-        events: Vec::new(), // TODO: Events from epoch transitions?
-    })
 }
 
 /// Map the return values from cron operations.
@@ -317,20 +368,6 @@ pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> anyhow::Result<r
     };
 
     Ok(res)
-}
-
-/// Project Genesis validators to Tendermint.
-pub fn to_validator_updates(
-    validators: Vec<Validator<Power>>,
-) -> anyhow::Result<Vec<tendermint::validator::Update>> {
-    let mut updates = vec![];
-    for v in validators {
-        updates.push(tendermint::validator::Update {
-            pub_key: tendermint::PublicKey::try_from(v.public_key)?,
-            power: tendermint::vote::Power::try_from(v.power.0)?,
-        });
-    }
-    Ok(updates)
 }
 
 pub fn to_timestamp(time: tendermint::time::Time) -> Timestamp {

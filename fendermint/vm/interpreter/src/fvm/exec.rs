@@ -12,7 +12,11 @@ use fvm_shared::{address::Address, ActorID, MethodNum, BLOCK_GAS_LIMIT};
 use ipc_observability::{emit, measure_time, observe::TracingError, Traceable};
 use tendermint_rpc::Client;
 
+use crate::fvm::gas::{GasMarket, GasUtilization};
 use crate::ExecInterpreter;
+use crate::fvm::activities::BlockMined;
+
+use crate::fvm::activities::ValidatorActivityTracker;
 
 use super::{
     checkpoint::{self, PowerUpdates},
@@ -157,8 +161,23 @@ where
 
             (apply_ret, emitters, latency)
         } else {
+            let available_gas = state.gas_market().available().block_gas;
+            if msg.gas_limit > available_gas {
+                // This is panic-worthy, but we suppress it to avoid liveness issues.
+                // Consider maybe record as evidence for the validator slashing?
+                tracing::warn!(
+                    txn_gas_limit = msg.gas_limit,
+                    block_gas_available = available_gas,
+                    "[ASSERTION FAILED] message gas limit exceed available block gas limit; consensus engine is misbehaving"
+                );
+            }
+
             let (execution_result, latency) = measure_time(|| state.execute_explicit(msg.clone()));
             let (apply_ret, emitters) = execution_result?;
+
+            state
+                .gas_market_mut()
+                .record_utilization(GasUtilization::from(&apply_ret));
 
             (apply_ret, emitters, latency)
         };
@@ -186,7 +205,11 @@ where
     }
 
     async fn end(&self, mut state: Self::State) -> anyhow::Result<(Self::State, Self::EndOutput)> {
-        state.validator_reward_mut().track_block_mined();
+        if let Some(pubkey) = state.validator_pubkey() {
+            state.activities_tracker().track_block_mined(BlockMined { validator: pubkey })?;
+        }
+
+        state.update_gas_market()?;
 
         // TODO: Consider doing this async, since it's purely informational and not consensus-critical.
         let _ = checkpoint::emit_trace_if_check_checkpoint_finalized(&self.gateway, &mut state)

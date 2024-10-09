@@ -35,6 +35,7 @@ members = [
   "fendermint/vm/*",
   "fendermint/actors",
   "fendermint/actors/chainmetadata",
+  "fendermint/actors/gas_market",
   "fendermint/actors/activity-tracker",
 ]
 

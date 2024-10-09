@@ -1,13 +1,11 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::HashMap;
 use cid::Cid;
 use fil_actors_runtime::runtime::Runtime;
 use fil_actors_runtime::{ActorError, Map2, DEFAULT_HAMT_CONFIG};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::address::Address;
-use fvm_shared::ActorID;
 use fvm_shared::clock::ChainEpoch;
 use serde::{Deserialize, Serialize};
 
@@ -16,8 +14,9 @@ pub type BlockCommitted = u64;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ValidatorSummary {
-    validator: Address,
-    block_committed: BlockCommitted,
+    pub validator: Address,
+    pub block_committed: BlockCommitted,
+    pub metadata: Vec<u8>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -43,8 +42,8 @@ impl State {
         let all_validators = self.validator_activities(rt)?;
         let mut validators = BlockCommittedMap::load(rt.store(), &self.blocks_committed, DEFAULT_HAMT_CONFIG, "verifiers")?;
 
-        for (v, _) in all_validators {
-            validators.delete(&v)?;
+        for v in all_validators {
+            validators.delete(&v.validator)?;
         }
 
         self.blocks_committed = validators.flush()?;
@@ -70,8 +69,8 @@ impl State {
         let mut result = vec![];
 
         let validators = BlockCommittedMap::load(rt.store(), &self.blocks_committed, DEFAULT_HAMT_CONFIG, "verifiers")?;
-        validators.for_each(|(k, v)| {
-            result.push(ValidatorSummary{ validator: k, block_committed: v});
+        validators.for_each(|k, v| {
+            result.push(ValidatorSummary{ validator: k, block_committed: *v, metadata: vec![]});
             Ok(())
         })?;
 
