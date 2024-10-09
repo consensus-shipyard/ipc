@@ -7,28 +7,6 @@ use std::path::PathBuf;
 use strum;
 use tracing_appender;
 use tracing_appender::rolling::Rotation;
-use tracing_subscriber::filter::EnvFilter;
-
-#[serde_as]
-#[derive(Debug, Deserialize, Clone, Default, strum::EnumString, strum::Display)]
-#[strum(serialize_all = "snake_case")]
-#[serde(rename_all = "lowercase")]
-pub enum LogLevel {
-    Off,
-    Error,
-    Warn,
-    #[default]
-    Info,
-    Debug,
-    Trace,
-}
-
-impl From<LogLevel> for EnvFilter {
-    fn from(val: LogLevel) -> Self {
-        // By default EnvFilter uses INFO, just like our default log level.
-        EnvFilter::try_new(val.to_string()).unwrap_or_default()
-    }
-}
 
 #[serde_as]
 #[derive(Debug, Deserialize, Clone, strum::EnumString, strum::Display)]
@@ -73,14 +51,14 @@ pub struct TracingSettings {
 #[serde_as]
 #[derive(Debug, Deserialize, Clone, Default)]
 pub struct ConsoleLayerSettings {
-    pub level: Option<LogLevel>,
+    pub level: Option<String>,
 }
 
 #[serde_as]
 #[derive(Debug, Deserialize, Clone, Default)]
 pub struct FileLayerSettings {
     pub enabled: bool,
-    pub level: Option<LogLevel>,
+    pub level: Option<String>,
     pub directory: Option<PathBuf>,
     pub max_log_files: Option<usize>,
     pub rotation: Option<RotationKind>,
