@@ -3,6 +3,7 @@ pragma solidity ^0.8.23;
 
 import {SubnetID, IPCAddress} from "./Subnet.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {ActivityCommitment} from "../activities/Activity.sol";
 
 uint64 constant MAX_MSGS_PER_BATCH = 10;
 uint256 constant BATCH_PERIOD = 100;
@@ -29,11 +30,8 @@ struct BottomUpCheckpoint {
     uint64 nextConfigurationNumber;
     /// @dev Batch of messages to execute.
     IpcEnvelope[] msgs;
-    /// @dev A commitment to the summary of our chain activity since the previous checkpoint and this one.
-    bytes32 summary;
-    /// @dev Summaries relayed upwards from descendants of this subnet.
-    /// NOTE: Not merkelized to keep it simple, but we will merkelize later to scale better.
-    RelayedSummary[] relayedSummaries;
+    /// @dev The activity commitment from child subnet to parent subnet
+    ActivityCommitment activities;
 }
 
 struct ActivitySummary {

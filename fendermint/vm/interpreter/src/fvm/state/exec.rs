@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 
 use anyhow::Ok;
 use cid::Cid;
+use fendermint_crypto::PublicKey;
 use fendermint_vm_genesis::PowerScale;
 use fvm::{
     call_manager::DefaultCallManager,
@@ -24,18 +25,19 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
 use crate::fvm::externs::FendermintExterns;
+use crate::fvm::gas::actor::ActorGasMarket;
 use fendermint_vm_core::{chainid::HasChainID, Timestamp};
 use fendermint_vm_encoding::IsHumanReadable;
+use crate::fvm::activities::actor::ActorActivityTracker;
 
 pub type BlockHash = [u8; 32];
-
-/// First 20 bytes of SHA256(PublicKey)
-pub type ValidatorId = tendermint::account::Id;
 
 pub type ActorAddressMap = HashMap<ActorID, Address>;
 
 /// The result of the message application bundled with any delegated addresses of event emitters.
 pub type ExecResult = anyhow::Result<(ApplyRet, ActorAddressMap)>;
+
+pub type StateExecutor<DB> = DefaultExecutor<DefaultKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>>;
 
 /// Parts of the state which evolve during the lifetime of the chain.
 #[serde_as]
@@ -106,13 +108,18 @@ where
     /// execution interpreter without having to add yet another piece to track at the app level.
     block_hash: Option<BlockHash>,
 
-    /// ID of the validator who created this block. For queries and checks this is empty.
-    validator_id: Option<ValidatorId>,
+    /// Public key of the validator who created this block. For queries and checks this is empty.
+    validator_pubkey: Option<PublicKey>,
     /// State of parameters that are outside the control of the FVM but can change and need to be persisted.
     params: FvmUpdatableParams,
 
     /// Indicate whether the parameters have been updated.
     params_dirty: bool,
+    /// Keeps track of block gas usage during execution, and takes care of updating
+    /// the chosen gas market strategy (by default an on-chain actor delivering EIP-1559 behaviour).
+    gas_market: ActorGasMarket,
+
+    // chain_info: (NetworkVersion, ChainID, EnginePool),
 }
 
 impl<DB> FvmExecState<DB>
@@ -146,12 +153,13 @@ where
         let engine = multi_engine.get(&nc)?;
         let externs = FendermintExterns::new(blockstore.clone(), params.state_root);
         let machine = DefaultMachine::new(&mc, blockstore, externs)?;
-        let executor = DefaultExecutor::new(engine, machine)?;
+        let mut executor = DefaultExecutor::new(engine.clone(), machine)?;
+        let gas_market = ActorGasMarket::create(&mut executor, block_height)?;
 
         Ok(Self {
             executor,
             block_hash: None,
-            validator_id: None,
+            validator_pubkey: None,
             params: FvmUpdatableParams {
                 app_version: params.app_version,
                 base_fee: params.base_fee,
@@ -159,6 +167,8 @@ where
                 power_scale: params.power_scale,
             },
             params_dirty: false,
+            gas_market,
+            // chain_info: (params.network_version, ChainID::from(params.chain_id), engine),
         })
     }
 
@@ -169,9 +179,17 @@ where
     }
 
     /// Set the validator during execution.
-    pub fn with_validator_id(mut self, validator_id: ValidatorId) -> Self {
-        self.validator_id = Some(validator_id);
+    pub fn with_validator(mut self, key: PublicKey) -> Self {
+        self.validator_pubkey = Some(key);
         self
+    }
+
+    pub fn gas_market_mut(&mut self) -> &mut ActorGasMarket {
+        &mut self.gas_market
+    }
+
+    pub fn gas_market(&self) -> &ActorGasMarket {
+        &self.gas_market
     }
 
     /// Execute message implicitly.
@@ -219,8 +237,8 @@ where
     }
 
     /// Identity of the block creator, if we are indeed executing any blocks.
-    pub fn validator_id(&self) -> Option<ValidatorId> {
-        self.validator_id
+    pub fn validator_pubkey(&self) -> Option<PublicKey> {
+        self.validator_pubkey
     }
 
     /// The timestamp of the currently executing block.
@@ -257,6 +275,10 @@ where
         self.executor.context().network.chain_id
     }
 
+    pub fn activities_tracker(&mut self) -> ActorActivityTracker<StateExecutor<DB>> {
+        ActorActivityTracker { epoch: self.block_height(), executor: &mut self.executor }
+    }
+
     /// Collect all the event emitters' delegated addresses, for those who have any.
     fn emitter_delegated_addresses(&self, apply_ret: &ApplyRet) -> anyhow::Result<ActorAddressMap> {
         let emitter_ids = apply_ret
@@ -286,12 +308,13 @@ where
         self.update_params(|p| f(&mut p.app_version))
     }
 
-    /// Update the application version.
-    pub fn update_base_fee<F>(&mut self, f: F)
-    where
-        F: FnOnce(&mut TokenAmount),
-    {
-        self.update_params(|p| f(&mut p.base_fee))
+    pub fn update_gas_market(&mut self) -> anyhow::Result<()> {
+        let height = self.block_height();
+        let ret = self
+            .gas_market
+            .commit(&mut self.executor, height, self.validator_pubkey)?;
+        self.params.base_fee = ret.base_fee;
+        Ok(())
     }
 
     /// Update the circulating supply, effective from the next block.
@@ -310,6 +333,19 @@ where
         f(&mut self.params);
         self.params_dirty = true;
     }
+
+    // pub fn call_only(&self) -> FvmCallState<DB> {
+    //     let mut nc = NetworkConfig::new(self.chain_info.0);
+    //     nc.chain_id = self.chain_info.1;
+    //
+    //     let engine = self.chain_info.2.clone();
+    //
+    //     self.executor.blockstore().clone()
+    //     let externs = FendermintExterns::new(blockstore.clone(), params.state_root);
+    //     let machine = DefaultMachine::new(&mc, blockstore, externs)?;
+    //     let mut executor = DefaultExecutor::new(engine, machine)?;
+    //
+    // }
 }
 
 impl<DB> HasChainID for FvmExecState<DB>
@@ -350,3 +386,20 @@ fn check_error(e: anyhow::Error) -> (ApplyRet, ActorAddressMap) {
     };
     (ret, Default::default())
 }
+
+// /// Compared to FvmExecState, this is used mostly for getters
+// pub struct FvmCallState<DB> {
+//     #[allow(clippy::type_complexity)]
+//     executor: RefCell<DefaultExecutor<
+//         DefaultKernel<DefaultCallManager<DefaultMachine<ReadOnlyBlockstore<DB>, FendermintExterns<ReadOnlyBlockstore<DB>>>>>,
+//     >>,
+// }
+//
+// impl<DB> FvmExecState<DB>
+//     where
+//         DB: Blockstore + Clone + 'static,
+// {
+//     pub fn call(&self, message: Message) -> anyhow::Result<ApplyRet> {
+//
+//     }
+// }
