@@ -1,6 +1,6 @@
 [package]
-name = "fendermint_actor_gas_market_eip1559"
-description = "EIP-1559 gas market actor for IPC. Singleton actor to be deployed at ID 98."
+name = "fendermint_actors_api"
+description = "API and interface types for pluggable actors."
 license.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -14,7 +14,6 @@ crate-type = ["cdylib", "lib"]
 [dependencies]
 anyhow = { workspace = true }
 cid = { workspace = true }
-fendermint_actors_api = { workspace = true }
 fil_actors_runtime = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }
 fvm_ipld_encoding = { workspace = true }

@@ -2822,6 +2822,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid",
+ "fendermint_actors_api",
  "fil_actors_evm_shared",
  "fil_actors_runtime",
  "frc42_dispatch",
@@ -2851,6 +2852,26 @@ dependencies = [
  "fvm_ipld_encoding",
  "num-traits",
  "toml 0.8.19",
+]
+
+[[package]]
+name = "fendermint_actors_api"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cid",
+ "fil_actors_evm_shared",
+ "fil_actors_runtime",
+ "frc42_dispatch",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
+ "fvm_shared",
+ "hex-literal 0.4.1",
+ "log",
+ "multihash 0.18.1",
+ "num-derive 0.3.3",
+ "num-traits",
+ "serde",
 ]
 
 [[package]]
@@ -3331,6 +3352,7 @@ dependencies = [
  "fendermint_actor_eam",
  "fendermint_actor_gas_market_eip1559",
  "fendermint_actors",
+ "fendermint_actors_api",
  "fendermint_crypto",
  "fendermint_eth_hardhat",
  "fendermint_rpc",

@@ -5,7 +5,7 @@ use crate::fvm::gas::{Available, CommitRet, Gas, GasMarket, GasUtilization};
 use crate::fvm::FvmMessage;
 use anyhow::Context;
 
-use fendermint_actor_gas_market_eip1559::{Reading, SetConstants};
+use fendermint_actor_gas_market_eip1559::{SetConstants};
 use fendermint_crypto::PublicKey;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::gas_market::GAS_MARKET_ACTOR_ADDR;
@@ -15,6 +15,7 @@ use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::METHOD_SEND;
+use fendermint_actors_api::gas_market::{Reading, Utilization};
 
 #[derive(Default)]
 pub struct ActorGasMarket {
@@ -180,7 +181,7 @@ impl ActorGasMarket {
     ) -> anyhow::Result<CommitRet> {
         let block_gas_used = self.block_gas_used.min(self.block_gas_limit);
         let params = fvm_ipld_encoding::RawBytes::serialize(
-            fendermint_actor_gas_market_eip1559::Utilization { block_gas_used },
+            Utilization { block_gas_used },
         )?;
 
         let msg = FvmMessage {

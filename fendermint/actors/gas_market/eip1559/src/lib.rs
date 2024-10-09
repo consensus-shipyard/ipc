@@ -1,6 +1,7 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use fendermint_actors_api;
 use fil_actors_runtime::actor_error;
 use fil_actors_runtime::runtime::{ActorCode, Runtime};
 use fil_actors_runtime::SYSTEM_ACTOR_ADDR;
@@ -43,27 +44,18 @@ pub struct ConstructorParams {
     constants: Constants,
 }
 
-#[derive(Serialize_tuple, Deserialize_tuple, Debug, Clone)]
-pub struct Reading {
-    pub block_gas_limit: Gas,
-    pub base_fee: TokenAmount,
-}
-
-#[derive(Serialize_tuple, Deserialize_tuple, Debug, Clone)]
-pub struct Utilization {
-    pub block_gas_used: Gas,
-}
-
 pub struct Actor {}
 
 #[derive(FromPrimitive)]
 #[repr(u64)]
 pub enum Method {
     Constructor = METHOD_CONSTRUCTOR,
-    CurrentReading = frc42_dispatch::method_hash!("CurrentReading"),
     GetConstants = frc42_dispatch::method_hash!("GetConstants"),
     SetConstants = frc42_dispatch::method_hash!("SetConstants"),
-    UpdateUtilization = frc42_dispatch::method_hash!("UpdateUtilization"),
+
+    // Standard methods.
+    CurrentReading = fendermint_actors_api::gas_market::Method::CurrentReading as u64,
+    UpdateUtilization = fendermint_actors_api::gas_market::Method::UpdateUtilization as u64,
 }
 
 impl Actor {
@@ -93,30 +85,33 @@ impl Actor {
         Ok(())
     }
 
-    fn current_reading(rt: &impl Runtime) -> Result<Reading, ActorError> {
+    fn get_constants(rt: &impl Runtime) -> Result<Constants, ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+        rt.state::<State>().map(|s| s.constants)
+    }
+}
+
+impl fendermint_actors_api::gas_market::GasMarket for Actor {
+    fn current_reading(rt: &impl Runtime) -> Result<fendermint_actors_api::gas_market::Reading, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
         let st = rt.state::<State>()?;
-        Ok(Reading {
+        Ok(fendermint_actors_api::gas_market::Reading {
             block_gas_limit: st.constants.block_gas_limit,
             base_fee: st.base_fee,
         })
     }
 
-    fn get_constants(rt: &impl Runtime) -> Result<Constants, ActorError> {
-        rt.validate_immediate_caller_accept_any()?;
-        rt.state::<State>().map(|s| s.constants)
-    }
 
     fn update_utilization(
         rt: &impl Runtime,
-        utilization: Utilization,
-    ) -> Result<Reading, ActorError> {
+        utilization: fendermint_actors_api::gas_market::Utilization,
+    ) -> Result<fendermint_actors_api::gas_market::Reading, ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
         rt.transaction(|st: &mut State, _rt| {
             st.base_fee = st.next_base_fee(utilization.block_gas_used);
-            Ok(Reading {
+            Ok(fendermint_actors_api::gas_market::Reading {
                 block_gas_limit: st.constants.block_gas_limit,
                 base_fee: st.base_fee.clone(),
             })
@@ -128,7 +123,7 @@ impl Default for Constants {
     fn default() -> Self {
         Self {
             // Matching the Filecoin block gas limit. Note that IPC consensus != Filecoin Expected Consensus,
-
+            // TODO
             block_gas_limit: 10_000_000_000,
             // Matching Filecoin's minimal base fee.
             minimal_base_fee: TokenAmount::from_atto(100),
@@ -169,6 +164,10 @@ impl State {
     }
 }
 
+// This import is necessary so that the actor_dispatch macro can find the methods on the GasMarket
+// trait, implemented by Self.
+use fendermint_actors_api::gas_market::GasMarket;
+
 impl ActorCode for Actor {
     type Methods = Method;
 
@@ -179,8 +178,9 @@ impl ActorCode for Actor {
     actor_dispatch! {
         Constructor => constructor,
         SetConstants => set_constants,
-        CurrentReading => current_reading,
         GetConstants => get_constants,
+
+        CurrentReading => current_reading,
         UpdateUtilization => update_utilization,
     }
 }
@@ -188,8 +188,8 @@ impl ActorCode for Actor {
 #[cfg(test)]
 mod tests {
     use crate::{
-        Utilization, Constants, Actor, State,
-        ConstructorParams, Reading, Method,
+        Constants, Actor, State,
+        ConstructorParams, Method,
     };
     use fil_actors_runtime::test_utils::{expect_empty, MockRuntime, SYSTEM_ACTOR_CODE_ID};
     use fil_actors_runtime::SYSTEM_ACTOR_ADDR;
@@ -197,6 +197,7 @@ mod tests {
     use fvm_shared::address::Address;
     use fvm_shared::econ::TokenAmount;
     use fvm_shared::error::ExitCode;
+    use fendermint_actors_api::gas_market::{Reading, Utilization};
 
     pub fn construct_and_verify() -> MockRuntime {
         let rt = MockRuntime {
