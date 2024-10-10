@@ -15,8 +15,6 @@ import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {AssetHelper} from "../lib/AssetHelper.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-import "forge-std/console.sol";
-
 // Validation outcomes for cross messages
 enum CrossMessageValidationOutcome {
     Valid,
@@ -380,10 +378,8 @@ library LibGateway {
         IPCMsgType applyType = crossMsg.applyType(s.networkName);
         if (applyType == IPCMsgType.BottomUp) {
             // Load the subnet this message is coming from.
-            (bool found, Subnet storage subnet) = LibGateway.getSubnet(arrivingFrom);
-            console.log("bottom up");
-            console.log("found: %s", found);
-   
+            (, Subnet storage subnet) = LibGateway.getSubnet(arrivingFrom);
+
             if (subnet.appliedBottomUpNonce != crossMsg.nonce) {
                 sendReceipt(crossMsg, OutcomeType.SystemErr, abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Nonce));
                 return;
@@ -394,7 +390,6 @@ library LibGateway {
             // configuration of the subnet.
             supplySource = SubnetActorGetterFacet(subnet.id.getActor()).supplySource();
         } else if (applyType == IPCMsgType.TopDown) {
-            console.log("top down");
             // Note: there is no need to load the subnet, as a top-down application means that _we_ are the subnet.
             if (s.appliedTopDownNonce != crossMsg.nonce) {
                 sendReceipt(crossMsg, OutcomeType.SystemErr, abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Nonce));
