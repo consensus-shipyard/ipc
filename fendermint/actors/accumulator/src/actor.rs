@@ -20,10 +20,14 @@ pub struct Actor;
 impl Actor {
     fn push(rt: &impl Runtime, params: PushParams) -> Result<PushReturn, ActorError> {
         Self::ensure_write_allowed(rt)?;
-        rt.transaction(|st: &mut State, rt| st.push(rt.store(), params.0))
+
+        let timestamp = rt.tipset_timestamp();
+        let data = (timestamp, params.0);
+
+        rt.transaction(|st: &mut State, rt| st.push(rt.store(), data))
     }
 
-    fn get_leaf_at(rt: &impl Runtime, index: u64) -> Result<Option<Vec<u8>>, ActorError> {
+    fn get_leaf_at(rt: &impl Runtime, index: u64) -> Result<Option<(u64, Vec<u8>)>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let st: State = rt.state()?;
         st.get_leaf_at(rt.store(), index)
