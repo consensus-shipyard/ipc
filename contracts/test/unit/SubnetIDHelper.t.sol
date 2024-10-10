@@ -133,8 +133,7 @@ contract SubnetIDHelperTest is Test {
         SubnetID memory subnetId1 = SubnetID(ROOTNET_CHAINID, route1);
         SubnetID memory subnetId2 = SubnetID(ROOTNET_CHAINID, route2);
 
-        vm.expectRevert(SubnetIDHelper.InvalidRoute.selector);
-        subnetId1.down(subnetId2);
+        assertTrue(subnetId1.down(subnetId2).isEmpty());
     }
 
     function test_Down_Works_Subnet2RouteLenghtEqualToSubnet1() public {
@@ -147,15 +146,14 @@ contract SubnetIDHelperTest is Test {
         SubnetID memory subnetId1 = SubnetID(ROOTNET_CHAINID, route1);
         SubnetID memory subnetId2 = SubnetID(ROOTNET_CHAINID, route2);
 
-        vm.expectRevert(SubnetIDHelper.InvalidRoute.selector);
-        subnetId1.down(subnetId2);
+        assertTrue(subnetId1.down(subnetId2).isEmpty());
     }
 
     function test_Down_Works_WrongRoot() public {
         SubnetID memory subnetId1 = SubnetID(1, new address[](0));
         SubnetID memory subnetId2 = SubnetID(2, new address[](0));
 
-        vm.expectRevert(SubnetIDHelper.DifferentRootNetwork.selector);
+        assertTrue(subnetId1.down(subnetId2).isEmpty());
         subnetId1.down(subnetId2);
     }
 

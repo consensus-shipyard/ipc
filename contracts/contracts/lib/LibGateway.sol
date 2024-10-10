@@ -17,6 +17,14 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 
 import "forge-std/console.sol";
 
+// Validation outcomes for cross messages
+enum CrossMessageValidationOutcome {
+    Valid,
+    InvalidDstSubnet,
+    CannotSendToItself,
+    CommonParentNotExist
+}
+
 library LibGateway {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for IpcEnvelope;
@@ -358,7 +366,6 @@ library LibGateway {
     /// @param arrivingFrom - the immediate subnet from which this message is arriving
     /// @param crossMsg - the cross message to be executed
     function applyMsg(SubnetID memory arrivingFrom, IpcEnvelope memory crossMsg) internal {
-        console.log("--------- applyMsg");
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
 
         if (crossMsg.to.subnetId.isEmpty()) {
@@ -372,17 +379,12 @@ library LibGateway {
         Asset memory supplySource;
         IPCMsgType applyType = crossMsg.applyType(s.networkName);
         if (applyType == IPCMsgType.BottomUp) {
-            console.log("--------- applyMsg - bottom up");
-            // Load the subnet this message is coming from. Ensure that it exists and that the nonce expectation is met.
-            (bool registered, Subnet storage subnet) = LibGateway.getSubnet(arrivingFrom);
-            if (!registered) {
-                // this means the subnet that sent the bottom up message is not registered,
-                // we cannot send the receipt back as top down because the subnet is not registered
-                // we ignore this message for as it's not valid, and it may be someone trying to forge it.
-                return;
-            }
+            // Load the subnet this message is coming from.
+            (bool found, Subnet storage subnet) = LibGateway.getSubnet(arrivingFrom);
+            console.log("bottom up");
+            console.log("found: %s", found);
+   
             if (subnet.appliedBottomUpNonce != crossMsg.nonce) {
-                console.log("--------- applyMsg - failed nonce");
                 sendReceipt(crossMsg, OutcomeType.SystemErr, abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Nonce));
                 return;
             }
@@ -392,10 +394,9 @@ library LibGateway {
             // configuration of the subnet.
             supplySource = SubnetActorGetterFacet(subnet.id.getActor()).supplySource();
         } else if (applyType == IPCMsgType.TopDown) {
-            console.log("--------- applyMsg - top down");
+            console.log("top down");
             // Note: there is no need to load the subnet, as a top-down application means that _we_ are the subnet.
             if (s.appliedTopDownNonce != crossMsg.nonce) {
-                console.log("--------- applyMsg - failed nonce. Want: %d, Got: %d", s.appliedTopDownNonce, crossMsg.nonce);
                 sendReceipt(crossMsg, OutcomeType.SystemErr, abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Nonce));
                 return;
             }
@@ -406,17 +407,18 @@ library LibGateway {
             supplySource = AssetHelper.native();
         }
 
-        console.log("crossMsg.to.subnetId: %s", crossMsg.to.subnetId.toString());
-        console.log("s.networkName: %s", s.networkName.toString());
-
         // If the crossnet destination is NOT the current network (network where the gateway is running),
         // we add it to the postbox for further propagation.
         // Even if we send for propagation, the execution of every message
         // should increase the appliedNonce to allow the execution of the next message
         // of the batch (this is way we have this after the nonce logic).
         if (!crossMsg.to.subnetId.equals(s.networkName)) {
-            console.log("--------- applyMsg - postbox");
-            console.log("--------- applyMsg address: %s", address(this));
+            CrossMessageValidationOutcome outcome = validateCrossMessage(crossMsg);
+            if (outcome != CrossMessageValidationOutcome.Valid) {
+                sendReceipt(crossMsg, OutcomeType.SystemErr, abi.encode(outcome));
+                return;
+            }
+
             bytes32 cid = crossMsg.toHash();
             s.postboxKeys.add(cid);
             s.postbox[cid] = crossMsg;
@@ -427,7 +429,6 @@ library LibGateway {
     
         // execute the message and get the receipt.
         (bool success, bytes memory ret) = executeCrossMsg(crossMsg, supplySource);
-        console.log("--------- applyMsg - success: %s", success);
         if (success) {
             sendReceipt(crossMsg, OutcomeType.Ok, ret);
         } else {
@@ -474,37 +475,6 @@ library LibGateway {
         // slither-disable-next-line unused-return
         commitCrossMessage(original.createResultMsg(outcomeType, ret));
     }
-
-    function commitCrossMessageFromCheckpoint(IpcEnvelope memory crossMessage) internal returns (bool shouldBurn) {
-        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
-        SubnetID memory to = crossMessage.to.subnetId;
-        SubnetID memory from = crossMessage.from.subnetId;
-        IPCMsgType applyType = crossMessage.applyType(s.networkName);
-        
-        console.log("--- commitCrossMessage");
-
-        // TODO Karel - this needs to be fixed. It is possible now to have supply kind of ERC20.
-        // only in case of a mismatch we want make sure we result the message with system error.
-        bool reject = false;
-        if (applyType == IPCMsgType.BottomUp) {
-            // We're traversing up, so if we're the first hop, we reject if the subnet was ERC20.
-            // If we're not the first hop, a child propagated this to us, they made a mistake and
-            // and we don't have enough info to evaluate.
-            reject = from.getParentSubnet().equals(s.networkName) && from.getActor().hasSupplyOfKind(AssetKind.ERC20);
-        } else if (applyType == IPCMsgType.TopDown) {
-            // We're traversing down.
-            // Check the next subnet (which can may be the destination subnet).
-            reject = to.down(s.networkName).getActor().hasSupplyOfKind(AssetKind.ERC20);
-        }
-        if (reject) {
-            // TODO Karel - send receit here instead
-            if (crossMessage.kind == IpcMsgKind.Transfer) {
-                revert MethodNotAllowed("propagation of `Transfer` messages not suppported for subnets with ERC20 supply");
-            }
-        }
-
-        commitCrossMessage(crossMessage);
-    }
     
     /**
      * @notice Commit the cross message to storage.
@@ -523,14 +493,12 @@ library LibGateway {
         // If the directionality is top-down, or if we're inverting the direction
         // because we're the LCA, commit a top-down message.
         if (applyType == IPCMsgType.TopDown || isLCA) {
-            console.log("--- commitCrossMessage top down");
             ++s.appliedTopDownNonce;
             (, Subnet storage subnet) = getSubnet(to.down(s.networkName));
             LibGateway.commitTopDownMsg(subnet, crossMessage);
             return (shouldBurn = false);
         }
 
-        console.log("--- commitCrossMessage bottom up");
         // Else, commit a bottom up message.
         LibGateway.commitBottomUpMsg(crossMessage);
         // gas-opt: original check: value > 0
@@ -560,4 +528,40 @@ library LibGateway {
             revert MaxMsgsPerBatchExceeded();
         }
     }
+
+    /// @notice Validates a cross message before committing it.
+    function validateCrossMessage(IpcEnvelope memory envelope) internal view returns (CrossMessageValidationOutcome) {
+        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
+        SubnetID memory toSubnetId = envelope.to.subnetId;
+
+        if (toSubnetId.isEmpty()) {
+            return CrossMessageValidationOutcome.InvalidDstSubnet;
+        }
+
+        // We cannot send a cross message to the same subnet.
+        if (toSubnetId.equals(s.networkName)) {
+            return CrossMessageValidationOutcome.CannotSendToItself;
+        }
+
+        // Lowest common ancestor subnet
+        bool isLCA = toSubnetId.commonParent(envelope.from.subnetId).equals(s.networkName);
+        IPCMsgType applyType = envelope.applyType(s.networkName);
+        
+        // If the directionality is top-down, or if we're inverting the direction
+        // else we need to check if the common parent exists.
+        if (applyType == IPCMsgType.TopDown || isLCA) {
+            (bool foundSubnet,) = LibGateway.getSubnet(toSubnetId.down(s.networkName));
+            if (!foundSubnet) {
+                return CrossMessageValidationOutcome.InvalidDstSubnet;
+            }
+        } else {
+            SubnetID memory commonParent = toSubnetId.commonParent(s.networkName);
+            if (commonParent.isEmpty()) {
+                return CrossMessageValidationOutcome.CommonParentNotExist;
+            }
+        }
+
+        return CrossMessageValidationOutcome.Valid;
+    }
+    
 }
