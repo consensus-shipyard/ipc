@@ -8,6 +8,7 @@ import "../../contracts/lib/FvmAddressHelper.sol";
 import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
 import {Asset} from "../../contracts/structs/Subnet.sol";
 import {IpcMsgKind, CallMsg} from "../../contracts/structs/CrossNet.sol";
+import {MockContractFailbackable} from "../helpers/TestUtils.sol";
 
 import "@openzeppelin/contracts/utils/Address.sol";
 
@@ -145,7 +146,7 @@ contract CrossMsgHelperTest is Test {
 
     function test_Execute_Works_SendValue() public {
         address sender = address(this);
-        address recipient = address(100);
+        address recipient = address(new MockContractFailbackable());
 
         crossMsg.to.rawAddress = FvmAddressHelper.from(recipient);
         crossMsg.kind = IpcMsgKind.Call;
@@ -165,7 +166,7 @@ contract CrossMsgHelperTest is Test {
 
     function test_Execute_Works_FunctionCallWithValue() public {
         address sender = address(this);
-        address recipient = address(100);
+        address recipient = address(new MockContractFailbackable());
 
         crossMsg.to.rawAddress = FvmAddressHelper.from(recipient);
         crossMsg.kind = IpcMsgKind.Call;
@@ -185,7 +186,7 @@ contract CrossMsgHelperTest is Test {
 
     function test_Execute_Works_FunctionCallWithoutValue() public {
         address sender = address(this);
-        address recipient = address(100);
+        address recipient = address(new MockContractFailbackable());
 
         crossMsg.kind = IpcMsgKind.Call;
         crossMsg.to.rawAddress = FvmAddressHelper.from(recipient);

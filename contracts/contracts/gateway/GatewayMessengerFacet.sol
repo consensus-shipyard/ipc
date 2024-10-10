@@ -7,7 +7,7 @@ import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {Subnet, SubnetID, AssetKind, IPCAddress} from "../structs/Subnet.sol";
 import {InvalidXnetMessage, InvalidXnetMessageReason, CannotSendCrossMsgToItself, MethodNotAllowed, CommonParentDoesNotExist} from "../errors/IPCErrors.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
-import {LibGateway} from "../lib/LibGateway.sol";
+import {LibGateway, CrossMessageValidationOutcome} from "../lib/LibGateway.sol";
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {AssetHelper} from "../lib/AssetHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
@@ -45,44 +45,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
             revert MethodNotAllowed(ERR_GENERAL_CROSS_MSG_DISABLED);
         }
 
-        // We prevent the sender from being an EoA.
-        if (!(msg.sender.code.length > 0)) {
-            revert InvalidXnetMessage(InvalidXnetMessageReason.Sender);
-        }
-
-        if (envelope.value != msg.value) {
-            revert InvalidXnetMessage(InvalidXnetMessageReason.Value);
-        }
-
-        if (envelope.kind != IpcMsgKind.Call) {
-            revert InvalidXnetMessage(InvalidXnetMessageReason.Kind);
-        }
-
-        SubnetID memory toId = envelope.to.subnetId;
-        
-        if (toId.isEmpty()) {
-            revert InvalidXnetMessage(InvalidXnetMessageReason.DstSubnet);
-        }
-
-        // destination is the current network, you are better off with a good old message, no cross needed
-        if (toId.equals(s.networkName)) {
-            revert CannotSendCrossMsgToItself();
-        }
-
-        IPCMsgType applyType = envelope.applyType(s.networkName);
-        bool isLCA = toId.commonParent(envelope.from.subnetId).equals(s.networkName);
-
-        if (applyType == IPCMsgType.TopDown || isLCA) {
-            (bool foundSubnet,) = LibGateway.getSubnet(toId.down(s.networkName));
-            if (!foundSubnet) {
-                revert InvalidXnetMessage(InvalidXnetMessageReason.DstSubnet);
-            }
-        } else {
-            SubnetID memory commonParent = toId.commonParent(s.networkName);
-            if (commonParent.isEmpty()) {
-                revert CommonParentDoesNotExist();
-            }
-        }
+        validateCrossMessage(envelope);
 
         // Will revert if the message won't deserialize into a CallMsg.
         abi.decode(envelope.message, (CallMsg));
@@ -153,5 +116,36 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
         LibGateway.crossMsgSideEffects({v: v, shouldBurn: shouldBurn});
 
         emit MessagePropagatedFromPostbox({id: msgCid});
+    }
+
+    /**
+     * @dev Validates the cross-net message and reverts if it is invalid.
+     * @param envelope - the cross-net message to validate
+     */
+    function validateCrossMessage(IpcEnvelope memory envelope) internal {
+        // We prevent the sender from being an EoA.
+        if (!(msg.sender.code.length > 0)) {
+            revert InvalidXnetMessage(InvalidXnetMessageReason.Sender);
+        }
+
+        if (envelope.value != msg.value) {
+            revert InvalidXnetMessage(InvalidXnetMessageReason.Value);
+        }
+
+        if (envelope.kind != IpcMsgKind.Call) {
+            revert InvalidXnetMessage(InvalidXnetMessageReason.Kind);
+        }
+
+        CrossMessageValidationOutcome outcome = LibGateway.validateCrossMessage(envelope);
+
+        if (outcome != CrossMessageValidationOutcome.Valid) {
+            if (outcome == CrossMessageValidationOutcome.InvalidDstSubnet) {
+                revert InvalidXnetMessage(InvalidXnetMessageReason.DstSubnet);
+            } else if (outcome == CrossMessageValidationOutcome.CannotSendToItself) {
+                revert CannotSendCrossMsgToItself();
+            } else if (outcome == CrossMessageValidationOutcome.CommonParentNotExist) {
+                revert CommonParentDoesNotExist();
+            }
+        }
     }
 }
