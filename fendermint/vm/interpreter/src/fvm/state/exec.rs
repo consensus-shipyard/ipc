@@ -1,11 +1,13 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
 use anyhow::Ok;
 use cid::Cid;
 use fendermint_vm_genesis::PowerScale;
+use fvm::engine::EnginePool;
 use fvm::{
     call_manager::DefaultCallManager,
     engine::MultiEngine,
@@ -24,6 +26,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
 use crate::fvm::externs::FendermintExterns;
+use crate::fvm::store::ReadOnlyBlockstore;
 use fendermint_vm_core::{chainid::HasChainID, Timestamp};
 use fendermint_vm_encoding::IsHumanReadable;
 
@@ -113,6 +116,8 @@ where
 
     /// Indicate whether the parameters have been updated.
     params_dirty: bool,
+
+    executor_info: ExecutorInfo<DB>,
 }
 
 impl<DB> FvmExecState<DB>
@@ -145,8 +150,8 @@ where
 
         let engine = multi_engine.get(&nc)?;
         let externs = FendermintExterns::new(blockstore.clone(), params.state_root);
-        let machine = DefaultMachine::new(&mc, blockstore, externs)?;
-        let executor = DefaultExecutor::new(engine, machine)?;
+        let machine = DefaultMachine::new(&mc, blockstore.clone(), externs)?;
+        let executor = DefaultExecutor::new(engine.clone(), machine)?;
 
         Ok(Self {
             executor,
@@ -159,6 +164,10 @@ where
                 power_scale: params.power_scale,
             },
             params_dirty: false,
+            executor_info: ExecutorInfo {
+                engine_pool: engine,
+                store: blockstore.clone(),
+            },
         })
     }
 
@@ -310,6 +319,22 @@ where
         f(&mut self.params);
         self.params_dirty = true;
     }
+
+    pub fn call_state(&self) -> anyhow::Result<FvmCallState<DB>> {
+        let externs = self.executor.externs().read_only_clone();
+        let machine = DefaultMachine::new(
+            self.executor.context(),
+            ReadOnlyBlockstore::new(self.executor_info.store.clone()),
+            externs,
+        )?;
+
+        Ok(FvmCallState {
+            executor: RefCell::new(DefaultExecutor::new(
+                self.executor_info.engine_pool.clone(),
+                machine,
+            )?),
+        })
+    }
 }
 
 impl<DB> HasChainID for FvmExecState<DB>
@@ -349,4 +374,34 @@ fn check_error(e: anyhow::Error) -> (ApplyRet, ActorAddressMap) {
         events: Vec::new(),
     };
     (ret, Default::default())
+}
+
+/// Tracks the metadata about the executor, so that it can be used to clone itself or create call state
+struct ExecutorInfo<DB> {
+    engine_pool: EnginePool,
+    store: DB,
+}
+
+type CallExecutor<DB> = DefaultExecutor<
+    DefaultKernel<
+        DefaultCallManager<
+            DefaultMachine<ReadOnlyBlockstore<DB>, FendermintExterns<ReadOnlyBlockstore<DB>>>,
+        >,
+    >,
+>;
+
+/// A state we create for the calling the getters through fvm
+pub struct FvmCallState<DB>
+where
+    DB: Blockstore + Clone + 'static,
+{
+    executor: RefCell<CallExecutor<DB>>,
+}
+
+impl<DB: Blockstore + Clone + 'static> FvmCallState<DB> {
+    pub fn call(&self, msg: Message) -> anyhow::Result<ApplyRet> {
+        let mut inner = self.executor.borrow_mut();
+        let raw_length = fvm_ipld_encoding::to_vec(&msg).map(|bz| bz.len())?;
+        Ok(inner.execute_message(msg, ApplyKind::Implicit, raw_length)?)
+    }
 }
