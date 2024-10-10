@@ -12,7 +12,7 @@ use fvm_shared::{address::Address, ActorID, MethodNum, BLOCK_GAS_LIMIT};
 use ipc_observability::{emit, measure_time, observe::TracingError, Traceable};
 use tendermint_rpc::Client;
 
-use crate::fvm::gas::{GasMarket, GasUtilization};
+use crate::fvm::gas_market::{GasMarket, GasUtilization};
 use crate::ExecInterpreter;
 
 use super::{
@@ -158,7 +158,7 @@ where
 
             (apply_ret, emitters, latency)
         } else {
-            let available_gas = state.gas_market().available().block_gas;
+            let available_gas = state.gas_market().available();
             if msg.gas_limit > available_gas {
                 // This is panic-worthy, but we suppress it to avoid liveness issues.
                 // Consider maybe record as evidence for the validator slashing?

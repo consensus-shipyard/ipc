@@ -3,7 +3,7 @@
 
 //! Gas related message selection
 
-use crate::fvm::gas::GasMarket;
+use crate::fvm::gas::BlockGasTracker;
 use crate::fvm::state::FvmExecState;
 use fendermint_vm_message::signed::SignedMessage;
 use fvm_ipld_blockstore::Blockstore;
@@ -25,7 +25,7 @@ impl MessageSelector for GasLimitSelector {
         state: &FvmExecState<DB>,
         mut msgs: Vec<SignedMessage>,
     ) -> Vec<SignedMessage> {
-        let total_gas_limit = state.gas_market().available().block_gas;
+        let total_gas_limit = state.gas_market().available();
 
         // sort by gas limit descending
         msgs.sort_by(|a, b| b.message.gas_limit.cmp(&a.message.gas_limit));

@@ -1,7 +1,7 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use fendermint_actors_api;
+use fendermint_actors_api::gas_market::Gas;
 use fil_actors_runtime::actor_error;
 use fil_actors_runtime::runtime::{ActorCode, Runtime};
 use fil_actors_runtime::SYSTEM_ACTOR_ADDR;
@@ -17,7 +17,6 @@ fil_actors_runtime::wasm_trampoline!(Actor);
 
 pub const ACTOR_NAME: &str = "eip1559_gas_market";
 
-pub type Gas = u64;
 pub type SetConstants = Constants;
 
 #[derive(Serialize_tuple, Deserialize_tuple, Debug, Clone)]
@@ -60,10 +59,7 @@ pub enum Method {
 
 impl Actor {
     /// Creates the actor
-    pub fn constructor(
-        rt: &impl Runtime,
-        params: ConstructorParams,
-    ) -> Result<(), ActorError> {
+    pub fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
         let st = State {
@@ -92,7 +88,9 @@ impl Actor {
 }
 
 impl fendermint_actors_api::gas_market::GasMarket for Actor {
-    fn current_reading(rt: &impl Runtime) -> Result<fendermint_actors_api::gas_market::Reading, ActorError> {
+    fn current_reading(
+        rt: &impl Runtime,
+    ) -> Result<fendermint_actors_api::gas_market::Reading, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
         let st = rt.state::<State>()?;
@@ -101,7 +99,6 @@ impl fendermint_actors_api::gas_market::GasMarket for Actor {
             base_fee: st.base_fee,
         })
     }
-
 
     fn update_utilization(
         rt: &impl Runtime,
@@ -187,17 +184,14 @@ impl ActorCode for Actor {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        Constants, Actor, State,
-        ConstructorParams, Method,
-    };
+    use crate::{Actor, Constants, ConstructorParams, Method, State};
+    use fendermint_actors_api::gas_market::{Reading, Utilization};
     use fil_actors_runtime::test_utils::{expect_empty, MockRuntime, SYSTEM_ACTOR_CODE_ID};
     use fil_actors_runtime::SYSTEM_ACTOR_ADDR;
     use fvm_ipld_encoding::ipld_block::IpldBlock;
     use fvm_shared::address::Address;
     use fvm_shared::econ::TokenAmount;
     use fvm_shared::error::ExitCode;
-    use fendermint_actors_api::gas_market::{Reading, Utilization};
 
     pub fn construct_and_verify() -> MockRuntime {
         let rt = MockRuntime {

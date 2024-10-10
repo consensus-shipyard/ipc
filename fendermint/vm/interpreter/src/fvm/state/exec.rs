@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
 use crate::fvm::externs::FendermintExterns;
-use crate::fvm::gas::actor::ActorGasMarket;
+use crate::fvm::gas::BlockGasTracker;
 use fendermint_vm_core::{chainid::HasChainID, Timestamp};
 use fendermint_vm_encoding::IsHumanReadable;
 
@@ -114,7 +114,7 @@ where
     params_dirty: bool,
     /// Keeps track of block gas usage during execution, and takes care of updating
     /// the chosen gas market strategy (by default an on-chain actor delivering EIP-1559 behaviour).
-    gas_market: ActorGasMarket,
+    gas_market: BlockGasTracker,
 }
 
 impl<DB> FvmExecState<DB>
@@ -149,7 +149,7 @@ where
         let externs = FendermintExterns::new(blockstore.clone(), params.state_root);
         let machine = DefaultMachine::new(&mc, blockstore, externs)?;
         let mut executor = DefaultExecutor::new(engine, machine)?;
-        let gas_market = ActorGasMarket::create(&mut executor, block_height)?;
+        let gas_market = BlockGasTracker::create(&mut executor, block_height)?;
 
         Ok(Self {
             executor,
@@ -178,11 +178,11 @@ where
         self
     }
 
-    pub fn gas_market_mut(&mut self) -> &mut ActorGasMarket {
+    pub fn gas_market_mut(&mut self) -> &mut BlockGasTracker {
         &mut self.gas_market
     }
 
-    pub fn gas_market(&self) -> &ActorGasMarket {
+    pub fn gas_market(&self) -> &BlockGasTracker {
         &self.gas_market
     }
 

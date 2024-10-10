@@ -1,6 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-use crate::fvm::gas::GasMarket;
+use crate::fvm::gas::BlockGasTracker;
 use crate::fvm::state::ipc::GatewayCaller;
 use crate::fvm::store::ReadOnlyBlockstore;
 use crate::fvm::{topdown, FvmApplyRet, PowerUpdates};
@@ -235,7 +235,7 @@ where
             };
         }
 
-        Ok(block_gas_usage <= state.gas_market().available().block_gas)
+        Ok(block_gas_usage <= state.gas_market().available())
     }
 }
 

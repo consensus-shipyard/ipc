@@ -13,7 +13,7 @@ use fendermint_vm_actor_interface::gas_market::GAS_MARKET_ACTOR_ADDR;
 use fendermint_vm_actor_interface::system;
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Account, Actor, ActorMeta, Genesis, PermissionMode, SignerAddr};
-use fendermint_vm_interpreter::fvm::gas::GasMarket;
+use fendermint_vm_interpreter::fvm::gas_market::GasMarket;
 use fendermint_vm_interpreter::fvm::state::FvmExecState;
 use fendermint_vm_interpreter::fvm::store::memory::MemoryBlockstore;
 use fendermint_vm_interpreter::fvm::upgrades::{Upgrade, UpgradeScheduler};
