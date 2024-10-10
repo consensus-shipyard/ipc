@@ -227,6 +227,11 @@ contract MockIpcContractPayable is IIpcHandler {
     receive() external payable {}
 }
 
+contract MockContractFailbackable {
+    // receive() external payable {}
+    fallback() external payable {}
+}
+
 contract MockIpcContractResult is IIpcHandler {
     ResultMsg _result;
     bool _hasResult;

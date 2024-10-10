@@ -45,11 +45,11 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
         IpcEnvelope[] memory topDownMsgs = new IpcEnvelope[](n);
         for (uint64 i = 0; i < n; i++) {
             topDownMsgs[i] = TestUtils.newXnetCallMsg(
-                IPCAddress({subnetId: id, rawAddress: FvmAddressHelper.from(address(this))}),
                 IPCAddress({
                     subnetId: gatewayDiamond.getter().getNetworkName().getParentSubnet(),
                     rawAddress: FvmAddressHelper.from(receipient)
                 }),
+                IPCAddress({subnetId: id, rawAddress: FvmAddressHelper.from(address(this))}),
                 0,
                 i
             );

@@ -626,11 +626,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         messenger.propagateAllPostboxMessages();
     }
 
-    function executeTopDownMsgsRevert(IpcEnvelope[] memory msgs, GatewayDiamond gw) internal {
-        vm.expectRevert();
-        executeTopDownMsgs(msgs, gw);
-    }
-
     function callCreateBottomUpCheckpointFromChildSubnet(
         SubnetID memory subnet,
         GatewayDiamond gw

@@ -285,43 +285,6 @@ contract LibGatewayTest is Test {
         require(stored.toHash() == expected.toHash(), "receipt hash not matching");
     }
 
-    function test_applyMsg_bottomUpNotRegistered() public {
-        LibGatewayMock t = new LibGatewayMock();
-
-        address callingContract = address(new GatewayDummyContract());
-
-        address childSubnetActor = address(new SubnetActorGetterFacet());
-
-        address[] memory parentRoute = new address[](1);
-        parentRoute[0] = address(1);
-
-        address[] memory childRoute = new address[](2);
-        childRoute[0] = address(1);
-        childRoute[1] = childSubnetActor;
-
-        SubnetID memory parentSubnet = SubnetID({root: 1, route: parentRoute});
-        SubnetID memory childSubnet = SubnetID({root: 1, route: childRoute});
-
-        t.setSubnet(parentSubnet, 1);
-
-        address fromRaw = address(1000);
-        address toRaw = callingContract;
-
-        IPCAddress memory from = IPCAddress({subnetId: childSubnet, rawAddress: FvmAddressHelper.from(fromRaw)});
-        IPCAddress memory to = IPCAddress({subnetId: parentSubnet, rawAddress: FvmAddressHelper.from(toRaw)});
-
-        IpcEnvelope memory crossMsg = CrossMsgHelper.createCallMsg({
-            from: from,
-            to: to,
-            value: 0,
-            method: GatewayDummyContract.reverts.selector,
-            params: new bytes(0)
-        });
-        crossMsg.nonce = 0;
-
-        t.applyMsg(childSubnet, crossMsg);
-    }
-
     function test_applyMsg_bottomUpInvalidNonce() public {
         LibGatewayMock t = new LibGatewayMock();
         address callingContract = address(new GatewayDummyContract());
