@@ -36,9 +36,10 @@ where
     }
 }
 
-impl <DB> FendermintExterns<DB>
-    where
-        DB: Blockstore + 'static + Clone,{
+impl<DB> FendermintExterns<DB>
+where
+    DB: Blockstore + 'static + Clone,
+{
     pub fn read_only_clone(&self) -> FendermintExterns<ReadOnlyBlockstore<DB>> {
         FendermintExterns {
             blockstore: ReadOnlyBlockstore::new(self.blockstore.clone()),

@@ -7,6 +7,7 @@ use std::collections::{HashMap, HashSet};
 use anyhow::Ok;
 use cid::Cid;
 use fendermint_vm_genesis::PowerScale;
+use fvm::engine::EnginePool;
 use fvm::{
     call_manager::DefaultCallManager,
     engine::MultiEngine,
@@ -15,7 +16,6 @@ use fvm::{
     state_tree::StateTree,
     DefaultKernel,
 };
-use fvm::engine::EnginePool;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::{
@@ -26,9 +26,9 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
 use crate::fvm::externs::FendermintExterns;
+use crate::fvm::store::ReadOnlyBlockstore;
 use fendermint_vm_core::{chainid::HasChainID, Timestamp};
 use fendermint_vm_encoding::IsHumanReadable;
-use crate::fvm::store::ReadOnlyBlockstore;
 
 pub type BlockHash = [u8; 32];
 
@@ -325,13 +325,14 @@ where
         let machine = DefaultMachine::new(
             self.executor.context(),
             ReadOnlyBlockstore::new(self.executor_info.store.clone()),
-            externs
+            externs,
         )?;
 
         Ok(FvmCallState {
-            executor: RefCell::new(
-                DefaultExecutor::new(self.executor_info.engine_pool.clone(), machine)?
-            )
+            executor: RefCell::new(DefaultExecutor::new(
+                self.executor_info.engine_pool.clone(),
+                machine,
+            )?),
         })
     }
 }
@@ -382,18 +383,22 @@ struct ExecutorInfo<DB> {
 }
 
 type CallExecutor<DB> = DefaultExecutor<
-    DefaultKernel<DefaultCallManager<DefaultMachine<ReadOnlyBlockstore<DB>, FendermintExterns<ReadOnlyBlockstore<DB>>>>>,
+    DefaultKernel<
+        DefaultCallManager<
+            DefaultMachine<ReadOnlyBlockstore<DB>, FendermintExterns<ReadOnlyBlockstore<DB>>>,
+        >,
+    >,
 >;
 
 /// A state we create for the calling the getters through fvm
 pub struct FvmCallState<DB>
-    where
-        DB: Blockstore + Clone + 'static,
+where
+    DB: Blockstore + Clone + 'static,
 {
     executor: RefCell<CallExecutor<DB>>,
 }
 
-impl <DB: Blockstore + Clone + 'static> FvmCallState<DB> {
+impl<DB: Blockstore + Clone + 'static> FvmCallState<DB> {
     pub fn call(&self, msg: Message) -> anyhow::Result<ApplyRet> {
         let mut inner = self.executor.borrow_mut();
         let raw_length = fvm_ipld_encoding::to_vec(&msg).map(|bz| bz.len())?;
