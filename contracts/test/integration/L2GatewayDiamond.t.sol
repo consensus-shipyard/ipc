@@ -6,7 +6,8 @@ import "../../contracts/errors/IPCErrors.sol";
 import {EMPTY_BYTES, METHOD_SEND} from "../../contracts/constants/Constants.sol";
 import {IpcEnvelope} from "../../contracts/structs/CrossNet.sol";
 import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
-import {SubnetID, Subnet, IPCAddress, Validator} from "../../contracts/structs/Subnet.sol";
+import {SubnetID, Subnet, IPCAddress, Validator, Asset, AssetKind} from "../../contracts/structs/Subnet.sol";
+import {AssetHelper} from "../../contracts/lib/AssetHelper.sol";
 import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../../contracts/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../../contracts/lib/CrossMsgHelper.sol";
@@ -29,6 +30,7 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for IpcEnvelope;
     using GatewayFacetsHelper for GatewayDiamond;
+    using AssetHelper for Asset;
 
     function testGatewayDiamond_CommitParentFinality_BigNumberOfMessages() public {
         uint256 n = 2000;
@@ -65,38 +67,15 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
         vm.stopPrank();
     }
 
-    function testGatewayDiamond_Propagate_Works_WithFeeRemainderNew() external {
-        if (!FEATURE_MULTILEVEL_CROSSMSG) {
-            // skip
-            return;
-        }
-        (, address[] memory validators) = setupValidators();
-        address caller = validators[0];
-
-        bytes32 postboxId = setupWhiteListMethod(caller);
-
+    function testGatewayDiamond_Propagate_Works() external {
+        address caller = vm.addr(100);  
         vm.deal(caller, 1 ether);
 
-        vm.expectCall(caller, 1 ether, new bytes(0), 1);
-        vm.prank(caller);
-        gatewayDiamond.messenger().propagatePostboxMessage{value: 1 ether}(postboxId);
-
-        require(caller.balance == 1 ether, "unexpected balance");
-    }
-
-    function testGatewayDiamond_Propagate_Works_NoFeeReminder() external {
-        if (!FEATURE_MULTILEVEL_CROSSMSG) {
-            // skip
-            return;
-        }
-        (, address[] memory validators) = setupValidators();
-        address caller = validators[0];
-
         bytes32 postboxId = setupWhiteListMethod(caller);
 
         vm.prank(caller);
-        vm.expectCall(caller, 0, EMPTY_BYTES, 0);
-        gatewayDiamond.messenger().propagatePostboxMessage{value: 0}(postboxId);
+        vm.expectCall(caller, 1 ether, EMPTY_BYTES, 0);
+        gatewayDiamond.messenger().propagatePostboxMessage{value: 1 ether}(postboxId);
         require(caller.balance == 0, "unexpected balance");
     }
 
@@ -105,7 +84,7 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
 
         IpcEnvelope memory crossMsg = TestUtils.newXnetCallMsg(
             IPCAddress({
-                subnetId: gatewayDiamond.getter().getNetworkName().createSubnetId(caller),
+                subnetId: gatewayDiamond.getter().getNetworkName().getParentSubnet(),
                 rawAddress: FvmAddressHelper.from(caller)
             }),
             IPCAddress({
@@ -125,4 +104,8 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
     }
 
     function callback() public view {}
+
+    function collateralSource() external view returns (Asset memory supply) {
+        return AssetHelper.native();
+    }
 }

@@ -341,6 +341,7 @@ library LibGateway {
         return ((uint64(blockNumber) / checkPeriod) + 1) * checkPeriod;
     }
 
+
     /// @notice applies a cross-net messages coming from some other subnet.
     /// The forwarder argument determines the previous subnet that submitted the checkpoint triggering the cross-net message execution.
     /// @param arrivingFrom - the immediate subnet from which this message is arriving
@@ -349,6 +350,19 @@ library LibGateway {
         uint256 crossMsgsLength = crossMsgs.length;
         for (uint256 i; i < crossMsgsLength; ) {
             applyMsg(arrivingFrom, crossMsgs[i]);
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    /// @notice applies a top down messages coming from parent. Reverts if a message is not top-down.
+    /// @param arrivingFrom - the immediate subnet from which this message is arriving
+    /// @param crossMsgs - the cross-net messages to apply
+    function applyTopDownMessages(SubnetID memory arrivingFrom, IpcEnvelope[] memory crossMsgs) internal {
+        uint256 crossMsgsLength = crossMsgs.length;
+        for (uint256 i; i < crossMsgsLength; ) {
+            applyMsg(arrivingFrom, crossMsgs[i], true);
             unchecked {
                 ++i;
             }
@@ -364,6 +378,19 @@ library LibGateway {
     /// @param arrivingFrom - the immediate subnet from which this message is arriving
     /// @param crossMsg - the cross message to be executed
     function applyMsg(SubnetID memory arrivingFrom, IpcEnvelope memory crossMsg) internal {
+        applyMsg(arrivingFrom, crossMsg, false);
+    }
+    
+    /// @notice executes a cross message if its destination is the current network, otherwise adds it to the postbox to be propagated further
+    /// This function assumes that the relevant funds have been already minted or burnt
+    /// when the top-down or bottom-up messages have been queued for execution.
+    /// This function is not expected to revert. If a controlled failure happens, a new
+    /// cross-message receipt is propagated for execution to inform the sending contract.
+    /// `Call` cross-messages also trigger receipts if they are successful.
+    /// @param arrivingFrom - the immediate subnet from which this message is arriving
+    /// @param crossMsg - the cross message to be executed
+    /// @param expectTopDownOnly - whether the message should be top-down only. Reverts if it is not.
+    function applyMsg(SubnetID memory arrivingFrom, IpcEnvelope memory crossMsg, bool expectTopDownOnly) internal {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
 
         if (crossMsg.to.subnetId.isEmpty()) {
@@ -377,7 +404,13 @@ library LibGateway {
         Asset memory supplySource;
         IPCMsgType applyType = crossMsg.applyType(s.networkName);
         if (applyType == IPCMsgType.BottomUp) {
+            if (expectTopDownOnly) {
+                revert("Expecting top-down messages only");
+            }
+
             // Load the subnet this message is coming from.
+            // It will revert in case the subnet is not found - which in this case makes sense
+            // This is because non existing child should not send messages.
             (, Subnet storage subnet) = LibGateway.getSubnet(arrivingFrom);
 
             if (subnet.appliedBottomUpNonce != crossMsg.nonce) {
