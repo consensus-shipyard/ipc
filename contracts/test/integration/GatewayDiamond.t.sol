@@ -1187,7 +1187,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             subnetId,
             FvmAddressHelper.from(address(caller))
         );
-        (, subnetInfo) = gatewayDiamond.getter().getSubnet(subnetId);        
+        (, subnetInfo) = gatewayDiamond.getter().getSubnet(subnetId);
         require(subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT, "unexpected circulation supply after funding");
 
         IpcEnvelope[] memory msgs = new IpcEnvelope[](10);

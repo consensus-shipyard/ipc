@@ -68,7 +68,7 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
     }
 
     function testGatewayDiamond_Propagate_Works() external {
-        address caller = vm.addr(100);  
+        address caller = vm.addr(100);
         vm.deal(caller, 1 ether);
 
         bytes32 postboxId = setupWhiteListMethod(caller);
