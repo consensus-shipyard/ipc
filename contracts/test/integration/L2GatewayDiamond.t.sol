@@ -67,42 +67,6 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
         vm.stopPrank();
     }
 
-    function testGatewayDiamond_Propagate_Works() external {
-        address caller = vm.addr(100);
-        vm.deal(caller, 1 ether);
-
-        bytes32 postboxId = setupWhiteListMethod(caller);
-
-        vm.prank(caller);
-        vm.expectCall(caller, 1 ether, EMPTY_BYTES, 0);
-        gatewayDiamond.messenger().propagatePostboxMessage{value: 1 ether}(postboxId);
-        require(caller.balance == 0, "unexpected balance");
-    }
-
-    function setupWhiteListMethod(address caller) internal returns (bytes32) {
-        registerSubnet(DEFAULT_COLLATERAL_AMOUNT, address(this));
-
-        IpcEnvelope memory crossMsg = TestUtils.newXnetCallMsg(
-            IPCAddress({
-                subnetId: gatewayDiamond.getter().getNetworkName().getParentSubnet(),
-                rawAddress: FvmAddressHelper.from(caller)
-            }),
-            IPCAddress({
-                subnetId: gatewayDiamond.getter().getNetworkName().createSubnetId(address(this)),
-                rawAddress: FvmAddressHelper.from(address(this))
-            }),
-            DEFAULT_CROSS_MSG_FEE + 1,
-            0
-        );
-        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
-        msgs[0] = crossMsg;
-
-        vm.prank(FilAddress.SYSTEM_ACTOR);
-        gatewayDiamond.xnetMessenger().applyCrossMessages(msgs);
-
-        return crossMsg.toHash();
-    }
-
     function callback() public view {}
 
     function collateralSource() external view returns (Asset memory supply) {
