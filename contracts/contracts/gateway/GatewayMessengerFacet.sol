@@ -25,7 +25,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
     using EnumerableSet for EnumerableSet.Bytes32Set;
     using CrossMsgHelper for IpcEnvelope;
-    
+
     event MessagePropagatedFromPostbox(bytes32 id);
 
     /**

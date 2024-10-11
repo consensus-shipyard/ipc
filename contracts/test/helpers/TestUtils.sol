@@ -249,7 +249,7 @@ contract MockIpcContractResult is IIpcHandler {
     function hasResult() public view returns (bool) {
         return _hasResult;
     }
-    
+
     function result() public view returns (ResultMsg memory) {
         return _result;
     }

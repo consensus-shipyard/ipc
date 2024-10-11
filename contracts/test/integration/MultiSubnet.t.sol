@@ -1130,7 +1130,11 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         vm.prank(address(caller));
         vm.expectEmit(true, true, true, true, rootSubnet.gatewayAddr);
-        emit LibGateway.NewTopDownMessage({subnet: nativeSubnet.subnetActorAddr, message: committedEvent, id: committedEvent.toHash()});
+        emit LibGateway.NewTopDownMessage({
+            subnet: nativeSubnet.subnetActorAddr,
+            message: committedEvent,
+            id: committedEvent.toHash()
+        });
         rootSubnet.gateway.messenger().sendContractXnetMessage{value: amount}(xnetCallMsg);
 
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
@@ -1278,7 +1282,11 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         vm.prank(address(caller));
         vm.expectEmit(true, true, true, true, rootSubnet.gatewayAddr);
-        emit LibGateway.NewTopDownMessage({subnet: tokenSubnet.subnetActorAddr, message: committedEvent, id: committedEvent.toHash()});
+        emit LibGateway.NewTopDownMessage({
+            subnet: tokenSubnet.subnetActorAddr,
+            message: committedEvent,
+            id: committedEvent.toHash()
+        });
         rootSubnet.gateway.messenger().sendContractXnetMessage{value: amount}(xnetCallMsg);
 
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
