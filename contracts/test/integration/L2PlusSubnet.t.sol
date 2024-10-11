@@ -3,46 +3,34 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 import "../../contracts/errors/IPCErrors.sol";
-import {EMPTY_BYTES, METHOD_SEND} from "../../contracts/constants/Constants.sol";
+import {EMPTY_BYTES} from "../../contracts/constants/Constants.sol";
 import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMsgKind, OutcomeType} from "../../contracts/structs/CrossNet.sol";
-import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
 import {SubnetID, Subnet, IPCAddress, Validator} from "../../contracts/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
 import {AssetHelper} from "../../contracts/lib/AssetHelper.sol";
 import {Asset, AssetKind} from "../../contracts/structs/Subnet.sol";
 import {FvmAddressHelper} from "../../contracts/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../../contracts/lib/CrossMsgHelper.sol";
-import {GatewayDiamond, FEATURE_MULTILEVEL_CROSSMSG} from "../../contracts/GatewayDiamond.sol";
+import {GatewayDiamond} from "../../contracts/GatewayDiamond.sol";
 import {SubnetActorDiamond} from "../../contracts/SubnetActorDiamond.sol";
-import {SubnetActorGetterFacet} from "../../contracts/subnet/SubnetActorGetterFacet.sol";
 import {SubnetActorManagerFacet} from "../../contracts/subnet/SubnetActorManagerFacet.sol";
 import {SubnetActorCheckpointingFacet} from "../../contracts/subnet/SubnetActorCheckpointingFacet.sol";
 import {GatewayGetterFacet} from "../../contracts/gateway/GatewayGetterFacet.sol";
-import {GatewayManagerFacet} from "../../contracts/gateway/GatewayManagerFacet.sol";
 import {LibGateway} from "../../contracts/lib/LibGateway.sol";
 import {TopDownFinalityFacet} from "../../contracts/gateway/router/TopDownFinalityFacet.sol";
 import {CheckpointingFacet} from "../../contracts/gateway/router/CheckpointingFacet.sol";
 import {XnetMessagingFacet} from "../../contracts/gateway/router/XnetMessagingFacet.sol";
 import {DiamondCutFacet} from "../../contracts/diamond/DiamondCutFacet.sol";
 import {GatewayMessengerFacet} from "../../contracts/gateway/GatewayMessengerFacet.sol";
-import {DiamondLoupeFacet} from "../../contracts/diamond/DiamondLoupeFacet.sol";
-import {DiamondCutFacet} from "../../contracts/diamond/DiamondCutFacet.sol";
 import {IntegrationTestBase, RootSubnetDefinition, TestSubnetDefinition} from "../IntegrationTestBase.sol";
-import {L2GatewayActorDiamond, L1GatewayActorDiamond} from "../IntegrationTestPresets.sol";
-import {TestUtils, MockIpcContract, MockIpcContractPayable, MockIpcContractResult, MockIpcContractRevert, MockIpcContractFallback} from "../helpers/TestUtils.sol";
+import {TestUtils, MockIpcContract, MockIpcContractPayable, MockIpcContractResult} from "../helpers/TestUtils.sol";
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
+import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
+import {SubnetActorFacetsHelper} from "../helpers/SubnetActorFacetsHelper.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20PresetFixedSupply} from "../helpers/ERC20PresetFixedSupply.sol";
-import {ERC20Deflationary} from "../helpers/ERC20Deflationary.sol";
-import {ERC20Inflationary} from "../helpers/ERC20Inflationary.sol";
-import {ERC20Nil} from "../helpers/ERC20Nil.sol";
-
-import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
-
-import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
-import {SubnetActorFacetsHelper} from "../helpers/SubnetActorFacetsHelper.sol";
 
 import "forge-std/console.sol";
 
@@ -762,10 +750,5 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             console.log("native L3-%d subnet gateway: %s", i, nativeL3Subnets[i].gatewayAddr);
             console.log("native L3-%d subnet actor: %s", i, (nativeL3Subnets[i].subnetActorAddr));
         }
-    }
-
-    function printEnvelope(IpcEnvelope memory envelope) internal view {
-        console.log("from %s:", envelope.from.subnetId.toString());
-        console.log("to %s:", envelope.to.subnetId.toString());
     }
 }
