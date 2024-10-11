@@ -83,7 +83,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         );
 
         tokenL3 = new ERC20PresetFixedSupply("TestL3Token", "TEST3", 1_000_000, address(this));
-        
+
         tokenL3SubnetsWithTokenParent.push(
             createTokenSubnet(address(tokenL3), tokenSubnet.path, tokenSubnet.gatewayAddr, tokenSubnet.id)
         );
@@ -356,7 +356,12 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         sendCrossMessageFromParentToChildWithResult(params);
     }
 
-    function fundSubnet(GatewayDiamond gateway, TestSubnetDefinition memory subnet, address callerAddr, uint256 amount) internal {
+    function fundSubnet(
+        GatewayDiamond gateway,
+        TestSubnetDefinition memory subnet,
+        address callerAddr,
+        uint256 amount
+    ) internal {
         Asset memory subnetSupply = subnet.subnetActor.getter().supplySource();
         if (subnetSupply.kind == AssetKind.ERC20) {
             IERC20(subnetSupply.tokenAddress).approve(address(gateway), amount);
@@ -420,7 +425,11 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             params.root.gatewayAddr
         );
 
-        assertEq(params.subnet.subnetActor.getter().supplySource().balanceOf(params.recipientAddr), params.expectedAmount, "wrong recipient balance");
+        assertEq(
+            params.subnet.subnetActor.getter().supplySource().balanceOf(params.recipientAddr),
+            params.expectedAmount,
+            "wrong recipient balance"
+        );
 
         // apply the result message in the L2 subnet and expect another top down message to be emitted
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
@@ -525,7 +534,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
 
         // register L3s into L2 subnet
         for (uint256 i; i < subnetL3s.length; i++) {
-            registerSubnet(subnetL3s[i].subnetActorAddr, subnet.gateway);            
+            registerSubnet(subnetL3s[i].subnetActorAddr, subnet.gateway);
         }
 
         // fund account in the L3-0 subnet
@@ -794,15 +803,19 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         return ((uint64(blockNumber) / checkPeriod) + 1) * checkPeriod;
     }
 
-    function cloneIpcEnvelopeWithDifferentNonce(IpcEnvelope memory original, uint64 newNonce) internal pure returns (IpcEnvelope memory) {
-        return IpcEnvelope({
-            kind: original.kind,
-            to: original.to,
-            from: original.from,
-            nonce: newNonce,
-            value: original.value,
-            message: original.message
-        });
+    function cloneIpcEnvelopeWithDifferentNonce(
+        IpcEnvelope memory original,
+        uint64 newNonce
+    ) internal pure returns (IpcEnvelope memory) {
+        return
+            IpcEnvelope({
+                kind: original.kind,
+                to: original.to,
+                from: original.from,
+                nonce: newNonce,
+                value: original.value,
+                message: original.message
+            });
     }
 
     function printActors() internal view {
@@ -824,9 +837,21 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
 
         for (uint256 i; i < nativeL3SubnetsWithTokenParent.length; i++) {
             console.log("--------------------");
-            console.log("native L3-%d subnet with token parent name: %s", i, nativeL3SubnetsWithTokenParent[i].id.toString());
-            console.log("native L3-%d subnet with token parent gateway: %s", i, nativeL3SubnetsWithTokenParent[i].gatewayAddr);
-            console.log("native L3-%d subnet with token parent actor: %s", i, (nativeL3SubnetsWithTokenParent[i].subnetActorAddr));
+            console.log(
+                "native L3-%d subnet with token parent name: %s",
+                i,
+                nativeL3SubnetsWithTokenParent[i].id.toString()
+            );
+            console.log(
+                "native L3-%d subnet with token parent gateway: %s",
+                i,
+                nativeL3SubnetsWithTokenParent[i].gatewayAddr
+            );
+            console.log(
+                "native L3-%d subnet with token parent actor: %s",
+                i,
+                (nativeL3SubnetsWithTokenParent[i].subnetActorAddr)
+            );
         }
     }
 }

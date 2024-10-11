@@ -10,8 +10,6 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {CrossMsgHelper} from "../contracts/lib/CrossMsgHelper.sol";
 import {IIpcHandler} from "./interfaces/IIpcHandler.sol";
 
-import "forge-std/console.sol";
-
 abstract contract IpcExchange is IIpcHandler, Ownable, ReentrancyGuard {
     using CrossMsgHelper for IpcEnvelope;
 
