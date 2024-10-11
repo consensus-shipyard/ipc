@@ -40,8 +40,10 @@ library LibGateway {
     event NewBottomUpMessage(bytes32 indexed id);
     /// @dev event emitted when there is a new bottom-up message batch to be signed.
     event NewBottomUpMsgBatch(uint256 indexed epoch);
-    /// @dev event emmited when a message is stored in the postbox - to be propagated further.
+    /// @dev event emmitted when a message is stored in the postbox - to be propagated further.
     event MessageStoredInPostbox(bytes32 indexed id);
+    /// @dev event emmitted when a message is propagated further from the postbox.
+    event MessagePropagatedFromPostbox(bytes32 id);
 
     /// @notice returns the current bottom-up checkpoint
     /// @return exists - whether the checkpoint exists
@@ -403,6 +405,7 @@ library LibGateway {
         // slither-disable-next-line uninitialized-local
         Asset memory supplySource;
         IPCMsgType applyType = crossMsg.applyType(s.networkName);
+        // it's ok to revert here, as this is a programming error or a malicious message from validator.
         if (applyType == IPCMsgType.BottomUp) {
             if (expectTopDownOnly) {
                 revert("Expecting top-down messages only");
@@ -592,4 +595,46 @@ library LibGateway {
         return CrossMessageValidationOutcome.Valid;
     }
     
+     /**
+     * @dev Propagates all the populated cross-net messages from the postbox.
+     */
+    function propagateAllPostboxMessages() internal {
+        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
+
+        uint256 keysLength = s.postboxKeys.length();
+        bytes32[] memory ids = new bytes32[](keysLength);
+        for (uint256 i = 0; i < keysLength; ) {
+            bytes32 msgCid = s.postboxKeys.at(i);
+            ids[i] = msgCid;
+            LibGateway.propagatePostboxMessage(msgCid);
+
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+     /**
+     * @dev Propagates the populated cross-net message for the given `msgCid`.
+     * @param msgCid - the cid of the cross-net message
+     */
+    function propagatePostboxMessage(bytes32 msgCid) internal {
+        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
+        IpcEnvelope storage crossMsg = s.postbox[msgCid];
+
+        bool shouldBurn = LibGateway.commitCrossMessage(crossMsg);
+
+        // Cache value before deletion to avoid re-entrancy
+        uint256 v = crossMsg.value;
+
+        // Remove the message to prevent re-entrancy and clean up state
+        delete s.postbox[msgCid];
+        s.postboxKeys.remove(msgCid);
+
+        // Execute side effects
+        LibGateway.crossMsgSideEffects({v: v, shouldBurn: shouldBurn});
+
+        emit MessagePropagatedFromPostbox({id: msgCid});
+    }
+
 }
