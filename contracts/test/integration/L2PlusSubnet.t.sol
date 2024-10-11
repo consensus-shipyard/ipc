@@ -50,6 +50,8 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
     IERC20 public token;
     TestSubnetDefinition public tokenSubnet;
     TestSubnetDefinition[] public nativeL3SubnetsWithTokenParent;
+    IERC20 public tokenL3;
+    TestSubnetDefinition[] public tokenL3SubnetsWithTokenParent;
 
     function setUp() public override {
         SubnetID memory rootNetworkName = SubnetID({root: ROOTNET_CHAINID, route: new address[](0)});
@@ -78,6 +80,15 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         );
         nativeL3SubnetsWithTokenParent.push(
             createNativeSubnet(tokenSubnet.path, tokenSubnet.gatewayAddr, tokenSubnet.id)
+        );
+
+        tokenL3 = new ERC20PresetFixedSupply("TestL3Token", "TEST3", 1_000_000, address(this));
+        
+        tokenL3SubnetsWithTokenParent.push(
+            createTokenSubnet(address(tokenL3), tokenSubnet.path, tokenSubnet.gatewayAddr, tokenSubnet.id)
+        );
+        tokenL3SubnetsWithTokenParent.push(
+            createTokenSubnet(address(tokenL3), tokenSubnet.path, tokenSubnet.gatewayAddr, tokenSubnet.id)
         );
 
         printActors();
@@ -210,6 +221,24 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         sendCrossMessageFromChildToParentWithResult(params);
     }
 
+    function testL2PlusSubnet_TokenMixed_SendCrossMessageFromChildToParentWithOkResult() public {
+        MockIpcContractResult caller = new MockIpcContractResult();
+        Params memory params = Params({
+            root: rootNetwork,
+            subnet: tokenSubnet,
+            subnetL3: tokenL3SubnetsWithTokenParent[0],
+            caller: caller,
+            callerAddr: address(caller),
+            recipientAddr: address(new MockIpcContractPayable()),
+            amount: 3,
+            expectedAmount: 3,
+            expectedOutcome: OutcomeType.Ok,
+            expectedRet: abi.encode(EMPTY_BYTES)
+        });
+
+        sendCrossMessageFromChildToParentWithResult(params);
+    }
+
     function testL2PlusSubnet_Token_SendCrossMessageFromParentToChildWithOkResult() public {
         MockIpcContractResult caller = new MockIpcContractResult();
         Params memory params = Params({
@@ -228,8 +257,30 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         sendCrossMessageFromParentToChildWithResult(params);
     }
 
+    function testL2PlusSubnet_TokenMixed_SendCrossMessageFromParentToChildWithOkResult() public {
+        MockIpcContractResult caller = new MockIpcContractResult();
+        Params memory params = Params({
+            root: rootNetwork,
+            subnet: tokenSubnet,
+            subnetL3: tokenL3SubnetsWithTokenParent[0],
+            caller: caller,
+            callerAddr: address(caller),
+            recipientAddr: address(new MockIpcContractPayable()),
+            amount: 3,
+            expectedAmount: 3,
+            expectedOutcome: OutcomeType.Ok,
+            expectedRet: abi.encode(EMPTY_BYTES)
+        });
+
+        sendCrossMessageFromParentToChildWithResult(params);
+    }
+
     function testL2PlusSubnet_Token_SendCrossMessageFromSiblingToSiblingWithOkResult() public {
         sendCrossMessageFromSiblingToSiblingWithOkResult(rootNetwork, tokenSubnet, nativeL3SubnetsWithTokenParent);
+    }
+
+    function testL2PlusSubnet_TokenMixed_SendCrossMessageFromSiblingToSiblingWithOkResult() public {
+        sendCrossMessageFromSiblingToSiblingWithOkResult(rootNetwork, tokenSubnet, tokenL3SubnetsWithTokenParent);
     }
 
     // Error scenarios
@@ -305,42 +356,34 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         sendCrossMessageFromParentToChildWithResult(params);
     }
 
+    function fundSubnet(GatewayDiamond gateway, TestSubnetDefinition memory subnet, address callerAddr, uint256 amount) internal {
+        Asset memory subnetSupply = subnet.subnetActor.getter().supplySource();
+        if (subnetSupply.kind == AssetKind.ERC20) {
+            IERC20(subnetSupply.tokenAddress).approve(address(gateway), amount);
+            gateway.manager().fundWithToken(subnet.id, FvmAddressHelper.from(callerAddr), amount);
+        } else {
+            gateway.manager().fund{value: amount}(subnet.id, FvmAddressHelper.from(callerAddr));
+        }
+    }
+
+    function registerSubnet(address subnetActorAddr, GatewayDiamond gateway) internal {
+        vm.deal(subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT);
+        vm.prank(subnetActorAddr);
+        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, subnetActorAddr, gateway);
+        vm.stopPrank();
+    }
+
     function sendCrossMessageFromChildToParentWithResult(Params memory params) public {
         // register L2 into root nerwork
-        vm.deal(params.subnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT);
-        vm.prank(params.subnet.subnetActorAddr);
-        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, params.subnet.subnetActorAddr, params.root.gateway);
-
+        registerSubnet(params.subnet.subnetActorAddr, params.root.gateway);
         // register L3 into L2 subnet
-        vm.deal(params.subnetL3.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT);
-        vm.prank(params.subnetL3.subnetActorAddr);
-        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, params.subnetL3.subnetActorAddr, params.subnet.gateway);
+        registerSubnet(params.subnetL3.subnetActorAddr, params.subnet.gateway);
 
         vm.deal(params.callerAddr, 1 ether);
         vm.prank(params.callerAddr);
 
-        Asset memory subnetSupply = params.subnet.subnetActor.getter().supplySource();
-
-        // fund from root network to L2
-        if (subnetSupply.kind == AssetKind.ERC20) {
-            IERC20(subnetSupply.tokenAddress).approve(params.root.gatewayAddr, 100000);
-            params.root.gateway.manager().fundWithToken(
-                params.subnet.id,
-                FvmAddressHelper.from(params.callerAddr),
-                100000
-            );
-        } else {
-            params.root.gateway.manager().fund{value: 100000}(
-                params.subnet.id,
-                FvmAddressHelper.from(params.callerAddr)
-            );
-        }
-
-        // fund from L2 to L3
-        params.subnet.gateway.manager().fund{value: 100000}(
-            params.subnetL3.id,
-            FvmAddressHelper.from(params.callerAddr)
-        );
+        fundSubnet(params.root.gateway, params.subnet, params.callerAddr, 100000);
+        fundSubnet(params.subnet.gateway, params.subnetL3, params.callerAddr, 100000);
 
         // create the xnet message on the subnet L3 - it's local gateway
         IpcEnvelope memory crossMessage = TestUtils.newXnetCallMsg(
@@ -377,7 +420,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             params.root.gatewayAddr
         );
 
-        assertEq(subnetSupply.balanceOf(params.recipientAddr), params.expectedAmount, "wrong recipient balance");
+        assertEq(params.subnet.subnetActor.getter().supplySource().balanceOf(params.recipientAddr), params.expectedAmount, "wrong recipient balance");
 
         // apply the result message in the L2 subnet and expect another top down message to be emitted
         resultMessage.nonce = 0;
@@ -406,36 +449,15 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
     }
 
     function sendCrossMessageFromParentToChildWithResult(Params memory params) public {
-        vm.deal(params.subnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT);
-        vm.deal(params.callerAddr, 1 ether);
-
         // register L2 into root network
-        vm.prank(params.subnet.subnetActorAddr);
-        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, params.subnet.subnetActorAddr, params.root.gateway);
-
+        registerSubnet(params.subnet.subnetActorAddr, params.root.gateway);
         // register L3 into L2 subnet
-        vm.deal(params.subnetL3.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT);
-        vm.prank(params.subnetL3.subnetActorAddr);
-        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, params.subnetL3.subnetActorAddr, params.subnet.gateway);
+        registerSubnet(params.subnetL3.subnetActorAddr, params.subnet.gateway);
 
+        vm.deal(params.callerAddr, 1 ether);
         vm.prank(params.callerAddr);
 
-        Asset memory subnetSupply = params.subnet.subnetActor.getter().supplySource();
-
-        // fund from root network to L2
-        if (subnetSupply.kind == AssetKind.ERC20) {
-            IERC20(subnetSupply.tokenAddress).approve(params.root.gatewayAddr, 100000);
-            params.root.gateway.manager().fundWithToken(
-                params.subnet.id,
-                FvmAddressHelper.from(params.callerAddr),
-                100000
-            );
-        } else {
-            params.root.gateway.manager().fund{value: 100000}(
-                params.subnet.id,
-                FvmAddressHelper.from(params.callerAddr)
-            );
-        }
+        fundSubnet(params.root.gateway, params.subnet, params.callerAddr, 100000);
 
         IpcEnvelope memory crossMessage = TestUtils.newXnetCallMsg(
             IPCAddress({subnetId: params.root.id, rawAddress: FvmAddressHelper.from(params.callerAddr)}),
@@ -509,23 +531,20 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         address recipientAddr = address(new MockIpcContract());
         uint256 amount = 3;
 
-        vm.deal(subnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT);
         vm.deal(callerAddr, 1 ether);
 
         // register L2 into root nerwork
-        vm.prank(subnet.subnetActorAddr);
-        registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, subnet.subnetActorAddr, root.gateway);
+        registerSubnet(subnet.subnetActorAddr, root.gateway);
 
         // register L3s into L2 subnet
         for (uint256 i; i < subnetL3s.length; i++) {
-            vm.deal(subnetL3s[i].subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT);
-            vm.prank(subnetL3s[i].subnetActorAddr);
-            registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, subnetL3s[i].subnetActorAddr, subnet.gateway);
+            registerSubnet(subnetL3s[i].subnetActorAddr, subnet.gateway);            
         }
 
         // fund account in the L3-0 subnet
         vm.prank(callerAddr);
-        subnet.gateway.manager().fund{value: 100000}(subnetL3s[0].id, FvmAddressHelper.from(callerAddr));
+
+        fundSubnet(subnet.gateway, subnetL3s[0], callerAddr, 100000);
 
         // create the xnet message to send fund from L3-0 to L3-1
         IpcEnvelope memory crossMessage = TestUtils.newXnetCallMsg(
@@ -786,6 +805,13 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             console.log("native L3-%d subnet name: %s", i, nativeL3Subnets[i].id.toString());
             console.log("native L3-%d subnet gateway: %s", i, nativeL3Subnets[i].gatewayAddr);
             console.log("native L3-%d subnet actor: %s", i, (nativeL3Subnets[i].subnetActorAddr));
+        }
+
+        for (uint256 i; i < nativeL3SubnetsWithTokenParent.length; i++) {
+            console.log("--------------------");
+            console.log("native L3-%d subnet with token parent name: %s", i, nativeL3SubnetsWithTokenParent[i].id.toString());
+            console.log("native L3-%d subnet with token parent gateway: %s", i, nativeL3SubnetsWithTokenParent[i].gatewayAddr);
+            console.log("native L3-%d subnet with token parent actor: %s", i, (nativeL3SubnetsWithTokenParent[i].subnetActorAddr));
         }
     }
 }
