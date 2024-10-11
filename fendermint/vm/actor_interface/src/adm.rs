@@ -29,15 +29,15 @@ pub enum Method {
 pub enum Kind {
     /// An object store with S3-like key semantics.
     ObjectStore,
-    /// An MMR accumulator.
-    Accumulator,
+    /// An MMR accumulator, used for timestamping data.
+    Timehub,
 }
 
 impl Display for Kind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let str = match self {
             Self::ObjectStore => "objectstore",
-            Self::Accumulator => "accumulator",
+            Self::Timehub => "timehub",
         };
         write!(f, "{}", str)
     }

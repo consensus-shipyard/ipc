@@ -33,7 +33,7 @@ members = [
     "fendermint/actors/chainmetadata",
     "fendermint/actors/eam",
     # hoku
-    "fendermint/actors/accumulator",
+    "fendermint/actors/timehub",
     "fendermint/actors/blobs",
     "fendermint/actors/blobs/shared",
     "fendermint/actors/machine",

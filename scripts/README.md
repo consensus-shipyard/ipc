@@ -87,7 +87,7 @@ fendermint key into-eth --secret-key ./scripts/test-network/keys/alice.sk --name
 ```
 
 Since the `alice.sk` will always be the same, the following is consistent across machines and can be
-used for `devnet` interactions (e.g., creating buckets, accumulators, writing data, etc.):
+used for `devnet` interactions (e.g., creating buckets, timehubs, writing data, etc.):
 
 - EVM address: `0xc05fe6b63ffa4b3c518e6ff1e597358ee839db01`
 - Hex private key: `1c323d494d1d069fe4c891350a1ec691c4216c17418a0cb3c7533b143bd2b812`

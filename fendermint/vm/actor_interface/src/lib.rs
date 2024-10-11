@@ -43,7 +43,7 @@ macro_rules! define_singleton {
 }
 
 pub mod account;
-pub mod accumulator;
+pub mod timehub;
 pub mod adm;
 pub mod blobs;
 pub mod burntfunds;

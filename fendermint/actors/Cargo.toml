@@ -6,7 +6,7 @@ edition.workspace = true
 license.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-fendermint_actor_accumulator = { path = "accumulator", features = [
+fendermint_actor_timehub = { path = "timehub", features = [
     "fil-actor",
 ] }
 fendermint_actor_blobs = { path = "blobs", features = [
@@ -25,7 +25,7 @@ cid = { workspace = true }
 anyhow = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
-fendermint_actor_accumulator = { path = "accumulator" }
+fendermint_actor_timehub = { path = "timehub" }
 fendermint_actor_blobs = { path = "blobs" }
 fendermint_actor_chainmetadata = { path = "chainmetadata" }
 fendermint_actor_eam = { path = "eam" }

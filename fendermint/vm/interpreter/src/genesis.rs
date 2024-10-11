@@ -411,7 +411,7 @@ impl GenesisBuilder {
         // ADM Address Manager (ADM) actor
         let machine_codes = state
             .custom_actor_manifest
-            .get_subset(vec!["accumulator", "objectstore"])
+            .get_subset(vec!["timehub", "objectstore"])
             .iter()
             .map(|(name, cid)| {
                 (

@@ -47,7 +47,7 @@ tokio-util = { workspace = true }
 tracing = { workspace = true }
 
 blobs_syscall = { path = "../../../hoku/blobs_syscall" }
-fendermint_actor_accumulator = { path = "../../actors/accumulator" }
+fendermint_actor_timehub = { path = "../../actors/timehub" }
 fendermint_actor_blobs = { path = "../../actors/blobs" }
 fendermint_actor_blobs_shared = { path = "../../actors/blobs/shared" }
 fendermint_actor_chainmetadata = { path = "../../actors/chainmetadata" }
