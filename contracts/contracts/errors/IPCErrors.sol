@@ -84,6 +84,7 @@ error CommitmentAlreadyInitialized();
 error SubnetNoTargetCommitment();
 error ValidatorAlreadyClaimed();
 error InvalidProof();
+error NotOwner();
 
 enum InvalidXnetMessageReason {
     Sender,

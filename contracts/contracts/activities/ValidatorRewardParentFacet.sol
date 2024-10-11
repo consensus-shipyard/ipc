@@ -6,17 +6,30 @@ import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap
 
 import {Pausable} from "../lib/LibPausable.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
-import {NotValidator, SubnetNoTargetCommitment, CommitmentAlreadyInitialized, ValidatorAlreadyClaimed} from "../errors/IPCErrors.sol";
+import {NotValidator, SubnetNoTargetCommitment, CommitmentAlreadyInitialized, ValidatorAlreadyClaimed, NotOwner} from "../errors/IPCErrors.sol";
 import {ValidatorSummary, ActivitySummary} from "./Activity.sol";
 import {IValidatorRewarder} from "./IValidatorRewarder.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {SubnetID} from "../structs/Subnet.sol";
 import {LibActivityMerkleVerifier} from "./LibActivityMerkleVerifier.sol";
+import {LibDiamond} from "../lib/LibDiamond.sol";
 
 /// The validator reward facet for the parent subnet, i.e. for validators in the child subnet
 /// to claim their reward in the parent subnet, which should be the current subnet this facet
 /// is deployed.
 contract ValidatorRewardParentFacet is ReentrancyGuard, Pausable {
+    event RewarderUpdated(address oldRewarder, address newRewarder);
+
+    function updateRewarder(address newRewarder) external {
+        if (msg.sender != LibDiamond.contractOwner()) {
+            revert NotOwner();
+        }
+
+        ValidatorRewardParentStorage storage s = LibValidatorRewardParent.facetStorage();
+        emit RewarderUpdated(s.validatorRewarder, newRewarder);
+        s.validatorRewarder = newRewarder;
+    }
+
     /// Validators claim their reward for doing work in the child subnet
     function claim(
         SubnetID calldata subnetId,

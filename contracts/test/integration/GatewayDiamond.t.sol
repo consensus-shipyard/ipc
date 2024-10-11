@@ -66,7 +66,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         require(owner != newOwner, "ownership should be updated");
         require(newOwner == address(1), "new owner not address 1");
 
-        vm.expectRevert(LibDiamond.NotOwner.selector);
+        vm.expectRevert(NotOwner.selector);
         gatewayDiamond.ownership().transferOwnership(address(1));
     }
 
@@ -144,7 +144,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         );
         //test that other user cannot call diamondcut to add function
         vm.prank(0x1234567890123456789012345678901234567890);
-        vm.expectRevert(LibDiamond.NotOwner.selector);
+        vm.expectRevert(NotOwner.selector);
         gwDiamondCutter.diamondCut(gwDiamondCut, address(0), new bytes(0));
 
         gwDiamondCutter.diamondCut(gwDiamondCut, address(0), new bytes(0));
@@ -165,7 +165,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
 
         //test that other user cannot call diamondcut to replace function
         vm.prank(0x1234567890123456789012345678901234567890);
-        vm.expectRevert(LibDiamond.NotOwner.selector);
+        vm.expectRevert(NotOwner.selector);
         gwDiamondCutter.diamondCut(gwDiamondCut, address(0), new bytes(0));
 
         gwDiamondCutter.diamondCut(gwDiamondCut, address(0), new bytes(0));
@@ -183,7 +183,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
 
         //test that other user cannot call diamondcut to remove function
         vm.prank(0x1234567890123456789012345678901234567890);
-        vm.expectRevert(LibDiamond.NotOwner.selector);
+        vm.expectRevert(NotOwner.selector);
         gwDiamondCutter.diamondCut(gwDiamondCut, address(0), new bytes(0));
 
         gwDiamondCutter.diamondCut(gwDiamondCut, address(0), new bytes(0));

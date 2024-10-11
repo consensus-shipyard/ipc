@@ -13,6 +13,8 @@ const gatewayConstructorParams = {
     },
     genesisValidators: [],
     commitSha: undefined, // Will be set later.
+    /// default to no rewarder
+    validatorRewarder: "0x0000000000000000000000000000000000000000",
 }
 
 task('deploy-gateway')
@@ -67,7 +69,8 @@ async function deployFacets(hre: HardhatRuntimeEnvironment, deployer: string): P
         },
         { name: 'TopDownFinalityFacet', libraries: ['AccountHelper'] },
         { name: 'OwnershipFacet' },
-    ]
+        { name: 'ValidatorRewardParentFacet' },
+    ];
 
     return await Deployments.deploy(hre, deployer, ...facets)
 }
@@ -76,6 +79,7 @@ async function deployGatewayDiamond(
     hre: HardhatRuntimeEnvironment,
     deployer: string,
     facets: Deployments,
+    
 ): Promise<Deployments> {
     gatewayConstructorParams.networkName.root = await hre.getChainId()
     gatewayConstructorParams.commitSha = hre.ethers.utils.formatBytes32String(gitCommitSha())

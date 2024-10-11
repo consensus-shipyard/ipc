@@ -1135,7 +1135,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         );
         //test that other user cannot call diamondcut to add function
         vm.prank(0x1234567890123456789012345678901234567890);
-        vm.expectRevert(LibDiamond.NotOwner.selector);
+        vm.expectRevert(NotOwner.selector);
         saDiamondCutter.diamondCut(saDiamondCut, address(0), new bytes(0));
 
         saDiamondCutter.diamondCut(saDiamondCut, address(0), new bytes(0));
@@ -1155,7 +1155,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         //test that other user cannot call diamondcut to replace function
         vm.prank(0x1234567890123456789012345678901234567890);
-        vm.expectRevert(LibDiamond.NotOwner.selector);
+        vm.expectRevert(NotOwner.selector);
         saDiamondCutter.diamondCut(saDiamondCut, address(0), new bytes(0));
 
         saDiamondCutter.diamondCut(saDiamondCut, address(0), new bytes(0));
@@ -1173,7 +1173,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         //test that other user cannot call diamondcut to remove function
         vm.prank(0x1234567890123456789012345678901234567890);
-        vm.expectRevert(LibDiamond.NotOwner.selector);
+        vm.expectRevert(NotOwner.selector);
         saDiamondCutter.diamondCut(saDiamondCut, address(0), new bytes(0));
 
         saDiamondCutter.diamondCut(saDiamondCut, address(0), new bytes(0));
@@ -1792,14 +1792,14 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
     function testSubnetActorDiamond_PauseUnpause_NotOwner() public {
         vm.prank(vm.addr(1));
-        vm.expectRevert(LibDiamond.NotOwner.selector);
+        vm.expectRevert(NotOwner.selector);
         saDiamond.pauser().pause();
 
         saDiamond.pauser().pause();
         require(saDiamond.pauser().paused(), "not paused");
 
         vm.prank(vm.addr(1));
-        vm.expectRevert(LibDiamond.NotOwner.selector);
+        vm.expectRevert(NotOwner.selector);
         saDiamond.pauser().unpause();
 
         saDiamond.pauser().unpause();

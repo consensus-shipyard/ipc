@@ -101,7 +101,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         params.permissionMode = PermissionMode.Collateral;
 
         vm.prank(address(1));
-        vm.expectRevert(LibDiamond.NotOwner.selector);
+        vm.expectRevert(NotOwner.selector);
         s.register().newSubnetActor(params);
     }
 
@@ -308,7 +308,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
 
         // Test only owner can update
         vm.prank(address(1)); // Set a different address as the sender
-        vm.expectRevert(abi.encodeWithSelector(LibDiamond.NotOwner.selector)); // Expected revert message
+        vm.expectRevert(abi.encodeWithSelector(NotOwner.selector)); // Expected revert message
         registrySubnetGetterFacet.updateReferenceSubnetContract(
             newGetterFacet,
             newManagerFacet,
