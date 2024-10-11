@@ -525,7 +525,7 @@ library LibGateway {
         // because we're the LCA, commit a top-down message.
         if (applyType == IPCMsgType.TopDown || isLCA) {
             ++s.appliedTopDownNonce;
-            (, Subnet storage subnet) = getSubnet(to.down(s.networkName));
+            (bool found, Subnet storage subnet) = getSubnet(to.down(s.networkName));
             LibGateway.commitTopDownMsg(subnet, crossMessage);
             return (shouldBurn = false);
         }
@@ -621,6 +621,10 @@ library LibGateway {
     function propagatePostboxMessage(bytes32 msgCid) internal {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
         IpcEnvelope storage crossMsg = s.postbox[msgCid];
+
+        if (crossMsg.isEmpty()) {
+            revert("Message not found in postbox");
+        }
 
         bool shouldBurn = LibGateway.commitCrossMessage(crossMsg);
 
