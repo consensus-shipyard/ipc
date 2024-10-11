@@ -19,9 +19,9 @@ pub const ADM_ACTOR_NAME: &str = "adm";
 #[repr(u64)]
 pub enum Method {
     Constructor = METHOD_CONSTRUCTOR,
-    CreateExternal = 2,
-    UpdateDeployers = 3,
-    ListMetadata = 4,
+    CreateExternal = 1214262202,
+    UpdateDeployers = 1768606754,
+    ListMetadata = 2283215593,
 }
 
 /// The kinds of machines available.
