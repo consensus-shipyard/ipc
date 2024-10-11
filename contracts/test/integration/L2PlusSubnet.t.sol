@@ -49,7 +49,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
     // token subnets
     IERC20 public token;
     TestSubnetDefinition public tokenSubnet;
-    TestSubnetDefinition[] public tokenL3Subnets;
+    TestSubnetDefinition[] public nativeL3SubnetsWithTokenParent;
 
     function setUp() public override {
         SubnetID memory rootNetworkName = SubnetID({root: ROOTNET_CHAINID, route: new address[](0)});
@@ -73,8 +73,12 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         token = new ERC20PresetFixedSupply("TestToken", "TEST", 1_000_000, address(this));
         tokenSubnet = createTokenSubnet(address(token), tokenSubnetPath, rootNetwork.gatewayAddr, rootNetworkName);
 
-        tokenL3Subnets.push(createNativeSubnet(tokenSubnet.path, tokenSubnet.gatewayAddr, tokenSubnet.id));
-        tokenL3Subnets.push(createNativeSubnet(tokenSubnet.path, tokenSubnet.gatewayAddr, tokenSubnet.id));
+        nativeL3SubnetsWithTokenParent.push(
+            createNativeSubnet(tokenSubnet.path, tokenSubnet.gatewayAddr, tokenSubnet.id)
+        );
+        nativeL3SubnetsWithTokenParent.push(
+            createNativeSubnet(tokenSubnet.path, tokenSubnet.gatewayAddr, tokenSubnet.id)
+        );
 
         printActors();
     }
@@ -100,7 +104,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         SubnetActorDiamond subnetActor = createSubnetActor(
             defaultSubnetActorParamsWith(parentGatewayAddress, parentNetworkName, tokenAddress)
         );
-        
+
         return createSubnet(subnetPath, subnetActor);
     }
 
@@ -118,14 +122,15 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         SubnetID memory subnetName = SubnetID({root: ROOTNET_CHAINID, route: newPath});
         GatewayDiamond subnetGateway = createGatewayDiamond(gatewayParams(subnetName));
 
-        return TestSubnetDefinition({
-            gateway: subnetGateway,
-            gatewayAddr: address(subnetGateway),
-            id: subnetName,
-            subnetActor: subnetActor,
-            subnetActorAddr: address(subnetActor),
-            path: newPath
-        });
+        return
+            TestSubnetDefinition({
+                gateway: subnetGateway,
+                gatewayAddr: address(subnetGateway),
+                id: subnetName,
+                subnetActor: subnetActor,
+                subnetActorAddr: address(subnetActor),
+                path: newPath
+            });
     }
 
     struct Params {
@@ -185,14 +190,14 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
     function testL2PlusSubnet_Native_SendCrossMessageFromSiblingToSiblingWithOkResult() public {
         sendCrossMessageFromSiblingToSiblingWithOkResult(rootNetwork, nativeSubnet, nativeL3Subnets);
     }
-    
+
     // Token supply source subnets
     function testL2PlusSubnet_Token_SendCrossMessageFromChildToParentWithOkResult() public {
         MockIpcContractResult caller = new MockIpcContractResult();
         Params memory params = Params({
             root: rootNetwork,
             subnet: tokenSubnet,
-            subnetL3: tokenL3Subnets[0],
+            subnetL3: nativeL3SubnetsWithTokenParent[0],
             caller: caller,
             callerAddr: address(caller),
             recipientAddr: address(new MockIpcContractPayable()),
@@ -210,7 +215,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         Params memory params = Params({
             root: rootNetwork,
             subnet: tokenSubnet,
-            subnetL3: tokenL3Subnets[0],
+            subnetL3: nativeL3SubnetsWithTokenParent[0],
             caller: caller,
             callerAddr: address(caller),
             recipientAddr: address(new MockIpcContractPayable()),
@@ -224,7 +229,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
     }
 
     function testL2PlusSubnet_Token_SendCrossMessageFromSiblingToSiblingWithOkResult() public {
-        sendCrossMessageFromSiblingToSiblingWithOkResult(rootNetwork, tokenSubnet, tokenL3Subnets);
+        sendCrossMessageFromSiblingToSiblingWithOkResult(rootNetwork, tokenSubnet, nativeL3SubnetsWithTokenParent);
     }
 
     // Error scenarios
@@ -251,7 +256,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         Params memory params = Params({
             root: rootNetwork,
             subnet: tokenSubnet,
-            subnetL3: tokenL3Subnets[0],
+            subnetL3: nativeL3SubnetsWithTokenParent[0],
             caller: caller,
             callerAddr: address(caller),
             recipientAddr: 0x53c82507aA03B1a6e695000c302674ef1ecb880B,
@@ -287,7 +292,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         Params memory params = Params({
             root: rootNetwork,
             subnet: tokenSubnet,
-            subnetL3: tokenL3Subnets[0],
+            subnetL3: nativeL3SubnetsWithTokenParent[0],
             caller: caller,
             callerAddr: address(caller),
             recipientAddr: 0x53c82507aA03B1a6e695000c302674ef1ecb880B,
@@ -315,17 +320,27 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         vm.prank(params.callerAddr);
 
         Asset memory subnetSupply = params.subnet.subnetActor.getter().supplySource();
-        
+
         // fund from root network to L2
         if (subnetSupply.kind == AssetKind.ERC20) {
             IERC20(subnetSupply.tokenAddress).approve(params.root.gatewayAddr, 100000);
-            params.root.gateway.manager().fundWithToken(params.subnet.id, FvmAddressHelper.from(params.callerAddr), 100000);
+            params.root.gateway.manager().fundWithToken(
+                params.subnet.id,
+                FvmAddressHelper.from(params.callerAddr),
+                100000
+            );
         } else {
-            params.root.gateway.manager().fund{value: 100000}(params.subnet.id, FvmAddressHelper.from(params.callerAddr));
+            params.root.gateway.manager().fund{value: 100000}(
+                params.subnet.id,
+                FvmAddressHelper.from(params.callerAddr)
+            );
         }
 
         // fund from L2 to L3
-        params.subnet.gateway.manager().fund{value: 100000}(params.subnetL3.id, FvmAddressHelper.from(params.callerAddr));
+        params.subnet.gateway.manager().fund{value: 100000}(
+            params.subnetL3.id,
+            FvmAddressHelper.from(params.callerAddr)
+        );
 
         // create the xnet message on the subnet L3 - it's local gateway
         IpcEnvelope memory crossMessage = TestUtils.newXnetCallMsg(
@@ -334,15 +349,15 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             params.amount,
             0
         );
-        
+
         vm.prank(params.callerAddr);
         params.subnetL3.gateway.messenger().sendContractXnetMessage{value: params.amount}(crossMessage);
 
         // this would normally submitted by releayer. It call the subnet actor on the L2 network.
-        submitBottomUpCheckpoint(callCreateBottomUpCheckpointFromChildSubnet(
-            params.subnetL3.id,
-            params.subnetL3.gateway
-        ), params.subnetL3.subnetActor);
+        submitBottomUpCheckpoint(
+            callCreateBottomUpCheckpointFromChildSubnet(params.subnetL3.id, params.subnetL3.gateway),
+            params.subnetL3.subnetActor
+        );
 
         // create checkpoint in L2 and submit it to the root network (L2 subnet actor)
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
@@ -363,12 +378,12 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         );
 
         assertEq(subnetSupply.balanceOf(params.recipientAddr), params.expectedAmount, "wrong recipient balance");
-    
+
         // apply the result message in the L2 subnet and expect another top down message to be emitted
         resultMessage.nonce = 0;
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = resultMessage;
-        
+
         commitParentFinality(params.subnet.gatewayAddr);
         executeTopDownMsgs(msgs, params.subnet.gateway);
 
@@ -387,17 +402,14 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
 
         assertTrue(params.caller.hasResult(), "missing result");
         assertTrue(params.caller.result().outcome == params.expectedOutcome, "wrong result outcome");
-        assertTrue(
-            keccak256(params.caller.result().ret) == keccak256(params.expectedRet), 
-            "wrong result outcome"
-        );
+        assertTrue(keccak256(params.caller.result().ret) == keccak256(params.expectedRet), "wrong result outcome");
     }
 
     function sendCrossMessageFromParentToChildWithResult(Params memory params) public {
         vm.deal(params.subnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT);
         vm.deal(params.callerAddr, 1 ether);
 
-         // register L2 into root network
+        // register L2 into root network
         vm.prank(params.subnet.subnetActorAddr);
         registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, params.subnet.subnetActorAddr, params.root.gateway);
 
@@ -409,13 +421,20 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         vm.prank(params.callerAddr);
 
         Asset memory subnetSupply = params.subnet.subnetActor.getter().supplySource();
-        
+
         // fund from root network to L2
         if (subnetSupply.kind == AssetKind.ERC20) {
             IERC20(subnetSupply.tokenAddress).approve(params.root.gatewayAddr, 100000);
-            params.root.gateway.manager().fundWithToken(params.subnet.id, FvmAddressHelper.from(params.callerAddr), 100000);
+            params.root.gateway.manager().fundWithToken(
+                params.subnet.id,
+                FvmAddressHelper.from(params.callerAddr),
+                100000
+            );
         } else {
-            params.root.gateway.manager().fund{value: 100000}(params.subnet.id, FvmAddressHelper.from(params.callerAddr));
+            params.root.gateway.manager().fund{value: 100000}(
+                params.subnet.id,
+                FvmAddressHelper.from(params.callerAddr)
+            );
         }
 
         IpcEnvelope memory crossMessage = TestUtils.newXnetCallMsg(
@@ -437,7 +456,11 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         // send the cross message from the root network to the L3 subnet
         vm.prank(params.callerAddr);
         vm.expectEmit(true, true, true, true, params.root.gatewayAddr);
-        emit LibGateway.NewTopDownMessage({subnet: params.subnet.subnetActorAddr, message: expectedMessage, id: expectedMessage.toHash()});
+        emit LibGateway.NewTopDownMessage({
+            subnet: params.subnet.subnetActorAddr,
+            message: expectedMessage,
+            id: expectedMessage.toHash()
+        });
         params.root.gateway.messenger().sendContractXnetMessage{value: params.amount}(crossMessage);
 
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
@@ -460,23 +483,20 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         assertEq(params.recipientAddr.balance, params.expectedAmount);
 
         // submit checkoint so the result message can be propagated to L2
-        submitBottomUpCheckpoint(callCreateBottomUpCheckpointFromChildSubnet(
-            params.subnetL3.id,
-            params.subnetL3.gateway
-        ), params.subnetL3.subnetActor);
+        submitBottomUpCheckpoint(
+            callCreateBottomUpCheckpointFromChildSubnet(params.subnetL3.id, params.subnetL3.gateway),
+            params.subnetL3.subnetActor
+        );
 
         // submit checkoint so the result message can be propagated to root network
-        submitBottomUpCheckpoint(callCreateBottomUpCheckpointFromChildSubnet(
-            params.subnet.id,
-            params.subnet.gateway
-        ), params.subnet.subnetActor);
+        submitBottomUpCheckpoint(
+            callCreateBottomUpCheckpointFromChildSubnet(params.subnet.id, params.subnet.gateway),
+            params.subnet.subnetActor
+        );
 
         assertTrue(params.caller.hasResult(), "missing result");
         assertTrue(params.caller.result().outcome == params.expectedOutcome, "wrong result outcome");
-        assertTrue(
-            keccak256(params.caller.result().ret) == keccak256(params.expectedRet), 
-            "wrong result outcome"
-        );
+        assertTrue(keccak256(params.caller.result().ret) == keccak256(params.expectedRet), "wrong result outcome");
     }
 
     function sendCrossMessageFromSiblingToSiblingWithOkResult(
@@ -563,7 +583,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         resultMessage.nonce = 0;
         IpcEnvelope[] memory resultMsgs = new IpcEnvelope[](1);
         resultMsgs[0] = resultMessage;
-        
+
         executeTopDownMsgs(resultMsgs, subnetL3s[0].gateway);
         assertTrue(caller.hasResult(), "missing result");
         assertTrue(caller.result().outcome == OutcomeType.Ok, "wrong result outcome");
@@ -609,7 +629,11 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
     ) internal {
         vm.prank(FilAddress.SYSTEM_ACTOR);
         vm.expectEmit(true, true, true, true, expectedGatewayAddr);
-        emit LibGateway.NewTopDownMessage({subnet: expectedSubnetAddr, message: expectedMessage, id: expectedMessage.toHash()});
+        emit LibGateway.NewTopDownMessage({
+            subnet: expectedSubnetAddr,
+            message: expectedMessage,
+            id: expectedMessage.toHash()
+        });
         GatewayMessengerFacet messenger = gw.messenger();
         messenger.propagateAllPostboxMessages();
     }
@@ -673,7 +697,10 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         return checkpoint;
     }
 
-    function prepareValidatorsSignatures(BottomUpCheckpoint memory checkpoint, SubnetActorDiamond sa) internal returns (address[] memory, bytes[] memory) {
+    function prepareValidatorsSignatures(
+        BottomUpCheckpoint memory checkpoint,
+        SubnetActorDiamond sa
+    ) internal returns (address[] memory, bytes[] memory) {
         (uint256[] memory parentKeys, address[] memory parentValidators, ) = TestUtils.getThreeValidators(vm);
         bytes[] memory parentPubKeys = new bytes[](3);
         bytes[] memory parentSignatures = new bytes[](3);
@@ -698,7 +725,10 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
     }
 
     function submitBottomUpCheckpoint(BottomUpCheckpoint memory checkpoint, SubnetActorDiamond sa) internal {
-        (address[] memory parentValidators, bytes[] memory parentSignatures) = prepareValidatorsSignatures(checkpoint,sa);
+        (address[] memory parentValidators, bytes[] memory parentSignatures) = prepareValidatorsSignatures(
+            checkpoint,
+            sa
+        );
 
         SubnetActorCheckpointingFacet checkpointer = sa.checkpointer();
 
@@ -714,13 +744,20 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         address expectedSubnetAddr,
         address expectedGatewayAddr
     ) internal {
-        (address[] memory parentValidators, bytes[] memory parentSignatures) = prepareValidatorsSignatures(checkpoint,subnetActor);
+        (address[] memory parentValidators, bytes[] memory parentSignatures) = prepareValidatorsSignatures(
+            checkpoint,
+            subnetActor
+        );
 
         SubnetActorCheckpointingFacet checkpointer = subnetActor.checkpointer();
 
         vm.startPrank(address(subnetActor));
         vm.expectEmit(true, true, true, true, expectedGatewayAddr);
-        emit LibGateway.NewTopDownMessage({subnet: expectedSubnetAddr, message: expectedMessage, id: expectedMessage.toHash()});
+        emit LibGateway.NewTopDownMessage({
+            subnet: expectedSubnetAddr,
+            message: expectedMessage,
+            id: expectedMessage.toHash()
+        });
         checkpointer.submitCheckpoint(checkpoint, parentValidators, parentSignatures);
         vm.stopPrank();
     }
