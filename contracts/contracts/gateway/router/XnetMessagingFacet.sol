@@ -28,5 +28,6 @@ contract XnetMessagingFacet is GatewayActorModifiers {
     /// @param crossMsgs The array of cross-network messages to be applied.
     function applyCrossMessages(IpcEnvelope[] calldata crossMsgs) external systemActorOnly {
         LibGateway.applyTopDownMessages(s.networkName.getParentSubnet(), crossMsgs);
+        LibGateway.propagateAllPostboxMessages();
     }
 }

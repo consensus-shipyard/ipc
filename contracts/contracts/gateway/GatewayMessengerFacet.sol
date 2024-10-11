@@ -26,8 +26,6 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
     using EnumerableSet for EnumerableSet.Bytes32Set;
     using CrossMsgHelper for IpcEnvelope;
 
-    event MessagePropagatedFromPostbox(bytes32 id);
-
     /**
      * @dev Sends a general-purpose cross-message from the local subnet to the destination subnet.
      * Any value in msg.value will be forwarded in the call.
@@ -72,20 +70,10 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
     }
 
     /**
-     * @dev Propagates all the populated cross-net messages for the given `cid`.
+     * @dev Propagates all the populated cross-net messages from the postbox.
      */
     function propagateAllPostboxMessages() external payable {
-        uint256 keysLength = s.postboxKeys.length();
-        bytes32[] memory ids = new bytes32[](keysLength);
-        for (uint256 i = 0; i < keysLength; ) {
-            bytes32 msgCid = s.postboxKeys.at(i);
-            ids[i] = msgCid;
-            _propagate(msgCid);
-
-            unchecked {
-                ++i;
-            }
-        }
+        LibGateway.propagateAllPostboxMessages();
     }
 
     /**
@@ -93,29 +81,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
      * @param msgCid - the cid of the cross-net message
      */
     function propagatePostboxMessage(bytes32 msgCid) external payable {
-        _propagate(msgCid);
-    }
-
-    /**
-     * @dev Internal function to propagate the cross-net message.
-     * @param msgCid - the cid of the cross-net message
-     */
-    function _propagate(bytes32 msgCid) internal {
-        IpcEnvelope storage crossMsg = s.postbox[msgCid];
-
-        bool shouldBurn = LibGateway.commitCrossMessage(crossMsg);
-
-        // Cache value before deletion to avoid re-entrancy
-        uint256 v = crossMsg.value;
-
-        // Remove the message to prevent re-entrancy and clean up state
-        delete s.postbox[msgCid];
-        s.postboxKeys.remove(msgCid);
-
-        // Execute side effects
-        LibGateway.crossMsgSideEffects({v: v, shouldBurn: shouldBurn});
-
-        emit MessagePropagatedFromPostbox({id: msgCid});
+        LibGateway.propagatePostboxMessage(msgCid);
     }
 
     /**
