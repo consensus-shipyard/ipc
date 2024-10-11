@@ -53,12 +53,12 @@ pub mod xnet_messaging_facet;
 // The list of contracts need to convert FvmAddress to fvm_shared::Address
 fvm_address_conversion!(gateway_manager_facet);
 fvm_address_conversion!(gateway_getter_facet);
-fvm_address_conversion!(checkpointing_facet);
 fvm_address_conversion!(xnet_messaging_facet);
 fvm_address_conversion!(gateway_messenger_facet);
 fvm_address_conversion!(subnet_actor_checkpointing_facet);
 fvm_address_conversion!(subnet_actor_getter_facet);
 fvm_address_conversion!(lib_gateway);
+fvm_address_conversion!(checkpointing_facet);
 
 // The list of contracts that need to convert common types between each other
 common_type_conversion!(subnet_actor_getter_facet, checkpointing_facet);

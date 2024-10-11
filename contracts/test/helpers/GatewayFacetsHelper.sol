@@ -7,6 +7,7 @@ import {GatewayManagerFacet} from "../../contracts/gateway/GatewayManagerFacet.s
 import {GatewayMessengerFacet} from "../../contracts/gateway/GatewayMessengerFacet.sol";
 import {TopDownFinalityFacet} from "../../contracts/gateway/router/TopDownFinalityFacet.sol";
 import {CheckpointingFacet} from "../../contracts/gateway/router/CheckpointingFacet.sol";
+import {ValidatorRewardParentFacet} from "../../contracts/activities/ValidatorRewardParentFacet.sol";
 import {XnetMessagingFacet} from "../../contracts/gateway/router/XnetMessagingFacet.sol";
 import {GatewayDiamond} from "../../contracts/GatewayDiamond.sol";
 import {DiamondLoupeFacet} from "../../contracts/diamond/DiamondLoupeFacet.sol";
@@ -49,6 +50,11 @@ library GatewayFacetsHelper {
     }
 
     //
+    function validatorReward(GatewayDiamond gw) internal pure returns (ValidatorRewardParentFacet) {
+        ValidatorRewardParentFacet facet = ValidatorRewardParentFacet(address(gw));
+        return facet;
+    }
+
     function ownership(GatewayDiamond gw) internal pure returns (OwnershipFacet) {
         OwnershipFacet facet = OwnershipFacet(address(gw));
         return facet;

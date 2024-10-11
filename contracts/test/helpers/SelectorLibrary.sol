@@ -122,6 +122,13 @@ library SelectorLibrary {
                     (bytes4[])
                 );
         }
+        if (keccak256(abi.encodePacked(facetName)) == keccak256(abi.encodePacked("ValidatorRewardParentFacet"))) {
+            return
+                abi.decode(
+                    hex"0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000116e6e14200000000000000000000000000000000000000000000000000000000",
+                    (bytes4[])
+                );
+        }
         revert(string.concat("Selectors not found for facet: ", facetName));
     }
 }

@@ -9,6 +9,7 @@ use fendermint_crypto::SecretKey;
 use fendermint_testing::arb::{ArbSubnetID, ArbTokenAmount};
 use fendermint_vm_core::Timestamp;
 use fvm_shared::{address::Address, version::NetworkVersion};
+use ipc_types::EthAddress;
 use quickcheck::{Arbitrary, Gen};
 use rand::{rngs::StdRng, SeedableRng};
 
@@ -126,6 +127,7 @@ impl Arbitrary for ipc::GatewayParams {
             bottom_up_check_period: u64::arbitrary(g).max(1),
             majority_percentage: u8::arbitrary(g) % 50 + 51,
             active_validators_limit: u16::arbitrary(g) % 100 + 1,
+            validator_rewarder: Address::from(EthAddress([0; 20])),
         }
     }
 }

@@ -43,6 +43,7 @@ macro_rules! define_singleton {
 }
 
 pub mod account;
+pub mod activity;
 pub mod burntfunds;
 pub mod chainmetadata;
 pub mod cron;
@@ -57,4 +58,3 @@ pub mod multisig;
 pub mod placeholder;
 pub mod reward;
 pub mod system;
-pub mod activity;

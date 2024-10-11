@@ -7,7 +7,7 @@ import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap
 import {Pausable} from "../lib/LibPausable.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
 import {NotValidator, SubnetNoTargetCommitment, CommitmentAlreadyInitialized, ValidatorAlreadyClaimed} from "../errors/IPCErrors.sol";
-import {ValidatorSummary, ActivitySummary, LibActivitySummary} from "./Activity.sol";
+import {ValidatorSummary, ActivitySummary} from "./Activity.sol";
 import {IValidatorRewarder} from "./IValidatorRewarder.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {SubnetID} from "../structs/Subnet.sol";
@@ -17,8 +17,6 @@ import {LibActivityMerkleVerifier} from "./LibActivityMerkleVerifier.sol";
 /// to claim their reward in the parent subnet, which should be the current subnet this facet
 /// is deployed.
 contract ValidatorRewardParentFacet is ReentrancyGuard, Pausable {
-    using LibActivitySummary for ActivitySummary;
-
     /// Validators claim their reward for doing work in the child subnet
     function claim(
         SubnetID calldata subnetId,
@@ -43,11 +41,11 @@ contract ValidatorRewardParentFacet is ReentrancyGuard, Pausable {
         LibActivityMerkleVerifier.ensureValidProof(commitment, summary, proof);
 
         handleDistribution(s, subnetId, commitment, summary);
-
     }
 
     function handleRelay() internal pure {
-        revert("not implemented yet");
+        // no opt for now
+        return;
     }
 
     function handleDistribution(
@@ -58,8 +56,6 @@ contract ValidatorRewardParentFacet is ReentrancyGuard, Pausable {
     ) internal {
         LibValidatorRewardParent.validatorTryClaim(s, commitment, summary.validator);
         IValidatorRewarder(s.validatorRewarder).disburseRewards(subnetId, summary);
-
-        // LibValidatorRewardParent.tryPurgeCommitment(s, subnetId, commitment, summary.numValidators());
     }
 }
 
@@ -87,7 +83,7 @@ struct ValidatorRewardParentStorage {
     mapping(bytes32 => RewardDistribution) distributions;
 }
 
-/// The payload for list commitments query 
+/// The payload for list commitments query
 struct ListCommimentDetail {
     /// The child subnet checkpoint height
     uint64 checkpointHeight;
@@ -104,7 +100,9 @@ library LibValidatorRewardParent {
 
     // =========== External library functions =============
 
-    function listCommitments(SubnetID calldata subnetId) internal view returns(ListCommimentDetail[] memory listDetails) {
+    function listCommitments(
+        SubnetID calldata subnetId
+    ) internal view returns (ListCommimentDetail[] memory listDetails) {
         ValidatorRewardParentStorage storage ds = facetStorage();
 
         bytes32 subnetKey = subnetId.toHash();
@@ -126,6 +124,11 @@ library LibValidatorRewardParent {
         }
 
         return listDetails;
+    }
+
+    function updateRewarder(address rewarder) internal {
+        ValidatorRewardParentStorage storage ds = facetStorage();
+        ds.validatorRewarder = rewarder;
     }
 
     function initNewDistribution(uint64 checkpointHeight, bytes32 commitment, SubnetID calldata subnetId) internal {
@@ -155,7 +158,7 @@ library LibValidatorRewardParent {
         ValidatorRewardParentStorage storage ds,
         SubnetID calldata subnetId,
         uint64 checkpointHeight
-    ) internal view returns(bytes32) {
+    ) internal view returns (bytes32) {
         bytes32 subnetKey = subnetId.toHash();
 
         (bool exists, bytes32 commitment) = ds.commitments[subnetKey].tryGet(bytes32(uint256(checkpointHeight)));
@@ -175,8 +178,12 @@ library LibValidatorRewardParent {
 
     /// Validator tries to claim the reward. The validator can only claim the reward if the validator
     /// has not claimed before
-    function validatorTryClaim(ValidatorRewardParentStorage storage ds, bytes32 commitment, address validator) internal {
-        if(ds.distributions[commitment].claimed.contains(validator)) {
+    function validatorTryClaim(
+        ValidatorRewardParentStorage storage ds,
+        bytes32 commitment,
+        address validator
+    ) internal {
+        if (ds.distributions[commitment].claimed.contains(validator)) {
             revert ValidatorAlreadyClaimed();
         }
 

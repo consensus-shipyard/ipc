@@ -35,7 +35,6 @@ import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 
 import {ActivityCommitment} from "../../contracts/activities/Activity.sol";
 
-
 contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for IpcEnvelope;
@@ -167,7 +166,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivityCommitment({ summary: bytes32(0)})
+            activities: ActivityCommitment({summary: bytes32(0)})
         });
 
         vm.prank(address(saDiamond));
@@ -226,7 +225,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivityCommitment({ summary: bytes32(0)})
+            activities: ActivityCommitment({summary: bytes32(0)})
         });
 
         // Verify that we received the call and that the recipient has the tokens.

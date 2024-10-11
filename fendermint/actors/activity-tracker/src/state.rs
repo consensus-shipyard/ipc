@@ -26,11 +26,12 @@ pub struct State {
 }
 
 impl State {
-    pub fn new<BS: Blockstore>(
-        store: &BS,
-    ) -> Result<State, ActorError> {
+    pub fn new<BS: Blockstore>(store: &BS) -> Result<State, ActorError> {
         let mut deployers_map = BlockCommittedMap::empty(store, DEFAULT_HAMT_CONFIG, "empty");
-        Ok(State { start_height: 0, blocks_committed: deployers_map.flush()? })
+        Ok(State {
+            start_height: 0,
+            blocks_committed: deployers_map.flush()?,
+        })
     }
 
     pub fn reset_start_height(&mut self, rt: &impl Runtime) -> Result<(), ActorError> {
@@ -40,7 +41,12 @@ impl State {
 
     pub fn purge_validator_block_committed(&mut self, rt: &impl Runtime) -> Result<(), ActorError> {
         let all_validators = self.validator_activities(rt)?;
-        let mut validators = BlockCommittedMap::load(rt.store(), &self.blocks_committed, DEFAULT_HAMT_CONFIG, "verifiers")?;
+        let mut validators = BlockCommittedMap::load(
+            rt.store(),
+            &self.blocks_committed,
+            DEFAULT_HAMT_CONFIG,
+            "verifiers",
+        )?;
 
         for v in all_validators {
             validators.delete(&v.validator)?;
@@ -51,8 +57,17 @@ impl State {
         Ok(())
     }
 
-    pub fn incr_validator_block_committed(&self, rt: &impl Runtime, validator: &Address) -> Result<(), ActorError> {
-        let mut validators = BlockCommittedMap::load(rt.store(), &self.blocks_committed, DEFAULT_HAMT_CONFIG, "verifiers")?;
+    pub fn incr_validator_block_committed(
+        &self,
+        rt: &impl Runtime,
+        validator: &Address,
+    ) -> Result<(), ActorError> {
+        let mut validators = BlockCommittedMap::load(
+            rt.store(),
+            &self.blocks_committed,
+            DEFAULT_HAMT_CONFIG,
+            "verifiers",
+        )?;
 
         let v = if let Some(v) = validators.get(validator)? {
             *v + 1
@@ -65,16 +80,27 @@ impl State {
         Ok(())
     }
 
-    pub fn validator_activities(&self, rt: &impl Runtime) -> Result<Vec<ValidatorSummary>, ActorError> {
+    pub fn validator_activities(
+        &self,
+        rt: &impl Runtime,
+    ) -> Result<Vec<ValidatorSummary>, ActorError> {
         let mut result = vec![];
 
-        let validators = BlockCommittedMap::load(rt.store(), &self.blocks_committed, DEFAULT_HAMT_CONFIG, "verifiers")?;
+        let validators = BlockCommittedMap::load(
+            rt.store(),
+            &self.blocks_committed,
+            DEFAULT_HAMT_CONFIG,
+            "verifiers",
+        )?;
         validators.for_each(|k, v| {
-            result.push(ValidatorSummary{ validator: k, block_committed: *v, metadata: vec![]});
+            result.push(ValidatorSummary {
+                validator: k,
+                block_committed: *v,
+                metadata: vec![],
+            });
             Ok(())
         })?;
 
         Ok(result)
     }
 }
-

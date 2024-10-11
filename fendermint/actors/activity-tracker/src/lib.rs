@@ -1,18 +1,18 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use fil_actors_runtime::actor_error;
+use fil_actors_runtime::builtin::singletons::SYSTEM_ACTOR_ADDR;
 use fil_actors_runtime::runtime::{ActorCode, Runtime};
 use fil_actors_runtime::{actor_dispatch, ActorError};
-use fil_actors_runtime::builtin::singletons::SYSTEM_ACTOR_ADDR;
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
-use fvm_shared::METHOD_CONSTRUCTOR;
 use fvm_shared::clock::ChainEpoch;
+use fvm_shared::METHOD_CONSTRUCTOR;
 use num_derive::FromPrimitive;
-use fil_actors_runtime::actor_error;
 
-pub use crate::state::{ValidatorSummary};
 use crate::state::State;
+pub use crate::state::ValidatorSummary;
 
 mod state;
 
@@ -76,10 +76,10 @@ impl ActivityTrackerActor {
         let state: State = rt.state()?;
         let activities = state.validator_activities(rt)?;
         Ok(GetActivitiesResult {
-            activities, start_height: state.start_height
+            activities,
+            start_height: state.start_height,
         })
     }
-
 }
 
 impl ActorCode for ActivityTrackerActor {

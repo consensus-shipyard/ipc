@@ -26,12 +26,12 @@ use fvm_shared::{
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
+use crate::fvm::activities::actor::ActorActivityTracker;
 use crate::fvm::externs::FendermintExterns;
 use crate::fvm::gas::actor::ActorGasMarket;
 use crate::fvm::store::ReadOnlyBlockstore;
 use fendermint_vm_core::{chainid::HasChainID, Timestamp};
 use fendermint_vm_encoding::IsHumanReadable;
-use crate::fvm::activities::actor::ActorActivityTracker;
 
 pub type BlockHash = [u8; 32];
 
@@ -40,7 +40,8 @@ pub type ActorAddressMap = HashMap<ActorID, Address>;
 /// The result of the message application bundled with any delegated addresses of event emitters.
 pub type ExecResult = anyhow::Result<(ApplyRet, ActorAddressMap)>;
 
-pub type StateExecutor<DB> = DefaultExecutor<DefaultKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>>;
+pub type StateExecutor<DB> =
+    DefaultExecutor<DefaultKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>>;
 
 /// Parts of the state which evolve during the lifetime of the chain.
 #[serde_as]
@@ -283,8 +284,11 @@ where
         self.executor.context().network.chain_id
     }
 
-    pub fn activities_tracker(&mut self) -> ActorActivityTracker<StateExecutor<DB>> {
-        ActorActivityTracker { epoch: self.block_height(), executor: &mut self.executor }
+    pub fn activities_tracker(&mut self) -> ActorActivityTracker<DB> {
+        ActorActivityTracker {
+            epoch: self.block_height(),
+            executor: self,
+        }
     }
 
     /// Collect all the event emitters' delegated addresses, for those who have any.

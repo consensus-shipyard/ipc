@@ -21,6 +21,7 @@ import {GatewayMessengerFacet} from "../contracts/gateway/GatewayMessengerFacet.
 import {GatewayManagerFacet} from "../contracts/gateway/GatewayManagerFacet.sol";
 
 import {CheckpointingFacet} from "../contracts/gateway/router/CheckpointingFacet.sol";
+import {ValidatorRewardParentFacet} from "../contracts/activities/ValidatorRewardParentFacet.sol";
 import {XnetMessagingFacet} from "../contracts/gateway/router/XnetMessagingFacet.sol";
 import {TopDownFinalityFacet} from "../contracts/gateway/router/TopDownFinalityFacet.sol";
 
@@ -46,8 +47,7 @@ import {GatewayFacetsHelper} from "./helpers/GatewayFacetsHelper.sol";
 import {SubnetActorFacetsHelper} from "./helpers/SubnetActorFacetsHelper.sol";
 import {DiamondFacetsHelper} from "./helpers/DiamondFacetsHelper.sol";
 
-import {ActivityCommitment} from "../../contracts/activities/Activity.sol";
-
+import {ActivityCommitment} from "../contracts/activities/Activity.sol";
 
 struct TestSubnetDefinition {
     GatewayDiamond gateway;
@@ -127,6 +127,7 @@ contract TestRegistry is Test, TestParams {
 
 contract TestGatewayActor is Test, TestParams {
     bytes4[] gwCheckpointingFacetSelectors;
+    bytes4[] gwValidatorRewardFacetSelectors;
     bytes4[] gwXnetMessagingFacetSelectors;
     bytes4[] gwTopDownFinalityFacetSelectors;
 
@@ -142,6 +143,7 @@ contract TestGatewayActor is Test, TestParams {
     GatewayDiamond gatewayDiamond;
 
     constructor() {
+        gwValidatorRewardFacetSelectors = SelectorLibrary.resolveSelectors("ValidatorRewardParentFacet");
         gwCheckpointingFacetSelectors = SelectorLibrary.resolveSelectors("CheckpointingFacet");
         gwXnetMessagingFacetSelectors = SelectorLibrary.resolveSelectors("XnetMessagingFacet");
         gwTopDownFinalityFacetSelectors = SelectorLibrary.resolveSelectors("TopDownFinalityFacet");
@@ -314,7 +316,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
-            commitSha: DEFAULT_COMMIT_SHA
+            commitSha: DEFAULT_COMMIT_SHA,
+            validatorRewarder: address(0)
         });
         return params;
     }
@@ -326,13 +329,15 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
-            commitSha: DEFAULT_COMMIT_SHA
+            commitSha: DEFAULT_COMMIT_SHA,
+            validatorRewarder: address(0)
         });
         return params;
     }
 
     function createGatewayDiamond(GatewayDiamond.ConstructorParams memory params) public returns (GatewayDiamond) {
         CheckpointingFacet checkpointingFacet = new CheckpointingFacet();
+        ValidatorRewardParentFacet validatorRewardParentFacet = new ValidatorRewardParentFacet();
         XnetMessagingFacet xnetMessagingFacet = new XnetMessagingFacet();
         TopDownFinalityFacet topDownFinalityFacet = new TopDownFinalityFacet();
         GatewayManagerFacet manager = new GatewayManagerFacet();
@@ -342,7 +347,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         DiamondLoupeFacet louper = new DiamondLoupeFacet();
         OwnershipFacet ownership = new OwnershipFacet();
 
-        IDiamond.FacetCut[] memory gwDiamondCut = new IDiamond.FacetCut[](9);
+        IDiamond.FacetCut[] memory gwDiamondCut = new IDiamond.FacetCut[](10);
 
         gwDiamondCut[0] = (
             IDiamond.FacetCut({
@@ -415,6 +420,15 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
                 functionSelectors: gwOwnershipSelectors
             })
         );
+
+        gwDiamondCut[9] = (
+            IDiamond.FacetCut({
+                facetAddress: address(validatorRewardParentFacet),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: gwValidatorRewardFacetSelectors
+            })
+        );
+
         gatewayDiamond = new GatewayDiamond(gwDiamondCut, params);
 
         return gatewayDiamond;
@@ -917,7 +931,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             blockHash: keccak256(abi.encode(h)),
             nextConfigurationNumber: nextConfigNum - 1,
             msgs: new IpcEnvelope[](0),
-            activities: ActivityCommitment({ summary: bytes32(uint256(nextConfigNum))})
+            activities: ActivityCommitment({summary: bytes32(uint256(nextConfigNum))})
         });
 
         vm.deal(address(saDiamond), 100 ether);

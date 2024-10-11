@@ -13,6 +13,7 @@ import {LibGateway} from "./lib/LibGateway.sol";
 import {SubnetID} from "./structs/Subnet.sol";
 import {LibStaking} from "./lib/LibStaking.sol";
 import {BATCH_PERIOD, MAX_MSGS_PER_BATCH} from "./structs/CrossNet.sol";
+import {LibValidatorRewardParent} from "./activities/ValidatorRewardParentFacet.sol";
 
 error FunctionNotFound(bytes4 _functionSelector);
 
@@ -30,6 +31,7 @@ contract GatewayDiamond {
         SubnetID networkName;
         Validator[] genesisValidators;
         bytes32 commitSha;
+        address validatorRewarder;
     }
 
     constructor(IDiamond.FacetCut[] memory _diamondCut, ConstructorParams memory params) {
@@ -76,6 +78,8 @@ contract GatewayDiamond {
         // set initial validators and update membership
         Membership memory initial = Membership({configurationNumber: 0, validators: params.genesisValidators});
         LibGateway.updateMembership(initial);
+
+        LibValidatorRewardParent.updateRewarder(params.validatorRewarder);
     }
 
     function _fallback() internal {

@@ -85,7 +85,6 @@ error SubnetNoTargetCommitment();
 error ValidatorAlreadyClaimed();
 error InvalidProof();
 
-
 enum InvalidXnetMessageReason {
     Sender,
     DstSubnet,

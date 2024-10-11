@@ -10,7 +10,7 @@ struct ActivityCommitment {
     // TODO: add relayed rewarder commitment
 }
 
-/// The summary for a single validator 
+/// The summary for a single validator
 struct ValidatorSummary {
     /// @dev The validator whose activity we're reporting about.
     address validator;
@@ -29,15 +29,15 @@ struct ActivitySummary {
 }
 
 library LibActivitySummary {
-    function numValidators(ActivitySummary calldata self) internal pure returns(uint64) {
+    function numValidators(ActivitySummary calldata self) internal pure returns (uint64) {
         return uint64(self.activities.length);
     }
 
-    function commitment(ActivitySummary calldata self) internal pure returns(bytes32) {
+    function commitment(ActivitySummary calldata self) internal pure returns (bytes32) {
         return keccak256(abi.encode(self));
     }
 
-    function containsValidator(ActivitySummary calldata self, address validator) internal pure returns(bool) {
+    function containsValidator(ActivitySummary calldata self, address validator) internal pure returns (bool) {
         uint256 len = self.activities.length;
         for (uint256 i = 0; i < len; ) {
             if (self.activities[i].validator == validator) {

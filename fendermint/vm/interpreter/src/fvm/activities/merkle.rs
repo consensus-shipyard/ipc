@@ -33,8 +33,13 @@ impl TryFrom<&[ValidatorSummary]> for MerkleProofGen {
         let values = values
             .iter()
             .map(|t| {
-                payload_to_evm_address(t.validator.payload())
-                    .map(|addr| vec![format!("{addr:?}"), t.block_committed.to_string(), hex::encode(&t.metadata)])
+                payload_to_evm_address(t.validator.payload()).map(|addr| {
+                    vec![
+                        format!("{addr:?}"),
+                        t.block_committed.to_string(),
+                        hex::encode(&t.metadata),
+                    ]
+                })
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
 
