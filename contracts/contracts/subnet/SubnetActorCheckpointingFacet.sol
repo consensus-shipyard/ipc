@@ -14,8 +14,6 @@ import {LibSubnetActor} from "../lib/LibSubnetActor.sol";
 import {Pausable} from "../lib/LibPausable.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 
-import "forge-std/console.sol";
-
 contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard, Pausable {
     using EnumerableSet for EnumerableSet.AddressSet;
     using LibValidatorSet for ValidatorSet;
