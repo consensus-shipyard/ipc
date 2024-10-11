@@ -423,22 +423,18 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         assertEq(params.subnet.subnetActor.getter().supplySource().balanceOf(params.recipientAddr), params.expectedAmount, "wrong recipient balance");
 
         // apply the result message in the L2 subnet and expect another top down message to be emitted
-        resultMessage.nonce = 0;
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
-        msgs[0] = resultMessage;
+        msgs[0] = cloneIpcEnvelopeWithDifferentNonce(resultMessage, 0);
 
         commitParentFinality(params.subnet.gatewayAddr);
-        executeTopDownMsgs(msgs, params.subnet.gateway);
-
-        resultMessage.nonce = 1;
-        propagateAllAndExpectTopDownMessageEvent(
+        executeTopDownMsgsAndExpectTopDownMessageEvent(
+            msgs,
             params.subnet.gateway,
             resultMessage,
             params.subnetL3.subnetActorAddr,
             params.subnet.gatewayAddr
         );
 
-        resultMessage.nonce = 0;
         // apply the result and check it was propagated to the correct actor
         commitParentFinality(params.subnetL3.gatewayAddr);
         executeTopDownMsgs(msgs, params.subnetL3.gateway);
@@ -466,36 +462,27 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             0
         );
 
-        IpcEnvelope memory expectedMessage = IpcEnvelope({
-            kind: IpcMsgKind.Call,
-            from: crossMessage.from,
-            to: crossMessage.to,
-            value: crossMessage.value,
-            message: crossMessage.message,
-            nonce: 1
-        });
-
+        crossMessage.nonce = 1;
         // send the cross message from the root network to the L3 subnet
         vm.prank(params.callerAddr);
         vm.expectEmit(true, true, true, true, params.root.gatewayAddr);
         emit LibGateway.NewTopDownMessage({
             subnet: params.subnet.subnetActorAddr,
-            message: expectedMessage,
-            id: expectedMessage.toHash()
+            message: crossMessage,
+            id: crossMessage.toHash()
         });
+
+        crossMessage.nonce = 0;
         params.root.gateway.messenger().sendContractXnetMessage{value: params.amount}(crossMessage);
 
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = crossMessage;
 
         // propagate the message from the L2 to the L3 subnet
-        executeTopDownMsgs(msgs, params.subnet.gateway);
-
-        // check that the cross message is propagated to the L3 subnet
-        expectedMessage.nonce = 0;
-        propagateAllAndExpectTopDownMessageEvent(
+        executeTopDownMsgsAndExpectTopDownMessageEvent(
+            msgs,
             params.subnet.gateway,
-            expectedMessage,
+            crossMessage,
             params.subnetL3.subnetActorAddr,
             params.subnet.gatewayAddr
         );
@@ -640,12 +627,29 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         xnetMessenger.applyCrossMessages(msgs);
     }
 
-    function propagateAllAndExpectTopDownMessageEvent(
+    function executeTopDownMsgsAndExpectTopDownMessageEvent(
+        IpcEnvelope[] memory msgs,
         GatewayDiamond gw,
         IpcEnvelope memory expectedMessage,
         address expectedSubnetAddr,
         address expectedGatewayAddr
     ) internal {
+        uint256 minted_tokens;
+
+        for (uint256 i; i < msgs.length; ) {
+            minted_tokens += msgs[i].value;
+            unchecked {
+                ++i;
+            }
+        }
+        console.log("minted tokens in executed top-downs: %d", minted_tokens);
+
+        // The implementation of the function in fendermint is in
+        // https://github.com/consensus-shipyard/ipc/blob/main/fendermint/vm/interpreter/contracts/fvm/topdown.rs#L43
+
+        // This emulates minting tokens.
+        vm.deal(address(gw), minted_tokens);
+
         vm.prank(FilAddress.SYSTEM_ACTOR);
         vm.expectEmit(true, true, true, true, expectedGatewayAddr);
         emit LibGateway.NewTopDownMessage({
@@ -653,8 +657,8 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             message: expectedMessage,
             id: expectedMessage.toHash()
         });
-        GatewayMessengerFacet messenger = gw.messenger();
-        messenger.propagateAllPostboxMessages();
+        XnetMessagingFacet xnetMessenger = gw.xnetMessenger();
+        xnetMessenger.applyCrossMessages(msgs);
     }
 
     function callCreateBottomUpCheckpointFromChildSubnet(
@@ -788,6 +792,17 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
 
     function getNextEpoch(uint256 blockNumber, uint256 checkPeriod) internal pure returns (uint256) {
         return ((uint64(blockNumber) / checkPeriod) + 1) * checkPeriod;
+    }
+
+    function cloneIpcEnvelopeWithDifferentNonce(IpcEnvelope memory original, uint64 newNonce) internal pure returns (IpcEnvelope memory) {
+        return IpcEnvelope({
+            kind: original.kind,
+            to: original.to,
+            from: original.from,
+            nonce: newNonce,
+            value: original.value,
+            message: original.message
+        });
     }
 
     function printActors() internal view {
