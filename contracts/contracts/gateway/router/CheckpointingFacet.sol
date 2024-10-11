@@ -22,7 +22,7 @@ import {ActivityRollupRecorded, FullActivityRollup} from "../../structs/Activity
 contract CheckpointingFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for IpcEnvelope;
-    
+
     /// @dev Emitted when a checkpoint is committed to gateway.
     event CheckpointCommitted(address indexed subnet, uint256 blockHeight);
 
