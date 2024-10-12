@@ -15,6 +15,7 @@ extend = [
     { path = "scripts/testnet.toml" },
     { path = "scripts/testnode.toml" },
     { path = "scripts/subnet.toml" },
+    { path = "scripts/relayer.toml" },
 ]
 
 [config]
@@ -67,6 +68,9 @@ PROMETHEUS_HOST_PORT = { value = "9090", condition = { env_not_set = [
 ] } }
 ANVIL_HOST_PORT = { value = "8545", condition = { env_not_set = [
     "ANVIL_HOST_PORT",
+] } }
+RELAYER_METRICS_HOST_PORT = { value = "9187", condition = { env_not_set = [
+    "RELAYER_METRICS_HOST_PORT",
 ] } }
 
 BALANCE = { value = "1000", condition = { env_not_set = ["BALANCE"] } }
@@ -171,6 +175,7 @@ PROMETHEUS_CONTAINER_NAME = "prometheus"
 GRAFANA_CONTAINER_NAME = "grafana"
 LOKI_CONTAINER_NAME = "loki"
 ANVIL_CONTAINER_NAME = "anvil"
+RELAYER_CONTAINER_NAME = "relayer"
 
 FOUNDRY_DOCKER_IMAGE = "ghcr.io/foundry-rs/foundry:latest"
 CMT_DOCKER_IMAGE = "cometbft/cometbft:v0.37.x"
@@ -204,6 +209,9 @@ OBJECTS_LOG_LEVEL = { value = "${LOG_LEVEL}", condition = { env_not_set = [
 LOG_DOMAINS = "Bottomup,Consensus,Execution,Mpool,System,Topdown"
 FM_LOG_DOMAINS = { value = "${LOG_DOMAINS}", condition = { env_not_set = [
     "FM_LOG_DOMAINS",
+] } }
+RELAYER_LOG_LEVEL = { value = "${LOG_LEVEL}", condition = { env_not_set = [
+    "RELAYER_LOG_LEVEL",
 ] } }
 
 [tasks.info]

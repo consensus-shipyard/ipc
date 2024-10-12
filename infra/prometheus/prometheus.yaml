@@ -9,6 +9,7 @@ scrape_configs:
     static_configs:
       - targets: [
         # note the ports are the container internal values since we are using the network domain resolution
+        "relayer:9184",
         "validator-0-fendermint:9184",
         "validator-1-fendermint:9184",
         "validator-2-fendermint:9184",
