@@ -453,7 +453,7 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
     echo "$deploy_supply_source_token_out"
     echo ""
     # note: this is consistently going to be
-    # 0xE6E340D132b5f46d1e472DebcD681B2aBc16e57E for localnet 
+    # 0xa85233C63b9Ee964Add6F2cffe00Fd84eb32338f for localnet
     SUPPLY_SOURCE_ADDRESS=$(echo "$deploy_supply_source_token_out" | sed -n 's/.*contract Hoku *\([^ ]*\).*/\1/p')
 
     # fund the all anvil accounts with 10100 HOKU (note the extra 100 HOKU)
