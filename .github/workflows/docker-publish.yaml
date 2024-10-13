@@ -5,19 +5,14 @@ on:
   workflow_call:
 
 env:
-  CARGO_INCREMENTAL: "0"
-  SCCACHE_CACHE_SIZE: 10G
-  CC: "sccache clang"
-  CXX: "sccache clang++"
   PROFILE: "ci"
-  BUILDX_FLAGS: "--cache-from=type=gha --cache-to=type=gha,mode=max"
 
 jobs:
 
   # Publish Docker image on the main branch
   publish:
     name: Publish artifacts
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     permissions:
       packages: write
@@ -40,17 +35,6 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           rust: stable
-
-      - name: Setup Cache
-        uses: ./.github/actions/setup-cache
-        timeout-minutes: 5
-        continue-on-error: true
-        with:
-          # The Cargo.lock file is very likely to change between PRs, which would mean a cache miss.
-          # Ideally we want to download the previous cache and do an upload if something changed.
-          # That's why the Cargo.lock hash is used as a suffix, so we match on a stable one and upload if changed.
-          cache-prefix: publish-${{ hashFiles('rust-toolchain', 'rust-toolchain.toml') }}
-          cache-suffix: ${{ hashFiles('**/Cargo.lock') }}
 
       # Not restoring Solidity artifact cache because of supply side attack potential.
 
@@ -90,21 +74,9 @@ jobs:
         run: |
           cd fendermint && make docker-deps
 
-      # https://github.com/marketplace/actions/free-disk-space-ubuntu
-      - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
       - name: Build and Push Multiarch Docker Image
         run: |
           export BUILDX_TAG=${{ steps.prep.outputs.IMAGE_TAG }}
           export BUILDX_STORE="--push"
-          export BUILDX_FLAGS="--platform linux/amd64,linux/arm64 ${BUILDX_FLAGS}"
+          export BUILDX_FLAGS="--platform linux/amd64,linux/arm64"
           cd fendermint && make docker-build
