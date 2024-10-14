@@ -69,7 +69,7 @@ contract L2GatewayActorDiamondTest is Test, L2GatewayActorDiamond {
 
     function callback() public view {}
 
-    function collateralSource() external view returns (Asset memory supply) {
+    function collateralSource() external pure returns (Asset memory supply) {
         return AssetHelper.native();
     }
 }

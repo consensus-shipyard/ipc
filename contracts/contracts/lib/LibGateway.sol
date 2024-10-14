@@ -526,7 +526,7 @@ library LibGateway {
         // because we're the LCA, commit a top-down message.
         if (applyType == IPCMsgType.TopDown || isLCA) {
             ++s.appliedTopDownNonce;
-            (bool found, Subnet storage subnet) = getSubnet(to.down(s.networkName));
+            (, Subnet storage subnet) = getSubnet(to.down(s.networkName));
             LibGateway.commitTopDownMsg(subnet, crossMessage);
             return (shouldBurn = false);
         }
