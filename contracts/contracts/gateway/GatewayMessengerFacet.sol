@@ -35,13 +35,24 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
      * @return committed envelope.
      */
     function sendContractXnetMessage(
-        IpcEnvelope calldata envelope
+        IpcEnvelope memory envelope
     ) external payable returns (IpcEnvelope memory committed) {
         if (!s.generalPurposeCrossMsg) {
             revert MethodNotAllowed(ERR_GENERAL_CROSS_MSG_DISABLED);
         }
 
-        validateCrossMessage(envelope);
+        // We prevent the sender from being an EoA.
+        if (!(msg.sender.code.length > 0)) {
+            revert InvalidXnetMessage(InvalidXnetMessageReason.Sender);
+        }
+
+        if (envelope.value != msg.value) {
+            revert InvalidXnetMessage(InvalidXnetMessageReason.Value);
+        }
+
+        if (envelope.kind != IpcMsgKind.Call) {
+            revert InvalidXnetMessage(InvalidXnetMessageReason.Kind);
+        }
 
         // Will revert if the message won't deserialize into a CallMsg.
         abi.decode(envelope.message, (CallMsg));
@@ -54,6 +65,18 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
             message: envelope.message,
             nonce: 0 // nonce will be updated by LibGateway.commitCrossMessage
         });
+
+        CrossMessageValidationOutcome outcome = LibGateway.validateCrossMessage(committed);
+
+        if (outcome != CrossMessageValidationOutcome.Valid) {
+            if (outcome == CrossMessageValidationOutcome.InvalidDstSubnet) {
+                revert InvalidXnetMessage(InvalidXnetMessageReason.DstSubnet);
+            } else if (outcome == CrossMessageValidationOutcome.CannotSendToItself) {
+                revert CannotSendCrossMsgToItself();
+            } else if (outcome == CrossMessageValidationOutcome.CommonParentNotExist) {
+                revert CommonParentDoesNotExist();
+            }
+        }
 
         // Commit xnet message for dispatch.
         bool shouldBurn = LibGateway.commitCrossMessage(committed);
@@ -72,44 +95,5 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
      */
     function propagateAllPostboxMessages() external payable {
         LibGateway.propagateAllPostboxMessages();
-    }
-
-    /**
-     * @dev Propagates the populated cross-net message for the given `msgCid`.
-     * @param msgCid - the cid of the cross-net message
-     */
-    function propagatePostboxMessage(bytes32 msgCid) external payable {
-        LibGateway.propagatePostboxMessage(msgCid);
-    }
-
-    /**
-     * @dev Validates the cross-net message and reverts if it is invalid.
-     * @param envelope - the cross-net message to validate
-     */
-    function validateCrossMessage(IpcEnvelope memory envelope) internal {
-        // We prevent the sender from being an EoA.
-        if (!(msg.sender.code.length > 0)) {
-            revert InvalidXnetMessage(InvalidXnetMessageReason.Sender);
-        }
-
-        if (envelope.value != msg.value) {
-            revert InvalidXnetMessage(InvalidXnetMessageReason.Value);
-        }
-
-        if (envelope.kind != IpcMsgKind.Call) {
-            revert InvalidXnetMessage(InvalidXnetMessageReason.Kind);
-        }
-
-        CrossMessageValidationOutcome outcome = LibGateway.validateCrossMessage(envelope);
-
-        if (outcome != CrossMessageValidationOutcome.Valid) {
-            if (outcome == CrossMessageValidationOutcome.InvalidDstSubnet) {
-                revert InvalidXnetMessage(InvalidXnetMessageReason.DstSubnet);
-            } else if (outcome == CrossMessageValidationOutcome.CannotSendToItself) {
-                revert CannotSendCrossMsgToItself();
-            } else if (outcome == CrossMessageValidationOutcome.CommonParentNotExist) {
-                revert CommonParentDoesNotExist();
-            }
-        }
     }
 }
