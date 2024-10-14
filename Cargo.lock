@@ -3119,6 +3119,7 @@ dependencies = [
  "blobs_actor_sdk",
  "fendermint_actor_blobs_shared",
  "fendermint_actor_machine",
+ "fendermint_testing",
  "fil_actors_evm_shared",
  "fil_actors_runtime",
  "fvm_ipld_blockstore",
@@ -3128,9 +3129,12 @@ dependencies = [
  "iroh-base",
  "log",
  "num-traits",
+ "quickcheck",
+ "quickcheck_macros",
  "rand",
  "serde",
  "serde_tuple",
+ "tracing-subscriber",
 ]
 
 [[package]]

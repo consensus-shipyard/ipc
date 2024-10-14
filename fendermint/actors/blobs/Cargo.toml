@@ -27,13 +27,17 @@ fendermint_actor_blobs_shared = { path = "./shared" }
 fendermint_actor_machine = { path = "../machine" }
 
 [dev-dependencies]
+fendermint_testing = { path = "../../testing", features = ["arb"] }
 fil_actors_evm_shared = { workspace = true }
 fil_actors_runtime = { workspace = true, features = [
     "test_utils",
 ] }
 hex-literal = { workspace = true }
 iroh-base = { workspace = true, features = ["key"] }
+quickcheck = { workspace = true }
+quickcheck_macros = { workspace = true }
 rand = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 [features]
 fil-actor = ["fil_actors_runtime/fil-actor"]

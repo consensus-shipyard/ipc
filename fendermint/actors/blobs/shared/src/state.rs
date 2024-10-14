@@ -96,7 +96,7 @@ pub struct Blob {
 /// An object used to determine what [`Account`](s) are accountable for a blob, and for how long.
 /// Subscriptions allow us to distribute the cost of a blob across multiple accounts that
 /// have added the same blob.   
-#[derive(Clone, Debug, Default, Serialize_tuple, Deserialize_tuple)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize_tuple, Deserialize_tuple)]
 pub struct Subscription {
     /// Added block.
     pub added: ChainEpoch,
@@ -225,7 +225,7 @@ impl SubscriptionGroup {
 }
 
 /// The status of a blob.
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub enum BlobStatus {
     /// Blob is pending resolve.
     #[default]
