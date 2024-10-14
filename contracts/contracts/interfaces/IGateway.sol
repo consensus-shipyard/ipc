@@ -62,9 +62,6 @@ interface IGateway {
         IpcEnvelope calldata envelope
     ) external payable returns (IpcEnvelope memory committed);
 
-    /// @notice Propagates the stored postbox item for the given cid
-    function propagatePostboxMessage(bytes32 msgCid) external payable;
-
     /// @notice Propagates all the stored postbox items
     function propagateAllPostboxMessages() external payable;
 
