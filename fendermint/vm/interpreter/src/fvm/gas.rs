@@ -68,9 +68,15 @@ impl BlockGasTracker {
         }
     }
 
-    pub fn finalize<E: Executor>(&self, executor: &mut E) -> anyhow::Result<TokenAmount> {
-        self.distribute_premiums(executor)
-            .and_then(|_| self.commit_utilization(executor))
+    pub fn finalize<E: Executor>(
+        &self,
+        executor: &mut E,
+        premium_recipient: Option<Address>,
+    ) -> anyhow::Result<Reading> {
+        if let Some(premium_recipient) = premium_recipient {
+            self.distribute_premiums(executor, premium_recipient)?
+        }
+        self.commit_utilization(executor)
     }
 
     fn load_reading<E: Executor>(&mut self, executor: &mut E) -> anyhow::Result<()> {

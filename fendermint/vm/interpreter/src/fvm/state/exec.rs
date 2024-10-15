@@ -302,13 +302,19 @@ where
         self.update_params(|p| f(&mut p.app_version))
     }
 
-    pub fn update_gas_market(&mut self) -> anyhow::Result<()> {
-        let height = self.block_height();
-        let ret = self
-            .gas_market
-            .commit(&mut self.executor, height, self.validator_pubkey)?;
-        self.params.base_fee = ret.base_fee;
-        Ok(())
+    /// Finalizes updates to the gas market based on the transactions processed by this instance.
+    /// Returns the new base fee for the next height.
+    pub fn finalize_gas_market(&mut self) -> anyhow::Result<Reading> {
+        let premium_recipient = match self.block_producer {
+            Some(pubkey) => Some(Address::from(EthAddress::new_secp256k1(
+                &pubkey.serialize(),
+            )?)),
+            None => None,
+        };
+
+        self.block_gas_tracker
+            .finalize(&mut self.executor, premium_recipient)
+            .inspect(|reading| self.update_params(|p| p.base_fee = reading.base_fee.clone()))
     }
 
     /// Update the circulating supply, effective from the next block.
