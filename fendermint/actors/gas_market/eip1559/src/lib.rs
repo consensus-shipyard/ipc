@@ -15,7 +15,7 @@ use std::cmp::Ordering;
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
 
-pub const ACTOR_NAME: &str = "eip1559_gas_market";
+pub const ACTOR_NAME: &str = "gas_market_eip1559";
 
 pub type SetConstants = Constants;
 

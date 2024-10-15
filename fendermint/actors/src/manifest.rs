@@ -4,12 +4,17 @@ use anyhow::{anyhow, Context};
 use cid::Cid;
 use fendermint_actor_chainmetadata::CHAINMETADATA_ACTOR_NAME;
 use fendermint_actor_eam::IPC_EAM_ACTOR_NAME;
+use fendermint_actor_gas_market_eip1559::ACTOR_NAME as GAS_MARKET_EIP1559_ACTOR_NAME;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::CborStore;
 use std::collections::HashMap;
 
 // array of required actors
-pub const REQUIRED_ACTORS: &[&str] = &[CHAINMETADATA_ACTOR_NAME, IPC_EAM_ACTOR_NAME];
+pub const REQUIRED_ACTORS: &[&str] = &[
+    CHAINMETADATA_ACTOR_NAME,
+    IPC_EAM_ACTOR_NAME,
+    GAS_MARKET_EIP1559_ACTOR_NAME,
+];
 
 /// A mapping of internal actor CIDs to their respective types.
 pub struct Manifest {
