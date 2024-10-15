@@ -1,9 +1,8 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-use crate::fvm::gas::BlockGasTracker;
 use crate::fvm::state::ipc::GatewayCaller;
 use crate::fvm::store::ReadOnlyBlockstore;
-use crate::fvm::{topdown, FvmApplyRet, PowerUpdates};
+use crate::fvm::{topdown, BlockGasLimit, FvmApplyRet, PowerUpdates};
 use crate::selector::{GasLimitSelector, MessageSelector};
 use crate::{
     fvm::state::FvmExecState,
@@ -235,7 +234,7 @@ where
             };
         }
 
-        Ok(block_gas_usage <= state.gas_market().available())
+        Ok(block_gas_usage <= state.block_gas_tracker().available())
     }
 }
 
@@ -247,7 +246,7 @@ where
         Message = VerifiableMessage,
         DeliverOutput = SignedMessageApplyRes,
         State = FvmExecState<DB>,
-        EndOutput = PowerUpdates,
+        EndOutput = (PowerUpdates, BlockGasLimit),
     >,
 {
     // The state consists of the resolver pool, which this interpreter needs, and the rest of the
@@ -435,9 +434,10 @@ where
         let (state, out) = self.inner.end(state).await?;
 
         // Update any component that needs to know about changes in the power table.
-        if !out.0.is_empty() {
+        if !out.0 .0.is_empty() {
             let power_updates = out
                 .0
+                 .0
                 .iter()
                 .map(|v| {
                     let vk = ValidatorKey::from(v.public_key.0);

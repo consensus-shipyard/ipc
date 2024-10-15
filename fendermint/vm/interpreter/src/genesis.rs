@@ -440,7 +440,7 @@ impl GenesisBuilder {
         let gas_market_state = fendermint_actor_gas_market_eip1559::State {
             base_fee: initial_base_fee,
             // If you need to customize the gas market constants, you can do so here.
-            constants: fendermint_actor_gas_market_eip1559::Constants::default()
+            constants: fendermint_actor_gas_market_eip1559::Constants::default(),
         };
         state
             .create_custom_actor(
@@ -450,7 +450,7 @@ impl GenesisBuilder {
                 TokenAmount::zero(),
                 None,
             )
-            .context("failed to create gas market actor")?;
+            .context("failed to create default eip1559 gas market actor")?;
 
         // STAGE 2: Create non-builtin accounts which do not have a fixed ID.
 

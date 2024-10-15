@@ -12,14 +12,12 @@ use fvm_shared::{address::Address, ActorID, MethodNum, BLOCK_GAS_LIMIT};
 use ipc_observability::{emit, measure_time, observe::TracingError, Traceable};
 use tendermint_rpc::Client;
 
-use crate::fvm::gas_market::{GasMarket, GasUtilization};
 use crate::ExecInterpreter;
 
 use super::{
     checkpoint::{self, PowerUpdates},
     observe::{CheckpointFinalized, MsgExec, MsgExecPurpose},
-    state::FvmExecState,
-    FvmMessage, FvmMessageInterpreter,
+    state::FvmExecState, BlockGasLimit, FvmMessage, FvmMessageInterpreter,
 };
 
 /// The return value extended with some things from the message that
@@ -46,10 +44,10 @@ where
     type Message = FvmMessage;
     type BeginOutput = FvmApplyRet;
     type DeliverOutput = FvmApplyRet;
-    /// Return validator power updates.
+    /// Return validator power updates and the next base fee.
     /// Currently ignoring events as there aren't any emitted by the smart contract,
     /// but keep in mind that if there were, those would have to be propagated.
-    type EndOutput = PowerUpdates;
+    type EndOutput = (PowerUpdates, BlockGasLimit);
 
     async fn begin(
         &self,
@@ -262,6 +260,7 @@ where
             PowerUpdates::default()
         };
 
-        Ok((state, updates))
+        let ret = (updates, next_gas_market.block_gas_limit);
+        Ok((state, ret))
     }
 }

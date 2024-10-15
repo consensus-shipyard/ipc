@@ -2,24 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use crate::fvm::FvmMessage;
-use anyhow::Context;
+use anyhow::{bail, Context};
 
-use fendermint_actor_gas_market_eip1559::SetConstants;
 use fendermint_actors_api::gas_market::{Gas, Reading, Utilization};
-use fendermint_crypto::PublicKey;
-use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::gas_market::GAS_MARKET_ACTOR_ADDR;
 use fendermint_vm_actor_interface::{reward, system};
 use fvm::executor::{ApplyKind, ApplyRet, Executor};
 use fvm_shared::address::Address;
-use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::METHOD_SEND;
 use num_traits::Zero;
 
+#[derive(Debug, Clone)]
 pub struct BlockGasTracker {
-    /// The address of the actor that will receive the gas premium. Usually the block producer.
-    premium_recipient: Address,
     /// The current base fee.
     base_fee: TokenAmount,
     /// The current block gas limit.
@@ -147,9 +142,8 @@ impl BlockGasTracker {
         msg: FvmMessage,
     ) -> anyhow::Result<ApplyRet> {
         let apply_ret = executor.execute_message(msg, ApplyKind::Implicit, 0)?;
-
         if let Some(err) = apply_ret.failure_info {
-            anyhow::bail!("failed to apply message: {}", err)
+            bail!("failed to apply message: {}", err)
         }
         Ok(apply_ret)
     }

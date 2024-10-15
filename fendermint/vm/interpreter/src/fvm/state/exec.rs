@@ -3,9 +3,15 @@
 
 use std::collections::{HashMap, HashSet};
 
+use crate::fvm::externs::FendermintExterns;
+use crate::fvm::gas::BlockGasTracker;
 use anyhow::Ok;
 use cid::Cid;
+use fendermint_actors_api::gas_market::Reading;
 use fendermint_crypto::PublicKey;
+use fendermint_vm_actor_interface::eam::EthAddress;
+use fendermint_vm_core::{chainid::HasChainID, Timestamp};
+use fendermint_vm_encoding::IsHumanReadable;
 use fendermint_vm_genesis::PowerScale;
 use fvm::{
     call_manager::DefaultCallManager,
@@ -23,11 +29,6 @@ use fvm_shared::{
 };
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-
-use crate::fvm::externs::FendermintExterns;
-use crate::fvm::gas::BlockGasTracker;
-use fendermint_vm_core::{chainid::HasChainID, Timestamp};
-use fendermint_vm_encoding::IsHumanReadable;
 
 pub type BlockHash = [u8; 32];
 
@@ -98,23 +99,21 @@ where
     executor: DefaultExecutor<
         DefaultKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>,
     >,
-
     /// Hash of the block currently being executed. For queries and checks this is empty.
     ///
     /// The main motivation to add it here was to make it easier to pass in data to the
     /// execution interpreter without having to add yet another piece to track at the app level.
     block_hash: Option<BlockHash>,
-
-    /// Public key of the validator who created this block. For queries and checks this is empty.
-    validator_pubkey: Option<PublicKey>,
-    /// State of parameters that are outside the control of the FVM but can change and need to be persisted.
-    params: FvmUpdatableParams,
-
-    /// Indicate whether the parameters have been updated.
-    params_dirty: bool,
+    /// Public key of the validator who created this block. For queries, checks, and proposal
+    /// validations this is None.
+    block_producer: Option<PublicKey>,
     /// Keeps track of block gas usage during execution, and takes care of updating
     /// the chosen gas market strategy (by default an on-chain actor delivering EIP-1559 behaviour).
-    gas_market: BlockGasTracker,
+    block_gas_tracker: BlockGasTracker,
+    /// State of parameters that are outside the control of the FVM but can change and need to be persisted.
+    params: FvmUpdatableParams,
+    /// Indicate whether the parameters have been updated.
+    params_dirty: bool,
 }
 
 impl<DB> FvmExecState<DB>
@@ -149,12 +148,14 @@ where
         let externs = FendermintExterns::new(blockstore.clone(), params.state_root);
         let machine = DefaultMachine::new(&mc, blockstore, externs)?;
         let mut executor = DefaultExecutor::new(engine, machine)?;
-        let gas_market = BlockGasTracker::create(&mut executor, block_height)?;
+
+        let block_gas_tracker = BlockGasTracker::create(&mut executor)?;
 
         Ok(Self {
             executor,
             block_hash: None,
-            validator_pubkey: None,
+            block_producer: None,
+            block_gas_tracker,
             params: FvmUpdatableParams {
                 app_version: params.app_version,
                 base_fee: params.base_fee,
@@ -162,7 +163,6 @@ where
                 power_scale: params.power_scale,
             },
             params_dirty: false,
-            gas_market,
         })
     }
 
@@ -173,17 +173,21 @@ where
     }
 
     /// Set the validator during execution.
-    pub fn with_validator(mut self, key: PublicKey) -> Self {
-        self.validator_pubkey = Some(key);
+    pub fn with_block_producer(mut self, pubkey: PublicKey) -> Self {
+        self.block_producer = Some(pubkey);
         self
     }
 
-    pub fn gas_market_mut(&mut self) -> &mut BlockGasTracker {
-        &mut self.gas_market
+    pub fn block_gas_tracker(&self) -> &BlockGasTracker {
+        &self.block_gas_tracker
     }
 
-    pub fn gas_market(&self) -> &BlockGasTracker {
-        &self.gas_market
+    pub fn block_gas_tracker_mut(&mut self) -> &mut BlockGasTracker {
+        &mut self.block_gas_tracker
+    }
+
+    pub fn read_gas_market(&mut self) -> anyhow::Result<Reading> {
+        BlockGasTracker::read_gas_market(&mut self.executor)
     }
 
     /// Execute message implicitly.

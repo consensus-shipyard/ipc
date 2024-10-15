@@ -3,7 +3,6 @@
 
 //! Gas related message selection
 
-use crate::fvm::gas::BlockGasTracker;
 use crate::fvm::state::FvmExecState;
 use fendermint_vm_message::signed::SignedMessage;
 use fvm_ipld_blockstore::Blockstore;

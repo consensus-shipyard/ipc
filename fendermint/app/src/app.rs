@@ -424,7 +424,7 @@ where
         Message = Vec<u8>,
         BeginOutput = FvmApplyRet,
         DeliverOutput = BytesMessageApplyRes,
-        EndOutput = PowerUpdates,
+        EndOutput = (PowerUpdates, BlockGasLimit),
     >,
     I: CheckInterpreter<
         State = FvmExecState<ReadOnlyBlockstore<SS>>,
@@ -792,22 +792,40 @@ where
     async fn end_block(&self, request: request::EndBlock) -> AbciResult<response::EndBlock> {
         tracing::debug!(height = request.height, "end block");
 
-        // TODO: Return events from epoch transitions.
-        let ret = self
-            .modify_exec_state(|s| async {
-                let ((chain_env, mut state), update) = self.interpreter.end(s).await?;
-
-                let mut end_block = EndBlockUpdate::new(update);
-                if let Some(gas) = state.gas_market_mut().take_constant_update() {
-                    end_block.update_gas(gas)
-                }
-
-                Ok(((chain_env, state), end_block))
-            })
+        // End the interpreter for this block.
+        let (power_updates, new_block_gas_limit) = self
+            .modify_exec_state(|s| self.interpreter.end(s))
             .await
             .context("end failed")?;
 
-        Ok(to_end_block(&self.client, request.height, ret).await?)
+        // Convert the incoming power updates to Tendermint validator updates.
+        let validator_updates =
+            to_validator_updates(power_updates.0).context("failed to convert validator updates")?;
+
+        // If the block gas limit has changed, we need to update the consensus layer so it can
+        // pack subsequent blocks against the new limit.
+        let consensus_param_updates = {
+            let mut consensus_params = self
+                .client
+                .consensus_params(tendermint::block::Height::try_from(request.height)?)
+                .await?
+                .consensus_params;
+
+            if consensus_params.block.max_gas != new_block_gas_limit as i64 {
+                consensus_params.block.max_gas = new_block_gas_limit as i64;
+                Some(consensus_params)
+            } else {
+                None
+            }
+        };
+
+        let ret = response::EndBlock {
+            validator_updates,
+            consensus_param_updates,
+            events: Vec::new(), // TODO: Return events from epoch transitions.
+        };
+
+        Ok(ret)
     }
 
     /// Commit the current state at the current height.
