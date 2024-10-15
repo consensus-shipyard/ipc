@@ -26,19 +26,18 @@ pub struct BlockGasTracker {
 }
 
 impl BlockGasTracker {
-    pub fn create<E: Executor>(
-        executor: &mut E,
-        premium_recipient: Address,
-    ) -> anyhow::Result<BlockGasTracker> {
+    pub fn create<E: Executor>(executor: &mut E) -> anyhow::Result<BlockGasTracker> {
         let mut ret = Self {
-            premium_recipient,
             base_fee: Zero::zero(),
             block_gas_limit: Zero::zero(),
             cumul_gas_premium: Zero::zero(),
             cumul_gas_used: Zero::zero(),
         };
 
-        ret.load_reading(executor)?;
+        let reading = Self::read_gas_market(executor)?;
+
+        ret.base_fee = reading.base_fee;
+        ret.block_gas_limit = reading.block_gas_limit;
 
         Ok(ret)
     }
@@ -79,7 +78,7 @@ impl BlockGasTracker {
         self.commit_utilization(executor)
     }
 
-    fn load_reading<E: Executor>(&mut self, executor: &mut E) -> anyhow::Result<()> {
+    pub fn read_gas_market<E: Executor>(executor: &mut E) -> anyhow::Result<Reading> {
         let msg = FvmMessage {
             from: system::SYSTEM_ACTOR_ADDR,
             to: GAS_MARKET_ACTOR_ADDR,
@@ -96,19 +95,14 @@ impl BlockGasTracker {
         let apply_ret = Self::apply_implicit_message(executor, msg)?;
 
         if let Some(err) = apply_ret.failure_info {
-            anyhow::bail!("failed to acquire gas market reading: {}", err);
+            bail!("failed to acquire gas market reading: {}", err);
         }
 
-        let reading = fvm_ipld_encoding::from_slice::<Reading>(&apply_ret.msg_receipt.return_data)
-            .context("failed to parse gas market reading")?;
-
-        self.base_fee = reading.base_fee;
-        self.block_gas_limit = reading.block_gas_limit;
-
-        Ok(())
+        fvm_ipld_encoding::from_slice::<Reading>(&apply_ret.msg_receipt.return_data)
+            .context("failed to parse gas market reading")
     }
 
-    fn commit_utilization<E: Executor>(&self, executor: &mut E) -> anyhow::Result<TokenAmount> {
+    fn commit_utilization<E: Executor>(&self, executor: &mut E) -> anyhow::Result<Reading> {
         let params = fvm_ipld_encoding::RawBytes::serialize(Utilization {
             block_gas_used: self.cumul_gas_used,
         })?;
@@ -128,18 +122,21 @@ impl BlockGasTracker {
 
         let apply_ret = Self::apply_implicit_message(executor, msg)?;
         fvm_ipld_encoding::from_slice::<Reading>(&apply_ret.msg_receipt.return_data)
-            .map(|r| r.base_fee)
             .context("failed to parse gas utilization result")
     }
 
-    fn distribute_premiums<E: Executor>(&self, executor: &mut E) -> anyhow::Result<()> {
+    fn distribute_premiums<E: Executor>(
+        &self,
+        executor: &mut E,
+        premium_recipient: Address,
+    ) -> anyhow::Result<()> {
         if self.cumul_gas_premium.is_zero() {
             return Ok(());
         }
 
         let msg = FvmMessage {
             from: reward::REWARD_ACTOR_ADDR,
-            to: self.premium_recipient.clone(),
+            to: premium_recipient,
             sequence: 0, // irrelevant for implicit executions.
             gas_limit: i64::MAX as u64,
             method_num: METHOD_SEND,
