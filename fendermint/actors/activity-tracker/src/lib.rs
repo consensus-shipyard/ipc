@@ -19,7 +19,7 @@ mod state;
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(ActivityTrackerActor);
 
-pub const IPC_ACTIVITY_TRACKER_ACTOR_NAME: &str = "activity";
+pub const IPC_ACTIVITY_TRACKER_ACTOR_NAME: &str = "activity_tracker";
 
 pub struct ActivityTrackerActor;
 
