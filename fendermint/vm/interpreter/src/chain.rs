@@ -555,11 +555,16 @@ fn relayed_bottom_up_ckpt_to_fvm(
     Ok(msg)
 }
 
+/// Selects messages to be executed. Currently, this is a static function whose main purpose is to
+/// coordinate various selectors. However, it does not have formal semantics for doing so, e.g.
+/// do we daisy-chain selectors, do we parallelize, how do we treat rejections and acceptances?
+/// It hasn't been well thought out yet. When we refactor the whole *Interpreter stack, we will
+/// revisit this and make the selection function properly pluggable.
 fn messages_selection<DB: Blockstore + Clone + 'static>(
     msgs: Vec<ChainMessage>,
     state: &FvmExecState<DB>,
 ) -> anyhow::Result<Vec<ChainMessage>> {
-    let mut signed = msgs
+    let mut user_msgs = msgs
         .into_iter()
         .map(|msg| match msg {
             ChainMessage::Signed(inner) => Ok(inner),
@@ -567,11 +572,13 @@ fn messages_selection<DB: Blockstore + Clone + 'static>(
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
 
-    // currently only one selector, we can potentially extend to more selectors
+    // Currently only one selector, we can potentially extend to more selectors
+    // This selector enforces that the total cumulative gas limit of all messages is less than the
+    // currently active block gas limit.
     let selectors = vec![GasLimitSelector {}];
     for s in selectors {
-        signed = s.select_messages(state, signed)
+        user_msgs = s.select_messages(state, user_msgs)
     }
 
-    Ok(signed.into_iter().map(ChainMessage::Signed).collect())
+    Ok(user_msgs.into_iter().map(ChainMessage::Signed).collect())
 }

@@ -24,22 +24,21 @@ impl MessageSelector for GasLimitSelector {
         state: &FvmExecState<DB>,
         mut msgs: Vec<SignedMessage>,
     ) -> Vec<SignedMessage> {
-        let total_gas_limit = state.gas_market().available();
+        let total_gas_limit = state.block_gas_tracker().available();
 
-        // sort by gas limit descending
+        // Sort by gas limit descending
         msgs.sort_by(|a, b| b.message.gas_limit.cmp(&a.message.gas_limit));
 
         let mut total_gas_limit_consumed = 0;
-        let mut selected = vec![];
-        for msg in msgs {
-            if total_gas_limit_consumed + msg.message.gas_limit <= total_gas_limit {
-                total_gas_limit_consumed += msg.message.gas_limit;
-                selected.push(msg);
-            } else {
-                break;
-            }
-        }
-
-        selected
+        msgs.into_iter()
+            .take_while(|msg| {
+                let gas_limit = msg.message.gas_limit;
+                let accepted = total_gas_limit_consumed + gas_limit <= total_gas_limit;
+                if accepted {
+                    total_gas_limit_consumed += gas_limit;
+                }
+                accepted
+            })
+            .collect()
     }
 }
