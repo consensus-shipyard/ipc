@@ -735,10 +735,11 @@ where
             .validators
             .get_validator(&request.header.proposer_address, block_height)
             .await?;
+
         let state = FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
             .context("error creating new state")?
             .with_block_hash(block_hash)
-            .with_validator(validator);
+            .with_block_producer(validator);
 
         tracing::debug!("initialized exec state");
 

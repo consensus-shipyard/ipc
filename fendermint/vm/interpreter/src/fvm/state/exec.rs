@@ -236,7 +236,7 @@ where
 
     /// Identity of the block creator, if we are indeed executing any blocks.
     pub fn validator_pubkey(&self) -> Option<PublicKey> {
-        self.validator_pubkey
+        self.block_producer
     }
 
     /// The timestamp of the currently executing block.
