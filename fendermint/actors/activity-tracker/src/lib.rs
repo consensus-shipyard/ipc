@@ -11,7 +11,7 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::METHOD_CONSTRUCTOR;
 use num_derive::FromPrimitive;
 
-use crate::state::State;
+pub use crate::state::State;
 pub use crate::state::ValidatorSummary;
 
 mod state;
