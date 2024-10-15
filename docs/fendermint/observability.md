@@ -9,47 +9,47 @@ This is achieved through the use of the `ipc-observability` crate/library, which
 ### How it works
 
 1. **Events**: Specific events are defined and triggered throughout the codebase to capture significant occurrences or actions.
-These events encapsulate relevant data and context about what is happening within the system.
+   These events encapsulate relevant data and context about what is happening within the system.
 
 2. **Journal**: Events are recorded in a journal, which is a rotational ledger that records chronologically ordered, timestamped trace objects to log files on disk.
-The journal can also be emitted to console.
+   The journal can also be emitted to console.
 
 3. **Metrics**: Each event is associated with one or more Prometheus metrics.
-When an event is triggered, the corresponding metrics are updated to reflect the event's occurrence.
-This allows for real-time tracking and monitoring of various system activities and states through dashboards and alerts.
+   When an event is triggered, the corresponding metrics are updated to reflect the event's occurrence.
+   This allows for real-time tracking and monitoring of various system activities and states through dashboards and alerts.
 
 4. **Prometheus integration**: The metrics collected are designed to integrate seamlessly with Prometheus, a powerful monitoring and alerting toolkit.
-Prometheus collects and stores these metrics, enabling detailed analysis and visualization through its query language and dashboarding capabilities.
+   Prometheus collects and stores these metrics, enabling detailed analysis and visualization through its query language and dashboarding capabilities.
 
 5. **ipc-observability crate**: This custom library encapsulates the logic and functionality required to define, trigger, and record events and metrics.
-It simplifies the process of adding observability to the codebase by providing ready-to-use macros, structs, and functions.
+   It simplifies the process of adding observability to the codebase by providing ready-to-use macros, structs, and functions.
 
 ## Metrics
 
-- `consensus_block_proposal_received_height` (IntGauge): Incremented when a block proposal is received.
-- `consensus_block_proposal_sent_height` (IntGauge): Incremented when a block proposal is sent.
-- `consensus_block_proposal_accepted_height` (IntGauge): Incremented if the block proposal is accepted.
-- `consensus_block_proposal_rejected_height` (IntGauge): Incremented if the block proposal is rejected.
-- `consensus_block_committed_height` (IntGauge): Incremented when a block is committed.
-- `exec_fvm_check_execution_time_secs` (Histogram): Records the execution time of FVM check in seconds.
-- `exec_fvm_estimate_execution_time_secs` (Histogram): Records the execution time of FVM estimate in seconds.
-- `exec_fvm_apply_execution_time_secs` (Histogram): Records the execution time of FVM apply in seconds.
-- `exec_fvm_call_execution_time_secs` (Histogram): Records the execution time of FVM call in seconds.
-- `bottomup_checkpoint_created_total` (IntCounter): Incremented when a bottom-up checkpoint is created.
-- `bottomup_checkpoint_created_height` (IntGauge): Sets the height of the created checkpoint.
-- `bottomup_checkpoint_created_msgcount` (IntGauge): Sets the number of messages in the created checkpoint.
-- `bottomup_checkpoint_created_confignum` (IntGauge): Sets the configuration number of the created checkpoint.
-- `bottomup_checkpoint_signed_height` (IntGaugeVec): Sets the height of the signed checkpoint, labeled by validator.
-- `bottomup_checkpoint_finalized_height` (IntGauge): Sets the height of the finalized checkpoint.
-- `topdown_parent_rpc_call_total` (IntCounterVec): Incremented when a parent RPC call is made.
-- `topdown_parent_rpc_call_latency_secs` (HistogramVec): Records the latency of parent RPC calls.
-- `topdown_parent_finality_latest_acquired_height` (IntGaugeVec): Sets the height of the latest locally acquired parent finality.
-- `topdown_parent_finality_voting_latest_received_height` (IntGaugeVec): Sets the height of the received parent finality peer vote.
-- `topdown_parent_finality_voting_latest_sent_height` (IntGauge): Sets the height of the sent parent finality peer vote.
-- `topdown_parent_finality_voting_quorum_height` (IntGauge): Sets the height of the parent finality quorum.
-- `topdown_parent_finality_voting_quorum_weight` (IntGauge): Sets the weight of the parent finality quorum.
-- `topdown_parent_finality_committed_height` (IntGauge): Sets the height of the committed parent finality.
-- `tracing_errors` (IntCounterVec): Increments the count of tracing errors for the affected event.
+- `ipc_consensus_block_proposal_received_height` (IntGauge): Incremented when a block proposal is received.
+- `ipc_consensus_block_proposal_sent_height` (IntGauge): Incremented when a block proposal is sent.
+- `ipc_consensus_block_proposal_accepted_height` (IntGauge): Incremented if the block proposal is accepted.
+- `ipc_consensus_block_proposal_rejected_height` (IntGauge): Incremented if the block proposal is rejected.
+- `ipc_consensus_block_committed_height` (IntGauge): Incremented when a block is committed.
+- `ipc_exec_fvm_check_execution_time_secs` (Histogram): Records the execution time of FVM check in seconds.
+- `ipc_exec_fvm_estimate_execution_time_secs` (Histogram): Records the execution time of FVM estimate in seconds.
+- `ipc_exec_fvm_apply_execution_time_secs` (Histogram): Records the execution time of FVM apply in seconds.
+- `ipc_exec_fvm_call_execution_time_secs` (Histogram): Records the execution time of FVM call in seconds.
+- `ipc_bottomup_checkpoint_created_total` (IntCounter): Incremented when a bottom-up checkpoint is created.
+- `ipc_bottomup_checkpoint_created_height` (IntGauge): Sets the height of the created checkpoint.
+- `ipc_bottomup_checkpoint_created_msgcount` (IntGauge): Sets the number of messages in the created checkpoint.
+- `ipc_bottomup_checkpoint_created_confignum` (IntGauge): Sets the configuration number of the created checkpoint.
+- `ipc_bottomup_checkpoint_signed_height` (IntGaugeVec): Sets the height of the signed checkpoint, labeled by validator.
+- `ipc_bottomup_checkpoint_finalized_height` (IntGauge): Sets the height of the finalized checkpoint.
+- `ipc_topdown_parent_rpc_call_total` (IntCounterVec): Incremented when a parent RPC call is made.
+- `ipc_topdown_parent_rpc_call_latency_secs` (HistogramVec): Records the latency of parent RPC calls.
+- `ipc_topdown_parent_finality_latest_acquired_height` (IntGaugeVec): Sets the height of the latest locally acquired parent finality.
+- `ipc_topdown_parent_finality_voting_latest_received_height` (IntGaugeVec): Sets the height of the received parent finality peer vote.
+- `ipc_topdown_parent_finality_voting_latest_sent_height` (IntGauge): Sets the height of the sent parent finality peer vote.
+- `ipc_topdown_parent_finality_voting_quorum_height` (IntGauge): Sets the height of the parent finality quorum.
+- `ipc_topdown_parent_finality_voting_quorum_weight` (IntGauge): Sets the weight of the parent finality quorum.
+- `ipc_topdown_parent_finality_committed_height` (IntGauge): Sets the height of the committed parent finality.
+- `ipc_tracing_errors` (IntCounterVec): Increments the count of tracing errors for the affected event.
 
 ## Events and corresponding metrics
 
@@ -68,7 +68,7 @@ Represents a block proposal received event.
 
 **Affects metrics:**
 
-- `consensus_block_proposal_received_height`
+- `ipc_consensus_block_proposal_received_height`
 
 ### BlockProposalSent
 
@@ -84,7 +84,7 @@ Represents a block proposal sent event.
 
 **Affects metrics:**
 
-- `consensus_block_proposal_sent_height`
+- `ipc_consensus_block_proposal_sent_height`
 
 ### BlockProposalEvaluated
 
@@ -103,8 +103,8 @@ Represents the evaluation of a block proposal.
 
 **Affects metrics:**
 
-- `consensus_block_proposal_accepted_height`
-- `consensus_block_proposal_rejected_height`
+- `ipc_consensus_block_proposal_accepted_height`
+- `ipc_consensus_block_proposal_rejected_height`
 
 ### BlockCommitted
 
@@ -118,7 +118,7 @@ Represents a block committed event.
 
 **Affects metrics:**
 
-- `consensus_block_committed_height`
+- `ipc_consensus_block_committed_height`
 
 ### MsgExec
 
@@ -135,10 +135,10 @@ Represents an execution message for different purposes.
 
 **Affects metrics:**
 
-- `exec_fvm_check_execution_time_secs`
-- `exec_fvm_estimate_execution_time_secs`
-- `exec_fvm_apply_execution_time_secs`
-- `exec_fvm_call_execution_time_secs`
+- `ipc_exec_fvm_check_execution_time_secs`
+- `ipc_exec_fvm_estimate_execution_time_secs`
+- `ipc_exec_fvm_apply_execution_time_secs`
+- `ipc_exec_fvm_call_execution_time_secs`
 
 ### CheckpointCreated
 
@@ -154,10 +154,10 @@ Represents the creation of a bottom-up checkpoint.
 
 **Affects metrics:**
 
-- `bottomup_checkpoint_created_total`
-- `bottomup_checkpoint_created_height`
-- `bottomup_checkpoint_created_msgcount`
-- `bottomup_checkpoint_created_confignum`
+- `ipc_bottomup_checkpoint_created_total`
+- `ipc_bottomup_checkpoint_created_height`
+- `ipc_bottomup_checkpoint_created_msgcount`
+- `ipc_bottomup_checkpoint_created_confignum`
 
 ### CheckpointSigned
 
@@ -187,7 +187,7 @@ Represents the finalization of a bottom-up checkpoint.
 
 **Affects metrics:**
 
-- `bottomup_checkpoint_finalized_height`
+- `ipc_bottomup_checkpoint_finalized_height`
 
 ### ParentRpcCalled
 
@@ -204,8 +204,8 @@ Represents a parent RPC call.
 
 **Affects metrics:**
 
-- `topdown_parent_rpc_call_total`
-- `topdown_parent_rpc_call_latency_secs`
+- `ipc_topdown_parent_rpc_call_total`
+- `ipc_topdown_parent_rpc_call_latency_secs`
 
 ### ParentFinalityAcquired
 
@@ -224,7 +224,7 @@ Represents the acquisition of parent finality.
 
 **Affects metrics:**
 
-- `topdown_parent_finality_latest_acquired_height`
+- `ipc_topdown_parent_finality_latest_acquired_height`
 
 ### ParentFinalityPeerVoteReceived
 
@@ -240,7 +240,7 @@ Represents the reception of a parent finality peer vote.
 
 **Affects metrics:**
 
-- `topdown_parent_finality_voting_latest_received_height`
+- `ipc_topdown_parent_finality_voting_latest_received_height`
 
 ### ParentFinalityPeerVoteSent
 
@@ -255,7 +255,7 @@ Represents the sending of a parent finality peer vote.
 
 **Affects metrics:**
 
-- `topdown_parent_finality_voting_latest_sent_height`
+- `ipc_topdown_parent_finality_voting_latest_sent_height`
 
 ### ParentFinalityPeerQuorumReached
 
@@ -271,8 +271,8 @@ Represents the reaching of a parent finality quorum.
 
 **Affects metrics:**
 
-- `topdown_parent_finality_voting_quorum_height`
-- `topdown_parent_finality_voting_quorum_weight`
+- `ipc_topdown_parent_finality_voting_quorum_height`
+- `ipc_topdown_parent_finality_voting_quorum_weight`
 
 ### ParentFinalityCommitted
 
@@ -288,7 +288,7 @@ Represents the commitment of parent finality.
 
 **Affects metrics:**
 
-- `topdown_parent_finality_committed_height`
+- `ipc_topdown_parent_finality_committed_height`
 
 ### TracingError
 
@@ -302,7 +302,7 @@ Represents an error that occurs during tracing.
 
 **Affects metrics:**
 
-- `tracing_errors`
+- `ipc_tracing_errors`
 
 ## Configuration
 
@@ -330,7 +330,7 @@ enabled = true
 
 > 🚧 Note: the event journal and general logs are currently output to the same file.
 > We plan to segregate in the near future so that the event journal has its dedicated file.
-> See this issue: https://github.com/consensus-shipyard/ipc/issues/1084.  
+> See this issue: https://github.com/consensus-shipyard/ipc/issues/1084.
 
 Tracing can also be configured via the configuration file for Fendermint. You can set the tracing level and specify whether to log to console or file.
 
@@ -342,7 +342,7 @@ Example config:
 [tracing]
 
 [tracing.console]
-level = "trace" # Options: off, error, warn, info, debug, trace (default: trace)
+level = "trace" # Eg. "info,my_crate::module=trace" - https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives
 ```
 
 ### File tracing
@@ -352,7 +352,7 @@ Example config:
 ```toml
 [tracing.file]
 enabled = true # Options: true, false
-level = "trace" # Options: off, error, warn, info, debug, trace (default: trace)
+level = "trace" # Eg. "info,my_crate::module=trace" - https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives
 directory = "/path/to/log/directory"
 max_log_files = 5 # Number of files to keep after rotation
 rotation = "daily" # Options: minutely, hourly, daily, never
