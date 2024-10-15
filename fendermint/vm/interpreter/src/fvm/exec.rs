@@ -156,23 +156,14 @@ where
 
             (apply_ret, emitters, latency)
         } else {
-            let available_gas = state.gas_market().available();
-            if msg.gas_limit > available_gas {
+            if let Err(err) = state.block_gas_tracker().ensure_sufficient_gas(&msg) {
                 // This is panic-worthy, but we suppress it to avoid liveness issues.
                 // Consider maybe record as evidence for the validator slashing?
-                tracing::warn!(
-                    txn_gas_limit = msg.gas_limit,
-                    block_gas_available = available_gas,
-                    "[ASSERTION FAILED] message gas limit exceed available block gas limit; consensus engine is misbehaving"
-                );
+                tracing::warn!("insufficient block gas; continuing to avoid halt, but this should've not happened: {}", err);
             }
 
             let (execution_result, latency) = measure_time(|| state.execute_explicit(msg.clone()));
             let (apply_ret, emitters) = execution_result?;
-
-            state
-                .gas_market_mut()
-                .record_utilization(GasUtilization::from(&apply_ret));
 
             (apply_ret, emitters, latency)
         };

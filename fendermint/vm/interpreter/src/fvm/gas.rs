@@ -47,6 +47,17 @@ impl BlockGasTracker {
         self.block_gas_limit.saturating_sub(self.cumul_gas_used)
     }
 
+    pub fn ensure_sufficient_gas(&self, msg: &FvmMessage) -> anyhow::Result<()> {
+        let available_gas = self.available();
+        if msg.gas_limit > available_gas {
+            bail!("message gas limit exceed available block gas limit; consensus engine may be misbehaving; txn gas limit: {}, block gas available: {}",
+                msg.gas_limit,
+                available_gas
+            );
+        }
+        Ok(())
+    }
+
     pub fn record_utilization(&mut self, ret: &ApplyRet) {
         self.cumul_gas_premium += ret.miner_tip.clone();
         self.cumul_gas_used = self.cumul_gas_used.saturating_add(ret.msg_receipt.gas_used);
