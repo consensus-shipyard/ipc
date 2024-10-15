@@ -22,7 +22,7 @@ use fendermint_vm_interpreter::fvm::state::{
     FvmUpdatableParams,
 };
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
-use fendermint_vm_interpreter::fvm::{FvmApplyRet, PowerUpdates};
+use fendermint_vm_interpreter::fvm::{BlockGasLimit, FvmApplyRet, PowerUpdates};
 use fendermint_vm_interpreter::genesis::{read_genesis_car, GenesisAppState};
 use fendermint_vm_interpreter::signed::InvalidSignature;
 use fendermint_vm_interpreter::{
@@ -324,34 +324,35 @@ where
         Ok(ret)
     }
 
-    /// Get a read only fvm execution state. This is useful to perform query commands targeting
-    /// the latest state.
-    pub fn new_read_only_exec_state(
+    /// Get a read-only view from the current FVM execution state, optionally passing a new BlockContext.
+    /// This is useful to perform query commands targeting the latest state. Mutations from transactions
+    /// will not be persisted.
+    pub fn read_only_view(
         &self,
+        height: Option<BlockHeight>,
     ) -> Result<Option<FvmExecState<ReadOnlyBlockstore<Arc<SS>>>>> {
-        let maybe_app_state = self.get_committed_state()?;
+        let app_state = match self.get_committed_state()? {
+            Some(app_state) => app_state,
+            None => return Ok(None),
+        };
 
-        Ok(if let Some(app_state) = maybe_app_state {
-            let block_height = app_state.block_height;
-            let state_params = app_state.state_params;
+        let block_height = height.unwrap_or(app_state.block_height);
+        let state_params = app_state.state_params;
 
-            // wait for block production
-            if !Self::can_query_state(block_height, &state_params) {
-                return Ok(None);
-            }
+        // wait for block production
+        if !Self::can_query_state(block_height, &state_params) {
+            return Ok(None);
+        }
 
-            let exec_state = FvmExecState::new(
-                ReadOnlyBlockstore::new(self.state_store.clone()),
-                self.multi_engine.as_ref(),
-                block_height as ChainEpoch,
-                state_params,
-            )
-            .context("error creating execution state")?;
+        let exec_state = FvmExecState::new(
+            ReadOnlyBlockstore::new(self.state_store.clone()),
+            self.multi_engine.as_ref(),
+            block_height as ChainEpoch,
+            state_params,
+        )
+        .context("error creating execution state")?;
 
-            Some(exec_state)
-        } else {
-            None
-        })
+        Ok(Some(exec_state))
     }
 
     /// Look up a past state at a particular height Tendermint Core is looking for.
@@ -627,7 +628,7 @@ where
         let txs = request.txs.into_iter().map(|tx| tx.to_vec()).collect();
 
         let state = self
-            .new_read_only_exec_state()?
+            .read_only_view(Some(request.height.value()))?
             .ok_or_else(|| anyhow!("exec state should be present"))?;
 
         let txs = self
@@ -666,7 +667,7 @@ where
         let num_txs = txs.len();
 
         let state = self
-            .new_read_only_exec_state()?
+            .read_only_view(Some(request.height.value()))?
             .ok_or_else(|| anyhow!("exec state should be present"))?;
 
         let accept = self
