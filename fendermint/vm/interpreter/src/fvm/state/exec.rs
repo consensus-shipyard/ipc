@@ -218,6 +218,18 @@ where
         Ok((ret, addrs))
     }
 
+    /// Execute a function with the internal executor and return an arbitrary result.
+    pub fn execute_with_executor<F, R>(&mut self, exec_func: F) -> anyhow::Result<R>
+    where
+        F: FnOnce(
+            &mut DefaultExecutor<
+                DefaultKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>,
+            >,
+        ) -> anyhow::Result<R>,
+    {
+        exec_func(&mut self.executor)
+    }
+
     /// Commit the state. It must not fail, but we're returning a result so that error
     /// handling can be done in the application root.
     ///
