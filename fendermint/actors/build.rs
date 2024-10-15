@@ -63,11 +63,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Cargo build command for all test_actors at once.
     let mut cmd = Command::new(cargo);
     cmd.arg("build")
-        .args(
-            actors
-                .iter()
-                .map(|(pkg, _)| "-p=".to_owned() + pkg),
-        )
+        .args(actors.iter().map(|(pkg, _)| "-p=".to_owned() + pkg))
         .arg("--target=wasm32-unknown-unknown")
         .arg("--profile=wasm")
         .arg("--features=fil-actor")
@@ -126,8 +122,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         // content-addressed CIDs.
         let forced_cid = None;
 
+        let actor_name = pkg
+            .to_owned()
+            .strip_prefix("fendermint_actor_")
+            .ok_or_else(|| {
+                format!("expected fendermint_actor_ prefix in actor package name; got: {pkg}")
+            })?
+            .to_owned();
+
         let cid = bundler
-            .add_from_file(id, pkg.to_owned(), forced_cid, &bytecode_path)
+            .add_from_file(id, actor_name, forced_cid, &bytecode_path)
             .unwrap_or_else(|err| {
                 panic!(
                     "failed to add file {:?} to bundle for actor {}: {}",
