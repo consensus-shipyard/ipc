@@ -209,6 +209,12 @@ where
         let raw_length = fvm_ipld_encoding::to_vec(&msg).map(|bz| bz.len())?;
         let ret = self.executor.execute_message(msg, kind, raw_length)?;
         let addrs = self.emitter_delegated_addresses(&ret)?;
+
+        // Record the utilization of this message if the apply type was Explicit.
+        if kind == ApplyKind::Explicit {
+            self.block_gas_tracker.record_utilization(&ret);
+        }
+
         Ok((ret, addrs))
     }
 
