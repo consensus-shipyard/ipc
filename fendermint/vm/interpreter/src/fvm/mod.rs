@@ -15,8 +15,8 @@ pub mod upgrades;
 #[cfg(any(test, feature = "bundle"))]
 pub mod bundle;
 
-pub(crate) mod topdown;
 pub(crate) mod gas;
+pub(crate) mod topdown;
 
 pub use check::FvmCheckRet;
 pub use checkpoint::PowerUpdates;
