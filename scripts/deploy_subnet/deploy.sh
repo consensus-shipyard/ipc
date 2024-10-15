@@ -24,11 +24,6 @@ if ! $local_deploy ; then
     exit 1
   fi
 
-  if [[ -z "${VALIDATOR_GATER_ADDRESS:-}" ]]; then
-    echo "VALIDATOR_GATER_ADDRESS is not set"
-    exit 1
-  fi
-
   if [[ -z "${PARENT_HTTP_AUTH_TOKEN:-}" ]]; then
     echo "PARENT_HTTP_AUTH_TOKEN is not set"
     exit 1
@@ -37,7 +32,6 @@ if ! $local_deploy ; then
 else
   # For local deployment, we'll set these variables later
   SUPPLY_SOURCE_ADDRESS=""
-  VALIDATOR_GATER_ADDRESS=""
   PARENT_HTTP_AUTH_TOKEN=""
   PARENT_AUTH_FLAG=""
 fi
@@ -412,14 +406,23 @@ if ! $local_deploy ; then
   cp /tmp/config.toml.0 "${IPC_CONFIG_FOLDER}"/config.toml
 fi
 
+# Setup Hoku contracts
+cd "${IPC_FOLDER}/hoku-contracts"
+# need to run clean or we hit upgradeable safety validation errors resulting
+# from contracts with the same name
+forge clean
+if [[ -z ${SKIP_BUILD+x} || "$SKIP_BUILD" == "" || "$SKIP_BUILD" == "false" ]]; then
+  forge install
+fi
+cd "$IPC_FOLDER"
+
 # Deploy IPC contracts
+rpc_url=$(if $local_deploy; then echo "http://localhost:${ANVIL_HOST_PORT}"; else echo "https://calibration.filfox.info/rpc/v1"; fi)
+pk=$(cat "${IPC_CONFIG_FOLDER}"/validator_0.sk)
 if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; then
   echo "$DASHES Deploying new IPC contracts..."
   cd "${IPC_FOLDER}"/contracts
   rm -rf deployments/localnet
-
-  rpc_url=$(if $local_deploy; then echo "http://localhost:8545"; else echo "https://calibration.filfox.info/rpc/v1"; fi)
-  pk=$(cat "${IPC_CONFIG_FOLDER}"/validator_0.sk)
 
   if ! $local_deploy ; then
     deploy_contracts_output=$(PRIVATE_KEY="${pk}" RPC_URL="${rpc_url}" make deploy-stack NETWORK=calibrationnet)
@@ -437,16 +440,8 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
 
   if [ $local_deploy == true ]; then
     cd "${IPC_FOLDER}/hoku-contracts"
-    # need to run clean or we hit upgradeable safety validation errors resulting
-    # from contracts with the same name 
-    forge clean
-
-    if [[ -z ${SKIP_BUILD+x} || "$SKIP_BUILD" == "" || "$SKIP_BUILD" == "false" ]]; then
-      forge install
-    fi
-
     # use the same account validator 0th account to deploy supply source token
-    deploy_supply_source_token_out="$(PRIVATE_KEY="0x${pk}" forge script script/Hoku.s.sol --tc DeployScript 0 --sig 'run(uint8)' --rpc-url "http://localhost:${ANVIL_HOST_PORT}" --broadcast -vv)"
+    deploy_supply_source_token_out="$(PRIVATE_KEY="0x${pk}" forge script script/Hoku.s.sol --tc DeployScript 0 --sig 'run(uint8)' --rpc-url "${rpc_url}" --broadcast -vv)"
 
     echo "$DASHES deploy supply source token output $DASHES"
     echo ""
@@ -464,37 +459,39 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
     for i in {0..9}
     do
       addr=$(jq .["$i"].address < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
-      cast send "$SUPPLY_SOURCE_ADDRESS" "mint(address,uint256)" "$addr" "$token_amount" --rpc-url "http://localhost:${ANVIL_HOST_PORT}" --private-key "$pk"
+      cast send "$SUPPLY_SOURCE_ADDRESS" "mint(address,uint256)" "$addr" "$token_amount" --rpc-url "$rpc_url" --private-key "$pk"
     done
     echo "Funded accounts with HOKU on anvil rootnet"
-
-    # the subnet address for localnet is t410fkzrz3mlkyufisiuae3scumllgalzuu3wxlxa2ly, which has the below hex value
-    subnet_route="[0x56639dB16Ac50A89228026e42a316B30179A5376]"
-    # use the same account validator 0th account to deploy validator gater
-    deploy_validator_gater_token_out="$(PRIVATE_KEY="0x${pk}" forge script script/ValidatorGater.s.sol --tc DeployScript 0 31337 "$subnet_route" --sig 'run(uint8,uint64,address[])' --rpc-url "http://localhost:${ANVIL_HOST_PORT}" --broadcast -vv)"
-
-    echo "$DASHES deploy validator gater output $DASHES"
-    echo ""
-    echo "$deploy_validator_gater_token_out"
-    echo ""
-    # note: this is consistently going to be
-    # 0x851356ae760d987E095750cCeb3bC6014560891C for localnet
-    VALIDATOR_GATER_ADDRESS=$(echo "$deploy_validator_gater_token_out" | sed -n 's/.*contract ValidatorGater *\([^ ]*\).*/\1/p')
-
-    # approve each validator to stake in the anvil rootnet
-    for i in {0..2}
-    do
-      # approved power min 1 HOKU max 10 HOKU
-      cast send "$VALIDATOR_GATER_ADDRESS" "approve(address,uint256,uint256)" "${wallet_addresses[i]}" 1000000000000000000 100000000000000000000 --rpc-url "http://localhost:${ANVIL_HOST_PORT}" --private-key "$pk"
-    done
-    echo "Approved validators to stake on anvil rootnet"
   fi
   cd "$IPC_FOLDER"
 fi
 echo "Parent gateway address: $PARENT_GATEWAY_ADDRESS"
 echo "Parent registry address: $PARENT_REGISTRY_ADDRESS"
 echo "Parent supply source address: $SUPPLY_SOURCE_ADDRESS"
+
+# use the same account validator 0th account to deploy validator gater
+cd "${IPC_FOLDER}/hoku-contracts"
+chain_env=$(if $local_deploy; then echo 0; else echo 1; fi)
+gas_mult=$(if $local_deploy; then echo 130; else echo 100000; fi)
+deploy_validator_gater_token_out="$(PRIVATE_KEY="0x${pk}" forge script script/ValidatorGater.s.sol --tc DeployScript "${chain_env}" --sig 'run(uint8)' --rpc-url "${rpc_url}" --broadcast -g "${gas_mult}" -vv)"
+
+echo "$DASHES deploy validator gater output $DASHES"
+echo ""
+echo "$deploy_validator_gater_token_out"
+echo ""
+# note: this is consistently going to be
+# 0x851356ae760d987E095750cCeb3bC6014560891C for localnet
+VALIDATOR_GATER_ADDRESS=$(echo "$deploy_validator_gater_token_out" | sed -n 's/.*contract ValidatorGater *\([^ ]*\).*/\1/p')
 echo "Parent validator gater address: $VALIDATOR_GATER_ADDRESS"
+cd "$IPC_FOLDER"
+
+# Approve each validator to stake
+for i in {0..2}
+do
+  # Approve power min 1 HOKU max 10 HOKU
+  cast send "$VALIDATOR_GATER_ADDRESS" "approve(address,uint256,uint256)" "${wallet_addresses[i]}" 1000000000000000000 100000000000000000000 --rpc-url "$rpc_url" --private-key "$pk"
+done
+echo "Approved validators to stake"
 
 # Use the parent gateway and registry address to update IPC config file
 toml set "${IPC_CONFIG_FOLDER}"/config.toml 'subnets[0].config.gateway_addr' "$PARENT_GATEWAY_ADDRESS" > /tmp/config.toml.1
@@ -530,9 +527,14 @@ echo "$create_subnet_output"
 echo
 
 subnet_id=$(echo "$create_subnet_output" | sed -n 's/.*with id: *\([^ ]*\).*/\1/p')
+subnet_root=$(echo "$subnet_id" | sed 's|/[^0-9]*\([0-9]\+\)/.*|\1|')
 subnet_f4_addr=$(echo "$subnet_id" | sed 's|.*/||')
 subnet_eth_addr=$(ipc-cli util f4-to-eth-addr --addr "$subnet_f4_addr" | sed -n 's/.*\(0x[0-9a-fA-F]\{40\}\).*/\1/p')
 echo "Created new subnet id: $subnet_id ($subnet_eth_addr)"
+
+subnet_struct="($subnet_root, [$subnet_eth_addr])"
+cast send --private-key "$pk" --rpc-url "$rpc_url" "$VALIDATOR_GATER_ADDRESS" "setSubnet((uint64,address[]))" "$subnet_struct"
+echo "Set validator gater subnet ID"
 
 # Use the new subnet ID to update IPC config file
 toml set "${IPC_CONFIG_FOLDER}"/config.toml 'subnets[1].id' "$subnet_id" > /tmp/config.toml.3
@@ -551,7 +553,7 @@ do
   echo "Joining subnet ${subnet_id} for validator ${wallet_addresses[i]}"
   # Approve subnet contract to lock up to 10 HOKU from collateral contract (which is also the supply source contract)
   vpk=$(cat "${IPC_CONFIG_FOLDER}"/validator_"$i".sk)
-  cast send "$SUPPLY_SOURCE_ADDRESS" "approve(address,uint256)" "$subnet_eth_addr" 10000000000000000000 --private-key "$vpk"
+  cast send --private-key "$vpk" --rpc-url "$rpc_url" "$SUPPLY_SOURCE_ADDRESS" "approve(address,uint256)" "$subnet_eth_addr" 10000000000000000000
   # Join and stake 10 HOKU
   ipc-cli subnet join --from "${wallet_addresses[i]}" --subnet "$subnet_id" --collateral 10
 done
