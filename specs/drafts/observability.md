@@ -25,33 +25,33 @@ Once we capture the trace object (hopefully with negligible overhead), and we en
 - The journal.
 - The metrics.
 
-| Done | Domain    | Subsystem      | Event                              | Trace                                                                                                          | Metrics                                                                  |
-|------|-----------|----------------|------------------------------------|----------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------|
-| x    | Topdown   | Parent syncer  | Parent RPC calls                   | ParentRpcCalled{source, json-rpc method, status, latency}                                                      | topdown_parent_rpc_call_total{source, method, status}++ (counter)        |
-| x    |           |                |                                    |                                                                                                                | topdown_parent_rpc_call_latency_secs{source, method, status} (histogram) |
-| x    |           |                | Parent finality locally acquired   | ParentFinalityAcquired{source, block height, block hash, commitment hash, num messages, num validator changes} | topdown_parent_finality_latest_acquired_height{source} (gauge)           |
-| x    |           |                | Parent finality gossip received    | ParentFinalityPeerVoteReceived{validator, block height, block hash, commitment hash}                           | topdown_parent_finality_voting_latest_received_height{validator} (gauge) |
-| x    |           |                | Parent finality peer gossip sent   | ParentFinalityPeerVoteSent{block height, block hash, commitment hash}                                          | topdown_parent_finality_voting_latest_sent_height (gauge)                |
-| x    |           |                | Parent finality quorum reached     | ParentFinalityPeerQuorumReached{block height, block hash, commitment hash, weight}                             | topdown_parent_finality_voting_quorum_height (gauge)                     |
-| x    |           |                |                                    |                                                                                                                | topdown_parent_finality_voting_quorum_weight (gauge)                     |
-| x    |           |                | Parent finality committed on chain | ParentFinalityCommitted{parent height, block hash, local height, proposer}                                     | topdown_parent_finality_committed_height (gauge)                         |
-| x    | Bottomup  | Checkpointing  | Checkpoint submitted               | CheckpointSubmitted{height, hash}                                                                              | bottomup_checkpoint_finalized_height (gauge)                             |
-| x    |           |                | Checkpoint created                 | CheckpointCreated{height, hash, msg_count, config_number}                                                      | bottomup_checkpoint_created_total (counter)                              |
-| x    |           |                |                                    |                                                                                                                | bottomup_checkpoint_created_height (gauge)                               |
-| x    |           |                |                                    |                                                                                                                | bottomup_checkpoint_created_msgcount (gauge)                             |
-| x    |           |                |                                    |                                                                                                                | bottomup_checkpoint_created_confignum (gauge)                            |
-| x    |           |                | Checkpoint signed                  | CheckpointSigned{role, height, hash, validator}                                                                | bottomup_checkpoint_signed_height{validator} (gauge)                     |
-| x    | Consensus | Block proposal | Block proposal received            | BlockProposalReceived{height, hash, size, tx_count, validator}                                                 | consensus_block_proposal_received_height (gauge)                         |
-| x    |           |                | Block proposal sent                | BlockProposalSent{validator, height, size, tx_count}                                                           | consensus_block_proposal_sent_height (gauge)                             |
-| x    |           |                | Block proposal evaluated           | BlockProposalEvaluated{height, hash, size, tx_count, validator, accept, reason}                                | consensus_block_proposal_accepted_height (gauge)                         |
-| x    |           |                |                                    |                                                                                                                | consensus_block_proposal_rejected_height (gauge)                         |
-| x    |           |                | Block proposal committed           | BlockCommitted{height, app_hash}                                                                               | consensus_block_committed_height (gauge)                                 |
-| x    | Mpool     | Message pool   | Message received                   | MpoolReceived{message, accept, reason}                                                                         | mpool_received{accept} (counter)                                         |
-| x    | Execution | VM execution   | Executing message                  | MsgExec{purpose, message, height, duration, exit_code}                                                         | exec_fvm_check_execution_time_secs (histogram)                           |
-| x    |           |                |                                    |                                                                                                                | exec_fvm_estimate_execution_time_secs (histogram)                        |
-| x    |           |                |                                    |                                                                                                                | exec_fvm_apply_execution_time_secs (histogram)                           |
-| x    |           |                |                                    |                                                                                                                | exec_fvm_call_execution_time_secs (histogram)                            |
-| x    | Tracing   | Errors         | Error while processing tracing     | TracingError{affected_event, reason}                                                                           | tracing_errors{event} (counter)                                          |
+| Done | Domain    | Subsystem      | Event                              | Trace                                                                                                          | Metrics                                                                      |
+| ---- | --------- | -------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| x    | Topdown   | Parent syncer  | Parent RPC calls                   | ParentRpcCalled{source, json-rpc method, status, latency}                                                      | ipc_topdown_parent_rpc_call_total{source, method, status}++ (counter)        |
+| x    |           |                |                                    |                                                                                                                | ipc_topdown_parent_rpc_call_latency_secs{source, method, status} (histogram) |
+| x    |           |                | Parent finality locally acquired   | ParentFinalityAcquired{source, block height, block hash, commitment hash, num messages, num validator changes} | ipc_topdown_parent_finality_latest_acquired_height{source} (gauge)           |
+| x    |           |                | Parent finality gossip received    | ParentFinalityPeerVoteReceived{validator, block height, block hash, commitment hash}                           | ipc_topdown_parent_finality_voting_latest_received_height{validator} (gauge) |
+| x    |           |                | Parent finality peer gossip sent   | ParentFinalityPeerVoteSent{block height, block hash, commitment hash}                                          | ipc_topdown_parent_finality_voting_latest_sent_height (gauge)                |
+| x    |           |                | Parent finality quorum reached     | ParentFinalityPeerQuorumReached{block height, block hash, commitment hash, weight}                             | ipc_topdown_parent_finality_voting_quorum_height (gauge)                     |
+| x    |           |                |                                    |                                                                                                                | ipc_topdown_parent_finality_voting_quorum_weight (gauge)                     |
+| x    |           |                | Parent finality committed on chain | ParentFinalityCommitted{parent height, block hash, local height, proposer}                                     | ipc_topdown_parent_finality_committed_height (gauge)                         |
+| x    | Bottomup  | Checkpointing  | Checkpoint submitted               | CheckpointSubmitted{height, hash}                                                                              | ipc_bottomup_checkpoint_finalized_height (gauge)                             |
+| x    |           |                | Checkpoint created                 | CheckpointCreated{height, hash, msg_count, config_number}                                                      | ipc_bottomup_checkpoint_created_total (counter)                              |
+| x    |           |                |                                    |                                                                                                                | ipc_bottomup_checkpoint_created_height (gauge)                               |
+| x    |           |                |                                    |                                                                                                                | ipc_bottomup_checkpoint_created_msgcount (gauge)                             |
+| x    |           |                |                                    |                                                                                                                | ipc_bottomup_checkpoint_created_confignum (gauge)                            |
+| x    |           |                | Checkpoint signed                  | CheckpointSigned{role, height, hash, validator}                                                                | ipc_bottomup_checkpoint_signed_height{validator} (gauge)                     |
+| x    | Consensus | Block proposal | Block proposal received            | BlockProposalReceived{height, hash, size, tx_count, validator}                                                 | ipc_consensus_block_proposal_received_height (gauge)                         |
+| x    |           |                | Block proposal sent                | BlockProposalSent{validator, height, size, tx_count}                                                           | ipc_consensus_block_proposal_sent_height (gauge)                             |
+| x    |           |                | Block proposal evaluated           | BlockProposalEvaluated{height, hash, size, tx_count, validator, accept, reason}                                | ipc_consensus_block_proposal_accepted_height (gauge)                         |
+| x    |           |                |                                    |                                                                                                                | ipc_consensus_block_proposal_rejected_height (gauge)                         |
+| x    |           |                | Block proposal committed           | BlockCommitted{height, app_hash}                                                                               | ipc_consensus_block_committed_height (gauge)                                 |
+| x    | Mpool     | Message pool   | Message received                   | MpoolReceived{message, accept, reason}                                                                         | ipc_mpool_received{accept} (counter)                                         |
+| x    | Execution | VM execution   | Executing message                  | MsgExec{purpose, message, height, duration, exit_code}                                                         | ipc_exec_fvm_check_execution_time_secs (histogram)                           |
+| x    |           |                |                                    |                                                                                                                | ipc_exec_fvm_estimate_execution_time_secs (histogram)                        |
+| x    |           |                |                                    |                                                                                                                | ipc_exec_fvm_apply_execution_time_secs (histogram)                           |
+| x    |           |                |                                    |                                                                                                                | ipc_exec_fvm_call_execution_time_secs (histogram)                            |
+| x    | Tracing   | Errors         | Error while processing tracing     | TracingError{affected_event, reason}                                                                           | ipc_tracing_errors{event} (counter)                                          |
 |      |
 
 ## Fine-grained VM metrics
@@ -98,7 +98,7 @@ Example config:
 [tracing]
 
 [tracing.console]
-level = "trace" # Options: off, error, warn, info, debug, trace (default: trace)
+level = "trace" # Eg. "info,my_crate::module=trace" - https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives
 ```
 
 ### File Tracing
@@ -108,7 +108,7 @@ Example config:
 ```toml
 [tracing.file]
 enabled = true # Options: true, false
-level = "trace" # Options: off, error, warn, info, debug, trace (default: trace)
+level = "trace" # Eg. "info,my_crate::module=trace" - https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives
 directory = "/path/to/log/directory"
 max_log_files = 5 # Number of files to keep after rotation
 rotation = "daily" # Options: minutely, hourly, daily, never
