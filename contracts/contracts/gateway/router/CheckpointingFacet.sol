@@ -56,7 +56,6 @@ contract CheckpointingFacet is GatewayActorModifiers {
     /// @param membershipWeight - the total weight of the membership
     function createBottomUpCheckpoint(
         BottomUpCheckpoint calldata checkpoint,
-        // TODO(rewarder) ActivitySummary calldata summary,
         bytes32 membershipRootHash,
         uint256 membershipWeight
     ) external systemActorOnly {
@@ -75,8 +74,6 @@ contract CheckpointingFacet is GatewayActorModifiers {
             membershipWeight: membershipWeight,
             majorityPercentage: s.majorityPercentage
         });
-
-        // TODO(rewarder): emit an ActivitySummaryCommittedevent so relayers can pick it up.
 
         LibGateway.storeBottomUpCheckpoint(checkpoint);
     }
