@@ -17,7 +17,8 @@ use crate::ExecInterpreter;
 use super::{
     checkpoint::{self, PowerUpdates},
     observe::{CheckpointFinalized, MsgExec, MsgExecPurpose},
-    state::FvmExecState, BlockGasLimit, FvmMessage, FvmMessageInterpreter,
+    state::FvmExecState,
+    BlockGasLimit, FvmMessage, FvmMessageInterpreter,
 };
 
 /// The return value extended with some things from the message that
