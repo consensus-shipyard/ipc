@@ -441,7 +441,7 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
   if [ $local_deploy == true ]; then
     cd "${IPC_FOLDER}/hoku-contracts"
     # use the same account validator 0th account to deploy supply source token
-    deploy_supply_source_token_out="$(PRIVATE_KEY="0x${pk}" forge script script/Hoku.s.sol --tc DeployScript 0 --sig 'run(uint8)' --rpc-url "${rpc_url}" --broadcast -vv)"
+    deploy_supply_source_token_out="$(forge script --private-key "${pk}" --rpc-url "${rpc_url}" --tc DeployScript --sig 'run(uint8)' --broadcast --timeout 120 -vv script/Hoku.s.sol 0)"
 
     echo "$DASHES deploy supply source token output $DASHES"
     echo ""
@@ -459,7 +459,7 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
     for i in {0..9}
     do
       addr=$(jq .["$i"].address < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
-      cast send "$SUPPLY_SOURCE_ADDRESS" "mint(address,uint256)" "$addr" "$token_amount" --rpc-url "$rpc_url" --private-key "$pk"
+      cast send --private-key "$pk" --rpc-url "$rpc_url" --timeout 120 "$SUPPLY_SOURCE_ADDRESS" "mint(address,uint256)" "$addr" "$token_amount"
     done
     echo "Funded accounts with HOKU on anvil rootnet"
   fi
@@ -473,7 +473,8 @@ echo "Parent supply source address: $SUPPLY_SOURCE_ADDRESS"
 cd "${IPC_FOLDER}/hoku-contracts"
 chain_env=$(if $local_deploy; then echo 0; else echo 1; fi)
 gas_mult=$(if $local_deploy; then echo 130; else echo 100000; fi)
-deploy_validator_gater_token_out="$(PRIVATE_KEY="0x${pk}" forge script script/ValidatorGater.s.sol --tc DeployScript "${chain_env}" --sig 'run(uint8)' --rpc-url "${rpc_url}" --broadcast -g "${gas_mult}" -vv)"
+# TODO: remove PRIVATE_KEY env variable when hoku-contracts is updated
+deploy_validator_gater_token_out="$(PRIVATE_KEY="0x${pk}" forge script --private-key "${pk}" --rpc-url "${rpc_url}" --tc DeployScript --sig 'run(uint8)' --broadcast --timeout 120 -g "${gas_mult}" -vv script/ValidatorGater.s.sol "${chain_env}")"
 
 echo "$DASHES deploy validator gater output $DASHES"
 echo ""
@@ -489,7 +490,7 @@ cd "$IPC_FOLDER"
 for i in {0..2}
 do
   # Approve power min 1 HOKU max 10 HOKU
-  cast send "$VALIDATOR_GATER_ADDRESS" "approve(address,uint256,uint256)" "${wallet_addresses[i]}" 1000000000000000000 100000000000000000000 --rpc-url "$rpc_url" --private-key "$pk"
+  cast send --private-key "$pk" --rpc-url "$rpc_url" --timeout 120 "$VALIDATOR_GATER_ADDRESS" "approve(address,uint256,uint256)" "${wallet_addresses[i]}" 1000000000000000000 100000000000000000000
 done
 echo "Approved validators to stake"
 
@@ -533,7 +534,7 @@ subnet_eth_addr=$(ipc-cli util f4-to-eth-addr --addr "$subnet_f4_addr" | sed -n 
 echo "Created new subnet id: $subnet_id ($subnet_eth_addr)"
 
 subnet_struct="($subnet_root, [$subnet_eth_addr])"
-cast send --private-key "$pk" --rpc-url "$rpc_url" "$VALIDATOR_GATER_ADDRESS" "setSubnet((uint64,address[]))" "$subnet_struct"
+cast send --private-key "$pk" --rpc-url "$rpc_url" --timeout 120 "$VALIDATOR_GATER_ADDRESS" "setSubnet((uint64,address[]))" "$subnet_struct"
 echo "Set validator gater subnet ID"
 
 # Use the new subnet ID to update IPC config file
@@ -553,7 +554,7 @@ do
   echo "Joining subnet ${subnet_id} for validator ${wallet_addresses[i]}"
   # Approve subnet contract to lock up to 10 HOKU from collateral contract (which is also the supply source contract)
   vpk=$(cat "${IPC_CONFIG_FOLDER}"/validator_"$i".sk)
-  cast send --private-key "$vpk" --rpc-url "$rpc_url" "$SUPPLY_SOURCE_ADDRESS" "approve(address,uint256)" "$subnet_eth_addr" 10000000000000000000
+  cast send --private-key "$vpk" --rpc-url "$rpc_url" --timeout 120 "$SUPPLY_SOURCE_ADDRESS" "approve(address,uint256)" "$subnet_eth_addr" 10000000000000000000
   # Join and stake 10 HOKU
   ipc-cli subnet join --from "${wallet_addresses[i]}" --subnet "$subnet_id" --collateral 10
 done
