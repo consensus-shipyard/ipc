@@ -66,7 +66,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
             nonce: 0 // nonce will be updated by LibGateway.commitCrossMessage
         });
 
-        CrossMessageValidationOutcome outcome = LibGateway.validateCrossMessage(committed);
+        CrossMessageValidationOutcome outcome = committed.validateCrossMessage();
 
         if (outcome != CrossMessageValidationOutcome.Valid) {
             if (outcome == CrossMessageValidationOutcome.InvalidDstSubnet) {
@@ -93,7 +93,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
     /**
      * @dev Propagates all the populated cross-net messages from the postbox.
      */
-    function propagateAllPostboxMessages() external payable {
+    function propagateAll() external payable {
         LibGateway.propagateAllPostboxMessages();
     }
 }
