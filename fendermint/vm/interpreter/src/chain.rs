@@ -389,7 +389,7 @@ where
 
                     let local_block_height = state.block_height() as u64;
                     let proposer = state
-                        .validator_pubkey()
+                        .block_producer()
                         .map(|id| hex::encode(id.serialize_compressed()));
                     let proposer_ref = proposer.as_deref();
 

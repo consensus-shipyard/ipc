@@ -252,8 +252,8 @@ where
         self.block_hash
     }
 
-    /// Identity of the block creator, if we are indeed executing any blocks.
-    pub fn validator_pubkey(&self) -> Option<PublicKey> {
+    /// Identity of the block producer, if we are indeed executing any blocks.
+    pub fn block_producer(&self) -> Option<PublicKey> {
         self.block_producer
     }
 
