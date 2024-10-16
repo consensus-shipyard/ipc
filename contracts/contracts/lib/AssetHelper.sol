@@ -210,11 +210,11 @@ library AssetHelper {
     }
 
     // @notice Gets the balance of the account.
-    function balanceOf(Asset memory asset, address account) internal view returns (uint256 ret) {
+    function balanceOf(Asset memory asset, address holder) internal view returns (uint256 ret) {
         if (asset.kind == AssetKind.Native) {
-            ret = account.balance;
+            ret = holder.balance;
         } else if (asset.kind == AssetKind.ERC20) {
-            ret = IERC20(asset.tokenAddress).balanceOf(account);
+            ret = IERC20(asset.tokenAddress).balanceOf(holder);
         }
     }
 
