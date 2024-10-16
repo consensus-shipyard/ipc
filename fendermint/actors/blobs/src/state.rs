@@ -1350,7 +1350,59 @@ mod tests {
         );
     }
 
-    // TODO: Add revoke_credit tests
+    #[test]
+    fn test_revoke_credit_success() {
+        let capacity = 1024;
+        let mut state = State::new(capacity, 1);
+        let from = new_address();
+        let to = new_address();
+        let current_epoch = 1;
+
+        let res = state.approve_credit(from, to, None, current_epoch, None, None);
+        assert!(res.is_ok());
+
+        // Add another and require caller
+        let require_caller = new_address();
+        let res = state.approve_credit(from, to, Some(require_caller), current_epoch, None, None);
+        assert!(res.is_ok());
+
+        // Check the account approvals
+        let account = state.get_account(from).unwrap();
+        assert_eq!(account.approvals.len(), 1);
+        let approvals = account.approvals.get(&to).unwrap();
+        assert!(approvals.contains_key(&to));
+        assert!(approvals.contains_key(&require_caller));
+
+        // Remove first
+        let res = state.revoke_credit(from, to, None);
+        assert!(res.is_ok());
+        let account = state.get_account(from).unwrap();
+        assert_eq!(account.approvals.len(), 1);
+        let approvals = account.approvals.get(&to).unwrap();
+        assert!(!approvals.contains_key(&to));
+        assert!(approvals.contains_key(&require_caller));
+
+        // Remove second
+        let res = state.revoke_credit(from, to, Some(require_caller));
+        assert!(res.is_ok());
+        let account = state.get_account(from).unwrap();
+        assert_eq!(account.approvals.len(), 0);
+    }
+
+    #[test]
+    fn test_revoke_credit_account_not_found() {
+        let capacity = 1024;
+        let mut state = State::new(capacity, 1);
+        let from = new_address();
+        let to = new_address();
+
+        let res = state.revoke_credit(from, to, None);
+        assert!(res.is_err());
+        assert_eq!(
+            res.err().unwrap().msg(),
+            format!("account {} not found", from)
+        );
+    }
 
     #[test]
     fn test_add_blob_same_hash_same_account() {
