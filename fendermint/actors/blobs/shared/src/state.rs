@@ -128,7 +128,8 @@ impl From<Vec<u8>> for SubscriptionId {
         if value.is_empty() {
             SubscriptionId::Default
         } else {
-            SubscriptionId::Key(value)
+            let key = blake3::hash(&value).as_bytes().to_vec();
+            SubscriptionId::Key(key)
         }
     }
 }

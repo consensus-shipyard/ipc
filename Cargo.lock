@@ -3142,6 +3142,7 @@ name = "fendermint_actor_blobs_shared"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "blake3",
  "data-encoding",
  "fil_actors_runtime",
  "frc42_dispatch",

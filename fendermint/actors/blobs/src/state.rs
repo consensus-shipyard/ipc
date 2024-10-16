@@ -1173,7 +1173,7 @@ mod tests {
     // We use an actor style (t/f2) addresses because they are straightforward to create.
     fn new_address() -> Address {
         let mut rng = rand::thread_rng();
-        let mut data = vec![0u8; 20];
+        let mut data = vec![0u8; 32];
         rng.fill_bytes(&mut data);
         Address::new_actor(&data)
     }

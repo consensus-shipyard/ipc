@@ -32,7 +32,8 @@ impl Actor {
         rt.validate_immediate_caller_accept_any()?;
         let state = rt.state::<State>()?;
         let key = BytesKey(params.key.clone());
-        let sub_id = SubscriptionId::from(params.key);
+        let sub_id = get_blob_id(&state, params.key)?;
+        // TODO: Allow overwrite at blob layer
         if let Some(object) = state.get(rt.store(), &key)? {
             if params.overwrite {
                 delete_blob(rt, Some(state.owner), object.hash, sub_id.clone())?;
@@ -74,7 +75,8 @@ impl Actor {
             .get(rt.store(), &key)?
             .ok_or(ActorError::illegal_state("object not found".into()))?;
         // Delete blob for object
-        delete_blob(rt, Some(state.owner), object.hash, params.0.into())?;
+        let sub_id = get_blob_id(&state, params.0)?;
+        delete_blob(rt, Some(state.owner), object.hash, sub_id)?;
         // Update state
         let res = rt.transaction(|st: &mut State, rt| st.delete(rt.store(), &key))?;
         Ok(res.1)
@@ -127,6 +129,13 @@ impl Actor {
             common_prefixes: prefixes,
         })
     }
+}
+
+/// Returns a blob subscription ID specific to this machine and object key.
+fn get_blob_id(state: &State, key: Vec<u8>) -> anyhow::Result<SubscriptionId, ActorError> {
+    let mut data = state.address.get()?.payload_bytes();
+    data.extend(key);
+    Ok(SubscriptionId::from(data))
 }
 
 /// Build an object from its state and blob.
@@ -304,6 +313,8 @@ mod tests {
             overwrite: false,
         };
         rt.expect_validate_caller_any();
+        let state = rt.state::<State>().unwrap();
+        let sub_id = get_blob_id(&state, key).unwrap();
         rt.expect_send_simple(
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
@@ -311,7 +322,7 @@ mod tests {
                 sponsor: Some(f4_eth_addr),
                 source: add_params.source,
                 hash: add_params.hash,
-                id: SubscriptionId::Key(key),
+                id: sub_id,
                 size: add_params.size,
                 ttl: add_params.ttl,
             })
@@ -360,6 +371,8 @@ mod tests {
             overwrite: false,
         };
         rt.expect_validate_caller_any();
+        let state = rt.state::<State>().unwrap();
+        let sub_id = get_blob_id(&state, key).unwrap();
         rt.expect_send_simple(
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
@@ -367,7 +380,7 @@ mod tests {
                 sponsor: Some(f4_eth_addr),
                 source: add_params.source,
                 hash: add_params.hash,
-                id: SubscriptionId::Key(key.clone()),
+                id: sub_id.clone(),
                 size: add_params.size,
                 ttl: add_params.ttl,
             })
@@ -407,7 +420,7 @@ mod tests {
             IpldBlock::serialize_cbor(&DeleteBlobParams {
                 sponsor: Some(f4_eth_addr),
                 hash: add_params.hash,
-                id: SubscriptionId::Key(key.clone()),
+                id: sub_id.clone(),
             })
             .unwrap(),
             TokenAmount::from_whole(0),
@@ -421,7 +434,7 @@ mod tests {
                 sponsor: Some(f4_eth_addr),
                 source: add_params2.source,
                 hash: add_params2.hash,
-                id: SubscriptionId::Key(key),
+                id: sub_id,
                 size: add_params2.size,
                 ttl: add_params2.ttl,
             })
@@ -470,6 +483,8 @@ mod tests {
             overwrite: false,
         };
         rt.expect_validate_caller_any();
+        let state = rt.state::<State>().unwrap();
+        let sub_id = get_blob_id(&state, key).unwrap();
         rt.expect_send_simple(
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
@@ -477,7 +492,7 @@ mod tests {
                 sponsor: Some(f4_eth_addr),
                 source: add_params.source,
                 hash: add_params.hash,
-                id: SubscriptionId::Key(key),
+                id: sub_id,
                 size: add_params.size,
                 ttl: add_params.ttl,
             })
@@ -547,6 +562,8 @@ mod tests {
             overwrite: false,
         };
         rt.expect_validate_caller_any();
+        let state = rt.state::<State>().unwrap();
+        let sub_id = get_blob_id(&state, key.clone()).unwrap();
         rt.expect_send_simple(
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
@@ -554,7 +571,7 @@ mod tests {
                 sponsor: Some(f4_eth_addr),
                 source: add_params.source,
                 hash: add_params.hash,
-                id: SubscriptionId::Key(key.clone()),
+                id: sub_id.clone(),
                 size: add_params.size,
                 ttl: add_params.ttl,
             })
@@ -577,7 +594,7 @@ mod tests {
         rt.verify();
 
         // Delete object
-        let delete_params = DeleteParams(key.clone());
+        let delete_params = DeleteParams(key);
         rt.expect_validate_caller_any();
         rt.expect_send_simple(
             BLOBS_ACTOR_ADDR,
@@ -585,7 +602,7 @@ mod tests {
             IpldBlock::serialize_cbor(&DeleteBlobParams {
                 sponsor: Some(f4_eth_addr),
                 hash: add_params.hash,
-                id: SubscriptionId::Key(key),
+                id: sub_id,
             })
             .unwrap(),
             TokenAmount::from_whole(0),
@@ -655,6 +672,8 @@ mod tests {
             overwrite: false,
         };
         rt.expect_validate_caller_any();
+        let state = rt.state::<State>().unwrap();
+        let sub_id = get_blob_id(&state, key.clone()).unwrap();
         rt.expect_send_simple(
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
@@ -662,7 +681,7 @@ mod tests {
                 sponsor: Some(f4_eth_addr),
                 source: add_params.source,
                 hash: add_params.hash,
-                id: SubscriptionId::Key(key.clone()),
+                id: sub_id.clone(),
                 size: add_params.size,
                 ttl: add_params.ttl,
             })
@@ -688,7 +707,7 @@ mod tests {
                 f4_eth_addr,
                 SubscriptionGroup {
                     subscriptions: HashMap::from([(
-                        SubscriptionId::Key(key.clone()),
+                        sub_id,
                         Subscription {
                             added: 0,
                             expiry: ttl,
