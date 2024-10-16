@@ -107,7 +107,7 @@ where
         activities: state
             .activities_tracker()
             .get_activities_summary()?
-            .commitment()?
+            .commitment(height.value() as i64)?
             .try_into()?,
     };
 
@@ -250,8 +250,9 @@ where
                 block_hash: cp.block_hash,
                 next_configuration_number: cp.next_configuration_number,
                 msgs: convert_tokenizables(cp.msgs)?,
-                activities: checkpoint::ActivityCommitment {
-                    summary: cp.activities.summary,
+                activities: checkpoint::ActivitySummary {
+                    total_active_validators: cp.activities.total_active_validators,
+                    commitment: cp.activities.commitment,
                 },
             };
 

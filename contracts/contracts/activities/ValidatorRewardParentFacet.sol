@@ -7,7 +7,7 @@ import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap
 import {Pausable} from "../lib/LibPausable.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
 import {NotValidator, SubnetNoTargetCommitment, CommitmentAlreadyInitialized, ValidatorAlreadyClaimed, NotOwner} from "../errors/IPCErrors.sol";
-import {ValidatorSummary, ActivitySummary} from "./Activity.sol";
+import {ValidatorSummary} from "./Activity.sol";
 import {IValidatorRewarder} from "./IValidatorRewarder.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {SubnetID} from "../structs/Subnet.sol";
@@ -33,7 +33,6 @@ contract ValidatorRewardParentFacet is ReentrancyGuard, Pausable {
     /// Validators claim their reward for doing work in the child subnet
     function claim(
         SubnetID calldata subnetId,
-        uint64 checkpointHeight,
         ValidatorSummary calldata summary,
         bytes32[] calldata proof
     ) external nonReentrant whenNotPaused {
@@ -50,32 +49,17 @@ contract ValidatorRewardParentFacet is ReentrancyGuard, Pausable {
             return handleRelay();
         }
 
-        bytes32 commitment = LibValidatorRewardParent.ensureValidCommitment(s, subnetId, checkpointHeight);
-        LibActivityMerkleVerifier.ensureValidProof(commitment, summary, proof);
-
-        handleDistribution(s, subnetId, commitment, summary);
+        LibValidatorRewardParent.handleDistribution(s, subnetId, summary, proof);
     }
 
     function handleRelay() internal pure {
         // no opt for now
         return;
     }
-
-    function handleDistribution(
-        ValidatorRewardParentStorage storage s,
-        SubnetID calldata subnetId,
-        bytes32 commitment,
-        ValidatorSummary calldata summary
-    ) internal {
-        LibValidatorRewardParent.validatorTryClaim(s, commitment, summary.validator);
-        IValidatorRewarder(s.validatorRewarder).disburseRewards(subnetId, summary);
-    }
 }
 
 /// The activity summary commiment that is currently under reward distribution
 struct RewardDistribution {
-    /// The checkpoint height that this distribution
-    uint64 checkpointHeight;
     /// Total number of valdators to claim the distribution
     uint64 totalValidators;
     /// The list of validators that have claimed the reward
@@ -93,7 +77,8 @@ struct ValidatorRewardParentStorage {
     mapping(bytes32 => EnumerableMap.Bytes32ToBytes32Map) commitments;
     /// @notice Index over presentable summaries back to the subnet ID, so we can locate them quickly when they're presented.
     /// Only used if the validator rewarder is non-zero.
-    mapping(bytes32 => RewardDistribution) distributions;
+    /// Partitioned by subnet ID (hash) then by checkpoint block height in the child subnet to the commitment
+    mapping(bytes32 => mapping(uint64 => RewardDistribution)) distributions;
 }
 
 /// The payload for list commitments query
@@ -144,17 +129,22 @@ library LibValidatorRewardParent {
         ds.validatorRewarder = rewarder;
     }
 
-    function initNewDistribution(uint64 checkpointHeight, bytes32 commitment, SubnetID calldata subnetId) internal {
+    function initNewDistribution(
+        uint64 checkpointHeight,
+        bytes32 commitment,
+        uint64 totalActiveValidators,
+        SubnetID calldata subnetId
+    ) internal {
         ValidatorRewardParentStorage storage ds = facetStorage();
 
         bytes32 subnetKey = subnetId.toHash();
 
-        if (ds.distributions[commitment].checkpointHeight != 0) {
+        if (ds.distributions[subnetKey][checkpointHeight].totalValidators != 0) {
             revert CommitmentAlreadyInitialized();
         }
 
         ds.commitments[subnetKey].set(bytes32(uint256(checkpointHeight)), commitment);
-        ds.distributions[commitment].checkpointHeight = checkpointHeight;
+        ds.distributions[subnetKey][checkpointHeight].totalValidators = totalActiveValidators;
     }
 
     // ============ Internal library functions ============
@@ -167,13 +157,26 @@ library LibValidatorRewardParent {
         return ds;
     }
 
-    function ensureValidCommitment(
-        ValidatorRewardParentStorage storage ds,
+    function handleDistribution(
+        ValidatorRewardParentStorage storage s,
         SubnetID calldata subnetId,
-        uint64 checkpointHeight
-    ) internal view returns (bytes32) {
+        ValidatorSummary calldata summary,
+        bytes32[] calldata proof
+    ) internal {
         bytes32 subnetKey = subnetId.toHash();
 
+        bytes32 commitment = ensureValidCommitment(s, subnetKey, summary.checkpointHeight);
+        LibActivityMerkleVerifier.ensureValidProof(commitment, summary, proof);
+
+        validatorTryClaim(s, subnetKey, summary.checkpointHeight, summary.validator);
+        IValidatorRewarder(s.validatorRewarder).disburseRewards(subnetId, summary);
+    }
+
+    function ensureValidCommitment(
+        ValidatorRewardParentStorage storage ds,
+        bytes32 subnetKey,
+        uint64 checkpointHeight
+    ) internal view returns (bytes32) {
         (bool exists, bytes32 commitment) = ds.commitments[subnetKey].tryGet(bytes32(uint256(checkpointHeight)));
         if (!exists) {
             revert SubnetNoTargetCommitment();
@@ -193,30 +196,33 @@ library LibValidatorRewardParent {
     /// has not claimed before
     function validatorTryClaim(
         ValidatorRewardParentStorage storage ds,
-        bytes32 commitment,
+        bytes32 subnetKey,
+        uint64 checkpointHeight,
         address validator
     ) internal {
-        if (ds.distributions[commitment].claimed.contains(validator)) {
+        if (ds.distributions[subnetKey][checkpointHeight].claimed.contains(validator)) {
             revert ValidatorAlreadyClaimed();
         }
 
-        ds.distributions[commitment].claimed.add(validator);
+        ds.distributions[subnetKey][checkpointHeight].claimed.add(validator);
     }
 
     /// Try to remove the commiment in the target subnet when ALL VALIDATORS HAVE CLAIMED.
     function tryPurgeCommitment(
         ValidatorRewardParentStorage storage ds,
         SubnetID calldata subnetId,
-        bytes32 commitment,
-        uint64 totalValidators
+        uint64 checkpointHeight
     ) internal {
         bytes32 subnetKey = subnetId.toHash();
 
-        if (ds.distributions[commitment].claimed.length() < totalValidators) {
+        uint256 total = uint256(ds.distributions[subnetKey][checkpointHeight].totalValidators);
+        uint256 claimed = ds.distributions[subnetKey][checkpointHeight].claimed.length();
+
+        if (claimed < total) {
             return;
         }
 
         delete ds.commitments[subnetKey];
-        delete ds.distributions[commitment];
+        delete ds.distributions[subnetKey][checkpointHeight];
     }
 }

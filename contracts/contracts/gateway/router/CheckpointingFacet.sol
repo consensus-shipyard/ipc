@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {GatewayActorModifiers} from "../../lib/LibGatewayActorStorage.sol";
-import {BottomUpCheckpoint, ActivitySummary, ActivitySummaryCommitted} from "../../structs/CrossNet.sol";
+import {BottomUpCheckpoint} from "../../structs/CrossNet.sol";
 import {LibGateway} from "../../lib/LibGateway.sol";
 import {LibQuorum} from "../../lib/LibQuorum.sol";
 import {Subnet} from "../../structs/Subnet.sol";
@@ -45,7 +45,8 @@ contract CheckpointingFacet is GatewayActorModifiers {
 
         LibValidatorRewardParent.initNewDistribution(
             uint64(checkpoint.blockHeight),
-            checkpoint.activities.summary,
+            checkpoint.activities.commitment,
+            checkpoint.activities.totalActiveValidators,
             checkpoint.subnetID
         );
     }

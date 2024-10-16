@@ -10,7 +10,8 @@ mod merkle;
 use crate::fvm::activities::merkle::MerkleProofGen;
 use fendermint_actor_activity_tracker::ValidatorSummary;
 use fendermint_crypto::PublicKey;
-use ipc_api::checkpoint::ActivityCommitment;
+use fvm_shared::clock::ChainEpoch;
+use ipc_api::checkpoint::ActivitySummary;
 use std::fmt::Debug;
 
 pub struct BlockMined {
@@ -18,7 +19,7 @@ pub struct BlockMined {
 }
 
 #[derive(Debug, Clone)]
-pub struct ActivitySummary<T> {
+pub struct ActivityDetails<T> {
     pub details: Vec<T>,
 }
 
@@ -32,17 +33,18 @@ pub trait ValidatorActivityTracker {
     /// Get the validators activities summary since the checkpoint height
     fn get_activities_summary(
         &self,
-    ) -> anyhow::Result<ActivitySummary<Self::ValidatorSummaryDetail>>;
+    ) -> anyhow::Result<ActivityDetails<Self::ValidatorSummaryDetail>>;
 
     /// Purge the current validator activities summary
     fn purge_activities(&mut self) -> anyhow::Result<()>;
 }
 
-impl ActivitySummary<ValidatorSummary> {
-    pub fn commitment(&self) -> anyhow::Result<ActivityCommitment> {
-        let gen = MerkleProofGen::try_from(self.details.as_slice())?;
-        Ok(ActivityCommitment {
-            summary: gen.root().to_fixed_bytes().to_vec(),
+impl ActivityDetails<ValidatorSummary> {
+    pub fn commitment(&self, checkpoint_height: ChainEpoch) -> anyhow::Result<ActivitySummary> {
+        let gen = MerkleProofGen::new(self.details.as_slice(), checkpoint_height)?;
+        Ok(ActivitySummary {
+            total_active_validators: self.details.len() as u64,
+            commitment: gen.root().to_fixed_bytes().to_vec(),
         })
     }
 }

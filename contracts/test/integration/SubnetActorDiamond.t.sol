@@ -43,7 +43,7 @@ import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 import {ERC20PresetFixedSupply} from "../helpers/ERC20PresetFixedSupply.sol";
 import {SubnetValidatorGater} from "../../contracts/examples/SubnetValidatorGater.sol";
 
-import {ActivityCommitment} from "../../contracts/activities/Activity.sol";
+import {ActivitySummary} from "../../contracts/activities/Activity.sol";
 
 contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
@@ -691,7 +691,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivityCommitment({summary: bytes32(0)})
+            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(0)})
         });
 
         BottomUpCheckpoint memory checkpointWithIncorrectHeight = BottomUpCheckpoint({
@@ -700,7 +700,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivityCommitment({summary: bytes32(0)})
+            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(0)})
         });
 
         vm.deal(address(saDiamond), 100 ether);
@@ -801,7 +801,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivityCommitment({summary: bytes32(0)})
+            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(0)})
         });
 
         BottomUpCheckpoint memory checkpointWithIncorrectHeight = BottomUpCheckpoint({
@@ -810,7 +810,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: new IpcEnvelope[](0),
-            activities: ActivityCommitment({summary: bytes32(uint256(1))})
+            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(uint256(1))})
         });
 
         vm.deal(address(saDiamond), 100 ether);
@@ -839,7 +839,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         // submit another again
         checkpoint.blockHeight = 2;
-        checkpoint.activities = ActivityCommitment({summary: bytes32(uint256(2))});
+        checkpoint.activities = ActivitySummary({totalActiveValidators: 1, commitment: bytes32(uint256(2))});
         hash = keccak256(abi.encode(checkpoint));
 
         for (uint256 i = 0; i < 3; i++) {
@@ -896,7 +896,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivityCommitment({summary: bytes32(uint256(1))})
+            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(uint256(1))})
         });
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
         require(saDiamond.getter().lastBottomUpCheckpointHeight() == 1, " checkpoint height incorrect");
@@ -909,7 +909,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivityCommitment({summary: bytes32(uint256(2))})
+            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(uint256(2))})
         });
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
         require(saDiamond.getter().lastBottomUpCheckpointHeight() == 3, " checkpoint height incorrect");
@@ -921,7 +921,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivityCommitment({summary: bytes32(uint256(3))})
+            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(uint256(3))})
         });
         vm.expectRevert(BottomUpCheckpointAlreadySubmitted.selector);
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
@@ -933,7 +933,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivityCommitment({summary: bytes32(uint256(4))})
+            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(uint256(4))})
         });
         vm.expectRevert(CannotSubmitFutureCheckpoint.selector);
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
@@ -944,7 +944,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: new IpcEnvelope[](0),
-            activities: ActivityCommitment({summary: bytes32(uint256(5))})
+            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(uint256(5))})
         });
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
         require(
@@ -958,7 +958,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivityCommitment({summary: bytes32(uint256(6))})
+            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(uint256(6))})
         });
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
         require(
@@ -972,7 +972,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivityCommitment({summary: bytes32(uint256(7))})
+            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(uint256(7))})
         });
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
         require(
@@ -986,7 +986,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: new IpcEnvelope[](0),
-            activities: ActivityCommitment({summary: bytes32(uint256(8))})
+            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(uint256(8))})
         });
         vm.expectRevert(InvalidCheckpointEpoch.selector);
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
@@ -997,7 +997,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: new IpcEnvelope[](0),
-            activities: ActivityCommitment({summary: bytes32(uint256(9))})
+            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(uint256(9))})
         });
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
         require(
@@ -1011,7 +1011,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: new IpcEnvelope[](0),
-            activities: ActivityCommitment({summary: bytes32(uint256(10))})
+            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(uint256(10))})
         });
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
         require(
@@ -1053,7 +1053,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivityCommitment({summary: bytes32(0)})
+            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(0)})
         });
 
         vm.deal(address(saDiamond), 100 ether);
@@ -1097,7 +1097,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivityCommitment({summary: bytes32(uint256(1))})
+            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(uint256(1))})
         });
 
         hash = keccak256(abi.encode(checkpoint));

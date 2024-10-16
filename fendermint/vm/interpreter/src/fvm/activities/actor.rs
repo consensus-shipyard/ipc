@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::fvm::activities::{ActivitySummary, BlockMined, ValidatorActivityTracker};
+use crate::fvm::activities::{ActivityDetails, BlockMined, ValidatorActivityTracker};
 use crate::fvm::state::FvmExecState;
 use crate::fvm::FvmMessage;
 use anyhow::Context;
@@ -48,7 +48,7 @@ impl<'a, DB: Blockstore + Clone + 'static> ValidatorActivityTracker
 
     fn get_activities_summary(
         &self,
-    ) -> anyhow::Result<ActivitySummary<Self::ValidatorSummaryDetail>> {
+    ) -> anyhow::Result<ActivityDetails<Self::ValidatorSummaryDetail>> {
         let msg = FvmMessage {
             from: system::SYSTEM_ACTOR_ADDR,
             to: ACTIVITY_TRACKER_ACTOR_ADDR,
@@ -68,7 +68,7 @@ impl<'a, DB: Blockstore + Clone + 'static> ValidatorActivityTracker
             &apply_ret.msg_receipt.return_data,
         )
         .context("failed to parse validator activities")?;
-        Ok(ActivitySummary {
+        Ok(ActivityDetails {
             details: r.activities,
         })
     }

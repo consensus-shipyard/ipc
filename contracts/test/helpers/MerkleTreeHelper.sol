@@ -35,6 +35,7 @@ library MerkleTreeHelper {
     function createMerkleProofsForActivities(
         address[] memory addrs,
         uint64[] memory blocksMined,
+        uint64[] memory checkpointHeights,
         bytes[] memory metadatas
     ) internal returns (bytes32, bytes32[][] memory) {
         Merkle merkleTree = new Merkle();
@@ -45,13 +46,16 @@ library MerkleTreeHelper {
         if (addrs.length != metadatas.length) {
             revert("different array lengths btw metadatas and addrs");
         }
+        if (addrs.length != checkpointHeights.length) {
+            revert("different array lengths btw checkpointHeights and addrs");
+        }
         uint256 len = addrs.length;
 
         bytes32 root;
         bytes32[][] memory proofs = new bytes32[][](len);
         bytes32[] memory data = new bytes32[](len);
         for (uint256 i = 0; i < len; i++) {
-            data[i] = keccak256(bytes.concat(keccak256(abi.encode(addrs[i], blocksMined[i], metadatas[i]))));
+            data[i] = keccak256(bytes.concat(keccak256(abi.encode(checkpointHeights[i], addrs[i], blocksMined[i], metadatas[i]))));
         }
 
         root = merkleTree.getRoot(data);

@@ -47,7 +47,7 @@ import {GatewayFacetsHelper} from "./helpers/GatewayFacetsHelper.sol";
 import {SubnetActorFacetsHelper} from "./helpers/SubnetActorFacetsHelper.sol";
 import {DiamondFacetsHelper} from "./helpers/DiamondFacetsHelper.sol";
 
-import {ActivityCommitment} from "../contracts/activities/Activity.sol";
+import {ActivitySummary} from "../contracts/activities/Activity.sol";
 
 struct TestSubnetDefinition {
     GatewayDiamond gateway;
@@ -931,7 +931,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             blockHash: keccak256(abi.encode(h)),
             nextConfigurationNumber: nextConfigNum - 1,
             msgs: new IpcEnvelope[](0),
-            activities: ActivityCommitment({summary: bytes32(uint256(nextConfigNum))})
+            activities: ActivitySummary({totalActiveValidators: uint64(validators.length), commitment: bytes32(uint256(nextConfigNum))})
         });
 
         vm.deal(address(saDiamond), 100 ether);

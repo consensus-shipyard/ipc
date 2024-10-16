@@ -3,6 +3,7 @@
 
 use anyhow::Context;
 use fendermint_actor_activity_tracker::ValidatorSummary;
+use fvm_shared::clock::ChainEpoch;
 use ipc_api::evm::payload_to_evm_address;
 use ipc_observability::lazy_static;
 use merkle_tree_rs::format::Raw;
@@ -12,7 +13,7 @@ pub type Hash = ethers::types::H256;
 
 lazy_static!(
     /// ABI types of the Merkle tree which contains validator addresses and their voting power.
-    pub static ref VALIDATOR_SUMMARY_FIELDS: Vec<String> = vec!["address".to_owned(), "uint64".to_owned(), "bytes".to_owned()];
+    pub static ref VALIDATOR_SUMMARY_FIELDS: Vec<String> = vec!["uint64".to_owned(), "address".to_owned(), "uint64".to_owned(), "bytes".to_owned()];
 );
 
 /// The merkle tree based proof verification to interact with solidity contracts
@@ -26,15 +27,14 @@ impl MerkleProofGen {
     }
 }
 
-impl TryFrom<&[ValidatorSummary]> for MerkleProofGen {
-    type Error = anyhow::Error;
-
-    fn try_from(values: &[ValidatorSummary]) -> Result<Self, Self::Error> {
+impl MerkleProofGen {
+    pub fn new(values: &[ValidatorSummary], checkpoint_height: ChainEpoch) -> anyhow::Result<Self> {
         let values = values
             .iter()
             .map(|t| {
                 payload_to_evm_address(t.validator.payload()).map(|addr| {
                     vec![
+                        checkpoint_height.to_string(),
                         format!("{addr:?}"),
                         t.block_committed.to_string(),
                         hex::encode(&t.metadata),
