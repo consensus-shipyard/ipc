@@ -14,25 +14,25 @@
     - [Parent-child interactions](concepts/subnets/parent-child-interactions.md)
   - [Circulating supply](concepts/circulating-supply.md)
 
-## Deploy
+## Infrastructure
 
-- [Deploy a subnet](deploy/deploy-a-subnet.md)
-- [Deploying an explorer](deploy/deploy-blockscout.md)
+- [Deploy a subnet](01-infra/deploy-a-subnet.md)
+- [Deploying an explorer](01-infra/deploy-blockscout.md)
 
 ## Use
 
-- [Performing transactions in a subnet](use/performing-transactions-in-a-subnet.md)
+- [Performing transactions in a subnet](03-use/performing-transactions-in-a-subnet.md)
 
 ## Develop
 
-- [Customizing a subnet](develop/customizations/pluggable-syscall-tutorial.md)
-- [Upgrading a subnet](develop/upgrades/README.md)
-  - [Example: Patching actor state](develop/upgrades/patch-state.md)
-  - [Example: Upgrading Wasm actor](develop/upgrades/upgrade-wasm-actor.md)
-
-## Operate
+- [Customizing a subnet](02-develop/customizations/pluggable-syscall-tutorial.md)
+- [Upgrading a subnet](02-develop/upgrades/README.md)
+  - [Example: Patching actor state](02-develop/upgrades/patch-state.md)
+  - [Example: Upgrading Wasm actor](02-develop/upgrades/upgrade-wasm-actor.md)
 
 ## Troubleshoot
+
+- [Build issues](./04-troubleshoot/build-issues.md)
 
 ## Specifications
 
@@ -45,7 +45,7 @@
 
 ## Reference
 
-- [Networks](reference/networks.md)
-- [IPC CLI](reference/ipc-cli-usage.md)
-- [Troubleshooting](reference/troubleshooting.md)
-- [FAQ](reference/faq.md)
+- [Networks](05-reference/networks.md)
+- [IPC CLI](05-reference/ipc-cli-usage.md)
+- [Troubleshooting](05-reference/troubleshooting.md)
+- [FAQ](05-reference/faq.md)

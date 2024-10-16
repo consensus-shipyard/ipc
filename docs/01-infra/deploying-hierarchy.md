@@ -1,6 +1,6 @@
 # Deploying a new IPC hierarchy
 
-We recommend that you connect to the existing contracts on CalibrationNet. Nevertheless, this document provides instructions for deploying a new root contract.
+We recommend that you connect to the existing contracts on Calibrationnet. Nevertheless, this document provides instructions for deploying a new root contract.
 
 ## Install prerequisites
 

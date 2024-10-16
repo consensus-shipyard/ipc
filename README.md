@@ -67,13 +67,13 @@ make test
 
 For further documentation, see:
 
-- [docs/contracts.md](docs/contracts.md) for instructions on how to deploy FEVM actors on subnets.
+- [docs/contracts.md](docs/02-develop/contracts.md) for instructions on how to deploy FEVM actors on subnets.
 - [docs/usage.md](docs/usage.md) for instructions on how to use the `ipc-cli` to interact with subnets (from managing your identities, to sending funds to a subnet).
-- [docs/deploying-hierarchy.md](docs/deploying-hierarchy.md) for instructions on how to deploy your own instance of IPC on a network.
+- [docs/deploying-hierarchy.md](docs/01-infra/deploying-hierarchy.md) for instructions on how to deploy your own instance of IPC on a network.
 
 If you are a developer, see:
 
-- [docs/developers.md](docs/developers.md) for useful tips and guides targeted for IPC developers.
+- [docs/developers.md](docs/04-troubleshoot/developers.md) for useful tips and guides targeted for IPC developers.
 
 ## Connecting to a rootnet
 
