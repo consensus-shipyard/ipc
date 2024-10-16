@@ -700,8 +700,12 @@ done
 # keep the accounts consistent for usage (e.g., logging accounts, using
 # validator keys, etc.), we temporarily copy the file and then restore it.
 echo "$DASHES Start relayer process (in the background)"
-toml set "${IPC_CONFIG_FOLDER}"/config.toml 'subnets[0].config.provider_http' 'http://anvil:8545' > /tmp/config.toml.4
-toml set /tmp/config.toml.4 'subnets[1].config.provider_http' 'http://validator-0-ethapi:8545' > "${IPC_CONFIG_FOLDER}"/relayer.config.toml
+if [[ $local_deploy = true ]]; then
+  toml set "${IPC_CONFIG_FOLDER}"/config.toml 'subnets[0].config.provider_http' 'http://anvil:8545' > /tmp/config.toml.4
+  toml set /tmp/config.toml.4 'subnets[1].config.provider_http' 'http://validator-0-ethapi:8545' > "${IPC_CONFIG_FOLDER}"/relayer.config.toml
+else
+  toml set "${IPC_CONFIG_FOLDER}"/config.toml 'subnets[1].config.provider_http' 'http://validator-0-ethapi:8545' > "${IPC_CONFIG_FOLDER}"/relayer.config.toml
+fi
 temp_evm_keystore=$(jq . "${IPC_CONFIG_FOLDER}"/evm_keystore.json)
 cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=relayer \
