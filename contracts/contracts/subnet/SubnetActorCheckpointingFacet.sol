@@ -49,7 +49,7 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
         LibStaking.confirmChange(checkpoint.nextConfigurationNumber);
 
         // Propagate cross messages from checkpoint to other subnets
-        IGateway(s.ipcGatewayAddr).propagateAllPostboxMessages();
+        IGateway(s.ipcGatewayAddr).propagateAll();
     }
 
     /// @notice Checks whether the signatures are valid for the provided signatories and hash within the current validator set.

@@ -22,7 +22,7 @@ contract CheckpointingFacet is GatewayActorModifiers {
     using CrossMsgHelper for IpcEnvelope;
 
     /// @dev Emitted when a checkpoint is committed to gateway.
-    event CheckpointCommitted(address indexed subnet, uint256 blockHeight);
+    event CheckpointCommitted(address indexed subnet, uint256 subnetHeight);
 
     /// @notice submit a verified checkpoint in the gateway to trigger side-effects.
     /// @dev this method is called by the corresponding subnet actor.
@@ -45,7 +45,7 @@ contract CheckpointingFacet is GatewayActorModifiers {
 
         execBottomUpMsgs(checkpoint.msgs, subnet);
 
-        emit CheckpointCommitted({subnet: checkpoint.subnetID.getAddress(), blockHeight: checkpoint.blockHeight});
+        emit CheckpointCommitted({subnet: checkpoint.subnetID.getAddress(), subnetHeight: checkpoint.blockHeight});
     }
 
     /// @notice creates a new bottom-up checkpoint
