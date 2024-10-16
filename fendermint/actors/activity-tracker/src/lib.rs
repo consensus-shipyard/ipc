@@ -10,6 +10,7 @@ use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::METHOD_CONSTRUCTOR;
 use num_derive::FromPrimitive;
+use serde::{Deserialize, Serialize};
 
 pub use crate::state::State;
 pub use crate::state::ValidatorSummary;
@@ -28,7 +29,7 @@ pub struct BlockedMinedParams {
     pub validator: Address,
 }
 
-#[derive(Deserialize_tuple, Serialize_tuple, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct GetActivitiesResult {
     pub activities: Vec<ValidatorSummary>,
     pub start_height: ChainEpoch,
@@ -73,6 +74,8 @@ impl ActivityTrackerActor {
     }
 
     pub fn get_activities(rt: &impl Runtime) -> Result<GetActivitiesResult, ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+
         let state: State = rt.state()?;
         let activities = state.validator_activities(rt)?;
         Ok(GetActivitiesResult {
