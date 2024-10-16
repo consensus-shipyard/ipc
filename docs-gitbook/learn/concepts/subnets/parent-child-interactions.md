@@ -16,8 +16,6 @@ There are following parent-child interactions available in IPC
 
 6\. Removing child subnets from the IPC hierarchy.
 
-
-
 ## Checkpointing
 
 Checkpointing is a method for a parent subnet to keep a record of the evolution of its child subnet’s state by including snapshots of the child’s state (called checkpoints) in the parent’s state. If, for some reason, the child subnet misbehaves as a whole, agreement can be reached in the parent subnet about how to proceed.
