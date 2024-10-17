@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {GatewayActorModifiers} from "../../lib/LibGatewayActorStorage.sol";
-import {BottomUpCheckpoint, ActivitySummary, ActivitySummaryCommitted} from "../../structs/CrossNet.sol";
+import {BottomUpCheckpoint} from "../../structs/CrossNet.sol";
 import {LibGateway} from "../../lib/LibGateway.sol";
 import {LibQuorum} from "../../lib/LibQuorum.sol";
 import {Subnet} from "../../structs/Subnet.sol";
@@ -16,7 +16,7 @@ import {BatchNotCreated, InvalidBatchEpoch, BatchAlreadyExists, NotEnoughSubnetC
 import {CrossMsgHelper} from "../../lib/CrossMsgHelper.sol";
 import {IpcEnvelope, SubnetID} from "../../structs/CrossNet.sol";
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
-import {LibValidatorRewardParent} from "../../activities/ValidatorRewardParentFacet.sol";
+import {LibValidatorReward} from "../../activities/ValidatorRewardFacet.sol";
 
 contract CheckpointingFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
@@ -43,9 +43,10 @@ contract CheckpointingFacet is GatewayActorModifiers {
 
         execBottomUpMsgs(checkpoint.msgs, subnet);
 
-        LibValidatorRewardParent.initNewDistribution(
+        LibValidatorReward.initNewDistribution(
             uint64(checkpoint.blockHeight),
-            checkpoint.activities.summary,
+            checkpoint.activities.commitment,
+            checkpoint.activities.totalActiveValidators,
             checkpoint.subnetID
         );
     }
@@ -56,7 +57,6 @@ contract CheckpointingFacet is GatewayActorModifiers {
     /// @param membershipWeight - the total weight of the membership
     function createBottomUpCheckpoint(
         BottomUpCheckpoint calldata checkpoint,
-        // TODO(rewarder) ActivitySummary calldata summary,
         bytes32 membershipRootHash,
         uint256 membershipWeight
     ) external systemActorOnly {
@@ -64,8 +64,11 @@ contract CheckpointingFacet is GatewayActorModifiers {
             revert CheckpointAlreadyExists();
         }
 
-        // TODO(rewarder): compute the commitment to the summary and set it in the checkpoint.
-        //  Collect summaries to relay and put them in the checkpoint. Reset the pending summaries map.
+        // TODO(rewarder): step 1. call fvm ActivityTrackerActor::get_summary to generate the summary
+        // TODO(rewarder): step 2. update checkpoint.activities with that in step 1 
+        // TODO: (if there is more time, should wrap param checkpoint with another data structure)
+        // TODO(rewarder): step 3. call fvm ActivityTrackerActor::purge_activities to purge the activities
+        // TODO(rewarder): step 4. emit validator details as event
 
         LibQuorum.createQuorumInfo({
             self: s.checkpointQuorumMap,
@@ -75,8 +78,6 @@ contract CheckpointingFacet is GatewayActorModifiers {
             membershipWeight: membershipWeight,
             majorityPercentage: s.majorityPercentage
         });
-
-        // TODO(rewarder): emit an ActivitySummaryCommittedevent so relayers can pick it up.
 
         LibGateway.storeBottomUpCheckpoint(checkpoint);
     }

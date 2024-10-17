@@ -1,25 +1,26 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use fil_actors_runtime::actor_error;
+use fil_actors_runtime::builtin::singletons::SYSTEM_ACTOR_ADDR;
 use fil_actors_runtime::runtime::{ActorCode, Runtime};
 use fil_actors_runtime::{actor_dispatch, ActorError};
-use fil_actors_runtime::builtin::singletons::SYSTEM_ACTOR_ADDR;
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
-use fvm_shared::METHOD_CONSTRUCTOR;
 use fvm_shared::clock::ChainEpoch;
+use fvm_shared::METHOD_CONSTRUCTOR;
 use num_derive::FromPrimitive;
-use fil_actors_runtime::actor_error;
+use serde::{Deserialize, Serialize};
 
-pub use crate::state::{ValidatorSummary};
-use crate::state::State;
+pub use crate::state::State;
+pub use crate::state::ValidatorSummary;
 
 mod state;
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(ActivityTrackerActor);
 
-pub const IPC_ACTIVITY_TRACKER_ACTOR_NAME: &str = "activity";
+pub const IPC_ACTIVITY_TRACKER_ACTOR_NAME: &str = "activity_tracker";
 
 pub struct ActivityTrackerActor;
 
@@ -28,10 +29,19 @@ pub struct BlockedMinedParams {
     pub validator: Address,
 }
 
-#[derive(Deserialize_tuple, Serialize_tuple, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct GetActivitiesResult {
     pub activities: Vec<ValidatorSummary>,
     pub start_height: ChainEpoch,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct GetActivitySummaryResult {
+    pub commitment: [u8; 32],
+    /// Total number validators that have mined blocks
+    pub total_active_validators: u64,
+    /// The validator details
+    pub activities: Vec<ValidatorSummary>,
 }
 
 #[derive(FromPrimitive)]
@@ -41,6 +51,7 @@ pub enum Method {
     BlockMined = frc42_dispatch::method_hash!("BlockMined"),
     GetActivities = frc42_dispatch::method_hash!("GetActivities"),
     PurgeActivities = frc42_dispatch::method_hash!("PurgeActivities"),
+    GetSummary = frc42_dispatch::method_hash!("GetSummary"),
 }
 
 impl ActivityTrackerActor {
@@ -72,14 +83,21 @@ impl ActivityTrackerActor {
         Ok(())
     }
 
+    pub fn get_summary(_rt: &impl Runtime) -> Result<GetActivitySummaryResult, ActorError> {
+        let dummy = GetActivitySummaryResult{ commitment: [0; 32], total_active_validators: 10 };
+        Ok(dummy)
+    }
+
     pub fn get_activities(rt: &impl Runtime) -> Result<GetActivitiesResult, ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+
         let state: State = rt.state()?;
         let activities = state.validator_activities(rt)?;
         Ok(GetActivitiesResult {
-            activities, start_height: state.start_height
+            activities,
+            start_height: state.start_height,
         })
     }
-
 }
 
 impl ActorCode for ActivityTrackerActor {
@@ -94,5 +112,6 @@ impl ActorCode for ActivityTrackerActor {
         BlockMined => block_mined,
         GetActivities => get_activities,
         PurgeActivities => purge_activities,
+        GetSummary => get_summary,
     }
 }

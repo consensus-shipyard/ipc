@@ -104,7 +104,11 @@ where
         block_hash,
         next_configuration_number,
         msgs,
-        activities: state.activities_tracker().get_activities_summary()?.commitment()?.try_into()?,
+        activities: state
+            .activities_tracker()
+            .get_activities_summary()?
+            .commitment(height.value() as i64)?
+            .try_into()?,
     };
 
     // Save the checkpoint in the ledger.
@@ -246,9 +250,10 @@ where
                 block_hash: cp.block_hash,
                 next_configuration_number: cp.next_configuration_number,
                 msgs: convert_tokenizables(cp.msgs)?,
-                activities: checkpoint::ActivityCommitment {
-                    summary: cp.activities.summary,
-                }
+                activities: checkpoint::ActivitySummary {
+                    total_active_validators: cp.activities.total_active_validators,
+                    commitment: cp.activities.commitment,
+                },
             };
 
             // We mustn't do these in parallel because of how nonces are fetched.

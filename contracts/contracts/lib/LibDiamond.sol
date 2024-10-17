@@ -3,12 +3,12 @@ pragma solidity ^0.8.23;
 
 import {IDiamondCut} from "../interfaces/IDiamondCut.sol";
 import {IDiamond} from "../interfaces/IDiamond.sol";
+import {NotOwner} from "../errors/IPCErrors.sol";
 
 library LibDiamond {
     bytes32 public constant DIAMOND_STORAGE_POSITION = keccak256("libdiamond.lib.diamond.storage");
 
     error InvalidAddress();
-    error NotOwner();
     error NoBytecodeAtAddress(address _contractAddress, string _message);
     error IncorrectFacetCutAction(IDiamondCut.FacetCutAction _action);
     error NoSelectorsProvidedForFacetForCut(address _facetAddress);

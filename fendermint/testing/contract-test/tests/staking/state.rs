@@ -566,6 +566,7 @@ impl arbitrary::Arbitrary<'_> for StakingState {
                 bottom_up_check_period: 1 + u.choose_index(100)? as u64,
                 majority_percentage: 51 + u8::arbitrary(u)? % 50,
                 active_validators_limit: 1 + u.choose_index(100)? as u16,
+                validator_rewarder: Address::from(EthAddress([0; 20])),
             },
         };
 
@@ -594,6 +595,7 @@ impl arbitrary::Arbitrary<'_> for StakingState {
                 bottom_up_check_period: 1 + u.choose_index(100)? as u64,
                 majority_percentage: 51 + u8::arbitrary(u)? % 50,
                 active_validators_limit: num_max_validators as u16,
+                validator_rewarder: Address::from(EthAddress([0; 20])),
             },
         };
 

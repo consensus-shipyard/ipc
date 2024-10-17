@@ -91,6 +91,7 @@ fn main() {
         "SubnetActorCheckpointingFacet",
         "SubnetActorGetterFacet",
         "LibGateway",
+        "CheckpointingFacet",
     ];
 
     let modules = fvm_address_conversion.into_iter().map(camel_to_snake);

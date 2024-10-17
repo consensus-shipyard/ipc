@@ -12,9 +12,9 @@ use fvm_shared::{address::Address, ActorID, MethodNum, BLOCK_GAS_LIMIT};
 use ipc_observability::{emit, measure_time, observe::TracingError, Traceable};
 use tendermint_rpc::Client;
 
+use crate::fvm::activities::BlockMined;
 use crate::fvm::gas::{GasMarket, GasUtilization};
 use crate::ExecInterpreter;
-use crate::fvm::activities::BlockMined;
 
 use crate::fvm::activities::ValidatorActivityTracker;
 
@@ -206,7 +206,9 @@ where
 
     async fn end(&self, mut state: Self::State) -> anyhow::Result<(Self::State, Self::EndOutput)> {
         if let Some(pubkey) = state.validator_pubkey() {
-            state.activities_tracker().track_block_mined(BlockMined { validator: pubkey })?;
+            state
+                .activities_tracker()
+                .track_block_mined(BlockMined { validator: pubkey })?;
         }
 
         state.update_gas_market()?;

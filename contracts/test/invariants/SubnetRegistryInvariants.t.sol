@@ -18,6 +18,7 @@ import {SubnetGetterFacet} from "../../contracts/subnetregistry/SubnetGetterFace
 import {DiamondLoupeFacet} from "../../contracts/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../../contracts/diamond/DiamondCutFacet.sol";
 import {OwnershipFacet} from "../../contracts/OwnershipFacet.sol";
+import {ValidatorRewardFacet} from "../../contracts/activities/ValidatorRewardFacet.sol";
 import {IntegrationTestBase, TestRegistry} from "../IntegrationTestBase.sol";
 import {SelectorLibrary} from "../helpers/SelectorLibrary.sol";
 
@@ -51,6 +52,7 @@ contract SubnetRegistryInvariants is StdInvariant, Test, TestRegistry, Integrati
         params.diamondCutFacet = address(new DiamondCutFacet());
         params.diamondLoupeFacet = address(new DiamondLoupeFacet());
         params.ownershipFacet = address(new OwnershipFacet());
+        params.validatorRewardFacet = address(new ValidatorRewardFacet());
 
         params.subnetActorGetterSelectors = mockedSelectors;
         params.subnetActorManagerSelectors = mockedSelectors2;
@@ -60,6 +62,7 @@ contract SubnetRegistryInvariants is StdInvariant, Test, TestRegistry, Integrati
         params.subnetActorDiamondCutSelectors = SelectorLibrary.resolveSelectors("DiamondCutFacet");
         params.subnetActorDiamondLoupeSelectors = SelectorLibrary.resolveSelectors("DiamondLoupeFacet");
         params.subnetActorOwnershipSelectors = SelectorLibrary.resolveSelectors("OwnershipFacet");
+        params.validatorRewardSelectors = SelectorLibrary.resolveSelectors("ValidatorRewardFacet");
 
         registryDiamond = createSubnetRegistry(params);
         registryHandler = new SubnetRegistryHandler(registryDiamond);
