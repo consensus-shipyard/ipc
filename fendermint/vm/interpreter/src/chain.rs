@@ -924,7 +924,7 @@ where
                     let params = FinalizeBlobParams {
                         subscriber: blob.subscriber,
                         hash,
-                        id: blob.id.into(),
+                        id: blob.id,
                         status,
                     };
                     let params = RawBytes::serialize(params)?;
