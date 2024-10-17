@@ -40,6 +40,8 @@ pub struct GetActivitySummaryResult {
     pub commitment: [u8; 32],
     /// Total number validators that have mined blocks
     pub total_active_validators: u64,
+    /// The validator details
+    pub activities: Vec<ValidatorSummary>,
 }
 
 #[derive(FromPrimitive)]

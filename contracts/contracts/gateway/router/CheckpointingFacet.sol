@@ -68,6 +68,7 @@ contract CheckpointingFacet is GatewayActorModifiers {
         // TODO(rewarder): step 2. update checkpoint.activities with that in step 1 
         // TODO: (if there is more time, should wrap param checkpoint with another data structure)
         // TODO(rewarder): step 3. call fvm ActivityTrackerActor::purge_activities to purge the activities
+        // TODO(rewarder): step 4. emit validator details as event
 
         LibQuorum.createQuorumInfo({
             self: s.checkpointQuorumMap,
