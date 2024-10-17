@@ -334,6 +334,29 @@ mod tests {
                 block_hash: r.0,
             })
         }
+
+        async fn get_top_down_nonce(
+            &self,
+            block_hash: &[u8],
+        ) -> anyhow::Result<TopDownQueryPayload<u64>> {
+            let mut nonce = 0;
+            for v in self.blocks.values() {
+                let Some(p) = v else {
+                    continue;
+                };
+
+                nonce += p.2.len();
+
+                if p.0 == *block_hash {
+                    return Ok(TopDownQueryPayload {
+                        value: nonce as u64,
+                        block_hash: block_hash.to_vec(),
+                    });
+                }
+            }
+
+            Err(anyhow!("not found"))
+        }
     }
 
     fn new_provider(
