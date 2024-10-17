@@ -20,3 +20,16 @@ task('validator-rewarder-deploy')
             libraries: [],
         })
     })
+
+// step 2. claim the validator rewarder
+// sample command: pnpm exec hardhat validator-rewarder-claim --network calibrationnet
+task('validator-rewarder-deploy')
+    .setDescription('Claim reward from example subnet validator rewarder contract')
+    .setAction(async (_: TaskArguments, hre: HardhatRuntimeEnvironment) => {
+        await hre.run('compile')
+
+        const [validator] = await hre.getUnnamedAccounts()
+        const balance = await hre.ethers.provider.getBalance(validator)
+
+        // todo
+    })

@@ -35,6 +35,13 @@ pub struct GetActivitiesResult {
     pub start_height: ChainEpoch,
 }
 
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct GetActivitySummaryResult {
+    pub commitment: [u8; 32],
+    /// Total number validators that have mined blocks
+    pub total_active_validators: u64,
+}
+
 #[derive(FromPrimitive)]
 #[repr(u64)]
 pub enum Method {
@@ -42,6 +49,7 @@ pub enum Method {
     BlockMined = frc42_dispatch::method_hash!("BlockMined"),
     GetActivities = frc42_dispatch::method_hash!("GetActivities"),
     PurgeActivities = frc42_dispatch::method_hash!("PurgeActivities"),
+    GetSummary = frc42_dispatch::method_hash!("GetSummary"),
 }
 
 impl ActivityTrackerActor {
@@ -73,6 +81,11 @@ impl ActivityTrackerActor {
         Ok(())
     }
 
+    pub fn get_summary(_rt: &impl Runtime) -> Result<GetActivitySummaryResult, ActorError> {
+        let dummy = GetActivitySummaryResult{ commitment: [0; 32], total_active_validators: 10 };
+        Ok(dummy)
+    }
+
     pub fn get_activities(rt: &impl Runtime) -> Result<GetActivitiesResult, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
@@ -97,5 +110,6 @@ impl ActorCode for ActivityTrackerActor {
         BlockMined => block_mined,
         GetActivities => get_activities,
         PurgeActivities => purge_activities,
+        GetSummary => get_summary,
     }
 }

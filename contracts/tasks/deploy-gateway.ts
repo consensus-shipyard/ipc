@@ -13,8 +13,6 @@ const gatewayConstructorParams = {
     },
     genesisValidators: [],
     commitSha: undefined, // Will be set later.
-    /// default to no rewarder
-    validatorRewarder: process.env.VALIDATOR_REWARDER || "0x0000000000000000000000000000000000000000",
 }
 
 task('deploy-gateway')
@@ -69,7 +67,6 @@ async function deployFacets(hre: HardhatRuntimeEnvironment, deployer: string): P
         },
         { name: 'TopDownFinalityFacet', libraries: ['AccountHelper'] },
         { name: 'OwnershipFacet' },
-        { name: 'ValidatorRewardParentFacet', libraries: ['SubnetIDHelper'] },
     ];
 
     return await Deployments.deploy(hre, deployer, ...facets)

@@ -21,7 +21,6 @@ import {GatewayMessengerFacet} from "../contracts/gateway/GatewayMessengerFacet.
 import {GatewayManagerFacet} from "../contracts/gateway/GatewayManagerFacet.sol";
 
 import {CheckpointingFacet} from "../contracts/gateway/router/CheckpointingFacet.sol";
-import {ValidatorRewardParentFacet} from "../contracts/activities/ValidatorRewardParentFacet.sol";
 import {XnetMessagingFacet} from "../contracts/gateway/router/XnetMessagingFacet.sol";
 import {TopDownFinalityFacet} from "../contracts/gateway/router/TopDownFinalityFacet.sol";
 
@@ -48,6 +47,8 @@ import {SubnetActorFacetsHelper} from "./helpers/SubnetActorFacetsHelper.sol";
 import {DiamondFacetsHelper} from "./helpers/DiamondFacetsHelper.sol";
 
 import {ActivitySummary} from "../contracts/activities/Activity.sol";
+import {ValidatorRewarderMap} from "../contracts/examples/ValidatorRewarderMap.sol";
+import {ValidatorRewardFacet} from "../contracts/activities/ValidatorRewardFacet.sol";
 
 struct TestSubnetDefinition {
     GatewayDiamond gateway;
@@ -127,7 +128,6 @@ contract TestRegistry is Test, TestParams {
 
 contract TestGatewayActor is Test, TestParams {
     bytes4[] gwCheckpointingFacetSelectors;
-    bytes4[] gwValidatorRewardFacetSelectors;
     bytes4[] gwXnetMessagingFacetSelectors;
     bytes4[] gwTopDownFinalityFacetSelectors;
 
@@ -143,7 +143,6 @@ contract TestGatewayActor is Test, TestParams {
     GatewayDiamond gatewayDiamond;
 
     constructor() {
-        gwValidatorRewardFacetSelectors = SelectorLibrary.resolveSelectors("ValidatorRewardParentFacet");
         gwCheckpointingFacetSelectors = SelectorLibrary.resolveSelectors("CheckpointingFacet");
         gwXnetMessagingFacetSelectors = SelectorLibrary.resolveSelectors("XnetMessagingFacet");
         gwTopDownFinalityFacetSelectors = SelectorLibrary.resolveSelectors("TopDownFinalityFacet");
@@ -168,6 +167,7 @@ contract TestSubnetActor is Test, TestParams {
     bytes4[] saCutterSelectors;
     bytes4[] saLouperSelectors;
     bytes4[] saOwnershipSelectors;
+    bytes4[] validatorRewardSelectors;
 
     SubnetActorDiamond saDiamond;
     SubnetActorMock saMock;
@@ -182,6 +182,7 @@ contract TestSubnetActor is Test, TestParams {
         saCutterSelectors = SelectorLibrary.resolveSelectors("DiamondCutFacet");
         saLouperSelectors = SelectorLibrary.resolveSelectors("DiamondLoupeFacet");
         saOwnershipSelectors = SelectorLibrary.resolveSelectors("OwnershipFacet");
+        validatorRewardSelectors = SelectorLibrary.resolveSelectors("ValidatorRewardFacet");
     }
 
     function defaultSubnetActorParamsWith(
@@ -210,7 +211,8 @@ contract TestSubnetActor is Test, TestParams {
             permissionMode: PermissionMode.Collateral,
             supplySource: source,
             collateralSource: AssetHelper.native(),
-            validatorGater: address(0)
+            validatorGater: address(0),
+            validatorRewarder: address(0)
         });
         return params;
     }
@@ -234,7 +236,8 @@ contract TestSubnetActor is Test, TestParams {
             permissionMode: PermissionMode.Collateral,
             supplySource: source,
             collateralSource: collateral,
-            validatorGater: address(0)
+            validatorGater: address(0),
+            validatorRewarder: address(0)
         });
         return params;
     }
@@ -268,7 +271,8 @@ contract TestSubnetActor is Test, TestParams {
             permissionMode: PermissionMode.Collateral,
             supplySource: Asset({kind: AssetKind.ERC20, tokenAddress: tokenAddress}),
             collateralSource: AssetHelper.native(),
-            validatorGater: address(0)
+            validatorGater: address(0),
+            validatorRewarder: address(0)
         });
         return params;
     }
@@ -316,8 +320,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
-            commitSha: DEFAULT_COMMIT_SHA,
-            validatorRewarder: address(0)
+            commitSha: DEFAULT_COMMIT_SHA
         });
         return params;
     }
@@ -329,15 +332,13 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
             genesisValidators: new Validator[](0),
             activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
-            commitSha: DEFAULT_COMMIT_SHA,
-            validatorRewarder: address(0)
+            commitSha: DEFAULT_COMMIT_SHA
         });
         return params;
     }
 
     function createGatewayDiamond(GatewayDiamond.ConstructorParams memory params) public returns (GatewayDiamond) {
         CheckpointingFacet checkpointingFacet = new CheckpointingFacet();
-        ValidatorRewardParentFacet validatorRewardParentFacet = new ValidatorRewardParentFacet();
         XnetMessagingFacet xnetMessagingFacet = new XnetMessagingFacet();
         TopDownFinalityFacet topDownFinalityFacet = new TopDownFinalityFacet();
         GatewayManagerFacet manager = new GatewayManagerFacet();
@@ -347,7 +348,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         DiamondLoupeFacet louper = new DiamondLoupeFacet();
         OwnershipFacet ownership = new OwnershipFacet();
 
-        IDiamond.FacetCut[] memory gwDiamondCut = new IDiamond.FacetCut[](10);
+        IDiamond.FacetCut[] memory gwDiamondCut = new IDiamond.FacetCut[](9);
 
         gwDiamondCut[0] = (
             IDiamond.FacetCut({
@@ -418,14 +419,6 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
                 facetAddress: address(ownership),
                 action: IDiamond.FacetCutAction.Add,
                 functionSelectors: gwOwnershipSelectors
-            })
-        );
-
-        gwDiamondCut[9] = (
-            IDiamond.FacetCut({
-                facetAddress: address(validatorRewardParentFacet),
-                action: IDiamond.FacetCutAction.Add,
-                functionSelectors: gwValidatorRewardFacetSelectors
             })
         );
 
@@ -506,8 +499,9 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         DiamondLoupeFacet louper = new DiamondLoupeFacet();
         DiamondCutFacet cutter = new DiamondCutFacet();
         OwnershipFacet ownership = new OwnershipFacet();
+        ValidatorRewardFacet validatorReward = new ValidatorRewardFacet();
 
-        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](8);
+        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](9);
 
         diamondCut[0] = (
             IDiamond.FacetCut({
@@ -573,6 +567,13 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             })
         );
 
+        diamondCut[8] = (
+            IDiamond.FacetCut({
+                facetAddress: address(validatorReward),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: validatorRewardSelectors
+            })
+        );
         SubnetActorDiamond diamond = new SubnetActorDiamond(diamondCut, params, address(this));
 
         return diamond;
@@ -623,7 +624,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             permissionMode: _permissionMode,
             supplySource: AssetHelper.native(),
             collateralSource: AssetHelper.native(),
-            validatorGater: address(0)
+            validatorGater: address(0),
+            validatorRewarder: address(new ValidatorRewarderMap())
         });
         saDiamond = createSubnetActor(params);
     }
@@ -654,7 +656,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             permissionMode: _permissionMode,
             supplySource: AssetHelper.native(),
             collateralSource: AssetHelper.native(),
-            validatorGater: _validatorGater
+            validatorGater: _validatorGater,
+            validatorRewarder: address(new ValidatorRewarderMap())
         });
         saDiamond = createSubnetActor(params);
     }

@@ -17,17 +17,11 @@ import {LibDiamond} from "../lib/LibDiamond.sol";
 /// The validator reward facet for the parent subnet, i.e. for validators in the child subnet
 /// to claim their reward in the parent subnet, which should be the current subnet this facet
 /// is deployed.
-contract ValidatorRewardParentFacet is ReentrancyGuard, Pausable {
+contract ValidatorRewardFacet is ReentrancyGuard, Pausable {
     event RewarderUpdated(address oldRewarder, address newRewarder);
 
-    function updateRewarder(address newRewarder) external {
-        if (msg.sender != LibDiamond.contractOwner()) {
-            revert NotOwner();
-        }
-
-        ValidatorRewardParentStorage storage s = LibValidatorRewardParent.facetStorage();
-        emit RewarderUpdated(s.validatorRewarder, newRewarder);
-        s.validatorRewarder = newRewarder;
+    function batchClaim(SubnetID calldata subnetId) external {
+        revert("todo");
     }
 
     /// Validators claim their reward for doing work in the child subnet
@@ -43,13 +37,13 @@ contract ValidatorRewardParentFacet is ReentrancyGuard, Pausable {
             revert NotValidator(msg.sender);
         }
 
-        ValidatorRewardParentStorage storage s = LibValidatorRewardParent.facetStorage();
+        ValidatorRewardStorage storage s = LibValidatorReward.facetStorage();
 
         if (s.validatorRewarder == address(0)) {
             return handleRelay();
         }
 
-        LibValidatorRewardParent.handleDistribution(s, subnetId, summary, proof);
+        LibValidatorReward.handleDistribution(s, subnetId, summary, proof);
     }
 
     function handleRelay() internal pure {
@@ -67,7 +61,7 @@ struct RewardDistribution {
 }
 
 /// Used by the SubnetActor to track the rewards for each validator
-struct ValidatorRewardParentStorage {
+struct ValidatorRewardStorage {
     /// @notice The contract address for validator rewarder
     address validatorRewarder;
     /// @notice Summaries look up pending to be processed.
@@ -89,7 +83,7 @@ struct ListCommimentDetail {
     bytes32 commitment;
 }
 
-library LibValidatorRewardParent {
+library LibValidatorReward {
     bytes32 private constant NAMESPACE = keccak256("validator.reward.parent");
 
     using SubnetIDHelper for SubnetID;
@@ -101,7 +95,7 @@ library LibValidatorRewardParent {
     function listCommitments(
         SubnetID calldata subnetId
     ) internal view returns (ListCommimentDetail[] memory listDetails) {
-        ValidatorRewardParentStorage storage ds = facetStorage();
+        ValidatorRewardStorage storage ds = facetStorage();
 
         bytes32 subnetKey = subnetId.toHash();
 
@@ -125,7 +119,7 @@ library LibValidatorRewardParent {
     }
 
     function updateRewarder(address rewarder) internal {
-        ValidatorRewardParentStorage storage ds = facetStorage();
+        ValidatorRewardStorage storage ds = facetStorage();
         ds.validatorRewarder = rewarder;
     }
 
@@ -135,7 +129,7 @@ library LibValidatorRewardParent {
         uint64 totalActiveValidators,
         SubnetID calldata subnetId
     ) internal {
-        ValidatorRewardParentStorage storage ds = facetStorage();
+        ValidatorRewardStorage storage ds = facetStorage();
 
         bytes32 subnetKey = subnetId.toHash();
 
@@ -149,7 +143,7 @@ library LibValidatorRewardParent {
 
     // ============ Internal library functions ============
 
-    function facetStorage() internal pure returns (ValidatorRewardParentStorage storage ds) {
+    function facetStorage() internal pure returns (ValidatorRewardStorage storage ds) {
         bytes32 position = NAMESPACE;
         assembly {
             ds.slot := position
@@ -158,7 +152,7 @@ library LibValidatorRewardParent {
     }
 
     function handleDistribution(
-        ValidatorRewardParentStorage storage s,
+        ValidatorRewardStorage storage s,
         SubnetID calldata subnetId,
         ValidatorSummary calldata summary,
         bytes32[] calldata proof
@@ -173,7 +167,7 @@ library LibValidatorRewardParent {
     }
 
     function ensureValidCommitment(
-        ValidatorRewardParentStorage storage ds,
+        ValidatorRewardStorage storage ds,
         bytes32 subnetKey,
         uint64 checkpointHeight
     ) internal view returns (bytes32) {
@@ -195,7 +189,7 @@ library LibValidatorRewardParent {
     /// Validator tries to claim the reward. The validator can only claim the reward if the validator
     /// has not claimed before
     function validatorTryClaim(
-        ValidatorRewardParentStorage storage ds,
+        ValidatorRewardStorage storage ds,
         bytes32 subnetKey,
         uint64 checkpointHeight,
         address validator
@@ -207,9 +201,9 @@ library LibValidatorRewardParent {
         ds.distributions[subnetKey][checkpointHeight].claimed.add(validator);
     }
 
-    /// Try to remove the commiment in the target subnet when ALL VALIDATORS HAVE CLAIMED.
-    function tryPurgeCommitment(
-        ValidatorRewardParentStorage storage ds,
+    /// Try to remove the distribution in the target subnet when ALL VALIDATORS HAVE CLAIMED.
+    function tryPurgeDistribution(
+        ValidatorRewardStorage storage ds,
         SubnetID calldata subnetId,
         uint64 checkpointHeight
     ) internal {

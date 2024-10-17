@@ -16,7 +16,7 @@ import {BatchNotCreated, InvalidBatchEpoch, BatchAlreadyExists, NotEnoughSubnetC
 import {CrossMsgHelper} from "../../lib/CrossMsgHelper.sol";
 import {IpcEnvelope, SubnetID} from "../../structs/CrossNet.sol";
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
-import {LibValidatorRewardParent} from "../../activities/ValidatorRewardParentFacet.sol";
+import {LibValidatorReward} from "../../activities/ValidatorRewardFacet.sol";
 
 contract CheckpointingFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
@@ -43,7 +43,7 @@ contract CheckpointingFacet is GatewayActorModifiers {
 
         execBottomUpMsgs(checkpoint.msgs, subnet);
 
-        LibValidatorRewardParent.initNewDistribution(
+        LibValidatorReward.initNewDistribution(
             uint64(checkpoint.blockHeight),
             checkpoint.activities.commitment,
             checkpoint.activities.totalActiveValidators,
@@ -64,8 +64,10 @@ contract CheckpointingFacet is GatewayActorModifiers {
             revert CheckpointAlreadyExists();
         }
 
-        // TODO(rewarder): compute the commitment to the summary and set it in the checkpoint.
-        //  Collect summaries to relay and put them in the checkpoint. Reset the pending summaries map.
+        // TODO(rewarder): step 1. call fvm ActivityTrackerActor::get_summary to generate the summary
+        // TODO(rewarder): step 2. update checkpoint.activities with that in step 1 
+        // TODO: (if there is more time, should wrap param checkpoint with another data structure)
+        // TODO(rewarder): step 3. call fvm ActivityTrackerActor::purge_activities to purge the activities
 
         LibQuorum.createQuorumInfo({
             self: s.checkpointQuorumMap,

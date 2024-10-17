@@ -29,6 +29,8 @@ import {OwnershipFacet} from "../../contracts/OwnershipFacet.sol";
 import {AssetHelper} from "../../contracts/lib/AssetHelper.sol";
 import {RegistryFacetsHelper} from "../helpers/RegistryFacetsHelper.sol";
 import {DiamondFacetsHelper} from "../helpers/DiamondFacetsHelper.sol";
+import {ValidatorRewardFacet} from "../../contracts/activities/ValidatorRewardFacet.sol";
+import {ValidatorRewarderMap} from "../../contracts/examples/ValidatorRewarderMap.sol";
 
 import {SelectorLibrary} from "../helpers/SelectorLibrary.sol";
 
@@ -66,6 +68,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         params.diamondCutFacet = address(new DiamondCutFacet());
         params.diamondLoupeFacet = address(new DiamondLoupeFacet());
         params.ownershipFacet = address(new OwnershipFacet());
+        params.validatorRewardFacet = address(new ValidatorRewardFacet());
 
         params.subnetActorGetterSelectors = mockedSelectors;
         params.subnetActorManagerSelectors = mockedSelectors2;
@@ -75,6 +78,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         params.subnetActorDiamondCutSelectors = SelectorLibrary.resolveSelectors("DiamondCutFacet");
         params.subnetActorDiamondLoupeSelectors = SelectorLibrary.resolveSelectors("DiamondLoupeFacet");
         params.subnetActorOwnershipSelectors = SelectorLibrary.resolveSelectors("OwnershipFacet");
+        params.validatorRewardSelectors = SelectorLibrary.resolveSelectors("ValidatorRewardFacet");
 
         params.creationPrivileges = SubnetCreationPrivileges.Unrestricted;
 
@@ -170,6 +174,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         new SubnetRegistryDiamond(diamondCut, params);
 
         params.ownershipFacet = address(8);
+        params.validatorRewardFacet = address(9);
         new SubnetRegistryDiamond(diamondCut, params);
     }
 
@@ -257,7 +262,8 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
             permissionMode: PermissionMode.Collateral,
             supplySource: AssetHelper.native(),
             collateralSource: AssetHelper.native(),
-            validatorGater: address(0)
+            validatorGater: address(0),
+            validatorRewarder: address(new ValidatorRewarderMap())
         });
 
         registrySubnetFacet.newSubnetActor(params);

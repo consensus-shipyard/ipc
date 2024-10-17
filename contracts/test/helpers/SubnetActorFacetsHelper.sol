@@ -9,6 +9,7 @@ import {SubnetActorGetterFacet} from "../../contracts/subnet/SubnetActorGetterFa
 import {SubnetActorDiamond} from "../../contracts/SubnetActorDiamond.sol";
 import {DiamondLoupeFacet} from "../../contracts/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../../contracts/diamond/DiamondCutFacet.sol";
+import {ValidatorRewardFacet} from "../../contracts/activities/ValidatorRewardFacet.sol";
 
 library SubnetActorFacetsHelper {
     function manager(address sa) internal pure returns (SubnetActorManagerFacet) {
@@ -47,6 +48,11 @@ library SubnetActorFacetsHelper {
     }
 
     //
+
+    function validatorReward(SubnetActorDiamond sa) internal pure returns (ValidatorRewardFacet) {
+        ValidatorRewardFacet facet = ValidatorRewardFacet(address(sa));
+        return facet;
+    }
 
     function manager(SubnetActorDiamond sa) internal pure returns (SubnetActorManagerFacet) {
         SubnetActorManagerFacet facet = SubnetActorManagerFacet(address(sa));
