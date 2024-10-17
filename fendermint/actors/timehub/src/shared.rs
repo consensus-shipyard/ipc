@@ -18,7 +18,7 @@ use fvm_shared::address::Address;
 use num_derive::FromPrimitive;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-pub const ACCUMULATOR_ACTOR_NAME: &str = "accumulator";
+pub const TIMEHUB_ACTOR_NAME: &str = "timehub";
 const BIT_WIDTH: u32 = 3;
 
 fn state_error(e: fvm_ipld_amt::Error) -> ActorError {
@@ -49,9 +49,9 @@ pub struct PushParams(#[serde(with = "strict_bytes")] pub Vec<u8>);
 
 #[derive(Serialize_tuple, Deserialize_tuple)]
 pub struct PushReturn {
-    /// The new root of the accumulator MMR after the object was pushed into it.
+    /// The new root of the timehub MMR after the object was pushed into it.
     pub root: Cid,
-    /// The index of the object that was just pushed into the accumulator.
+    /// The index of the object that was just pushed into the timehub.
     pub index: u64,
 }
 
@@ -94,7 +94,7 @@ fn hash_and_put_pair<BS: Blockstore>(
     }
 }
 
-/// Return the new peaks of the accumulator after adding `new_leaf`.
+/// Return the new peaks of the timehub after adding `new_leaf`.
 fn push<BS: Blockstore, S: DeserializeOwned + Serialize>(
     store: &BS,
     leaf_count: u64,
@@ -243,7 +243,7 @@ pub struct State {
     pub write_access: WriteAccess,
     /// Root of the AMT that is storing the peaks of the MMR
     pub peaks: Cid,
-    /// Number of leaf nodes in the accumulator MMR.
+    /// Number of leaf nodes in the timehub MMR.
     pub leaf_count: u64,
     /// User-defined metadata.
     pub metadata: HashMap<String, String>,
@@ -260,7 +260,7 @@ impl MachineState for State {
             Ok(cid) => cid,
             Err(e) => {
                 return Err(ActorError::illegal_state(format!(
-                    "accumulator actor failed to create empty Amt: {}",
+                    "timehub actor failed to create empty Amt: {}",
                     e
                 )));
             }
@@ -284,7 +284,7 @@ impl MachineState for State {
     }
 
     fn kind(&self) -> Kind {
-        Kind::Accumulator
+        Kind::Timehub
     }
 
     fn owner(&self) -> Address {
@@ -556,7 +556,7 @@ mod tests {
             state.push(&store, vec![i]).unwrap();
             assert_eq!(state.leaf_count(), i + 1);
 
-            // As more items are added to the accumulator, ensure each item remains gettable at
+            // As more items are added to the timehub, ensure each item remains gettable at
             // each phase of the growth of the inner tree structures.
             for j in 0..i {
                 let item = state

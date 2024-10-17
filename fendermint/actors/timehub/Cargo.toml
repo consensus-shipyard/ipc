@@ -1,5 +1,5 @@
 [package]
-name = "fendermint_actor_accumulator"
+name = "fendermint_actor_timehub"
 description = "Actor for event accumulation"
 license.workspace = true
 edition.workspace = true

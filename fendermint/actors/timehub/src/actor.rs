@@ -10,7 +10,7 @@ use fil_actors_runtime::{
     ActorError,
 };
 
-use crate::{Method, PushParams, PushReturn, State, ACCUMULATOR_ACTOR_NAME};
+use crate::{Method, PushParams, PushReturn, State, TIMEHUB_ACTOR_NAME};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
@@ -60,7 +60,7 @@ impl ActorCode for Actor {
     type Methods = Method;
 
     fn name() -> &'static str {
-        ACCUMULATOR_ACTOR_NAME
+        TIMEHUB_ACTOR_NAME
     }
 
     actor_dispatch! {

@@ -256,7 +256,7 @@ You can test using the subnet with the [`hoku` SDK & CLI](https://github.com/hok
 Keys _are not_ logged if you're running a testnet. For localnet, keys _are_ logged with their
 corresponding balances. You'll notice the first three accounts correspond to the validators and
 marked as reserved. If you're trying to do non-validator actions (e.g., create a bucket or
-accumulator), it's best to avoid these accounts since nonce race conditions can occur.
+timehub), it's best to avoid these accounts since nonce race conditions can occur.
 
 ```txt
 Account balances:

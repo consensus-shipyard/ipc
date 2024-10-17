@@ -9,11 +9,11 @@ use std::process::{Command, Stdio};
 use std::thread;
 
 const ACTORS: &[&str] = &[
-    "accumulator",
     "blobs",
     "chainmetadata",
     "eam",
     "objectstore",
+    "timehub",
 ];
 
 const FILES_TO_WATCH: &[&str] = &["Cargo.toml", "src"];

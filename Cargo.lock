@@ -3112,27 +3112,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fendermint_actor_accumulator"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "cid",
- "fendermint_actor_machine",
- "fil_actors_runtime",
- "frc42_dispatch",
- "fvm_ipld_amt",
- "fvm_ipld_blockstore",
- "fvm_ipld_encoding",
- "fvm_shared",
- "log",
- "num-derive 0.3.3",
- "num-traits",
- "serde",
- "serde_tuple",
- "tracing",
-]
-
-[[package]]
 name = "fendermint_actor_blobs"
 version = "0.1.0"
 dependencies = [
@@ -3252,16 +3231,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_actor_timehub"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cid",
+ "fendermint_actor_machine",
+ "fil_actors_runtime",
+ "frc42_dispatch",
+ "fvm_ipld_amt",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
+ "fvm_shared",
+ "log",
+ "num-derive 0.3.3",
+ "num-traits",
+ "serde",
+ "serde_tuple",
+ "tracing",
+]
+
+[[package]]
 name = "fendermint_actors"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid",
- "fendermint_actor_accumulator",
  "fendermint_actor_blobs",
  "fendermint_actor_chainmetadata",
  "fendermint_actor_eam",
  "fendermint_actor_objectstore",
+ "fendermint_actor_timehub",
  "fil_actor_bundler",
  "fil_actors_runtime",
  "fvm_ipld_blockstore",
@@ -3282,10 +3282,10 @@ dependencies = [
  "cid",
  "ethers",
  "fendermint_abci",
- "fendermint_actor_accumulator",
  "fendermint_actor_blobs_shared",
  "fendermint_actor_machine",
  "fendermint_actor_objectstore",
+ "fendermint_actor_timehub",
  "fendermint_app_options",
  "fendermint_app_settings",
  "fendermint_crypto",
@@ -3581,9 +3581,9 @@ dependencies = [
  "cid",
  "clap 4.5.11",
  "ethers",
- "fendermint_actor_accumulator",
  "fendermint_actor_machine",
  "fendermint_actor_objectstore",
+ "fendermint_actor_timehub",
  "fendermint_crypto",
  "fendermint_vm_actor_interface",
  "fendermint_vm_genesis",
@@ -3759,12 +3759,12 @@ dependencies = [
  "blobs_syscall",
  "cid",
  "ethers",
- "fendermint_actor_accumulator",
  "fendermint_actor_blobs",
  "fendermint_actor_blobs_shared",
  "fendermint_actor_chainmetadata",
  "fendermint_actor_eam",
  "fendermint_actor_objectstore",
+ "fendermint_actor_timehub",
  "fendermint_actors",
  "fendermint_crypto",
  "fendermint_eth_hardhat",
