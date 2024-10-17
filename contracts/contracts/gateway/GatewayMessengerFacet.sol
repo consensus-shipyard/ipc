@@ -4,14 +4,16 @@ pragma solidity ^0.8.23;
 import {GatewayActorModifiers} from "../lib/LibGatewayActorStorage.sol";
 import {IpcEnvelope, CallMsg, IpcMsgKind} from "../structs/CrossNet.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
-import {SubnetID, AssetKind, IPCAddress} from "../structs/Subnet.sol";
-import {InvalidXnetMessage, InvalidXnetMessageReason, CannotSendCrossMsgToItself, MethodNotAllowed} from "../errors/IPCErrors.sol";
+import {Subnet, SubnetID, AssetKind, IPCAddress} from "../structs/Subnet.sol";
+import {InvalidXnetMessage, InvalidXnetMessageReason, CannotSendCrossMsgToItself, MethodNotAllowed, CommonParentDoesNotExist} from "../errors/IPCErrors.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
-import {LibGateway} from "../lib/LibGateway.sol";
+import {LibGateway, CrossMessageValidationOutcome} from "../lib/LibGateway.sol";
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {AssetHelper} from "../lib/AssetHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
+
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 string constant ERR_GENERAL_CROSS_MSG_DISABLED = "Support for general-purpose cross-net messages is disabled";
 string constant ERR_MULTILEVEL_CROSS_MSG_DISABLED = "Support for multi-level cross-net messages is disabled";
@@ -19,6 +21,8 @@ string constant ERR_MULTILEVEL_CROSS_MSG_DISABLED = "Support for multi-level cro
 contract GatewayMessengerFacet is GatewayActorModifiers {
     using FilAddress for address payable;
     using SubnetIDHelper for SubnetID;
+    using EnumerableSet for EnumerableSet.Bytes32Set;
+    using CrossMsgHelper for IpcEnvelope;
 
     /**
      * @dev Sends a general-purpose cross-message from the local subnet to the destination subnet.
@@ -31,7 +35,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
      * @return committed envelope.
      */
     function sendContractXnetMessage(
-        IpcEnvelope calldata envelope
+        IpcEnvelope memory envelope
     ) external payable returns (IpcEnvelope memory committed) {
         if (!s.generalPurposeCrossMsg) {
             revert MethodNotAllowed(ERR_GENERAL_CROSS_MSG_DISABLED);
@@ -62,6 +66,18 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
             nonce: 0 // nonce will be updated by LibGateway.commitCrossMessage
         });
 
+        CrossMessageValidationOutcome outcome = committed.validateCrossMessage();
+
+        if (outcome != CrossMessageValidationOutcome.Valid) {
+            if (outcome == CrossMessageValidationOutcome.InvalidDstSubnet) {
+                revert InvalidXnetMessage(InvalidXnetMessageReason.DstSubnet);
+            } else if (outcome == CrossMessageValidationOutcome.CannotSendToItself) {
+                revert CannotSendCrossMsgToItself();
+            } else if (outcome == CrossMessageValidationOutcome.CommonParentNotExist) {
+                revert CommonParentDoesNotExist();
+            }
+        }
+
         // Commit xnet message for dispatch.
         bool shouldBurn = LibGateway.commitCrossMessage(committed);
 
@@ -75,23 +91,9 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
     }
 
     /**
-     * @dev propagates the populated cross net message for the given cid
-     * @param msgCid - the cid of the cross-net message
+     * @dev Propagates all the populated cross-net messages from the postbox.
      */
-    function propagate(bytes32 msgCid) external payable {
-        if (!s.multiLevelCrossMsg) {
-            revert MethodNotAllowed(ERR_MULTILEVEL_CROSS_MSG_DISABLED);
-        }
-
-        IpcEnvelope storage crossMsg = s.postbox[msgCid];
-
-        bool shouldBurn = LibGateway.commitCrossMessage(crossMsg);
-        // We must delete the message first to prevent potential re-entrancies,
-        // and as the message is deleted and we don't have a reference to the object
-        // anymore, we need to pull the data from the message to trigger the side-effects.
-        uint256 v = crossMsg.value;
-        delete s.postbox[msgCid];
-
-        LibGateway.crossMsgSideEffects({v: v, shouldBurn: shouldBurn});
+    function propagateAll() external payable {
+        LibGateway.propagateAllPostboxMessages();
     }
 }
