@@ -34,7 +34,10 @@ members = [
   "fendermint/tracing",
   "fendermint/vm/*",
   "fendermint/actors",
+  "fendermint/actors/api",
   "fendermint/actors/chainmetadata",
+  "fendermint/actors/eam",
+  "fendermint/actors/gas_market/eip1559",
 ]
 
 [workspace.package]
@@ -179,6 +182,7 @@ ipc_ipld_resolver = { path = "ipld/resolver" }
 ipc-types = { path = "ipc/types" }
 ipc-observability = { path = "ipc/observability" }
 ipc_actors_abis = { path = "contracts/binding" }
+fendermint_actors_api = { path = "fendermint/actors/api" }
 
 # Vendored for cross-compilation, see https://github.com/cross-rs/cross/wiki/Recipes#openssl
 # Make sure every top level build target actually imports this dependency, and don't end up
