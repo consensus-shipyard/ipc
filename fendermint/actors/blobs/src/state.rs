@@ -358,8 +358,8 @@ impl State {
                         // The refund extends up to the last debit epoch.
                         let refund_blocks = account.last_debit_epoch - group_expiry;
                         let refund = refund_blocks as u64 * &size;
-                        account.credit_free += &refund; // re-mint spent credit
                         self.credit_debited -= &refund;
+                        account.credit_free += &refund; // re-mint spent credit
                         debug!("refunded {} credits to {}", refund, subscriber);
                     }
                 }
@@ -651,8 +651,8 @@ impl State {
             // The refund extends up to the last debit epoch
             let refund_blocks = account.last_debit_epoch - group_expiry;
             let refund = refund_blocks as u64 * &size;
-            account.credit_free += &refund; // re-mint spent credit
             self.credit_debited -= &refund;
+            account.credit_free += &refund; // re-mint spent credit
             debug!("refunded {} credits to {}", refund, subscriber);
         }
         // Ensure subscriber has enough credits, considering the subscription group may
@@ -700,16 +700,37 @@ impl State {
         self.blobs.get(&hash).cloned()
     }
 
-    pub fn get_blob_status(&self, hash: Hash, subscriber: Address) -> Option<BlobStatus> {
+    pub fn get_blob_status(
+        &self,
+        subscriber: Address,
+        hash: Hash,
+        id: SubscriptionId,
+    ) -> Option<BlobStatus> {
         let blob = self.blobs.get(&hash)?;
         if blob.subscribers.contains_key(&subscriber) {
-            if matches!(blob.status, BlobStatus::Resolved) {
-                Some(BlobStatus::Resolved)
-            } else {
-                // The blob state's status may have been finalized as failed by another
-                // subscription, but since this one exists, there must be another pending
-                // resolution task in the queue.
-                Some(BlobStatus::Pending)
+            match blob.status {
+                BlobStatus::Pending => Some(BlobStatus::Pending),
+                BlobStatus::Resolved => Some(BlobStatus::Resolved),
+                BlobStatus::Failed => {
+                    // The blob state's status may have been finalized as failed by another
+                    // subscription.
+                    // We need to if this specific subscription failed.
+                    if let Some(sub) = blob
+                        .subscribers
+                        .get(&subscriber)
+                        .unwrap() // safe here
+                        .subscriptions
+                        .get(&id)
+                    {
+                        if sub.failed {
+                            Some(BlobStatus::Failed)
+                        } else {
+                            Some(BlobStatus::Pending)
+                        }
+                    } else {
+                        None
+                    }
+                }
             }
         } else {
             None
@@ -813,8 +834,9 @@ impl State {
                     .min(account.last_debit_epoch);
                 let refund_blocks = refund_cutoff - sub.added;
                 let refund = refund_blocks as u64 * &size;
-                account.credit_free += &refund; // re-mint spent credit
+                // Re-mint spent credit
                 self.credit_debited -= &refund;
+                account.credit_free += &refund; // move directly to free
                 debug!("refunded {} credits to {}", refund, subscriber);
             }
             // If there's no new group expiry, all subscriptions have failed.
@@ -977,8 +999,10 @@ impl State {
             // The account was debited after this blob's expiry
             let refund_blocks = account.last_debit_epoch - group_expiry;
             let refund = refund_blocks as u64 * &BigInt::from(blob.size);
-            account.credit_free += &refund; // re-mint spent credit
+            // Re-mint spent credit
             self.credit_debited -= &refund;
+            self.credit_committed += &refund;
+            account.credit_committed += &refund;
             debug!("refunded {} credits to {}", refund, subscriber);
         }
         // Account for reclaimed size and move committed credit to free credit
@@ -988,7 +1012,7 @@ impl State {
             // If there's no new group expiry, we can reclaim capacity.
             if new_group_expiry.is_none() {
                 account.capacity_used -= &size;
-                if num_subscribers == 0 {
+                if num_subscribers == 1 {
                     self.capacity_used -= &size;
                     debug!("released {} bytes to subnet", size);
                 }
@@ -1133,6 +1157,11 @@ fn update_expiry_index(
 
 #[cfg(test)]
 mod tests {
+    // TODO: More add tests, include delgation
+    // TODO: Delete tests, include delegation
+    // TODO: Renew tests
+    // TODO: More debit accounts tests
+
     use super::*;
 
     use rand::RngCore;
@@ -1180,6 +1209,7 @@ mod tests {
 
     #[test]
     fn test_buy_credit_success() {
+        setup_logs();
         let capacity = 1024;
         let mut state = State::new(capacity, 1);
         let recipient = new_address();
@@ -1188,7 +1218,7 @@ mod tests {
         let res = state.buy_credit(recipient, amount.clone(), 1);
         assert!(res.is_ok());
         let account = res.unwrap();
-        let credit_sold = BigInt::from(amount.atto() * state.credit_debit_rate);
+        let credit_sold = amount.atto() * state.credit_debit_rate;
         assert_eq!(account.credit_free, credit_sold);
         assert_eq!(state.credit_sold, credit_sold);
         assert_eq!(state.accounts.len(), 1);
@@ -1196,6 +1226,7 @@ mod tests {
 
     #[test]
     fn test_buy_credit_negative_amount() {
+        setup_logs();
         let capacity = 1024;
         let mut state = State::new(capacity, 1);
         let recipient = new_address();
@@ -1208,6 +1239,7 @@ mod tests {
 
     #[test]
     fn test_buy_credit_at_capacity() {
+        setup_logs();
         let capacity = 1024;
         let mut state = State::new(capacity, 1);
         let recipient = new_address();
@@ -1224,6 +1256,7 @@ mod tests {
 
     #[test]
     fn test_approve_credit_success() {
+        setup_logs();
         let capacity = 1024;
         let mut state = State::new(capacity, 1);
         let from = new_address();
@@ -1244,7 +1277,7 @@ mod tests {
             to,
             None,
             current_epoch,
-            Some(BigUint::from(limit.clone())),
+            Some(BigUint::from(limit)),
             None,
         );
         assert!(res.is_ok());
@@ -1253,14 +1286,14 @@ mod tests {
         assert_eq!(approval.expiry, None);
 
         // Add ttl
-        let ttl = ChainEpoch::from(3600);
+        let ttl = ChainEpoch::from(MIN_TTL);
         let res = state.approve_credit(
             from,
             to,
             None,
             current_epoch,
-            Some(BigUint::from(limit.clone())),
-            Some(ttl.clone()),
+            Some(BigUint::from(limit)),
+            Some(ttl),
         );
         assert!(res.is_ok());
         let approval = res.unwrap();
@@ -1282,6 +1315,7 @@ mod tests {
 
     #[test]
     fn test_approve_credit_invalid_ttl() {
+        setup_logs();
         let capacity = 1024;
         let mut state = State::new(capacity, 1);
         let from = new_address();
@@ -1299,6 +1333,7 @@ mod tests {
 
     #[test]
     fn test_approve_credit_insufficient_credit() {
+        setup_logs();
         let capacity = 1024;
         let mut state = State::new(capacity, 1);
         let from = new_address();
@@ -1337,7 +1372,7 @@ mod tests {
             to,
             None,
             current_epoch,
-            Some(BigUint::from(limit.clone())),
+            Some(BigUint::from(limit)),
             None,
         );
         assert!(res.is_err());
@@ -1352,6 +1387,7 @@ mod tests {
 
     #[test]
     fn test_revoke_credit_success() {
+        setup_logs();
         let capacity = 1024;
         let mut state = State::new(capacity, 1);
         let from = new_address();
@@ -1391,6 +1427,7 @@ mod tests {
 
     #[test]
     fn test_revoke_credit_account_not_found() {
+        setup_logs();
         let capacity = 1024;
         let mut state = State::new(capacity, 1);
         let from = new_address();
@@ -1403,250 +1440,6 @@ mod tests {
             format!("account {} not found", from)
         );
     }
-
-    #[test]
-    fn test_add_blob_same_hash_same_account() {
-        let capacity = 1024 * 1024;
-        let mut state = State::new(capacity, 1);
-        let subscriber = new_address();
-        let current_epoch = ChainEpoch::from(1);
-        let amount = TokenAmount::from_whole(10);
-        state
-            .buy_credit(subscriber, amount.clone(), current_epoch)
-            .unwrap();
-        let mut credit_amount = amount.atto() * state.credit_debit_rate;
-
-        // Add blob with default a subscription ID
-        let (hash, size) = new_hash(1024);
-        let add1_epoch = current_epoch;
-        let id1 = SubscriptionId::Default;
-        let source = new_pk();
-        let res = state.add_blob(
-            subscriber,
-            subscriber,
-            subscriber,
-            add1_epoch,
-            hash,
-            id1.clone(),
-            size,
-            None,
-            source,
-        );
-        assert!(res.is_ok());
-        let sub = res.unwrap();
-        assert_eq!(sub.added, add1_epoch);
-        assert_eq!(sub.expiry, add1_epoch + AUTO_TTL);
-        assert!(sub.auto_renew);
-        assert_eq!(sub.source, source);
-        assert!(!sub.failed);
-        assert_eq!(sub.delegate, None);
-
-        // Check the blob status
-        assert_eq!(
-            state.get_blob_status(hash, subscriber),
-            Some(BlobStatus::Pending)
-        );
-
-        // Check the blob
-        let blob = state.get_blob(hash).unwrap();
-        assert_eq!(blob.subscribers.len(), 1);
-        assert_eq!(blob.status, BlobStatus::Pending);
-        assert_eq!(blob.size, size);
-
-        // Check the subscription group
-        let group = blob.subscribers.get(&subscriber).unwrap();
-        assert_eq!(group.subscriptions.len(), 1);
-        let got_sub = group.subscriptions.get(&id1.clone()).unwrap();
-        assert_eq!(*got_sub, sub);
-
-        // Check the account balance
-        let account = state.get_account(subscriber).unwrap();
-        assert_eq!(account.last_debit_epoch, add1_epoch);
-        assert_eq!(
-            account.credit_committed,
-            BigInt::from(AUTO_TTL as u64 * size),
-        );
-        credit_amount -= account.credit_committed;
-        assert_eq!(account.credit_free, credit_amount);
-        assert_eq!(account.capacity_used, BigInt::from(size));
-
-        // Finalize as resolved
-        let finalize_epoch = ChainEpoch::from(11);
-        let res = state.finalize_blob(
-            subscriber,
-            finalize_epoch,
-            hash,
-            id1.clone(),
-            BlobStatus::Resolved,
-        );
-        assert!(res.is_ok());
-        assert_eq!(
-            state.get_blob_status(hash, subscriber),
-            Some(BlobStatus::Resolved)
-        );
-
-        // Add the same blob again with a default subscription ID
-        let add2_epoch = ChainEpoch::from(21);
-        let source = new_pk();
-        let res = state.add_blob(
-            subscriber,
-            subscriber,
-            subscriber,
-            add2_epoch,
-            hash,
-            id1.clone(),
-            size,
-            None,
-            source,
-        );
-        assert!(res.is_ok());
-        let sub = res.unwrap();
-        assert_eq!(sub.added, add1_epoch); // added should not change
-        assert_eq!(sub.expiry, add2_epoch + AUTO_TTL);
-        assert!(sub.auto_renew);
-        assert_eq!(sub.source, source);
-        assert!(!sub.failed);
-        assert_eq!(sub.delegate, None);
-
-        // Check the blob status
-        // Should already be resolved
-        assert_eq!(
-            state.get_blob_status(hash, subscriber),
-            Some(BlobStatus::Resolved)
-        );
-
-        // Check the blob
-        let blob = state.get_blob(hash).unwrap();
-        assert_eq!(blob.subscribers.len(), 1);
-        assert_eq!(blob.status, BlobStatus::Resolved);
-        assert_eq!(blob.size, size);
-
-        // Check the subscription group
-        let group = blob.subscribers.get(&subscriber).unwrap();
-        assert_eq!(group.subscriptions.len(), 1); // Still only one subscription
-        let got_sub = group.subscriptions.get(&id1.clone()).unwrap();
-        assert_eq!(*got_sub, sub);
-
-        // Check the account balance
-        let account = state.get_account(subscriber).unwrap();
-        assert_eq!(account.last_debit_epoch, add2_epoch);
-        assert_eq!(
-            account.credit_committed, // stays the same becuase we're starting over
-            BigInt::from(AUTO_TTL as u64 * size),
-        );
-        credit_amount -= BigInt::from((add2_epoch - add1_epoch) as u64 * size);
-        assert_eq!(account.credit_free, credit_amount);
-        assert_eq!(account.capacity_used, BigInt::from(size)); // not changed
-
-        // Add the same blob but this time uses a different subscription ID
-        let add3_epoch = ChainEpoch::from(31);
-        let id2 = SubscriptionId::Key(b"foo".to_vec());
-        let source = new_pk();
-        let res = state.add_blob(
-            subscriber,
-            subscriber,
-            subscriber,
-            add3_epoch,
-            hash,
-            id2.clone(),
-            size,
-            None,
-            source,
-        );
-        assert!(res.is_ok());
-        let sub = res.unwrap();
-        assert_eq!(sub.added, add3_epoch);
-        assert_eq!(sub.expiry, add3_epoch + AUTO_TTL);
-        assert!(sub.auto_renew);
-        assert_eq!(sub.source, source);
-        assert!(!sub.failed);
-        assert_eq!(sub.delegate, None);
-
-        // Check the blob status
-        // Should already be resolved
-        assert_eq!(
-            state.get_blob_status(hash, subscriber),
-            Some(BlobStatus::Resolved)
-        );
-
-        // Check the blob
-        let blob = state.get_blob(hash).unwrap();
-        assert_eq!(blob.subscribers.len(), 1); // still only one subscriber
-        assert_eq!(blob.status, BlobStatus::Resolved);
-        assert_eq!(blob.size, size);
-
-        // Check the subscription group
-        let group = blob.subscribers.get(&subscriber).unwrap();
-        assert_eq!(group.subscriptions.len(), 2);
-        let got_sub = group.subscriptions.get(&id2.clone()).unwrap();
-        assert_eq!(*got_sub, sub);
-
-        // Check the account balance
-        let account = state.get_account(subscriber).unwrap();
-        assert_eq!(account.last_debit_epoch, add3_epoch);
-        assert_eq!(
-            account.credit_committed, // stays the same becuase we're starting over
-            BigInt::from(AUTO_TTL as u64 * size),
-        );
-        credit_amount -= BigInt::from((add3_epoch - add2_epoch) as u64 * size);
-        assert_eq!(account.credit_free, credit_amount);
-        assert_eq!(account.capacity_used, BigInt::from(size)); // not changed
-
-        // Debit all accounts
-        let debit_epoch = ChainEpoch::from(41);
-        let deletes_from_disc = state.debit_accounts(debit_epoch).unwrap();
-        assert!(deletes_from_disc.is_empty());
-
-        // Check the account balance
-        let account = state.get_account(subscriber).unwrap();
-        assert_eq!(account.last_debit_epoch, debit_epoch);
-        assert_eq!(
-            account.credit_committed, // debit reduces this
-            BigInt::from((AUTO_TTL - (debit_epoch - add3_epoch)) as u64 * size),
-        );
-        assert_eq!(account.credit_free, credit_amount); // not changed
-        assert_eq!(account.capacity_used, BigInt::from(size)); // not changed
-
-        // Delete the default subscription ID
-        let delete_epoch = ChainEpoch::from(51);
-        let res = state.delete_blob(
-            subscriber,
-            subscriber,
-            subscriber,
-            delete_epoch,
-            hash,
-            id1.clone(),
-        );
-        assert!(res.is_ok());
-        let delete_from_disk = res.unwrap();
-        assert!(!delete_from_disk);
-
-        // Check the blob
-        let blob = state.get_blob(hash).unwrap();
-        assert_eq!(blob.subscribers.len(), 1); // still one subscriber
-        assert_eq!(blob.status, BlobStatus::Resolved);
-        assert_eq!(blob.size, size);
-
-        // Check the subscription group
-        let group = blob.subscribers.get(&subscriber).unwrap();
-        assert_eq!(group.subscriptions.len(), 1);
-        let sub = group.subscriptions.get(&id2.clone()).unwrap();
-        assert_eq!(sub.added, add3_epoch);
-        assert_eq!(sub.expiry, add3_epoch + AUTO_TTL);
-
-        // Check the account balance
-        let account = state.get_account(subscriber).unwrap();
-        assert_eq!(account.last_debit_epoch, delete_epoch);
-        assert_eq!(
-            account.credit_committed, // debit reduces this
-            BigInt::from((AUTO_TTL - (delete_epoch - add3_epoch)) as u64 * size),
-        );
-        assert_eq!(account.credit_free, credit_amount); // not changed
-        assert_eq!(account.capacity_used, BigInt::from(size)); // not changed
-    }
-
-    // TODO: Add test for finalized failed
-    // TODO: Add test for delete
 
     #[test]
     fn test_debit_accounts_delete_from_disc() {
@@ -1694,8 +1487,8 @@ mod tests {
         // Check the account balance
         let account = state.get_account(subscriber).unwrap();
         assert_eq!(account.last_debit_epoch, add1_epoch);
-        assert_eq!(account.credit_committed, BigInt::from(ttl1 as u64 * size),);
-        credit_amount -= account.credit_committed;
+        assert_eq!(account.credit_committed, BigInt::from(ttl1 as u64 * size));
+        credit_amount -= &account.credit_committed;
         assert_eq!(account.credit_free, credit_amount);
         assert_eq!(account.capacity_used, BigInt::from(size));
 
@@ -1733,7 +1526,7 @@ mod tests {
         let group = blob.subscribers.get(&subscriber).unwrap();
         assert_eq!(group.subscriptions.len(), 2);
 
-        // Debit all accounts at an epoch between two expiries (3601-3621)
+        // Debit all accounts at an epoch between the two expiries (3601-3621)
         let debit_epoch = ChainEpoch::from(MIN_TTL + 11);
         let deletes_from_disc = state.debit_accounts(debit_epoch).unwrap();
         assert!(deletes_from_disc.is_empty());
@@ -1753,21 +1546,636 @@ mod tests {
         let group = blob.subscribers.get(&subscriber).unwrap();
         assert_eq!(group.subscriptions.len(), 1); // the first subscription was deleted
 
-        // only 10240 credit left
-
         // Debit all accounts at an epoch greater than group expiry (3621)
         let debit_epoch = ChainEpoch::from(MIN_TTL + 31);
         let deletes_from_disc = state.debit_accounts(debit_epoch).unwrap();
-        assert!(!deletes_from_disc.is_empty());
+        assert!(!deletes_from_disc.is_empty()); // blob is marked for deletion
+
+        // Check the account balance
+        let account = state.get_account(subscriber).unwrap();
+        assert_eq!(account.last_debit_epoch, debit_epoch);
+        assert_eq!(
+            account.credit_committed, // the second debit reduces this to zero
+            BigInt::from(0),
+        );
+        assert_eq!(account.credit_free, credit_amount); // not changed
+        assert_eq!(account.capacity_used, BigInt::from(0));
+
+        // Check state
+        assert_eq!(state.credit_committed, BigInt::from(0)); // credit was released
+        assert_eq!(state.credit_debited, amount.atto() - &account.credit_free);
+        assert_eq!(state.capacity_used, BigInt::from(0)); // capacity was released
+
+        // Check indexes
+        assert_eq!(state.expiries.len(), 0);
+        assert_eq!(state.pending.len(), 0);
+    }
+
+    #[test]
+    fn test_add_blob_same_hash_same_account() {
+        setup_logs();
+        let capacity = 1024 * 1024;
+        let mut state = State::new(capacity, 1);
+        let subscriber = new_address();
+        let current_epoch = ChainEpoch::from(1);
+        let amount = TokenAmount::from_whole(10);
+        state
+            .buy_credit(subscriber, amount.clone(), current_epoch)
+            .unwrap();
+        let mut credit_amount = amount.atto() * state.credit_debit_rate;
+
+        // Add blob with default a subscription ID
+        let (hash, size) = new_hash(1024);
+        let add1_epoch = current_epoch;
+        let id1 = SubscriptionId::Default;
+        let source = new_pk();
+        let res = state.add_blob(
+            subscriber,
+            subscriber,
+            subscriber,
+            add1_epoch,
+            hash,
+            id1.clone(),
+            size,
+            None,
+            source,
+        );
+        assert!(res.is_ok());
+        let sub = res.unwrap();
+        assert_eq!(sub.added, add1_epoch);
+        assert_eq!(sub.expiry, add1_epoch + AUTO_TTL);
+        assert!(sub.auto_renew);
+        assert_eq!(sub.source, source);
+        assert!(!sub.failed);
+        assert_eq!(sub.delegate, None);
+
+        // Check the blob status
+        assert_eq!(
+            state.get_blob_status(subscriber, hash, id1.clone()),
+            Some(BlobStatus::Pending)
+        );
+
+        // Check the blob
+        let blob = state.get_blob(hash).unwrap();
+        assert_eq!(blob.subscribers.len(), 1);
+        assert_eq!(blob.status, BlobStatus::Pending);
+        assert_eq!(blob.size, size);
+
+        // Check the subscription group
+        let group = blob.subscribers.get(&subscriber).unwrap();
+        assert_eq!(group.subscriptions.len(), 1);
+        let got_sub = group.subscriptions.get(&id1.clone()).unwrap();
+        assert_eq!(*got_sub, sub);
+
+        // Check the account balance
+        let account = state.get_account(subscriber).unwrap();
+        assert_eq!(account.last_debit_epoch, add1_epoch);
+        assert_eq!(
+            account.credit_committed,
+            BigInt::from(AUTO_TTL as u64 * size),
+        );
+        credit_amount -= &account.credit_committed;
+        assert_eq!(account.credit_free, credit_amount);
+        assert_eq!(account.capacity_used, BigInt::from(size));
+
+        // Finalize as resolved
+        let finalize_epoch = ChainEpoch::from(11);
+        let res = state.finalize_blob(
+            subscriber,
+            finalize_epoch,
+            hash,
+            id1.clone(),
+            BlobStatus::Resolved,
+        );
+        assert!(res.is_ok());
+        assert_eq!(
+            state.get_blob_status(subscriber, hash, id1.clone()),
+            Some(BlobStatus::Resolved)
+        );
+
+        // Add the same blob again with a default subscription ID
+        let add2_epoch = ChainEpoch::from(21);
+        let source = new_pk();
+        let res = state.add_blob(
+            subscriber,
+            subscriber,
+            subscriber,
+            add2_epoch,
+            hash,
+            id1.clone(),
+            size,
+            None,
+            source,
+        );
+        assert!(res.is_ok());
+        let sub = res.unwrap();
+        assert_eq!(sub.added, add1_epoch); // added should not change
+        assert_eq!(sub.expiry, add2_epoch + AUTO_TTL);
+        assert!(sub.auto_renew);
+        assert_eq!(sub.source, source);
+        assert!(!sub.failed);
+        assert_eq!(sub.delegate, None);
+
+        // Check the blob status
+        // Should already be resolved
+        assert_eq!(
+            state.get_blob_status(subscriber, hash, id1.clone()),
+            Some(BlobStatus::Resolved)
+        );
+
+        // Check the blob
+        let blob = state.get_blob(hash).unwrap();
+        assert_eq!(blob.subscribers.len(), 1);
+        assert_eq!(blob.status, BlobStatus::Resolved);
+        assert_eq!(blob.size, size);
+
+        // Check the subscription group
+        let group = blob.subscribers.get(&subscriber).unwrap();
+        assert_eq!(group.subscriptions.len(), 1); // Still only one subscription
+        let got_sub = group.subscriptions.get(&id1.clone()).unwrap();
+        assert_eq!(*got_sub, sub);
+
+        // Check the account balance
+        let account = state.get_account(subscriber).unwrap();
+        assert_eq!(account.last_debit_epoch, add2_epoch);
+        assert_eq!(
+            account.credit_committed, // stays the same becuase we're starting over
+            BigInt::from(AUTO_TTL as u64 * size),
+        );
+        credit_amount -= BigInt::from((add2_epoch - add1_epoch) as u64 * size);
+        assert_eq!(account.credit_free, credit_amount);
+        assert_eq!(account.capacity_used, BigInt::from(size)); // not changed
+
+        // Add the same blob again but use a different subscription ID
+        let add3_epoch = ChainEpoch::from(31);
+        let id2 = SubscriptionId::Key(b"foo".to_vec());
+        let source = new_pk();
+        let res = state.add_blob(
+            subscriber,
+            subscriber,
+            subscriber,
+            add3_epoch,
+            hash,
+            id2.clone(),
+            size,
+            None,
+            source,
+        );
+        assert!(res.is_ok());
+        let sub = res.unwrap();
+        assert_eq!(sub.added, add3_epoch);
+        assert_eq!(sub.expiry, add3_epoch + AUTO_TTL);
+        assert!(sub.auto_renew);
+        assert_eq!(sub.source, source);
+        assert!(!sub.failed);
+        assert_eq!(sub.delegate, None);
+
+        // Check the blob status
+        // Should already be resolved
+        assert_eq!(
+            state.get_blob_status(subscriber, hash, id2.clone()),
+            Some(BlobStatus::Resolved)
+        );
+
+        // Check the blob
+        let blob = state.get_blob(hash).unwrap();
+        assert_eq!(blob.subscribers.len(), 1); // still only one subscriber
+        assert_eq!(blob.status, BlobStatus::Resolved);
+        assert_eq!(blob.size, size);
+
+        // Check the subscription group
+        let group = blob.subscribers.get(&subscriber).unwrap();
+        assert_eq!(group.subscriptions.len(), 2);
+        let got_sub = group.subscriptions.get(&id2.clone()).unwrap();
+        assert_eq!(*got_sub, sub);
+
+        // Check the account balance
+        let account = state.get_account(subscriber).unwrap();
+        assert_eq!(account.last_debit_epoch, add3_epoch);
+        assert_eq!(
+            account.credit_committed, // stays the same becuase we're starting over
+            BigInt::from(AUTO_TTL as u64 * size),
+        );
+        credit_amount -= BigInt::from((add3_epoch - add2_epoch) as u64 * size);
+        assert_eq!(account.credit_free, credit_amount);
+        assert_eq!(account.capacity_used, BigInt::from(size)); // not changed
+
+        // Debit all accounts
+        let debit_epoch = ChainEpoch::from(41);
+        let deletes_from_disc = state.debit_accounts(debit_epoch).unwrap();
+        assert!(deletes_from_disc.is_empty());
 
         // Check the account balance
         let account = state.get_account(subscriber).unwrap();
         assert_eq!(account.last_debit_epoch, debit_epoch);
         assert_eq!(
             account.credit_committed, // debit reduces this
-            BigInt::from(0),
+            BigInt::from((AUTO_TTL - (debit_epoch - add3_epoch)) as u64 * size),
         );
         assert_eq!(account.credit_free, credit_amount); // not changed
-        assert_eq!(account.capacity_used, BigInt::from(0));
+        assert_eq!(account.capacity_used, BigInt::from(size)); // not changed
+
+        // Check indexes
+        assert_eq!(state.expiries.len(), 2);
+        assert_eq!(state.pending.len(), 0);
+
+        // Delete the default subscription ID
+        let delete_epoch = ChainEpoch::from(51);
+        let res = state.delete_blob(
+            subscriber,
+            subscriber,
+            subscriber,
+            delete_epoch,
+            hash,
+            id1.clone(),
+        );
+        assert!(res.is_ok());
+        let delete_from_disk = res.unwrap();
+        assert!(!delete_from_disk);
+
+        // Check the blob
+        let blob = state.get_blob(hash).unwrap();
+        assert_eq!(blob.subscribers.len(), 1); // still one subscriber
+        assert_eq!(blob.status, BlobStatus::Resolved);
+        assert_eq!(blob.size, size);
+
+        // Check the subscription group
+        let group = blob.subscribers.get(&subscriber).unwrap();
+        assert_eq!(group.subscriptions.len(), 1);
+        let sub = group.subscriptions.get(&id2.clone()).unwrap();
+        assert_eq!(sub.added, add3_epoch);
+        assert_eq!(sub.expiry, add3_epoch + AUTO_TTL);
+
+        // Check the account balance
+        let account = state.get_account(subscriber).unwrap();
+        assert_eq!(account.last_debit_epoch, delete_epoch);
+        assert_eq!(
+            account.credit_committed, // debit reduces this
+            BigInt::from((AUTO_TTL - (delete_epoch - add3_epoch)) as u64 * size),
+        );
+        assert_eq!(account.credit_free, credit_amount); // not changed
+        assert_eq!(account.capacity_used, BigInt::from(size)); // not changed
+
+        // Check state
+        assert_eq!(state.credit_committed, account.credit_committed);
+        assert_eq!(
+            state.credit_debited,
+            amount.atto() - (&account.credit_free + &account.credit_committed)
+        );
+        assert_eq!(state.capacity_used, BigInt::from(size));
+
+        // Check indexes
+        assert_eq!(state.expiries.len(), 1);
+        assert_eq!(state.pending.len(), 0);
+    }
+
+    #[test]
+    fn test_finalize_blob_pending() {
+        setup_logs();
+        let capacity = 1024 * 1024;
+        let mut state = State::new(capacity, 1);
+        let subscriber = new_address();
+        let current_epoch = ChainEpoch::from(1);
+        let amount = TokenAmount::from_whole(10);
+        state
+            .buy_credit(subscriber, amount.clone(), current_epoch)
+            .unwrap();
+
+        let (hash, size) = new_hash(1024);
+        let res = state.add_blob(
+            subscriber,
+            subscriber,
+            subscriber,
+            current_epoch,
+            hash,
+            SubscriptionId::Default,
+            size,
+            None,
+            new_pk(),
+        );
+        assert!(res.is_ok());
+
+        let finalize_epoch = ChainEpoch::from(11);
+        let res = state.finalize_blob(
+            subscriber,
+            finalize_epoch,
+            hash,
+            SubscriptionId::Default,
+            BlobStatus::Pending,
+        );
+        assert!(res.is_err());
+        assert_eq!(
+            res.err().unwrap().msg(),
+            format!("cannot finalize blob {} as pending", hash)
+        );
+    }
+
+    #[test]
+    fn test_finalize_blob_resolved() {
+        setup_logs();
+        let capacity = 1024 * 1024;
+        let mut state = State::new(capacity, 1);
+        let subscriber = new_address();
+        let current_epoch = ChainEpoch::from(1);
+        let amount = TokenAmount::from_whole(10);
+        state
+            .buy_credit(subscriber, amount.clone(), current_epoch)
+            .unwrap();
+
+        // Add blob
+        let (hash, size) = new_hash(1024);
+        let res = state.add_blob(
+            subscriber,
+            subscriber,
+            subscriber,
+            current_epoch,
+            hash,
+            SubscriptionId::Default,
+            size,
+            None,
+            new_pk(),
+        );
+        assert!(res.is_ok());
+
+        let finalize_epoch = ChainEpoch::from(11);
+        let res = state.finalize_blob(
+            subscriber,
+            finalize_epoch,
+            hash,
+            SubscriptionId::Default,
+            BlobStatus::Resolved,
+        );
+        assert!(res.is_ok());
+
+        let status = state
+            .get_blob_status(subscriber, hash, SubscriptionId::Default)
+            .unwrap();
+        assert!(matches!(status, BlobStatus::Resolved));
+
+        // Check indexes
+        assert_eq!(state.expiries.len(), 1);
+        assert_eq!(state.pending.len(), 0);
+    }
+
+    #[test]
+    fn test_finalize_blob_failed() {
+        setup_logs();
+        let capacity = 1024 * 1024;
+        let mut state = State::new(capacity, 1);
+        let subscriber = new_address();
+        let current_epoch = ChainEpoch::from(1);
+        let amount = TokenAmount::from_whole(10);
+        state
+            .buy_credit(subscriber, amount.clone(), current_epoch)
+            .unwrap();
+        let credit_amount = amount.atto() * state.credit_debit_rate;
+
+        let add_epoch = current_epoch;
+        let (hash, size) = new_hash(1024);
+        let res = state.add_blob(
+            subscriber,
+            subscriber,
+            subscriber,
+            add_epoch,
+            hash,
+            SubscriptionId::Default,
+            size,
+            None,
+            new_pk(),
+        );
+        assert!(res.is_ok());
+
+        let finalize_epoch = ChainEpoch::from(11);
+        let res = state.finalize_blob(
+            subscriber,
+            finalize_epoch,
+            hash,
+            SubscriptionId::Default,
+            BlobStatus::Failed,
+        );
+        assert!(res.is_ok());
+
+        let status = state
+            .get_blob_status(subscriber, hash, SubscriptionId::Default)
+            .unwrap();
+        assert!(matches!(status, BlobStatus::Failed));
+
+        // Check the account balance
+        let account = state.get_account(subscriber).unwrap();
+        assert_eq!(account.last_debit_epoch, add_epoch);
+        assert_eq!(account.credit_committed, BigInt::from(0)); // credit was released
+        assert_eq!(account.credit_free, credit_amount);
+        assert_eq!(account.capacity_used, BigInt::from(0)); // capacity was released
+
+        // Check state
+        assert_eq!(state.credit_committed, BigInt::from(0)); // credit was released
+        assert_eq!(state.credit_debited, BigInt::from(0));
+        assert_eq!(state.capacity_used, BigInt::from(0)); // capacity was released
+
+        // Check indexes
+        assert_eq!(state.expiries.len(), 1); // remains until the blob is explicitly deleted
+        assert_eq!(state.pending.len(), 0);
+    }
+
+    #[test]
+    fn test_finalize_blob_failed_refund() {
+        setup_logs();
+        let capacity = 1024 * 1024;
+        let mut state = State::new(capacity, 1);
+        let subscriber = new_address();
+        let current_epoch = ChainEpoch::from(1);
+        let amount = TokenAmount::from_whole(10);
+        state
+            .buy_credit(subscriber, amount.clone(), current_epoch)
+            .unwrap();
+        let mut credit_amount = amount.atto() * state.credit_debit_rate;
+
+        let add_epoch = current_epoch;
+        let (hash, size) = new_hash(1024);
+        let res = state.add_blob(
+            subscriber,
+            subscriber,
+            subscriber,
+            add_epoch,
+            hash,
+            SubscriptionId::Default,
+            size,
+            None,
+            new_pk(),
+        );
+        assert!(res.is_ok());
+
+        // Check the account balance
+        let account = state.get_account(subscriber).unwrap();
+        assert_eq!(account.last_debit_epoch, add_epoch);
+        assert_eq!(
+            account.credit_committed,
+            BigInt::from(AUTO_TTL as u64 * size),
+        );
+        credit_amount -= &account.credit_committed;
+        assert_eq!(account.credit_free, credit_amount);
+        assert_eq!(account.capacity_used, BigInt::from(size));
+
+        // Check state
+        assert_eq!(state.credit_committed, account.credit_committed);
+        assert_eq!(state.credit_debited, BigInt::from(0));
+        assert_eq!(state.capacity_used, account.capacity_used); // capacity was released
+
+        // Debit accounts to trigger a refund when we fail below
+        let debit_epoch = ChainEpoch::from(11);
+        let deletes_from_disc = state.debit_accounts(debit_epoch).unwrap();
+        assert!(deletes_from_disc.is_empty());
+
+        // Check the account balance
+        let account = state.get_account(subscriber).unwrap();
+        assert_eq!(account.last_debit_epoch, debit_epoch);
+        assert_eq!(
+            account.credit_committed,
+            BigInt::from((AUTO_TTL - (debit_epoch - add_epoch)) as u64 * size),
+        );
+        assert_eq!(account.credit_free, credit_amount); // not changed
+        assert_eq!(account.capacity_used, BigInt::from(size));
+
+        // Check state
+        assert_eq!(state.credit_committed, account.credit_committed);
+        assert_eq!(
+            state.credit_debited,
+            BigInt::from((debit_epoch - add_epoch) as u64 * size)
+        );
+        assert_eq!(state.capacity_used, account.capacity_used);
+
+        let finalize_epoch = ChainEpoch::from(21);
+        let res = state.finalize_blob(
+            subscriber,
+            finalize_epoch,
+            hash,
+            SubscriptionId::Default,
+            BlobStatus::Failed,
+        );
+        assert!(res.is_ok());
+
+        let status = state
+            .get_blob_status(subscriber, hash, SubscriptionId::Default)
+            .unwrap();
+        assert!(matches!(status, BlobStatus::Failed));
+
+        // Check the account balance
+        let account = state.get_account(subscriber).unwrap();
+        assert_eq!(account.last_debit_epoch, debit_epoch);
+        assert_eq!(account.credit_committed, BigInt::from(0)); // credit was released
+        assert_eq!(account.credit_free, amount.atto() * state.credit_debit_rate); // credit was refunded
+        assert_eq!(account.capacity_used, BigInt::from(0)); // capacity was released
+
+        // Check state
+        assert_eq!(state.credit_committed, BigInt::from(0)); // credit was released
+        assert_eq!(state.credit_debited, BigInt::from(0)); // credit was refunded and released
+        assert_eq!(state.capacity_used, BigInt::from(0)); // capacity was released
+
+        // Check indexes
+        assert_eq!(state.expiries.len(), 1); // remains until the blob is explicitly deleted
+        assert_eq!(state.pending.len(), 0);
+    }
+
+    #[test]
+    fn test_delete_blob_refund() {
+        setup_logs();
+        let capacity = 1024 * 1024;
+        let mut state = State::new(capacity, 1);
+        let subscriber = new_address();
+        let current_epoch = ChainEpoch::from(1);
+        let amount = TokenAmount::from_whole(10);
+        state
+            .buy_credit(subscriber, amount.clone(), current_epoch)
+            .unwrap();
+        let mut credit_amount = amount.atto() * state.credit_debit_rate;
+
+        let add1_epoch = current_epoch;
+        let (hash1, size1) = new_hash(1024);
+        let res = state.add_blob(
+            subscriber,
+            subscriber,
+            subscriber,
+            add1_epoch,
+            hash1,
+            SubscriptionId::Default,
+            size1,
+            Some(MIN_TTL),
+            new_pk(),
+        );
+        assert!(res.is_ok());
+
+        // Check the account balance
+        let account = state.get_account(subscriber).unwrap();
+        assert_eq!(account.last_debit_epoch, add1_epoch);
+        assert_eq!(
+            account.credit_committed,
+            BigInt::from(MIN_TTL as u64 * size1),
+        );
+        credit_amount -= &account.credit_committed;
+        assert_eq!(account.credit_free, credit_amount);
+        assert_eq!(account.capacity_used, BigInt::from(size1));
+
+        // Add another blob past the first blob expiry
+        // This will trigger a debit on the account
+        let add2_epoch = ChainEpoch::from(MIN_TTL + 10);
+        let (hash2, size2) = new_hash(2048);
+        let res = state.add_blob(
+            subscriber,
+            subscriber,
+            subscriber,
+            add2_epoch,
+            hash2,
+            SubscriptionId::Default,
+            size2,
+            Some(MIN_TTL),
+            new_pk(),
+        );
+        assert!(res.is_ok());
+
+        // Check the account balance
+        let account = state.get_account(subscriber).unwrap();
+        assert_eq!(account.last_debit_epoch, add2_epoch);
+        let blob1_expiry = ChainEpoch::from(MIN_TTL + add1_epoch);
+        let overcharge = BigInt::from((add2_epoch - blob1_expiry) as u64 * size1);
+        assert_eq!(
+            account.credit_committed, // this includes an overcharge that needs to be refunded
+            BigInt::from((MIN_TTL as u64 * size2) - overcharge),
+        );
+        credit_amount -= BigInt::from(MIN_TTL as u64 * size2);
+        assert_eq!(account.credit_free, credit_amount);
+        assert_eq!(account.capacity_used, BigInt::from(size1 + size2));
+
+        // Delete the first blob
+        let delete_epoch = ChainEpoch::from(MIN_TTL + 20);
+        let delete_from_disc = state
+            .delete_blob(
+                subscriber,
+                subscriber,
+                subscriber,
+                delete_epoch,
+                hash1,
+                SubscriptionId::Default,
+            )
+            .unwrap();
+        assert!(delete_from_disc);
+
+        // Check the account balance
+        let account = state.get_account(subscriber).unwrap();
+        assert_eq!(account.last_debit_epoch, add2_epoch); // not changed, blob is expired
+        assert_eq!(
+            account.credit_committed, // this includes an overcharge that needs to be refunded
+            BigInt::from(MIN_TTL as u64 * size2), // should not include overcharge due to refund
+        );
+        assert_eq!(account.credit_free, credit_amount); // not changed
+        assert_eq!(account.capacity_used, BigInt::from(size2));
+
+        // Check state
+        assert_eq!(state.credit_committed, account.credit_committed); // credit was released
+        assert_eq!(state.credit_debited, BigInt::from(MIN_TTL as u64 * size1));
+        assert_eq!(state.capacity_used, BigInt::from(size2)); // capacity was released
+
+        // Check indexes
+        assert_eq!(state.expiries.len(), 1);
+        assert_eq!(state.pending.len(), 1);
     }
 }

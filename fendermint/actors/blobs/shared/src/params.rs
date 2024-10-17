@@ -87,6 +87,8 @@ pub struct GetBlobStatusParams {
     pub subscriber: Address,
     /// Blob blake3 hash.
     pub hash: Hash,
+    /// Identifier used to differentiate blob additions for the same subscriber.
+    pub id: SubscriptionId,
 }
 
 /// Params for getting pending blobs.

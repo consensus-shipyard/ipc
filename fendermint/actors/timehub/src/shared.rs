@@ -192,7 +192,8 @@ fn path_for_eigen_root(leaf_index: u64, leaf_count: u64) -> anyhow::Result<Optio
     Ok(Some((local_path, eigen_index as u64)))
 }
 
-/// Returns None when the index doesn't point to a leaf. if the index is valid, it will return a value or error
+/// Returns None when the index doesn't point to a leaf.
+/// If the index is valid, it will return a value or error.
 fn get_at<BS: Blockstore, S: DeserializeOwned + Serialize>(
     store: &BS,
     leaf_index: u64,

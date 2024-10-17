@@ -220,9 +220,9 @@ impl BlobsActor {
         params: GetBlobStatusParams,
     ) -> Result<Option<BlobStatus>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let status = rt
-            .state::<State>()?
-            .get_blob_status(params.hash, params.subscriber);
+        let status =
+            rt.state::<State>()?
+                .get_blob_status(params.subscriber, params.hash, params.id);
         Ok(status)
     }
 
@@ -575,7 +575,7 @@ mod tests {
         rt.set_delegated_address(receiver_id_addr.id().unwrap(), receiver_f4_eth_addr);
         rt.set_address_actor_type(receiver_id_addr, *ETHACCOUNT_ACTOR_CODE_ID);
 
-        // Proxy EVM contract on behalf of credit owner
+        // Proxy EVM contract on behalf of the credit owner
         let proxy_id_addr = Address::new_id(112);
         let proxy_eth_addr = EthAddress(hex_literal::hex!(
             "CAFEB0BA00000000000000000000000000000002"
@@ -664,7 +664,7 @@ mod tests {
         rt.set_delegated_address(receiver_id_addr.id().unwrap(), receiver_f4_eth_addr);
         rt.set_address_actor_type(receiver_id_addr, *ETHACCOUNT_ACTOR_CODE_ID);
 
-        // Proxy EVM contract on behalf of credit owner
+        // Proxy EVM contract on behalf of the credit owner
         let proxy_id_addr = Address::new_id(112);
         let proxy_eth_addr = EthAddress(hex_literal::hex!(
             "CAFEB0BA00000000000000000000000000000002"

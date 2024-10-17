@@ -134,16 +134,6 @@ impl From<Vec<u8>> for SubscriptionId {
     }
 }
 
-impl From<SubscriptionId> for Vec<u8> {
-    fn from(value: SubscriptionId) -> Self {
-        if let SubscriptionId::Key(key) = value {
-            key
-        } else {
-            Vec::new()
-        }
-    }
-}
-
 impl fmt::Display for SubscriptionId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

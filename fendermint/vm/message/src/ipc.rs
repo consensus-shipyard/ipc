@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use cid::Cid;
+use fendermint_actor_blobs_shared::state::SubscriptionId;
 use fvm_shared::{
     address::Address, clock::ChainEpoch, crypto::signature::Signature, econ::TokenAmount,
 };
@@ -119,7 +120,7 @@ pub struct Blob {
     /// The blake3 hash of the blob.
     pub hash: Hash,
     /// Identifier used to differentiate blob additions for the same subscriber.
-    pub id: Vec<u8>,
+    pub id: SubscriptionId,
     /// The node ID of the source node serving validators the blob.
     pub source: NodeId,
     /// Whether the blob was resolved or failed.

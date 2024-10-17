@@ -275,7 +275,7 @@ where
             // We start a blockstore transaction that can be reverted
             state.state_tree_mut().begin_transaction();
             for item in local_finalized_blobs.iter() {
-                if !is_blob_pending(&mut state, item.hash, item.subscriber)? {
+                if !is_blob_pending(&mut state, item.subscriber, item.hash, item.id.clone())? {
                     tracing::debug!(hash = ?item.hash, "blob already finalized on chain; removing from pool");
                     atomically(|| chain_env.blob_pool.remove(item)).await;
                     continue;
@@ -292,7 +292,7 @@ where
                     blobs.push(ChainMessage::Ipc(IpcMessage::BlobFinalized(Blob {
                         subscriber: item.subscriber,
                         hash: item.hash,
-                        id: item.id.clone().into(),
+                        id: item.id.clone(),
                         source: item.source,
                         succeeded,
                     })));
@@ -364,7 +364,7 @@ where
                     // not yet finalized.
                     // Start a blockstore transaction that can be reverted.
                     state.state_tree_mut().begin_transaction();
-                    if !is_blob_pending(&mut state, blob.hash, blob.subscriber)? {
+                    if !is_blob_pending(&mut state, blob.subscriber, blob.hash, blob.id.clone())? {
                         tracing::debug!(hash = ?blob.hash, "blob is already finalized on chain; rejecting proposal");
                         return Ok(false);
                     }
@@ -397,7 +397,7 @@ where
                     let item = BlobPoolItem {
                         subscriber: blob.subscriber,
                         hash: blob.hash,
-                        id: blob.id.into(),
+                        id: blob.id,
                         source: blob.source,
                     };
                     let is_locally_finalized =
@@ -640,7 +640,7 @@ where
                     let params = FinalizeBlobParams {
                         subscriber: blob.subscriber,
                         hash,
-                        id: blob.id.into(),
+                        id: blob.id,
                         status,
                     };
                     let params = RawBytes::serialize(params)?;
@@ -910,14 +910,19 @@ where
 /// This approach uses an implicit FVM transaction to query a read-only blockstore.
 fn is_blob_pending<DB>(
     state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
-    hash: Hash,
     subscriber: Address,
+    hash: Hash,
+    id: SubscriptionId,
 ) -> anyhow::Result<bool>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
     let hash = fendermint_actor_blobs_shared::state::Hash(*hash.as_bytes());
-    let params = GetBlobStatusParams { hash, subscriber };
+    let params = GetBlobStatusParams {
+        subscriber,
+        hash,
+        id,
+    };
     let params = RawBytes::serialize(params)?;
     let msg = FvmMessage {
         version: 0,
