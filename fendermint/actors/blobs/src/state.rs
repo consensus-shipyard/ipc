@@ -27,8 +27,8 @@ const AUTO_TTL: ChainEpoch = 3600; // one hour
 /// TODO: use raw HAMTs
 #[derive(Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct State {
-    /// The total free storage capacity of the subnet.
-    pub capacity_free: BigInt,
+    /// The total storage capacity of the subnet.
+    pub capacity_total: BigInt,
     /// The total used storage capacity of the subnet.
     pub capacity_used: BigInt,
     /// The total number of credits sold in the subnet.
@@ -67,7 +67,7 @@ impl CreditDelegate<'_> {
 impl State {
     pub fn new(capacity: u64, credit_debit_rate: u64) -> Self {
         Self {
-            capacity_free: BigInt::from(capacity),
+            capacity_total: BigInt::from(capacity),
             capacity_used: BigInt::zero(),
             credit_sold: BigInt::zero(),
             credit_committed: BigInt::zero(),
@@ -83,7 +83,7 @@ impl State {
     pub fn get_stats(&self, balance: TokenAmount) -> GetStatsReturn {
         GetStatsReturn {
             balance,
-            capacity_free: self.capacity_free.clone(),
+            capacity_free: self.capacity_available(),
             capacity_used: self.capacity_used.clone(),
             credit_sold: self.credit_sold.clone(),
             credit_committed: self.credit_committed.clone(),
@@ -103,7 +103,7 @@ impl State {
     ) -> anyhow::Result<Account, ActorError> {
         let credits = self.credit_debit_rate * amount.atto();
         // Don't sell credits if we're at storage capacity
-        if self.capacity_used == self.capacity_free {
+        if self.capacity_available().is_zero() {
             return Err(ActorError::forbidden(
                 "credits not available (subnet has reached storage capacity)".into(),
             ));
@@ -383,7 +383,8 @@ impl State {
             new_account_capacity = size.clone();
             // New blob increases network capacity as well.
             // Ensure there is enough capacity available.
-            let available_capacity = &self.capacity_free - &self.capacity_used;
+            let available_capacity = &self.capacity_total - &self.capacity_used;
+
             if size > available_capacity {
                 return Err(ActorError::forbidden(format!(
                     "subnet has insufficient storage capacity (available: {}; required: {})",
@@ -854,6 +855,11 @@ impl State {
             debug!("deleted blob {}", hash);
         }
         Ok(delete_blob)
+    }
+
+    /// Return available capacity as a difference between `capacity_total` and `capacity_used`.
+    fn capacity_available(&self) -> BigInt {
+        &self.capacity_total - &self.capacity_used
     }
 }
 
