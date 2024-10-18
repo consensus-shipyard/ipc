@@ -19,18 +19,6 @@ jobs:
             ${{ secrets.BUILTIN_ACTORS_DEPLOY_KEY }}
             ${{ secrets.CONTRACTS_DEPLOY_KEY }}
 
-      # https://github.com/marketplace/actions/free-disk-space-ubuntu
-      - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          large-packages: false
-          swap-storage: false
-          docker-images: false
-          android: true
-          dotnet: true
-          haskell: true
-
       - name: Check out the project
         uses: actions/checkout@v4
         with:
