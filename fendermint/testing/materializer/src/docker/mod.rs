@@ -12,6 +12,7 @@ use bollard::{
 use either::Either;
 use ethers::{
     core::rand::{rngs::StdRng, SeedableRng},
+    etherscan::contract,
     types::H160,
 };
 use fendermint_vm_actor_interface::eam::EthAddress;
@@ -20,7 +21,9 @@ use fendermint_vm_genesis::{
     ipc::{GatewayParams, IpcParams},
     Account, Actor, ActorMeta, Collateral, Genesis, SignerAddr, Validator, ValidatorKey,
 };
-use fvm_shared::{bigint::Zero, chainid::ChainID, econ::TokenAmount, version::NetworkVersion};
+use fvm_shared::{
+    bigint::Zero, chainid::ChainID, econ::TokenAmount, sys::out, version::NetworkVersion,
+};
 use ipc_api::subnet_id::SubnetID;
 use ipc_provider::config::subnet::{
     EVMSubnet, Subnet as IpcCliSubnet, SubnetConfig as IpcCliSubnetConfig,
@@ -29,6 +32,7 @@ use ipc_provider::config::Config as IpcCliConfig;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::process::Command;
 use std::{
     collections::{BTreeMap, HashMap},
     os::unix::fs::MetadataExt,
@@ -41,13 +45,14 @@ use url::Url;
 use crate::{
     manifest::Balance,
     materializer::{
-        Materializer, NodeConfig, RelayerConfig, SubmitConfig, SubnetConfig, TargetConfig,
+        Materializer, NodeConfig, RelayerConfig, SolidityContractDeploymentConfig, SubmitConfig,
+        SubnetConfig, TargetConfig,
     },
     materials::{
         export_file, export_json, export_script, import_json, DefaultAccount, DefaultDeployment,
-        DefaultGenesis, DefaultSubnet, Materials,
+        DefaultGenesis, DefaultSolidityContractDeployment, DefaultSubnet, Materials,
     },
-    CliName, NodeName, RelayerName, ResourceHash, ResourceName, SubnetName, TestnetName,
+    CliName, HasEthApi, NodeName, RelayerName, ResourceHash, ResourceName, SubnetName, TestnetName,
     TestnetResource,
 };
 
@@ -68,6 +73,7 @@ use self::{dropper::DropHandle, network::NetworkName, runner::DockerRunner};
 // TODO: Add these to the materializer.
 const COMETBFT_IMAGE: &str = "cometbft/cometbft:v0.37.x";
 const FENDERMINT_IMAGE: &str = "fendermint:latest";
+const FOUNDRY_IMAGE: &str = "foundry:latest";
 
 const STATE_JSON_FILE_NAME: &str = "materializer-state.json";
 
@@ -90,10 +96,18 @@ macro_rules! env_vars {
     };
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct ForgeCreateOutput {
+    deployer: String,
+    #[serde(rename = "deployedTo")]
+    deployed_to: String,
+}
+
 pub struct DockerMaterials;
 
 impl Materials for DockerMaterials {
     type Deployment = DefaultDeployment;
+    type SolidityContractDeployment = DefaultSolidityContractDeployment;
     type Account = DefaultAccount;
     type Genesis = DefaultGenesis;
     type Subnet = DefaultSubnet;
@@ -584,6 +598,72 @@ impl DockerMaterializer {
             Ok(())
         }
     }
+
+    fn run_forge_create_cmd(
+        &self,
+        rpc_url: &Url,
+        private_key: &str,
+        foundry_root: &str,
+        constructor_args: &[String],
+        contract_path: &Path,
+        contract_name: &str,
+        libraries: Option<Vec<DefaultSolidityContractDeployment>>,
+    ) -> anyhow::Result<DefaultSolidityContractDeployment> {
+        // Convert contract path to a string, handle errors gracefully
+        let path_str = contract_path
+            .to_str()
+            .ok_or_else(|| anyhow::anyhow!("Invalid contract path"))?;
+
+        let rpc_url_str = rpc_url.to_string();
+
+        // Initialize the forge command with necessary arguments
+        let mut cmd = Command::new("forge");
+        cmd.args([
+            "create",
+            "--rpc-url",
+            &rpc_url_str,
+            "--private-key",
+            private_key,
+            "--constructor-args",
+            &constructor_args.join(","),
+            "--root",
+            foundry_root,
+            "--json",
+            &format!("{}:{}", path_str, contract_name),
+        ]);
+
+        // Add libraries if provided
+        if let Some(libraries) = libraries {
+            let libraries_arg = libraries
+                .iter()
+                .map(|lib| format!("{}:{}:{}", lib.path, lib.name, lib.address.to_hex()))
+                .collect::<Vec<_>>()
+                .join(",");
+            cmd.arg("--libraries").arg(libraries_arg);
+        }
+
+        println!(
+            "CMD: {:?} {:?}",
+            cmd.get_program(),
+            cmd.get_args().collect::<Vec<_>>()
+        );
+
+        // Run the command and handle errors
+        let output = cmd.output().context("failed to run forge create")?;
+
+        println!("OUT: {}", String::from_utf8_lossy(&output.stdout));
+
+        // Parse the JSON output
+        let json_output: ForgeCreateOutput =
+            serde_json::from_slice(&output.stdout).context("failed to parse forge output")?;
+
+        // Return the contract deployment details
+        Ok(DefaultSolidityContractDeployment {
+            name: contract_name.to_string(),
+            path: path_str.to_string(),
+            address: EthAddress::from(H160::from_str(&json_output.deployed_to)?),
+        })
+    }
 }
 
 #[async_trait]
@@ -1020,6 +1100,77 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
 
         Ok(relayer)
     }
+
+    async fn deploy_solidity_contract<'s, 'a>(
+        &'s mut self,
+        config: SolidityContractDeploymentConfig<'a, DockerMaterials>,
+    ) -> anyhow::Result<DefaultSolidityContractDeployment> {
+        let rpc_url = config
+            .nodes
+            .into_iter()
+            .filter_map(|node| node.ethapi_http_endpoint())
+            .collect::<Vec<_>>()
+            .first()
+            .cloned()
+            .unwrap_or_else(|| {
+                panic!("No node with ethapi_http_endpoint found in the contract deployment config")
+            });
+
+        let private_key = hex::encode(config.account.secret_key().serialize());
+
+        let deployed_libraries = config
+            .libraries
+            .map(|libraries| {
+                libraries
+                    .into_iter()
+                    .map(|library| {
+                        self.run_forge_create_cmd(
+                            &rpc_url,
+                            &private_key,
+                            &config.foundry_root,
+                            &library.constructor_args,
+                            &library.path,
+                            &library.name,
+                            None,
+                        )
+                        .context(format!("failed to deploy library {}", library.name))
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .transpose()?;
+
+        self.run_forge_create_cmd(
+            &rpc_url,
+            &private_key,
+            &config.foundry_root,
+            &config.contract.constructor_args,
+            &config.contract.path,
+            &config.contract.name,
+            deployed_libraries,
+        )
+    }
+
+    // async fn wait_for_balance<'s, 'a>(
+    //     &'s mut self,
+    //     account: &'a DefaultAccount,
+    //     balance: Balance,
+    // ) -> anyhow::Result<()> {
+    //     let cmd = format!(
+    //         "ipc-cli account wait-balance \
+    //             --address {:?} \
+    //             --balance {} \
+    //         ",
+    //         account.eth_addr(),
+    //         balance.0
+    //     );
+
+    //     let logs = self
+    //         .ipc_cli_run_cmd(&SubmitConfig::default(), account, cmd)
+    //         .await
+    //         .context("failed to wait for balance")?;
+
+    //     Ok(())
+    // }
 }
 
 /// The `ipc-cli` puts the output in a human readable log instead of printing JSON.

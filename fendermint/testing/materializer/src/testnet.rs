@@ -2,14 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 use anyhow::{anyhow, bail, Context};
 use async_recursion::async_recursion;
+use core::time;
 use either::Either;
 use fvm_shared::chainid::ChainID;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Display,
     marker::PhantomData,
+    path::Path,
 };
 use url::Url;
+
+use std::thread;
+use std::time::Duration;
 
 use crate::{
     manifest::{
@@ -17,8 +22,8 @@ use crate::{
         Rootnet, Subnet,
     },
     materializer::{
-        Materializer, NodeConfig, ParentConfig, RelayerConfig, SubmitConfig, SubnetConfig,
-        TargetConfig,
+        Materializer, NodeConfig, ParentConfig, RelayerConfig, SolidityContract,
+        SolidityContractDeploymentConfig, SubmitConfig, SubnetConfig, TargetConfig,
     },
     materials::Materials,
     AccountId, NodeId, NodeName, RelayerName, ResourceHash, SubnetId, SubnetName, TestnetName,
@@ -43,6 +48,7 @@ pub struct Testnet<M: Materials, R> {
     externals: Vec<Url>,
     accounts: BTreeMap<AccountId, M::Account>,
     deployments: BTreeMap<SubnetName, M::Deployment>,
+    solidity_deployments: BTreeMap<SubnetName, M::SolidityContractDeployment>,
     genesis: BTreeMap<SubnetName, M::Genesis>,
     subnets: BTreeMap<SubnetName, M::Subnet>,
     nodes: BTreeMap<NodeName, M::Node>,
@@ -75,6 +81,7 @@ where
             externals: Default::default(),
             accounts: Default::default(),
             deployments: Default::default(),
+            solidity_deployments: Default::default(),
             genesis: Default::default(),
             subnets: Default::default(),
             nodes: Default::default(),
@@ -638,6 +645,37 @@ where
                 relayers.push((relayer_name, relayer));
             }
             self.relayers.extend(relayers.into_iter());
+        }
+
+        // TODO Karel - use some mechanism to wait for the subnet to be ready - accounts to be funded.
+        // This best thing to do probably is to use provider to wait for the accounts to be funded.
+        // IpcProvider.wallet_balance.
+        thread::sleep(Duration::from_secs(15));
+
+        if let Some(solidity_deployments) = &subnet.solidity_deployments {
+            for deployment in solidity_deployments {
+                let libraries = deployment.libraries.clone().map(|libs| {
+                    libs.into_iter()
+                        .map(|lib| lib.into())
+                        .collect::<Vec<SolidityContract>>()
+                });
+
+                let deployment_config = SolidityContractDeploymentConfig {
+                    foundry_root: deployment.foundry_root.clone(),
+                    contract: deployment.contract.clone().into(),
+                    libraries,
+                    nodes: self.nodes_by_subnet(&subnet_name),
+                    account: self.account(&deployment.deployer)?,
+                };
+
+                let deployed = m
+                    .deploy_solidity_contract(deployment_config)
+                    .await
+                    .with_context(|| "failed to deploy custom contract")?;
+
+                self.solidity_deployments
+                    .insert(subnet_name.clone(), deployed);
+            }
         }
 
         // Recursively create and start all subnet nodes.
