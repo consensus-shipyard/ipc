@@ -10,7 +10,10 @@ use url::Url;
 
 use crate::{
     manifest::Balance,
-    materializer::{Materializer, NodeConfig, RelayerConfig, SubmitConfig, SubnetConfig},
+    materializer::{
+        Materializer, NodeConfig, RelayerConfig, SolidityContractDeploymentConfig, SubmitConfig,
+        SubnetConfig,
+    },
     materials::Materials,
     AccountName, NodeName, RelayerName, ResourceHash, SubnetName, TestnetName,
 };
@@ -219,5 +222,13 @@ where
         self.inner
             .create_relayer(parent_submit_config, relayer_name, relayer_config)
             .await
+    }
+
+    async fn deploy_solidity_contract<'s, 'a>(
+        &'s mut self,
+        contract: SolidityContractDeploymentConfig<'a, M>,
+    ) -> anyhow::Result<M::CustomContractDeployment> {
+        tracing::info!(ctx = self.ctx, "deploy_solidity_contract");
+        self.inner.deploy_solidity_contract(contract).await
     }
 }

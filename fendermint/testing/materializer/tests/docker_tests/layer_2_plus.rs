@@ -3,7 +3,13 @@
 use anyhow::{anyhow, bail, Context};
 use ethers::contract::{ContractError, ContractRevert};
 use ethers::core::types as et;
-use ethers::providers::Middleware;
+use ethers::{
+    core::k256::ecdsa::SigningKey,
+    middleware::SignerMiddleware,
+    providers::{JsonRpcClient, Middleware, PendingTransaction, Provider},
+    signers::{Signer, Wallet},
+    types::{transaction::eip2718::TypedTransaction, Eip1559TransactionRequest, H160},
+};
 use futures::FutureExt;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -85,9 +91,12 @@ async fn test_topdown_and_bottomup_plus() {
                     nonce: 0,
                 };
 
-                let commited_result = parent_gateway_mesenger
-                    .send_contract_xnet_message(envelope.try_into()?)
-                    .await;
+                let mut commited_result =
+                    parent_gateway_mesenger.send_contract_xnet_message(envelope.try_into()?);
+
+                commited_result.tx.set_value(1);
+
+                let commited_result = commited_result.call().await;
 
                 match commited_result {
                     Ok(commited) => {

@@ -140,6 +140,20 @@ pub enum Rootnet {
     },
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SolidityContractDefinition {
+    pub name: String,
+    pub path: String,
+    pub constructor_args: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SolidityContractDeployment {
+    pub deployer: AccountId,
+    pub contract: SolidityContractDefinition,
+    pub libraries: Option<Vec<SolidityContractDefinition>>,
+}
+
 /// An IPC subnet.
 ///
 /// The balance of the account on the parent subnet, as declared in this manifest,
@@ -173,6 +187,8 @@ pub struct Subnet {
     /// The subnet ID exists so we can find the outcome of existing deployments in the log.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub subnets: SubnetMap,
+
+    pub custom_deployments: Option<Vec<SolidityContractDeployment>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
