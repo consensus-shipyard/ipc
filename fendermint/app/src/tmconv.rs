@@ -7,7 +7,7 @@ use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Power, Validator};
 use fendermint_vm_interpreter::fvm::{
     state::{BlockHash, FvmStateParams},
-    FvmApplyRet, FvmCheckRet, FvmQueryRet, PowerUpdates,
+    FvmApplyRet, FvmCheckRet, FvmQueryRet,
 };
 use fendermint_vm_message::signed::DomainHash;
 use fendermint_vm_snapshot::{SnapshotItem, SnapshotManifest};
@@ -368,6 +368,22 @@ pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> anyhow::Result<r
     };
 
     Ok(res)
+}
+
+/// Project Genesis validators to Tendermint.
+/// TODO: the import is quite strange, `Validator` and `Power` are imported from `genesis` crate,
+/// TODO: which should be from a `type` or `validator` crate.
+pub fn to_validator_updates(
+    validators: Vec<Validator<Power>>,
+) -> anyhow::Result<Vec<tendermint::validator::Update>> {
+    let mut updates = vec![];
+    for v in validators {
+        updates.push(tendermint::validator::Update {
+            pub_key: tendermint::PublicKey::try_from(v.public_key)?,
+            power: tendermint::vote::Power::try_from(v.power.0)?,
+        });
+    }
+    Ok(updates)
 }
 
 pub fn to_timestamp(time: tendermint::time::Time) -> Timestamp {

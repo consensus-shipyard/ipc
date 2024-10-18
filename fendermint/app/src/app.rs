@@ -22,7 +22,7 @@ use fendermint_vm_interpreter::fvm::state::{
     FvmUpdatableParams,
 };
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
-use fendermint_vm_interpreter::fvm::{FvmApplyRet, PowerUpdates};
+use fendermint_vm_interpreter::fvm::{BlockGasLimit, FvmApplyRet, PowerUpdates};
 use fendermint_vm_interpreter::genesis::{read_genesis_car, GenesisAppState};
 use fendermint_vm_interpreter::signed::InvalidSignature;
 use fendermint_vm_interpreter::{
@@ -324,34 +324,35 @@ where
         Ok(ret)
     }
 
-    /// Get a read only fvm execution state. This is useful to perform query commands targeting
-    /// the latest state.
-    pub fn new_read_only_exec_state(
+    /// Get a read-only view from the current FVM execution state, optionally passing a new BlockContext.
+    /// This is useful to perform query commands targeting the latest state. Mutations from transactions
+    /// will not be persisted.
+    pub fn read_only_view(
         &self,
+        height: Option<BlockHeight>,
     ) -> Result<Option<FvmExecState<ReadOnlyBlockstore<Arc<SS>>>>> {
-        let maybe_app_state = self.get_committed_state()?;
+        let app_state = match self.get_committed_state()? {
+            Some(app_state) => app_state,
+            None => return Ok(None),
+        };
 
-        Ok(if let Some(app_state) = maybe_app_state {
-            let block_height = app_state.block_height;
-            let state_params = app_state.state_params;
+        let block_height = height.unwrap_or(app_state.block_height);
+        let state_params = app_state.state_params;
 
-            // wait for block production
-            if !Self::can_query_state(block_height, &state_params) {
-                return Ok(None);
-            }
+        // wait for block production
+        if !Self::can_query_state(block_height, &state_params) {
+            return Ok(None);
+        }
 
-            let exec_state = FvmExecState::new(
-                ReadOnlyBlockstore::new(self.state_store.clone()),
-                self.multi_engine.as_ref(),
-                block_height as ChainEpoch,
-                state_params,
-            )
-            .context("error creating execution state")?;
+        let exec_state = FvmExecState::new(
+            ReadOnlyBlockstore::new(self.state_store.clone()),
+            self.multi_engine.as_ref(),
+            block_height as ChainEpoch,
+            state_params,
+        )
+        .context("error creating execution state")?;
 
-            Some(exec_state)
-        } else {
-            None
-        })
+        Ok(Some(exec_state))
     }
 
     /// Look up a past state at a particular height Tendermint Core is looking for.
@@ -423,7 +424,7 @@ where
         Message = Vec<u8>,
         BeginOutput = FvmApplyRet,
         DeliverOutput = BytesMessageApplyRes,
-        EndOutput = PowerUpdates,
+        EndOutput = (PowerUpdates, BlockGasLimit),
     >,
     I: CheckInterpreter<
         State = FvmExecState<ReadOnlyBlockstore<SS>>,
@@ -627,7 +628,7 @@ where
         let txs = request.txs.into_iter().map(|tx| tx.to_vec()).collect();
 
         let state = self
-            .new_read_only_exec_state()?
+            .read_only_view(Some(request.height.value()))?
             .ok_or_else(|| anyhow!("exec state should be present"))?;
 
         let txs = self
@@ -666,7 +667,7 @@ where
         let num_txs = txs.len();
 
         let state = self
-            .new_read_only_exec_state()?
+            .read_only_view(Some(request.height.value()))?
             .ok_or_else(|| anyhow!("exec state should be present"))?;
 
         let accept = self
@@ -734,10 +735,11 @@ where
             .validators
             .get_validator(&request.header.proposer_address, block_height)
             .await?;
+
         let state = FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
             .context("error creating new state")?
             .with_block_hash(block_hash)
-            .with_validator(validator);
+            .with_block_producer(validator);
 
         tracing::debug!("initialized exec state");
 
@@ -791,22 +793,40 @@ where
     async fn end_block(&self, request: request::EndBlock) -> AbciResult<response::EndBlock> {
         tracing::debug!(height = request.height, "end block");
 
-        // TODO: Return events from epoch transitions.
-        let ret = self
-            .modify_exec_state(|s| async {
-                let ((chain_env, mut state), update) = self.interpreter.end(s).await?;
-
-                let mut end_block = EndBlockUpdate::new(update);
-                if let Some(gas) = state.gas_market_mut().take_constant_update() {
-                    end_block.update_gas(gas)
-                }
-
-                Ok(((chain_env, state), end_block))
-            })
+        // End the interpreter for this block.
+        let (power_updates, new_block_gas_limit) = self
+            .modify_exec_state(|s| self.interpreter.end(s))
             .await
             .context("end failed")?;
 
-        Ok(to_end_block(&self.client, request.height, ret).await?)
+        // Convert the incoming power updates to Tendermint validator updates.
+        let validator_updates =
+            to_validator_updates(power_updates.0).context("failed to convert validator updates")?;
+
+        // If the block gas limit has changed, we need to update the consensus layer so it can
+        // pack subsequent blocks against the new limit.
+        let consensus_param_updates = {
+            let mut consensus_params = self
+                .client
+                .consensus_params(tendermint::block::Height::try_from(request.height)?)
+                .await?
+                .consensus_params;
+
+            if consensus_params.block.max_gas != new_block_gas_limit as i64 {
+                consensus_params.block.max_gas = new_block_gas_limit as i64;
+                Some(consensus_params)
+            } else {
+                None
+            }
+        };
+
+        let ret = response::EndBlock {
+            validator_updates,
+            consensus_param_updates,
+            events: Vec::new(), // TODO: Return events from epoch transitions.
+        };
+
+        Ok(ret)
     }
 
     /// Commit the current state at the current height.

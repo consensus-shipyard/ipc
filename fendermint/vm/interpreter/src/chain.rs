@@ -3,7 +3,7 @@
 use crate::fvm::gas::GasMarket;
 use crate::fvm::state::ipc::GatewayCaller;
 use crate::fvm::store::ReadOnlyBlockstore;
-use crate::fvm::{topdown, FvmApplyRet, PowerUpdates};
+use crate::fvm::{topdown, BlockGasLimit, FvmApplyRet, PowerUpdates};
 use crate::selector::{GasLimitSelector, MessageSelector};
 use crate::{
     fvm::state::FvmExecState,
@@ -235,7 +235,7 @@ where
             };
         }
 
-        Ok(block_gas_usage <= state.gas_market().available().block_gas)
+        Ok(block_gas_usage <= state.block_gas_tracker().available())
     }
 }
 
@@ -247,7 +247,7 @@ where
         Message = VerifiableMessage,
         DeliverOutput = SignedMessageApplyRes,
         State = FvmExecState<DB>,
-        EndOutput = PowerUpdates,
+        EndOutput = (PowerUpdates, BlockGasLimit),
     >,
 {
     // The state consists of the resolver pool, which this interpreter needs, and the rest of the
@@ -390,7 +390,7 @@ where
 
                     let local_block_height = state.block_height() as u64;
                     let proposer = state
-                        .validator_pubkey()
+                        .block_producer()
                         .map(|id| hex::encode(id.serialize_compressed()));
                     let proposer_ref = proposer.as_deref();
 
@@ -435,9 +435,10 @@ where
         let (state, out) = self.inner.end(state).await?;
 
         // Update any component that needs to know about changes in the power table.
-        if !out.0.is_empty() {
+        if !out.0 .0.is_empty() {
             let power_updates = out
                 .0
+                 .0
                 .iter()
                 .map(|v| {
                     let vk = ValidatorKey::from(v.public_key.0);
@@ -555,11 +556,16 @@ fn relayed_bottom_up_ckpt_to_fvm(
     Ok(msg)
 }
 
+/// Selects messages to be executed. Currently, this is a static function whose main purpose is to
+/// coordinate various selectors. However, it does not have formal semantics for doing so, e.g.
+/// do we daisy-chain selectors, do we parallelize, how do we treat rejections and acceptances?
+/// It hasn't been well thought out yet. When we refactor the whole *Interpreter stack, we will
+/// revisit this and make the selection function properly pluggable.
 fn messages_selection<DB: Blockstore + Clone + 'static>(
     msgs: Vec<ChainMessage>,
     state: &FvmExecState<DB>,
 ) -> anyhow::Result<Vec<ChainMessage>> {
-    let mut signed = msgs
+    let mut user_msgs = msgs
         .into_iter()
         .map(|msg| match msg {
             ChainMessage::Signed(inner) => Ok(inner),
@@ -567,11 +573,13 @@ fn messages_selection<DB: Blockstore + Clone + 'static>(
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
 
-    // currently only one selector, we can potentially extend to more selectors
+    // Currently only one selector, we can potentially extend to more selectors
+    // This selector enforces that the total cumulative gas limit of all messages is less than the
+    // currently active block gas limit.
     let selectors = vec![GasLimitSelector {}];
     for s in selectors {
-        signed = s.select_messages(state, signed)
+        user_msgs = s.select_messages(state, user_msgs)
     }
 
-    Ok(signed.into_iter().map(ChainMessage::Signed).collect())
+    Ok(user_msgs.into_iter().map(ChainMessage::Signed).collect())
 }

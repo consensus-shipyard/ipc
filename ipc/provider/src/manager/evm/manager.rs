@@ -772,7 +772,7 @@ impl SubnetManager for EthSubnetManager {
             address,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
-        let raw = contract.collateral_source().call().await?;
+        let raw = contract.supply_source().call().await?;
         Ok(Asset::try_from(raw)?)
     }
 

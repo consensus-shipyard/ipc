@@ -19,8 +19,7 @@ use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
 use fendermint_vm_actor_interface::{
-    account, activity, burntfunds, chainmetadata, cron, eam, gas, init, ipc, reward, system,
-    EMPTY_ARR,
+    account, burntfunds, chainmetadata, cron, eam, gas_market, init, ipc, reward, system, EMPTY_ARR,
 };
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Collateral, Genesis, Power, PowerScale, Validator};
@@ -431,33 +430,27 @@ impl GenesisBuilder {
             )
             .context("failed to replace built in eam actor")?;
 
-        // currently hard code them for now, once genesis V2 is implemented, should be taken
-        // from genesis.
-        // initial base fee as defined in [EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)
-        let initial_base_fee = TokenAmount::from_atto(1_000_000_000);
-        let gas_market_state = fendermint_actor_gas_market::EIP1559GasState::from(
-            fendermint_actor_gas_market::GasActorConstructorParams::new(initial_base_fee),
-        );
+        // Currently hardcoded for now, once genesis V2 is implemented, should be taken
+        // from genesis parameters.
+        //
+        // Default initial base fee equals minimum base fee in Filecoin.
+        let initial_base_fee = TokenAmount::from_atto(100);
+        // We construct the actor state here for simplicity, but for better decoupling we should
+        // be invoking the constructor instead.
+        let gas_market_state = fendermint_actor_gas_market_eip1559::State {
+            base_fee: initial_base_fee,
+            // If you need to customize the gas market constants, you can do so here.
+            constants: fendermint_actor_gas_market_eip1559::Constants::default(),
+        };
         state
             .create_custom_actor(
-                fendermint_actor_gas_market::IPC_GAS_MARKET_ACTOR_NAME,
-                gas::GAS_MARKET_ACTOR_ID,
+                fendermint_actor_gas_market_eip1559::ACTOR_NAME,
+                gas_market::GAS_MARKET_ACTOR_ID,
                 &gas_market_state,
                 TokenAmount::zero(),
                 None,
             )
-            .context("failed to create gas market actor")?;
-
-        let tracker_state = fendermint_actor_activity_tracker::State::new(state.store())?;
-        state
-            .create_custom_actor(
-                fendermint_actor_activity_tracker::IPC_ACTIVITY_TRACKER_ACTOR_NAME,
-                activity::ACTIVITY_TRACKER_ACTOR_ID,
-                &tracker_state,
-                TokenAmount::zero(),
-                None,
-            )
-            .context("failed to create activity tracker actor")?;
+            .context("failed to create default eip1559 gas market actor")?;
 
         // STAGE 2: Create non-builtin accounts which do not have a fixed ID.
 

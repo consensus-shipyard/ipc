@@ -9,7 +9,7 @@ use std::{future::Future, sync::Arc};
 
 use fendermint_crypto::PublicKey;
 use fendermint_vm_genesis::Genesis;
-use fendermint_vm_interpreter::fvm::PowerUpdates;
+use fendermint_vm_interpreter::fvm::{BlockGasLimit, PowerUpdates};
 use fendermint_vm_interpreter::genesis::{create_test_genesis_state, GenesisOutput};
 use fendermint_vm_interpreter::{
     fvm::{
@@ -67,7 +67,7 @@ where
         Message = FvmMessage,
         BeginOutput = FvmApplyRet,
         DeliverOutput = FvmApplyRet,
-        EndOutput = PowerUpdates,
+        EndOutput = (PowerUpdates, BlockGasLimit),
     >,
 {
     pub async fn new(interpreter: I, genesis: Genesis) -> anyhow::Result<Self> {
@@ -125,15 +125,7 @@ where
         guard.take().expect("exec state empty")
     }
 
-    pub async fn begin_block(&self, block_height: ChainEpoch) -> Result<()> {
-        self.begin_block_with_validator(block_height, None).await
-    }
-
-    pub async fn begin_block_with_validator(
-        &self,
-        block_height: ChainEpoch,
-        maybe_validator: Option<PublicKey>,
-    ) -> Result<()> {
+    pub async fn begin_block(&self, block_height: ChainEpoch, producer: PublicKey) -> Result<()> {
         let mut block_hash: [u8; 32] = [0; 32];
         let _ = block_hash.as_mut().write_i64::<BigEndian>(block_height);
 
@@ -141,13 +133,10 @@ where
         let mut state_params = self.state_params.clone();
         state_params.timestamp = Timestamp(block_height as u64);
 
-        let mut state =
-            FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
-                .context("error creating new state")?
-                .with_block_hash(block_hash);
-        if let Some(validator) = maybe_validator {
-            state = state.with_validator(validator);
-        }
+        let state = FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
+            .context("error creating new state")?
+            .with_block_hash(block_hash)
+            .with_block_producer(producer);
 
         self.put_exec_state(state).await;
 

@@ -4,9 +4,15 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
+use crate::fvm::externs::FendermintExterns;
+use crate::fvm::gas::BlockGasTracker;
 use anyhow::Ok;
 use cid::Cid;
+use fendermint_actors_api::gas_market::Reading;
 use fendermint_crypto::PublicKey;
+use fendermint_vm_actor_interface::eam::EthAddress;
+use fendermint_vm_core::{chainid::HasChainID, Timestamp};
+use fendermint_vm_encoding::IsHumanReadable;
 use fendermint_vm_genesis::PowerScale;
 use fvm::engine::EnginePool;
 use fvm::{
@@ -25,13 +31,6 @@ use fvm_shared::{
 };
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-
-use crate::fvm::activities::actor::ActorActivityTracker;
-use crate::fvm::externs::FendermintExterns;
-use crate::fvm::gas::actor::ActorGasMarket;
-use crate::fvm::store::ReadOnlyBlockstore;
-use fendermint_vm_core::{chainid::HasChainID, Timestamp};
-use fendermint_vm_encoding::IsHumanReadable;
 
 pub type BlockHash = [u8; 32];
 
@@ -105,18 +104,19 @@ where
     executor: DefaultExecutor<
         DefaultKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>,
     >,
-
     /// Hash of the block currently being executed. For queries and checks this is empty.
     ///
     /// The main motivation to add it here was to make it easier to pass in data to the
     /// execution interpreter without having to add yet another piece to track at the app level.
     block_hash: Option<BlockHash>,
-
-    /// Public key of the validator who created this block. For queries and checks this is empty.
-    validator_pubkey: Option<PublicKey>,
+    /// Public key of the validator who created this block. For queries, checks, and proposal
+    /// validations this is None.
+    block_producer: Option<PublicKey>,
+    /// Keeps track of block gas usage during execution, and takes care of updating
+    /// the chosen gas market strategy (by default an on-chain actor delivering EIP-1559 behaviour).
+    block_gas_tracker: BlockGasTracker,
     /// State of parameters that are outside the control of the FVM but can change and need to be persisted.
     params: FvmUpdatableParams,
-
     /// Indicate whether the parameters have been updated.
     params_dirty: bool,
     /// Keeps track of block gas usage during execution, and takes care of updating
@@ -156,15 +156,16 @@ where
 
         let engine = multi_engine.get(&nc)?;
         let externs = FendermintExterns::new(blockstore.clone(), params.state_root);
+        let machine = DefaultMachine::new(&mc, blockstore, externs)?;
+        let mut executor = DefaultExecutor::new(engine, machine)?;
 
-        let machine = DefaultMachine::new(&mc, blockstore.clone(), externs)?;
-        let mut executor = DefaultExecutor::new(engine.clone(), machine)?;
-        let gas_market = ActorGasMarket::create(&mut executor, block_height)?;
+        let block_gas_tracker = BlockGasTracker::create(&mut executor)?;
 
         Ok(Self {
             executor,
             block_hash: None,
-            validator_pubkey: None,
+            block_producer: None,
+            block_gas_tracker,
             params: FvmUpdatableParams {
                 app_version: params.app_version,
                 base_fee: params.base_fee,
@@ -188,17 +189,21 @@ where
     }
 
     /// Set the validator during execution.
-    pub fn with_validator(mut self, key: PublicKey) -> Self {
-        self.validator_pubkey = Some(key);
+    pub fn with_block_producer(mut self, pubkey: PublicKey) -> Self {
+        self.block_producer = Some(pubkey);
         self
     }
 
-    pub fn gas_market_mut(&mut self) -> &mut ActorGasMarket {
-        &mut self.gas_market
+    pub fn block_gas_tracker(&self) -> &BlockGasTracker {
+        &self.block_gas_tracker
     }
 
-    pub fn gas_market(&self) -> &ActorGasMarket {
-        &self.gas_market
+    pub fn block_gas_tracker_mut(&mut self) -> &mut BlockGasTracker {
+        &mut self.block_gas_tracker
+    }
+
+    pub fn read_gas_market(&mut self) -> anyhow::Result<Reading> {
+        BlockGasTracker::read_gas_market(&mut self.executor)
     }
 
     /// Execute message implicitly.
@@ -220,7 +225,25 @@ where
         let raw_length = fvm_ipld_encoding::to_vec(&msg).map(|bz| bz.len())?;
         let ret = self.executor.execute_message(msg, kind, raw_length)?;
         let addrs = self.emitter_delegated_addresses(&ret)?;
+
+        // Record the utilization of this message if the apply type was Explicit.
+        if kind == ApplyKind::Explicit {
+            self.block_gas_tracker.record_utilization(&ret);
+        }
+
         Ok((ret, addrs))
+    }
+
+    /// Execute a function with the internal executor and return an arbitrary result.
+    pub fn execute_with_executor<F, R>(&mut self, exec_func: F) -> anyhow::Result<R>
+    where
+        F: FnOnce(
+            &mut DefaultExecutor<
+                DefaultKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>,
+            >,
+        ) -> anyhow::Result<R>,
+    {
+        exec_func(&mut self.executor)
     }
 
     /// Commit the state. It must not fail, but we're returning a result so that error
@@ -245,9 +268,9 @@ where
         self.block_hash
     }
 
-    /// Identity of the block creator, if we are indeed executing any blocks.
-    pub fn validator_pubkey(&self) -> Option<PublicKey> {
-        self.validator_pubkey
+    /// Identity of the block producer, if we are indeed executing any blocks.
+    pub fn block_producer(&self) -> Option<PublicKey> {
+        self.block_producer
     }
 
     /// The timestamp of the currently executing block.
@@ -320,13 +343,19 @@ where
         self.update_params(|p| f(&mut p.app_version))
     }
 
-    pub fn update_gas_market(&mut self) -> anyhow::Result<()> {
-        let height = self.block_height();
-        let ret = self
-            .gas_market
-            .commit(&mut self.executor, height, self.validator_pubkey)?;
-        self.params.base_fee = ret.base_fee;
-        Ok(())
+    /// Finalizes updates to the gas market based on the transactions processed by this instance.
+    /// Returns the new base fee for the next height.
+    pub fn finalize_gas_market(&mut self) -> anyhow::Result<Reading> {
+        let premium_recipient = match self.block_producer {
+            Some(pubkey) => Some(Address::from(EthAddress::new_secp256k1(
+                &pubkey.serialize(),
+            )?)),
+            None => None,
+        };
+
+        self.block_gas_tracker
+            .finalize(&mut self.executor, premium_recipient)
+            .inspect(|reading| self.update_params(|p| p.base_fee = reading.base_fee.clone()))
     }
 
     /// Update the circulating supply, effective from the next block.
