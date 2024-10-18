@@ -482,6 +482,17 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
                 header_map.insert("Accept-Ranges", HeaderValue::from_str("bytes").unwrap());
             }
             header_map.insert("Content-Length", HeaderValue::from(object_range.len));
+            header_map.insert(
+                "Content-Type",
+                HeaderValue::from_str(
+                    object
+                        .metadata
+                        .get("content-type")
+                        .unwrap_or(&"application/octet-stream".to_string()),
+                )
+                .unwrap(),
+            );
+
             let headers = response.headers_mut();
             headers.extend(header_map);
 
@@ -784,6 +795,15 @@ mod tests {
         assert!(result.is_ok());
         let response = result.unwrap().into_response();
         assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response
+                .headers()
+                .get("Content-Type")
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "application/octet-stream"
+        );
         let body = warp::hyper::body::to_bytes(response.into_body())
             .await
             .unwrap();
