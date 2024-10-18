@@ -36,6 +36,7 @@ members = [
   "fendermint/actors",
   "fendermint/actors/api",
   "fendermint/actors/chainmetadata",
+  "fendermint/actors/activity-tracker",
   "fendermint/actors/eam",
   "fendermint/actors/gas_market/eip1559",
 ]

@@ -99,9 +99,7 @@ where
 
     let num_msgs = msgs.len();
 
-    let activities = state
-        .activities_tracker()
-        .get_activities_summary()?;
+    let activities = state.activities_tracker().get_activities_summary()?;
 
     // Construct checkpoint.
     let checkpoint = BottomUpCheckpoint {
@@ -124,19 +122,17 @@ where
         validators: activities
             .details
             .into_iter()
-            .map(|v| Ok(checkpoint::ValidatorActivityReport {
-                validator: payload_to_evm_address(v.validator.payload())?,
-                blocks_committed: v.block_committed,
-                metadata: ethers::types::Bytes::from(v.metadata),
-            })).collect::<anyhow::Result<Vec<_>>>()?
+            .map(|v| {
+                Ok(checkpoint::ValidatorActivityReport {
+                    validator: payload_to_evm_address(v.validator.payload())?,
+                    blocks_committed: v.block_committed,
+                    metadata: ethers::types::Bytes::from(v.metadata),
+                })
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?,
     };
     gateway
-        .create_bu_ckpt_with_activities(
-            state,
-            checkpoint.clone(),
-            &curr_power_table.0,
-            report
-        )
+        .create_bu_ckpt_with_activities(state, checkpoint.clone(), &curr_power_table.0, report)
         .context("failed to store checkpoint")?;
 
     state.activities_tracker().purge_activities()?;

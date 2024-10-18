@@ -226,7 +226,6 @@ impl From<PermissionMode> for PermissionModeParams {
 /// IPC related data structures.
 pub mod ipc {
     use fendermint_vm_encoding::IsHumanReadable;
-    use fvm_shared::address::Address;
     use ipc_api::subnet_id::SubnetID;
     use serde::{Deserialize, Serialize};
     use serde_with::serde_as;

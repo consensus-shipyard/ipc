@@ -1,6 +1,5 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-use crate::fvm::gas::GasMarket;
 use crate::fvm::state::ipc::GatewayCaller;
 use crate::fvm::store::ReadOnlyBlockstore;
 use crate::fvm::{topdown, BlockGasLimit, FvmApplyRet, PowerUpdates};

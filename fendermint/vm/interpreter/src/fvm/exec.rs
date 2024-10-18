@@ -5,18 +5,13 @@ use anyhow::Context;
 use async_trait::async_trait;
 use std::collections::HashMap;
 
+use crate::ExecInterpreter;
 use fendermint_vm_actor_interface::{chainmetadata, cron, system};
 use fvm::executor::ApplyRet;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::{address::Address, ActorID, MethodNum, BLOCK_GAS_LIMIT};
 use ipc_observability::{emit, measure_time, observe::TracingError, Traceable};
 use tendermint_rpc::Client;
-
-use crate::fvm::activities::BlockMined;
-use crate::fvm::gas::{GasMarket, GasUtilization};
-use crate::ExecInterpreter;
-
-use crate::fvm::activities::ValidatorActivityTracker;
 
 use super::{
     checkpoint::{self, PowerUpdates},
@@ -169,10 +164,6 @@ where
 
             let (execution_result, latency) = measure_time(|| state.execute_explicit(msg.clone()));
             let (apply_ret, emitters) = execution_result?;
-
-            state
-                .gas_market_mut()
-                .record_utilization(GasUtilization::from(&apply_ret));
 
             (apply_ret, emitters, latency)
         };

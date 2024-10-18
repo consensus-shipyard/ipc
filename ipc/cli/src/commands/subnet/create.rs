@@ -172,10 +172,7 @@ pub struct CreateSubnetArgs {
         help = "The address of validator gating contract. None if validator gating is disabled"
     )]
     pub validator_gater: Option<String>,
-    #[arg(
-        long,
-        help = "The address of validator rewarder contract."
-    )]
+    #[arg(long, help = "The address of validator rewarder contract.")]
     pub validator_rewarder: Option<String>,
     #[arg(
         long,

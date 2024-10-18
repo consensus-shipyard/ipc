@@ -4,8 +4,10 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
+use crate::fvm::activities::actor::ActorActivityTracker;
 use crate::fvm::externs::FendermintExterns;
 use crate::fvm::gas::BlockGasTracker;
+use crate::fvm::store::ReadOnlyBlockstore;
 use anyhow::Ok;
 use cid::Cid;
 use fendermint_actors_api::gas_market::Reading;
@@ -38,9 +40,6 @@ pub type ActorAddressMap = HashMap<ActorID, Address>;
 
 /// The result of the message application bundled with any delegated addresses of event emitters.
 pub type ExecResult = anyhow::Result<(ApplyRet, ActorAddressMap)>;
-
-pub type StateExecutor<DB> =
-    DefaultExecutor<DefaultKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>>;
 
 /// Parts of the state which evolve during the lifetime of the chain.
 #[serde_as]
@@ -119,9 +118,6 @@ where
     params: FvmUpdatableParams,
     /// Indicate whether the parameters have been updated.
     params_dirty: bool,
-    /// Keeps track of block gas usage during execution, and takes care of updating
-    /// the chosen gas market strategy (by default an on-chain actor delivering EIP-1559 behaviour).
-    gas_market: ActorGasMarket,
 
     executor_info: ExecutorInfo<DB>,
 }
@@ -156,8 +152,8 @@ where
 
         let engine = multi_engine.get(&nc)?;
         let externs = FendermintExterns::new(blockstore.clone(), params.state_root);
-        let machine = DefaultMachine::new(&mc, blockstore, externs)?;
-        let mut executor = DefaultExecutor::new(engine, machine)?;
+        let machine = DefaultMachine::new(&mc, blockstore.clone(), externs)?;
+        let mut executor = DefaultExecutor::new(engine.clone(), machine)?;
 
         let block_gas_tracker = BlockGasTracker::create(&mut executor)?;
 
@@ -173,7 +169,6 @@ where
                 power_scale: params.power_scale,
             },
             params_dirty: false,
-            gas_market,
 
             executor_info: ExecutorInfo {
                 engine_pool: engine,

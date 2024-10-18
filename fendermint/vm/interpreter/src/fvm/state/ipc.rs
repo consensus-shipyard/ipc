@@ -156,7 +156,12 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         });
 
         self.checkpointing.call(state, |c| {
-            c.create_bu_chpt_with_activities(checkpoint, tree.root_hash().0, total_power, activities)
+            c.create_bu_chpt_with_activities(
+                checkpoint,
+                tree.root_hash().0,
+                total_power,
+                activities,
+            )
         })
     }
 
