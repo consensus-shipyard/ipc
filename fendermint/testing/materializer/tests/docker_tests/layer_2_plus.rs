@@ -11,6 +11,7 @@ use ethers::{
     types::{transaction::eip2718::TypedTransaction, Eip1559TransactionRequest, H160},
 };
 use futures::FutureExt;
+use ipc_provider::IpcProvider;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -41,6 +42,46 @@ const MAX_RETRIES: u32 = 5;
 /// Test that top-down syncing and bottom-up checkpoint submission work.
 #[serial_test::serial]
 #[tokio::test]
+async fn test_provider() {
+    // TODO Karel - use the provider to wait for balance to be updated in the child subnet.
+    use ipc_api::ethers_address_to_fil_address;
+    use ipc_api::subnet_id::SubnetID;
+    use ipc_provider::config::{
+        subnet::{EVMSubnet, SubnetConfig},
+        Subnet,
+    };
+
+    let subnet_id =
+        SubnetID::from_str("/r1126193293194756/f410fhwibtof7hp6v5f453q5soyn6ksxym7chbqata2q")
+            .unwrap();
+
+    let parent_provider = IpcProvider::new_with_subnet(
+        None,
+        Subnet {
+            id: subnet_id.clone(),
+            config: SubnetConfig::Fevm(EVMSubnet {
+                provider_http: "http://localhost:30745".parse().unwrap(),
+                provider_timeout: None,
+                auth_token: None,
+                registry_addr: builtin_actor_eth_addr(ipc::SUBNETREGISTRY_ACTOR_ID).into(),
+                gateway_addr: builtin_actor_eth_addr(ipc::GATEWAY_ACTOR_ID).into(),
+            }),
+        },
+    )
+    .unwrap();
+
+    let eth_address =
+        ethers::types::Address::from_str("0x651a3c584f4c71b54c50ea73f41b936845ab4fdf").unwrap();
+    let address = ethers_address_to_fil_address(&eth_address).unwrap();
+
+    let balance = parent_provider
+        .wallet_balance(&subnet_id, &address)
+        .await
+        .unwrap();
+
+    println!("Balance: {:?}", balance);
+}
+
 async fn test_topdown_and_bottomup_plus() {
     with_testnet(
         MANIFEST,

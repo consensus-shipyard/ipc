@@ -97,7 +97,7 @@ macro_rules! env_vars {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct CreateOutput {
+struct ForgeCreateOutput {
     deployer: String,
     #[serde(rename = "deployedTo")]
     deployed_to: String,
@@ -654,7 +654,7 @@ impl DockerMaterializer {
         println!("OUT: {}", String::from_utf8_lossy(&output.stdout));
 
         // Parse the JSON output
-        let json_output: CreateOutput =
+        let json_output: ForgeCreateOutput =
             serde_json::from_slice(&output.stdout).context("failed to parse forge output")?;
 
         // Return the contract deployment details
@@ -709,7 +709,6 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     where
         's: 'a,
     {
-        // TODO Karel - find a way to deploy contract
         todo!("use the deploy scripts to create a new IPC stack on L1")
     }
 
@@ -1150,6 +1149,28 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             deployed_libraries,
         )
     }
+
+    // async fn wait_for_balance<'s, 'a>(
+    //     &'s mut self,
+    //     account: &'a DefaultAccount,
+    //     balance: Balance,
+    // ) -> anyhow::Result<()> {
+    //     let cmd = format!(
+    //         "ipc-cli account wait-balance \
+    //             --address {:?} \
+    //             --balance {} \
+    //         ",
+    //         account.eth_addr(),
+    //         balance.0
+    //     );
+
+    //     let logs = self
+    //         .ipc_cli_run_cmd(&SubmitConfig::default(), account, cmd)
+    //         .await
+    //         .context("failed to wait for balance")?;
+
+    //     Ok(())
+    // }
 }
 
 /// The `ipc-cli` puts the output in a human readable log instead of printing JSON.
