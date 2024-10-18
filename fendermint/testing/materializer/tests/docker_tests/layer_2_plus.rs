@@ -33,7 +33,7 @@ use ipc_api::evm;
 
 use crate::with_testnet;
 
-const MANIFEST: &str = "layer2.yaml";
+const MANIFEST: &str = "layer3.yaml";
 const CHECKPOINT_PERIOD: u64 = 10;
 const SLEEP_SECS: u64 = 5;
 const MAX_RETRIES: u32 = 5;

@@ -212,7 +212,7 @@ pub trait Materializer<M: Materials> {
     async fn deploy_solidity_contract<'s, 'a>(
         &'s mut self,
         contract: SolidityContractDeploymentConfig<'a, M>,
-    ) -> anyhow::Result<M::CustomContractDeployment>
+    ) -> anyhow::Result<M::SolidityContractDeployment>
     where
         's: 'a;
 }
@@ -245,25 +245,19 @@ pub struct SolidityContract {
 
 impl From<SolidityContractDefinition> for SolidityContract {
     fn from(def: SolidityContractDefinition) -> Self {
+        // TODO Karel - just keep string instead of PathBuf
         let path = Path::new(&def.path);
-
-        let resolved_path = if path.is_absolute() {
-            Ok(path.to_path_buf())
-        } else {
-            fs::canonicalize(path)
-        }
-        .context(format!("failed to resolve path for {}", def.name))
-        .unwrap();
 
         Self {
             name: def.name.clone(),
-            path: resolved_path,
+            path: path.to_path_buf(),
             constructor_args: def.constructor_args.clone(),
         }
     }
 }
 
 pub struct SolidityContractDeploymentConfig<'a, M: Materials> {
+    pub foundry_root: String,
     pub contract: SolidityContract,
     pub libraries: Option<Vec<SolidityContract>>,
     pub nodes: Vec<&'a M::Node>,

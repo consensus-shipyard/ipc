@@ -142,15 +142,23 @@ pub enum Rootnet {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SolidityContractDefinition {
+    // The name of the contract.
     pub name: String,
+    // The path to the contract file relative to the foundry root.
     pub path: String,
+    // The name of the constructor function.
     pub constructor_args: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SolidityContractDeployment {
+    // The account that deploys the contract.
     pub deployer: AccountId,
+    // The root of the Foundry project where the contract is located and foundry.toml is.
+    pub foundry_root: String,
+    // The contract definition.
     pub contract: SolidityContractDefinition,
+    // Libraries that the contract uses.
     pub libraries: Option<Vec<SolidityContractDefinition>>,
 }
 
@@ -187,8 +195,8 @@ pub struct Subnet {
     /// The subnet ID exists so we can find the outcome of existing deployments in the log.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub subnets: SubnetMap,
-
-    pub custom_deployments: Option<Vec<SolidityContractDeployment>>,
+    /// Solidity contracts to deploy on the subnet.
+    pub solidity_deployments: Option<Vec<SolidityContractDeployment>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
