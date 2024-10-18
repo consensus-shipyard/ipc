@@ -227,7 +227,7 @@ where
     async fn deploy_solidity_contract<'s, 'a>(
         &'s mut self,
         contract: SolidityContractDeploymentConfig<'a, M>,
-    ) -> anyhow::Result<M::CustomContractDeployment> {
+    ) -> anyhow::Result<M::SolidityContractDeployment> {
         tracing::info!(ctx = self.ctx, "deploy_solidity_contract");
         self.inner.deploy_solidity_contract(contract).await
     }

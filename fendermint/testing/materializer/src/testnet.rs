@@ -48,6 +48,7 @@ pub struct Testnet<M: Materials, R> {
     externals: Vec<Url>,
     accounts: BTreeMap<AccountId, M::Account>,
     deployments: BTreeMap<SubnetName, M::Deployment>,
+    solidity_deployments: BTreeMap<SubnetName, M::SolidityContractDeployment>,
     genesis: BTreeMap<SubnetName, M::Genesis>,
     subnets: BTreeMap<SubnetName, M::Subnet>,
     nodes: BTreeMap<NodeName, M::Node>,
@@ -80,6 +81,7 @@ where
             externals: Default::default(),
             accounts: Default::default(),
             deployments: Default::default(),
+            solidity_deployments: Default::default(),
             genesis: Default::default(),
             subnets: Default::default(),
             nodes: Default::default(),
@@ -650,8 +652,8 @@ where
         // IpcProvider.wallet_balance.
         thread::sleep(Duration::from_secs(15));
 
-        if let Some(custom_deployments) = &subnet.custom_deployments {
-            for deployment in custom_deployments {
+        if let Some(solidity_deployments) = &subnet.solidity_deployments {
+            for deployment in solidity_deployments {
                 let libraries = deployment.libraries.clone().map(|libs| {
                     libs.into_iter()
                         .map(|lib| lib.into())
@@ -659,15 +661,20 @@ where
                 });
 
                 let deployment_config = SolidityContractDeploymentConfig {
+                    foundry_root: deployment.foundry_root.clone(),
                     contract: deployment.contract.clone().into(),
                     libraries,
                     nodes: self.nodes_by_subnet(&subnet_name),
                     account: self.account(&deployment.deployer)?,
                 };
 
-                m.deploy_solidity_contract(deployment_config)
+                let deployed = m
+                    .deploy_solidity_contract(deployment_config)
                     .await
                     .with_context(|| "failed to deploy custom contract")?;
+
+                self.solidity_deployments
+                    .insert(subnet_name.clone(), deployed);
             }
         }
 

@@ -107,7 +107,7 @@ pub struct DockerMaterials;
 
 impl Materials for DockerMaterials {
     type Deployment = DefaultDeployment;
-    type CustomContractDeployment = DefaultSolidityContractDeployment;
+    type SolidityContractDeployment = DefaultSolidityContractDeployment;
     type Account = DefaultAccount;
     type Genesis = DefaultGenesis;
     type Subnet = DefaultSubnet;
@@ -603,6 +603,7 @@ impl DockerMaterializer {
         &self,
         rpc_url: &Url,
         private_key: &str,
+        foundry_root: &str,
         constructor_args: &[String],
         contract_path: &Path,
         contract_name: &str,
@@ -623,28 +624,38 @@ impl DockerMaterializer {
             &rpc_url_str,
             "--private-key",
             private_key,
-            "--contract",
-            contract_name,
-            "--path",
-            path_str,
+            "--constructor-args",
+            &constructor_args.join(","),
+            "--root",
+            foundry_root,
+            "--json",
+            &format!("{}:{}", path_str, contract_name),
         ]);
 
         // Add libraries if provided
         if let Some(libraries) = libraries {
             let libraries_arg = libraries
                 .iter()
-                .map(|lib| format!("{}:{}:{}", lib.path, lib.name, lib.address))
+                .map(|lib| format!("{}:{}:{}", lib.path, lib.name, lib.address.to_hex()))
                 .collect::<Vec<_>>()
                 .join(",");
             cmd.arg("--libraries").arg(libraries_arg);
         }
 
+        println!(
+            "CMD: {:?} {:?}",
+            cmd.get_program(),
+            cmd.get_args().collect::<Vec<_>>()
+        );
+
         // Run the command and handle errors
-        let output = cmd.output().context("Failed to run forge create")?;
+        let output = cmd.output().context("failed to run forge create")?;
+
+        println!("OUT: {}", String::from_utf8_lossy(&output.stdout));
 
         // Parse the JSON output
         let json_output: CreateOutput =
-            serde_json::from_slice(&output.stdout).context("Failed to parse forge output")?;
+            serde_json::from_slice(&output.stdout).context("failed to parse forge output")?;
 
         // Return the contract deployment details
         Ok(DefaultSolidityContractDeployment {
@@ -1117,6 +1128,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
                         self.run_forge_create_cmd(
                             &rpc_url,
                             &private_key,
+                            &config.foundry_root,
                             &library.constructor_args,
                             &library.path,
                             &library.name,
@@ -1131,6 +1143,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         self.run_forge_create_cmd(
             &rpc_url,
             &private_key,
+            &config.foundry_root,
             &config.contract.constructor_args,
             &config.contract.path,
             &config.contract.name,

@@ -33,7 +33,7 @@ pub trait Materials {
     /// The handle to a relayer process.
     type Relayer: Sync + Send;
     /// Represents custom contract deployment to a subnet.
-    type CustomContractDeployment: Sync + Send;
+    type SolidityContractDeployment: Sync + Send;
 }
 
 /// Write some content to a file.

@@ -50,7 +50,7 @@ impl Materials for ValidationMaterials {
     type Subnet = SubnetName;
     type Node = NodeName;
     type Relayer = RelayerName;
-    type CustomContractDeployment = ();
+    type SolidityContractDeployment = ();
 }
 
 type VNetwork = <ValidationMaterials as Materials>::Network;
@@ -60,7 +60,7 @@ type VGenesis = <ValidationMaterials as Materials>::Genesis;
 type VSubnet = <ValidationMaterials as Materials>::Subnet;
 type VNode = <ValidationMaterials as Materials>::Node;
 type VRelayer = <ValidationMaterials as Materials>::Relayer;
-type VCustomContractDeployment = <ValidationMaterials as Materials>::CustomContractDeployment;
+type VCustomContractDeployment = <ValidationMaterials as Materials>::SolidityContractDeployment;
 
 #[derive(Clone, Debug, Default)]
 pub struct ValidatingMaterializer {
