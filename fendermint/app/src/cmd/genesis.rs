@@ -271,7 +271,6 @@ fn set_ipc_gateway(genesis_file: &PathBuf, args: &GenesisIpcGatewayArgs) -> anyh
             bottom_up_check_period: args.bottom_up_check_period,
             majority_percentage: args.majority_percentage,
             active_validators_limit: args.active_validators_limit,
-            validator_rewarder: args.validator_rewarder,
         };
 
         let ipc_params = match genesis.ipc {
@@ -337,8 +336,6 @@ async fn new_genesis_from_parent(
             bottom_up_check_period: genesis_info.bottom_up_checkpoint_period,
             majority_percentage: genesis_info.majority_percentage,
             active_validators_limit: genesis_info.active_validators_limit,
-            // default to zero address, need to call setter separately
-            validator_rewarder: Address::from(EthAddress([0; 20])),
         },
     };
     let mut genesis = Genesis {

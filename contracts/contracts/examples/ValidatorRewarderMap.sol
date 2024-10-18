@@ -5,7 +5,7 @@ import {IValidatorRewarder} from "../activities/IValidatorRewarder.sol";
 import {ValidatorSummary} from "../activities/Activity.sol";
 import {SubnetID} from "../structs/Subnet.sol";
 
-/// An example validator rewarder implementation that tracks the accumulated 
+/// An example validator rewarder implementation that tracks the accumulated
 /// reward for each valdiator only.
 contract ValidatorRewarderMap is IValidatorRewarder {
     SubnetID public subnetId;
@@ -26,7 +26,7 @@ contract ValidatorRewarderMap is IValidatorRewarder {
 
     function disburseRewards(SubnetID calldata id, ValidatorSummary calldata summary) external {
         require(keccak256(abi.encode(id)) == keccak256(abi.encode(subnetId)), "not my subnet");
-        
+
         address actor = id.route[id.route.length - 1];
         require(actor == msg.sender, "not from subnet");
 

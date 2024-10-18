@@ -194,9 +194,6 @@ pub struct GenesisIpcGatewayArgs {
     /// Maximum number of active validators.
     #[arg(long, short = 'v', default_value = "100")]
     pub active_validators_limit: u16,
-
-    #[arg(long, value_parser = parse_eth_address, default_value = "0xff00000000000000000000000000000000000065")]
-    pub validator_rewarder: Address,
 }
 
 #[derive(Args, Debug, Clone)]

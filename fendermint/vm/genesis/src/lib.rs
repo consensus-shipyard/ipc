@@ -244,8 +244,6 @@ pub mod ipc {
         pub bottom_up_check_period: u64,
         pub majority_percentage: u8,
         pub active_validators_limit: u16,
-        #[serde_as(as = "IsHumanReadable")]
-        pub validator_rewarder: Address,
     }
 }
 

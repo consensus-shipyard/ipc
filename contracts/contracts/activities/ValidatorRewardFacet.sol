@@ -6,9 +6,9 @@ import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap
 
 import {Pausable} from "../lib/LibPausable.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
-import {NotValidator, SubnetNoTargetCommitment, CommitmentAlreadyInitialized, ValidatorAlreadyClaimed, NotOwner} from "../errors/IPCErrors.sol";
-import {ValidatorSummary} from "./Activity.sol";
-import {IValidatorRewarder} from "./IValidatorRewarder.sol";
+import {NotValidator, SubnetNoTargetCommitment, CommitmentAlreadyInitialized, ValidatorAlreadyClaimed, NotGateway, NotOwner} from "../errors/IPCErrors.sol";
+import {ValidatorSummary, BatchClaimProofs} from "./Activity.sol";
+import {IValidatorRewarder, IValidatorRewardSetup} from "./IValidatorRewarder.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {SubnetID} from "../structs/Subnet.sol";
 import {LibActivityMerkleVerifier} from "./LibActivityMerkleVerifier.sol";
@@ -18,10 +18,16 @@ import {LibDiamond} from "../lib/LibDiamond.sol";
 /// to claim their reward in the parent subnet, which should be the current subnet this facet
 /// is deployed.
 contract ValidatorRewardFacet is ReentrancyGuard, Pausable {
-    event RewarderUpdated(address oldRewarder, address newRewarder);
-
-    function batchClaim(SubnetID calldata subnetId) external {
-        revert("todo");
+    function batchClaim(
+        BatchClaimProofs calldata payload
+    ) external nonReentrant whenNotPaused {
+        uint256 len = payload.proofs.length;
+        for (uint256 i = 0; i < len; ) {
+            _claim(payload.subnetId, payload.proofs[i].summary, payload.proofs[i].proof);
+            unchecked {
+                i++;
+            }
+        }
     }
 
     /// Validators claim their reward for doing work in the child subnet
@@ -30,6 +36,15 @@ contract ValidatorRewardFacet is ReentrancyGuard, Pausable {
         ValidatorSummary calldata summary,
         bytes32[] calldata proof
     ) external nonReentrant whenNotPaused {
+        _claim(subnetId, summary, proof);
+    }
+
+    function handleRelay() internal pure {
+        // no opt for now
+        return;
+    }
+
+    function _claim(SubnetID calldata subnetId, ValidatorSummary calldata summary, bytes32[] calldata proof) internal {
         // note: No need to check if the subnet is active. If the subnet is not active, the checkpointHeight
         // note: will never exist.
 
@@ -44,11 +59,6 @@ contract ValidatorRewardFacet is ReentrancyGuard, Pausable {
         }
 
         LibValidatorReward.handleDistribution(s, subnetId, summary, proof);
-    }
-
-    function handleRelay() internal pure {
-        // no opt for now
-        return;
     }
 }
 
@@ -92,6 +102,24 @@ library LibValidatorReward {
 
     // =========== External library functions =============
 
+    function initNewDistribution(
+        SubnetID calldata subnetId,
+        uint64 checkpointHeight,
+        bytes32 commitment,
+        uint64 totalActiveValidators
+    ) internal {
+        ValidatorRewardStorage storage ds = facetStorage();
+
+        bytes32 subnetKey = subnetId.toHash();
+
+        if (ds.distributions[subnetKey][checkpointHeight].totalValidators != 0) {
+            revert CommitmentAlreadyInitialized();
+        }
+
+        ds.commitments[subnetKey].set(bytes32(uint256(checkpointHeight)), commitment);
+        ds.distributions[subnetKey][checkpointHeight].totalValidators = totalActiveValidators;
+    }
+
     function listCommitments(
         SubnetID calldata subnetId
     ) internal view returns (ListCommimentDetail[] memory listDetails) {
@@ -121,24 +149,6 @@ library LibValidatorReward {
     function updateRewarder(address rewarder) internal {
         ValidatorRewardStorage storage ds = facetStorage();
         ds.validatorRewarder = rewarder;
-    }
-
-    function initNewDistribution(
-        uint64 checkpointHeight,
-        bytes32 commitment,
-        uint64 totalActiveValidators,
-        SubnetID calldata subnetId
-    ) internal {
-        ValidatorRewardStorage storage ds = facetStorage();
-
-        bytes32 subnetKey = subnetId.toHash();
-
-        if (ds.distributions[subnetKey][checkpointHeight].totalValidators != 0) {
-            revert CommitmentAlreadyInitialized();
-        }
-
-        ds.commitments[subnetKey].set(bytes32(uint256(checkpointHeight)), commitment);
-        ds.distributions[subnetKey][checkpointHeight].totalValidators = totalActiveValidators;
     }
 
     // ============ Internal library functions ============

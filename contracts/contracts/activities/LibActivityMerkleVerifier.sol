@@ -15,9 +15,11 @@ library LibActivityMerkleVerifier {
     ) internal pure {
         // Constructing leaf: https://github.com/OpenZeppelin/merkle-tree#leaf-hash
         bytes32 leaf = keccak256(
-            bytes.concat(keccak256(abi.encode(
-                summary.checkpointHeight, summary.validator, summary.blocksCommitted, summary.metadata
-            )))
+            bytes.concat(
+                keccak256(
+                    abi.encode(summary.checkpointHeight, summary.validator, summary.blocksCommitted, summary.metadata)
+                )
+            )
         );
         bool valid = MerkleProof.verify({proof: proof, root: commitment, leaf: leaf});
         if (!valid) {

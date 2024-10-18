@@ -694,7 +694,6 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
                         bottom_up_check_period: 1,
                         majority_percentage: 67,
                         active_validators_limit: 100,
-                        validator_rewarder: fvm_shared::address::Address::from(EthAddress([0; 20])),
                     },
                 }),
             };

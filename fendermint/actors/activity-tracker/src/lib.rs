@@ -84,7 +84,8 @@ impl ActivityTrackerActor {
     }
 
     pub fn get_summary(_rt: &impl Runtime) -> Result<GetActivitySummaryResult, ActorError> {
-        let dummy = GetActivitySummaryResult{ commitment: [0; 32], total_active_validators: 10 };
+        // todo
+        let dummy = GetActivitySummaryResult{ commitment: [0; 32], total_active_validators: 10, activities: vec![] };
         Ok(dummy)
     }
 

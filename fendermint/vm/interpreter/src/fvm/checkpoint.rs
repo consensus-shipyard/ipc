@@ -19,6 +19,8 @@ use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::BottomUpCheckpoint;
 use fendermint_vm_genesis::{Power, Validator, ValidatorKey};
 
+use ipc_api::evm::payload_to_evm_address;
+
 use ipc_actors_abis::checkpointing_facet as checkpoint;
 use ipc_actors_abis::gateway_getter_facet as getter;
 use ipc_api::staking::ConfigurationNumber;
@@ -97,6 +99,10 @@ where
 
     let num_msgs = msgs.len();
 
+    let activities = state
+        .activities_tracker()
+        .get_activities_summary()?;
+
     // Construct checkpoint.
     let checkpoint = BottomUpCheckpoint {
         subnet_id,
@@ -104,17 +110,33 @@ where
         block_hash,
         next_configuration_number,
         msgs,
-        activities: state
-            .activities_tracker()
-            .get_activities_summary()?
-            .commitment(height.value() as i64)?
-            .try_into()?,
+        activities: activities.commitment(height.value() as i64)?.try_into()?,
     };
 
     // Save the checkpoint in the ledger.
     // Pass in the current power table, because these are the validators who can sign this checkpoint.
+
+    // gateway
+    //     .create_bottom_up_checkpoint(state, checkpoint.clone(), &curr_power_table.0)
+    //     .context("failed to store checkpoint")?;
+
+    let report = checkpoint::ActivityReport {
+        validators: activities
+            .details
+            .into_iter()
+            .map(|v| Ok(checkpoint::ValidatorActivityReport {
+                validator: payload_to_evm_address(v.validator.payload())?,
+                blocks_committed: v.block_committed,
+                metadata: ethers::types::Bytes::from(v.metadata),
+            })).collect::<anyhow::Result<Vec<_>>>()?
+    };
     gateway
-        .create_bottom_up_checkpoint(state, checkpoint.clone(), &curr_power_table.0)
+        .create_bu_ckpt_with_activities(
+            state,
+            checkpoint.clone(),
+            &curr_power_table.0,
+            report
+        )
         .context("failed to store checkpoint")?;
 
     state.activities_tracker().purge_activities()?;

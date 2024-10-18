@@ -2346,33 +2346,24 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         );
         ValidatorRewarderMap m = new ValidatorRewarderMap();
         params.validatorRewarder = address(m);
-
+        params.minValidators = 2;
+        params.permissionMode = PermissionMode.Federated;
+        
         saDiamond = createSubnetActor(params);
 
-        SubnetID memory tmpId = SubnetID(ROOTNET_CHAINID, new address[](1));
-        tmpId.route[0] = address(saDiamond);
-        m.setSubnet(tmpId);
+        SubnetID memory subnetId = SubnetID(ROOTNET_CHAINID, new address[](1));
+        subnetId.route[0] = address(saDiamond);
+        m.setSubnet(subnetId);
 
-        address caller = address(saDiamond);
-        vm.startPrank(caller);
-        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE);
-        registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
-        vm.stopPrank();
+        (address[] memory addrs, uint256[] memory privKeys, bytes[] memory pubkeys) = TestUtils.newValidators(4);
+        
+        uint256[] memory powers = new uint256[](4);
+        powers[0] = 10000;
+        powers[1] = 10000;
+        powers[2] = 10000;
+        powers[3] = 10000;
+        saDiamond.manager().setFederatedPower(addrs, pubkeys, powers);
 
-        (SubnetID memory subnetId, , , , ) = getSubnet(address(caller));
-        (bool exist, Subnet memory subnetInfo) = gatewayDiamond.getter().getSubnet(subnetId);
-        require(exist, "subnet does not exist");
-        require(subnetInfo.circSupply == 0, "unexpected initial circulation supply");
-        require(tmpId.route[0] == subnetId.route[0], "address not match");
-
-        gatewayDiamond.manager().fund{value: DEFAULT_COLLATERAL_AMOUNT}(
-            subnetId,
-            FvmAddressHelper.from(address(caller))
-        );
-        (, subnetInfo) = gatewayDiamond.getter().getSubnet(subnetId);
-        require(subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT, "unexpected circulation supply after funding");
-
-        (, address[] memory addrs, ) = TestUtils.getFourValidators(vm);
         bytes[] memory metadata = new bytes[](addrs.length);
         uint64[] memory blocksMined = new uint64[](addrs.length);
         uint64[] memory checkpointHeights = new uint64[](addrs.length);
@@ -2391,17 +2382,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             checkpointHeights,
             metadata
         );
-        BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
-            subnetID: subnetId,
-            blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
-            blockHash: keccak256("block1"),
-            nextConfigurationNumber: 1,
-            msgs: new IpcEnvelope[](0),
-            activities: ActivitySummary({totalActiveValidators: 1, commitment: activityRoot})
-        });
 
-        vm.prank(caller);
-        gatewayDiamond.checkpointer().commitCheckpoint(checkpoint);
+        confirmChange(addrs, privKeys, ActivitySummary({totalActiveValidators: 2, commitment: activityRoot}));
 
         vm.startPrank(addrs[0]);
         vm.deal(addrs[0], 1 ether);
