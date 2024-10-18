@@ -6,9 +6,8 @@ edition.workspace = true
 license.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-fendermint_actor_chainmetadata = { path = "chainmetadata", features = [
-    "fil-actor",
-] }
+fendermint_actor_chainmetadata = { path = "chainmetadata", features = ["fil-actor"] }
+fendermint_actor_gas_market_eip1559 = { path = "gas_market/eip1559", features = ["fil-actor"] }
 fendermint_actor_eam = { path = "eam", features = ["fil-actor"] }
 
 [dependencies]
@@ -18,8 +17,11 @@ fvm_ipld_blockstore = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 fendermint_actor_chainmetadata = { path = "chainmetadata" }
 fendermint_actor_eam = { path = "eam" }
+fendermint_actor_gas_market_eip1559 = { path = "gas_market/eip1559" }
 
 [build-dependencies]
+anyhow = { workspace = true }
 fil_actors_runtime = { workspace = true, features = ["test_utils"] }
 fil_actor_bundler = "6.1.0"
 num-traits = { workspace = true }
+toml = "0.8.19"

@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import {SubnetID, IPCAddress} from "./Subnet.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {ActivityCommitment} from "../activities/Activity.sol";
+import {ActivitySummary} from "../activities/Activity.sol";
 
 uint64 constant MAX_MSGS_PER_BATCH = 10;
 uint256 constant BATCH_PERIOD = 100;
@@ -30,21 +30,9 @@ struct BottomUpCheckpoint {
     uint64 nextConfigurationNumber;
     /// @dev Batch of messages to execute.
     IpcEnvelope[] msgs;
-    /// @dev The activity commitment from child subnet to parent subnet
-    ActivityCommitment activities;
+    /// @dev The activity summary from child subnet to parent subnet
+    ActivitySummary activities;
 }
-
-struct ActivitySummary {
-    /// @dev The block range the activity summary spans; these are the local heights of the start and the end, inclusive.
-    uint256[2] blockRange;
-    /// @dev The validators whose activity we're reporting about.
-    address[] validators;
-    /// @dev The number of blocks committed by each validator in the position they appear in the validators array.
-    /// If there is a configuration change applied at this checkpoint, this carries information about the _old_ validator set.
-    uint64[] blocksCommitted;
-}
-
-event ActivitySummaryCommitted(bytes32 indexed commitment, ActivitySummary summary);
 
 struct RelayedSummary {
     /// @dev The subnet IDs whose activity is being relayed.

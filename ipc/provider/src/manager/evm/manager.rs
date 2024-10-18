@@ -278,6 +278,7 @@ impl SubnetManager for EthSubnetManager {
             supply_source: register_subnet_facet::Asset::try_from(params.supply_source)?,
             collateral_source: register_subnet_facet::Asset::try_from(params.collateral_source)?,
             validator_gater: payload_to_evm_address(params.validator_gater.payload())?,
+            validator_rewarder: payload_to_evm_address(params.validator_rewarder.payload())?,
         };
 
         tracing::info!("creating subnet on evm with params: {params:?}");
@@ -771,7 +772,7 @@ impl SubnetManager for EthSubnetManager {
             address,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
-        let raw = contract.collateral_source().call().await?;
+        let raw = contract.supply_source().call().await?;
         Ok(Asset::try_from(raw)?)
     }
 

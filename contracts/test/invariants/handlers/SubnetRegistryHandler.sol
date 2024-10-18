@@ -11,6 +11,8 @@ import {SubnetRegistryDiamond} from "../../../contracts/SubnetRegistryDiamond.so
 import {ConsensusType} from "../../../contracts/enums/ConsensusType.sol";
 import {SubnetID, PermissionMode} from "../../../contracts/structs/Subnet.sol";
 import {AssetHelper} from "../../../contracts/lib/AssetHelper.sol";
+import {ValidatorRewarderMap} from "../../../contracts/examples/ValidatorRewarderMap.sol";
+
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {RegistryFacetsHelper} from "../../helpers/RegistryFacetsHelper.sol";
 
@@ -124,7 +126,8 @@ contract SubnetRegistryHandler is CommonBase, StdCheats, StdUtils {
             permissionMode: PermissionMode.Collateral,
             supplySource: AssetHelper.native(),
             collateralSource: AssetHelper.native(),
-            validatorGater: address(0)
+            validatorGater: address(0),
+            validatorRewarder: address(new ValidatorRewarderMap())
         });
 
         address owner = getRandomOldAddressOrNewOne(seed);

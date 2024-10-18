@@ -256,6 +256,7 @@ impl IpcProvider {
         supply_source: Asset,
         collateral_source: Asset,
         validator_gater: Address,
+        validator_rewarder: Address,
     ) -> anyhow::Result<Address> {
         let conn = self.get_connection(&parent)?;
 
@@ -275,6 +276,7 @@ impl IpcProvider {
             supply_source,
             collateral_source,
             validator_gater,
+            validator_rewarder,
         };
 
         conn.manager()

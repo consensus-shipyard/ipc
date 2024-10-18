@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {GatewayActorModifiers} from "../../lib/LibGatewayActorStorage.sol";
-import {BottomUpCheckpoint, ActivitySummary, ActivitySummaryCommitted} from "../../structs/CrossNet.sol";
+import {BottomUpCheckpoint} from "../../structs/CrossNet.sol";
 import {LibGateway} from "../../lib/LibGateway.sol";
 import {LibQuorum} from "../../lib/LibQuorum.sol";
 import {Subnet} from "../../structs/Subnet.sol";
@@ -16,7 +16,8 @@ import {BatchNotCreated, InvalidBatchEpoch, BatchAlreadyExists, NotEnoughSubnetC
 import {CrossMsgHelper} from "../../lib/CrossMsgHelper.sol";
 import {IpcEnvelope, SubnetID} from "../../structs/CrossNet.sol";
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
-import {LibValidatorRewardParent} from "../../activities/ValidatorRewardParentFacet.sol";
+
+import {ActivityReportCreated, ActivityReport} from "../../activities/Activity.sol";
 
 contract CheckpointingFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
@@ -42,30 +43,22 @@ contract CheckpointingFacet is GatewayActorModifiers {
         LibGateway.checkMsgLength(checkpoint.msgs);
 
         execBottomUpMsgs(checkpoint.msgs, subnet);
-
-        LibValidatorRewardParent.initNewDistribution(
-            uint64(checkpoint.blockHeight),
-            checkpoint.activities.summary,
-            checkpoint.subnetID
-        );
     }
 
-    /// @notice creates a new bottom-up checkpoint
+    /// @notice creates a new bottom-up checkpoint with activity report
     /// @param checkpoint - a bottom-up checkpoint
     /// @param membershipRootHash - a root hash of the Merkle tree built from the validator public keys and their weight
     /// @param membershipWeight - the total weight of the membership
-    function createBottomUpCheckpoint(
+    /// @param activityReport - the validator validator report
+    function createBUChptWithActivities(
         BottomUpCheckpoint calldata checkpoint,
-        // TODO(rewarder) ActivitySummary calldata summary,
         bytes32 membershipRootHash,
-        uint256 membershipWeight
+        uint256 membershipWeight,
+        ActivityReport calldata activityReport
     ) external systemActorOnly {
         if (LibGateway.bottomUpCheckpointExists(checkpoint.blockHeight)) {
             revert CheckpointAlreadyExists();
         }
-
-        // TODO(rewarder): compute the commitment to the summary and set it in the checkpoint.
-        //  Collect summaries to relay and put them in the checkpoint. Reset the pending summaries map.
 
         LibQuorum.createQuorumInfo({
             self: s.checkpointQuorumMap,
@@ -76,7 +69,38 @@ contract CheckpointingFacet is GatewayActorModifiers {
             majorityPercentage: s.majorityPercentage
         });
 
-        // TODO(rewarder): emit an ActivitySummaryCommittedevent so relayers can pick it up.
+        LibGateway.storeBottomUpCheckpoint(checkpoint);
+
+        emit ActivityReportCreated(uint64(checkpoint.blockHeight), activityReport);
+    }
+
+    /// @notice creates a new bottom-up checkpoint
+    /// @param checkpoint - a bottom-up checkpoint
+    /// @param membershipRootHash - a root hash of the Merkle tree built from the validator public keys and their weight
+    /// @param membershipWeight - the total weight of the membership
+    function createBottomUpCheckpoint(
+        BottomUpCheckpoint calldata checkpoint,
+        bytes32 membershipRootHash,
+        uint256 membershipWeight
+    ) external systemActorOnly {
+        if (LibGateway.bottomUpCheckpointExists(checkpoint.blockHeight)) {
+            revert CheckpointAlreadyExists();
+        }
+
+        // TODO(rewarder): step 1. call fvm ActivityTrackerActor::get_summary to generate the summary
+        // TODO(rewarder): step 2. update checkpoint.activities with that in step 1
+        // TODO: (if there is more time, should wrap param checkpoint with another data structure)
+        // TODO(rewarder): step 3. call fvm ActivityTrackerActor::purge_activities to purge the activities
+        // TODO(rewarder): step 4. emit validator details as event
+
+        LibQuorum.createQuorumInfo({
+            self: s.checkpointQuorumMap,
+            objHeight: checkpoint.blockHeight,
+            objHash: keccak256(abi.encode(checkpoint)),
+            membershipRootHash: membershipRootHash,
+            membershipWeight: membershipWeight,
+            majorityPercentage: s.majorityPercentage
+        });
 
         LibGateway.storeBottomUpCheckpoint(checkpoint);
     }

@@ -19,7 +19,7 @@ impl CommandLineHandler for EthToF4Addr {
 
     async fn handle(_global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
         let eth_addr = EthAddress::from_str(&arguments.addr)?;
-        log::info!("f4 address: {:}", Address::from(eth_addr));
+        log::info!("f4 address: {}", Address::from(eth_addr));
         Ok(())
     }
 }

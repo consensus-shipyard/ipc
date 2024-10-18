@@ -4,8 +4,8 @@
 //! Type conversion for IPC Agent struct with solidity contract struct
 
 use crate::address::IPCAddress;
-use crate::checkpoint::{BottomUpCheckpoint, ActivityCommitment};
 use crate::checkpoint::BottomUpMsgBatch;
+use crate::checkpoint::{ActivitySummary, BottomUpCheckpoint};
 use crate::cross::{IpcEnvelope, IpcMsgKind};
 use crate::staking::StakingChange;
 use crate::staking::StakingChangeRequest;
@@ -18,10 +18,9 @@ use fvm_shared::address::{Address, Payload};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use ipc_actors_abis::{
-    gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet, lib_gateway,
-    register_subnet_facet, subnet_actor_checkpointing_facet, subnet_actor_diamond,
+    checkpointing_facet, gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet,
+    lib_gateway, register_subnet_facet, subnet_actor_checkpointing_facet, subnet_actor_diamond,
     subnet_actor_getter_facet, top_down_finality_facet, xnet_messaging_facet,
-    checkpointing_facet
 };
 
 /// The type conversion for IPC structs to evm solidity contracts. We need this convenient macro because
@@ -122,15 +121,17 @@ macro_rules! cross_msg_types {
 /// The type conversion between different bottom up checkpoint definition in ethers and sdk
 macro_rules! bottom_up_checkpoint_conversion {
     ($module:ident) => {
-        impl TryFrom<ActivityCommitment> for $module::ActivityCommitment {
+        impl TryFrom<ActivitySummary> for $module::ActivitySummary {
             type Error = anyhow::Error;
 
-            fn try_from(c: ActivityCommitment) -> Result<Self, Self::Error> {
-                Ok(
-                    $module::ActivityCommitment {
-                        summary: c.summary.try_into().map_err(|_| anyhow!("cannot convert bytes32"))?,
-                    }
-                )
+            fn try_from(c: ActivitySummary) -> Result<Self, Self::Error> {
+                Ok($module::ActivitySummary {
+                    total_active_validators: c.total_active_validators,
+                    commitment: c
+                        .commitment
+                        .try_into()
+                        .map_err(|_| anyhow!("cannot convert bytes32"))?,
+                })
             }
         }
 
@@ -167,8 +168,9 @@ macro_rules! bottom_up_checkpoint_conversion {
                         .into_iter()
                         .map(IpcEnvelope::try_from)
                         .collect::<Result<Vec<_>, _>>()?,
-                    activities: ActivityCommitment {
-                        summary: value.activities.summary.to_vec(),
+                    activities: ActivitySummary {
+                        total_active_validators: value.activities.total_active_validators,
+                        commitment: value.activities.commitment.to_vec(),
                     },
                 })
             }

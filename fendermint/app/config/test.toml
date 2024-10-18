@@ -9,9 +9,7 @@ kind = "ethereum"
 subnet_id = "/r31415926"
 
 [resolver.membership]
-static_subnets = [
-  "/r31415926/f2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq",
-]
+static_subnets = ["/r31415926/f2xwzbdu7z5sam6hc57xxwkctciuaz7oe5omipwbq"]
 
 [resolver.discovery]
 static_addresses = [
@@ -30,3 +28,10 @@ external_addresses = [
 
 [testing]
 push_chain_meta = false
+
+[tracing.file]
+enabled = true
+level = "debug"
+directory = "logs"
+max_log_files = 4
+rotation = "minutely"
