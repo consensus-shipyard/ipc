@@ -1,16 +1,21 @@
+use anyhow::Context;
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use async_trait::async_trait;
 use either::Either;
 use ethers::types::H160;
 use fvm_shared::{chainid::ChainID, econ::TokenAmount};
-use std::collections::BTreeMap;
+use std::{
+    collections::BTreeMap,
+    fs,
+    path::{Path, PathBuf},
+};
 use url::Url;
 
 use fendermint_vm_genesis::Collateral;
 
 use crate::{
-    manifest::{Balance, CheckpointConfig, EnvMap},
+    manifest::{Balance, CheckpointConfig, EnvMap, SolidityContractDefinition},
     materials::Materials,
     AccountName, NodeName, RelayerName, ResourceHash, SubnetName, TestnetName,
 };
@@ -202,6 +207,14 @@ pub trait Materializer<M: Materials> {
     ) -> anyhow::Result<M::Relayer>
     where
         's: 'a;
+
+    /// Deploy a custom contract to the subnet.
+    async fn deploy_solidity_contract<'s, 'a>(
+        &'s mut self,
+        contract: SolidityContractDeploymentConfig<'a, M>,
+    ) -> anyhow::Result<M::CustomContractDeployment>
+    where
+        's: 'a;
 }
 
 /// Options regarding node configuration, e.g. which services to start.
@@ -222,6 +235,39 @@ pub struct NodeConfig<'a, M: Materials> {
     pub env: &'a EnvMap,
     /// Number of nodes to be expected in the subnet, including this node, or 0 if unknown.
     pub peer_count: usize,
+}
+
+pub struct SolidityContract {
+    pub path: PathBuf,
+    pub name: String,
+    pub constructor_args: Vec<String>,
+}
+
+impl From<SolidityContractDefinition> for SolidityContract {
+    fn from(def: SolidityContractDefinition) -> Self {
+        let path = Path::new(&def.path);
+
+        let resolved_path = if path.is_absolute() {
+            Ok(path.to_path_buf())
+        } else {
+            fs::canonicalize(path)
+        }
+        .context(format!("failed to resolve path for {}", def.name))
+        .unwrap();
+
+        Self {
+            name: def.name.clone(),
+            path: resolved_path,
+            constructor_args: def.constructor_args.clone(),
+        }
+    }
+}
+
+pub struct SolidityContractDeploymentConfig<'a, M: Materials> {
+    pub contract: SolidityContract,
+    pub libraries: Option<Vec<SolidityContract>>,
+    pub nodes: Vec<&'a M::Node>,
+    pub account: &'a M::Account,
 }
 
 /// Options regarding relayer configuration

@@ -16,7 +16,10 @@ use url::Url;
 use crate::{
     logging::LoggingMaterializer,
     manifest::{Balance, Manifest},
-    materializer::{Materializer, NodeConfig, RelayerConfig, SubmitConfig, SubnetConfig},
+    materializer::{
+        Materializer, NodeConfig, RelayerConfig, SolidityContractDeploymentConfig, SubmitConfig,
+        SubnetConfig,
+    },
     materials::Materials,
     testnet::Testnet,
     AccountName, NodeName, RelayerName, ResourceHash, ResourceName, SubnetName, TestnetName,
@@ -47,6 +50,7 @@ impl Materials for ValidationMaterials {
     type Subnet = SubnetName;
     type Node = NodeName;
     type Relayer = RelayerName;
+    type CustomContractDeployment = ();
 }
 
 type VNetwork = <ValidationMaterials as Materials>::Network;
@@ -56,6 +60,7 @@ type VGenesis = <ValidationMaterials as Materials>::Genesis;
 type VSubnet = <ValidationMaterials as Materials>::Subnet;
 type VNode = <ValidationMaterials as Materials>::Node;
 type VRelayer = <ValidationMaterials as Materials>::Relayer;
+type VCustomContractDeployment = <ValidationMaterials as Materials>::CustomContractDeployment;
 
 #[derive(Clone, Debug, Default)]
 pub struct ValidatingMaterializer {
@@ -359,6 +364,13 @@ impl Materializer<ValidationMaterials> for ValidatingMaterializer {
         let parent = parent_submit_config.subnet;
         self.ensure_balance(parent, relayer_config.submitter)?;
         Ok(relayer_name.clone())
+    }
+
+    async fn deploy_solidity_contract<'s, 'a>(
+        &'s mut self,
+        contract: SolidityContractDeploymentConfig<'a, ValidationMaterials>,
+    ) -> anyhow::Result<VCustomContractDeployment> {
+        Ok(())
     }
 }
 
