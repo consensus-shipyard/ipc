@@ -3149,6 +3149,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_actor_bucket"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cid",
+ "fendermint_actor_blobs_shared",
+ "fendermint_actor_machine",
+ "fendermint_testing",
+ "fil_actors_evm_shared",
+ "fil_actors_runtime",
+ "frc42_dispatch",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
+ "fvm_ipld_hamt 0.9.0",
+ "fvm_shared",
+ "hex-literal 0.4.1",
+ "iroh-base",
+ "log",
+ "num-derive 0.3.3",
+ "num-traits",
+ "quickcheck",
+ "quickcheck_macros",
+ "rand",
+ "serde",
+ "serde_tuple",
+]
+
+[[package]]
 name = "fendermint_actor_chainmetadata"
 version = "0.1.0"
 dependencies = [
@@ -3203,34 +3231,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fendermint_actor_objectstore"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "cid",
- "fendermint_actor_blobs_shared",
- "fendermint_actor_machine",
- "fendermint_testing",
- "fil_actors_evm_shared",
- "fil_actors_runtime",
- "frc42_dispatch",
- "fvm_ipld_blockstore",
- "fvm_ipld_encoding",
- "fvm_ipld_hamt 0.9.0",
- "fvm_shared",
- "hex-literal 0.4.1",
- "iroh-base",
- "log",
- "num-derive 0.3.3",
- "num-traits",
- "quickcheck",
- "quickcheck_macros",
- "rand",
- "serde",
- "serde_tuple",
-]
-
-[[package]]
 name = "fendermint_actor_timehub"
 version = "0.1.0"
 dependencies = [
@@ -3258,9 +3258,9 @@ dependencies = [
  "anyhow",
  "cid",
  "fendermint_actor_blobs",
+ "fendermint_actor_bucket",
  "fendermint_actor_chainmetadata",
  "fendermint_actor_eam",
- "fendermint_actor_objectstore",
  "fendermint_actor_timehub",
  "fil_actor_bundler",
  "fil_actors_runtime",
@@ -3283,8 +3283,8 @@ dependencies = [
  "ethers",
  "fendermint_abci",
  "fendermint_actor_blobs_shared",
+ "fendermint_actor_bucket",
  "fendermint_actor_machine",
- "fendermint_actor_objectstore",
  "fendermint_actor_timehub",
  "fendermint_app_options",
  "fendermint_app_settings",
@@ -3581,8 +3581,8 @@ dependencies = [
  "cid",
  "clap 4.5.11",
  "ethers",
+ "fendermint_actor_bucket",
  "fendermint_actor_machine",
- "fendermint_actor_objectstore",
  "fendermint_actor_timehub",
  "fendermint_crypto",
  "fendermint_vm_actor_interface",
@@ -3761,9 +3761,9 @@ dependencies = [
  "ethers",
  "fendermint_actor_blobs",
  "fendermint_actor_blobs_shared",
+ "fendermint_actor_bucket",
  "fendermint_actor_chainmetadata",
  "fendermint_actor_eam",
- "fendermint_actor_objectstore",
  "fendermint_actor_timehub",
  "fendermint_actors",
  "fendermint_crypto",

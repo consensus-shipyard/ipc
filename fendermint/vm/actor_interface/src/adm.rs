@@ -27,8 +27,8 @@ pub enum Method {
 /// The kinds of machines available.
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Kind {
-    /// An object store with S3-like key semantics.
-    ObjectStore,
+    /// A bucket with S3-like key semantics.
+    Bucket,
     /// An MMR accumulator, used for timestamping data.
     Timehub,
 }
@@ -36,7 +36,7 @@ pub enum Kind {
 impl Display for Kind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let str = match self {
-            Self::ObjectStore => "objectstore",
+            Self::Bucket => "bucket",
             Self::Timehub => "timehub",
         };
         write!(f, "{}", str)

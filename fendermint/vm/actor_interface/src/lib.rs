@@ -43,9 +43,9 @@ macro_rules! define_singleton {
 }
 
 pub mod account;
-pub mod timehub;
 pub mod adm;
 pub mod blobs;
+pub mod bucket;
 pub mod burntfunds;
 pub mod chainmetadata;
 pub mod cron;
@@ -56,7 +56,7 @@ pub mod evm;
 pub mod init;
 pub mod ipc;
 pub mod multisig;
-pub mod objectstore;
 pub mod placeholder;
 pub mod reward;
 pub mod system;
+pub mod timehub;

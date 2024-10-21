@@ -3,7 +3,7 @@
 
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
-use fendermint_actor_objectstore::{GetParams, Object};
+use fendermint_actor_bucket::{GetParams, Object};
 use fendermint_vm_actor_interface::system::SYSTEM_ACTOR_ADDR;
 use fvm_ipld_encoding::serde::Serialize;
 use fvm_shared::econ::TokenAmount;
@@ -133,7 +133,7 @@ pub trait QueryClient: Sync {
         Ok(QueryResponse { height, value })
     }
 
-    /// Get an object in an object store without including a transaction on the blockchain.
+    /// Get an object in a bucket without including a transaction on the blockchain.
     async fn os_get_call(
         &mut self,
         address: Address,

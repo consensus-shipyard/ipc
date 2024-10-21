@@ -7,8 +7,7 @@ use std::{convert::Infallible, net::ToSocketAddrs, num::ParseIntError};
 use anyhow::anyhow;
 use base64::{engine::general_purpose, Engine};
 use bytes::Buf;
-use fendermint_actor_objectstore::GetParams;
-use fendermint_actor_objectstore::Object;
+use fendermint_actor_bucket::{GetParams, Object};
 use fendermint_app_settings::objects::ObjectsSettings;
 use fendermint_rpc::client::FendermintClient;
 use fendermint_rpc::message::GasParams;
@@ -280,11 +279,11 @@ async fn handle_object_upload<F: QueryClient>(
 
     // Ensure the sender has enough credits, and fetch the data through iroh
     let SignedMessage { message, .. } = signed_msg;
-    ensure_objectstore_exists(client, message.to)
+    ensure_bucket_exists(client, message.to)
         .await
         .map_err(|e| {
             Rejection::from(BadRequest {
-                message: format!("failed to connect with objectstore: {}", e),
+                message: format!("failed to connect with bucket: {}", e),
             })
         })?;
 
@@ -337,7 +336,7 @@ async fn handle_object_upload<F: QueryClient>(
     Ok(hash.to_string())
 }
 
-async fn ensure_objectstore_exists<F: QueryClient>(client: F, to: Address) -> anyhow::Result<()> {
+async fn ensure_bucket_exists<F: QueryClient>(client: F, to: Address) -> anyhow::Result<()> {
     let actor_state = client.actor_state(&to, FvmQueryHeight::Committed).await?;
     actor_state.value.ok_or(anyhow!("cannot find actor {to}"))?;
     Ok(())
@@ -397,7 +396,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
         .await
         .map_err(|e| {
             Rejection::from(BadRequest {
-                message: format!("objectstore get error: {}", e),
+                message: format!("bucket get error: {}", e),
             })
         })?;
 
@@ -563,7 +562,7 @@ mod tests {
     use super::*;
     use ethers::core::k256::ecdsa::SigningKey;
     use ethers::core::rand::{rngs::StdRng, SeedableRng};
-    use fendermint_actor_objectstore::AddParams;
+    use fendermint_actor_bucket::AddParams;
     use fendermint_rpc::FendermintClient;
     use fendermint_vm_message::conv::from_eth::to_fvm_address;
     use fvm_ipld_encoding::RawBytes;
@@ -728,7 +727,7 @@ mod tests {
             to: store,
             sequence: 0,
             value: TokenAmount::from_atto(0),
-            method_num: fendermint_actor_objectstore::Method::AddObject as u64,
+            method_num: fendermint_actor_bucket::Method::AddObject as u64,
             params,
             gas_limit: 3000000,
             gas_fee_cap: TokenAmount::from_atto(0),

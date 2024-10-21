@@ -15,7 +15,7 @@ use fvm_ipld_hamt::BytesKey;
 
 use crate::shared::{
     AddParams, DeleteParams, GetParams, ListObjectsReturn, ListParams, Method, Object,
-    OBJECTSTORE_ACTOR_NAME,
+    BUCKET_ACTOR_NAME,
 };
 use crate::state::{ObjectState, State};
 
@@ -157,7 +157,7 @@ impl ActorCode for Actor {
     type Methods = Method;
 
     fn name() -> &'static str {
-        OBJECTSTORE_ACTOR_NAME
+        BUCKET_ACTOR_NAME
     }
 
     actor_dispatch! {

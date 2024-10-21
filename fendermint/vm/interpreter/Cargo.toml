@@ -47,12 +47,12 @@ tokio-util = { workspace = true }
 tracing = { workspace = true }
 
 blobs_syscall = { path = "../../../hoku/blobs_syscall" }
-fendermint_actor_timehub = { path = "../../actors/timehub" }
 fendermint_actor_blobs = { path = "../../actors/blobs" }
 fendermint_actor_blobs_shared = { path = "../../actors/blobs/shared" }
+fendermint_actor_bucket = { path = "../../actors/bucket" }
 fendermint_actor_chainmetadata = { path = "../../actors/chainmetadata" }
 fendermint_actor_eam = { path = "../../actors/eam" }
-fendermint_actor_objectstore = { path = "../../actors/objectstore" }
+fendermint_actor_timehub = { path = "../../actors/timehub" }
 fendermint_actors = { path = "../../actors" }
 fendermint_crypto = { path = "../../crypto" }
 fendermint_eth_hardhat = { path = "../../eth/hardhat" }

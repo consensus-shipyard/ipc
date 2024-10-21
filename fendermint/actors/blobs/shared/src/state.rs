@@ -50,7 +50,7 @@ pub struct Account {
     /// The chain epoch of the last debit.
     pub last_debit_epoch: ChainEpoch,
     /// Credit approvals to other accounts, keyed by receiver, keyed by caller,
-    /// which could be the receiver or a specific contract, like an object store.
+    /// which could be the receiver or a specific contract, like a bucket.
     /// This allows for limiting approvals to interactions from a specific contract.
     /// For example, an approval for Alice might be valid for any contract caller, so long as
     /// the origin is Alice.
