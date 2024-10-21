@@ -12,7 +12,6 @@ use bollard::{
 use either::Either;
 use ethers::{
     core::rand::{rngs::StdRng, SeedableRng},
-    etherscan::contract,
     types::H160,
 };
 use fendermint_vm_actor_interface::eam::EthAddress;
@@ -21,14 +20,16 @@ use fendermint_vm_genesis::{
     ipc::{GatewayParams, IpcParams},
     Account, Actor, ActorMeta, Collateral, Genesis, SignerAddr, Validator, ValidatorKey,
 };
-use fvm_shared::{
-    bigint::Zero, chainid::ChainID, econ::TokenAmount, sys::out, version::NetworkVersion,
-};
+use fvm_shared::{bigint::Zero, chainid::ChainID, econ::TokenAmount, version::NetworkVersion};
 use ipc_api::subnet_id::SubnetID;
 use ipc_provider::config::subnet::{
     EVMSubnet, Subnet as IpcCliSubnet, SubnetConfig as IpcCliSubnetConfig,
 };
+
+use fendermint_vm_actor_interface::init::builtin_actor_eth_addr;
+use fendermint_vm_actor_interface::ipc;
 use ipc_provider::config::Config as IpcCliConfig;
+use ipc_provider::IpcProvider;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -38,7 +39,7 @@ use std::{
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
     str::FromStr,
-    time::Duration,
+    time::{Duration, Instant},
 };
 use url::Url;
 
@@ -664,6 +665,31 @@ impl DockerMaterializer {
             address: EthAddress::from(H160::from_str(&json_output.deployed_to)?),
         })
     }
+
+    fn ipc_provider(
+        &self,
+        subnet: &DefaultSubnet,
+        nodes: Vec<&DockerNode>,
+    ) -> anyhow::Result<IpcProvider> {
+        let rpc_url = nodes
+            .into_iter()
+            .find_map(|node| node.ethapi_http_endpoint())
+            .ok_or_else(|| anyhow::anyhow!("No valid HTTP endpoint found in the provided nodes"))?;
+
+        IpcProvider::new_with_subnet(
+            None,
+            IpcCliSubnet {
+                id: subnet.subnet_id.clone(),
+                config: IpcCliSubnetConfig::Fevm(EVMSubnet {
+                    provider_http: rpc_url,
+                    provider_timeout: None,
+                    auth_token: None,
+                    registry_addr: builtin_actor_eth_addr(ipc::SUBNETREGISTRY_ACTOR_ID).into(),
+                    gateway_addr: builtin_actor_eth_addr(ipc::GATEWAY_ACTOR_ID).into(),
+                }),
+            },
+        )
+    }
 }
 
 #[async_trait]
@@ -1102,19 +1128,14 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     }
 
     async fn deploy_solidity_contract<'s, 'a>(
-        &'s mut self,
+        &'s self,
         config: SolidityContractDeploymentConfig<'a, DockerMaterials>,
     ) -> anyhow::Result<DefaultSolidityContractDeployment> {
         let rpc_url = config
             .nodes
             .into_iter()
-            .filter_map(|node| node.ethapi_http_endpoint())
-            .collect::<Vec<_>>()
-            .first()
-            .cloned()
-            .unwrap_or_else(|| {
-                panic!("No node with ethapi_http_endpoint found in the contract deployment config")
-            });
+            .find_map(|node| node.ethapi_http_endpoint())
+            .ok_or_else(|| anyhow::anyhow!("No valid HTTP endpoint found in the provided nodes"))?;
 
         let private_key = hex::encode(config.account.secret_key().serialize());
 
@@ -1150,27 +1171,32 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         )
     }
 
-    // async fn wait_for_balance<'s, 'a>(
-    //     &'s mut self,
-    //     account: &'a DefaultAccount,
-    //     balance: Balance,
-    // ) -> anyhow::Result<()> {
-    //     let cmd = format!(
-    //         "ipc-cli account wait-balance \
-    //             --address {:?} \
-    //             --balance {} \
-    //         ",
-    //         account.eth_addr(),
-    //         balance.0
-    //     );
+    async fn wait_for_balance<'s, 'a>(
+        &'s self,
+        subnet_id: &'a DefaultSubnet,
+        nodes: Vec<&'a DockerNode>,
+        account: &'a DefaultAccount,
+    ) -> anyhow::Result<TokenAmount> {
+        let timeout = Duration::from_secs(15);
+        let start = Instant::now();
 
-    //     let logs = self
-    //         .ipc_cli_run_cmd(&SubmitConfig::default(), account, cmd)
-    //         .await
-    //         .context("failed to wait for balance")?;
+        let parent_provider = self.ipc_provider(subnet_id, nodes)?;
 
-    //     Ok(())
-    // }
+        while start.elapsed() < timeout {
+            let balance = parent_provider
+                .wallet_balance(&subnet_id.subnet_id, &account.fvm_addr())
+                .await?;
+
+            if balance > TokenAmount::zero() {
+                return Ok(balance);
+            }
+        }
+
+        Err(anyhow!(
+            "failed to get balance for {} - timeout",
+            account.eth_addr()
+        ))
+    }
 }
 
 /// The `ipc-cli` puts the output in a human readable log instead of printing JSON.

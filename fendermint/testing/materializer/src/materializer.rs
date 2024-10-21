@@ -208,11 +208,21 @@ pub trait Materializer<M: Materials> {
     where
         's: 'a;
 
-    /// Deploy a custom contract to the subnet.
+    /// Deploy a Solidity contract to the subnet.
     async fn deploy_solidity_contract<'s, 'a>(
-        &'s mut self,
+        &'s self,
         contract: SolidityContractDeploymentConfig<'a, M>,
     ) -> anyhow::Result<M::SolidityContractDeployment>
+    where
+        's: 'a;
+
+    /// Wait for the balance of an account to have a non zero amount.
+    async fn wait_for_balance<'s, 'a>(
+        &'s self,
+        subnet_id: &'a M::Subnet,
+        nodes: Vec<&'a M::Node>,
+        account: &'a M::Account,
+    ) -> anyhow::Result<TokenAmount>
     where
         's: 'a;
 }

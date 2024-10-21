@@ -60,7 +60,7 @@ type VGenesis = <ValidationMaterials as Materials>::Genesis;
 type VSubnet = <ValidationMaterials as Materials>::Subnet;
 type VNode = <ValidationMaterials as Materials>::Node;
 type VRelayer = <ValidationMaterials as Materials>::Relayer;
-type VCustomContractDeployment = <ValidationMaterials as Materials>::SolidityContractDeployment;
+type VSolidityContractDeployment = <ValidationMaterials as Materials>::SolidityContractDeployment;
 
 #[derive(Clone, Debug, Default)]
 pub struct ValidatingMaterializer {
@@ -367,10 +367,19 @@ impl Materializer<ValidationMaterials> for ValidatingMaterializer {
     }
 
     async fn deploy_solidity_contract<'s, 'a>(
-        &'s mut self,
-        contract: SolidityContractDeploymentConfig<'a, ValidationMaterials>,
-    ) -> anyhow::Result<VCustomContractDeployment> {
+        &'s self,
+        _contract: SolidityContractDeploymentConfig<'a, ValidationMaterials>,
+    ) -> anyhow::Result<VSolidityContractDeployment> {
         Ok(())
+    }
+
+    async fn wait_for_balance<'s, 'a>(
+        &'s self,
+        _subnet_id: &'a VSubnet,
+        _nodes: Vec<&'a VNode>,
+        _account: &'a VAccount,
+    ) -> anyhow::Result<TokenAmount> {
+        Ok(TokenAmount::from_whole(0))
     }
 }
 

@@ -26,6 +26,8 @@ use ipc_actors_abis::gateway_messenger_facet::{
 };
 use ipc_actors_abis::subnet_actor_getter_facet::SubnetActorGetterFacet;
 
+use ipc_actors_abis::cross_messenger::{self, CrossMessenger, Ipcaddress};
+
 use fvm_shared::econ::TokenAmount;
 
 use ipc_api::address::IPCAddress;
@@ -39,50 +41,9 @@ const CHECKPOINT_PERIOD: u64 = 10;
 const SLEEP_SECS: u64 = 5;
 const MAX_RETRIES: u32 = 5;
 
-/// Test that top-down syncing and bottom-up checkpoint submission work.
 #[serial_test::serial]
 #[tokio::test]
-async fn test_provider() {
-    // TODO Karel - use the provider to wait for balance to be updated in the child subnet.
-    use ipc_api::ethers_address_to_fil_address;
-    use ipc_api::subnet_id::SubnetID;
-    use ipc_provider::config::{
-        subnet::{EVMSubnet, SubnetConfig},
-        Subnet,
-    };
-
-    let subnet_id =
-        SubnetID::from_str("/r1126193293194756/f410fhwibtof7hp6v5f453q5soyn6ksxym7chbqata2q")
-            .unwrap();
-
-    let parent_provider = IpcProvider::new_with_subnet(
-        None,
-        Subnet {
-            id: subnet_id.clone(),
-            config: SubnetConfig::Fevm(EVMSubnet {
-                provider_http: "http://localhost:30745".parse().unwrap(),
-                provider_timeout: None,
-                auth_token: None,
-                registry_addr: builtin_actor_eth_addr(ipc::SUBNETREGISTRY_ACTOR_ID).into(),
-                gateway_addr: builtin_actor_eth_addr(ipc::GATEWAY_ACTOR_ID).into(),
-            }),
-        },
-    )
-    .unwrap();
-
-    let eth_address =
-        ethers::types::Address::from_str("0x651a3c584f4c71b54c50ea73f41b936845ab4fdf").unwrap();
-    let address = ethers_address_to_fil_address(&eth_address).unwrap();
-
-    let balance = parent_provider
-        .wallet_balance(&subnet_id, &address)
-        .await
-        .unwrap();
-
-    println!("Balance: {:?}", balance);
-}
-
-async fn test_topdown_and_bottomup_plus() {
+async fn test_cross_messages() {
     with_testnet(
         MANIFEST,
         |manifest| {
@@ -122,6 +83,25 @@ async fn test_topdown_and_bottomup_plus() {
 
                 let root_network = testnet.subnet(&testnet.root())?;
                 let subnet = testnet.subnet(&testnet.root().subnet("england"))?;
+
+                let parent_cross_messenger = CrossMessenger::new(
+                    builtin_actor_eth_addr(ipc::GATEWAY_ACTOR_ID),
+                    parent_provider.clone(),
+                );
+
+                Ipcaddress {
+                    subnet_id: SubnetID::new(vec![0], vec![0]),
+                    raw_address: FvmAddress::new(vec![0]),
+                };
+
+                let from = IPCAddress::new(&root_network.subnet_id, &charlie.fvm_addr())?;
+                let to = IPCAddress::new(&subnet.subnet_id, &bob.fvm_addr())?;
+
+                parent_cross_messenger.invoke_cross_message(
+                    from.try_into().unwrap(),
+                    to.try_into(),
+                    TokenAmount::from_nano(10),
+                );
 
                 let envelope = IpcEnvelope {
                     kind: IpcMsgKind::Call,
