@@ -9,6 +9,7 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_api::checkpoint::{
     BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent, Signature,
+    ValidatorClaimProof, ValidatorSummary,
 };
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::{StakingChangeRequest, ValidatorInfo};
@@ -20,7 +21,9 @@ use crate::lotus::message::ipc::SubnetInfo;
 
 /// Trait to interact with a subnet and handle its lifecycle.
 #[async_trait]
-pub trait SubnetManager: Send + Sync + TopDownFinalityQuery + BottomUpCheckpointRelayer {
+pub trait SubnetManager:
+    Send + Sync + TopDownFinalityQuery + BottomUpCheckpointRelayer + ValidatorRewarder
+{
     /// Deploys a new subnet actor on the `parent` subnet and with the
     /// configuration passed in `ConstructParams`.
     /// The result of the function is the ID address for the subnet actor from which the final
@@ -278,4 +281,32 @@ pub trait BottomUpCheckpointRelayer: Send + Sync {
     async fn quorum_reached_events(&self, height: ChainEpoch) -> Result<Vec<QuorumReachedEvent>>;
     /// Get the current epoch in the current subnet
     async fn current_epoch(&self) -> Result<ChainEpoch>;
+}
+
+/// The validator reward related functions, such as check reward and claim reward for mining blocks
+/// in the child subnet
+#[async_trait]
+pub trait ValidatorRewarder: Send + Sync {
+    /// Obtain the proofs needed for the validator to batch claim the rewards
+    async fn get_validator_claim_proofs(
+        &self,
+        validator_addr: &Address,
+        from_checkpoint: ChainEpoch,
+        to_checkpoint: ChainEpoch,
+    ) -> Result<Vec<ValidatorClaimProof>>;
+    /// Get the reward for specific validator in the current subnet gateway
+    async fn get_validator_activities(
+        &self,
+        validator: &Address,
+        from_checkpoint: ChainEpoch,
+        to_checkpoint: ChainEpoch,
+    ) -> Result<Vec<ValidatorSummary>>;
+    /// Claim the reward in batches
+    async fn batch_claim(
+        &self,
+        submitter: &Address,
+        reward_claim_subnet: &SubnetID,
+        reward_source_subnet: &SubnetID,
+        proofs: Vec<ValidatorClaimProof>,
+    ) -> Result<()>;
 }

@@ -58,7 +58,7 @@ impl State {
     }
 
     pub fn incr_validator_block_committed(
-        &self,
+        &mut self,
         rt: &impl Runtime,
         validator: &Address,
     ) -> Result<(), ActorError> {
@@ -76,6 +76,8 @@ impl State {
         };
 
         validators.set(validator, v)?;
+
+        self.blocks_committed = validators.flush()?;
 
         Ok(())
     }

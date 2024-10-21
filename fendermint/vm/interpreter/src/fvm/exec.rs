@@ -1,28 +1,23 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::Context;
-use async_trait::async_trait;
-use std::collections::HashMap;
-
-use fendermint_vm_actor_interface::{chainmetadata, cron, system};
-use fvm::executor::ApplyRet;
-use fvm_ipld_blockstore::Blockstore;
-use fvm_shared::{address::Address, ActorID, MethodNum, BLOCK_GAS_LIMIT};
-use ipc_observability::{emit, measure_time, observe::TracingError, Traceable};
-use tendermint_rpc::Client;
-
-use crate::fvm::activities::BlockMined;
-use crate::ExecInterpreter;
-
-use crate::fvm::activities::ValidatorActivityTracker;
-
 use super::{
     checkpoint::{self, PowerUpdates},
     observe::{CheckpointFinalized, MsgExec, MsgExecPurpose},
     state::FvmExecState,
     BlockGasLimit, FvmMessage, FvmMessageInterpreter,
 };
+use crate::fvm::activities::{BlockMined, ValidatorActivityTracker};
+use crate::ExecInterpreter;
+use anyhow::Context;
+use async_trait::async_trait;
+use fendermint_vm_actor_interface::{chainmetadata, cron, system};
+use fvm::executor::ApplyRet;
+use fvm_ipld_blockstore::Blockstore;
+use fvm_shared::{address::Address, ActorID, MethodNum, BLOCK_GAS_LIMIT};
+use ipc_observability::{emit, measure_time, observe::TracingError, Traceable};
+use std::collections::HashMap;
+use tendermint_rpc::Client;
 
 /// The return value extended with some things from the message that
 /// might not be available to the caller, because of the message lookups

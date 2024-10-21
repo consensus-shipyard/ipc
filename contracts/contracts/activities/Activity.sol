@@ -1,17 +1,16 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-/// The commitments for the child subnet activities that should be submitted to the parent subnet
-/// together with a bottom up checkpoint
-struct ActivityCommitment {
-    /// The activity summary for validators
-    bytes32 summary;
+import {SubnetID} from "../structs/Subnet.sol";
 
-    // TODO: add relayed rewarder commitment
+event ActivityReportCreated(uint64 checkpointHeight, ActivityReport report);
+
+/// The full validator activities report
+struct ActivityReport {
+    ValidatorActivityReport[] validators;
 }
 
-/// The summary for a single validator 
-struct ValidatorSummary {
+struct ValidatorActivityReport {
     /// @dev The validator whose activity we're reporting about.
     address validator;
     /// @dev The number of blocks committed by each validator in the position they appear in the validators array.
@@ -21,34 +20,38 @@ struct ValidatorSummary {
     bytes metadata;
 }
 
-/// A summary of validator's activity in the child subnet. This is submitted to the parent for reward distribution.
+/// The summary for the child subnet activities that should be submitted to the parent subnet
+/// together with a bottom up checkpoint
 struct ActivitySummary {
-    /// @dev The block range the activity summary spans; these are the local heights of the start and the end, inclusive.
-    uint256[2] blockRange;
-    ValidatorSummary[] activities;
+    /// The total number of distintive validators that have mined
+    uint64 totalActiveValidators;
+    /// The activity commitment for validators
+    bytes32 commitment;
+
+    // TODO: add relayed rewarder commitment
 }
 
-library LibActivitySummary {
-    function numValidators(ActivitySummary calldata self) internal pure returns(uint64) {
-        return uint64(self.activities.length);
-    }
+/// The summary for a single validator
+struct ValidatorSummary {
+    /// @dev The child subnet checkpoint height associated with this summary
+    uint64 checkpointHeight;
+    /// @dev The validator whose activity we're reporting about.
+    address validator;
+    /// @dev The number of blocks committed by each validator in the position they appear in the validators array.
+    /// If there is a configuration change applied at this checkpoint, this carries information about the _old_ validator set.
+    uint64 blocksCommitted;
+    /// @dev Other metadata
+    bytes metadata;
+}
 
-    function commitment(ActivitySummary calldata self) internal pure returns(bytes32) {
-        return keccak256(abi.encode(self));
-    }
+/// The proof required for validators to claim rewards
+struct ValidatorClaimProof {
+    ValidatorSummary summary;
+    bytes32[] proof;
+}
 
-    function containsValidator(ActivitySummary calldata self, address validator) internal pure returns(bool) {
-        uint256 len = self.activities.length;
-        for (uint256 i = 0; i < len; ) {
-            if (self.activities[i].validator == validator) {
-                return true;
-            }
-
-            unchecked {
-                i++;
-            }
-        }
-
-        return false;
-    }
+/// The proofs to batch claim validator rewards
+struct BatchClaimProofs {
+    SubnetID subnetId;
+    ValidatorClaimProof[] proofs;
 }

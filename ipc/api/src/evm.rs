@@ -4,8 +4,8 @@
 //! Type conversion for IPC Agent struct with solidity contract struct
 
 use crate::address::IPCAddress;
-use crate::checkpoint::BottomUpMsgBatch;
-use crate::checkpoint::{ActivityCommitment, BottomUpCheckpoint};
+use crate::checkpoint::{ActivitySummary, BottomUpCheckpoint};
+use crate::checkpoint::{BottomUpMsgBatch, ValidatorClaimProof};
 use crate::cross::{IpcEnvelope, IpcMsgKind};
 use crate::staking::StakingChange;
 use crate::staking::StakingChangeRequest;
@@ -18,9 +18,10 @@ use fvm_shared::address::{Address, Payload};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use ipc_actors_abis::{
-    gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet,
+    checkpointing_facet, gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet,
     lib_gateway, register_subnet_facet, subnet_actor_checkpointing_facet, subnet_actor_diamond,
-    subnet_actor_getter_facet, top_down_finality_facet, xnet_messaging_facet,
+    subnet_actor_getter_facet, top_down_finality_facet, validator_reward_facet,
+    xnet_messaging_facet,
 };
 
 /// The type conversion for IPC structs to evm solidity contracts. We need this convenient macro because
@@ -121,13 +122,14 @@ macro_rules! cross_msg_types {
 /// The type conversion between different bottom up checkpoint definition in ethers and sdk
 macro_rules! bottom_up_checkpoint_conversion {
     ($module:ident) => {
-        impl TryFrom<ActivityCommitment> for $module::ActivityCommitment {
+        impl TryFrom<ActivitySummary> for $module::ActivitySummary {
             type Error = anyhow::Error;
 
-            fn try_from(c: ActivityCommitment) -> Result<Self, Self::Error> {
-                Ok($module::ActivityCommitment {
-                    summary: c
-                        .summary
+            fn try_from(c: ActivitySummary) -> Result<Self, Self::Error> {
+                Ok($module::ActivitySummary {
+                    total_active_validators: c.total_active_validators,
+                    commitment: c
+                        .commitment
                         .try_into()
                         .map_err(|_| anyhow!("cannot convert bytes32"))?,
                 })
@@ -167,8 +169,9 @@ macro_rules! bottom_up_checkpoint_conversion {
                         .into_iter()
                         .map(IpcEnvelope::try_from)
                         .collect::<Result<Vec<_>, _>>()?,
-                    activities: ActivityCommitment {
-                        summary: value.activities.summary.to_vec(),
+                    activities: ActivitySummary {
+                        total_active_validators: value.activities.total_active_validators,
+                        commitment: value.activities.commitment.to_vec(),
                     },
                 })
             }
@@ -243,13 +246,17 @@ base_type_conversion!(subnet_actor_checkpointing_facet);
 base_type_conversion!(gateway_getter_facet);
 base_type_conversion!(gateway_messenger_facet);
 base_type_conversion!(lib_gateway);
+base_type_conversion!(validator_reward_facet);
+base_type_conversion!(checkpointing_facet);
 
 cross_msg_types!(gateway_getter_facet);
 cross_msg_types!(xnet_messaging_facet);
 cross_msg_types!(gateway_messenger_facet);
 cross_msg_types!(lib_gateway);
 cross_msg_types!(subnet_actor_checkpointing_facet);
+cross_msg_types!(checkpointing_facet);
 
+bottom_up_checkpoint_conversion!(checkpointing_facet);
 bottom_up_checkpoint_conversion!(gateway_getter_facet);
 bottom_up_checkpoint_conversion!(subnet_actor_checkpointing_facet);
 bottom_up_msg_batch_conversion!(gateway_getter_facet);
@@ -267,6 +274,22 @@ impl TryFrom<u8> for AssetKind {
             1 => Ok(AssetKind::ERC20),
             _ => Err(anyhow!("invalid kind {value}")),
         }
+    }
+}
+
+impl TryFrom<ValidatorClaimProof> for validator_reward_facet::ValidatorClaimProof {
+    type Error = anyhow::Error;
+
+    fn try_from(v: ValidatorClaimProof) -> Result<Self, Self::Error> {
+        Ok(Self {
+            proof: v.proof,
+            summary: validator_reward_facet::ValidatorSummary {
+                checkpoint_height: v.summary.checkpoint_height,
+                validator: payload_to_evm_address(v.summary.validator.payload())?,
+                blocks_committed: v.summary.blocks_committed,
+                metadata: ethers::types::Bytes::from(v.summary.metadata),
+            },
+        })
     }
 }
 

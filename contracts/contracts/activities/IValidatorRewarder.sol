@@ -16,3 +16,15 @@ interface IValidatorRewarder {
     /// @dev This method should revert if the summary is invalid; this will cause the
     function disburseRewards(SubnetID calldata id, ValidatorSummary calldata summary) external;
 }
+
+/// @title Validator reward setup interface
+///
+/// @dev This is used to initialize a reward distribution
+interface IValidatorRewardSetup {
+    function initDistribution(
+        SubnetID calldata subnetId,
+        uint64 checkpointHeight,
+        bytes32 commitment,
+        uint64 totalActiveValidators
+    ) external;
+}

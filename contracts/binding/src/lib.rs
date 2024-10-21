@@ -48,6 +48,8 @@ pub mod subnet_registry_diamond;
 #[allow(clippy::all)]
 pub mod top_down_finality_facet;
 #[allow(clippy::all)]
+pub mod validator_reward_facet;
+#[allow(clippy::all)]
 pub mod xnet_messaging_facet;
 
 // The list of contracts need to convert FvmAddress to fvm_shared::Address
@@ -58,6 +60,7 @@ fvm_address_conversion!(gateway_messenger_facet);
 fvm_address_conversion!(subnet_actor_checkpointing_facet);
 fvm_address_conversion!(subnet_actor_getter_facet);
 fvm_address_conversion!(lib_gateway);
+fvm_address_conversion!(checkpointing_facet);
 
 // The list of contracts that need to convert common types between each other
 common_type_conversion!(subnet_actor_getter_facet, checkpointing_facet);

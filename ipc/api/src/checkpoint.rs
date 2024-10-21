@@ -76,14 +76,33 @@ pub struct BottomUpMsgBatch {
     pub msgs: Vec<IpcEnvelope>,
 }
 
-#[serde_as]
-#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
 /// The commitments for the child subnet activities that should be submitted to the parent subnet
 /// together with a bottom up checkpoint
-pub struct ActivityCommitment {
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+pub struct ValidatorSummary {
+    /// The checkpoint height in the child subnet
+    pub checkpoint_height: u64,
+    /// The validator address
+    pub validator: Address,
+    /// The number of blocks mined
+    pub blocks_committed: u64,
+    /// The extra metadata attached to the validator
+    pub metadata: Vec<u8>,
+}
+
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+pub struct ValidatorClaimProof {
+    pub summary: ValidatorSummary,
+    pub proof: Vec<[u8; 32]>,
+}
+
+#[serde_as]
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+pub struct ActivitySummary {
+    pub total_active_validators: u64,
     /// The activity summary for validators
     #[serde_as(as = "HumanReadable")]
-    pub summary: Vec<u8>,
+    pub commitment: Vec<u8>,
     // TODO: add relayed activity commitment
 }
 
@@ -106,7 +125,7 @@ pub struct BottomUpCheckpoint {
     /// The list of messages for execution
     pub msgs: Vec<IpcEnvelope>,
     /// The activity commitment from child subnet to parent subnet
-    pub activities: ActivityCommitment,
+    pub activities: ActivitySummary,
 }
 
 pub fn serialize_vec_bytes_to_vec_hex<T: AsRef<[u8]>, S>(

@@ -25,6 +25,7 @@ contract SubnetRegistryDiamond {
         address diamondCutFacet;
         address diamondLoupeFacet;
         address ownershipFacet;
+        address validatorRewardFacet;
         bytes4[] subnetActorGetterSelectors;
         bytes4[] subnetActorManagerSelectors;
         bytes4[] subnetActorRewarderSelectors;
@@ -33,6 +34,7 @@ contract SubnetRegistryDiamond {
         bytes4[] subnetActorDiamondCutSelectors;
         bytes4[] subnetActorDiamondLoupeSelectors;
         bytes4[] subnetActorOwnershipSelectors;
+        bytes4[] validatorRewardSelectors;
         SubnetCreationPrivileges creationPrivileges;
     }
 
@@ -64,6 +66,9 @@ contract SubnetRegistryDiamond {
         if (params.ownershipFacet == address(0)) {
             revert FacetCannotBeZero();
         }
+        if (params.validatorRewardFacet == address(0)) {
+            revert FacetCannotBeZero();
+        }
 
         LibDiamond.setContractOwner(msg.sender);
         LibDiamond.diamondCut({_diamondCut: _diamondCut, _init: address(0), _calldata: new bytes(0)});
@@ -83,6 +88,7 @@ contract SubnetRegistryDiamond {
         s.SUBNET_ACTOR_DIAMOND_CUT_FACET = params.diamondCutFacet;
         s.SUBNET_ACTOR_LOUPE_FACET = params.diamondLoupeFacet;
         s.SUBNET_ACTOR_OWNERSHIP_FACET = params.ownershipFacet;
+        s.VALIDATOR_REWARD_FACET = params.validatorRewardFacet;
 
         s.subnetActorGetterSelectors = params.subnetActorGetterSelectors;
         s.subnetActorManagerSelectors = params.subnetActorManagerSelectors;
@@ -92,6 +98,7 @@ contract SubnetRegistryDiamond {
         s.subnetActorDiamondCutSelectors = params.subnetActorDiamondCutSelectors;
         s.subnetActorDiamondLoupeSelectors = params.subnetActorDiamondLoupeSelectors;
         s.subnetActorOwnershipSelectors = params.subnetActorOwnershipSelectors;
+        s.validatorRewardSelectors = params.validatorRewardSelectors;
 
         s.creationPrivileges = params.creationPrivileges;
     }
