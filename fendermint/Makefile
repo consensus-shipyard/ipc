@@ -50,7 +50,7 @@ e2e: docker-build | cargo-make
 	${MAKE} e2e-only
 
 e2e-only:
-	cd testing/smoke-test    && cargo make --profile $(PROFILE)
+	cd testing/smoke-test && cargo make --profile $(PROFILE)
 
 clean:
 	cargo clean
