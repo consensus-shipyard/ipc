@@ -16,10 +16,10 @@ jobs:
             ${{ secrets.CONTRACTS_DEPLOY_KEY }}
 
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref }}
           submodules: recursive
+          ssh-key: ${{ secrets.IPC_DEPLOY_KEY }}
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
