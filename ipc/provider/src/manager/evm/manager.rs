@@ -11,7 +11,7 @@ use ipc_actors_abis::{
     checkpointing_facet, gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet,
     lib_gateway, lib_quorum, lib_staking_change_log, register_subnet_facet,
     subnet_actor_checkpointing_facet, subnet_actor_getter_facet, subnet_actor_manager_facet,
-    subnet_actor_reward_facet,
+    subnet_actor_reward_facet, validator_reward_facet,
 };
 use ipc_api::evm::{fil_to_eth_amount, payload_to_evm_address, subnet_id_to_evm_addresses};
 use ipc_api::validator::from_contract_validators;
@@ -27,7 +27,7 @@ use crate::config::Subnet;
 use crate::lotus::message::ipc::SubnetInfo;
 use crate::manager::subnet::{
     BottomUpCheckpointRelayer, GetBlockHashResult, SubnetGenesisInfo, TopDownFinalityQuery,
-    TopDownQueryPayload,
+    TopDownQueryPayload, ValidatorRewarder,
 };
 use crate::manager::{EthManager, SubnetManager};
 use anyhow::{anyhow, Context, Result};
@@ -44,12 +44,16 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_api::checkpoint::{
     BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent, Signature,
+    ValidatorClaimProof, ValidatorSummary,
 };
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::{StakingChangeRequest, ValidatorInfo, ValidatorStakingInfo};
 use ipc_api::subnet::ConstructParams;
 use ipc_api::subnet_id::SubnetID;
+use ipc_observability::lazy_static;
 use ipc_wallet::{EthKeyAddress, EvmKeyStore, PersistentKeyStore};
+use merkle_tree_rs::format::Raw;
+use merkle_tree_rs::standard::{LeafType, StandardMerkleTree};
 use num_traits::ToPrimitive;
 use std::result;
 
@@ -1276,6 +1280,149 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
             .await?
             .as_u64();
         Ok(epoch as ChainEpoch)
+    }
+}
+
+lazy_static!(
+    /// ABI types of the Merkle tree which contains validator addresses and their voting power.
+    pub static ref VALIDATOR_SUMMARY_FIELDS: Vec<String> = vec!["uint64".to_owned(), "address".to_owned(), "uint64".to_owned(), "bytes".to_owned()];
+);
+
+#[async_trait]
+impl ValidatorRewarder for EthSubnetManager {
+    async fn get_validator_claim_proofs(
+        &self,
+        validator_addr: &Address,
+        from_checkpoint: ChainEpoch,
+        to_checkpoint: ChainEpoch,
+    ) -> Result<Vec<ValidatorClaimProof>> {
+        let contract = checkpointing_facet::CheckpointingFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+
+        let ev = contract
+            .event::<checkpointing_facet::ActivityReportCreatedFilter>()
+            .from_block(from_checkpoint as u64)
+            .to_block(to_checkpoint as u64)
+            .address(ValueOrArray::Value(contract.address()));
+
+        let validator_evm_addr = payload_to_evm_address(validator_addr.payload())?;
+
+        let mut proofs = vec![];
+        for (event, meta) in query_with_meta(ev, contract.client()).await? {
+            tracing::debug!("found event at height: {}", meta.block_number);
+
+            let mut activities = vec![];
+            let mut maybe_validator = None;
+            for validator in event.report.validators {
+                let payload = vec![
+                    event.checkpoint_height.to_string(),
+                    format!("{:?}", validator.validator),
+                    validator.blocks_committed.to_string(),
+                    hex::encode(validator.metadata.as_ref()),
+                ];
+
+                if validator.validator == validator_evm_addr {
+                    let summary = ValidatorSummary {
+                        checkpoint_height: event.checkpoint_height,
+                        validator: *validator_addr,
+                        blocks_committed: validator.blocks_committed,
+                        metadata: validator.metadata.to_vec(),
+                    };
+                    maybe_validator = Some((payload.clone(), summary));
+                }
+
+                activities.push(payload);
+            }
+
+            let tree = StandardMerkleTree::<Raw>::of(&activities, &VALIDATOR_SUMMARY_FIELDS)
+                .context("failed to construct Merkle tree")?;
+
+            let Some((payload, summary)) = maybe_validator else {
+                tracing::info!(
+                    "target validator address has not activities in epoch {}",
+                    meta.block_number
+                );
+                continue;
+            };
+            let proof = tree.get_proof(LeafType::LeafBytes(payload))?;
+
+            proofs.push(ValidatorClaimProof {
+                summary,
+                proof: proof.into_iter().map(|v| v.into()).collect(),
+            });
+        }
+
+        Ok(proofs)
+    }
+
+    /// Get the reward for specific validator in a subnet
+    async fn get_validator_activities(
+        &self,
+        validator_addr: &Address,
+        from_checkpoint: ChainEpoch,
+        to_checkpoint: ChainEpoch,
+    ) -> Result<Vec<ValidatorSummary>> {
+        let contract = checkpointing_facet::CheckpointingFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+
+        let ev = contract
+            .event::<checkpointing_facet::ActivityReportCreatedFilter>()
+            .from_block(from_checkpoint as u64)
+            .to_block(to_checkpoint as u64)
+            .address(ValueOrArray::Value(contract.address()));
+
+        let mut activities = vec![];
+        let validator_eth_addr = payload_to_evm_address(validator_addr.payload())?;
+
+        for (event, meta) in query_with_meta(ev, contract.client()).await? {
+            tracing::debug!("found event at height: {}", meta.block_number);
+            for validator in event.report.validators {
+                if validator.validator != validator_eth_addr {
+                    continue;
+                }
+
+                activities.push(ValidatorSummary {
+                    validator: *validator_addr,
+                    checkpoint_height: event.checkpoint_height,
+                    blocks_committed: validator.blocks_committed,
+                    metadata: validator.metadata.to_vec(),
+                });
+            }
+        }
+
+        Ok(activities)
+    }
+
+    /// Claim the reward in batch
+    async fn batch_claim(
+        &self,
+        submitter: &Address,
+        reward_claim_subnet: &SubnetID,
+        reward_source_subnet: &SubnetID,
+        proofs: Vec<ValidatorClaimProof>,
+    ) -> Result<()> {
+        let signer = Arc::new(self.get_signer(submitter)?);
+        let contract = validator_reward_facet::ValidatorRewardFacet::new(
+            contract_address_from_subnet(reward_claim_subnet)?,
+            signer.clone(),
+        );
+
+        let call = contract.batch_claim(validator_reward_facet::BatchClaimProofs {
+            subnet_id: validator_reward_facet::SubnetID::try_from(reward_source_subnet)?,
+            proofs: proofs
+                .into_iter()
+                .map(validator_reward_facet::ValidatorClaimProof::try_from)
+                .collect::<Result<Vec<_>>>()?,
+        });
+        let call = call_with_premium_estimation(signer, call).await?;
+
+        call.send().await?;
+
+        Ok(())
     }
 }
 

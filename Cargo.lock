@@ -5181,6 +5181,7 @@ dependencies = [
  "ipc_actors_abis",
  "libsecp256k1",
  "log",
+ "merkle-tree-rs",
  "num-derive 0.3.3",
  "num-traits",
  "prometheus",

@@ -8,6 +8,7 @@ mod crossmsg;
 // mod daemon;
 mod subnet;
 mod util;
+mod validator;
 mod wallet;
 
 use crate::commands::checkpoint::CheckpointCommandsArgs;
@@ -30,6 +31,7 @@ use std::path::Path;
 use std::str::FromStr;
 
 use crate::commands::config::ConfigCommandsArgs;
+use crate::commands::validator::ValidatorCommandsArgs;
 use crate::commands::wallet::WalletCommandsArgs;
 use subnet::SubnetCommandsArgs;
 
@@ -47,6 +49,7 @@ enum Commands {
     CrossMsg(CrossMsgsCommandsArgs),
     Checkpoint(CheckpointCommandsArgs),
     Util(UtilCommandsArgs),
+    Validator(ValidatorCommandsArgs),
 }
 
 #[derive(Debug, Parser)]
@@ -133,6 +136,7 @@ pub async fn cli() -> anyhow::Result<()> {
                 Commands::Wallet(args) => args.handle(global).await,
                 Commands::Checkpoint(args) => args.handle(global).await,
                 Commands::Util(args) => args.handle(global).await,
+                Commands::Validator(args) => args.handle(global).await,
             };
 
             r.with_context(|| format!("error processing command {:?}", args.command))

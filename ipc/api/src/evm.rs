@@ -4,8 +4,8 @@
 //! Type conversion for IPC Agent struct with solidity contract struct
 
 use crate::address::IPCAddress;
-use crate::checkpoint::BottomUpMsgBatch;
 use crate::checkpoint::{ActivitySummary, BottomUpCheckpoint};
+use crate::checkpoint::{BottomUpMsgBatch, ValidatorClaimProof};
 use crate::cross::{IpcEnvelope, IpcMsgKind};
 use crate::staking::StakingChange;
 use crate::staking::StakingChangeRequest;
@@ -20,7 +20,8 @@ use fvm_shared::econ::TokenAmount;
 use ipc_actors_abis::{
     checkpointing_facet, gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet,
     lib_gateway, register_subnet_facet, subnet_actor_checkpointing_facet, subnet_actor_diamond,
-    subnet_actor_getter_facet, top_down_finality_facet, xnet_messaging_facet,
+    subnet_actor_getter_facet, top_down_finality_facet, validator_reward_facet,
+    xnet_messaging_facet,
 };
 
 /// The type conversion for IPC structs to evm solidity contracts. We need this convenient macro because
@@ -246,6 +247,7 @@ base_type_conversion!(gateway_getter_facet);
 base_type_conversion!(gateway_messenger_facet);
 base_type_conversion!(lib_gateway);
 base_type_conversion!(checkpointing_facet);
+base_type_conversion!(validator_reward_facet);
 
 cross_msg_types!(checkpointing_facet);
 cross_msg_types!(gateway_getter_facet);
@@ -272,6 +274,22 @@ impl TryFrom<u8> for AssetKind {
             1 => Ok(AssetKind::ERC20),
             _ => Err(anyhow!("invalid kind {value}")),
         }
+    }
+}
+
+impl TryFrom<ValidatorClaimProof> for validator_reward_facet::ValidatorClaimProof {
+    type Error = anyhow::Error;
+
+    fn try_from(v: ValidatorClaimProof) -> Result<Self, Self::Error> {
+        Ok(Self {
+            proof: v.proof,
+            summary: validator_reward_facet::ValidatorSummary {
+                checkpoint_height: v.summary.checkpoint_height,
+                validator: payload_to_evm_address(v.summary.validator.payload())?,
+                blocks_committed: v.summary.blocks_committed,
+                metadata: ethers::types::Bytes::from(v.summary.metadata),
+            },
+        })
     }
 }
 

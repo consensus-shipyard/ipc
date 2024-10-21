@@ -82,7 +82,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testSubnetActorDiamondReal_LoupeFunction() public view {
-        require(saDiamond.diamondLouper().facets().length == 8, "unexpected length");
+        require(saDiamond.diamondLouper().facets().length == 9, "unexpected length");
         require(
             saDiamond.diamondLouper().supportsInterface(type(IERC165).interfaceId) == true,
             "IERC165 not supported"
@@ -2348,7 +2348,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         params.validatorRewarder = address(m);
         params.minValidators = 2;
         params.permissionMode = PermissionMode.Federated;
-        
+
         saDiamond = createSubnetActor(params);
 
         SubnetID memory subnetId = SubnetID(ROOTNET_CHAINID, new address[](1));
@@ -2356,7 +2356,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         m.setSubnet(subnetId);
 
         (address[] memory addrs, uint256[] memory privKeys, bytes[] memory pubkeys) = TestUtils.newValidators(4);
-        
+
         uint256[] memory powers = new uint256[](4);
         powers[0] = 10000;
         powers[1] = 10000;

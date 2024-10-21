@@ -78,6 +78,24 @@ pub struct BottomUpMsgBatch {
 
 /// The commitments for the child subnet activities that should be submitted to the parent subnet
 /// together with a bottom up checkpoint
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+pub struct ValidatorSummary {
+    /// The checkpoint height in the child subnet
+    pub checkpoint_height: u64,
+    /// The validator address
+    pub validator: Address,
+    /// The number of blocks mined
+    pub blocks_committed: u64,
+    /// The extra metadata attached to the validator
+    pub metadata: Vec<u8>,
+}
+
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+pub struct ValidatorClaimProof {
+    pub summary: ValidatorSummary,
+    pub proof: Vec<[u8; 32]>,
+}
+
 #[serde_as]
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
 pub struct ActivitySummary {

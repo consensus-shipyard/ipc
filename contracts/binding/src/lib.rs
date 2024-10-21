@@ -48,6 +48,8 @@ pub mod subnet_registry_diamond;
 #[allow(clippy::all)]
 pub mod top_down_finality_facet;
 #[allow(clippy::all)]
+pub mod validator_reward_facet;
+#[allow(clippy::all)]
 pub mod xnet_messaging_facet;
 
 // The list of contracts need to convert FvmAddress to fvm_shared::Address

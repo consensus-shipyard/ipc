@@ -9,7 +9,7 @@ use config::Config;
 use fvm_shared::{
     address::Address, clock::ChainEpoch, crypto::signature::SignatureType, econ::TokenAmount,
 };
-use ipc_api::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
+use ipc_api::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent, ValidatorSummary};
 use ipc_api::evm::payload_to_evm_address;
 use ipc_api::staking::{StakingChangeRequest, ValidatorInfo};
 use ipc_api::subnet::{Asset, PermissionMode};
@@ -743,6 +743,46 @@ impl IpcProvider {
         let conn = self.get_connection(&parent)?;
         conn.manager()
             .set_federated_power(from, subnet, validators, public_keys, federated_power)
+            .await
+    }
+
+    pub async fn list_validator_activities(
+        &self,
+        subnet: &SubnetID,
+        validator: &Address,
+        from: ChainEpoch,
+        to: ChainEpoch,
+    ) -> anyhow::Result<Vec<ValidatorSummary>> {
+        let conn = self.get_connection(subnet)?;
+        conn.manager()
+            .get_validator_activities(validator, from, to)
+            .await
+    }
+
+    pub async fn batch_claim(
+        &self,
+        reward_claim_subnet: &SubnetID,
+        reward_source_subnet: &SubnetID,
+        from: ChainEpoch,
+        to: ChainEpoch,
+        validator: &Address,
+    ) -> anyhow::Result<()> {
+        let conn = self.get_connection(reward_source_subnet)?;
+
+        let proofs = conn
+            .manager()
+            .get_validator_claim_proofs(validator, from, to)
+            .await?;
+        if proofs.is_empty() {
+            return Err(anyhow!(
+                "address {} has no reward to claim",
+                validator.to_string()
+            ));
+        }
+
+        let conn = self.get_connection(reward_claim_subnet)?;
+        conn.manager()
+            .batch_claim(validator, reward_claim_subnet, reward_source_subnet, proofs)
             .await
     }
 }

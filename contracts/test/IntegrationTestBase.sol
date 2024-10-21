@@ -953,7 +953,11 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         saDiamond.checkpointer().submitCheckpoint(checkpoint, validators, signatures);
     }
 
-    function confirmChange(address[] memory validators, uint256[] memory privKeys, ActivitySummary memory activities) internal {
+    function confirmChange(
+        address[] memory validators,
+        uint256[] memory privKeys,
+        ActivitySummary memory activities
+    ) internal {
         uint256 n = validators.length;
 
         bytes[] memory signatures = new bytes[](n);

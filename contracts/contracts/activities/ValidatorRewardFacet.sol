@@ -18,9 +18,7 @@ import {LibDiamond} from "../lib/LibDiamond.sol";
 /// to claim their reward in the parent subnet, which should be the current subnet this facet
 /// is deployed.
 contract ValidatorRewardFacet is ReentrancyGuard, Pausable {
-    function batchClaim(
-        BatchClaimProofs calldata payload
-    ) external nonReentrant whenNotPaused {
+    function batchClaim(BatchClaimProofs calldata payload) external nonReentrant whenNotPaused {
         uint256 len = payload.proofs.length;
         for (uint256 i = 0; i < len; ) {
             _claim(payload.subnetId, payload.proofs[i].summary, payload.proofs[i].proof);
