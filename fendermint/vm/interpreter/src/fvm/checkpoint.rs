@@ -33,6 +33,7 @@ use super::{
     state::{ipc::GatewayCaller, FvmExecState},
     ValidatorContext,
 };
+use crate::fvm::activities::ValidatorActivityTracker;
 
 /// Validator voting power snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -96,13 +97,6 @@ where
 
     let num_msgs = msgs.len();
 
-    // TODO(rewards): query block producers for the blocks from the last checkpointed epoch to the current one.
-    // Ideally keep a live cache of block producers, append to it when new blocks are committed, and prune it when generating a checkpoint.
-    // But for now, we can try to keep it simple and query CometBFT, although that adds latency.
-    // If we do this, this method seems to be the quickest way: https://docs.cometbft.com/main/rpc/#/Info/block_search
-
-    // TODO(rewards): populate the ActivitySummary struct with the information above, and pass it to the create_bottom_up_checkpoint call.
-
     // Construct checkpoint.
     let checkpoint = BottomUpCheckpoint {
         subnet_id,
@@ -110,6 +104,11 @@ where
         block_hash,
         next_configuration_number,
         msgs,
+        activities: state
+            .activities_tracker()
+            .get_activities_summary()?
+            .commitment()?
+            .try_into()?,
     };
 
     // Save the checkpoint in the ledger.
@@ -117,6 +116,8 @@ where
     gateway
         .create_bottom_up_checkpoint(state, checkpoint.clone(), &curr_power_table.0)
         .context("failed to store checkpoint")?;
+
+    state.activities_tracker().purge_activities()?;
 
     // Figure out the power updates if there was some change in the configuration.
     let power_updates = if next_configuration_number == 0 {
@@ -249,6 +250,9 @@ where
                 block_hash: cp.block_hash,
                 next_configuration_number: cp.next_configuration_number,
                 msgs: convert_tokenizables(cp.msgs)?,
+                activities: checkpoint::ActivityCommitment {
+                    summary: cp.activities.summary,
+                },
             };
 
             // We mustn't do these in parallel because of how nonces are fetched.

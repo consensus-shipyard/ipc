@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 import "../contracts/errors/IPCErrors.sol";
 
 import {EMPTY_BYTES, METHOD_SEND} from "../contracts/constants/Constants.sol";
+import {ActivityCommitment} from "../contracts/activities/Activity.sol";
 import {ConsensusType} from "../contracts/enums/ConsensusType.sol";
 import {IDiamond} from "../contracts/interfaces/IDiamond.sol";
 import {IpcEnvelope, BottomUpCheckpoint, IpcMsgKind, ParentFinality, CallMsg} from "../contracts/structs/CrossNet.sol";
@@ -45,6 +46,9 @@ import {SelectorLibrary} from "./helpers/SelectorLibrary.sol";
 import {GatewayFacetsHelper} from "./helpers/GatewayFacetsHelper.sol";
 import {SubnetActorFacetsHelper} from "./helpers/SubnetActorFacetsHelper.sol";
 import {DiamondFacetsHelper} from "./helpers/DiamondFacetsHelper.sol";
+
+
+
 
 struct TestSubnetDefinition {
     GatewayDiamond gateway;
@@ -913,7 +917,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             blockHeight: h,
             blockHash: keccak256(abi.encode(h)),
             nextConfigurationNumber: nextConfigNum - 1,
-            msgs: new IpcEnvelope[](0)
+            msgs: new IpcEnvelope[](0),
+            activities: ActivityCommitment({ summary: bytes32(uint256(nextConfigNum))})
         });
 
         vm.deal(address(saDiamond), 100 ether);

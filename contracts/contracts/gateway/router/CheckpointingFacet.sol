@@ -16,6 +16,7 @@ import {BatchNotCreated, InvalidBatchEpoch, BatchAlreadyExists, NotEnoughSubnetC
 import {CrossMsgHelper} from "../../lib/CrossMsgHelper.sol";
 import {IpcEnvelope, SubnetID} from "../../structs/CrossNet.sol";
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
+import {LibValidatorRewardParent} from "../../activities/ValidatorRewardParentFacet.sol";
 
 contract CheckpointingFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
@@ -41,6 +42,12 @@ contract CheckpointingFacet is GatewayActorModifiers {
         LibGateway.checkMsgLength(checkpoint.msgs);
 
         execBottomUpMsgs(checkpoint.msgs, subnet);
+
+        LibValidatorRewardParent.initNewDistribution(
+            uint64(checkpoint.blockHeight),
+            checkpoint.activities.summary,
+            checkpoint.subnetID
+        );
     }
 
     /// @notice creates a new bottom-up checkpoint

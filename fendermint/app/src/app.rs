@@ -795,7 +795,16 @@ where
 
         // End the interpreter for this block.
         let (power_updates, new_block_gas_limit) = self
-            .modify_exec_state(|s| self.interpreter.end(s))
+            .modify_exec_state(|s| async {
+                let ((chain_env, mut state), update) = self.interpreter.end(s).await?;
+
+                let mut end_block = EndBlockUpdate::new(update);
+                if let Some(gas) = state.gas_market_mut().take_constant_update() {
+                    end_block.update_gas(gas)
+                }
+
+                Ok(((chain_env, state), end_block))
+            })
             .await
             .context("end failed")?;
 

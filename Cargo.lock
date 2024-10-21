@@ -2778,6 +2778,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_actor_activity_tracker"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cid",
+ "fil_actor_eam",
+ "fil_actors_evm_shared",
+ "fil_actors_runtime",
+ "frc42_dispatch",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
+ "fvm_shared",
+ "hex-literal 0.4.1",
+ "log",
+ "multihash 0.18.1",
+ "num-derive 0.3.3",
+ "num-traits",
+ "serde",
+]
+
+[[package]]
 name = "fendermint_actor_chainmetadata"
 version = "0.1.0"
 dependencies = [
@@ -2843,6 +2864,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid",
+ "fendermint_actor_activity_tracker",
  "fendermint_actor_chainmetadata",
  "fendermint_actor_eam",
  "fendermint_actor_gas_market_eip1559",
@@ -3349,6 +3371,7 @@ dependencies = [
  "base64 0.21.7",
  "cid",
  "ethers",
+ "fendermint_actor_activity_tracker",
  "fendermint_actor_chainmetadata",
  "fendermint_actor_eam",
  "fendermint_actor_gas_market_eip1559",
@@ -3380,6 +3403,7 @@ dependencies = [
  "ipc-observability",
  "ipc_actors_abis",
  "libipld",
+ "merkle-tree-rs",
  "multihash 0.18.1",
  "num-traits",
  "pin-project",

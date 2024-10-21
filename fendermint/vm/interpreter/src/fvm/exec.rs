@@ -12,7 +12,10 @@ use fvm_shared::{address::Address, ActorID, MethodNum, BLOCK_GAS_LIMIT};
 use ipc_observability::{emit, measure_time, observe::TracingError, Traceable};
 use tendermint_rpc::Client;
 
+use crate::fvm::activities::BlockMined;
 use crate::ExecInterpreter;
+
+use crate::fvm::activities::ValidatorActivityTracker;
 
 use super::{
     checkpoint::{self, PowerUpdates},
@@ -192,6 +195,12 @@ where
     }
 
     async fn end(&self, mut state: Self::State) -> anyhow::Result<(Self::State, Self::EndOutput)> {
+        if let Some(pubkey) = state.block_producer() {
+            state
+                .activities_tracker()
+                .track_block_mined(BlockMined { validator: pubkey })?;
+        }
+
         let next_gas_market = state.finalize_gas_market()?;
 
         // TODO: Consider doing this async, since it's purely informational and not consensus-critical.

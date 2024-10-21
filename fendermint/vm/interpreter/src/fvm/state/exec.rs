@@ -29,6 +29,7 @@ use fvm_shared::{
 };
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
+use crate::fvm::activities::actor::ActorActivityTracker;
 
 pub type BlockHash = [u8; 32];
 
@@ -36,6 +37,9 @@ pub type ActorAddressMap = HashMap<ActorID, Address>;
 
 /// The result of the message application bundled with any delegated addresses of event emitters.
 pub type ExecResult = anyhow::Result<(ApplyRet, ActorAddressMap)>;
+
+pub type StateExecutor<DB> =
+    DefaultExecutor<DefaultKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>>;
 
 /// Parts of the state which evolve during the lifetime of the chain.
 #[serde_as]
@@ -114,6 +118,7 @@ where
     params: FvmUpdatableParams,
     /// Indicate whether the parameters have been updated.
     params_dirty: bool,
+    // chain_info: (NetworkVersion, ChainID, EnginePool),
 }
 
 impl<DB> FvmExecState<DB>
@@ -163,6 +168,7 @@ where
                 power_scale: params.power_scale,
             },
             params_dirty: false,
+            // chain_info: (params.network_version, ChainID::from(params.chain_id), engine),
         })
     }
 
@@ -291,6 +297,13 @@ where
         self.executor.context().network.chain_id
     }
 
+    pub fn activities_tracker(&mut self) -> ActorActivityTracker<StateExecutor<DB>> {
+        ActorActivityTracker {
+            epoch: self.block_height(),
+            executor: &mut self.executor,
+        }
+    }
+
     /// Collect all the event emitters' delegated addresses, for those who have any.
     fn emitter_delegated_addresses(&self, apply_ret: &ApplyRet) -> anyhow::Result<ActorAddressMap> {
         let emitter_ids = apply_ret
@@ -351,6 +364,19 @@ where
         f(&mut self.params);
         self.params_dirty = true;
     }
+
+    // pub fn call_only(&self) -> FvmCallState<DB> {
+    //     let mut nc = NetworkConfig::new(self.chain_info.0);
+    //     nc.chain_id = self.chain_info.1;
+    //
+    //     let engine = self.chain_info.2.clone();
+    //
+    //     self.executor.blockstore().clone()
+    //     let externs = FendermintExterns::new(blockstore.clone(), params.state_root);
+    //     let machine = DefaultMachine::new(&mc, blockstore, externs)?;
+    //     let mut executor = DefaultExecutor::new(engine, machine)?;
+    //
+    // }
 }
 
 impl<DB> HasChainID for FvmExecState<DB>
@@ -391,3 +417,20 @@ fn check_error(e: anyhow::Error) -> (ApplyRet, ActorAddressMap) {
     };
     (ret, Default::default())
 }
+
+// /// Compared to FvmExecState, this is used mostly for getters
+// pub struct FvmCallState<DB> {
+//     #[allow(clippy::type_complexity)]
+//     executor: RefCell<DefaultExecutor<
+//         DefaultKernel<DefaultCallManager<DefaultMachine<ReadOnlyBlockstore<DB>, FendermintExterns<ReadOnlyBlockstore<DB>>>>>,
+//     >>,
+// }
+//
+// impl<DB> FvmExecState<DB>
+//     where
+//         DB: Blockstore + Clone + 'static,
+// {
+//     pub fn call(&self, message: Message) -> anyhow::Result<ApplyRet> {
+//
+//     }
+// }
