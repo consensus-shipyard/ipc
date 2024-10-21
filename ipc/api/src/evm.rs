@@ -18,8 +18,8 @@ use fvm_shared::address::{Address, Payload};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use ipc_actors_abis::{
-    gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet, lib_gateway,
-    register_subnet_facet, subnet_actor_checkpointing_facet, subnet_actor_diamond,
+    cross_messenger, gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet,
+    lib_gateway, register_subnet_facet, subnet_actor_checkpointing_facet, subnet_actor_diamond,
     subnet_actor_getter_facet, top_down_finality_facet, xnet_messaging_facet,
 };
 
