@@ -86,11 +86,6 @@ async fn test_applying_upgrades() {
 
                 // execute the message
                 let (res, _) = state.execute_implicit(message).unwrap();
-
-println!("");
-println!("res {:?}", res);
-println!("");
-
                 assert!(
                     res.msg_receipt.exit_code.is_success(),
                     "{:?}",
