@@ -20,9 +20,10 @@ jobs:
             ${{ secrets.CONTRACTS_DEPLOY_KEY }}
 
       - name: Check out the project
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
+          ssh-key: ${{ secrets.IPC_DEPLOY_KEY }}
 
       - name: Install Tools
         uses: ./.github/actions/install-tools
