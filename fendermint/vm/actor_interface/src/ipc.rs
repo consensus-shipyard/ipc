@@ -129,6 +129,10 @@ lazy_static! {
                             name: "SubnetGetterFacet",
                             abi: ia::subnet_getter_facet::SUBNETGETTERFACET_ABI.to_owned(),
                         },
+                        EthFacet {
+                            name: "ValidatorRewardFacet",
+                            abi: ia::validator_reward_facet::VALIDATORREWARDFACET_ABI.to_owned(),
+                        },
                     ],
                 },
             ),
