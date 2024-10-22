@@ -9,7 +9,6 @@ use fendermint_crypto::SecretKey;
 use fendermint_testing::arb::{ArbSubnetID, ArbTokenAmount};
 use fendermint_vm_core::Timestamp;
 use fvm_shared::{address::Address, version::NetworkVersion};
-use ipc_types::EthAddress;
 use quickcheck::{Arbitrary, Gen};
 use rand::{rngs::StdRng, SeedableRng};
 

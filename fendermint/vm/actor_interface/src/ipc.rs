@@ -534,6 +534,7 @@ pub mod subnet {
                 ],
                 next_configuration_number: 1,
                 msgs: vec![],
+                activities: Default::default(),
             };
 
             let param_type = BottomUpCheckpoint::param_type();
