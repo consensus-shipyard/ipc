@@ -45,16 +45,15 @@ impl Actor {
         let st: State = rt.state()?;
         // Decode leaf as timestamp and raw bytes. Then decode as a CID
         let leaf: Option<RawLeaf> = st.get_leaf_at(rt.store(), index)?;
-        Ok(leaf
-            .map(|(timestamp, bytes)| -> Result<Leaf, ActorError> {
-                Ok(Leaf {
-                    timestamp,
-                    witnessed: Cid::try_from(bytes).map_err(
-                        |_err| actor_error!(illegal_argument; "internal bytes are not a valid CID"),
-                    )?,
-                })
+        leaf.map(|(timestamp, bytes)| -> Result<Leaf, ActorError> {
+            Ok(Leaf {
+                timestamp,
+                witnessed: Cid::try_from(bytes).map_err(
+                    |_err| actor_error!(illegal_argument; "internal bytes are not a valid CID"),
+                )?,
             })
-            .transpose()?)
+        })
+        .transpose()
     }
 
     fn get_root(rt: &impl Runtime) -> Result<Cid, ActorError> {

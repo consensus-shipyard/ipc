@@ -628,14 +628,6 @@ where
             time = request.time.to_string(),
             "prepare proposal"
         );
-        let state = self.committed_state()?;
-        let exec_state = FvmExecState::new(
-            ReadOnlyBlockstore::new(self.state_store_clone()),
-            self.multi_engine.as_ref(),
-            state.block_height as ChainEpoch,
-            state.state_params,
-        )
-        .context("error creating execution state")?;
 
         let txs = request.txs.into_iter().map(|tx| tx.to_vec()).collect();
 
@@ -674,14 +666,6 @@ where
             time = request.time.to_string(),
             "process proposal"
         );
-        let state = self.committed_state()?;
-        let exec_state = FvmExecState::new(
-            ReadOnlyBlockstore::new(self.state_store_clone()),
-            self.multi_engine.as_ref(),
-            state.block_height as ChainEpoch,
-            state.state_params,
-        )
-        .context("error creating execution state")?;
 
         let txs: Vec<_> = request.txs.into_iter().map(|tx| tx.to_vec()).collect();
         let size_txs = txs.iter().map(|tx| tx.len()).sum::<usize>();
