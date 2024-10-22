@@ -18,13 +18,10 @@ import {LibDiamond} from "../lib/LibDiamond.sol";
 /// to claim their reward in the parent subnet, which should be the current subnet this facet
 /// is deployed.
 contract ValidatorRewardFacet is ReentrancyGuard, Pausable {
-    function batchClaim(BatchClaimProofs calldata payload) external nonReentrant whenNotPaused {
-        uint256 len = payload.proofs.length;
+    function batchClaim(BatchClaimProofs[] calldata payload) external nonReentrant whenNotPaused {
+        uint256 len = payload.length;
         for (uint256 i = 0; i < len; ) {
-            _claim(payload.subnetId, payload.proofs[i].summary, payload.proofs[i].proof);
-            unchecked {
-                i++;
-            }
+            _batchClaimInSubnet(payload[i]);
         }
     }
 
@@ -34,23 +31,41 @@ contract ValidatorRewardFacet is ReentrancyGuard, Pausable {
         ValidatorSummary calldata summary,
         bytes32[] calldata proof
     ) external nonReentrant whenNotPaused {
-        _claim(subnetId, summary, proof);
+        ValidatorRewardStorage storage s = LibValidatorReward.facetStorage();
+        _claim(s, subnetId, summary, proof);
     }
+
+    // ======== Internal functions ===========
 
     function handleRelay() internal pure {
         // no opt for now
         return;
     }
 
-    function _claim(SubnetID calldata subnetId, ValidatorSummary calldata summary, bytes32[] calldata proof) internal {
+    function _batchClaimInSubnet(BatchClaimProofs calldata payload) internal {
+        uint256 len = payload.proofs.length;
+        ValidatorRewardStorage storage s = LibValidatorReward.facetStorage();
+
+        for (uint256 i = 0; i < len; ) {
+            _claim(s, payload.subnetId, payload.proofs[i].summary, payload.proofs[i].proof);
+            unchecked {
+                i++;
+            }
+        }
+    }
+
+    function _claim(
+        ValidatorRewardStorage storage s, 
+        SubnetID calldata subnetId,
+        ValidatorSummary calldata summary,
+        bytes32[] calldata proof
+    ) internal {
         // note: No need to check if the subnet is active. If the subnet is not active, the checkpointHeight
         // note: will never exist.
 
         if (msg.sender != summary.validator) {
             revert NotValidator(msg.sender);
         }
-
-        ValidatorRewardStorage storage s = LibValidatorReward.facetStorage();
 
         if (s.validatorRewarder == address(0)) {
             return handleRelay();

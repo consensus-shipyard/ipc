@@ -50,7 +50,7 @@ struct ValidatorClaimProof {
     bytes32[] proof;
 }
 
-/// The proofs to batch claim validator rewards
+/// The proofs to batch claim validator rewards in a specific subnet
 struct BatchClaimProofs {
     SubnetID subnetId;
     ValidatorClaimProof[] proofs;
