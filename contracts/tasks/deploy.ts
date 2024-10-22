@@ -7,18 +7,18 @@ task(
     async (args, hre: HardhatRuntimeEnvironment) => {
         await hre.run('compile')
 
-        console.log()
-        console.log(
-            '==== LIBRARY DEPLOYMENT ===========================================================================',
-        )
-        await hre.run('deploy-libraries')
-        console.log()
+        // console.log()
+        // console.log(
+        //     '==== LIBRARY DEPLOYMENT ===========================================================================',
+        // )
+        // await hre.run('deploy-libraries')
+        // console.log()
 
-        console.log(
-            '==== GATEWAY DEPLOYMENT ===========================================================================',
-        )
-        await hre.run('deploy-gateway')
-        console.log()
+        // console.log(
+        //     '==== GATEWAY DEPLOYMENT ===========================================================================',
+        // )
+        // await hre.run('deploy-gateway')
+        // console.log()
 
         console.log(
             '==== REGISTRY DEPLOYMENT ==========================================================================',

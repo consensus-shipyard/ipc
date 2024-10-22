@@ -18,9 +18,7 @@ use fendermint_eth_hardhat::{ContractSourceAndName, Hardhat, FQN};
 use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
-use fendermint_vm_actor_interface::{
-    account, burntfunds, chainmetadata, cron, eam, gas_market, init, ipc, reward, system, EMPTY_ARR,
-};
+use fendermint_vm_actor_interface::{account, burntfunds, chainmetadata, cron, eam, gas_market, init, ipc, reward, system, EMPTY_ARR, activity};
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Collateral, Genesis, Power, PowerScale, Validator};
 use futures_util::io::Cursor;
@@ -451,6 +449,17 @@ impl GenesisBuilder {
                 None,
             )
             .context("failed to create default eip1559 gas market actor")?;
+
+        let tracker_state = fendermint_actor_activity_tracker::State::new(state.store())?;
+        state
+            .create_custom_actor(
+                fendermint_actor_activity_tracker::IPC_ACTIVITY_TRACKER_ACTOR_NAME,
+                activity::ACTIVITY_TRACKER_ACTOR_ID,
+                &tracker_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create activity tracker actor")?;
 
         // STAGE 2: Create non-builtin accounts which do not have a fixed ID.
 
