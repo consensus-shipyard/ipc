@@ -22,6 +22,9 @@ contract ValidatorRewardFacet is ReentrancyGuard, Pausable {
         uint256 len = payload.length;
         for (uint256 i = 0; i < len; ) {
             _batchClaimInSubnet(payload[i]);
+            unchecked {
+                i++;
+            }
         }
     }
 
