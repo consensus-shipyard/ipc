@@ -441,7 +441,7 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
   if [ $local_deploy == true ]; then
     cd "${IPC_FOLDER}/hoku-contracts"
     # use the same account validator 0th account to deploy supply source token
-    deploy_supply_source_token_out="$(forge script --private-key "${pk}" --rpc-url "${rpc_url}" --tc DeployScript --sig 'run(uint8)' --broadcast --timeout 120 -vv script/Hoku.s.sol 0)"
+    deploy_supply_source_token_out="$(PRIVATE_KEY="0x${pk}" forge script --private-key "${pk}" --rpc-url "${rpc_url}" --tc DeployScript --sig 'run(uint8)' --broadcast --timeout 120 -vv script/Hoku.s.sol 0)"
 
     echo "$DASHES deploy supply source token output $DASHES"
     echo ""
