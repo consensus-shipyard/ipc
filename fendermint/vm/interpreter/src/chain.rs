@@ -44,6 +44,7 @@ use fendermint_vm_iroh_resolver::pool::{
 use fendermint_vm_message::ipc::{
     ClosedReadRequest, FinalizedBlob, ParentFinality, PendingBlob, PendingReadRequest,
 };
+use fendermint_vm_message::ipc::{Blob, ParentFinality, ReadRequest as ReadRequestIPCMessage};
 use fendermint_vm_message::{
     chain::ChainMessage,
     ipc::{BottomUpCheckpoint, CertifiedMessage, IpcMessage, SignedRelayedMessage},
@@ -164,6 +165,31 @@ impl From<&ReadRequestPoolItem> for IrohTaskType {
             offset: value.offset,
             len: value.len,
         }
+    }
+}
+
+#[derive(Clone, Hash, PartialEq, Eq)]
+pub struct ReadRequestPoolItem {
+    request_id: [u8; 32],
+    offset: u32,
+    callback_addr: Address,
+    callback_method: u64,
+}
+
+impl From<&ReadRequestPoolItem> for IrohResolveKey {
+    fn from(value: &ReadRequestPoolItem) -> Self {
+        Self {
+            hash: value.request_id.into(),
+        }
+    }
+}
+
+// TODO: Task Pool shoule not require a source. it should be optional to make it more generic
+impl From<&ReadRequestPoolItem> for IrohResolveSource {
+    fn from(_value: &ReadRequestPoolItem) -> Self {
+        let random_bytes = [0u8; 32];
+        let random_node_id = NodeId::from_bytes(&random_bytes).unwrap();
+        Self { id: random_node_id }
     }
 }
 
@@ -308,6 +334,28 @@ where
             msgs.push(ChainMessage::Ipc(IpcMessage::DebitCreditAccounts));
         }
 
+        // Collect and enqueue blobs that need to be resolved.
+        let pending_blobs = with_state_transaction(&mut state, |state| {
+            let pending_blobs = get_pending_blobs(state, env.blob_concurrency)?;
+            Ok(pending_blobs)
+        })?;
+        for (hash, sources) in pending_blobs {
+            for (subscriber, source) in sources {
+                atomically(|| {
+                    env.blob_pool.add(
+                        BlobPoolItem {
+                            subscriber,
+                            hash,
+                            source,
+                        },
+                        fendermint_vm_iroh_resolver::pool::TaskType::Blob,
+                    )
+                })
+                .await;
+                tracing::debug!(hash = ?hash, subscriber = ?subscriber, "blob added to pool");
+            }
+        }
+
         // Collect locally completed blobs from the pool. We're relying on the proposer's local
         // view of blob resolution, rather than considering those that _might_ have a quorum,
         // but have not yet been resolved by _this_ proposer. However, a blob like this will get
@@ -327,7 +375,9 @@ where
             for item in local_finalized_blobs.iter() {
                 if is_blob_finalized(&mut state, item.subscriber, item.hash, item.id.clone())? {
                     tracing::debug!(hash = ?item.hash, "blob already finalized on chain; removing from pool");
-                    atomically(|| chain_env.blob_pool.remove_task(item)).await;
+                    atomically(|| chain_env.blob_pool.remove_task(item)).await;                    
+                    // Remove the result from the pool (we don't have result for a blob so can remove it here)
+                    atomically(|| chain_env.blob_pool.remove_result(item)).await;
                     continue;
                 }
 
@@ -565,6 +615,8 @@ where
                     if is_locally_finalized {
                         tracing::debug!(hash = ?blob.hash, "blob is locally finalized; removing from pool");
                         atomically(|| chain_env.blob_pool.remove_task(&item)).await;
+                        // Remove the result from the pool
+                        atomically(|| chain_env.blob_pool.remove_result(&item)).await;
                     } else {
                         tracing::debug!(hash = ?blob.hash, "blob is not locally finalized");
                     }

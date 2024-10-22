@@ -32,7 +32,9 @@ use fendermint_vm_topdown::{
     CachedFinalityProvider, IPCBlobFinality, IPCParentFinality, IPCReadRequestClosed, Toggle,
 };
 use fvm_shared::address::{current_network, Address, Network};
+use ipc_ipld_resolver::{Event as ResolverEvent, ValidatorKey, VoteRecord};
 use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
+use ipc_observability::observe::register_metrics as register_default_metrics;
 use ipc_observability::{emit, observe::register_metrics as register_default_metrics};
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
@@ -252,6 +254,7 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
                 key.clone(),
                 own_subnet_id.clone(),
                 |hash, success| AppVote::BlobFinality(IPCBlobFinality::new(hash, success)),
+                iroh_pin_pool.results(),
             );
 
             info!("starting the iroh Resolver...");
@@ -266,6 +269,7 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
                 key,
                 own_subnet_id,
                 |hash, _| AppVote::ReadRequestClosed(IPCReadRequestClosed::new(hash)),
+                read_request_pool.results(),
             );
 
             info!("starting the read request resolver...");

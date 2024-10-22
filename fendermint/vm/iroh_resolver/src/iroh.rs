@@ -45,6 +45,7 @@ where
         key: Keypair,
         subnet_id: SubnetID,
         to_vote: fn(Hash, bool) -> V,
+        results: ResolveResults,
     ) -> Self {
         Self {
             client,
@@ -54,7 +55,7 @@ where
             key,
             subnet_id,
             to_vote,
-            results: Default::default(),
+            results,
         }
     }
 

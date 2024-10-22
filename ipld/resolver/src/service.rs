@@ -113,6 +113,7 @@ pub(crate) enum Request<V> {
     SetProvidedSubnets(Vec<SubnetID>),
     AddProvidedSubnet(SubnetID),
     RemoveProvidedSubnet(SubnetID),
+    // (publish vote is a broadcast)
     PublishVote(Box<SignedVoteRecord<V>>),
     PublishPreemptive(SubnetID, Vec<u8>),
     PinSubnet(SubnetID),
@@ -472,6 +473,9 @@ where
                 }
             }
             Request::PublishVote(vote) => {
+                let listen_addr = self.listen_addr.clone();
+                eprintln!("=====>>>> publishing vote in node: {:?}", listen_addr);
+
                 if let Err(e) = self.membership_mut().publish_vote(*vote) {
                     warn!("failed to publish vote: {e}")
                 }
@@ -550,6 +554,9 @@ where
         node_addr: NodeAddr,
         response_channel: ResponseChannel,
     ) {
+        let listen_addr = self.listen_addr.clone();
+        eprintln!("===>>>> (start_iroh_query) in node: {:?}", listen_addr);
+
         let mut iroh = self.iroh.clone();
         tokio::spawn(async move {
             match iroh.client().await {
