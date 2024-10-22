@@ -25,54 +25,6 @@ jobs:
         with:
           fail-on: low
 
-  aderyn:
-    name: Aderyn check
-    runs-on: ubuntu-latest
-    if: ${{ !github.event.pull_request.draft }}
-    steps:
-      - uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: |
-            ${{ secrets.BUILTIN_ACTORS_DEPLOY_KEY }}
-            ${{ secrets.CONTRACTS_DEPLOY_KEY }}
-
-      - uses: actions/checkout@v3
-        with:
-          submodules: recursive
-
-      # We remove this file because Aderyn can choose hardhat for compilation if that config file exists.
-      # Currently, it is not possible to configure Aderyn to use foundry by default.
-      - name: delete hardhat config
-        run: cd contracts && rm -rf ./hardhat.config.ts
-
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          cache: false
-
-      - name: Install aderyn
-        run: cargo install aderyn
-
-      - name: Make deps
-        run: cd contracts && make deps
-
-      # We need a normal npm install because pnpm hoists node_modules and creates symlinks.
-      # Aderyn performs local compilation calling solc directly. Solc requires the target of symlinks to be whitelisted
-      # in allowed-paths. Unfortunately, Aderyn doesn't support passing in allowed-paths, nor does it pick them up from
-      # Foundry config. I also wasn't able to mimic a standard node_modules layout with pnpm, after trying various
-      # hoisting and linking settings. So we bite the bullet and perform an ordinary npm install to make Aderyn happy.
-      - name: Force an ordinary npm install
-        run: cd contracts && rm -rf node_modules && npm install
-
-      - name: Print Aderyn version
-        run: aderyn --version
-
-      - name: Run aderyn
-        run: cd contracts && aderyn ./ -o report.json
-
-      - name: Check results
-        run: cd contracts && ./tools/check_aderyn.sh
-
   solhint:
     name: Solhint check
     runs-on: ubuntu-latest

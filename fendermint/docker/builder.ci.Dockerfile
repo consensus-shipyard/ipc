@@ -48,8 +48,12 @@ ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
 WORKDIR /app
 
 # Update the version here if our `rust-toolchain.toml` would cause something new to be fetched every time.
-ARG RUST_VERSION=1.78
-RUN rustup install ${RUST_VERSION} && rustup target add wasm32-unknown-unknown
+ARG RUST_VERSION=1.81.0
+RUN \
+  rustup install ${RUST_VERSION} && \
+  rustup default ${RUST_VERSION} && \
+  rustup target add wasm32-unknown-unknown && \
+  rustup target add aarch64-unknown-linux-gnu
 
 # Defined here so anything above it can be cached as a common dependency.
 ARG TARGETARCH
@@ -58,7 +62,7 @@ ARG TARGETARCH
 RUN if [ "${TARGETARCH}" = "arm64" ]; then \
   apt-get install -y g++-aarch64-linux-gnu libc6-dev-arm64-cross; \
   rustup target add aarch64-unknown-linux-gnu; \
-  rustup toolchain install stable-aarch64-unknown-linux-gnu; \
+  rustup toolchain install ${RUST_VERSION}-aarch64-unknown-linux-gnu; \
   fi
 
 # Copy the stripped source code.
@@ -98,5 +102,6 @@ RUN \
   amd64) ARCH='x86_64'  ;; \
   arm64) ARCH='aarch64' ;; \
   esac; \
+  rustup show ; \
   cargo install --locked --root output --path fendermint/app --target ${ARCH}-unknown-linux-gnu ; \
   cargo install --locked --root output --path ipc/cli --target ${ARCH}-unknown-linux-gnu
