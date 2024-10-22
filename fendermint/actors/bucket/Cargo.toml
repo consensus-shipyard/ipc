@@ -1,6 +1,6 @@
 [package]
-name = "fendermint_actor_objectstore"
-description = "Actor for object storage"
+name = "fendermint_actor_bucket"
+description = "Actor for bucket object storage"
 license.workspace = true
 edition.workspace = true
 authors.workspace = true

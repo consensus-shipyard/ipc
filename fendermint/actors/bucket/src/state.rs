@@ -26,7 +26,7 @@ fn utf8_error(e: FromUtf8Error) -> ActorError {
     ActorError::illegal_argument(e.to_string())
 }
 
-/// The state represents an object store backed by a Hamt.
+/// The state represents a bucket backed by a Hamt.
 #[derive(Serialize_tuple, Deserialize_tuple)]
 pub struct State {
     /// The machine address set by the init actor.
@@ -52,7 +52,7 @@ impl MachineState for State {
             Ok(cid) => cid,
             Err(e) => {
                 return Err(ActorError::illegal_state(format!(
-                    "objectstore actor failed to create empty Hamt: {}",
+                    "bucket actor failed to create empty Hamt: {}",
                     e
                 )));
             }
@@ -75,7 +75,7 @@ impl MachineState for State {
     }
 
     fn kind(&self) -> Kind {
-        Kind::ObjectStore
+        Kind::Bucket
     }
 
     fn owner(&self) -> Address {
@@ -91,7 +91,7 @@ impl MachineState for State {
     }
 }
 
-/// The stored representation of an object in the object store.
+/// The stored representation of an object in the bucket.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ObjectState {
     /// The object blake3 hash.

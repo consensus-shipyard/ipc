@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 pub use crate::state::State;
 
-pub const OBJECTSTORE_ACTOR_NAME: &str = "objectstore";
+pub const BUCKET_ACTOR_NAME: &str = "bucket";
 
 #[derive(FromPrimitive)]
 #[repr(u64)]
@@ -77,7 +77,7 @@ pub struct ListParams {
     pub limit: u64,
 }
 
-/// The stored representation of an object in the object store.
+/// The stored representation of an object in the bucket.
 #[derive(Clone, Debug, PartialEq, Serialize_tuple, Deserialize_tuple)]
 pub struct Object {
     /// The object blake3 hash.

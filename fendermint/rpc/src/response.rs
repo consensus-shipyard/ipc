@@ -3,7 +3,7 @@
 use anyhow::{anyhow, Context};
 use base64::Engine;
 use bytes::Bytes;
-use fendermint_actor_objectstore::Object;
+use fendermint_actor_bucket::Object;
 use fendermint_vm_actor_interface::eam;
 use fvm_ipld_encoding::{BytesDe, RawBytes};
 use tendermint::abci::response::DeliverTx;

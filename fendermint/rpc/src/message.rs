@@ -6,7 +6,7 @@ use std::path::Path;
 use anyhow::Context;
 use base64::Engine;
 use bytes::Bytes;
-use fendermint_actor_objectstore::{GetParams, Method::GetObject};
+use fendermint_actor_bucket::{GetParams, Method::GetObject};
 use fendermint_crypto::SecretKey;
 use fendermint_vm_actor_interface::{eam, evm};
 use fendermint_vm_message::{chain::ChainMessage, signed::SignedMessage};
@@ -101,7 +101,7 @@ impl MessageFactory {
         ))
     }
 
-    /// Get an object from an object store. This will not create a transaction.
+    /// Get an object from a bucket. This will not create a transaction.
     pub fn os_get(
         &mut self,
         address: Address,

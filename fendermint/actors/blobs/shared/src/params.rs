@@ -24,7 +24,7 @@ pub struct ApproveCreditParams {
     pub from: Address,
     /// Account address that is receiving the approval.
     pub receiver: Address,
-    /// Optional restriction on caller address, e.g., an object store.
+    /// Optional restriction on caller address, e.g., a bucket.
     /// The receiver will only be able to use the approval via a caller contract.
     pub required_caller: Option<Address>,
     /// Optional credit approval limit.
@@ -44,7 +44,7 @@ pub struct RevokeCreditParams {
     pub from: Address,
     /// Account address that is receiving the approval.
     pub receiver: Address,
-    /// Optional restriction on caller address, e.g., an object store.
+    /// Optional restriction on caller address, e.g., a bucket.
     /// This allows the origin of a transaction to use an approval limited to the caller.
     pub required_caller: Option<Address>,
 }

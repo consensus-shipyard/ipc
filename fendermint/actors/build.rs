@@ -8,13 +8,7 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 use std::thread;
 
-const ACTORS: &[&str] = &[
-    "blobs",
-    "chainmetadata",
-    "eam",
-    "objectstore",
-    "timehub",
-];
+const ACTORS: &[&str] = &["blobs", "bucket", "chainmetadata", "eam", "timehub"];
 
 const FILES_TO_WATCH: &[&str] = &["Cargo.toml", "src"];
 

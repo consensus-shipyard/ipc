@@ -6,17 +6,17 @@ edition.workspace = true
 license.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-fendermint_actor_timehub = { path = "timehub", features = [
+fendermint_actor_blobs = { path = "blobs", features = [
     "fil-actor",
 ] }
-fendermint_actor_blobs = { path = "blobs", features = [
+fendermint_actor_bucket = { path = "bucket", features = [
     "fil-actor",
 ] }
 fendermint_actor_chainmetadata = { path = "chainmetadata", features = [
     "fil-actor",
 ] }
 fendermint_actor_eam = { path = "eam", features = ["fil-actor"] }
-fendermint_actor_objectstore = { path = "objectstore", features = [
+fendermint_actor_timehub = { path = "timehub", features = [
     "fil-actor",
 ] }
 
@@ -25,11 +25,11 @@ cid = { workspace = true }
 anyhow = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
-fendermint_actor_timehub = { path = "timehub" }
 fendermint_actor_blobs = { path = "blobs" }
+fendermint_actor_bucket = { path = "bucket" }
 fendermint_actor_chainmetadata = { path = "chainmetadata" }
 fendermint_actor_eam = { path = "eam" }
-fendermint_actor_objectstore = { path = "objectstore" }
+fendermint_actor_timehub = { path = "timehub" }
 
 [build-dependencies]
 fil_actors_runtime = { workspace = true, features = ["test_utils"] }
