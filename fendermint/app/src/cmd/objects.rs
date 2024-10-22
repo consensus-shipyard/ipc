@@ -5,6 +5,7 @@
 use std::{convert::Infallible, net::ToSocketAddrs, num::ParseIntError};
 
 use anyhow::anyhow;
+use anyhow::Context;
 use base64::{engine::general_purpose, Engine};
 use bytes::Buf;
 use fendermint_actor_objectstore::GetParams;
@@ -23,6 +24,7 @@ use iroh::client::blobs::{BlobStatus, ReadAtLen};
 use iroh::net::NodeAddr;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use tracing::info;
 use warp::{
     filters::multipart::Part,
     http::{HeaderMap, HeaderValue, StatusCode},
@@ -40,6 +42,22 @@ cmd! {
     ObjectsArgs(self, settings: ObjectsSettings) {
         match self.command.clone() {
             ObjectsCommands::Run { tendermint_url, iroh_addr} => {
+                if settings.metrics.enabled {
+                    info!("metrics enabled");
+                    let registry = prometheus::Registry::new();
+                    // Default process metrics are enabled by default.
+
+                    info!(
+                        listen_addr = settings.metrics.listen.to_string(),
+                        "serving metrics"
+                    );
+                    let mut builder = prometheus_exporter::Builder::new(settings.metrics.listen.try_into()?);
+                    builder.with_registry(registry);
+                    let _ = builder.start().context("failed to start metrics server")?;
+                } else {
+                    info!("metrics disabled");
+                }
+
                 let client = FendermintClient::new_http(tendermint_url, None)?;
 
                 let iroh_addr = iroh_addr

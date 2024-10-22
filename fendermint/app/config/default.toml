@@ -195,6 +195,16 @@ enabled = true
 [objects.tracing.file]
 enabled = false
 
+[objects.metrics]
+# Enable the export of metrics over HTTP.
+enabled = true
+
+[objects.metrics.listen]
+# Only accept connections from a Prometheus scraper, assumed to be running locally.
+host = "127.0.0.1"
+# The default port where the Prometheus exporter makes the metrics available.
+port = 9186
+
 # IPLD Resolver Configuration
 [resolver]
 # Time to wait between attempts to resolve a CID after an error.
