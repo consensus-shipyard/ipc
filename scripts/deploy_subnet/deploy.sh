@@ -528,8 +528,8 @@ echo "$create_subnet_output"
 echo
 
 subnet_id=$(echo "$create_subnet_output" | sed -n 's/.*with id: *\([^ ]*\).*/\1/p')
-subnet_root=$(echo "$subnet_id" | sed 's|/[^0-9]*\([0-9]\+\)/.*|\1|')
-subnet_f4_addr=$(echo "$subnet_id" | sed 's|.*/||')
+subnet_root=$(echo "$subnet_id" | awk -F'[/]' '{print $2}' | sed 's/[^0-9]//g')
+subnet_f4_addr=${subnet_id##*/}
 subnet_eth_addr=$(ipc-cli util f4-to-eth-addr --addr "$subnet_f4_addr" | sed -n 's/.*\(0x[0-9a-fA-F]\{40\}\).*/\1/p')
 echo "Created new subnet id: $subnet_id ($subnet_eth_addr)"
 
