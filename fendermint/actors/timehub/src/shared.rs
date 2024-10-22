@@ -55,6 +55,14 @@ pub struct PushReturn {
     pub index: u64,
 }
 
+#[derive(Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct Leaf {
+    /// Timestamp of the witness in seconds since the UNIX epoch
+    pub timestamp: u64,
+    /// Witnessed CID
+    pub witnessed: Cid,
+}
+
 /// Compute the hash of a pair of CIDs.
 /// The hash is the CID of a new block containing the concatenation of the two CIDs.
 /// We do not include the index of the element(s) because incoming data should already be "nonced".
@@ -192,8 +200,8 @@ fn get_at<BS: Blockstore, S: DeserializeOwned + Serialize>(
     peaks: &Amt<Cid, &BS>,
 ) -> anyhow::Result<Option<S>> {
     let (path, eigen_index) = match path_for_eigen_root(leaf_index, leaf_count)? {
-        None => {return Ok(None)}
-        Some(res) => {res}
+        None => return Ok(None),
+        Some(res) => res,
     };
     let cid = match peaks.get(eigen_index)? {
         Some(cid) => cid,
