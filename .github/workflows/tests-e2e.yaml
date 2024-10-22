@@ -34,12 +34,12 @@ jobs:
       - name: Download Docker image
         uses: actions/download-artifact@v4
         with:
-          name: docker-image
+          name: docker-image-${{ github.sha }}
           path: /tmp
 
       - name: Load Docker image
         run: |
-          docker load --input /tmp/docker-image.tar
+          docker load --input /tmp/docker-image-${{ github.sha }}.tar
           docker image ls -a
 
       - name: Cache Solidity ABI artifacts
