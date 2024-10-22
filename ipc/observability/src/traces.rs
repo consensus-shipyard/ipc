@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::config::{FileLayerSettings, LogLevel, TracingSettings};
+use crate::config::{FileLayerSettings, TracingSettings};
 use crate::tracing_layers::DomainEventFilterLayer;
 use std::num::NonZeroUsize;
 use tracing::Level;
@@ -95,7 +95,7 @@ pub fn set_global_tracing_subscriber(config: &TracingSettings) -> Vec<WorkerGuar
 
             let mut filter: EnvFilter = file_settings.level.clone().unwrap_or_default().into();
             filter = filter.add_directive(
-                format!("{TRACING_TARGET}={}", LogLevel::Off)
+                format!("{TRACING_TARGET}=off")
                     .parse()
                     .expect("invalid logs level"),
             );

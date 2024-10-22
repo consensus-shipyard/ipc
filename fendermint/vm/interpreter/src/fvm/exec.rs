@@ -18,7 +18,7 @@ use super::{
     checkpoint::{self, PowerUpdates},
     observe::{CheckpointFinalized, MsgExec, MsgExecPurpose},
     state::FvmExecState,
-    FvmMessage, FvmMessageInterpreter,
+    BlockGasLimit, FvmMessage, FvmMessageInterpreter,
 };
 
 /// The return value extended with some things from the message that
@@ -45,10 +45,10 @@ where
     type Message = FvmMessage;
     type BeginOutput = FvmApplyRet;
     type DeliverOutput = FvmApplyRet;
-    /// Return validator power updates.
+    /// Return validator power updates and the next base fee.
     /// Currently ignoring events as there aren't any emitted by the smart contract,
     /// but keep in mind that if there were, those would have to be propagated.
-    type EndOutput = PowerUpdates;
+    type EndOutput = (PowerUpdates, BlockGasLimit);
 
     async fn begin(
         &self,
@@ -157,6 +157,12 @@ where
 
             (apply_ret, emitters, latency)
         } else {
+            if let Err(err) = state.block_gas_tracker().ensure_sufficient_gas(&msg) {
+                // This is panic-worthy, but we suppress it to avoid liveness issues.
+                // Consider maybe record as evidence for the validator slashing?
+                tracing::warn!("insufficient block gas; continuing to avoid halt, but this should've not happened: {}", err);
+            }
+
             let (execution_result, latency) = measure_time(|| state.execute_explicit(msg.clone()));
             let (apply_ret, emitters) = execution_result?;
 
@@ -186,6 +192,8 @@ where
     }
 
     async fn end(&self, mut state: Self::State) -> anyhow::Result<(Self::State, Self::EndOutput)> {
+        let next_gas_market = state.finalize_gas_market()?;
+
         // TODO: Consider doing this async, since it's purely informational and not consensus-critical.
         let _ = checkpoint::emit_trace_if_check_checkpoint_finalized(&self.gateway, &mut state)
             .inspect_err(|e| {
@@ -244,6 +252,7 @@ where
             PowerUpdates::default()
         };
 
-        Ok((state, updates))
+        let ret = (updates, next_gas_market.block_gas_limit);
+        Ok((state, ret))
     }
 }
