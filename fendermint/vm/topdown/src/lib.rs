@@ -161,6 +161,29 @@ impl Display for IPCBlobFinality {
     }
 }
 
+/// The finality view for a read request at certain height.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct IPCReadRequestCompleted {
+    pub hash: Hash,
+    pub success: bool,
+}
+
+impl IPCReadRequestCompleted {
+    pub fn new(hash: Hash, success: bool) -> Self {
+        Self { hash, success }
+    }
+}
+
+impl Display for IPCReadRequestCompleted {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "IPCReadRequestCompleted(hash: {}, success: {})",
+            self.hash, self.success
+        )
+    }
+}
+
 #[async_trait]
 pub trait ParentViewProvider {
     /// Obtain the genesis epoch of the current subnet in the parent

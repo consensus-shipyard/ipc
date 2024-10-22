@@ -304,26 +304,6 @@ fn delete_from_disc(hash: Hash) -> Result<(), ActorError> {
     }
 }
 
-fn get_from_disc(hash: Hash, offset: u32) -> Result<[u8; 65536], ActorError> {
-    #[cfg(feature = "fil-actor")]
-    {
-        let result = blobs_actor_sdk::hash_get(hash.0, offset).map_err(|en| {
-            ActorError::unspecified(format!("failed to get blob from disc: {:?}", en))
-        })?;
-        log::debug!("read blob bytes from disc, length={}", result.len());
-        Ok(result)
-    }
-    #[cfg(not(feature = "fil-actor"))]
-    {
-        log::debug!(
-            "mock get_from_disc (blobs), hash={}, offset={}",
-            hash,
-            offset,
-        );
-        Ok([0u8; 65536])
-    }
-}
-
 impl ActorCode for BlobsActor {
     type Methods = Method;
 

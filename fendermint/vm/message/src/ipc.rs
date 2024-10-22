@@ -143,6 +143,23 @@ pub struct PendingBlob {
     pub source: NodeId,
 }
 
+/// A read request that the validators will be voting on.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct ReadRequest {
+    /// The request ID (blake3 hash of the request).
+    pub request_id: Hash,
+    /// The offset in the blob to read from.
+    pub offset: u32,
+    /// The address of the callback actor.
+    pub callback_addr: Address,
+    /// The method ID of the callback actor.
+    pub callback_method: u64,
+    /// The status of the read request.
+    pub succeeded: bool,
+    /// The data read from the blob.
+    pub data: Option<Vec<u8>>,
+}
+
 #[cfg(feature = "arb")]
 mod arb {
     use crate::ipc::ParentFinality;

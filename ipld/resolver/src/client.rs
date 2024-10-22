@@ -10,7 +10,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::oneshot;
 
 use crate::{
-    service::{Request, ResolveResult},
+    service::{Request, ResolveReadRequestResult, ResolveResult},
     vote_record::SignedVoteRecord,
 };
 
@@ -131,6 +131,32 @@ where
     async fn resolve_iroh(&self, hash: Hash, node_addr: NodeAddr) -> anyhow::Result<ResolveResult> {
         let (tx, rx) = oneshot::channel();
         let req = Request::ResolveIroh(hash, node_addr, tx);
+        self.send_request(req)?;
+        let res = rx.await?;
+        Ok(res)
+    }
+}
+
+/// Trait to limit the capabilities to reading data from Iroh.
+#[async_trait]
+pub trait ResolverIrohReadRequest {
+    /// Send a hash for getting the data from iroh, await its completion,
+    /// then return the result, to be inspected by the caller.
+    async fn resolve_read_request(&self, hash: Hash) -> anyhow::Result<ResolveReadRequestResult>;
+}
+
+#[async_trait]
+impl<V> ResolverIrohReadRequest for Client<V>
+where
+    V: Sync + Send + 'static,
+{
+    async fn resolve_read_request(&self, hash: Hash) -> anyhow::Result<ResolveReadRequestResult> {
+        eprintln!(
+            "====>>>>> (resolve_read_request) starting resolve read request: {:?}",
+            hash
+        );
+        let (tx, rx) = oneshot::channel();
+        let req = Request::ResolveReadRequest(hash, tx);
         self.send_request(req)?;
         let res = rx.await?;
         Ok(res)

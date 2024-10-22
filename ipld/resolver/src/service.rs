@@ -8,6 +8,7 @@ use anyhow::anyhow;
 use bloom::{BloomFilter, ASMS};
 use ipc_api::subnet_id::SubnetID;
 use iroh::blobs::Hash;
+use iroh::client::blobs::ReadAtLen;
 use iroh::client::Iroh;
 use iroh::net::NodeAddr;
 use libipld::store::StoreParams;
@@ -44,8 +45,14 @@ use crate::vote_record::{SignedVoteRecord, VoteRecord};
 /// Result of attempting to resolve a CID.
 pub type ResolveResult = anyhow::Result<()>;
 
+/// Result of attempting to resolve a read request.
+pub type ResolveReadRequestResult = anyhow::Result<bytes::Bytes>;
+
 /// Channel to complete the results with.
 type ResponseChannel = Sender<ResolveResult>;
+
+/// Channel to complete the read request with.
+type ReadRequestResponseChannel = Sender<anyhow::Result<bytes::Bytes>>;
 
 /// State of a query. The fallback peers can be used
 /// if the current attempt fails.
@@ -106,12 +113,14 @@ pub(crate) enum Request<V> {
     SetProvidedSubnets(Vec<SubnetID>),
     AddProvidedSubnet(SubnetID),
     RemoveProvidedSubnet(SubnetID),
+    // (publish vote is a broadcast)
     PublishVote(Box<SignedVoteRecord<V>>),
     PublishPreemptive(SubnetID, Vec<u8>),
     PinSubnet(SubnetID),
     UnpinSubnet(SubnetID),
     Resolve(Cid, SubnetID, ResponseChannel),
     ResolveIroh(Hash, NodeAddr, ResponseChannel),
+    ResolveReadRequest(Hash, ReadRequestResponseChannel),
     RateLimitUsed(PeerId, usize),
     UpdateRateLimit(u32),
 }
@@ -464,6 +473,9 @@ where
                 }
             }
             Request::PublishVote(vote) => {
+                let listen_addr = self.listen_addr.clone();
+                eprintln!("=====>>>> publishing vote in node: {:?}", listen_addr);
+
                 if let Err(e) = self.membership_mut().publish_vote(*vote) {
                     warn!("failed to publish vote: {e}")
                 }
@@ -488,6 +500,13 @@ where
             }
             Request::ResolveIroh(hash, node_addr, response_channel) => {
                 self.start_iroh_query(hash, node_addr, response_channel)
+            }
+            Request::ResolveReadRequest(hash, response_channel) => {
+                eprintln!(
+                    "====>>>>> (handle_request) starting resolve read request: {:?}",
+                    hash
+                );
+                self.start_iroh_read_request(hash, response_channel)
             }
             Request::RateLimitUsed(peer_id, bytes) => {
                 self.content_mut().rate_limit_used(peer_id, bytes)
@@ -539,6 +558,9 @@ where
         node_addr: NodeAddr,
         response_channel: ResponseChannel,
     ) {
+        let listen_addr = self.listen_addr.clone();
+        eprintln!("===>>>> (start_iroh_query) in node: {:?}", listen_addr);
+
         let mut iroh = self.iroh.clone();
         tokio::spawn(async move {
             match iroh.client().await {
@@ -551,6 +573,44 @@ where
                 }
                 Err(e) => warn!(
                     "cannot resolve {}; failed to create iroh client ({})",
+                    hash, e
+                ),
+            }
+        });
+    }
+
+    /// Start a read request resolution using iorh.
+    fn start_iroh_read_request(
+        &mut self,
+        hash: Hash,
+        response_channel: ReadRequestResponseChannel,
+    ) {
+        let mut iroh = self.iroh.clone();
+        tokio::spawn(async move {
+            eprintln!(
+                "====>>>>> (start_iroh_read_request) starting resolve read request: {:?}",
+                hash
+            );
+            match iroh.client().await {
+                Ok(client) => {
+                    let offset = 0;
+                    let len = 1024 * 1024;
+
+                    // put a dummy blob in iroh corresponding to the blob hash
+                    let data_hex = r#"a46022bf66ff011abaedd2556bd2e0c21d2367cb430692ea6a1e84ec9d4639c2bb79c46629e9c5c76759b2aadf906df8ad45b7da458290be731e043b9dacbefcb931ba4da810f0673ec06f8d9dc05e6dd20e232765e78e301c7ffa5c0ebf4579c8d20096cbfe6f80044ffff274343ad7735eae3e12e2322e9cc8473f80e50c2893b284e619fcee70ad59a735520dbb1263be54c4cffa9bb914284c835de4550ba4c40cc6f733406aebc281aaa42e4ff44db953647d6d3737493fe9f7936a8dbf91fd381be144201ea5d9b376789279b2c5c6357b29d814dcbed9f8d8f4dd4802b9206a391645b8c712943ca2ae8a78611570bd96fe0175d524dfe75a373639435d7ea8125f53605b774ab96708b60a8e8805b795c92d8b49f238fa3e0d714f0db15f1c02abe081f25a544a9127cbf383dc52c8a88752fc0dc2c03692e22e8c0f6e1c5adcf4de18fa3a821ddd151a7e6707e1f0ea559105f87eb7ea3d0dd62815ef0b21a0d5f8bdf4abfcd5a16764a9120220db8c2dbe207892cb2b20a404f21b901b5272b5af27a63deca7641a160bd8c7903a40131d1ed84aa6bde91a55f156042e0cf2f0d738095c741e8913e5cdf8d40cb346f4e6793ac8502a7aa0873ed96c0929ee1a0fab035a5c12c76e92bfe844fd96f92cbe104c41c8ffe0e1bdb8878f7158f64ba44ac08178411ca46d0557a6e7cc1ade13f69bd6751bd3023558e0ca33f13af5afa70f3d3cce094bc51510475f1e6f4a5b0cb9f1120229ceacf220f919024410f3c06c607a823aa47c10879a655b9d3a96433dc0ad64e0d8c80fbf7a6e6e5adfdf7e8e4b68335325b5a57c735dbf72b256bf6dd89816dcded29eabdf7f6379f354b81cab2464d43462b99e0a6093d0b1368cfd1563c0c2ee9bef7106c0727ce204405044ae11926e534dda81a2e082c680a76bbbbccd92b44d44773b27cf1388359d73facae0545754155b5e63172088067bcb9d7779d6e8d49b331f0593800bcf4b96f33ccc2e68a9e7272472966c9c0285e9260e88a3698be07fae1f728bd0dc4103eb13cda16657dd6e8de6ef300467c5ed52f1409be7a0065fbe45d90a64f15d44980b91ce40155430a3eadeced2653ad089656f24e1a5213f25cef0a43f6ee829f22c3213c16db8f71e37923617a79661ece1c305390c81d696aa1788f5182d9ef8cf0d1ef0d4da223d0934a53f16af46af75e145675d0cf6b4f49d414d0c916cd48a4fa87d7e22fd1131c21ab521ae245b819c4ea2cf7b6539a49877c5a87894ba49744723657d996413c0a77029b401397461cd100f715fa299ec6200cb7c17898d8e80e52c7ab5555dd6858592c6d7dc7f2ae289cc5e266f592a389e3d87ece818592bc3096e18afb7e95cd0520542af073dc49e817ffe778bdbdcf71c52ecb7e0bc8d9624fa9dd833fcb19c7c1467029b9165bfa1af5bba"#;
+                    let data = hex::decode(data_hex).unwrap();
+                    client.blobs().add_bytes(data).await.unwrap();
+
+                    // -----
+
+                    let res = read_blob(client, hash, offset, len).await;
+                    match res {
+                        Ok(bytes) => send_read_request_result(response_channel, Ok(bytes)),
+                        Err(e) => send_read_request_result(response_channel, Err(anyhow!(e))),
+                    }
+                }
+                Err(e) => warn!(
+                    "cannot resolve read request {}; failed to create iroh client ({})",
                     hash, e
                 ),
             }
@@ -622,6 +682,15 @@ fn send_resolve_result(tx: Sender<ResolveResult>, res: ResolveResult) {
     }
 }
 
+fn send_read_request_result(
+    tx: Sender<anyhow::Result<bytes::Bytes>>,
+    res: anyhow::Result<bytes::Bytes>,
+) {
+    if tx.send(res).is_err() {
+        error!("error sending read request result; listener closed")
+    }
+}
+
 /// Builds the transport stack that libp2p will communicate over.
 ///
 /// Based on the equivalent in Forest.
@@ -675,4 +744,15 @@ async fn download_blob(iroh: Iroh, hash: Hash, node_addr: NodeAddr) -> anyhow::R
     iroh.tags().delete(tag).await.ok();
 
     Ok(())
+}
+
+async fn read_blob(iroh: Iroh, hash: Hash, offset: u64, len: u64) -> anyhow::Result<bytes::Bytes> {
+    eprintln!(
+        "====>>>>> (read_blob) starting read blob: {:?} offset: {} len: {}",
+        hash, offset, len
+    );
+    let len = ReadAtLen::AtMost(len);
+    let res = iroh.blobs().read_at_to_bytes(hash, offset, len).await?;
+    debug!("read blob {}: {:?}", hash, res);
+    Ok(res)
 }

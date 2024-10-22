@@ -80,6 +80,14 @@ pub struct ResolveTask {
     num_attempts: TVar<u64>,
     /// Counter to add to if all attempts are used.
     num_failures: TVar<u64>,
+    /// Type of task
+    task_type: TaskType,
+}
+
+#[derive(Clone, Debug)]
+pub enum TaskType {
+    Blob,
+    ReadRequest,
 }
 
 impl ResolveTask {
@@ -108,9 +116,14 @@ impl ResolveTask {
     pub fn add_failure(&self) -> Stm<()> {
         self.num_failures.update(|a| a + 1)
     }
+
+    pub fn task_type(&self) -> TaskType {
+        self.task_type.clone()
+    }
 }
 
 pub type ResolveQueue = TChan<ResolveTask>;
+pub type ResolveResults = TVar<im::HashMap<ResolveKey, Vec<u8>>>;
 
 /// A data structure used to communicate resolution requirements and outcomes
 /// between the resolver running in the background and the application waiting
@@ -127,6 +140,8 @@ where
     items: TVar<im::HashMap<ResolveKey, ResolveStatus<T>>>,
     /// Items queued for resolution.
     queue: ResolveQueue,
+    /// Results of resolved items.
+    results: ResolveResults,
 }
 
 impl<T> ResolvePool<T>
@@ -139,6 +154,7 @@ where
         Self {
             items: Default::default(),
             queue: Default::default(),
+            results: Default::default(),
         }
     }
 
@@ -149,10 +165,15 @@ where
         self.queue.clone()
     }
 
+    /// Results of resolved items.
+    pub fn results(&self) -> ResolveResults {
+        self.results.clone()
+    }
+
     /// Add an item to the resolution targets.
     ///
     /// If the item is new, enqueue it from background resolution, otherwise return its existing status.
-    pub fn add(&self, item: T) -> Stm<ResolveStatus<T>> {
+    pub fn add(&self, item: T, task_type: TaskType) -> Stm<ResolveStatus<T>> {
         let key = ResolveKey::from(&item);
         let source = ResolveSource::from(&item);
         let mut items = self.items.read_clone()?;
@@ -173,6 +194,7 @@ where
                 is_resolved: status.is_resolved.clone(),
                 num_attempts: TVar::new(0),
                 num_failures: status.num_failures.clone(),
+                task_type,
             })?;
             Ok(status)
         }
@@ -203,18 +225,35 @@ where
         Ok(done)
     }
 
-    /// Remove an item from the resolution targets.
+    /// Remove an item from the resolution targets and its result.
     pub fn remove(&self, item: &T) -> Stm<()> {
         let key = ResolveKey::from(item);
         self.items.update_mut(|items| {
             items.remove(&key);
         })
     }
+
+    /// Get the result of a resolved item.
+    pub fn get_result(&self, item: &T) -> Stm<Option<Vec<u8>>> {
+        let key = ResolveKey::from(item);
+        self.results
+            .read()
+            .map(|results| results.get(&key).cloned())
+    }
+
+    /// Remove the result of a resolved item.
+    pub fn remove_result(&self, item: &T) -> Stm<()> {
+        let key = ResolveKey::from(item);
+        self.results.update(|mut results| {
+            results.remove(&key);
+            results
+        })
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{ResolveKey, ResolvePool, ResolveSource};
+    use super::{ResolveKey, ResolvePool, ResolveSource, TaskType};
 
     use async_stm::{atomically, queues::TQueueLike};
     use iroh::base::key::SecretKey;
@@ -256,7 +295,7 @@ mod tests {
         let pool = ResolvePool::new();
         let item = TestItem::dummy();
 
-        atomically(|| pool.add(item.clone())).await;
+        atomically(|| pool.add(item.clone(), TaskType::Blob)).await;
         atomically(|| {
             assert!(pool.get_status(&item)?.is_some());
             assert!(!pool.queue.is_empty()?);
@@ -272,7 +311,7 @@ mod tests {
         let item = TestItem::dummy();
 
         // Add once.
-        atomically(|| pool.add(item.clone())).await;
+        atomically(|| pool.add(item.clone(), TaskType::Blob)).await;
 
         // Consume it from the queue.
         atomically(|| {
@@ -283,7 +322,7 @@ mod tests {
         .await;
 
         // Add again.
-        atomically(|| pool.add(item.clone())).await;
+        atomically(|| pool.add(item.clone(), TaskType::Blob)).await;
 
         // Should not be queued a second time.
         atomically(|| {
@@ -300,7 +339,7 @@ mod tests {
         let pool = ResolvePool::new();
         let item = TestItem::dummy();
 
-        let status1 = atomically(|| pool.add(item.clone())).await;
+        let status1 = atomically(|| pool.add(item.clone(), TaskType::Blob)).await;
         let status2 = atomically(|| pool.get_status(&item))
             .await
             .expect("status exists");
@@ -329,7 +368,7 @@ mod tests {
         let item = TestItem::dummy();
 
         atomically(|| {
-            let status = pool.add(item.clone())?;
+            let status = pool.add(item.clone(), TaskType::Blob)?;
             status.is_resolved.write(true)?;
 
             let resolved1 = pool.collect_done()?;
