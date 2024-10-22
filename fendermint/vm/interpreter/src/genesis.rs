@@ -582,6 +582,7 @@ fn deploy_contracts(
         let diamond_loupe_facet = facets.remove(0);
         let diamond_cut_facet = facets.remove(0);
         let ownership_facet = facets.remove(0);
+        let validator_reward_facet = facets.remove(0);
 
         debug_assert_eq!(facets.len(), 2, "SubnetRegistry has 2 facets of its own");
 
@@ -595,6 +596,7 @@ fn deploy_contracts(
             diamond_cut_facet: diamond_cut_facet.facet_address,
             diamond_loupe_facet: diamond_loupe_facet.facet_address,
             ownership_facet: ownership_facet.facet_address,
+            validator_reward_facet: validator_reward_facet.facet_address,
             subnet_getter_selectors: getter_facet.function_selectors,
             subnet_manager_selectors: manager_facet.function_selectors,
             subnet_rewarder_selectors: rewarder_facet.function_selectors,
@@ -603,6 +605,7 @@ fn deploy_contracts(
             subnet_actor_diamond_cut_selectors: diamond_cut_facet.function_selectors,
             subnet_actor_diamond_loupe_selectors: diamond_loupe_facet.function_selectors,
             subnet_actor_ownership_selectors: ownership_facet.function_selectors,
+            validator_reward_selectors: validator_reward_facet.function_selectors,
             creation_privileges: 0,
         };
 
