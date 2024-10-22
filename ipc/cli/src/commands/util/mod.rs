@@ -4,8 +4,10 @@ use crate::{CommandLineHandler, GlobalArguments};
 
 use clap::{Args, Subcommand};
 
-use self::f4::{EthToF4Addr, EthToF4AddrArgs, F4ToEthAddr, F4ToEthAddrArgs};
+use self::eth::{F4ToEthAddr, F4ToEthAddrArgs};
+use self::f4::{EthToF4Addr, EthToF4AddrArgs};
 
+mod eth;
 mod f4;
 
 #[derive(Debug, Args)]

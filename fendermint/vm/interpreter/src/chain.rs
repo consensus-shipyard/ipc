@@ -4,12 +4,13 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use crate::fvm::state::ipc::GatewayCaller;
-use crate::fvm::{topdown, FvmApplyRet, PowerUpdates};
+use crate::selector::{GasLimitSelector, MessageSelector};
 use crate::{
+    fvm::state::ipc::GatewayCaller,
     fvm::state::FvmExecState,
     fvm::store::ReadOnlyBlockstore,
     fvm::FvmMessage,
+    fvm::{topdown, BlockGasLimit, FvmApplyRet, PowerUpdates},
     signed::{SignedMessageApplyRes, SignedMessageCheckRes, SyntheticMessage, VerifiableMessage},
     CheckInterpreter, ExecInterpreter, ProposalInterpreter, QueryInterpreter,
 };
@@ -149,7 +150,7 @@ where
     DB: Blockstore + Clone + 'static + Send + Sync,
     I: Sync + Send,
 {
-    type State = (ChainEnv, FvmExecState<ReadOnlyBlockstore<DB>>);
+    type State = (ChainEnv, FvmExecState<ReadOnlyBlockstore<Arc<DB>>>);
     type Message = ChainMessage;
 
     /// Check whether there are any "ready" messages in the IPLD resolution mempool which can be
@@ -160,28 +161,34 @@ where
     /// checkpoints, to stay within gas limits.
     async fn prepare(
         &self,
-        (env, mut state): Self::State,
+        (chain_env, mut state): Self::State,
         mut msgs: Vec<Self::Message>,
     ) -> anyhow::Result<Vec<Self::Message>> {
+        msgs = messages_selection(msgs, &state)?;
+
         // Collect resolved CIDs ready to be proposed from the pool.
-        let ckpts = atomically(|| env.checkpoint_pool.collect_resolved()).await;
+        let ckpts = atomically(|| chain_env.checkpoint_pool.collect_resolved()).await;
 
         // Create transactions ready to be included on the chain.
         let ckpts = ckpts.into_iter().map(|ckpt| match ckpt {
             CheckpointPoolItem::BottomUp(ckpt) => ChainMessage::Ipc(IpcMessage::BottomUpExec(ckpt)),
         });
 
-        // Prepare top-down proposals.
-        // Before we try to find a quorum, pause incoming votes. This is optional, but if there are
-        // lots of votes coming in, it might hold up proposals.
-        atomically(|| env.parent_finality_votes.pause_votes_until_find_quorum()).await;
+        // Prepare top down proposals.
+        // Before we try to find a quorum, pause incoming votes. This is optional but if there are lots of votes coming in it might hold up proposals.
+        atomically(|| {
+            chain_env
+                .parent_finality_votes
+                .pause_votes_until_find_quorum()
+        })
+        .await;
 
         // The pre-requisite for a proposal is that there is a quorum of gossiped votes at that height.
         // The final proposal can be at most as high as the quorum, but can be less if we have already
         // hit some limits such as how many blocks we can propose in a single step.
         let finalities = atomically(|| {
-            let parent = env.parent_finality_provider.next_proposal()?;
-            let quorum = env
+            let parent = chain_env.parent_finality_provider.next_proposal()?;
+            let quorum = chain_env
                 .parent_finality_votes
                 .find_quorum()?
                 .map(|(height, block_hash)| IPCParentFinality { height, block_hash });
@@ -225,7 +232,7 @@ where
 
         // Collect and enqueue blobs that need to be resolved.
         state.state_tree_mut().begin_transaction();
-        let pending_blobs = get_pending_blobs(&mut state, env.blob_concurrency)?;
+        let pending_blobs = get_pending_blobs(&mut state, chain_env.blob_concurrency)?;
         state
             .state_tree_mut()
             .end_transaction(true)
@@ -233,7 +240,7 @@ where
         for (hash, sources) in pending_blobs {
             for (subscriber, source) in sources {
                 atomically(|| {
-                    env.blob_pool.add(BlobPoolItem {
+                    chain_env.blob_pool.add(BlobPoolItem {
                         subscriber,
                         hash,
                         source,
@@ -255,7 +262,7 @@ where
         // view of blob resolution, rather than considering those that _might_ have a quorum,
         // but have not yet been resolved by _this_ proposer. However, a blob like this will get
         // picked up by a different proposer who _does_ consider it resolved.
-        let local_finalized_blobs = atomically(|| env.blob_pool.collect_done()).await;
+        let local_finalized_blobs = atomically(|| chain_env.blob_pool.collect_done()).await;
 
         // Create transactions ready to be included on the chain. These are from locally resolved
         // or failed blobs that have reached a global quorum and are not yet finalized.
@@ -270,12 +277,13 @@ where
             for item in local_finalized_blobs.iter() {
                 if !is_blob_pending(&mut state, item.hash, item.subscriber)? {
                     tracing::debug!(hash = ?item.hash, "blob already finalized on chain; removing from pool");
-                    atomically(|| env.blob_pool.remove(item)).await;
+                    atomically(|| chain_env.blob_pool.remove(item)).await;
                     continue;
                 }
 
                 let (is_globally_finalized, succeeded) = atomically(|| {
-                    env.parent_finality_votes
+                    chain_env
+                        .parent_finality_votes
                         .find_blob_quorum(&item.hash.as_bytes().to_vec())
                 })
                 .await;
@@ -294,7 +302,7 @@ where
                 .end_transaction(true)
                 .expect("we just started a transaction");
 
-            let pending_blobs = atomically(|| env.blob_pool.count()).await;
+            let pending_blobs = atomically(|| chain_env.blob_pool.count()).await;
             tracing::info!(size = pending_blobs, "blob pool status");
 
             // Append at the end - if we run out of block space,
@@ -305,13 +313,14 @@ where
         Ok(msgs)
     }
 
-    /// Perform finality checks on top-down transactions and availability checks on bottom-up
-    /// transactions.
+    /// Perform finality checks on top-down transactions and availability checks on bottom-up transactions.
     async fn process(
         &self,
-        (env, mut state): Self::State,
+        (chain_env, mut state): Self::State,
         msgs: Vec<Self::Message>,
     ) -> anyhow::Result<bool> {
+        let mut block_gas_usage = 0;
+
         for msg in msgs {
             match msg {
                 ChainMessage::Ipc(IpcMessage::BottomUpExec(msg)) => {
@@ -323,7 +332,7 @@ where
                     // 1) we validated it when it was relayed, and
                     // 2) if a validator proposes something invalid, we can make them pay during execution.
                     let is_resolved =
-                        atomically(|| match env.checkpoint_pool.get_status(&item)? {
+                        atomically(|| match chain_env.checkpoint_pool.get_status(&item)? {
                             None => Ok(false),
                             Some(status) => status.is_resolved(),
                         })
@@ -342,7 +351,8 @@ where
                         block_hash,
                     };
                     let is_final =
-                        atomically(|| env.parent_finality_provider.check_proposal(&prop)).await;
+                        atomically(|| chain_env.parent_finality_provider.check_proposal(&prop))
+                            .await;
                     if !is_final {
                         return Ok(false);
                     }
@@ -363,7 +373,8 @@ where
                         .expect("we just started a transaction");
 
                     let (is_globally_finalized, succeeded) = atomically(|| {
-                        env.parent_finality_votes
+                        chain_env
+                            .parent_finality_votes
                             .find_blob_quorum(&blob.hash.as_bytes().to_vec())
                     })
                     .await;
@@ -388,14 +399,14 @@ where
                         source: blob.source,
                     };
                     let is_locally_finalized =
-                        atomically(|| match env.blob_pool.get_status(&item)? {
+                        atomically(|| match chain_env.blob_pool.get_status(&item)? {
                             None => Ok(false),
                             Some(status) => Ok(status.is_resolved()? || status.is_failed()?),
                         })
                         .await;
                     if is_locally_finalized {
                         tracing::debug!(hash = ?blob.hash, "blob is locally finalized; removing from pool");
-                        atomically(|| env.blob_pool.remove(&item)).await;
+                        atomically(|| chain_env.blob_pool.remove(&item)).await;
                     } else {
                         tracing::debug!(hash = ?blob.hash, "blob is not locally finalized");
                     }
@@ -416,10 +427,14 @@ where
                         return Ok(false);
                     }
                 }
+                ChainMessage::Signed(signed) => {
+                    block_gas_usage += signed.message.gas_limit;
+                }
                 _ => {}
             };
         }
-        Ok(true)
+
+        Ok(block_gas_usage <= state.block_gas_tracker().available())
     }
 }
 
@@ -431,7 +446,7 @@ where
         Message = VerifiableMessage,
         DeliverOutput = SignedMessageApplyRes,
         State = FvmExecState<DB>,
-        EndOutput = PowerUpdates,
+        EndOutput = (PowerUpdates, BlockGasLimit),
     >,
 {
     // The state consists of the resolver pool, which this interpreter needs, and the rest of the
@@ -581,7 +596,9 @@ where
                     tracing::debug!("chain interpreter applied topdown msgs");
 
                     let local_block_height = state.block_height() as u64;
-                    let proposer = state.validator_id().map(|id| id.to_string());
+                    let proposer = state
+                        .block_producer()
+                        .map(|id| hex::encode(id.serialize_compressed()));
                     let proposer_ref = proposer.as_deref();
 
                     atomically(|| {
@@ -732,9 +749,10 @@ where
         let (state, out) = self.inner.end(state).await?;
 
         // Update any component that needs to know about changes in the power table.
-        if !out.0.is_empty() {
+        if !out.0 .0.is_empty() {
             let power_updates = out
                 .0
+                 .0
                 .iter()
                 .map(|v| {
                     let vk = ValidatorKey::from(v.public_key.0);
@@ -924,4 +942,32 @@ where
         false
     };
     Ok(pending)
+}
+
+/// Selects messages to be executed. Currently, this is a static function whose main purpose is to
+/// coordinate various selectors. However, it does not have formal semantics for doing so, e.g.
+/// do we daisy-chain selectors, do we parallelize, how do we treat rejections and acceptances?
+/// It hasn't been well thought out yet. When we refactor the whole *Interpreter stack, we will
+/// revisit this and make the selection function properly pluggable.
+fn messages_selection<DB: Blockstore + Clone + 'static>(
+    msgs: Vec<ChainMessage>,
+    state: &FvmExecState<DB>,
+) -> anyhow::Result<Vec<ChainMessage>> {
+    let mut user_msgs = msgs
+        .into_iter()
+        .map(|msg| match msg {
+            ChainMessage::Signed(inner) => Ok(inner),
+            ChainMessage::Ipc(_) => Err(anyhow!("should not have ipc messages in user proposals")),
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+
+    // Currently only one selector, we can potentially extend to more selectors
+    // This selector enforces that the total cumulative gas limit of all messages is less than the
+    // currently active block gas limit.
+    let selectors = vec![GasLimitSelector {}];
+    for s in selectors {
+        user_msgs = s.select_messages(state, user_msgs)
+    }
+
+    Ok(user_msgs.into_iter().map(ChainMessage::Signed).collect())
 }

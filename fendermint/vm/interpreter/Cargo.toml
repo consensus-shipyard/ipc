@@ -47,10 +47,12 @@ tokio-util = { workspace = true }
 tracing = { workspace = true }
 
 blobs_syscall = { path = "../../../hoku/blobs_syscall" }
+fendermint_actors_api = { workspace = true }
 fendermint_actor_blobs = { path = "../../actors/blobs" }
 fendermint_actor_blobs_shared = { path = "../../actors/blobs/shared" }
 fendermint_actor_bucket = { path = "../../actors/bucket" }
 fendermint_actor_chainmetadata = { path = "../../actors/chainmetadata" }
+fendermint_actor_gas_market_eip1559 = { path = "../../actors/gas_market/eip1559" }
 fendermint_actor_eam = { path = "../../actors/eam" }
 fendermint_actor_timehub = { path = "../../actors/timehub" }
 fendermint_actors = { path = "../../actors" }
@@ -78,6 +80,7 @@ tempfile = { workspace = true }
 
 fendermint_testing = { path = "../../testing", features = ["golden"] }
 fendermint_vm_genesis = { path = "../genesis", features = ["arb"] }
+fendermint_vm_message = { path = "../message", features = ["arb"] }
 fendermint_vm_interpreter = { path = ".", features = ["arb"] }
 
 [features]
