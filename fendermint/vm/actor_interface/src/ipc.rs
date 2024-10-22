@@ -474,6 +474,7 @@ pub mod registry {
         pub diamond_cut_facet: Address,
         pub diamond_loupe_facet: Address,
         pub ownership_facet: Address,
+        pub validator_reward_facet: Address,
         pub subnet_getter_selectors: Vec<FunctionSelector>,
         pub subnet_manager_selectors: Vec<FunctionSelector>,
         pub subnet_rewarder_selectors: Vec<FunctionSelector>,
@@ -482,6 +483,7 @@ pub mod registry {
         pub subnet_actor_diamond_cut_selectors: Vec<FunctionSelector>,
         pub subnet_actor_diamond_loupe_selectors: Vec<FunctionSelector>,
         pub subnet_actor_ownership_selectors: Vec<FunctionSelector>,
+        pub validator_reward_selectors: Vec<FunctionSelector>,
         pub creation_privileges: u8, // 0 = Unrestricted, 1 = Owner.
     }
 }
