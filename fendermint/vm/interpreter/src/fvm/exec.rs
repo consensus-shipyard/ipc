@@ -5,6 +5,7 @@ use anyhow::Context;
 use async_trait::async_trait;
 use std::collections::HashMap;
 
+use crate::fvm::activities::{BlockMined, ValidatorActivityTracker};
 use crate::ExecInterpreter;
 use fendermint_vm_actor_interface::{chainmetadata, cron, system};
 use fvm::executor::ApplyRet;
@@ -192,6 +193,12 @@ where
 
     async fn end(&self, mut state: Self::State) -> anyhow::Result<(Self::State, Self::EndOutput)> {
         let next_gas_market = state.finalize_gas_market()?;
+
+        if let Some(pubkey) = state.block_producer() {
+            state
+                .activities_tracker()
+                .track_block_mined(BlockMined { validator: pubkey })?;
+        }
 
         // TODO: Consider doing this async, since it's purely informational and not consensus-critical.
         let _ = checkpoint::emit_trace_if_check_checkpoint_finalized(&self.gateway, &mut state)
