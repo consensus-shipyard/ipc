@@ -963,9 +963,9 @@ where
 
     while height <= to_height {
         if let Ok(block_results) = data.tm().block_results(height).await {
-            if let Some(tx_results) = block_results.txs_results {
-                let block_number = et::U64::from(height.value());
+            let block_number = et::U64::from(height.value());
 
+            if let Some(tx_results) = block_results.txs_results {
                 let block = data
                     .block_by_height(et::BlockNumber::Number(block_number))
                     .await?;
@@ -1009,6 +1009,26 @@ where
 
                     log_index_start += tx_result.events.len();
                 }
+            } else if let Some(events) = block_results.end_block_events {
+                let emitters = from_tm::collect_emitters(&events);
+
+                // Filter by address.
+                if !addrs.is_empty() && addrs.intersection(&emitters).next().is_none() {
+                    continue;
+                }
+
+                // all zero indicating it's system contract call
+                let tx_hash = et::TxHash::zero();
+                let tx_idx = et::U64::zero();
+                let block_hash = et::H256::zero();
+
+                let mut tx_logs =
+                    from_tm::to_logs(&events, block_hash, block_number, tx_hash, tx_idx, 0)?;
+
+                // Filter by topic.
+                tx_logs.retain(|log| matches_topics(&filter, log));
+
+                logs.append(&mut tx_logs);
             }
         } else {
             break;
