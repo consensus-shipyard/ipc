@@ -21,6 +21,7 @@ extend = [
 ]
 
 [env]
+FM_DOCKER_IMAGE = { value = "fendermint:latest", condition = { env_not_set = ["FM_DOCKER_IMAGE"] } }
 CMT_P2P_HOST_PORT = { script = ["${ROOT_SCRIPTS_DIR}/get_port.sh 30000"], condition = { env_not_set = [
     "CMT_P2P_HOST_PORT",
 ] } }

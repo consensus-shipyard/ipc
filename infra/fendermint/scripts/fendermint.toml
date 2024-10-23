@@ -13,6 +13,7 @@ script = """
 
 [tasks.fendermint-run]
 script.main = """
+echo ${FM_DOCKER_IMAGE}
 docker run \
   ${FLAGS} \
   --name ${FM_CONTAINER_NAME} \

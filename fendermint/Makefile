@@ -25,6 +25,8 @@ BUILDX_STORE ?= --load
 BUILDX_FLAGS ?=
 # Set to the `<repo>/<image>:<tag>` label the image.
 BUILDX_TAG   ?= fendermint:latest
+# Used by e2e test
+FM_DOCKER_IMAGE ?= fendermint:latest
 
 all: lint build test diagrams docker-build
 
@@ -50,7 +52,7 @@ e2e: docker-build | cargo-make
 	${MAKE} e2e-only
 
 e2e-only:
-	cd testing/smoke-test && cargo make --profile $(PROFILE)
+	cd testing/smoke-test && cargo make -e FM_DOCKER_IMAGE=$(FM_DOCKER_IMAGE) --profile $(PROFILE)
 
 clean:
 	cargo clean
