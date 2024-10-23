@@ -790,7 +790,10 @@ impl IpcProvider {
             });
         }
 
-        let conn = self.get_connection(reward_claim_subnet)?;
+        let parent = reward_claim_subnet
+            .parent()
+            .ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = self.get_connection(&parent)?;
         conn.manager()
             .batch_claim(validator, reward_claim_subnet, batch_proofs)
             .await

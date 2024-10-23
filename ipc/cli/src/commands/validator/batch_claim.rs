@@ -20,9 +20,9 @@ pub(crate) struct BatchClaimArgs {
     pub to: ChainEpoch,
     #[arg(
         long,
-        help = "The source subnets that generated the reward, use , to separate subnets"
+        help = "The source subnets that generated the reward, use ',' to separate subnets"
     )]
-    pub reward_source_subnet: String,
+    pub reward_source_subnets: String,
     #[arg(long, help = "The subnet to claim reward from")]
     pub reward_claim_subnet: String,
 }
@@ -39,7 +39,7 @@ impl CommandLineHandler for BatchClaim {
         let provider = get_ipc_provider(global)?;
 
         let reward_source_subnets = arguments
-            .reward_source_subnet
+            .reward_source_subnets
             .split(',')
             .map(SubnetID::from_str)
             .collect::<Result<Vec<_>, _>>()?;
