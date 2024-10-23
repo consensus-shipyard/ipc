@@ -2366,20 +2366,13 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         bytes[] memory metadata = new bytes[](addrs.length);
         uint64[] memory blocksMined = new uint64[](addrs.length);
-        uint64[] memory checkpointHeights = new uint64[](addrs.length);
 
         blocksMined[0] = 1;
         blocksMined[1] = 2;
 
-        checkpointHeights[0] = uint64(gatewayDiamond.getter().bottomUpCheckPeriod());
-        checkpointHeights[1] = uint64(gatewayDiamond.getter().bottomUpCheckPeriod());
-        checkpointHeights[2] = uint64(gatewayDiamond.getter().bottomUpCheckPeriod());
-        checkpointHeights[3] = uint64(gatewayDiamond.getter().bottomUpCheckPeriod());
-
         (bytes32 activityRoot, bytes32[][] memory proofs) = MerkleTreeHelper.createMerkleProofsForActivities(
             addrs,
             blocksMined,
-            checkpointHeights,
             metadata
         );
 
@@ -2481,32 +2474,19 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         bytes[] memory metadata = new bytes[](addrs.length);
         uint64[] memory blocksMined = new uint64[](addrs.length);
-        uint64[] memory checkpointHeights = new uint64[](addrs.length);
 
         blocksMined[0] = 1;
         blocksMined[1] = 2;
 
-        checkpointHeights[0] = uint64(gatewayDiamond.getter().bottomUpCheckPeriod());
-        checkpointHeights[1] = uint64(gatewayDiamond.getter().bottomUpCheckPeriod());
-        checkpointHeights[2] = uint64(gatewayDiamond.getter().bottomUpCheckPeriod());
-        checkpointHeights[3] = uint64(gatewayDiamond.getter().bottomUpCheckPeriod());
-
         (bytes32 activityRoot1, bytes32[][] memory proofs1) = MerkleTreeHelper.createMerkleProofsForActivities(
             addrs,
             blocksMined,
-            checkpointHeights,
             metadata
         );
-
-        checkpointHeights[0] = uint64(gatewayDiamond.getter().bottomUpCheckPeriod()) * 2;
-        checkpointHeights[1] = uint64(gatewayDiamond.getter().bottomUpCheckPeriod()) * 2;
-        checkpointHeights[2] = uint64(gatewayDiamond.getter().bottomUpCheckPeriod()) * 2;
-        checkpointHeights[3] = uint64(gatewayDiamond.getter().bottomUpCheckPeriod()) * 2;
 
         (bytes32 activityRoot2, bytes32[][] memory proofs2) = MerkleTreeHelper.createMerkleProofsForActivities(
             addrs,
             blocksMined,
-            checkpointHeights,
             metadata
         );
 
@@ -2586,32 +2566,19 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         bytes[] memory metadata = new bytes[](addrs.length);
         uint64[] memory blocksMined = new uint64[](addrs.length);
-        uint64[] memory checkpointHeights = new uint64[](addrs.length);
 
         blocksMined[0] = 1;
         blocksMined[1] = 2;
 
-        checkpointHeights[0] = uint64(gatewayDiamond.getter().bottomUpCheckPeriod());
-        checkpointHeights[1] = uint64(gatewayDiamond.getter().bottomUpCheckPeriod());
-        checkpointHeights[2] = uint64(gatewayDiamond.getter().bottomUpCheckPeriod());
-        checkpointHeights[3] = uint64(gatewayDiamond.getter().bottomUpCheckPeriod());
-
         (bytes32 activityRoot1, bytes32[][] memory proofs1) = MerkleTreeHelper.createMerkleProofsForActivities(
             addrs,
             blocksMined,
-            checkpointHeights,
             metadata
         );
-
-        checkpointHeights[0] = uint64(gatewayDiamond.getter().bottomUpCheckPeriod()) * 2;
-        checkpointHeights[1] = uint64(gatewayDiamond.getter().bottomUpCheckPeriod()) * 2;
-        checkpointHeights[2] = uint64(gatewayDiamond.getter().bottomUpCheckPeriod()) * 2;
-        checkpointHeights[3] = uint64(gatewayDiamond.getter().bottomUpCheckPeriod()) * 2;
 
         (bytes32 activityRoot2, bytes32[][] memory proofs2) = MerkleTreeHelper.createMerkleProofsForActivities(
             addrs,
             blocksMined,
-            checkpointHeights,
             metadata
         );
 

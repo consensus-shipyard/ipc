@@ -17,7 +17,7 @@ library LibActivityMerkleVerifier {
         bytes32 leaf = keccak256(
             bytes.concat(
                 keccak256(
-                    abi.encode(summary.checkpointHeight, summary.validator, summary.blocksCommitted, summary.metadata)
+                    abi.encode(summary.validator, summary.blocksCommitted, summary.metadata)
                 )
             )
         );

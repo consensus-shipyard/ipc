@@ -110,7 +110,7 @@ where
         block_hash,
         next_configuration_number,
         msgs,
-        activities: activities.commitment(height.value() as i64)?.try_into()?,
+        activities: activities.commitment()?.try_into()?,
     };
 
     // Save the checkpoint in the ledger.

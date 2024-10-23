@@ -10,7 +10,6 @@ mod merkle;
 use crate::fvm::activities::merkle::MerkleProofGen;
 use fendermint_actor_activity_tracker::ValidatorSummary;
 use fendermint_crypto::PublicKey;
-use fvm_shared::clock::ChainEpoch;
 use ipc_api::checkpoint::ActivitySummary;
 use std::fmt::Debug;
 
@@ -40,8 +39,8 @@ pub trait ValidatorActivityTracker {
 }
 
 impl ActivityDetails<ValidatorSummary> {
-    pub fn commitment(&self, checkpoint_height: ChainEpoch) -> anyhow::Result<ActivitySummary> {
-        let gen = MerkleProofGen::new(self.details.as_slice(), checkpoint_height)?;
+    pub fn commitment(&self) -> anyhow::Result<ActivitySummary> {
+        let gen = MerkleProofGen::new(self.details.as_slice())?;
         Ok(ActivitySummary {
             total_active_validators: self.details.len() as u64,
             commitment: gen.root().to_fixed_bytes().to_vec(),

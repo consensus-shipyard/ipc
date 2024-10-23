@@ -1285,7 +1285,7 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
 
 lazy_static!(
     /// ABI types of the Merkle tree which contains validator addresses and their voting power.
-    pub static ref VALIDATOR_SUMMARY_FIELDS: Vec<String> = vec!["uint64".to_owned(), "address".to_owned(), "uint64".to_owned(), "bytes".to_owned()];
+    pub static ref VALIDATOR_SUMMARY_FIELDS: Vec<String> = vec!["address".to_owned(), "uint64".to_owned(), "bytes".to_owned()];
 );
 
 #[async_trait]
@@ -1317,7 +1317,6 @@ impl ValidatorRewarder for EthSubnetManager {
             let mut maybe_validator = None;
             for validator in event.report.validators {
                 let payload = vec![
-                    event.checkpoint_height.to_string(),
                     format!("{:?}", validator.validator),
                     validator.blocks_committed.to_string(),
                     hex::encode(validator.metadata.as_ref()),
