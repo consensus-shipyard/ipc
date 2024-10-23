@@ -1009,7 +1009,9 @@ where
 
                     log_index_start += tx_result.events.len();
                 }
-            } else if let Some(events) = block_results.end_block_events {
+            }
+
+            if let Some(events) = block_results.end_block_events {
                 let emitters = from_tm::collect_emitters(&events);
 
                 // Filter by address.
