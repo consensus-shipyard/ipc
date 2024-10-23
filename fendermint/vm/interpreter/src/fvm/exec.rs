@@ -14,10 +14,14 @@ use async_trait::async_trait;
 use fendermint_vm_actor_interface::{chainmetadata, cron, system};
 use fvm::executor::ApplyRet;
 use fvm_ipld_blockstore::Blockstore;
+use fvm_shared::event::StampedEvent;
 use fvm_shared::{address::Address, ActorID, MethodNum, BLOCK_GAS_LIMIT};
 use ipc_observability::{emit, measure_time, observe::TracingError, Traceable};
 use std::collections::HashMap;
 use tendermint_rpc::Client;
+
+pub type Event = (Vec<StampedEvent>, HashMap<ActorID, Address>);
+pub type BlockEndEvents = Vec<Event>;
 
 /// The return value extended with some things from the message that
 /// might not be available to the caller, because of the message lookups
@@ -33,6 +37,13 @@ pub struct FvmApplyRet {
     pub emitters: HashMap<ActorID, Address>,
 }
 
+pub struct EndBlockOutput {
+    pub power_updates: PowerUpdates,
+    pub block_gas_limit: BlockGasLimit,
+    /// The end block events to be recorded
+    pub events: BlockEndEvents,
+}
+
 #[async_trait]
 impl<DB, TC> ExecInterpreter for FvmMessageInterpreter<DB, TC>
 where
@@ -46,7 +57,7 @@ where
     /// Return validator power updates and the next base fee.
     /// Currently ignoring events as there aren't any emitted by the smart contract,
     /// but keep in mind that if there were, those would have to be propagated.
-    type EndOutput = (PowerUpdates, BlockGasLimit);
+    type EndOutput = EndBlockOutput;
 
     async fn begin(
         &self,
@@ -190,6 +201,8 @@ where
     }
 
     async fn end(&self, mut state: Self::State) -> anyhow::Result<(Self::State, Self::EndOutput)> {
+        let mut block_end_events = BlockEndEvents::default();
+
         if let Some(pubkey) = state.block_producer() {
             state
                 .activities_tracker()
@@ -208,7 +221,7 @@ where
             });
 
         let updates = if let Some((checkpoint, updates)) =
-            checkpoint::maybe_create_checkpoint(&self.gateway, &mut state)
+            checkpoint::maybe_create_checkpoint(&self.gateway, &mut state, &mut block_end_events)
                 .context("failed to create checkpoint")?
         {
             // Asynchronously broadcast signature, if validating.
@@ -256,7 +269,11 @@ where
             PowerUpdates::default()
         };
 
-        let ret = (updates, next_gas_market.block_gas_limit);
+        let ret = EndBlockOutput {
+            power_updates: updates,
+            block_gas_limit: next_gas_market.block_gas_limit,
+            events: block_end_events,
+        };
         Ok((state, ret))
     }
 }

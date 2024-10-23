@@ -41,9 +41,6 @@ pub type ActorAddressMap = HashMap<ActorID, Address>;
 /// The result of the message application bundled with any delegated addresses of event emitters.
 pub type ExecResult = anyhow::Result<(ApplyRet, ActorAddressMap)>;
 
-pub type StateExecutor<DB> =
-    DefaultExecutor<DefaultKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>>;
-
 /// Parts of the state which evolve during the lifetime of the chain.
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]

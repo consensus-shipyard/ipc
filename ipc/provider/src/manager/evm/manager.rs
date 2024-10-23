@@ -43,7 +43,7 @@ use ethers::types::{BlockId, Eip1559TransactionRequest, ValueOrArray, I256, U256
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_api::checkpoint::{
-    BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent, Signature,
+    BatchClaimProofs, BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent, Signature,
     ValidatorClaimProof, ValidatorSummary,
 };
 use ipc_api::cross::IpcEnvelope;
@@ -1402,8 +1402,7 @@ impl ValidatorRewarder for EthSubnetManager {
         &self,
         submitter: &Address,
         reward_claim_subnet: &SubnetID,
-        reward_source_subnet: &SubnetID,
-        proofs: Vec<ValidatorClaimProof>,
+        payloads: Vec<BatchClaimProofs>,
     ) -> Result<()> {
         let signer = Arc::new(self.get_signer(submitter)?);
         let contract = validator_reward_facet::ValidatorRewardFacet::new(
@@ -1411,13 +1410,11 @@ impl ValidatorRewarder for EthSubnetManager {
             signer.clone(),
         );
 
-        let call = contract.batch_claim(validator_reward_facet::BatchClaimProofs {
-            subnet_id: validator_reward_facet::SubnetID::try_from(reward_source_subnet)?,
-            proofs: proofs
-                .into_iter()
-                .map(validator_reward_facet::ValidatorClaimProof::try_from)
-                .collect::<Result<Vec<_>>>()?,
-        });
+        let p = payloads
+            .into_iter()
+            .map(validator_reward_facet::BatchClaimProofs::try_from)
+            .collect::<Result<Vec<_>>>()?;
+        let call = contract.batch_claim(p);
         let call = call_with_premium_estimation(signer, call).await?;
 
         call.send().await?;

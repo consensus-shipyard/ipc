@@ -91,6 +91,12 @@ pub struct ValidatorSummary {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+pub struct BatchClaimProofs {
+    pub subnet_id: SubnetID,
+    pub proofs: Vec<ValidatorClaimProof>,
+}
+
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
 pub struct ValidatorClaimProof {
     pub summary: ValidatorSummary,
     pub proof: Vec<[u8; 32]>,

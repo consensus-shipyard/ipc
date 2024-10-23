@@ -4,7 +4,7 @@
 //! Type conversion for IPC Agent struct with solidity contract struct
 
 use crate::address::IPCAddress;
-use crate::checkpoint::{ActivitySummary, BottomUpCheckpoint};
+use crate::checkpoint::{ActivitySummary, BatchClaimProofs, BottomUpCheckpoint};
 use crate::checkpoint::{BottomUpMsgBatch, ValidatorClaimProof};
 use crate::cross::{IpcEnvelope, IpcMsgKind};
 use crate::staking::StakingChange;
@@ -320,6 +320,21 @@ pub fn payload_to_evm_address(payload: &Payload) -> anyhow::Result<ethers::types
 pub fn fil_to_eth_amount(amount: &TokenAmount) -> anyhow::Result<U256> {
     let str = amount.atto().to_string();
     Ok(U256::from_dec_str(&str)?)
+}
+
+impl TryFrom<BatchClaimProofs> for validator_reward_facet::BatchClaimProofs {
+    type Error = anyhow::Error;
+
+    fn try_from(v: BatchClaimProofs) -> Result<Self, Self::Error> {
+        Ok(Self {
+            subnet_id: validator_reward_facet::SubnetID::try_from(&v.subnet_id)?,
+            proofs: v
+                .proofs
+                .into_iter()
+                .map(validator_reward_facet::ValidatorClaimProof::try_from)
+                .collect::<Result<Vec<_>, _>>()?,
+        })
+    }
 }
 
 impl TryFrom<StakingChange> for top_down_finality_facet::StakingChange {

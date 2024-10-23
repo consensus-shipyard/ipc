@@ -18,7 +18,10 @@ pub(crate) struct BatchClaimArgs {
     pub from: ChainEpoch,
     #[arg(long, help = "The checkpoint height to claim to")]
     pub to: ChainEpoch,
-    #[arg(long, help = "The source subnet that generated the reward")]
+    #[arg(
+        long,
+        help = "The source subnets that generated the reward, use , to separate subnets"
+    )]
     pub reward_source_subnet: String,
     #[arg(long, help = "The subnet to claim reward from")]
     pub reward_claim_subnet: String,
@@ -34,14 +37,19 @@ impl CommandLineHandler for BatchClaim {
         log::debug!("batch claim operation with args: {:?}", arguments);
 
         let provider = get_ipc_provider(global)?;
-        let reward_source_subnet = SubnetID::from_str(&arguments.reward_source_subnet)?;
+
+        let reward_source_subnets = arguments
+            .reward_source_subnet
+            .split(',')
+            .map(SubnetID::from_str)
+            .collect::<Result<Vec<_>, _>>()?;
         let reward_claim_subnet = SubnetID::from_str(&arguments.reward_claim_subnet)?;
         let validator = Address::from_str(&arguments.validator)?;
 
         provider
             .batch_claim(
                 &reward_claim_subnet,
-                &reward_source_subnet,
+                &reward_source_subnets,
                 arguments.from,
                 arguments.to,
                 &validator,

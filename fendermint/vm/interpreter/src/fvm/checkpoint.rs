@@ -36,6 +36,7 @@ use super::{
     ValidatorContext,
 };
 use crate::fvm::activities::ValidatorActivityTracker;
+use crate::fvm::exec::BlockEndEvents;
 
 /// Validator voting power snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -53,6 +54,7 @@ pub struct PowerUpdates(pub Vec<Validator<Power>>);
 pub fn maybe_create_checkpoint<DB>(
     gateway: &GatewayCaller<DB>,
     state: &mut FvmExecState<DB>,
+    event_tracker: &mut BlockEndEvents,
 ) -> anyhow::Result<Option<(checkpoint::BottomUpCheckpoint, PowerUpdates)>>
 where
     DB: Blockstore + Sync + Send + Clone + 'static,
@@ -131,9 +133,10 @@ where
             })
             .collect::<anyhow::Result<Vec<_>>>()?,
     };
-    gateway
+    let ret = gateway
         .create_bu_ckpt_with_activities(state, checkpoint.clone(), &curr_power_table.0, report)
         .context("failed to store checkpoint")?;
+    event_tracker.push((ret.apply_ret.events, ret.emitters));
 
     state.activities_tracker().purge_activities()?;
 

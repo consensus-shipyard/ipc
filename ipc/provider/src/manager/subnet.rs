@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_api::checkpoint::{
-    BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent, Signature,
+    BatchClaimProofs, BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent, Signature,
     ValidatorClaimProof, ValidatorSummary,
 };
 use ipc_api::cross::IpcEnvelope;
@@ -306,7 +306,6 @@ pub trait ValidatorRewarder: Send + Sync {
         &self,
         submitter: &Address,
         reward_claim_subnet: &SubnetID,
-        reward_source_subnet: &SubnetID,
-        proofs: Vec<ValidatorClaimProof>,
+        payloads: Vec<BatchClaimProofs>,
     ) -> Result<()>;
 }
