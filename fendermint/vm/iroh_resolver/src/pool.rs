@@ -173,7 +173,7 @@ where
     /// Add an item to the resolution targets.
     ///
     /// If the item is new, enqueue it from background resolution, otherwise return its existing status.
-    pub fn add(&self, item: T, task_type: TaskType) -> Stm<ResolveStatus<T>> {
+    pub fn add(&self, item: T) -> Stm<ResolveStatus<T>> {
         let key = ResolveKey::from(&item);
         let task_type = TaskType::from(&item);
         let mut items = self.items.read_clone()?;
@@ -296,7 +296,7 @@ mod tests {
         let pool = ResolvePool::new();
         let item = TestItem::dummy();
 
-        atomically(|| pool.add(item.clone(), TaskType::Blob)).await;
+        atomically(|| pool.add(item.clone())).await;
         atomically(|| {
             assert!(pool.get_status(&item)?.is_some());
             assert!(!pool.queue.is_empty()?);
@@ -312,7 +312,7 @@ mod tests {
         let item = TestItem::dummy();
 
         // Add once.
-        atomically(|| pool.add(item.clone(), TaskType::Blob)).await;
+        atomically(|| pool.add(item.clone())).await;
 
         // Consume it from the queue.
         atomically(|| {
@@ -323,7 +323,7 @@ mod tests {
         .await;
 
         // Add again.
-        atomically(|| pool.add(item.clone(), TaskType::Blob)).await;
+        atomically(|| pool.add(item.clone())).await;
 
         // Should not be queued a second time.
         atomically(|| {
@@ -340,7 +340,7 @@ mod tests {
         let pool = ResolvePool::new();
         let item = TestItem::dummy();
 
-        let status1 = atomically(|| pool.add(item.clone(), TaskType::Blob)).await;
+        let status1 = atomically(|| pool.add(item.clone())).await;
         let status2 = atomically(|| pool.get_status(&item))
             .await
             .expect("status exists");
@@ -369,7 +369,7 @@ mod tests {
         let item = TestItem::dummy();
 
         atomically(|| {
-            let status = pool.add(item.clone(), TaskType::Blob)?;
+            let status = pool.add(item.clone())?;
             status.is_resolved.write(true)?;
 
             let resolved1 = pool.collect_done()?;

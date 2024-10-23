@@ -197,7 +197,7 @@ pub struct GetStatsReturn {
 
 /// Params for adding a read request.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct AddReadRequestParams {
+pub struct OpenReadRequestParams {
     /// The hash of the blob to read.
     pub hash: Hash,
     /// The offset to start reading from.
@@ -210,21 +210,19 @@ pub struct AddReadRequestParams {
 
 /// Params for getting a read request status.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct GetReadRequestStatusParams {
+pub struct ReadRequestExistParams {
     /// The ID of the read request.
-    pub request_id: u64,
+    pub request_id: Hash,
 }
 
-/// Params for fulfilling a read request.
+/// Params for closing a read request.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct FulfillReadRequestParams {
+pub struct CloseReadRequestParams {
     /// The ID of the read request.
-    pub request_id: u64,
-    /// The status to set as final.
-    pub status: ReadRequestStatus,
+    pub request_id: Hash,
 }
 
 /// Params for getting pending read requests.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct GetPendingReadRequestsParams(pub u32);
+pub struct GetOpenReadRequestsParams(pub u32);

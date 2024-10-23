@@ -256,48 +256,11 @@ impl fmt::Display for BlobStatus {
     }
 }
 
-/// An object used to determine what [`Account`](s) are accountable for a blob, and for how long.
-/// Subscriptions allow us to distribute the cost of a blob across multiple accounts that
-/// have added the same blob.   
-#[derive(Clone, Debug, Default, Serialize_tuple, Deserialize_tuple)]
-pub struct Subscription {
-    /// Added block.
-    pub added: ChainEpoch,
-    /// Expiry block.
-    pub expiry: ChainEpoch,
-    /// Whether to automatically renew the subscription.
-    pub auto_renew: bool,
-    /// Source Iroh node ID used for ingestion.
-    /// This might be unique to each instance of the same blob.
-    /// It's included here for record keeping.
-    pub source: PublicKey,
-    /// The delegate origin and caller that may have created the subscription via a credit approval.
-    pub delegate: Option<(Address, Address)>,
-}
-
-// A request to read a blob data from an Iroh node.
+/// A request to read a blob data from the Iroh node.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ReadRequest {
     pub blob_hash: Hash,
     pub offset: u32,
     pub callback_addr: Address,
     pub callback_method: u64,
-    pub status: ReadRequestStatus,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum ReadRequestStatus {
-    Pending,
-    Fulfilled,
-    Failed,
-}
-
-impl fmt::Display for ReadRequestStatus {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ReadRequestStatus::Pending => write!(f, "pending"),
-            ReadRequestStatus::Fulfilled => write!(f, "fulfilled"),
-            ReadRequestStatus::Failed => write!(f, "failed"),
-        }
-    }
 }

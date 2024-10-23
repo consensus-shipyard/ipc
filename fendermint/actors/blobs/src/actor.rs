@@ -273,63 +273,6 @@ impl BlobsActor {
         Ok(())
     }
 
-    fn get_pending_blobs_count(rt: &impl Runtime) -> Result<u64, ActorError> {
-        rt.validate_immediate_caller_accept_any()?;
-        let count = rt.state::<State>()?.get_pending_blobs_count();
-        Ok(count)
-    }
-
-    fn get_pending_bytes_count(rt: &impl Runtime) -> Result<u64, ActorError> {
-        rt.validate_immediate_caller_accept_any()?;
-        let count = rt.state::<State>()?.get_pending_bytes_count();
-        Ok(count)
-    }
-
-    fn add_read_request(rt: &impl Runtime, params: AddReadRequestParams) -> Result<(), ActorError> {
-        rt.validate_immediate_caller_accept_any()?;
-        rt.transaction(|st: &mut State, _rt| {
-            st.add_read_request(
-                params.hash,
-                params.offset,
-                params.callback_addr,
-                params.callback_method,
-            )
-        })
-    }
-
-    fn get_pending_read_requests(
-        rt: &impl Runtime,
-        params: GetPendingReadRequestsParams,
-    ) -> Result<Vec<PendingReadRequestTuple>, ActorError> {
-        rt.validate_immediate_caller_accept_any()?;
-        Ok(rt.state::<State>()?.get_pending_read_requests(params.0))
-    }
-
-    fn get_read_request_status(
-        rt: &impl Runtime,
-        params: GetReadRequestStatusParams,
-    ) -> Result<Option<ReadRequestStatus>, ActorError> {
-        rt.validate_immediate_caller_accept_any()?;
-        let status = rt
-            .state::<State>()?
-            .get_read_request_status(params.request_id);
-        Ok(status)
-    }
-
-    fn fulfill_read_request(
-        rt: &impl Runtime,
-        params: FulfillReadRequestParams,
-    ) -> Result<(), ActorError> {
-        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        rt.transaction(|st: &mut State, _| st.fulfil_read_request(params.request_id, params.status))
-    }
-
-    fn receive_read_response(rt: &impl Runtime, params: Vec<u8>) -> Result<(), ActorError> {
-        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        log::info!("====>>>>> receive_read_response: {:?}", params.len());
-        Ok(())
-    }
-
     /// Fallback method for unimplemented method numbers.
     pub fn fallback(
         rt: &impl Runtime,
@@ -361,26 +304,6 @@ fn delete_from_disc(hash: Hash) -> Result<(), ActorError> {
     }
 }
 
-fn get_from_disc(hash: Hash, offset: u32) -> Result<[u8; 65536], ActorError> {
-    #[cfg(feature = "fil-actor")]
-    {
-        let result = blobs_actor_sdk::hash_get(hash.0, offset).map_err(|en| {
-            ActorError::unspecified(format!("failed to get blob from disc: {:?}", en))
-        })?;
-        log::debug!("read blob bytes from disc, length={}", result.len());
-        Ok(result)
-    }
-    #[cfg(not(feature = "fil-actor"))]
-    {
-        log::debug!(
-            "mock get_from_disc (blobs), hash={}, offset={}",
-            hash,
-            offset,
-        );
-        Ok([0u8; 65536])
-    }
-}
-
 impl ActorCode for BlobsActor {
     type Methods = Method;
 
@@ -405,13 +328,6 @@ impl ActorCode for BlobsActor {
         SetBlobPending => set_blob_pending,
         FinalizeBlob => finalize_blob,
         DeleteBlob => delete_blob,
-        GetPendingBlobsCount => get_pending_blobs_count,
-        GetPendingBytesCount => get_pending_bytes_count,
-        ReceiveReadResponse => receive_read_response,
-        GetReadRequestStatus => get_read_request_status,
-        FulfillReadRequest => fulfill_read_request,
-        GetPendingReadRequests => get_pending_read_requests,
-        AddReadRequest => add_read_request,
         _ => fallback,
     }
 }

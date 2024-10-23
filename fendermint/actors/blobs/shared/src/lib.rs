@@ -39,13 +39,6 @@ pub enum Method {
     SetBlobPending = frc42_dispatch::method_hash!("SetBlobPending"),
     FinalizeBlob = frc42_dispatch::method_hash!("FinalizeBlob"),
     DeleteBlob = frc42_dispatch::method_hash!("DeleteBlob"),
-    GetPendingBlobsCount = frc42_dispatch::method_hash!("GetPendingBlobsCount"),
-    GetPendingBytesCount = frc42_dispatch::method_hash!("GetPendingBytesCount"),
-    ReceiveReadResponse = frc42_dispatch::method_hash!("ReceiveReadResponse"),
-    GetReadRequestStatus = frc42_dispatch::method_hash!("GetReadRequestStatus"),
-    FulfillReadRequest = frc42_dispatch::method_hash!("FulfillReadRequest"),
-    GetPendingReadRequests = frc42_dispatch::method_hash!("GetPendingReadRequests"),
-    AddReadRequest = frc42_dispatch::method_hash!("AddReadRequest"),
 }
 
 pub fn buy_credit(rt: &impl Runtime, recipient: Address) -> Result<Account, ActorError> {
@@ -150,19 +143,4 @@ pub fn delete_blob(
         rt.message().value_received(),
     ))?;
     Ok(())
-}
-
-pub fn get_blob_bytes(
-    rt: &impl Runtime,
-    hash: state::Hash,
-    offset: u32,
-) -> Result<Vec<u8>, ActorError> {
-    let params = IpldBlock::serialize_cbor(&params::GetBlobBytesParams { hash, offset })?;
-    let result = extract_send_result(rt.send_simple(
-        &BLOBS_ACTOR_ADDR,
-        Method::GetBlobBytes as MethodNum,
-        params,
-        rt.message().value_received(),
-    ))?;
-    Ok(deserialize_block(result)?)
 }

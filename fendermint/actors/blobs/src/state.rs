@@ -10,7 +10,6 @@ use fendermint_actor_blobs_shared::state::{
     Account, Blob, BlobStatus, CreditApproval, Hash, PublicKey, Subscription, SubscriptionGroup,
     SubscriptionId,
 };
-use fendermint_actor_blobs_shared::BLOBS_ACTOR_ADDR;
 use fil_actors_runtime::ActorError;
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
@@ -103,20 +102,6 @@ impl<'a> CreditDelegation<'a> {
 
 impl State {
     pub fn new(capacity: u64, credit_debit_rate: u64) -> Self {
-        let hash_bytes: [u8; 32] = [
-            118, 20, 165, 240, 232, 107, 85, 45, 201, 13, 216, 164, 83, 232, 221, 16, 171, 214,
-            104, 140, 251, 163, 162, 158, 59, 151, 67, 101, 53, 194, 163, 71,
-        ];
-
-        let read_request = ReadRequest {
-            blob_hash: Hash(hash_bytes),
-            offset: 0,
-            callback_addr: BLOBS_ACTOR_ADDR,
-            callback_method: fendermint_actor_blobs_shared::Method::ReceiveReadResponse as u64,
-            status: ReadRequestStatus::Pending,
-        };
-        let read_requests = HashMap::from([(0u64, read_request)]);
-
         Self {
             capacity_total: BigInt::from(capacity),
             capacity_used: BigInt::zero(),
@@ -1205,64 +1190,6 @@ impl State {
     /// Return available capacity as a difference between `capacity_total` and `capacity_used`.
     fn capacity_available(&self) -> BigInt {
         &self.capacity_total - &self.capacity_used
-    }
-
-    pub fn add_read_request(
-        &mut self,
-        hash: Hash,
-        offset: u32,
-        callback_addr: Address,
-        callback_method: u64,
-    ) -> Result<(), ActorError> {
-        let read_request = ReadRequest {
-            blob_hash: hash,
-            offset,
-            callback_addr,
-            callback_method,
-            status: ReadRequestStatus::Pending,
-        };
-
-        // calculate a random request id using rand
-        let request_id = 0u64;
-
-        // todo: check if request id already exists
-        debug!("adding read request id: {:?}", request_id);
-        self.read_requests.insert(request_id, read_request);
-        Ok(())
-    }
-
-    pub fn fulfil_read_request(
-        &mut self,
-        request_id: u64,
-        status: ReadRequestStatus,
-    ) -> Result<(), ActorError> {
-        if matches!(status, ReadRequestStatus::Pending) {
-            return Err(ActorError::illegal_state(format!(
-                "cannot fullfil read request, it is pending",
-            )));
-        }
-        self.read_requests.remove(&request_id);
-        Ok(())
-    }
-
-    pub fn get_pending_read_requests(&self, size: u32) -> Vec<(Hash, u32, Address, u64)> {
-        self.read_requests
-            .iter()
-            .take(size as usize)
-            .map(|element| {
-                (
-                    element.1.blob_hash,
-                    element.1.offset,
-                    element.1.callback_addr,
-                    element.1.callback_method,
-                )
-            })
-            .collect::<Vec<_>>()
-    }
-
-    pub fn get_read_request_status(&self, request_id: u64) -> Option<ReadRequestStatus> {
-        let request = self.read_requests.get(&request_id)?;
-        Some(request.status.clone())
     }
 }
 
