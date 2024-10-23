@@ -29,6 +29,11 @@ use crate::manager::subnet::{
     BottomUpCheckpointRelayer, GetBlockHashResult, SubnetGenesisInfo, TopDownFinalityQuery,
     TopDownQueryPayload,
 };
+
+use super::gas_estimator::{
+    eip1559_estimator, EIP1559_FEE_ESTIMATION_PAST_BLOCKS, EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE,
+};
+
 use crate::manager::{EthManager, SubnetManager};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
@@ -1288,8 +1293,54 @@ where
     B: std::borrow::Borrow<D>,
     M: ethers::abi::Detokenize,
 {
-    let (max_priority_fee_per_gas, _) = premium_estimation(signer).await?;
+    let fee_history = signer
+        .fee_history(
+            EIP1559_FEE_ESTIMATION_PAST_BLOCKS,
+            ethers::types::BlockNumber::Latest,
+            &[EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE],
+        )
+        .await?;
+
+    let latest_block_base_fee = fee_history.base_fee_per_gas.iter().rev().nth(1).copied();
+
+    // if the base fee of the Latest block is 0 then we need check if the latest block even has
+    // a base fee/supports EIP1559
+    let base_fee_per_gas = match latest_block_base_fee {
+        Some(base_fee) if !base_fee.is_zero() => base_fee,
+        _ => {
+            // empty response, fetch base fee from latest block directly
+            signer
+                .get_block(ethers::types::BlockNumber::Latest)
+                .await?
+                .ok_or_else(|| anyhow!("Latest block not found"))?
+                .base_fee_per_gas
+                .ok_or_else(|| anyhow!("EIP-1559 not activated"))?
+        }
+    };
+
+    let rewards = fee_history
+        .reward
+        .into_iter()
+        .map(|inner_vec| {
+            inner_vec
+                .into_iter()
+                .map(|u256_value| {
+                    // Safely convert U256 to u128
+                    u256_value.low_u128()
+                })
+                .collect::<Vec<u128>>()
+        })
+        .collect::<Vec<Vec<u128>>>();
+
+    let estimation = eip1559_estimator(base_fee_per_gas.try_into().unwrap(), &rewards);
+
+    let max_priority_fee_per_gas = U256::from(estimation.max_priority_fee_per_gas);
     Ok(call.gas_price(max_priority_fee_per_gas))
+
+    // TODO Karel - remove this after the Alloy based estimate is tested.
+
+    // let (max_priority_fee_per_gas, _) = premium_estimation(signer).await?;
+    // Ok(call.gas_price(max_priority_fee_per_gas))
 }
 
 /// Returns an estimation of an optimal `gas_premium` and `gas_fee_cap`
