@@ -19,6 +19,8 @@ use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::BottomUpCheckpoint;
 use fendermint_vm_genesis::{Power, Validator, ValidatorKey};
 
+use ipc_api::evm::payload_to_evm_address;
+
 use ipc_actors_abis::checkpointing_facet as checkpoint;
 use ipc_actors_abis::gateway_getter_facet as getter;
 use ipc_api::staking::ConfigurationNumber;
@@ -33,6 +35,8 @@ use super::{
     state::{ipc::GatewayCaller, FvmExecState},
     ValidatorContext,
 };
+use crate::fvm::activities::ValidatorActivityTracker;
+use crate::fvm::exec::BlockEndEvents;
 
 /// Validator voting power snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -50,6 +54,7 @@ pub struct PowerUpdates(pub Vec<Validator<Power>>);
 pub fn maybe_create_checkpoint<DB>(
     gateway: &GatewayCaller<DB>,
     state: &mut FvmExecState<DB>,
+    event_tracker: &mut BlockEndEvents,
 ) -> anyhow::Result<Option<(checkpoint::BottomUpCheckpoint, PowerUpdates)>>
 where
     DB: Blockstore + Sync + Send + Clone + 'static,
@@ -96,6 +101,8 @@ where
 
     let num_msgs = msgs.len();
 
+    let activities = state.activities_tracker().get_activities_summary()?;
+
     // Construct checkpoint.
     let checkpoint = BottomUpCheckpoint {
         subnet_id,
@@ -103,13 +110,35 @@ where
         block_hash,
         next_configuration_number,
         msgs,
+        activities: activities.commitment()?.try_into()?,
     };
 
     // Save the checkpoint in the ledger.
     // Pass in the current power table, because these are the validators who can sign this checkpoint.
-    gateway
-        .create_bottom_up_checkpoint(state, checkpoint.clone(), &curr_power_table.0)
+
+    // gateway
+    //     .create_bottom_up_checkpoint(state, checkpoint.clone(), &curr_power_table.0)
+    //     .context("failed to store checkpoint")?;
+
+    let report = checkpoint::ActivityReport {
+        validators: activities
+            .details
+            .into_iter()
+            .map(|v| {
+                Ok(checkpoint::ValidatorActivityReport {
+                    validator: payload_to_evm_address(v.validator.payload())?,
+                    blocks_committed: v.block_committed,
+                    metadata: ethers::types::Bytes::from(v.metadata),
+                })
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?,
+    };
+    let ret = gateway
+        .create_bu_ckpt_with_activities(state, checkpoint.clone(), &curr_power_table.0, report)
         .context("failed to store checkpoint")?;
+    event_tracker.push((ret.apply_ret.events, ret.emitters));
+
+    state.activities_tracker().purge_activities()?;
 
     // Figure out the power updates if there was some change in the configuration.
     let power_updates = if next_configuration_number == 0 {
@@ -242,6 +271,10 @@ where
                 block_hash: cp.block_hash,
                 next_configuration_number: cp.next_configuration_number,
                 msgs: convert_tokenizables(cp.msgs)?,
+                activities: checkpoint::ActivitySummary {
+                    total_active_validators: cp.activities.total_active_validators,
+                    commitment: cp.activities.commitment,
+                },
             };
 
             // We mustn't do these in parallel because of how nonces are fetched.

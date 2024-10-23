@@ -43,6 +43,7 @@ macro_rules! define_singleton {
 }
 
 pub mod account;
+pub mod activity;
 pub mod burntfunds;
 pub mod chainmetadata;
 pub mod cron;
