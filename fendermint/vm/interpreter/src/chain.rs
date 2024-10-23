@@ -127,7 +127,7 @@ impl From<&BlobPoolItem> for IrohResolveSource {
 
 #[derive(Clone, Hash, PartialEq, Eq)]
 pub struct ReadRequestPoolItem {
-    request_id: [u8; 32],
+    request_id: Hash,
     offset: u32,
     callback_addr: Address,
     callback_method: u64,
@@ -349,7 +349,7 @@ where
         // -----
         // ====>>>> 1) Get pending read requests (tasks) from blobs actor (tasks actor)
         let read_requests = with_state_transaction(&mut state, |state| {
-            let requests = get_pending_read_requests(state, env.read_request_concurrency)?;
+            let requests = get_open_read_requests(state, env.read_request_concurrency)?;
             eprintln!(
                 "====>>>>> read requests fetched from chain: {:?}",
                 requests.len()
@@ -391,21 +391,21 @@ where
                 // ====>>>> 3.1)
                 eprintln!("====>>>>> (prepare) found locally resolved read request");
                 // if the request is fulfilled onchain, remove it from the read request pool
-                if !is_read_request_pending(&mut state, item.request_id)? {
+                if !is_read_request_open(&mut state, item.request_id)? {
                     eprintln!("====>>>>> (prepare) read request already fulfilled on chain; removing from pool");
                     tracing::debug!(request_id = ?item.request_id, "read request already fulfilled on chain; removing from pool");
                     atomically(|| env.read_request_pool.remove(item)).await;
                     continue;
                 }
                 // ====>>>> 3.2)
-                // for each pending read request (from step 1), check if it has quorum
-                // if it has, create a transaction to fulfill the read request
+                // for each open read request (from step 1), check if it has quorum
+                // if it has, propose a transaction to complete the read request
                 // if not, do nothing
 
                 // Reusing the blob quorum functions as it takes generic hash as input
                 let (is_globally_finalized, succeeded) = atomically(|| {
                     env.parent_finality_votes
-                        .find_blob_quorum(&item.request_id.to_vec())
+                        .find_blob_quorum(&item.request_id.as_bytes().to_vec())
                 })
                 .await;
 
@@ -430,9 +430,9 @@ where
 
                 if is_globally_finalized {
                     tracing::debug!(request_id = ?item.request_id, "read request has quorum; adding tx to chain");
-                    read_requests.push(ChainMessage::Ipc(IpcMessage::ReadRequestFulfilled(
+                    read_requests.push(ChainMessage::Ipc(IpcMessage::ReadRequestCompleted(
                         ReadRequestIPCMessage {
-                            request_id: Hash::from_bytes(item.request_id),
+                            request_id: item.request_id,
                             offset: item.offset,
                             callback_addr: item.callback_addr,
                             callback_method: item.callback_method,
@@ -469,6 +469,17 @@ where
         msgs: Vec<Self::Message>,
     ) -> anyhow::Result<bool> {
         let mut block_gas_usage = 0;
+        // count all ReadRequestCompleted messages before processing
+        let mut read_request_completed_count = 0;
+        for msg in msgs.clone() {
+            if let ChainMessage::Ipc(IpcMessage::ReadRequestCompleted(_)) = msg {
+                read_request_completed_count += 1;
+            }
+        }
+        eprintln!(
+            "====>>>>> (process) read request completed: {:?}",
+            read_request_completed_count
+        );
 
         for msg in msgs {
             match msg {
@@ -590,13 +601,12 @@ where
                 ChainMessage::Signed(signed) => {
                     block_gas_usage += signed.message.gas_limit;
                 }
-                ChainMessage::Ipc(IpcMessage::ReadRequestFulfilled(read_request)) => {
+                ChainMessage::Ipc(IpcMessage::ReadRequestCompleted(read_request)) => {
                     // Ensure that the read request is ready to be fulfilled.
                     // We can accept the proposal if the read request has reached a quorum and is
                     // not yet fulfilled.
-                    let request_id = *read_request.request_id.as_bytes();
                     let is_pending = with_state_transaction(&mut state, |state| {
-                        is_read_request_pending(state, request_id)
+                        is_read_request_open(state, read_request.request_id)
                     })?;
                     if !is_pending {
                         tracing::debug!(hash = ?read_request.request_id, "read request is already fulfilled; rejecting proposal");
@@ -624,7 +634,7 @@ where
 
                     // Remove from pool if locally resolved
                     let item = ReadRequestPoolItem {
-                        request_id,
+                        request_id: read_request.request_id,
                         offset: read_request.offset,
                         callback_addr: read_request.callback_addr,
                         callback_method: read_request.callback_method,
@@ -636,12 +646,12 @@ where
                         })
                         .await;
                     if is_locally_finalized {
-                        tracing::debug!(request_id = ?request_id, "read request is locally finalized; removing from pool");
+                        tracing::debug!(request_id = ?read_request.request_id, "read request is locally finalized; removing from pool");
                         atomically(|| env.read_request_pool.remove(&item)).await;
                         // Remove the result from the pool
                         atomically(|| env.read_request_pool.remove_result(&item)).await;
                     } else {
-                        tracing::debug!(request_id = ?request_id, "read request is not locally finalized");
+                        tracing::debug!(request_id = ?read_request.request_id, "read request is not locally finalized");
                     }
                 }
                 _ => {}
@@ -1121,7 +1131,7 @@ where
                     | IpcMessage::BlobFinalized(_)
                     | IpcMessage::DebitCreditAccounts => {
                         // Users cannot send these messages, only validators can propose them in blocks.
-                        Ok((state, Err(IllegalMessage)))
+                        Ok((state, Err(ActorError::illegal_message())))
                     }
                 }
             }
@@ -1377,21 +1387,21 @@ where
     Ok(())
 }
 
-fn get_pending_read_requests<DB>(
+fn get_open_read_requests<DB>(
     state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
     size: u32,
-) -> anyhow::Result<Vec<PendingReadRequestItem>>
+) -> anyhow::Result<Vec<OpenReadRequestItem>>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
-    let params = GetPendingReadRequestsParams(size);
+    let params = GetOpenReadRequestsParams(size);
     let params = RawBytes::serialize(params)?;
     let msg = FvmMessage {
         from: system::SYSTEM_ACTOR_ADDR,
         to: blobs::BLOBS_ACTOR_ADDR,
         sequence: 0,
         gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
-        method_num: fendermint_actor_blobs_shared::Method::GetPendingReadRequests as u64,
+        method_num: fendermint_actor_blobs_shared::Method::GetOpenReadRequests as u64,
         params,
         value: Default::default(),
         version: Default::default(),
@@ -1408,27 +1418,26 @@ where
 
     let return_data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
     let read_requests =
-        fvm_ipld_encoding::from_slice::<Vec<PendingReadRequestItem>>(&return_data).unwrap();
+        fvm_ipld_encoding::from_slice::<Vec<OpenReadRequestItem>>(&return_data).unwrap();
 
     Ok(read_requests)
 }
 
-fn is_read_request_pending<DB>(
+fn is_read_request_open<DB>(
     state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
-    request_id: [u8; 32],
+    request_id: Hash,
 ) -> anyhow::Result<bool>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
-    // let request_id = fendermint_actor_blobs_shared::state::Hash(request_id);
-    let request_id = 0u64;
+    let request_id = fendermint_actor_blobs_shared::state::Hash(request_id.into());
     let msg = FvmMessage {
         from: system::SYSTEM_ACTOR_ADDR,
         to: blobs::BLOBS_ACTOR_ADDR,
         sequence: 0,
         gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
-        method_num: fendermint_actor_blobs_shared::Method::GetReadRequestStatus as u64,
-        params: RawBytes::serialize(GetReadRequestStatusParams { request_id })?,
+        method_num: fendermint_actor_blobs_shared::Method::ReadRequestExist as u64,
+        params: RawBytes::serialize(ReadRequestExistParams { request_id })?,
         value: Default::default(),
         version: Default::default(),
         gas_fee_cap: Default::default(),
@@ -1436,19 +1445,69 @@ where
     };
 
     let (apply_ret, _emitters) = state.execute_implicit(msg)?;
-
     let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
-    let status = fvm_ipld_encoding::from_slice::<Option<ReadRequestStatus>>(&data)
-        .map_err(|e| anyhow!("error parsing as Option<ReadRequestStatus>: {e}"))?;
-    let pending = if let Some(status) = status {
-        match status {
-            ReadRequestStatus::Pending => true,
-            ReadRequestStatus::Fulfilled | ReadRequestStatus::Failed => false,
-        }
+    let exists = fvm_ipld_encoding::from_slice::<bool>(&data)
+        .map_err(|e| anyhow!("error parsing as bool: {e}"))?;
+    Ok(exists)
+}
+
+fn read_request_callback<DB>(
+    state: &mut FvmExecState<DB>,
+    read_request: &ReadRequestIPCMessage,
+) -> anyhow::Result<()>
+where
+    DB: Blockstore + Clone + 'static + Send + Sync,
+{
+    let from = system::SYSTEM_ACTOR_ADDR;
+    let ReadRequestIPCMessage {
+        request_id,
+        offset,
+        callback_addr,
+        callback_method,
+        succeeded,
+        data,
+    } = read_request;
+    // if request failed, we will send an empty vector back
+    let data_read = if data.is_none() || !succeeded {
+        vec![]
     } else {
-        false
+        data.as_ref().unwrap().clone()
     };
-    Ok(pending)
+    let msg = Message {
+        version: Default::default(),
+        from,
+        to: *callback_addr,
+        sequence: 0,
+        value: Default::default(),
+        method_num: *callback_method,
+        params: RawBytes::serialize(data_read)?,
+        gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
+        gas_fee_cap: Default::default(),
+        gas_premium: Default::default(),
+    };
+
+    let (apply_ret, _emitters) = state.execute_implicit(msg)?;
+    let info = apply_ret
+        .failure_info
+        .clone()
+        .map(|i| i.to_string())
+        .filter(|s| !s.is_empty());
+
+    tracing::info!(
+        exit_code = apply_ret.msg_receipt.exit_code.value(),
+        from = from.to_string(),
+        to = callback_addr.to_string(),
+        method_num = callback_method,
+        read_request_id = request_id.to_string(),
+        read_offset = offset,
+        succeeded = succeeded,
+        gas_limit = fvm_shared::BLOCK_GAS_LIMIT,
+        gas_used = apply_ret.msg_receipt.gas_used,
+        info = info.unwrap_or_default(),
+        "implicit tx delivered"
+    );
+
+    Ok(())
 }
 
 fn with_state_transaction<F, R, DB>(
@@ -1466,4 +1525,43 @@ where
         .end_transaction(true)
         .expect("we just started a transaction");
     result
+}
+
+fn close_read_request<DB>(
+    state: &mut FvmExecState<DB>,
+    request_id: Hash,
+) -> anyhow::Result<FvmApplyRet>
+where
+    DB: Blockstore + Clone + 'static + Send + Sync,
+{
+    let from = system::SYSTEM_ACTOR_ADDR;
+    let to = blobs::BLOBS_ACTOR_ADDR;
+    let method_num = CloseReadRequest as u64;
+    let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
+    let params = RawBytes::serialize(CloseReadRequestParams {
+        request_id: fendermint_actor_blobs_shared::state::Hash(request_id.into()),
+    })?;
+    let msg = Message {
+        version: Default::default(),
+        from,
+        to,
+        sequence: 0,
+        value: Default::default(),
+        method_num,
+        params,
+        gas_limit,
+        gas_fee_cap: Default::default(),
+        gas_premium: Default::default(),
+    };
+
+    let (apply_ret, emitters) = state.execute_implicit(msg)?;
+    let ret = FvmApplyRet {
+        apply_ret,
+        from,
+        to,
+        method_num,
+        gas_limit,
+        emitters,
+    };
+    Ok(ret)
 }

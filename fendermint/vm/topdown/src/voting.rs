@@ -76,9 +76,6 @@ pub struct VoteTally<K = ValidatorKey, V = BlockHash, O = Blob> {
     /// Adding votes can be paused if we observe that looking for a quorum takes too long
     /// and is often retried due to votes being added.
     pause_blob_votes: TVar<bool>,
-
-    /// Index votes received by read request.
-    read_request_votes: TVar<im::HashMap<O, im::HashMap<K, bool>>>,
 }
 
 impl<K, V, O> VoteTally<K, V, O>
@@ -100,7 +97,6 @@ where
             pause_votes: TVar::new(false),
             blob_votes: TVar::default(),
             pause_blob_votes: TVar::new(false),
-            read_request_votes: TVar::default(),
         }
     }
 
@@ -115,7 +111,6 @@ where
             pause_votes: TVar::new(false),
             blob_votes: TVar::default(),
             pause_blob_votes: TVar::new(false),
-            read_request_votes: TVar::default(),
         }
     }
 
