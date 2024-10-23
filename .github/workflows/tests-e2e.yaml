@@ -56,4 +56,4 @@ jobs:
           shared-key: build
 
       - name: Run e2e tests
-        run: cd fendermint && PROFILE=release make e2e-only
+        run: cd fendermint && FM_DOCKER_IMAGE=fendermint:${{ github.sha }} PROFILE=release make e2e-only
