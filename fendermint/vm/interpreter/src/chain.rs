@@ -462,7 +462,7 @@ where
     async fn begin(
         &self,
         (env, state): Self::State,
-    ) -> anyhow::Result<(Self::State, Self::BeginOutput)> {
+        ) -> anyhow::Result<(Self::State, Self::BeginOutput)> {
         let (state, out) = self.inner.begin(state).await?;
         Ok(((env, state), out))
     }
@@ -471,7 +471,7 @@ where
         &self,
         (env, mut state): Self::State,
         msg: Self::Message,
-    ) -> anyhow::Result<(Self::State, Self::DeliverOutput)> {
+        ) -> anyhow::Result<(Self::State, Self::DeliverOutput)> {
         match msg {
             ChainMessage::Signed(msg) => {
                 let (state, ret) = self
@@ -676,6 +676,12 @@ where
                         hash = ?blob.hash,
                         "chain interpreter has finalized blob"
                     );
+
+                    // once the blob is finalized on the parent we can clean up the votes
+                    atomically(|| {
+                        env.parent_finality_votes.clear_blob(blob.hash.as_bytes().to_vec())?;
+                        Ok(())
+                    }).await;
 
                     let ret = FvmApplyRet {
                         apply_ret,
