@@ -37,7 +37,7 @@ library LibGateway {
     event NewTopDownMessage(address indexed subnet, IpcEnvelope message, bytes32 indexed id);
     /// @dev event emitted when there is a new bottom-up message added to the batch.
     /// @dev there is no need to emit the message itself, as the message is included in batch.
-    event NewBottomUpMessage(bytes32 indexed id);
+    event QueuedBottomUpMessage(bytes32 indexed id);
     /// @dev event emitted when there is a new bottom-up message batch to be signed.
     event NewBottomUpMsgBatch(uint256 indexed epoch);
     /// @dev event emmitted when a message is stored in the postbox - to be propagated further.
@@ -272,7 +272,7 @@ library LibGateway {
             batch.blockHeight = epoch;
             // we need to use push here to initialize the array.
             batch.msgs.push(crossMessage);
-            emit NewBottomUpMessage({id: crossMessage.toHash()});
+            emit QueuedBottomUpMessage({id: crossMessage.toHash()});
             return;
         }
 
@@ -303,14 +303,14 @@ library LibGateway {
             // need to push here to avoid a copy from memory to storage
             batch.msgs.push(crossMessage);
 
-            LibGateway.storeBottomUpMsgBatch(newBatch);            
+            LibGateway.storeBottomUpMsgBatch(newBatch);
         } else {
             // we append the new message normally, and wait for the batch period
             // to trigger the cutting of the batch.
             batch.msgs.push(crossMessage);
         }
 
-        emit NewBottomUpMessage({id: crossMessage.toHash()});
+        emit QueuedBottomUpMessage({id: crossMessage.toHash()});
     }
 
     /// @notice returns the subnet created by a validator
@@ -504,7 +504,7 @@ library LibGateway {
 
         // commmit the receipt for propagation
         // slither-disable-next-line unused-return
-        commitCrossMessage(original.createResultMsg(outcomeType, ret));
+        commitValidatedCrossMessage(original.createResultMsg(outcomeType, ret));
     }
     
     /**
@@ -514,7 +514,7 @@ library LibGateway {
      *  @param crossMessage The cross-network message to commit.
      *  @return shouldBurn A Boolean that indicates if the input amount should be burned.
      */
-    function commitCrossMessage(IpcEnvelope memory crossMessage) internal returns (bool shouldBurn) {
+    function commitValidatedCrossMessage(IpcEnvelope memory crossMessage) internal returns (bool shouldBurn) {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
 
         SubnetID memory to = crossMessage.to.subnetId;
@@ -626,7 +626,7 @@ library LibGateway {
             revert("Message not found in postbox");
         }
 
-        bool shouldBurn = LibGateway.commitCrossMessage(crossMsg);
+        bool shouldBurn = LibGateway.commitValidatedCrossMessage(crossMsg);
 
         // Cache value before deletion to avoid re-entrancy
         uint256 v = crossMsg.value;

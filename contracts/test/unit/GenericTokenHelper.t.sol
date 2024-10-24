@@ -9,7 +9,7 @@ import {Asset, AssetKind} from "../../contracts/structs/Subnet.sol";
 import {AssetHelper} from "../../contracts/lib/AssetHelper.sol";
 
 import {AssetHelperMock} from "../mocks/AssetHelperMock.sol";
-import {MockContractFailbackable} from "../helpers/TestUtils.sol";
+import {MockFallbackContract} from "../helpers/TestUtils.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -62,7 +62,7 @@ contract AssetHelperTest is Test {
         uint256 balance = 1_000_000;
         uint256 value = 100;
         AssetHelperMock mock = new AssetHelperMock();
-        MockContractFailbackable actor = new MockContractFailbackable();
+        MockFallbackContract actor = new MockFallbackContract();
 
         IERC20 token = new ERC20PresetFixedSupply("TestToken", "TEST", balance, address(mock));
 
@@ -79,7 +79,7 @@ contract AssetHelperTest is Test {
     function test_call_with_native_zero_balance_ok() public {
         uint256 value = 0;
         AssetHelperMock mock = new AssetHelperMock();
-        MockContractFailbackable actor = new MockContractFailbackable();
+        MockFallbackContract actor = new MockFallbackContract();
 
         Asset memory source = Asset({kind: AssetKind.Native, tokenAddress: address(0)});
 
@@ -92,7 +92,7 @@ contract AssetHelperTest is Test {
     function test_call_with_native_ok() public {
         uint256 value = 10;
         AssetHelperMock mock = new AssetHelperMock();
-        MockContractFailbackable actor = new MockContractFailbackable();
+        MockFallbackContract actor = new MockFallbackContract();
 
         vm.deal(address(mock), 1 ether);
 
