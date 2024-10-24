@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::fvm::externs::FendermintExterns;
 use crate::fvm::gas::BlockGasTracker;
+use crate::fvm::state::priority::TxnPriorityCalculator;
 use anyhow::Ok;
 use cid::Cid;
 use fendermint_actors_api::gas_market::Reading;
@@ -36,6 +37,8 @@ pub type ActorAddressMap = HashMap<ActorID, Address>;
 
 /// The result of the message application bundled with any delegated addresses of event emitters.
 pub type ExecResult = anyhow::Result<(ApplyRet, ActorAddressMap)>;
+
+const DEFAULT_BASE_FEE_HISTORY: usize = 5;
 
 /// Parts of the state which evolve during the lifetime of the chain.
 #[serde_as]
@@ -114,6 +117,8 @@ where
     params: FvmUpdatableParams,
     /// Indicate whether the parameters have been updated.
     params_dirty: bool,
+
+    txn_priority: TxnPriorityCalculator,
 }
 
 impl<DB> FvmExecState<DB>
@@ -163,6 +168,7 @@ where
                 power_scale: params.power_scale,
             },
             params_dirty: false,
+            txn_priority: TxnPriorityCalculator::new(DEFAULT_BASE_FEE_HISTORY),
         })
     }
 
@@ -265,6 +271,14 @@ where
     /// Conversion between collateral and voting power.
     pub fn power_scale(&self) -> PowerScale {
         self.params.power_scale
+    }
+
+    pub fn txn_priority_calculator(&self) -> &TxnPriorityCalculator {
+        &self.txn_priority
+    }
+
+    pub fn txn_priority_calculator_mut(&mut self) -> &mut TxnPriorityCalculator {
+        &mut self.txn_priority
     }
 
     pub fn app_version(&self) -> u64 {

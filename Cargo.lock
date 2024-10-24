@@ -3379,6 +3379,7 @@ dependencies = [
  "ipc-api",
  "ipc-observability",
  "ipc_actors_abis",
+ "lazy_static",
  "libipld",
  "multihash 0.18.1",
  "num-traits",
