@@ -613,7 +613,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
             if method == "HEAD" {
                 let mut response = warp::reply::Response::new(Body::empty());
                 let mut header_map = HeaderMap::new();
-                header_map.insert("Content-Length", HeaderValue::from(object_range.size));
+                header_map.insert("Content-Length", HeaderValue::from(object_range.len));
                 let headers = response.headers_mut();
                 headers.extend(header_map);
                 return Ok(response);
@@ -627,7 +627,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
                     "Content-Range",
                     HeaderValue::from_str(&format!(
                         "bytes {}-{}/{}",
-                        object_range.start, object_range.end, object_range.len
+                        object_range.start, object_range.end, object_range.size
                     ))
                     .unwrap(),
                 );
