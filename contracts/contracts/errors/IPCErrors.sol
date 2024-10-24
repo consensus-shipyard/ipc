@@ -85,6 +85,7 @@ error ValidatorAlreadyClaimed();
 error InvalidActivityProof();
 error NotOwner();
 error CommonParentDoesNotExist();
+error UnroutableMessage(string reason);
 
 enum InvalidXnetMessageReason {
     Sender,
