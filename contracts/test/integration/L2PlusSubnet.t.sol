@@ -43,12 +43,12 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
 
     RootSubnetDefinition public rootNetwork;
     // native subnets
-    TestSubnetDefinition public nativeSubnet;
+    TestSubnetDefinition public nativeL2Subnet;
     TestSubnetDefinition[] public nativeL3Subnets;
 
     // token subnets
     IERC20 public token;
-    TestSubnetDefinition public tokenSubnet;
+    TestSubnetDefinition public tokenL2Subnet;
     TestSubnetDefinition[] public nativeL3SubnetsWithTokenParent;
     IERC20 public tokenL3;
     TestSubnetDefinition[] public tokenL3SubnetsWithTokenParent;
@@ -65,37 +65,34 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             id: rootNetworkName
         });
 
-        address[] memory nativeSubnetPath;
-        nativeSubnet = createNativeSubnet(nativeSubnetPath, rootNetwork.gatewayAddr, rootNetwork.id);
+        nativeL2Subnet = createNativeSubnet(rootNetwork.gatewayAddr, rootNetwork.id);
 
-        nativeL3Subnets.push(createNativeSubnet(nativeSubnet.path, nativeSubnet.gatewayAddr, nativeSubnet.id));
-        nativeL3Subnets.push(createNativeSubnet(nativeSubnet.path, nativeSubnet.gatewayAddr, nativeSubnet.id));
+        nativeL3Subnets.push(createNativeSubnet(nativeL2Subnet.gatewayAddr, nativeL2Subnet.id));
+        nativeL3Subnets.push(createNativeSubnet(nativeL2Subnet.gatewayAddr, nativeL2Subnet.id));
 
-        address[] memory tokenSubnetPath;
         token = new ERC20PresetFixedSupply("TestToken", "TEST", 1_000_000, address(this));
-        tokenSubnet = createTokenSubnet(address(token), tokenSubnetPath, rootNetwork.gatewayAddr, rootNetworkName);
+        tokenL2Subnet = createTokenSubnet(address(token), rootNetwork.gatewayAddr, rootNetworkName);
 
         nativeL3SubnetsWithTokenParent.push(
-            createNativeSubnet(tokenSubnet.path, tokenSubnet.gatewayAddr, tokenSubnet.id)
+            createNativeSubnet(tokenL2Subnet.gatewayAddr, tokenL2Subnet.id)
         );
         nativeL3SubnetsWithTokenParent.push(
-            createNativeSubnet(tokenSubnet.path, tokenSubnet.gatewayAddr, tokenSubnet.id)
+            createNativeSubnet(tokenL2Subnet.gatewayAddr, tokenL2Subnet.id)
         );
 
         tokenL3 = new ERC20PresetFixedSupply("TestL3Token", "TEST3", 1_000_000, address(this));
 
         tokenL3SubnetsWithTokenParent.push(
-            createTokenSubnet(address(tokenL3), tokenSubnet.path, tokenSubnet.gatewayAddr, tokenSubnet.id)
+            createTokenSubnet(address(tokenL3), tokenL2Subnet.gatewayAddr, tokenL2Subnet.id)
         );
         tokenL3SubnetsWithTokenParent.push(
-            createTokenSubnet(address(tokenL3), tokenSubnet.path, tokenSubnet.gatewayAddr, tokenSubnet.id)
+            createTokenSubnet(address(tokenL3), tokenL2Subnet.gatewayAddr, tokenL2Subnet.id)
         );
 
         printActors();
     }
 
     function createNativeSubnet(
-        address[] memory subnetPath,
         address parentGatewayAddress,
         SubnetID memory parentNetworkName
     ) internal returns (TestSubnetDefinition memory) {
@@ -103,12 +100,12 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             defaultSubnetActorParamsWith(parentGatewayAddress, parentNetworkName)
         );
 
-        return createSubnet(subnetPath, subnetActor);
+    
+        return createSubnet(parentNetworkName.route, subnetActor);
     }
 
     function createTokenSubnet(
         address tokenAddress,
-        address[] memory subnetPath,
         address parentGatewayAddress,
         SubnetID memory parentNetworkName
     ) internal returns (TestSubnetDefinition memory) {
@@ -116,7 +113,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             defaultSubnetActorParamsWith(parentGatewayAddress, parentNetworkName, tokenAddress)
         );
 
-        return createSubnet(subnetPath, subnetActor);
+        return createSubnet(parentNetworkName.route, subnetActor);
     }
 
     function createSubnet(
@@ -151,6 +148,8 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         MockIpcContractResult caller;
         address callerAddr;
         address recipientAddr;
+        uint256 callerAmount;
+        uint256 fundAmount;
         uint256 amount;
         uint256 expectedAmount;
         OutcomeType expectedOutcome;
@@ -166,7 +165,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         MockIpcContractResult caller = new MockIpcContractResult();
         Params memory params = Params({
             root: rootNetwork,
-            subnet: nativeSubnet,
+            subnet: nativeL2Subnet,
             subnetL3: nativeL3Subnets[0],
             caller: caller,
             callerAddr: address(caller),
@@ -174,7 +173,9 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             amount: 3,
             expectedAmount: 3,
             expectedOutcome: OutcomeType.Ok,
-            expectedRet: abi.encode(EMPTY_BYTES)
+            expectedRet: abi.encode(EMPTY_BYTES),
+            callerAmount: 1 ether,
+            fundAmount: 100000
         });
 
         sendCrossMessageFromChildToParentWithResult(params);
@@ -184,7 +185,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         MockIpcContractResult caller = new MockIpcContractResult();
         Params memory params = Params({
             root: rootNetwork,
-            subnet: nativeSubnet,
+            subnet: nativeL2Subnet,
             subnetL3: nativeL3Subnets[0],
             caller: caller,
             callerAddr: address(caller),
@@ -192,14 +193,16 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             amount: 3,
             expectedAmount: 3,
             expectedOutcome: OutcomeType.Ok,
-            expectedRet: abi.encode(EMPTY_BYTES)
+            expectedRet: abi.encode(EMPTY_BYTES),
+            callerAmount: 1 ether,
+            fundAmount: 100000
         });
 
         sendCrossMessageFromParentToChildWithResult(params);
     }
 
     function testL2PlusSubnet_Native_SendCrossMessageFromSiblingToSiblingWithOkResult() public {
-        sendCrossMessageFromSiblingToSiblingWithOkResult(rootNetwork, nativeSubnet, nativeL3Subnets);
+        sendCrossMessageFromSiblingToSiblingWithOkResult(rootNetwork, nativeL2Subnet, nativeL3Subnets);
     }
 
     // Token supply source subnets
@@ -207,7 +210,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         MockIpcContractResult caller = new MockIpcContractResult();
         Params memory params = Params({
             root: rootNetwork,
-            subnet: tokenSubnet,
+            subnet: tokenL2Subnet,
             subnetL3: nativeL3SubnetsWithTokenParent[0],
             caller: caller,
             callerAddr: address(caller),
@@ -215,7 +218,9 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             amount: 3,
             expectedAmount: 3,
             expectedOutcome: OutcomeType.Ok,
-            expectedRet: abi.encode(EMPTY_BYTES)
+            expectedRet: abi.encode(EMPTY_BYTES),
+            callerAmount: 1 ether,
+            fundAmount: 100000
         });
 
         sendCrossMessageFromChildToParentWithResult(params);
@@ -225,7 +230,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         MockIpcContractResult caller = new MockIpcContractResult();
         Params memory params = Params({
             root: rootNetwork,
-            subnet: tokenSubnet,
+            subnet: tokenL2Subnet,
             subnetL3: tokenL3SubnetsWithTokenParent[0],
             caller: caller,
             callerAddr: address(caller),
@@ -233,7 +238,9 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             amount: 3,
             expectedAmount: 3,
             expectedOutcome: OutcomeType.Ok,
-            expectedRet: abi.encode(EMPTY_BYTES)
+            expectedRet: abi.encode(EMPTY_BYTES),
+            callerAmount: 1 ether,
+            fundAmount: 100000
         });
 
         sendCrossMessageFromChildToParentWithResult(params);
@@ -243,7 +250,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         MockIpcContractResult caller = new MockIpcContractResult();
         Params memory params = Params({
             root: rootNetwork,
-            subnet: tokenSubnet,
+            subnet: tokenL2Subnet,
             subnetL3: nativeL3SubnetsWithTokenParent[0],
             caller: caller,
             callerAddr: address(caller),
@@ -251,7 +258,9 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             amount: 3,
             expectedAmount: 3,
             expectedOutcome: OutcomeType.Ok,
-            expectedRet: abi.encode(EMPTY_BYTES)
+            expectedRet: abi.encode(EMPTY_BYTES),
+            callerAmount: 1 ether,
+            fundAmount: 100000
         });
 
         sendCrossMessageFromParentToChildWithResult(params);
@@ -261,7 +270,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         MockIpcContractResult caller = new MockIpcContractResult();
         Params memory params = Params({
             root: rootNetwork,
-            subnet: tokenSubnet,
+            subnet: tokenL2Subnet,
             subnetL3: tokenL3SubnetsWithTokenParent[0],
             caller: caller,
             callerAddr: address(caller),
@@ -269,18 +278,20 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             amount: 3,
             expectedAmount: 3,
             expectedOutcome: OutcomeType.Ok,
-            expectedRet: abi.encode(EMPTY_BYTES)
+            expectedRet: abi.encode(EMPTY_BYTES),
+            callerAmount: 1 ether,
+            fundAmount: 100000
         });
 
         sendCrossMessageFromParentToChildWithResult(params);
     }
 
     function testL2PlusSubnet_Token_SendCrossMessageFromSiblingToSiblingWithOkResult() public {
-        sendCrossMessageFromSiblingToSiblingWithOkResult(rootNetwork, tokenSubnet, nativeL3SubnetsWithTokenParent);
+        sendCrossMessageFromSiblingToSiblingWithOkResult(rootNetwork, tokenL2Subnet, nativeL3SubnetsWithTokenParent);
     }
 
     function testL2PlusSubnet_TokenMixed_SendCrossMessageFromSiblingToSiblingWithOkResult() public {
-        sendCrossMessageFromSiblingToSiblingWithOkResult(rootNetwork, tokenSubnet, tokenL3SubnetsWithTokenParent);
+        sendCrossMessageFromSiblingToSiblingWithOkResult(rootNetwork, tokenL2Subnet, tokenL3SubnetsWithTokenParent);
     }
 
     // Error scenarios
@@ -288,7 +299,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         MockIpcContractResult caller = new MockIpcContractResult();
         Params memory params = Params({
             root: rootNetwork,
-            subnet: nativeSubnet,
+            subnet: nativeL2Subnet,
             subnetL3: nativeL3Subnets[0],
             caller: caller,
             callerAddr: address(caller),
@@ -296,7 +307,9 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             amount: 3,
             expectedAmount: 0,
             expectedOutcome: OutcomeType.ActorErr,
-            expectedRet: abi.encodeWithSelector(InvalidSubnetActor.selector)
+            expectedRet: abi.encodeWithSelector(InvalidSubnetActor.selector),
+            callerAmount: 1 ether,
+            fundAmount: 100000
         });
 
         sendCrossMessageFromChildToParentWithResult(params);
@@ -306,7 +319,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         MockIpcContractResult caller = new MockIpcContractResult();
         Params memory params = Params({
             root: rootNetwork,
-            subnet: tokenSubnet,
+            subnet: tokenL2Subnet,
             subnetL3: nativeL3SubnetsWithTokenParent[0],
             caller: caller,
             callerAddr: address(caller),
@@ -314,7 +327,9 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             amount: 3,
             expectedAmount: 0,
             expectedOutcome: OutcomeType.ActorErr,
-            expectedRet: abi.encodeWithSelector(InvalidSubnetActor.selector)
+            expectedRet: abi.encodeWithSelector(InvalidSubnetActor.selector),
+            callerAmount: 1 ether,
+            fundAmount: 100000
         });
 
         sendCrossMessageFromChildToParentWithResult(params);
@@ -324,7 +339,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         MockIpcContractResult caller = new MockIpcContractResult();
         Params memory params = Params({
             root: rootNetwork,
-            subnet: nativeSubnet,
+            subnet: nativeL2Subnet,
             subnetL3: nativeL3Subnets[0],
             caller: caller,
             callerAddr: address(caller),
@@ -332,7 +347,9 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             amount: 3,
             expectedAmount: 0,
             expectedOutcome: OutcomeType.ActorErr,
-            expectedRet: abi.encodeWithSelector(InvalidSubnetActor.selector)
+            expectedRet: abi.encodeWithSelector(InvalidSubnetActor.selector),
+            callerAmount: 1 ether,
+            fundAmount: 100000
         });
 
         sendCrossMessageFromParentToChildWithResult(params);
@@ -342,7 +359,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         MockIpcContractResult caller = new MockIpcContractResult();
         Params memory params = Params({
             root: rootNetwork,
-            subnet: tokenSubnet,
+            subnet: tokenL2Subnet,
             subnetL3: nativeL3SubnetsWithTokenParent[0],
             caller: caller,
             callerAddr: address(caller),
@@ -350,7 +367,9 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             amount: 3,
             expectedAmount: 0,
             expectedOutcome: OutcomeType.ActorErr,
-            expectedRet: abi.encodeWithSelector(InvalidSubnetActor.selector)
+            expectedRet: abi.encodeWithSelector(InvalidSubnetActor.selector),
+            callerAmount: 1 ether,
+            fundAmount: 100000
         });
 
         sendCrossMessageFromParentToChildWithResult(params);
@@ -384,11 +403,11 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         // register L3 into L2 subnet
         registerSubnet(params.subnetL3.subnetActorAddr, params.subnet.gateway);
 
-        vm.deal(params.callerAddr, 1 ether);
+        vm.deal(params.callerAddr, params.callerAmount);
         vm.prank(params.callerAddr);
 
-        fundSubnet(params.root.gateway, params.subnet, params.callerAddr, 100000);
-        fundSubnet(params.subnet.gateway, params.subnetL3, params.callerAddr, 100000);
+        fundSubnet(params.root.gateway, params.subnet, params.callerAddr, params.fundAmount);
+        fundSubnet(params.subnet.gateway, params.subnetL3, params.callerAddr, params.fundAmount);
 
         // create the xnet message on the subnet L3 - it's local gateway
         IpcEnvelope memory crossMessage = TestUtils.newXnetCallMsg(
@@ -459,10 +478,10 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         // register L3 into L2 subnet
         registerSubnet(params.subnetL3.subnetActorAddr, params.subnet.gateway);
 
-        vm.deal(params.callerAddr, 1 ether);
+        vm.deal(params.callerAddr, params.callerAmount);
         vm.prank(params.callerAddr);
 
-        fundSubnet(params.root.gateway, params.subnet, params.callerAddr, 100000);
+        fundSubnet(params.root.gateway, params.subnet, params.callerAddr, params.fundAmount);
 
         IpcEnvelope memory crossMessage = TestUtils.newXnetCallMsg(
             IPCAddress({subnetId: params.root.id, rawAddress: FvmAddressHelper.from(params.callerAddr)}),
@@ -824,9 +843,9 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         console.log("root actor: %s", rootNetwork.id.getActor());
         console.log("--------------------");
 
-        console.log("native L2 subnet name: %s", nativeSubnet.id.toString());
-        console.log("native L2 subnet gateway: %s", nativeSubnet.gatewayAddr);
-        console.log("native L2 subnet actor: %s", (nativeSubnet.subnetActorAddr));
+        console.log("native L2 subnet name: %s", nativeL2Subnet.id.toString());
+        console.log("native L2 subnet gateway: %s", nativeL2Subnet.gatewayAddr);
+        console.log("native L2 subnet actor: %s", (nativeL2Subnet.subnetActorAddr));
 
         for (uint256 i; i < nativeL3Subnets.length; i++) {
             console.log("--------------------");

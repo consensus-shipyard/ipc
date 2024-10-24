@@ -79,7 +79,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
         }
 
         // Commit xnet message for dispatch.
-        bool shouldBurn = LibGateway.commitCrossMessage(committed);
+        bool shouldBurn = LibGateway.commitValidatedCrossMessage(committed);
 
         // Apply side effects, such as burning funds.
         LibGateway.crossMsgSideEffects({v: committed.value, shouldBurn: shouldBurn});
