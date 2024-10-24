@@ -8,7 +8,7 @@ import {SubnetID, Subnet, AssetKind, Asset} from "../structs/Subnet.sol";
 import {SubnetActorGetterFacet} from "../subnet/SubnetActorGetterFacet.sol";
 import {CallMsg, IpcMsgKind, IpcEnvelope, OutcomeType, BottomUpMsgBatch, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../structs/CrossNet.sol";
 import {Membership} from "../structs/Subnet.sol";
-import {CannotSendCrossMsgToItself, MethodNotAllowed, MaxMsgsPerBatchExceeded, InvalidXnetMessage ,OldConfigurationNumber, NotRegisteredSubnet, InvalidActorAddress, ParentFinalityAlreadyCommitted, InvalidXnetMessageReason, CommonParentDoesNotExist} from "../errors/IPCErrors.sol";
+import {CannotSendCrossMsgToItself, MethodNotAllowed, MaxMsgsPerBatchExceeded, InvalidXnetMessage ,OldConfigurationNumber, NotRegisteredSubnet, InvalidActorAddress, ParentFinalityAlreadyCommitted, InvalidXnetMessageReason, UnroutableMessage} from "../errors/IPCErrors.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
