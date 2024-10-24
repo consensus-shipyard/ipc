@@ -182,7 +182,7 @@ contract MultiSubnetTest is IntegrationTestBase {
         ipcTokenReplica.setLinkedContract(address(ipcTokenController));
     }
 
-    function testMultiSubnet_Native_FundFromParentToChild_USDCBridge() public {
+    function testMultiSubnet_Native_FundFromParentToChild_USDCBridgeBaisc() public {
         _testLinkedTokenBridge();
     }
 

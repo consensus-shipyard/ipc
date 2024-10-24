@@ -7,6 +7,7 @@ import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {SubnetID, IPCAddress} from "../structs/Subnet.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
+import {LibGateway, CrossMessageValidationOutcome} from "../lib/LibGateway.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
@@ -67,6 +68,7 @@ library CrossMsgHelper {
         bytes memory ret
     ) public pure returns (IpcEnvelope memory) {
         ResultMsg memory message = ResultMsg({id: toHash(crossMsg), outcome: outcome, ret: ret});
+
         uint256 value = crossMsg.value;
         if (outcome == OutcomeType.Ok) {
             // if the message was executed successfully, the value stayed
@@ -84,6 +86,7 @@ library CrossMsgHelper {
             });
     }
 
+    // creates transfer message from the child subnet to the parent subnet
     function createReleaseMsg(
         SubnetID calldata subnet,
         address signer,
@@ -98,6 +101,7 @@ library CrossMsgHelper {
             );
     }
 
+    // creates transfer message from the parent subnet to the child subnet
     function createFundMsg(
         SubnetID calldata subnet,
         address signer,
@@ -198,5 +202,9 @@ library CrossMsgHelper {
         }
 
         return true;
+    }
+
+    function validateCrossMessage(IpcEnvelope memory crossMsg) internal view returns (CrossMessageValidationOutcome)  {
+        return LibGateway.validateCrossMessage(crossMsg);
     }
 }
