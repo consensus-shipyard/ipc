@@ -21,6 +21,9 @@ use fvm_shared::{address::Address, econ::TokenAmount};
 use iroh::blobs::Hash;
 use iroh::client::blobs::{BlobStatus, ReadAtLen};
 use iroh::net::NodeAddr;
+use lazy_static::lazy_static;
+use prometheus::register_int_counter;
+use prometheus::IntCounter;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tracing::info;
@@ -42,16 +45,11 @@ cmd! {
         match self.command.clone() {
             ObjectsCommands::Run { tendermint_url, iroh_addr} => {
                 if settings.metrics.enabled {
-                    info!("metrics enabled");
-                    let registry = prometheus::Registry::new();
-                    // Default process metrics are enabled by default.
-
                     info!(
                         listen_addr = settings.metrics.listen.to_string(),
                         "serving metrics"
                     );
-                    let mut builder = prometheus_exporter::Builder::new(settings.metrics.listen.try_into()?);
-                    builder.with_registry(registry);
+                    let builder = prometheus_exporter::Builder::new(settings.metrics.listen.try_into()?);
                     let _ = builder.start().context("failed to start metrics server")?;
                 } else {
                     info!("metrics disabled");
@@ -256,6 +254,29 @@ impl ObjectParser {
     }
 }
 
+lazy_static! {
+    static ref COUNTER_BLOBS_UPLOADED: IntCounter = register_int_counter!(
+        "objects_blobs_uploaded_total",
+        "Number of successfully uploaded blobs"
+    )
+    .unwrap();
+    static ref COUNTER_BYTES_UPLOADED: IntCounter = register_int_counter!(
+        "objects_bytes_uploaded_total",
+        "Number of successfully uploaded bytes"
+    )
+    .unwrap();
+    static ref COUNTER_BLOBS_DOWNLOADED: IntCounter = register_int_counter!(
+        "objects_blobs_downloaded_total",
+        "Number of successfully downloaded blobs"
+    )
+    .unwrap();
+    static ref COUNTER_BYTES_DOWNLOADED: IntCounter = register_int_counter!(
+        "objects_bytes_downloaded_total",
+        "Number of successfully downloaded bytes"
+    )
+    .unwrap();
+}
+
 async fn handle_health() -> Result<impl Reply, Rejection> {
     Ok(warp::reply::reply())
 }
@@ -350,6 +371,8 @@ async fn handle_object_upload<F: QueryClient>(
         outcome.local_size,
         outcome.downloaded_size,
     );
+    COUNTER_BLOBS_UPLOADED.inc();
+    COUNTER_BYTES_UPLOADED.inc_by(size);
 
     Ok(hash.to_string())
 }
@@ -512,6 +535,9 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
 
             let headers = response.headers_mut();
             headers.extend(header_map);
+
+            COUNTER_BLOBS_DOWNLOADED.inc();
+            COUNTER_BYTES_DOWNLOADED.inc_by(object_range.size);
 
             Ok(response)
         }
