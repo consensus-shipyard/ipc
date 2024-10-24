@@ -80,7 +80,7 @@ error InvalidFederationPayload();
 error DuplicatedGenesisValidator();
 error NotEnoughGenesisValidators();
 error ValidatorPowerChangeDenied();
-error CommonParentDoesNotExist();
+error UnroutableMessage(string reason);
 
 enum InvalidXnetMessageReason {
     Sender,
