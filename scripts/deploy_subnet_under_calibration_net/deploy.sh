@@ -153,7 +153,7 @@ cd ${IPC_FOLDER}/contracts
 npm install
 export RPC_URL=https://calibration.filfox.info/rpc/v1
 export PRIVATE_KEY=$(cat ${IPC_CONFIG_FOLDER}/validator_0.sk)
-deploy_contracts_output=$(make deploy-ipc NETWORK=calibrationnet)
+deploy_contracts_output=$(make deploy-stack NETWORK=calibrationnet)
 
 parent_gateway_address=$(echo "$deploy_contracts_output" | grep '"Gateway"' | awk -F'"' '{print $4}')
 parent_registry_address=$(echo "$deploy_contracts_output" | grep '"SubnetRegistry"' | awk -F'"' '{print $4}')
