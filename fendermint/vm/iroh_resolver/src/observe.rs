@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use ipc_observability::{
-    impl_traceable, impl_traceables, lazy_static, register_metrics, serde::HexEncodableBlockHash,
-    Recordable, TraceLevel, Traceable,
+    impl_traceable, impl_traceables, lazy_static, register_metrics, Recordable, TraceLevel,
+    Traceable,
 };
 use prometheus::{register_int_counter_vec, register_int_gauge, IntCounterVec, IntGauge, Registry};
 
@@ -66,24 +66,20 @@ impl Recordable for BlobsFinalityVotingFailure {
 }
 
 #[derive(Debug)]
-pub struct BlobsFinalityPendingBlobs {
-    pub count: u64,
-}
+pub struct BlobsFinalityPendingBlobs(pub u64);
 
 impl Recordable for BlobsFinalityPendingBlobs {
     fn record_metrics(&self) {
-        BLOBS_FINALITY_PENDING_BLOBS.set(self.count as i64);
+        BLOBS_FINALITY_PENDING_BLOBS.set(self.0 as i64);
     }
 }
 
 #[derive(Debug)]
-pub struct BlobsFinalityPendingBytes {
-    pub bytes_count: u64,
-}
+pub struct BlobsFinalityPendingBytes(pub u64);
 
 impl Recordable for BlobsFinalityPendingBytes {
     fn record_metrics(&self) {
-        BLOBS_FINALITY_PENDING_BYTES.set(self.bytes_count as i64);
+        BLOBS_FINALITY_PENDING_BYTES.set(self.0 as i64);
     }
 }
 
@@ -103,8 +99,8 @@ mod tests {
         let registry = Registry::new();
         register_metrics(&registry).unwrap();
 
-        emit(BlobsFinalityPendingBlobs { count: 1 });
-        emit(BlobsFinalityPendingBytes { bytes_count: 1 });
+        emit(BlobsFinalityPendingBlobs(1));
+        emit(BlobsFinalityPendingBytes(1));
     }
 
     #[test]
@@ -117,8 +113,8 @@ mod tests {
             blob_hash: Some([0u8; 32]),
         });
 
-        emit(BlobsFinalityPendingBlobs { count: 1 });
+        emit(BlobsFinalityPendingBlobs(1));
 
-        emit(BlobsFinalityPendingBytes { bytes_count: 1 });
+        emit(BlobsFinalityPendingBytes(1));
     }
 }

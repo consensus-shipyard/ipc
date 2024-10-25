@@ -22,11 +22,14 @@ use fendermint_actor_blobs_shared::state::BlobStatus;
 use fendermint_actor_blobs_shared::Method::DebitAccounts;
 use fendermint_actor_blobs_shared::{
     params::FinalizeBlobParams,
-    Method::{FinalizeBlob, GetBlobStatus, GetPendingBlobs},
+    Method::{
+        FinalizeBlob, GetBlobStatus, GetPendingBlobs, GetPendingBlobsCount, GetPendingBytesCount,
+    },
 };
 use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::{blobs, ipc, system};
 use fendermint_vm_event::ParentFinalityMissingQuorum;
+use fendermint_vm_iroh_resolver::observe::{BlobsFinalityPendingBlobs, BlobsFinalityPendingBytes};
 use fendermint_vm_iroh_resolver::pool::{
     ResolveKey as IrohResolveKey, ResolvePool as IrohResolvePool,
     ResolveSource as IrohResolveSource,
@@ -304,7 +307,6 @@ where
 
             let pending_blobs = atomically(|| chain_env.blob_pool.count()).await;
             tracing::info!(size = pending_blobs, "blob pool status");
-
             // Append at the end - if we run out of block space,
             // these are going to be reproposed in the next block.
             msgs.extend(blobs);
@@ -746,7 +748,7 @@ where
         &self,
         (env, state): Self::State,
     ) -> anyhow::Result<(Self::State, Self::EndOutput)> {
-        let (state, out) = self.inner.end(state).await?;
+        let (mut state, out) = self.inner.end(state).await?;
 
         // Update any component that needs to know about changes in the power table.
         if !out.0 .0.is_empty() {
@@ -767,6 +769,14 @@ where
             })
             .await;
         }
+
+        // Get pending blobs count and bytes count to emit metrics
+        ipc_observability::emit(BlobsFinalityPendingBlobs(get_pending_blobs_count(
+            &mut state,
+        )?));
+        ipc_observability::emit(BlobsFinalityPendingBytes(get_pending_bytes_count(
+            &mut state,
+        )?));
 
         Ok(((env, state), out))
     }
@@ -942,6 +952,52 @@ where
         false
     };
     Ok(pending)
+}
+
+fn get_pending_blobs_count<DB>(state: &mut FvmExecState<DB>) -> anyhow::Result<u64>
+where
+    DB: Blockstore + Clone + 'static + Send + Sync,
+{
+    let msg = FvmMessage {
+        version: 0,
+        from: system::SYSTEM_ACTOR_ADDR,
+        to: blobs::BLOBS_ACTOR_ADDR,
+        sequence: 0,
+        value: Default::default(),
+        method_num: GetPendingBlobsCount as u64,
+        params: RawBytes::default(),
+        gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
+        gas_fee_cap: Default::default(),
+        gas_premium: Default::default(),
+    };
+    let (apply_ret, _) = state.execute_implicit(msg)?;
+
+    let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
+    fvm_ipld_encoding::from_slice::<u64>(&data)
+        .map_err(|e| anyhow!("error parsing pending blobs count: {e}"))
+}
+
+fn get_pending_bytes_count<DB>(state: &mut FvmExecState<DB>) -> anyhow::Result<u64>
+where
+    DB: Blockstore + Clone + 'static + Send + Sync,
+{
+    let msg = FvmMessage {
+        version: 0,
+        from: system::SYSTEM_ACTOR_ADDR,
+        to: blobs::BLOBS_ACTOR_ADDR,
+        sequence: 0,
+        value: Default::default(),
+        method_num: GetPendingBytesCount as u64,
+        params: RawBytes::default(),
+        gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
+        gas_fee_cap: Default::default(),
+        gas_premium: Default::default(),
+    };
+    let (apply_ret, _) = state.execute_implicit(msg)?;
+
+    let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
+    fvm_ipld_encoding::from_slice::<u64>(&data)
+        .map_err(|e| anyhow!("error parsing pending bytes count: {e}"))
 }
 
 /// Selects messages to be executed. Currently, this is a static function whose main purpose is to

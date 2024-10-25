@@ -4,10 +4,12 @@
 
 use std::time::Duration;
 
+use crate::observe::{BlobsFinalityVotingFailure, BlobsFinalityVotingSuccess};
 use async_stm::{atomically, atomically_or_err, queues::TQueueLike};
 use fendermint_vm_topdown::voting::VoteTally;
 use ipc_api::subnet_id::SubnetID;
 use ipc_ipld_resolver::{Client, ResolverIroh, ValidatorKey, VoteRecord};
+use ipc_observability::emit;
 use iroh::blobs::Hash;
 use libp2p::identity::Keypair;
 use serde::de::DeserializeOwned;
@@ -162,6 +164,16 @@ async fn add_own_vote<V>(
                 )
             })
             .await;
+
+            if resolved {
+                emit(BlobsFinalityVotingSuccess {
+                    blob_hash: Some(task.hash().into()),
+                });
+            } else {
+                emit(BlobsFinalityVotingFailure {
+                    blob_hash: Some(task.hash().into()),
+                });
+            }
 
             match res {
                 Ok(added) => {
