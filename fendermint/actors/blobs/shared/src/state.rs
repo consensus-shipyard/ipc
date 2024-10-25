@@ -7,9 +7,9 @@ use std::fmt;
 
 use fil_actors_runtime::ActorError;
 use fvm_ipld_encoding::tuple::*;
-use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
+use fvm_shared::{address::Address, MethodNum};
 use serde::{Deserialize, Serialize};
 
 /// The stored representation of a credit account.
@@ -262,5 +262,5 @@ pub struct ReadRequest {
     pub blob_hash: Hash,
     pub offset: u32,
     pub callback_addr: Address,
-    pub callback_method: u64,
+    pub callback_method: MethodNum,
 }

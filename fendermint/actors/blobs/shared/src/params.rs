@@ -3,10 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use fvm_ipld_encoding::tuple::*;
-use fvm_shared::address::Address;
 use fvm_shared::bigint::{BigInt, BigUint};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
+use fvm_shared::{address::Address, MethodNum};
 use serde::{Deserialize, Serialize};
 
 use crate::state::{BlobStatus, Hash, PublicKey, SubscriptionId};
@@ -205,7 +205,7 @@ pub struct OpenReadRequestParams {
     /// The address to call back when the read is complete.
     pub callback_addr: Address,
     /// The method to call back when the read is complete.
-    pub callback_method: u64,
+    pub callback_method: MethodNum,
 }
 
 /// Params for getting a read request status.
