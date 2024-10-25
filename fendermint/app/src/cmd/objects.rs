@@ -372,7 +372,7 @@ async fn handle_object_upload<F: QueryClient>(
         outcome.downloaded_size,
     );
     COUNTER_BLOBS_UPLOADED.inc();
-    COUNTER_BYTES_UPLOADED.inc_by(size);
+    COUNTER_BYTES_UPLOADED.inc_by(outcome.downloaded_size);
 
     Ok(hash.to_string())
 }
