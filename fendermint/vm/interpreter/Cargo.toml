@@ -68,7 +68,6 @@ tokio-util = { workspace = true }
 arbitrary = { workspace = true, optional = true }
 quickcheck = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
-lazy_static = { workspace = true }
 
 [dev-dependencies]
 quickcheck = { workspace = true }

@@ -4,14 +4,7 @@
 use crate::fvm::FvmMessage;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::econ::TokenAmount;
-use lazy_static::lazy_static;
 use num_traits::{ToPrimitive, Zero};
-use std::str::FromStr;
-
-lazy_static! {
-    // Max U256
-    static ref MAX_GAS: TokenAmount = TokenAmount::from_atto(BigInt::from_str("115792089237316195423570985008687907853269984665640564039457584007913129639935").unwrap());
-}
 
 /// The transaction priority calculator. The priority calculated is used to determine the ordering
 /// in the mempool.
