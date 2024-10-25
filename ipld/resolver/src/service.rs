@@ -551,9 +551,6 @@ where
         node_addr: NodeAddr,
         response_channel: ResponseChannel,
     ) {
-        let listen_addr = self.listen_addr.clone();
-        eprintln!("===>>>> (start_iroh_query) in node: {:?}", listen_addr);
-
         let mut iroh = self.iroh.clone();
         tokio::spawn(async move {
             match iroh.client().await {

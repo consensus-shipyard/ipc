@@ -49,10 +49,10 @@ use fendermint_vm_topdown::{
 };
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
-use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::message::Message;
+use fvm_shared::{address::Address, MethodNum};
 use iroh::base::key::PublicKey;
 use iroh::blobs::Hash;
 use iroh::net::NodeId;
@@ -397,9 +397,21 @@ where
                     atomically(|| env.read_request_pool.remove(item)).await;
                     continue;
                 }
-                let (is_globally_finalized, succeeded) = atomically(|| {
+                let read_response = atomically(|| env.read_request_pool.get_result(&item))
+                    .await
+                    .unwrap_or(vec![]);
+                // Remove the result from the pool
+                atomically(|| env.read_request_pool.remove_result(&item)).await;
+
+                // Extend request id with response data to use as the vote hash.
+                // This ensures that the all validators are voting
+                // on the same response from IROH.
+                let mut request_id = item.id.as_bytes().to_vec();
+                request_id.extend(read_response.clone());
+                let vote_hash = Hash::new(request_id);
+                let (is_globally_finalized, _) = atomically(|| {
                     env.parent_finality_votes
-                        .find_blob_quorum(&item.id.as_bytes().to_vec())
+                        .find_blob_quorum(&vote_hash.as_bytes().to_vec())
                 })
                 .await;
                 tracing::debug!(
@@ -414,9 +426,6 @@ where
                     len: READ_REQUEST_LEN,
                     callback: item.callback,
                 };
-                let read_response = atomically(|| env.read_request_pool.get_result(&item)).await;
-                // Remove the result from the pool
-                atomically(|| env.read_request_pool.remove_result(&item)).await;
 
                 if is_globally_finalized {
                     tracing::debug!(request_id = ?item.id, "read request has quorum; adding tx to chain");
@@ -426,8 +435,7 @@ where
                             blob_hash: item.blob_hash,
                             offset: item.offset,
                             callback: item.callback,
-                            succeeded,
-                            data: read_response,
+                            response: read_response,
                         },
                     )));
                 }
@@ -607,15 +615,6 @@ where
                     .await;
                     if !is_globally_finalized {
                         tracing::debug!(hash = ?read_request.id, "read request is not globally finalized; rejecting proposal");
-                        return Ok(false);
-                    }
-                    if read_request.succeeded != succeeded {
-                        tracing::debug!(
-                            hash = ?read_request.id,
-                            quorum = ?succeeded,
-                            message = ?read_request.succeeded,
-                            "read request fulfillment mismatch; rejecting proposal"
-                        );
                         return Ok(false);
                     }
 
@@ -1453,15 +1452,9 @@ where
         blob_hash,
         offset,
         callback: (to, method_num),
-        succeeded,
-        data,
+        response,
     } = read_request.clone();
     // if request failed, we will send an empty vector back
-    let data_read: Vec<u8> = if data.is_none() || !succeeded {
-        vec![]
-    } else {
-        data.unwrap()
-    };
     let msg = Message {
         version: Default::default(),
         from,
@@ -1469,7 +1462,7 @@ where
         sequence: 0,
         value: Default::default(),
         method_num,
-        params: RawBytes::serialize(data_read)?,
+        params: RawBytes::serialize(response)?,
         gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
         gas_fee_cap: Default::default(),
         gas_premium: Default::default(),
@@ -1490,7 +1483,6 @@ where
         read_request_id = id.to_string(),
         blob_hash = blob_hash.to_string(),
         read_offset = offset,
-        succeeded = succeeded,
         gas_limit = fvm_shared::BLOCK_GAS_LIMIT,
         gas_used = apply_ret.msg_receipt.gas_used,
         info = info.unwrap_or_default(),

@@ -12,10 +12,10 @@ use fendermint_actor_blobs_shared::state::{
 };
 use fil_actors_runtime::ActorError;
 use fvm_ipld_encoding::tuple::*;
-use fvm_shared::address::Address;
 use fvm_shared::bigint::{BigInt, BigUint};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
+use fvm_shared::{address::Address, MethodNum};
 use log::{debug, warn};
 use num_traits::{Signed, ToPrimitive, Zero};
 use sha2::{Digest, Sha256};
