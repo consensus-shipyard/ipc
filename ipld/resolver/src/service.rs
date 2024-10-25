@@ -473,9 +473,6 @@ where
                 }
             }
             Request::PublishVote(vote) => {
-                let listen_addr = self.listen_addr.clone();
-                eprintln!("=====>>>> publishing vote in node: {:?}", listen_addr);
-
                 if let Err(e) = self.membership_mut().publish_vote(*vote) {
                     warn!("failed to publish vote: {e}")
                 }

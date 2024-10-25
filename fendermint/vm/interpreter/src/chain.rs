@@ -148,7 +148,7 @@ pub struct ReadRequestPoolItem {
     /// The length of the read request.
     len: u32,
     /// The address and method to callback when the read request is closed.
-    callback: (Address, MethodNum),
+    callback: (Address, u64),
 }
 
 impl From<&ReadRequestPoolItem> for IrohResolveKey {
@@ -164,15 +164,6 @@ impl From<&ReadRequestPoolItem> for IrohTaskType {
             offset: value.offset,
             len: value.len,
         }
-    }
-}
-
-// TODO: Task Pool shoule not require a source. it should be optional to make it more generic
-impl From<&ReadRequestPoolItem> for IrohResolveSource {
-    fn from(_value: &ReadRequestPoolItem) -> Self {
-        let random_bytes = [0u8; 32];
-        let random_node_id = NodeId::from_bytes(&random_bytes).unwrap();
-        Self { id: random_node_id }
     }
 }
 
