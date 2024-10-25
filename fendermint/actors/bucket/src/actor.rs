@@ -39,12 +39,14 @@ impl Actor {
                 ));
             }
         }
+
         // Add blob for object
         add_blob(
             rt,
             Some(state.owner),
             params.source,
             params.hash,
+            params.recovery_hash,
             params.size,
             params.ttl,
         )?;
@@ -140,6 +142,7 @@ fn build_object(
                 })?;
             Ok(Some(Object {
                 hash: object_state.hash,
+                recovery_hash: blob.metadata_hash,
                 size: blob.size,
                 expiry: max_sub.expiry,
                 metadata: object_state.metadata.clone(),
@@ -260,6 +263,7 @@ mod tests {
             source: new_pk(),
             key: vec![0, 1, 2],
             hash: hash.0,
+            recovery_hash: new_hash(256).0,
             size: hash.1,
             ttl: None,
             metadata: HashMap::new(),
@@ -273,6 +277,7 @@ mod tests {
                 sponsor: Some(f4_eth_addr),
                 source: add_params.source,
                 hash: add_params.hash,
+                metadata_hash: add_params.recovery_hash,
                 size: add_params.size,
                 ttl: add_params.ttl,
             })
@@ -313,6 +318,7 @@ mod tests {
             source: new_pk(),
             key: vec![0, 1, 2],
             hash: hash.0,
+            recovery_hash: new_hash(256).0,
             size: hash.1,
             ttl: None,
             metadata: HashMap::new(),
@@ -326,6 +332,7 @@ mod tests {
                 sponsor: Some(f4_eth_addr),
                 source: add_params.source,
                 hash: add_params.hash,
+                metadata_hash: add_params.recovery_hash,
                 size: add_params.size,
                 ttl: add_params.ttl,
             })
@@ -352,6 +359,7 @@ mod tests {
             source: add_params.source,
             key: add_params.key,
             hash: hash.0,
+            recovery_hash: new_hash(256).0,
             size: hash.1,
             ttl: None,
             metadata: HashMap::new(),
@@ -377,6 +385,7 @@ mod tests {
                 sponsor: Some(f4_eth_addr),
                 source: add_params2.source,
                 hash: add_params2.hash,
+                metadata_hash: add_params2.recovery_hash,
                 size: add_params2.size,
                 ttl: add_params2.ttl,
             })
@@ -418,6 +427,7 @@ mod tests {
             key: vec![0, 1, 2],
             hash: hash.0,
             size: hash.1,
+            recovery_hash: new_hash(256).0,
             ttl: None,
             metadata: HashMap::new(),
             overwrite: false,
@@ -430,6 +440,7 @@ mod tests {
                 sponsor: Some(f4_eth_addr),
                 source: add_params.source,
                 hash: add_params.hash,
+                metadata_hash: add_params.recovery_hash,
                 size: add_params.size,
                 ttl: add_params.ttl,
             })
@@ -457,6 +468,7 @@ mod tests {
             key: add_params.key,
             hash: hash.0,
             size: hash.1,
+            recovery_hash: new_hash(256).0,
             ttl: None,
             metadata: HashMap::new(),
             overwrite: false,
@@ -494,6 +506,7 @@ mod tests {
             key: key.clone(),
             hash: hash.0,
             size: hash.1,
+            recovery_hash: new_hash(256).0,
             ttl: None,
             metadata: HashMap::new(),
             overwrite: false,
@@ -507,6 +520,7 @@ mod tests {
                 source: add_params.source,
                 hash: add_params.hash,
                 size: add_params.size,
+                metadata_hash: add_params.recovery_hash,
                 ttl: add_params.ttl,
             })
             .unwrap(),
@@ -601,6 +615,7 @@ mod tests {
             key: key.clone(),
             hash: hash.0,
             size: hash.1,
+            recovery_hash: new_hash(256).0,
             ttl: Some(ttl),
             metadata: HashMap::new(),
             overwrite: false,
@@ -614,6 +629,7 @@ mod tests {
                 source: add_params.source,
                 hash: add_params.hash,
                 size: add_params.size,
+                metadata_hash: add_params.recovery_hash,
                 ttl: add_params.ttl,
             })
             .unwrap(),
@@ -644,6 +660,7 @@ mod tests {
                 },
             )]),
             status: BlobStatus::Resolved,
+            metadata_hash: add_params.recovery_hash,
         };
         rt.expect_validate_caller_any();
         rt.expect_send(
@@ -671,6 +688,7 @@ mod tests {
             result.unwrap(),
             Some(Object {
                 hash: hash.0,
+                recovery_hash: add_params.recovery_hash,
                 size: blob.size,
                 expiry: ttl,
                 metadata: add_params.metadata,

@@ -93,6 +93,7 @@ pub fn add_blob(
     sponsor: Option<Address>,
     source: state::PublicKey,
     hash: state::Hash,
+    metadata_hash: state::Hash,
     size: u64,
     ttl: Option<ChainEpoch>,
 ) -> Result<Subscription, ActorError> {
@@ -100,6 +101,7 @@ pub fn add_blob(
         sponsor,
         source,
         hash,
+        metadata_hash,
         size,
         ttl,
     })?;

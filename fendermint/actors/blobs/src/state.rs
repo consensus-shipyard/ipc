@@ -258,6 +258,7 @@ impl State {
         subscriber: Address,
         current_epoch: ChainEpoch,
         hash: Hash,
+        metadata_hash: Hash,
         size: u64,
         ttl: Option<ChainEpoch>,
         source: PublicKey,
@@ -412,6 +413,7 @@ impl State {
                 size: size.to_u64().unwrap(),
                 subs: HashMap::from([(subscriber, sub.clone())]),
                 status: BlobStatus::Pending,
+                metadata_hash,
             };
             self.blobs.insert(hash, blob);
             debug!("created new blob {}", hash);

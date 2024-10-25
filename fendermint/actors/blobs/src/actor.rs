@@ -201,6 +201,7 @@ impl BlobsActor {
                 subscriber,
                 rt.curr_epoch(),
                 params.hash,
+                params.metadata_hash,
                 params.size,
                 params.ttl,
                 params.source,
@@ -758,6 +759,7 @@ mod tests {
             source: new_pk(),
             hash: hash.0,
             size: hash.1,
+            metadata_hash: new_hash(1024).0,
             ttl: Some(3600),
         };
         let result = rt.call::<BlobsActor>(

@@ -188,6 +188,9 @@ url = { version = "2.4.1", features = ["serde"] }
 warp = "0.3.7"
 zeroize = "1.6"
 
+entangler = { git = "ssh://git@github.com/hokunet/entanglement.git", rev = "6e4a417a5b01de130b5294cf820452a789782562" }
+entangler_storage = { package = "storage", git = "ssh://git@github.com/hokunet/entanglement.git", rev = "6e4a417a5b01de130b5294cf820452a789782562" }
+
 # Workspace deps
 ipc-api = { path = "ipc/api" }
 ipc-provider = { path = "ipc/provider" }
@@ -240,6 +243,12 @@ tendermint-rpc = { version = "0.31", features = [
     "websocket-client",
 ] }
 tendermint-proto = { version = "0.31" }
+
+# Use below when working locally on entanglement and this repo simultaneously.
+# Assumes the entanglement checkout is in a sibling directory with the same name.
+#[patch."ssh://git@github.com/hokunet/entanglement.git"]
+#entangler = { path = "../entanglement/entangler" }
+#entangler_storage = { package = "storage", path = "../entanglement/storage" }
 
 [patch.crates-io]
 # Use stable-only features.

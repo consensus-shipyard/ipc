@@ -31,6 +31,18 @@ impl fmt::Display for Hash {
     }
 }
 
+impl TryFrom<&str> for Hash {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let mut res = [0u8; 32];
+        data_encoding::BASE32_NOPAD
+            .decode_mut(value.as_bytes(), &mut res)
+            .map_err(|_| anyhow::anyhow!("invalid hash"))?;
+        Ok(Self(res))
+    }
+}
+
 /// Iroh node public key.
 #[derive(
     Clone, Copy, Debug, Default, PartialEq, Eq, Ord, PartialOrd, Hash, Serialize, Deserialize,
@@ -91,6 +103,8 @@ pub struct Blob {
     pub subs: HashMap<Address, Subscription>,
     /// Blob status.
     pub status: BlobStatus,
+    /// Blob metadata that contains information for block recovery.
+    pub metadata_hash: Hash,
 }
 
 /// The status of a blob.

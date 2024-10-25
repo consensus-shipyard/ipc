@@ -88,6 +88,9 @@ ipc-provider = { workspace = true }
 ipc_ipld_resolver = { workspace = true }
 ipc-observability = { workspace = true }
 
+entangler = { workspace = true }
+entangler_storage = { workspace = true }
+
 [dev-dependencies]
 tempfile = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }

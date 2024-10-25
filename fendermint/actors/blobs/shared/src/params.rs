@@ -64,6 +64,8 @@ pub struct AddBlobParams {
     pub source: PublicKey,
     /// Blob blake3 hash.
     pub hash: Hash,
+    /// Blake3 hash of the metadata to use for blob recovery.
+    pub metadata_hash: Hash,
     /// Blob size.
     pub size: u64,
     /// Blob time-to-live epochs.
