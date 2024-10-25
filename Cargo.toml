@@ -44,7 +44,7 @@ members = [
     "hoku/blobs_syscall",
     "hoku/maybe_iroh",
 ]
-exclude = ["builtin-actors"]
+exclude = ["builtin-actors", "entanglement"]
 
 [workspace.package]
 authors = ["Protocol Labs"]

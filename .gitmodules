@@ -16,3 +16,6 @@
 [submodule "hoku-contracts"]
 	path = hoku-contracts
 	url = git@github.com:hokunet/contracts.git
+[submodule "entanglement"]
+	path = entanglement
+	url = https://github.com/hokunet/entanglement
