@@ -60,11 +60,13 @@ pub fn hash_rm(context: Context<'_, impl HokuOps>, hash_offset: u32) -> Result<(
                 return;
             }
         };
-
-        match iroh_client.blobs().delete_blob(hash).await {
-            Ok(_) => tracing::debug!(hash = ?hash, "removed content from Iroh"),
+        // Deleting the tag will trigger deletion of the blob if it was the last reference.
+        // TODO: this needs to be tagged with a "user id"
+        let tag = iroh::blobs::Tag(format!("stored-{hash}").into());
+        match iroh_client.tags().delete(tag.clone()).await {
+            Ok(_) => tracing::debug!(tag = ?tag, hash = ?hash, "removed content from Iroh"),
             Err(e) => {
-                tracing::error!(hash = ?hash, error = e.to_string(), "removing content from Iroh failed");
+                tracing::warn!(tag = ?tag, hash = ?hash, error = e.to_string(), "deleting tag from Iroh failed");
             }
         }
     });
