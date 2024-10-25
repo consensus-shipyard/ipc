@@ -608,9 +608,6 @@ where
             .await
             .context("error running check")?;
 
-        // Update the check state.
-        *guard = Some(state);
-
         let mut mpool_received_trace = MpoolReceived::default();
 
         let response = match result {
@@ -620,10 +617,17 @@ where
                 Ok(Err(InvalidSignature(d))) => invalid_check_tx(AppError::InvalidSignature, d),
                 Ok(Ok(ret)) => {
                     mpool_received_trace.message = Some(Message::from(&ret.message));
-                    to_check_tx(ret)
+
+                    let priority = state.txn_priority_calculator().priority(&ret.message);
+                    let mut t = to_check_tx(ret);
+                    t.priority = priority;
+                    t
                 }
             },
         };
+
+        // Update the check state.
+        *guard = Some(state);
 
         mpool_received_trace.accept = response.code.is_ok();
         if !mpool_received_trace.accept {
