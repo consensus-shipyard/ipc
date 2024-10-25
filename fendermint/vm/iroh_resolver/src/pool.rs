@@ -9,7 +9,7 @@ use async_stm::{
     Stm, TVar,
 };
 use iroh::blobs::Hash;
-use iroh::net::{NodeAddr, NodeId};
+use iroh::net::NodeId;
 
 /// The maximum number of times a task can be attempted.
 /// TODO: make configurable
@@ -72,8 +72,6 @@ where
 pub struct ResolveTask {
     /// Content to resolve.
     key: ResolveKey,
-    /// Source Iroh node ID from which to resolve the content.
-    source: ResolveSource,
     /// Flag to flip when the task is done.
     is_resolved: TVar<bool>,
     /// Current number of resolve attempts.
@@ -86,17 +84,19 @@ pub struct ResolveTask {
 
 #[derive(Clone, Debug)]
 pub enum TaskType {
-    Blob,
-    ReadRequest,
+    ResolveBlob {
+        source: ResolveSource,
+    },
+    CloseReadRequest {
+        blob_hash: Hash,
+        offset: u64,
+        len: u64,
+    },
 }
 
 impl ResolveTask {
     pub fn hash(&self) -> Hash {
         self.key.hash
-    }
-
-    pub fn node_addr(&self) -> NodeAddr {
-        NodeAddr::new(self.source.id)
     }
 
     pub fn set_resolved(&self) -> Stm<()> {
@@ -147,7 +147,7 @@ where
 impl<T> ResolvePool<T>
 where
     for<'a> ResolveKey: From<&'a T>,
-    for<'a> ResolveSource: From<&'a T>,
+    for<'a> TaskType: From<&'a T>,
     T: Sync + Send + Clone + std::hash::Hash + Eq + PartialEq + 'static,
 {
     pub fn new() -> Self {
@@ -173,9 +173,9 @@ where
     /// Add an item to the resolution targets.
     ///
     /// If the item is new, enqueue it from background resolution, otherwise return its existing status.
-    pub fn add(&self, item: T, task_type: TaskType) -> Stm<ResolveStatus<T>> {
+    pub fn add(&self, item: T) -> Stm<ResolveStatus<T>> {
         let key = ResolveKey::from(&item);
-        let source = ResolveSource::from(&item);
+        let task_type = TaskType::from(&item);
         let mut items = self.items.read_clone()?;
 
         if items.contains_key(&key) {
@@ -190,7 +190,6 @@ where
             self.items.write(items)?;
             self.queue.write(ResolveTask {
                 key,
-                source,
                 is_resolved: status.is_resolved.clone(),
                 num_attempts: TVar::new(0),
                 num_failures: status.num_failures.clone(),
@@ -284,9 +283,11 @@ mod tests {
         }
     }
 
-    impl From<&TestItem> for ResolveSource {
+    impl From<&TestItem> for TaskType {
         fn from(value: &TestItem) -> Self {
-            Self { id: value.source }
+            Self::ResolveBlob {
+                source: ResolveSource { id: value.source },
+            }
         }
     }
 
@@ -295,7 +296,7 @@ mod tests {
         let pool = ResolvePool::new();
         let item = TestItem::dummy();
 
-        atomically(|| pool.add(item.clone(), TaskType::Blob)).await;
+        atomically(|| pool.add(item.clone())).await;
         atomically(|| {
             assert!(pool.get_status(&item)?.is_some());
             assert!(!pool.queue.is_empty()?);
@@ -311,7 +312,7 @@ mod tests {
         let item = TestItem::dummy();
 
         // Add once.
-        atomically(|| pool.add(item.clone(), TaskType::Blob)).await;
+        atomically(|| pool.add(item.clone())).await;
 
         // Consume it from the queue.
         atomically(|| {
@@ -322,7 +323,7 @@ mod tests {
         .await;
 
         // Add again.
-        atomically(|| pool.add(item.clone(), TaskType::Blob)).await;
+        atomically(|| pool.add(item.clone())).await;
 
         // Should not be queued a second time.
         atomically(|| {
@@ -339,7 +340,7 @@ mod tests {
         let pool = ResolvePool::new();
         let item = TestItem::dummy();
 
-        let status1 = atomically(|| pool.add(item.clone(), TaskType::Blob)).await;
+        let status1 = atomically(|| pool.add(item.clone())).await;
         let status2 = atomically(|| pool.get_status(&item))
             .await
             .expect("status exists");
@@ -368,7 +369,7 @@ mod tests {
         let item = TestItem::dummy();
 
         atomically(|| {
-            let status = pool.add(item.clone(), TaskType::Blob)?;
+            let status = pool.add(item.clone())?;
             status.is_resolved.write(true)?;
 
             let resolved1 = pool.collect_done()?;

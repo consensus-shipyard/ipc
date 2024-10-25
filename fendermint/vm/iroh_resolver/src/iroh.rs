@@ -16,7 +16,7 @@ use libp2p::identity::Keypair;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use crate::pool::{ResolveQueue, ResolveResults, ResolveTask};
+use crate::pool::{ResolveKey, ResolveQueue, ResolveResults, ResolveTask, TaskType};
 
 /// The iroh Resolver takes resolution tasks from the [ResolvePool] and
 /// uses the [ipc_ipld_resolver] to fetch the content from the local iroh node.
@@ -99,13 +99,9 @@ fn start_resolve<V>(
 {
     tokio::spawn(async move {
         tracing::debug!(hash = ?task.hash(), "starting iroh blob resolve");
-        eprintln!("====>>>>> starting resolve task: {:?}", task.hash());
-        eprintln!("======>>>>>> task type: {:?}", task.task_type());
         match task.task_type() {
-            crate::pool::TaskType::Blob => {
-                // (resolve_iroh sends a message to ourselves)
-                let res = client.resolve_iroh(task.hash(), task.node_addr()).await;
-                let err = match res {
+            TaskType::ResolveBlob { source } => {
+                match client.resolve_iroh(task.hash(), source.id.into()).await {
                     Err(e) => {
                         tracing::error!(
                             error = e.to_string(),
@@ -115,47 +111,37 @@ fn start_resolve<V>(
                         // By not quitting, we should see this error every time there is a new task, which is at least a constant reminder.
                         return;
                     }
-                    Ok(Ok(())) => None,
-                    Ok(Err(e)) => Some(e),
-                };
-
-                match err {
-                    None => {
+                    Ok(Ok(())) => {
                         tracing::debug!(hash = ?task.hash(), "iroh blob resolved");
-
                         atomically(|| task.set_resolved()).await;
                         add_own_vote(task, client, vote_tally, key, subnet_id, true, to_vote).await;
                     }
-                    Some(e) => {
-                        let retryable = atomically(|| task.add_attempt()).await;
-                        if retryable {
-                            tracing::error!(
-                                hash = ?task.hash(),
-                                error = e.to_string(),
-                                "iroh blob resolution failed; retrying later"
-                            );
-
-                            schedule_retry(task, queue, retry_delay).await;
-                        } else {
-                            tracing::error!(
-                                hash = ?task.hash(),
-                                error = e.to_string(),
-                                "iroh blob resolution failed; no attempts remaining"
-                            );
-
-                            atomically(|| task.add_failure()).await;
-                            add_own_vote(task, client, vote_tally, key, subnet_id, false, to_vote)
-                                .await;
-                        }
+                    Ok(Err(e)) => {
+                        tracing::error!(
+                            hash = ?task.hash(),
+                            error = e.to_string(),
+                            "iroh blob resolution failed, attempting retry"
+                        );
+                        retry(
+                            task,
+                            queue,
+                            retry_delay,
+                            client,
+                            vote_tally,
+                            key,
+                            subnet_id,
+                            to_vote,
+                        )
+                        .await;
                     }
-                }
+                };
             }
-            crate::pool::TaskType::ReadRequest => {
-                let res = client.resolve_read_request(task.hash()).await;
-
-                eprintln!("====>>>>> read request completed");
-
-                match res {
+            TaskType::CloseReadRequest {
+                blob_hash,
+                offset,
+                len,
+            } => {
+                match client.resolve_read_request(blob_hash, offset, len).await {
                     Err(e) => {
                         tracing::error!(
                             error = e.to_string(),
@@ -166,47 +152,36 @@ fn start_resolve<V>(
                         return;
                     }
                     Ok(Ok(data)) => {
-                        eprintln!("====>>>>> read request data: {:?}", data.len());
                         let hash = task.hash();
                         tracing::debug!(hash = ?hash, "iroh read request resolved");
 
                         atomically(|| task.set_resolved()).await;
-                        add_own_vote(task, client, vote_tally, key, subnet_id, true, to_vote).await;
-                        // Store the result
                         atomically(|| {
                             results.update(|mut results| {
-                                results.insert(crate::pool::ResolveKey { hash }, data.to_vec());
+                                results.insert(ResolveKey { hash }, data.to_vec());
                                 results
                             })
                         })
                         .await;
-                        eprintln!(
-                            "====>>>>> stored result for {:?}, data: {:?}",
-                            hash,
-                            data.len()
-                        );
+                        add_own_vote(task, client, vote_tally, key, subnet_id, true, to_vote).await;
                     }
                     Ok(Err(e)) => {
-                        let retryable = atomically(|| task.add_attempt()).await;
-                        if retryable {
-                            tracing::error!(
-                                hash = ?task.hash(),
-                                error = e.to_string(),
-                                "iroh blob resolution failed; retrying later"
-                            );
-
-                            schedule_retry(task, queue, retry_delay).await;
-                        } else {
-                            tracing::error!(
-                                hash = ?task.hash(),
-                                error = e.to_string(),
-                                "iroh blob resolution failed; no attempts remaining"
-                            );
-
-                            atomically(|| task.add_failure()).await;
-                            add_own_vote(task, client, vote_tally, key, subnet_id, false, to_vote)
-                                .await;
-                        }
+                        tracing::error!(
+                            hash = ?task.hash(),
+                            error = e.to_string(),
+                            "iroh read request resolution failed, attempting retry"
+                        );
+                        retry(
+                            task,
+                            queue,
+                            retry_delay,
+                            client,
+                            vote_tally,
+                            key,
+                            subnet_id,
+                            to_vote,
+                        )
+                        .await;
                     }
                 };
             }
@@ -229,11 +204,6 @@ async fn add_own_vote<V>(
     match VoteRecord::signed(&key, subnet_id, vote) {
         Ok(vote) => {
             let validator_key = ValidatorKey::from(key.public());
-            eprintln!(
-                "====>>>>> adding vote for {:?}, validator key: {:?}",
-                task.hash(),
-                validator_key
-            );
             let res = atomically_or_err(|| {
                 vote_tally.add_blob_vote(
                     validator_key.clone(),
@@ -270,6 +240,35 @@ async fn add_own_vote<V>(
         Err(e) => {
             tracing::error!(error = e.to_string(), "failed to sign vote");
         }
+    }
+}
+
+async fn retry<V>(
+    task: ResolveTask,
+    queue: ResolveQueue,
+    retry_delay: Duration,
+    client: Client<V>,
+    vote_tally: VoteTally,
+    key: Keypair,
+    subnet_id: SubnetID,
+    to_vote: fn(Hash, bool) -> V,
+) where
+    V: Clone + Send + Sync + Serialize + DeserializeOwned + 'static,
+{
+    let retryable = atomically(|| task.add_attempt()).await;
+    if retryable {
+        tracing::error!(
+            hash = ?task.hash(),
+            "iroh blob resolution failed; retrying later"
+        );
+        schedule_retry(task, queue, retry_delay).await;
+    } else {
+        tracing::error!(
+            hash = ?task.hash(),
+            "iroh blob resolution failed; no attempts remaining"
+        );
+        atomically(|| task.add_failure()).await;
+        add_own_vote(task, client, vote_tally, key, subnet_id, false, to_vote).await;
     }
 }
 

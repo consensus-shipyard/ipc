@@ -34,7 +34,7 @@ use fendermint_vm_iroh_resolver::observe::{
 };
 use fendermint_vm_iroh_resolver::pool::{
     ResolveKey as IrohResolveKey, ResolvePool as IrohResolvePool,
-    ResolveSource as IrohResolveSource,
+    ResolveSource as IrohResolveSource, TaskType as IrohTaskType,
 };
 use fendermint_vm_message::ipc::{Blob, ParentFinality, ReadRequest as ReadRequestIPCMessage};
 use fendermint_vm_message::{
@@ -119,34 +119,42 @@ impl From<&BlobPoolItem> for IrohResolveKey {
     }
 }
 
-impl From<&BlobPoolItem> for IrohResolveSource {
+impl From<&BlobPoolItem> for IrohTaskType {
     fn from(value: &BlobPoolItem) -> Self {
-        Self { id: value.source }
-    }
-}
-
-#[derive(Clone, Hash, PartialEq, Eq)]
-pub struct ReadRequestPoolItem {
-    request_id: Hash,
-    offset: u32,
-    callback_addr: Address,
-    callback_method: u64,
-}
-
-impl From<&ReadRequestPoolItem> for IrohResolveKey {
-    fn from(value: &ReadRequestPoolItem) -> Self {
-        Self {
-            hash: value.request_id.into(),
+        Self::ResolveBlob {
+            source: IrohResolveSource { id: value.source },
         }
     }
 }
 
-// TODO: Task Pool shoule not require a source. it should be optional to make it more generic
-impl From<&ReadRequestPoolItem> for IrohResolveSource {
-    fn from(_value: &ReadRequestPoolItem) -> Self {
-        let random_bytes = [0u8; 32];
-        let random_node_id = NodeId::from_bytes(&random_bytes).unwrap();
-        Self { id: random_node_id }
+/// A read request pool item. This is the task that needs to be resolved by iroh resolver.
+#[derive(Clone, Hash, PartialEq, Eq)]
+pub struct ReadRequestPoolItem {
+    /// The unique id of the read request.
+    id: Hash,
+    /// The hash of the blob that the read request is for.
+    blob_hash: Hash,
+    /// The offset of the read request.
+    offset: u64,
+    /// The length of the read request.
+    len: u64,
+    /// The address and method to callback when the read request is closed.
+    callback: (Address, u64),
+}
+
+impl From<&ReadRequestPoolItem> for IrohResolveKey {
+    fn from(value: &ReadRequestPoolItem) -> Self {
+        Self { hash: value.id }
+    }
+}
+
+impl From<&ReadRequestPoolItem> for IrohTaskType {
+    fn from(value: &ReadRequestPoolItem) -> Self {
+        Self::CloseReadRequest {
+            blob_hash: value.blob_hash,
+            offset: value.offset,
+            len: value.len,
+        }
     }
 }
 
@@ -346,40 +354,35 @@ where
             msgs.extend(blobs);
         }
 
-        // -----
-        // ====>>>> 1) Get pending read requests (tasks) from blobs actor (tasks actor)
-        let read_requests = with_state_transaction(&mut state, |state| {
+        // Get pending read requests from blobs actor
+        let open_requests = with_state_transaction(&mut state, |state| {
             let requests = get_open_read_requests(state, env.read_request_concurrency)?;
-            eprintln!(
-                "====>>>>> read requests fetched from chain: {:?}",
-                requests.len()
-            );
+            tracing::debug!(size = requests.len(), "read requests fetched from chain");
             Ok(requests)
         })?;
 
-        // ====>>>> 2) add read requests (tasks) to the read request pool (tasks pool)
-        for (request_id, offset, callback_addr, callback_method) in read_requests {
+        // add read requests to the read request pool
+        for (id, blob_hash, offset, callback_addr, callback_method) in open_requests {
             atomically(|| {
-                env.read_request_pool.add(
-                    ReadRequestPoolItem {
-                        request_id,
-                        offset,
-                        callback_addr,
-                        callback_method,
-                    },
-                    fendermint_vm_iroh_resolver::pool::TaskType::ReadRequest,
-                )
+                let item = ReadRequestPoolItem {
+                    id,
+                    blob_hash,
+                    offset,
+                    len: READ_REQUEST_LEN,
+                    callback: (callback_addr, callback_method),
+                };
+                env.read_request_pool.add(item)
             })
             .await;
-            eprintln!("====>>>>> read request added to pool: {:?}", request_id);
+            tracing::debug!(request_id = ?id, "read request added to pool");
         }
 
-        // ====>>>> 3) collect locally resolved read requests (tasks)
+        // collect locally resolved read requests
         let locally_resolved_read_requests =
             atomically(|| env.read_request_pool.collect_done()).await;
-        eprintln!(
-            "====>>>>> locally resolved read requests: {:?}",
-            locally_resolved_read_requests.len()
+        tracing::debug!(
+            size = locally_resolved_read_requests.len(),
+            "locally resolved read requests"
         );
 
         if !locally_resolved_read_requests.is_empty() {
@@ -388,56 +391,43 @@ where
             state.state_tree_mut().begin_transaction();
             for item in locally_resolved_read_requests.iter() {
                 // TODO: Hash to request_id. request_id should be hash(request||response)
-                // ====>>>> 3.1)
-                eprintln!("====>>>>> (prepare) found locally resolved read request");
                 // if the request is fulfilled onchain, remove it from the read request pool
-                if !is_read_request_open(&mut state, item.request_id)? {
-                    eprintln!("====>>>>> (prepare) read request already fulfilled on chain; removing from pool");
-                    tracing::debug!(request_id = ?item.request_id, "read request already fulfilled on chain; removing from pool");
+                if !is_read_request_open(&mut state, item.id)? {
+                    tracing::debug!(request_id = ?item.id, "read request already fulfilled on chain; removing from pool");
                     atomically(|| env.read_request_pool.remove(item)).await;
                     continue;
                 }
-                // ====>>>> 3.2)
-                // for each open read request (from step 1), check if it has quorum
-                // if it has, propose a transaction to complete the read request
-                // if not, do nothing
-
-                // Reusing the blob quorum functions as it takes generic hash as input
                 let (is_globally_finalized, succeeded) = atomically(|| {
                     env.parent_finality_votes
-                        .find_blob_quorum(&item.request_id.as_bytes().to_vec())
+                        .find_blob_quorum(&item.id.as_bytes().to_vec())
                 })
                 .await;
-
-                eprintln!(
-                    "====>>>>> (prepare) read request quorum: {:?}",
-                    is_globally_finalized
+                tracing::debug!(
+                    request_id = ?item.id,
+                    quorum = ?is_globally_finalized,
+                    "read request quorum"
                 );
-
                 let item = ReadRequestPoolItem {
-                    request_id: item.request_id,
+                    id: item.id,
+                    blob_hash: item.blob_hash,
                     offset: item.offset,
-                    callback_addr: item.callback_addr,
-                    callback_method: item.callback_method,
+                    len: READ_REQUEST_LEN,
+                    callback: item.callback,
                 };
-                let data = atomically(|| env.read_request_pool.get_result(&item)).await;
-                eprintln!(
-                    "====>>>>> (prepare) read request data: {:?}",
-                    data.clone().unwrap_or(vec![]).len()
-                );
+                let read_response = atomically(|| env.read_request_pool.get_result(&item)).await;
                 // Remove the result from the pool
                 atomically(|| env.read_request_pool.remove_result(&item)).await;
 
                 if is_globally_finalized {
-                    tracing::debug!(request_id = ?item.request_id, "read request has quorum; adding tx to chain");
-                    read_requests.push(ChainMessage::Ipc(IpcMessage::ReadRequestCompleted(
+                    tracing::debug!(request_id = ?item.id, "read request has quorum; adding tx to chain");
+                    read_requests.push(ChainMessage::Ipc(IpcMessage::ReadRequestClosed(
                         ReadRequestIPCMessage {
-                            request_id: item.request_id,
+                            id: item.id,
+                            blob_hash: item.blob_hash,
                             offset: item.offset,
-                            callback_addr: item.callback_addr,
-                            callback_method: item.callback_method,
+                            callback: item.callback,
                             succeeded,
-                            data,
+                            data: read_response,
                         },
                     )));
                 }
@@ -449,10 +439,6 @@ where
 
             let pending_read_requests = atomically(|| env.read_request_pool.count()).await;
             tracing::info!(size = pending_read_requests, "read request pool status");
-            eprintln!(
-                "====>>>>> read request pool status: {:?}",
-                pending_read_requests
-            );
             // Append at the end - if we run out of block space,
             // these are going to be reproposed in the next block.
             msgs.extend(read_requests);
@@ -575,9 +561,9 @@ where
                         .await;
                     if is_locally_finalized {
                         tracing::debug!(hash = ?blob.hash, "blob is locally finalized; removing from pool");
-                        atomically(|| env.blob_pool.remove(&item)).await;
+                        atomically(|| chain_env.blob_pool.remove(&item)).await;
                         // Remove the result from the pool
-                        atomically(|| env.blob_pool.remove_result(&item)).await;
+                        atomically(|| chain_env.blob_pool.remove_result(&item)).await;
                     } else {
                         tracing::debug!(hash = ?blob.hash, "blob is not locally finalized");
                     }
@@ -601,30 +587,31 @@ where
                 ChainMessage::Signed(signed) => {
                     block_gas_usage += signed.message.gas_limit;
                 }
-                ChainMessage::Ipc(IpcMessage::ReadRequestCompleted(read_request)) => {
+                ChainMessage::Ipc(IpcMessage::ReadRequestClosed(read_request)) => {
                     // Ensure that the read request is ready to be fulfilled.
                     // We can accept the proposal if the read request has reached a quorum and is
                     // not yet fulfilled.
                     let is_pending = with_state_transaction(&mut state, |state| {
-                        is_read_request_open(state, read_request.request_id)
+                        is_read_request_open(state, read_request.id)
                     })?;
                     if !is_pending {
-                        tracing::debug!(hash = ?read_request.request_id, "read request is already fulfilled; rejecting proposal");
+                        tracing::debug!(hash = ?read_request.id, "read request is already fulfilled; rejecting proposal");
                         return Ok(false);
                     }
 
                     let (is_globally_finalized, succeeded) = atomically(|| {
-                        env.parent_finality_votes
-                            .find_blob_quorum(&read_request.request_id.as_bytes().to_vec())
+                        chain_env
+                            .parent_finality_votes
+                            .find_blob_quorum(&read_request.id.as_bytes().to_vec())
                     })
                     .await;
                     if !is_globally_finalized {
-                        tracing::debug!(hash = ?read_request.request_id, "read request is not globally finalized; rejecting proposal");
+                        tracing::debug!(hash = ?read_request.id, "read request is not globally finalized; rejecting proposal");
                         return Ok(false);
                     }
                     if read_request.succeeded != succeeded {
                         tracing::debug!(
-                            hash = ?read_request.request_id,
+                            hash = ?read_request.id,
                             quorum = ?succeeded,
                             message = ?read_request.succeeded,
                             "read request fulfillment mismatch; rejecting proposal"
@@ -634,24 +621,25 @@ where
 
                     // Remove from pool if locally resolved
                     let item = ReadRequestPoolItem {
-                        request_id: read_request.request_id,
+                        id: read_request.id,
+                        blob_hash: read_request.blob_hash,
                         offset: read_request.offset,
-                        callback_addr: read_request.callback_addr,
-                        callback_method: read_request.callback_method,
+                        len: READ_REQUEST_LEN,
+                        callback: read_request.callback,
                     };
                     let is_locally_finalized =
-                        atomically(|| match env.read_request_pool.get_status(&item)? {
+                        atomically(|| match chain_env.read_request_pool.get_status(&item)? {
                             None => Ok(false),
                             Some(status) => Ok(status.is_resolved()? || status.is_failed()?),
                         })
                         .await;
                     if is_locally_finalized {
-                        tracing::debug!(request_id = ?read_request.request_id, "read request is locally finalized; removing from pool");
-                        atomically(|| env.read_request_pool.remove(&item)).await;
+                        tracing::debug!(request_id = ?read_request.id, "read request is locally finalized; removing from pool");
+                        atomically(|| chain_env.read_request_pool.remove(&item)).await;
                         // Remove the result from the pool
-                        atomically(|| env.read_request_pool.remove_result(&item)).await;
+                        atomically(|| chain_env.read_request_pool.remove_result(&item)).await;
                     } else {
-                        tracing::debug!(request_id = ?read_request.request_id, "read request is not locally finalized");
+                        tracing::debug!(request_id = ?read_request.id, "read request is not locally finalized");
                     }
                 }
                 _ => {}
@@ -1129,9 +1117,10 @@ where
                     | IpcMessage::BottomUpExec(_)
                     | IpcMessage::BlobPending(_)
                     | IpcMessage::BlobFinalized(_)
-                    | IpcMessage::DebitCreditAccounts => {
+                    | IpcMessage::DebitCreditAccounts
+                    | IpcMessage::ReadRequestClosed(_) => {
                         // Users cannot send these messages, only validators can propose them in blocks.
-                        Ok((state, Err(ActorError::illegal_message())))
+                        Ok((state, Err(IllegalMessage)))
                     }
                 }
             }
@@ -1425,12 +1414,12 @@ where
 
 fn is_read_request_open<DB>(
     state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
-    request_id: Hash,
+    id: Hash,
 ) -> anyhow::Result<bool>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
-    let request_id = fendermint_actor_blobs_shared::state::Hash(request_id.into());
+    let request_id = fendermint_actor_blobs_shared::state::Hash(id.into());
     let msg = FvmMessage {
         from: system::SYSTEM_ACTOR_ADDR,
         to: blobs::BLOBS_ACTOR_ADDR,
@@ -1460,26 +1449,26 @@ where
 {
     let from = system::SYSTEM_ACTOR_ADDR;
     let ReadRequestIPCMessage {
-        request_id,
+        id,
+        blob_hash,
         offset,
-        callback_addr,
-        callback_method,
+        callback: (to, method_num),
         succeeded,
         data,
-    } = read_request;
+    } = read_request.clone();
     // if request failed, we will send an empty vector back
-    let data_read = if data.is_none() || !succeeded {
+    let data_read: Vec<u8> = if data.is_none() || !succeeded {
         vec![]
     } else {
-        data.as_ref().unwrap().clone()
+        data.unwrap()
     };
     let msg = Message {
         version: Default::default(),
         from,
-        to: *callback_addr,
+        to,
         sequence: 0,
         value: Default::default(),
-        method_num: *callback_method,
+        method_num,
         params: RawBytes::serialize(data_read)?,
         gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
         gas_fee_cap: Default::default(),
@@ -1496,9 +1485,10 @@ where
     tracing::info!(
         exit_code = apply_ret.msg_receipt.exit_code.value(),
         from = from.to_string(),
-        to = callback_addr.to_string(),
-        method_num = callback_method,
-        read_request_id = request_id.to_string(),
+        to = to.to_string(),
+        method_num = method_num,
+        read_request_id = id.to_string(),
+        blob_hash = blob_hash.to_string(),
         read_offset = offset,
         succeeded = succeeded,
         gas_limit = fvm_shared::BLOCK_GAS_LIMIT,
@@ -1527,10 +1517,7 @@ where
     result
 }
 
-fn close_read_request<DB>(
-    state: &mut FvmExecState<DB>,
-    request_id: Hash,
-) -> anyhow::Result<FvmApplyRet>
+fn close_read_request<DB>(state: &mut FvmExecState<DB>, id: Hash) -> anyhow::Result<FvmApplyRet>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
@@ -1539,7 +1526,7 @@ where
     let method_num = CloseReadRequest as u64;
     let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
     let params = RawBytes::serialize(CloseReadRequestParams {
-        request_id: fendermint_actor_blobs_shared::state::Hash(request_id.into()),
+        request_id: fendermint_actor_blobs_shared::state::Hash(id.into()),
     })?;
     let msg = Message {
         version: Default::default(),

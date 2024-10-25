@@ -142,7 +142,12 @@ where
 pub trait ResolverIrohReadRequest {
     /// Send a hash for getting the data from iroh, await its completion,
     /// then return the result, to be inspected by the caller.
-    async fn resolve_read_request(&self, hash: Hash) -> anyhow::Result<ResolveReadRequestResult>;
+    async fn resolve_read_request(
+        &self,
+        hash: Hash,
+        offset: u64,
+        len: u64,
+    ) -> anyhow::Result<ResolveReadRequestResult>;
 }
 
 #[async_trait]
@@ -150,13 +155,14 @@ impl<V> ResolverIrohReadRequest for Client<V>
 where
     V: Sync + Send + 'static,
 {
-    async fn resolve_read_request(&self, hash: Hash) -> anyhow::Result<ResolveReadRequestResult> {
-        eprintln!(
-            "====>>>>> (resolve_read_request) starting resolve read request: {:?}",
-            hash
-        );
+    async fn resolve_read_request(
+        &self,
+        hash: Hash,
+        offset: u64,
+        len: u64,
+    ) -> anyhow::Result<ResolveReadRequestResult> {
         let (tx, rx) = oneshot::channel();
-        let req = Request::ResolveReadRequest(hash, tx);
+        let req = Request::ResolveReadRequest(hash, offset, len, tx);
         self.send_request(req)?;
         let res = rx.await?;
         Ok(res)

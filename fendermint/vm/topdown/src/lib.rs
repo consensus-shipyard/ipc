@@ -163,18 +163,18 @@ impl Display for IPCBlobFinality {
 
 /// The finality view for a read request at certain height.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct IPCReadRequestCompleted {
+pub struct IPCReadRequestClosed {
     pub hash: Hash,
     pub success: bool,
 }
 
-impl IPCReadRequestCompleted {
+impl IPCReadRequestClosed {
     pub fn new(hash: Hash, success: bool) -> Self {
         Self { hash, success }
     }
 }
 
-impl Display for IPCReadRequestCompleted {
+impl Display for IPCReadRequestClosed {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

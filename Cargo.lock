@@ -3123,6 +3123,7 @@ dependencies = [
  "rand",
  "serde",
  "serde_tuple",
+ "sha2 0.10.8",
  "tracing-subscriber",
 ]
 

@@ -29,7 +29,7 @@ use fendermint_vm_topdown::proxy::{IPCProviderProxy, IPCProviderProxyWithLatency
 use fendermint_vm_topdown::sync::launch_polling_syncer;
 use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
 use fendermint_vm_topdown::{
-    CachedFinalityProvider, IPCBlobFinality, IPCParentFinality, IPCReadRequestCompleted, Toggle,
+    CachedFinalityProvider, IPCBlobFinality, IPCParentFinality, IPCReadRequestClosed, Toggle,
 };
 use fvm_shared::address::{current_network, Address, Network};
 use ipc_ipld_resolver::{Event as ResolverEvent, ValidatorKey, VoteRecord};
@@ -245,6 +245,7 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
         }
 
         if let Some(key) = validator_keypair {
+            // Blob resolver
             let iroh_resolver = IrohResolver::new(
                 client.clone(),
                 iroh_pin_pool.queue(),
@@ -259,7 +260,7 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
             info!("starting the iroh Resolver...");
             tokio::spawn(async move { iroh_resolver.run().await });
 
-            // -----
+            // Read request resolver
             let read_request_resolver = IrohResolver::new(
                 client.clone(),
                 read_request_pool.queue(),
@@ -268,7 +269,7 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
                 key,
                 own_subnet_id,
                 |hash, success| {
-                    AppVote::ReadRequestCompleted(IPCReadRequestCompleted::new(hash, success))
+                    AppVote::ReadRequestClosed(IPCReadRequestClosed::new(hash, success))
                 },
                 read_request_pool.results(),
             );
@@ -625,7 +626,6 @@ async fn dispatch_vote(
         }
         AppVote::BlobFinality(f) => {
             debug!(hash = ?f.hash, success = ?f.success, "received vote for blob finality");
-            eprintln!("====> (dispatch_vote blob)");
             handle_blob_vote(
                 parent_finality_votes,
                 vote.public_key,
@@ -635,9 +635,8 @@ async fn dispatch_vote(
             )
             .await;
         }
-        AppVote::ReadRequestCompleted(r) => {
+        AppVote::ReadRequestClosed(r) => {
             debug!(hash = ?r.hash, success = ?r.success, "received vote for read request completion");
-            eprintln!("====> (dispatch_vote read request completed)");
             handle_blob_vote(
                 parent_finality_votes,
                 vote.public_key,
