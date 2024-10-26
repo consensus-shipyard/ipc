@@ -188,8 +188,8 @@ url = { version = "2.4.1", features = ["serde"] }
 warp = "0.3.7"
 zeroize = "1.6"
 
-entangler = { git = "ssh://git@github.com/hokunet/entanglement.git", rev = "6e4a417a5b01de130b5294cf820452a789782562" }
-entangler_storage = { package = "storage", git = "ssh://git@github.com/hokunet/entanglement.git", rev = "6e4a417a5b01de130b5294cf820452a789782562" }
+entangler = { git = "ssh://git@github.com/hokunet/entanglement.git", rev = "ef3fdecf7cdd87d9e715556d627e4b5a2f79d6bd" }
+entangler_storage = { package = "storage", git = "ssh://git@github.com/hokunet/entanglement.git", rev = "ef3fdecf7cdd87d9e715556d627e4b5a2f79d6bd" }
 
 # Workspace deps
 ipc-api = { path = "ipc/api" }
