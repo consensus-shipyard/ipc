@@ -73,7 +73,7 @@ export class Deployments {
                 log: true,
                 args: contract.args,
                 libraries: libraries.addresses,
-                waitConfirmations: 1,
+                waitConfirmations: 3,
             })
             results[contract.name] = result
             console.log(`${contract.name} deployed at ${result.address}`)
