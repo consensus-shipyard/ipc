@@ -356,7 +356,7 @@ where
 
         // Get pending read requests from blobs actor
         let open_requests = with_state_transaction(&mut state, |state| {
-            let requests = get_open_read_requests(state, env.read_request_concurrency)?;
+            let requests = get_open_read_requests(state, chain_env.read_request_concurrency)?;
             tracing::debug!(size = requests.len(), "read requests fetched from chain");
             Ok(requests)
         })?;
@@ -371,7 +371,7 @@ where
                     len: READ_REQUEST_LEN,
                     callback: (callback_addr, callback_method),
                 };
-                env.read_request_pool.add(item)
+                chain_env.read_request_pool.add(item)
             })
             .await;
             tracing::debug!(request_id = ?id, "read request added to pool");
@@ -379,7 +379,7 @@ where
 
         // collect locally resolved read requests
         let locally_resolved_read_requests =
-            atomically(|| env.read_request_pool.collect_done()).await;
+            atomically(|| chain_env.read_request_pool.collect_done()).await;
         tracing::debug!(
             size = locally_resolved_read_requests.len(),
             "locally resolved read requests"
@@ -394,14 +394,14 @@ where
                 // if the request is fulfilled onchain, remove it from the read request pool
                 if !is_read_request_open(&mut state, item.id)? {
                     tracing::debug!(request_id = ?item.id, "read request already fulfilled on chain; removing from pool");
-                    atomically(|| env.read_request_pool.remove(item)).await;
+                    atomically(|| chain_env.read_request_pool.remove(item)).await;
                     continue;
                 }
-                let read_response = atomically(|| env.read_request_pool.get_result(&item))
+                let read_response = atomically(|| chain_env.read_request_pool.get_result(&item))
                     .await
                     .unwrap_or(vec![]);
                 // Remove the result from the pool
-                atomically(|| env.read_request_pool.remove_result(&item)).await;
+                atomically(|| chain_env.read_request_pool.remove_result(&item)).await;
 
                 // Extend request id with response data to use as the vote hash.
                 // This ensures that the all validators are voting
@@ -410,7 +410,8 @@ where
                 request_id.extend(read_response.clone());
                 let vote_hash = Hash::new(request_id);
                 let (is_globally_finalized, _) = atomically(|| {
-                    env.parent_finality_votes
+                    chain_env
+                        .parent_finality_votes
                         .find_blob_quorum(&vote_hash.as_bytes().to_vec())
                 })
                 .await;
@@ -445,7 +446,7 @@ where
                 .end_transaction(true)
                 .expect("we just started a transaction");
 
-            let pending_read_requests = atomically(|| env.read_request_pool.count()).await;
+            let pending_read_requests = atomically(|| chain_env.read_request_pool.count()).await;
             tracing::info!(size = pending_read_requests, "read request pool status");
             // Append at the end - if we run out of block space,
             // these are going to be reproposed in the next block.
@@ -463,18 +464,6 @@ where
         msgs: Vec<Self::Message>,
     ) -> anyhow::Result<bool> {
         let mut block_gas_usage = 0;
-        // count all ReadRequestCompleted messages before processing
-        let mut read_request_completed_count = 0;
-        for msg in msgs.clone() {
-            if let ChainMessage::Ipc(IpcMessage::ReadRequestCompleted(_)) = msg {
-                read_request_completed_count += 1;
-            }
-        }
-        eprintln!(
-            "====>>>>> (process) read request completed: {:?}",
-            read_request_completed_count
-        );
-
         for msg in msgs {
             match msg {
                 ChainMessage::Ipc(IpcMessage::BottomUpExec(msg)) => {
@@ -1329,50 +1318,6 @@ fn messages_selection<DB: Blockstore + Clone + 'static>(
     }
 
     Ok(user_msgs.into_iter().map(ChainMessage::Signed).collect())
-}
-
-/// Add a read request to the blobs actor.
-fn add_read_request<DB>(
-    state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
-    hash: fendermint_actor_blobs_shared::state::Hash,
-    offset: u32,
-    callback_addr: Address,
-    callback_method: u64,
-) -> anyhow::Result<()>
-where
-    DB: Blockstore + Clone + 'static + Send + Sync,
-{
-    let params = fvm_ipld_encoding::RawBytes::serialize(
-        fendermint_actor_blobs_shared::params::AddReadRequestParams {
-            hash,
-            offset,
-            callback_addr,
-            callback_method,
-        },
-    )?;
-
-    let msg = FvmMessage {
-        from: system::SYSTEM_ACTOR_ADDR,
-        to: blobs::BLOBS_ACTOR_ADDR,
-        sequence: 0,
-        gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
-        method_num: fendermint_actor_blobs_shared::Method::AddReadRequest as u64,
-        params,
-        value: Default::default(),
-        version: Default::default(),
-        gas_fee_cap: Default::default(),
-        gas_premium: Default::default(),
-    };
-
-    let (apply_ret, _emitters) = state.execute_implicit(msg)?;
-    if let Some(err) = apply_ret.failure_info {
-        anyhow::bail!("failed to add read request: {}", err);
-    } else {
-        tracing::info!("added read request successfully");
-    }
-    println!("===> added read request with blobs actor");
-
-    Ok(())
 }
 
 fn get_open_read_requests<DB>(
