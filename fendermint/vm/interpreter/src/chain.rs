@@ -328,6 +328,8 @@ where
                 if is_blob_finalized(&mut state, item.subscriber, item.hash, item.id.clone())? {
                     tracing::debug!(hash = ?item.hash, "blob already finalized on chain; removing from pool");
                     atomically(|| chain_env.blob_pool.remove_task(item)).await;
+                    // Remove the result from the pool (we don't have result for a blob so can remove it here)
+                    atomically(|| chain_env.blob_pool.remove_result(item)).await;
                     continue;
                 }
 
