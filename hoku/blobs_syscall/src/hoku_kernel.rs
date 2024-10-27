@@ -77,11 +77,6 @@ where
             crate::HASHRM_SYSCALL_FUNCTION_NAME,
             crate::hash_rm,
         )?;
-        linker.link_syscall(
-            crate::SYSCALL_MODULE_NAME,
-            crate::HASHGET_SYSCALL_FUNCTION_NAME,
-            crate::hash_get,
-        )?;
 
         Ok(())
     }
