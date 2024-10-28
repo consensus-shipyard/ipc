@@ -139,6 +139,7 @@ library CrossMsgHelper {
     /// because it doesn't include the network-specific nonce.
     function toDeterministicHash(IpcEnvelope memory crossMsg) internal pure returns (bytes32) {
         return keccak256(
+            // solhint-disable-next-line func-named-parameters
             abi.encode(
                 crossMsg.kind,
                 crossMsg.to,
