@@ -19,7 +19,6 @@ pub mod hoku_kernel;
 
 pub const SYSCALL_MODULE_NAME: &str = "blobs";
 pub const HASHRM_SYSCALL_FUNCTION_NAME: &str = "hash_rm";
-pub const HASHGET_SYSCALL_FUNCTION_NAME: &str = "hash_get";
 
 const ENV_IROH_ADDR: &str = "IROH_RPC_ADDR";
 const HASHRM_SYSCALL_ERROR_CODE: u32 = 101; // TODO(sander): Is the okay?
