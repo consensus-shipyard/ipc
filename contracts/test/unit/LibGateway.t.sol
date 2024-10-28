@@ -266,7 +266,11 @@ contract LibGatewayTest is Test {
         });
         crossMsg.nonce = 0;
 
-        ResultMsg memory message = ResultMsg({outcome: OutcomeType.ActorErr, id: crossMsg.toDeterministicHash(), ret: new bytes(0)});
+        ResultMsg memory message = ResultMsg({
+            outcome: OutcomeType.ActorErr,
+            id: crossMsg.toDeterministicHash(),
+            ret: new bytes(0)
+        });
         IpcEnvelope memory expected = IpcEnvelope({
             kind: IpcMsgKind.Result,
             from: crossMsg.to,
@@ -373,7 +377,11 @@ contract LibGatewayTest is Test {
         });
         crossMsg.nonce = 0;
 
-        ResultMsg memory message = ResultMsg({outcome: OutcomeType.ActorErr, id: crossMsg.toDeterministicHash(), ret: new bytes(0)});
+        ResultMsg memory message = ResultMsg({
+            outcome: OutcomeType.ActorErr,
+            id: crossMsg.toDeterministicHash(),
+            ret: new bytes(0)
+        });
         IpcEnvelope memory expected = IpcEnvelope({
             kind: IpcMsgKind.Result,
             from: crossMsg.to,
