@@ -3,6 +3,8 @@
 use anyhow::{anyhow, bail, Context};
 use ethers::contract::{ContractError, ContractRevert};
 use ethers::core::types as et;
+use ethers::types::transaction::response;
+use ethers::types::U256;
 use ethers::{
     core::k256::ecdsa::SigningKey,
     middleware::SignerMiddleware,
@@ -26,13 +28,16 @@ use ipc_actors_abis::gateway_messenger_facet::{
 };
 use ipc_actors_abis::subnet_actor_getter_facet::SubnetActorGetterFacet;
 
-use ipc_actors_abis::cross_messenger::{self, CrossMessenger, Ipcaddress};
+use ipc_actors_abis::cross_messenger::{
+    self, CrossMessenger, FvmAddress, Ipcaddress, SubnetID as IPCSubnetID,
+};
 
 use fvm_shared::econ::TokenAmount;
 
 use ipc_api::address::IPCAddress;
 use ipc_api::cross::{IpcEnvelope, IpcMsgKind};
 use ipc_api::evm;
+use ipc_api::subnet_id::SubnetID;
 
 use crate::with_testnet;
 
@@ -40,6 +45,31 @@ const MANIFEST: &str = "layer3.yaml";
 const CHECKPOINT_PERIOD: u64 = 10;
 const SLEEP_SECS: u64 = 5;
 const MAX_RETRIES: u32 = 5;
+
+use fvm_shared::address::{Address, Payload};
+
+/// Convert the ipc SubnetID type to a vec of evm addresses. It extracts all the children addresses
+/// in the subnet id and turns them as a vec of evm addresses.
+pub fn subnet_id_to_evm_addresses(
+    subnet: &SubnetID,
+) -> anyhow::Result<Vec<ethers::types::Address>> {
+    let children = subnet.children();
+    children
+        .iter()
+        .map(|addr| payload_to_evm_address(addr.payload()))
+        .collect::<anyhow::Result<_>>()
+}
+
+/// Util function to convert Fil address payload to evm address. Only delegated address is supported.
+pub fn payload_to_evm_address(payload: &Payload) -> anyhow::Result<ethers::types::Address> {
+    match payload {
+        Payload::Delegated(delegated) => {
+            let slice = delegated.subaddress();
+            Ok(ethers::types::Address::from_slice(&slice[0..20]))
+        }
+        _ => Err(anyhow!("address provided is not delegated")),
+    }
+}
 
 #[serial_test::serial]
 #[tokio::test]
@@ -89,19 +119,50 @@ async fn test_cross_messages() {
                     parent_provider.clone(),
                 );
 
-                Ipcaddress {
-                    subnet_id: SubnetID::new(vec![0], vec![0]),
-                    raw_address: FvmAddress::new(vec![0]),
-                };
-
-                let from = IPCAddress::new(&root_network.subnet_id, &charlie.fvm_addr())?;
-                let to = IPCAddress::new(&subnet.subnet_id, &bob.fvm_addr())?;
-
-                parent_cross_messenger.invoke_cross_message(
-                    from.try_into().unwrap(),
-                    to.try_into(),
-                    TokenAmount::from_nano(10),
+                let call = parent_cross_messenger.invoke_cross_message(
+                    Ipcaddress {
+                        subnet_id: IPCSubnetID {
+                            root: root_network.subnet_id.root_id(),
+                            route: Default::default(),
+                        },
+                        raw_address: Default::default(),
+                    },
+                    Ipcaddress {
+                        subnet_id: IPCSubnetID {
+                            root: subnet.subnet_id.root_id(),
+                            route: subnet_id_to_evm_addresses(&subnet.subnet_id)?,
+                        },
+                        raw_address: Default::default(),
+                    },
+                    U256::from(3),
                 );
+
+                let response = call.call().await;
+
+                match response {
+                    Ok(response) => {
+                        println!("Response: {:?}", response);
+                    }
+                    Err(ContractError::Revert(revert_reason)) => {
+                        println!("Revert reason: {:?}", revert_reason);
+                    }
+                    Err(e) => {
+                        // Generic error handler for other cases
+                        println!(
+                            "An error occurred while sending the contract message: {:?}",
+                            e
+                        );
+                    }
+                }
+
+                // let from = IPCAddress::new(&root_network.subnet_id, &charlie.fvm_addr())?;
+                // let to = IPCAddress::new(&subnet.subnet_id, &bob.fvm_addr())?;
+
+                // parent_cross_messenger.invoke_cross_message(
+                //     from.try_into().unwrap(),
+                //     to.try_into(),
+                //     TokenAmount::from_nano(10),
+                // );
 
                 let envelope = IpcEnvelope {
                     kind: IpcMsgKind::Call,

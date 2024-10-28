@@ -46,10 +46,11 @@ subnets:
     solidity_deployments:
       - name: "cross_messenger"
         deployer: will
+        # TODO Karel - allow relative paths
         foundry_root: "/Users/karlem/work/ipc/contracts"
         contract:
           name: "CrossMessenger"
-          path: "contracts/contracts/materializer/CrossMessenger.sol"
+          path: "contracts/materializer/CrossMessenger.sol"
           constructor_args:
             - ""
 
@@ -86,7 +87,7 @@ subnets:
             foundry_root: "/Users/karlem/work/ipc/contracts"
             contract:
               name: "CrossMessenger"
-              path: "contracts/contracts/materializer/CrossMessenger.sol"
+              path: "contracts/materializer/CrossMessenger.sol"
               constructor_args:
                 - ""
 

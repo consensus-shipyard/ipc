@@ -708,7 +708,7 @@ where
             let deployed = m
                 .deploy_solidity_contract(deployment_config)
                 .await
-                .with_context(|| "failed to deploy custom contract")?;
+                .with_context(|| "failed to deploy solidity contract")?;
 
             self.solidity_deployments
                 .entry(subnet_name.clone())

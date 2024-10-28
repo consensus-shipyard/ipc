@@ -652,7 +652,12 @@ impl DockerMaterializer {
         // Run the command and handle errors
         let output = cmd.output().context("failed to run forge create")?;
 
-        println!("OUT: {}", String::from_utf8_lossy(&output.stdout));
+        if output.status.success() {
+            println!("OUT: {}", String::from_utf8_lossy(&output.stdout));
+        } else {
+            println!("ERR: {}", String::from_utf8_lossy(&output.stderr));
+            bail!("forge create failed");
+        }
 
         // Parse the JSON output
         let json_output: ForgeCreateOutput =
