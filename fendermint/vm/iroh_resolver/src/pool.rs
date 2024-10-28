@@ -225,7 +225,7 @@ where
     }
 
     /// Remove an item from the resolution targets and its result.
-    pub fn remove(&self, item: &T) -> Stm<()> {
+    pub fn remove_task(&self, item: &T) -> Stm<()> {
         let key = ResolveKey::from(item);
         self.items.update_mut(|items| {
             items.remove(&key);

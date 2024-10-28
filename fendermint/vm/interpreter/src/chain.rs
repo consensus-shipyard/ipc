@@ -318,7 +318,9 @@ where
             for item in local_finalized_blobs.iter() {
                 if is_blob_finalized(&mut state, item.subscriber, item.hash, item.id.clone())? {
                     tracing::debug!(hash = ?item.hash, "blob already finalized on chain; removing from pool");
-                    atomically(|| chain_env.blob_pool.remove(item)).await;
+                    atomically(|| chain_env.blob_pool.remove_task(item)).await;
+                    // Remove the result from the pool (we don't have result for a blob so can remove it here)
+                    atomically(|| chain_env.blob_pool.remove_result(item)).await;
                     continue;
                 }
 
@@ -390,11 +392,9 @@ where
             // We start a blockstore transaction that can be reverted
             state.state_tree_mut().begin_transaction();
             for item in locally_resolved_read_requests.iter() {
-                // TODO: Hash to request_id. request_id should be hash(request||response)
-                // if the request is fulfilled onchain, remove it from the read request pool
                 if !is_read_request_open(&mut state, item.id)? {
                     tracing::debug!(request_id = ?item.id, "read request already fulfilled on chain; removing from pool");
-                    atomically(|| chain_env.read_request_pool.remove(item)).await;
+                    atomically(|| chain_env.read_request_pool.remove_task(item)).await;
                     continue;
                 }
                 let read_response = atomically(|| chain_env.read_request_pool.get_result(item))
@@ -453,7 +453,6 @@ where
             msgs.extend(read_requests);
         }
 
-        // -----
         Ok(msgs)
     }
 
@@ -558,7 +557,7 @@ where
                         .await;
                     if is_locally_finalized {
                         tracing::debug!(hash = ?blob.hash, "blob is locally finalized; removing from pool");
-                        atomically(|| chain_env.blob_pool.remove(&item)).await;
+                        atomically(|| chain_env.blob_pool.remove_task(&item)).await;
                         // Remove the result from the pool
                         atomically(|| chain_env.blob_pool.remove_result(&item)).await;
                     } else {
@@ -623,7 +622,7 @@ where
                         .await;
                     if is_locally_finalized {
                         tracing::debug!(request_id = ?read_request.id, "read request is locally finalized; removing from pool");
-                        atomically(|| chain_env.read_request_pool.remove(&item)).await;
+                        atomically(|| chain_env.read_request_pool.remove_task(&item)).await;
                         // Remove the result from the pool
                         atomically(|| chain_env.read_request_pool.remove_result(&item)).await;
                     } else {
