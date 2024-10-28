@@ -47,6 +47,54 @@ pub struct VoteReactorClient {
     tx: mpsc::Sender<VoteReactorRequest>,
 }
 
+impl VoteReactorClient {
+    pub fn new(req_channel_buffer_size: usize) -> (Self, mpsc::Receiver<VoteReactorRequest>) {
+        let (tx, rx) = mpsc::channel(req_channel_buffer_size);
+        (Self { tx }, rx)
+    }
+
+    pub fn start_reactor<
+        G: GossipClient + Send + Sync + 'static,
+        V: VoteStore + Send + Sync + 'static,
+    >(
+        rx: mpsc::Receiver<VoteReactorRequest>,
+        params: StartVoteReactorParams<G, V>,
+    ) -> anyhow::Result<()> {
+        let config = params.config;
+        let vote_tally = VoteTally::new(
+            params.power_table,
+            params.last_finalized_height,
+            params.vote_store,
+        )?;
+
+        let validator_key = params.validator_key;
+        let internal_event_listener = params.internal_event_listener;
+        let latest_child_block = params.latest_child_block;
+        let gossip = params.gossip;
+
+        tokio::spawn(async move {
+            let sleep = Duration::new(config.voting_sleep_interval_sec, 0);
+
+            let inner = VotingHandler {
+                validator_key,
+                req_rx: rx,
+                internal_event_listener,
+                vote_tally,
+                latest_child_block,
+                config,
+                gossip,
+            };
+            let mut machine = OperationStateMachine::new(inner);
+            loop {
+                machine = machine.step().await;
+                tokio::time::sleep(sleep).await;
+            }
+        });
+
+        Ok(())
+    }
+}
+
 pub struct StartVoteReactorParams<G, V> {
     pub config: VoteConfig,
     pub validator_key: SecretKey,
@@ -56,47 +104,6 @@ pub struct StartVoteReactorParams<G, V> {
     pub gossip: G,
     pub vote_store: V,
     pub internal_event_listener: broadcast::Receiver<TopDownSyncEvent>,
-}
-
-pub fn start_vote_reactor<
-    G: GossipClient + Send + Sync + 'static,
-    V: VoteStore + Send + Sync + 'static,
->(
-    params: StartVoteReactorParams<G, V>,
-) -> anyhow::Result<VoteReactorClient> {
-    let config = params.config;
-    let (tx, rx) = mpsc::channel(config.req_channel_buffer_size);
-    let vote_tally = VoteTally::new(
-        params.power_table,
-        params.last_finalized_height,
-        params.vote_store,
-    )?;
-
-    let validator_key = params.validator_key;
-    let internal_event_listener = params.internal_event_listener;
-    let latest_child_block = params.latest_child_block;
-    let gossip = params.gossip;
-
-    tokio::spawn(async move {
-        let sleep = Duration::new(config.voting_sleep_interval_sec, 0);
-
-        let inner = VotingHandler {
-            validator_key,
-            req_rx: rx,
-            internal_event_listener,
-            vote_tally,
-            latest_child_block,
-            config,
-            gossip,
-        };
-        let mut machine = OperationStateMachine::new(inner);
-        loop {
-            machine = machine.step().await;
-            tokio::time::sleep(sleep).await;
-        }
-    });
-
-    Ok(VoteReactorClient { tx })
 }
 
 impl VoteReactorClient {
@@ -184,7 +191,7 @@ impl VoteReactorClient {
     }
 }
 
-enum VoteReactorRequest {
+pub enum VoteReactorRequest {
     /// A new child subnet block is mined, this is the fendermint block
     NewLocalBlockMined(BlockHeight),
     /// Query the current operation mode of the vote tally state machine

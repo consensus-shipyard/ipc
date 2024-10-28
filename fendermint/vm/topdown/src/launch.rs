@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use crate::proxy::ParentQueryProxy;
-use crate::syncer::{start_parent_syncer, ParentPoller, ParentSyncerConfig};
+use crate::syncer::{ParentPoller, ParentSyncerConfig, ParentSyncerReactorClient};
 use crate::vote::gossip::GossipClient;
 use crate::vote::payload::PowerUpdates;
 use crate::vote::store::InMemoryVoteStore;
-use crate::vote::{start_vote_reactor, StartVoteReactorParams};
+use crate::vote::{StartVoteReactorParams, VoteReactorClient};
 use crate::{BlockHeight, Checkpoint, Config, TopdownClient, TopdownProposal};
 use anyhow::anyhow;
 use cid::Cid;
@@ -33,7 +33,7 @@ pub async fn run_topdown<CheckpointQuery, Gossip, Poller, ParentClient>(
     validator_key: SecretKey,
     gossip_client: Gossip,
     parent_client: ParentClient,
-    poller_fn: impl FnOnce(&Checkpoint, ParentClient, ParentSyncerConfig) -> Poller,
+    poller_fn: impl FnOnce(&Checkpoint, ParentClient, ParentSyncerConfig) -> Poller + Send + 'static,
 ) -> anyhow::Result<TopdownClient>
 where
     CheckpointQuery: LaunchQuery + Send + Sync + 'static,
@@ -41,39 +41,54 @@ where
     Poller: ParentPoller + Send + Sync + 'static,
     ParentClient: ParentQueryProxy + Send + Sync + 'static,
 {
-    let query = Arc::new(query);
-    let checkpoint = query_starting_checkpoint(&query, &parent_client).await?;
+    let (syncer_client, syncer_rx) =
+        ParentSyncerReactorClient::new(config.syncer.request_channel_size);
+    let (voting_client, voting_rx) = VoteReactorClient::new(config.voting.req_channel_buffer_size);
 
-    let power_table = query_starting_committee(&query).await?;
-    let power_table = power_table
-        .into_iter()
-        .map(|v| {
-            let vk = ValidatorKey::new(v.public_key.0);
-            let w = v.power.0;
-            (vk, w)
-        })
-        .collect::<Vec<_>>();
+    tokio::spawn(async move {
+        let query = Arc::new(query);
+        let checkpoint = query_starting_checkpoint(&query, &parent_client)
+            .await
+            .expect("should be able to query starting checkpoint");
 
-    let poller = poller_fn(&checkpoint, parent_client, config.syncer.clone());
-    let internal_event_rx = poller.subscribe();
+        let power_table = query_starting_committee(&query)
+            .await
+            .expect("should be able to query starting committee");
+        let power_table = power_table
+            .into_iter()
+            .map(|v| {
+                let vk = ValidatorKey::new(v.public_key.0);
+                let w = v.power.0;
+                (vk, w)
+            })
+            .collect::<Vec<_>>();
 
-    let syncer_client = start_parent_syncer(config.syncer, poller)?;
+        let poller = poller_fn(&checkpoint, parent_client, config.syncer.clone());
+        let internal_event_rx = poller.subscribe();
 
-    let voting_client = start_vote_reactor(StartVoteReactorParams {
-        config: config.voting,
-        validator_key,
-        power_table,
-        last_finalized_height: checkpoint.target_height(),
-        latest_child_block: query.latest_chain_block()?,
-        gossip: gossip_client,
-        vote_store: InMemoryVoteStore::default(),
-        internal_event_listener: internal_event_rx,
-    })?;
+        ParentSyncerReactorClient::start_reactor(syncer_rx, poller, config.syncer);
+        VoteReactorClient::start_reactor(
+            voting_rx,
+            StartVoteReactorParams {
+                config: config.voting,
+                validator_key,
+                power_table,
+                last_finalized_height: checkpoint.target_height(),
+                latest_child_block: query
+                    .latest_chain_block()
+                    .expect("should query latest chain block"),
+                gossip: gossip_client,
+                vote_store: InMemoryVoteStore::default(),
+                internal_event_listener: internal_event_rx,
+            },
+        )
+        .expect("cannot start vote reactor");
 
-    tracing::info!(
-        finality = checkpoint.to_string(),
-        "launching parent syncer with last committed checkpoint"
-    );
+        tracing::info!(
+            finality = checkpoint.to_string(),
+            "launching parent syncer with last committed checkpoint"
+        );
+    });
 
     Ok(TopdownClient {
         syncer: syncer_client,

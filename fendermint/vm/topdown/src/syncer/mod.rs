@@ -48,6 +48,39 @@ pub struct ParentSyncerReactorClient {
     tx: mpsc::Sender<ParentSyncerRequest>,
 }
 
+impl ParentSyncerReactorClient {
+    pub fn new(request_channel_size: usize) -> (Self, mpsc::Receiver<ParentSyncerRequest>) {
+        let (tx, rx) = mpsc::channel(request_channel_size);
+        (Self { tx }, rx)
+    }
+
+    pub fn start_reactor<P: ParentPoller + Send + Sync + 'static>(
+        mut rx: mpsc::Receiver<ParentSyncerRequest>,
+        mut poller: P,
+        config: ParentSyncerConfig,
+    ) {
+        tokio::spawn(async move {
+            let polling_interval = config.polling_interval;
+
+            loop {
+                select! {
+                    _ = tokio::time::sleep(polling_interval) => {
+                        if let Err(e) = poller.try_poll().await {
+                            tracing::error!(err = e.to_string(), "cannot sync with parent");
+                        }
+                    }
+                    req = rx.recv() => {
+                        let Some(req) = req else { break };
+                        handle_request(req, &mut poller);
+                    }
+                }
+            }
+
+            tracing::warn!("parent syncer stopped")
+        });
+    }
+}
+
 /// Polls the parent block view
 #[async_trait]
 pub trait ParentPoller {
@@ -67,34 +100,6 @@ pub trait ParentPoller {
         &self,
         to: BlockHeight,
     ) -> anyhow::Result<Vec<Option<ParentBlockView>>>;
-}
-
-pub fn start_parent_syncer<P: Send + Sync + 'static + ParentPoller>(
-    config: ParentSyncerConfig,
-    mut poller: P,
-) -> anyhow::Result<ParentSyncerReactorClient> {
-    let (tx, mut rx) = mpsc::channel(config.request_channel_size);
-
-    tokio::spawn(async move {
-        let polling_interval = config.polling_interval;
-
-        loop {
-            select! {
-                _ = tokio::time::sleep(polling_interval) => {
-                    if let Err(e) = poller.try_poll().await {
-                        tracing::error!(err = e.to_string(), "cannot sync with parent");
-                    }
-                }
-                req = rx.recv() => {
-                    let Some(req) = req else { break };
-                    handle_request(req, &mut poller);
-                }
-            }
-        }
-
-        tracing::warn!("parent syncer stopped")
-    });
-    Ok(ParentSyncerReactorClient { tx })
 }
 
 impl ParentSyncerReactorClient {
@@ -117,7 +122,7 @@ impl ParentSyncerReactorClient {
     }
 }
 
-enum ParentSyncerRequest {
+pub enum ParentSyncerRequest {
     /// A new parent height is finalized
     Finalized(Checkpoint),
     QueryParentBlockViews {
