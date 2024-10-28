@@ -129,12 +129,12 @@ library SubnetIDHelper {
     /// subnet2 needs to be a prefix of the subnet1.
     /// If subnet1 is /a/b/c/d and subnet2 is /a/b, then the returned ID should be /a/b/c.
     /// @dev Returns an empty SubnetID if subnet2 is not a prefix of subnet1 or if the roots are different.
-    function down(SubnetID calldata subnet1, SubnetID calldata subnet2) public pure returns (SubnetID memory) {
+    function down(SubnetID calldata subnet1, SubnetID calldata subnet2) public pure returns (bool, SubnetID memory) {
         if (subnet1.root != subnet2.root) {
-            return SubnetID({root: 0, route: new address[](0)});
+            return (false, SubnetID({root: 0, route: new address[](0)}));
         }
         if (subnet1.route.length <= subnet2.route.length) {
-            return SubnetID({root: 0, route: new address[](0)});
+            return (false, SubnetID({root: 0, route: new address[](0)}));
         }
 
         uint256 i;
@@ -156,7 +156,7 @@ library SubnetIDHelper {
             }
         }
 
-        return SubnetID({root: subnet1.root, route: route});
+        return (true, SubnetID({root: subnet1.root, route: route}));
     }
 
     function isEmpty(SubnetID calldata subnetId) public pure returns (bool) {
