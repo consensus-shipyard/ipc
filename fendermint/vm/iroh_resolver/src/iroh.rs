@@ -35,6 +35,7 @@ impl<V> IrohResolver<V>
 where
     V: Clone + Send + Sync + Serialize + DeserializeOwned + 'static,
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         client: Client<V>,
         queue: ResolveQueue,
@@ -109,7 +110,6 @@ fn start_resolve<V>(
                         );
                         // The service is no longer listening, we might as well stop taking new tasks from the queue.
                         // By not quitting, we should see this error every time there is a new task, which is at least a constant reminder.
-                        return;
                     }
                     Ok(Ok(())) => {
                         tracing::debug!(hash = ?task.hash(), "iroh blob resolved");
@@ -160,7 +160,6 @@ fn start_resolve<V>(
                         );
                         // The service is no longer listening, we might as well stop taking new tasks from the queue.
                         // By not quitting, we should see this error every time there is a new task, which is at least a constant reminder.
-                        return;
                     }
                     Ok(Ok(response)) => {
                         let hash = task.hash();

@@ -120,7 +120,7 @@ pub(crate) enum Request<V> {
     UnpinSubnet(SubnetID),
     Resolve(Cid, SubnetID, ResponseChannel),
     ResolveIroh(Hash, NodeAddr, ResponseChannel),
-    ResolveReadRequest(Hash, u64, u64, ReadRequestResponseChannel),
+    ResolveIrohRead(Hash, u64, u64, ReadRequestResponseChannel),
     RateLimitUsed(PeerId, usize),
     UpdateRateLimit(u32),
 }
@@ -498,7 +498,7 @@ where
             Request::ResolveIroh(hash, node_addr, response_channel) => {
                 self.start_iroh_query(hash, node_addr, response_channel)
             }
-            Request::ResolveReadRequest(hash, offset, len, response_channel) => {
+            Request::ResolveIrohRead(hash, offset, len, response_channel) => {
                 self.start_iroh_read_request(hash, offset, len, response_channel)
             }
             Request::RateLimitUsed(peer_id, bytes) => {

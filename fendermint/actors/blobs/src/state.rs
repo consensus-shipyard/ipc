@@ -12,13 +12,13 @@ use fendermint_actor_blobs_shared::state::{
 };
 use fil_actors_runtime::ActorError;
 use fvm_ipld_encoding::tuple::*;
+use fvm_shared::address::Address;
 use fvm_shared::bigint::{BigInt, BigUint};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
-use fvm_shared::{address::Address, MethodNum};
 use log::{debug, warn};
 use num_traits::{Signed, ToPrimitive, Zero};
-use sha2::{Digest, Sha256};
+
 /// The minimum epoch duration a blob can be stored.
 const MIN_TTL: ChainEpoch = 3600; // one hour
 /// The rolling epoch duration used for non-expiring blobs.
@@ -98,13 +98,6 @@ impl<'a> CreditDelegation<'a> {
     pub fn addresses(&self) -> (Address, Address) {
         (self.origin, self.caller)
     }
-}
-
-pub(crate) fn pad_to_32_bytes(input: &[u8]) -> [u8; 32] {
-    let mut padded = [0u8; 32];
-    let start = 32_usize.saturating_sub(input.len());
-    padded[start..].copy_from_slice(&input[..input.len().min(32)]);
-    padded
 }
 
 impl State {

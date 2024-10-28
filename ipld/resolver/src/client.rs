@@ -162,7 +162,7 @@ where
         len: u64,
     ) -> anyhow::Result<ResolveReadRequestResult> {
         let (tx, rx) = oneshot::channel();
-        let req = Request::ResolveReadRequest(hash, offset, len, tx);
+        let req = Request::ResolveIrohRead(hash, offset, len, tx);
         self.send_request(req)?;
         let res = rx.await?;
         Ok(res)

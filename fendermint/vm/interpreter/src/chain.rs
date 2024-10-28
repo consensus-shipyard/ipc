@@ -49,10 +49,10 @@ use fendermint_vm_topdown::{
 };
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
+use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::message::Message;
-use fvm_shared::{address::Address, MethodNum};
 use iroh::base::key::PublicKey;
 use iroh::blobs::Hash;
 use iroh::net::NodeId;
@@ -397,11 +397,11 @@ where
                     atomically(|| chain_env.read_request_pool.remove(item)).await;
                     continue;
                 }
-                let read_response = atomically(|| chain_env.read_request_pool.get_result(&item))
+                let read_response = atomically(|| chain_env.read_request_pool.get_result(item))
                     .await
                     .unwrap_or(vec![]);
                 // Remove the result from the pool
-                atomically(|| chain_env.read_request_pool.remove_result(&item)).await;
+                atomically(|| chain_env.read_request_pool.remove_result(item)).await;
 
                 // Extend request id with response data to use as the vote hash.
                 // This ensures that the all validators are voting
