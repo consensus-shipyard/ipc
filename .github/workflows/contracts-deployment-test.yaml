@@ -36,6 +36,6 @@ jobs:
         echo "export RPC_URL=http://127.0.0.1:1337" >> .env
         echo "export CHAIN_ID=1337" >> .env
         export PATH="$PATH:/home/runner/.config/.foundry/bin"
-        pnpm exec ganache-cli -g0 -p1337 --account 0x$PRIVATE_KEY,1001901919191919191  &
+        pnpm exec ganache-cli -b 1 -g0 -p1337 --account 0x$PRIVATE_KEY,1001901919191919191  &
         sleep 5
         make deploy-stack
