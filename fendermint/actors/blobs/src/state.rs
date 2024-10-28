@@ -100,7 +100,7 @@ impl<'a> CreditDelegation<'a> {
     }
 }
 
-fn pad_to_32_bytes(input: &[u8]) -> [u8; 32] {
+pub(crate) fn pad_to_32_bytes(input: &[u8]) -> [u8; 32] {
     let mut padded = [0u8; 32];
     let start = 32_usize.saturating_sub(input.len());
     padded[start..].copy_from_slice(&input[..input.len().min(32)]);
