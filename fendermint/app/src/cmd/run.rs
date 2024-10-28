@@ -84,7 +84,8 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
 
     // Prometheus metrics
     let metrics_registry = if settings.metrics.enabled {
-        let registry = prometheus::Registry::new();
+        let registry = prometheus::Registry::new_custom(Some("ipc".to_string()), None)
+            .context("failed to create Prometheus registry")?;
 
         register_default_metrics(&registry).context("failed to register default metrics")?;
         register_topdown_metrics(&registry).context("failed to register topdown metrics")?;
@@ -244,7 +245,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         None
     };
 
-    let mut app: App<_, _, AppStore, _> = App::new(
+    let mut app: App<_, _, AppStore, _, _> = App::new(
         AppConfig {
             app_namespace: ns.app,
             state_hist_namespace: ns.state_hist,
@@ -259,6 +260,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             topdown_client: Toggle::<TopdownClient>::disable(),
         },
         snapshots,
+        tendermint_client.clone(),
     )?;
 
     if settings.topdown_enabled() {

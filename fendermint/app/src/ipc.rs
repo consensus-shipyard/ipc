@@ -14,19 +14,21 @@ use fvm_ipld_blockstore::Blockstore;
 use std::sync::Arc;
 
 use fendermint_vm_topdown::Checkpoint;
+use tendermint_rpc::Client;
 
 /// Queries the LATEST COMMITTED parent finality from the storage
-pub struct AppParentFinalityQuery<DB, SS, S, I>
+pub struct AppParentFinalityQuery<DB, SS, S, I, C>
 where
     SS: Blockstore + Clone + 'static,
     S: KVStore,
+    C: Client,
 {
     /// The app to get state
-    app: App<DB, SS, S, I>,
+    app: App<DB, SS, S, I, C>,
     gateway_caller: GatewayCaller<ReadOnlyBlockstore<Arc<SS>>>,
 }
 
-impl<DB, SS, S, I> AppParentFinalityQuery<DB, SS, S, I>
+impl<DB, SS, S, I, C> AppParentFinalityQuery<DB, SS, S, I, C>
 where
     S: KVStore
         + Codec<AppState>
@@ -35,8 +37,9 @@ where
         + Codec<FvmStateParams>,
     DB: KVWritable<S> + KVReadable<S> + 'static + Clone,
     SS: Blockstore + 'static + Clone,
+    C: Client,
 {
-    pub fn new(app: App<DB, SS, S, I>) -> Self {
+    pub fn new(app: App<DB, SS, S, I, C>) -> Self {
         Self {
             app,
             gateway_caller: GatewayCaller::default(),
@@ -47,14 +50,14 @@ where
     where
         F: FnOnce(FvmExecState<ReadOnlyBlockstore<Arc<SS>>>) -> anyhow::Result<T>,
     {
-        match self.app.new_read_only_exec_state()? {
+        match self.app.read_only_view(None)? {
             Some(s) => f(s).map(Some),
             None => Ok(None),
         }
     }
 }
 
-impl<DB, SS, S, I> LaunchQuery for AppParentFinalityQuery<DB, SS, S, I>
+impl<DB, SS, S, I, C> LaunchQuery for AppParentFinalityQuery<DB, SS, S, I, C>
 where
     S: KVStore
         + Codec<AppState>
@@ -63,6 +66,7 @@ where
         + Codec<FvmStateParams>,
     DB: KVWritable<S> + KVReadable<S> + 'static + Clone,
     SS: Blockstore + 'static + Clone,
+    C: Client,
 {
     fn get_latest_checkpoint(&self) -> anyhow::Result<Option<Checkpoint>> {
         self.with_exec_state(|mut exec_state| {

@@ -1,14 +1,16 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use crate::fvm::state::ipc::GatewayCaller;
-use crate::fvm::{topdown, FvmApplyRet, PowerUpdates};
+use crate::fvm::store::ReadOnlyBlockstore;
+use crate::fvm::{topdown, BlockGasLimit, FvmApplyRet, PowerUpdates};
+use crate::selector::{GasLimitSelector, MessageSelector};
 use crate::{
     fvm::state::FvmExecState,
     fvm::FvmMessage,
     signed::{SignedMessageApplyRes, SignedMessageCheckRes, SyntheticMessage, VerifiableMessage},
     CheckInterpreter, ExecInterpreter, ProposalInterpreter, QueryInterpreter,
 };
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use async_stm::atomically;
 use async_trait::async_trait;
 use fendermint_vm_actor_interface::ipc;
@@ -24,6 +26,7 @@ use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::econ::TokenAmount;
 use num_traits::Zero;
+use std::sync::Arc;
 
 /// A resolution pool for bottom-up and top-down checkpoints.
 pub type CheckpointPool = ResolvePool<CheckpointPoolItem>;
@@ -93,7 +96,7 @@ where
     DB: Blockstore + Clone + 'static + Send + Sync,
     I: Sync + Send,
 {
-    type State = ChainEnv;
+    type State = (ChainEnv, FvmExecState<ReadOnlyBlockstore<Arc<DB>>>);
     type Message = ChainMessage;
 
     /// Check whether there are any "ready" messages in the IPLD resolution mempool which can be appended to the proposal.
@@ -102,18 +105,20 @@ where
     /// account the transactions which are part of top-down or bottom-up checkpoints, to stay within gas limits.
     async fn prepare(
         &self,
-        state: Self::State,
+        (chain_env, state): Self::State,
         mut msgs: Vec<Self::Message>,
     ) -> anyhow::Result<Vec<Self::Message>> {
+        msgs = messages_selection(msgs, &state)?;
+
         // Collect resolved CIDs ready to be proposed from the pool.
-        let ckpts = atomically(|| state.checkpoint_pool.collect_resolved()).await;
+        let ckpts = atomically(|| chain_env.checkpoint_pool.collect_resolved()).await;
 
         // Create transactions ready to be included on the chain.
         let ckpts = ckpts.into_iter().map(|ckpt| match ckpt {
             CheckpointPoolItem::BottomUp(ckpt) => ChainMessage::Ipc(IpcMessage::BottomUpExec(ckpt)),
         });
 
-        match state.topdown_client.find_topdown_proposal().await {
+        match chain_env.topdown_client.find_topdown_proposal().await {
             Ok(Some(p)) => msgs.push(ChainMessage::Ipc(IpcMessage::TopDownExec(p))),
             Ok(None) => {}
             Err(e) => {
@@ -127,7 +132,13 @@ where
     }
 
     /// Perform finality checks on top-down transactions and availability checks on bottom-up transactions.
-    async fn process(&self, env: Self::State, msgs: Vec<Self::Message>) -> anyhow::Result<bool> {
+    async fn process(
+        &self,
+        (chain_env, state): Self::State,
+        msgs: Vec<Self::Message>,
+    ) -> anyhow::Result<bool> {
+        let mut block_gas_usage = 0;
+
         for msg in msgs {
             match msg {
                 ChainMessage::Ipc(IpcMessage::BottomUpExec(msg)) => {
@@ -139,7 +150,7 @@ where
                     // 1) we validated it when it was relayed, and
                     // 2) if a validator proposes something invalid, we can make them pay during execution.
                     let is_resolved =
-                        atomically(|| match env.checkpoint_pool.get_status(&item)? {
+                        atomically(|| match chain_env.checkpoint_pool.get_status(&item)? {
                             None => Ok(false),
                             Some(status) => status.is_resolved(),
                         })
@@ -151,8 +162,7 @@ where
                 }
                 ChainMessage::Ipc(IpcMessage::TopDownExec(p)) => {
                     let proposal_height = p.cert.payload().parent_height();
-
-                    match env.topdown_client.validate_quorum_proposal(p).await {
+                    match chain_env.topdown_client.validate_quorum_proposal(p).await {
                         Ok(_) => {
                             tracing::info!(proposal_height, "validated quorum proposal");
                         }
@@ -162,10 +172,14 @@ where
                         }
                     }
                 }
+                ChainMessage::Signed(signed) => {
+                    block_gas_usage += signed.message.gas_limit;
+                }
                 _ => {}
             };
         }
-        Ok(true)
+
+        Ok(block_gas_usage <= state.block_gas_tracker().available())
     }
 }
 
@@ -177,7 +191,7 @@ where
         Message = VerifiableMessage,
         DeliverOutput = SignedMessageApplyRes,
         State = FvmExecState<DB>,
-        EndOutput = PowerUpdates,
+        EndOutput = (PowerUpdates, BlockGasLimit),
     >,
 {
     // The state consists of the resolver pool, which this interpreter needs, and the rest of the
@@ -273,7 +287,6 @@ where
                         .store_validator_changes(&mut state, validator_changes)
                         .context("failed to store validator changes")?;
 
-                    // error happens if we cannot get the cross messages from ipc agent after retries
                     let msgs = p.effects.0;
 
                     tracing::debug!(
@@ -317,9 +330,10 @@ where
         let (state, out) = self.inner.end(state).await?;
 
         // Update any component that needs to know about changes in the power table.
-        if !out.0.is_empty() {
+        if !out.0 .0.is_empty() {
             let power_updates = out
                 .0
+                 .0
                 .iter()
                 .map(|v| {
                     let vk = ValidatorKey::new(v.public_key.0);
@@ -431,4 +445,32 @@ fn relayed_bottom_up_ckpt_to_fvm(
         .context("failed to create syntetic message")?;
 
     Ok(msg)
+}
+
+/// Selects messages to be executed. Currently, this is a static function whose main purpose is to
+/// coordinate various selectors. However, it does not have formal semantics for doing so, e.g.
+/// do we daisy-chain selectors, do we parallelize, how do we treat rejections and acceptances?
+/// It hasn't been well thought out yet. When we refactor the whole *Interpreter stack, we will
+/// revisit this and make the selection function properly pluggable.
+fn messages_selection<DB: Blockstore + Clone + 'static>(
+    msgs: Vec<ChainMessage>,
+    state: &FvmExecState<DB>,
+) -> anyhow::Result<Vec<ChainMessage>> {
+    let mut user_msgs = msgs
+        .into_iter()
+        .map(|msg| match msg {
+            ChainMessage::Signed(inner) => Ok(inner),
+            ChainMessage::Ipc(_) => Err(anyhow!("should not have ipc messages in user proposals")),
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+
+    // Currently only one selector, we can potentially extend to more selectors
+    // This selector enforces that the total cumulative gas limit of all messages is less than the
+    // currently active block gas limit.
+    let selectors = vec![GasLimitSelector {}];
+    for s in selectors {
+        user_msgs = s.select_messages(state, user_msgs)
+    }
+
+    Ok(user_msgs.into_iter().map(ChainMessage::Signed).collect())
 }

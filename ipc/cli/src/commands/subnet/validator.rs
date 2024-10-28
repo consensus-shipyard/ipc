@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: MIT
 //! Get the validator information
 
+use crate::{get_ipc_provider, CommandLineHandler, GlobalArguments};
 use async_trait::async_trait;
 use clap::Args;
 use fvm_shared::address::Address;
 use ipc_api::subnet_id::SubnetID;
+use ipc_types::EthAddress;
 use std::fmt::Debug;
 use std::str::FromStr;
-
-use crate::{get_ipc_provider, CommandLineHandler, GlobalArguments};
 
 /// The command to get the validator information
 pub(crate) struct ValidatorInfo;
@@ -23,7 +23,11 @@ impl CommandLineHandler for ValidatorInfo {
 
         let provider = get_ipc_provider(global)?;
         let subnet = SubnetID::from_str(&arguments.subnet)?;
-        let validator = Address::from_str(&arguments.validator)?;
+        // Attempt to parse the validator address as an EthAddress first; if not, parse as a
+        // Filecoin address.
+        let validator: Address = EthAddress::from_str(&arguments.validator)
+            .map(EthAddress::into)
+            .or_else(|_| Address::from_str(&arguments.validator))?;
 
         let validator_info = provider.get_validator_info(&subnet, &validator).await?;
         println!("{}", validator_info);
@@ -37,6 +41,9 @@ impl CommandLineHandler for ValidatorInfo {
 pub(crate) struct ValidatorInfoArgs {
     #[arg(long, help = "The subnet id to query validator info")]
     pub subnet: String,
-    #[arg(long, help = "The validator address")]
+    #[arg(
+        long,
+        help = "The validator address, in 0x Eth format or Filecoin address format"
+    )]
     pub validator: String,
 }

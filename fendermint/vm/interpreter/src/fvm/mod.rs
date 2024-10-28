@@ -14,6 +14,8 @@ pub mod upgrades;
 
 #[cfg(any(test, feature = "bundle"))]
 pub mod bundle;
+
+pub(crate) mod gas;
 pub(crate) mod topdown;
 
 pub use check::FvmCheckRet;
@@ -29,6 +31,8 @@ pub use self::broadcast::Broadcaster;
 use self::{state::ipc::GatewayCaller, upgrades::UpgradeScheduler};
 
 pub type FvmMessage = fvm_shared::message::Message;
+pub type BaseFee = fvm_shared::econ::TokenAmount;
+pub type BlockGasLimit = u64;
 
 #[derive(Clone)]
 pub struct ValidatorContext<C> {
