@@ -73,12 +73,8 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         token = new ERC20PresetFixedSupply("TestToken", "TEST", 1_000_000, address(this));
         tokenL2Subnet = createTokenSubnet(address(token), rootNetwork.gatewayAddr, rootNetworkName);
 
-        nativeL3SubnetsWithTokenParent.push(
-            createNativeSubnet(tokenL2Subnet.gatewayAddr, tokenL2Subnet.id)
-        );
-        nativeL3SubnetsWithTokenParent.push(
-            createNativeSubnet(tokenL2Subnet.gatewayAddr, tokenL2Subnet.id)
-        );
+        nativeL3SubnetsWithTokenParent.push(createNativeSubnet(tokenL2Subnet.gatewayAddr, tokenL2Subnet.id));
+        nativeL3SubnetsWithTokenParent.push(createNativeSubnet(tokenL2Subnet.gatewayAddr, tokenL2Subnet.id));
 
         tokenL3 = new ERC20PresetFixedSupply("TestL3Token", "TEST3", 1_000_000, address(this));
 
@@ -100,7 +96,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             defaultSubnetActorParamsWith(parentGatewayAddress, parentNetworkName)
         );
 
-    
         return createSubnet(parentNetworkName.route, subnetActor);
     }
 
