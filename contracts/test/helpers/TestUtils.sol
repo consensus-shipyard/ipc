@@ -228,7 +228,6 @@ contract MockIpcContractPayable is IIpcHandler {
 }
 
 contract MockFallbackContract {
-    // receive() external payable {}
     fallback() external payable {}
 }
 

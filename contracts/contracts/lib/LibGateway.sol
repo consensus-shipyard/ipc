@@ -252,7 +252,7 @@ library LibGateway {
         subnet.topDownNonce = topDownNonce + 1;
         subnet.circSupply += crossMessage.value;
 
-        emit NewTopDownMessage({subnet: subnet.id.getAddress(), message: crossMessage, id: crossMessage.toHash()});
+        emit NewTopDownMessage({subnet: subnet.id.getAddress(), message: crossMessage, id: crossMessage.toDeterministicHash()});
     }
 
     /// @notice Commits a new cross-net message to a message batch for execution
@@ -272,7 +272,7 @@ library LibGateway {
             batch.blockHeight = epoch;
             // we need to use push here to initialize the array.
             batch.msgs.push(crossMessage);
-            emit QueuedBottomUpMessage({id: crossMessage.toHash()});
+            emit QueuedBottomUpMessage({id: crossMessage.toDeterministicHash()});
             return;
         }
 
@@ -310,7 +310,7 @@ library LibGateway {
             batch.msgs.push(crossMessage);
         }
 
-        emit QueuedBottomUpMessage({id: crossMessage.toHash()});
+        emit QueuedBottomUpMessage({id: crossMessage.toDeterministicHash()});
     }
 
     /// @notice returns the subnet created by a validator
@@ -454,7 +454,7 @@ library LibGateway {
             s.postboxKeys.add(cid);
             s.postbox[cid] = crossMsg;
 
-            emit MessageStoredInPostbox({id: cid});
+            emit MessageStoredInPostbox({id: crossMsg.toDeterministicHash()});
             return;
         }
     
@@ -525,7 +525,8 @@ library LibGateway {
         // because we're the LCA, commit a top-down message.
         if (applyType == IPCMsgType.TopDown || isLCA) {
             ++s.appliedTopDownNonce;
-            (, Subnet storage subnet) = getSubnet(to.down(s.networkName));
+            (, SubnetID memory subnetId) = to.down(s.networkName);
+            (, Subnet storage subnet) = getSubnet(subnetId);
             LibGateway.commitTopDownMsg(subnet, crossMessage);
             return (shouldBurn = false);
         }
@@ -581,7 +582,12 @@ library LibGateway {
         // If the directionality is top-down, or if we're inverting the direction
         // else we need to check if the common parent exists.
         if (applyType == IPCMsgType.TopDown || isLCA) {
-            (bool foundSubnet,) = LibGateway.getSubnet(toSubnetId.down(s.networkName));
+            (bool foundChildSubnetId, SubnetID memory childSubnetId) = toSubnetId.down(s.networkName);
+            if (!foundChildSubnetId) {
+                return CrossMessageValidationOutcome.InvalidDstSubnet;
+            }
+
+            (bool foundSubnet,) = LibGateway.getSubnet(childSubnetId);
             if (!foundSubnet) {
                 return CrossMessageValidationOutcome.InvalidDstSubnet;
             }
@@ -630,6 +636,7 @@ library LibGateway {
 
         // Cache value before deletion to avoid re-entrancy
         uint256 v = crossMsg.value;
+        bytes32 deterministicId = crossMsg.toDeterministicHash();
 
         // Remove the message to prevent re-entrancy and clean up state
         delete s.postbox[msgCid];
@@ -638,7 +645,7 @@ library LibGateway {
         // Execute side effects
         LibGateway.crossMsgSideEffects({v: v, shouldBurn: shouldBurn});
 
-        emit MessagePropagatedFromPostbox({id: msgCid});
+        emit MessagePropagatedFromPostbox({id: deterministicId});
     }
 
 }
