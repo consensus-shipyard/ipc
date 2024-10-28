@@ -497,7 +497,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         emit LibGateway.NewTopDownMessage({
             subnet: params.subnet.subnetActorAddr,
             message: crossMessage,
-            id: crossMessage.toHash()
+            id: crossMessage.toDeterministicHash()
         });
 
         crossMessage.nonce = 0;
@@ -683,7 +683,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         emit LibGateway.NewTopDownMessage({
             subnet: expectedSubnetAddr,
             message: expectedMessage,
-            id: expectedMessage.toHash()
+            id: expectedMessage.toDeterministicHash()
         });
         XnetMessagingFacet xnetMessenger = gw.xnetMessenger();
         xnetMessenger.applyCrossMessages(msgs);
@@ -807,7 +807,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         emit LibGateway.NewTopDownMessage({
             subnet: expectedSubnetAddr,
             message: expectedMessage,
-            id: expectedMessage.toHash()
+            id: expectedMessage.toDeterministicHash()
         });
         checkpointer.submitCheckpoint(checkpoint, parentValidators, parentSignatures);
         vm.stopPrank();
