@@ -67,7 +67,7 @@ library CrossMsgHelper {
         OutcomeType outcome,
         bytes memory ret
     ) public pure returns (IpcEnvelope memory) {
-        ResultMsg memory message = ResultMsg({id: toHash(crossMsg), outcome: outcome, ret: ret});
+        ResultMsg memory message = ResultMsg({id: toDeterministicHash(crossMsg), outcome: outcome, ret: ret});
 
         uint256 value = crossMsg.value;
         if (outcome == OutcomeType.Ok) {
@@ -134,6 +134,21 @@ library CrossMsgHelper {
     function toHash(IpcEnvelope memory crossMsg) internal pure returns (bytes32) {
         return keccak256(abi.encode(crossMsg));
     }
+
+    /// @notice Returns a deterministic hash for the given cross message. The hash remains the same accross different networks
+    /// because it doesn't include the network-specific nonce.
+    function toDeterministicHash(IpcEnvelope memory crossMsg) internal pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                crossMsg.kind,
+                crossMsg.to,
+                crossMsg.from,
+                crossMsg.value,
+                crossMsg.message
+            )
+        );
+    }
+
 
     function toHash(IpcEnvelope[] memory crossMsgs) public pure returns (bytes32) {
         return keccak256(abi.encode(crossMsgs));
