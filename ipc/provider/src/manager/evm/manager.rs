@@ -39,7 +39,7 @@ use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::{Signer, SignerMiddleware};
 use ethers::providers::{Authorization, Http, Middleware, Provider};
 use ethers::signers::{LocalWallet, Wallet};
-use ethers::types::{BlockId, Eip1559TransactionRequest, ValueOrArray, I256, U256};
+use ethers::types::{BlockId, Eip1559TransactionRequest, ValueOrArray, U256};
 
 use super::gas_estimator_middleware::Eip1559GasEstimatorMiddleware;
 use fvm_shared::clock::ChainEpoch;
@@ -1579,7 +1579,6 @@ impl TryFrom<gateway_getter_facet::Subnet> for SubnetInfo {
 #[cfg(test)]
 mod tests {
     use crate::manager::evm::manager::contract_address_from_subnet;
-    use ethers::providers::Middleware;
     use fvm_shared::address::Address;
     use ipc_api::subnet_id::SubnetID;
     use std::str::FromStr;

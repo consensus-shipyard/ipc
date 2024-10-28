@@ -1,3 +1,6 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: MIT
+
 use async_trait::async_trait;
 use ethers::{
     core::types::{transaction::eip2718::TypedTransaction, BlockId, U256},
@@ -12,6 +15,14 @@ pub enum Eip1559GasEstimatorError<M: Middleware> {
     MiddlewareError(M::Error),
     #[error("{0}")]
     FailedToEstimateGas(String),
+}
+
+impl<M: Middleware> Eip1559GasEstimatorError<M> {
+    pub fn failed_to_estimate_gas_not_supported() -> Self {
+        Eip1559GasEstimatorError::FailedToEstimateGas(
+            "Only EIP-1559 transactions are supported".to_string(),
+        )
+    }
 }
 
 impl<M: Middleware> MiddlewareError for Eip1559GasEstimatorError<M> {
@@ -112,9 +123,7 @@ impl<M: Middleware> Middleware for Eip1559GasEstimatorMiddleware<M> {
 
             *tx = TypedTransaction::Eip1559(tx_req);
         } else {
-            return Err(Eip1559GasEstimatorError::FailedToEstimateGas(
-                "Only EIP-1559 transactions are supported".to_string(),
-            ));
+            return Err(Eip1559GasEstimatorError::failed_to_estimate_gas_not_supported());
         }
 
         // Delegate to the inner middleware for filling remaining transaction fields.
@@ -138,6 +147,8 @@ impl<M: Middleware> Middleware for Eip1559GasEstimatorMiddleware<M> {
                 // Populate missing gas fees with `fill_transaction`.
                 self.fill_transaction(&mut tx, block).await?;
             }
+        } else {
+            return Err(Eip1559GasEstimatorError::failed_to_estimate_gas_not_supported());
         }
 
         // Proceed to send the transaction with the inner middleware.
