@@ -15,21 +15,28 @@ contract CrossMessenger {
         gatewayAddr = gateway;
     }
 
+    function getGatewayAddress() external view returns (address) {
+        return gatewayAddr;
+    }
+
+    function invokeCrossEmpty() external {
+        IGateway(gatewayAddr).propagateAll();
+    }
+
     function invokeCrossMessage(
         IPCAddress memory from,
-        IPCAddress memory to,
-        uint256 value
-    ) external {
+        IPCAddress memory to
+    ) external payable {
         CallMsg memory message = CallMsg({method: abi.encodePacked(METHOD_SEND), params: EMPTY_BYTES});
         IpcEnvelope memory envelope = IpcEnvelope({
             kind: IpcMsgKind.Call,
             from: from,
             to: to,
-            value: value,
+            value: msg.value,
             message: abi.encode(message),
             nonce: 0
         });
 
-        IGateway(gatewayAddr).sendContractXnetMessage(envelope);
+        IGateway(gatewayAddr).sendContractXnetMessage{value: msg.value}(envelope);
     }
 }

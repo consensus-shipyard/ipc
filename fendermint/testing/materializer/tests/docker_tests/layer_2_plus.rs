@@ -3,15 +3,17 @@
 use anyhow::{anyhow, bail, Context};
 use ethers::contract::{ContractError, ContractRevert};
 use ethers::core::types as et;
+use ethers::middleware::gas_oracle::middleware;
 use ethers::types::transaction::response;
 use ethers::types::U256;
 use ethers::{
     core::k256::ecdsa::SigningKey,
     middleware::SignerMiddleware,
-    providers::{JsonRpcClient, Middleware, PendingTransaction, Provider},
+    providers::{Http, JsonRpcClient, Middleware, PendingTransaction, Provider},
     signers::{Signer, Wallet},
     types::{transaction::eip2718::TypedTransaction, Eip1559TransactionRequest, H160},
 };
+
 use futures::FutureExt;
 use ipc_provider::IpcProvider;
 use std::str::FromStr;
@@ -71,6 +73,28 @@ pub fn payload_to_evm_address(payload: &Payload) -> anyhow::Result<ethers::types
     }
 }
 
+use fendermint_materializer::{manifest::Rootnet, materials::DefaultAccount};
+
+pub type TestMiddleware<C> = SignerMiddleware<Provider<C>, Wallet<SigningKey>>;
+
+async fn make_middleware<C>(
+    provider: Provider<C>,
+    sender: &DefaultAccount,
+) -> anyhow::Result<TestMiddleware<C>>
+where
+    C: JsonRpcClient,
+{
+    let chain_id = provider
+        .get_chainid()
+        .await
+        .context("failed to get chain ID")?;
+
+    let wallet: Wallet<SigningKey> = Wallet::from_bytes(sender.secret_key().serialize().as_ref())?
+        .with_chain_id(chain_id.as_u64());
+
+    Ok(SignerMiddleware::new(provider, wallet))
+}
+
 #[serial_test::serial]
 #[tokio::test]
 async fn test_cross_messages() {
@@ -88,154 +112,115 @@ async fn test_cross_messages() {
         |_, _, testnet| {
             let test = async {
                 let brussels = testnet.node(&testnet.root().node("brussels"))?;
-                let london = testnet.node(&testnet.root().subnet("england").node("london"))?;
                 let england = testnet.subnet(&testnet.root().subnet("england"))?;
+                let london = testnet.node(&testnet.root().subnet("england").node("london"))?;
 
-                let london_provider = Arc::new(
-                    london
-                        .ethapi_http_provider()?
-                        .ok_or_else(|| anyhow!("ethapi should be enabled"))?,
+                let _bob = testnet.account("bob")?;
+
+                let will = testnet.account("will")?;
+
+                let england_subnet = testnet.subnet(&testnet.root().subnet("england"))?;
+
+                let oxfordshire_subnet =
+                    testnet.subnet(&testnet.root().subnet("england").subnet("oxfordshire"))?;
+
+                let cross_messenger_contract_name = "cross_messenger".to_string();
+                let messenger_deployment = testnet
+                    .solidity_deployment(&england_subnet.name, cross_messenger_contract_name)?;
+
+                let london_provider = london
+                    .ethapi_http_provider()?
+                    .expect("ethapi should be enabled");
+
+                let signer = Arc::new(
+                    make_middleware(london_provider, &will)
+                        .await
+                        .context("failed to set up middleware")?,
                 );
 
-                let parent_provider = Arc::new(
-                    brussels
-                        .ethapi_http_provider()?
-                        .ok_or_else(|| anyhow!("ethapi should be enabled"))?,
-                );
+                let london_cross_messenger =
+                    CrossMessenger::new(messenger_deployment.address, signer.clone());
 
-                let parent_gateway_mesenger = GatewayMessengerFacet::new(
-                    builtin_actor_eth_addr(ipc::GATEWAY_ACTOR_ID),
-                    parent_provider.clone(),
-                );
+                let _resp = london_cross_messenger
+                    .set_gateway_address(builtin_actor_eth_addr(ipc::GATEWAY_ACTOR_ID).into())
+                    .send()
+                    .await?
+                    .await?
+                    .expect("set gateway address failed");
 
-                let bob = testnet.account("bob")?;
-                let charlie = testnet.account("charlie")?;
+                let set_gt_addr = london_cross_messenger.get_gateway_address().call().await?;
+
+                println!("Gateway address: {:?}", set_gt_addr);
 
                 let root_network = testnet.subnet(&testnet.root())?;
-                let subnet = testnet.subnet(&testnet.root().subnet("england"))?;
+                let root_id = root_network.subnet_id.root_id();
 
-                let parent_cross_messenger = CrossMessenger::new(
-                    builtin_actor_eth_addr(ipc::GATEWAY_ACTOR_ID),
-                    parent_provider.clone(),
-                );
-
-                let call = parent_cross_messenger.invoke_cross_message(
+                let invoke_cross_message_call = london_cross_messenger.invoke_cross_message(
                     Ipcaddress {
                         subnet_id: IPCSubnetID {
-                            root: root_network.subnet_id.root_id(),
-                            route: Default::default(),
+                            root: root_id,
+                            route: subnet_id_to_evm_addresses(&england_subnet.subnet_id)?,
                         },
                         raw_address: Default::default(),
                     },
                     Ipcaddress {
                         subnet_id: IPCSubnetID {
-                            root: subnet.subnet_id.root_id(),
-                            route: subnet_id_to_evm_addresses(&subnet.subnet_id)?,
+                            root: root_id,
+                            route: subnet_id_to_evm_addresses(&oxfordshire_subnet.subnet_id)?,
                         },
-                        raw_address: Default::default(),
+                        raw_address: Default::default(), // TODO Karel - fill the address here.
                     },
-                    U256::from(3),
                 );
 
-                let response = call.call().await;
+                let response = invoke_cross_message_call
+                    .value(3)
+                    .send()
+                    .await?
+                    .await?
+                    .expect("invoke cross message failed");
 
-                match response {
-                    Ok(response) => {
-                        println!("Response: {:?}", response);
-                    }
-                    Err(ContractError::Revert(revert_reason)) => {
-                        println!("Revert reason: {:?}", revert_reason);
-                    }
-                    Err(e) => {
-                        // Generic error handler for other cases
-                        println!(
-                            "An error occurred while sending the contract message: {:?}",
-                            e
-                        );
-                    }
-                }
+                // TODO Karel - parse the response
+                println!("Invoke cross message response: {:?}", response);
 
-                // let from = IPCAddress::new(&root_network.subnet_id, &charlie.fvm_addr())?;
-                // let to = IPCAddress::new(&subnet.subnet_id, &bob.fvm_addr())?;
+                // match response {
+                //     Ok(response) => {
+                //         println!("Response: {:?}", response);
+                //     }
+                //     Err(ContractError::Revert(revert_reason)) => {
+                //         println!("Revert reason: {:?}", revert_reason);
+                //     }
+                //     Err(e) => {
+                //         // Generic error handler for other cases
+                //         println!(
+                //             "An error occurred while sending the contract message: {:?}",
+                //             e
+                //         );
+                //     }
+                // }
 
-                // parent_cross_messenger.invoke_cross_message(
-                //     from.try_into().unwrap(),
-                //     to.try_into(),
-                //     TokenAmount::from_nano(10),
+                // let parent_provider = Arc::new(
+                //     brussels
+                //         .ethapi_http_provider()?
+                //         .ok_or_else(|| anyhow!("ethapi should be enabled"))?,
                 // );
 
-                let envelope = IpcEnvelope {
-                    kind: IpcMsgKind::Call,
-                    from: IPCAddress::new(&root_network.subnet_id, &charlie.fvm_addr())?,
-                    to: IPCAddress::new(&subnet.subnet_id, &bob.fvm_addr())?,
-                    value: TokenAmount::from_nano(10),
-                    message: vec![0],
-                    nonce: 0,
-                };
-
-                let mut commited_result =
-                    parent_gateway_mesenger.send_contract_xnet_message(envelope.try_into()?);
-
-                commited_result.tx.set_value(1);
-
-                let commited_result = commited_result.call().await;
-
-                match commited_result {
-                    Ok(commited) => {
-                        println!("Message sent successfully: {:?}", commited);
-                    }
-                    Err(ContractError::Revert(revert_reason)) => {
-                        // Use the custom GatewayMessengerFacetErrors::decode to decode the revert data
-                        match GatewayMessengerFacetErrors::decode_with_selector(&revert_reason) {
-                            Some(decoded_error) => match decoded_error {
-                                GatewayMessengerFacetErrors::CallFailed(call_failed) => {
-                                    println!("Call failed: {:?}", call_failed);
-                                }
-                                GatewayMessengerFacetErrors::CannotSendCrossMsgToItself(err) => {
-                                    println!("Cannot send cross message to itself: {:?}", err);
-                                }
-                                GatewayMessengerFacetErrors::CommonParentDoesNotExist(err) => {
-                                    println!("Common parent does not exist: {:?}", err);
-                                }
-                                GatewayMessengerFacetErrors::InsufficientFunds(err) => {
-                                    println!("Insufficient funds: {:?}", err);
-                                }
-                                GatewayMessengerFacetErrors::InvalidXnetMessage(err) => {
-                                    println!("Invalid Xnet message: {:?}", err);
-                                }
-                                GatewayMessengerFacetErrors::MethodNotAllowed(err) => {
-                                    println!("Method not allowed: {:?}", err);
-                                }
-                                GatewayMessengerFacetErrors::RevertString(reason) => {
-                                    println!("Revert reason: {}", reason);
-                                }
-                            },
-                            None => {
-                                println!("Failed to decode revert reason");
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        // Generic error handler for other cases
-                        println!(
-                            "An error occurred while sending the contract message: {:?}",
-                            e
-                        );
-                    }
-                }
+                // let _parent_gateway_mesenger = GatewayMessengerFacet::new(
+                //     builtin_actor_eth_addr(ipc::GATEWAY_ACTOR_ID),
+                //     parent_provider.clone(),
+                // );
 
                 // Gateway actor on the child
-                let subnet_gateway_getter = GatewayGetterFacet::new(
-                    builtin_actor_eth_addr(ipc::GATEWAY_ACTOR_ID),
-                    london_provider.clone(),
-                );
+                // let subnet_gateway_getter = GatewayGetterFacet::new(
+                //     builtin_actor_eth_addr(ipc::GATEWAY_ACTOR_ID),
+                //     london_provider.clone(),
+                // );
 
-                // Subnet actor on the parent
-                let subnet_actor_getter = SubnetActorGetterFacet::new(
-                    to_eth_address(&england.subnet_id.subnet_actor())
-                        .and_then(|a| a.ok_or_else(|| anyhow!("not an eth address")))?,
-                    parent_provider.clone(),
-                );
+                // // Subnet actor on the parent
+                // let subnet_actor_getter = SubnetActorGetterFacet::new(
+                //     to_eth_address(&england.subnet_id.subnet_actor())
+                //         .and_then(|a| a.ok_or_else(|| anyhow!("not an eth address")))?,
+                //     parent_provider.clone(),
+                // );
 
                 // // Query the latest committed parent finality and compare to the parent.
                 // {

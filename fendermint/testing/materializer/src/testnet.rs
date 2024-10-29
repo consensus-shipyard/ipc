@@ -176,6 +176,19 @@ where
             .ok_or_else(|| anyhow!("deployment for {name:?} does not exist"))
     }
 
+    /// Get a solidity deployment by subnet and contract name.
+    pub fn solidity_deployment(
+        &self,
+        subnet_name: &SubnetName,
+        contract_name: String,
+    ) -> anyhow::Result<&M::SolidityContractDeployment> {
+        self.solidity_deployments
+            .get(subnet_name)
+            .ok_or_else(|| anyhow!("solidity deployment for {contract_name:?} does not exist"))?
+            .get(&contract_name)
+            .ok_or_else(|| anyhow!("solidity deployment for {contract_name:?} does not exist"))
+    }
+
     /// List all the nodes in a subnet.
     pub fn nodes_by_subnet(&self, subnet_name: &SubnetName) -> Vec<&M::Node> {
         self.nodes
