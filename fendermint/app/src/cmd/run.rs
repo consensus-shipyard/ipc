@@ -48,6 +48,7 @@ use ipc_provider::IpcProvider;
 use libp2p::identity::secp256k1;
 use libp2p::identity::Keypair;
 use std::sync::Arc;
+use std::time::Duration;
 use tendermint_rpc::Client;
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::error::TryRecvError;
@@ -274,7 +275,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
                 request_channel_size: 1024,
                 broadcast_channel_size: 1024,
                 chain_head_delay: topdown_config.chain_head_delay,
-                polling_interval: topdown_config.polling_interval,
+                polling_interval_millis: Duration::from_millis(100),
                 max_store_blocks: topdown_config.parent_view_store_max_blocks.unwrap_or(2000),
                 sync_many: true,
                 observation: ObservationConfig {
@@ -285,7 +286,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
                 req_channel_buffer_size: 1024,
                 req_batch_processing_size: 10,
                 gossip_req_processing_size: 256,
-                voting_sleep_interval_sec: 10,
+                voting_sleep_interval_millis: 100,
             },
         };
 

@@ -62,7 +62,7 @@ fn default_config() -> VoteConfig {
         req_channel_buffer_size: 1024,
         req_batch_processing_size: 10,
         gossip_req_processing_size: 10,
-        voting_sleep_interval_sec: 1,
+        voting_sleep_interval_millis: 1,
     }
 }
 

@@ -67,6 +67,7 @@ impl TopdownClient {
 
     pub async fn find_topdown_proposal(&self) -> anyhow::Result<Option<TopdownProposal>> {
         let Some(quorum_cert) = self.voting.find_quorum().await? else {
+            tracing::debug!("no quorum cert found");
             return Ok(None);
         };
 
@@ -76,10 +77,12 @@ impl TopdownClient {
             .await?
         else {
             // absorb the error, dont alert the caller
+            tracing::warn!("no parent block views found");
             return Ok(None);
         };
 
-        let mut linear = LinearizedParentBlockView::from(quorum_cert.payload());
+        let latest_checkpoint = self.syncer.latest_checkpoint().await?;
+        let mut linear = LinearizedParentBlockView::from(&latest_checkpoint);
 
         let mut xnet_msgs = vec![];
         let mut validator_changes = vec![];

@@ -38,7 +38,7 @@ pub struct VoteConfig {
     /// The number of vote recording requests the reactor should process per run before handling other tasks
     pub gossip_req_processing_size: usize,
     /// The time to sleep for voting loop if nothing happens
-    pub voting_sleep_interval_sec: u64,
+    pub voting_sleep_interval_millis: u64,
 }
 
 /// The client to interact with the vote reactor
@@ -73,7 +73,7 @@ impl VoteReactorClient {
         let gossip = params.gossip;
 
         tokio::spawn(async move {
-            let sleep = Duration::new(config.voting_sleep_interval_sec, 0);
+            let sleep = Duration::from_millis(config.voting_sleep_interval_millis);
 
             let inner = VotingHandler {
                 validator_key,

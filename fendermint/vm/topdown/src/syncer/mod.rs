@@ -33,8 +33,8 @@ pub struct ParentSyncerConfig {
     /// conservative and avoid other from rejecting the proposal because they don't see the
     /// height as final yet.
     pub chain_head_delay: BlockHeight,
-    /// Parent syncing cron period, in seconds
-    pub polling_interval: Duration,
+    /// Parent syncing cron period, in millis
+    pub polling_interval_millis: Duration,
     /// Max number of un-finalized parent blocks that should be stored in the store
     pub max_store_blocks: BlockHeight,
     /// Attempts to sync as many block as possible till the finalized chain head
@@ -60,7 +60,7 @@ impl ParentSyncerReactorClient {
         config: ParentSyncerConfig,
     ) {
         tokio::spawn(async move {
-            let polling_interval = config.polling_interval;
+            let polling_interval = config.polling_interval_millis;
 
             loop {
                 select! {
@@ -110,6 +110,16 @@ impl ParentSyncerReactorClient {
         Ok(())
     }
 
+    pub async fn latest_checkpoint(
+        &self,
+    ) -> anyhow::Result<Checkpoint> {
+        let (tx, rx) = oneshot::channel();
+        self.tx
+            .send(ParentSyncerRequest::QueryLatestCheckpoint(tx))
+            .await?;
+        Ok(rx.await?)
+    }
+
     pub async fn query_parent_block_view(
         &self,
         to: BlockHeight,
@@ -125,6 +135,7 @@ impl ParentSyncerReactorClient {
 pub enum ParentSyncerRequest {
     /// A new parent height is finalized
     Finalized(Checkpoint),
+    QueryLatestCheckpoint(oneshot::Sender<Checkpoint>),
     QueryParentBlockViews {
         to: BlockHeight,
         tx: oneshot::Sender<anyhow::Result<Vec<Option<ParentBlockView>>>>,
@@ -152,6 +163,9 @@ fn handle_request<P: Send + Sync + 'static + ParentPoller>(
                 anyhow!("cannot read parent block view: {}", e)
             });
             let _ = tx.send(r);
+        }
+        ParentSyncerRequest::QueryLatestCheckpoint(tx) => {
+            let _ = tx.send(poller.last_checkpoint().clone());
         }
     }
 }
