@@ -113,7 +113,6 @@ pub(crate) enum Request<V> {
     SetProvidedSubnets(Vec<SubnetID>),
     AddProvidedSubnet(SubnetID),
     RemoveProvidedSubnet(SubnetID),
-    // (publish vote is a broadcast)
     PublishVote(Box<SignedVoteRecord<V>>),
     PublishPreemptive(SubnetID, Vec<u8>),
     PinSubnet(SubnetID),
