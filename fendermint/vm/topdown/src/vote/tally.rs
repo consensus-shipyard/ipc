@@ -293,7 +293,7 @@ mod tests {
         vote_tally.add_vote(vote).unwrap();
 
         let mut obs2 = random_observation();
-        obs2.parent_height = obs.parent_height;
+        obs2.parent_subnet_height = obs.parent_subnet_height;
         let vote =
             Vote::v1_checked(CertifiedObservation::sign(obs2, 100, &validators[0].0).unwrap())
                 .unwrap();
@@ -315,7 +315,7 @@ mod tests {
         let observation = random_observation();
 
         vote_tally
-            .set_finalized(observation.parent_height - 1)
+            .set_finalized(observation.parent_subnet_height - 1)
             .unwrap();
 
         for validator in validators {
@@ -351,10 +351,10 @@ mod tests {
 
         let observation1 = random_observation();
         let mut observation2 = observation1.clone();
-        observation2.parent_hash = vec![1];
+        observation2.parent_subnet_hash = vec![1];
 
         vote_tally
-            .set_finalized(observation1.parent_height - 1)
+            .set_finalized(observation1.parent_subnet_height - 1)
             .unwrap();
 
         for validator in validators_grp1 {
@@ -390,7 +390,7 @@ mod tests {
         let observation = random_observation();
 
         vote_tally
-            .set_finalized(observation.parent_height - 1)
+            .set_finalized(observation.parent_subnet_height - 1)
             .unwrap();
 
         for validator in validators {
@@ -425,7 +425,7 @@ mod tests {
         let observation = random_observation();
 
         vote_tally
-            .set_finalized(observation.parent_height - 1)
+            .set_finalized(observation.parent_subnet_height - 1)
             .unwrap();
 
         for (count, validator) in validators.iter().enumerate() {

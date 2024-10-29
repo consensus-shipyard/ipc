@@ -110,9 +110,7 @@ impl ParentSyncerReactorClient {
         Ok(())
     }
 
-    pub async fn latest_checkpoint(
-        &self,
-    ) -> anyhow::Result<Checkpoint> {
+    pub async fn latest_checkpoint(&self) -> anyhow::Result<Checkpoint> {
         let (tx, rx) = oneshot::channel();
         self.tx
             .send(ParentSyncerRequest::QueryLatestCheckpoint(tx))

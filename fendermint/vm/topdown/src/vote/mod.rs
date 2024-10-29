@@ -295,9 +295,16 @@ where
                 if !self.vote_tally.check_quorum_cert(cert.borrow()) {
                     let _ = tx.send(false);
                 } else {
-                    let _ = tx.send(
-                        self.vote_tally.last_finalized_height() + 1 == cert.payload().parent_height,
-                    );
+                    let is_future = self.vote_tally.last_finalized_height()
+                        < cert.payload().parent_subnet_height;
+                    if !is_future {
+                        tracing::error!(
+                            finalized = self.vote_tally.last_finalized_height(),
+                            cert = cert.payload().parent_subnet_height,
+                            "cert block number lower than latest finalized height"
+                        );
+                    }
+                    let _ = tx.send(is_future);
                 }
             }
         }

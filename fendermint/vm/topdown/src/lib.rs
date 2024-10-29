@@ -73,7 +73,7 @@ impl TopdownClient {
 
         let Ok(views) = self
             .syncer
-            .query_parent_block_view(quorum_cert.payload().parent_height)
+            .query_parent_block_view(quorum_cert.payload().parent_subnet_height)
             .await?
         else {
             // absorb the error, dont alert the caller
@@ -90,7 +90,7 @@ impl TopdownClient {
         for maybe_view in views {
             let Some(v) = maybe_view else {
                 tracing::error!(
-                    till = quorum_cert.payload().parent_height,
+                    till = quorum_cert.payload().parent_subnet_height,
                     "parent block view does not have all the data"
                 );
                 return Ok(None);
@@ -164,8 +164,8 @@ impl Display for Checkpoint {
                 write!(
                     f,
                     "Checkpoint(version = 1, height = {}, block_hash = {}, effects = {})",
-                    v.parent_height,
-                    hex::encode(&v.parent_hash),
+                    v.parent_subnet_height,
+                    hex::encode(&v.parent_subnet_hash),
                     hex::encode(&v.cumulative_effects_comm)
                 )
             }
@@ -180,13 +180,13 @@ impl Checkpoint {
 
     pub fn target_height(&self) -> BlockHeight {
         match self {
-            Checkpoint::V1(b) => b.parent_height,
+            Checkpoint::V1(b) => b.parent_subnet_height,
         }
     }
 
     pub fn target_hash(&self) -> &Bytes {
         match self {
-            Checkpoint::V1(b) => &b.parent_hash,
+            Checkpoint::V1(b) => &b.parent_subnet_hash,
         }
     }
 

@@ -32,13 +32,13 @@ pub struct ObservationConfig {
 /// The content that validators gossip among each other.
 #[derive(Serialize, Deserialize, Hash, Debug, Clone, Eq, PartialEq, Arbitrary)]
 pub struct Observation {
-    pub(crate) parent_height: u64,
+    pub(crate) parent_subnet_height: u64,
     /// The hash of the chain unit at that height. Usually a block hash, but could
     /// be another entity (e.g. tipset CID), depending on the parent chain
     /// and our interface to it. For example, if the parent is a Filecoin network,
     /// this would be a tipset CID coerced into a block hash if queried through
     /// the Eth API, or the tipset CID as-is if accessed through the Filecoin API.
-    pub(crate) parent_hash: Bytes,
+    pub(crate) parent_subnet_hash: Bytes,
     /// A rolling/cumulative commitment to topdown effects since the beginning of
     /// time, including the ones in this block.
     pub(crate) cumulative_effects_comm: Bytes,
@@ -100,7 +100,7 @@ pub fn deduce_new_observation<S: ParentViewStore>(
 
     let observation = agg.into_observation()?;
     tracing::info!(
-        height = observation.parent_height,
+        height = observation.parent_subnet_height,
         "new observation derived"
     );
 
@@ -167,8 +167,8 @@ impl CertifiedObservation {
 impl Observation {
     pub fn new(parent_height: BlockHeight, parent_hash: Bytes, commitment: Bytes) -> Self {
         Self {
-            parent_height,
-            parent_hash,
+            parent_subnet_height: parent_height,
+            parent_subnet_hash: parent_hash,
             cumulative_effects_comm: commitment,
         }
     }
@@ -179,8 +179,8 @@ impl Display for Observation {
         write!(
             f,
             "Observation(parent_height={}, parent_hash={}, commitment={})",
-            self.parent_height,
-            hex::encode(&self.parent_hash),
+            self.parent_subnet_height,
+            hex::encode(&self.parent_subnet_hash),
             hex::encode(&self.cumulative_effects_comm),
         )
     }
@@ -188,7 +188,7 @@ impl Display for Observation {
 
 impl Observation {
     pub fn parent_height(&self) -> BlockHeight {
-        self.parent_height
+        self.parent_subnet_height
     }
 }
 
@@ -218,8 +218,8 @@ impl From<&Checkpoint> for LinearizedParentBlockView {
 impl From<&Observation> for LinearizedParentBlockView {
     fn from(value: &Observation) -> Self {
         LinearizedParentBlockView {
-            parent_height: value.parent_height,
-            parent_hash: Some(value.parent_hash.clone()),
+            parent_height: value.parent_subnet_height,
+            parent_hash: Some(value.parent_subnet_hash.clone()),
             cumulative_effects_comm: value.cumulative_effects_comm.clone(),
         }
     }
