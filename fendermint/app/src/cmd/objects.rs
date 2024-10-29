@@ -270,7 +270,7 @@ lazy_static! {
     .unwrap();
     static ref HISTOGRAM_UPLOAD_TIME: Histogram = register_histogram!(
         "objects_upload_time_seconds",
-        "Time spent downloading an object in seconds"
+        "Time spent uploading an object in seconds"
     )
     .unwrap();
     static ref COUNTER_BLOBS_DOWNLOADED: IntCounter = register_int_counter!(
@@ -285,7 +285,7 @@ lazy_static! {
     .unwrap();
     static ref HISTOGRAM_DOWNLOAD_TIME: Histogram = register_histogram!(
         "objects_download_time_seconds",
-        "Time spent uploading an object in seconds"
+        "Time spent downloading an object in seconds"
     )
     .unwrap();
 }
