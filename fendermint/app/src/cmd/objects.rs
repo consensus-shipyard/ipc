@@ -553,7 +553,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
             headers.extend(header_map);
 
             COUNTER_BLOBS_DOWNLOADED.inc();
-            COUNTER_BYTES_DOWNLOADED.inc_by(object_range.size);
+            COUNTER_BYTES_DOWNLOADED.inc_by(object_range.len);
             HISTOGRAM_DOWNLOAD_TIME.observe(start_time.elapsed().as_secs_f64());
 
             Ok(response)
