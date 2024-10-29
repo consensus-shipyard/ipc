@@ -626,7 +626,7 @@ async fn dispatch_vote(
         }
         AppVote::BlobFinality(f) => {
             debug!(hash = ?f.hash, success = ?f.success, "received vote for blob finality");
-            handle_blob_vote(
+            handle_vote(
                 parent_finality_votes,
                 vote.public_key,
                 f.hash,
@@ -637,7 +637,7 @@ async fn dispatch_vote(
         }
         AppVote::ReadRequestClosed(r) => {
             debug!(hash = ?r.hash, success = ?r.success, "received vote for read request completion");
-            handle_blob_vote(
+            handle_vote(
                 parent_finality_votes,
                 vote.public_key,
                 r.hash,
@@ -649,7 +649,7 @@ async fn dispatch_vote(
     }
 }
 
-async fn handle_blob_vote(
+async fn handle_vote(
     parent_finality_votes: &VoteTally,
     public_key: ValidatorKey,
     hash: iroh::blobs::Hash,

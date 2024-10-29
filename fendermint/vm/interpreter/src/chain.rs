@@ -139,7 +139,7 @@ pub struct ReadRequestPoolItem {
     /// The length of the read request.
     len: u64,
     /// The address and method to callback when the read request is closed.
-    callback: (Address, u64),
+    callback: (Address, MethodNum),
 }
 
 impl From<&ReadRequestPoolItem> for IrohResolveKey {
@@ -319,7 +319,7 @@ where
                 if is_blob_finalized(&mut state, item.subscriber, item.hash, item.id.clone())? {
                     tracing::debug!(hash = ?item.hash, "blob already finalized on chain; removing from pool");
                     atomically(|| chain_env.blob_pool.remove_task(item)).await;
-                    // Remove the result from the pool (we don't have result for a blob so can remove it here)
+                    // Remove the result from the pool
                     atomically(|| chain_env.blob_pool.remove_result(item)).await;
                     continue;
                 }
@@ -1020,6 +1020,21 @@ where
 
                     Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
                 }
+                IpcMessage::ReadRequestClosed(read_request) => {
+                    // send the data to the callback address
+                    // if this fails (e.g. the callback address is not reachable),
+                    // we will still close the request
+                    read_request_callback(&mut state, &read_request)?;
+                    // set the status of the request to fulfilled
+                    let ret = close_read_request(&mut state, read_request.id)?;
+
+                    tracing::debug!(
+                        hash = ?read_request.id,
+                        "read request is closed"
+                    );
+
+                    Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
+                }
             },
         }
     }
@@ -1369,7 +1384,7 @@ where
         sequence: 0,
         gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
         method_num: fendermint_actor_blobs_shared::Method::ReadRequestExist as u64,
-        params: RawBytes::serialize(ReadRequestExistParams { request_id })?,
+        params: RawBytes::serialize(ReadRequestExistParams(request_id))?,
         value: Default::default(),
         version: Default::default(),
         gas_fee_cap: Default::default(),
@@ -1461,9 +1476,9 @@ where
     let to = blobs::BLOBS_ACTOR_ADDR;
     let method_num = CloseReadRequest as u64;
     let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
-    let params = RawBytes::serialize(CloseReadRequestParams {
-        request_id: fendermint_actor_blobs_shared::state::Hash(id.into()),
-    })?;
+    let params = RawBytes::serialize(CloseReadRequestParams(
+        fendermint_actor_blobs_shared::state::Hash(id.into()),
+    ))?;
     let msg = Message {
         version: Default::default(),
         from,

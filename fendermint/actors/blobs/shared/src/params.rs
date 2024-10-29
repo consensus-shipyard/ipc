@@ -199,12 +199,10 @@ pub struct OpenReadRequestParams {
     pub callback_method: MethodNum,
 }
 
-/// Params for getting a read request status.
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct ReadRequestExistParams {
-    /// The ID of the read request.
-    pub request_id: Hash,
-}
+/// Params for checking if a read request exists.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ReadRequestExistParams(pub Hash);
 
 /// Params for getting pending read requests.
 #[derive(Clone, Debug, Serialize, Deserialize)]
