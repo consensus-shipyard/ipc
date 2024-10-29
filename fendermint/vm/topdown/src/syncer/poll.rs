@@ -29,15 +29,17 @@ pub struct ParentPoll<P, S> {
 #[async_trait]
 impl<P, S> ParentPoller for ParentPoll<P, S>
 where
-    S: ParentViewStore + Send + Sync + 'static,
+    S: ParentViewStore + Send + Sync + 'static + Clone,
     P: Send + Sync + 'static + ParentQueryProxy,
 {
+    type Store = S;
+
     fn subscribe(&self) -> Receiver<TopDownSyncEvent> {
         self.event_broadcast.subscribe()
     }
 
-    fn last_checkpoint(&self) -> &Checkpoint {
-        &self.last_finalized
+    fn store(&self) -> Self::Store {
+        self.store.clone()
     }
 
     /// The target block height is finalized, purge all the parent view before the target height
@@ -48,6 +50,9 @@ where
         for h in min_height..=checkpoint.target_height() {
             self.store.purge(h)?;
         }
+
+        self.last_finalized = checkpoint;
+
         Ok(())
     }
 
@@ -58,7 +63,7 @@ where
         };
 
         let (mut latest_height_fetched, mut first_non_null_parent_hash) =
-            self.latest_nonnull_data().await?;
+            self.latest_nonnull_data()?;
         tracing::debug!(chain_head, latest_height_fetched, "syncing heights");
 
         if latest_height_fetched > chain_head {
@@ -110,22 +115,6 @@ where
 
         Ok(())
     }
-
-    fn dump_parent_block_views(
-        &self,
-        to: BlockHeight,
-    ) -> anyhow::Result<Vec<Option<ParentBlockView>>> {
-        let store = self.store();
-
-        let mut r = vec![];
-
-        let start = self.last_checkpoint().target_height() + 1;
-        for h in start..=to {
-            r.push(store.get(h)?)
-        }
-
-        Ok(r)
-    }
 }
 
 impl<P, S> ParentPoll<P, S>
@@ -144,12 +133,8 @@ where
         }
     }
 
-    pub fn store(&self) -> &S {
-        &self.store
-    }
-
     /// Get the latest non null block data stored
-    async fn latest_nonnull_data(&self) -> anyhow::Result<(BlockHeight, BlockHash)> {
+    fn latest_nonnull_data(&self) -> anyhow::Result<(BlockHeight, BlockHash)> {
         let Some(latest_height) = self.store.max_parent_view_height()? else {
             return Ok((
                 self.last_finalized.target_height(),

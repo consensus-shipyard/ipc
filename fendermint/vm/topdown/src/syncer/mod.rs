@@ -1,20 +1,25 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::observation::{Observation, ObservationConfig};
-use crate::syncer::payload::ParentBlockView;
+use crate::observation::{LinearizedParentBlockView, Observation, ObservationConfig};
+use crate::syncer::store::ParentViewStore;
 use crate::{BlockHeight, Checkpoint};
 use anyhow::anyhow;
 use async_trait::async_trait;
+use ipc_api::cross::IpcEnvelope;
+use ipc_api::staking::StakingChangeRequest;
 use serde::Deserialize;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::select;
-use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio::sync::{broadcast, mpsc};
 
 pub mod error;
 pub mod payload;
 pub mod poll;
 pub mod store;
+
+pub type QuorumCertContent = (Observation, Vec<IpcEnvelope>, Vec<StakingChangeRequest>);
 
 #[derive(Clone, Debug)]
 pub enum TopDownSyncEvent {
@@ -35,6 +40,8 @@ pub struct ParentSyncerConfig {
     pub chain_head_delay: BlockHeight,
     /// Parent syncing cron period, in millis
     pub polling_interval_millis: Duration,
+    /// Max number of requests to process in the reactor loop
+    pub max_requests_per_loop: usize,
     /// Max number of un-finalized parent blocks that should be stored in the store
     pub max_store_blocks: BlockHeight,
     /// Attempts to sync as many block as possible till the finalized chain head
@@ -44,126 +51,123 @@ pub struct ParentSyncerConfig {
 }
 
 #[derive(Clone)]
-pub struct ParentSyncerReactorClient {
+pub struct ParentSyncerReactorClient<S> {
     tx: mpsc::Sender<ParentSyncerRequest>,
+    checkpoint: Arc<Mutex<Checkpoint>>,
+    store: S,
 }
 
-impl ParentSyncerReactorClient {
-    pub fn new(request_channel_size: usize) -> (Self, mpsc::Receiver<ParentSyncerRequest>) {
+impl<S: ParentViewStore + Send + Sync> ParentSyncerReactorClient<S> {
+    pub fn new(
+        request_channel_size: usize,
+        store: S,
+    ) -> (Self, mpsc::Receiver<ParentSyncerRequest>) {
         let (tx, rx) = mpsc::channel(request_channel_size);
-        (Self { tx }, rx)
+        let checkpoint = Arc::new(Mutex::new(Checkpoint::v1(0, vec![], vec![])));
+        (
+            Self {
+                tx,
+                checkpoint,
+                store,
+            },
+            rx,
+        )
     }
+}
 
-    pub fn start_reactor<P: ParentPoller + Send + Sync + 'static>(
-        mut rx: mpsc::Receiver<ParentSyncerRequest>,
-        mut poller: P,
-        config: ParentSyncerConfig,
-    ) {
-        tokio::spawn(async move {
-            let polling_interval = config.polling_interval_millis;
-
-            loop {
-                select! {
-                    _ = tokio::time::sleep(polling_interval) => {
-                        if let Err(e) = poller.try_poll().await {
-                            tracing::error!(err = e.to_string(), "cannot sync with parent");
-                        }
+pub fn start_polling_reactor<P: ParentPoller + Send + Sync + 'static>(
+    mut rx: mpsc::Receiver<ParentSyncerRequest>,
+    mut poller: P,
+    config: ParentSyncerConfig,
+) {
+    let polling_interval = config.polling_interval_millis;
+    tokio::spawn(async move {
+        loop {
+            select! {
+                _ = tokio::time::sleep(polling_interval) => {
+                    if let Err(e) = poller.try_poll().await {
+                        tracing::error!(err = e.to_string(), "cannot sync with parent");
                     }
-                    req = rx.recv() => {
-                        let Some(req) = req else { break };
-                        handle_request(req, &mut poller);
+                }
+                req = rx.recv() => {
+                    let Some(req) = req else { break };
+                    match req {
+                        ParentSyncerRequest::Finalized(cp) => {
+                            if let Err(e) = poller.finalize(cp) {
+                                tracing::error!(err = e.to_string(), "cannot finalize syncer")
+                            }
+                        },
                     }
                 }
             }
-
-            tracing::warn!("parent syncer stopped")
-        });
-    }
+        }
+    });
 }
 
 /// Polls the parent block view
 #[async_trait]
 pub trait ParentPoller {
+    type Store: ParentViewStore + Send + Sync + 'static + Clone;
+
     fn subscribe(&self) -> broadcast::Receiver<TopDownSyncEvent>;
 
-    /// The previous checkpoint committed
-    fn last_checkpoint(&self) -> &Checkpoint;
+    fn store(&self) -> Self::Store;
 
     /// The target block height is finalized, purge all the parent view before the target height
     fn finalize(&mut self, checkpoint: Checkpoint) -> anyhow::Result<()>;
 
     /// Try to poll the next parent height
     async fn try_poll(&mut self) -> anyhow::Result<()>;
-
-    /// Dump the parent block view from the height after the last committed checkpoint to the `to` height
-    fn dump_parent_block_views(
-        &self,
-        to: BlockHeight,
-    ) -> anyhow::Result<Vec<Option<ParentBlockView>>>;
 }
 
-impl ParentSyncerReactorClient {
+impl<S: ParentViewStore + Send + Sync + 'static> ParentSyncerReactorClient<S> {
+    fn set_checkpoint(&self, cp: Checkpoint) {
+        let mut checkpoint = self.checkpoint.lock().unwrap();
+        *checkpoint = cp.clone();
+    }
     /// Marks the height as finalized.
     /// There is no need to wait for ack from the reactor
     pub async fn finalize_parent_height(&self, cp: Checkpoint) -> anyhow::Result<()> {
+        self.set_checkpoint(cp.clone());
         self.tx.send(ParentSyncerRequest::Finalized(cp)).await?;
         Ok(())
     }
 
-    pub async fn latest_checkpoint(&self) -> anyhow::Result<Checkpoint> {
-        let (tx, rx) = oneshot::channel();
-        self.tx
-            .send(ParentSyncerRequest::QueryLatestCheckpoint(tx))
-            .await?;
-        Ok(rx.await?)
-    }
-
-    pub async fn query_parent_block_view(
+    pub fn prepare_quorum_cert_content(
         &self,
-        to: BlockHeight,
-    ) -> anyhow::Result<anyhow::Result<Vec<Option<ParentBlockView>>>> {
-        let (tx, rx) = oneshot::channel();
-        self.tx
-            .send(ParentSyncerRequest::QueryParentBlockViews { to, tx })
-            .await?;
-        Ok(rx.await?)
+        end_height: BlockHeight,
+    ) -> anyhow::Result<QuorumCertContent> {
+        let latest_checkpoint = self.checkpoint.lock().unwrap().clone();
+
+        let mut xnet_msgs = vec![];
+        let mut validator_changes = vec![];
+        let mut linear = LinearizedParentBlockView::from(&latest_checkpoint);
+
+        let start = latest_checkpoint.target_height() + 1;
+        for h in start..=end_height {
+            let Some(v) = self.store.get(h)? else {
+                return Err(anyhow!("parent block view store does not have data at {h}"));
+            };
+
+            if let Err(e) = linear.append(v.clone()) {
+                return Err(anyhow!("parent block view cannot be appended: {e}"));
+            }
+
+            if let Some(payload) = v.payload {
+                xnet_msgs.extend(payload.xnet_msgs);
+                validator_changes.extend(payload.validator_changes);
+            }
+        }
+
+        let ob = linear
+            .into_observation()
+            .map_err(|e| anyhow!("cannot convert linearized parent view into observation: {e}"))?;
+
+        Ok((ob, xnet_msgs, validator_changes))
     }
 }
 
 pub enum ParentSyncerRequest {
     /// A new parent height is finalized
     Finalized(Checkpoint),
-    QueryLatestCheckpoint(oneshot::Sender<Checkpoint>),
-    QueryParentBlockViews {
-        to: BlockHeight,
-        tx: oneshot::Sender<anyhow::Result<Vec<Option<ParentBlockView>>>>,
-    },
-}
-
-fn handle_request<P: Send + Sync + 'static + ParentPoller>(
-    req: ParentSyncerRequest,
-    poller: &mut P,
-) {
-    match req {
-        ParentSyncerRequest::Finalized(c) => {
-            let height = c.target_height();
-            if let Err(e) = poller.finalize(c) {
-                tracing::error!(height, err = e.to_string(), "cannot finalize parent viewer");
-            }
-        }
-        ParentSyncerRequest::QueryParentBlockViews { to, tx } => {
-            let r = poller.dump_parent_block_views(to).map_err(|e| {
-                tracing::error!(
-                    height = to,
-                    err = e.to_string(),
-                    "cannot query parent block view"
-                );
-                anyhow!("cannot read parent block view: {}", e)
-            });
-            let _ = tx.send(r);
-        }
-        ParentSyncerRequest::QueryLatestCheckpoint(tx) => {
-            let _ = tx.send(poller.last_checkpoint().clone());
-        }
-    }
 }

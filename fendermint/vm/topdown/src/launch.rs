@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use crate::proxy::ParentQueryProxy;
-use crate::syncer::{ParentPoller, ParentSyncerConfig, ParentSyncerReactorClient};
+use crate::syncer::store::InMemoryParentViewStore;
+use crate::syncer::{
+    start_polling_reactor, ParentPoller, ParentSyncerConfig, ParentSyncerReactorClient,
+};
 use crate::vote::gossip::GossipClient;
 use crate::vote::payload::PowerUpdates;
 use crate::vote::store::InMemoryVoteStore;
@@ -28,6 +31,7 @@ use std::time::Duration;
 ///     - listens to certified topdown observation from p2p
 ///     - aggregate peer certified observations into a quorum certificate for commitment in fendermint
 pub async fn run_topdown<CheckpointQuery, Gossip, Poller, ParentClient>(
+    store: InMemoryParentViewStore,
     query: CheckpointQuery,
     config: Config,
     validator_key: SecretKey,
@@ -42,7 +46,7 @@ where
     ParentClient: ParentQueryProxy + Send + Sync + 'static,
 {
     let (syncer_client, syncer_rx) =
-        ParentSyncerReactorClient::new(config.syncer.request_channel_size);
+        ParentSyncerReactorClient::new(config.syncer.request_channel_size, store);
     let (voting_client, voting_rx) = VoteReactorClient::new(config.voting.req_channel_buffer_size);
 
     tokio::spawn(async move {
@@ -66,7 +70,7 @@ where
         let poller = poller_fn(&checkpoint, parent_client, config.syncer.clone());
         let internal_event_rx = poller.subscribe();
 
-        ParentSyncerReactorClient::start_reactor(syncer_rx, poller, config.syncer);
+        start_polling_reactor(syncer_rx, poller, config.syncer);
         VoteReactorClient::start_reactor(
             voting_rx,
             StartVoteReactorParams {

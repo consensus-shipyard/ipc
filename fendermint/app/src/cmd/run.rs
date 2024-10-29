@@ -30,7 +30,6 @@ use fendermint_vm_topdown::observe::register_metrics as register_topdown_metrics
 use fendermint_vm_topdown::proxy::{
     IPCProviderProxy, IPCProviderProxyWithLatency, ParentQueryProxy,
 };
-use fendermint_vm_topdown::syncer::payload::ParentBlockView;
 use fendermint_vm_topdown::syncer::poll::ParentPoll;
 use fendermint_vm_topdown::syncer::store::{InMemoryParentViewStore, ParentViewStore};
 use fendermint_vm_topdown::syncer::{ParentPoller, ParentSyncerConfig, TopDownSyncEvent};
@@ -38,7 +37,7 @@ use fendermint_vm_topdown::vote::error::Error;
 use fendermint_vm_topdown::vote::gossip::GossipClient;
 use fendermint_vm_topdown::vote::payload::Vote;
 use fendermint_vm_topdown::vote::VoteConfig;
-use fendermint_vm_topdown::{BlockHeight, Checkpoint, TopdownClient};
+use fendermint_vm_topdown::{Checkpoint, TopdownClient};
 use fvm_shared::address::{current_network, Address, Network};
 use ipc_api::subnet_id::SubnetID;
 use ipc_ipld_resolver::{Event as ResolverEvent, SubnetVoteRecord};
@@ -276,6 +275,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
                 broadcast_channel_size: 1024,
                 chain_head_delay: topdown_config.chain_head_delay,
                 polling_interval_millis: Duration::from_millis(100),
+                max_requests_per_loop: 10,
                 max_store_blocks: topdown_config.parent_view_store_max_blocks.unwrap_or(2000),
                 sync_many: true,
                 observation: ObservationConfig {
@@ -299,6 +299,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             .ok_or_else(|| anyhow!("topdown enabled but ipld is not, enable ipld first"))?;
 
         let client = run_topdown(
+            parent_view_store.clone(),
             app_parent_finality_query,
             config,
             validator
@@ -540,15 +541,17 @@ struct TendermintAwareParentPoller<P, S> {
 #[async_trait]
 impl<P, S> ParentPoller for TendermintAwareParentPoller<P, S>
 where
-    S: ParentViewStore + Send + Sync + 'static,
+    S: ParentViewStore + Send + Sync + 'static + Clone,
     P: Send + Sync + 'static + ParentQueryProxy,
 {
+    type Store = S;
+
     fn subscribe(&self) -> Receiver<TopDownSyncEvent> {
         self.inner.subscribe()
     }
 
-    fn last_checkpoint(&self) -> &Checkpoint {
-        self.inner.last_checkpoint()
+    fn store(&self) -> Self::Store {
+        self.inner.store()
     }
 
     fn finalize(&mut self, checkpoint: Checkpoint) -> anyhow::Result<()> {
@@ -561,13 +564,6 @@ where
             return Ok(());
         }
         self.inner.try_poll().await
-    }
-
-    fn dump_parent_block_views(
-        &self,
-        to: BlockHeight,
-    ) -> anyhow::Result<Vec<Option<ParentBlockView>>> {
-        self.inner.dump_parent_block_views(to)
     }
 }
 

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 mod cache;
-mod error;
 
 pub mod convert;
 pub mod proxy;
@@ -21,8 +20,8 @@ use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
 pub use crate::cache::{SequentialAppendError, SequentialKeyCache, ValueIter};
-pub use crate::error::Error;
-use crate::observation::{LinearizedParentBlockView, Observation};
+use crate::observation::Observation;
+use crate::syncer::store::InMemoryParentViewStore;
 use crate::syncer::{ParentSyncerConfig, ParentSyncerReactorClient};
 use crate::vote::payload::PowerUpdates;
 use crate::vote::{VoteConfig, VoteReactorClient};
@@ -56,7 +55,7 @@ pub struct TopdownProposal {
 
 #[derive(Clone)]
 pub struct TopdownClient {
-    syncer: ParentSyncerReactorClient,
+    syncer: ParentSyncerReactorClient<InMemoryParentViewStore>,
     voting: VoteReactorClient,
 }
 
@@ -71,52 +70,16 @@ impl TopdownClient {
             return Ok(None);
         };
 
-        let Ok(views) = self
-            .syncer
-            .query_parent_block_view(quorum_cert.payload().parent_subnet_height)
-            .await?
-        else {
-            // absorb the error, dont alert the caller
-            tracing::warn!("no parent block views found");
-            return Ok(None);
-        };
-
-        let latest_checkpoint = self.syncer.latest_checkpoint().await?;
-        let mut linear = LinearizedParentBlockView::from(&latest_checkpoint);
-
-        let mut xnet_msgs = vec![];
-        let mut validator_changes = vec![];
-
-        for maybe_view in views {
-            let Some(v) = maybe_view else {
-                tracing::error!(
-                    till = quorum_cert.payload().parent_subnet_height,
-                    "parent block view does not have all the data"
-                );
-                return Ok(None);
+        let end_height = quorum_cert.payload().parent_subnet_height;
+        let (ob, xnet_msgs, validator_changes) =
+            match self.syncer.prepare_quorum_cert_content(end_height) {
+                Ok(v) => v,
+                Err(e) => {
+                    tracing::error!(err = e.to_string(), "cannot prepare quorum cert content");
+                    // return None, don't crash the app
+                    return Ok(None);
+                }
             };
-
-            if let Err(e) = linear.append(v.clone()) {
-                tracing::error!(err = e.to_string(), "parent block view cannot be appended");
-                return Ok(None);
-            }
-
-            if let Some(payload) = v.payload {
-                xnet_msgs.extend(payload.xnet_msgs);
-                validator_changes.extend(payload.validator_changes);
-            }
-        }
-
-        let ob = match linear.into_observation() {
-            Ok(ob) => ob,
-            Err(e) => {
-                tracing::error!(
-                    err = e.to_string(),
-                    "cannot convert linearized parent view into observation"
-                );
-                return Ok(None);
-            }
-        };
 
         if ob != *quorum_cert.payload() {
             // could be due to the minor quorum, just return no proposal
