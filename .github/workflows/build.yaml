@@ -110,4 +110,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: docker-image
+          run-id: ${{ github.event.workflow_run.id }}
           path: /tmp/artifacts/docker-image.tar

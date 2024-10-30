@@ -40,6 +40,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: docker-image-${{ github.sha }}
+          run-id: ${{ github.event.workflow_run.id }}
           path: /tmp
 
       - name: Load Docker image
