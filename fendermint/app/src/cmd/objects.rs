@@ -2,6 +2,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::time::Instant;
 use std::{convert::Infallible, net::ToSocketAddrs, num::ParseIntError};
 
 use anyhow::anyhow;
@@ -23,6 +24,11 @@ use fvm_shared::{address::Address, econ::TokenAmount};
 use iroh::blobs::Hash;
 use iroh::client::blobs::BlobStatus;
 use iroh::net::NodeAddr;
+use lazy_static::lazy_static;
+use prometheus::register_histogram;
+use prometheus::register_int_counter;
+use prometheus::Histogram;
+use prometheus::IntCounter;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tracing::info;
@@ -52,16 +58,11 @@ cmd! {
         match self.command.clone() {
             ObjectsCommands::Run { tendermint_url, iroh_addr} => {
                 if settings.metrics.enabled {
-                    info!("metrics enabled");
-                    let registry = prometheus::Registry::new();
-                    // Default process metrics are enabled by default.
-
                     info!(
                         listen_addr = settings.metrics.listen.to_string(),
                         "serving metrics"
                     );
-                    let mut builder = prometheus_exporter::Builder::new(settings.metrics.listen.try_into()?);
-                    builder.with_registry(registry);
+                    let builder = prometheus_exporter::Builder::new(settings.metrics.listen.try_into()?);
                     let _ = builder.start().context("failed to start metrics server")?;
                 } else {
                     info!("metrics disabled");
@@ -265,6 +266,39 @@ impl ObjectParser {
     }
 }
 
+lazy_static! {
+    static ref COUNTER_BLOBS_UPLOADED: IntCounter = register_int_counter!(
+        "objects_blobs_uploaded_total",
+        "Number of successfully uploaded blobs"
+    )
+    .unwrap();
+    static ref COUNTER_BYTES_UPLOADED: IntCounter = register_int_counter!(
+        "objects_bytes_uploaded_total",
+        "Number of successfully uploaded bytes"
+    )
+    .unwrap();
+    static ref HISTOGRAM_UPLOAD_TIME: Histogram = register_histogram!(
+        "objects_upload_time_seconds",
+        "Time spent uploading an object in seconds"
+    )
+    .unwrap();
+    static ref COUNTER_BLOBS_DOWNLOADED: IntCounter = register_int_counter!(
+        "objects_blobs_downloaded_total",
+        "Number of successfully downloaded blobs"
+    )
+    .unwrap();
+    static ref COUNTER_BYTES_DOWNLOADED: IntCounter = register_int_counter!(
+        "objects_bytes_downloaded_total",
+        "Number of successfully downloaded bytes"
+    )
+    .unwrap();
+    static ref HISTOGRAM_DOWNLOAD_TIME: Histogram = register_histogram!(
+        "objects_download_time_seconds",
+        "Time spent downloading an object in seconds"
+    )
+    .unwrap();
+}
+
 async fn handle_health() -> Result<impl Reply, Rejection> {
     Ok(warp::reply::reply())
 }
@@ -289,6 +323,7 @@ async fn handle_object_upload<F: QueryClient>(
     iroh: iroh::client::Iroh,
     form_parts: warp::multipart::FormData,
 ) -> Result<impl Reply, Rejection> {
+    let start_time = Instant::now();
     let parser = ObjectParser::read_form(form_parts).await.map_err(|e| {
         Rejection::from(BadRequest {
             message: format!("failed to read form: {}", e),
@@ -377,6 +412,9 @@ async fn handle_object_upload<F: QueryClient>(
         outcome.downloaded_size,
         metadata_hash,
     );
+    COUNTER_BLOBS_UPLOADED.inc();
+    COUNTER_BYTES_UPLOADED.inc_by(outcome.downloaded_size);
+    HISTOGRAM_UPLOAD_TIME.observe(start_time.elapsed().as_secs_f64());
 
     let response = UploadResponse {
         hash: hash.to_string(),
@@ -452,6 +490,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
         .unwrap_or(FvmQueryHeight::Committed.into());
     let path = tail.as_str();
     let key: Vec<u8> = path.into();
+    let start_time = Instant::now();
     let maybe_object = os_get(client, address, GetParams(key), height)
         .await
         .map_err(|e| {
@@ -572,6 +611,10 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
 
             let headers = response.headers_mut();
             headers.extend(header_map);
+
+            COUNTER_BLOBS_DOWNLOADED.inc();
+            COUNTER_BYTES_DOWNLOADED.inc_by(object_range.len);
+            HISTOGRAM_DOWNLOAD_TIME.observe(start_time.elapsed().as_secs_f64());
 
             Ok(response)
         }
