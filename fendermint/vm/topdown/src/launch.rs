@@ -49,6 +49,7 @@ where
         ParentSyncerReactorClient::new(config.syncer.request_channel_size, store);
     let (voting_client, voting_rx) = VoteReactorClient::new(config.voting.req_channel_buffer_size);
 
+    let syncer_client_cloned = syncer_client.clone();
     tokio::spawn(async move {
         let query = Arc::new(query);
         let checkpoint = query_starting_checkpoint(&query, &parent_client)
@@ -69,6 +70,11 @@ where
 
         let poller = poller_fn(&checkpoint, parent_client, config.syncer.clone());
         let internal_event_rx = poller.subscribe();
+
+        syncer_client_cloned
+            .finalize_parent_height(checkpoint.clone())
+            .await
+            .expect("should be ok to set checkpoint");
 
         start_polling_reactor(syncer_rx, poller, config.syncer);
         VoteReactorClient::start_reactor(
