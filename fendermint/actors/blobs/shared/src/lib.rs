@@ -17,7 +17,7 @@ use crate::state::{Account, CreditApproval, Subscription};
 pub mod params;
 pub mod state;
 
-pub const BLOBS_ACTOR_ID: ActorID = 49;
+pub const BLOBS_ACTOR_ID: ActorID = 66;
 pub const BLOBS_ACTOR_ADDR: Address = Address::new_id(BLOBS_ACTOR_ID);
 
 #[derive(FromPrimitive)]
