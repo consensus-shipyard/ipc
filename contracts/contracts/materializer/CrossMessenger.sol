@@ -19,10 +19,6 @@ contract CrossMessenger {
         return gatewayAddr;
     }
 
-    function invokeCrossEmpty() external {
-        IGateway(gatewayAddr).propagateAll();
-    }
-
     function invokeCrossMessage(
         IPCAddress memory from,
         IPCAddress memory to

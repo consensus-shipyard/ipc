@@ -5,34 +5,41 @@ use ethers::contract::{ContractError, ContractRevert};
 use ethers::core::types as et;
 use ethers::middleware::gas_oracle::middleware;
 use ethers::types::transaction::response;
-use ethers::types::U256;
+use ethers::types::{Filter, U256};
 use ethers::{
     core::k256::ecdsa::SigningKey,
     middleware::SignerMiddleware,
     providers::{Http, JsonRpcClient, Middleware, PendingTransaction, Provider},
     signers::{Signer, Wallet},
-    types::{transaction::eip2718::TypedTransaction, Eip1559TransactionRequest, H160},
+    types::{transaction::eip2718::TypedTransaction, Eip1559TransactionRequest, H160, H256},
 };
 
+use ethers_contract::EthLogDecode;
 use futures::FutureExt;
 use ipc_provider::IpcProvider;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
+use tracing::event;
 
 use fendermint_materializer::{HasEthApi, ResourceId};
 use fendermint_vm_actor_interface::init::builtin_actor_eth_addr;
 use fendermint_vm_actor_interface::ipc;
 use fendermint_vm_message::conv::from_fvm::to_eth_address;
 use ipc_actors_abis::gateway_getter_facet::{GatewayGetterFacet, ParentFinality};
+use ipc_actors_abis::gateway_manager_facet::{GatewayManagerFacet, GatewayManagerFacetErrors};
 use ipc_actors_abis::gateway_messenger_facet::{
-    GatewayMessengerFacet, GatewayMessengerFacetErrors,
+    self, GatewayMessengerFacet, GatewayMessengerFacetErrors, GatewayMessengerFacetEvents,
+    NewTopDownMessageFilter,
 };
-use ipc_actors_abis::subnet_actor_getter_facet::SubnetActorGetterFacet;
+
+use ipc_actors_abis::subnet_actor_getter_facet::{SubnetActorGetterFacet, FvmAddress as FvmAddress2};
 
 use ipc_actors_abis::cross_messenger::{
     self, CrossMessenger, FvmAddress, Ipcaddress, SubnetID as IPCSubnetID,
 };
+
+use fendermint_vm_message::{conv::from_eth::to_fvm_address};
 
 use fvm_shared::econ::TokenAmount;
 
@@ -40,13 +47,14 @@ use ipc_api::address::IPCAddress;
 use ipc_api::cross::{IpcEnvelope, IpcMsgKind};
 use ipc_api::evm;
 use ipc_api::subnet_id::SubnetID;
+use ipc_api::ethers_address_to_fil_address;
 
 use crate::with_testnet;
 
 const MANIFEST: &str = "layer3.yaml";
 const CHECKPOINT_PERIOD: u64 = 10;
 const SLEEP_SECS: u64 = 5;
-const MAX_RETRIES: u32 = 5;
+const MAX_RETRIES: u32 = 10;
 
 use fvm_shared::address::{Address, Payload};
 
@@ -97,6 +105,25 @@ where
 
 #[serial_test::serial]
 #[tokio::test]
+async fn test_jedu_rajenka() {
+    // cast logs -r "http://localhost:30945" --address 0x77aa40b105843728088c0132e43fc44348881da8
+    let provider = Arc::new(Provider::<Http>::try_from("http://localhost:31045").unwrap());
+    let contract_address = H160::from_str("0x77aa40b105843728088c0132e43fc44348881da8").unwrap();
+
+    let gateway_getter = GatewayGetterFacet::new(contract_address, provider.clone());
+
+    let finality: ParentFinality = gateway_getter
+        .get_latest_parent_finality()
+        .call()
+        .await
+        .unwrap();
+
+    let block_hash = hex::encode(finality.block_hash);
+    println!("Finality: {:?} {:?}", finality.height, block_hash);
+}
+
+#[serial_test::serial]
+#[tokio::test]
 async fn test_cross_messages() {
     with_testnet(
         MANIFEST,
@@ -113,47 +140,57 @@ async fn test_cross_messages() {
             let test = async {
                 let brussels = testnet.node(&testnet.root().node("brussels"))?;
                 let england = testnet.subnet(&testnet.root().subnet("england"))?;
-                let london = testnet.node(&testnet.root().subnet("england").node("london"))?;
 
                 let _bob = testnet.account("bob")?;
 
                 let will = testnet.account("will")?;
 
                 let england_subnet = testnet.subnet(&testnet.root().subnet("england"))?;
+                let england_london_node =
+                    testnet.node(&testnet.root().subnet("england").node("london"))?;
 
                 let oxfordshire_subnet =
                     testnet.subnet(&testnet.root().subnet("england").subnet("oxfordshire"))?;
+                let oxfordshire_oxford_node = testnet.node(
+                    &testnet
+                        .root()
+                        .subnet("england")
+                        .subnet("oxfordshire")
+                        .node("oxford"),
+                )?;
 
                 let cross_messenger_contract_name = "cross_messenger".to_string();
-                let messenger_deployment = testnet
+                let england_messenger_deployment = testnet
                     .solidity_deployment(&england_subnet.name, cross_messenger_contract_name)?;
 
-                let london_provider = london
+                let london_provider = england_london_node
                     .ethapi_http_provider()?
                     .expect("ethapi should be enabled");
 
-                let signer = Arc::new(
+                let london_signer = Arc::new(
                     make_middleware(london_provider, &will)
                         .await
                         .context("failed to set up middleware")?,
                 );
 
-                let london_cross_messenger =
-                    CrossMessenger::new(messenger_deployment.address, signer.clone());
+                let london_cross_messenger = CrossMessenger::new(
+                    england_messenger_deployment.address,
+                    london_signer.clone(),
+                );
 
-                let _resp = london_cross_messenger
+                london_cross_messenger
                     .set_gateway_address(builtin_actor_eth_addr(ipc::GATEWAY_ACTOR_ID).into())
                     .send()
                     .await?
                     .await?
                     .expect("set gateway address failed");
 
-                let set_gt_addr = london_cross_messenger.get_gateway_address().call().await?;
-
-                println!("Gateway address: {:?}", set_gt_addr);
-
                 let root_network = testnet.subnet(&testnet.root())?;
                 let root_id = root_network.subnet_id.root_id();
+                
+                let addr = ethers::types::Address::from_str("0xc0ffee254729296a45a3885639AC7E10F9d54979")?;
+                let fil_addr = ethers_address_to_fil_address(&addr)?;
+                let fvm_addr_2 = FvmAddress2::try_from(fil_addr)?;
 
                 let invoke_cross_message_call = london_cross_messenger.invoke_cross_message(
                     Ipcaddress {
@@ -161,42 +198,105 @@ async fn test_cross_messages() {
                             root: root_id,
                             route: subnet_id_to_evm_addresses(&england_subnet.subnet_id)?,
                         },
-                        raw_address: Default::default(),
+                        raw_address: FvmAddress{
+                            addr_type: fvm_addr_2.addr_type,
+                            payload: fvm_addr_2.payload.clone(),
+                        },
                     },
                     Ipcaddress {
                         subnet_id: IPCSubnetID {
                             root: root_id,
                             route: subnet_id_to_evm_addresses(&oxfordshire_subnet.subnet_id)?,
                         },
-                        raw_address: Default::default(), // TODO Karel - fill the address here.
+                        raw_address: FvmAddress{
+                            addr_type: fvm_addr_2.addr_type,
+                            payload: fvm_addr_2.payload,
+                        },
                     },
                 );
 
-                let response = invoke_cross_message_call
+                let invoke_cross_message_receipt = invoke_cross_message_call
                     .value(3)
                     .send()
                     .await?
                     .await?
                     .expect("invoke cross message failed");
 
-                // TODO Karel - parse the response
-                println!("Invoke cross message response: {:?}", response);
+                println!(
+                    "Invoke cross message response: {:?}",
+                    invoke_cross_message_receipt
+                );
 
-                // match response {
-                //     Ok(response) => {
-                //         println!("Response: {:?}", response);
-                //     }
-                //     Err(ContractError::Revert(revert_reason)) => {
-                //         println!("Revert reason: {:?}", revert_reason);
-                //     }
-                //     Err(e) => {
-                //         // Generic error handler for other cases
-                //         println!(
-                //             "An error occurred while sending the contract message: {:?}",
-                //             e
-                //         );
-                //     }
-                // }
+                let oxford_provider = Arc::new(
+                    oxfordshire_oxford_node
+                        .ethapi_http_provider()?
+                        .expect("ethapi should be enabled"),
+                );
+
+                let gateway_address = builtin_actor_eth_addr(ipc::GATEWAY_ACTOR_ID);
+
+                let oxford_subnet_gateway_getter =
+                    GatewayGetterFacet::new(gateway_address, oxford_provider.clone());
+
+                let london_gateway_messenger =
+                    GatewayMessengerFacet::new(gateway_address, london_signer.clone());
+
+                let invoke_cross_message_tx = london_signer.get_transaction(invoke_cross_message_receipt.transaction_hash).await.unwrap().unwrap();
+                let invoked_on_height = invoke_cross_message_tx.block_number.unwrap().as_u64();
+    
+                // Query the latest committed parent finality and compare to the parent.
+                {
+                    let mut retry = 0;
+                    loop {
+                        let finality: ParentFinality = oxford_subnet_gateway_getter
+                            .get_latest_parent_finality()
+                            .call()
+                            .await
+                            .context("failed to get parent finality")?;
+
+                        let finality_height = finality.height.as_u64();
+
+                        // If the latest finality is not zero it means the syncer is working,
+                        if finality_height == 0 || finality_height < invoked_on_height {
+                            if retry < MAX_RETRIES {
+                                eprintln!("waiting for syncing with the parent... finality_height: {}, invoked_on_height: {}", finality_height, invoked_on_height);
+                                tokio::time::sleep(Duration::from_secs(SLEEP_SECS)).await;
+                                retry += 1;
+                                continue;
+                            }
+                            bail!("the parent finality is still zero");
+                        }
+
+                        // Check that the block hash of the parent is actually the same at that height.
+                        let parent_block: Option<et::Block<_>> = london_signer
+                            .get_block(finality.height.as_u64())
+                            .await
+                            .context("failed to get parent block")?;
+
+                        let Some(parent_block_hash) = parent_block.and_then(|b| b.hash) else {
+                            bail!("cannot find parent block at final height");
+                        };
+
+                        if parent_block_hash.0 != finality.block_hash {
+                            bail!("the finality block hash is different from the API");
+                        }
+
+                        let events: Vec<NewTopDownMessageFilter> = london_gateway_messenger
+                            .new_top_down_message_filter()
+                            .from_block(1)
+                            .to_block(finality_height)
+                            .query()
+                            .await
+                            .unwrap();
+
+                        println!("---- Events: {:?}", events.len());
+
+                        events.iter().for_each(|event| {
+                            println!("---- Event: {:?}", event);
+                        });
+                        break;
+                    }
+                }
 
                 // let parent_provider = Arc::new(
                 //     brussels
@@ -221,44 +321,6 @@ async fn test_cross_messages() {
                 //         .and_then(|a| a.ok_or_else(|| anyhow!("not an eth address")))?,
                 //     parent_provider.clone(),
                 // );
-
-                // // Query the latest committed parent finality and compare to the parent.
-                // {
-                //     let mut retry = 0;
-                //     loop {
-                //         let finality: ParentFinality = subnet_gateway_getter
-                //             .get_latest_parent_finality()
-                //             .call()
-                //             .await
-                //             .context("failed to get parent finality")?;
-
-                //         // If the latest finality is not zero it means the syncer is working,
-                //         if finality.height.is_zero() {
-                //             if retry < MAX_RETRIES {
-                //                 eprintln!("waiting for syncing with the parent...");
-                //                 tokio::time::sleep(Duration::from_secs(SLEEP_SECS)).await;
-                //                 retry += 1;
-                //                 continue;
-                //             }
-                //             bail!("the parent finality is still zero");
-                //         }
-
-                //         // Check that the block hash of the parent is actually the same at that height.
-                //         let parent_block: Option<et::Block<_>> = parent_provider
-                //             .get_block(finality.height.as_u64())
-                //             .await
-                //             .context("failed to get parent block")?;
-
-                //         let Some(parent_block_hash) = parent_block.and_then(|b| b.hash) else {
-                //             bail!("cannot find parent block at final height");
-                //         };
-
-                //         if parent_block_hash.0 != finality.block_hash {
-                //             bail!("the finality block hash is different from the API");
-                //         }
-                //         break;
-                //     }
-                // }
 
                 // // Check that the parent knows about a checkpoint submitted from the child.
                 // {
