@@ -90,7 +90,10 @@ impl<S: VoteStore> VoteTally<S> {
     }
 
     pub fn check_quorum_cert(&self, cert: &ECDSACertificate<Observation>) -> bool {
-        let power_table = self.power_table.iter().map(|(v, w)| (v.public_key(), *w));
+        let power_table = self
+            .ordered_validators()
+            .into_iter()
+            .map(|(v, w)| (v.public_key(), *w));
         match cert.quorum_reached(power_table, self.quorum_ratio) {
             Ok(v) => v,
             Err(e) => {
@@ -196,7 +199,15 @@ impl<S: VoteStore> VoteTally<S> {
     ///
     /// After this operation the minimum item in the chain will the new finalized block.
     pub fn set_finalized(&mut self, block_height: BlockHeight) -> Result<(), Error> {
-        self.votes.purge_votes_at_height(block_height)?;
+        let start = if let Some(start) = self.votes.earliest_vote_height()? {
+            start
+        } else {
+            block_height
+        };
+        for h in start..=block_height {
+            self.votes.purge_votes_at_height(h)?;
+        }
+
         self.last_finalized_height = block_height;
         Ok(())
     }

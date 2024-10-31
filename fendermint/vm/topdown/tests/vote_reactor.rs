@@ -14,9 +14,7 @@ use fendermint_vm_topdown::vote::error::Error;
 use fendermint_vm_topdown::vote::gossip::GossipClient;
 use fendermint_vm_topdown::vote::payload::{PowerUpdates, Vote};
 use fendermint_vm_topdown::vote::store::InMemoryVoteStore;
-use fendermint_vm_topdown::vote::{
-    start_vote_reactor, StartVoteReactorParams, VoteConfig, VoteReactorClient, Weight,
-};
+use fendermint_vm_topdown::vote::{StartVoteReactorParams, VoteConfig, VoteReactorClient, Weight};
 use fendermint_vm_topdown::BlockHeight;
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::error::TryRecvError;
@@ -130,16 +128,20 @@ async fn simple_lifecycle() {
 
     let (internal_event_tx, _) = broadcast::channel(validators.len() + 1);
 
-    let client = start_vote_reactor(StartVoteReactorParams {
-        config: config.clone(),
-        validator_key: validators[0].sk.clone(),
-        power_table: power_updates.clone(),
-        last_finalized_height: initial_finalized_height,
-        latest_child_block: 100,
-        gossip: gossips.pop().unwrap(),
-        vote_store: InMemoryVoteStore::default(),
-        internal_event_listener: internal_event_tx.subscribe(),
-    })
+    let (client, rx) = VoteReactorClient::new(1024);
+    VoteReactorClient::start_reactor(
+        rx,
+        StartVoteReactorParams {
+            config: config.clone(),
+            validator_key: validators[0].sk.clone(),
+            power_table: power_updates.clone(),
+            last_finalized_height: initial_finalized_height,
+            latest_child_block: 100,
+            gossip: gossips.pop().unwrap(),
+            vote_store: InMemoryVoteStore::default(),
+            internal_event_listener: internal_event_tx.subscribe(),
+        },
+    )
     .unwrap();
 
     assert_eq!(client.find_quorum().await.unwrap(), None);
@@ -208,16 +210,20 @@ async fn waiting_for_quorum() {
     for i in 0..validators.len() {
         let (internal_event_tx, _) = broadcast::channel(validators.len() + 1);
 
-        let client = start_vote_reactor(StartVoteReactorParams {
-            config: config.clone(),
-            validator_key: validators[i].sk.clone(),
-            power_table: power_updates.clone(),
-            last_finalized_height: initial_finalized_height,
-            latest_child_block: 100,
-            gossip: gossips.pop().unwrap(),
-            vote_store: InMemoryVoteStore::default(),
-            internal_event_listener: internal_event_tx.subscribe(),
-        })
+        let (client, rx) = VoteReactorClient::new(1024);
+        VoteReactorClient::start_reactor(
+            rx,
+            StartVoteReactorParams {
+                config: config.clone(),
+                validator_key: validators[i].sk.clone(),
+                power_table: power_updates.clone(),
+                last_finalized_height: initial_finalized_height,
+                latest_child_block: 100,
+                gossip: gossips.pop().unwrap(),
+                vote_store: InMemoryVoteStore::default(),
+                internal_event_listener: internal_event_tx.subscribe(),
+            },
+        )
         .unwrap();
 
         clients.push(client);
@@ -338,16 +344,20 @@ async fn all_validator_in_sync() {
 
     let mut node_clients = vec![];
     for validator in &validators {
-        let r = start_vote_reactor(StartVoteReactorParams {
-            config: config.clone(),
-            validator_key: validator.sk.clone(),
-            power_table: power_updates.clone(),
-            last_finalized_height: initial_finalized_height,
-            latest_child_block: 100,
-            gossip: gossips.pop().unwrap(),
-            vote_store: InMemoryVoteStore::default(),
-            internal_event_listener: internal_event_tx.subscribe(),
-        })
+        let (r, rx) = VoteReactorClient::new(1024);
+        VoteReactorClient::start_reactor(
+            rx,
+            StartVoteReactorParams {
+                config: config.clone(),
+                validator_key: validator.sk.clone(),
+                power_table: power_updates.clone(),
+                last_finalized_height: initial_finalized_height,
+                latest_child_block: 100,
+                gossip: gossips.pop().unwrap(),
+                vote_store: InMemoryVoteStore::default(),
+                internal_event_listener: internal_event_tx.subscribe(),
+            },
+        )
         .unwrap();
 
         node_clients.push(r);
