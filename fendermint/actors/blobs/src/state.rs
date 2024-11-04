@@ -51,8 +51,16 @@ pub struct State {
 
 /// Helper for handling credit approvals.
 struct CreditDelegation<'a> {
+    /// The address that is submitting the transaction to add this blob
     pub origin: Address,
+    ///  address that is calling into the blob actor.  If the blobs actor is
+    ///  accessed directly, this will be the same as "origin". But most of the time this will be
+    ///  the address of the actor instance that is calling into the blobs actor. I.e a specific
+    ///  Bucket or Timehub instance.
     pub caller: Address,
+    /// Information about the approval that allows "origin" to use credits via "caller".
+    /// Note that the Address that has issued this approval (the subscriber/sponsor), and whose
+    /// credits are being allowed to be used, are not stored internal to this struct.
     pub approval: &'a mut CreditApproval,
 }
 
@@ -256,6 +264,15 @@ impl State {
         Ok(delete_from_disc)
     }
 
+    /// Add a blob
+    ///
+    /// @param origin - the address that is submitting the transaction to add this blob
+    /// @param caller - the address that is calling into this function.  If the blobs actor is
+    ///   accessed directly, this will be the same as "origin". But most of the time this will be
+    ///   the address of the actor instance that is calling into the blobs actor. I.e a specific
+    ///   Bucket or Timehub instance.
+    /// @param subscriber - the address whose credits will be spent by this transaction. Generally
+    ///  this is the owner of the wrapping Actor (e.g. Buckets, Timehub).
     #[allow(clippy::too_many_arguments)]
     pub fn add_blob(
         &mut self,
