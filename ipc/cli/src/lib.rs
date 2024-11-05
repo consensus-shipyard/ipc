@@ -46,14 +46,6 @@ pub struct GlobalArguments {
     /// Legacy env var for network
     #[arg(long = "__network", hide = true, env = "NETWORK", value_parser = parse_network)]
     __network: Option<Network>,
-
-    /// The number of confirmations to wait for before considering a transaction final.
-    /// TODO Karel - this is a hotfix.
-    #[arg(
-        long,
-        help = "The number of confirmations to wait for before considering a transaction final"
-    )]
-    confirmations: Option<usize>,
 }
 
 impl GlobalArguments {
