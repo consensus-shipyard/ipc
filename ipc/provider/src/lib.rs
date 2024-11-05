@@ -67,6 +67,7 @@ pub struct IpcProvider {
     config: Arc<Config>,
     fvm_wallet: Option<Arc<RwLock<Wallet>>>,
     evm_keystore: Option<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>>,
+    confirmations: Option<usize>,
 }
 
 impl IpcProvider {
@@ -74,24 +75,29 @@ impl IpcProvider {
         config: Arc<Config>,
         fvm_wallet: Arc<RwLock<Wallet>>,
         evm_keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
+        confirmations: Option<usize>,
     ) -> Self {
         Self {
             sender: None,
             config,
             fvm_wallet: Some(fvm_wallet),
             evm_keystore: Some(evm_keystore),
+            confirmations,
         }
     }
 
     /// Initializes an `IpcProvider` from the config specified in the
     /// argument's config path.
-    pub fn new_from_config(config_path: String) -> anyhow::Result<Self> {
+    pub fn new_from_config(
+        config_path: String,
+        confirmations: Option<usize>,
+    ) -> anyhow::Result<Self> {
         let config = Arc::new(Config::from_file(config_path)?);
         let fvm_wallet = Arc::new(RwLock::new(Wallet::new(new_fvm_wallet_from_config(
             config.clone(),
         )?)));
         let evm_keystore = Arc::new(RwLock::new(new_evm_keystore_from_config(config.clone())?));
-        Ok(Self::new(config, fvm_wallet, evm_keystore))
+        Ok(Self::new(config, fvm_wallet, evm_keystore, confirmations))
     }
 
     /// Initializes a new `IpcProvider` configured to interact with
@@ -109,20 +115,21 @@ impl IpcProvider {
                 &repo_path,
             )?)));
             let evm_keystore = Arc::new(RwLock::new(new_evm_keystore_from_path(&repo_path)?));
-            Ok(Self::new(config, fvm_wallet, evm_keystore))
+            Ok(Self::new(config, fvm_wallet, evm_keystore, None))
         } else {
             Ok(Self {
                 sender: None,
                 config,
                 fvm_wallet: None,
                 evm_keystore: None,
+                confirmations: None,
             })
         }
     }
 
     /// Initialized an `IpcProvider` using the default config path.
     pub fn new_default() -> anyhow::Result<Self> {
-        Self::new_from_config(default_config_path())
+        Self::new_from_config(default_config_path(), None)
     }
 
     /// Get the connection instance for the subnet.
@@ -133,14 +140,17 @@ impl IpcProvider {
             Some(subnet) => match &subnet.config {
                 config::subnet::SubnetConfig::Fevm(_) => {
                     let wallet = self.evm_keystore.clone();
-                    let manager =
-                        match EthSubnetManager::from_subnet_with_wallet_store(subnet, wallet) {
-                            Ok(w) => Some(w),
-                            Err(e) => {
-                                tracing::warn!("error initializing evm manager: {e}");
-                                return None;
-                            }
-                        };
+                    let manager = match EthSubnetManager::from_subnet_with_wallet_store(
+                        subnet,
+                        wallet,
+                        self.confirmations,
+                    ) {
+                        Ok(w) => Some(w),
+                        Err(e) => {
+                            tracing::warn!("error initializing evm manager: {e}");
+                            return None;
+                        }
+                    };
                     Some(Connection {
                         manager: Box::new(manager.unwrap()),
                         subnet: subnet.clone(),
