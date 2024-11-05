@@ -18,6 +18,16 @@ rootnet:
   env:
     CMT_CONSENSUS_TIMEOUT_COMMIT: 2s
     FM_LOG_LEVEL: info,fendermint=debug
+  solidity_deployments:
+    - name: "cross_messenger"
+      deployer: will
+      # TODO Karel - allow relative paths
+      foundry_root: "/Users/karlem/work/ipc/contracts"
+      contract:
+        name: "CrossMessenger"
+        path: "contracts/materializer/CrossMessenger.sol"
+        constructor_args:
+          - ""
 
   nodes:
     brussels:
@@ -43,16 +53,6 @@ subnets:
       FM_LOG_LEVEL: info,fendermint=debug
       # Enable debug log on the relayers
       RUST_LOG: debug
-    solidity_deployments:
-      - name: "cross_messenger"
-        deployer: will
-        # TODO Karel - allow relative paths
-        foundry_root: "/Users/karlem/work/ipc/contracts"
-        contract:
-          name: "CrossMessenger"
-          path: "contracts/materializer/CrossMessenger.sol"
-          constructor_args:
-            - ""
 
     relayers:
       euston:

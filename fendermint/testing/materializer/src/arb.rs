@@ -159,6 +159,7 @@ fn gen_manifest(
             balances: initial_balances,
             nodes: subnet.nodes,
             env: gen_env(g),
+            solidity_deployments: None,
         }
     };
 

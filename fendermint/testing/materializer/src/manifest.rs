@@ -137,6 +137,8 @@ pub enum Rootnet {
         /// Custom env vars to pass on to the nodes.
         #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
         env: EnvMap,
+        /// Solidity contracts to deploy on the subnet.
+        solidity_deployments: Option<Vec<SolidityContractDeployment>>,
     },
 }
 

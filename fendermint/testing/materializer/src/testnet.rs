@@ -440,6 +440,7 @@ where
                 balances,
                 nodes,
                 env,
+                solidity_deployments,
             } => {
                 self.create_root_genesis(m, root_name, validators.clone(), balances.clone())
                     .context("failed to create root genesis")?;
@@ -456,6 +457,14 @@ where
                 self.create_and_start_nodes(m, root_name, nodes, env)
                     .await
                     .context("failed to start root nodes")?;
+
+                if let Some(solidity_deployments) = solidity_deployments {
+                    self.deploy_solidity_contracts(m, root_name, solidity_deployments.clone())
+                        .await
+                        .with_context(|| {
+                            format!("failed to deploy solidity contracts in {root_name}")
+                        })?;
+                }
             }
         }
         Ok(())

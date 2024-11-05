@@ -107,19 +107,68 @@ where
 #[tokio::test]
 async fn test_jedu_rajenka() {
     // cast logs -r "http://localhost:30945" --address 0x77aa40b105843728088c0132e43fc44348881da8
-    let provider = Arc::new(Provider::<Http>::try_from("http://localhost:31045").unwrap());
+    let root_provider = Arc::new(Provider::<Http>::try_from("http://localhost:30845").unwrap());
+    let england_provider = Arc::new(Provider::<Http>::try_from("http://localhost:30945").unwrap());
     let contract_address = H160::from_str("0x77aa40b105843728088c0132e43fc44348881da8").unwrap();
 
-    let gateway_getter = GatewayGetterFacet::new(contract_address, provider.clone());
+    let england_gateway_getter = GatewayGetterFacet::new(contract_address, england_provider.clone());
 
-    let finality: ParentFinality = gateway_getter
-        .get_latest_parent_finality()
-        .call()
-        .await
-        .unwrap();
+    // let finality: ParentFinality = england_gateway_getter
+    //     .get_latest_parent_finality()
+    //     .call()
+    //     .await
+    //     .unwrap();
 
-    let block_hash = hex::encode(finality.block_hash);
-    println!("Finality: {:?} {:?}", finality.height, block_hash);
+    // let block_hash = hex::encode(finality.block_hash);
+    // println!("England finality: {:?} {:?}", finality.height, block_hash);
+
+    let england_gateway_messenger = GatewayMessengerFacet::new(
+        contract_address,
+        england_provider.clone(),
+    );
+
+    let filter = Filter::new().address(contract_address);
+
+    // Query the logs
+    let logs = england_provider.get_logs(&filter).await.unwrap();
+
+    // Process each log by parsing it into the event struct
+    for log in logs {
+        println!("Historical Event: {:?}", log);
+    }
+
+    // let events = england_gateway_messenger
+    //     .events()
+    //     .from_block(1)
+    //     .to_block(ethers::types::BlockNumber::Latest)
+    //     .query()
+    //     .await
+    //     .unwrap();
+
+    // println!("---- Events: {:?}", events.len());
+
+    // events.iter().for_each(|event| {
+    //     println!("---- Event: {:?}", event);
+    // });
+
+    // let root_gateway_messenger = GatewayMessengerFacet::new(
+    //     contract_address,
+    //     root_provider.clone(),
+    // );
+
+    // let events: Vec<NewTopDownMessageFilter> = root_gateway_messenger
+    //     .new_top_down_message_filter()
+    //     .from_block(1)
+    //     .to_block(ethers::types::BlockNumber::Latest)
+    //     .query()
+    //     .await
+    //     .unwrap();
+
+    // println!("---- Events: {:?}", events.len());
+
+    // events.iter().for_each(|event| {
+    //     println!("---- Event: {:?}", event);
+    // });
 }
 
 #[serial_test::serial]
@@ -138,7 +187,6 @@ async fn test_cross_messages() {
         },
         |_, _, testnet| {
             let test = async {
-                let brussels = testnet.node(&testnet.root().node("brussels"))?;
                 let england = testnet.subnet(&testnet.root().subnet("england"))?;
 
                 let _bob = testnet.account("bob")?;
@@ -151,6 +199,7 @@ async fn test_cross_messages() {
 
                 let oxfordshire_subnet =
                     testnet.subnet(&testnet.root().subnet("england").subnet("oxfordshire"))?;
+
                 let oxfordshire_oxford_node = testnet.node(
                     &testnet
                         .root()
@@ -160,25 +209,28 @@ async fn test_cross_messages() {
                 )?;
 
                 let cross_messenger_contract_name = "cross_messenger".to_string();
-                let england_messenger_deployment = testnet
-                    .solidity_deployment(&england_subnet.name, cross_messenger_contract_name)?;
 
-                let london_provider = england_london_node
+                let root_net = testnet.subnet(&testnet.root())?;
+                let root_brussels_node = testnet.node(&testnet.root().node("brussels"))?;
+                let root_provider = root_brussels_node
                     .ethapi_http_provider()?
                     .expect("ethapi should be enabled");
-
-                let london_signer = Arc::new(
-                    make_middleware(london_provider, &will)
+                
+                let root_provider_signer = Arc::new(
+                    make_middleware(root_provider, will)
                         .await
-                        .context("failed to set up middleware")?,
+                        .context("failed to set up signer middleware")?,
+                );
+    
+                let root_cross_messenger_deployment = testnet
+                .solidity_deployment(&root_net.name, cross_messenger_contract_name)?;
+
+                let root_cross_messenger = CrossMessenger::new(
+                    root_cross_messenger_deployment.address,
+                    root_provider_signer.clone(),
                 );
 
-                let london_cross_messenger = CrossMessenger::new(
-                    england_messenger_deployment.address,
-                    london_signer.clone(),
-                );
-
-                london_cross_messenger
+                root_cross_messenger
                     .set_gateway_address(builtin_actor_eth_addr(ipc::GATEWAY_ACTOR_ID).into())
                     .send()
                     .await?
@@ -192,14 +244,14 @@ async fn test_cross_messages() {
                 let fil_addr = ethers_address_to_fil_address(&addr)?;
                 let fvm_addr_2 = FvmAddress2::try_from(fil_addr)?;
 
-                let invoke_cross_message_call = london_cross_messenger.invoke_cross_message(
+                let invoke_cross_message_call = root_cross_messenger.invoke_cross_message(
                     Ipcaddress {
                         subnet_id: IPCSubnetID {
                             root: root_id,
-                            route: subnet_id_to_evm_addresses(&england_subnet.subnet_id)?,
+                            route: subnet_id_to_evm_addresses(&root_net.subnet_id)?,
                         },
                         raw_address: FvmAddress{
-                            addr_type: fvm_addr_2.addr_type,
+                            addr_type: fvm_addr_2.addr_type, // TODO Karel - add the cross message address and type
                             payload: fvm_addr_2.payload.clone(),
                         },
                     },
@@ -221,34 +273,35 @@ async fn test_cross_messages() {
                     .await?
                     .await?
                     .expect("invoke cross message failed");
-
+                
                 println!(
                     "Invoke cross message response: {:?}",
                     invoke_cross_message_receipt
                 );
+                
+                let gateway_address = builtin_actor_eth_addr(ipc::GATEWAY_ACTOR_ID);
 
-                let oxford_provider = Arc::new(
-                    oxfordshire_oxford_node
+                let london_provider = Arc::new(
+                    england_london_node
                         .ethapi_http_provider()?
                         .expect("ethapi should be enabled"),
                 );
 
-                let gateway_address = builtin_actor_eth_addr(ipc::GATEWAY_ACTOR_ID);
+                let london_subnet_gateway_getter =
+                    GatewayGetterFacet::new(gateway_address, london_provider.clone());
+                
+                let london_gateway_messenger = GatewayMessengerFacet::new(
+                    gateway_address,
+                    london_provider.clone(),
+                );
 
-                let oxford_subnet_gateway_getter =
-                    GatewayGetterFacet::new(gateway_address, oxford_provider.clone());
+                let invoked_on_height = invoke_cross_message_receipt.block_number.unwrap().as_u64();
 
-                let london_gateway_messenger =
-                    GatewayMessengerFacet::new(gateway_address, london_signer.clone());
-
-                let invoke_cross_message_tx = london_signer.get_transaction(invoke_cross_message_receipt.transaction_hash).await.unwrap().unwrap();
-                let invoked_on_height = invoke_cross_message_tx.block_number.unwrap().as_u64();
-    
                 // Query the latest committed parent finality and compare to the parent.
                 {
                     let mut retry = 0;
                     loop {
-                        let finality: ParentFinality = oxford_subnet_gateway_getter
+                        let finality: ParentFinality = london_subnet_gateway_getter
                             .get_latest_parent_finality()
                             .call()
                             .await
@@ -268,7 +321,7 @@ async fn test_cross_messages() {
                         }
 
                         // Check that the block hash of the parent is actually the same at that height.
-                        let parent_block: Option<et::Block<_>> = london_signer
+                        let parent_block: Option<et::Block<_>> = root_provider_signer
                             .get_block(finality.height.as_u64())
                             .await
                             .context("failed to get parent block")?;
@@ -297,6 +350,21 @@ async fn test_cross_messages() {
                         break;
                     }
                 }
+
+
+                let events = london_gateway_messenger
+                    .events()
+                    .from_block(1)
+                    .to_block(ethers::types::BlockNumber::Latest)
+                    .query()
+                    .await
+                    .unwrap();
+
+                println!("---- after Events: {:?}", events.len());
+
+                events.iter().for_each(|event| {
+                    println!("---- after Event: {:?}", event);
+                });
 
                 // let parent_provider = Arc::new(
                 //     brussels
