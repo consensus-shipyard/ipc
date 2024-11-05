@@ -73,6 +73,7 @@ const SUBNET_MAJORITY_PERCENTAGE: u8 = 67;
 
 pub struct EthSubnetManager {
     keystore: Option<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>>,
+    confirmations: usize,
     ipc_contract_info: IPCContractInfo,
 }
 
@@ -296,7 +297,10 @@ impl SubnetManager for EthSubnetManager {
         // We need the retry to parse the deployment event. At the time of this writing, it's a bug
         // in current FEVM that without the retries, events are not picked up.
         // See https://github.com/filecoin-project/community/discussions/638 for more info and updates.
-        let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
+        let receipt = pending_tx
+            .retries(TRANSACTION_RECEIPT_RETRIES)
+            .confirmations(self.confirmations)
+            .await?;
         match receipt {
             Some(r) => {
                 for log in r.logs {
@@ -354,7 +358,10 @@ impl SubnetManager for EthSubnetManager {
         let txn = txn.block(BlockId::Number(ethers::types::BlockNumber::Pending));
 
         let pending_tx = txn.send().await?;
-        let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
+        let receipt = pending_tx
+            .retries(TRANSACTION_RECEIPT_RETRIES)
+            .confirmations(self.confirmations)
+            .await?;
         block_number_from_receipt(receipt)
     }
 
@@ -567,7 +574,10 @@ impl SubnetManager for EthSubnetManager {
         let txn = call_with_premium_estimation(signer, txn).await?;
 
         let pending_tx = txn.send().await?;
-        let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
+        let receipt = pending_tx
+            .retries(TRANSACTION_RECEIPT_RETRIES)
+            .confirmations(self.confirmations)
+            .await?;
         block_number_from_receipt(receipt)
     }
 
@@ -601,7 +611,10 @@ impl SubnetManager for EthSubnetManager {
         let txn = call_with_premium_estimation(signer, txn).await?;
 
         let pending_tx = txn.send().await?;
-        let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
+        let receipt = pending_tx
+            .retries(TRANSACTION_RECEIPT_RETRIES)
+            .confirmations(self.confirmations)
+            .await?;
         block_number_from_receipt(receipt)
     }
 
@@ -633,7 +646,10 @@ impl SubnetManager for EthSubnetManager {
         let txn = call_with_premium_estimation(signer, txn).await?;
 
         let pending_tx = txn.send().await?;
-        let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
+        let receipt = pending_tx
+            .retries(TRANSACTION_RECEIPT_RETRIES)
+            .confirmations(self.confirmations)
+            .await?;
         block_number_from_receipt(receipt)
     }
 
@@ -663,7 +679,10 @@ impl SubnetManager for EthSubnetManager {
         let txn = call_with_premium_estimation(signer, txn).await?;
 
         let pending_tx = txn.send().await?;
-        let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
+        let receipt = pending_tx
+            .retries(TRANSACTION_RECEIPT_RETRIES)
+            .confirmations(self.confirmations)
+            .await?;
         block_number_from_receipt(receipt)
     }
 
@@ -913,7 +932,10 @@ impl SubnetManager for EthSubnetManager {
         let call = contract.set_federated_power(addresses, pubkeys, power_u256);
         let txn = call_with_premium_estimation(signer, call).await?;
         let pending_tx = txn.send().await?;
-        let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
+        let receipt = pending_tx
+            .retries(TRANSACTION_RECEIPT_RETRIES)
+            .confirmations(self.confirmations)
+            .await?;
         block_number_from_receipt(receipt)
     }
 }
@@ -1026,9 +1048,11 @@ impl EthSubnetManager {
         chain_id: u64,
         provider: Provider<Http>,
         keystore: Option<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>>,
+        confirmations: Option<usize>,
     ) -> Self {
         Self {
             keystore,
+            confirmations: confirmations.unwrap_or(0),
             ipc_contract_info: IPCContractInfo {
                 gateway_addr,
                 registry_addr,
@@ -1101,6 +1125,7 @@ impl EthSubnetManager {
     pub fn from_subnet_with_wallet_store(
         subnet: &Subnet,
         keystore: Option<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>>,
+        confirmations: Option<usize>,
     ) -> Result<Self> {
         let url = subnet.rpc_http().clone();
         let auth_token = subnet.auth_token();
@@ -1142,6 +1167,7 @@ impl EthSubnetManager {
             subnet.id.chain_id(),
             provider,
             keystore,
+            confirmations,
         ))
     }
 }
@@ -1181,7 +1207,10 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
         let call = call_with_premium_estimation(signer, call).await?;
 
         let pending_tx = call.send().await?;
-        let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
+        let receipt = pending_tx
+            .retries(TRANSACTION_RECEIPT_RETRIES)
+            .confirmations(self.confirmations)
+            .await?;
         block_number_from_receipt(receipt)
     }
 
