@@ -271,8 +271,10 @@ impl State {
     ///   accessed directly, this will be the same as "origin". But most of the time this will be
     ///   the address of the actor instance that is calling into the blobs actor. I.e a specific
     ///   Bucket or Timehub instance.
-    /// @param subscriber - the address whose credits will be spent by this transaction. Generally
-    ///  this is the owner of the wrapping Actor (e.g. Buckets, Timehub).
+    /// @param subscriber - the address responsible for the subscription to keep this blob around.
+    ///  This is whose credits will be spent by this transaction, and going forward to continue to
+    ///  pay for the blob over time. Generally this is the owner of the wrapping Actor
+    ///  (e.g. Buckets, Timehub).
     #[allow(clippy::too_many_arguments)]
     pub fn add_blob(
         &mut self,
