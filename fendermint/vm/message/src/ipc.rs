@@ -36,6 +36,9 @@ pub enum IpcMessage {
 
     /// Proposed by validators at the credit debit interval set at genesis.
     DebitCreditAccounts,
+
+    /// List of pending blobs
+    PendingBlobs(std::collections::HashSet<Blob>),
 }
 
 /// A message relayed by a user on the current subnet.

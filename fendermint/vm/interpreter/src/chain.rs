@@ -23,7 +23,8 @@ use fendermint_actor_blobs_shared::Method::DebitAccounts;
 use fendermint_actor_blobs_shared::{
     params::FinalizeBlobParams,
     Method::{
-        FinalizeBlob, GetBlobStatus, GetPendingBlobs, GetPendingBlobsCount, GetPendingBytesCount,
+        BlobNoop, FinalizeBlob, GetBlobStatus, GetPendingBlobs, GetPendingBlobsCount,
+        GetPendingBytesCount,
     },
 };
 use fendermint_tracing::emit;
@@ -240,19 +241,21 @@ where
             .state_tree_mut()
             .end_transaction(true)
             .expect("we just started a transaction");
+        let mut pending_hashes = HashSet::new();
         for (hash, sources) in pending_blobs {
             for (subscriber, source) in sources {
-                atomically(|| {
-                    chain_env.blob_pool.add(BlobPoolItem {
-                        subscriber,
-                        hash,
-                        source,
-                    })
-                })
-                .await;
-                tracing::debug!(hash = ?hash, subscriber = ?subscriber, "blob added to pool");
+                // Create a set of hashes which are pending
+                pending_hashes.insert(fendermint_vm_message::ipc::Blob {
+                    subscriber,
+                    hash,
+                    source,
+                    succeeded: false,
+                });
+                tracing::debug!(hash = ?hash, subscriber = ?subscriber, "blob pending message created");
             }
         }
+
+        msgs.push(ChainMessage::Ipc(IpcMessage::PendingBlobs(pending_hashes)));
 
         // Maybe debit all credit accounts
         let current_height = state.block_height();
@@ -427,6 +430,15 @@ where
                             "invalid height for credit debit; rejecting proposal"
                         );
                         return Ok(false);
+                    }
+                }
+                ChainMessage::Ipc(IpcMessage::PendingBlobs(pending_blobs)) => {
+                    // Check that the pending blobs are still pending in the actor
+                    for blob in pending_blobs {
+                        if !is_blob_pending(&mut state, blob.hash, blob.subscriber)? {
+                            tracing::debug!(hash = ?blob.hash, "blob is not pending onchain; rejecting proposal");
+                            return Ok(false);
+                        }
                     }
                 }
                 ChainMessage::Signed(signed) => {
@@ -740,6 +752,55 @@ where
 
                     Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
                 }
+                IpcMessage::PendingBlobs(blobs) => {
+                    // add pending blobs to the pool
+                    for Blob {
+                        subscriber,
+                        hash,
+                        source,
+                        ..
+                    } in blobs
+                    {
+                        atomically(|| {
+                            env.blob_pool.add(BlobPoolItem {
+                                subscriber,
+                                hash,
+                                source,
+                            })
+                        })
+                        .await;
+                        tracing::debug!(hash = ?hash, subscriber = ?subscriber, "blob added to pool");
+                    }
+                    // call the blob_noop method
+                    let from = system::SYSTEM_ACTOR_ADDR;
+                    let to = blobs::BLOBS_ACTOR_ADDR;
+                    let method_num = BlobNoop as u64;
+                    let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
+                    let params = RawBytes::default();
+                    let msg = Message {
+                        version: Default::default(),
+                        from,
+                        to,
+                        sequence: 0,
+                        value: Default::default(),
+                        method_num,
+                        params,
+                        gas_limit,
+                        gas_fee_cap: Default::default(),
+                        gas_premium: Default::default(),
+                    };
+
+                    let (apply_ret, emitters) = state.execute_implicit(msg)?;
+                    let ret = FvmApplyRet {
+                        apply_ret,
+                        from,
+                        to,
+                        method_num,
+                        gas_limit,
+                        emitters,
+                    };
+                    Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
+                }
             },
         }
     }
@@ -824,7 +885,8 @@ where
                     IpcMessage::TopDownExec(_)
                     | IpcMessage::BottomUpExec(_)
                     | IpcMessage::BlobFinalized(_)
-                    | IpcMessage::DebitCreditAccounts => {
+                    | IpcMessage::DebitCreditAccounts
+                    | IpcMessage::PendingBlobs(_) => {
                         // Users cannot send these messages, only validators can propose them in blocks.
                         Ok((state, Err(IllegalMessage)))
                     }
