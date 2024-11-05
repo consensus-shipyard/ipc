@@ -1,3 +1,6 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: MIT
+
 use async_trait::async_trait;
 use ethers::core::types::{transaction::eip2718::TypedTransaction, *};
 use ethers::providers::{Middleware, MiddlewareError, PendingTransaction};
