@@ -349,17 +349,19 @@ impl State {
                 let (group_expiry, new_group_expiry) = group.max_expiries(&id, Some(expiry));
                 // If the subscriber has been debited after the group's max expiry, we need to
                 // clean up the accounting with a refund.
-                // This might affect the subscriber's ability to renew.
                 // If the ensure-credit check below fails, the refund won't be saved in the
                 // subscriber's state.
                 // However, they will get rerefunded during the next auto debit tick.
                 if let Some(group_expiry) = group_expiry {
                     if account.last_debit_epoch > group_expiry {
-                        // The refund extends up to the last debit epoch.
-                        let refund_blocks = account.last_debit_epoch - group_expiry;
+                        // The refund extends up to the current epoch because we need to
+                        // account for the charge that will happen below at the current epoch.
+                        let refund_blocks = current_epoch - group_expiry;
                         let refund = refund_blocks as u64 * &size;
+                        // Re-mint spent credit
                         self.credit_debited -= &refund;
-                        account.credit_free += &refund; // re-mint spent credit
+                        self.credit_committed += &refund;
+                        account.credit_committed += &refund;
                         debug!("refunded {} credits to {}", refund, subscriber);
                     }
                 }
@@ -369,7 +371,7 @@ impl State {
                 // When adding, the new group expiry will always contain a value.
                 let new_group_expiry = new_group_expiry.unwrap();
                 credit_required = if let Some(group_expiry) = group_expiry {
-                    (new_group_expiry - group_expiry) as u64 * &size
+                    (new_group_expiry - group_expiry.max(current_epoch)) as u64 * &size
                 } else {
                     (new_group_expiry - current_epoch) as u64 * &size
                 };
@@ -489,7 +491,6 @@ impl State {
             // New blob increases network capacity as well.
             // Ensure there is enough capacity available.
             let available_capacity = &self.capacity_total - &self.capacity_used;
-
             if size > available_capacity {
                 return Err(ActorError::forbidden(format!(
                     "subnet has insufficient storage capacity (available: {}; required: {})",
@@ -641,7 +642,6 @@ impl State {
         };
         // If the subscriber has been debited after the group's max expiry, we need to
         // clean up the accounting with a refund.
-        // This might affect the subscriber's ability to renew.
         // We could just account for the refund amount when ensuring credit below, but if that
         // fails, the overcharge would still exist.
         // When renewing, the existing group expiry will always contain a value.
@@ -651,8 +651,10 @@ impl State {
             // The refund extends up to the last debit epoch
             let refund_blocks = account.last_debit_epoch - group_expiry;
             let refund = refund_blocks as u64 * &size;
+            // Re-mint spent credit
             self.credit_debited -= &refund;
-            account.credit_free += &refund; // re-mint spent credit
+            self.credit_committed += &refund;
+            account.credit_committed += &refund;
             debug!("refunded {} credits to {}", refund, subscriber);
         }
         // Ensure subscriber has enough credits, considering the subscription group may
@@ -1572,6 +1574,134 @@ mod tests {
     }
 
     #[test]
+    fn test_add_blob_refund() {
+        setup_logs();
+        let capacity = 1024 * 1024;
+        let mut state = State::new(capacity, 1);
+        let subscriber = new_address();
+        let current_epoch = ChainEpoch::from(1);
+        let amount = TokenAmount::from_whole(10);
+        state
+            .buy_credit(subscriber, amount.clone(), current_epoch)
+            .unwrap();
+        let mut credit_amount = amount.atto() * state.credit_debit_rate;
+
+        // Add blob with default a subscription ID
+        let (hash1, size1) = new_hash(1024);
+        let add1_epoch = current_epoch;
+        let id1 = SubscriptionId::Default;
+        let source = new_pk();
+        let res = state.add_blob(
+            subscriber,
+            subscriber,
+            subscriber,
+            add1_epoch,
+            hash1,
+            id1.clone(),
+            size1,
+            Some(MIN_TTL),
+            source,
+        );
+        assert!(res.is_ok());
+
+        // Check the account balance
+        let account = state.get_account(subscriber).unwrap();
+        assert_eq!(account.last_debit_epoch, add1_epoch);
+        assert_eq!(
+            account.credit_committed,
+            BigInt::from(MIN_TTL as u64 * size1),
+        );
+        credit_amount -= &account.credit_committed;
+        assert_eq!(account.credit_free, credit_amount);
+        assert_eq!(account.capacity_used, BigInt::from(size1));
+
+        // Add another blob past the first blob's expiry
+        let (hash2, size2) = new_hash(2048);
+        let add2_epoch = ChainEpoch::from(MIN_TTL + 11);
+        let id2 = SubscriptionId::Key(b"foo".to_vec());
+        let source = new_pk();
+        let res = state.add_blob(
+            subscriber,
+            subscriber,
+            subscriber,
+            add2_epoch,
+            hash2,
+            id2.clone(),
+            size2,
+            None,
+            source,
+        );
+        assert!(res.is_ok());
+
+        // Check the account balance
+        let account = state.get_account(subscriber).unwrap();
+        assert_eq!(account.last_debit_epoch, add2_epoch);
+        let blob1_expiry = ChainEpoch::from(MIN_TTL + add1_epoch);
+        let overcharge = BigInt::from((add2_epoch - blob1_expiry) as u64 * size1);
+        assert_eq!(
+            account.credit_committed, // this includes an overcharge that needs to be refunded
+            BigInt::from((AUTO_TTL as u64 * size2) - overcharge),
+        );
+        credit_amount -= BigInt::from(AUTO_TTL as u64 * size2);
+        assert_eq!(account.credit_free, credit_amount);
+        assert_eq!(account.capacity_used, BigInt::from(size1 + size2));
+
+        // Check state
+        assert_eq!(state.credit_committed, account.credit_committed);
+        assert_eq!(
+            state.credit_debited,
+            amount.atto() - (&account.credit_free + &account.credit_committed)
+        );
+        assert_eq!(state.capacity_used, account.capacity_used);
+
+        // Check indexes
+        assert_eq!(state.expiries.len(), 2);
+        assert_eq!(state.pending.len(), 2);
+
+        // Add the first (now expired) blob again
+        let add3_epoch = ChainEpoch::from(MIN_TTL + 21);
+        let id1 = SubscriptionId::Default;
+        let source = new_pk();
+        let res = state.add_blob(
+            subscriber,
+            subscriber,
+            subscriber,
+            add3_epoch,
+            hash1,
+            id1.clone(),
+            size1,
+            None,
+            source,
+        );
+        assert!(res.is_ok());
+
+        // Check the account balance
+        let account = state.get_account(subscriber).unwrap();
+        assert_eq!(account.last_debit_epoch, add3_epoch);
+        assert_eq!(
+            account.credit_committed, // should not include overcharge due to refund
+            BigInt::from(
+                (AUTO_TTL - (add3_epoch - add2_epoch)) as u64 * size2 + AUTO_TTL as u64 * size1
+            ),
+        );
+        credit_amount -= BigInt::from(AUTO_TTL as u64 * size1);
+        assert_eq!(account.credit_free, credit_amount);
+        assert_eq!(account.capacity_used, BigInt::from(size1 + size2));
+
+        // Check state
+        assert_eq!(state.credit_committed, account.credit_committed);
+        assert_eq!(
+            state.credit_debited,
+            amount.atto() - (&account.credit_free + &account.credit_committed)
+        );
+        assert_eq!(state.capacity_used, account.capacity_used);
+
+        // Check indexes
+        assert_eq!(state.expiries.len(), 2);
+        assert_eq!(state.pending.len(), 2);
+    }
+
+    #[test]
     fn test_add_blob_same_hash_same_account() {
         setup_logs();
         let capacity = 1024 * 1024;
@@ -2163,8 +2293,8 @@ mod tests {
         let account = state.get_account(subscriber).unwrap();
         assert_eq!(account.last_debit_epoch, add2_epoch); // not changed, blob is expired
         assert_eq!(
-            account.credit_committed, // this includes an overcharge that needs to be refunded
-            BigInt::from(MIN_TTL as u64 * size2), // should not include overcharge due to refund
+            account.credit_committed, // should not include overcharge due to refund
+            BigInt::from(MIN_TTL as u64 * size2),
         );
         assert_eq!(account.credit_free, credit_amount); // not changed
         assert_eq!(account.capacity_used, BigInt::from(size2));
