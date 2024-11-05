@@ -3871,13 +3871,17 @@ dependencies = [
 name = "fendermint_vm_iroh_resolver"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-stm",
  "fendermint_vm_topdown",
+ "hex",
  "im",
  "ipc-api",
+ "ipc-observability",
  "ipc_ipld_resolver",
  "iroh",
  "libp2p",
+ "prometheus",
  "rand",
  "serde",
  "tokio",

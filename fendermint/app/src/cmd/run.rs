@@ -31,7 +31,7 @@ use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteT
 use fendermint_vm_topdown::{CachedFinalityProvider, IPCBlobFinality, IPCParentFinality, Toggle};
 use fvm_shared::address::{current_network, Address, Network};
 use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
-use ipc_observability::observe::register_metrics as register_default_metrics;
+use ipc_observability::{emit, observe::register_metrics as register_default_metrics};
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
 use tokio::sync::broadcast::error::RecvError;
@@ -41,6 +41,10 @@ use tracing::{debug, error, info, warn};
 use crate::cmd::key::read_secret_key;
 use crate::{cmd, options::run::RunArgs, settings::Settings};
 use fendermint_app::observe::register_metrics as register_consensus_metrics;
+use fendermint_vm_iroh_resolver::observe::{
+    register_metrics as register_blobs_metrics, BlobsFinalityVotingFailure,
+    BlobsFinalityVotingSuccess,
+};
 
 cmd! {
   RunArgs(self, settings) {
@@ -79,6 +83,7 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
         register_interpreter_metrics(&registry)
             .context("failed to register interpreter metrics")?;
         register_consensus_metrics(&registry).context("failed to register consensus metrics")?;
+        register_blobs_metrics(&registry).context("failed to register blobs metrics")?;
 
         Some(registry)
     } else {
@@ -613,7 +618,17 @@ async fn dispatch_vote(
             .await;
 
             match res {
-                Ok(_) => {}
+                Ok(_) => {
+                    if f.success {
+                        emit(BlobsFinalityVotingSuccess {
+                            blob_hash: Some(f.hash.into()),
+                        });
+                    } else {
+                        emit(BlobsFinalityVotingFailure {
+                            blob_hash: Some(f.hash.into()),
+                        });
+                    }
+                }
                 Err(e @ VoteError::Equivocation(_, _, _, _)) => {
                     warn!(error = e.to_string(), "failed to handle vote");
                 }

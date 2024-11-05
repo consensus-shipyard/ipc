@@ -7,16 +7,20 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+anyhow = { workspace = true }
 async-stm = { workspace = true }
+hex = { workspace = true }
 im = { workspace = true }
 iroh = { workspace = true }
 libp2p = { workspace = true }
+prometheus = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true }
 
 ipc-api = { workspace = true }
 ipc_ipld_resolver = { workspace = true }
+ipc-observability = { workspace = true }
 
 fendermint_vm_topdown = { path = "../topdown" }
 

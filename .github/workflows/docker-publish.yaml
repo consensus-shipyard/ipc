@@ -34,6 +34,11 @@ jobs:
           submodules: recursive
           ssh-key: ${{ secrets.IPC_DEPLOY_KEY }}
 
+      - name: Collect Git and SSH config files in a directory that is part of the Docker build context
+        run: |
+          mkdir root-config
+          cp -r ~/.gitconfig ~/.ssh root-config/
+
       - name: Install Tools
         uses: ./.github/actions/install-tools
         with:
