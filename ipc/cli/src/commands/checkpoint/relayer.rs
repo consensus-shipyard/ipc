@@ -81,6 +81,7 @@ impl CommandLineHandler for BottomUpRelayer {
             child.clone(),
             Arc::new(RwLock::new(keystore)),
             arguments.max_parallelism,
+            global.confirmations,
         )
         .await?;
 

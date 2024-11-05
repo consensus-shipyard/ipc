@@ -75,9 +75,13 @@ impl BottomUpCheckpointManager<EthSubnetManager> {
         child: Subnet,
         keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
         max_parallelism: usize,
+        confirmations: Option<usize>,
     ) -> Result<Self> {
-        let parent_handler =
-            EthSubnetManager::from_subnet_with_wallet_store(&parent, Some(keystore.clone()), None)?;
+        let parent_handler = EthSubnetManager::from_subnet_with_wallet_store(
+            &parent,
+            Some(keystore.clone()),
+            confirmations,
+        )?;
         let child_handler =
             EthSubnetManager::from_subnet_with_wallet_store(&child, Some(keystore), None)?;
         Self::new(
