@@ -73,6 +73,7 @@ impl<'a> CreditDelegation<'a> {
         }
     }
 
+    /// Tuple of (Origin, Caller) addresses
     pub fn addresses(&self) -> (Address, Address) {
         (self.origin, self.caller)
     }
