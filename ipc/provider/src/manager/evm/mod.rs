@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 mod manager;
+mod nonce_manager;
 
 use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
@@ -9,6 +10,7 @@ use ipc_api::subnet_id::SubnetID;
 
 use super::subnet::SubnetManager;
 pub use manager::EthSubnetManager;
+pub use nonce_manager::NonceManagerMiddleware;
 
 use ipc_actors_abis::subnet_actor_checkpointing_facet;
 
