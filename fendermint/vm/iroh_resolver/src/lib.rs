@@ -3,4 +3,5 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 pub mod iroh;
+pub mod observe;
 pub mod pool;

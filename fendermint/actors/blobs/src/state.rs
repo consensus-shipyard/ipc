@@ -600,6 +600,17 @@ impl State {
             .collect::<Vec<_>>()
     }
 
+    pub fn get_pending_blobs_count(&self) -> u64 {
+        self.pending.len() as u64
+    }
+
+    pub fn get_pending_bytes_count(&self) -> u64 {
+        self.pending
+            .keys()
+            .map(|hash| self.blobs[hash].size)
+            .sum()
+    }
+
     pub fn finalize_blob(
         &mut self,
         subscriber: Address,

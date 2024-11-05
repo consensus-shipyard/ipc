@@ -36,6 +36,8 @@ pub enum Method {
     GetPendingBlobs = frc42_dispatch::method_hash!("GetPendingBlobs"),
     FinalizeBlob = frc42_dispatch::method_hash!("FinalizeBlob"),
     DeleteBlob = frc42_dispatch::method_hash!("DeleteBlob"),
+    GetPendingBlobsCount = frc42_dispatch::method_hash!("GetPendingBlobsCount"),
+    GetPendingBytesCount = frc42_dispatch::method_hash!("GetPendingBytesCount"),
 }
 
 pub fn buy_credit(rt: &impl Runtime, recipient: Address) -> Result<Account, ActorError> {
