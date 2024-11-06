@@ -1,0 +1,26 @@
+{
+  "chain_name": "test",
+  "timestamp": 1680101412,
+  "network_version": 21,
+  "base_fee": "1000",
+  "power_scale": 0,
+  "validators": [
+    {
+      "public_key": "BD3oisjtoq9hsofANnb9X5LDfvuBGsjLN4N0afJIqLHPQsLKdP2doSij8pKFLAoSjIW315m6LMb6t68t0ysPGYk=",
+      "power": "1000000000000000000"
+    }
+  ],
+  "accounts": [
+    {
+      "meta": {
+        "Account": {
+          "owner": "t1334bzpbgxk2rekknoe3bu53r4gq6xoccaybekai"
+        }
+      },
+      "balance": "10000000000000000000"
+    }
+  ],
+  "eam_permission_mode": {
+    "mode": "unrestricted"
+  }
+}

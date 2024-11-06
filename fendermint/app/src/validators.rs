@@ -44,10 +44,7 @@ impl<C: Client + Sync> ValidatorTracker<C> {
         let mut new_validators = HashMap::new();
         let mut pubkey = None;
         for validator in response.validators {
-            let p = validator.pub_key.secp256k1().unwrap();
-            let compressed = p.to_encoded_point(true);
-            let b = compressed.as_bytes();
-            let key = PublicKey::parse_slice(b, None)?;
+            let key = fendermint_pub_key_from_tendermint_pub_key(&validator.pub_key)?;
 
             if *id == validator.address {
                 pubkey = Some(key);
@@ -66,4 +63,31 @@ impl<C: Client + Sync> ValidatorTracker<C> {
         let keys = self.public_keys.read().unwrap();
         keys.get(id).copied()
     }
+
+    pub fn hydrate_cache(
+        &self,
+        public_keys: Vec<(tendermint::account::Id, tendermint::public_key::PublicKey)>,
+    ) {
+        let public_keys = public_keys
+            .into_iter()
+            .filter_map(|(id, key)| {
+                fendermint_pub_key_from_tendermint_pub_key(&key)
+                    .map(|key| (id, key))
+                    .ok()
+            })
+            .collect();
+
+        *self.public_keys.write().unwrap() = public_keys;
+    }
+}
+
+// TODO Karel - consider using From trait
+fn fendermint_pub_key_from_tendermint_pub_key(
+    key: &tendermint::public_key::PublicKey,
+) -> anyhow::Result<PublicKey> {
+    let p = key.secp256k1().unwrap();
+    let compressed = p.to_encoded_point(true);
+    let b = compressed.as_bytes();
+    let key = PublicKey::parse_slice(b, None)?;
+    Ok(key)
 }

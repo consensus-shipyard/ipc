@@ -9,6 +9,7 @@ use async_trait::async_trait;
 use cid::Cid;
 use fendermint_abci::util::take_until_max_size;
 use fendermint_abci::{AbciResult, Application};
+use fendermint_crypto::PublicKey as FendermintPublicKey;
 use fendermint_storage::{
     Codec, Encode, KVCollection, KVRead, KVReadable, KVStore, KVWritable, KVWrite,
 };
@@ -39,8 +40,12 @@ use fvm_shared::version::NetworkVersion;
 use ipc_observability::{emit, serde::HexEncodableBlockHash};
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use tendermint::abci::request::CheckTxKind;
 use tendermint::abci::{request, response};
+use tendermint::account::Id as TendermintAccountId;
+use tendermint::PublicKey as TendermintPublicKey;
+
 use tendermint_rpc::Client;
 use tracing::instrument;
 
@@ -464,8 +469,16 @@ where
         tracing::info!(genesis_hash = genesis_hash.to_string(), "genesis");
 
         let (validators, state_params) = read_genesis_car(genesis_bytes, &self.state_store).await?;
+
         let validators =
             to_validator_updates(validators).context("failed to convert validators")?;
+
+        let validators_ids_with_keys: Vec<(TendermintAccountId, TendermintPublicKey)> = validators
+            .iter()
+            .map(|v| (TendermintAccountId::from(v.pub_key), v.pub_key))
+            .collect();
+
+        self.validators.hydrate_cache(validators_ids_with_keys);
 
         tracing::info!(state_params = serde_json::to_string(&state_params)?);
 
