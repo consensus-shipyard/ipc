@@ -68,16 +68,13 @@ impl<C: Client + Sync> ValidatorTracker<C> {
         &self,
         public_keys: Vec<(tendermint::account::Id, tendermint::public_key::PublicKey)>,
     ) {
-        let public_keys = public_keys
-            .into_iter()
-            .filter_map(|(id, key)| {
-                fendermint_pub_key_from_tendermint_pub_key(&key)
-                    .map(|key| (id, key))
-                    .ok()
-            })
-            .collect();
+        let mut cache = self.public_keys.write().unwrap();
 
-        *self.public_keys.write().unwrap() = public_keys;
+        for (id, key) in public_keys {
+            if let Ok(fendermint_key) = fendermint_pub_key_from_tendermint_pub_key(&key) {
+                cache.insert(id, fendermint_key);
+            }
+        }
     }
 }
 
