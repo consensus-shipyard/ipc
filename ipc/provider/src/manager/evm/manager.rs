@@ -1096,9 +1096,6 @@ impl EthSubnetManager {
 
         let signer = SignerMiddleware::new(self.ipc_contract_info.provider.clone(), wallet);
         Ok(signer)
-
-        // let nonce_manager = NonceManagerMiddleware::new(signer, addr);
-        // Ok(nonce_manager)
     }
 
     pub fn from_subnet_with_wallet_store(
