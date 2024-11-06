@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use std::future::Future;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use anyhow::{anyhow, Context, Result};
 use async_stm::{atomically, atomically_or_err};
@@ -40,10 +40,10 @@ use fvm_shared::version::NetworkVersion;
 use ipc_observability::{emit, serde::HexEncodableBlockHash};
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use tendermint::abci::request::CheckTxKind;
 use tendermint::abci::{request, response};
 use tendermint::account::Id as TendermintAccountId;
+use tendermint::consensus::Params as TendermintConsensusParams;
 use tendermint::PublicKey as TendermintPublicKey;
 
 use tendermint_rpc::Client;
@@ -169,6 +169,8 @@ where
     state_hist_size: u64,
     /// Tracks the validator
     validators: ValidatorTracker<C>,
+
+    latest_consensus_params: Arc<RwLock<Option<TendermintConsensusParams>>>,
     /// The cometbft client
     client: C,
 }
@@ -207,6 +209,7 @@ where
             exec_state: Arc::new(tokio::sync::Mutex::new(None)),
             check_state: Arc::new(tokio::sync::Mutex::new(None)),
             validators: ValidatorTracker::new(client.clone()),
+            latest_consensus_params: Arc::new(RwLock::new(None)),
             client,
         };
         app.init_committed_state()?;
@@ -470,9 +473,12 @@ where
 
         let (validators, state_params) = read_genesis_car(genesis_bytes, &self.state_store).await?;
 
+        *self.latest_consensus_params.write().unwrap() = Some(request.consensus_params);
+
         let validators =
             to_validator_updates(validators).context("failed to convert validators")?;
 
+        // Set the initial validator set to validators cache.
         let validators_ids_with_keys: Vec<(TendermintAccountId, TendermintPublicKey)> = validators
             .iter()
             .map(|v| (TendermintAccountId::from(v.pub_key), v.pub_key))
@@ -820,18 +826,28 @@ where
         let validator_updates =
             to_validator_updates(power_updates.0).context("failed to convert validator updates")?;
 
+        // Updates the validator cache with the new validator set.
+        let validators_ids_with_keys: Vec<(TendermintAccountId, TendermintPublicKey)> =
+            validator_updates
+                .iter()
+                .map(|v| (TendermintAccountId::from(v.pub_key), v.pub_key))
+                .collect();
+
+        self.validators.hydrate_cache(validators_ids_with_keys);
+
+        // TODO Karel - this is a bit of a hack, but we need to update the consensus params
+        let mut latest_consensus_params = self.latest_consensus_params.write().unwrap();
+
         // If the block gas limit has changed, we need to update the consensus layer so it can
         // pack subsequent blocks against the new limit.
         let consensus_param_updates = {
-            let mut consensus_params = self
-                .client
-                .consensus_params(tendermint::block::Height::try_from(request.height)?)
-                .await?
-                .consensus_params;
-
-            if consensus_params.block.max_gas != new_block_gas_limit as i64 {
-                consensus_params.block.max_gas = new_block_gas_limit as i64;
-                Some(consensus_params)
+            if let Some(ref mut params) = *latest_consensus_params {
+                if params.block.max_gas != new_block_gas_limit as i64 {
+                    params.block.max_gas = new_block_gas_limit as i64;
+                    Some(params.clone())
+                } else {
+                    None
+                }
             } else {
                 None
             }
