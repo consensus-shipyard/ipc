@@ -181,6 +181,33 @@ impl State {
         Ok(approval.clone())
     }
 
+    /// Returns the CreditApproval if one exists from the given address, to the given address,
+    /// for the given caller, or None if no approval exists.
+    pub fn get_credit_approval(
+        &self,
+        from: Address,
+        to: Address,
+        caller: Address,
+    ) -> Option<CreditApproval> {
+        let account = match self.accounts.get(&from) {
+            None => return None,
+            Some(account) => account,
+        };
+        // First look for an approval for "to" keyed by "to", which denotes it's valid for
+        // any caller.
+        // Second look for an approval for the supplied caller.
+        let approval = if let Some(approvals) = account.approvals.get(&to) {
+            if let Some(approval) = approvals.get(&to) {
+                Some(approval)
+            } else {
+                approvals.get(&caller)
+            }
+        } else {
+            None
+        };
+        approval.cloned()
+    }
+
     pub fn revoke_credit(
         &mut self,
         from: Address,
@@ -631,10 +658,7 @@ impl State {
     }
 
     pub fn get_pending_bytes_count(&self) -> u64 {
-        self.pending
-            .keys()
-            .map(|hash| self.blobs[hash].size)
-            .sum()
+        self.pending.keys().map(|hash| self.blobs[hash].size).sum()
     }
 
     pub fn finalize_blob(

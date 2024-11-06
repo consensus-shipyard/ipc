@@ -36,6 +36,18 @@ pub struct ApproveCreditParams {
     pub ttl: Option<ChainEpoch>,
 }
 
+/// Params for looking up a credit approval
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct GetCreditApprovalParams {
+    /// Account address (credit owner) that made the approval.
+    pub from: Address,
+    /// Account address that received the approval.
+    pub to: Address,
+    /// The caller address, e.g., a bucket.
+    /// The receiver can only use the approval via a caller contract.
+    pub caller: Address,
+}
+
 /// Params for revoking credit.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct RevokeCreditParams {
