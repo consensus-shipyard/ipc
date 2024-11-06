@@ -443,8 +443,9 @@ fn resolve_external(
             Ok((delegated_addr, ActorType::Evm))
         }
         Some(t) => Err(ActorError::forbidden(format!(
-            "disallowed caller type {}",
-            t.name()
+            "disallowed caller type {} for address {}",
+            t.name(),
+            address
         ))),
         None => {
             // The caller might be a machine
