@@ -661,8 +661,11 @@ impl State {
         // have expiries that cover a portion of the renewal.
         // Required credit can be negative if subscriber is reducing expiry.
         // When renewing, the new group expiry will always contain a value.
+        // There may be a gap between the existing expiry and the last debit that will make
+        // the renewal discontinuous.
         let new_group_expiry = new_group_expiry.unwrap();
-        let credit_required = (new_group_expiry - group_expiry) as u64 * &size;
+        let credit_required =
+            (new_group_expiry - group_expiry.max(account.last_debit_epoch)) as u64 * &size;
         ensure_credit(
             subscriber,
             current_epoch,
@@ -1159,10 +1162,7 @@ fn update_expiry_index(
 
 #[cfg(test)]
 mod tests {
-    // TODO: More add tests, include delgation
-    // TODO: Delete tests, include delegation
-    // TODO: Renew tests
-    // TODO: More debit accounts tests
+    // TODO: Allow relevant tests to use a delegation
 
     use super::*;
 
@@ -1957,6 +1957,206 @@ mod tests {
         // Check indexes
         assert_eq!(state.expiries.len(), 1);
         assert_eq!(state.pending.len(), 0);
+    }
+
+    #[test]
+    fn test_renew_blob_success() {
+        setup_logs();
+        let capacity = 1024 * 1024;
+        let mut state = State::new(capacity, 1);
+        let subscriber = new_address();
+        let current_epoch = ChainEpoch::from(1);
+        let amount = TokenAmount::from_whole(10);
+        state
+            .buy_credit(subscriber, amount.clone(), current_epoch)
+            .unwrap();
+        let mut credit_amount = amount.atto() * state.credit_debit_rate;
+
+        // Add blob with default a subscription ID
+        let (hash, size) = new_hash(1024);
+        let add_epoch = current_epoch;
+        let source = new_pk();
+        let res = state.add_blob(
+            subscriber,
+            subscriber,
+            subscriber,
+            add_epoch,
+            hash,
+            SubscriptionId::Default,
+            size,
+            None,
+            source,
+        );
+        assert!(res.is_ok());
+
+        // Check the account balance
+        let account = state.get_account(subscriber).unwrap();
+        assert_eq!(account.last_debit_epoch, add_epoch);
+        assert_eq!(
+            account.credit_committed,
+            BigInt::from(AUTO_TTL as u64 * size),
+        );
+        credit_amount -= &account.credit_committed;
+        assert_eq!(account.credit_free, credit_amount);
+        assert_eq!(account.capacity_used, BigInt::from(size));
+
+        // Finalize as resolved
+        let finalize_epoch = ChainEpoch::from(11);
+        let res = state.finalize_blob(
+            subscriber,
+            finalize_epoch,
+            hash,
+            SubscriptionId::Default,
+            BlobStatus::Resolved,
+        );
+        assert!(res.is_ok());
+
+        // Renew blob
+        let renew_epoch = ChainEpoch::from(21);
+        let res = state.renew_blob(subscriber, renew_epoch, hash, SubscriptionId::Default);
+        assert!(res.is_ok());
+
+        // Check the account balance
+        let account = state.get_account(subscriber).unwrap();
+        assert_eq!(account.last_debit_epoch, add_epoch);
+        assert_eq!(
+            account.credit_committed,
+            BigInt::from((AUTO_TTL + (renew_epoch - add_epoch)) as u64 * size),
+        );
+        credit_amount -= (renew_epoch - add_epoch) as u64 * size;
+        assert_eq!(account.credit_free, credit_amount);
+        assert_eq!(account.capacity_used, BigInt::from(size));
+
+        // Check state
+        assert_eq!(state.credit_committed, account.credit_committed);
+        assert_eq!(
+            state.credit_debited,
+            amount.atto() - (&account.credit_free + &account.credit_committed)
+        );
+        assert_eq!(state.capacity_used, account.capacity_used);
+
+        // Check indexes
+        assert_eq!(state.expiries.len(), 1);
+        assert_eq!(state.pending.len(), 0);
+    }
+
+    #[test]
+    fn test_renew_blob_refund() {
+        setup_logs();
+        let capacity = 1024 * 1024;
+        let mut state = State::new(capacity, 1);
+        let subscriber = new_address();
+        let current_epoch = ChainEpoch::from(1);
+        let amount = TokenAmount::from_whole(10);
+        state
+            .buy_credit(subscriber, amount.clone(), current_epoch)
+            .unwrap();
+        let mut credit_amount = amount.atto() * state.credit_debit_rate;
+
+        // Add blob with default a subscription ID
+        let (hash1, size1) = new_hash(1024);
+        let add1_epoch = current_epoch;
+        let id1 = SubscriptionId::Default;
+        let source = new_pk();
+        let res = state.add_blob(
+            subscriber,
+            subscriber,
+            subscriber,
+            add1_epoch,
+            hash1,
+            id1.clone(),
+            size1,
+            None,
+            source,
+        );
+        assert!(res.is_ok());
+
+        // Check the account balance
+        let account = state.get_account(subscriber).unwrap();
+        assert_eq!(account.last_debit_epoch, add1_epoch);
+        assert_eq!(
+            account.credit_committed,
+            BigInt::from(AUTO_TTL as u64 * size1),
+        );
+        credit_amount -= &account.credit_committed;
+        assert_eq!(account.credit_free, credit_amount);
+        assert_eq!(account.capacity_used, BigInt::from(size1));
+
+        // Add another blob past the first blob's expiry
+        let (hash2, size2) = new_hash(2048);
+        let add2_epoch = ChainEpoch::from(AUTO_TTL + 11);
+        let id2 = SubscriptionId::Key(b"foo".to_vec());
+        let source = new_pk();
+        let res = state.add_blob(
+            subscriber,
+            subscriber,
+            subscriber,
+            add2_epoch,
+            hash2,
+            id2.clone(),
+            size2,
+            None,
+            source,
+        );
+        assert!(res.is_ok());
+
+        // Check the account balance
+        let account = state.get_account(subscriber).unwrap();
+        assert_eq!(account.last_debit_epoch, add2_epoch);
+        let blob1_expiry = ChainEpoch::from(AUTO_TTL + add1_epoch);
+        let overcharge = BigInt::from((add2_epoch - blob1_expiry) as u64 * size1);
+        assert_eq!(
+            account.credit_committed, // this includes an overcharge that needs to be accounted for
+            BigInt::from((AUTO_TTL as u64 * size2) - overcharge),
+        );
+        credit_amount -= BigInt::from(AUTO_TTL as u64 * size2);
+        assert_eq!(account.credit_free, credit_amount);
+        assert_eq!(account.capacity_used, BigInt::from(size1 + size2));
+
+        // Check state
+        assert_eq!(state.credit_committed, account.credit_committed);
+        assert_eq!(
+            state.credit_debited,
+            amount.atto() - (&account.credit_free + &account.credit_committed)
+        );
+        assert_eq!(state.capacity_used, account.capacity_used);
+
+        // Check indexes
+        assert_eq!(state.expiries.len(), 2);
+        assert_eq!(state.pending.len(), 2);
+
+        // Renew the first blob
+        let renew_epoch = ChainEpoch::from(AUTO_TTL + 31);
+        let res = state.renew_blob(subscriber, renew_epoch, hash1, id1.clone());
+        assert!(res.is_ok());
+
+        // Check the account balance
+        let account = state.get_account(subscriber).unwrap();
+        assert_eq!(account.last_debit_epoch, add2_epoch);
+        let blob1_expiry2 = ChainEpoch::from(AUTO_TTL + renew_epoch);
+        let blob2_expiry = ChainEpoch::from(AUTO_TTL + add2_epoch);
+        assert_eq!(
+            account.credit_committed,
+            BigInt::from(
+                (blob2_expiry - add2_epoch) as u64 * size2
+                    + (blob1_expiry2 - add2_epoch) as u64 * size1
+            ),
+        );
+        credit_amount -= BigInt::from((blob1_expiry2 - add2_epoch) as u64 * size1);
+        assert_eq!(account.credit_free, credit_amount);
+        assert_eq!(account.capacity_used, BigInt::from(size1 + size2));
+
+        // Check state
+        assert_eq!(state.credit_committed, account.credit_committed);
+        assert_eq!(
+            state.credit_debited,
+            amount.atto() - (&account.credit_free + &account.credit_committed)
+        );
+        assert_eq!(state.capacity_used, account.capacity_used);
+
+        // Check indexes
+        assert_eq!(state.expiries.len(), 2);
+        assert_eq!(state.pending.len(), 2);
     }
 
     #[test]
