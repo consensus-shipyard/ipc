@@ -90,6 +90,7 @@ pub fn revoke_credit(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn add_blob(
     rt: &impl Runtime,
     sponsor: Option<Address>,

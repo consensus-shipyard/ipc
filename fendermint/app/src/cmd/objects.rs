@@ -403,7 +403,7 @@ async fn handle_object_upload<F: QueryClient>(
         })
     })?;
 
-    tracing::info!(
+    info!(
         "downloaded blob {} in {:?} (size: {}; local_size: {}; downloaded_size: {}; metadata: {})",
         hash,
         outcome.stats.elapsed,
@@ -841,7 +841,7 @@ mod tests {
         let ent = Entangler::new(iroh_storage, 3, 5, 5).unwrap();
         let metadata_hash = ent.entangle_uploaded(hash.to_string()).await.unwrap();
 
-        let iroh_metadata_hash = Hash::from_str(&metadata_hash.as_str()).unwrap();
+        let iroh_metadata_hash = Hash::from_str(metadata_hash.as_str()).unwrap();
 
         let store = Address::new_id(90);
         let key = b"key";

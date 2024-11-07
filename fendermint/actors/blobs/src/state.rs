@@ -851,11 +851,7 @@ impl State {
             } else {
                 None
             };
-            if let Some(approval) = approval {
-                Some(CreditDelegation::new(origin, caller, approval))
-            } else {
-                None
-            }
+            approval.map(|approval| CreditDelegation::new(origin, caller, approval))
         } else {
             None
         };
@@ -1784,7 +1780,7 @@ mod tests {
         let overcharge = BigInt::from((add2_epoch - blob1_expiry) as u64 * size1);
         assert_eq!(
             account.credit_committed, // this includes an overcharge that needs to be refunded
-            BigInt::from((AUTO_TTL as u64 * size2) - overcharge),
+            AUTO_TTL as u64 * size2 - overcharge,
         );
         credit_amount -= BigInt::from(AUTO_TTL as u64 * size2);
         assert_eq!(account.credit_free, credit_amount);
@@ -2337,7 +2333,7 @@ mod tests {
         let overcharge = BigInt::from((add2_epoch - blob1_expiry) as u64 * size1);
         assert_eq!(
             account.credit_committed, // this includes an overcharge that needs to be accounted for
-            BigInt::from((AUTO_TTL as u64 * size2) - overcharge),
+            AUTO_TTL as u64 * size2 - overcharge,
         );
         credit_amount -= BigInt::from(AUTO_TTL as u64 * size2);
         assert_eq!(account.credit_free, credit_amount);
@@ -2752,7 +2748,7 @@ mod tests {
         let overcharge = BigInt::from((add2_epoch - blob1_expiry) as u64 * size1);
         assert_eq!(
             account.credit_committed, // this includes an overcharge that needs to be refunded
-            BigInt::from((MIN_TTL as u64 * size2) - overcharge),
+            MIN_TTL as u64 * size2 - overcharge,
         );
         credit_amount -= BigInt::from(MIN_TTL as u64 * size2);
         assert_eq!(account.credit_free, credit_amount);
