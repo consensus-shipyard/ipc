@@ -186,7 +186,7 @@ impl State {
     pub fn get_credit_approval(
         &self,
         from: Address,
-        to: Address,
+        receiver: Address,
         caller: Address,
     ) -> Option<CreditApproval> {
         let account = match self.accounts.get(&from) {
@@ -196,8 +196,8 @@ impl State {
         // First look for an approval for "to" keyed by "to", which denotes it's valid for
         // any caller.
         // Second look for an approval for the supplied caller.
-        let approval = if let Some(approvals) = account.approvals.get(&to) {
-            if let Some(approval) = approvals.get(&to) {
+        let approval = if let Some(approvals) = account.approvals.get(&receiver) {
+            if let Some(approval) = approvals.get(&receiver) {
                 Some(approval)
             } else {
                 approvals.get(&caller)

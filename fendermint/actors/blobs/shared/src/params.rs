@@ -42,7 +42,7 @@ pub struct GetCreditApprovalParams {
     /// Account address (credit owner) that made the approval.
     pub from: Address,
     /// Account address that received the approval.
-    pub to: Address,
+    pub receiver: Address,
     /// The caller address, e.g., a bucket.
     /// The receiver can only use the approval via a caller contract.
     pub caller: Address,

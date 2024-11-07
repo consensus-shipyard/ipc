@@ -132,18 +132,20 @@ impl BlobsActor {
             )));
         }
 
-        let (to, actor_type) = resolve_external(rt, params.to)?;
+        let (receiver, actor_type) = resolve_external(rt, params.receiver)?;
         // Receiver cannot be a machine
         if matches!(actor_type, ActorType::Machine) {
             return Err(ActorError::illegal_argument(format!(
-                "to address {} cannot be a machine",
-                to
+                "receiver address {} cannot be a machine",
+                receiver
             )));
         }
 
         let (caller, _) = resolve_external(rt, params.caller)?;
 
-        let approval = rt.state::<State>()?.get_credit_approval(from, to, caller);
+        let approval = rt
+            .state::<State>()?
+            .get_credit_approval(from, receiver, caller);
         Ok(approval)
     }
 
