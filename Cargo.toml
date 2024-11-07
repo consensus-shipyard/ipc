@@ -80,6 +80,8 @@ data-encoding = { version = "2.3.3" }
 dirs = "5.0"
 dircpy = "0.3.19"
 either = "1.10"
+entangler = { git = "ssh://git@github.com/hokunet/entanglement.git", rev = "ef3fdecf7cdd87d9e715556d627e4b5a2f79d6bd" }
+entangler_storage = { package = "storage", git = "ssh://git@github.com/hokunet/entanglement.git", rev = "ef3fdecf7cdd87d9e715556d627e4b5a2f79d6bd" }
 env_logger = "0.10"
 erased-serde = "0.3"
 ethers = { version = "2.0.13", features = ["abigen", "ws"] }
@@ -256,6 +258,12 @@ gcra = { git = "https://github.com/consensus-shipyard/gcra-rs.git", branch = "ma
 # fvm_ipld_encoding = { path = "../ref-fvm/ipld/encoding" }
 # fvm_ipld_hamt = { path = "../ref-fvm/ipld/hamt" }
 # fvm_ipld_amt = { path = "../ref-fvm/ipld/amt" }
+
+# Use below when working locally on entanglement and this repo simultaneously.
+# Assumes the entanglement checkout is in a sibling directory with the same name.
+#[patch."ssh://git@github.com/hokunet/entanglement.git"]
+#entangler = { path = "../entanglement/entangler" }
+#entangler_storage = { package = "storage", path = "../entanglement/storage" }
 
 [profile.wasm]
 inherits = "release"

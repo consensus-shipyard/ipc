@@ -69,17 +69,32 @@ impl ExpiryKey {
 }
 
 /// Helper for handling credit approvals.
-enum CreditDelegate<'a> {
-    IsNone,
-    IsSome((Address, Address), &'a mut CreditApproval),
+struct CreditDelegation<'a> {
+    /// The address that is submitting the transaction to add this blob.
+    pub origin: Address,
+    /// The address that is calling into the blob actor.
+    /// If the blob actor is accessed directly, this will be the same as "origin".
+    /// However, most of the time this will be the address of the actor instance that is
+    /// calling into the blobs actor, i.e., a specific Bucket or Timehub instance.
+    pub caller: Address,
+    /// Information about the approval that allows "origin" to use credits via "caller".
+    /// Note that the Address that has issued this approval (the subscriber/sponsor), and whose
+    /// credits are being allowed to be used, are not stored internal to this struct.
+    pub approval: &'a mut CreditApproval,
 }
 
-impl CreditDelegate<'_> {
-    fn addresses(&self) -> Option<(Address, Address)> {
-        match self {
-            Self::IsNone => None,
-            Self::IsSome(a, _) => Some(*a),
+impl<'a> CreditDelegation<'a> {
+    pub fn new(origin: Address, caller: Address, approval: &'a mut CreditApproval) -> Self {
+        Self {
+            origin,
+            caller,
+            approval,
         }
+    }
+
+    /// Tuple of (Origin, Caller) addresses.
+    pub fn addresses(&self) -> (Address, Address) {
+        (self.origin, self.caller)
     }
 }
 
@@ -288,6 +303,17 @@ impl State {
         Ok(delete_from_disc)
     }
 
+    /// Add a blob.
+    ///
+    /// @param origin - The address that is submitting the transaction to add this blob.
+    /// @param caller - The address that is calling into this function.
+    //    If the blob actor is accessed directly, this will be the same as "origin".
+    //    However, most of the time this will be the address of the actor instance that is
+    //    calling into the blobs actor, i.e., a specific Bucket or Timehub instance.
+    /// @param subscriber - The address responsible for the subscription to keep this blob around.
+    ///   This is whose credits will be spent by this transaction, and going forward to continue to
+    ///   pay for the blob over time. Generally, this is the owner of the wrapping Actor
+    ///   (e.g., Buckets, Timehub).
     #[allow(clippy::too_many_arguments)]
     pub fn add_blob(
         &mut self,
@@ -296,6 +322,7 @@ impl State {
         subscriber: Address,
         current_epoch: ChainEpoch,
         hash: Hash,
+        metadata_hash: Hash,
         id: SubscriptionId,
         size: u64,
         ttl: Option<ChainEpoch>,
@@ -316,7 +343,7 @@ impl State {
             .accounts
             .entry(subscriber)
             .or_insert(Account::new(BigInt::zero(), current_epoch));
-        let delegate = if origin != subscriber {
+        let delegation = if origin != subscriber {
             // First look for an approval for origin keyed by origin, which denotes it's valid for
             // any caller.
             // Second look for an approval for the supplied caller.
@@ -333,9 +360,9 @@ impl State {
                 "approval from {} to {} via caller {} not found",
                 subscriber, origin, caller
             )))?;
-            CreditDelegate::IsSome((origin, caller), approval)
+            Some(CreditDelegation::new(origin, caller, approval))
         } else {
-            CreditDelegate::IsNone
+            None
         };
         // Capacity updates and required credit depend on whether the subscriber is already
         // subcribing to this blob
@@ -380,7 +407,7 @@ impl State {
                     current_epoch,
                     &account.credit_free,
                     &credit_required,
-                    &delegate,
+                    &delegation,
                 )?;
                 if let Some(sub) = group.subscriptions.get_mut(&id) {
                     // Update expiry index
@@ -398,7 +425,7 @@ impl State {
                     sub.auto_renew = auto_renew;
                     // Overwrite source allows subscriber to retry resolving
                     sub.source = source;
-                    sub.delegate = delegate.addresses();
+                    sub.delegate = delegation.as_ref().map(|d| d.addresses());
                     sub.failed = false;
                     debug!(
                         "updated subscription to blob {} for {} (key: {})",
@@ -412,7 +439,7 @@ impl State {
                         expiry,
                         auto_renew,
                         source,
-                        delegate: delegate.addresses(),
+                        delegate: delegation.as_ref().map(|d| d.addresses()),
                         failed: false,
                     };
                     group.subscriptions.insert(id.clone(), sub.clone());
@@ -442,7 +469,7 @@ impl State {
                     current_epoch,
                     &account.credit_free,
                     &credit_required,
-                    &delegate,
+                    &delegation,
                 )?;
                 // Add new subscription
                 let sub = Subscription {
@@ -450,7 +477,7 @@ impl State {
                     expiry,
                     auto_renew,
                     source,
-                    delegate: delegate.addresses(),
+                    delegate: delegation.as_ref().map(|d| d.addresses()),
                     failed: false,
                 };
                 blob.subscribers.insert(
@@ -504,7 +531,7 @@ impl State {
                 current_epoch,
                 &account.credit_free,
                 &credit_required,
-                &delegate,
+                &delegation,
             )?;
             // Create new blob
             let sub = Subscription {
@@ -512,11 +539,12 @@ impl State {
                 expiry,
                 auto_renew,
                 source,
-                delegate: delegate.addresses(),
+                delegate: delegation.as_ref().map(|d| d.addresses()),
                 failed: false,
             };
             let blob = Blob {
                 size: size.to_u64().unwrap(),
+                metadata_hash,
                 subscribers: HashMap::from([(
                     subscriber,
                     SubscriptionGroup {
@@ -562,8 +590,8 @@ impl State {
         account.credit_committed += &credit_required;
         account.credit_free -= &credit_required;
         // Update credit approval
-        if let CreditDelegate::IsSome(_, delegation) = delegate {
-            delegation.used += &credit_required;
+        if let Some(delegation) = delegation {
+            delegation.approval.used += &credit_required;
         }
         if credit_required.is_positive() {
             debug!("committed {} credits from {}", credit_required, subscriber);
@@ -619,7 +647,7 @@ impl State {
                 "subscription id {} not found",
                 id.clone()
             )))?;
-        let delegate = if let Some((origin, caller)) = sub.delegate {
+        let delegation = if let Some((origin, caller)) = sub.delegate {
             // First look for an approval for origin keyed by origin, which denotes it's valid for
             // any caller.
             // Second look for an approval for the supplied caller.
@@ -636,9 +664,9 @@ impl State {
                 "approval from {} to {} via caller {} not found",
                 subscriber, origin, caller
             )))?;
-            CreditDelegate::IsSome((origin, caller), approval)
+            Some(CreditDelegation::new(origin, caller, approval))
         } else {
-            CreditDelegate::IsNone
+            None
         };
         // If the subscriber has been debited after the group's max expiry, we need to
         // clean up the accounting with a refund.
@@ -671,7 +699,7 @@ impl State {
             current_epoch,
             &account.credit_free,
             &credit_required,
-            &delegate,
+            &delegation,
         )?;
         // Update expiry index
         if expiry != sub.expiry {
@@ -694,8 +722,8 @@ impl State {
         account.credit_committed += &credit_required;
         account.credit_free -= &credit_required;
         // Update credit approval
-        if let CreditDelegate::IsSome(_, delegation) = delegate {
-            delegation.used += &credit_required;
+        if let Some(delegation) = delegation {
+            delegation.approval.used += &credit_required;
         }
         debug!("committed {} credits from {}", credit_required, subscriber);
         Ok(account.clone())
@@ -754,6 +782,14 @@ impl State {
             .collect::<Vec<_>>()
     }
 
+    pub fn get_pending_blobs_count(&self) -> u64 {
+        self.pending.len() as u64
+    }
+
+    pub fn get_pending_bytes_count(&self) -> u64 {
+        self.pending.keys().map(|hash| self.blobs[hash].size).sum()
+    }
+
     pub fn finalize_blob(
         &mut self,
         subscriber: Address,
@@ -802,7 +838,7 @@ impl State {
                 id.clone()
             )))?;
         // Do not error if the approval was removed while this blob was pending
-        let delegate = if let Some((origin, caller)) = sub.delegate {
+        let delegation = if let Some((origin, caller)) = sub.delegate {
             // First look for an approval for origin keyed by origin, which denotes it's valid for
             // any caller.
             // Second look for an approval for the supplied caller.
@@ -816,12 +852,12 @@ impl State {
                 None
             };
             if let Some(approval) = approval {
-                CreditDelegate::IsSome((origin, caller), approval)
+                Some(CreditDelegation::new(origin, caller, approval))
             } else {
-                CreditDelegate::IsNone
+                None
             }
         } else {
-            CreditDelegate::IsNone
+            None
         };
         // Update blob status
         blob.status = status;
@@ -865,8 +901,8 @@ impl State {
                 account.credit_committed -= &reclaim;
                 account.credit_free += &reclaim;
                 // Update credit approval
-                if let CreditDelegate::IsSome(_, delegation) = delegate {
-                    delegation.used -= &reclaim;
+                if let Some(delegation) = delegation {
+                    delegation.approval.used -= &reclaim;
                 }
                 debug!("released {} credits to {}", reclaim, subscriber);
             }
@@ -923,7 +959,7 @@ impl State {
                 "subscription id {} not found",
                 id.clone()
             )))?;
-        let delegate = if let Some((origin, caller)) = sub.delegate {
+        let delegation = if let Some((origin, caller)) = sub.delegate {
             // First look for an approval for origin keyed by origin, which denotes it's valid for
             // any caller.
             // Second look for an approval for the supplied caller.
@@ -937,7 +973,7 @@ impl State {
                 None
             };
             if let Some(approval) = approval {
-                CreditDelegate::IsSome((origin, caller), approval)
+                Some(CreditDelegation::new(origin, caller, approval))
             } else {
                 // Approval may have been removed, or this is a call from the system actor,
                 // in which case the origin will be supplied as the subscriber
@@ -947,16 +983,16 @@ impl State {
                         subscriber, origin, caller
                     )));
                 }
-                CreditDelegate::IsNone
+                None
             }
         } else {
-            CreditDelegate::IsNone
+            None
         };
         // If the subscription does not have a delegate, the caller must be the subscriber.
         // If the subscription has a delegate, it must be the caller or the
         // caller must be the subscriber.
-        match &delegate {
-            CreditDelegate::IsNone => {
+        match &delegation {
+            None => {
                 if origin != subscriber {
                     return Err(ActorError::forbidden(format!(
                         "origin {} is not subscriber {} for blob {}",
@@ -964,20 +1000,20 @@ impl State {
                     )));
                 }
             }
-            CreditDelegate::IsSome((delegate_origin, delegate_caller), delegation) => {
-                if !(origin == *delegate_origin && caller == *delegate_caller)
+            Some(delegation) => {
+                if !(origin == delegation.origin && caller == delegation.caller)
                     && origin != subscriber
                 {
                     return Err(ActorError::forbidden(format!(
                         "origin {} is not delegate origin {} or caller {} is not delegate caller {} or subscriber {} for blob {}",
-                        origin, delegate_origin, caller, delegate_caller, subscriber, hash
+                        origin, delegation.origin, caller, delegation.caller, subscriber, hash
                     )));
                 }
-                if let Some(expiry) = delegation.expiry {
+                if let Some(expiry) = delegation.approval.expiry {
                     if expiry <= current_epoch {
                         return Err(ActorError::forbidden(format!(
                             "approval from {} to {} via caller {} expired",
-                            subscriber, delegate_origin, delegate_caller
+                            subscriber, delegation.origin, delegation.caller
                         )));
                     }
                 }
@@ -1035,8 +1071,8 @@ impl State {
                 account.credit_committed -= &reclaim;
                 account.credit_free += &reclaim;
                 // Update credit approval
-                if let CreditDelegate::IsSome(_, delegation) = delegate {
-                    delegation.used -= &reclaim;
+                if let Some(delegation) = delegation {
+                    delegation.approval.used -= &reclaim;
                 }
                 debug!("released {} credits to {}", reclaim, subscriber);
             }
@@ -1091,7 +1127,7 @@ fn ensure_credit(
     current_epoch: ChainEpoch,
     credit_free: &BigInt,
     required_credit: &BigInt,
-    delegate: &CreditDelegate,
+    delegation: &Option<CreditDelegation>,
 ) -> anyhow::Result<(), ActorError> {
     if credit_free < required_credit {
         return Err(ActorError::insufficient_funds(format!(
@@ -1099,21 +1135,21 @@ fn ensure_credit(
             subscriber, credit_free, required_credit
         )));
     }
-    if let CreditDelegate::IsSome((origin, caller), delegation) = delegate {
-        if let Some(limit) = &delegation.limit {
-            let uncommitted = &(limit - &delegation.used);
-            if uncommitted < required_credit {
+    if let Some(delegation) = delegation {
+        if let Some(limit) = &delegation.approval.limit {
+            let unused = &(limit - &delegation.approval.used);
+            if unused < required_credit {
                 return Err(ActorError::insufficient_funds(format!(
                     "approval from {} to {} via caller {} has insufficient credit (available: {}; required: {})",
-                    subscriber, origin, caller, uncommitted, required_credit
+                    subscriber, delegation.origin, delegation.caller, unused, required_credit
                 )));
             }
         }
-        if let Some(expiry) = delegation.expiry {
+        if let Some(expiry) = delegation.approval.expiry {
             if expiry <= current_epoch {
                 return Err(ActorError::forbidden(format!(
                     "approval from {} to {} via caller {} expired",
-                    subscriber, origin, caller
+                    subscriber, delegation.origin, delegation.caller
                 )));
             }
         }
@@ -1189,6 +1225,13 @@ mod tests {
             Hash(*iroh_base::hash::Hash::new(&data).as_bytes()),
             size as u64,
         )
+    }
+
+    fn new_metadata_hash() -> Hash {
+        let mut rng = rand::thread_rng();
+        let mut data = vec![0u8; 8];
+        rng.fill_bytes(&mut data);
+        Hash(*iroh_base::hash::Hash::new(&data).as_bytes())
     }
 
     pub fn new_pk() -> PublicKey {
@@ -1367,6 +1410,7 @@ mod tests {
             from,
             current_epoch,
             hash,
+            new_metadata_hash(),
             SubscriptionId::Default,
             size,
             None,
@@ -1516,6 +1560,7 @@ mod tests {
             subscriber,
             add1_epoch,
             hash,
+            new_metadata_hash(),
             id1.clone(),
             size,
             Some(ttl1),
@@ -1553,6 +1598,7 @@ mod tests {
             subscriber,
             add2_epoch,
             hash,
+            new_metadata_hash(),
             id2.clone(),
             size,
             Some(ttl2),
@@ -1693,6 +1739,7 @@ mod tests {
             subscriber,
             add1_epoch,
             hash1,
+            new_metadata_hash(),
             id1.clone(),
             size1,
             Some(MIN_TTL),
@@ -1722,6 +1769,7 @@ mod tests {
             subscriber,
             add2_epoch,
             hash2,
+            new_metadata_hash(),
             id2.clone(),
             size2,
             None,
@@ -1764,6 +1812,7 @@ mod tests {
             subscriber,
             add3_epoch,
             hash1,
+            new_metadata_hash(),
             id1.clone(),
             size1,
             None,
@@ -1892,6 +1941,7 @@ mod tests {
             subscriber,
             add1_epoch,
             hash,
+            new_metadata_hash(),
             id1.clone(),
             size,
             None,
@@ -1961,6 +2011,7 @@ mod tests {
             subscriber,
             add2_epoch,
             hash,
+            new_metadata_hash(),
             id1.clone(),
             size,
             None,
@@ -2017,6 +2068,7 @@ mod tests {
             subscriber,
             add3_epoch,
             hash,
+            new_metadata_hash(),
             id2.clone(),
             size,
             None,
@@ -2157,6 +2209,7 @@ mod tests {
             subscriber,
             add_epoch,
             hash,
+            new_metadata_hash(),
             SubscriptionId::Default,
             size,
             None,
@@ -2239,6 +2292,7 @@ mod tests {
             subscriber,
             add1_epoch,
             hash1,
+            new_metadata_hash(),
             id1.clone(),
             size1,
             None,
@@ -2268,6 +2322,7 @@ mod tests {
             subscriber,
             add2_epoch,
             hash2,
+            new_metadata_hash(),
             id2.clone(),
             size2,
             None,
@@ -2354,6 +2409,7 @@ mod tests {
             subscriber,
             current_epoch,
             hash,
+            new_metadata_hash(),
             SubscriptionId::Default,
             size,
             None,
@@ -2397,6 +2453,7 @@ mod tests {
             subscriber,
             current_epoch,
             hash,
+            new_metadata_hash(),
             SubscriptionId::Default,
             size,
             None,
@@ -2448,6 +2505,7 @@ mod tests {
             subscriber,
             add_epoch,
             hash,
+            new_metadata_hash(),
             SubscriptionId::Default,
             size,
             None,
@@ -2511,6 +2569,7 @@ mod tests {
             subscriber,
             add_epoch,
             hash,
+            new_metadata_hash(),
             SubscriptionId::Default,
             size,
             None,
@@ -2649,6 +2708,7 @@ mod tests {
             subscriber,
             add1_epoch,
             hash1,
+            new_metadata_hash(),
             SubscriptionId::Default,
             size1,
             Some(MIN_TTL),
@@ -2677,6 +2737,7 @@ mod tests {
             subscriber,
             add2_epoch,
             hash2,
+            new_metadata_hash(),
             SubscriptionId::Default,
             size2,
             Some(MIN_TTL),

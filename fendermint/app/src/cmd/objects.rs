@@ -2,12 +2,15 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::time::Instant;
 use std::{convert::Infallible, net::ToSocketAddrs, num::ParseIntError};
 
 use anyhow::anyhow;
 use anyhow::Context;
 use base64::{engine::general_purpose, Engine};
 use bytes::Buf;
+use entangler::{ChunkRange, Entangler};
+use entangler_storage::iroh::IrohStorage as EntanglerIrohStorage;
 use fendermint_actor_bucket::{GetParams, Object};
 use fendermint_app_settings::objects::ObjectsSettings;
 use fendermint_rpc::client::FendermintClient;
@@ -19,8 +22,13 @@ use futures_util::StreamExt;
 use fvm_shared::chainid::ChainID;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use iroh::blobs::Hash;
-use iroh::client::blobs::{BlobStatus, ReadAtLen};
+use iroh::client::blobs::BlobStatus;
 use iroh::net::NodeAddr;
+use lazy_static::lazy_static;
+use prometheus::register_histogram;
+use prometheus::register_int_counter;
+use prometheus::Histogram;
+use prometheus::IntCounter;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tracing::info;
@@ -36,22 +44,25 @@ use crate::cmd;
 use crate::options::objects::{ObjectsArgs, ObjectsCommands};
 
 const MAX_OBJECT_LENGTH: u64 = 1024 * 1024 * 1024;
+/// The alpha parameter for alpha entanglement determines the number of parity blob to generate for the original blob.
+const ENTANGLER_ALPHA: u8 = 3;
+/// The s parameter for alpha entanglement determines the number of horizontal strands in the grid.
+const ENTANGLER_S: u8 = 5;
+/// The p parameter for alpha entanglement determines the number of helical strands in the grid.
+const ENTANGLER_P: u8 = 5;
+/// Chunk size used by the entangler.
+const CHUNK_SIZE: u64 = 1024;
 
 cmd! {
     ObjectsArgs(self, settings: ObjectsSettings) {
         match self.command.clone() {
             ObjectsCommands::Run { tendermint_url, iroh_addr} => {
                 if settings.metrics.enabled {
-                    info!("metrics enabled");
-                    let registry = prometheus::Registry::new();
-                    // Default process metrics are enabled by default.
-
                     info!(
                         listen_addr = settings.metrics.listen.to_string(),
                         "serving metrics"
                     );
-                    let mut builder = prometheus_exporter::Builder::new(settings.metrics.listen.try_into()?);
-                    builder.with_registry(registry);
+                    let builder = prometheus_exporter::Builder::new(settings.metrics.listen.try_into()?);
                     let _ = builder.start().context("failed to start metrics server")?;
                 } else {
                     info!("metrics disabled");
@@ -85,7 +96,6 @@ cmd! {
                 .and(warp::path::tail())
                 .and(
                     warp::get().map(|| "GET".to_string()).or(warp::head().map(|| "HEAD".to_string())).unify()
-
                 )
                 .and(warp::header::optional::<String>("Range"))
                 .and(warp::query::<HeightQuery>())
@@ -256,6 +266,39 @@ impl ObjectParser {
     }
 }
 
+lazy_static! {
+    static ref COUNTER_BLOBS_UPLOADED: IntCounter = register_int_counter!(
+        "objects_blobs_uploaded_total",
+        "Number of successfully uploaded blobs"
+    )
+    .unwrap();
+    static ref COUNTER_BYTES_UPLOADED: IntCounter = register_int_counter!(
+        "objects_bytes_uploaded_total",
+        "Number of successfully uploaded bytes"
+    )
+    .unwrap();
+    static ref HISTOGRAM_UPLOAD_TIME: Histogram = register_histogram!(
+        "objects_upload_time_seconds",
+        "Time spent uploading an object in seconds"
+    )
+    .unwrap();
+    static ref COUNTER_BLOBS_DOWNLOADED: IntCounter = register_int_counter!(
+        "objects_blobs_downloaded_total",
+        "Number of successfully downloaded blobs"
+    )
+    .unwrap();
+    static ref COUNTER_BYTES_DOWNLOADED: IntCounter = register_int_counter!(
+        "objects_bytes_downloaded_total",
+        "Number of successfully downloaded bytes"
+    )
+    .unwrap();
+    static ref HISTOGRAM_DOWNLOAD_TIME: Histogram = register_histogram!(
+        "objects_download_time_seconds",
+        "Time spent downloading an object in seconds"
+    )
+    .unwrap();
+}
+
 async fn handle_health() -> Result<impl Reply, Rejection> {
     Ok(warp::reply::reply())
 }
@@ -269,11 +312,18 @@ async fn handle_node_addr(iroh: iroh::client::Iroh) -> Result<impl Reply, Reject
     Ok(warp::reply::json(&node_addr))
 }
 
+#[derive(Serialize)]
+struct UploadResponse {
+    hash: String,
+    metadata_hash: String,
+}
+
 async fn handle_object_upload<F: QueryClient>(
     client: F,
     iroh: iroh::client::Iroh,
     form_parts: warp::multipart::FormData,
 ) -> Result<impl Reply, Rejection> {
+    let start_time = Instant::now();
     let parser = ObjectParser::read_form(form_parts).await.map_err(|e| {
         Rejection::from(BadRequest {
             message: format!("failed to read form: {}", e),
@@ -342,16 +392,46 @@ async fn handle_object_upload<F: QueryClient>(
         })
     })?;
 
+    let ent = new_entangler(iroh).map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("failed to create entangler: {}", e),
+        })
+    })?;
+    let metadata_hash = ent.entangle_uploaded(hash.to_string()).await.map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("failed to entangle uploaded data: {}", e),
+        })
+    })?;
+
     tracing::info!(
-        "downloaded blob {} in {:?} (size: {}; local_size: {}; downloaded_size: {})",
+        "downloaded blob {} in {:?} (size: {}; local_size: {}; downloaded_size: {}; metadata: {})",
         hash,
         outcome.stats.elapsed,
         size,
         outcome.local_size,
         outcome.downloaded_size,
+        metadata_hash,
     );
+    COUNTER_BLOBS_UPLOADED.inc();
+    COUNTER_BYTES_UPLOADED.inc_by(outcome.downloaded_size);
+    HISTOGRAM_UPLOAD_TIME.observe(start_time.elapsed().as_secs_f64());
 
-    Ok(hash.to_string())
+    let response = UploadResponse {
+        hash: hash.to_string(),
+        metadata_hash,
+    };
+    Ok(warp::reply::json(&response))
+}
+
+fn new_entangler(
+    iroh: iroh::client::Iroh,
+) -> Result<Entangler<EntanglerIrohStorage>, entangler::Error> {
+    Entangler::new(
+        EntanglerIrohStorage::from_client(iroh),
+        ENTANGLER_ALPHA,
+        ENTANGLER_S,
+        ENTANGLER_P,
+    )
 }
 
 async fn ensure_bucket_exists<F: QueryClient>(client: F, to: Address) -> anyhow::Result<()> {
@@ -369,7 +449,7 @@ fn get_range_params(range: String, size: u64) -> Result<(u64, u64), ObjectsError
     if range.len() != 2 {
         return Err(ObjectsError::RangeHeaderInvalid);
     }
-    let (start, end): (u64, u64) = match (!range[0].is_empty(), !range[1].is_empty()) {
+    let (first, last): (u64, u64) = match (!range[0].is_empty(), !range[1].is_empty()) {
         (true, true) => (range[0].parse::<u64>()?, range[1].parse::<u64>()?),
         (true, false) => (range[0].parse::<u64>()?, size - 1),
         (false, true) => {
@@ -382,10 +462,10 @@ fn get_range_params(range: String, size: u64) -> Result<(u64, u64), ObjectsError
         }
         (false, false) => (0, size - 1),
     };
-    if start > end || end >= size {
+    if first > last || last >= size {
         return Err(ObjectsError::RangeHeaderInvalid);
     }
-    Ok((start, end))
+    Ok((first, last))
 }
 
 pub(crate) struct ObjectRange {
@@ -410,6 +490,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
         .unwrap_or(FvmQueryHeight::Committed.into());
     let path = tail.as_str();
     let key: Vec<u8> = path.into();
+    let start_time = Instant::now();
     let maybe_object = os_get(client, address, GetParams(key), height)
         .await
         .map_err(|e| {
@@ -433,35 +514,53 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
                 }));
             };
 
+            let ent = new_entangler(iroh).map_err(|e| {
+                Rejection::from(BadRequest {
+                    message: format!("failed to create entangler: {}", e),
+                })
+            })?;
+            let recovery_hash = Hash::from_bytes(object.recovery_hash.0);
+
             let object_range = match range {
                 Some(range) => {
-                    let (start, end) = get_range_params(range, size).unwrap();
-                    let len = (end - start) + 1;
-                    let reader = iroh
-                        .blobs()
-                        .read_at(hash, start, ReadAtLen::AtMost(len))
+                    let (first_byte, last_byte) = get_range_params(range, size).unwrap();
+                    let len = (last_byte - first_byte) + 1;
+
+                    let fist_chunk = first_byte / CHUNK_SIZE;
+                    let last_chunk = last_byte / CHUNK_SIZE;
+
+                    let bytes = ent
+                        .download_range(
+                            &hash.to_string(),
+                            ChunkRange::Between(fist_chunk, last_chunk),
+                            Some(&recovery_hash.to_string()),
+                        )
                         .await
                         .map_err(|e| {
                             Rejection::from(BadRequest {
-                                message: format!("failed to fetch object: {} {}", hash, e),
+                                message: format!("failed to download object: {} {}", hash, e),
                             })
                         })?;
-                    let body = Body::wrap_stream(reader);
+                    let offset = (first_byte - fist_chunk * CHUNK_SIZE) as usize;
+                    let body = Body::from(bytes.slice(offset..offset + len as usize));
                     ObjectRange {
-                        start,
-                        end,
+                        start: first_byte,
+                        end: last_byte,
                         len,
                         size,
                         body,
                     }
                 }
                 None => {
-                    let reader = iroh.blobs().read(hash).await.map_err(|e| {
-                        Rejection::from(BadRequest {
-                            message: format!("failed to fetch object: {} {}", hash, e),
-                        })
-                    })?;
-                    let body = Body::wrap_stream(reader);
+                    let bytes = ent
+                        .download(&hash.to_string(), Some(&recovery_hash.to_string()))
+                        .await
+                        .map_err(|e| {
+                            Rejection::from(BadRequest {
+                                message: format!("failed to download object: {} {}", hash, e),
+                            })
+                        })?;
+                    let body = Body::from(bytes);
                     ObjectRange {
                         start: 0,
                         end: size - 1,
@@ -512,6 +611,10 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
 
             let headers = response.headers_mut();
             headers.extend(header_map);
+
+            COUNTER_BLOBS_DOWNLOADED.inc();
+            COUNTER_BYTES_DOWNLOADED.inc_by(object_range.len);
+            HISTOGRAM_DOWNLOAD_TIME.observe(start_time.elapsed().as_secs_f64());
 
             Ok(response)
         }
@@ -587,6 +690,7 @@ async fn os_get<F: QueryClient + Send + Sync>(
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use std::str::FromStr;
 
     use super::*;
     use ethers::core::k256::ecdsa::SigningKey;
@@ -733,6 +837,12 @@ mod tests {
             .hash;
         let client_node_addr = client_iroh.net().node_addr().await.unwrap();
 
+        let iroh_storage = EntanglerIrohStorage::from_client(client_iroh.client().clone());
+        let ent = Entangler::new(iroh_storage, 3, 5, 5).unwrap();
+        let metadata_hash = ent.entangle_uploaded(hash.to_string()).await.unwrap();
+
+        let iroh_metadata_hash = Hash::from_str(&metadata_hash.as_str()).unwrap();
+
         let store = Address::new_id(90);
         let key = b"key";
         let size = 11;
@@ -741,6 +851,9 @@ mod tests {
             key: key.to_vec(),
             hash: fendermint_actor_blobs_shared::state::Hash(*hash.as_bytes()),
             size,
+            recovery_hash: fendermint_actor_blobs_shared::state::Hash(
+                *iroh_metadata_hash.as_bytes(),
+            ),
             ttl: None,
             metadata: HashMap::new(),
             overwrite: true,

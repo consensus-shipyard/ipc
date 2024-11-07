@@ -21,6 +21,7 @@ jobs:
           ssh-private-key: |
             ${{ secrets.BUILTIN_ACTORS_DEPLOY_KEY }}
             ${{ secrets.CONTRACTS_DEPLOY_KEY }}
+            ${{ secrets.ENTANGLEMENT_DEPLOY_KEY }}
       - uses: actions/checkout@v4
         with:
           submodules: recursive

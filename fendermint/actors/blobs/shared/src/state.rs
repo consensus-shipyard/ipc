@@ -57,7 +57,9 @@ pub struct CreditApproval {
 }
 
 /// Blob blake3 hash.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, Hash, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize,
+)]
 #[serde(transparent)]
 pub struct Hash(pub [u8; 32]);
 
@@ -77,6 +79,18 @@ impl fmt::Display for Hash {
     }
 }
 
+impl TryFrom<&str> for Hash {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let mut res = [0u8; 32];
+        data_encoding::BASE32_NOPAD
+            .decode_mut(value.as_bytes(), &mut res)
+            .map_err(|_| anyhow::anyhow!("invalid hash"))?;
+        Ok(Self(res))
+    }
+}
+
 /// Iroh node public key.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -87,6 +101,8 @@ pub struct PublicKey(pub [u8; 32]);
 pub struct Blob {
     /// The size of the content.
     pub size: u64,
+    /// Blob metadata that contains information for block recovery.
+    pub metadata_hash: Hash,
     /// Active subscribers (accounts) that are paying for the blob.
     pub subscribers: HashMap<Address, SubscriptionGroup>,
     /// Blob status.

@@ -58,12 +58,14 @@ pub struct GetAccountParams(pub Address);
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct AddBlobParams {
     /// Optional sponsor address.
-    /// Caller must have a delegation from sponsor.
+    /// Txn origin must have a delegation from sponsor.
     pub sponsor: Option<Address>,
     /// Source Iroh node ID used for ingestion.
     pub source: PublicKey,
     /// Blob blake3 hash.
     pub hash: Hash,
+    /// Blake3 hash of the metadata to use for blob recovery.
+    pub metadata_hash: Hash,
     /// Identifier used to differentiate blob additions for the same subscriber.
     pub id: SubscriptionId,
     /// Blob size.

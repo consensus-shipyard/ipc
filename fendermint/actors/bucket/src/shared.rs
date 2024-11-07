@@ -40,6 +40,8 @@ pub struct AddParams {
     pub key: Vec<u8>,
     /// Object blake3 hash.
     pub hash: Hash,
+    /// Blake3 hash of the metadata to use for object recovery.
+    pub recovery_hash: Hash,
     /// Object size.
     pub size: u64,
     /// Object time-to-live epochs.
@@ -82,6 +84,8 @@ pub struct ListParams {
 pub struct Object {
     /// The object blake3 hash.
     pub hash: Hash,
+    /// Blake3 hash of the metadata to use for object recovery.
+    pub recovery_hash: Hash,
     /// The object size.
     pub size: u64,
     /// Expiry block.

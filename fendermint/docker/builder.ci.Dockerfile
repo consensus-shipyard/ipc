@@ -35,7 +35,7 @@ FROM --platform=$BUILDPLATFORM ubuntu:jammy as builder
 
 RUN apt-get update && \
   apt-get install -y build-essential clang cmake protobuf-compiler curl \
-  openssl libssl-dev pkg-config
+  openssl libssl-dev pkg-config git-core
 
 # Get Rust
 RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y
@@ -67,6 +67,10 @@ RUN if [ "${TARGETARCH}" = "arm64" ]; then \
 
 # Copy the stripped source code.
 COPY --from=stripper /app /app
+
+COPY root-config /root/
+RUN sed 's|/home/ghrunner|/root|g' -i.bak /root/.ssh/config
+ENV CARGO_NET_GIT_FETCH_WITH_CLI=true
 
 # Build the dependencies.
 RUN \
