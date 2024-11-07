@@ -772,9 +772,9 @@ where
                             })
                         })
                         .await;
-                        tracing::debug!(hash = ?hash, subscriber = ?subscriber, source = ?source, "blob added to pool");
+                        tracing::info!(hash = ?hash, subscriber = ?subscriber, source = ?source, "blob added to pool");
                     }
-                    // call a fake FVM call to return the state
+                    // fake FVM (read-only) call to create a return value
                     let from = system::SYSTEM_ACTOR_ADDR;
                     let to = gas_market::GAS_MARKET_ACTOR_ADDR;
                     let method_num = GetConstants as u64;
