@@ -9,6 +9,7 @@ use ipc_api::subnet_id::SubnetID;
 use iroh_base::hash::Hash;
 use iroh_base::key::NodeId;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 /// Messages involved in InterPlanetary Consensus.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -38,7 +39,7 @@ pub enum IpcMessage {
     DebitCreditAccounts,
 
     /// List of pending blobs
-    PendingBlobs(std::collections::HashSet<Blob>),
+    BlobsPending(HashSet<Blob>),
 }
 
 /// A message relayed by a user on the current subnet.

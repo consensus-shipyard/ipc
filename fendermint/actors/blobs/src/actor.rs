@@ -321,11 +321,6 @@ impl BlobsActor {
         Ok(count)
     }
 
-    pub fn blob_noop(rt: &impl Runtime) -> Result<(), ActorError> {
-        rt.validate_immediate_caller_accept_any()?;
-        Ok(())
-    }
-
     /// Fallback method for unimplemented method numbers.
     pub fn fallback(
         rt: &impl Runtime,
@@ -381,7 +376,6 @@ impl ActorCode for BlobsActor {
         DeleteBlob => delete_blob,
         GetPendingBlobsCount => get_pending_blobs_count,
         GetPendingBytesCount => get_pending_bytes_count,
-        BlobNoop => blob_noop,
         _ => fallback,
     }
 }
