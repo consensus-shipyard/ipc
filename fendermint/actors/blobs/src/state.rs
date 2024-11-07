@@ -173,15 +173,15 @@ impl State {
             .entry(caller)
             .or_insert(CreditApproval {
                 limit: limit.clone(),
-                committed: BigInt::zero(),
                 expiry,
+                used: BigInt::zero(),
             });
         // Validate approval changes
         if let Some(limit) = limit.clone() {
-            if approval.committed > limit {
+            if approval.used > limit {
                 return Err(ActorError::illegal_argument(format!(
                     "limit cannot be less than amount of already spent credits ({})",
-                    approval.committed
+                    approval.used
                 )));
             }
         }
@@ -563,7 +563,7 @@ impl State {
         account.credit_free -= &credit_required;
         // Update credit approval
         if let CreditDelegate::IsSome(_, delegation) = delegate {
-            delegation.committed += &credit_required;
+            delegation.used += &credit_required;
         }
         if credit_required.is_positive() {
             debug!("committed {} credits from {}", credit_required, subscriber);
@@ -695,7 +695,7 @@ impl State {
         account.credit_free -= &credit_required;
         // Update credit approval
         if let CreditDelegate::IsSome(_, delegation) = delegate {
-            delegation.committed += &credit_required;
+            delegation.used += &credit_required;
         }
         debug!("committed {} credits from {}", credit_required, subscriber);
         Ok(account.clone())
@@ -866,7 +866,7 @@ impl State {
                 account.credit_free += &reclaim;
                 // Update credit approval
                 if let CreditDelegate::IsSome(_, delegation) = delegate {
-                    delegation.committed -= &reclaim;
+                    delegation.used -= &reclaim;
                 }
                 debug!("released {} credits to {}", reclaim, subscriber);
             }
@@ -1036,7 +1036,7 @@ impl State {
                 account.credit_free += &reclaim;
                 // Update credit approval
                 if let CreditDelegate::IsSome(_, delegation) = delegate {
-                    delegation.committed -= &reclaim;
+                    delegation.used -= &reclaim;
                 }
                 debug!("released {} credits to {}", reclaim, subscriber);
             }
@@ -1101,7 +1101,7 @@ fn ensure_credit(
     }
     if let CreditDelegate::IsSome((origin, caller), delegation) = delegate {
         if let Some(limit) = &delegation.limit {
-            let uncommitted = &(limit - &delegation.committed);
+            let uncommitted = &(limit - &delegation.used);
             if uncommitted < required_credit {
                 return Err(ActorError::insufficient_funds(format!(
                     "approval from {} to {} via caller {} has insufficient credit (available: {}; required: {})",
@@ -1162,8 +1162,6 @@ fn update_expiry_index(
 
 #[cfg(test)]
 mod tests {
-    // TODO: Allow relevant tests to use a delegation
-
     use super::*;
 
     use rand::RngCore;
@@ -1207,6 +1205,18 @@ mod tests {
         let mut data = vec![0u8; 32];
         rng.fill_bytes(&mut data);
         Address::new_actor(&data)
+    }
+
+    fn check_approval(account: Account, origin: Address, caller: Address, expect_used: BigInt) {
+        if !account.approvals.is_empty() {
+            let approvals = account.approvals.get(&origin).unwrap();
+            let approval = if origin == caller {
+                approvals.get(&origin).unwrap()
+            } else {
+                approvals.get(&caller).unwrap()
+            };
+            assert_eq!(approval.used, expect_used);
+        }
     }
 
     #[test]
@@ -1349,6 +1359,7 @@ mod tests {
         let res = state.approve_credit(from, to, None, current_epoch, None, None);
         assert!(res.is_ok());
 
+        // Add a blob
         let (hash, size) = new_hash(1024);
         let res = state.add_blob(
             to,
@@ -1363,9 +1374,10 @@ mod tests {
         );
         assert!(res.is_ok());
 
+        // Check approval
         let account = state.get_account(from).unwrap();
         let approval = account.approvals.get(&to).unwrap().get(&to).unwrap();
-        assert_eq!(account.credit_committed, approval.committed);
+        assert_eq!(account.credit_committed, approval.used);
 
         // Try to update approval with a limit below what's already been committed
         let limit = 1_000u64;
@@ -1382,7 +1394,7 @@ mod tests {
             res.err().unwrap().msg(),
             format!(
                 "limit cannot be less than amount of already spent credits ({})",
-                approval.committed
+                approval.used
             )
         );
     }
@@ -1448,13 +1460,49 @@ mod tests {
         setup_logs();
         let capacity = 1024 * 1024;
         let mut state = State::new(capacity, 1);
+        let origin = new_address();
+        let current_epoch = ChainEpoch::from(1);
+        let token_amount = TokenAmount::from_whole(10);
+        state
+            .buy_credit(origin, token_amount.clone(), current_epoch)
+            .unwrap();
+        debit_accounts_delete_from_disc(state, origin, origin, origin, current_epoch, token_amount);
+    }
+
+    #[test]
+    fn test_debit_accounts_delete_from_disc_with_approval() {
+        setup_logs();
+        let capacity = 1024 * 1024;
+        let mut state = State::new(capacity, 1);
+        let origin = new_address();
         let subscriber = new_address();
         let current_epoch = ChainEpoch::from(1);
-        let amount = TokenAmount::from_whole(10);
+        let token_amount = TokenAmount::from_whole(10);
         state
-            .buy_credit(subscriber, amount.clone(), current_epoch)
+            .buy_credit(subscriber, token_amount.clone(), current_epoch)
             .unwrap();
-        let mut credit_amount = amount.atto() * state.credit_debit_rate;
+        state
+            .approve_credit(subscriber, origin, None, current_epoch, None, None)
+            .unwrap();
+        debit_accounts_delete_from_disc(
+            state,
+            origin,
+            origin,
+            subscriber,
+            current_epoch,
+            token_amount,
+        );
+    }
+
+    fn debit_accounts_delete_from_disc(
+        mut state: State,
+        origin: Address,
+        caller: Address,
+        subscriber: Address,
+        current_epoch: ChainEpoch,
+        token_amount: TokenAmount,
+    ) {
+        let mut credit_amount = token_amount.atto() * state.credit_debit_rate;
 
         // Add blob with default a subscription ID
         let (hash, size) = new_hash(1024);
@@ -1463,8 +1511,8 @@ mod tests {
         let ttl1 = ChainEpoch::from(MIN_TTL);
         let source = new_pk();
         let res = state.add_blob(
-            subscriber,
-            subscriber,
+            origin,
+            caller,
             subscriber,
             add1_epoch,
             hash,
@@ -1500,8 +1548,8 @@ mod tests {
         let id2 = SubscriptionId::Key(b"foo".to_vec());
         let source = new_pk();
         let res = state.add_blob(
-            subscriber,
-            subscriber,
+            origin,
+            caller,
             subscriber,
             add2_epoch,
             hash,
@@ -1565,12 +1613,24 @@ mod tests {
 
         // Check state
         assert_eq!(state.credit_committed, BigInt::from(0)); // credit was released
-        assert_eq!(state.credit_debited, amount.atto() - &account.credit_free);
+        assert_eq!(
+            state.credit_debited,
+            token_amount.atto() - &account.credit_free
+        );
         assert_eq!(state.capacity_used, BigInt::from(0)); // capacity was released
 
         // Check indexes
         assert_eq!(state.expiries.len(), 0);
         assert_eq!(state.pending.len(), 0);
+
+        // Check approval
+        let account_committed = account.credit_committed.clone();
+        check_approval(
+            account,
+            origin,
+            caller,
+            state.credit_debited + account_committed,
+        );
     }
 
     #[test]
@@ -1578,13 +1638,49 @@ mod tests {
         setup_logs();
         let capacity = 1024 * 1024;
         let mut state = State::new(capacity, 1);
+        let origin = new_address();
+        let current_epoch = ChainEpoch::from(1);
+        let token_amount = TokenAmount::from_whole(10);
+        state
+            .buy_credit(origin, token_amount.clone(), current_epoch)
+            .unwrap();
+        add_blob_refund(state, origin, origin, origin, current_epoch, token_amount);
+    }
+
+    #[test]
+    fn test_add_blob_refund_with_approval() {
+        setup_logs();
+        let capacity = 1024 * 1024;
+        let mut state = State::new(capacity, 1);
+        let origin = new_address();
         let subscriber = new_address();
         let current_epoch = ChainEpoch::from(1);
-        let amount = TokenAmount::from_whole(10);
+        let token_amount = TokenAmount::from_whole(10);
         state
-            .buy_credit(subscriber, amount.clone(), current_epoch)
+            .buy_credit(subscriber, token_amount.clone(), current_epoch)
             .unwrap();
-        let mut credit_amount = amount.atto() * state.credit_debit_rate;
+        state
+            .approve_credit(subscriber, origin, None, current_epoch, None, None)
+            .unwrap();
+        add_blob_refund(
+            state,
+            origin,
+            origin,
+            subscriber,
+            current_epoch,
+            token_amount,
+        );
+    }
+
+    fn add_blob_refund(
+        mut state: State,
+        origin: Address,
+        caller: Address,
+        subscriber: Address,
+        current_epoch: ChainEpoch,
+        token_amount: TokenAmount,
+    ) {
+        let mut credit_amount = token_amount.atto() * state.credit_debit_rate;
 
         // Add blob with default a subscription ID
         let (hash1, size1) = new_hash(1024);
@@ -1592,8 +1688,8 @@ mod tests {
         let id1 = SubscriptionId::Default;
         let source = new_pk();
         let res = state.add_blob(
-            subscriber,
-            subscriber,
+            origin,
+            caller,
             subscriber,
             add1_epoch,
             hash1,
@@ -1621,8 +1717,8 @@ mod tests {
         let id2 = SubscriptionId::Key(b"foo".to_vec());
         let source = new_pk();
         let res = state.add_blob(
-            subscriber,
-            subscriber,
+            origin,
+            caller,
             subscriber,
             add2_epoch,
             hash2,
@@ -1650,7 +1746,7 @@ mod tests {
         assert_eq!(state.credit_committed, account.credit_committed);
         assert_eq!(
             state.credit_debited,
-            amount.atto() - (&account.credit_free + &account.credit_committed)
+            token_amount.atto() - (&account.credit_free + &account.credit_committed)
         );
         assert_eq!(state.capacity_used, account.capacity_used);
 
@@ -1663,8 +1759,8 @@ mod tests {
         let id1 = SubscriptionId::Default;
         let source = new_pk();
         let res = state.add_blob(
-            subscriber,
-            subscriber,
+            origin,
+            caller,
             subscriber,
             add3_epoch,
             hash1,
@@ -1692,13 +1788,22 @@ mod tests {
         assert_eq!(state.credit_committed, account.credit_committed);
         assert_eq!(
             state.credit_debited,
-            amount.atto() - (&account.credit_free + &account.credit_committed)
+            token_amount.atto() - (&account.credit_free + &account.credit_committed)
         );
         assert_eq!(state.capacity_used, account.capacity_used);
 
         // Check indexes
         assert_eq!(state.expiries.len(), 2);
         assert_eq!(state.pending.len(), 2);
+
+        // Check approval
+        let account_committed = account.credit_committed.clone();
+        check_approval(
+            account,
+            origin,
+            caller,
+            state.credit_debited + account_committed,
+        );
     }
 
     #[test]
@@ -1706,13 +1811,75 @@ mod tests {
         setup_logs();
         let capacity = 1024 * 1024;
         let mut state = State::new(capacity, 1);
+        let origin = new_address();
+        let current_epoch = ChainEpoch::from(1);
+        let token_amount = TokenAmount::from_whole(10);
+        state
+            .buy_credit(origin, token_amount.clone(), current_epoch)
+            .unwrap();
+        add_blob_same_hash_same_account(state, origin, origin, origin, current_epoch, token_amount);
+    }
+
+    #[test]
+    fn test_add_blob_same_hash_same_account_with_approval() {
+        setup_logs();
+        let capacity = 1024 * 1024;
+        let mut state = State::new(capacity, 1);
+        let origin = new_address();
         let subscriber = new_address();
         let current_epoch = ChainEpoch::from(1);
-        let amount = TokenAmount::from_whole(10);
+        let token_amount = TokenAmount::from_whole(10);
         state
-            .buy_credit(subscriber, amount.clone(), current_epoch)
+            .buy_credit(subscriber, token_amount.clone(), current_epoch)
             .unwrap();
-        let mut credit_amount = amount.atto() * state.credit_debit_rate;
+        state
+            .approve_credit(subscriber, origin, None, current_epoch, None, None)
+            .unwrap();
+        add_blob_same_hash_same_account(
+            state,
+            origin,
+            origin,
+            subscriber,
+            current_epoch,
+            token_amount,
+        );
+    }
+
+    #[test]
+    fn test_add_blob_same_hash_same_account_with_scoped_approval() {
+        setup_logs();
+        let capacity = 1024 * 1024;
+        let mut state = State::new(capacity, 1);
+        let origin = new_address();
+        let caller = new_address();
+        let subscriber = new_address();
+        let current_epoch = ChainEpoch::from(1);
+        let token_amount = TokenAmount::from_whole(10);
+        state
+            .buy_credit(subscriber, token_amount.clone(), current_epoch)
+            .unwrap();
+        state
+            .approve_credit(subscriber, origin, Some(caller), current_epoch, None, None)
+            .unwrap();
+        add_blob_same_hash_same_account(
+            state,
+            origin,
+            caller,
+            subscriber,
+            current_epoch,
+            token_amount,
+        );
+    }
+
+    fn add_blob_same_hash_same_account(
+        mut state: State,
+        origin: Address,
+        caller: Address,
+        subscriber: Address,
+        current_epoch: ChainEpoch,
+        token_amount: TokenAmount,
+    ) {
+        let mut credit_amount = token_amount.atto() * state.credit_debit_rate;
 
         // Add blob with default a subscription ID
         let (hash, size) = new_hash(1024);
@@ -1720,8 +1887,8 @@ mod tests {
         let id1 = SubscriptionId::Default;
         let source = new_pk();
         let res = state.add_blob(
-            subscriber,
-            subscriber,
+            origin,
+            caller,
             subscriber,
             add1_epoch,
             hash,
@@ -1737,7 +1904,9 @@ mod tests {
         assert!(sub.auto_renew);
         assert_eq!(sub.source, source);
         assert!(!sub.failed);
-        assert_eq!(sub.delegate, None);
+        if subscriber != origin {
+            assert_eq!(sub.delegate, Some((origin, caller)));
+        }
 
         // Check the blob status
         assert_eq!(
@@ -1787,8 +1956,8 @@ mod tests {
         let add2_epoch = ChainEpoch::from(21);
         let source = new_pk();
         let res = state.add_blob(
-            subscriber,
-            subscriber,
+            origin,
+            caller,
             subscriber,
             add2_epoch,
             hash,
@@ -1804,7 +1973,9 @@ mod tests {
         assert!(sub.auto_renew);
         assert_eq!(sub.source, source);
         assert!(!sub.failed);
-        assert_eq!(sub.delegate, None);
+        if subscriber != origin {
+            assert_eq!(sub.delegate, Some((origin, caller)));
+        }
 
         // Check the blob status
         // Should already be resolved
@@ -1841,8 +2012,8 @@ mod tests {
         let id2 = SubscriptionId::Key(b"foo".to_vec());
         let source = new_pk();
         let res = state.add_blob(
-            subscriber,
-            subscriber,
+            origin,
+            caller,
             subscriber,
             add3_epoch,
             hash,
@@ -1858,7 +2029,9 @@ mod tests {
         assert!(sub.auto_renew);
         assert_eq!(sub.source, source);
         assert!(!sub.failed);
-        assert_eq!(sub.delegate, None);
+        if subscriber != origin {
+            assert_eq!(sub.delegate, Some((origin, caller)));
+        }
 
         // Check the blob status
         // Should already be resolved
@@ -1911,14 +2084,7 @@ mod tests {
 
         // Delete the default subscription ID
         let delete_epoch = ChainEpoch::from(51);
-        let res = state.delete_blob(
-            subscriber,
-            subscriber,
-            subscriber,
-            delete_epoch,
-            hash,
-            id1.clone(),
-        );
+        let res = state.delete_blob(origin, caller, subscriber, delete_epoch, hash, id1.clone());
         assert!(res.is_ok());
         let delete_from_disk = res.unwrap();
         assert!(!delete_from_disk);
@@ -1950,13 +2116,22 @@ mod tests {
         assert_eq!(state.credit_committed, account.credit_committed);
         assert_eq!(
             state.credit_debited,
-            amount.atto() - (&account.credit_free + &account.credit_committed)
+            token_amount.atto() - (&account.credit_free + &account.credit_committed)
         );
         assert_eq!(state.capacity_used, BigInt::from(size));
 
         // Check indexes
         assert_eq!(state.expiries.len(), 1);
         assert_eq!(state.pending.len(), 0);
+
+        // Check approval
+        let account_committed = account.credit_committed.clone();
+        check_approval(
+            account,
+            origin,
+            caller,
+            state.credit_debited + account_committed,
+        );
     }
 
     #[test]
@@ -2171,6 +2346,7 @@ mod tests {
             .buy_credit(subscriber, amount.clone(), current_epoch)
             .unwrap();
 
+        // Add a blob
         let (hash, size) = new_hash(1024);
         let res = state.add_blob(
             subscriber,
@@ -2185,6 +2361,7 @@ mod tests {
         );
         assert!(res.is_ok());
 
+        // Finalize as pending
         let finalize_epoch = ChainEpoch::from(11);
         let res = state.finalize_blob(
             subscriber,
@@ -2212,7 +2389,7 @@ mod tests {
             .buy_credit(subscriber, amount.clone(), current_epoch)
             .unwrap();
 
-        // Add blob
+        // Add a blob
         let (hash, size) = new_hash(1024);
         let res = state.add_blob(
             subscriber,
@@ -2227,6 +2404,7 @@ mod tests {
         );
         assert!(res.is_ok());
 
+        // Finalize as resolved
         let finalize_epoch = ChainEpoch::from(11);
         let res = state.finalize_blob(
             subscriber,
@@ -2237,6 +2415,7 @@ mod tests {
         );
         assert!(res.is_ok());
 
+        // Check status
         let status = state
             .get_blob_status(subscriber, hash, SubscriptionId::Default)
             .unwrap();
@@ -2260,6 +2439,7 @@ mod tests {
             .unwrap();
         let credit_amount = amount.atto() * state.credit_debit_rate;
 
+        // Add a blob
         let add_epoch = current_epoch;
         let (hash, size) = new_hash(1024);
         let res = state.add_blob(
@@ -2275,6 +2455,7 @@ mod tests {
         );
         assert!(res.is_ok());
 
+        // Finalize as failed
         let finalize_epoch = ChainEpoch::from(11);
         let res = state.finalize_blob(
             subscriber,
@@ -2285,6 +2466,7 @@ mod tests {
         );
         assert!(res.is_ok());
 
+        // Check status
         let status = state
             .get_blob_status(subscriber, hash, SubscriptionId::Default)
             .unwrap();
@@ -2320,6 +2502,7 @@ mod tests {
             .unwrap();
         let mut credit_amount = amount.atto() * state.credit_debit_rate;
 
+        // Add a blob
         let add_epoch = current_epoch;
         let (hash, size) = new_hash(1024);
         let res = state.add_blob(
@@ -2374,6 +2557,7 @@ mod tests {
         );
         assert_eq!(state.capacity_used, account.capacity_used);
 
+        // Finalize as failed
         let finalize_epoch = ChainEpoch::from(21);
         let res = state.finalize_blob(
             subscriber,
@@ -2384,6 +2568,7 @@ mod tests {
         );
         assert!(res.is_ok());
 
+        // Check status
         let status = state
             .get_blob_status(subscriber, hash, SubscriptionId::Default)
             .unwrap();
@@ -2411,19 +2596,56 @@ mod tests {
         setup_logs();
         let capacity = 1024 * 1024;
         let mut state = State::new(capacity, 1);
+        let origin = new_address();
+        let current_epoch = ChainEpoch::from(1);
+        let token_amount = TokenAmount::from_whole(10);
+        state
+            .buy_credit(origin, token_amount.clone(), current_epoch)
+            .unwrap();
+        delete_blob_refund(state, origin, origin, origin, current_epoch, token_amount);
+    }
+
+    #[test]
+    fn test_delete_blob_refund_with_approval() {
+        setup_logs();
+        let capacity = 1024 * 1024;
+        let mut state = State::new(capacity, 1);
+        let origin = new_address();
         let subscriber = new_address();
         let current_epoch = ChainEpoch::from(1);
-        let amount = TokenAmount::from_whole(10);
+        let token_amount = TokenAmount::from_whole(10);
         state
-            .buy_credit(subscriber, amount.clone(), current_epoch)
+            .buy_credit(subscriber, token_amount.clone(), current_epoch)
             .unwrap();
-        let mut credit_amount = amount.atto() * state.credit_debit_rate;
+        state
+            .approve_credit(subscriber, origin, None, current_epoch, None, None)
+            .unwrap();
+        delete_blob_refund(
+            state,
+            origin,
+            origin,
+            subscriber,
+            current_epoch,
+            token_amount,
+        );
+    }
 
+    fn delete_blob_refund(
+        mut state: State,
+        origin: Address,
+        caller: Address,
+        subscriber: Address,
+        current_epoch: ChainEpoch,
+        token_amount: TokenAmount,
+    ) {
+        let mut credit_amount = token_amount.atto() * state.credit_debit_rate;
+
+        // Add a blob
         let add1_epoch = current_epoch;
         let (hash1, size1) = new_hash(1024);
         let res = state.add_blob(
-            subscriber,
-            subscriber,
+            origin,
+            caller,
             subscriber,
             add1_epoch,
             hash1,
@@ -2450,8 +2672,8 @@ mod tests {
         let add2_epoch = ChainEpoch::from(MIN_TTL + 10);
         let (hash2, size2) = new_hash(2048);
         let res = state.add_blob(
-            subscriber,
-            subscriber,
+            origin,
+            caller,
             subscriber,
             add2_epoch,
             hash2,
@@ -2479,8 +2701,8 @@ mod tests {
         let delete_epoch = ChainEpoch::from(MIN_TTL + 20);
         let delete_from_disc = state
             .delete_blob(
-                subscriber,
-                subscriber,
+                origin,
+                caller,
                 subscriber,
                 delete_epoch,
                 hash1,
@@ -2507,5 +2729,14 @@ mod tests {
         // Check indexes
         assert_eq!(state.expiries.len(), 1);
         assert_eq!(state.pending.len(), 1);
+
+        // Check approval
+        let account_committed = account.credit_committed.clone();
+        check_approval(
+            account,
+            origin,
+            caller,
+            state.credit_debited + account_committed,
+        );
     }
 }

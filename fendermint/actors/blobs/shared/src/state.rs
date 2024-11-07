@@ -52,8 +52,8 @@ pub struct CreditApproval {
     pub limit: Option<BigInt>,
     /// Optional credit approval expiry epoch.
     pub expiry: Option<ChainEpoch>,
-    /// Counter for how much credit has been committed via this approval.
-    pub committed: BigInt,
+    /// Counter for how much credit has been used via this approval.
+    pub used: BigInt,
 }
 
 /// Blob blake3 hash.
