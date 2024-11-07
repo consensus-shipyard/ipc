@@ -6,8 +6,8 @@ use std::collections::HashSet;
 
 use fendermint_actor_blobs_shared::params::{
     AddBlobParams, ApproveCreditParams, BuyCreditParams, DeleteBlobParams, FinalizeBlobParams,
-    GetAccountParams, GetBlobParams, GetBlobStatusParams, GetPendingBlobsParams, GetStatsReturn,
-    RevokeCreditParams,
+    GetAccountParams, GetBlobParams, GetBlobStatusParams, GetCreditApprovalParams,
+    GetPendingBlobsParams, GetStatsReturn, RevokeCreditParams,
 };
 use fendermint_actor_blobs_shared::state::{
     Account, Blob, BlobStatus, CreditApproval, Hash, PublicKey, Subscription,
@@ -68,6 +68,14 @@ impl BlobsActor {
     ) -> Result<CreditApproval, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let (from, actor_type) = resolve_external(rt, params.from)?;
+        // Credit owner cannot be a machine
+        if matches!(actor_type, ActorType::Machine) {
+            return Err(ActorError::illegal_argument(format!(
+                "from {} cannot be a machine",
+                from
+            )));
+        }
+
         let (origin, caller) = if rt.message().origin() == rt.message().caller() {
             let (origin, _) = resolve_external(rt, rt.message().origin())?;
             (origin, origin)
@@ -80,13 +88,6 @@ impl BlobsActor {
         if from != caller && from != origin {
             return Err(ActorError::illegal_argument(format!(
                 "from {} does not match origin or caller",
-                from
-            )));
-        }
-        // Credit owner cannot be a machine
-        if matches!(actor_type, ActorType::Machine) {
-            return Err(ActorError::illegal_argument(format!(
-                "from {} cannot be a machine",
                 from
             )));
         }
@@ -114,6 +115,38 @@ impl BlobsActor {
                 params.ttl,
             )
         })
+    }
+
+    fn get_credit_approval(
+        rt: &impl Runtime,
+        params: GetCreditApprovalParams,
+    ) -> Result<Option<CreditApproval>, ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+
+        let (from, actor_type) = resolve_external(rt, params.from)?;
+        // Credit owner cannot be a machine
+        if matches!(actor_type, ActorType::Machine) {
+            return Err(ActorError::illegal_argument(format!(
+                "from address {} cannot be a machine",
+                from
+            )));
+        }
+
+        let (receiver, actor_type) = resolve_external(rt, params.receiver)?;
+        // Receiver cannot be a machine
+        if matches!(actor_type, ActorType::Machine) {
+            return Err(ActorError::illegal_argument(format!(
+                "receiver address {} cannot be a machine",
+                receiver
+            )));
+        }
+
+        let (caller, _) = resolve_external(rt, params.caller)?;
+
+        let approval = rt
+            .state::<State>()?
+            .get_credit_approval(from, receiver, caller);
+        Ok(approval)
     }
 
     fn revoke_credit(rt: &impl Runtime, params: RevokeCreditParams) -> Result<(), ActorError> {
@@ -331,6 +364,7 @@ impl ActorCode for BlobsActor {
         GetStats => get_stats,
         BuyCredit => buy_credit,
         ApproveCredit => approve_credit,
+        GetCreditApproval => get_credit_approval,
         RevokeCredit => revoke_credit,
         GetAccount => get_account,
         DebitAccounts => debit_accounts,
@@ -411,8 +445,9 @@ fn resolve_external(
             Ok((delegated_addr, ActorType::Evm))
         }
         Some(t) => Err(ActorError::forbidden(format!(
-            "disallowed caller type {}",
-            t.name()
+            "disallowed caller type {} for address {}",
+            t.name(),
+            address
         ))),
         None => {
             // The caller might be a machine
