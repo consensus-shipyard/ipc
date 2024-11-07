@@ -97,12 +97,8 @@ task('deploy-registry')
             creationPrivileges: Number(mode),
         }
 
-        console.log(`Deploying SubnetRegistryDiamond...`)
-        const registry = await hre.deployments.deploy('SubnetRegistryDiamond', {
-            from: deployer,
+        Deployments.deploy(hre, deployer, {
+            name: 'SubnetRegistryDiamond',
             args: [registryFacets.asFacetCuts(), registryConstructorParams],
-            log: true,
-            waitConfirmations: 1,
-        })
-        console.log(`SubnetRegistryDiamond deployed at ${registry.address}`)
+        });
     })

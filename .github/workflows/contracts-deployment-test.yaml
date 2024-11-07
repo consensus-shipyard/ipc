@@ -1,4 +1,4 @@
-name: 'Contracts: Smoke test deployment'
+name: "Contracts: Smoke test deployment"
 
 # This workflow is triggered from the main CI workflow.
 on:
@@ -17,8 +17,8 @@ jobs:
     - name: Setup Node
       uses: actions/setup-node@v4
       with:
-        node-version: '18.x'
-        cache: 'pnpm'
+        node-version: "18.x"
+        cache: "pnpm"
 
     - name: Install dependencies
       run: cd contracts && make deps
@@ -36,6 +36,6 @@ jobs:
         echo "export RPC_URL=http://127.0.0.1:1337" >> .env
         echo "export CHAIN_ID=1337" >> .env
         export PATH="$PATH:/home/runner/.config/.foundry/bin"
-        pnpm exec ganache-cli -b 1 -g0 -p1337 --account 0x$PRIVATE_KEY,1001901919191919191  &
+        pnpm exec ganache-cli -g0 -p1337 --account 0x$PRIVATE_KEY,1001901919191919191  &
         sleep 5
         make deploy-stack

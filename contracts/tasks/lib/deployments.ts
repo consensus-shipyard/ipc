@@ -68,29 +68,19 @@ export class Deployments {
                 ...(contract.libraries || []),
             )
 
-            // This is a workaround for an issue where the nonce gets reused. This can occur in load-balanced environments 
-            // where transactions are sent to different nodes, and the nonce is not consistently updated across all nodes.
-            while (true) {
-                try {
-                    const result = await hre.deployments.deploy(contract.name, {
-                        from: deployer,
-                        log: true,
-                        args: contract.args,
-                        libraries: libraries.addresses,
-                        waitConfirmations: 2,
-                    })
-                    results[contract.name] = result
-                    console.log(`${contract.name} deployed at ${result.address}`)
-                    break
-                } catch (error) {
-                    if (error instanceof Error &&(error as any).code === "NONCE_EXPIRED") {
-                        console.log(`Nonce expired. Retrying deployment of ${contract.name}`)
+            // Manually managed nonce due to a Filecoin update, which requires specifying 'pending' with
+            // getTransactionCount to retrieve the latest nonce.
+            const nonce = await hre.ethers.provider.getTransactionCount(deployer, "pending");
 
-                        continue
-                      }
-                      throw error
-                }
-            }
+            const result = await hre.deployments.deploy(contract.name, {
+                from: deployer,
+                log: true,
+                args: contract.args,
+                libraries: libraries.addresses,
+                nonce: nonce,
+            })
+            results[contract.name] = result
+            console.log(`${contract.name} deployed at ${result.address}`)
         }
 
         return new Deployments(
