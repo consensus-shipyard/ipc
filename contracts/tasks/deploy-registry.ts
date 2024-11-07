@@ -100,5 +100,5 @@ task('deploy-registry')
         Deployments.deploy(hre, deployer, {
             name: 'SubnetRegistryDiamond',
             args: [registryFacets.asFacetCuts(), registryConstructorParams],
-        });
+        })
     })
