@@ -254,10 +254,9 @@ where
             }
         }
         if !pending_hashes.is_empty() {
-            msgs.push(ChainMessage::Ipc(IpcMessage::BlobsPending(
-                pending_hashes.clone(),
-            )));
-            tracing::debug!(size = pending_hashes.len(), "pending blobs");
+            let pending_hash_count = pending_hashes.len();
+            msgs.push(ChainMessage::Ipc(IpcMessage::BlobsPending(pending_hashes)));
+            tracing::debug!(size = pending_hash_count, "pending blobs");
         }
 
         // Maybe debit all credit accounts
