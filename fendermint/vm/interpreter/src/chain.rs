@@ -462,7 +462,7 @@ where
     async fn begin(
         &self,
         (env, state): Self::State,
-        ) -> anyhow::Result<(Self::State, Self::BeginOutput)> {
+    ) -> anyhow::Result<(Self::State, Self::BeginOutput)> {
         let (state, out) = self.inner.begin(state).await?;
         Ok(((env, state), out))
     }
@@ -471,7 +471,7 @@ where
         &self,
         (env, mut state): Self::State,
         msg: Self::Message,
-        ) -> anyhow::Result<(Self::State, Self::DeliverOutput)> {
+    ) -> anyhow::Result<(Self::State, Self::DeliverOutput)> {
         match msg {
             ChainMessage::Signed(msg) => {
                 let (state, ret) = self
