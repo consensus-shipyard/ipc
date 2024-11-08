@@ -4,6 +4,10 @@ name: Build IPC
 on:
   workflow_call:
 
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
+
 jobs:
   build:
     name: Build IPC
@@ -18,6 +22,7 @@ jobs:
           ssh-private-key: |
             ${{ secrets.BUILTIN_ACTORS_DEPLOY_KEY }}
             ${{ secrets.CONTRACTS_DEPLOY_KEY }}
+            ${{ secrets.ENTANGLEMENT_DEPLOY_KEY }}
 
       - name: Check out the project
         uses: actions/checkout@v4
@@ -29,7 +34,7 @@ jobs:
         uses: ./.github/actions/install-tools
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          rust: stable
+          rust: 1.81.0
 
       - name: Install Node.js
         uses: actions/setup-node@v2
@@ -65,7 +70,7 @@ jobs:
       - name: Build Docker image for e2e tests
         run: |
           ## Create the temporary Dockerfile.
-          cat <<EOF > /tmp/Dockerfile
+          cat <<EOF > /tmp/Dockerfile-${{ github.sha }}
           # syntax=docker/dockerfile:1
           FROM alpine AS builder
           COPY /fendermint/app/config /app/fendermint/app/config
@@ -74,14 +79,14 @@ jobs:
           EOF
           
           ## Append the runner build phase to the Dockerfile.
-          cat fendermint/docker/runner.Dockerfile >> /tmp/Dockerfile
+          cat fendermint/docker/runner.Dockerfile >> /tmp/Dockerfile-${{ github.sha }}
           
           ## Print the Dockerfile for debugging.
-          echo "Dockerfile:"
-          cat /tmp/Dockerfile
+          echo "Dockerfile-${{ github.sha }}:"
+          cat /tmp/Dockerfile-${{ github.sha }}
           
           ## Create the temporary .dockerignore file.
-          cat <<EOF > /tmp/Dockerfile.dockerignore
+          cat <<EOF > /tmp/Dockerfile-${{ github.sha }}.dockerignore
           target
           !target/release/fendermint
           !target/release/ipc-cli
@@ -90,25 +95,24 @@ jobs:
           EOF
           
           ## Print the .dockerignore file for debugging.
-          echo "Dockerfile.dockerignore:"
-          cat /tmp/Dockerfile.dockerignore
+          echo "Dockerfile-${{ github.sha }}.dockerignore:"
+          cat /tmp/Dockerfile-${{ github.sha }}.dockerignore
           
           ## Build the Docker image.
           DOCKER_BUILDKIT=1 docker build \
             --load \
-            -f /tmp/Dockerfile \
-            -t fendermint:latest \
+            -f /tmp/Dockerfile-${{ github.sha }} \
+            -t fendermint:${{ github.sha }} \
             .
 
       - name: Create artifacts directory
         run: mkdir -p /tmp/artifacts
 
       - name: Export Docker image
-        run: docker save fendermint:latest > /tmp/artifacts/docker-image.tar
+        run: docker save fendermint:${{ github.sha }} > /tmp/artifacts/docker-image-${{ github.sha }}.tar
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: docker-image
-          run-id: ${{ github.event.workflow_run.id }}
-          path: /tmp/artifacts/docker-image.tar
+          name: docker-image-${{ github.sha }}
+          path: /tmp/artifacts/docker-image-${{ github.sha }}.tar
