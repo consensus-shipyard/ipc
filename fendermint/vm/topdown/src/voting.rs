@@ -329,7 +329,7 @@ where
 
     /// Call when a new finalized block is added to the ledger, to clear out all preceding blocks.
     ///
-    /// After this operation the minimum item in the chain will the new finalized block.
+    /// After this operation the minimum item in the chain will be the new finalized block.
     pub fn set_finalized(
         &self,
         parent_block_height: BlockHeight,
@@ -343,6 +343,8 @@ where
             chain
         })?;
 
+        // The votes' TVar will be updated such that the only key in the
+        // map of block heights to validator votes per block is the newest finalized block
         self.votes
             .update(|votes| votes.split(&parent_block_height).1)?;
 
@@ -353,6 +355,14 @@ where
             proposer,
         });
 
+        Ok(())
+    }
+
+    // when a blob is finalized in the parent we can remove it from the blob votes tally, note: ensure this is called with `atomically`
+    pub fn clear_blob(&self, blob: O) -> Stm<()> {
+        self.blob_votes.update_mut(|votes| {
+            votes.remove(&blob);
+        })?;
         Ok(())
     }
 
