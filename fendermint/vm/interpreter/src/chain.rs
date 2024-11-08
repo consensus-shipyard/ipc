@@ -684,11 +684,13 @@ where
                         "chain interpreter has finalized blob"
                     );
 
-                    // once the blob is finalized on the parent we can clean up the votes
+                    // Once the blob is finalized on the parent, we can clean up the votes
                     atomically(|| {
-                        env.parent_finality_votes.clear_blob(blob.hash.as_bytes().to_vec())?;
+                        env.parent_finality_votes
+                            .clear_blob(blob.hash.as_bytes().to_vec())?;
                         Ok(())
-                    }).await;
+                    })
+                    .await;
 
                     let ret = FvmApplyRet {
                         apply_ret,
