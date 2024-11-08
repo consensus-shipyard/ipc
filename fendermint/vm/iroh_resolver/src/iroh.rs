@@ -205,7 +205,8 @@ async fn add_own_vote<V>(
     subnet_id: SubnetID,
     resolved: bool,
     to_vote: fn(Hash, bool) -> V,
-) where
+) -> bool
+where
     V: Clone + Send + Sync + Serialize + DeserializeOwned + 'static,
 {
     let vote = to_vote(vote_hash, resolved);
@@ -237,16 +238,20 @@ async fn add_own_vote<V>(
                         // Send our own vote to peers
                         if let Err(e) = client.publish_vote(vote) {
                             tracing::error!(error = e.to_string(), "failed to publish vote");
+                            return false;
                         }
                     }
+                    true
                 }
                 Err(e) => {
                     tracing::error!(error = e.to_string(), "failed to handle own vote");
+                    false
                 }
             }
         }
         Err(e) => {
             tracing::error!(error = e.to_string(), "failed to sign vote");
+            false
         }
     }
 }
