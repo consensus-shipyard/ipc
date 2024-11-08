@@ -33,8 +33,6 @@ use fendermint_vm_topdown::{
 };
 use fvm_shared::address::{current_network, Address, Network};
 use ipc_ipld_resolver::{Event as ResolverEvent, ValidatorKey, VoteRecord};
-use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
-use ipc_observability::observe::register_metrics as register_default_metrics;
 use ipc_observability::{emit, observe::register_metrics as register_default_metrics};
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
