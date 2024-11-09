@@ -26,6 +26,7 @@ use fvm_shared::{
     address::Address, chainid::ChainID, clock::ChainEpoch, econ::TokenAmount, error::ExitCode,
     message::Message, receipt::Receipt, version::NetworkVersion, ActorID,
 };
+use hoku_executor::HokuExecutor;
 use hoku_kernel::HokuKernel;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -109,7 +110,7 @@ where
 {
     #[allow(clippy::type_complexity)]
     executor:
-        DefaultExecutor<HokuKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>>,
+        HokuExecutor<HokuKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>>,
     /// Hash of the block currently being executed. For queries and checks this is empty.
     ///
     /// The main motivation to add it here was to make it easier to pass in data to the
@@ -160,7 +161,7 @@ where
         let engine = multi_engine.get(&nc)?;
         let externs = FendermintExterns::new(blockstore.clone(), params.state_root);
         let machine = DefaultMachine::new(&mc, blockstore, externs)?;
-        let mut executor = DefaultExecutor::new(engine, machine)?;
+        let mut executor = HokuExecutor::new(engine, machine)?;
 
         let block_gas_tracker = BlockGasTracker::create(&mut executor)?;
 
@@ -238,7 +239,7 @@ where
     pub fn execute_with_executor<F, R>(&mut self, exec_func: F) -> anyhow::Result<R>
     where
         F: FnOnce(
-            &mut DefaultExecutor<
+            &mut HokuExecutor<
                 HokuKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>,
             >,
         ) -> anyhow::Result<R>,

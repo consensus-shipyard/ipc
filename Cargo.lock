@@ -3817,6 +3817,7 @@ dependencies = [
  "fvm_ipld_encoding",
  "fvm_shared",
  "hex",
+ "hoku_executor",
  "hoku_kernel",
  "ipc-api",
  "ipc-observability",
@@ -5320,6 +5321,19 @@ dependencies = [
  "fvm_sdk",
  "fvm_shared",
  "num-traits",
+]
+
+[[package]]
+name = "hoku_executor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cid",
+ "fvm",
+ "fvm_ipld_encoding",
+ "fvm_shared",
+ "num-traits",
+ "replace_with",
 ]
 
 [[package]]
