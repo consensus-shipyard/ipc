@@ -10,6 +10,7 @@ use ipc_api::subnet_id::SubnetID;
 use iroh::blobs::Hash;
 use iroh::client::Iroh;
 use iroh::net::NodeAddr;
+use iroh_manager::IrohManager;
 use libipld::store::StoreParams;
 use libipld::Cid;
 use libp2p::futures::StreamExt;
@@ -23,7 +24,6 @@ use libp2p::{identify, ping};
 use libp2p_bitswap::{BitswapResponse, BitswapStore};
 use libp2p_mplex::MplexConfig;
 use log::{debug, error, info, trace, warn};
-use maybe_iroh::MaybeIroh;
 use prometheus::Registry;
 use rand::seq::SliceRandom;
 use serde::de::DeserializeOwned;
@@ -148,7 +148,7 @@ where
     /// To limit the number of peers contacted in a Bitswap resolution attempt.
     max_peers_per_query: usize,
     /// Iroh client
-    iroh: MaybeIroh,
+    iroh: IrohManager,
 }
 
 impl<P, V> Service<P, V>
@@ -228,7 +228,7 @@ where
                 config.connection.expected_peer_count,
             ),
             max_peers_per_query: config.connection.max_peers_per_query as usize,
-            iroh: MaybeIroh::maybe_addr(config.iroh_addr),
+            iroh: IrohManager::from_addr(config.iroh_addr),
         };
 
         Ok(service)

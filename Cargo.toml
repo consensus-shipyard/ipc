@@ -40,9 +40,11 @@ members = [
     "fendermint/actors/bucket",
     "fendermint/actors/machine",
     "fendermint/actors/timehub",
-    "hoku/blobs_actor_sdk",
-    "hoku/blobs_syscall",
-    "hoku/maybe_iroh",
+    "hoku/actor_sdk",
+    "hoku/iroh_manager",
+    "hoku/kernel",
+    "hoku/kernel/ops",
+    "hoku/syscalls",
 ]
 exclude = ["builtin-actors"]
 

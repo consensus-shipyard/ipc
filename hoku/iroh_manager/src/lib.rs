@@ -8,20 +8,13 @@ use anyhow::anyhow;
 use iroh::client::Iroh;
 
 #[derive(Clone, Debug)]
-pub struct MaybeIroh {
+pub struct IrohManager {
     addr: Option<String>,
     client: Option<Iroh>,
 }
 
-impl MaybeIroh {
-    pub fn from_addr(addr: String) -> MaybeIroh {
-        Self {
-            addr: Some(addr),
-            client: None,
-        }
-    }
-
-    pub fn maybe_addr(addr: Option<String>) -> MaybeIroh {
+impl IrohManager {
+    pub fn from_addr(addr: Option<String>) -> IrohManager {
         Self { addr, client: None }
     }
 

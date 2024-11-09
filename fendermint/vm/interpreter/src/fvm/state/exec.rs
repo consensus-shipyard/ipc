@@ -6,7 +6,6 @@ use std::collections::{HashMap, HashSet};
 use crate::fvm::externs::FendermintExterns;
 use crate::fvm::gas::BlockGasTracker;
 use anyhow::Ok;
-use blobs_syscall::hoku_kernel::HokuKernel;
 use cid::Cid;
 use fendermint_actors_api::gas_market::Reading;
 use fendermint_crypto::PublicKey;
@@ -27,6 +26,7 @@ use fvm_shared::{
     address::Address, chainid::ChainID, clock::ChainEpoch, econ::TokenAmount, error::ExitCode,
     message::Message, receipt::Receipt, version::NetworkVersion, ActorID,
 };
+use hoku_kernel::HokuKernel;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 

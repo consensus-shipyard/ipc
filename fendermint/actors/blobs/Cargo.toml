@@ -22,9 +22,9 @@ fvm_shared = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_tuple = { workspace = true }
 
-blobs_actor_sdk = { path = "../../../hoku/blobs_actor_sdk" }
 fendermint_actor_blobs_shared = { path = "./shared" }
 fendermint_actor_machine = { path = "../machine" }
+hoku_actor_sdk = { path = "../../../hoku/actor_sdk" }
 
 [dev-dependencies]
 fendermint_testing = { path = "../../testing", features = ["arb"] }

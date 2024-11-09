@@ -348,7 +348,7 @@ impl BlobsActor {
 fn delete_from_disc(hash: Hash) -> Result<(), ActorError> {
     #[cfg(feature = "fil-actor")]
     {
-        blobs_actor_sdk::hash_rm(hash.0).map_err(|en| {
+        hoku_actor_sdk::hash_rm(hash.0).map_err(|en| {
             ActorError::unspecified(format!("failed to delete blob from disc: {:?}", en))
         })?;
         log::debug!("deleted blob {} from disc", hash);

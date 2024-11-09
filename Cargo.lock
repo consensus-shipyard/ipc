@@ -924,33 +924,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "blobs_actor_sdk"
-version = "0.1.0"
-dependencies = [
- "fvm_sdk",
- "fvm_shared",
- "log",
- "num-traits",
-]
-
-[[package]]
-name = "blobs_syscall"
-version = "0.1.0"
-dependencies = [
- "ambassador",
- "anyhow",
- "fvm",
- "fvm_ipld_blockstore",
- "fvm_shared",
- "iroh",
- "maybe_iroh",
- "num-traits",
- "once_cell",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "block-buffer"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3115,7 +3088,6 @@ name = "fendermint_actor_blobs"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "blobs_actor_sdk",
  "fendermint_actor_blobs_shared",
  "fendermint_actor_machine",
  "fendermint_testing",
@@ -3125,6 +3097,7 @@ dependencies = [
  "fvm_ipld_encoding",
  "fvm_shared",
  "hex-literal 0.4.1",
+ "hoku_actor_sdk",
  "iroh-base",
  "log",
  "num-traits",
@@ -3809,7 +3782,6 @@ dependencies = [
  "async-stm",
  "async-trait",
  "base64 0.21.7",
- "blobs_syscall",
  "cid",
  "ethers",
  "fendermint_actor_blobs",
@@ -3845,6 +3817,7 @@ dependencies = [
  "fvm_ipld_encoding",
  "fvm_shared",
  "hex",
+ "hoku_kernel",
  "ipc-api",
  "ipc-observability",
  "ipc_actors_abis",
@@ -5341,6 +5314,49 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3688e69b38018fec1557254f64c8dc2cc8ec502890182f395dbb0aa997aa5735"
 
 [[package]]
+name = "hoku_actor_sdk"
+version = "0.1.0"
+dependencies = [
+ "fvm_sdk",
+ "fvm_shared",
+ "num-traits",
+]
+
+[[package]]
+name = "hoku_kernel"
+version = "0.1.0"
+dependencies = [
+ "ambassador",
+ "anyhow",
+ "fvm",
+ "fvm_ipld_blockstore",
+ "fvm_shared",
+ "hoku_kernel_ops",
+ "hoku_syscalls",
+]
+
+[[package]]
+name = "hoku_kernel_ops"
+version = "0.1.0"
+dependencies = [
+ "fvm",
+]
+
+[[package]]
+name = "hoku_syscalls"
+version = "0.1.0"
+dependencies = [
+ "fvm",
+ "fvm_shared",
+ "hoku_kernel_ops",
+ "iroh",
+ "iroh_manager",
+ "once_cell",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "home"
 version = "0.5.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6060,6 +6076,7 @@ dependencies = [
  "ipc-api",
  "ipc_ipld_resolver",
  "iroh",
+ "iroh_manager",
  "lazy_static",
  "libipld",
  "libp2p",
@@ -6068,7 +6085,6 @@ dependencies = [
  "libsecp256k1",
  "log",
  "lru_time_cache",
- "maybe_iroh",
  "multihash 0.18.1",
  "prometheus",
  "quickcheck",
@@ -6454,6 +6470,14 @@ dependencies = [
  "socket2",
  "tracing",
  "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "iroh_manager"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "iroh",
 ]
 
 [[package]]
@@ -7489,14 +7513,6 @@ name = "matchit"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e7465ac9959cc2b1404e8e2367b43684a6d13790fe23056cc8c6c5a6b7bcb94"
-
-[[package]]
-name = "maybe_iroh"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "iroh",
-]
 
 [[package]]
 name = "md-5"

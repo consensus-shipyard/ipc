@@ -1,10 +1,12 @@
 [package]
-name = "maybe_iroh"
+name = "hoku_kernel_ops"
 version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[lib]
+crate-type = ["cdylib", "lib"]
+
 [dependencies]
-anyhow = { workspace = true }
-iroh = { workspace = true }
+fvm = { workspace = true }

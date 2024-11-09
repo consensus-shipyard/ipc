@@ -7,7 +7,7 @@ default:
 	./target/release/ipc-cli --version
 	./target/release/fendermint --version
 
-SUBTREES_RUST := fendermint ipc ipld/resolver
+SUBTREES_RUST := fendermint ipc ipld/resolver hoku
 SUBTREES_CONTRACTS := contracts
 SUBTREES_ALL := $(SUBTREES_RUST) $(SUBTREES_CONTRACTS)
 
