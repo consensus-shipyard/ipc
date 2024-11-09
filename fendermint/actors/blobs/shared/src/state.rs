@@ -108,8 +108,11 @@ pub struct Blob {
 }
 
 /// The status of a blob.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub enum BlobStatus {
+    /// Blob is not yet added to reolve pools
+    #[default]
+    Added,
     /// Blob is pending resolve.
     Pending,
     /// Blob was successfully resolved.
@@ -121,6 +124,7 @@ pub enum BlobStatus {
 impl fmt::Display for BlobStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            BlobStatus::Added => write!(f, "added"),
             BlobStatus::Pending => write!(f, "pending"),
             BlobStatus::Resolved => write!(f, "resolved"),
             BlobStatus::Failed => write!(f, "failed"),

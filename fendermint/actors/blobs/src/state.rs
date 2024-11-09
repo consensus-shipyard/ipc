@@ -47,6 +47,8 @@ pub struct State {
     pub expiries: BTreeMap<ChainEpoch, HashMap<Address, HashMap<Hash, bool>>>,
     /// Map of currently pending blob hashes to account and source Iroh node IDs.
     pub pending: BTreeMap<Hash, HashSet<(Address, PublicKey)>>,
+    /// Map of blob hashes that are not yet added to the validator's resolve pool.
+    pub added: BTreeMap<Hash, HashSet<(Address, PublicKey)>>,
 }
 
 /// Helper for handling credit approvals.
@@ -92,6 +94,7 @@ impl State {
             blobs: HashMap::new(),
             expiries: BTreeMap::new(),
             pending: BTreeMap::new(),
+            added: BTreeMap::new(),
         }
     }
 
@@ -107,6 +110,9 @@ impl State {
             num_accounts: self.accounts.len() as u64,
             num_blobs: self.blobs.len() as u64,
             num_resolving: self.pending.len() as u64,
+            bytes_resolving: self.pending.keys().map(|hash| self.blobs[hash].size).sum(),
+            num_added: self.added.len() as u64,
+            bytes_added: self.added.keys().map(|hash| self.blobs[hash].size).sum(),
         }
     }
 
@@ -422,10 +428,10 @@ impl State {
                 sub
             };
             if !matches!(blob.status, BlobStatus::Failed) {
-                // It's pending or failed, reset to pending
-                blob.status = BlobStatus::Pending;
-                // Add/update pending with hash and its source
-                self.pending
+                // It's pending or failed, reset to "added"
+                blob.status = BlobStatus::Added;
+                // Add/update "added" with hash and its source
+                self.added
                     .entry(hash)
                     .and_modify(|sources| {
                         sources.insert((subscriber, source));
@@ -465,7 +471,7 @@ impl State {
             let blob = Blob {
                 size: size.to_u64().unwrap(),
                 subs: HashMap::from([(subscriber, sub.clone())]),
-                status: BlobStatus::Pending,
+                status: BlobStatus::Added,
                 metadata_hash,
             };
             self.blobs.insert(hash, blob);
@@ -479,8 +485,8 @@ impl State {
                 Some((expiry, auto_renew)),
                 None,
             );
-            // Add to pending
-            self.pending
+            // Add to "added" map
+            self.added
                 .insert(hash, HashSet::from([(subscriber, source)]));
             sub
         };
@@ -632,17 +638,18 @@ impl State {
     pub fn get_blob_status(&self, hash: Hash, subscriber: Address) -> Option<BlobStatus> {
         let blob = self.blobs.get(&hash)?;
         if blob.subs.contains_key(&subscriber) {
-            if matches!(blob.status, BlobStatus::Resolved) {
-                Some(BlobStatus::Resolved)
-            } else {
-                // The blob state's status may have been finalized as failed by another
-                // subscription, but since this one exists, there must be another pending
-                // resolution task in the queue.
-                Some(BlobStatus::Pending)
-            }
+            Some(blob.status.clone())
         } else {
             None
         }
+    }
+
+    pub fn get_added_blobs(&self, size: u32) -> Vec<(Hash, HashSet<(Address, PublicKey)>)> {
+        self.added
+            .iter()
+            .take(size as usize)
+            .map(|element| (*element.0, element.1.clone()))
+            .collect::<Vec<_>>()
     }
 
     pub fn get_pending_blobs(&self, size: u32) -> Vec<(Hash, HashSet<(Address, PublicKey)>)> {
@@ -653,12 +660,19 @@ impl State {
             .collect::<Vec<_>>()
     }
 
-    pub fn get_pending_blobs_count(&self) -> u64 {
-        self.pending.len() as u64
-    }
-
-    pub fn get_pending_bytes_count(&self) -> u64 {
-        self.pending.keys().map(|hash| self.blobs[hash].size).sum()
+    pub fn set_pending(&mut self, subscriber: Address, hash: Hash, source: PublicKey) {
+        // set blob status to pending
+        let blob = self.blobs.get_mut(&hash).unwrap();
+        blob.status = BlobStatus::Pending;
+        // Add to pending map
+        self.pending
+            .entry(hash)
+            .and_modify(|sources| {
+                sources.insert((subscriber, source));
+            })
+            .or_insert(HashSet::from([(subscriber, source)]));
+        // Remove from added map
+        self.added.remove(&hash);
     }
 
     pub fn finalize_blob(
@@ -901,6 +915,14 @@ impl State {
         }
         // Update expiry index
         update_expiry_index(&mut self.expiries, subscriber, hash, None, Some(sub.expiry));
+        // Remove entry from the "added" map if it exists
+        if let Some(entry) = self.added.get_mut(&hash) {
+            entry.remove(&(subscriber, sub.source));
+            if entry.is_empty() {
+                self.added.remove(&hash);
+            }
+        }
+
         // Remove entry from pending
         if let Some(entry) = self.pending.get_mut(&hash) {
             entry.remove(&(subscriber, sub.source));

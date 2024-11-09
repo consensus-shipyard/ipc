@@ -9,7 +9,6 @@ use ipc_api::subnet_id::SubnetID;
 use iroh_base::hash::Hash;
 use iroh_base::key::NodeId;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 
 /// Messages involved in InterPlanetary Consensus.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -33,13 +32,13 @@ pub enum IpcMessage {
     TopDownExec(ParentFinality),
 
     /// Proposed by validators when a blob has been finalized and is ready to be executed.
-    BlobFinalized(Blob),
+    BlobFinalized(FinalizedBlob),
 
     /// Proposed by validators at the credit debit interval set at genesis.
     DebitCreditAccounts,
 
-    /// List of pending blobs
-    BlobsPending(HashSet<Blob>),
+    /// List of blobs that needs to be enqueued for resolution.
+    BlobsPending(PendingBlob),
 }
 
 /// A message relayed by a user on the current subnet.
@@ -117,7 +116,7 @@ pub struct ParentFinality {
 
 /// A blob resolution target that the validators will be voting on.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub struct Blob {
+pub struct FinalizedBlob {
     /// The address that requested the blob.
     pub subscriber: Address,
     /// The blake3 hash of the blob.
@@ -126,6 +125,17 @@ pub struct Blob {
     pub source: NodeId,
     /// Whether the blob was resolved or failed.
     pub succeeded: bool,
+}
+
+/// A blob that has been added but not yet queued for resolution.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct PendingBlob {
+    /// The address that requested the blob.
+    pub subscriber: Address,
+    /// The blake3 hash of the blob.
+    pub hash: Hash,
+    /// The node ID of the source node serving validators the blob.
+    pub source: NodeId,
 }
 
 #[cfg(feature = "arb")]
