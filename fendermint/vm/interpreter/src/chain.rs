@@ -276,7 +276,7 @@ where
             // We start a blockstore transaction that can be reverted
             state.state_tree_mut().begin_transaction();
             for item in local_finalized_blobs.iter() {
-                if !is_blob_pending(&mut state, item.hash, item.subscriber)? {
+                if is_blob_finalized(&mut state, item.hash, item.subscriber)? {
                     tracing::debug!(hash = ?item.hash, "blob already finalized on chain; removing from pool");
                     atomically(|| chain_env.blob_pool.remove(item)).await;
                     continue;
@@ -365,7 +365,7 @@ where
                     // not yet finalized.
                     // Start a blockstore transaction that can be reverted.
                     state.state_tree_mut().begin_transaction();
-                    if !is_blob_pending(&mut state, blob.hash, blob.subscriber)? {
+                    if is_blob_finalized(&mut state, blob.hash, blob.subscriber)? {
                         tracing::debug!(hash = ?blob.hash, "blob is already finalized on chain; rejecting proposal");
                         return Ok(false);
                     }
@@ -761,6 +761,7 @@ where
                         .await;
                         tracing::info!(hash = ?blob.hash, subscriber = ?blob.subscriber, source = ?blob.source, "blob added to pool");
                     }
+                    // set the blob to "pending" state
                     let from = system::SYSTEM_ACTOR_ADDR;
                     let to = blobs::BLOBS_ACTOR_ADDR;
                     let method_num = SetPending as u64;
@@ -1011,7 +1012,7 @@ where
 
 /// Check if a blob is pending (if it is not resolved or failed), by reading its on-chain state.
 /// This approach uses an implicit FVM transaction to query a read-only blockstore.
-fn is_blob_pending<DB>(
+fn is_blob_finalized<DB>(
     state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
     hash: Hash,
     subscriber: Address,
@@ -1039,15 +1040,15 @@ where
     let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
     let status = fvm_ipld_encoding::from_slice::<Option<BlobStatus>>(&data)
         .map_err(|e| anyhow!("error parsing as Option<BlobStatus>: {e}"))?;
-    let pending = if let Some(status) = status {
+    let status = if let Some(status) = status {
         match status {
-            BlobStatus::Pending => true,
-            BlobStatus::Added | BlobStatus::Resolved | BlobStatus::Failed => false,
+            BlobStatus::Pending | BlobStatus::Added => false,
+            BlobStatus::Resolved | BlobStatus::Failed => true,
         }
     } else {
         false
     };
-    Ok(pending)
+    Ok(status)
 }
 
 fn get_blobs_stats<DB>(state: &mut FvmExecState<DB>) -> anyhow::Result<GetStatsReturn>
