@@ -5329,9 +5329,12 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid",
+ "fendermint_actor_blobs_shared",
+ "frc42_dispatch",
  "fvm",
  "fvm_ipld_encoding",
  "fvm_shared",
+ "log",
  "num-traits",
  "replace_with",
 ]

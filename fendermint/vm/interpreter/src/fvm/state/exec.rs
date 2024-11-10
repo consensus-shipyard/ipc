@@ -3,8 +3,6 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::fvm::externs::FendermintExterns;
-use crate::fvm::gas::BlockGasTracker;
 use anyhow::Ok;
 use cid::Cid;
 use fendermint_actors_api::gas_market::Reading;
@@ -16,7 +14,7 @@ use fendermint_vm_genesis::PowerScale;
 use fvm::{
     call_manager::DefaultCallManager,
     engine::MultiEngine,
-    executor::{ApplyFailure, ApplyKind, ApplyRet, DefaultExecutor, Executor},
+    executor::{ApplyFailure, ApplyKind, ApplyRet, Executor},
     machine::{DefaultMachine, Machine, Manifest, NetworkConfig},
     state_tree::StateTree,
 };
@@ -30,6 +28,10 @@ use hoku_executor::HokuExecutor;
 use hoku_kernel::HokuKernel;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
+
+use crate::fvm::externs::FendermintExterns;
+use crate::fvm::gas::BlockGasTracker;
+use crate::fvm::virtual_gas::{deduct_vgas_allowance, get_vgas_allowance};
 
 pub type BlockHash = [u8; 32];
 
@@ -222,14 +224,22 @@ where
             return Ok(check_error(e));
         }
 
+        let from = msg.from;
+        let vgas_allowance = get_vgas_allowance(&mut self.executor, from)?;
+
         // TODO: We could preserve the message length by changing the input type.
         let raw_length = fvm_ipld_encoding::to_vec(&msg).map(|bz| bz.len())?;
-        let ret = self.executor.execute_message(msg, kind, raw_length)?;
+        let (ret, vgas_used) =
+            self.executor
+                .execute_sponsored_message(msg, kind, raw_length, vgas_allowance)?;
         let addrs = self.emitter_delegated_addresses(&ret)?;
 
         // Record the utilization of this message if the apply type was Explicit.
         if kind == ApplyKind::Explicit {
             self.block_gas_tracker.record_utilization(&ret);
+            if !vgas_used.is_zero() {
+                deduct_vgas_allowance(&mut self.executor, from, vgas_used)?;
+            }
         }
 
         Ok((ret, addrs))

@@ -5,9 +5,10 @@
 use std::collections::HashSet;
 
 use fendermint_actor_blobs_shared::params::{
-    AddBlobParams, ApproveCreditParams, BuyCreditParams, DeleteBlobParams, FinalizeBlobParams,
-    GetAccountParams, GetBlobParams, GetBlobStatusParams, GetCreditApprovalParams,
-    GetPendingBlobsParams, GetStatsReturn, RevokeCreditParams,
+    AddBlobParams, ApproveCreditParams, BuyCreditParams, DebitCreditParams, DeleteBlobParams,
+    FinalizeBlobParams, GetAccountParams, GetBlobParams, GetBlobStatusParams,
+    GetCreditApprovalParams, GetGasAllowanceParams, GetPendingBlobsParams, GetStatsReturn,
+    RevokeCreditParams,
 };
 use fendermint_actor_blobs_shared::state::{
     Account, Blob, BlobStatus, CreditApproval, Hash, PublicKey, Subscription, SubscriptionId,
@@ -21,6 +22,7 @@ use fil_actors_runtime::{
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::address::Address;
+use fvm_shared::econ::TokenAmount;
 use fvm_shared::sys::SendFlags;
 use fvm_shared::{error::ExitCode, MethodNum};
 use num_traits::Zero;
@@ -60,6 +62,13 @@ impl BlobsActor {
         rt.transaction(|st: &mut State, rt| {
             st.buy_credit(recipient, rt.message().value_received(), rt.curr_epoch())
         })
+    }
+
+    fn debit_credit(rt: &impl Runtime, params: DebitCreditParams) -> Result<(), ActorError> {
+        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
+        // We control this method call and can guarantee subscriber is an external address,
+        // i.e., no need to resolve its external address.
+        rt.transaction(|st: &mut State, _rt| st.deduct_credit(params.from, params.amount))
     }
 
     fn approve_credit(
@@ -189,6 +198,21 @@ impl BlobsActor {
             None
         };
         rt.transaction(|st: &mut State, _| st.revoke_credit(from, receiver, required_caller))
+    }
+
+    fn get_gas_allowance(
+        rt: &impl Runtime,
+        params: GetGasAllowanceParams,
+    ) -> Result<TokenAmount, ActorError> {
+        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
+        // We control this method call and can guarantee subscriber is an external address,
+        // i.e., no need to resolve its external address.
+        let allowance = rt
+            .state::<State>()?
+            .get_account(params.sender)
+            .map(|a| TokenAmount::from_atto(a.credit_free))
+            .unwrap_or(TokenAmount::zero());
+        Ok(allowance)
     }
 
     fn get_account(
@@ -372,9 +396,11 @@ impl ActorCode for BlobsActor {
         Constructor => constructor,
         GetStats => get_stats,
         BuyCredit => buy_credit,
+        DebitCredit => debit_credit,
         ApproveCredit => approve_credit,
         GetCreditApproval => get_credit_approval,
         RevokeCredit => revoke_credit,
+        GetGasAllowance => get_gas_allowance,
         GetAccount => get_account,
         DebitAccounts => debit_accounts,
         AddBlob => add_blob,
@@ -956,7 +982,7 @@ mod tests {
         assert_eq!(count, 2);
         rt.verify();
 
-        // Check pending bytes count is sum of both blob sizes
+        // Check pending bytes count is the sum of both blob sizes
         rt.expect_validate_caller_any();
         let bytes = rt
             .call::<BlobsActor>(Method::GetPendingBytesCount as u64, None)

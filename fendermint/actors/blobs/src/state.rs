@@ -152,8 +152,36 @@ impl State {
             .accounts
             .entry(recipient)
             .and_modify(|a| a.credit_free += &credits)
-            .or_insert(Account::new(credits.clone(), current_epoch));
+            .or_insert(Account::new(amount, credits.clone(), current_epoch));
+        debug!("sold {} credits to {}", credits, recipient);
         Ok(account.clone())
+    }
+
+    pub fn deduct_credit(
+        &mut self,
+        from: Address,
+        amount: TokenAmount,
+    ) -> anyhow::Result<(), ActorError> {
+        if amount.is_negative() {
+            return Err(ActorError::illegal_argument(
+                "token amount must be positive".into(),
+            ));
+        }
+        let account = self
+            .accounts
+            .get_mut(&from)
+            .ok_or(ActorError::not_found(format!("account {} not found", from)))?;
+        let credits = self.credit_debit_rate * amount.atto();
+        if account.credit_free < credits {
+            return Err(ActorError::insufficient_funds(format!(
+                "account {} has insufficient credit (available: {}; required: {})",
+                from, account.credit_free, credits
+            )));
+        }
+        self.credit_debited += &credits;
+        account.credit_free -= &credits;
+        debug!("deducted {} credits from {}", credits, from);
+        Ok(())
     }
 
     pub fn approve_credit(
@@ -175,10 +203,11 @@ impl State {
             }
         }
         let expiry = ttl.map(|t| t + current_epoch);
-        let account = self
-            .accounts
-            .entry(from)
-            .or_insert(Account::new(BigInt::zero(), current_epoch));
+        let account = self.accounts.entry(from).or_insert(Account::new(
+            TokenAmount::zero(),
+            BigInt::zero(),
+            current_epoch,
+        ));
         // Get or add a new approval
         let caller = require_caller.unwrap_or(to);
         let approval = account
@@ -195,13 +224,17 @@ impl State {
         if let Some(limit) = limit.clone() {
             if approval.used > limit {
                 return Err(ActorError::illegal_argument(format!(
-                    "limit cannot be less than amount of already spent credits ({})",
+                    "limit cannot be less than amount of already used credits ({})",
                     approval.used
                 )));
             }
         }
         approval.limit = limit;
         approval.expiry = expiry;
+        debug!(
+            "approved credits from {} to {} (limit: {:?}; expiry: {:?}, required_caller: {:?})",
+            from, to, approval.limit, approval.expiry, require_caller
+        );
         Ok(approval.clone())
     }
 
@@ -210,7 +243,7 @@ impl State {
     pub fn get_credit_approval(
         &self,
         from: Address,
-        receiver: Address,
+        to: Address,
         caller: Address,
     ) -> Option<CreditApproval> {
         let account = match self.accounts.get(&from) {
@@ -220,8 +253,8 @@ impl State {
         // First look for an approval for "to" keyed by "to", which denotes it's valid for
         // any caller.
         // Second look for an approval for the supplied caller.
-        let approval = if let Some(approvals) = account.approvals.get(&receiver) {
-            if let Some(approval) = approvals.get(&receiver) {
+        let approval = if let Some(approvals) = account.approvals.get(&to) {
+            if let Some(approval) = approvals.get(&to) {
                 Some(approval)
             } else {
                 approvals.get(&caller)
@@ -249,6 +282,10 @@ impl State {
                 account.approvals.remove(&to);
             }
         }
+        debug!(
+            "approved credits from {} to {} (required_caller: {:?})",
+            from, to, require_caller
+        );
         Ok(())
     }
 
@@ -366,10 +403,11 @@ impl State {
                 MIN_TTL
             )));
         }
-        let account = self
-            .accounts
-            .entry(subscriber)
-            .or_insert(Account::new(BigInt::zero(), current_epoch));
+        let account = self.accounts.entry(subscriber).or_insert(Account::new(
+            TokenAmount::zero(),
+            BigInt::zero(),
+            current_epoch,
+        ));
         let delegation = if origin != subscriber {
             // First look for an approval for origin keyed by origin, which denotes it's valid for
             // any caller.
@@ -639,10 +677,11 @@ impl State {
         hash: Hash,
         id: SubscriptionId,
     ) -> anyhow::Result<Account, ActorError> {
-        let account = self
-            .accounts
-            .entry(subscriber)
-            .or_insert(Account::new(BigInt::zero(), current_epoch));
+        let account = self.accounts.entry(subscriber).or_insert(Account::new(
+            TokenAmount::zero(),
+            BigInt::zero(),
+            current_epoch,
+        ));
         let blob = self
             .blobs
             .get_mut(&hash)
@@ -831,10 +870,11 @@ impl State {
                 hash
             )));
         }
-        let account = self
-            .accounts
-            .entry(subscriber)
-            .or_insert(Account::new(BigInt::zero(), current_epoch));
+        let account = self.accounts.entry(subscriber).or_insert(Account::new(
+            TokenAmount::zero(),
+            BigInt::zero(),
+            current_epoch,
+        ));
         let blob = if let Some(blob) = self.blobs.get_mut(&hash) {
             blob
         } else {
@@ -950,10 +990,11 @@ impl State {
         hash: Hash,
         id: SubscriptionId,
     ) -> anyhow::Result<bool, ActorError> {
-        let account = self
-            .accounts
-            .entry(subscriber)
-            .or_insert(Account::new(BigInt::zero(), current_epoch));
+        let account = self.accounts.entry(subscriber).or_insert(Account::new(
+            TokenAmount::zero(),
+            BigInt::zero(),
+            current_epoch,
+        ));
         let blob = if let Some(blob) = self.blobs.get_mut(&hash) {
             blob
         } else {

@@ -10,11 +10,14 @@ use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
+use fvm_shared::econ::TokenAmount;
 use serde::{Deserialize, Serialize};
 
 /// The stored representation of a credit account.
 #[derive(Clone, Debug, PartialEq, Serialize_tuple, Deserialize_tuple)]
 pub struct Account {
+    /// The amount of token the account is allowed to spend on virtual gas.
+    pub gas_allowance: TokenAmount,
     /// Total size of all blobs managed by the account.
     pub capacity_used: BigInt,
     /// Current free credit in byte-blocks that can be used for new commitments.
@@ -34,8 +37,9 @@ pub struct Account {
 }
 
 impl Account {
-    pub fn new(credit_free: BigInt, current_epoch: ChainEpoch) -> Self {
+    pub fn new(gas_allowance: TokenAmount, credit_free: BigInt, current_epoch: ChainEpoch) -> Self {
         Self {
+            gas_allowance,
             capacity_used: Default::default(),
             credit_free,
             credit_committed: Default::default(),

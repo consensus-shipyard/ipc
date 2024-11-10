@@ -7,6 +7,7 @@ use std::result::Result as StdResult;
 
 use anyhow::{anyhow, Result};
 use cid::Cid;
+use fendermint_actor_blobs_shared::BLOBS_ACTOR_ID;
 use fvm::call_manager::{backtrace, Backtrace, CallManager, Entrypoint, InvocationResult};
 use fvm::engine::EnginePool;
 use fvm::executor::{ApplyFailure, ApplyKind, ApplyRet, Executor};
@@ -70,11 +71,64 @@ where
         apply_kind: ApplyKind,
         raw_length: usize,
     ) -> Result<ApplyRet> {
+        let (ret, _) =
+            self.execute_sponsored_message(msg, apply_kind, raw_length, TokenAmount::zero())?;
+        Ok(ret)
+    }
+
+    /// Flush the state-tree to the underlying blockstore.
+    fn flush(&mut self) -> Result<Cid> {
+        let k = (**self).flush()?;
+        Ok(k)
+    }
+}
+
+impl<K> HokuExecutor<K>
+where
+    K: Kernel,
+{
+    /// Create a new [`HokuExecutor`] for executing messages on the [`Machine`].
+    pub fn new(
+        engine_pool: EnginePool,
+        machine: <K::CallManager as CallManager>::Machine,
+    ) -> Result<Self> {
+        // Skip preloading all builtin actors when testing.
+        #[cfg(not(any(test, feature = "testing")))]
+        {
+            // Preload any uncached modules.
+            // This interface works for now because we know all actor CIDs
+            // ahead of time, but with user-supplied code, we won't have that
+            // guarantee.
+            engine_pool.acquire().preload_all(
+                machine.blockstore(),
+                machine.builtin_actors().builtin_actor_codes(),
+            )?;
+        }
+        Ok(Self {
+            engine_pool,
+            machine: Some(machine),
+        })
+    }
+
+    /// Consume consumes the executor and returns the Machine. If the Machine had
+    /// been poisoned during execution, the Option will be None.
+    pub fn into_machine(self) -> Option<<K::CallManager as CallManager>::Machine> {
+        self.machine
+    }
+
+    /// This is the entrypoint to execute a sponsored message.
+    pub fn execute_sponsored_message(
+        &mut self,
+        msg: Message,
+        apply_kind: ApplyKind,
+        raw_length: usize,
+        gas_allowance: TokenAmount,
+    ) -> Result<(ApplyRet, TokenAmount)> {
         // Validate if the message was correct, charge for it, and extract some preliminary data.
-        let (sender_id, gas_cost, inclusion_cost) =
-            match self.preflight_message(&msg, apply_kind, raw_length)? {
+        let (sender_id, gas_cost, sponsored_gas_cost, inclusion_cost) =
+            match self.preflight_message(&msg, apply_kind, raw_length, gas_allowance.clone())? {
                 Ok(res) => res,
-                Err(apply_ret) => return Ok(apply_ret),
+                Err(apply_ret) => return Ok((apply_ret, TokenAmount::zero())),
             };
 
         struct MachineExecRet {
@@ -271,63 +325,27 @@ where
                 receipt,
                 failure_info,
                 gas_cost,
+                sponsored_gas_cost,
                 exec_trace,
                 events,
             ),
-            ApplyKind::Implicit => Ok(ApplyRet {
-                msg_receipt: receipt,
-                penalty: TokenAmount::zero(),
-                miner_tip: TokenAmount::zero(),
-                base_fee_burn: TokenAmount::zero(),
-                over_estimation_burn: TokenAmount::zero(),
-                refund: TokenAmount::zero(),
-                gas_refund: 0,
-                gas_burned: 0,
-                failure_info,
-                exec_trace,
-                events,
-            }),
+            ApplyKind::Implicit => Ok((
+                ApplyRet {
+                    msg_receipt: receipt,
+                    penalty: TokenAmount::zero(),
+                    miner_tip: TokenAmount::zero(),
+                    base_fee_burn: TokenAmount::zero(),
+                    over_estimation_burn: TokenAmount::zero(),
+                    refund: TokenAmount::zero(),
+                    gas_refund: 0,
+                    gas_burned: 0,
+                    failure_info,
+                    exec_trace,
+                    events,
+                },
+                TokenAmount::zero(),
+            )),
         }
-    }
-
-    /// Flush the state-tree to the underlying blockstore.
-    fn flush(&mut self) -> Result<Cid> {
-        let k = (**self).flush()?;
-        Ok(k)
-    }
-}
-
-impl<K> HokuExecutor<K>
-where
-    K: Kernel,
-{
-    /// Create a new [`HokuExecutor`] for executing messages on the [`Machine`].
-    pub fn new(
-        engine_pool: EnginePool,
-        machine: <K::CallManager as CallManager>::Machine,
-    ) -> Result<Self> {
-        // Skip preloading all builtin actors when testing.
-        #[cfg(not(any(test, feature = "testing")))]
-        {
-            // Preload any uncached modules.
-            // This interface works for now because we know all actor CIDs
-            // ahead of time, but with user-supplied code, we won't have that
-            // guarantee.
-            engine_pool.acquire().preload_all(
-                machine.blockstore(),
-                machine.builtin_actors().builtin_actor_codes(),
-            )?;
-        }
-        Ok(Self {
-            engine_pool,
-            machine: Some(machine),
-        })
-    }
-
-    /// Consume consumes the executor and returns the Machine. If the Machine had
-    /// been poisoned during execution, the Option will be None.
-    pub fn into_machine(self) -> Option<<K::CallManager as CallManager>::Machine> {
-        self.machine
     }
 
     // TODO: The return type here is very strange because we have three cases:
@@ -340,7 +358,8 @@ where
         msg: &Message,
         apply_kind: ApplyKind,
         raw_length: usize,
-    ) -> Result<StdResult<(ActorID, TokenAmount, GasCharge), ApplyRet>> {
+        gas_allowance: TokenAmount,
+    ) -> Result<StdResult<(ActorID, TokenAmount, TokenAmount, GasCharge), ApplyRet>> {
         msg.check().or_fatal()?;
 
         // TODO We don't like having price lists _inside_ the FVM, but passing
@@ -387,7 +406,12 @@ where
         };
 
         if apply_kind == ApplyKind::Implicit {
-            return Ok(Ok((sender_id, TokenAmount::zero(), inclusion_cost)));
+            return Ok(Ok((
+                sender_id,
+                TokenAmount::zero(),
+                TokenAmount::zero(),
+                inclusion_cost,
+            )));
         }
 
         let mut sender_state = match self
@@ -449,23 +473,97 @@ where
 
         // Ensure from actor has enough balance to cover the gas cost of the message.
         let gas_cost: TokenAmount = msg.gas_fee_cap.clone() * msg.gas_limit;
-        if sender_state.balance < gas_cost {
-            return Ok(Err(ApplyRet::prevalidation_fail(
-                ExitCode::SYS_SENDER_STATE_INVALID,
-                format!(
-                    "Actor balance less than needed: {} < {}",
-                    sender_state.balance, gas_cost
-                ),
-                miner_penalty_amount,
-            )));
-        }
+        let sender_balance = sender_state.balance.clone();
+        let (gas_cost, sponsored_gas_cost) = if gas_allowance.is_zero() {
+            // The sender is responsible for the entire gas cost
+            if sender_state.balance < gas_cost {
+                return Ok(Err(ApplyRet::prevalidation_fail(
+                    ExitCode::SYS_SENDER_STATE_INVALID,
+                    format!(
+                        "Actor balance less than needed: {} < {}",
+                        sender_state.balance, gas_cost
+                    ),
+                    miner_penalty_amount,
+                )));
+            }
 
-        sender_state.deduct_funds(&gas_cost)?;
+            sender_state.deduct_funds(&gas_cost)?;
+            (gas_cost, TokenAmount::zero())
+        } else {
+            // Use the sender's gas allowance from the source actor
+            let mut source_state =
+                match self
+                    .state_tree()
+                    .get_actor(BLOBS_ACTOR_ID)
+                    .with_context(|| {
+                        format!(
+                            "failed to lookup gas source actor with id {}",
+                            BLOBS_ACTOR_ID
+                        )
+                    })? {
+                    Some(act) => act,
+                    None => {
+                        return Ok(Err(ApplyRet::prevalidation_fail(
+                            ExitCode::SYS_SENDER_INVALID,
+                            "Sender invalid",
+                            miner_penalty_amount,
+                        )));
+                    }
+                };
 
-        // Update the actor in the state tree
+            // Check the source balance
+            if source_state.balance < gas_allowance {
+                // This should not happen
+                return Ok(Err(ApplyRet::prevalidation_fail(
+                    ExitCode::SYS_SENDER_STATE_INVALID,
+                    format!(
+                        "Gas allowance source actor balance less than needed: {} < {}",
+                        source_state.balance, gas_allowance
+                    ),
+                    miner_penalty_amount,
+                )));
+            }
+
+            // Check allowance plus balance
+            if gas_allowance.clone() + sender_balance < gas_cost {
+                return Ok(Err(ApplyRet::prevalidation_fail(
+                    ExitCode::SYS_SENDER_STATE_INVALID,
+                    format!(
+                        "Actor gas allowance plus balance less than needed: {} + {} < {}",
+                        gas_allowance, sender_state.balance, gas_cost
+                    ),
+                    miner_penalty_amount,
+                )));
+            }
+
+            let (gas_cost, sponsored_gas_cost) = if gas_allowance < gas_cost {
+                // Deduct the entire allowance
+                source_state.deduct_funds(&gas_allowance)?;
+
+                // Deduct the remainder from sender
+                let sender_gas_cost = gas_cost - gas_allowance.clone();
+                sender_state.deduct_funds(&sender_gas_cost)?;
+                (sender_gas_cost, gas_allowance)
+            } else {
+                source_state.deduct_funds(&gas_cost)?;
+                (TokenAmount::zero(), gas_cost)
+            };
+
+            // Update the source actor in the state tree
+            self.state_tree_mut()
+                .set_actor(BLOBS_ACTOR_ID, source_state);
+            (gas_cost, sponsored_gas_cost)
+        };
+
+        // Update the sender actor in the state tree
         self.state_tree_mut().set_actor(sender_id, sender_state);
 
-        Ok(Ok((sender_id, gas_cost, inclusion_cost)))
+        Ok(Ok((
+            sender_id,
+            gas_cost,
+            sponsored_gas_cost,
+            inclusion_cost,
+        )))
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -476,9 +574,10 @@ where
         receipt: Receipt,
         failure_info: Option<ApplyFailure>,
         gas_cost: TokenAmount,
+        sponsored_gas_cost: TokenAmount,
         exec_trace: ExecutionTrace,
         events: Vec<StampedEvent>,
-    ) -> Result<ApplyRet> {
+    ) -> Result<(ApplyRet, TokenAmount)> {
         // NOTE: we don't support old network versions in the FVM, so we always burn.
         let GasOutputs {
             base_fee_burn,
@@ -516,26 +615,47 @@ where
 
         transfer_to_actor(BURNT_FUNDS_ACTOR_ID, &over_estimation_burn)?;
 
-        // refund unused gas
-        transfer_to_actor(sender_id, &refund)?;
+        // Refund unused gas, prioritizing the sender
+        let sponsored_gas_used = if refund > gas_cost {
+            if gas_cost.is_zero() {
+                // The entire refund goes to the allowance source
+                transfer_to_actor(BLOBS_ACTOR_ID, &refund)?;
+                &sponsored_gas_cost - &refund
+            } else {
+                // Cap the sender's refund to its gas cost
+                transfer_to_actor(sender_id, &gas_cost)?;
+                // The remainder goes to the allowance source
+                let remainder = &refund - &gas_cost;
+                transfer_to_actor(BLOBS_ACTOR_ID, &remainder)?;
+                &sponsored_gas_cost - &remainder
+            }
+        } else {
+            // The entire refund goes to the sender
+            transfer_to_actor(sender_id, &refund)?;
+            sponsored_gas_cost.clone()
+        };
 
-        if (&base_fee_burn + &over_estimation_burn + &refund + &miner_tip) != gas_cost {
+        let total_gas_cost = gas_cost + sponsored_gas_cost;
+        if (&base_fee_burn + &over_estimation_burn + &refund + &miner_tip) != total_gas_cost {
             // Sanity check. This could be a fatal error.
             return Err(anyhow!("Gas handling math is wrong"));
         }
-        Ok(ApplyRet {
-            msg_receipt: receipt,
-            penalty: miner_penalty,
-            miner_tip,
-            base_fee_burn,
-            over_estimation_burn,
-            refund,
-            gas_refund,
-            gas_burned,
-            failure_info,
-            exec_trace,
-            events,
-        })
+        Ok((
+            ApplyRet {
+                msg_receipt: receipt,
+                penalty: miner_penalty,
+                miner_tip,
+                base_fee_burn,
+                over_estimation_burn,
+                refund,
+                gas_refund,
+                gas_burned,
+                failure_info,
+                exec_trace,
+                events,
+            },
+            sponsored_gas_used,
+        ))
     }
 
     fn map_machine<F, T>(&mut self, f: F) -> T

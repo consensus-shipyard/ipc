@@ -12,7 +12,7 @@ mod sys {
     use fvm_sdk::sys::fvm_syscalls;
 
     fvm_syscalls! {
-        module = "blobs";
+        module = "hoku";
         pub fn hash_rm(hash_ptr: *const u8) -> Result<()>;
     }
 }
