@@ -36,7 +36,9 @@ use fendermint_vm_iroh_resolver::pool::{
     ResolveKey as IrohResolveKey, ResolvePool as IrohResolvePool,
     ResolveSource as IrohResolveSource, TaskType as IrohTaskType,
 };
-use fendermint_vm_message::ipc::{Blob, ParentFinality, ReadRequest as ReadRequestIPCMessage};
+use fendermint_vm_message::ipc::{
+    FinalizedBlob, ParentFinality, PendingBlob, ReadRequest as ReadRequestIPCMessage,
+};
 use fendermint_vm_message::{
     chain::ChainMessage,
     ipc::{BottomUpCheckpoint, CertifiedMessage, IpcMessage, SignedRelayedMessage},
@@ -1017,7 +1019,6 @@ where
                         gas_limit,
                         emitters,
                     };
-
                     Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
                 }
                 IpcMessage::ReadRequestClosed(read_request) => {
