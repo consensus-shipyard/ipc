@@ -1034,7 +1034,6 @@ where
                         gas_limit,
                         emitters,
                     };
-
                     Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
                 }
                 IpcMessage::ReadRequestClosed(read_request) => {
