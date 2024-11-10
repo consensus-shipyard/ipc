@@ -114,7 +114,7 @@ fn start_resolve<V>(
                     Ok(Ok(())) => {
                         tracing::debug!(hash = ?task.hash(), "iroh blob resolved");
                         atomically(|| task.set_resolved()).await;
-                        add_own_vote(
+                        let success = add_own_vote(
                             task.hash(),
                             client,
                             vote_tally,
@@ -124,6 +124,11 @@ fn start_resolve<V>(
                             to_vote,
                         )
                         .await;
+                        if success {
+                            emit(BlobsFinalityVotingSuccess {
+                                blob_hash: Some(task.hash().into()),
+                            });
+                        }
                     }
                     Ok(Err(e)) => {
                         tracing::error!(
@@ -133,7 +138,7 @@ fn start_resolve<V>(
                         );
                         let reenqueue_success = reenqueue(task.clone(), queue, retry_delay).await;
                         if !reenqueue_success {
-                            add_own_vote(
+                            let success = add_own_vote(
                                 task.hash(),
                                 client,
                                 vote_tally,
@@ -143,6 +148,12 @@ fn start_resolve<V>(
                                 to_vote,
                             )
                             .await;
+                            // If we cast a "failure" vote, emit a failure event.
+                            if success {
+                                emit(BlobsFinalityVotingFailure {
+                                    blob_hash: Some(task.hash().into()),
+                                });
+                            }
                         }
                     }
                 };

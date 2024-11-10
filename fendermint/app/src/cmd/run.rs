@@ -612,78 +612,102 @@ async fn dispatch_vote(
                 debug!("ignoring vote; topdown disabled");
                 return;
             }
-            let res = atomically_or_err(|| {
+            match atomically_or_err(|| {
                 parent_finality_votes.add_vote(
                     vote.public_key.clone(),
                     f.height,
                     f.block_hash.clone(),
                 )
             })
-            .await;
-            handle_vote_result(res, "parent finality");
+            .await
+            {
+                Ok(_) => {
+                    debug!("vote handled for parent finality");
+                }
+                Err(e @ VoteError::Equivocation(_, _, _, _)) => {
+                    warn!(
+                        error = e.to_string(),
+                        "failed to handle parent finality vote"
+                    );
+                }
+                Err(
+                    e @ (VoteError::Uninitialized
+                    | VoteError::UnpoweredValidator(_)
+                    | VoteError::UnexpectedBlock(_, _)),
+                ) => {
+                    debug!(
+                        error = e.to_string(),
+                        "failed to handle parent finality vote"
+                    );
+                }
+            }
         }
         AppVote::BlobFinality(f) => {
             debug!(hash = ?f.hash, success = ?f.success, "received vote for blob finality");
-            handle_vote(
-                parent_finality_votes,
-                vote.public_key,
-                f.hash,
-                f.success,
-                "blob finality",
-            )
-            .await;
+            match atomically_or_err(|| {
+                parent_finality_votes.add_blob_vote(
+                    vote.public_key.clone(),
+                    f.hash.as_bytes().to_vec(),
+                    f.success,
+                )
+            })
+            .await
+            {
+                Ok(_) => {
+                    debug!("vote handled for blob finality");
+                    if f.success {
+                        emit(BlobsFinalityVotingSuccess {
+                            blob_hash: Some(f.hash.into()),
+                        });
+                    } else {
+                        emit(BlobsFinalityVotingFailure {
+                            blob_hash: Some(f.hash.into()),
+                        });
+                    }
+                }
+                Err(e @ VoteError::Equivocation(_, _, _, _)) => {
+                    warn!(error = e.to_string(), "failed to handle blob finality vote");
+                }
+                Err(
+                    e @ (VoteError::Uninitialized
+                    | VoteError::UnpoweredValidator(_)
+                    | VoteError::UnexpectedBlock(_, _)),
+                ) => {
+                    debug!(error = e.to_string(), "failed to handle blob finality vote");
+                }
+            }
         }
         AppVote::ReadRequestClosed(r) => {
             debug!(hash = ?r.hash, success = ?r.success, "received vote for read request completion");
-            handle_vote(
-                parent_finality_votes,
-                vote.public_key,
-                r.hash,
-                r.success,
-                "read request completion",
-            )
-            .await;
-        }
-    }
-}
-
-async fn handle_vote(
-    parent_finality_votes: &VoteTally,
-    public_key: ValidatorKey,
-    hash: iroh::blobs::Hash,
-    success: bool,
-    vote_type: &str,
-) {
-    let res = atomically_or_err(|| {
-        parent_finality_votes.add_blob_vote(public_key.clone(), hash.as_bytes().to_vec(), success)
-    })
-    .await;
-    handle_vote_result(res, vote_type);
-}
-
-fn handle_vote_result(res: Result<bool, VoteError>, vote_type: &str) {
-    match res {
-        Ok(_) => {
-            debug!("vote handled for {}", vote_type);
-            if f.success {
-                emit(BlobsFinalityVotingSuccess {
-                    blob_hash: Some(f.hash.into()),
-                });
-            } else {
-                emit(BlobsFinalityVotingFailure {
-                    blob_hash: Some(f.hash.into()),
-                });
+            match atomically_or_err(|| {
+                parent_finality_votes.add_blob_vote(
+                    vote.public_key.clone(),
+                    r.hash.as_bytes().to_vec(),
+                    r.success,
+                )
+            })
+            .await
+            {
+                Ok(_) => {
+                    debug!("vote handled for read request completion");
+                }
+                Err(e @ VoteError::Equivocation(_, _, _, _)) => {
+                    warn!(
+                        error = e.to_string(),
+                        "failed to handle read request completion vote"
+                    );
+                }
+                Err(
+                    e @ (VoteError::Uninitialized
+                    | VoteError::UnpoweredValidator(_)
+                    | VoteError::UnexpectedBlock(_, _)),
+                ) => {
+                    debug!(
+                        error = e.to_string(),
+                        "failed to handle read request completion vote"
+                    );
+                }
             }
-        }
-        Err(e @ VoteError::Equivocation(_, _, _, _)) => {
-            warn!(error = e.to_string(), "failed to handle {} vote", vote_type);
-        }
-        Err(
-            e @ (VoteError::Uninitialized
-            | VoteError::UnpoweredValidator(_)
-            | VoteError::UnexpectedBlock(_, _)),
-        ) => {
-            debug!(error = e.to_string(), "failed to handle {} vote", vote_type);
         }
     }
 }
