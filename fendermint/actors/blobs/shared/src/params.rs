@@ -208,3 +208,15 @@ pub struct ReadRequestExistParams(pub Hash);
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct GetOpenReadRequestsParams(pub u32);
+
+/// Params for setting a read request to pending.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SetReadRequestPendingParams(pub Hash);
+
+/// Params for getting read request status.
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct GetReadRequestStatusParams {
+    /// The ID of the read request.
+    pub id: Hash,
+}

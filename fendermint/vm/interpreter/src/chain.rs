@@ -37,7 +37,7 @@ use fendermint_vm_iroh_resolver::pool::{
     ResolveSource as IrohResolveSource, TaskType as IrohTaskType,
 };
 use fendermint_vm_message::ipc::{
-    FinalizedBlob, ParentFinality, PendingBlob, ReadRequest as ReadRequestIPCMessage,
+    ClosedReadRequest, FinalizedBlob, ParentFinality, PendingBlob, PendingReadRequest,
 };
 use fendermint_vm_message::{
     chain::ChainMessage,
@@ -365,20 +365,16 @@ where
             Ok(requests)
         })?;
 
-        // add read requests to the read request pool
+        // create IPC messages to add read requests to the pool
         for (id, blob_hash, offset, callback_addr, callback_method) in open_requests {
-            atomically(|| {
-                let item = ReadRequestPoolItem {
+            msgs.push(ChainMessage::Ipc(IpcMessage::ReadRequestPending(
+                PendingReadRequest {
                     id,
                     blob_hash,
                     offset,
-                    len: READ_REQUEST_LEN,
                     callback: (callback_addr, callback_method),
-                };
-                chain_env.read_request_pool.add(item)
-            })
-            .await;
-            tracing::debug!(request_id = ?id, "read request added to pool");
+                },
+            )));
         }
 
         // collect locally resolved read requests
@@ -394,7 +390,10 @@ where
             // We start a blockstore transaction that can be reverted
             state.state_tree_mut().begin_transaction();
             for item in locally_resolved_read_requests.iter() {
-                if !is_read_request_open(&mut state, item.id)? {
+                // check if the read request is closed i.e. not open or pending
+                // if a request is not found in actor state but exists in the pool, it is considered closed
+                let status = get_read_request_status(&mut state, item.id)?;
+                if status.is_none() {
                     tracing::debug!(request_id = ?item.id, "read request already fulfilled on chain; removing from pool");
                     atomically(|| chain_env.read_request_pool.remove_task(item)).await;
                     continue;
@@ -433,7 +432,7 @@ where
                 if is_globally_finalized {
                     tracing::debug!(request_id = ?item.id, "read request has quorum; adding tx to chain");
                     read_requests.push(ChainMessage::Ipc(IpcMessage::ReadRequestClosed(
-                        ReadRequestIPCMessage {
+                        ClosedReadRequest {
                             id: item.id,
                             blob_hash: item.blob_hash,
                             offset: item.offset,
@@ -588,12 +587,12 @@ where
                 ChainMessage::Ipc(IpcMessage::ReadRequestClosed(read_request)) => {
                     // Ensure that the read request is ready to be fulfilled.
                     // We can accept the proposal if the read request has reached a quorum and is
-                    // not yet fulfilled.
-                    let is_pending = with_state_transaction(&mut state, |state| {
-                        is_read_request_open(state, read_request.id)
+                    // not yet closed.
+                    let status = with_state_transaction(&mut state, |state| {
+                        get_read_request_status(state, read_request.id)
                     })?;
-                    if !is_pending {
-                        tracing::debug!(hash = ?read_request.id, "read request is already fulfilled; rejecting proposal");
+                    if !matches!(status, Some(ReadRequestStatus::Pending)) {
+                        tracing::info!(hash = ?read_request.id, "only pending read requests can be closed; rejecting proposal");
                         return Ok(false);
                     }
 
@@ -604,7 +603,7 @@ where
                     })
                     .await;
                     if !is_globally_finalized {
-                        tracing::debug!(hash = ?read_request.id, "read request is not globally finalized; rejecting proposal");
+                        tracing::info!(hash = ?read_request.id, "read request is not globally finalized; rejecting proposal");
                         return Ok(false);
                     }
 
@@ -629,6 +628,14 @@ where
                         atomically(|| chain_env.read_request_pool.remove_result(&item)).await;
                     } else {
                         tracing::debug!(request_id = ?read_request.id, "read request is not locally finalized");
+                    }
+                }
+                ChainMessage::Ipc(IpcMessage::ReadRequestPending(read_request)) => {
+                    // Check that the read request is still open
+                    let status = get_read_request_status(&mut state, read_request.id)?;
+                    if !matches!(status, Some(ReadRequestStatus::Open)) {
+                        tracing::info!(request_id = ?read_request.id, "read request is not open; rejecting proposal");
+                        return Ok(false);
                     }
                 }
                 _ => {}
@@ -1036,6 +1043,52 @@ where
 
                     Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
                 }
+                IpcMessage::ReadRequestPending(read_request) => {
+                    // Add the read request to the pool
+                    atomically(|| {
+                        env.read_request_pool.add(ReadRequestPoolItem {
+                            id: read_request.id,
+                            blob_hash: read_request.blob_hash,
+                            offset: read_request.offset as u64,
+                            len: READ_REQUEST_LEN,
+                            callback: read_request.callback,
+                        })
+                    })
+                    .await;
+                    tracing::info!(request_id = ?read_request.id, "read request added to pool");
+
+                    // Set the read request to "pending" state
+                    let from = system::SYSTEM_ACTOR_ADDR;
+                    let to = blobs::BLOBS_ACTOR_ADDR;
+                    let method_num = SetReadRequestPending as u64;
+                    let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
+                    let params = SetReadRequestPendingParams(
+                        fendermint_actor_blobs_shared::state::Hash(*read_request.id.as_bytes()),
+                    );
+                    let params = RawBytes::serialize(params)?;
+                    let msg = Message {
+                        version: Default::default(),
+                        from,
+                        to,
+                        sequence: 0,
+                        value: Default::default(),
+                        method_num,
+                        params,
+                        gas_limit,
+                        gas_fee_cap: Default::default(),
+                        gas_premium: Default::default(),
+                    };
+                    let (apply_ret, emitters) = state.execute_implicit(msg)?;
+                    let ret = FvmApplyRet {
+                        apply_ret,
+                        from,
+                        to,
+                        method_num,
+                        gas_limit,
+                        emitters,
+                    };
+                    Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
+                }
             },
         }
     }
@@ -1121,7 +1174,8 @@ where
                     | IpcMessage::BlobPending(_)
                     | IpcMessage::BlobFinalized(_)
                     | IpcMessage::DebitCreditAccounts
-                    | IpcMessage::ReadRequestClosed(_) => {
+                    | IpcMessage::ReadRequestClosed(_)
+                    | IpcMessage::ReadRequestPending(_) => {
                         // Users cannot send these messages, only validators can propose them in blocks.
                         Ok((state, Err(IllegalMessage)))
                     }
@@ -1349,7 +1403,7 @@ where
         to: blobs::BLOBS_ACTOR_ADDR,
         sequence: 0,
         gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
-        method_num: fendermint_actor_blobs_shared::Method::GetOpenReadRequests as u64,
+        method_num: GetOpenReadRequests as u64,
         params,
         value: Default::default(),
         version: Default::default(),
@@ -1371,43 +1425,15 @@ where
     Ok(read_requests)
 }
 
-fn is_read_request_open<DB>(
-    state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
-    id: Hash,
-) -> anyhow::Result<bool>
-where
-    DB: Blockstore + Clone + 'static + Send + Sync,
-{
-    let request_id = fendermint_actor_blobs_shared::state::Hash(id.into());
-    let msg = FvmMessage {
-        from: system::SYSTEM_ACTOR_ADDR,
-        to: blobs::BLOBS_ACTOR_ADDR,
-        sequence: 0,
-        gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
-        method_num: fendermint_actor_blobs_shared::Method::ReadRequestExist as u64,
-        params: RawBytes::serialize(ReadRequestExistParams(request_id))?,
-        value: Default::default(),
-        version: Default::default(),
-        gas_fee_cap: Default::default(),
-        gas_premium: Default::default(),
-    };
-
-    let (apply_ret, _emitters) = state.execute_implicit(msg)?;
-    let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
-    let exists = fvm_ipld_encoding::from_slice::<bool>(&data)
-        .map_err(|e| anyhow!("error parsing as bool: {e}"))?;
-    Ok(exists)
-}
-
 fn read_request_callback<DB>(
     state: &mut FvmExecState<DB>,
-    read_request: &ReadRequestIPCMessage,
+    read_request: &ClosedReadRequest,
 ) -> anyhow::Result<()>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
     let from = system::SYSTEM_ACTOR_ADDR;
-    let ReadRequestIPCMessage {
+    let ClosedReadRequest {
         id,
         blob_hash,
         offset,
@@ -1503,4 +1529,31 @@ where
         emitters,
     };
     Ok(ret)
+}
+
+fn get_read_request_status<DB>(
+    state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
+    id: Hash,
+) -> anyhow::Result<Option<ReadRequestStatus>>
+where
+    DB: Blockstore + Clone + 'static + Send + Sync,
+{
+    let request_id = fendermint_actor_blobs_shared::state::Hash(id.into());
+    let msg = FvmMessage {
+        from: system::SYSTEM_ACTOR_ADDR,
+        to: blobs::BLOBS_ACTOR_ADDR,
+        sequence: 0,
+        gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
+        method_num: GetReadRequestStatus as u64,
+        params: RawBytes::serialize(GetReadRequestStatusParams { id: request_id })?,
+        value: Default::default(),
+        version: Default::default(),
+        gas_fee_cap: Default::default(),
+        gas_premium: Default::default(),
+    };
+
+    let (apply_ret, _emitters) = state.execute_implicit(msg)?;
+    let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
+    fvm_ipld_encoding::from_slice::<Option<ReadRequestStatus>>(&data)
+        .map_err(|e| anyhow!("error parsing as Option<ReadRequestStatus>: {e}"))
 }
