@@ -975,6 +975,38 @@ where
         .map_err(|e| anyhow!("error parsing added blobs: {e}"))
 }
 
+/// Helper function to check blob status by reading its on-chain state.
+/// This approach uses an implicit FVM transaction to query a read-only blockstore.
+fn check_blob_status<DB>(
+    state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
+    hash: Hash,
+    subscriber: Address,
+) -> anyhow::Result<Option<BlobStatus>>
+where
+    DB: Blockstore + Clone + 'static + Send + Sync,
+{
+    let hash = fendermint_actor_blobs_shared::state::Hash(*hash.as_bytes());
+    let params = GetBlobStatusParams { hash, subscriber };
+    let params = RawBytes::serialize(params)?;
+    let msg = FvmMessage {
+        version: 0,
+        from: system::SYSTEM_ACTOR_ADDR,
+        to: blobs::BLOBS_ACTOR_ADDR,
+        sequence: 0,
+        value: Default::default(),
+        method_num: GetBlobStatus as u64,
+        params,
+        gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
+        gas_fee_cap: Default::default(),
+        gas_premium: Default::default(),
+    };
+    let (apply_ret, _) = state.execute_implicit(msg)?;
+
+    let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
+    fvm_ipld_encoding::from_slice::<Option<BlobStatus>>(&data)
+        .map_err(|e| anyhow!("error parsing as Option<BlobStatus>: {e}"))
+}
+
 /// Check if a blob is in added state, by reading its on-chain state.
 /// This approach uses an implicit FVM transaction to query a read-only blockstore.
 fn is_blob_added<DB>(
@@ -985,38 +1017,16 @@ fn is_blob_added<DB>(
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
-    let hash = fendermint_actor_blobs_shared::state::Hash(*hash.as_bytes());
-    let params = GetBlobStatusParams { hash, subscriber };
-    let params = RawBytes::serialize(params)?;
-    let msg = FvmMessage {
-        version: 0,
-        from: system::SYSTEM_ACTOR_ADDR,
-        to: blobs::BLOBS_ACTOR_ADDR,
-        sequence: 0,
-        value: Default::default(),
-        method_num: GetBlobStatus as u64,
-        params,
-        gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
-        gas_fee_cap: Default::default(),
-        gas_premium: Default::default(),
-    };
-    let (apply_ret, _) = state.execute_implicit(msg)?;
-
-    let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
-    let status = fvm_ipld_encoding::from_slice::<Option<BlobStatus>>(&data)
-        .map_err(|e| anyhow!("error parsing as Option<BlobStatus>: {e}"))?;
+    let status = check_blob_status(state, hash, subscriber)?;
     let added = if let Some(status) = status {
-        match status {
-            BlobStatus::Added => true,
-            BlobStatus::Pending | BlobStatus::Resolved | BlobStatus::Failed => false,
-        }
+        matches!(status, BlobStatus::Added)
     } else {
         false
     };
     Ok(added)
 }
 
-/// Check if a blob is pending (if it is not resolved or failed), by reading its on-chain state.
+/// Check if a blob is finalized (if it is resolved or failed), by reading its on-chain state.
 /// This approach uses an implicit FVM transaction to query a read-only blockstore.
 fn is_blob_finalized<DB>(
     state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
@@ -1026,35 +1036,13 @@ fn is_blob_finalized<DB>(
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
-    let hash = fendermint_actor_blobs_shared::state::Hash(*hash.as_bytes());
-    let params = GetBlobStatusParams { hash, subscriber };
-    let params = RawBytes::serialize(params)?;
-    let msg = FvmMessage {
-        version: 0,
-        from: system::SYSTEM_ACTOR_ADDR,
-        to: blobs::BLOBS_ACTOR_ADDR,
-        sequence: 0,
-        value: Default::default(),
-        method_num: GetBlobStatus as u64,
-        params,
-        gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
-        gas_fee_cap: Default::default(),
-        gas_premium: Default::default(),
-    };
-    let (apply_ret, _) = state.execute_implicit(msg)?;
-
-    let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
-    let status = fvm_ipld_encoding::from_slice::<Option<BlobStatus>>(&data)
-        .map_err(|e| anyhow!("error parsing as Option<BlobStatus>: {e}"))?;
-    let status = if let Some(status) = status {
-        match status {
-            BlobStatus::Pending | BlobStatus::Added => false,
-            BlobStatus::Resolved | BlobStatus::Failed => true,
-        }
+    let status = check_blob_status(state, hash, subscriber)?;
+    let finalized = if let Some(status) = status {
+        matches!(status, BlobStatus::Resolved | BlobStatus::Failed)
     } else {
         false
     };
-    Ok(status)
+    Ok(finalized)
 }
 
 fn get_blobs_stats<DB>(state: &mut FvmExecState<DB>) -> anyhow::Result<GetStatsReturn>
