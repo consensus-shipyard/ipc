@@ -193,16 +193,13 @@ pub struct OpenReadRequestParams {
     pub hash: Hash,
     /// The offset to start reading from.
     pub offset: u32,
+    /// The length of the read request.
+    pub len: u32,
     /// The address to call back when the read is complete.
     pub callback_addr: Address,
     /// The method to call back when the read is complete.
     pub callback_method: MethodNum,
 }
-
-/// Params for checking if a read request exists.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct ReadRequestExistParams(pub Hash);
 
 /// Params for closing a read request. The ID of the read request.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -220,8 +217,6 @@ pub struct GetOpenReadRequestsParams(pub u32);
 pub struct SetReadRequestPendingParams(pub Hash);
 
 /// Params for getting read request status.
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct GetReadRequestStatusParams {
-    /// The ID of the read request.
-    pub id: Hash,
-}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct GetReadRequestStatusParams(pub Hash);
