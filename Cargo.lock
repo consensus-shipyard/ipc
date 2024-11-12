@@ -3258,6 +3258,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid",
+ "fendermint_actor_blobs_shared",
  "fendermint_actor_machine",
  "fil_actors_runtime",
  "frc42_dispatch",

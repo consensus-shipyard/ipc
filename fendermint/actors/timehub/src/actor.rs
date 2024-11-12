@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use cid::Cid;
+use fendermint_actor_blobs_shared::{get_credit_approval, resolve_external};
 use fendermint_actor_machine::MachineActor;
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
@@ -24,7 +25,21 @@ type RawLeaf = (u64, Vec<u8>);
 
 impl Actor {
     fn push(rt: &impl Runtime, params: PushParams) -> Result<PushReturn, ActorError> {
-        Self::ensure_write_allowed(rt)?;
+        rt.validate_immediate_caller_accept_any()?;
+
+        // Check access control.
+        // Either the caller needs to be the Timehub owner, or the owner needs to have given a
+        // credit approval to the caller.
+        let state = rt.state::<State>()?;
+        let owner = state.owner;
+        let (origin, _) = resolve_external(rt, rt.message().origin())?;
+        let actor_address = state.address.get()?;
+        if origin != owner {
+            let approval = get_credit_approval(rt, owner, origin, actor_address)?;
+            approval.ok_or(actor_error!(
+                forbidden;
+                format!("Unauthorized: missing credit approval from Timehub owner {} to caller {} for Timehub {}", owner, origin, actor_address)))?;
+        }
 
         // Decode the raw bytes as a Cid and report any errors.
         // However we pass opaque bytes to the store as it tries to validate and resolve any CIDs

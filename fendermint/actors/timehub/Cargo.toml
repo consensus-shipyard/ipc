@@ -27,6 +27,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_tuple = { workspace = true }
 tracing = { workspace = true, features = ["log"] }
 
+fendermint_actor_blobs_shared = { path = "../blobs/shared" }
 fendermint_actor_machine = { path = "../machine" }
 
 [dev-dependencies]
