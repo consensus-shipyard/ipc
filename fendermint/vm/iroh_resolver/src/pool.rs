@@ -89,8 +89,8 @@ pub enum TaskType {
     },
     CloseReadRequest {
         blob_hash: Hash,
-        offset: u64,
-        len: u64,
+        offset: u32,
+        len: u32,
     },
 }
 

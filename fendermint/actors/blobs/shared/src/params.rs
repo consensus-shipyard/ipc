@@ -185,38 +185,3 @@ pub struct GetStatsReturn {
     /// Total bytes of all blobs that are not yet added to the validator's resolve pool.
     pub bytes_added: u64,
 }
-
-/// Params for adding a read request.
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct OpenReadRequestParams {
-    /// The hash of the blob to read.
-    pub hash: Hash,
-    /// The offset to start reading from.
-    pub offset: u32,
-    /// The address to call back when the read is complete.
-    pub callback_addr: Address,
-    /// The method to call back when the read is complete.
-    pub callback_method: MethodNum,
-}
-
-/// Params for checking if a read request exists.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct ReadRequestExistParams(pub Hash);
-
-/// Params for getting pending read requests.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct GetOpenReadRequestsParams(pub u32);
-
-/// Params for setting a read request to pending.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct SetReadRequestPendingParams(pub Hash);
-
-/// Params for getting read request status.
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct GetReadRequestStatusParams {
-    /// The ID of the read request.
-    pub id: Hash,
-}

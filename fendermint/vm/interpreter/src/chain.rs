@@ -55,6 +55,7 @@ use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::message::Message;
+use fvm_shared::MethodNum;
 use iroh::base::key::PublicKey;
 use iroh::blobs::Hash;
 use iroh::net::NodeId;
@@ -68,6 +69,7 @@ pub type BlobPool = IrohResolvePool<BlobPoolItem>;
 pub type ReadRequestPool = IrohResolvePool<ReadRequestPoolItem>;
 
 type AddedBlobItem = (Hash, HashSet<(Address, SubscriptionId, PublicKey)>);
+type OpenReadRequestItem = (Hash, Hash, u32, u32, Address, MethodNum);
 
 /// These are the extra state items that the chain interpreter needs,
 /// a sort of "environment" supporting IPC.
@@ -137,9 +139,9 @@ pub struct ReadRequestPoolItem {
     /// The hash of the blob that the read request is for.
     blob_hash: Hash,
     /// The offset of the read request.
-    offset: u64,
+    offset: u32,
     /// The length of the read request.
-    len: u64,
+    len: u32,
     /// The address and method to callback when the read request is closed.
     callback: (Address, MethodNum),
 }
@@ -366,12 +368,13 @@ where
         })?;
 
         // create IPC messages to add read requests to the pool
-        for (id, blob_hash, offset, callback_addr, callback_method) in open_requests {
+        for (id, blob_hash, offset, len, callback_addr, callback_method) in open_requests {
             msgs.push(ChainMessage::Ipc(IpcMessage::ReadRequestPending(
                 PendingReadRequest {
                     id,
                     blob_hash,
                     offset,
+                    len,
                     callback: (callback_addr, callback_method),
                 },
             )));
@@ -425,7 +428,7 @@ where
                     id: item.id,
                     blob_hash: item.blob_hash,
                     offset: item.offset,
-                    len: READ_REQUEST_LEN,
+                    len: item.len,
                     callback: item.callback,
                 };
 
@@ -436,6 +439,7 @@ where
                             id: item.id,
                             blob_hash: item.blob_hash,
                             offset: item.offset,
+                            len: item.len as u32,
                             callback: item.callback,
                             response: read_response,
                         },
@@ -612,7 +616,7 @@ where
                         id: read_request.id,
                         blob_hash: read_request.blob_hash,
                         offset: read_request.offset,
-                        len: READ_REQUEST_LEN,
+                        len: read_request.len,
                         callback: read_request.callback,
                     };
                     let is_locally_finalized =
@@ -1049,8 +1053,8 @@ where
                         env.read_request_pool.add(ReadRequestPoolItem {
                             id: read_request.id,
                             blob_hash: read_request.blob_hash,
-                            offset: read_request.offset as u64,
-                            len: READ_REQUEST_LEN,
+                            offset: read_request.offset,
+                            len: read_request.len,
                             callback: read_request.callback,
                         })
                     })
@@ -1437,6 +1441,7 @@ where
         id,
         blob_hash,
         offset,
+        len,
         callback: (to, method_num),
         response,
     } = read_request.clone();
@@ -1469,6 +1474,7 @@ where
         read_request_id = id.to_string(),
         blob_hash = blob_hash.to_string(),
         read_offset = offset,
+        read_len = len,
         gas_limit = fvm_shared::BLOCK_GAS_LIMIT,
         gas_used = apply_ret.msg_receipt.gas_used,
         info = info.unwrap_or_default(),
@@ -1545,7 +1551,7 @@ where
         sequence: 0,
         gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
         method_num: GetReadRequestStatus as u64,
-        params: RawBytes::serialize(GetReadRequestStatusParams { id: request_id })?,
+        params: RawBytes::serialize(GetReadRequestStatusParams(request_id))?,
         value: Default::default(),
         version: Default::default(),
         gas_fee_cap: Default::default(),

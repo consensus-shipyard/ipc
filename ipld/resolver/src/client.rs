@@ -145,8 +145,8 @@ pub trait ResolverIrohReadRequest {
     async fn resolve_read_request(
         &self,
         hash: Hash,
-        offset: u64,
-        len: u64,
+        offset: u32,
+        len: u32,
     ) -> anyhow::Result<ResolveReadRequestResult>;
 }
 
@@ -158,8 +158,8 @@ where
     async fn resolve_read_request(
         &self,
         hash: Hash,
-        offset: u64,
-        len: u64,
+        offset: u32,
+        len: u32,
     ) -> anyhow::Result<ResolveReadRequestResult> {
         let (tx, rx) = oneshot::channel();
         let req = Request::ResolveIrohRead(hash, offset, len, tx);

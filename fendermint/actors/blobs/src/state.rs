@@ -24,6 +24,7 @@ const MIN_TTL: ChainEpoch = 3600; // one hour
 /// The rolling epoch duration used for non-expiring blobs.
 const AUTO_TTL: ChainEpoch = 3600; // one hour
 
+const MAX_READ_REQUEST_LEN: u32 = 1024 * 1024; // 1MB
 /// The state represents all accounts and stored blobs.
 #[derive(Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct State {

@@ -119,7 +119,7 @@ pub(crate) enum Request<V> {
     UnpinSubnet(SubnetID),
     Resolve(Cid, SubnetID, ResponseChannel),
     ResolveIroh(Hash, NodeAddr, ResponseChannel),
-    ResolveIrohRead(Hash, u64, u64, ReadRequestResponseChannel),
+    ResolveIrohRead(Hash, u32, u32, ReadRequestResponseChannel),
     RateLimitUsed(PeerId, usize),
     UpdateRateLimit(u32),
 }
@@ -572,8 +572,8 @@ where
     fn start_iroh_read_request(
         &mut self,
         hash: Hash,
-        offset: u64,
-        len: u64,
+        offset: u32,
+        len: u32,
         response_channel: ReadRequestResponseChannel,
     ) {
         let mut iroh = self.iroh.clone();
@@ -723,9 +723,12 @@ async fn download_blob(iroh: Iroh, hash: Hash, node_addr: NodeAddr) -> anyhow::R
     Ok(())
 }
 
-async fn read_blob(iroh: Iroh, hash: Hash, offset: u64, len: u64) -> anyhow::Result<bytes::Bytes> {
-    let len = ReadAtLen::AtMost(len);
-    let res = iroh.blobs().read_at_to_bytes(hash, offset, len).await?;
+async fn read_blob(iroh: Iroh, hash: Hash, offset: u32, len: u32) -> anyhow::Result<bytes::Bytes> {
+    let len = ReadAtLen::AtMost(len as u64);
+    let res = iroh
+        .blobs()
+        .read_at_to_bytes(hash, offset as u64, len)
+        .await?;
     debug!("read blob {}: {:?}", hash, res);
     Ok(res)
 }
