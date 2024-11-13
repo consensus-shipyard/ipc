@@ -244,7 +244,7 @@ where
             .expect("we just started a transaction");
         for (hash, sources) in added_blobs {
             for (subscriber, source) in sources {
-                msgs.push(ChainMessage::Ipc(IpcMessage::BlobsPending(PendingBlob {
+                msgs.push(ChainMessage::Ipc(IpcMessage::BlobPending(PendingBlob {
                     subscriber,
                     hash,
                     source,
@@ -429,7 +429,7 @@ where
                         return Ok(false);
                     }
                 }
-                ChainMessage::Ipc(IpcMessage::BlobsPending(blob)) => {
+                ChainMessage::Ipc(IpcMessage::BlobPending(blob)) => {
                     // Check that blobs that are being enqueued are still in "added" state in the actor
                     // Once we enqueue a blob, the actor will transition it to "pending" state.
                     if !is_blob_added(&mut state, blob.hash, blob.subscriber)? {
@@ -689,9 +689,11 @@ where
 
                     // once the blob is finalized on the parent we can clean up the votes
                     atomically(|| {
-                        env.parent_finality_votes.clear_blob(blob.hash.as_bytes().to_vec())?;
+                        env.parent_finality_votes
+                            .clear_blob(blob.hash.as_bytes().to_vec())?;
                         Ok(())
-                    }).await;
+                    })
+                    .await;
 
                     let ret = FvmApplyRet {
                         apply_ret,
@@ -754,20 +756,8 @@ where
 
                     Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
                 }
-                IpcMessage::BlobsPending(blob) => {
-                    // enqueue "added" blobs to the pool and change their state to pending
-                    {
-                        atomically(|| {
-                            env.blob_pool.add(BlobPoolItem {
-                                subscriber: blob.subscriber,
-                                hash: blob.hash,
-                                source: blob.source,
-                            })
-                        })
-                        .await;
-                        tracing::info!(hash = ?blob.hash, subscriber = ?blob.subscriber, source = ?blob.source, "blob added to pool");
-                    }
-                    // set the blob to "pending" state
+                IpcMessage::BlobPending(blob) => {
+                    // set the blob to "pending" state in the actor
                     let from = system::SYSTEM_ACTOR_ADDR;
                     let to = blobs::BLOBS_ACTOR_ADDR;
                     let method_num = SetPending as u64;
@@ -801,6 +791,18 @@ where
                         gas_limit,
                         emitters,
                     };
+                    // enqueue "added" blobs to the pool for resolution
+                    {
+                        atomically(|| {
+                            env.blob_pool.add(BlobPoolItem {
+                                subscriber: blob.subscriber,
+                                hash: blob.hash,
+                                source: blob.source,
+                            })
+                        })
+                        .await;
+                        tracing::info!(hash = ?blob.hash, subscriber = ?blob.subscriber, source = ?blob.source, "blob added to pool");
+                    }
                     Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
                 }
             },
@@ -887,7 +889,7 @@ where
                     | IpcMessage::BottomUpExec(_)
                     | IpcMessage::BlobFinalized(_)
                     | IpcMessage::DebitCreditAccounts
-                    | IpcMessage::BlobsPending(_) => {
+                    | IpcMessage::BlobPending(_) => {
                         // Users cannot send these messages, only validators can propose them in blocks.
                         Ok((state, Err(IllegalMessage)))
                     }

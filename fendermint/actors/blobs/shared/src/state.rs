@@ -110,7 +110,7 @@ pub struct Blob {
 /// The status of a blob.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub enum BlobStatus {
-    /// Blob is not yet added to reolve pools
+    /// Blob is added but not resolving.
     #[default]
     Added,
     /// Blob is pending resolve.

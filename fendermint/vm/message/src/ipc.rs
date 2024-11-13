@@ -38,7 +38,7 @@ pub enum IpcMessage {
     DebitCreditAccounts,
 
     /// List of blobs that needs to be enqueued for resolution.
-    BlobsPending(PendingBlob),
+    BlobPending(PendingBlob),
 }
 
 /// A message relayed by a user on the current subnet.
