@@ -7,6 +7,7 @@ use fendermint_actor_bucket::BUCKET_ACTOR_NAME;
 use fendermint_actor_chainmetadata::CHAINMETADATA_ACTOR_NAME;
 use fendermint_actor_eam::IPC_EAM_ACTOR_NAME;
 use fendermint_actor_gas_market_eip1559::ACTOR_NAME as GAS_MARKET_EIP1559_ACTOR_NAME;
+use fendermint_actor_readreq::READREQ_ACTOR_NAME;
 use fendermint_actor_timehub::TIMEHUB_ACTOR_NAME;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::CborStore;
@@ -15,6 +16,7 @@ use std::collections::HashMap;
 // array of required actors
 pub const REQUIRED_ACTORS: &[&str] = &[
     BLOBS_ACTOR_NAME,
+    READREQ_ACTOR_NAME,
     BUCKET_ACTOR_NAME,
     CHAINMETADATA_ACTOR_NAME,
     GAS_MARKET_EIP1559_ACTOR_NAME,

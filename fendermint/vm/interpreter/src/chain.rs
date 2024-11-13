@@ -26,7 +26,7 @@ use fendermint_actor_blobs_shared::{
     Method::{DebitAccounts, FinalizeBlob, GetAddedBlobs, GetBlobStatus, GetStats, SetBlobPending},
 };
 use fendermint_tracing::emit;
-use fendermint_vm_actor_interface::{blobs, ipc, system};
+use fendermint_vm_actor_interface::{blobs, ipc, readreq, system};
 use fendermint_vm_event::ParentFinalityMissingQuorum;
 use fendermint_vm_iroh_resolver::observe::{
     BlobsFinalityAddedBlobs, BlobsFinalityAddedBytes, BlobsFinalityPendingBlobs,
@@ -1063,12 +1063,12 @@ where
 
                     // Set the read request to "pending" state
                     let from = system::SYSTEM_ACTOR_ADDR;
-                    let to = blobs::BLOBS_ACTOR_ADDR;
+                    let to = readreq::READREQ_ACTOR_ADDR;
                     let method_num = SetReadRequestPending as u64;
                     let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
-                    let params = SetReadRequestPendingParams(
-                        fendermint_actor_blobs_shared::state::Hash(*read_request.id.as_bytes()),
-                    );
+                    let params = SetReadRequestPendingParams(fendermint_actor_readreq::Hash(
+                        *read_request.id.as_bytes(),
+                    ));
                     let params = RawBytes::serialize(params)?;
                     let msg = Message {
                         version: Default::default(),
@@ -1404,7 +1404,7 @@ where
     let params = RawBytes::serialize(params)?;
     let msg = FvmMessage {
         from: system::SYSTEM_ACTOR_ADDR,
-        to: blobs::BLOBS_ACTOR_ADDR,
+        to: readreq::READREQ_ACTOR_ADDR,
         sequence: 0,
         gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
         method_num: GetOpenReadRequests as u64,
@@ -1506,12 +1506,12 @@ where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
     let from = system::SYSTEM_ACTOR_ADDR;
-    let to = blobs::BLOBS_ACTOR_ADDR;
+    let to = readreq::READREQ_ACTOR_ADDR;
     let method_num = CloseReadRequest as u64;
     let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
-    let params = RawBytes::serialize(CloseReadRequestParams(
-        fendermint_actor_blobs_shared::state::Hash(id.into()),
-    ))?;
+    let params = RawBytes::serialize(CloseReadRequestParams(fendermint_actor_readreq::Hash(
+        *id.as_bytes(),
+    )))?;
     let msg = Message {
         version: Default::default(),
         from,
@@ -1544,10 +1544,10 @@ fn get_read_request_status<DB>(
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
-    let request_id = fendermint_actor_blobs_shared::state::Hash(id.into());
+    let request_id = fendermint_actor_readreq::Hash(*id.as_bytes());
     let msg = FvmMessage {
         from: system::SYSTEM_ACTOR_ADDR,
-        to: blobs::BLOBS_ACTOR_ADDR,
+        to: readreq::READREQ_ACTOR_ADDR,
         sequence: 0,
         gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
         method_num: GetReadRequestStatus as u64,
