@@ -441,8 +441,7 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
   if [ $local_deploy == true ]; then
     cd "${IPC_FOLDER}/hoku-contracts"
     # use the same account validator 0th account to deploy supply source token
-    deploy_supply_source_token_out="$(PRIVATE_KEY="0x${pk}" forge script --private-key "${pk}" --rpc-url "${rpc_url}" --tc DeployScript --sig 'run(uint8)' --broadcast --timeout 120 -vv script/Hoku.s.sol 0)"
-
+    deploy_supply_source_token_out="$(forge script script/Hoku.s.sol --private-key "${pk}" --rpc-url "${rpc_url}" --tc DeployScript --sig 'run(string)' local --broadcast --timeout 120 -vv)"
     echo "$DASHES deploy supply source token output $DASHES"
     echo ""
     echo "$deploy_supply_source_token_out"
@@ -471,10 +470,10 @@ echo "Parent supply source address: $SUPPLY_SOURCE_ADDRESS"
 
 # use the same account validator 0th account to deploy validator gater
 cd "${IPC_FOLDER}/hoku-contracts"
-chain_env=$(if $local_deploy; then echo 0; else echo 1; fi)
+forge clean && forge build # Note: required to avoid upgradeable safety validation errors with `ValidatorGater.sol`
+chain_env=$(if $local_deploy; then echo "local"; else echo "testnet"; fi)
 gas_mult=$(if $local_deploy; then echo 130; else echo 100000; fi)
-# TODO: remove PRIVATE_KEY env variable when hoku-contracts is updated
-deploy_validator_gater_token_out="$(PRIVATE_KEY="0x${pk}" forge script --private-key "${pk}" --rpc-url "${rpc_url}" --tc DeployScript --sig 'run(uint8)' --broadcast --timeout 120 -g "${gas_mult}" -vv script/ValidatorGater.s.sol "${chain_env}")"
+deploy_validator_gater_token_out="$(forge script script/ValidatorGater.s.sol --private-key "${pk}" --rpc-url "${rpc_url}" --tc DeployScript --sig 'run(string)' "${chain_env}" --broadcast --timeout 120 -g "${gas_mult}" -vv)"
 
 echo "$DASHES deploy validator gater output $DASHES"
 echo ""
