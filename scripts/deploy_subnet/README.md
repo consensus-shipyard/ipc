@@ -3,6 +3,7 @@
 > Start a three-node network for remote or local development.
 
 <!-- omit from toc -->
+
 ## Table of Contents
 
 - [Background](#background)
@@ -128,14 +129,6 @@ are deployed during the deployment flow:
 - `FM_LOG_LEVEL`: Fendermint log level. One of `off`, `error`, `warn`, `info`, `debug`, or `trace`
   (default is `info`).
 
-> [!CAUTION]
-> Note that the `fendermint`, `ipc-cli`, and `hoku` binaries all use a `NETWORK` flag with
-> varying values. The scripts properly manage this, but if you run `deploy.sh` with a `NETWORK`
-> variable already exported, it'll override the value set in the scripts. Namely, if you have the
-> `NETWORK` set from using the `hoku` CLI prior to running the deployment, it'll fail due to a
-> mismatch with the `ipc-cli`'s expected flag. Be sure to open a new terminal window for the
-> deployment and work in other shells if you're developing against it.
-
 For localnet deployments, you won't need to set any of the above. There are also two additional
 optional variables:
 
@@ -255,8 +248,8 @@ other validators:
 You can test using the subnet with the [`hoku` SDK & CLI](https://github.com/hokunet/rust-hoku).
 Keys _are not_ logged if you're running a testnet. For localnet, keys _are_ logged with their
 corresponding balances. You'll notice the first three accounts correspond to the validators and
-marked as reserved. If you're trying to do non-validator actions (e.g., create a bucket or
-timehub), it's best to avoid these accounts since nonce race conditions can occur.
+marked as reserved. If you're trying to do non-validator actions (e.g., create a bucket or timehub),
+it's best to avoid these accounts since nonce race conditions can occur.
 
 ```txt
 Account balances:
@@ -281,13 +274,12 @@ Private keys:
 ```
 
 You can use then these keys with the `hoku` SDK and CLI by creating an `.env` file and sourcing it,
-or by setting the variables in your shell. Keep in mind a `NETWORK` variable is used by
-`fendermint` and `ipc-cli` but with a different value, so it's best to use separate terminal
-windows when using the `hoku` CLI alongside the others.
+or by setting the variables in your shell. Keep in mind a `NETWORK` variable is used by `fendermint`
+and `ipc-cli`, and these differ from the `HOKU_NETWORK` value used by the CLI.
 
 ```dotenv
-export NETWORK=localnet
-export PRIVATE_KEY=<private_key>
+export HOKU_NETWORK=localnet
+export HOKU_PRIVATE_KEY=<private_key>
 ```
 
 You can now use `hoku` as normal, e.g., `hoku account deposit`, `hoku os create`, etc. Similarly,
