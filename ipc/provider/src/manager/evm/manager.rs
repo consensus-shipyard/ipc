@@ -292,9 +292,9 @@ impl SubnetManager for EthSubnetManager {
             signer.clone(),
         );
 
-        let call = call_with_premium_estimation(signer, registry_contract.new_subnet_actor(params))
+        let call = call_with_premium_and_pending_block(signer, registry_contract.new_subnet_actor(params))
             .await?;
-        // TODO: Edit call to get estimate premium
+
         let pending_tx = call.send().await?;
         // We need the retry to parse the deployment event. At the time of this writing, it's a bug
         // in current FEVM that without the retries, events are not picked up.
@@ -351,7 +351,7 @@ impl SubnetManager for EthSubnetManager {
         let mut txn = contract.join(ethers::types::Bytes::from(pub_key), U256::from(collateral));
         txn = self.handle_txn_token(&subnet, txn, collateral, 0).await?;
 
-        let txn = call_with_premium_estimation(signer, txn).await?;
+        let txn = call_with_premium_and_pending_block(signer, txn).await?;
 
         // Use the pending state to get the nonce because there could have been a pre-fund. Best would be to use this for everything.
         let txn = txn.block(BlockId::Number(ethers::types::BlockNumber::Pending));
@@ -377,7 +377,7 @@ impl SubnetManager for EthSubnetManager {
         let mut txn = contract.pre_fund(U256::from(balance));
         txn = self.handle_txn_token(&subnet, txn, 0, balance).await?;
 
-        let txn = call_with_premium_estimation(signer, txn).await?;
+        let txn = call_with_premium_and_pending_block(signer, txn).await?;
 
         txn.send().await?;
         Ok(())
@@ -401,7 +401,7 @@ impl SubnetManager for EthSubnetManager {
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
-        call_with_premium_estimation(signer, contract.pre_release(amount.into()))
+        call_with_premium_and_pending_block(signer, contract.pre_release(amount.into()))
             .await?
             .send()
             .await?
@@ -428,7 +428,7 @@ impl SubnetManager for EthSubnetManager {
         let mut txn = contract.stake(U256::from(collateral));
         txn = self.handle_txn_token(&subnet, txn, collateral, 0).await?;
 
-        let txn = call_with_premium_estimation(signer, txn).await?;
+        let txn = call_with_premium_and_pending_block(signer, txn).await?;
 
         txn.send().await?.await?;
 
@@ -455,7 +455,7 @@ impl SubnetManager for EthSubnetManager {
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
-        let txn = call_with_premium_estimation(signer, contract.unstake(collateral.into())).await?;
+        let txn = call_with_premium_and_pending_block(signer, contract.unstake(collateral.into())).await?;
         txn.send().await?.await?;
 
         Ok(())
@@ -469,7 +469,7 @@ impl SubnetManager for EthSubnetManager {
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
-        call_with_premium_estimation(signer, contract.leave())
+        call_with_premium_and_pending_block(signer, contract.leave())
             .await?
             .send()
             .await?
@@ -486,7 +486,7 @@ impl SubnetManager for EthSubnetManager {
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
-        call_with_premium_estimation(signer, contract.kill())
+        call_with_premium_and_pending_block(signer, contract.kill())
             .await?
             .send()
             .await?
@@ -527,7 +527,7 @@ impl SubnetManager for EthSubnetManager {
         let contract =
             subnet_actor_reward_facet::SubnetActorRewardFacet::new(address, signer.clone());
 
-        call_with_premium_estimation(signer, contract.claim())
+        call_with_premium_and_pending_block(signer, contract.claim())
             .await?
             .send()
             .await?
@@ -567,7 +567,7 @@ impl SubnetManager for EthSubnetManager {
             gateway_manager_facet::FvmAddress::try_from(to)?,
         );
         txn.tx.set_value(value);
-        let txn = call_with_premium_estimation(signer, txn).await?;
+        let txn = call_with_premium_and_pending_block(signer, txn).await?;
 
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
@@ -601,7 +601,7 @@ impl SubnetManager for EthSubnetManager {
         let token_contract = IERC20::new(token_address, signer.clone());
 
         let txn = token_contract.approve(self.ipc_contract_info.gateway_addr, value);
-        let txn = call_with_premium_estimation(signer, txn).await?;
+        let txn = call_with_premium_and_pending_block(signer, txn).await?;
 
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
@@ -633,7 +633,7 @@ impl SubnetManager for EthSubnetManager {
             gateway_manager_facet::FvmAddress::try_from(to)?,
             value,
         );
-        let txn = call_with_premium_estimation(signer, txn).await?;
+        let txn = call_with_premium_and_pending_block(signer, txn).await?;
 
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
@@ -663,7 +663,7 @@ impl SubnetManager for EthSubnetManager {
         );
         let mut txn = gateway_contract.release(gateway_manager_facet::FvmAddress::try_from(to)?);
         txn.tx.set_value(value);
-        let txn = call_with_premium_estimation(signer, txn).await?;
+        let txn = call_with_premium_and_pending_block(signer, txn).await?;
 
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
@@ -698,7 +698,7 @@ impl SubnetManager for EthSubnetManager {
         let mut key = [0u8; 32];
         key.copy_from_slice(&postbox_msg_key);
 
-        call_with_premium_estimation(signer, gateway_contract.propagate(key))
+        call_with_premium_and_pending_block(signer, gateway_contract.propagate(key))
             .await?
             .send()
             .await?;
@@ -837,7 +837,7 @@ impl SubnetManager for EthSubnetManager {
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
-        call_with_premium_estimation(signer, contract.add_bootstrap_node(endpoint))
+        call_with_premium_and_pending_block(signer, contract.add_bootstrap_node(endpoint))
             .await?
             .send()
             .await?
@@ -914,7 +914,7 @@ impl SubnetManager for EthSubnetManager {
         tracing::debug!("from address: {:?}", from);
 
         let call = contract.set_federated_power(addresses, pubkeys, power_u256);
-        let txn = call_with_premium_estimation(signer, call).await?;
+        let txn = call_with_premium_and_pending_block(signer, call).await?;
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
         block_number_from_receipt(receipt)
@@ -1095,10 +1095,8 @@ impl EthSubnetManager {
         let wallet = LocalWallet::from_bytes(private_key.private_key())?
             .with_chain_id(self.ipc_contract_info.chain_id);
 
-        Ok(SignerMiddleware::new(
-            self.ipc_contract_info.provider.clone(),
-            wallet,
-        ))
+        let signer = SignerMiddleware::new(self.ipc_contract_info.provider.clone(), wallet);
+        Ok(signer)
     }
 
     pub fn from_subnet_with_wallet_store(
@@ -1181,7 +1179,7 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
             signer.clone(),
         );
         let call = contract.submit_checkpoint(checkpoint, signatories, signatures);
-        let call = call_with_premium_estimation(signer, call).await?;
+        let call = call_with_premium_and_pending_block(signer, call).await?;
 
         let pending_tx = call.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
@@ -1281,32 +1279,39 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
     }
 }
 
-/// Receives an input `FunctionCall` and returns a new instance
-/// after estimating an optimal `gas_premium` for the transaction
-pub(crate) async fn call_with_premium_estimation<B, D, M>(
+/// Takes a `FunctionCall` input and returns a new instance with an estimated optimal `gas_premium`.
+/// The function also uses the pending block number to help retrieve the latest nonce
+/// via `get_transaction_count` with the `pending` parameter.
+pub(crate) async fn call_with_premium_and_pending_block<B, D, M>(
     signer: Arc<DefaultSignerMiddleware>,
-    call: ethers_contract::FunctionCall<B, D, M>,
+    mut call: ethers_contract::FunctionCall<B, D, M>,
 ) -> Result<ethers_contract::FunctionCall<B, D, M>>
 where
     B: std::borrow::Borrow<D>,
     M: ethers::abi::Detokenize,
 {
     let (max_priority_fee_per_gas, max_fee_per_gas) = premium_estimation(signer).await?;
-    match call.tx.clone() {
+
+    let call_with_gas = match call.tx.clone() {
         TypedTransaction::Eip1559(mut tx) => {
             tx.max_fee_per_gas = Some(max_fee_per_gas);
             tx.max_priority_fee_per_gas = Some(max_priority_fee_per_gas);
-            Ok(call)
+            call.tx = TypedTransaction::Eip1559(tx);
+            call
         }
         TypedTransaction::Legacy(mut tx) => {
             tx.gas_price = Some(max_fee_per_gas);
-            Ok(call)
+            call.tx = TypedTransaction::Legacy(tx);
+            call
         }
         TypedTransaction::Eip2930(mut wrapped_tx) => {
             wrapped_tx.tx.gas_price = Some(max_fee_per_gas);
-            Ok(call)
+            call.tx = TypedTransaction::Eip2930(wrapped_tx);
+            call
         }
-    }
+    };
+
+    Ok(call_with_gas.block(ethers::types::BlockNumber::Pending))
 }
 
 /// Returns an estimation of an optimal `gas_premium` and `gas_fee_cap`
