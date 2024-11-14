@@ -16,6 +16,7 @@ use fendermint_app_settings::objects::ObjectsSettings;
 use fendermint_rpc::client::FendermintClient;
 use fendermint_rpc::message::GasParams;
 use fendermint_rpc::QueryClient;
+use fendermint_vm_message::conv::from_eth;
 use fendermint_vm_message::query::FvmQueryHeight;
 use fendermint_vm_message::signed::SignedMessage;
 use futures_util::{StreamExt, TryStreamExt};
@@ -202,8 +203,19 @@ impl ObjectParser {
             .decode(value)
             .map_err(|e| anyhow!("Failed to decode b64 encoded message: {}", e))
             .and_then(|b64_decoded| {
-                fvm_ipld_encoding::from_slice::<SignedMessage>(&b64_decoded)
-                    .map_err(|e| anyhow!("Failed to deserialize signed message: {}", e))
+                // Allow both FVM signed messages and Ethereum signed transactions
+                match fvm_ipld_encoding::from_slice::<SignedMessage>(&b64_decoded) {
+                    Ok(signed_msg) => Ok(signed_msg),
+                    Err(e) => {
+                        tracing::debug!("Failed to deserialize FVM signed message, trying Ethereum tx format: {}", e);
+                        let fvm_msg =
+                            from_eth::to_fvm_signed_message(&ethers::types::Bytes::from(b64_decoded))
+                                .map_err(|e| {
+                                    anyhow!("Failed to deserialize signed message: {}", e)
+                                })?;
+                        Ok(fvm_msg)
+                    }
+                }
             })?;
         self.signed_msg = Some(signed_msg);
         Ok(())
@@ -706,8 +718,11 @@ mod tests {
     use std::str::FromStr;
 
     use super::*;
+    use ethers::core::abi;
     use ethers::core::k256::ecdsa::SigningKey;
     use ethers::core::rand::{rngs::StdRng, SeedableRng};
+    use ethers::signers::{LocalWallet, Signer};
+    use ethers::types as et;
     use fendermint_actor_bucket::AddParams;
     use fendermint_rpc::FendermintClient;
     use fendermint_vm_message::conv::from_eth::to_fvm_address;
@@ -897,6 +912,99 @@ mod tests {
 
         let multipart_form =
             multipart_form(&serialized_signed_message_b64, hash, client_node_addr, size).await;
+
+        let reply = handle_object_upload(client, iroh.client().clone(), multipart_form)
+            .await
+            .unwrap();
+        let response = reply.into_response();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_handle_object_upload_from_eth_tx() {
+        setup_logs();
+
+        let matcher = MockRequestMethodMatcher::default().map(
+            Method::AbciQuery,
+            Ok(ABCI_QUERY_RESPONSE_UPLOAD.to_string()),
+        );
+        let client = FendermintClient::new(MockClient::new(matcher).0);
+        let iroh = iroh::node::Node::memory().spawn().await.unwrap();
+
+        // client iroh node
+        let client_iroh = iroh::node::Node::memory().spawn().await.unwrap();
+        let hash = client_iroh
+            .blobs()
+            .add_bytes(&b"hello world"[..])
+            .await
+            .unwrap()
+            .hash;
+        let client_node_addr = client_iroh.net().node_addr().await.unwrap();
+
+        let iroh_storage = EntanglerIrohStorage::from_client(client_iroh.client().clone());
+        let ent = Entangler::new(iroh_storage, 3, 5, 5).unwrap();
+        let metadata_hash = ent.entangle_uploaded(hash.to_string()).await.unwrap();
+
+        let iroh_metadata_hash = Hash::from_str(&metadata_hash.as_str()).unwrap();
+
+        let store = Address::new_id(90);
+        let key = b"key";
+        let size = 11;
+        let params = AddParams {
+            source: fendermint_actor_blobs_shared::state::PublicKey(*iroh.node_id().as_bytes()),
+            key: key.to_vec(),
+            hash: fendermint_actor_blobs_shared::state::Hash(*hash.as_bytes()),
+            size,
+            recovery_hash: fendermint_actor_blobs_shared::state::Hash(
+                *iroh_metadata_hash.as_bytes(),
+            ),
+            ttl: None,
+            metadata: HashMap::new(),
+            overwrite: true,
+        };
+        let params = RawBytes::serialize(params).unwrap();
+
+        // This mimics how Solidity wrappers send transactions to a bucket actor (needs to be `to` EVM address)
+        const CALL_ACTOR_ID: &str = "0xfe00000000000000000000000000000000000005";
+        let calldata = abi::encode(&[
+            abi::Token::Uint(et::U256::from(
+                fendermint_actor_bucket::Method::AddObject as u64, // method_num
+            )),
+            abi::Token::Uint(0.into()),                       // value
+            abi::Token::Uint(0x00000000.into()),              // static call
+            abi::Token::Uint(fvm_ipld_encoding::CBOR.into()), // cbor codec
+            abi::Token::Bytes(params.to_vec()),               // params
+            abi::Token::Uint(store.id().unwrap().into()),     // target contract ID address
+        ]);
+
+        // Set up EVM wallet
+        let sk = fendermint_crypto::SecretKey::random(&mut StdRng::from_entropy());
+        let signing_key = SigningKey::from_slice(sk.serialize().as_ref()).unwrap();
+        let chain_id = 314159u64;
+        let wallet = LocalWallet::from_bytes(signing_key.to_bytes().as_ref())
+            .unwrap()
+            .with_chain_id(chain_id);
+
+        // Create and sign an EVM transaction
+        let tx = et::Eip1559TransactionRequest::new()
+            .from(wallet.address())
+            .to(CALL_ACTOR_ID.parse::<et::Address>().unwrap())
+            .nonce(0)
+            .gas(3000000)
+            .max_fee_per_gas(et::U256::zero())
+            .max_priority_fee_per_gas(et::U256::zero())
+            .data(et::Bytes::from(calldata))
+            .chain_id(chain_id);
+        let tx = et::transaction::eip2718::TypedTransaction::Eip1559(tx);
+        let sig = wallet.sign_transaction_sync(&tx).expect("failed to sign");
+
+        // Encode the signed bytes as base64
+        let bz = tx.rlp_signed(&sig);
+        let serialized_eth_tx_b64 = general_purpose::URL_SAFE.encode(bz.as_ref());
+
+        // Send the signed EVM tx as a multipart form in the `msg` field
+        let multipart_form =
+            multipart_form(&serialized_eth_tx_b64, hash, client_node_addr, size).await;
 
         let reply = handle_object_upload(client, iroh.client().clone(), multipart_form)
             .await

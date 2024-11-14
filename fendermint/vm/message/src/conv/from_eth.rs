@@ -3,7 +3,12 @@
 
 //! Helper methods to convert between Ethereum and FVM data formats.
 
-use ethers_core::types::{Eip1559TransactionRequest, NameOrAddress, H160, U256};
+use ethers_core::types::{
+    transaction::eip2718::TypedTransaction, Bytes, Eip1559TransactionRequest, NameOrAddress,
+    Signature, H160, U256,
+};
+use ethers_core::utils::rlp;
+
 use fendermint_vm_actor_interface::{
     eam::{self, EthAddress},
     evm,
@@ -12,9 +17,12 @@ use fvm_ipld_encoding::{BytesSer, RawBytes};
 use fvm_shared::{
     address::Address,
     bigint::{BigInt, Sign},
+    crypto::signature::Signature as FvmSignature,
     econ::TokenAmount,
     message::Message,
 };
+
+use crate::signed::SignedMessage;
 
 // https://github.com/filecoin-project/lotus/blob/594c52b96537a8c8728389b446482a2d7ea5617c/chain/types/ethtypes/eth_transactions.go#L152
 pub fn to_fvm_message(tx: &Eip1559TransactionRequest) -> anyhow::Result<Message> {
@@ -63,6 +71,19 @@ pub fn to_fvm_message(tx: &Eip1559TransactionRequest) -> anyhow::Result<Message>
     Ok(msg)
 }
 
+/// Convert an RLP encoded signed EVM transaction to a signed FVM message
+pub fn to_fvm_signed_message(tx: &Bytes) -> anyhow::Result<SignedMessage> {
+    let rlp = rlp::Rlp::new(&tx);
+    let (tx, sig): (TypedTransaction, Signature) = TypedTransaction::decode_signed(&rlp)?;
+    let msg = to_fvm_message(&tx.as_eip1559_ref().unwrap())?;
+
+    let msg = SignedMessage {
+        message: msg,
+        signature: FvmSignature::new_secp256k1(sig.to_vec()),
+    };
+    Ok(msg)
+}
+
 pub fn to_fvm_address(addr: H160) -> Address {
     Address::from(EthAddress(addr.0))
 }
@@ -82,11 +103,17 @@ mod tests {
         utils::rlp,
     };
     use fendermint_testing::arb::ArbTokenAmount;
-    use fvm_shared::{chainid::ChainID, crypto::signature::Signature};
+    use fendermint_vm_actor_interface::eam::EthAddress;
+    use fvm_shared::{
+        address::Address, chainid::ChainID, crypto::signature::Signature as FvmSignature,
+    };
     use quickcheck_macros::quickcheck;
 
     use crate::{
-        conv::{from_eth::to_fvm_message, from_fvm::to_eth_tokens},
+        conv::{
+            from_eth::{to_fvm_message, to_fvm_signed_message},
+            from_fvm::to_eth_tokens,
+        },
         signed::{DomainHash, SignedMessage},
     };
 
@@ -121,7 +148,7 @@ mod tests {
 
         let msg = SignedMessage {
             message: to_fvm_message(tx0.as_eip1559_ref().unwrap()).expect("to_fvm_message"),
-            signature: Signature::new_secp256k1(sig.to_vec()),
+            signature: FvmSignature::new_secp256k1(sig.to_vec()),
         };
 
         let domain_hash = msg.domain_hash(&chain_id).expect("domain_hash");
@@ -130,5 +157,11 @@ mod tests {
             Some(DomainHash::Eth(h)) => assert_eq!(h, tx_hash.0),
             other => panic!("unexpected domain hash: {other:?}"),
         }
+
+        let msg = to_fvm_signed_message(&raw_tx).expect("to_fvm_signed_message");
+        assert_eq!(
+            msg.message.from,
+            Address::from(EthAddress(tx0.from().unwrap().0))
+        );
     }
 }
