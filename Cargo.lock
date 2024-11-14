@@ -7575,7 +7575,7 @@ dependencies = [
  "hex",
  "lazy_static",
  "procfs-core",
- "rustix 0.38.34",
+ "rustix",
 ]
 
 [[package]]
