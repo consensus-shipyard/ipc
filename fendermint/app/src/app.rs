@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use std::future::Future;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use anyhow::{anyhow, Context, Result};
 use async_stm::{atomically, atomically_or_err};
@@ -9,7 +9,6 @@ use async_trait::async_trait;
 use cid::Cid;
 use fendermint_abci::util::take_until_max_size;
 use fendermint_abci::{AbciResult, Application};
-use fendermint_crypto::PublicKey as FendermintPublicKey;
 use fendermint_storage::{
     Codec, Encode, KVCollection, KVRead, KVReadable, KVStore, KVWritable, KVWrite,
 };
@@ -46,9 +45,9 @@ use tendermint::account::Id as TendermintAccountId;
 use tendermint::consensus::Params as TendermintConsensusParams;
 use tendermint::PublicKey as TendermintPublicKey;
 
-use tendermint_rpc::Client;
 use tracing::instrument;
 
+use crate::consensus_params::ConsensusParamsTracker;
 use crate::observe::{
     BlockCommitted, BlockProposalEvaluated, BlockProposalReceived, BlockProposalSent, Message,
     MpoolReceived,
@@ -122,11 +121,10 @@ pub struct AppConfig<S: KVStore> {
 
 /// Handle ABCI requests.
 #[derive(Clone)]
-pub struct App<DB, SS, S, I, C>
+pub struct App<DB, SS, S, I>
 where
     SS: Blockstore + Clone + 'static,
     S: KVStore,
-    C: Client,
 {
     /// Database backing all key-value operations.
     db: Arc<DB>,
@@ -168,14 +166,12 @@ where
     /// Zero means unlimited.
     state_hist_size: u64,
     /// Tracks the validator
-    validators: ValidatorTracker<C>,
-
-    latest_consensus_params: Arc<RwLock<Option<TendermintConsensusParams>>>,
-    /// The cometbft client
-    client: C,
+    validators: ValidatorTracker,
+    /// Tracks the consensus params
+    consensus_params: ConsensusParamsTracker,
 }
 
-impl<DB, SS, S, I, C> App<DB, SS, S, I, C>
+impl<DB, SS, S, I> App<DB, SS, S, I>
 where
     S: KVStore
         + Codec<AppState>
@@ -184,7 +180,6 @@ where
         + Codec<FvmStateParams>,
     DB: KVWritable<S> + KVReadable<S> + Clone + 'static,
     SS: Blockstore + Clone + 'static,
-    C: Client + Clone,
 {
     pub fn new(
         config: AppConfig<S>,
@@ -193,7 +188,6 @@ where
         interpreter: I,
         chain_env: ChainEnv,
         snapshots: Option<SnapshotClient>,
-        client: C,
     ) -> Result<Self> {
         let app = Self {
             db: Arc::new(db),
@@ -208,16 +202,15 @@ where
             snapshots,
             exec_state: Arc::new(tokio::sync::Mutex::new(None)),
             check_state: Arc::new(tokio::sync::Mutex::new(None)),
-            validators: ValidatorTracker::new(client.clone()),
-            latest_consensus_params: Arc::new(RwLock::new(None)),
-            client,
+            validators: ValidatorTracker::new(),
+            consensus_params: ConsensusParamsTracker::new(),
         };
         app.init_committed_state()?;
         Ok(app)
     }
 }
 
-impl<DB, SS, S, I, C> App<DB, SS, S, I, C>
+impl<DB, SS, S, I> App<DB, SS, S, I>
 where
     S: KVStore
         + Codec<AppState>
@@ -226,7 +219,6 @@ where
         + Codec<FvmStateParams>,
     DB: KVWritable<S> + KVReadable<S> + 'static + Clone,
     SS: Blockstore + 'static + Clone,
-    C: Client,
 {
     /// Get an owned clone of the state store.
     fn state_store_clone(&self) -> SS {
@@ -413,7 +405,7 @@ where
 // the `tower-abci` library would throw an exception when it tried to convert a
 // `Response::Exception` into a `ConsensusResponse` for example.
 #[async_trait]
-impl<DB, SS, S, I, C> Application for App<DB, SS, S, I, C>
+impl<DB, SS, S, I> Application for App<DB, SS, S, I>
 where
     S: KVStore
         + Codec<AppState>
@@ -444,7 +436,6 @@ where
         Query = BytesMessageQuery,
         Output = BytesMessageQueryRes,
     >,
-    C: Client + Sync + Clone,
 {
     /// Provide information about the ABCI application.
     async fn info(&self, _request: request::Info) -> AbciResult<response::Info> {
@@ -473,7 +464,8 @@ where
 
         let (validators, state_params) = read_genesis_car(genesis_bytes, &self.state_store).await?;
 
-        *self.latest_consensus_params.write().unwrap() = Some(request.consensus_params);
+        self.consensus_params
+            .set_consensus_params(request.consensus_params);
 
         let validators =
             to_validator_updates(validators).context("failed to convert validators")?;
@@ -484,7 +476,7 @@ where
             .map(|v| (TendermintAccountId::from(v.pub_key), v.pub_key))
             .collect();
 
-        self.validators.hydrate_cache(validators_ids_with_keys);
+        self.validators.set_validators(validators_ids_with_keys);
 
         tracing::info!(state_params = serde_json::to_string(&state_params)?);
 
@@ -752,8 +744,7 @@ where
 
         let validator = self
             .validators
-            .get_validator(&request.header.proposer_address, block_height)
-            .await?;
+            .get_validator(&request.header.proposer_address)?;
 
         let state = FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
             .context("error creating new state")?
@@ -833,25 +824,24 @@ where
                 .map(|v| (TendermintAccountId::from(v.pub_key), v.pub_key))
                 .collect();
 
-        self.validators.hydrate_cache(validators_ids_with_keys);
+        self.validators.set_validators(validators_ids_with_keys);
 
-        // TODO Karel - this is a bit of a hack, but we need to update the consensus params
-        let mut latest_consensus_params = self.latest_consensus_params.write().unwrap();
+        let new_block_gas_limit = new_block_gas_limit as i64;
 
-        // If the block gas limit has changed, we need to update the consensus layer so it can
-        // pack subsequent blocks against the new limit.
-        let consensus_param_updates = {
-            if let Some(ref mut params) = *latest_consensus_params {
-                if params.block.max_gas != new_block_gas_limit as i64 {
-                    params.block.max_gas = new_block_gas_limit as i64;
-                    Some(params.clone())
-                } else {
-                    None
-                }
+        let consensus_param_updates =
+            if self.consensus_params.get_current_block_gas_limit() != new_block_gas_limit {
+                self.consensus_params
+                    .set_current_block_gas_limit(new_block_gas_limit);
+
+                let mut updated_params = self
+                    .consensus_params
+                    .get_genesis_consensus_params()
+                    .ok_or_else(|| anyhow!("missing genesis consensus params"))?;
+                updated_params.block.max_gas = new_block_gas_limit;
+                Some(updated_params)
             } else {
                 None
-            }
-        };
+            };
 
         let ret = response::EndBlock {
             validator_updates,
