@@ -45,6 +45,7 @@ import {SubnetValidatorGater} from "../../contracts/examples/SubnetValidatorGate
 
 import {ActivitySummary, ValidatorSummary, BatchClaimProofs, ValidatorClaimProof} from "../../contracts/activities/Activity.sol";
 import {ValidatorRewarderMap} from "../../contracts/examples/ValidatorRewarderMap.sol";
+import {ValidatorRewarder} from "../../contracts/examples/ValidatorRewarder.sol";
 import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
 
 contract SubnetActorDiamondTest is Test, IntegrationTestBase {
@@ -2517,17 +2518,13 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             proof: proofs2[0]
         });
 
-        batchProofs[0] = BatchClaimProofs({
-            subnetId: subnetId,
-            proofs: claimProofs
-        });
+        batchProofs[0] = BatchClaimProofs({subnetId: subnetId, proofs: claimProofs});
 
         saDiamond.validatorReward().batchClaim(batchProofs);
 
         // check
         assert(m.blocksCommitted(addrs[0]) == 2);
     }
-
 
     function testGatewayDiamond_ValidatorBatchClaimMiningReward_NoDoubleClaim() public {
         ValidatorRewarderMap m = new ValidatorRewarderMap();
@@ -2576,11 +2573,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             metadata
         );
 
-        (bytes32 activityRoot2, bytes32[][] memory proofs2) = MerkleTreeHelper.createMerkleProofsForActivities(
-            addrs,
-            blocksMined,
-            metadata
-        );
+        (bytes32 activityRoot2, ) = MerkleTreeHelper.createMerkleProofsForActivities(addrs, blocksMined, metadata);
 
         confirmChange(addrs, privKeys, ActivitySummary({totalActiveValidators: 2, commitment: activityRoot1}));
         confirmChange(addrs, privKeys, ActivitySummary({totalActiveValidators: 2, commitment: activityRoot2}));
@@ -2609,13 +2602,102 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             proof: proofs1[0]
         });
 
-        batchProofs[0] = BatchClaimProofs({
-            subnetId: subnetId,
-            proofs: claimProofs
-        });
+        batchProofs[0] = BatchClaimProofs({subnetId: subnetId, proofs: claimProofs});
 
         vm.expectRevert(ValidatorAlreadyClaimed.selector);
         saDiamond.validatorReward().batchClaim(batchProofs);
+    }
+
+    function testGatewayDiamond_ValidatorBatchClaimERC20Reward_Works() public {
+        ValidatorRewarder m = new ValidatorRewarder();
+        {
+            gatewayAddress = address(gatewayDiamond);
+
+            Asset memory source = Asset({kind: AssetKind.Native, tokenAddress: address(0)});
+
+            SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(
+                gatewayAddress,
+                SubnetID(ROOTNET_CHAINID, new address[](0)),
+                source,
+                AssetHelper.native()
+            );
+            params.validatorRewarder = address(m);
+            params.minValidators = 2;
+            params.permissionMode = PermissionMode.Federated;
+
+            saDiamond = createSubnetActor(params);
+        }
+
+        SubnetID memory subnetId = SubnetID(ROOTNET_CHAINID, new address[](1));
+        subnetId.route[0] = address(saDiamond);
+        m.setSubnet(subnetId);
+
+        (address[] memory addrs, uint256[] memory privKeys, bytes[] memory pubkeys) = TestUtils.newValidators(4);
+
+        {
+            uint256[] memory powers = new uint256[](4);
+            powers[0] = 10000;
+            powers[1] = 10000;
+            powers[2] = 10000;
+            powers[3] = 10000;
+            saDiamond.manager().setFederatedPower(addrs, pubkeys, powers);
+        }
+
+        bytes[] memory metadata = new bytes[](addrs.length);
+        uint64[] memory blocksMined = new uint64[](addrs.length);
+
+        // assign extra metadata to validator 0
+        // hardcode storageReward and uptimeReward to avoid stack too deep issues
+        metadata[0] = abi.encode(uint256(100), uint256(10));
+
+        blocksMined[0] = 1;
+        blocksMined[1] = 2;
+
+        (bytes32 activityRoot1, bytes32[][] memory proofs1) = MerkleTreeHelper.createMerkleProofsForActivities(
+            addrs,
+            blocksMined,
+            metadata
+        );
+
+        (bytes32 activityRoot2, bytes32[][] memory proofs2) = MerkleTreeHelper.createMerkleProofsForActivities(
+            addrs,
+            blocksMined,
+            metadata
+        );
+
+        confirmChange(addrs, privKeys, ActivitySummary({totalActiveValidators: 2, commitment: activityRoot1}));
+        confirmChange(addrs, privKeys, ActivitySummary({totalActiveValidators: 2, commitment: activityRoot2}));
+
+        vm.startPrank(addrs[0]);
+        vm.deal(addrs[0], 1 ether);
+
+        BatchClaimProofs[] memory batchProofs = new BatchClaimProofs[](1);
+        ValidatorClaimProof[] memory claimProofs = new ValidatorClaimProof[](2);
+        claimProofs[0] = ValidatorClaimProof({
+            summary: ValidatorSummary({
+                checkpointHeight: uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
+                validator: addrs[0],
+                blocksCommitted: blocksMined[0],
+                metadata: metadata[0]
+            }),
+            proof: proofs1[0]
+        });
+        claimProofs[1] = ValidatorClaimProof({
+            summary: ValidatorSummary({
+                checkpointHeight: uint64(gatewayDiamond.getter().bottomUpCheckPeriod()) * 2,
+                validator: addrs[0],
+                blocksCommitted: blocksMined[0],
+                metadata: metadata[0]
+            }),
+            proof: proofs2[0]
+        });
+
+        batchProofs[0] = BatchClaimProofs({subnetId: subnetId, proofs: claimProofs});
+
+        saDiamond.validatorReward().batchClaim(batchProofs);
+
+        // check
+        assert(m.token().balanceOf(addrs[0]) == 2 * (blocksMined[0] + 100 + 10));
     }
 
     // -----------------------------------------------------------------------------------------------------------------
