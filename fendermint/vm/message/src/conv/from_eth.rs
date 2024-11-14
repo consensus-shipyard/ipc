@@ -71,11 +71,14 @@ pub fn to_fvm_message(tx: &Eip1559TransactionRequest) -> anyhow::Result<Message>
     Ok(msg)
 }
 
-/// Convert an RLP encoded signed EVM transaction to a signed FVM message
+/// Convert an RLP encoded signed EVM EIP-1559 transaction to a signed FVM message
 pub fn to_fvm_signed_message(tx: &Bytes) -> anyhow::Result<SignedMessage> {
     let rlp = rlp::Rlp::new(&tx);
     let (tx, sig): (TypedTransaction, Signature) = TypedTransaction::decode_signed(&rlp)?;
-    let msg = to_fvm_message(&tx.as_eip1559_ref().unwrap())?;
+    let tx = tx
+        .as_eip1559_ref()
+        .ok_or_else(|| anyhow::anyhow!("failed to process signed transaction as eip1559"))?;
+    let msg = to_fvm_message(tx)?;
 
     let msg = SignedMessage {
         message: msg,
