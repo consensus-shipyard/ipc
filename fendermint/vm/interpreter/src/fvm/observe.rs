@@ -1,6 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use fvm_shared::address::Address;
 use ipc_observability::{
     impl_traceable, impl_traceables, lazy_static, register_metrics, serde::HexEncodableBlockHash,
     Recordable, TraceLevel, Traceable,
@@ -115,8 +116,10 @@ pub struct CheckpointSigned {
 
 impl Recordable for CheckpointSigned {
     fn record_metrics(&self) {
+        let pk = self.validator.serialize();
+        let addr = Address::new_secp256k1(&pk).unwrap();
         BOTTOMUP_CHECKPOINT_SIGNED_HEIGHT
-            .with_label_values(&[format!("{:?}", self.validator).as_str()])
+            .with_label_values(&[format!("{}", addr).as_str()])
             .set(self.height as i64);
     }
 }
