@@ -3,7 +3,32 @@
 
 use fvm_shared::econ::TokenAmount;
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
+pub(crate) struct GasAmounts {
+    pub from_balance: TokenAmount,
+    pub from_credit: TokenAmount,
+    pub from_sponsor_credit: TokenAmount,
+}
+
+impl GasAmounts {
+    pub fn new(
+        from_balance: TokenAmount,
+        from_credit: TokenAmount,
+        from_sponsor_credit: TokenAmount,
+    ) -> Self {
+        Self {
+            from_balance,
+            from_credit,
+            from_sponsor_credit,
+        }
+    }
+
+    pub fn total(&self) -> TokenAmount {
+        &self.from_balance + &self.from_credit + &self.from_sponsor_credit
+    }
+}
+
+#[derive(Clone, Debug, Default)]
 pub(crate) struct GasOutputs {
     pub base_fee_burn: TokenAmount,
     pub over_estimation_burn: TokenAmount,

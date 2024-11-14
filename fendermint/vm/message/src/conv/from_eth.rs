@@ -48,6 +48,7 @@ pub fn to_fvm_message(tx: &Eip1559TransactionRequest) -> anyhow::Result<Message>
         version: 0,
         from,
         to,
+        sponsor: None,
         sequence: tx.nonce.unwrap_or_default().as_u64(),
         value: to_fvm_tokens(&tx.value.unwrap_or_default()),
         method_num,

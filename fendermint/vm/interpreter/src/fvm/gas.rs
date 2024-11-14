@@ -82,6 +82,7 @@ impl BlockGasTracker {
         let msg = FvmMessage {
             from: system::SYSTEM_ACTOR_ADDR,
             to: GAS_MARKET_ACTOR_ADDR,
+            sponsor: None,
             sequence: 0, // irrelevant for implicit executions.
             gas_limit: i64::MAX as u64,
             method_num: fendermint_actors_api::gas_market::Method::CurrentReading as u64,
@@ -110,6 +111,7 @@ impl BlockGasTracker {
         let msg = FvmMessage {
             from: system::SYSTEM_ACTOR_ADDR,
             to: GAS_MARKET_ACTOR_ADDR,
+            sponsor: None,
             sequence: 0, // irrelevant for implicit executions.
             gas_limit: i64::MAX as u64,
             method_num: fendermint_actors_api::gas_market::Method::UpdateUtilization as u64,
@@ -137,6 +139,7 @@ impl BlockGasTracker {
         let msg = FvmMessage {
             from: reward::REWARD_ACTOR_ADDR,
             to: premium_recipient,
+            sponsor: None,
             sequence: 0, // irrelevant for implicit executions.
             gas_limit: i64::MAX as u64,
             method_num: METHOD_SEND,

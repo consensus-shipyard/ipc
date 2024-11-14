@@ -86,6 +86,7 @@ where
         let msg = FvmMessage {
             from,
             to,
+            sponsor: None,
             sequence: height as u64,
             gas_limit,
             method_num,
@@ -116,6 +117,7 @@ where
                 let msg = FvmMessage {
                     from: system::SYSTEM_ACTOR_ADDR,
                     to: chainmetadata::CHAINMETADATA_ACTOR_ADDR,
+                    sponsor: None,
                     sequence: height as u64,
                     gas_limit,
                     method_num: fendermint_actor_chainmetadata::Method::PushBlockHash as u64,

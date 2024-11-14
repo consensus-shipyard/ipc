@@ -16,13 +16,13 @@ use crate::state::{BlobStatus, Hash, PublicKey, SubscriptionId};
 #[serde(transparent)]
 pub struct BuyCreditParams(pub Address);
 
-/// Params for debiting credit.
+/// Params for updating credit.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct DebitCreditParams {
-    /// Account address (credit owner) to debit from.
+pub struct UpdateCreditParams {
+    /// Account address to update.
     pub from: Address,
-    /// Token account to debit.
-    pub amount: TokenAmount,
+    /// Token amount to add.
+    pub add_amount: TokenAmount,
 }
 
 /// Params for approving credit.
@@ -45,18 +45,6 @@ pub struct ApproveCreditParams {
     pub ttl: Option<ChainEpoch>,
 }
 
-/// Params for looking up a credit approval.
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct GetCreditApprovalParams {
-    /// Account address (credit owner) that made the approval.
-    pub from: Address,
-    /// Account address that received the approval.
-    pub receiver: Address,
-    /// The caller address, e.g., a bucket.
-    /// The receiver can only use the approval via a caller contract.
-    pub caller: Address,
-}
-
 /// Params for revoking credit.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct RevokeCreditParams {
@@ -70,22 +58,24 @@ pub struct RevokeCreditParams {
     pub required_caller: Option<Address>,
 }
 
-/// Params for looking up gas allowance.
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct GetGasAllowanceParams {
-    // /// Account address (credit owner) that made the approval.
-    pub sender: Address,
-    // /// Account address that received the approval.
-    // pub to: Address,
-    // /// The caller address, e.g., a bucket.
-    // /// The receiver can only use the approval via a caller contract.
-    // pub caller: Address,
-}
-
 /// Params for getting an account.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct GetAccountParams(pub Address);
+
+/// Params for looking up a credit approval.
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct GetCreditApprovalParams {
+    /// Account address (credit owner) that made the approval.
+    pub from: Address,
+    /// Account address that received the approval.
+    pub receiver: Address,
+}
+
+/// Params for looking up credit allowance.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct GetCreditAllowanceParams(pub Address);
 
 /// Params for adding a blob.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]

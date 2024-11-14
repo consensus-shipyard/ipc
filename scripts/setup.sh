@@ -20,9 +20,9 @@ rm -rf "$HOME/.cometbft"
 
 # Build actors
 if [[ -z ${SKIP_BUILD+x} || "$SKIP_BUILD" == "" || "$SKIP_BUILD" == "false" ]]; then
-  (cd builtin-actors && make bundle-mainnet)
+  (cd ../builtin-actors && make bundle-mainnet)
   mkdir -p fendermint/builtin-actors/output
-  cp builtin-actors/output/builtin-actors-mainnet.car fendermint/builtin-actors/output/bundle.car
+  cp ../builtin-actors/output/builtin-actors-mainnet.car fendermint/builtin-actors/output/bundle.car
   # These need to be built for release
   cargo build --release -p fendermint_actors
 fi

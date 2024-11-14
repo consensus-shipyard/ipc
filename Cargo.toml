@@ -91,7 +91,7 @@ ethers = { version = "2.0.13", features = ["abigen", "ws"] }
 ethers-core = { version = "2.0.13" }
 ethers-contract = "2.0.13"
 fnv = "1.0"
-frc42_dispatch = "6.0.0"
+frc42_dispatch = "5.0.0-alpha.1"
 futures = "0.3"
 futures-core = "0.3"
 futures-util = "0.3"
@@ -215,9 +215,9 @@ openssl = { version = "0.10", features = ["vendored"] }
 # pull in crates as transitive dependencies that do not support Wasm architector. If this
 # happens, try removing "crypto" feature from fvm_shared dependency in contracts/binding/Cargo.toml
 # and run `cargo build`. Then add the "crypto" feature back and run `cargo build` again.
-fvm = { version = "4.1.0", default-features = false } # no opencl feature or it fails on CI
-fvm_shared = { version = "4.1.0" }
-fvm_sdk = { version = "4.1.0" }
+fvm = { version = "4.1.2", default-features = false } # no opencl feature or it fails on CI
+fvm_shared = { version = "4.1.2" }
+fvm_sdk = { version = "4.1.2" }
 fvm_ipld_blockstore = "0.2.0"
 fvm_ipld_car = "0.7.1"
 fvm_ipld_encoding = "0.4.0"
@@ -231,10 +231,10 @@ fvm_ipld_amt = "0.6.2"
 #
 # The original IPC build fetches a pre-built builtin-actors CAR bundle from a GH release.
 # For ADM, we can do the same at some point, but for now I've included the repo as a submodule.
-fil_actors_evm_shared = { path = "builtin-actors/actors/evm/shared" }
-fil_actor_eam = { path = "builtin-actors/actors/eam" }
-fil_actor_adm = { path = "builtin-actors/actors/adm" }
-fil_actors_runtime = { path = "builtin-actors/runtime" }
+fil_actors_evm_shared = { path = "../builtin-actors/actors/evm/shared" }
+fil_actor_eam = { path = "../builtin-actors/actors/eam" }
+fil_actor_adm = { path = "../builtin-actors/actors/adm" }
+fil_actors_runtime = { path = "../builtin-actors/runtime" }
 
 # Using the same tendermint-rs dependency as tower-abci. From both we are interested in v037 modules.
 tower-abci = { version = "0.7" }
@@ -254,14 +254,15 @@ gcra = { git = "https://github.com/consensus-shipyard/gcra-rs.git", branch = "ma
 
 # Uncomment entries below when working locally on ref-fvm and this repo simultaneously.
 # Assumes the ref-fvm checkout is in a sibling directory with the same name.
-# fvm = { path = "../ref-fvm/fvm", default-features = false }
-# fvm_shared = { path = "../ref-fvm/shared" }
-# fvm_sdk = { path = "../ref-fvm/sdk" }
-# fvm_ipld_blockstore = { path = "../ref-fvm/ipld/blockstore" }
-# fvm_ipld_car = { path = "../ref-fvm/ipld/car" }
-# fvm_ipld_encoding = { path = "../ref-fvm/ipld/encoding" }
-# fvm_ipld_hamt = { path = "../ref-fvm/ipld/hamt" }
-# fvm_ipld_amt = { path = "../ref-fvm/ipld/amt" }
+fvm = { path = "../ref-fvm/fvm" }
+fvm_shared = { path = "../ref-fvm/shared" }
+fvm_sdk = { path = "../ref-fvm/sdk" }
+fvm_ipld_blockstore = { path = "../ref-fvm/ipld/blockstore" }
+fvm_ipld_car = { path = "../ref-fvm/ipld/car" }
+fvm_ipld_encoding = { path = "../ref-fvm/ipld/encoding" }
+fvm_ipld_hamt = { path = "../ref-fvm/ipld/hamt" }
+fvm_ipld_amt = { path = "../ref-fvm/ipld/amt" }
+frc42_dispatch = { path = "../actors-utils/frc42_dispatch" }
 
 # Use below when working locally on entanglement and this repo simultaneously.
 # Assumes the entanglement checkout is in a sibling directory with the same name.

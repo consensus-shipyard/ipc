@@ -52,6 +52,7 @@ impl MessageFactory {
             version: Default::default(), // TODO: What does this do?
             from: self.addr,
             to,
+            sponsor: None,
             sequence: self.sequence,
             value,
             method_num,

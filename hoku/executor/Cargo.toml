@@ -17,9 +17,10 @@ fvm_ipld_encoding = { workspace = true }
 fvm_shared = { workspace = true }
 num-traits = { workspace = true }
 replace_with = { workspace = true }
+tracing = { workspace = true }
 
 fendermint_actor_blobs_shared = { path = "../../fendermint/actors/blobs/shared" }
-log = "0.4.22"
+fendermint_vm_actor_interface = { path = "../../fendermint/vm/actor_interface" }
 
 [features]
 testing = []

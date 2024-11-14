@@ -440,6 +440,7 @@ where
             version: 0,
             from: init::INIT_ACTOR_ADDR, // asserted by the constructor
             to: f0_addr,
+            sponsor: None,
             sequence: 0, // We will use implicit execution which doesn't check or modify this.
             value: TokenAmount::zero(),
             method_num: METHOD_CONSTRUCTOR,

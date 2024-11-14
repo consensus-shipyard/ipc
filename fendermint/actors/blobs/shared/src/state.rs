@@ -2,7 +2,7 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 use fil_actors_runtime::ActorError;
@@ -16,8 +16,6 @@ use serde::{Deserialize, Serialize};
 /// The stored representation of a credit account.
 #[derive(Clone, Debug, PartialEq, Serialize_tuple, Deserialize_tuple)]
 pub struct Account {
-    /// The amount of token the account is allowed to spend on virtual gas.
-    pub gas_allowance: TokenAmount,
     /// Total size of all blobs managed by the account.
     pub capacity_used: BigInt,
     /// Current free credit in byte-blocks that can be used for new commitments.
@@ -33,13 +31,12 @@ pub struct Account {
     /// the origin is Alice.
     /// An approval for Bob might be valid from only one contract caller, so long as
     /// the origin is Bob.
-    pub approvals: HashMap<Address, HashMap<Address, CreditApproval>>,
+    pub approvals: HashMap<Address, CreditApproval>,
 }
 
 impl Account {
-    pub fn new(gas_allowance: TokenAmount, credit_free: BigInt, current_epoch: ChainEpoch) -> Self {
+    pub fn new(credit_free: BigInt, current_epoch: ChainEpoch) -> Self {
         Self {
-            gas_allowance,
             capacity_used: Default::default(),
             credit_free,
             credit_committed: Default::default(),
@@ -58,6 +55,25 @@ pub struct CreditApproval {
     pub expiry: Option<ChainEpoch>,
     /// Counter for how much credit has been used via this approval.
     pub used: BigInt,
+    /// A set of allowed callers.
+    /// An empty set indicates any caller is allowed.
+    pub allowed_callers: HashSet<Address>,
+}
+
+/// Credit allowance for an account and from an approval.
+#[derive(Debug, Clone, Default, Serialize_tuple, Deserialize_tuple)]
+pub struct CreditAllowance {
+    /// Allowance from self.
+    pub origin: TokenAmount,
+    /// Allowance from an approval.
+    pub sponsored: Option<TokenAmount>,
+}
+
+impl CreditAllowance {
+    /// Returns the total allowance.
+    pub fn total(&self) -> TokenAmount {
+        self.origin.clone() + self.sponsored.clone().unwrap_or_default()
+    }
 }
 
 /// Blob blake3 hash.

@@ -17,7 +17,6 @@ pub mod bundle;
 
 pub(crate) mod gas;
 pub(crate) mod topdown;
-pub(crate) mod virtual_gas;
 
 pub use check::FvmCheckRet;
 pub use checkpoint::PowerUpdates;
