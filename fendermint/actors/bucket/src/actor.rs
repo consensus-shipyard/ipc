@@ -60,7 +60,13 @@ impl Actor {
                 params.overwrite,
             )
         })?;
-        Ok(Object { hash: params.hash, recovery_hash: params.recovery_hash, size: params.size, expiry: sub.expiry, metadata })
+        Ok(Object {
+            hash: params.hash,
+            recovery_hash: params.recovery_hash,
+            size: params.size,
+            expiry: sub.expiry,
+            metadata,
+        })
     }
 
     fn delete_object(rt: &impl Runtime, params: DeleteParams) -> Result<(), ActorError> {
@@ -148,7 +154,7 @@ fn build_object(
                 metadata: object_state.metadata.clone(),
             }))
         }
-        BlobStatus::Pending | BlobStatus::Failed => Ok(None),
+        BlobStatus::Added | BlobStatus::Pending | BlobStatus::Failed => Ok(None),
     }
 }
 
@@ -181,7 +187,7 @@ mod tests {
     use super::*;
 
     use std::collections::HashMap;
-    
+
     use fendermint_actor_blobs_shared::params::{AddBlobParams, DeleteBlobParams, GetBlobParams};
     use fendermint_actor_blobs_shared::state::{BlobStatus, Hash, PublicKey, Subscription};
     use fendermint_actor_blobs_shared::{Method as BlobMethod, BLOBS_ACTOR_ADDR};

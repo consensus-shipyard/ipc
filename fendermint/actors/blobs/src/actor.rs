@@ -6,8 +6,9 @@ use std::collections::HashSet;
 
 use fendermint_actor_blobs_shared::params::{
     AddBlobParams, ApproveCreditParams, BuyCreditParams, DeleteBlobParams, FinalizeBlobParams,
-    GetAccountParams, GetBlobParams, GetBlobStatusParams, GetCreditApprovalParams,
-    GetPendingBlobsParams, GetStatsReturn, RevokeCreditParams,
+    GetAccountParams, GetAddedBlobsParams, GetBlobParams, GetBlobStatusParams,
+    GetCreditApprovalParams, GetPendingBlobsParams, GetStatsReturn, RevokeCreditParams,
+    SetPendingParams,
 };
 use fendermint_actor_blobs_shared::state::{
     Account, Blob, BlobStatus, CreditApproval, Hash, PublicKey, Subscription,
@@ -200,6 +201,15 @@ impl BlobsActor {
         Ok(status)
     }
 
+    fn get_added_blobs(
+        rt: &impl Runtime,
+        params: GetAddedBlobsParams,
+    ) -> Result<Vec<BlobTuple>, ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+        let added = rt.state::<State>()?.get_added_blobs(params.0);
+        Ok(added)
+    }
+
     fn get_pending_blobs(
         rt: &impl Runtime,
         params: GetPendingBlobsParams,
@@ -207,6 +217,14 @@ impl BlobsActor {
         rt.validate_immediate_caller_accept_any()?;
         let pending = rt.state::<State>()?.get_pending_blobs(params.0);
         Ok(pending)
+    }
+
+    fn set_pending(rt: &impl Runtime, params: SetPendingParams) -> Result<(), ActorError> {
+        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
+        rt.transaction(|st: &mut State, _| {
+            st.set_pending(params.subscriber, params.hash, params.source);
+            Ok(())
+        })
     }
 
     fn finalize_blob(rt: &impl Runtime, params: FinalizeBlobParams) -> Result<(), ActorError> {
@@ -240,18 +258,6 @@ impl BlobsActor {
             delete_from_disc(params.hash)?;
         }
         Ok(())
-    }
-
-    fn get_pending_blobs_count(rt: &impl Runtime) -> Result<u64, ActorError> {
-        rt.validate_immediate_caller_accept_any()?;
-        let count = rt.state::<State>()?.get_pending_blobs_count();
-        Ok(count)
-    }
-
-    fn get_pending_bytes_count(rt: &impl Runtime) -> Result<u64, ActorError> {
-        rt.validate_immediate_caller_accept_any()?;
-        let count = rt.state::<State>()?.get_pending_bytes_count();
-        Ok(count)
     }
 
     /// Fallback method for unimplemented method numbers.
@@ -304,11 +310,11 @@ impl ActorCode for BlobsActor {
         AddBlob => add_blob,
         GetBlob => get_blob,
         GetBlobStatus => get_blob_status,
+        GetAddedBlobs => get_added_blobs,
         GetPendingBlobs => get_pending_blobs,
+        SetPending => set_pending,
         FinalizeBlob => finalize_blob,
         DeleteBlob => delete_blob,
-        GetPendingBlobsCount => get_pending_blobs_count,
-        GetPendingBytesCount => get_pending_bytes_count,
         _ => fallback,
     }
 }
@@ -792,150 +798,6 @@ mod tests {
         assert_eq!(subscription.expiry, 3605);
         assert!(!subscription.auto_renew);
         assert_eq!(subscription.delegate, None);
-        rt.verify();
-    }
-
-    #[test]
-    fn test_pending_blob_counts() {
-        let rt = construct_and_verify(1024 * 1024, 1);
-
-        // Set up test address
-        let id_addr = Address::new_id(110);
-        let eth_addr = EthAddress(hex_literal::hex!(
-            "CAFEB0BA00000000000000000000000000000000"
-        ));
-        let f4_eth_addr = Address::new_delegated(10, &eth_addr.0).unwrap();
-
-        rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
-        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
-        rt.set_origin(id_addr);
-        rt.set_epoch(ChainEpoch::from(0));
-
-        // Initially there should be no pending blobs
-        rt.expect_validate_caller_any();
-        let count = rt
-            .call::<BlobsActor>(Method::GetPendingBlobsCount as u64, None)
-            .unwrap()
-            .unwrap()
-            .deserialize::<u64>()
-            .unwrap();
-        assert_eq!(count, 0);
-        rt.verify();
-
-        rt.expect_validate_caller_any();
-        let bytes = rt
-            .call::<BlobsActor>(Method::GetPendingBytesCount as u64, None)
-            .unwrap()
-            .unwrap()
-            .deserialize::<u64>()
-            .unwrap();
-        assert_eq!(bytes, 0);
-        rt.verify();
-
-        // Fund the account
-        rt.set_received(TokenAmount::from_whole(1));
-        rt.expect_validate_caller_any();
-        let fund_params = BuyCreditParams(f4_eth_addr);
-        let result = rt.call::<BlobsActor>(
-            Method::BuyCredit as u64,
-            IpldBlock::serialize_cbor(&fund_params).unwrap(),
-        );
-        assert!(result.is_ok());
-        rt.verify();
-
-        // Add two blobs of different sizes
-        rt.set_epoch(ChainEpoch::from(5));
-        rt.expect_validate_caller_any();
-
-        let hash1 = new_hash(1024);
-        let add_params1 = AddBlobParams {
-            sponsor: None,
-            source: new_pk(),
-            hash: hash1.0,
-            size: hash1.1,
-            metadata_hash: new_hash(1024).0,
-            ttl: Some(3600),
-        };
-        let result = rt.call::<BlobsActor>(
-            Method::AddBlob as u64,
-            IpldBlock::serialize_cbor(&add_params1).unwrap(),
-        );
-        assert!(result.is_ok());
-        rt.verify();
-
-        let hash2 = new_hash(2048);
-        rt.expect_validate_caller_any();
-        let add_params2 = AddBlobParams {
-            sponsor: None,
-            source: new_pk(),
-            hash: hash2.0,
-            size: hash2.1,
-            metadata_hash: new_hash(1024).0,
-            ttl: Some(3600),
-        };
-        let result = rt.call::<BlobsActor>(
-            Method::AddBlob as u64,
-            IpldBlock::serialize_cbor(&add_params2).unwrap(),
-        );
-        assert!(result.is_ok());
-        rt.verify();
-
-        // Check pending blob count is now 2
-        rt.expect_validate_caller_any();
-        let count = rt
-            .call::<BlobsActor>(Method::GetPendingBlobsCount as u64, None)
-            .unwrap()
-            .unwrap()
-            .deserialize::<u64>()
-            .unwrap();
-        assert_eq!(count, 2);
-        rt.verify();
-
-        // Check pending bytes count is sum of both blob sizes
-        rt.expect_validate_caller_any();
-        let bytes = rt
-            .call::<BlobsActor>(Method::GetPendingBytesCount as u64, None)
-            .unwrap()
-            .unwrap()
-            .deserialize::<u64>()
-            .unwrap();
-        assert_eq!(bytes, 1024 + 2048);
-        rt.verify();
-
-        // Finalize one blob as resolved
-        rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
-        rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
-        let finalize_params = FinalizeBlobParams {
-            subscriber: f4_eth_addr,
-            hash: hash1.0,
-            status: BlobStatus::Resolved,
-        };
-        let result = rt.call::<BlobsActor>(
-            Method::FinalizeBlob as u64,
-            IpldBlock::serialize_cbor(&finalize_params).unwrap(),
-        );
-        assert!(result.is_ok());
-        rt.verify();
-
-        // Check counts are updated
-        rt.expect_validate_caller_any();
-        let count = rt
-            .call::<BlobsActor>(Method::GetPendingBlobsCount as u64, None)
-            .unwrap()
-            .unwrap()
-            .deserialize::<u64>()
-            .unwrap();
-        assert_eq!(count, 1);
-        rt.verify();
-
-        rt.expect_validate_caller_any();
-        let bytes = rt
-            .call::<BlobsActor>(Method::GetPendingBytesCount as u64, None)
-            .unwrap()
-            .unwrap()
-            .deserialize::<u64>()
-            .unwrap();
-        assert_eq!(bytes, 2048);
         rt.verify();
     }
 }

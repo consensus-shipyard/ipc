@@ -17,24 +17,27 @@ use crate::{
 use anyhow::{anyhow, bail, Context};
 use async_stm::atomically;
 use async_trait::async_trait;
-use fendermint_actor_blobs_shared::params::{GetBlobStatusParams, GetPendingBlobsParams};
+use fendermint_actor_blobs_shared::params::{
+    GetAddedBlobsParams, GetBlobStatusParams, GetStatsReturn, SetPendingParams,
+};
 use fendermint_actor_blobs_shared::state::BlobStatus;
 use fendermint_actor_blobs_shared::Method::DebitAccounts;
 use fendermint_actor_blobs_shared::{
     params::FinalizeBlobParams,
-    Method::{
-        FinalizeBlob, GetBlobStatus, GetPendingBlobs, GetPendingBlobsCount, GetPendingBytesCount,
-    },
+    Method::{FinalizeBlob, GetAddedBlobs, GetBlobStatus, GetStats, SetPending},
 };
 use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::{blobs, ipc, system};
 use fendermint_vm_event::ParentFinalityMissingQuorum;
-use fendermint_vm_iroh_resolver::observe::{BlobsFinalityPendingBlobs, BlobsFinalityPendingBytes};
+use fendermint_vm_iroh_resolver::observe::{
+    BlobsFinalityAddedBlobs, BlobsFinalityAddedBytes, BlobsFinalityPendingBlobs,
+    BlobsFinalityPendingBytes,
+};
 use fendermint_vm_iroh_resolver::pool::{
     ResolveKey as IrohResolveKey, ResolvePool as IrohResolvePool,
     ResolveSource as IrohResolveSource,
 };
-use fendermint_vm_message::ipc::{Blob, ParentFinality};
+use fendermint_vm_message::ipc::{FinalizedBlob, ParentFinality, PendingBlob};
 use fendermint_vm_message::{
     chain::ChainMessage,
     ipc::{BottomUpCheckpoint, CertifiedMessage, IpcMessage, SignedRelayedMessage},
@@ -62,8 +65,7 @@ pub type CheckpointPool = ResolvePool<CheckpointPoolItem>;
 pub type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProviderProxyWithLatency>>>;
 pub type BlobPool = IrohResolvePool<BlobPoolItem>;
 
-type PendingBlobItem = (Hash, HashSet<(Address, PublicKey)>);
-
+type AddedBlobItem = (Hash, HashSet<(Address, PublicKey)>);
 /// These are the extra state items that the chain interpreter needs,
 /// a sort of "environment" supporting IPC.
 #[derive(Clone)]
@@ -233,24 +235,20 @@ where
         // the next block.
         msgs.extend(ckpts);
 
-        // Collect and enqueue blobs that need to be resolved.
+        // Collect and enqueue blobs that are not added in the pool yet.
         state.state_tree_mut().begin_transaction();
-        let pending_blobs = get_pending_blobs(&mut state, chain_env.blob_concurrency)?;
+        let added_blobs = get_added_blobs(&mut state, chain_env.blob_concurrency)?;
         state
             .state_tree_mut()
             .end_transaction(true)
             .expect("we just started a transaction");
-        for (hash, sources) in pending_blobs {
+        for (hash, sources) in added_blobs {
             for (subscriber, source) in sources {
-                atomically(|| {
-                    chain_env.blob_pool.add(BlobPoolItem {
-                        subscriber,
-                        hash,
-                        source,
-                    })
-                })
-                .await;
-                tracing::debug!(hash = ?hash, subscriber = ?subscriber, "blob added to pool");
+                msgs.push(ChainMessage::Ipc(IpcMessage::BlobPending(PendingBlob {
+                    subscriber,
+                    hash,
+                    source,
+                })));
             }
         }
 
@@ -278,7 +276,7 @@ where
             // We start a blockstore transaction that can be reverted
             state.state_tree_mut().begin_transaction();
             for item in local_finalized_blobs.iter() {
-                if !is_blob_pending(&mut state, item.hash, item.subscriber)? {
+                if is_blob_finalized(&mut state, item.hash, item.subscriber)? {
                     tracing::debug!(hash = ?item.hash, "blob already finalized on chain; removing from pool");
                     atomically(|| chain_env.blob_pool.remove(item)).await;
                     continue;
@@ -292,12 +290,14 @@ where
                 .await;
                 if is_globally_finalized {
                     tracing::debug!(hash = ?item.hash, "blob has quorum; adding tx to chain");
-                    blobs.push(ChainMessage::Ipc(IpcMessage::BlobFinalized(Blob {
-                        subscriber: item.subscriber,
-                        hash: item.hash,
-                        source: item.source,
-                        succeeded,
-                    })));
+                    blobs.push(ChainMessage::Ipc(IpcMessage::BlobFinalized(
+                        FinalizedBlob {
+                            subscriber: item.subscriber,
+                            hash: item.hash,
+                            source: item.source,
+                            succeeded,
+                        },
+                    )));
                 }
             }
             state
@@ -365,7 +365,7 @@ where
                     // not yet finalized.
                     // Start a blockstore transaction that can be reverted.
                     state.state_tree_mut().begin_transaction();
-                    if !is_blob_pending(&mut state, blob.hash, blob.subscriber)? {
+                    if is_blob_finalized(&mut state, blob.hash, blob.subscriber)? {
                         tracing::debug!(hash = ?blob.hash, "blob is already finalized on chain; rejecting proposal");
                         return Ok(false);
                     }
@@ -426,6 +426,14 @@ where
                             height = ?current_height,
                             "invalid height for credit debit; rejecting proposal"
                         );
+                        return Ok(false);
+                    }
+                }
+                ChainMessage::Ipc(IpcMessage::BlobPending(blob)) => {
+                    // Check that blobs that are being enqueued are still in "added" state in the actor
+                    // Once we enqueue a blob, the actor will transition it to "pending" state.
+                    if !is_blob_added(&mut state, blob.hash, blob.subscriber)? {
+                        tracing::debug!(hash = ?blob.hash, "blob is not added onchain; rejecting proposal");
                         return Ok(false);
                     }
                 }
@@ -681,9 +689,11 @@ where
 
                     // once the blob is finalized on the parent we can clean up the votes
                     atomically(|| {
-                        env.parent_finality_votes.clear_blob(blob.hash.as_bytes().to_vec())?;
+                        env.parent_finality_votes
+                            .clear_blob(blob.hash.as_bytes().to_vec())?;
                         Ok(())
-                    }).await;
+                    })
+                    .await;
 
                     let ret = FvmApplyRet {
                         apply_ret,
@@ -746,6 +756,55 @@ where
 
                     Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
                 }
+                IpcMessage::BlobPending(blob) => {
+                    // set the blob to "pending" state in the actor
+                    let from = system::SYSTEM_ACTOR_ADDR;
+                    let to = blobs::BLOBS_ACTOR_ADDR;
+                    let method_num = SetPending as u64;
+                    let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
+                    let params = SetPendingParams {
+                        hash: fendermint_actor_blobs_shared::state::Hash(*blob.hash.as_bytes()),
+                        subscriber: blob.subscriber,
+                        source: fendermint_actor_blobs_shared::state::PublicKey(
+                            *blob.source.as_bytes(),
+                        ),
+                    };
+                    let params = RawBytes::serialize(params)?;
+                    let msg = Message {
+                        version: Default::default(),
+                        from,
+                        to,
+                        sequence: 0,
+                        value: Default::default(),
+                        method_num,
+                        params,
+                        gas_limit,
+                        gas_fee_cap: Default::default(),
+                        gas_premium: Default::default(),
+                    };
+                    let (apply_ret, emitters) = state.execute_implicit(msg)?;
+                    let ret = FvmApplyRet {
+                        apply_ret,
+                        from,
+                        to,
+                        method_num,
+                        gas_limit,
+                        emitters,
+                    };
+                    // enqueue "added" blobs to the pool for resolution
+                    {
+                        atomically(|| {
+                            env.blob_pool.add(BlobPoolItem {
+                                subscriber: blob.subscriber,
+                                hash: blob.hash,
+                                source: blob.source,
+                            })
+                        })
+                        .await;
+                        tracing::info!(hash = ?blob.hash, subscriber = ?blob.subscriber, source = ?blob.source, "blob added to pool");
+                    }
+                    Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
+                }
             },
         }
     }
@@ -777,12 +836,11 @@ where
         }
 
         // Get pending blobs count and bytes count to emit metrics
-        ipc_observability::emit(BlobsFinalityPendingBlobs(get_pending_blobs_count(
-            &mut state,
-        )?));
-        ipc_observability::emit(BlobsFinalityPendingBytes(get_pending_bytes_count(
-            &mut state,
-        )?));
+        let stats = get_blobs_stats(&mut state)?;
+        ipc_observability::emit(BlobsFinalityPendingBlobs(stats.num_resolving));
+        ipc_observability::emit(BlobsFinalityPendingBytes(stats.bytes_resolving));
+        ipc_observability::emit(BlobsFinalityAddedBlobs(stats.num_added));
+        ipc_observability::emit(BlobsFinalityAddedBytes(stats.bytes_added));
 
         Ok(((env, state), out))
     }
@@ -830,7 +888,8 @@ where
                     IpcMessage::TopDownExec(_)
                     | IpcMessage::BottomUpExec(_)
                     | IpcMessage::BlobFinalized(_)
-                    | IpcMessage::DebitCreditAccounts => {
+                    | IpcMessage::DebitCreditAccounts
+                    | IpcMessage::BlobPending(_) => {
                         // Users cannot send these messages, only validators can propose them in blocks.
                         Ok((state, Err(IllegalMessage)))
                     }
@@ -889,16 +948,15 @@ fn relayed_bottom_up_ckpt_to_fvm(
     Ok(msg)
 }
 
-/// Get pending blobs from on chain state.
-/// This approach uses an implicit FVM transaction to query a read-only blockstore.
-fn get_pending_blobs<DB>(
+/// Get added blobs from on chain state.
+fn get_added_blobs<DB>(
     state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
     size: u32,
-) -> anyhow::Result<Vec<PendingBlobItem>>
+) -> anyhow::Result<Vec<AddedBlobItem>>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
-    let params = GetPendingBlobsParams(size);
+    let params = GetAddedBlobsParams(size);
     let params = RawBytes::serialize(params)?;
     let msg = FvmMessage {
         version: 0,
@@ -906,7 +964,7 @@ where
         to: blobs::BLOBS_ACTOR_ADDR,
         sequence: 0,
         value: Default::default(),
-        method_num: GetPendingBlobs as u64,
+        method_num: GetAddedBlobs as u64,
         params,
         gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
         gas_fee_cap: Default::default(),
@@ -915,17 +973,17 @@ where
     let (apply_ret, _) = state.execute_implicit(msg)?;
 
     let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
-    fvm_ipld_encoding::from_slice::<Vec<PendingBlobItem>>(&data)
-        .map_err(|e| anyhow!("error parsing pending blobs: {e}"))
+    fvm_ipld_encoding::from_slice::<Vec<AddedBlobItem>>(&data)
+        .map_err(|e| anyhow!("error parsing added blobs: {e}"))
 }
 
-/// Check if a blob is pending (if it is not resolved or failed), by reading its on-chain state.
+/// Helper function to check blob status by reading its on-chain state.
 /// This approach uses an implicit FVM transaction to query a read-only blockstore.
-fn is_blob_pending<DB>(
+fn check_blob_status<DB>(
     state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
     hash: Hash,
     subscriber: Address,
-) -> anyhow::Result<bool>
+) -> anyhow::Result<Option<BlobStatus>>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
@@ -947,20 +1005,49 @@ where
     let (apply_ret, _) = state.execute_implicit(msg)?;
 
     let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
-    let status = fvm_ipld_encoding::from_slice::<Option<BlobStatus>>(&data)
-        .map_err(|e| anyhow!("error parsing as Option<BlobStatus>: {e}"))?;
-    let pending = if let Some(status) = status {
-        match status {
-            BlobStatus::Pending => true,
-            BlobStatus::Resolved | BlobStatus::Failed => false,
-        }
+    fvm_ipld_encoding::from_slice::<Option<BlobStatus>>(&data)
+        .map_err(|e| anyhow!("error parsing as Option<BlobStatus>: {e}"))
+}
+
+/// Check if a blob is in added state, by reading its on-chain state.
+/// This approach uses an implicit FVM transaction to query a read-only blockstore.
+fn is_blob_added<DB>(
+    state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
+    hash: Hash,
+    subscriber: Address,
+) -> anyhow::Result<bool>
+where
+    DB: Blockstore + Clone + 'static + Send + Sync,
+{
+    let status = check_blob_status(state, hash, subscriber)?;
+    let added = if let Some(status) = status {
+        matches!(status, BlobStatus::Added)
     } else {
         false
     };
-    Ok(pending)
+    Ok(added)
 }
 
-fn get_pending_blobs_count<DB>(state: &mut FvmExecState<DB>) -> anyhow::Result<u64>
+/// Check if a blob is finalized (if it is resolved or failed), by reading its on-chain state.
+/// This approach uses an implicit FVM transaction to query a read-only blockstore.
+fn is_blob_finalized<DB>(
+    state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
+    hash: Hash,
+    subscriber: Address,
+) -> anyhow::Result<bool>
+where
+    DB: Blockstore + Clone + 'static + Send + Sync,
+{
+    let status = check_blob_status(state, hash, subscriber)?;
+    let finalized = if let Some(status) = status {
+        matches!(status, BlobStatus::Resolved | BlobStatus::Failed)
+    } else {
+        false
+    };
+    Ok(finalized)
+}
+
+fn get_blobs_stats<DB>(state: &mut FvmExecState<DB>) -> anyhow::Result<GetStatsReturn>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
@@ -970,7 +1057,7 @@ where
         to: blobs::BLOBS_ACTOR_ADDR,
         sequence: 0,
         value: Default::default(),
-        method_num: GetPendingBlobsCount as u64,
+        method_num: GetStats as u64,
         params: RawBytes::default(),
         gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
         gas_fee_cap: Default::default(),
@@ -979,31 +1066,8 @@ where
     let (apply_ret, _) = state.execute_implicit(msg)?;
 
     let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
-    fvm_ipld_encoding::from_slice::<u64>(&data)
-        .map_err(|e| anyhow!("error parsing pending blobs count: {e}"))
-}
-
-fn get_pending_bytes_count<DB>(state: &mut FvmExecState<DB>) -> anyhow::Result<u64>
-where
-    DB: Blockstore + Clone + 'static + Send + Sync,
-{
-    let msg = FvmMessage {
-        version: 0,
-        from: system::SYSTEM_ACTOR_ADDR,
-        to: blobs::BLOBS_ACTOR_ADDR,
-        sequence: 0,
-        value: Default::default(),
-        method_num: GetPendingBytesCount as u64,
-        params: RawBytes::default(),
-        gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
-        gas_fee_cap: Default::default(),
-        gas_premium: Default::default(),
-    };
-    let (apply_ret, _) = state.execute_implicit(msg)?;
-
-    let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
-    fvm_ipld_encoding::from_slice::<u64>(&data)
-        .map_err(|e| anyhow!("error parsing pending bytes count: {e}"))
+    fvm_ipld_encoding::from_slice::<GetStatsReturn>(&data)
+        .map_err(|e| anyhow!("error parsing stats: {e}"))
 }
 
 /// Selects messages to be executed. Currently, this is a static function whose main purpose is to
