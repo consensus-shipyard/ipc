@@ -498,7 +498,7 @@ where
                 self.start_iroh_query(hash, node_addr, response_channel)
             }
             Request::ResolveIrohRead(hash, offset, len, response_channel) => {
-                self.start_iroh_read_request(hash, offset, len, response_channel)
+                self.start_iroh_read_query(hash, offset, len, response_channel)
             }
             Request::RateLimitUsed(peer_id, bytes) => {
                 self.content_mut().rate_limit_used(peer_id, bytes)
@@ -569,7 +569,7 @@ where
     }
 
     /// Start a read request resolution using iorh.
-    fn start_iroh_read_request(
+    fn start_iroh_read_query(
         &mut self,
         hash: Hash,
         offset: u32,

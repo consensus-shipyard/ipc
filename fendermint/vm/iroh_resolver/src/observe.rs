@@ -34,6 +34,13 @@ register_metrics! {
 
     BLOBS_FINALITY_ADDED_BYTES: IntGauge
         = register_int_gauge!("blobs_finality_added_bytes", "Blobs finality: current count of added bytes");
+
+    READ_REQUESTS_VOTING_CLOSE: IntCounterVec
+        = register_int_counter_vec!(
+            "read_requests_voting_close",
+            "Read requests finality: number of votes for closing read request",
+            &["read_request_id"]
+        );
 }
 
 impl_traceables!(
@@ -44,7 +51,8 @@ impl_traceables!(
     BlobsFinalityPendingBlobs,
     BlobsFinalityPendingBytes,
     BlobsFinalityAddedBlobs,
-    BlobsFinalityAddedBytes
+    BlobsFinalityAddedBytes,
+    ReadRequestsCloseVoting
 );
 
 #[derive(Debug)]
@@ -109,6 +117,19 @@ impl Recordable for BlobsFinalityAddedBytes {
     }
 }
 
+#[derive(Debug)]
+pub struct ReadRequestsCloseVoting {
+    pub read_request_id: Option<[u8; 32]>,
+}
+
+impl Recordable for ReadRequestsCloseVoting {
+    fn record_metrics(&self) {
+        READ_REQUESTS_VOTING_CLOSE
+            .with_label_values(&[hex::encode(self.read_request_id.unwrap_or([0u8; 32])).as_str()])
+            .inc();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -127,6 +148,11 @@ mod tests {
 
         emit(BlobsFinalityPendingBlobs(1));
         emit(BlobsFinalityPendingBytes(1));
+        emit(BlobsFinalityAddedBlobs(1));
+        emit(BlobsFinalityAddedBytes(1));
+        emit(ReadRequestsCloseVoting {
+            read_request_id: Some([0u8; 32]),
+        });
     }
 
     #[test]

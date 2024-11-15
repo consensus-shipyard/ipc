@@ -4,7 +4,9 @@
 
 use std::time::Duration;
 
-use crate::observe::{BlobsFinalityVotingFailure, BlobsFinalityVotingSuccess};
+use crate::observe::{
+    BlobsFinalityVotingFailure, BlobsFinalityVotingSuccess, ReadRequestsCloseVoting,
+};
 use async_stm::{atomically, atomically_or_err, queues::TQueueLike};
 use fendermint_vm_topdown::voting::VoteTally;
 use ipc_api::subnet_id::SubnetID;
@@ -114,7 +116,7 @@ fn start_resolve<V>(
                     Ok(Ok(())) => {
                         tracing::debug!(hash = ?task.hash(), "iroh blob resolved");
                         atomically(|| task.set_resolved()).await;
-                        let success = add_own_vote(
+                        if add_own_vote(
                             task.hash(),
                             client,
                             vote_tally,
@@ -123,8 +125,8 @@ fn start_resolve<V>(
                             true,
                             to_vote,
                         )
-                        .await;
-                        if success {
+                        .await
+                        {
                             emit(BlobsFinalityVotingSuccess {
                                 blob_hash: Some(task.hash().into()),
                             });
@@ -136,9 +138,10 @@ fn start_resolve<V>(
                             error = e.to_string(),
                             "iroh blob resolution failed, attempting retry"
                         );
-                        let reenqueue_success = reenqueue(task.clone(), queue, retry_delay).await;
-                        if !reenqueue_success {
-                            let success = add_own_vote(
+                        // If we fail to re-enqueue the task, cast a "failure" vote.
+                        // And emit a failure event.
+                        if !reenqueue(task.clone(), queue, retry_delay).await {
+                            if add_own_vote(
                                 task.hash(),
                                 client,
                                 vote_tally,
@@ -147,9 +150,8 @@ fn start_resolve<V>(
                                 false,
                                 to_vote,
                             )
-                            .await;
-                            // If we cast a "failure" vote, emit a failure event.
-                            if success {
+                            .await
+                            {
                                 emit(BlobsFinalityVotingFailure {
                                     blob_hash: Some(task.hash().into()),
                                 });
@@ -163,7 +165,7 @@ fn start_resolve<V>(
                 offset,
                 len,
             } => {
-                match client.resolve_read_request(blob_hash, offset, len).await {
+                match client.close_read_request(blob_hash, offset, len).await {
                     Err(e) => {
                         tracing::error!(
                             error = e.to_string(),
@@ -191,16 +193,28 @@ fn start_resolve<V>(
                         let mut task_id = task.hash().as_bytes().to_vec();
                         task_id.extend(response.to_vec());
                         let vote_hash = Hash::new(task_id);
-                        add_own_vote(vote_hash, client, vote_tally, key, subnet_id, true, to_vote)
-                            .await;
+                        if add_own_vote(
+                            vote_hash, client, vote_tally, key, subnet_id, true, to_vote,
+                        )
+                        .await
+                        {
+                            emit(ReadRequestsCloseVoting {
+                                read_request_id: Some(task.hash().into()),
+                            });
+                        }
                     }
                     Ok(Err(e)) => {
-                        // no retry for now
                         tracing::error!(
                             hash = ?task.hash(),
                             error = e.to_string(),
                             "iroh read request failed"
                         );
+                        if !reenqueue(task.clone(), queue, retry_delay).await {
+                            tracing::error!(
+                                hash = ?task.hash(),
+                                "failed to re-enqueue read request"
+                            );
+                        }
                     }
                 };
             }

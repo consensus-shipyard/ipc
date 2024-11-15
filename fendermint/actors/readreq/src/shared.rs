@@ -3,9 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 pub use crate::state::State;
-use fendermint_actor_machine::METHOD_CONSTRUCTOR;
 use fvm_ipld_encoding::tuple::*;
-use fvm_shared::{address::Address, ActorID, MethodNum};
+use fvm_shared::{address::Address, ActorID, MethodNum, METHOD_CONSTRUCTOR};
 use num_derive::FromPrimitive;
 use serde::{Deserialize, Serialize};
 use std::fmt;

@@ -224,7 +224,7 @@ where
         Ok(done)
     }
 
-    /// Remove an item from the resolution targets and its result.
+    /// Remove an item from the resolution targets.
     pub fn remove_task(&self, item: &T) -> Stm<()> {
         let key = ResolveKey::from(item);
         self.items.update_mut(|items| {

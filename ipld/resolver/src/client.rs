@@ -142,7 +142,7 @@ where
 pub trait ResolverIrohReadRequest {
     /// Send a hash for getting the data from iroh, await its completion,
     /// then return the result, to be inspected by the caller.
-    async fn resolve_read_request(
+    async fn close_read_request(
         &self,
         hash: Hash,
         offset: u32,
@@ -155,7 +155,7 @@ impl<V> ResolverIrohReadRequest for Client<V>
 where
     V: Sync + Send + 'static,
 {
-    async fn resolve_read_request(
+    async fn close_read_request(
         &self,
         hash: Hash,
         offset: u32,

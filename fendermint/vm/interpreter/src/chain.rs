@@ -395,8 +395,7 @@ where
             for item in locally_resolved_read_requests.iter() {
                 // check if the read request is closed i.e. not open or pending
                 // if a request is not found in actor state but exists in the pool, it is considered closed
-                let status = get_read_request_status(&mut state, item.id)?;
-                if status.is_none() {
+                if get_read_request_status(&mut state, item.id)?.is_none() {
                     tracing::debug!(request_id = ?item.id, "read request already fulfilled on chain; removing from pool");
                     atomically(|| chain_env.read_request_pool.remove_task(item)).await;
                     continue;
@@ -1048,19 +1047,6 @@ where
                     Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
                 }
                 IpcMessage::ReadRequestPending(read_request) => {
-                    // Add the read request to the pool
-                    atomically(|| {
-                        env.read_request_pool.add(ReadRequestPoolItem {
-                            id: read_request.id,
-                            blob_hash: read_request.blob_hash,
-                            offset: read_request.offset,
-                            len: read_request.len,
-                            callback: read_request.callback,
-                        })
-                    })
-                    .await;
-                    tracing::info!(request_id = ?read_request.id, "read request added to pool");
-
                     // Set the read request to "pending" state
                     let from = system::SYSTEM_ACTOR_ADDR;
                     let to = readreq::READREQ_ACTOR_ADDR;
@@ -1091,6 +1077,19 @@ where
                         gas_limit,
                         emitters,
                     };
+
+                    // Add the read request to the pool
+                    atomically(|| {
+                        env.read_request_pool.add(ReadRequestPoolItem {
+                            id: read_request.id,
+                            blob_hash: read_request.blob_hash,
+                            offset: read_request.offset,
+                            len: read_request.len,
+                            callback: read_request.callback,
+                        })
+                    })
+                    .await;
+                    tracing::info!(request_id = ?read_request.id, "read request added to pool");
                     Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
                 }
             },
