@@ -71,8 +71,11 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
 
     // Prometheus metrics
     let metrics_registry = if settings.metrics.enabled {
-        let registry = prometheus::Registry::new_custom(Some("ipc".to_string()), None)
-            .context("failed to create Prometheus registry")?;
+        let registry = prometheus::Registry::new_custom(
+            Some("ipc".to_string()),
+            Some([("subnet_id".to_string(), settings.ipc.subnet_id.to_string())].into()),
+        )
+        .context("failed to create Prometheus registry")?;
 
         register_default_metrics(&registry).context("failed to register default metrics")?;
         register_topdown_metrics(&registry).context("failed to register topdown metrics")?;
