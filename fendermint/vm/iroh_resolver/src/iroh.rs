@@ -204,7 +204,6 @@ fn start_resolve<V>(
                         }
                     }
                     Ok(Err(e)) => {
-                        // no retry for now
                         tracing::error!(
                             hash = ?task.hash(),
                             error = e.to_string(),

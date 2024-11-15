@@ -19,7 +19,6 @@ fil_actors_runtime = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }
 fvm_shared = { workspace = true }
-sha2 = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_tuple = { workspace = true }
 
