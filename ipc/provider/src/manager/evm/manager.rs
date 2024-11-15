@@ -1414,7 +1414,7 @@ impl ValidatorRewarder for EthSubnetManager {
             .map(validator_reward_facet::BatchClaimProofs::try_from)
             .collect::<Result<Vec<_>>>()?;
         let call = contract.batch_claim(p);
-        let call = call_with_premium_estimation(signer, call).await?;
+        let call = call_with_premium_and_pending_block(signer, call).await?;
 
         call.send().await?;
 
