@@ -188,8 +188,8 @@ url = { version = "2.4.1", features = ["serde"] }
 warp = "0.3.7"
 zeroize = "1.6"
 
-entangler = { git = "ssh://git@github.com/hokunet/entanglement.git", rev = "ef3fdecf7cdd87d9e715556d627e4b5a2f79d6bd" }
-entangler_storage = { package = "storage", git = "ssh://git@github.com/hokunet/entanglement.git", rev = "ef3fdecf7cdd87d9e715556d627e4b5a2f79d6bd" }
+entangler = { git = "ssh://git@github.com/hokunet/entanglement.git", rev = "8113eed819e4a2eac4988b842a8806174ed486b0" }
+entangler_storage = { package = "storage", git = "ssh://git@github.com/hokunet/entanglement.git", rev = "8113eed819e4a2eac4988b842a8806174ed486b0" }
 
 
 # Workspace deps

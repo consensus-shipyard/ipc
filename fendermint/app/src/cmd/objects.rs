@@ -9,7 +9,7 @@ use anyhow::anyhow;
 use anyhow::Context;
 use base64::{engine::general_purpose, Engine};
 use bytes::Buf;
-use entangler::{ChunkRange, Entangler};
+use entangler::{ChunkRange, Config, Entangler};
 use entangler_storage::iroh::IrohStorage as EntanglerIrohStorage;
 use fendermint_actor_bucket::{GetParams, Object};
 use fendermint_app_settings::objects::ObjectsSettings;
@@ -18,7 +18,7 @@ use fendermint_rpc::message::GasParams;
 use fendermint_rpc::QueryClient;
 use fendermint_vm_message::query::FvmQueryHeight;
 use fendermint_vm_message::signed::SignedMessage;
-use futures_util::StreamExt;
+use futures_util::{StreamExt, TryStreamExt};
 use fvm_shared::chainid::ChainID;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use iroh::blobs::Hash;
@@ -428,9 +428,7 @@ fn new_entangler(
 ) -> Result<Entangler<EntanglerIrohStorage>, entangler::Error> {
     Entangler::new(
         EntanglerIrohStorage::from_client(iroh),
-        ENTANGLER_ALPHA,
-        ENTANGLER_S,
-        ENTANGLER_P,
+        Config::new(ENTANGLER_ALPHA, ENTANGLER_S, ENTANGLER_P),
     )
 }
 
@@ -526,14 +524,14 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
                     let (first_byte, last_byte) = get_range_params(range, size).unwrap();
                     let len = (last_byte - first_byte) + 1;
 
-                    let fist_chunk = first_byte / CHUNK_SIZE;
+                    let first_chunk = first_byte / CHUNK_SIZE;
                     let last_chunk = last_byte / CHUNK_SIZE;
 
-                    let bytes = ent
+                    let bytes_stream = ent
                         .download_range(
                             &hash.to_string(),
-                            ChunkRange::Between(fist_chunk, last_chunk),
-                            Some(&recovery_hash.to_string()),
+                            ChunkRange::Between(first_chunk, last_chunk),
+                            Some(recovery_hash.to_string()),
                         )
                         .await
                         .map_err(|e| {
@@ -541,8 +539,23 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
                                 message: format!("failed to download object: {} {}", hash, e),
                             })
                         })?;
-                    let offset = (first_byte - fist_chunk * CHUNK_SIZE) as usize;
-                    let body = Body::from(bytes.slice(offset..offset + len as usize));
+
+                    let offset = (first_byte % CHUNK_SIZE) as usize;
+                    let end_offset = (last_byte % CHUNK_SIZE + 1) as usize;
+
+                    let bytes_stream = bytes_stream.enumerate().map(move |(i, chunk)| {
+                        let chunk = chunk?;
+                        let result = if i == 0 {
+                            chunk.slice(offset..)
+                        } else if i == (last_chunk - first_chunk) as usize {
+                            chunk.slice(..end_offset)
+                        } else {
+                            chunk
+                        };
+                        Ok::<_, anyhow::Error>(result)
+                    });
+
+                    let body = Body::wrap_stream(bytes_stream);
                     ObjectRange {
                         start: first_byte,
                         end: last_byte,
@@ -552,7 +565,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
                     }
                 }
                 None => {
-                    let bytes = ent
+                    let bytes_stream = ent
                         .download(&hash.to_string(), Some(&recovery_hash.to_string()))
                         .await
                         .map_err(|e| {
@@ -560,7 +573,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
                                 message: format!("failed to download object: {} {}", hash, e),
                             })
                         })?;
-                    let body = Body::from(bytes);
+                    let body = Body::wrap_stream(bytes_stream.map_err(|e| anyhow::anyhow!(e)));
                     ObjectRange {
                         start: 0,
                         end: size - 1,
@@ -838,7 +851,7 @@ mod tests {
         let client_node_addr = client_iroh.net().node_addr().await.unwrap();
 
         let iroh_storage = EntanglerIrohStorage::from_client(client_iroh.client().clone());
-        let ent = Entangler::new(iroh_storage, 3, 5, 5).unwrap();
+        let ent = Entangler::new(iroh_storage, Config::new(3, 5, 5)).unwrap();
         let metadata_hash = ent.entangle_uploaded(hash.to_string()).await.unwrap();
 
         let iroh_metadata_hash = Hash::from_str(&metadata_hash.as_str()).unwrap();
