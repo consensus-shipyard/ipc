@@ -146,11 +146,9 @@ mod tests {
 
     #[test]
     fn test_emit() {
-        use fendermint_crypto::SecretKey;
         use fvm_ipld_encoding::RawBytes;
         use fvm_shared::address::Address;
         use fvm_shared::econ::TokenAmount;
-        use rand::thread_rng;
 
         let message = Message {
             version: 1,
@@ -181,16 +179,11 @@ mod tests {
             config_number: 3,
         });
 
-        let mut r = thread_rng();
-        let secret_key = SecretKey::random(&mut r);
-        let pk = secret_key.public_key().serialize();
-        let addr = Address::new_secp256k1(&pk).unwrap();
-
         emit(CheckpointSigned {
             role: CheckpointSignedRole::Own,
             height: 1,
             hash: HexEncodableBlockHash(hash.clone()),
-            validator: addr,
+            validator: Address::new_id(1),
         });
     }
 }
