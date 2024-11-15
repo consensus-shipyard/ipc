@@ -50,8 +50,8 @@ pub fn empty_state_tree<DB: Blockstore>(store: DB) -> anyhow::Result<StateTree<D
 /// Then we have to create the built-in actors' state that the FVM relies on.
 /// Then we can instantiate an FVM execution engine, which we can use to construct FEVM based actors.
 enum Stage<DB: Blockstore + Clone + 'static> {
-    Tree(StateTree<DB>),
-    Exec(FvmExecState<DB>),
+    Tree(Box<StateTree<DB>>),
+    Exec(Box<FvmExecState<DB>>),
 }
 
 /// A state we create for the execution of genesis initialisation.
@@ -121,7 +121,7 @@ where
             custom_actor_manifest,
             store,
             multi_engine,
-            stage: Stage::Tree(state_tree),
+            stage: Stage::Tree(Box::new(state_tree)),
         };
 
         Ok(state)
@@ -139,11 +139,11 @@ where
         chain_id: u64,
         power_scale: PowerScale,
     ) -> anyhow::Result<()> {
-        self.stage = match self.stage {
+        self.stage = match &mut self.stage {
             Stage::Exec(_) => bail!("execution engine already initialized"),
             Stage::Tree(ref mut state_tree) => {
                 // We have to flush the data at this point.
-                let state_root = state_tree.flush()?;
+                let state_root = (*state_tree).flush()?;
 
                 let params = FvmStateParams {
                     state_root,
@@ -160,7 +160,7 @@ where
                     FvmExecState::new(self.store.clone(), &self.multi_engine, 1, params)
                         .context("failed to create exec state")?;
 
-                Stage::Exec(exec_state)
+                Stage::Exec(Box::new(exec_state))
             }
         };
         Ok(())
@@ -170,7 +170,7 @@ where
     pub fn finalize(self) -> anyhow::Result<(Cid, DB)> {
         match self.stage {
             Stage::Tree(_) => Err(anyhow!("invalid finalize state")),
-            Stage::Exec(exec_state) => match exec_state.commit()? {
+            Stage::Exec(exec_state) => match (*exec_state).commit()? {
                 (_, _, true) => bail!("FVM parameters are not expected to be updated in genesis"),
                 (cid, _, _) => Ok((cid, self.store)),
             },
@@ -471,7 +471,7 @@ where
 
         let (apply_ret, _) = match self.stage {
             Stage::Tree(_) => bail!("execution engine not initialized"),
-            Stage::Exec(ref mut exec_state) => exec_state
+            Stage::Exec(ref mut exec_state) => (*exec_state)
                 .execute_implicit(msg)
                 .context("failed to execute message")?,
         };
@@ -520,14 +520,14 @@ where
     pub fn exec_state(&mut self) -> Option<&mut FvmExecState<DB>> {
         match self.stage {
             Stage::Tree(_) => None,
-            Stage::Exec(ref mut exec) => Some(exec),
+            Stage::Exec(ref mut exec) => Some(&mut *exec),
         }
     }
 
     pub fn into_exec_state(self) -> Result<FvmExecState<DB>, Self> {
         match self.stage {
             Stage::Tree(_) => Err(self),
-            Stage::Exec(exec) => Ok(exec),
+            Stage::Exec(exec) => Ok(*exec),
         }
     }
 
@@ -547,7 +547,7 @@ where
     {
         match self.stage {
             Stage::Tree(ref mut state_tree) => f(state_tree),
-            Stage::Exec(ref mut exec_state) => g(exec_state.state_tree_mut()),
+            Stage::Exec(ref mut exec_state) => g((*exec_state).state_tree_mut()),
         }
     }
 
@@ -555,7 +555,7 @@ where
     fn get_actor_state<T: de::DeserializeOwned>(&self, actor: ActorID) -> anyhow::Result<T> {
         let actor_state_cid = match &self.stage {
             Stage::Tree(s) => s.get_actor(actor)?,
-            Stage::Exec(s) => s.state_tree().get_actor(actor)?,
+            Stage::Exec(ref s) => (*s).state_tree().get_actor(actor)?,
         }
         .ok_or_else(|| anyhow!("actor state {actor} not found, is it deployed?"))?
         .state;
