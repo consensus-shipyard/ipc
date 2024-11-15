@@ -46,7 +46,7 @@ import {GatewayFacetsHelper} from "./helpers/GatewayFacetsHelper.sol";
 import {SubnetActorFacetsHelper} from "./helpers/SubnetActorFacetsHelper.sol";
 import {DiamondFacetsHelper} from "./helpers/DiamondFacetsHelper.sol";
 
-import {ActivitySummary} from "../contracts/activities/Activity.sol";
+import {FullActivitySummary} from "../contracts/activities/Activity.sol";
 import {ValidatorRewarderMap} from "../contracts/examples/ValidatorRewarderMap.sol";
 import {ValidatorRewardFacet} from "../contracts/activities/ValidatorRewardFacet.sol";
 
@@ -956,7 +956,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     function confirmChange(
         address[] memory validators,
         uint256[] memory privKeys,
-        ActivitySummary memory activities
+        FullActivitySummary memory activities
     ) internal {
         uint256 n = validators.length;
 

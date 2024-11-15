@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import {SubnetID, IPCAddress} from "./Subnet.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {ActivitySummary} from "../activities/Activity.sol";
+import {FullActivitySummary} from "../activities/Activity.sol";
 
 uint64 constant MAX_MSGS_PER_BATCH = 10;
 uint256 constant BATCH_PERIOD = 100;
@@ -31,7 +31,7 @@ struct BottomUpCheckpoint {
     /// @dev Batch of messages to execute.
     IpcEnvelope[] msgs;
     /// @dev The activity summary from child subnet to parent subnet
-    ActivitySummary activities;
+    FullActivitySummary activities;
 }
 
 struct RelayedSummary {

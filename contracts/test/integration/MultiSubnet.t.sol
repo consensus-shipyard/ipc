@@ -45,7 +45,7 @@ import {SubnetActorFacetsHelper} from "../helpers/SubnetActorFacetsHelper.sol";
 
 import "forge-std/console.sol";
 
-import {ActivitySummary} from "../../contracts/activities/Activity.sol";
+import {FullActivitySummary} from "../../contracts/activities/Activity.sol";
 
 contract MultiSubnetTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;

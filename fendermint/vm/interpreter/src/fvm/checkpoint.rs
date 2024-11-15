@@ -127,7 +127,7 @@ where
             .map(|v| {
                 Ok(checkpoint::ValidatorActivityReport {
                     validator: payload_to_evm_address(v.validator.payload())?,
-                    blocks_committed: v.block_committed,
+                    blocks_committed: v.blocks_committed_count,
                     metadata: ethers::types::Bytes::from(v.metadata),
                 })
             })
