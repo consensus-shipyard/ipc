@@ -53,12 +53,15 @@ library Consensus {
         address validator;
         /// @dev The number of blocks committed by this validator during the summarised period.
         uint64 blocksCommitted;
+        /// @dev Other metadata
+        bytes metadata;
     }
 }
 
 /// The proof required for validators to claim rewards
 struct ValidatorClaimProof {
-    ValidatorSummary summary;
+    uint64 checkpointHeight;
+    Consensus.ValidatorDetail detail;
     bytes32[] proof;
 }
 

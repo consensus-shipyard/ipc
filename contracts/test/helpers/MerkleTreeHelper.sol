@@ -51,9 +51,7 @@ library MerkleTreeHelper {
         bytes32[][] memory proofs = new bytes32[][](len);
         bytes32[] memory data = new bytes32[](len);
         for (uint256 i = 0; i < len; i++) {
-            data[i] = keccak256(
-                bytes.concat(keccak256(abi.encode(addrs[i], blocksMined[i], metadatas[i])))
-            );
+            data[i] = keccak256(bytes.concat(keccak256(abi.encode(addrs[i], blocksMined[i], metadatas[i]))));
         }
 
         root = merkleTree.getRoot(data);

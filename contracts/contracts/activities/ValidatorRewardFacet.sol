@@ -7,7 +7,7 @@ import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap
 import {Pausable} from "../lib/LibPausable.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
 import {NotValidator, SubnetNoTargetCommitment, CommitmentAlreadyInitialized, ValidatorAlreadyClaimed, NotGateway, NotOwner} from "../errors/IPCErrors.sol";
-import {ValidatorSummary, BatchClaimProofs} from "./Activity.sol";
+import {Consensus, BatchClaimProofs} from "./Activity.sol";
 import {IValidatorRewarder, IValidatorRewardSetup} from "./IValidatorRewarder.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {SubnetID} from "../structs/Subnet.sol";
@@ -31,11 +31,11 @@ contract ValidatorRewardFacet is ReentrancyGuard, Pausable {
     /// Validators claim their reward for doing work in the child subnet
     function claim(
         SubnetID calldata subnetId,
-        ValidatorSummary calldata summary,
+        uint64 checkpointHeight,
+        Consensus.ValidatorDetail calldata detail,
         bytes32[] calldata proof
     ) external nonReentrant whenNotPaused {
-        ValidatorRewardStorage storage s = LibValidatorReward.facetStorage();
-        _claim(s, subnetId, summary, proof);
+        _claim(subnetId, checkpointHeight, detail, proof);
     }
 
     // ======== Internal functions ===========
@@ -47,10 +47,14 @@ contract ValidatorRewardFacet is ReentrancyGuard, Pausable {
 
     function _batchClaimInSubnet(BatchClaimProofs calldata payload) internal {
         uint256 len = payload.proofs.length;
-        ValidatorRewardStorage storage s = LibValidatorReward.facetStorage();
 
         for (uint256 i = 0; i < len; ) {
-            _claim(s, payload.subnetId, payload.proofs[i].summary, payload.proofs[i].proof);
+            _claim(
+                payload.subnetId,
+                payload.proofs[i].checkpointHeight,
+                payload.proofs[i].detail,
+                payload.proofs[i].proof
+            );
             unchecked {
                 i++;
             }
@@ -58,15 +62,17 @@ contract ValidatorRewardFacet is ReentrancyGuard, Pausable {
     }
 
     function _claim(
-        ValidatorRewardStorage storage s, 
         SubnetID calldata subnetId,
-        ValidatorSummary calldata summary,
+        uint64 checkpointHeight,
+        Consensus.ValidatorDetail calldata detail,
         bytes32[] calldata proof
     ) internal {
+        ValidatorRewardStorage storage s = LibValidatorReward.facetStorage();
+
         // note: No need to check if the subnet is active. If the subnet is not active, the checkpointHeight
         // note: will never exist.
 
-        if (msg.sender != summary.validator) {
+        if (msg.sender != detail.validator) {
             revert NotValidator(msg.sender);
         }
 
@@ -74,7 +80,7 @@ contract ValidatorRewardFacet is ReentrancyGuard, Pausable {
             return handleRelay();
         }
 
-        LibValidatorReward.handleDistribution(s, subnetId, summary, proof);
+        LibValidatorReward.handleDistribution(subnetId, checkpointHeight, detail, proof);
     }
 }
 
@@ -178,18 +184,20 @@ library LibValidatorReward {
     }
 
     function handleDistribution(
-        ValidatorRewardStorage storage s,
         SubnetID calldata subnetId,
-        ValidatorSummary calldata summary,
+        uint64 checkpointHeight,
+        Consensus.ValidatorDetail calldata detail,
         bytes32[] calldata proof
     ) internal {
+        ValidatorRewardStorage storage s = LibValidatorReward.facetStorage();
+
         bytes32 subnetKey = subnetId.toHash();
 
-        bytes32 commitment = ensureValidCommitment(s, subnetKey, summary.checkpointHeight);
-        LibActivityMerkleVerifier.ensureValidProof(commitment, summary, proof);
+        bytes32 commitment = ensureValidCommitment(s, subnetKey, checkpointHeight);
+        LibActivityMerkleVerifier.ensureValidProof(commitment, detail, proof);
 
-        validatorTryClaim(s, subnetKey, summary.checkpointHeight, summary.validator);
-        IValidatorRewarder(s.validatorRewarder).disburseRewards(subnetId, summary);
+        validatorTryClaim(s, subnetKey, checkpointHeight, detail.validator);
+        IValidatorRewarder(s.validatorRewarder).disburseRewards(subnetId, detail);
     }
 
     function ensureValidCommitment(

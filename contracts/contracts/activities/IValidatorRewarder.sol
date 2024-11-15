@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {SubnetID} from "../structs/Subnet.sol";
-import {ValidatorSummary} from "./Activity.sol";
+import {Consensus} from "./Activity.sol";
 
 /// @title ValidatorRewarder interface.
 ///
@@ -14,7 +14,7 @@ interface IValidatorRewarder {
     /// @notice Called by the subnet manager contract to instruct the rewarder to process the subnet summary and
     /// disburse any relevant rewards.
     /// @dev This method should revert if the summary is invalid; this will cause the
-    function disburseRewards(SubnetID calldata id, ValidatorSummary calldata summary) external;
+    function disburseRewards(SubnetID calldata id, Consensus.ValidatorDetail calldata detail) external;
 }
 
 /// @title Validator reward setup interface

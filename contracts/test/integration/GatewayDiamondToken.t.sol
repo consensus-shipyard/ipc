@@ -33,7 +33,7 @@ import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.so
 
 import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 
-import {FullActivitySummary} from "../../contracts/activities/Activity.sol";
+import {FullActivitySummary, Consensus} from "../../contracts/activities/Activity.sol";
 
 contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
@@ -166,7 +166,10 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(0)})
+            activities: Consensus.Compressed({
+                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
+                commitment: bytes32(uint256(0))
+            })
         });
 
         vm.prank(address(saDiamond));
@@ -225,7 +228,10 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(0)})
+            activities: Consensus.Compressed({
+                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
+                commitment: bytes32(uint256(0))
+            })
         });
 
         // Verify that we received the call and that the recipient has the tokens.

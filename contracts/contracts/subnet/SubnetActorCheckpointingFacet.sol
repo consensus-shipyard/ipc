@@ -54,7 +54,7 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
             checkpoint.subnetID,
             uint64(checkpoint.blockHeight),
             checkpoint.activities.commitment,
-            checkpoint.activities.totalActiveValidators
+            checkpoint.activities.aggregated.totalActiveValidators
         );
 
         // confirming the changes in membership in the child
