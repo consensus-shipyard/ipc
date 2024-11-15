@@ -12,7 +12,6 @@ use prometheus::{
     Histogram, IntCounter, IntGauge, IntGaugeVec, Registry,
 };
 
-use fendermint_crypto::PublicKey;
 use fvm_shared::message::Message;
 
 register_metrics! {
@@ -111,15 +110,13 @@ pub struct CheckpointSigned {
     pub role: CheckpointSignedRole,
     pub height: u64,
     pub hash: HexEncodableBlockHash,
-    pub validator: PublicKey,
+    pub validator: Address,
 }
 
 impl Recordable for CheckpointSigned {
     fn record_metrics(&self) {
-        let pk = self.validator.serialize();
-        let addr = Address::new_secp256k1(&pk).unwrap();
         BOTTOMUP_CHECKPOINT_SIGNED_HEIGHT
-            .with_label_values(&[format!("{}", addr).as_str()])
+            .with_label_values(&[format!("{}", self.validator).as_str()])
             .set(self.height as i64);
     }
 }
@@ -186,12 +183,14 @@ mod tests {
 
         let mut r = thread_rng();
         let secret_key = SecretKey::random(&mut r);
+        let pk = secret_key.public_key().serialize();
+        let addr =  Address::new_secp256k1(&pk).unwrap();
 
         emit(CheckpointSigned {
             role: CheckpointSignedRole::Own,
             height: 1,
             hash: HexEncodableBlockHash(hash.clone()),
-            validator: secret_key.public_key(),
+            validator: addr,
         });
     }
 }
