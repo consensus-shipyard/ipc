@@ -954,7 +954,7 @@ mod tests {
         let client_node_addr = client_iroh.net().node_addr().await.unwrap();
 
         let iroh_storage = EntanglerIrohStorage::from_client(client_iroh.client().clone());
-        let ent = Entangler::new(iroh_storage, 3, 5, 5).unwrap();
+        let ent = Entangler::new(iroh_storage, Config::new(3, 5, 5)).unwrap();
         let metadata_hash = ent.entangle_uploaded(hash.to_string()).await.unwrap();
 
         let iroh_metadata_hash = Hash::from_str(&metadata_hash.as_str()).unwrap();
@@ -1047,7 +1047,7 @@ mod tests {
         let client_node_addr = client_iroh.net().node_addr().await.unwrap();
 
         let iroh_storage = EntanglerIrohStorage::from_client(client_iroh.client().clone());
-        let ent = Entangler::new(iroh_storage, 3, 5, 5).unwrap();
+        let ent = Entangler::new(iroh_storage, Config::new(3, 5, 5)).unwrap();
         let metadata_hash = ent.entangle_uploaded(hash.to_string()).await.unwrap();
 
         let iroh_metadata_hash = Hash::from_str(&metadata_hash.as_str()).unwrap();
