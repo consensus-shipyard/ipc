@@ -3,11 +3,7 @@
 
 //! Helper methods to convert between Ethereum and FVM data formats.
 
-use ethers_core::types::{
-    transaction::eip2718::TypedTransaction, Bytes, Eip1559TransactionRequest, NameOrAddress,
-    Signature, H160, U256,
-};
-use ethers_core::utils::rlp;
+use ethers_core::types::{Eip1559TransactionRequest, NameOrAddress, Signature, H160, U256};
 
 use fendermint_vm_actor_interface::{
     eam::{self, EthAddress},
@@ -71,13 +67,11 @@ pub fn to_fvm_message(tx: &Eip1559TransactionRequest) -> anyhow::Result<Message>
     Ok(msg)
 }
 
-/// Convert an RLP encoded signed EVM EIP-1559 transaction to a signed FVM message
-pub fn to_fvm_signed_message(tx: &Bytes) -> anyhow::Result<SignedMessage> {
-    let rlp = rlp::Rlp::new(&tx);
-    let (tx, sig): (TypedTransaction, Signature) = TypedTransaction::decode_signed(&rlp)?;
-    let tx = tx
-        .as_eip1559_ref()
-        .ok_or_else(|| anyhow::anyhow!("failed to process signed transaction as eip1559"))?;
+/// Convert a signed EVM EIP-1559 transaction to a signed FVM message
+pub fn to_fvm_signed_message(
+    tx: &Eip1559TransactionRequest,
+    sig: &Signature,
+) -> anyhow::Result<SignedMessage> {
     let msg = to_fvm_message(tx)?;
 
     let msg = SignedMessage {
@@ -161,7 +155,8 @@ mod tests {
             other => panic!("unexpected domain hash: {other:?}"),
         }
 
-        let msg = to_fvm_signed_message(&raw_tx).expect("to_fvm_signed_message");
+        let tx1 = tx0.as_eip1559_ref().expect("tx as eip1559");
+        let msg = to_fvm_signed_message(&tx1, &sig).expect("to_fvm_signed_message");
         assert_eq!(
             msg.message.from,
             Address::from(EthAddress(tx0.from().unwrap().0))

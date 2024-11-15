@@ -214,10 +214,17 @@ impl ObjectParser {
                             "failed to deserialize FVM signed message, trying EVM tx format: {}",
                             e
                         );
-                        let fvm_msg = from_eth::to_fvm_signed_message(&ethers::types::Bytes::from(
-                            b64_decoded,
-                        ))
-                        .map_err(|e| anyhow!("failed to deserialize signed message: {}", e))?;
+                        let tx = ethers::types::Bytes::from(b64_decoded);
+                        let rlp = ethers::core::utils::rlp::Rlp::new(&tx);
+                        let (tx, sig) =
+                            ethers::types::transaction::eip2718::TypedTransaction::decode_signed(
+                                &rlp,
+                            )?;
+                        let tx = tx.as_eip1559_ref().ok_or_else(|| {
+                            anyhow!("failed to process signed transaction as eip1559")
+                        })?;
+                        let fvm_msg = from_eth::to_fvm_signed_message(&tx, &sig)
+                            .map_err(|e| anyhow!("failed to deserialize signed message: {}", e))?;
                         Ok(fvm_msg)
                     }
                 }
