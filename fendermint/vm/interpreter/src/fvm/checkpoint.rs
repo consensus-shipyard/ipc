@@ -261,7 +261,7 @@ where
                 role: CheckpointSignedRole::Own,
                 height: height.value(),
                 hash: HexEncodableBlockHash(cp.block_hash.to_vec()),
-                validator: validator_ctx.public_key,
+                validator: validator_ctx.addr,
             });
 
             tracing::debug!(?height, "submitted checkpoint signature");

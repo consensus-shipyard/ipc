@@ -128,7 +128,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         .with_max_retries(settings.broadcast.max_retries)
         .with_retry_delay(settings.broadcast.retry_delay);
 
-        ValidatorContext::new(sk, broadcaster)
+        ValidatorContext::new(sk, addr, broadcaster)
     });
 
     let testing_settings = match settings.testing.as_ref() {
