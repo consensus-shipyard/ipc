@@ -184,7 +184,7 @@ mod tests {
         let mut r = thread_rng();
         let secret_key = SecretKey::random(&mut r);
         let pk = secret_key.public_key().serialize();
-        let addr =  Address::new_secp256k1(&pk).unwrap();
+        let addr = Address::new_secp256k1(&pk).unwrap();
 
         emit(CheckpointSigned {
             role: CheckpointSignedRole::Own,
