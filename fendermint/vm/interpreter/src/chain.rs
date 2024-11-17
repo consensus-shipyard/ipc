@@ -1029,6 +1029,18 @@ where
                         gas_limit,
                         emitters,
                     };
+                    // enqueue "added" blobs to the pool for resolution
+                    {
+                        atomically(|| {
+                            env.blob_pool.add(BlobPoolItem {
+                                subscriber: blob.subscriber,
+                                hash: blob.hash,
+                                source: blob.source,
+                            })
+                        })
+                        .await;
+                        tracing::info!(hash = ?blob.hash, subscriber = ?blob.subscriber, source = ?blob.source, "blob added to pool");
+                    }
                     Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
                 }
                 IpcMessage::ReadRequestClosed(read_request) => {
