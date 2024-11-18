@@ -4,8 +4,8 @@
 //! Type conversion for IPC Agent struct with solidity contract struct
 
 use crate::address::IPCAddress;
-use crate::checkpoint::{ActivitySummary, BatchClaimProofs, BottomUpCheckpoint};
-use crate::checkpoint::{BottomUpMsgBatch, ValidatorClaimProof};
+use crate::checkpoint::{ActivitySummary, BatchClaimPayload, BottomUpCheckpoint};
+use crate::checkpoint::{BottomUpMsgBatch, ValidatorClaimPayload};
 use crate::cross::{IpcEnvelope, IpcMsgKind};
 use crate::staking::StakingChange;
 use crate::staking::StakingChangeRequest;
@@ -277,17 +277,16 @@ impl TryFrom<u8> for AssetKind {
     }
 }
 
-impl TryFrom<ValidatorClaimProof> for validator_reward_facet::ValidatorClaimProof {
+impl TryFrom<ValidatorClaimPayload> for validator_reward_facet::ValidatorClaimPayload {
     type Error = anyhow::Error;
 
-    fn try_from(v: ValidatorClaimProof) -> Result<Self, Self::Error> {
+    fn try_from(v: ValidatorClaimPayload) -> Result<Self, Self::Error> {
         Ok(Self {
+            checkpoint_height: v.detail.checkpoint_height,
             proof: v.proof,
-            summary: validator_reward_facet::ValidatorSummary {
-                checkpoint_height: v.summary.checkpoint_height,
-                validator: payload_to_evm_address(v.summary.validator.payload())?,
-                blocks_committed: v.summary.blocks_committed,
-                metadata: ethers::types::Bytes::from(v.summary.metadata),
+            detail: validator_reward_facet::ValidatorDetail {
+                validator: payload_to_evm_address(v.detail.validator.payload())?,
+                blocks_committed: v.detail.blocks_committed,
             },
         })
     }
@@ -322,16 +321,16 @@ pub fn fil_to_eth_amount(amount: &TokenAmount) -> anyhow::Result<U256> {
     Ok(U256::from_dec_str(&str)?)
 }
 
-impl TryFrom<BatchClaimProofs> for validator_reward_facet::BatchClaimProofs {
+impl TryFrom<BatchClaimPayload> for validator_reward_facet::BatchClaimPayload {
     type Error = anyhow::Error;
 
-    fn try_from(v: BatchClaimProofs) -> Result<Self, Self::Error> {
+    fn try_from(v: BatchClaimPayload) -> Result<Self, Self::Error> {
         Ok(Self {
             subnet_id: validator_reward_facet::SubnetID::try_from(&v.subnet_id)?,
-            proofs: v
-                .proofs
+            claims: v
+                .claims
                 .into_iter()
-                .map(validator_reward_facet::ValidatorClaimProof::try_from)
+                .map(validator_reward_facet::ValidatorClaimPayload::try_from)
                 .collect::<Result<Vec<_>, _>>()?,
         })
     }

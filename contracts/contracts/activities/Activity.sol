@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 import {SubnetID} from "../structs/Subnet.sol";
 
 // Event to be emitted within the subnet when a new activity summary has been recorded.
-event ActivitySummaryRecorded(FullActivitySummary summary);
+event ActivitySummaryRecorded(uint64 checkpointHeight, FullActivitySummary summary);
 
 // Carries a set of reports summarising various aspects of the activity that took place in the subnet between the
 // previous checkpoint and the checkpoint this summary is committed into. If this is the first checkpoint, the summary
@@ -53,21 +53,18 @@ library Consensus {
         address validator;
         /// @dev The number of blocks committed by this validator during the summarised period.
         uint64 blocksCommitted;
-        /// @dev Other metadata
-        bytes metadata;
     }
 }
 
-/// The proof required for validators to claim rewards
-struct ValidatorClaimProof {
+/// The payload for validators to claim rewards
+struct ValidatorClaimPayload {
     uint64 checkpointHeight;
     Consensus.ValidatorDetail detail;
     bytes32[] proof;
 }
 
 /// The proofs to batch claim validator rewards in a specific subnet
-/// REVIEW(raulk): Delete this type. Make the method just take the subnet ID and the list of claim proofs.
-struct BatchClaimProofs {
+struct BatchClaimPayload {
     SubnetID subnetId;
-    ValidatorClaimProof[] proofs;
+    ValidatorClaimPayload[] claims;
 }

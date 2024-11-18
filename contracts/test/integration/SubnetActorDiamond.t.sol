@@ -43,7 +43,7 @@ import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 import {ERC20PresetFixedSupply} from "../helpers/ERC20PresetFixedSupply.sol";
 import {SubnetValidatorGater} from "../../contracts/examples/SubnetValidatorGater.sol";
 
-import {FullActivitySummary, Consensus, BatchClaimProofs, ValidatorClaimProof} from "../../contracts/activities/Activity.sol";
+import {FullActivitySummary, Consensus, BatchClaimPayload, ValidatorClaimPayload} from "../../contracts/activities/Activity.sol";
 import {ValidatorRewarderMap} from "../../contracts/examples/ValidatorRewarderMap.sol";
 import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
 
@@ -2415,7 +2415,6 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         powers[3] = 10000;
         saDiamond.manager().setFederatedPower(addrs, pubkeys, powers);
 
-        bytes[] memory metadata = new bytes[](addrs.length);
         uint64[] memory blocksMined = new uint64[](addrs.length);
 
         blocksMined[0] = 1;
@@ -2423,8 +2422,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         (bytes32 activityRoot, bytes32[][] memory proofs) = MerkleTreeHelper.createMerkleProofsForActivities(
             addrs,
-            blocksMined,
-            metadata
+            blocksMined
         );
 
         confirmChange(
@@ -2441,7 +2439,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         saDiamond.validatorReward().claim(
             subnetId,
             uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
-            Consensus.ValidatorDetail({validator: addrs[0], blocksCommitted: blocksMined[0], metadata: metadata[0]}),
+            Consensus.ValidatorDetail({validator: addrs[0], blocksCommitted: blocksMined[0]}),
             proofs[0]
         );
 
@@ -2450,7 +2448,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         saDiamond.validatorReward().claim(
             subnetId,
             uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
-            Consensus.ValidatorDetail({validator: addrs[1], blocksCommitted: blocksMined[1], metadata: metadata[1]}),
+            Consensus.ValidatorDetail({validator: addrs[1], blocksCommitted: blocksMined[1]}),
             proofs[1]
         );
 
@@ -2459,7 +2457,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         saDiamond.validatorReward().claim(
             subnetId,
             uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
-            Consensus.ValidatorDetail({validator: addrs[2], blocksCommitted: blocksMined[2], metadata: metadata[2]}),
+            Consensus.ValidatorDetail({validator: addrs[2], blocksCommitted: blocksMined[2]}),
             proofs[2]
         );
 
@@ -2468,7 +2466,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         saDiamond.validatorReward().claim(
             subnetId,
             uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
-            Consensus.ValidatorDetail({validator: addrs[3], blocksCommitted: blocksMined[3], metadata: metadata[3]}),
+            Consensus.ValidatorDetail({validator: addrs[3], blocksCommitted: blocksMined[3]}),
             proofs[3]
         );
 
@@ -2514,7 +2512,6 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             saDiamond.manager().setFederatedPower(addrs, pubkeys, powers);
         }
 
-        bytes[] memory metadata = new bytes[](addrs.length);
         uint64[] memory blocksMined = new uint64[](addrs.length);
 
         blocksMined[0] = 1;
@@ -2522,14 +2519,12 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         (bytes32 activityRoot1, bytes32[][] memory proofs1) = MerkleTreeHelper.createMerkleProofsForActivities(
             addrs,
-            blocksMined,
-            metadata
+            blocksMined
         );
 
         (bytes32 activityRoot2, bytes32[][] memory proofs2) = MerkleTreeHelper.createMerkleProofsForActivities(
             addrs,
-            blocksMined,
-            metadata
+            blocksMined
         );
 
         confirmChange(
@@ -2552,28 +2547,20 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.startPrank(addrs[0]);
         vm.deal(addrs[0], 1 ether);
 
-        BatchClaimProofs[] memory batchProofs = new BatchClaimProofs[](1);
-        ValidatorClaimProof[] memory claimProofs = new ValidatorClaimProof[](2);
-        claimProofs[0] = ValidatorClaimProof({
+        BatchClaimPayload[] memory batchProofs = new BatchClaimPayload[](1);
+        ValidatorClaimPayload[] memory claimProofs = new ValidatorClaimPayload[](2);
+        claimProofs[0] = ValidatorClaimPayload({
             checkpointHeight: uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
-            detail: Consensus.ValidatorDetail({
-                validator: addrs[0],
-                blocksCommitted: blocksMined[0],
-                metadata: metadata[0]
-            }),
+            detail: Consensus.ValidatorDetail({validator: addrs[0], blocksCommitted: blocksMined[0]}),
             proof: proofs1[0]
         });
-        claimProofs[1] = ValidatorClaimProof({
+        claimProofs[1] = ValidatorClaimPayload({
             checkpointHeight: uint64(gatewayDiamond.getter().bottomUpCheckPeriod()) * 2,
-            detail: Consensus.ValidatorDetail({
-                validator: addrs[0],
-                blocksCommitted: blocksMined[0],
-                metadata: metadata[0]
-            }),
+            detail: Consensus.ValidatorDetail({validator: addrs[0], blocksCommitted: blocksMined[0]}),
             proof: proofs2[0]
         });
 
-        batchProofs[0] = BatchClaimProofs({subnetId: subnetId, proofs: claimProofs});
+        batchProofs[0] = BatchClaimPayload({subnetId: subnetId, claims: claimProofs});
 
         saDiamond.validatorReward().batchClaim(batchProofs);
 
@@ -2616,7 +2603,6 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             saDiamond.manager().setFederatedPower(addrs, pubkeys, powers);
         }
 
-        bytes[] memory metadata = new bytes[](addrs.length);
         uint64[] memory blocksMined = new uint64[](addrs.length);
 
         blocksMined[0] = 1;
@@ -2624,13 +2610,11 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         (bytes32 activityRoot1, bytes32[][] memory proofs1) = MerkleTreeHelper.createMerkleProofsForActivities(
             addrs,
-            blocksMined,
-            metadata
+            blocksMined
         );
         (bytes32 activityRoot2, bytes32[][] memory proofs2) = MerkleTreeHelper.createMerkleProofsForActivities(
             addrs,
-            blocksMined,
-            metadata
+            blocksMined
         );
 
         confirmChange(
@@ -2653,28 +2637,20 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.startPrank(addrs[0]);
         vm.deal(addrs[0], 1 ether);
 
-        BatchClaimProofs[] memory batchProofs = new BatchClaimProofs[](1);
-        ValidatorClaimProof[] memory claimProofs = new ValidatorClaimProof[](2);
-        claimProofs[0] = ValidatorClaimProof({
+        BatchClaimPayload[] memory batchProofs = new BatchClaimPayload[](1);
+        ValidatorClaimPayload[] memory claimProofs = new ValidatorClaimPayload[](2);
+        claimProofs[0] = ValidatorClaimPayload({
             checkpointHeight: uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
-            detail: Consensus.ValidatorDetail({
-                validator: addrs[0],
-                blocksCommitted: blocksMined[0],
-                metadata: metadata[0]
-            }),
+            detail: Consensus.ValidatorDetail({validator: addrs[0], blocksCommitted: blocksMined[0]}),
             proof: proofs1[0]
         });
-        claimProofs[1] = ValidatorClaimProof({
+        claimProofs[1] = ValidatorClaimPayload({
             checkpointHeight: uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
-            detail: Consensus.ValidatorDetail({
-                validator: addrs[0],
-                blocksCommitted: blocksMined[0],
-                metadata: metadata[0]
-            }),
+            detail: Consensus.ValidatorDetail({validator: addrs[0], blocksCommitted: blocksMined[0]}),
             proof: proofs1[0]
         });
 
-        batchProofs[0] = BatchClaimProofs({subnetId: subnetId, proofs: claimProofs});
+        batchProofs[0] = BatchClaimPayload({subnetId: subnetId, claims: claimProofs});
 
         vm.expectRevert(ValidatorAlreadyClaimed.selector);
         saDiamond.validatorReward().batchClaim(batchProofs);

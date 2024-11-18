@@ -71,7 +71,7 @@ contract CheckpointingFacet is GatewayActorModifiers {
 
         LibGateway.storeBottomUpCheckpoint(checkpoint);
 
-        emit ActivitySummaryRecorded(fullSummary);
+        emit ActivitySummaryRecorded(uint64(checkpoint.blockHeight), fullSummary);
     }
 
     /// @notice creates a new bottom-up checkpoint

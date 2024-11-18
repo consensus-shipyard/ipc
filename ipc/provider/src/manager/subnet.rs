@@ -8,8 +8,8 @@ use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_api::checkpoint::{
-    BatchClaimProofs, BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent, Signature,
-    ValidatorClaimProof, ValidatorSummary,
+    BatchClaimPayload, BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent, Signature,
+    ValidatorClaimPayload, ValidatorDetail,
 };
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::{StakingChangeRequest, ValidatorInfo};
@@ -287,25 +287,25 @@ pub trait BottomUpCheckpointRelayer: Send + Sync {
 /// in the child subnet
 #[async_trait]
 pub trait ValidatorRewarder: Send + Sync {
-    /// Obtain the proofs needed for the validator to batch claim the rewards
-    async fn get_validator_claim_proofs(
+    /// Obtain the payload needed for the validator to batch claim the rewards
+    async fn get_validator_claim_payload(
         &self,
         validator_addr: &Address,
         from_checkpoint: ChainEpoch,
         to_checkpoint: ChainEpoch,
-    ) -> Result<Vec<ValidatorClaimProof>>;
+    ) -> Result<Vec<ValidatorClaimPayload>>;
     /// Get the reward for specific validator in the current subnet gateway
     async fn get_validator_activities(
         &self,
         validator: &Address,
         from_checkpoint: ChainEpoch,
         to_checkpoint: ChainEpoch,
-    ) -> Result<Vec<ValidatorSummary>>;
-    /// Claim the reward in batches
+    ) -> Result<Vec<ValidatorDetail>>;
+    /// Claim the validator reward in batches
     async fn batch_claim(
         &self,
         submitter: &Address,
         reward_claim_subnet: &SubnetID,
-        payloads: Vec<BatchClaimProofs>,
+        payloads: Vec<BatchClaimPayload>,
     ) -> Result<()>;
 }

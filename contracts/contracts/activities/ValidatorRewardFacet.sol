@@ -7,7 +7,7 @@ import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap
 import {Pausable} from "../lib/LibPausable.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
 import {NotValidator, SubnetNoTargetCommitment, CommitmentAlreadyInitialized, ValidatorAlreadyClaimed, NotGateway, NotOwner} from "../errors/IPCErrors.sol";
-import {Consensus, BatchClaimProofs} from "./Activity.sol";
+import {Consensus, BatchClaimPayload} from "./Activity.sol";
 import {IValidatorRewarder, IValidatorRewardSetup} from "./IValidatorRewarder.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {SubnetID} from "../structs/Subnet.sol";
@@ -18,7 +18,7 @@ import {LibDiamond} from "../lib/LibDiamond.sol";
 /// to claim their reward in the parent subnet, which should be the current subnet this facet
 /// is deployed.
 contract ValidatorRewardFacet is ReentrancyGuard, Pausable {
-    function batchClaim(BatchClaimProofs[] calldata payload) external nonReentrant whenNotPaused {
+    function batchClaim(BatchClaimPayload[] calldata payload) external nonReentrant whenNotPaused {
         uint256 len = payload.length;
         for (uint256 i = 0; i < len; ) {
             _batchClaimInSubnet(payload[i]);
@@ -45,15 +45,15 @@ contract ValidatorRewardFacet is ReentrancyGuard, Pausable {
         return;
     }
 
-    function _batchClaimInSubnet(BatchClaimProofs calldata payload) internal {
-        uint256 len = payload.proofs.length;
+    function _batchClaimInSubnet(BatchClaimPayload calldata batchClaimPayload) internal {
+        uint256 len = batchClaimPayload.claims.length;
 
         for (uint256 i = 0; i < len; ) {
             _claim(
-                payload.subnetId,
-                payload.proofs[i].checkpointHeight,
-                payload.proofs[i].detail,
-                payload.proofs[i].proof
+                batchClaimPayload.subnetId,
+                batchClaimPayload.claims[i].checkpointHeight,
+                batchClaimPayload.claims[i].detail,
+                batchClaimPayload.claims[i].proof
             );
             unchecked {
                 i++;

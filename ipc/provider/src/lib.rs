@@ -10,7 +10,7 @@ use fvm_shared::{
     address::Address, clock::ChainEpoch, crypto::signature::SignatureType, econ::TokenAmount,
 };
 use ipc_api::checkpoint::{
-    BatchClaimProofs, BottomUpCheckpointBundle, QuorumReachedEvent, ValidatorSummary,
+    BatchClaimPayload, BottomUpCheckpointBundle, QuorumReachedEvent, ValidatorDetail,
 };
 use ipc_api::evm::payload_to_evm_address;
 use ipc_api::staking::{StakingChangeRequest, ValidatorInfo};
@@ -754,7 +754,7 @@ impl IpcProvider {
         validator: &Address,
         from: ChainEpoch,
         to: ChainEpoch,
-    ) -> anyhow::Result<Vec<ValidatorSummary>> {
+    ) -> anyhow::Result<Vec<ValidatorDetail>> {
         let conn = self.get_connection(subnet)?;
         conn.manager()
             .get_validator_activities(validator, from, to)
@@ -773,20 +773,20 @@ impl IpcProvider {
         for source_subnet in reward_source_subnets {
             let conn = self.get_connection(source_subnet)?;
 
-            let proofs = conn
+            let claims = conn
                 .manager()
-                .get_validator_claim_proofs(validator, from, to)
+                .get_validator_claim_payload(validator, from, to)
                 .await?;
-            if proofs.is_empty() {
+            if claims.is_empty() {
                 return Err(anyhow!(
                     "address {} has no reward to claim",
                     validator.to_string()
                 ));
             }
 
-            batch_proofs.push(BatchClaimProofs {
+            batch_proofs.push(BatchClaimPayload {
                 subnet_id: source_subnet.clone(),
-                proofs,
+                claims,
             });
         }
 
