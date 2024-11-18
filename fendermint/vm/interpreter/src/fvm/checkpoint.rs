@@ -102,6 +102,10 @@ where
     let num_msgs = msgs.len();
 
     let activities = state.activities_tracker().get_activities_summary()?;
+    let agg = checkpoint::Aggregated {
+        total_active_validators: activities.active_validators() as u64,
+        total_num_blocks_committed: activities.elapsed(state.block_height()) as u64,
+    };
 
     // Construct checkpoint.
     let checkpoint = BottomUpCheckpoint {
@@ -110,28 +114,31 @@ where
         block_hash,
         next_configuration_number,
         msgs,
-        activities: activities.commitment()?.try_into()?,
+        activities: checkpoint::Compressed {
+            aggregated: agg.clone(),
+            commitment: activities
+                .commitment()?
+                .try_into()
+                .map_err(|_| anyhow!("cannot convert commitment"))?,
+        },
     };
 
     // Save the checkpoint in the ledger.
     // Pass in the current power table, because these are the validators who can sign this checkpoint.
-
-    // gateway
-    //     .create_bottom_up_checkpoint(state, checkpoint.clone(), &curr_power_table.0)
-    //     .context("failed to store checkpoint")?;
-
-    let report = checkpoint::ActivityReport {
-        validators: activities
-            .details
-            .into_iter()
-            .map(|v| {
-                Ok(checkpoint::ValidatorActivityReport {
-                    validator: payload_to_evm_address(v.validator.payload())?,
-                    blocks_committed: v.blocks_committed_count,
-                    metadata: ethers::types::Bytes::from(v.metadata),
+    let report = checkpoint::FullActivitySummary {
+        consensus: checkpoint::Full {
+            aggregated: agg,
+            validator_details: activities
+                .details
+                .into_iter()
+                .map(|v| {
+                    Ok(checkpoint::ValidatorDetail {
+                        validator: payload_to_evm_address(v.validator.payload())?,
+                        blocks_committed: v.stats.blocks_committed,
+                    })
                 })
-            })
-            .collect::<anyhow::Result<Vec<_>>>()?,
+                .collect::<anyhow::Result<Vec<_>>>()?,
+        },
     };
     let ret = gateway
         .create_bu_ckpt_with_activities(state, checkpoint.clone(), &curr_power_table.0, report)
@@ -271,8 +278,14 @@ where
                 block_hash: cp.block_hash,
                 next_configuration_number: cp.next_configuration_number,
                 msgs: convert_tokenizables(cp.msgs)?,
-                activities: checkpoint::ActivitySummary {
-                    total_active_validators: cp.activities.total_active_validators,
+                activities: checkpoint::Compressed {
+                    aggregated: checkpoint::Aggregated {
+                        total_active_validators: cp.activities.aggregated.total_active_validators,
+                        total_num_blocks_committed: cp
+                            .activities
+                            .aggregated
+                            .total_num_blocks_committed,
+                    },
                     commitment: cp.activities.commitment,
                 },
             };

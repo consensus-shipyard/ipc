@@ -12,7 +12,7 @@ pub type Hash = ethers::types::H256;
 
 lazy_static!(
     /// ABI types of the Merkle tree which contains validator addresses and their voting power.
-    pub static ref VALIDATOR_SUMMARY_FIELDS: Vec<String> = vec!["address".to_owned(), "uint64".to_owned(), "bytes".to_owned()];
+    pub static ref VALIDATOR_SUMMARY_FIELDS: Vec<String> = vec!["address".to_owned(), "uint64".to_owned()];
 );
 
 /// The merkle tree based proof verification to interact with solidity contracts
@@ -31,13 +31,8 @@ impl MerkleProofGen {
         let values = values
             .iter()
             .map(|t| {
-                payload_to_evm_address(t.validator.payload()).map(|addr| {
-                    vec![
-                        format!("{addr:?}"),
-                        t.blocks_committed_count.to_string(),
-                        hex::encode(&t.metadata),
-                    ]
-                })
+                payload_to_evm_address(t.validator.payload())
+                    .map(|addr| vec![format!("{addr:?}"), t.stats.blocks_committed.to_string()])
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
 

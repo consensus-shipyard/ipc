@@ -9,7 +9,7 @@ use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Default)]
 pub struct ValidatorStats {
     pub blocks_committed: u64,
 }
@@ -72,13 +72,8 @@ impl State {
             "verifiers",
         )?;
 
-        // REVIEW(raulk): Use validators.get(validator)?.unwrap_or()
-
-        let v = if let Some(v) = validators.get(validator)? {
-            *v + 1
-        } else {
-            1
-        };
+        let mut v = validators.get(validator)?.cloned().unwrap_or_default();
+        v.blocks_committed += 1;
 
         validators.set(validator, v)?;
 
@@ -103,7 +98,7 @@ impl State {
         validators.for_each(|k, v| {
             let detail = ValidatorDetail {
                 validator: k,
-                stats: ValidatorStats { blocks_committed: *v },
+                stats: v.clone(),
             };
             result.push(detail);
             Ok(())

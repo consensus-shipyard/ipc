@@ -9,9 +9,8 @@ use config::Config;
 use fvm_shared::{
     address::Address, clock::ChainEpoch, crypto::signature::SignatureType, econ::TokenAmount,
 };
-use ipc_api::checkpoint::{
-    BatchClaimPayload, BottomUpCheckpointBundle, QuorumReachedEvent, ValidatorDetail,
-};
+use ipc_api::checkpoint::consensus::ValidatorDetail;
+use ipc_api::checkpoint::{BatchClaimPayload, BottomUpCheckpointBundle, QuorumReachedEvent};
 use ipc_api::evm::payload_to_evm_address;
 use ipc_api::staking::{StakingChangeRequest, ValidatorInfo};
 use ipc_api::subnet::{Asset, PermissionMode};

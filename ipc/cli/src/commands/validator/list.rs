@@ -41,9 +41,7 @@ impl CommandLineHandler for ListActivities {
 
         println!("found total {} entries", r.len());
         for v in r {
-            println!("checkpoint height: {}", v.checkpoint_height);
             println!("  addr: {}", v.validator);
-            println!("  metadata: {}", hex::encode(v.metadata));
             println!("  locks_committed: {}", v.blocks_committed);
         }
 

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 //! Cross network messages related struct and utility functions.
 
+use crate::checkpoint::consensus::ValidatorDetail;
 use crate::cross::IpcEnvelope;
 use crate::subnet_id::SubnetID;
 use crate::HumanReadable;
@@ -76,16 +77,6 @@ pub struct BottomUpMsgBatch {
     pub msgs: Vec<IpcEnvelope>,
 }
 
-/// The commitments for the child subnet activities that should be submitted to the parent subnet
-/// together with a bottom up checkpoint
-#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
-pub struct ValidatorDetail {
-    /// The validator address
-    pub validator: Address,
-    /// The number of blocks mined
-    pub blocks_committed: u64,
-}
-
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
 pub struct BatchClaimPayload {
     pub subnet_id: SubnetID,
@@ -99,14 +90,45 @@ pub struct ValidatorClaimPayload {
     pub proof: Vec<[u8; 32]>,
 }
 
-#[serde_as]
-#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
-pub struct ActivitySummary {
-    pub total_active_validators: u64,
-    /// The activity summary for validators
-    #[serde_as(as = "HumanReadable")]
-    pub commitment: Vec<u8>,
-    // TODO: add relayed activity commitment
+/// Namespace for consensus-level activity summaries.
+pub mod consensus {
+    use fvm_shared::address::Address;
+    use serde::{Deserialize, Serialize};
+
+    /// Aggregated stats for consensus-level activity.
+    #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+    pub struct Aggregated {
+        /// The total number of unique validators that have mined within this period.
+        pub total_active_validators: u64,
+        /// The total number of blocks committed by all validators during this period.
+        pub total_num_blocks_committed: u64,
+    }
+
+    /// The commitments for the child subnet activities that should be submitted to the parent subnet
+    /// together with a bottom up checkpoint
+    #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+    pub struct ValidatorDetail {
+        /// The validator address
+        pub validator: Address,
+        /// The number of blocks mined
+        pub blocks_committed: u64,
+    }
+
+    // The full activity summary for consensus-level activity.
+    #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+    pub struct Full {
+        pub aggregated: Aggregated,
+        /// The breakdown of activity per validator.
+        pub validator_details: Vec<ValidatorDetail>,
+    }
+
+    /// The compresed representation of the activity summary for consensus-level activity suitable for embedding in a checkpoint.
+    #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+    pub struct Compressed {
+        pub aggregated: Aggregated,
+        /// The commitment for the validator details, so that we don't have to transmit them in full.
+        pub commitment: Vec<u8>,
+    }
 }
 
 #[serde_as]
@@ -128,7 +150,7 @@ pub struct BottomUpCheckpoint {
     /// The list of messages for execution
     pub msgs: Vec<IpcEnvelope>,
     /// The activity commitment from child subnet to parent subnet
-    pub activities: ActivitySummary,
+    pub activities: consensus::Compressed,
 }
 
 pub fn serialize_vec_bytes_to_vec_hex<T: AsRef<[u8]>, S>(

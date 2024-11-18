@@ -69,6 +69,7 @@ impl<'a, DB: Blockstore + Clone + 'static> ValidatorActivityTracker
         )
         .context("failed to parse validator activities")?;
         Ok(ActivityDetails {
+            cycle_start: r.cycle_start,
             details: r.activities,
         })
     }

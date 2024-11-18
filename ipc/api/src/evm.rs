@@ -4,7 +4,7 @@
 //! Type conversion for IPC Agent struct with solidity contract struct
 
 use crate::address::IPCAddress;
-use crate::checkpoint::{ActivitySummary, BatchClaimPayload, BottomUpCheckpoint};
+use crate::checkpoint::{consensus, BatchClaimPayload, BottomUpCheckpoint};
 use crate::checkpoint::{BottomUpMsgBatch, ValidatorClaimPayload};
 use crate::cross::{IpcEnvelope, IpcMsgKind};
 use crate::staking::StakingChange;
@@ -122,12 +122,26 @@ macro_rules! cross_msg_types {
 /// The type conversion between different bottom up checkpoint definition in ethers and sdk
 macro_rules! bottom_up_checkpoint_conversion {
     ($module:ident) => {
-        impl TryFrom<ActivitySummary> for $module::ActivitySummary {
+        impl TryFrom<consensus::Aggregated> for $module::Aggregated {
             type Error = anyhow::Error;
 
-            fn try_from(c: ActivitySummary) -> Result<Self, Self::Error> {
-                Ok($module::ActivitySummary {
+            fn try_from(c: consensus::Aggregated) -> Result<Self, Self::Error> {
+                Ok($module::Aggregated {
                     total_active_validators: c.total_active_validators,
+                    total_num_blocks_committed: c.total_num_blocks_committed,
+                })
+            }
+        }
+
+        impl TryFrom<consensus::Compressed> for $module::Compressed {
+            type Error = anyhow::Error;
+
+            fn try_from(c: consensus::Compressed) -> Result<Self, Self::Error> {
+                Ok($module::Compressed {
+                    aggregated: c
+                        .aggregated
+                        .try_into()
+                        .map_err(|_| anyhow!("cannot convert aggregated stats"))?,
                     commitment: c
                         .commitment
                         .try_into()
@@ -169,8 +183,17 @@ macro_rules! bottom_up_checkpoint_conversion {
                         .into_iter()
                         .map(IpcEnvelope::try_from)
                         .collect::<Result<Vec<_>, _>>()?,
-                    activities: ActivitySummary {
-                        total_active_validators: value.activities.total_active_validators,
+                    activities: consensus::Compressed {
+                        aggregated: consensus::Aggregated {
+                            total_active_validators: value
+                                .activities
+                                .aggregated
+                                .total_active_validators,
+                            total_num_blocks_committed: value
+                                .activities
+                                .aggregated
+                                .total_num_blocks_committed,
+                        },
                         commitment: value.activities.commitment.to_vec(),
                     },
                 })
@@ -282,7 +305,7 @@ impl TryFrom<ValidatorClaimPayload> for validator_reward_facet::ValidatorClaimPa
 
     fn try_from(v: ValidatorClaimPayload) -> Result<Self, Self::Error> {
         Ok(Self {
-            checkpoint_height: v.detail.checkpoint_height,
+            checkpoint_height: v.checkpoint_height,
             proof: v.proof,
             detail: validator_reward_facet::ValidatorDetail {
                 validator: payload_to_evm_address(v.detail.validator.payload())?,

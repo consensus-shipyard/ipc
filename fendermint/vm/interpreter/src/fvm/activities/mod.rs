@@ -10,7 +10,7 @@ mod merkle;
 use crate::fvm::activities::merkle::MerkleProofGen;
 use fendermint_actor_activity_tracker::ValidatorDetail;
 use fendermint_crypto::PublicKey;
-use ipc_api::checkpoint::ActivitySummary;
+use fvm_shared::clock::ChainEpoch;
 use std::fmt::Debug;
 
 pub struct BlockMined {
@@ -20,6 +20,7 @@ pub struct BlockMined {
 #[derive(Debug, Clone)]
 pub struct ActivityDetails<T> {
     pub details: Vec<T>,
+    pub cycle_start: ChainEpoch,
 }
 
 /// Tracks the validator activities in the current blockchain
@@ -39,11 +40,18 @@ pub trait ValidatorActivityTracker {
 }
 
 impl ActivityDetails<ValidatorDetail> {
-    pub fn commitment(&self) -> anyhow::Result<ActivitySummary> {
+    pub fn commitment(&self) -> anyhow::Result<Vec<u8>> {
         let gen = MerkleProofGen::new(self.details.as_slice())?;
-        Ok(ActivitySummary {
-            total_active_validators: self.details.len() as u64,
-            commitment: gen.root().to_fixed_bytes().to_vec(),
-        })
+        Ok(gen.root().to_fixed_bytes().to_vec())
+    }
+}
+
+impl<T> ActivityDetails<T> {
+    pub fn elapsed(&self, height: ChainEpoch) -> ChainEpoch {
+        height.saturating_sub(self.cycle_start)
+    }
+
+    pub fn active_validators(&self) -> usize {
+        self.details.len()
     }
 }

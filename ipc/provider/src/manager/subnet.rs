@@ -8,8 +8,8 @@ use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_api::checkpoint::{
-    BatchClaimPayload, BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent, Signature,
-    ValidatorClaimPayload, ValidatorDetail,
+    consensus::ValidatorDetail, BatchClaimPayload, BottomUpCheckpoint, BottomUpCheckpointBundle,
+    QuorumReachedEvent, Signature, ValidatorClaimPayload,
 };
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::{StakingChangeRequest, ValidatorInfo};

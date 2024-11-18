@@ -35,16 +35,6 @@ pub struct GetActivitiesResult {
     pub cycle_start: ChainEpoch,
 }
 
-// REVIEW(raulk): Seems not used?
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct GetActivitySummaryResult {
-    pub commitment: [u8; 32],
-    /// Total number validators that have mined blocks
-    pub total_active_validators: u64,
-    /// The validator details
-    pub activities: Vec<ValidatorDetail>,
-}
-
 #[derive(FromPrimitive)]
 #[repr(u64)]
 pub enum Method {
@@ -54,8 +44,6 @@ pub enum Method {
     // REVIEW(raulk): Merge these two methods into a "PullActivity" method that returns the full activity summary _and_ resets the internal state atomically.
     GetActivities = frc42_dispatch::method_hash!("GetActivities"),
     PurgeActivities = frc42_dispatch::method_hash!("PurgeActivities"),
-    // REVIEW(raulk): Rename this to "GetPendingSummary" to make it clear that this returns the summary being constructed.
-    GetSummary = frc42_dispatch::method_hash!("GetSummary"),
 }
 
 impl ActivityTrackerActor {
@@ -88,17 +76,6 @@ impl ActivityTrackerActor {
         Ok(())
     }
 
-    //
-    pub fn get_summary(_rt: &impl Runtime) -> Result<GetActivitySummaryResult, ActorError> {
-        // todo
-        let dummy = GetActivitySummaryResult {
-            commitment: [0; 32],
-            total_active_validators: 10,
-            activities: vec![],
-        };
-        Ok(dummy)
-    }
-
     pub fn get_activities(rt: &impl Runtime) -> Result<GetActivitiesResult, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
@@ -123,6 +100,5 @@ impl ActorCode for ActivityTrackerActor {
         BlockMined => block_mined,
         GetActivities => get_activities,
         PurgeActivities => purge_activities,
-        GetSummary => get_summary,
     }
 }
