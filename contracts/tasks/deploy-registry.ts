@@ -97,7 +97,7 @@ task('deploy-registry')
             creationPrivileges: Number(mode),
         }
 
-        Deployments.deploy(hre, deployer, {
+        await Deployments.deploy(hre, deployer, {
             name: 'SubnetRegistryDiamond',
             args: [registryFacets.asFacetCuts(), registryConstructorParams],
         })
