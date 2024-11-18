@@ -16,14 +16,14 @@ use fendermint_actor_blobs_shared::state::{
 use fendermint_actor_blobs_shared::Method;
 use fil_actors_runtime::runtime::builtins::Type;
 use fil_actors_runtime::{
-    actor_dispatch, actor_error, deserialize_block,
+    actor_dispatch, actor_error, deserialize_block, extract_send_result,
     runtime::{ActorCode, Runtime},
     ActorError, AsActorError, FIRST_EXPORTED_METHOD_NUMBER, SYSTEM_ACTOR_ADDR,
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::address::Address;
 use fvm_shared::sys::SendFlags;
-use fvm_shared::{error::ExitCode, MethodNum};
+use fvm_shared::{error::ExitCode, MethodNum, METHOD_SEND};
 use num_traits::Zero;
 
 use crate::{ext, ConstructorParams, State, BLOBS_ACTOR_NAME};
@@ -169,7 +169,8 @@ impl BlobsActor {
         } else {
             origin
         };
-        rt.transaction(|st: &mut State, rt| {
+        let tokens_received = rt.message().value_received();
+        let (subscription, unspent_tokens) = rt.transaction(|st: &mut State, rt| {
             st.add_blob(
                 origin,
                 caller,
@@ -180,8 +181,14 @@ impl BlobsActor {
                 params.size,
                 params.ttl,
                 params.source,
+                tokens_received,
             )
-        })
+        })?;
+        // Send the tokens not required for the buying back
+        if !unspent_tokens.is_zero() {
+            extract_send_result(rt.send_simple(&origin, METHOD_SEND, None, unspent_tokens))?;
+        }
+        Ok(subscription)
     }
 
     fn get_blob(rt: &impl Runtime, params: GetBlobParams) -> Result<Option<Blob>, ActorError> {
@@ -328,7 +335,10 @@ enum ActorType {
 
 /// Resolve robust address and ensure it is not a Machine actor type.
 /// See `resolve_external`.
-fn resolve_external_non_machine(rt: &impl Runtime, address: Address) -> Result<Address, ActorError> {
+fn resolve_external_non_machine(
+    rt: &impl Runtime,
+    address: Address,
+) -> Result<Address, ActorError> {
     let (address, actor_type) = resolve_external(rt, address)?;
     if matches!(actor_type, ActorType::Machine) {
         Err(ActorError::illegal_argument(format!(
@@ -798,6 +808,213 @@ mod tests {
         assert_eq!(subscription.expiry, 3605);
         assert!(!subscription.auto_renew);
         assert_eq!(subscription.delegate, None);
+        rt.verify();
+    }
+
+    #[test]
+    fn test_add_blob_inline_buy() {
+        let rt = construct_and_verify(1024 * 1024, 1);
+
+        let id_addr = Address::new_id(110);
+        let eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000000"
+        ));
+        let f4_eth_addr = Address::new_delegated(10, &eth_addr.0).unwrap();
+
+        rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
+        rt.set_origin(id_addr);
+        rt.set_epoch(ChainEpoch::from(0));
+
+        // Try sending a lot
+        rt.expect_validate_caller_any();
+        let hash = new_hash(1024);
+        let add_params = AddBlobParams {
+            sponsor: None,
+            source: new_pk(),
+            hash: hash.0,
+            size: hash.1,
+            metadata_hash: new_hash(1024).0,
+            ttl: Some(3600),
+        };
+        let tokens_sent = TokenAmount::from_whole(1);
+        rt.set_received(tokens_sent.clone());
+        rt.set_balance(tokens_sent.clone());
+        let tokens_required_atto = add_params.size * add_params.ttl.unwrap() as u64;
+        let expected_tokens_unspent = tokens_sent.atto() - tokens_required_atto;
+        rt.expect_send_simple(
+            f4_eth_addr,
+            METHOD_SEND,
+            None,
+            TokenAmount::from_atto(expected_tokens_unspent),
+            None,
+            ExitCode::OK,
+        );
+        let result = rt.call::<BlobsActor>(
+            Method::AddBlob as u64,
+            IpldBlock::serialize_cbor(&add_params).unwrap(),
+        );
+        assert!(result.is_ok());
+        rt.verify();
+
+        // Try sending zero
+        rt.expect_validate_caller_any();
+        rt.set_received(TokenAmount::zero());
+        let hash = new_hash(1024);
+        let add_params = AddBlobParams {
+            sponsor: None,
+            source: new_pk(),
+            hash: hash.0,
+            size: hash.1,
+            metadata_hash: new_hash(1024).0,
+            ttl: Some(3600),
+        };
+        let response = rt.call::<BlobsActor>(
+            Method::AddBlob as u64,
+            IpldBlock::serialize_cbor(&add_params).unwrap(),
+        );
+        assert!(response.is_err());
+        rt.verify();
+
+        // Try sending exact amount
+        let tokens_required_atto = add_params.size * add_params.ttl.unwrap() as u64;
+        let tokens_sent = TokenAmount::from_atto(tokens_required_atto);
+        rt.set_received(tokens_sent.clone());
+        rt.expect_validate_caller_any();
+        let hash = new_hash(1024);
+        let add_params = AddBlobParams {
+            sponsor: None,
+            source: new_pk(),
+            hash: hash.0,
+            size: hash.1,
+            metadata_hash: new_hash(1024).0,
+            ttl: Some(3600),
+        };
+        let result = rt.call::<BlobsActor>(
+            Method::AddBlob as u64,
+            IpldBlock::serialize_cbor(&add_params).unwrap(),
+        );
+        assert!(result.is_ok());
+        rt.verify();
+    }
+
+    #[test]
+    fn test_add_blob_sponsor() {
+        let rt = construct_and_verify(1024 * 1024, 1);
+
+        // Credit sponsor
+        let sponsor_id_addr = Address::new_id(110);
+        let sponsor_eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000000"
+        ));
+        let sponsor_f4_eth_addr = Address::new_delegated(10, &sponsor_eth_addr.0).unwrap();
+        rt.set_delegated_address(sponsor_id_addr.id().unwrap(), sponsor_f4_eth_addr);
+
+        // Credit spender
+        let spender_id_addr = Address::new_id(111);
+        let spender_eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000001"
+        ));
+        let spender_f4_eth_addr = Address::new_delegated(10, &spender_eth_addr.0).unwrap();
+        rt.set_delegated_address(spender_id_addr.id().unwrap(), spender_f4_eth_addr);
+        rt.set_address_actor_type(spender_id_addr, *ETHACCOUNT_ACTOR_CODE_ID);
+
+        // Proxy EVM contract on behalf of credit owner
+        let proxy_id_addr = Address::new_id(112);
+        let proxy_eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000002"
+        ));
+        let proxy_f4_eth_addr = Address::new_delegated(10, &proxy_eth_addr.0).unwrap();
+        rt.set_delegated_address(proxy_id_addr.id().unwrap(), proxy_f4_eth_addr);
+        rt.set_address_actor_type(proxy_id_addr, *EVM_ACTOR_CODE_ID);
+
+        // Sponsor buys credit
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, sponsor_id_addr);
+        rt.set_received(TokenAmount::from_whole(1));
+        rt.expect_validate_caller_any();
+        let fund_params = BuyCreditParams(sponsor_id_addr);
+        let buy_credit_result = rt.call::<BlobsActor>(
+            Method::BuyCredit as u64,
+            IpldBlock::serialize_cbor(&fund_params).unwrap(),
+        );
+        assert!(buy_credit_result.is_ok());
+        rt.verify();
+
+        // Sponsors approves credit
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, sponsor_id_addr);
+        rt.set_origin(sponsor_id_addr);
+        rt.expect_validate_caller_any();
+        let approve_params = ApproveCreditParams {
+            from: sponsor_id_addr,
+            receiver: spender_id_addr,
+            required_caller: None,
+            limit: None,
+            ttl: None,
+        };
+        let result = rt.call::<BlobsActor>(
+            Method::ApproveCredit as u64,
+            IpldBlock::serialize_cbor(&approve_params).unwrap(),
+        );
+        assert!(result.is_ok());
+        rt.verify();
+
+        rt.set_origin(sponsor_id_addr);
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, sponsor_id_addr);
+        rt.expect_validate_caller_any();
+        let approve_params = ApproveCreditParams {
+            from: sponsor_id_addr,
+            receiver: spender_id_addr,
+            required_caller: None,
+            limit: None,
+            ttl: None,
+        };
+        let approve_result = rt.call::<BlobsActor>(
+            Method::ApproveCredit as u64,
+            IpldBlock::serialize_cbor(&approve_params).unwrap(),
+        );
+        assert!(approve_result.is_ok());
+        rt.verify();
+
+        // Try sending zero
+        rt.set_origin(spender_id_addr);
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, spender_id_addr);
+        rt.expect_validate_caller_any();
+        rt.set_received(TokenAmount::zero());
+        let hash = new_hash(1024);
+        let add_params = AddBlobParams {
+            sponsor: Some(sponsor_id_addr),
+            source: new_pk(),
+            hash: hash.0,
+            size: hash.1,
+            metadata_hash: new_hash(1024).0,
+            ttl: Some(3600),
+        };
+        let response = rt.call::<BlobsActor>(
+            Method::AddBlob as u64,
+            IpldBlock::serialize_cbor(&add_params).unwrap(),
+        );
+        assert!(response.is_ok());
+        rt.verify();
+
+        // Try sending non-zero -> can not buy for a sponsor
+        rt.set_origin(spender_id_addr);
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, spender_id_addr);
+        rt.expect_validate_caller_any();
+        rt.set_received(TokenAmount::from_whole(1));
+        let hash = new_hash(1024);
+        let add_params = AddBlobParams {
+            sponsor: Some(sponsor_id_addr),
+            source: new_pk(),
+            hash: hash.0,
+            size: hash.1,
+            metadata_hash: new_hash(1024).0,
+            ttl: Some(3600),
+        };
+        let response = rt.call::<BlobsActor>(
+            Method::AddBlob as u64,
+            IpldBlock::serialize_cbor(&add_params).unwrap(),
+        );
+        assert!(response.is_err());
         rt.verify();
     }
 }

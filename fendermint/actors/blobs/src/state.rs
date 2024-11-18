@@ -321,18 +321,9 @@ impl State {
         size: u64,
         ttl: Option<ChainEpoch>,
         source: PublicKey,
-    ) -> anyhow::Result<Subscription, ActorError> {
-        let (ttl, auto_renew) = if let Some(ttl) = ttl {
-            (ttl, false)
-        } else {
-            (AUTO_TTL, true)
-        };
-        if ttl < MIN_TTL {
-            return Err(ActorError::illegal_argument(format!(
-                "minimum blob TTL is {}",
-                MIN_TTL
-            )));
-        }
+        tokens_received: TokenAmount,
+    ) -> anyhow::Result<(Subscription, TokenAmount), ActorError> {
+        let (ttl, auto_renew) = accept_ttl(ttl)?;
         let account = self
             .accounts
             .entry(subscriber)
@@ -365,15 +356,22 @@ impl State {
         let mut new_capacity = BigInt::zero();
         let mut new_account_capacity = BigInt::zero();
         let credit_required: BigInt;
+        // Like cashback but for sending unspent tokens back
+        let tokens_unspent: TokenAmount;
+
         let sub = if let Some(blob) = self.blobs.get_mut(&hash) {
             let sub = if let Some(sub) = blob.subs.get_mut(&subscriber) {
                 // Required credit can be negative if subscriber is reducing expiry
                 credit_required = (expiry - sub.expiry) as u64 * &size;
-                ensure_credit(
-                    subscriber,
-                    current_epoch,
-                    &account.credit_free,
+
+                tokens_unspent = ensure_credit_or_buy(
+                    &mut account.credit_free,
+                    &mut self.credit_sold,
                     &credit_required,
+                    &tokens_received,
+                    self.credit_debit_rate,
+                    &subscriber,
+                    current_epoch,
                     &delegation,
                 )?;
                 // Update expiry index
@@ -400,11 +398,14 @@ impl State {
                 // subscriber, as the existing account(s) may decide to change the
                 // expiry or cancel.
                 credit_required = ttl as u64 * &size;
-                ensure_credit(
-                    subscriber,
-                    current_epoch,
-                    &account.credit_free,
+                tokens_unspent = ensure_credit_or_buy(
+                    &mut account.credit_free,
+                    &mut self.credit_sold,
                     &credit_required,
+                    &tokens_received,
+                    self.credit_debit_rate,
+                    &subscriber,
+                    current_epoch,
                     &delegation,
                 )?;
                 // Add new subscription
@@ -453,11 +454,14 @@ impl State {
             }
             new_capacity = size.clone();
             credit_required = ttl as u64 * &size;
-            ensure_credit(
-                subscriber,
-                current_epoch,
-                &account.credit_free,
+            tokens_unspent = ensure_credit_or_buy(
+                &mut account.credit_free,
+                &mut self.credit_sold,
                 &credit_required,
+                &tokens_received,
+                self.credit_debit_rate,
+                &subscriber,
+                current_epoch,
                 &delegation,
             )?;
             // Create new blob
@@ -519,7 +523,7 @@ impl State {
                 subscriber
             );
         }
-        Ok(sub)
+        Ok((sub, tokens_unspent))
     }
 
     fn renew_blob(
@@ -601,7 +605,7 @@ impl State {
         let expiry = sub.expiry + AUTO_TTL;
         let credit_required = AUTO_TTL as u64 * &size;
         ensure_credit(
-            subscriber,
+            &subscriber,
             current_epoch,
             &account.credit_free,
             &credit_required,
@@ -724,11 +728,7 @@ impl State {
             } else {
                 None
             };
-            if let Some(approval) = approval {
-                Some(CreditDelegation::new(origin, caller, approval))
-            } else {
-                None
-            }
+            approval.map(|approval| CreditDelegation::new(origin, caller, approval))
         } else {
             None
         };
@@ -948,19 +948,103 @@ impl State {
     }
 }
 
+/// Check if `subscriber` has enough credits, including delegated credits.
 fn ensure_credit(
-    subscriber: Address,
+    subscriber: &Address,
     current_epoch: ChainEpoch,
     credit_free: &BigInt,
     required_credit: &BigInt,
     delegation: &Option<CreditDelegation>,
 ) -> anyhow::Result<(), ActorError> {
-    if credit_free < required_credit {
-        return Err(ActorError::insufficient_funds(format!(
+    ensure_enough_credits(subscriber, credit_free, required_credit)?;
+    ensure_delegated_credit(subscriber, current_epoch, required_credit, delegation)
+}
+
+/// Check if `subscriber` owns enough free credits.
+fn ensure_enough_credits(
+    subscriber: &Address,
+    credit_free: &BigInt,
+    required_credit: &BigInt,
+) -> anyhow::Result<(), ActorError> {
+    if credit_free >= required_credit {
+        Ok(())
+    } else {
+        Err(ActorError::insufficient_funds(format!(
             "account {} has insufficient credit (available: {}; required: {})",
             subscriber, credit_free, required_credit
-        )));
+        )))
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn ensure_credit_or_buy(
+    account_credit_free: &mut BigInt,
+    state_credit_sold: &mut BigInt,
+    credit_required: &BigInt,
+    tokens_received: &TokenAmount,
+    debit_credit_rate: u64,
+    subscriber: &Address,
+    current_epoch: ChainEpoch,
+    delegate: &Option<CreditDelegation>,
+) -> anyhow::Result<TokenAmount, ActorError> {
+    let tokens_received_non_zero = !tokens_received.is_zero();
+    let has_delegation = delegate.is_some();
+    match (tokens_received_non_zero, has_delegation) {
+        (true, true) => Err(ActorError::illegal_argument(format!(
+            "can not buy credits inline for {}",
+            subscriber,
+        ))),
+        (true, false) => {
+            // Try buying credits for self
+            let not_enough_credits = *account_credit_free < *credit_required;
+            if not_enough_credits {
+                let credits_needed = credit_required - &*account_credit_free;
+                let tokens_needed_atto = &credits_needed / debit_credit_rate;
+                let tokens_needed = TokenAmount::from_atto(tokens_needed_atto);
+                if tokens_needed <= *tokens_received {
+                    let tokens_to_rebate = tokens_received - tokens_needed;
+                    *state_credit_sold += &credits_needed;
+                    *account_credit_free += &credits_needed;
+                    Ok(tokens_to_rebate)
+                } else {
+                    Err(ActorError::insufficient_funds(format!(
+                        "account {} sent insufficient tokens (received: {}; required: {})",
+                        subscriber, tokens_received, tokens_needed
+                    )))
+                }
+            } else {
+                Ok(TokenAmount::zero())
+            }
+        }
+        (false, true) => {
+            ensure_credit(
+                subscriber,
+                current_epoch,
+                account_credit_free,
+                credit_required,
+                delegate,
+            )?;
+            Ok(TokenAmount::zero())
+        }
+        (false, false) => {
+            ensure_credit(
+                subscriber,
+                current_epoch,
+                account_credit_free,
+                credit_required,
+                delegate,
+            )?;
+            Ok(TokenAmount::zero())
+        }
+    }
+}
+
+fn ensure_delegated_credit(
+    subscriber: &Address,
+    current_epoch: ChainEpoch,
+    required_credit: &BigInt,
+    delegation: &Option<CreditDelegation>,
+) -> anyhow::Result<(), ActorError> {
     if let Some(delegation) = delegation {
         if let Some(limit) = &delegation.approval.limit {
             let uncommitted = &(limit - &delegation.approval.committed);
@@ -1018,5 +1102,17 @@ fn update_expiry_index(
                 expiries.remove(&remove);
             }
         }
+    }
+}
+
+fn accept_ttl(ttl: Option<ChainEpoch>) -> anyhow::Result<(ChainEpoch, bool), ActorError> {
+    let (ttl, auto_renew) = ttl.map(|ttl| (ttl, false)).unwrap_or((AUTO_TTL, true));
+    if ttl < MIN_TTL {
+        Err(ActorError::illegal_argument(format!(
+            "minimum blob TTL is {}",
+            MIN_TTL
+        )))
+    } else {
+        Ok((ttl, auto_renew))
     }
 }
