@@ -47,7 +47,7 @@ impl<'a, DB: Blockstore + Clone + 'static> ValidatorActivityTracker
     }
 
     fn get_activities_summary(
-        &self,
+        &mut self,
     ) -> anyhow::Result<ActivityDetails<Self::ValidatorSummaryDetail>> {
         let msg = FvmMessage {
             from: system::SYSTEM_ACTOR_ADDR,
@@ -63,7 +63,7 @@ impl<'a, DB: Blockstore + Clone + 'static> ValidatorActivityTracker
             gas_premium: Default::default(),
         };
 
-        let apply_ret = self.executor.call_state()?.call(msg)?;
+        let (apply_ret, _) = self.executor.execute_implicit(msg)?;
         let r = fvm_ipld_encoding::from_slice::<GetActivitiesResult>(
             &apply_ret.msg_receipt.return_data,
         )

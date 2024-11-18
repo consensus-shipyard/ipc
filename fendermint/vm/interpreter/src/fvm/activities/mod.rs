@@ -32,7 +32,7 @@ pub trait ValidatorActivityTracker {
 
     /// Get the validators activities summary since the checkpoint height
     fn get_activities_summary(
-        &self,
+        &mut self,
     ) -> anyhow::Result<ActivityDetails<Self::ValidatorSummaryDetail>>;
 
     /// Purge the current validator activities summary
