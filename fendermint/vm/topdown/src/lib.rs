@@ -165,22 +165,17 @@ impl Display for IPCBlobFinality {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct IPCReadRequestClosed {
     pub hash: Hash,
-    pub success: bool,
 }
 
 impl IPCReadRequestClosed {
-    pub fn new(hash: Hash, success: bool) -> Self {
-        Self { hash, success }
+    pub fn new(hash: Hash) -> Self {
+        Self { hash }
     }
 }
 
 impl Display for IPCReadRequestClosed {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "IPCReadRequestCompleted(hash: {}, success: {})",
-            self.hash, self.success
-        )
+        write!(f, "IPCReadRequestClosed(hash: {})", self.hash)
     }
 }
 

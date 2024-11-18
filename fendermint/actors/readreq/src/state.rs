@@ -2,7 +2,6 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::shared::Hash;
 use fil_actors_runtime::ActorError;
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::{address::Address, MethodNum};
@@ -10,7 +9,7 @@ use log::info;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 
-use crate::shared::{ReadRequest, ReadRequestStatus};
+use crate::shared::{Hash, ReadRequest, ReadRequestStatus};
 
 const MAX_READ_REQUEST_LEN: u32 = 1024 * 1024; // 1MB
 

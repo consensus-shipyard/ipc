@@ -45,7 +45,7 @@ use crate::{cmd, options::run::RunArgs, settings::Settings};
 use fendermint_app::observe::register_metrics as register_consensus_metrics;
 use fendermint_vm_iroh_resolver::observe::{
     register_metrics as register_blobs_metrics, BlobsFinalityVotingFailure,
-    BlobsFinalityVotingSuccess,
+    BlobsFinalityVotingSuccess, ReadRequestsCloseVoting,
 };
 
 cmd! {
@@ -252,7 +252,6 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
                 key.clone(),
                 own_subnet_id.clone(),
                 |hash, success| AppVote::BlobFinality(IPCBlobFinality::new(hash, success)),
-                iroh_pin_pool.results(),
             );
 
             info!("starting the iroh Resolver...");
@@ -266,10 +265,7 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
                 parent_finality_votes.clone(),
                 key,
                 own_subnet_id,
-                |hash, success| {
-                    AppVote::ReadRequestClosed(IPCReadRequestClosed::new(hash, success))
-                },
-                read_request_pool.results(),
+                |hash, _| AppVote::ReadRequestClosed(IPCReadRequestClosed::new(hash)),
             );
 
             info!("starting the read request resolver...");
@@ -677,18 +673,21 @@ async fn dispatch_vote(
             }
         }
         AppVote::ReadRequestClosed(r) => {
-            debug!(hash = ?r.hash, success = ?r.success, "received vote for read request completion");
+            debug!(hash = ?r.hash, "received vote for read request completion");
             match atomically_or_err(|| {
                 parent_finality_votes.add_blob_vote(
                     vote.public_key.clone(),
                     r.hash.as_bytes().to_vec(),
-                    r.success,
+                    true,
                 )
             })
             .await
             {
                 Ok(_) => {
                     debug!("vote handled for read request completion");
+                    emit(ReadRequestsCloseVoting {
+                        read_request_id: Some(r.hash.into()),
+                    });
                 }
                 Err(e @ VoteError::Equivocation(_, _, _, _)) => {
                     warn!(

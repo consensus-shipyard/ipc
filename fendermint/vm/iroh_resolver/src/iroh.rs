@@ -37,7 +37,6 @@ impl<V> IrohResolver<V>
 where
     V: Clone + Send + Sync + Serialize + DeserializeOwned + 'static,
 {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         client: Client<V>,
         queue: ResolveQueue,
@@ -46,7 +45,6 @@ where
         key: Keypair,
         subnet_id: SubnetID,
         to_vote: fn(Hash, bool) -> V,
-        results: ResolveResults,
     ) -> Self {
         Self {
             client,
@@ -56,7 +54,7 @@ where
             key,
             subnet_id,
             to_vote,
-            results,
+            results: Default::default(),
         }
     }
 
@@ -199,7 +197,7 @@ fn start_resolve<V>(
                         .await
                         {
                             emit(ReadRequestsCloseVoting {
-                                read_request_id: Some(task.hash().into()),
+                                read_request_id: Some(vote_hash.into()),
                             });
                         }
                     }
@@ -282,8 +280,7 @@ where
 }
 
 async fn reenqueue(task: ResolveTask, queue: ResolveQueue, retry_delay: Duration) -> bool {
-    let retryable = atomically(|| task.add_attempt()).await;
-    if retryable {
+    if atomically(|| task.add_attempt()).await {
         tracing::error!(
             hash = ?task.hash(),
             "iroh blob resolution failed; retrying later"

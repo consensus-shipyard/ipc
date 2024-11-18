@@ -360,7 +360,7 @@ where
             msgs.extend(blobs);
         }
 
-        // Get pending read requests from blobs actor
+        // Get pending read requests from the readreq actor
         let open_requests = with_state_transaction(&mut state, |state| {
             let requests = get_open_read_requests(state, chain_env.read_request_concurrency)?;
             tracing::debug!(size = requests.len(), "read requests fetched from chain");

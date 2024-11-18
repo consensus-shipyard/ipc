@@ -56,20 +56,18 @@ impl fmt::Display for ReadRequestStatus {
 /// A request to read blob data.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ReadRequest {
+    /// The hash of the blob to read data from.
     pub blob_hash: Hash,
+    /// The offset to start reading from.
     pub offset: u32,
+    /// The length of data to read.
     pub len: u32,
+    /// The address to call back when the read is complete.
     pub callback_addr: Address,
+    /// The method to call back when the read is complete.
     pub callback_method: MethodNum,
     /// Status of the read request
     pub status: ReadRequestStatus,
-}
-
-/// Params for actor construction.
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct ConstructorParams {
-    /// Maximum read request length in bytes
-    pub max_read_len: u32,
 }
 
 #[derive(FromPrimitive)]
