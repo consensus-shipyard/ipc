@@ -7,8 +7,9 @@ use anyhow::Result;
 use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
+use ipc_actors_abis::validator_reward_facet::ValidatorClaim;
 use ipc_api::checkpoint::{
-    consensus::ValidatorDetail, BatchClaimPayload, BottomUpCheckpoint, BottomUpCheckpointBundle,
+    consensus::ValidatorData, BatchClaimPayload, BottomUpCheckpoint, BottomUpCheckpointBundle,
     QuorumReachedEvent, Signature, ValidatorClaimPayload,
 };
 use ipc_api::cross::IpcEnvelope;
@@ -209,7 +210,7 @@ pub struct SubnetGenesisInfo {
     pub active_validators_limit: u16,
     pub min_collateral: TokenAmount,
     pub genesis_epoch: ChainEpoch,
-    pub validators: Vec<Validator>,
+    pub validators: Vec<ValidatorData>,
     pub genesis_balances: BTreeMap<Address, TokenAmount>,
     pub permission_mode: PermissionMode,
     pub supply_source: Asset,
@@ -287,25 +288,28 @@ pub trait BottomUpCheckpointRelayer: Send + Sync {
 /// in the child subnet
 #[async_trait]
 pub trait ValidatorRewarder: Send + Sync {
-    /// Obtain the payload needed for the validator to batch claim the rewards
-    async fn get_validator_claim_payload(
+    /// Query validator claims, indexed by checkpoint height, to batch claim rewards.
+    async fn query_reward_claims(
         &self,
         validator_addr: &Address,
         from_checkpoint: ChainEpoch,
         to_checkpoint: ChainEpoch,
-    ) -> Result<Vec<ValidatorClaimPayload>>;
-    /// Get the reward for specific validator in the current subnet gateway
-    async fn get_validator_activities(
+    ) -> Result<Vec<(u64, ValidatorClaim)>>;
+
+    /// Query validator rewards in the current subnet, without obtaining proofs.
+    async fn query_validator_rewards(
         &self,
         validator: &Address,
         from_checkpoint: ChainEpoch,
         to_checkpoint: ChainEpoch,
-    ) -> Result<Vec<ValidatorDetail>>;
-    /// Claim the validator reward in batches
-    async fn batch_claim(
+    ) -> Result<Vec<ValidatorData>>;
+
+    /// Claim validator rewards in a batch for the specified subnet.
+    async fn batch_subnet_claim(
         &self,
         submitter: &Address,
         reward_claim_subnet: &SubnetID,
-        payloads: Vec<BatchClaimPayload>,
+        reward_origin_subnet: &SubnetID,
+        claims: Vec<(u64, ValidatorClaim)>,
     ) -> Result<()>;
 }

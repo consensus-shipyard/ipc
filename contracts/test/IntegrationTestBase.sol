@@ -46,7 +46,7 @@ import {GatewayFacetsHelper} from "./helpers/GatewayFacetsHelper.sol";
 import {SubnetActorFacetsHelper} from "./helpers/SubnetActorFacetsHelper.sol";
 import {DiamondFacetsHelper} from "./helpers/DiamondFacetsHelper.sol";
 
-import {FullActivitySummary, Consensus} from "../contracts/activities/Activity.sol";
+import {FullActivityBundle, Consensus} from "../contracts/activities/Activity.sol";
 import {ValidatorRewarderMap} from "../contracts/examples/ValidatorRewarderMap.sol";
 import {ValidatorRewardFacet} from "../contracts/activities/ValidatorRewardFacet.sol";
 
@@ -934,12 +934,12 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             blockHash: keccak256(abi.encode(h)),
             nextConfigurationNumber: nextConfigNum - 1,
             msgs: new IpcEnvelope[](0),
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({
+            activities: Consensus.CompressedSummary({
+                stats: Consensus.AggregatedStats({
                     totalActiveValidators: uint64(validators.length),
                     totalNumBlocksCommitted: 3
                 }),
-                commitment: bytes32(uint256(nextConfigNum))
+                dataRootCommitment: Consensus.MerkleHash.wrap(bytes32(uint256(nextConfigNum)))
             })
         });
 
@@ -959,7 +959,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     function confirmChange(
         address[] memory validators,
         uint256[] memory privKeys,
-        Consensus.Compressed memory activities
+        Consensus.CompressedSummary memory activities
     ) internal {
         uint256 n = validators.length;
 

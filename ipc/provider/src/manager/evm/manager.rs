@@ -36,15 +36,16 @@ use ethers::abi::Tokenizable;
 use ethers::contract::abigen;
 use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::{Signer, SignerMiddleware};
-use ethers::providers::{Authorization, Http, Middleware, Provider};
+use ethers::providers::{Authorization, Http, Provider};
 use ethers::signers::{LocalWallet, Wallet};
 use ethers::types::{BlockId, Eip1559TransactionRequest, ValueOrArray, I256, U256};
 
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
+use ipc_actors_abis::validator_reward_facet::ValidatorClaim;
 use ipc_api::checkpoint::{
-    consensus::ValidatorDetail, BatchClaimPayload, BottomUpCheckpoint, BottomUpCheckpointBundle,
-    QuorumReachedEvent, Signature, ValidatorClaimPayload,
+    consensus::ValidatorData, BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent,
+    Signature,
 };
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::{StakingChangeRequest, ValidatorInfo, ValidatorStakingInfo};
@@ -1284,120 +1285,145 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
 }
 
 lazy_static!(
-    /// ABI types of the Merkle tree which contains validator addresses and their voting power.
+    /// ABI types of the Merkle tree which contains validator addresses and their committed block count.
     pub static ref VALIDATOR_SUMMARY_FIELDS: Vec<String> = vec!["address".to_owned(), "uint64".to_owned()];
 );
 
 #[async_trait]
 impl ValidatorRewarder for EthSubnetManager {
-    async fn get_validator_claim_payload(
+    /// Query validator claims, indexed by checkpoint height, to batch claim rewards.
+    async fn query_reward_claims(
         &self,
         validator_addr: &Address,
         from_checkpoint: ChainEpoch,
         to_checkpoint: ChainEpoch,
-    ) -> Result<Vec<ValidatorClaimPayload>> {
+    ) -> Result<Vec<(u64, ValidatorClaim)>> {
         let contract = checkpointing_facet::CheckpointingFacet::new(
             self.ipc_contract_info.gateway_addr,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
 
         let ev = contract
-            .event::<checkpointing_facet::ActivitySummaryRecordedFilter>()
+            .event::<checkpointing_facet::ActivityBundleRecordedFilter>()
             .from_block(from_checkpoint as u64)
             .to_block(to_checkpoint as u64)
             .address(ValueOrArray::Value(contract.address()));
 
-        let validator_evm_addr = payload_to_evm_address(validator_addr.payload())?;
+        let validator_eth_addr = payload_to_evm_address(validator_addr.payload())?;
 
-        let mut proofs = vec![];
+        let mut claims = vec![];
         for (event, meta) in query_with_meta(ev, contract.client()).await? {
-            tracing::debug!("found event at height: {}", meta.block_number);
+            tracing::debug!(
+                "found activity bundle published at height: {}",
+                meta.block_number
+            );
 
-            let mut activities = vec![];
-            let mut maybe_validator = None;
-            for validator in event.summary.consensus.validator_details {
-                let payload = vec![
-                    format!("{:?}", validator.validator),
-                    validator.blocks_committed.to_string(),
-                ];
+            // Check if we have claims for this validator in this block.
+            let our_data = event
+                .bundle
+                .consensus
+                .data
+                .iter()
+                .find(|v| v.validator == validator_eth_addr);
 
-                if validator.validator == validator_evm_addr {
-                    let summary = ValidatorDetail {
-                        validator: *validator_addr,
-                        blocks_committed: validator.blocks_committed,
-                    };
-                    maybe_validator = Some((payload.clone(), summary));
-                }
-
-                activities.push(payload);
-            }
-
-            let tree = StandardMerkleTree::<Raw>::of(&activities, &VALIDATOR_SUMMARY_FIELDS)
-                .context("failed to construct Merkle tree")?;
-
-            let Some((payload, summary)) = maybe_validator else {
+            // If we don't, skip this block.
+            let Some(data) = our_data else {
                 tracing::info!(
-                    "target validator address has not activities in epoch {}",
+                    "target validator address has no reward claims in epoch {}",
                     meta.block_number
                 );
                 continue;
             };
-            let proof = tree.get_proof(LeafType::LeafBytes(payload))?;
 
-            proofs.push(ValidatorClaimPayload {
-                checkpoint_height: event.checkpoint_height,
-                detail: summary,
+            // Utilty function to pack validator data into a vector of strings for proof generation.
+            let pack_validator_data = |v: &ValidatorData| {
+                vec![format!("{:?}", v.validator), v.blocks_committed.to_string()]
+            };
+
+            // Form the entire tree from the leaves.
+            let tree = {
+                let leaves = event
+                    .bundle
+                    .consensus
+                    .data
+                    .iter()
+                    .map(pack_validator_data)
+                    .collect();
+                StandardMerkleTree::<Raw>::of(&leaves, &VALIDATOR_SUMMARY_FIELDS)
+                    .context("failed to construct Merkle tree")?
+            };
+
+            // Get the proof for the leaf.
+            let proof = {
+                let leaf = pack_validator_data(data);
+                tree.get_proof(LeafType::LeafBytes(leaf))?
+            };
+
+            // Construct the claim and add it to the list.
+            let claim = ValidatorClaim {
+                data: data.clone(),
                 proof: proof.into_iter().map(|v| v.into()).collect(),
-            });
+            };
+            claims.push((event.checkpoint_height, claim));
         }
 
-        Ok(proofs)
+        Ok(claims)
     }
 
-    /// Get the reward for specific validator in a subnet
-    async fn get_validator_activities(
+    /// Query validator rewards in the current subnet, without obtaining proofs.
+    async fn query_validator_rewards(
         &self,
         validator_addr: &Address,
         from_checkpoint: ChainEpoch,
         to_checkpoint: ChainEpoch,
-    ) -> Result<Vec<ValidatorDetail>> {
+    ) -> Result<Vec<(u64, ValidatorData)>> {
         let contract = checkpointing_facet::CheckpointingFacet::new(
             self.ipc_contract_info.gateway_addr,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
 
         let ev = contract
-            .event::<checkpointing_facet::ActivitySummaryRecordedFilter>()
+            .event::<checkpointing_facet::ActivityBundleRecordedFilter>()
             .from_block(from_checkpoint as u64)
             .to_block(to_checkpoint as u64)
             .address(ValueOrArray::Value(contract.address()));
 
-        let mut activities = vec![];
+        let mut rewards = vec![];
         let validator_eth_addr = payload_to_evm_address(validator_addr.payload())?;
 
         for (event, meta) in query_with_meta(ev, contract.client()).await? {
-            tracing::debug!("found event at height: {}", meta.block_number);
-            for validator in event.summary.consensus.validator_details {
-                if validator.validator != validator_eth_addr {
-                    continue;
-                }
+            tracing::debug!(
+                "found activity bundle published at height: {}",
+                meta.block_number
+            );
 
-                activities.push(ValidatorDetail {
+            // Check if we have rewards for this validator in this block.
+            if let Some(data) = event
+                .bundle
+                .consensus
+                .data
+                .iter()
+                .find(|v| v.validator == validator_eth_addr)
+            {
+                // TODO type conversion.
+                let data = ValidatorData {
                     validator: *validator_addr,
-                    blocks_committed: validator.blocks_committed,
-                });
+                    blocks_committed: data.blocks_committed,
+                };
+                rewards.push((meta.block_number.into(), data));
             }
         }
 
-        Ok(activities)
+        Ok(rewards)
     }
 
-    /// Claim the reward in batch
-    async fn batch_claim(
+    /// Claim validator rewards in a batch for the specified subnet.
+    async fn batch_subnet_claim(
         &self,
         submitter: &Address,
         reward_claim_subnet: &SubnetID,
-        payloads: Vec<BatchClaimPayload>,
+        reward_origin_subnet: &SubnetID,
+        claims: Vec<(u64, ValidatorClaim)>,
     ) -> Result<()> {
         let signer = Arc::new(self.get_signer(submitter)?);
         let contract = validator_reward_facet::ValidatorRewardFacet::new(
@@ -1405,12 +1431,14 @@ impl ValidatorRewarder for EthSubnetManager {
             signer.clone(),
         );
 
-        let p = payloads
-            .into_iter()
-            .map(validator_reward_facet::BatchClaimPayload::try_from)
-            .collect::<Result<Vec<_>>>()?;
-        let call = contract.batch_claim(p);
-        let call = call_with_premium_and_pending_block(signer, call).await?;
+        // separate the Vec of tuples claims into two Vecs of Height and Claim
+        let (heights, claims): (Vec<u64>, Vec<ValidatorClaim>) =
+            claims.into_iter().unzip();
+
+        let call = {
+            let call = contract.batch_subnet_claim(reward_origin_subnet.into(), heights, claims);
+            call_with_premium_and_pending_block(signer, call).await?
+        };
 
         call.send().await?;
 

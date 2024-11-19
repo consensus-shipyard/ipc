@@ -33,7 +33,7 @@ import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.so
 
 import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 
-import {FullActivitySummary, Consensus} from "../../contracts/activities/Activity.sol";
+import {FullActivityBundle, Consensus} from "../../contracts/activities/Activity.sol";
 
 contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
@@ -166,8 +166,8 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
                 commitment: bytes32(uint256(0))
             })
         });
@@ -228,8 +228,8 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
                 commitment: bytes32(uint256(0))
             })
         });

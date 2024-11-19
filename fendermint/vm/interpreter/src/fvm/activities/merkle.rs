@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::Context;
-use fendermint_actor_activity_tracker::ValidatorDetail;
+use fendermint_actor_activity_tracker::ValidatorData;
 use ipc_api::evm::payload_to_evm_address;
 use ipc_observability::lazy_static;
 use merkle_tree_rs::format::Raw;
@@ -27,7 +27,7 @@ impl MerkleProofGen {
 }
 
 impl MerkleProofGen {
-    pub fn new(values: &[ValidatorDetail]) -> anyhow::Result<Self> {
+    pub fn new(values: &[ValidatorData]) -> anyhow::Result<Self> {
         let values = values
             .iter()
             .map(|t| {

@@ -14,7 +14,7 @@ import {IDiamondCut} from "../../contracts/interfaces/IDiamondCut.sol";
 import {QuorumInfo} from "../../contracts/structs/Quorum.sol";
 import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../../contracts/structs/CrossNet.sol";
 import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
-import {SubnetID, Subnet, IPCAddress, Validator, StakingChange, StakingChangeRequest, Asset, StakingOperation} from "../../contracts/structs/Subnet.sol";
+import {SubnetID, Subnet, IPCAddress, ValidatorData, StakingChange, StakingChangeRequest, Asset, StakingOperation} from "../../contracts/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../../contracts/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../../contracts/lib/CrossMsgHelper.sol";
@@ -39,7 +39,7 @@ import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 import {SubnetActorDiamond} from "../../contracts/SubnetActorDiamond.sol";
 import {SubnetActorFacetsHelper} from "../helpers/SubnetActorFacetsHelper.sol";
 
-import {FullActivitySummary, Consensus} from "../../contracts/activities/Activity.sol";
+import {FullActivityBundle, Consensus} from "../../contracts/activities/Activity.sol";
 
 contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeTokenMock {
     using SubnetIDHelper for SubnetID;
@@ -1070,9 +1070,12 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 1,
             msgs: new IpcEnvelope[](0),
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
-                commitment: bytes32(uint256(0))
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({
+                    totalActiveValidators: 1,
+                    totalNumBlocksCommitted: 3
+                }),
+                detailsRootCommitment: bytes32(uint256(0))
             })
         });
 
@@ -1082,9 +1085,12 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 1,
             msgs: new IpcEnvelope[](0),
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
-                commitment: bytes32(uint256(0))
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({
+                    totalActiveValidators: 1,
+                    totalNumBlocksCommitted: 3
+                }),
+                detailsRootCommitment: bytes32(uint256(0))
             })
         });
 
@@ -1127,9 +1133,12 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             blockHash: keccak256("block"),
             nextConfigurationNumber: 2,
             msgs: new IpcEnvelope[](0),
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
-                commitment: bytes32(uint256(0))
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({
+                    totalActiveValidators: 1,
+                    totalNumBlocksCommitted: 3
+                }),
+                detailsRootCommitment: bytes32(uint256(0))
             })
         });
 
@@ -1154,9 +1163,12 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 1,
             msgs: new IpcEnvelope[](0),
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
-                commitment: bytes32(uint256(0))
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({
+                    totalActiveValidators: 1,
+                    totalNumBlocksCommitted: 3
+                }),
+                detailsRootCommitment: bytes32(uint256(0))
             })
         });
 
@@ -1179,9 +1191,12 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 1,
             msgs: new IpcEnvelope[](0),
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
-                commitment: bytes32(uint256(0))
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({
+                    totalActiveValidators: 1,
+                    totalNumBlocksCommitted: 3
+                }),
+                detailsRootCommitment: bytes32(uint256(0))
             })
         });
 
@@ -1229,9 +1244,12 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 1,
             msgs: msgs,
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
-                commitment: bytes32(uint256(0))
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({
+                    totalActiveValidators: 1,
+                    totalNumBlocksCommitted: 3
+                }),
+                detailsRootCommitment: bytes32(uint256(0))
             })
         });
 
@@ -1253,9 +1271,12 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 1,
             msgs: new IpcEnvelope[](0),
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
-                commitment: bytes32(uint256(0))
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({
+                    totalActiveValidators: 1,
+                    totalNumBlocksCommitted: 3
+                }),
+                detailsRootCommitment: bytes32(uint256(0))
             })
         });
 
@@ -1265,9 +1286,12 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 1,
             msgs: new IpcEnvelope[](0),
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
-                commitment: bytes32(uint256(0))
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({
+                    totalActiveValidators: 1,
+                    totalNumBlocksCommitted: 3
+                }),
+                detailsRootCommitment: bytes32(uint256(0))
             })
         });
 
@@ -1333,9 +1357,12 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             blockHash: keccak256("block"),
             nextConfigurationNumber: 1,
             msgs: new IpcEnvelope[](0),
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
-                commitment: bytes32(uint256(0))
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({
+                    totalActiveValidators: 1,
+                    totalNumBlocksCommitted: 3
+                }),
+                detailsRootCommitment: bytes32(uint256(0))
             })
         });
 
@@ -1398,9 +1425,12 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             blockHash: keccak256("block"),
             nextConfigurationNumber: 1,
             msgs: new IpcEnvelope[](0),
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
-                commitment: bytes32(uint256(0))
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({
+                    totalActiveValidators: 1,
+                    totalNumBlocksCommitted: 3
+                }),
+                detailsRootCommitment: bytes32(uint256(0))
             })
         });
 
@@ -1485,9 +1515,12 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             blockHash: keccak256("block"),
             nextConfigurationNumber: 1,
             msgs: new IpcEnvelope[](0),
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
-                commitment: bytes32(uint256(0))
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({
+                    totalActiveValidators: 1,
+                    totalNumBlocksCommitted: 3
+                }),
+                detailsRootCommitment: bytes32(uint256(0))
             })
         });
 
@@ -1523,9 +1556,12 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             blockHash: keccak256("block"),
             nextConfigurationNumber: 1,
             msgs: new IpcEnvelope[](0),
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
-                commitment: bytes32(uint256(0))
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({
+                    totalActiveValidators: 1,
+                    totalNumBlocksCommitted: 3
+                }),
+                detailsRootCommitment: bytes32(uint256(0))
             })
         });
 
@@ -1571,9 +1607,12 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             blockHash: keccak256("block"),
             nextConfigurationNumber: 1,
             msgs: new IpcEnvelope[](0),
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
-                commitment: bytes32(uint256(0))
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({
+                    totalActiveValidators: 1,
+                    totalNumBlocksCommitted: 3
+                }),
+                detailsRootCommitment: bytes32(uint256(0))
             })
         });
 
@@ -1623,9 +1662,12 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
                 blockHash: keccak256("block"),
                 nextConfigurationNumber: 1,
                 msgs: new IpcEnvelope[](0),
-                activities: Consensus.Compressed({
-                    aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
-                    commitment: bytes32(uint256(0))
+                activities: Consensus.CompressedSummary({
+                    aggregated: Consensus.AggregatedStats({
+                        totalActiveValidators: 1,
+                        totalNumBlocksCommitted: 3
+                    }),
+                    detailsRootCommitment: bytes32(uint256(0))
                 })
             });
 
@@ -1690,10 +1732,12 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 1,
             msgs: msgs,
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
-                commitment: bytes32(uint256(0))
-            })
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({
+                    totalActiveValidators: 1,
+                    totalNumBlocksCommitted: 3
+                }),
+                detailsRootCommitment: bytes32(uint256(0))
         });
 
         vm.prank(caller);

@@ -8,7 +8,7 @@ pub mod actor;
 mod merkle;
 
 use crate::fvm::activities::merkle::MerkleProofGen;
-use fendermint_actor_activity_tracker::ValidatorDetail;
+use fendermint_actor_activity_tracker::ValidatorData;
 use fendermint_crypto::PublicKey;
 use fvm_shared::clock::ChainEpoch;
 use std::fmt::Debug;
@@ -39,7 +39,7 @@ pub trait ValidatorActivityTracker {
     fn purge_activities(&mut self) -> anyhow::Result<()>;
 }
 
-impl ActivityDetails<ValidatorDetail> {
+impl ActivityDetails<ValidatorData> {
     pub fn commitment(&self) -> anyhow::Result<Vec<u8>> {
         let gen = MerkleProofGen::new(self.details.as_slice())?;
         Ok(gen.root().to_fixed_bytes().to_vec())
