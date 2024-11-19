@@ -716,6 +716,8 @@ sleep 3 # briefly wait for the relayer to start
 echo "$temp_evm_keystore" > "${IPC_CONFIG_FOLDER}"/evm_keystore.json
 
 # move localnet funds to subnet
+BUCKET_MANAGER_ADDRESS=""
+CREDIT_MANAGER_ADDRESS=""
 if [[ $local_deploy = true ]]; then
   echo "$DASHES Move account funds into subnet"
   # move 10000 HOKU to subnet (i.e., leave 100 HOKU on rootnet for
@@ -734,7 +736,7 @@ if [[ $local_deploy = true ]]; then
   while true; do
     # validate accounts have subnet balance (the last account will be final deposit tx)
     addr=$(jq .[9].address < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
-    balance=$(cast balance --rpc-url http://localhost:8645 --ether "${addr}" | awk '{printf "%.0f", $1}')
+    balance=$(cast balance --rpc-url http://localhost:"${ETHAPI_HOST_PORTS[0]}" --ether "${addr}" | awk '{printf "%.0f", $1}')
     if [[ $balance != 0 ]]; then
       break
     fi
@@ -755,8 +757,30 @@ if [[ $local_deploy = true ]]; then
     echo "Hoku CLI not installed...skipping credit funding"
   fi
   echo
+  
+  # Deploy the bucket and credit manager contracts
+  # Note: due to validators also submitting checkpoints, it's impossible to get around nonce issues
+  # with validator accounts. So, we deploy the bucket and credit manager contracts via the last evm
+  # account. Ideally, we would use validator 0 and somehow avoid nonce clashes.
+  deployer_pk=$(jq .[9].private_key < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
+  cd "${IPC_FOLDER}/hoku-contracts"
+  echo "$DASHES deploy bucket and credit manager output $DASHES"
+  deploy_bucket_manager_token_out="$(forge script script/BucketManager.s.sol --private-key "${deployer_pk}" --rpc-url http://localhost:"${ETHAPI_HOST_PORTS[0]}" --tc DeployScript --sig 'run(string)' local --broadcast --timeout 120 -g 100000 -vv)"
+  deploy_credit_manager_token_out="$(forge script script/Credit.s.sol --private-key "${deployer_pk}" --rpc-url http://localhost:"${ETHAPI_HOST_PORTS[0]}" --tc DeployScript --sig 'run(string)' local --broadcast --timeout 120 -g 100000 -vv)"
+  echo ""
+  echo "$deploy_bucket_manager_token_out"
+  echo "$deploy_credit_manager_token_out"
+  echo ""
+  # note: these are consistently going to be 0xe1Aa25618fA0c7A1CFDab5d6B456af611873b629 and
+  # 0xf7Cd8fa9b94DB2Aa972023b379c7f72c65E4De9D, respectively, for localnet
+  BUCKET_MANAGER_ADDRESS=$(echo "$deploy_bucket_manager_token_out" | sed -n 's/.*contract BucketManager *\([^ ]*\).*/\1/p')
+  CREDIT_MANAGER_ADDRESS=$(echo "$deploy_credit_manager_token_out" | sed -n 's/.*contract Credit *\([^ ]*\).*/\1/p')
+  echo "Bucket manager address: ${BUCKET_MANAGER_ADDRESS}"
+  echo "Credit manager address: ${CREDIT_MANAGER_ADDRESS}"
+  echo
   echo "${DASHES} Subnet setup complete ${DASHES}"
   echo
+  cd "$IPC_FOLDER"
 fi
 
 # Print a summary of the deployment
@@ -811,9 +835,11 @@ Subnet registry:        0x74539671a1d2f1c8f200826baba665179f53a1b7
 EOF
 
 if [[ $local_deploy = true ]]; then
+  echo "Subnet bucket manager:  ${BUCKET_MANAGER_ADDRESS}"
+  echo "Subnet credit manager:  ${CREDIT_MANAGER_ADDRESS}"
   echo
   echo "Account balances:"
-  addr=$(jq .[0].address < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
+  addr=$(jq .[3].address < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
   parent_native=$(cast balance --rpc-url http://localhost:"${ANVIL_HOST_PORT}" --ether "${addr}" | awk '{printf "%.2f", $1}')
   parent_hoku=$(cast balance --rpc-url http://localhost:"${ANVIL_HOST_PORT}" --erc20 "${SUPPLY_SOURCE_ADDRESS}" "${addr}" | awk '{printf "%.0f", $1 / 1000000000000000000}')
   subnet_native=$(cast balance --rpc-url http://localhost:"${ETHAPI_HOST_PORTS[0]}" --ether "${addr}" | awk '{printf "%.2f", $1}')
