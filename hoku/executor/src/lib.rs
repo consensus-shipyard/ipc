@@ -642,50 +642,18 @@ where
 
         transfer_to_actor(BURNT_FUNDS_ACTOR_ID, &over_estimation_burn)?;
 
-        // Refund unused gas, prioritizing the sender
-        let gas_used = if refund < gas_costs.from_balance {
-            // The entire refund goes to the sender
-            transfer_to_actor(sender_id, &refund)?;
-            // Both credit costs were used entirely
-            let from_balance_used = &gas_costs.from_balance - &refund;
-            GasAmounts::new(
-                from_balance_used,
-                gas_costs.from_credit.clone(),
-                gas_costs.from_sponsor_credit.clone(),
-            )
-        } else if refund < &gas_costs.from_balance + &gas_costs.from_credit {
-            // Cap the sender's refund to its gas cost
-            transfer_to_actor(sender_id, &gas_costs.from_balance)?;
-            // The remainder goes to the allowance source
-            let remainder = &refund - &gas_costs.from_balance;
-            transfer_to_actor(BLOBS_ACTOR_ID, &remainder)?;
-            // A portion of gas credits were used and the sponsored credits were used entirely
-            let from_credit_used = &gas_costs.from_credit - &remainder;
-            GasAmounts::new(
-                TokenAmount::zero(),
-                from_credit_used,
-                gas_costs.from_sponsor_credit.clone(),
-            )
-        } else {
-            // Cap the sender's refund to its gas cost
-            transfer_to_actor(sender_id, &gas_costs.from_balance)?;
-            // The remainder goes to the allowance source
-            let remainder = &refund - (&gas_costs.from_balance + &gas_costs.from_credit);
-            transfer_to_actor(BLOBS_ACTOR_ID, &remainder)?;
-            // Only sponsored gas credits were used
-            let from_sponsor_used = &gas_costs.from_sponsor_credit - &remainder;
-            GasAmounts::new(TokenAmount::zero(), TokenAmount::zero(), from_sponsor_used)
-        };
+        let gas_refunds = gas_costs.refund(&refund);
+        transfer_to_actor(sender_id, &gas_refunds.from_balance)?;
+        transfer_to_actor(
+            BLOBS_ACTOR_ID,
+            &(&gas_refunds.from_credit + &gas_refunds.from_sponsor_credit),
+        )?;
 
         debug!(
-            base_fee_burn = ?base_fee_burn,
-            over_estimation_burn = ?over_estimation_burn,
-            refund = ?refund,
-            miner_tip = ?miner_tip,
-            from_balance = ?gas_used.from_balance,
-            from_credit = ?gas_used.from_credit,
-            from_sponsor_credit = ?gas_used.from_sponsor_credit,
-            "calculated gas used for tx from {} to {}",
+            balance_refund = ?gas_refunds.from_balance,
+            credit_refund = ?gas_refunds.from_credit,
+            sponsor_credit_refund = ?gas_refunds.from_sponsor_credit,
+            "calculated gas refunds for tx from {} to {}",
             msg.from,
             msg.to
         );
@@ -696,10 +664,8 @@ where
         }
 
         // Refund gas credit difference
-        let credit_refund = &gas_costs.from_credit - &gas_used.from_credit;
-        self.update_vgas_allowance(msg.from, None, credit_refund)?;
-        let sponsor_credit_refund = &gas_costs.from_sponsor_credit - &gas_used.from_sponsor_credit;
-        self.update_vgas_allowance(msg.from, msg.sponsor, sponsor_credit_refund)?;
+        self.update_vgas_allowance(msg.from, None, gas_refunds.from_credit)?;
+        self.update_vgas_allowance(msg.from, msg.sponsor, gas_refunds.from_sponsor_credit)?;
 
         Ok(ApplyRet {
             msg_receipt: receipt,

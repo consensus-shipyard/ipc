@@ -1,7 +1,9 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use fendermint_vm_actor_interface::blobs::BLOBS_ACTOR_ID;
 use fvm_shared::econ::TokenAmount;
+use num_traits::Zero;
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct GasAmounts {
@@ -25,6 +27,29 @@ impl GasAmounts {
 
     pub fn total(&self) -> TokenAmount {
         &self.from_balance + &self.from_credit + &self.from_sponsor_credit
+    }
+
+    // Calculate refunds, prioritizing the sender
+    pub fn refund(&self, refund: &TokenAmount) -> GasAmounts {
+        if refund < &self.from_balance {
+            // The entire refund goes to the sender balance
+            GasAmounts::new(refund.clone(), TokenAmount::zero(), TokenAmount::zero())
+        } else if refund < &(&self.from_balance + &self.from_credit) {
+            // Cap the sender balance refund to its cost
+            // The remainder goes to the sender's gas credit
+            let remainder = refund - &self.from_balance;
+            GasAmounts::new(self.from_balance.clone(), remainder, TokenAmount::zero())
+        } else {
+            // Cap the sender balance refund to its cost
+            // Cap the sender gas credit refund to its cost
+            // The remainder goes to the sponsor's gas credit
+            let remainder = refund - &self.from_balance - &self.from_credit;
+            GasAmounts::new(
+                self.from_balance.clone(),
+                self.from_credit.clone(),
+                remainder,
+            )
+        }
     }
 }
 
