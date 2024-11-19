@@ -464,10 +464,10 @@ where
     fn start_query(&mut self, cid: Cid, subnet_id: SubnetID, response_channel: ResponseChannel) {
         let mut peers = self.membership_mut().providers_of_subnet(&subnet_id);
 
-        emit(observe::ContentEvent::ResolvePeers(peers.len()));
+        emit(observe::ResolveEvent::Peers(peers.len()));
 
         if peers.is_empty() {
-            emit(observe::ContentEvent::ResolveNoPeers);
+            emit(observe::ResolveEvent::NoPeers);
             send_resolve_result(response_channel, Err(anyhow!(NoKnownPeers(subnet_id))));
         } else {
             // Connect to them in a random order, so as not to overwhelm any specific peer.
@@ -478,9 +478,7 @@ where
                 .into_iter()
                 .partition::<Vec<_>, _>(|id| self.swarm.is_connected(id));
 
-            emit(observe::ContentEvent::ResolveConnectedPeers(
-                connected.len(),
-            ));
+            emit(observe::ResolveEvent::ConnectedPeers(connected.len()));
 
             let peers = [connected, known].into_iter().flatten().collect();
             let (peers, fallback) = self.split_peers_for_query(peers);
@@ -506,15 +504,15 @@ where
     fn resolve_query(&mut self, mut query: Query, result: ResolveResult) {
         match result {
             Ok(_) => {
-                emit(observe::ContentEvent::ResolveSuccess(query.cid));
+                emit(observe::ResolveEvent::Success(query.cid));
                 send_resolve_result(query.response_channel, result)
             }
             Err(_) if query.fallback_peer_ids.is_empty() => {
-                emit(observe::ContentFailureEvent::ResolveFailure(query.cid));
+                emit(observe::ResolveFailureEvent::Failure(query.cid));
                 send_resolve_result(query.response_channel, result)
             }
             Err(e) => {
-                emit(observe::ContentFailureEvent::ResolveFallback(query.cid));
+                emit(observe::ResolveFailureEvent::Fallback(query.cid));
                 debug!(
                     "resolving {} from {} failed with {}, but there are {} fallback peers to try",
                     query.cid,

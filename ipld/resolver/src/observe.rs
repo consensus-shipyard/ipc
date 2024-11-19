@@ -92,8 +92,8 @@ impl_traceables!(TraceLevel::Warn, "Identify", IdentifyFailureEvent);
 impl_traceables!(TraceLevel::Info, "Discovery", DiscoveryEvent);
 impl_traceables!(TraceLevel::Info, "Membership", MembershipEvent);
 impl_traceables!(TraceLevel::Warn, "Membership", MembershipFailureEvent);
-impl_traceables!(TraceLevel::Info, "Content", ContentEvent);
-impl_traceables!(TraceLevel::Warn, "Content", ContentFailureEvent);
+impl_traceables!(TraceLevel::Info, "Content", ResolveEvent);
+impl_traceables!(TraceLevel::Warn, "Content", ResolveFailureEvent);
 
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -218,40 +218,40 @@ impl Recordable for MembershipFailureEvent {
 
 #[derive(Debug)]
 #[allow(dead_code)]
-pub enum ContentEvent {
-    ResolveStarted(Cid),
-    ResolveSuccess(Cid),
-    ResolveCompleted,
-    ResolvePeers(usize),
-    ResolveNoPeers,
-    ResolveConnectedPeers(usize),
+pub enum ResolveEvent {
+    Started(Cid),
+    Success(Cid),
+    Completed,
+    Peers(usize),
+    NoPeers,
+    ConnectedPeers(usize),
 }
 
-impl Recordable for ContentEvent {
+impl Recordable for ResolveEvent {
     fn record_metrics(&self) {
         match self {
-            Self::ResolveStarted(_) => CONTENT_RESOLVE_RUNNING.inc(),
-            Self::ResolveSuccess(_) => CONTENT_RESOLVE_SUCCESS.inc(),
-            Self::ResolveCompleted => CONTENT_RESOLVE_RUNNING.dec(),
-            Self::ResolvePeers(num) => CONTENT_RESOLVE_PEERS.observe(*num as f64),
-            Self::ResolveNoPeers => CONTENT_RESOLVE_NO_PEERS.inc(),
-            Self::ResolveConnectedPeers(num) => CONTENT_CONNECTED_PEERS.observe(*num as f64),
+            Self::Started(_) => CONTENT_RESOLVE_RUNNING.inc(),
+            Self::Success(_) => CONTENT_RESOLVE_SUCCESS.inc(),
+            Self::Completed => CONTENT_RESOLVE_RUNNING.dec(),
+            Self::Peers(num) => CONTENT_RESOLVE_PEERS.observe(*num as f64),
+            Self::NoPeers => CONTENT_RESOLVE_NO_PEERS.inc(),
+            Self::ConnectedPeers(num) => CONTENT_CONNECTED_PEERS.observe(*num as f64),
         }
     }
 }
 
 #[derive(Debug)]
 #[allow(dead_code)]
-pub enum ContentFailureEvent {
-    ResolveFailure(Cid),
-    ResolveFallback(Cid),
+pub enum ResolveFailureEvent {
+    Failure(Cid),
+    Fallback(Cid),
 }
 
-impl Recordable for ContentFailureEvent {
+impl Recordable for ResolveFailureEvent {
     fn record_metrics(&self) {
         match self {
-            Self::ResolveFailure(_) => CONTENT_RESOLVE_FAILURE.inc(),
-            Self::ResolveFallback(_) => CONTENT_RESOLVE_FALLBACK.inc(),
+            Self::Failure(_) => CONTENT_RESOLVE_FAILURE.inc(),
+            Self::Fallback(_) => CONTENT_RESOLVE_FALLBACK.inc(),
         }
     }
 }
@@ -300,13 +300,13 @@ mod tests {
             Some(peer_id),
             TopicHash::from_raw("topic".to_string()),
         ));
-        emit(ContentEvent::ResolveStarted(cid));
-        emit(ContentEvent::ResolveSuccess(cid));
-        emit(ContentEvent::ResolveCompleted);
-        emit(ContentEvent::ResolvePeers(Default::default()));
-        emit(ContentEvent::ResolveNoPeers);
-        emit(ContentEvent::ResolveConnectedPeers(Default::default()));
-        emit(ContentFailureEvent::ResolveFailure(cid));
-        emit(ContentFailureEvent::ResolveFallback(cid));
+        emit(ResolveEvent::Started(cid));
+        emit(ResolveEvent::Success(cid));
+        emit(ResolveEvent::Completed);
+        emit(ResolveEvent::Peers(Default::default()));
+        emit(ResolveEvent::NoPeers);
+        emit(ResolveEvent::ConnectedPeers(Default::default()));
+        emit(ResolveFailureEvent::Failure(cid));
+        emit(ResolveFailureEvent::Fallback(cid));
     }
 }

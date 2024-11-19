@@ -140,7 +140,7 @@ impl<P: StoreParams> Behaviour<P> {
     /// will initiate connections to the peers which aren't connected at the moment.
     pub fn resolve(&mut self, cid: Cid, peers: Vec<PeerId>) -> QueryId {
         debug!("resolving {cid} from {peers:?}");
-        emit(observe::ContentEvent::ResolveStarted(cid));
+        emit(observe::ResolveEvent::Started(cid));
         // Not passing any missing items, which will result in a call to `BitswapStore::missing_blocks`.
         self.inner.sync(cid, peers, [].into_iter())
     }
@@ -334,7 +334,7 @@ impl<P: StoreParams> NetworkBehaviour for Behaviour<P> {
                 ToSwarm::GenerateEvent(ev) => match ev {
                     BitswapEvent::Progress(_, _) => {}
                     BitswapEvent::Complete(id, result) => {
-                        emit(observe::ContentEvent::ResolveCompleted);
+                        emit(observe::ResolveEvent::Completed);
                         let out = Event::Complete(id, result);
                         return Poll::Ready(ToSwarm::GenerateEvent(out));
                     }
