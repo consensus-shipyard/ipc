@@ -5362,6 +5362,7 @@ dependencies = [
  "fvm_shared",
  "gcra",
  "ipc-api",
+ "ipc-observability",
  "ipc_ipld_resolver",
  "lazy_static",
  "libipld",

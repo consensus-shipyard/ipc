@@ -5,8 +5,16 @@ use std::marker::PhantomData;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
+use super::NetworkConfig;
+use crate::hash::blake2b_256;
+use crate::observe;
+use crate::provider_cache::{ProviderDelta, SubnetProviderCache};
+use crate::provider_record::{ProviderRecord, SignedProviderRecord};
+use crate::vote_record::{SignedVoteRecord, VoteRecord};
+use crate::Timestamp;
 use anyhow::anyhow;
 use ipc_api::subnet_id::SubnetID;
+use ipc_observability::emit;
 use libp2p::core::Endpoint;
 use libp2p::gossipsub::{
     self, IdentTopic, MessageAuthenticity, MessageId, PublishError, Sha256Topic, SubscriptionError,
@@ -23,14 +31,6 @@ use log::{debug, error, info, warn};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tokio::time::{Instant, Interval};
-
-use crate::hash::blake2b_256;
-use crate::provider_cache::{ProviderDelta, SubnetProviderCache};
-use crate::provider_record::{ProviderRecord, SignedProviderRecord};
-use crate::vote_record::{SignedVoteRecord, VoteRecord};
-use crate::{stats, Timestamp};
-
-use super::NetworkConfig;
 
 /// `Gossipsub` topic identifier for subnet membership.
 const PUBSUB_MEMBERSHIP: &str = "/ipc/membership";
@@ -326,11 +326,13 @@ where
         );
         match self.inner.publish(self.membership_topic.clone(), data) {
             Err(e) => {
-                stats::MEMBERSHIP_PUBLISH_FAILURE.inc();
+                emit(observe::MembershipFailureEvent::PublishFailure(
+                    e.to_string().into(),
+                ));
                 Err(anyhow!(e))
             }
             Ok(_msg_id) => {
-                stats::MEMBERSHIP_PUBLISH_SUCCESS.inc();
+                emit(observe::MembershipEvent::PublishSuccess);
                 self.last_publish_timestamp = Timestamp::now();
                 self.next_publish_timestamp =
                     self.last_publish_timestamp + self.publish_interval.period();
@@ -346,11 +348,13 @@ where
         let data = vote.into_envelope().into_protobuf_encoding();
         match self.inner.publish(topic, data) {
             Err(e) => {
-                stats::MEMBERSHIP_PUBLISH_FAILURE.inc();
+                emit(observe::MembershipFailureEvent::PublishFailure(
+                    e.to_string().into(),
+                ));
                 Err(anyhow!(e))
             }
             Ok(_msg_id) => {
-                stats::MEMBERSHIP_PUBLISH_SUCCESS.inc();
+                emit(observe::MembershipEvent::PublishSuccess);
                 Ok(())
             }
         }
@@ -363,11 +367,13 @@ where
         let topic = self.preemptive_topic(&subnet_id);
         match self.inner.publish(topic, data) {
             Err(e) => {
-                stats::MEMBERSHIP_PUBLISH_FAILURE.inc();
+                emit(observe::MembershipFailureEvent::PublishFailure(
+                    e.to_string().into(),
+                ));
                 Err(anyhow!(e))
             }
             Ok(_msg_id) => {
-                stats::MEMBERSHIP_PUBLISH_SUCCESS.inc();
+                emit(observe::MembershipEvent::PublishSuccess);
                 Ok(())
             }
         }
@@ -378,8 +384,9 @@ where
     /// Call this method when the discovery service learns the address of a peer.
     pub fn set_routable(&mut self, peer_id: PeerId) {
         self.provider_cache.set_routable(peer_id);
-        stats::MEMBERSHIP_ROUTABLE_PEERS
-            .set(self.provider_cache.num_routable().try_into().unwrap());
+
+        let num_routable = self.provider_cache.num_routable().try_into().unwrap();
+        emit(observe::MembershipEvent::RoutablePeers(num_routable));
         self.publish_for_new_peer(peer_id);
     }
 
@@ -406,33 +413,27 @@ where
         if msg.topic == self.membership_topic.hash() {
             match SignedProviderRecord::from_bytes(&msg.data).map(|r| r.into_record()) {
                 Ok(record) => self.handle_provider_record(record),
-                Err(e) => {
-                    stats::MEMBERSHIP_INVALID_MESSAGE.inc();
-                    warn!(
-                        "Gossip message from peer {:?} could not be deserialized as ProviderRecord: {e}",
-                        msg.source
-                    );
-                }
+                Err(e) => emit(
+                    observe::MembershipFailureEvent::GossipInvalidProviderRecord(
+                        msg.source,
+                        e.into(),
+                    ),
+                ),
             }
         } else if self.voting_topics.contains(&msg.topic) {
             match SignedVoteRecord::from_bytes(&msg.data).map(|r| r.into_record()) {
                 Ok(record) => self.handle_vote_record(record),
-                Err(e) => {
-                    stats::MEMBERSHIP_INVALID_MESSAGE.inc();
-                    warn!(
-                        "Gossip message from peer {:?} could not be deserialized as VoteRecord: {e}",
-                        msg.source
-                    );
-                }
+                Err(e) => emit(observe::MembershipFailureEvent::GossipInvalidVoteRecord(
+                    msg.source,
+                    e.into(),
+                )),
             }
         } else if let Some(subnet_id) = self.preemptive_topics.get(&msg.topic) {
             self.handle_preemptive_data(subnet_id.clone(), msg.data)
         } else {
-            stats::MEMBERSHIP_UNKNOWN_TOPIC.inc();
-            warn!(
-                "unknown gossipsub topic in message from {:?}: {}",
-                msg.source, msg.topic
-            );
+            emit(observe::MembershipFailureEvent::GossipUnknownTopic(
+                msg.source, msg.topic,
+            ));
         }
     }
 
@@ -444,7 +445,7 @@ where
         debug!("received provider record: {record:?}");
         let (event, publish) = match self.provider_cache.add_provider(&record) {
             None => {
-                stats::MEMBERSHIP_SKIPPED_PEERS.inc();
+                emit(observe::MembershipEvent::Skipped(record.peer_id));
                 (Some(Event::Skipped(record.peer_id)), false)
             }
             Some(d) if d.is_empty() && !d.is_new => (None, false),
@@ -459,7 +460,7 @@ where
         }
 
         if publish {
-            stats::MEMBERSHIP_PROVIDER_PEERS.inc();
+            emit(observe::MembershipEvent::Added(record.peer_id));
             self.publish_for_new_peer(record.peer_id)
         }
     }
@@ -514,7 +515,7 @@ where
         let cutoff_timestamp = Timestamp::now() - self.max_provider_age;
         let pruned = self.provider_cache.prune_providers(cutoff_timestamp);
         for peer_id in pruned {
-            stats::MEMBERSHIP_PROVIDER_PEERS.dec();
+            emit(observe::MembershipEvent::Removed(peer_id));
             self.outbox.push_back(Event::Removed(peer_id))
         }
     }
