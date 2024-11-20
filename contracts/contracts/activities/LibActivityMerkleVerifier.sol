@@ -10,12 +10,17 @@ import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProo
 library LibActivityMerkleVerifier {
     function ensureValidProof(
         bytes32 commitment,
-        Consensus.ValidatorDetail calldata detail,
-        bytes32[] calldata proof
+        Consensus.ValidatorData calldata detail,
+        Consensus.MerkleHash[] calldata proof
     ) internal pure {
         // Constructing leaf: https://github.com/OpenZeppelin/merkle-tree#leaf-hash
         bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(detail.validator, detail.blocksCommitted))));
-        bool valid = MerkleProof.verify({proof: proof, root: commitment, leaf: leaf});
+        // converting proof to bytes32[]
+        bytes32[] memory proofBytes = new bytes32[](proof.length);
+        for (uint256 i = 0; i < proof.length; i++) {
+            proofBytes[i] = Consensus.MerkleHash.unwrap(proof[i]);
+        }
+        bool valid = MerkleProof.verify({proof: proofBytes, root: commitment, leaf: leaf});
         if (!valid) {
             revert InvalidProof();
         }

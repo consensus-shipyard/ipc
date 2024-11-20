@@ -14,10 +14,10 @@ pub struct ValidatorStats {
     pub blocks_committed: u64,
 }
 
-pub type ValidatorDetailMap<BS> = Map2<BS, Address, ValidatorStats>;
+pub type ValidatorMap<BS> = Map2<BS, Address, ValidatorStats>;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct ValidatorDetail {
+pub struct ValidatorData {
     pub validator: Address,
     pub stats: ValidatorStats,
 }
@@ -30,7 +30,7 @@ pub struct State {
 
 impl State {
     pub fn new<BS: Blockstore>(store: &BS) -> Result<State, ActorError> {
-        let mut deployers_map = ValidatorDetailMap::empty(store, DEFAULT_HAMT_CONFIG, "empty");
+        let mut deployers_map = ValidatorMap::empty(store, DEFAULT_HAMT_CONFIG, "empty");
         Ok(State {
             cycle_start: 0,
             consensus: deployers_map.flush()?,
@@ -44,7 +44,7 @@ impl State {
 
     pub fn purge_validator_block_committed(&mut self, rt: &impl Runtime) -> Result<(), ActorError> {
         let all_validators = self.validator_activities(rt)?;
-        let mut validators = ValidatorDetailMap::load(
+        let mut validators = ValidatorMap::load(
             rt.store(),
             &self.consensus,
             DEFAULT_HAMT_CONFIG,
@@ -65,7 +65,7 @@ impl State {
         rt: &impl Runtime,
         validator: &Address,
     ) -> Result<(), ActorError> {
-        let mut validators = ValidatorDetailMap::load(
+        let mut validators = ValidatorMap::load(
             rt.store(),
             &self.consensus,
             DEFAULT_HAMT_CONFIG,
@@ -85,8 +85,8 @@ impl State {
     pub fn validator_activities(
         &self,
         rt: &impl Runtime,
-    ) -> Result<Vec<ValidatorDetail>, ActorError> {
-        let validators = ValidatorDetailMap::load(
+    ) -> Result<Vec<ValidatorData>, ActorError> {
+        let validators = ValidatorMap::load(
             rt.store(),
             &self.consensus,
             DEFAULT_HAMT_CONFIG,
@@ -96,7 +96,7 @@ impl State {
         let mut result = vec![];
 
         validators.for_each(|k, v| {
-            let detail = ValidatorDetail {
+            let detail = ValidatorData {
                 validator: k,
                 stats: v.clone(),
             };

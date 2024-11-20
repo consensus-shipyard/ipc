@@ -5,7 +5,7 @@ use crate::fvm::activities::{ActivityDetails, BlockMined, ValidatorActivityTrack
 use crate::fvm::state::FvmExecState;
 use crate::fvm::FvmMessage;
 use anyhow::Context;
-use fendermint_actor_activity_tracker::{GetActivitiesResult, ValidatorDetail};
+use fendermint_actor_activity_tracker::{GetActivitiesResult, ValidatorData};
 use fendermint_vm_actor_interface::activity::ACTIVITY_TRACKER_ACTOR_ADDR;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::system;
@@ -21,7 +21,7 @@ pub struct ActorActivityTracker<'a, DB: Blockstore + Clone + 'static> {
 impl<'a, DB: Blockstore + Clone + 'static> ValidatorActivityTracker
     for ActorActivityTracker<'a, DB>
 {
-    type ValidatorSummaryDetail = ValidatorDetail;
+    type ValidatorSummaryDetail = ValidatorData;
 
     fn track_block_mined(&mut self, block: BlockMined) -> anyhow::Result<()> {
         let params = fendermint_actor_activity_tracker::BlockedMinedParams {

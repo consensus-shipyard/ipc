@@ -122,7 +122,7 @@ macro_rules! cross_msg_types {
 /// The type conversion between different bottom up checkpoint definition in ethers and sdk
 macro_rules! bottom_up_checkpoint_conversion {
     ($module:ident) => {
-        impl TryFrom<consensus::Aggregated> for $module::Aggregated {
+        impl TryFrom<consensus::AggregatedStats> for $module::AggregatedStats {
             type Error = anyhow::Error;
 
             fn try_from(c: consensus::Aggregated) -> Result<Self, Self::Error> {
@@ -133,10 +133,10 @@ macro_rules! bottom_up_checkpoint_conversion {
             }
         }
 
-        impl TryFrom<consensus::Compressed> for $module::Compressed {
+        impl TryFrom<consensus::CompressedSummary> for $module::Compressed {
             type Error = anyhow::Error;
 
-            fn try_from(c: consensus::Compressed) -> Result<Self, Self::Error> {
+            fn try_from(c: consensus::CompressedSummary) -> Result<Self, Self::Error> {
                 Ok($module::Compressed {
                     aggregated: c
                         .aggregated
@@ -164,7 +164,7 @@ macro_rules! bottom_up_checkpoint_conversion {
                         .into_iter()
                         .map($module::IpcEnvelope::try_from)
                         .collect::<Result<Vec<_>, _>>()?,
-                    activities: checkpoint.activities.try_into()?,
+                    activities: checkpoint.activity_bundle.try_into()?,
                 })
             }
         }
@@ -183,7 +183,7 @@ macro_rules! bottom_up_checkpoint_conversion {
                         .into_iter()
                         .map(IpcEnvelope::try_from)
                         .collect::<Result<Vec<_>, _>>()?,
-                    activities: consensus::Compressed {
+                    activity_bundle: consensus::CompressedSummary {
                         aggregated: consensus::Aggregated {
                             total_active_validators: value
                                 .activities
@@ -300,21 +300,6 @@ impl TryFrom<u8> for AssetKind {
     }
 }
 
-impl TryFrom<ValidatorClaimPayload> for validator_reward_facet::ValidatorClaimPayload {
-    type Error = anyhow::Error;
-
-    fn try_from(v: ValidatorClaimPayload) -> Result<Self, Self::Error> {
-        Ok(Self {
-            checkpoint_height: v.checkpoint_height,
-            proof: v.proof,
-            detail: validator_reward_facet::ValidatorDetail {
-                validator: payload_to_evm_address(v.detail.validator.payload())?,
-                blocks_committed: v.detail.blocks_committed,
-            },
-        })
-    }
-}
-
 /// Convert the ipc SubnetID type to a vec of evm addresses. It extracts all the children addresses
 /// in the subnet id and turns them as a vec of evm addresses.
 pub fn subnet_id_to_evm_addresses(
@@ -342,21 +327,6 @@ pub fn payload_to_evm_address(payload: &Payload) -> anyhow::Result<ethers::types
 pub fn fil_to_eth_amount(amount: &TokenAmount) -> anyhow::Result<U256> {
     let str = amount.atto().to_string();
     Ok(U256::from_dec_str(&str)?)
-}
-
-impl TryFrom<BatchClaimPayload> for validator_reward_facet::BatchClaimPayload {
-    type Error = anyhow::Error;
-
-    fn try_from(v: BatchClaimPayload) -> Result<Self, Self::Error> {
-        Ok(Self {
-            subnet_id: validator_reward_facet::SubnetID::try_from(&v.subnet_id)?,
-            claims: v
-                .claims
-                .into_iter()
-                .map(validator_reward_facet::ValidatorClaimPayload::try_from)
-                .collect::<Result<Vec<_>, _>>()?,
-        })
-    }
 }
 
 impl TryFrom<StakingChange> for top_down_finality_facet::StakingChange {

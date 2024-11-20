@@ -47,7 +47,7 @@ impl CommandLineHandler for BatchClaim {
         let validator = Address::from_str(&arguments.validator)?;
 
         provider
-            .batch_claim(
+            .batch_subnet_claim(
                 &reward_claim_subnet,
                 &reward_source_subnets,
                 arguments.from,

@@ -13,7 +13,7 @@ use num_derive::FromPrimitive;
 use serde::{Deserialize, Serialize};
 
 pub use crate::state::State;
-pub use crate::state::ValidatorDetail;
+pub use crate::state::ValidatorData;
 
 mod state;
 
@@ -31,7 +31,7 @@ pub struct BlockedMinedParams {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct GetActivitiesResult {
-    pub activities: Vec<ValidatorDetail>,
+    pub activities: Vec<ValidatorData>,
     pub cycle_start: ChainEpoch,
 }
 

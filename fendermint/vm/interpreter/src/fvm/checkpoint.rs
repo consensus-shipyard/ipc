@@ -102,7 +102,7 @@ where
     let num_msgs = msgs.len();
 
     let activities = state.activities_tracker().get_activities_summary()?;
-    let agg = checkpoint::Aggregated {
+    let agg = checkpoint::AggregatedStats {
         total_active_validators: activities.active_validators() as u64,
         total_num_blocks_committed: activities.elapsed(state.block_height()) as u64,
     };
@@ -114,9 +114,9 @@ where
         block_hash,
         next_configuration_number,
         msgs,
-        activities: checkpoint::Compressed {
-            aggregated: agg.clone(),
-            commitment: activities
+        activities: checkpoint::CompressedSummary {
+            stats: agg.clone(),
+            data_root_commitment: activities
                 .commitment()?
                 .try_into()
                 .map_err(|_| anyhow!("cannot convert commitment"))?,
@@ -125,14 +125,14 @@ where
 
     // Save the checkpoint in the ledger.
     // Pass in the current power table, because these are the validators who can sign this checkpoint.
-    let report = checkpoint::FullActivitySummary {
-        consensus: checkpoint::Full {
-            aggregated: agg,
-            validator_details: activities
+    let report = checkpoint::FullActivityBundle {
+        consensus: checkpoint::FullSummary {
+            stats: agg,
+            data: activities
                 .details
                 .into_iter()
                 .map(|v| {
-                    Ok(checkpoint::ValidatorDetail {
+                    Ok(checkpoint::ValidatorData {
                         validator: payload_to_evm_address(v.validator.payload())?,
                         blocks_committed: v.stats.blocks_committed,
                     })
@@ -278,15 +278,15 @@ where
                 block_hash: cp.block_hash,
                 next_configuration_number: cp.next_configuration_number,
                 msgs: convert_tokenizables(cp.msgs)?,
-                activities: checkpoint::Compressed {
-                    aggregated: checkpoint::Aggregated {
-                        total_active_validators: cp.activities.aggregated.total_active_validators,
+                activities: checkpoint::CompressedSummary {
+                    stats: checkpoint::AggregatedStats {
+                        total_active_validators: cp.activities.stats.total_active_validators,
                         total_num_blocks_committed: cp
                             .activities
-                            .aggregated
+                            .stats
                             .total_num_blocks_committed,
                     },
-                    commitment: cp.activities.commitment,
+                    data_root_commitment: cp.activities.data_root_commitment,
                 },
             };
 

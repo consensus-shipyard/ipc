@@ -43,7 +43,7 @@ import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 import {ERC20PresetFixedSupply} from "../helpers/ERC20PresetFixedSupply.sol";
 import {SubnetValidatorGater} from "../../contracts/examples/SubnetValidatorGater.sol";
 
-import {FullActivitySummary, Consensus, BatchClaimPayload, ValidatorClaimPayload} from "../../contracts/activities/Activity.sol";
+import {FullActivityBundle, Consensus} from "../../contracts/activities/Activity.sol";
 import {ValidatorRewarderMap} from "../../contracts/examples/ValidatorRewarderMap.sol";
 import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
 
@@ -694,8 +694,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
                 commitment: bytes32(uint256(0))
             })
         });
@@ -706,8 +706,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
                 commitment: bytes32(uint256(0))
             })
         });
@@ -810,8 +810,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
                 commitment: bytes32(uint256(0))
             })
         });
@@ -822,8 +822,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: new IpcEnvelope[](0),
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
                 commitment: bytes32(uint256(0))
             })
         });
@@ -854,8 +854,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         // submit another again
         checkpoint.blockHeight = 2;
-        checkpoint.activities = Consensus.Compressed({
-            aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
+        checkpoint.activities = Consensus.CompressedSummary({
+            aggregated: Consensus.AggregatedStats({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
             commitment: bytes32(uint256(0))
         });
         hash = keccak256(abi.encode(checkpoint));
@@ -914,8 +914,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
                 commitment: bytes32(uint256(0))
             })
         });
@@ -930,8 +930,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
                 commitment: bytes32(uint256(0))
             })
         });
@@ -945,8 +945,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
                 commitment: bytes32(uint256(0))
             })
         });
@@ -960,8 +960,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
                 commitment: bytes32(uint256(0))
             })
         });
@@ -974,8 +974,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: new IpcEnvelope[](0),
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
                 commitment: bytes32(uint256(0))
             })
         });
@@ -991,8 +991,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
                 commitment: bytes32(uint256(0))
             })
         });
@@ -1008,8 +1008,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
                 commitment: bytes32(uint256(0))
             })
         });
@@ -1025,8 +1025,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: new IpcEnvelope[](0),
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
                 commitment: bytes32(uint256(0))
             })
         });
@@ -1039,8 +1039,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: new IpcEnvelope[](0),
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
                 commitment: bytes32(uint256(0))
             })
         });
@@ -1056,8 +1056,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: new IpcEnvelope[](0),
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
                 commitment: bytes32(uint256(0))
             })
         });
@@ -1101,8 +1101,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
                 commitment: bytes32(uint256(0))
             })
         });
@@ -1148,8 +1148,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
+            activities: Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
                 commitment: bytes32(uint256(0))
             })
         });
@@ -2428,8 +2428,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         confirmChange(
             addrs,
             privKeys,
-            Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 2, totalNumBlocksCommitted: 3}),
+            Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({totalActiveValidators: 2, totalNumBlocksCommitted: 3}),
                 commitment: activityRoot
             })
         );
@@ -2439,7 +2439,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         saDiamond.validatorReward().claim(
             subnetId,
             uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
-            Consensus.ValidatorDetail({validator: addrs[0], blocksCommitted: blocksMined[0]}),
+            Consensus.ValidatorData({validator: addrs[0], blocksCommitted: blocksMined[0]}),
             proofs[0]
         );
 
@@ -2448,7 +2448,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         saDiamond.validatorReward().claim(
             subnetId,
             uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
-            Consensus.ValidatorDetail({validator: addrs[1], blocksCommitted: blocksMined[1]}),
+            Consensus.ValidatorData({validator: addrs[1], blocksCommitted: blocksMined[1]}),
             proofs[1]
         );
 
@@ -2457,7 +2457,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         saDiamond.validatorReward().claim(
             subnetId,
             uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
-            Consensus.ValidatorDetail({validator: addrs[2], blocksCommitted: blocksMined[2]}),
+            Consensus.ValidatorData({validator: addrs[2], blocksCommitted: blocksMined[2]}),
             proofs[2]
         );
 
@@ -2466,7 +2466,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         saDiamond.validatorReward().claim(
             subnetId,
             uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
-            Consensus.ValidatorDetail({validator: addrs[3], blocksCommitted: blocksMined[3]}),
+            Consensus.ValidatorData({validator: addrs[3], blocksCommitted: blocksMined[3]}),
             proofs[3]
         );
 
@@ -2530,16 +2530,16 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         confirmChange(
             addrs,
             privKeys,
-            Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 2, totalNumBlocksCommitted: 3}),
+            Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({totalActiveValidators: 2, totalNumBlocksCommitted: 3}),
                 commitment: activityRoot1
             })
         );
         confirmChange(
             addrs,
             privKeys,
-            Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 2, totalNumBlocksCommitted: 3}),
+            Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({totalActiveValidators: 2, totalNumBlocksCommitted: 3}),
                 commitment: activityRoot2
             })
         );
@@ -2547,22 +2547,19 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.startPrank(addrs[0]);
         vm.deal(addrs[0], 1 ether);
 
-        BatchClaimPayload[] memory batchProofs = new BatchClaimPayload[](1);
-        ValidatorClaimPayload[] memory claimProofs = new ValidatorClaimPayload[](2);
-        claimProofs[0] = ValidatorClaimPayload({
+        Consensus.ValidatorClaim[] memory claimProofs = new Consensus.ValidatorClaim[](2);
+        claimProofs[0] = Consensus.ValidatorClaim({
             checkpointHeight: uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
-            detail: Consensus.ValidatorDetail({validator: addrs[0], blocksCommitted: blocksMined[0]}),
+            detail: Consensus.ValidatorData({validator: addrs[0], blocksCommitted: blocksMined[0]}),
             proof: proofs1[0]
         });
-        claimProofs[1] = ValidatorClaimPayload({
+        claimProofs[1] = Consensus.ValidatorClaim({
             checkpointHeight: uint64(gatewayDiamond.getter().bottomUpCheckPeriod()) * 2,
-            detail: Consensus.ValidatorDetail({validator: addrs[0], blocksCommitted: blocksMined[0]}),
+            detail: Consensus.ValidatorData({validator: addrs[0], blocksCommitted: blocksMined[0]}),
             proof: proofs2[0]
         });
 
-        batchProofs[0] = BatchClaimPayload({subnetId: subnetId, claims: claimProofs});
-
-        saDiamond.validatorReward().batchClaim(batchProofs);
+        saDiamond.validatorReward().batchSubnetClaim(subnetId, claimProofs);
 
         // check
         assert(m.blocksCommitted(addrs[0]) == 2);
@@ -2620,16 +2617,16 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         confirmChange(
             addrs,
             privKeys,
-            Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 2, totalNumBlocksCommitted: 3}),
+            Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({totalActiveValidators: 2, totalNumBlocksCommitted: 3}),
                 commitment: activityRoot1
             })
         );
         confirmChange(
             addrs,
             privKeys,
-            Consensus.Compressed({
-                aggregated: Consensus.Aggregated({totalActiveValidators: 2, totalNumBlocksCommitted: 3}),
+            Consensus.CompressedSummary({
+                aggregated: Consensus.AggregatedStats({totalActiveValidators: 2, totalNumBlocksCommitted: 3}),
                 commitment: activityRoot2
             })
         );
@@ -2637,23 +2634,20 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.startPrank(addrs[0]);
         vm.deal(addrs[0], 1 ether);
 
-        BatchClaimPayload[] memory batchProofs = new BatchClaimPayload[](1);
-        ValidatorClaimPayload[] memory claimProofs = new ValidatorClaimPayload[](2);
-        claimProofs[0] = ValidatorClaimPayload({
+        Consensus.ValidatorClaim[] memory claimProofs = new Consensus.ValidatorClaim[](2);
+        claimProofs[0] = Consensus.ValidatorClaim({
             checkpointHeight: uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
-            detail: Consensus.ValidatorDetail({validator: addrs[0], blocksCommitted: blocksMined[0]}),
+            detail: Consensus.ValidatorData({validator: addrs[0], blocksCommitted: blocksMined[0]}),
             proof: proofs1[0]
         });
-        claimProofs[1] = ValidatorClaimPayload({
+        claimProofs[1] = Consensus.ValidatorClaim({
             checkpointHeight: uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
-            detail: Consensus.ValidatorDetail({validator: addrs[0], blocksCommitted: blocksMined[0]}),
+            detail: Consensus.ValidatorData({validator: addrs[0], blocksCommitted: blocksMined[0]}),
             proof: proofs1[0]
         });
-
-        batchProofs[0] = BatchClaimPayload({subnetId: subnetId, claims: claimProofs});
 
         vm.expectRevert(ValidatorAlreadyClaimed.selector);
-        saDiamond.validatorReward().batchClaim(batchProofs);
+        saDiamond.validatorReward().batchSubnetClaim(subnetId, claimProofs);
     }
 
     // -----------------------------------------------------------------------------------------------------------------
