@@ -4,13 +4,13 @@ pragma solidity ^0.8.23;
 import {SubnetID} from "../structs/Subnet.sol";
 
 // Event to be emitted within the subnet when a new activity summary has been recorded.
-event ActivityBundleRecorded(uint64 checkpointHeight, FullActivityBundle bundle);
+event ActivityRollupRecorded(uint64 checkpointHeight, FullActivityRollup rollup);
 
 // Carries a set of reports summarising various aspects of the activity that took place in the subnet between the
 // previous checkpoint and the checkpoint this summary is committed into. If this is the first checkpoint, the summary
 // contains information about the subnet's activity since genesis.
 // In the future we'll be having more kinds of activity reports here.
-struct FullActivityBundle {
+struct FullActivityRollup {
     /// A report of consensus-level activity that took place in the subnet between the previous checkpoint
     /// and the checkpoint this summary is committed into.
     /// @dev If there is a configuration change applied at this checkpoint, this carries information
@@ -19,7 +19,7 @@ struct FullActivityBundle {
 }
 
 // Compressed representation of the activity summary that can be embedded in checkpoints to propagate up the hierarchy.
-struct CompressedActivityBundle {
+struct CompressedActivityRollup {
     Consensus.CompressedSummary consensus;
 }
 

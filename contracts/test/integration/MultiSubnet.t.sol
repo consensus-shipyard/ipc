@@ -45,7 +45,7 @@ import {SubnetActorFacetsHelper} from "../helpers/SubnetActorFacetsHelper.sol";
 
 import "forge-std/console.sol";
 
-import {FullActivityBundle, Consensus} from "../../contracts/activities/Activity.sol";
+import {FullActivityRollup, Consensus} from "../../contracts/activities/Activity.sol";
 import {ActivityHelper} from "../helpers/ActivityHelper.sol";
 
 contract MultiSubnetTest is Test, IntegrationTestBase {

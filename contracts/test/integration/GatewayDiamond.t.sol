@@ -39,7 +39,7 @@ import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 import {SubnetActorDiamond} from "../../contracts/SubnetActorDiamond.sol";
 import {SubnetActorFacetsHelper} from "../helpers/SubnetActorFacetsHelper.sol";
 
-import {FullActivityBundle, Consensus} from "../../contracts/activities/Activity.sol";
+import {FullActivityRollup, Consensus} from "../../contracts/activities/Activity.sol";
 import {ActivityHelper} from "../helpers/ActivityHelper.sol";
 
 contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeTokenMock {

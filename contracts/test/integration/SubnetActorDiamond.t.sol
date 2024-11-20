@@ -43,7 +43,7 @@ import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 import {ERC20PresetFixedSupply} from "../helpers/ERC20PresetFixedSupply.sol";
 import {SubnetValidatorGater} from "../../contracts/examples/SubnetValidatorGater.sol";
 
-import {FullActivityBundle, Consensus} from "../../contracts/activities/Activity.sol";
+import {FullActivityRollup, Consensus} from "../../contracts/activities/Activity.sol";
 import {ValidatorRewarderMap} from "../../contracts/examples/ValidatorRewarderMap.sol";
 import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
 import {ActivityHelper} from "../helpers/ActivityHelper.sol";

@@ -1305,7 +1305,7 @@ impl ValidatorRewarder for EthSubnetManager {
         );
 
         let ev = contract
-            .event::<checkpointing_facet::ActivityBundleRecordedFilter>()
+            .event::<checkpointing_facet::ActivityRollupRecordedFilter>()
             .from_block(from_checkpoint as u64)
             .to_block(to_checkpoint as u64)
             .address(ValueOrArray::Value(contract.address()));
@@ -1389,7 +1389,7 @@ impl ValidatorRewarder for EthSubnetManager {
         );
 
         let ev = contract
-            .event::<checkpointing_facet::ActivityBundleRecordedFilter>()
+            .event::<checkpointing_facet::ActivityRollupRecordedFilter>()
             .from_block(from_checkpoint as u64)
             .to_block(to_checkpoint as u64)
             .address(ValueOrArray::Value(contract.address()));

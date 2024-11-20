@@ -46,7 +46,7 @@ import {GatewayFacetsHelper} from "./helpers/GatewayFacetsHelper.sol";
 import {SubnetActorFacetsHelper} from "./helpers/SubnetActorFacetsHelper.sol";
 import {DiamondFacetsHelper} from "./helpers/DiamondFacetsHelper.sol";
 
-import {FullActivityBundle, Consensus} from "../contracts/activities/Activity.sol";
+import {FullActivityRollup, Consensus} from "../contracts/activities/Activity.sol";
 import {ValidatorRewarderMap} from "../contracts/examples/ValidatorRewarderMap.sol";
 import {ValidatorRewardFacet} from "../contracts/activities/ValidatorRewardFacet.sol";
 

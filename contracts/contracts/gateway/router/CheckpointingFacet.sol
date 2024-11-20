@@ -17,7 +17,7 @@ import {CrossMsgHelper} from "../../lib/CrossMsgHelper.sol";
 import {IpcEnvelope, SubnetID} from "../../structs/CrossNet.sol";
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
 
-import {ActivityBundleRecorded, FullActivityBundle} from "../../activities/Activity.sol";
+import {ActivityRollupRecorded, FullActivityRollup} from "../../activities/Activity.sol";
 
 contract CheckpointingFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
@@ -54,7 +54,7 @@ contract CheckpointingFacet is GatewayActorModifiers {
         BottomUpCheckpoint calldata checkpoint,
         bytes32 membershipRootHash,
         uint256 membershipWeight,
-        FullActivityBundle calldata fullSummary
+        FullActivityRollup calldata fullSummary
     ) external systemActorOnly {
         if (LibGateway.bottomUpCheckpointExists(checkpoint.blockHeight)) {
             revert CheckpointAlreadyExists();
@@ -71,7 +71,7 @@ contract CheckpointingFacet is GatewayActorModifiers {
 
         LibGateway.storeBottomUpCheckpoint(checkpoint);
 
-        emit ActivityBundleRecorded(uint64(checkpoint.blockHeight), fullSummary);
+        emit ActivityRollupRecorded(uint64(checkpoint.blockHeight), fullSummary);
     }
 
     /// @notice creates a new bottom-up checkpoint

@@ -125,7 +125,7 @@ where
 
     // Save the checkpoint in the ledger.
     // Pass in the current power table, because these are the validators who can sign this checkpoint.
-    let report = checkpoint::FullActivityBundle {
+    let report = checkpoint::FullActivityRollup {
         consensus: checkpoint::FullSummary {
             stats: agg,
             data: activities
