@@ -76,6 +76,12 @@ pub struct BottomUpMsgBatch {
     pub msgs: Vec<IpcEnvelope>,
 }
 
+/// Compressed representation of the activity summary that can be embedded in checkpoints to propagate up the hierarchy.
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+pub struct CompressedActivityRollup {
+    pub consensus: consensus::CompressedSummary,
+}
+
 /// Namespace for consensus-level activity summaries.
 pub mod consensus {
     use fvm_shared::address::Address;
@@ -136,8 +142,7 @@ pub struct BottomUpCheckpoint {
     /// The list of messages for execution
     pub msgs: Vec<IpcEnvelope>,
     /// The activity commitment from child subnet to parent subnet
-    /// TODO(review): this needs to be the compressed activity bundle, and not the consensus summary only.
-    pub activity_bundle: consensus::CompressedSummary,
+    pub activities: CompressedActivityRollup,
 }
 
 pub fn serialize_vec_bytes_to_vec_hex<T: AsRef<[u8]>, S>(

@@ -1,9 +1,19 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {Consensus} from "../../contracts/activities/Activity.sol";
+import {Consensus, CompressedActivityRollup} from "../../contracts/activities/Activity.sol";
 
 library ActivityHelper {
+    function newCompressedActivityRollup(
+        uint64 totalActiveValidators,
+        uint64 totalNumBlocksCommitted,
+        bytes32 detailsRootCommitment
+    ) internal pure returns (CompressedActivityRollup memory compressed) {
+        Consensus.CompressedSummary memory summary = newCompressedSummary(totalActiveValidators, totalNumBlocksCommitted, detailsRootCommitment);
+        compressed.consensus = summary;
+        return compressed;
+    }
+
     function newCompressedSummary(
         uint64 totalActiveValidators,
         uint64 totalNumBlocksCommitted,

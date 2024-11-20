@@ -695,7 +695,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivityHelper.newCompressedSummary(1, 3, bytes32(uint256(0)))
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
         BottomUpCheckpoint memory checkpointWithIncorrectHeight = BottomUpCheckpoint({
@@ -704,7 +704,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivityHelper.newCompressedSummary(1, 3, bytes32(uint256(0)))
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
         vm.deal(address(saDiamond), 100 ether);
@@ -805,7 +805,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivityHelper.newCompressedSummary(1, 3, bytes32(uint256(0)))
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
         BottomUpCheckpoint memory checkpointWithIncorrectHeight = BottomUpCheckpoint({
@@ -814,7 +814,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: new IpcEnvelope[](0),
-            activities: ActivityHelper.newCompressedSummary(1, 3, bytes32(uint256(0)))
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
         vm.deal(address(saDiamond), 100 ether);
@@ -843,7 +843,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         // submit another again
         checkpoint.blockHeight = 2;
-        checkpoint.activities = ActivityHelper.newCompressedSummary(1, 3, bytes32(uint256(0)));
+        checkpoint.activities = ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)));
         hash = keccak256(abi.encode(checkpoint));
 
         for (uint256 i = 0; i < 3; i++) {
@@ -900,7 +900,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivityHelper.newCompressedSummary(1, 3, bytes32(uint256(0)))
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
         require(saDiamond.getter().lastBottomUpCheckpointHeight() == 1, " checkpoint height incorrect");
@@ -913,7 +913,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivityHelper.newCompressedSummary(1, 3, bytes32(uint256(0)))
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
         require(saDiamond.getter().lastBottomUpCheckpointHeight() == 3, " checkpoint height incorrect");
@@ -925,7 +925,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivityHelper.newCompressedSummary(1, 3, bytes32(uint256(0)))
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
         vm.expectRevert(BottomUpCheckpointAlreadySubmitted.selector);
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
@@ -937,7 +937,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivityHelper.newCompressedSummary(1, 3, bytes32(uint256(0)))
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
         vm.expectRevert(CannotSubmitFutureCheckpoint.selector);
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
@@ -948,7 +948,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: new IpcEnvelope[](0),
-            activities: ActivityHelper.newCompressedSummary(1, 3, bytes32(uint256(0)))
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
         require(
@@ -962,7 +962,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivityHelper.newCompressedSummary(1, 3, bytes32(uint256(0)))
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
         require(
@@ -976,7 +976,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivityHelper.newCompressedSummary(1, 3, bytes32(uint256(0)))
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
         require(
@@ -990,7 +990,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: new IpcEnvelope[](0),
-            activities: ActivityHelper.newCompressedSummary(1, 3, bytes32(uint256(0)))
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
         vm.expectRevert(InvalidCheckpointEpoch.selector);
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
@@ -1001,7 +1001,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: new IpcEnvelope[](0),
-            activities: ActivityHelper.newCompressedSummary(1, 3, bytes32(uint256(0)))
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
         require(
@@ -1015,7 +1015,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: new IpcEnvelope[](0),
-            activities: ActivityHelper.newCompressedSummary(1, 3, bytes32(uint256(0)))
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
         require(
@@ -1057,7 +1057,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivityHelper.newCompressedSummary(1, 3, bytes32(uint256(0)))
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
         vm.deal(address(saDiamond), 100 ether);
@@ -1101,7 +1101,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivityHelper.newCompressedSummary(1, 3, bytes32(uint256(0)))
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
         hash = keccak256(abi.encode(checkpoint));
@@ -2375,7 +2375,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blocksMined
         );
 
-        confirmChange(addrs, privKeys, ActivityHelper.newCompressedSummary(2, 3, activityRoot));
+        confirmChange(addrs, privKeys, ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot));
 
         vm.startPrank(addrs[0]);
         vm.deal(addrs[0], 1 ether);
@@ -2470,8 +2470,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blocksMined
         );
 
-        confirmChange(addrs, privKeys, ActivityHelper.newCompressedSummary(2, 3, activityRoot1));
-        confirmChange(addrs, privKeys, ActivityHelper.newCompressedSummary(2, 3, activityRoot2));
+        confirmChange(addrs, privKeys, ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot1));
+        confirmChange(addrs, privKeys, ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot2));
 
         vm.startPrank(addrs[0]);
         vm.deal(addrs[0], 1 ether);
@@ -2546,8 +2546,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blocksMined
         );
 
-        confirmChange(addrs, privKeys, ActivityHelper.newCompressedSummary(2, 3, activityRoot1));
-        confirmChange(addrs, privKeys, ActivityHelper.newCompressedSummary(2, 3, activityRoot2));
+        confirmChange(addrs, privKeys, ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot1));
+        confirmChange(addrs, privKeys, ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot2));
 
         vm.startPrank(addrs[0]);
         vm.deal(addrs[0], 1 ether);

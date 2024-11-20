@@ -1321,7 +1321,7 @@ impl ValidatorRewarder for EthSubnetManager {
 
             // Check if we have claims for this validator in this block.
             let our_data = event
-                .bundle
+                .rollup
                 .consensus
                 .data
                 .iter()
@@ -1344,7 +1344,7 @@ impl ValidatorRewarder for EthSubnetManager {
             // Form the entire tree from the leaves.
             let tree = {
                 let leaves = event
-                    .bundle
+                    .rollup
                     .consensus
                     .data
                     .iter()
@@ -1405,7 +1405,7 @@ impl ValidatorRewarder for EthSubnetManager {
 
             // Check if we have rewards for this validator in this block.
             if let Some(data) = event
-                .bundle
+                .rollup
                 .consensus
                 .data
                 .iter()

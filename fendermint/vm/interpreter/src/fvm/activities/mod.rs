@@ -19,8 +19,8 @@ pub struct BlockMined {
 
 #[derive(Debug, Clone)]
 pub struct ActivityDetails<T> {
-    pub details: Vec<T>,
-    pub cycle_start: ChainEpoch,
+    details: Vec<T>,
+    cycle_start: ChainEpoch,
 }
 
 /// Tracks the validator activities in the current blockchain
@@ -46,6 +46,16 @@ impl ActivityDetails<ValidatorData> {
     }
 }
 
+impl<T: Ord> ActivityDetails<T> {
+    pub fn new(mut details: Vec<T>, cycle_start: ChainEpoch) -> Self {
+        details.sort();
+        Self {
+            details,
+            cycle_start,
+        }
+    }
+}
+
 impl<T> ActivityDetails<T> {
     pub fn elapsed(&self, height: ChainEpoch) -> ChainEpoch {
         height.saturating_sub(self.cycle_start)
@@ -53,5 +63,9 @@ impl<T> ActivityDetails<T> {
 
     pub fn active_validators(&self) -> usize {
         self.details.len()
+    }
+
+    pub fn details(&self) -> &[T] {
+        self.details.as_slice()
     }
 }

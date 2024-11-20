@@ -53,8 +53,8 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
         LibValidatorReward.initNewDistribution(
             checkpoint.subnetID,
             uint64(checkpoint.blockHeight),
-            checkpoint.activities.dataRootCommitment,
-            checkpoint.activities.stats.totalActiveValidators
+            checkpoint.activities.consensus.dataRootCommitment,
+            checkpoint.activities.consensus.stats.totalActiveValidators
         );
 
         // confirming the changes in membership in the child

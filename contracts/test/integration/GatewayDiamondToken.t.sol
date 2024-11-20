@@ -167,7 +167,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivityHelper.newCompressedSummary(1, 3, bytes32(uint256(0)))
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
         vm.prank(address(saDiamond));
@@ -226,7 +226,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivityHelper.newCompressedSummary(1, 3, bytes32(uint256(0)))
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
         // Verify that we received the call and that the recipient has the tokens.

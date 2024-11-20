@@ -5,7 +5,7 @@
 
 use crate::address::IPCAddress;
 use crate::checkpoint::BottomUpMsgBatch;
-use crate::checkpoint::{consensus, BottomUpCheckpoint};
+use crate::checkpoint::{consensus, BottomUpCheckpoint, CompressedActivityRollup};
 use crate::cross::{IpcEnvelope, IpcMsgKind};
 use crate::staking::StakingChange;
 use crate::staking::StakingChangeRequest;
@@ -133,6 +133,33 @@ macro_rules! bottom_up_checkpoint_conversion {
             }
         }
 
+        impl TryFrom<CompressedActivityRollup> for $module::CompressedActivityRollup {
+            type Error = anyhow::Error;
+
+            fn try_from(c: CompressedActivityRollup) -> Result<Self, Self::Error> {
+                Ok($module::CompressedActivityRollup {
+                    consensus: c.consensus.try_into()?,
+                })
+            }
+        }
+
+        impl From<$module::CompressedActivityRollup> for CompressedActivityRollup {
+            fn from(value: $module::CompressedActivityRollup) -> Self {
+                CompressedActivityRollup {
+                    consensus: consensus::CompressedSummary {
+                        stats: consensus::AggregatedStats {
+                            total_active_validators: value.consensus.stats.total_active_validators,
+                            total_num_blocks_committed: value
+                                .consensus
+                                .stats
+                                .total_num_blocks_committed,
+                        },
+                        data_root_commitment: value.consensus.data_root_commitment.to_vec(),
+                    },
+                }
+            }
+        }
+
         impl TryFrom<consensus::CompressedSummary> for $module::CompressedSummary {
             type Error = anyhow::Error;
 
@@ -164,7 +191,7 @@ macro_rules! bottom_up_checkpoint_conversion {
                         .into_iter()
                         .map($module::IpcEnvelope::try_from)
                         .collect::<Result<Vec<_>, _>>()?,
-                    activities: checkpoint.activity_bundle.try_into()?,
+                    activities: checkpoint.activities.try_into()?,
                 })
             }
         }
@@ -183,16 +210,7 @@ macro_rules! bottom_up_checkpoint_conversion {
                         .into_iter()
                         .map(IpcEnvelope::try_from)
                         .collect::<Result<Vec<_>, _>>()?,
-                    activity_bundle: consensus::CompressedSummary {
-                        stats: consensus::AggregatedStats {
-                            total_active_validators: value.activities.stats.total_active_validators,
-                            total_num_blocks_committed: value
-                                .activities
-                                .stats
-                                .total_num_blocks_committed,
-                        },
-                        data_root_commitment: value.activities.data_root_commitment.to_vec(),
-                    },
+                    activities: value.activities.into(),
                 })
             }
         }

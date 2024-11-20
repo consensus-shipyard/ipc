@@ -11,6 +11,7 @@ use tendermint_rpc::endpoint::commit;
 use tendermint_rpc::{endpoint::validators, Client, Paging};
 
 use fvm_ipld_blockstore::Blockstore;
+use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, chainid::ChainID};
 
 use fendermint_crypto::PublicKey;
@@ -21,6 +22,7 @@ use fendermint_vm_genesis::{Power, Validator, ValidatorKey};
 
 use ipc_api::evm::payload_to_evm_address;
 
+use crate::fvm::activities::ActivityDetails;
 use ipc_actors_abis::checkpointing_facet as checkpoint;
 use ipc_actors_abis::gateway_getter_facet as getter;
 use ipc_api::staking::ConfigurationNumber;
@@ -37,6 +39,7 @@ use super::{
 };
 use crate::fvm::activities::ValidatorActivityTracker;
 use crate::fvm::exec::BlockEndEvents;
+use fendermint_actor_activity_tracker::ValidatorData;
 
 /// Validator voting power snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -102,10 +105,9 @@ where
     let num_msgs = msgs.len();
 
     let activities = state.activities_tracker().get_activities_summary()?;
-    let agg = checkpoint::AggregatedStats {
-        total_active_validators: activities.active_validators() as u64,
-        total_num_blocks_committed: activities.elapsed(state.block_height()) as u64,
-    };
+
+    let (consensus_full, consensus_compressed) =
+        gen_consensus_reports(state.block_height(), &activities)?;
 
     // Construct checkpoint.
     let checkpoint = BottomUpCheckpoint {
@@ -114,31 +116,15 @@ where
         block_hash,
         next_configuration_number,
         msgs,
-        activities: checkpoint::CompressedSummary {
-            stats: agg.clone(),
-            data_root_commitment: activities
-                .commitment()?
-                .try_into()
-                .map_err(|_| anyhow!("cannot convert commitment"))?,
+        activities: checkpoint::CompressedActivityRollup {
+            consensus: consensus_compressed,
         },
     };
 
     // Save the checkpoint in the ledger.
     // Pass in the current power table, because these are the validators who can sign this checkpoint.
     let report = checkpoint::FullActivityRollup {
-        consensus: checkpoint::FullSummary {
-            stats: agg,
-            data: activities
-                .details
-                .into_iter()
-                .map(|v| {
-                    Ok(checkpoint::ValidatorData {
-                        validator: payload_to_evm_address(v.validator.payload())?,
-                        blocks_committed: v.stats.blocks_committed,
-                    })
-                })
-                .collect::<anyhow::Result<Vec<_>>>()?,
-        },
+        consensus: consensus_full,
     };
     let ret = gateway
         .create_bu_ckpt_with_activities(state, checkpoint.clone(), &curr_power_table.0, report)
@@ -167,6 +153,40 @@ where
     });
 
     Ok(Some((checkpoint, power_updates)))
+}
+
+fn gen_consensus_reports(
+    block_height: ChainEpoch,
+    activities: &ActivityDetails<ValidatorData>,
+) -> anyhow::Result<(checkpoint::FullSummary, checkpoint::CompressedSummary)> {
+    let agg = checkpoint::AggregatedStats {
+        total_active_validators: activities.active_validators() as u64,
+        total_num_blocks_committed: activities.elapsed(block_height) as u64,
+    };
+
+    let compressed = checkpoint::CompressedSummary {
+        stats: agg.clone(),
+        data_root_commitment: activities
+            .commitment()?
+            .try_into()
+            .map_err(|_| anyhow!("cannot convert commitment"))?,
+    };
+
+    let full = checkpoint::FullSummary {
+        stats: agg,
+        data: activities
+            .details()
+            .iter()
+            .map(|v| {
+                Ok(checkpoint::ValidatorData {
+                    validator: payload_to_evm_address(v.validator.payload())?,
+                    blocks_committed: v.stats.blocks_committed,
+                })
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?,
+    };
+
+    Ok((full, compressed))
 }
 
 /// Wait until CometBFT has reached a specific block height.
@@ -278,12 +298,22 @@ where
                 block_hash: cp.block_hash,
                 next_configuration_number: cp.next_configuration_number,
                 msgs: convert_tokenizables(cp.msgs)?,
-                activities: checkpoint::CompressedSummary {
-                    stats: checkpoint::AggregatedStats {
-                        total_active_validators: cp.activities.stats.total_active_validators,
-                        total_num_blocks_committed: cp.activities.stats.total_num_blocks_committed,
+                activities: checkpoint::CompressedActivityRollup {
+                    consensus: checkpoint::CompressedSummary {
+                        stats: checkpoint::AggregatedStats {
+                            total_active_validators: cp
+                                .activities
+                                .consensus
+                                .stats
+                                .total_active_validators,
+                            total_num_blocks_committed: cp
+                                .activities
+                                .consensus
+                                .stats
+                                .total_num_blocks_committed,
+                        },
+                        data_root_commitment: cp.activities.consensus.data_root_commitment,
                     },
-                    data_root_commitment: cp.activities.data_root_commitment,
                 },
             };
 

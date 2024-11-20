@@ -68,10 +68,7 @@ impl<'a, DB: Blockstore + Clone + 'static> ValidatorActivityTracker
             &apply_ret.msg_receipt.return_data,
         )
         .context("failed to parse validator activities")?;
-        Ok(ActivityDetails {
-            cycle_start: r.cycle_start,
-            details: r.activities,
-        })
+        Ok(ActivityDetails::new(r.activities, r.cycle_start))
     }
 
     fn purge_activities(&mut self) -> anyhow::Result<()> {
