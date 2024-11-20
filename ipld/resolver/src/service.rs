@@ -310,9 +310,10 @@ where
         match event.result {
             Ok(rtt) => emit(observe::PingEvent::Success(event.peer, rtt)),
             Err(ping::Failure::Timeout) => emit(observe::PingFailureEvent::Timeout(event.peer)),
-            Err(ping::Failure::Other { error }) => {
-                emit(observe::PingFailureEvent::Failure(event.peer, error))
-            }
+            Err(ping::Failure::Other { error }) => emit(observe::PingFailureEvent::Failure(
+                event.peer,
+                error.to_string(),
+            )),
             Err(ping::Failure::Unsupported) => {
                 warn!("Should ban peer {peer_id} due to protocol error");
                 // TODO: How do we ban peers in 0.53 ?
@@ -326,7 +327,7 @@ where
         if let identify::Event::Error { peer_id, error } = event {
             emit(observe::IdentifyFailureEvent::Failure(
                 peer_id,
-                error.into(),
+                error.to_string(),
             ));
         } else if let identify::Event::Received { peer_id, info } = event {
             emit(observe::IdentifyEvent::Received(peer_id));

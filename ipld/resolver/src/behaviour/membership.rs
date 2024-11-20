@@ -327,7 +327,7 @@ where
         match self.inner.publish(self.membership_topic.clone(), data) {
             Err(e) => {
                 emit(observe::MembershipFailureEvent::PublishFailure(
-                    e.to_string().into(),
+                    e.to_string(),
                 ));
                 Err(anyhow!(e))
             }
@@ -349,7 +349,7 @@ where
         match self.inner.publish(topic, data) {
             Err(e) => {
                 emit(observe::MembershipFailureEvent::PublishFailure(
-                    e.to_string().into(),
+                    e.to_string(),
                 ));
                 Err(anyhow!(e))
             }
@@ -368,7 +368,7 @@ where
         match self.inner.publish(topic, data) {
             Err(e) => {
                 emit(observe::MembershipFailureEvent::PublishFailure(
-                    e.to_string().into(),
+                    e.to_string(),
                 ));
                 Err(anyhow!(e))
             }
@@ -416,7 +416,7 @@ where
                 Err(e) => emit(
                     observe::MembershipFailureEvent::GossipInvalidProviderRecord(
                         msg.source,
-                        e.into(),
+                        e.to_string(),
                     ),
                 ),
             }
@@ -425,7 +425,7 @@ where
                 Ok(record) => self.handle_vote_record(record),
                 Err(e) => emit(observe::MembershipFailureEvent::GossipInvalidVoteRecord(
                     msg.source,
-                    e.into(),
+                    e.to_string(),
                 )),
             }
         } else if let Some(subnet_id) = self.preemptive_topics.get(&msg.topic) {

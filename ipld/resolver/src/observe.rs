@@ -11,7 +11,6 @@ use prometheus::{
     register_histogram, register_int_counter, register_int_gauge, Histogram, IntCounter, IntGauge,
     Registry,
 };
-use std::error::Error;
 use std::time::Duration;
 
 register_metrics! {
@@ -116,7 +115,7 @@ impl Recordable for PingEvent {
 #[allow(dead_code)]
 pub enum PingFailureEvent {
     Timeout(PeerId),
-    Failure(PeerId, Box<dyn Error>),
+    Failure(PeerId, String),
 }
 
 impl Recordable for PingFailureEvent {
@@ -145,7 +144,7 @@ impl Recordable for IdentifyEvent {
 #[derive(Debug)]
 #[allow(dead_code)]
 pub enum IdentifyFailureEvent {
-    Failure(PeerId, Box<dyn Error>),
+    Failure(PeerId, String),
 }
 
 impl Recordable for IdentifyFailureEvent {
@@ -191,7 +190,9 @@ impl Recordable for MembershipEvent {
             Self::Removed(_) => IPLD_RESOLVER_MEMBERSHIP_PROVIDER_PEERS.dec(),
             Self::Skipped(_) => IPLD_RESOLVER_MEMBERSHIP_SKIPPED_PEERS.inc(),
             Self::PublishSuccess => IPLD_RESOLVER_MEMBERSHIP_PUBLISH_SUCCESS.inc(),
-            Self::RoutablePeers(num_routable) => IPLD_RESOLVER_MEMBERSHIP_ROUTABLE_PEERS.set(*num_routable),
+            Self::RoutablePeers(num_routable) => {
+                IPLD_RESOLVER_MEMBERSHIP_ROUTABLE_PEERS.set(*num_routable)
+            }
         }
     }
 }
@@ -199,9 +200,9 @@ impl Recordable for MembershipEvent {
 #[derive(Debug)]
 #[allow(dead_code)]
 pub enum MembershipFailureEvent {
-    PublishFailure(Box<dyn Error>),
-    GossipInvalidProviderRecord(Option<PeerId>, Box<dyn Error>),
-    GossipInvalidVoteRecord(Option<PeerId>, Box<dyn Error>),
+    PublishFailure(String),
+    GossipInvalidProviderRecord(Option<PeerId>, String),
+    GossipInvalidVoteRecord(Option<PeerId>, String),
     GossipUnknownTopic(Option<PeerId>, TopicHash),
 }
 
@@ -209,7 +210,9 @@ impl Recordable for MembershipFailureEvent {
     fn record_metrics(&self) {
         match self {
             Self::PublishFailure(_) => IPLD_RESOLVER_MEMBERSHIP_PUBLISH_FAILURE.inc(),
-            Self::GossipInvalidProviderRecord(_, _) => IPLD_RESOLVER_MEMBERSHIP_INVALID_MESSAGE.inc(),
+            Self::GossipInvalidProviderRecord(_, _) => {
+                IPLD_RESOLVER_MEMBERSHIP_INVALID_MESSAGE.inc()
+            }
             Self::GossipInvalidVoteRecord(_, _) => IPLD_RESOLVER_MEMBERSHIP_INVALID_MESSAGE.inc(),
             Self::GossipUnknownTopic(_, _) => IPLD_RESOLVER_MEMBERSHIP_UNKNOWN_TOPIC.inc(),
         }
@@ -271,14 +274,14 @@ mod tests {
     fn test_emit() {
         let peer_id = PeerId::random();
         let rtt: Duration = Duration::from_millis(500);
-        let error = Box::new(std::fmt::Error);
+        let err_str = "err".to_string();
         let cid = Cid::default();
 
         emit(PingEvent::Success(peer_id, rtt));
         emit(PingFailureEvent::Timeout(peer_id));
-        emit(PingFailureEvent::Failure(peer_id, error.clone()));
+        emit(PingFailureEvent::Failure(peer_id, err_str.clone()));
         emit(IdentifyEvent::Received(peer_id));
-        emit(IdentifyFailureEvent::Failure(peer_id, error.clone()));
+        emit(IdentifyFailureEvent::Failure(peer_id, err_str.clone()));
         emit(DiscoveryEvent::BackgroundLookup(peer_id));
         emit(DiscoveryEvent::ConnectionEstablished(peer_id));
         emit(DiscoveryEvent::ConnectionClosed(peer_id));
@@ -287,14 +290,14 @@ mod tests {
         emit(MembershipEvent::Skipped(peer_id));
         emit(MembershipEvent::PublishSuccess);
         emit(MembershipEvent::RoutablePeers(Default::default()));
-        emit(MembershipFailureEvent::PublishFailure(error.clone()));
+        emit(MembershipFailureEvent::PublishFailure(err_str.clone()));
         emit(MembershipFailureEvent::GossipInvalidProviderRecord(
             Some(peer_id),
-            error.clone(),
+            err_str.clone(),
         ));
         emit(MembershipFailureEvent::GossipInvalidVoteRecord(
             Some(peer_id),
-            error.clone(),
+            err_str.clone(),
         ));
         emit(MembershipFailureEvent::GossipUnknownTopic(
             Some(peer_id),
