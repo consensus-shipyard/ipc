@@ -15,74 +15,74 @@ use std::error::Error;
 use std::time::Duration;
 
 register_metrics! {
-    PING_RTT: Histogram =
-        register_histogram!("ping_rtt", "Ping roundtrip time");
+    IPLD_RESOLVER_PING_RTT: Histogram =
+        register_histogram!("ipld_resolver_ping_rtt", "Ping roundtrip time");
 
-    PING_TIMEOUT: IntCounter =
-        register_int_counter!("ping_timeouts", "Number of timed out pings");
+    IPLD_RESOLVER_PING_TIMEOUT: IntCounter =
+        register_int_counter!("ipld_resolver_ping_timeouts", "Number of timed out pings");
 
-    PING_FAILURE: IntCounter =
-        register_int_counter!("ping_failure", "Number of failed pings");
+    IPLD_RESOLVER_PING_FAILURE: IntCounter =
+        register_int_counter!("ipld_resolver_ping_failure", "Number of failed pings");
 
-    PING_SUCCESS: IntCounter =
-        register_int_counter!("ping_success", "Number of successful pings");
+    IPLD_RESOLVER_PING_SUCCESS: IntCounter =
+        register_int_counter!("ipld_resolver_ping_success", "Number of successful pings");
 
-    IDENTIFY_FAILURE: IntCounter =
-        register_int_counter!("identify_failure", "Number of Identify errors");
+    IPLD_RESOLVER_IDENTIFY_FAILURE: IntCounter =
+        register_int_counter!("ipld_resolver_identify_failure", "Number of Identify errors");
 
-    IDENTIFY_RECEIVED: IntCounter =
-        register_int_counter!("identify_received", "Number of Identify infos received");
+    IPLD_RESOLVER_IDENTIFY_RECEIVED: IntCounter =
+        register_int_counter!("ipld_resolver_identify_received", "Number of Identify infos received");
 
-    DISCOVERY_BACKGROUND_LOOKUP: IntCounter =
-        register_int_counter!("discovery_background_lookup", "Number of background lookups started");
+    IPLD_RESOLVER_DISCOVERY_BACKGROUND_LOOKUP: IntCounter =
+        register_int_counter!("ipld_resolver_discovery_background_lookup", "Number of background lookups started");
 
-    DISCOVERY_CONNECTED_PEERS: IntGauge =
-        register_int_gauge!("discovery_connected_peers", "Number of connections");
+    IPLD_RESOLVER_DISCOVERY_CONNECTED_PEERS: IntGauge =
+        register_int_gauge!("ipld_resolver_discovery_connected_peers", "Number of connections");
 
-    MEMBERSHIP_SKIPPED_PEERS: IntCounter =
-        register_int_counter!("membership_skipped_peers", "Number of providers skipped");
+    IPLD_RESOLVER_MEMBERSHIP_SKIPPED_PEERS: IntCounter =
+        register_int_counter!("ipld_resolver_membership_skipped_peers", "Number of providers skipped");
 
-    MEMBERSHIP_ROUTABLE_PEERS: IntGauge =
-        register_int_gauge!("membership_routable_peers", "Number of routable peers");
+    IPLD_RESOLVER_MEMBERSHIP_ROUTABLE_PEERS: IntGauge =
+        register_int_gauge!("ipld_resolver_membership_routable_peers", "Number of routable peers");
 
-    MEMBERSHIP_PROVIDER_PEERS: IntGauge =
-        register_int_gauge!("membership_provider_peers", "Number of unique providers");
+    IPLD_RESOLVER_MEMBERSHIP_PROVIDER_PEERS: IntGauge =
+        register_int_gauge!("ipld_resolver_membership_provider_peers", "Number of unique providers");
 
-    MEMBERSHIP_UNKNOWN_TOPIC: IntCounter =
-        register_int_counter!("membership_unknown_topic", "Number of messages with unknown topic");
+    IPLD_RESOLVER_MEMBERSHIP_UNKNOWN_TOPIC: IntCounter =
+        register_int_counter!("ipld_resolver_membership_unknown_topic", "Number of messages with unknown topic");
 
-    MEMBERSHIP_INVALID_MESSAGE: IntCounter =
-        register_int_counter!("membership_invalid_message", "Number of invalid messages received");
+    IPLD_RESOLVER_MEMBERSHIP_INVALID_MESSAGE: IntCounter =
+        register_int_counter!("ipld_resolver_membership_invalid_message", "Number of invalid messages received");
 
-    MEMBERSHIP_PUBLISH_SUCCESS: IntCounter =
-        register_int_counter!("membership_publish_total", "Number of published messages");
+    IPLD_RESOLVER_MEMBERSHIP_PUBLISH_SUCCESS: IntCounter =
+        register_int_counter!("ipld_resolver_membership_publish_total", "Number of published messages");
 
-    MEMBERSHIP_PUBLISH_FAILURE: IntCounter =
-        register_int_counter!("membership_publish_failure", "Number of failed publish attempts");
+    IPLD_RESOLVER_MEMBERSHIP_PUBLISH_FAILURE: IntCounter =
+        register_int_counter!("ipld_resolver_membership_publish_failure", "Number of failed publish attempts");
 
-    CONTENT_RESOLVE_RUNNING: IntGauge =
-        register_int_gauge!("content_resolve_running", "Number of currently running content resolutions");
+    IPLD_RESOLVER_CONTENT_RESOLVE_RUNNING: IntGauge =
+        register_int_gauge!("ipld_resolver_content_resolve_running", "Number of currently running content resolutions");
 
-    CONTENT_RESOLVE_NO_PEERS: IntCounter =
-        register_int_counter!("content_resolve_no_peers", "Number of resolutions with no known peers");
+    IPLD_RESOLVER_CONTENT_RESOLVE_NO_PEERS: IntCounter =
+        register_int_counter!("ipld_resolver_content_resolve_no_peers", "Number of resolutions with no known peers");
 
-    CONTENT_RESOLVE_SUCCESS: IntCounter =
-        register_int_counter!("content_resolve_success", "Number of successful resolutions");
+    IPLD_RESOLVER_CONTENT_RESOLVE_SUCCESS: IntCounter =
+        register_int_counter!("ipld_resolver_content_resolve_success", "Number of successful resolutions");
 
-    CONTENT_RESOLVE_FAILURE: IntCounter =
-        register_int_counter!("content_resolve_failure", "Number of failed resolutions");
+    IPLD_RESOLVER_CONTENT_RESOLVE_FAILURE: IntCounter =
+        register_int_counter!("ipld_resolver_content_resolve_failure", "Number of failed resolutions");
 
-    CONTENT_RESOLVE_FALLBACK: IntCounter =
-        register_int_counter!("content_resolve_fallback", "Number of resolutions that fall back on secondary peers");
+    IPLD_RESOLVER_CONTENT_RESOLVE_FALLBACK: IntCounter =
+        register_int_counter!("ipld_resolver_content_resolve_fallback", "Number of resolutions that fall back on secondary peers");
 
-    CONTENT_RESOLVE_PEERS: Histogram =
-        register_histogram!("content_resolve_peers", "Number of peers found for resolution from a subnet");
+    IPLD_RESOLVER_CONTENT_RESOLVE_PEERS: Histogram =
+        register_histogram!("ipld_resolver_content_resolve_peers", "Number of peers found for resolution from a subnet");
 
-    CONTENT_CONNECTED_PEERS: Histogram =
-        register_histogram!("content_connected_peers", "Number of connected peers in a resolution");
+    IPLD_RESOLVER_CONTENT_CONNECTED_PEERS: Histogram =
+        register_histogram!("ipld_resolver_content_connected_peers", "Number of connected peers in a resolution");
 
-    CONTENT_RATE_LIMITED: IntCounter =
-        register_int_counter!("content_rate_limited", "Number of rate limited requests");
+    IPLD_RESOLVER_CONTENT_RATE_LIMITED: IntCounter =
+        register_int_counter!("ipld_resolver_content_rate_limited", "Number of rate limited requests");
 }
 
 impl_traceables!(TraceLevel::Info, "Ping", PingEvent);
@@ -105,8 +105,8 @@ impl Recordable for PingEvent {
     fn record_metrics(&self) {
         match self {
             Self::Success(_, rtt) => {
-                PING_SUCCESS.inc();
-                PING_RTT.observe(rtt.as_millis() as f64);
+                IPLD_RESOLVER_PING_SUCCESS.inc();
+                IPLD_RESOLVER_PING_RTT.observe(rtt.as_millis() as f64);
             }
         }
     }
@@ -122,8 +122,8 @@ pub enum PingFailureEvent {
 impl Recordable for PingFailureEvent {
     fn record_metrics(&self) {
         match self {
-            Self::Failure(_, _) => PING_FAILURE.inc(),
-            Self::Timeout(_) => PING_TIMEOUT.inc(),
+            Self::Failure(_, _) => IPLD_RESOLVER_PING_FAILURE.inc(),
+            Self::Timeout(_) => IPLD_RESOLVER_PING_TIMEOUT.inc(),
         }
     }
 }
@@ -137,7 +137,7 @@ pub enum IdentifyEvent {
 impl Recordable for IdentifyEvent {
     fn record_metrics(&self) {
         match self {
-            Self::Received(_) => IDENTIFY_RECEIVED.inc(),
+            Self::Received(_) => IPLD_RESOLVER_IDENTIFY_RECEIVED.inc(),
         }
     }
 }
@@ -151,7 +151,7 @@ pub enum IdentifyFailureEvent {
 impl Recordable for IdentifyFailureEvent {
     fn record_metrics(&self) {
         match self {
-            Self::Failure(_, _) => IDENTIFY_FAILURE.inc(),
+            Self::Failure(_, _) => IPLD_RESOLVER_IDENTIFY_FAILURE.inc(),
         }
     }
 }
@@ -167,9 +167,9 @@ pub enum DiscoveryEvent {
 impl Recordable for DiscoveryEvent {
     fn record_metrics(&self) {
         match self {
-            Self::BackgroundLookup(_) => DISCOVERY_BACKGROUND_LOOKUP.inc(),
-            Self::ConnectionEstablished(_) => DISCOVERY_CONNECTED_PEERS.inc(),
-            Self::ConnectionClosed(_) => DISCOVERY_CONNECTED_PEERS.dec(),
+            Self::BackgroundLookup(_) => IPLD_RESOLVER_DISCOVERY_BACKGROUND_LOOKUP.inc(),
+            Self::ConnectionEstablished(_) => IPLD_RESOLVER_DISCOVERY_CONNECTED_PEERS.inc(),
+            Self::ConnectionClosed(_) => IPLD_RESOLVER_DISCOVERY_CONNECTED_PEERS.dec(),
         }
     }
 }
@@ -187,11 +187,11 @@ pub enum MembershipEvent {
 impl Recordable for MembershipEvent {
     fn record_metrics(&self) {
         match self {
-            Self::Added(_) => MEMBERSHIP_PROVIDER_PEERS.inc(),
-            Self::Removed(_) => MEMBERSHIP_PROVIDER_PEERS.dec(),
-            Self::Skipped(_) => MEMBERSHIP_SKIPPED_PEERS.inc(),
-            Self::PublishSuccess => MEMBERSHIP_PUBLISH_SUCCESS.inc(),
-            Self::RoutablePeers(num_routable) => MEMBERSHIP_ROUTABLE_PEERS.set(*num_routable),
+            Self::Added(_) => IPLD_RESOLVER_MEMBERSHIP_PROVIDER_PEERS.inc(),
+            Self::Removed(_) => IPLD_RESOLVER_MEMBERSHIP_PROVIDER_PEERS.dec(),
+            Self::Skipped(_) => IPLD_RESOLVER_MEMBERSHIP_SKIPPED_PEERS.inc(),
+            Self::PublishSuccess => IPLD_RESOLVER_MEMBERSHIP_PUBLISH_SUCCESS.inc(),
+            Self::RoutablePeers(num_routable) => IPLD_RESOLVER_MEMBERSHIP_ROUTABLE_PEERS.set(*num_routable),
         }
     }
 }
@@ -208,10 +208,10 @@ pub enum MembershipFailureEvent {
 impl Recordable for MembershipFailureEvent {
     fn record_metrics(&self) {
         match self {
-            Self::PublishFailure(_) => MEMBERSHIP_PUBLISH_FAILURE.inc(),
-            Self::GossipInvalidProviderRecord(_, _) => MEMBERSHIP_INVALID_MESSAGE.inc(),
-            Self::GossipInvalidVoteRecord(_, _) => MEMBERSHIP_INVALID_MESSAGE.inc(),
-            Self::GossipUnknownTopic(_, _) => MEMBERSHIP_UNKNOWN_TOPIC.inc(),
+            Self::PublishFailure(_) => IPLD_RESOLVER_MEMBERSHIP_PUBLISH_FAILURE.inc(),
+            Self::GossipInvalidProviderRecord(_, _) => IPLD_RESOLVER_MEMBERSHIP_INVALID_MESSAGE.inc(),
+            Self::GossipInvalidVoteRecord(_, _) => IPLD_RESOLVER_MEMBERSHIP_INVALID_MESSAGE.inc(),
+            Self::GossipUnknownTopic(_, _) => IPLD_RESOLVER_MEMBERSHIP_UNKNOWN_TOPIC.inc(),
         }
     }
 }
@@ -230,12 +230,12 @@ pub enum ResolveEvent {
 impl Recordable for ResolveEvent {
     fn record_metrics(&self) {
         match self {
-            Self::Started(_) => CONTENT_RESOLVE_RUNNING.inc(),
-            Self::Success(_) => CONTENT_RESOLVE_SUCCESS.inc(),
-            Self::Completed => CONTENT_RESOLVE_RUNNING.dec(),
-            Self::Peers(num) => CONTENT_RESOLVE_PEERS.observe(*num as f64),
-            Self::NoPeers => CONTENT_RESOLVE_NO_PEERS.inc(),
-            Self::ConnectedPeers(num) => CONTENT_CONNECTED_PEERS.observe(*num as f64),
+            Self::Started(_) => IPLD_RESOLVER_CONTENT_RESOLVE_RUNNING.inc(),
+            Self::Success(_) => IPLD_RESOLVER_CONTENT_RESOLVE_SUCCESS.inc(),
+            Self::Completed => IPLD_RESOLVER_CONTENT_RESOLVE_RUNNING.dec(),
+            Self::Peers(num) => IPLD_RESOLVER_CONTENT_RESOLVE_PEERS.observe(*num as f64),
+            Self::NoPeers => IPLD_RESOLVER_CONTENT_RESOLVE_NO_PEERS.inc(),
+            Self::ConnectedPeers(num) => IPLD_RESOLVER_CONTENT_CONNECTED_PEERS.observe(*num as f64),
         }
     }
 }
@@ -250,8 +250,8 @@ pub enum ResolveFailureEvent {
 impl Recordable for ResolveFailureEvent {
     fn record_metrics(&self) {
         match self {
-            Self::Failure(_) => CONTENT_RESOLVE_FAILURE.inc(),
-            Self::Fallback(_) => CONTENT_RESOLVE_FALLBACK.inc(),
+            Self::Failure(_) => IPLD_RESOLVER_CONTENT_RESOLVE_FAILURE.inc(),
+            Self::Fallback(_) => IPLD_RESOLVER_CONTENT_RESOLVE_FALLBACK.inc(),
         }
     }
 }
