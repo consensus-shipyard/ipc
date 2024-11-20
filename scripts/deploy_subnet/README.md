@@ -253,7 +253,7 @@ it's best to avoid these accounts since nonce race conditions can occur.
 
 ```txt
 Account balances:
-Parent native: 9999 ETH
+Parent native: 10000 ETH
 Parent HOKU:   100 HOKU
 Subnet native: 5000 HOKU
 Subnet credits: 5000000000000000000000
