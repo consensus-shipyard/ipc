@@ -30,10 +30,6 @@ use crate::manager::subnet::{
     TopDownQueryPayload,
 };
 
-use super::gas_estimator::{
-    eip1559_estimator, EIP1559_FEE_ESTIMATION_PAST_BLOCKS, EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE,
-};
-
 use crate::manager::{EthManager, SubnetManager};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
@@ -45,6 +41,7 @@ use ethers::providers::{Authorization, Http, Middleware, Provider};
 use ethers::signers::{LocalWallet, Wallet};
 use ethers::types::{BlockId, Eip1559TransactionRequest, ValueOrArray, I256, U256};
 
+use super::gas_estimator_middleware::Eip1559GasEstimatorMiddleware;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_api::checkpoint::{
@@ -58,7 +55,8 @@ use ipc_wallet::{EthKeyAddress, EvmKeyStore, PersistentKeyStore};
 use num_traits::ToPrimitive;
 use std::result;
 
-pub type DefaultSignerMiddleware = SignerMiddleware<Provider<Http>, Wallet<SigningKey>>;
+pub type SignerWithFeeEstimatorMiddleware =
+    Eip1559GasEstimatorMiddleware<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>;
 
 /// Default polling time used by the Ethers provider to check for pending
 /// transactions and events. Default is 7, and for our child subnets we
@@ -287,16 +285,21 @@ impl SubnetManager for EthSubnetManager {
 
         tracing::info!("creating subnet on evm with params: {params:?}");
 
-        let signer = self.get_signer(&from)?;
+        let signer = self.get_signer_with_fee_estimator(&from)?;
         let signer = Arc::new(signer);
         let registry_contract = register_subnet_facet::RegisterSubnetFacet::new(
             self.ipc_contract_info.registry_addr,
             signer.clone(),
         );
 
+<<<<<<< HEAD
         let call =
             call_with_premium_and_pending_block(signer, registry_contract.new_subnet_actor(params))
                 .await?;
+=======
+        let call = registry_contract.new_subnet_actor(params);
+
+>>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
         // TODO: Edit call to get estimate premium
         let pending_tx = call.send().await?;
         // We need the retry to parse the deployment event. At the time of this writing, it's a bug
@@ -347,15 +350,18 @@ impl SubnetManager for EthSubnetManager {
             "interacting with evm subnet contract: {address:} with collateral: {collateral:}"
         );
 
-        let signer = Arc::new(self.get_signer(&from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
         let mut txn = contract.join(ethers::types::Bytes::from(pub_key), U256::from(collateral));
         txn = self.handle_txn_token(&subnet, txn, collateral, 0).await?;
 
+<<<<<<< HEAD
         let txn = call_with_premium_and_pending_block(signer, txn).await?;
 
+=======
+>>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
         // Use the pending state to get the nonce because there could have been a pre-fund. Best would be to use this for everything.
         let txn = txn.block(BlockId::Number(ethers::types::BlockNumber::Pending));
 
@@ -373,15 +379,18 @@ impl SubnetManager for EthSubnetManager {
         let address = contract_address_from_subnet(&subnet)?;
         tracing::info!("interacting with evm subnet contract: {address:} with balance: {balance:}");
 
-        let signer = Arc::new(self.get_signer(&from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
         let mut txn = contract.pre_fund(U256::from(balance));
         txn = self.handle_txn_token(&subnet, txn, 0, balance).await?;
 
+<<<<<<< HEAD
         let txn = call_with_premium_and_pending_block(signer, txn).await?;
 
+=======
+>>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
         txn.send().await?;
         Ok(())
     }
@@ -400,15 +409,19 @@ impl SubnetManager for EthSubnetManager {
             .to_u128()
             .ok_or_else(|| anyhow!("invalid pre-release amount"))?;
 
-        let signer = Arc::new(self.get_signer(&from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
+<<<<<<< HEAD
         call_with_premium_and_pending_block(signer, contract.pre_release(amount.into()))
             .await?
             .send()
             .await?
             .await?;
+=======
+        contract.pre_release(amount.into()).send().await?.await?;
+>>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
 
         Ok(())
     }
@@ -424,15 +437,18 @@ impl SubnetManager for EthSubnetManager {
             "interacting with evm subnet contract: {address:} with collateral: {collateral:}"
         );
 
-        let signer = Arc::new(self.get_signer(&from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
         let mut txn = contract.stake(U256::from(collateral));
         txn = self.handle_txn_token(&subnet, txn, collateral, 0).await?;
 
+<<<<<<< HEAD
         let txn = call_with_premium_and_pending_block(signer, txn).await?;
 
+=======
+>>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
         txn.send().await?.await?;
 
         Ok(())
@@ -454,13 +470,17 @@ impl SubnetManager for EthSubnetManager {
             "interacting with evm subnet contract: {address:} with collateral: {collateral:}"
         );
 
-        let signer = Arc::new(self.get_signer(&from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
+<<<<<<< HEAD
         let txn = call_with_premium_and_pending_block(signer, contract.unstake(collateral.into()))
             .await?;
         txn.send().await?.await?;
+=======
+        contract.unstake(collateral.into()).send().await?.await?;
+>>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
 
         Ok(())
     }
@@ -469,15 +489,19 @@ impl SubnetManager for EthSubnetManager {
         let address = contract_address_from_subnet(&subnet)?;
         tracing::info!("leaving evm subnet: {subnet:} at contract: {address:}");
 
-        let signer = Arc::new(self.get_signer(&from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
+<<<<<<< HEAD
         call_with_premium_and_pending_block(signer, contract.leave())
             .await?
             .send()
             .await?
             .await?;
+=======
+        contract.leave().send().await?.await?;
+>>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
 
         Ok(())
     }
@@ -486,15 +510,19 @@ impl SubnetManager for EthSubnetManager {
         let address = contract_address_from_subnet(&subnet)?;
         tracing::info!("kill evm subnet: {subnet:} at contract: {address:}");
 
-        let signer = Arc::new(self.get_signer(&from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
+<<<<<<< HEAD
         call_with_premium_and_pending_block(signer, contract.kill())
             .await?
             .send()
             .await?
             .await?;
+=======
+        contract.kill().send().await?.await?;
+>>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
 
         Ok(())
     }
@@ -527,15 +555,19 @@ impl SubnetManager for EthSubnetManager {
         let address = contract_address_from_subnet(&subnet)?;
         tracing::info!("claim collateral evm subnet: {subnet:} at contract: {address:}");
 
-        let signer = Arc::new(self.get_signer(&from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
         let contract =
             subnet_actor_reward_facet::SubnetActorRewardFacet::new(address, signer.clone());
 
+<<<<<<< HEAD
         call_with_premium_and_pending_block(signer, contract.claim())
             .await?
             .send()
             .await?
             .await?;
+=======
+        contract.claim().send().await?.await?;
+>>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
 
         Ok(())
     }
@@ -560,7 +592,7 @@ impl SubnetManager for EthSubnetManager {
         let evm_subnet_id = gateway_manager_facet::SubnetID::try_from(&subnet)?;
         tracing::debug!("evm subnet id to fund: {evm_subnet_id:?}");
 
-        let signer = Arc::new(self.get_signer(&from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
         let gateway_contract = gateway_manager_facet::GatewayManagerFacet::new(
             self.ipc_contract_info.gateway_addr,
             signer.clone(),
@@ -571,7 +603,10 @@ impl SubnetManager for EthSubnetManager {
             gateway_manager_facet::FvmAddress::try_from(to)?,
         );
         txn.tx.set_value(value);
+<<<<<<< HEAD
         let txn = call_with_premium_and_pending_block(signer, txn).await?;
+=======
+>>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
 
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
@@ -589,7 +624,7 @@ impl SubnetManager for EthSubnetManager {
 
         let value = fil_amount_to_eth_amount(&amount)?;
 
-        let signer = Arc::new(self.get_signer(&from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
 
         let subnet_supply_source = self.get_subnet_supply_source(&subnet).await?;
         if subnet_supply_source.kind != AssetKind::ERC20 {
@@ -605,7 +640,10 @@ impl SubnetManager for EthSubnetManager {
         let token_contract = IERC20::new(token_address, signer.clone());
 
         let txn = token_contract.approve(self.ipc_contract_info.gateway_addr, value);
+<<<<<<< HEAD
         let txn = call_with_premium_and_pending_block(signer, txn).await?;
+=======
+>>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
 
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
@@ -626,7 +664,7 @@ impl SubnetManager for EthSubnetManager {
         let value = fil_amount_to_eth_amount(&amount)?;
         let evm_subnet_id = gateway_manager_facet::SubnetID::try_from(&subnet)?;
 
-        let signer = Arc::new(self.get_signer(&from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
         let gateway_contract = gateway_manager_facet::GatewayManagerFacet::new(
             self.ipc_contract_info.gateway_addr,
             signer.clone(),
@@ -637,7 +675,10 @@ impl SubnetManager for EthSubnetManager {
             gateway_manager_facet::FvmAddress::try_from(to)?,
             value,
         );
+<<<<<<< HEAD
         let txn = call_with_premium_and_pending_block(signer, txn).await?;
+=======
+>>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
 
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
@@ -660,14 +701,17 @@ impl SubnetManager for EthSubnetManager {
 
         tracing::info!("release with evm gateway contract: {gateway_addr:} with value: {value:}");
 
-        let signer = Arc::new(self.get_signer(&from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
         let gateway_contract = gateway_manager_facet::GatewayManagerFacet::new(
             self.ipc_contract_info.gateway_addr,
             signer.clone(),
         );
         let mut txn = gateway_contract.release(gateway_manager_facet::FvmAddress::try_from(to)?);
         txn.tx.set_value(value);
+<<<<<<< HEAD
         let txn = call_with_premium_and_pending_block(signer, txn).await?;
+=======
+>>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
 
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
@@ -693,7 +737,7 @@ impl SubnetManager for EthSubnetManager {
 
         tracing::info!("propagate postbox evm gateway contract: {gateway_addr:} with message key: {postbox_msg_key:?}");
 
-        let signer = Arc::new(self.get_signer(&from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
         let gateway_contract = gateway_messenger_facet::GatewayMessengerFacet::new(
             self.ipc_contract_info.gateway_addr,
             signer.clone(),
@@ -702,23 +746,24 @@ impl SubnetManager for EthSubnetManager {
         let mut key = [0u8; 32];
         key.copy_from_slice(&postbox_msg_key);
 
+<<<<<<< HEAD
         call_with_premium_and_pending_block(signer, gateway_contract.propagate(key))
             .await?
             .send()
             .await?;
+=======
+        gateway_contract.propagate(key).send().await?;
+>>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
 
         Ok(())
     }
 
     /// Send value between two addresses in a subnet
     async fn send_value(&self, from: Address, to: Address, amount: TokenAmount) -> Result<()> {
-        let signer = Arc::new(self.get_signer(&from)?);
-        let (fee, fee_cap) = premium_estimation(signer.clone()).await?;
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
         let tx = Eip1559TransactionRequest::new()
             .to(payload_to_evm_address(to.payload())?)
-            .value(fil_to_eth_amount(&amount)?)
-            .max_priority_fee_per_gas(fee)
-            .max_fee_per_gas(fee_cap);
+            .value(fil_to_eth_amount(&amount)?);
 
         let tx_pending = signer.send_transaction(tx, None).await?;
 
@@ -837,15 +882,19 @@ impl SubnetManager for EthSubnetManager {
             return Err(anyhow!("wrong format for bootstrap endpoint"));
         }
 
-        let signer = Arc::new(self.get_signer(from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(from)?);
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
+<<<<<<< HEAD
         call_with_premium_and_pending_block(signer, contract.add_bootstrap_node(endpoint))
             .await?
             .send()
             .await?
             .await?;
+=======
+        contract.add_bootstrap_node(endpoint).send().await?.await?;
+>>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
 
         Ok(())
     }
@@ -893,7 +942,7 @@ impl SubnetManager for EthSubnetManager {
         let address = contract_address_from_subnet(subnet)?;
         tracing::info!("interacting with evm subnet contract: {address:}");
 
-        let signer = Arc::new(self.get_signer(from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(from)?);
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
@@ -918,8 +967,12 @@ impl SubnetManager for EthSubnetManager {
         tracing::debug!("from address: {:?}", from);
 
         let call = contract.set_federated_power(addresses, pubkeys, power_u256);
+<<<<<<< HEAD
         let txn = call_with_premium_and_pending_block(signer, call).await?;
         let pending_tx = txn.send().await?;
+=======
+        let pending_tx = call.send().await?;
+>>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
         block_number_from_receipt(receipt)
     }
@@ -1088,7 +1141,10 @@ impl EthSubnetManager {
     /// Get the ethers singer instance.
     /// We use filecoin addresses throughout our whole code-base
     /// and translate them to evm addresses when relevant.
-    fn get_signer(&self, addr: &Address) -> Result<DefaultSignerMiddleware> {
+    fn get_signer_with_fee_estimator(
+        &self,
+        addr: &Address,
+    ) -> Result<SignerWithFeeEstimatorMiddleware> {
         // convert to its underlying eth address
         let addr = payload_to_evm_address(addr.payload())?;
         let keystore = self.keystore()?;
@@ -1099,8 +1155,15 @@ impl EthSubnetManager {
         let wallet = LocalWallet::from_bytes(private_key.private_key())?
             .with_chain_id(self.ipc_contract_info.chain_id);
 
+<<<<<<< HEAD
         let signer = SignerMiddleware::new(self.ipc_contract_info.provider.clone(), wallet);
         Ok(signer)
+=======
+        use super::gas_estimator_middleware::Eip1559GasEstimatorMiddleware;
+
+        let signer = SignerMiddleware::new(self.ipc_contract_info.provider.clone(), wallet);
+        Ok(Eip1559GasEstimatorMiddleware::new(signer))
+>>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
     }
 
     pub fn from_subnet_with_wallet_store(
@@ -1177,13 +1240,16 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
         let checkpoint =
             subnet_actor_checkpointing_facet::BottomUpCheckpoint::try_from(checkpoint)?;
 
-        let signer = Arc::new(self.get_signer(submitter)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(submitter)?);
         let contract = subnet_actor_checkpointing_facet::SubnetActorCheckpointingFacet::new(
             address,
             signer.clone(),
         );
         let call = contract.submit_checkpoint(checkpoint, signatories, signatures);
+<<<<<<< HEAD
         let call = call_with_premium_and_pending_block(signer, call).await?;
+=======
+>>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
 
         let pending_tx = call.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
@@ -1283,6 +1349,7 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
     }
 }
 
+<<<<<<< HEAD
 /// Takes a `FunctionCall` input and returns a new instance with an estimated optimal `gas_premium`.
 /// The function also uses the pending block number to help retrieve the latest nonce
 /// via `get_transaction_count` with the `pending` parameter.
@@ -1404,6 +1471,8 @@ fn estimate_priority_fee(rewards: Vec<Vec<U256>>) -> U256 {
     values[values.len() / 2]
 }
 
+=======
+>>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
 /// Get the block number from the transaction receipt
 fn block_number_from_receipt(
     receipt: Option<ethers::types::TransactionReceipt>,
@@ -1510,6 +1579,7 @@ impl TryFrom<gateway_getter_facet::Subnet> for SubnetInfo {
 #[cfg(test)]
 mod tests {
     use crate::manager::evm::manager::contract_address_from_subnet;
+    use ethers::providers::Middleware;
     use fvm_shared::address::Address;
     use ipc_api::subnet_id::SubnetID;
     use std::str::FromStr;
