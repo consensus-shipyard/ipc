@@ -292,14 +292,8 @@ impl SubnetManager for EthSubnetManager {
             signer.clone(),
         );
 
-<<<<<<< HEAD
         let call =
-            call_with_premium_and_pending_block(signer, registry_contract.new_subnet_actor(params))
-                .await?;
-=======
-        let call = registry_contract.new_subnet_actor(params);
-
->>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
+            extend_call_with_pending_block(registry_contract.new_subnet_actor(params)).await?;
         // TODO: Edit call to get estimate premium
         let pending_tx = call.send().await?;
         // We need the retry to parse the deployment event. At the time of this writing, it's a bug
@@ -357,13 +351,7 @@ impl SubnetManager for EthSubnetManager {
         let mut txn = contract.join(ethers::types::Bytes::from(pub_key), U256::from(collateral));
         txn = self.handle_txn_token(&subnet, txn, collateral, 0).await?;
 
-<<<<<<< HEAD
-        let txn = call_with_premium_and_pending_block(signer, txn).await?;
-
-=======
->>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
-        // Use the pending state to get the nonce because there could have been a pre-fund. Best would be to use this for everything.
-        let txn = txn.block(BlockId::Number(ethers::types::BlockNumber::Pending));
+        let txn = extend_call_with_pending_block(txn).await?;
 
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
@@ -386,11 +374,8 @@ impl SubnetManager for EthSubnetManager {
         let mut txn = contract.pre_fund(U256::from(balance));
         txn = self.handle_txn_token(&subnet, txn, 0, balance).await?;
 
-<<<<<<< HEAD
-        let txn = call_with_premium_and_pending_block(signer, txn).await?;
+        let txn = extend_call_with_pending_block(txn).await?;
 
-=======
->>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
         txn.send().await?;
         Ok(())
     }
@@ -413,15 +398,11 @@ impl SubnetManager for EthSubnetManager {
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
-<<<<<<< HEAD
-        call_with_premium_and_pending_block(signer, contract.pre_release(amount.into()))
+        extend_call_with_pending_block(contract.pre_release(amount.into()))
             .await?
             .send()
             .await?
             .await?;
-=======
-        contract.pre_release(amount.into()).send().await?.await?;
->>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
 
         Ok(())
     }
@@ -444,11 +425,8 @@ impl SubnetManager for EthSubnetManager {
         let mut txn = contract.stake(U256::from(collateral));
         txn = self.handle_txn_token(&subnet, txn, collateral, 0).await?;
 
-<<<<<<< HEAD
-        let txn = call_with_premium_and_pending_block(signer, txn).await?;
+        let txn = extend_call_with_pending_block(txn).await?;
 
-=======
->>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
         txn.send().await?.await?;
 
         Ok(())
@@ -474,13 +452,8 @@ impl SubnetManager for EthSubnetManager {
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
-<<<<<<< HEAD
-        let txn = call_with_premium_and_pending_block(signer, contract.unstake(collateral.into()))
-            .await?;
+        let txn = extend_call_with_pending_block(contract.unstake(collateral.into())).await?;
         txn.send().await?.await?;
-=======
-        contract.unstake(collateral.into()).send().await?.await?;
->>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
 
         Ok(())
     }
@@ -493,15 +466,11 @@ impl SubnetManager for EthSubnetManager {
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
-<<<<<<< HEAD
-        call_with_premium_and_pending_block(signer, contract.leave())
+        extend_call_with_pending_block(contract.leave())
             .await?
             .send()
             .await?
             .await?;
-=======
-        contract.leave().send().await?.await?;
->>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
 
         Ok(())
     }
@@ -514,15 +483,11 @@ impl SubnetManager for EthSubnetManager {
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
-<<<<<<< HEAD
-        call_with_premium_and_pending_block(signer, contract.kill())
+        extend_call_with_pending_block(contract.kill())
             .await?
             .send()
             .await?
             .await?;
-=======
-        contract.kill().send().await?.await?;
->>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
 
         Ok(())
     }
@@ -559,15 +524,11 @@ impl SubnetManager for EthSubnetManager {
         let contract =
             subnet_actor_reward_facet::SubnetActorRewardFacet::new(address, signer.clone());
 
-<<<<<<< HEAD
-        call_with_premium_and_pending_block(signer, contract.claim())
+        extend_call_with_pending_block(contract.claim())
             .await?
             .send()
             .await?
             .await?;
-=======
-        contract.claim().send().await?.await?;
->>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
 
         Ok(())
     }
@@ -603,10 +564,7 @@ impl SubnetManager for EthSubnetManager {
             gateway_manager_facet::FvmAddress::try_from(to)?,
         );
         txn.tx.set_value(value);
-<<<<<<< HEAD
-        let txn = call_with_premium_and_pending_block(signer, txn).await?;
-=======
->>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
+        let txn = extend_call_with_pending_block(txn).await?;
 
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
@@ -640,10 +598,7 @@ impl SubnetManager for EthSubnetManager {
         let token_contract = IERC20::new(token_address, signer.clone());
 
         let txn = token_contract.approve(self.ipc_contract_info.gateway_addr, value);
-<<<<<<< HEAD
-        let txn = call_with_premium_and_pending_block(signer, txn).await?;
-=======
->>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
+        let txn = extend_call_with_pending_block(txn).await?;
 
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
@@ -675,10 +630,7 @@ impl SubnetManager for EthSubnetManager {
             gateway_manager_facet::FvmAddress::try_from(to)?,
             value,
         );
-<<<<<<< HEAD
-        let txn = call_with_premium_and_pending_block(signer, txn).await?;
-=======
->>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
+        let txn = extend_call_with_pending_block(txn).await?;
 
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
@@ -708,10 +660,7 @@ impl SubnetManager for EthSubnetManager {
         );
         let mut txn = gateway_contract.release(gateway_manager_facet::FvmAddress::try_from(to)?);
         txn.tx.set_value(value);
-<<<<<<< HEAD
-        let txn = call_with_premium_and_pending_block(signer, txn).await?;
-=======
->>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
+        let txn = extend_call_with_pending_block(txn).await?;
 
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
@@ -746,14 +695,10 @@ impl SubnetManager for EthSubnetManager {
         let mut key = [0u8; 32];
         key.copy_from_slice(&postbox_msg_key);
 
-<<<<<<< HEAD
-        call_with_premium_and_pending_block(signer, gateway_contract.propagate(key))
+        extend_call_with_pending_block(gateway_contract.propagate(key))
             .await?
             .send()
             .await?;
-=======
-        gateway_contract.propagate(key).send().await?;
->>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
 
         Ok(())
     }
@@ -886,15 +831,11 @@ impl SubnetManager for EthSubnetManager {
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
-<<<<<<< HEAD
-        call_with_premium_and_pending_block(signer, contract.add_bootstrap_node(endpoint))
+        extend_call_with_pending_block(contract.add_bootstrap_node(endpoint))
             .await?
             .send()
             .await?
             .await?;
-=======
-        contract.add_bootstrap_node(endpoint).send().await?.await?;
->>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
 
         Ok(())
     }
@@ -967,12 +908,8 @@ impl SubnetManager for EthSubnetManager {
         tracing::debug!("from address: {:?}", from);
 
         let call = contract.set_federated_power(addresses, pubkeys, power_u256);
-<<<<<<< HEAD
-        let txn = call_with_premium_and_pending_block(signer, call).await?;
+        let txn = extend_call_with_pending_block(call).await?;
         let pending_tx = txn.send().await?;
-=======
-        let pending_tx = call.send().await?;
->>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
         block_number_from_receipt(receipt)
     }
@@ -1155,15 +1092,10 @@ impl EthSubnetManager {
         let wallet = LocalWallet::from_bytes(private_key.private_key())?
             .with_chain_id(self.ipc_contract_info.chain_id);
 
-<<<<<<< HEAD
-        let signer = SignerMiddleware::new(self.ipc_contract_info.provider.clone(), wallet);
-        Ok(signer)
-=======
         use super::gas_estimator_middleware::Eip1559GasEstimatorMiddleware;
 
         let signer = SignerMiddleware::new(self.ipc_contract_info.provider.clone(), wallet);
         Ok(Eip1559GasEstimatorMiddleware::new(signer))
->>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
     }
 
     pub fn from_subnet_with_wallet_store(
@@ -1246,10 +1178,7 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
             signer.clone(),
         );
         let call = contract.submit_checkpoint(checkpoint, signatories, signatures);
-<<<<<<< HEAD
-        let call = call_with_premium_and_pending_block(signer, call).await?;
-=======
->>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
+        let call = extend_call_with_pending_block(call).await?;
 
         let pending_tx = call.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
@@ -1348,131 +1277,19 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
         Ok(epoch as ChainEpoch)
     }
 }
-
-<<<<<<< HEAD
 /// Takes a `FunctionCall` input and returns a new instance with an estimated optimal `gas_premium`.
 /// The function also uses the pending block number to help retrieve the latest nonce
 /// via `get_transaction_count` with the `pending` parameter.
-pub(crate) async fn call_with_premium_and_pending_block<B, D, M>(
-    signer: Arc<DefaultSignerMiddleware>,
+pub(crate) async fn extend_call_with_pending_block<B, D, M>(
     call: ethers_contract::FunctionCall<B, D, M>,
 ) -> Result<ethers_contract::FunctionCall<B, D, M>>
 where
     B: std::borrow::Borrow<D>,
     M: ethers::abi::Detokenize,
 {
-    let (max_priority_fee_per_gas, _) = premium_estimation(signer).await?;
-    Ok(call
-        .gas_price(max_priority_fee_per_gas)
-        .block(ethers::types::BlockNumber::Pending))
+    Ok(call.block(ethers::types::BlockNumber::Pending))
 }
 
-/// Returns an estimation of an optimal `gas_premium` and `gas_fee_cap`
-/// for a transaction considering the average premium, base_fee and reward percentile from
-/// past blocks
-/// This is adaptation of ethers' `eip1559_default_estimator`:
-/// https://github.com/gakonst/ethers-rs/blob/5dcd3b7e754174448f9a8cbfc0523896609629f9/ethers-core/src/utils/mod.rs#L476
-async fn premium_estimation(
-    signer: Arc<DefaultSignerMiddleware>,
-) -> Result<(ethers::types::U256, ethers::types::U256)> {
-    let base_fee_per_gas = signer
-        .get_block(ethers::types::BlockNumber::Latest)
-        .await?
-        .ok_or_else(|| anyhow!("Latest block not found"))?
-        .base_fee_per_gas
-        .ok_or_else(|| anyhow!("EIP-1559 not activated"))?;
-
-    let fee_history = signer
-        .fee_history(
-            ethers::utils::EIP1559_FEE_ESTIMATION_PAST_BLOCKS,
-            ethers::types::BlockNumber::Latest,
-            &[ethers::utils::EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE],
-        )
-        .await?;
-
-    let max_priority_fee_per_gas = estimate_priority_fee(fee_history.reward); //overestimate?
-    let potential_max_fee = base_fee_surged(base_fee_per_gas);
-    let max_fee_per_gas = if max_priority_fee_per_gas > potential_max_fee {
-        max_priority_fee_per_gas + potential_max_fee
-    } else {
-        potential_max_fee
-    };
-
-    Ok((max_priority_fee_per_gas, max_fee_per_gas))
-}
-
-/// Implementation borrowed from
-/// https://github.com/gakonst/ethers-rs/blob/ethers-v2.0.8/ethers-core/src/utils/mod.rs#L582
-/// Refer to the implementation for unit tests
-fn base_fee_surged(base_fee_per_gas: U256) -> U256 {
-    if base_fee_per_gas <= U256::from(40_000_000_000u64) {
-        base_fee_per_gas * 2
-    } else if base_fee_per_gas <= U256::from(100_000_000_000u64) {
-        base_fee_per_gas * 16 / 10
-    } else if base_fee_per_gas <= U256::from(200_000_000_000u64) {
-        base_fee_per_gas * 14 / 10
-    } else {
-        base_fee_per_gas * 12 / 10
-    }
-}
-
-/// Implementation borrowed from
-/// https://github.com/gakonst/ethers-rs/blob/ethers-v2.0.8/ethers-core/src/utils/mod.rs#L536
-/// Refer to the implementation for unit tests
-fn estimate_priority_fee(rewards: Vec<Vec<U256>>) -> U256 {
-    let mut rewards: Vec<U256> = rewards
-        .iter()
-        .map(|r| r[0])
-        .filter(|r| *r > U256::zero())
-        .collect();
-    if rewards.is_empty() {
-        return U256::zero();
-    }
-    if rewards.len() == 1 {
-        return rewards[0];
-    }
-    // Sort the rewards as we will eventually take the median.
-    rewards.sort();
-
-    // A copy of the same vector is created for convenience to calculate percentage change
-    // between subsequent fee values.
-    let mut rewards_copy = rewards.clone();
-    rewards_copy.rotate_left(1);
-
-    let mut percentage_change: Vec<I256> = rewards
-        .iter()
-        .zip(rewards_copy.iter())
-        .map(|(a, b)| {
-            let a = I256::try_from(*a).expect("priority fee overflow");
-            let b = I256::try_from(*b).expect("priority fee overflow");
-            ((b - a) * 100) / a
-        })
-        .collect();
-    percentage_change.pop();
-
-    // Fetch the max of the percentage change, and that element's index.
-    let max_change = percentage_change.iter().max().unwrap();
-    let max_change_index = percentage_change
-        .iter()
-        .position(|&c| c == *max_change)
-        .unwrap();
-
-    // If we encountered a big change in fees at a certain position, then consider only
-    // the values >= it.
-    let values = if *max_change >= ethers::utils::EIP1559_FEE_ESTIMATION_THRESHOLD_MAX_CHANGE.into()
-        && (max_change_index >= (rewards.len() / 2))
-    {
-        rewards[max_change_index..].to_vec()
-    } else {
-        rewards
-    };
-
-    // Return the median.
-    values[values.len() / 2]
-}
-
-=======
->>>>>>> 4aff1ad9 (feat: implement middleware eip estimator)
 /// Get the block number from the transaction receipt
 fn block_number_from_receipt(
     receipt: Option<ethers::types::TransactionReceipt>,
