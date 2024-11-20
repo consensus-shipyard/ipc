@@ -29,6 +29,11 @@ use crate::manager::subnet::{
     BottomUpCheckpointRelayer, GetBlockHashResult, SubnetGenesisInfo, TopDownFinalityQuery,
     TopDownQueryPayload,
 };
+
+use super::gas_estimator::{
+    eip1559_estimator, EIP1559_FEE_ESTIMATION_PAST_BLOCKS, EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE,
+};
+
 use crate::manager::{EthManager, SubnetManager};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
