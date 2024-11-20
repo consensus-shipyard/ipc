@@ -3,9 +3,9 @@
 
 use cid::Cid;
 use fil_actors_runtime::runtime::Runtime;
-use fil_actors_runtime::{ActorError, Map2, DEFAULT_HAMT_CONFIG};
+use fil_actors_runtime::{actor_error, ActorError, Map2, DEFAULT_HAMT_CONFIG};
 use fvm_ipld_blockstore::Blockstore;
-use fvm_shared::address::Address;
+use fvm_shared::address::{Address, Payload};
 use fvm_shared::clock::ChainEpoch;
 use serde::{Deserialize, Serialize};
 
@@ -14,96 +14,57 @@ pub struct ValidatorStats {
     pub blocks_committed: u64,
 }
 
-pub type ValidatorMap<BS> = Map2<BS, Address, ValidatorStats>;
-
-#[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
-pub struct ValidatorData {
-    pub validator: Address,
-    pub stats: ValidatorStats,
-}
-
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct State {
-    pub cycle_start: ChainEpoch,
-    pub consensus: Cid, // BlockCommittedMap
+    pub tracking_since: ChainEpoch,
+    pub consensus: Cid, // ConsensusData
 }
+
+pub type ConsensusData<BS> = Map2<BS, Address, ValidatorStats>;
 
 impl State {
     pub fn new<BS: Blockstore>(store: &BS) -> Result<State, ActorError> {
-        let mut deployers_map = ValidatorMap::empty(store, DEFAULT_HAMT_CONFIG, "empty");
-        Ok(State {
-            cycle_start: 0,
-            consensus: deployers_map.flush()?,
-        })
+        let state = State {
+            tracking_since: 0,
+            consensus: ConsensusData::flush_empty(store, DEFAULT_HAMT_CONFIG)?,
+        };
+        Ok(state)
     }
 
-    pub fn reset_cycle_height(&mut self, rt: &impl Runtime) -> Result<(), ActorError> {
-        self.cycle_start = rt.curr_epoch();
-        Ok(())
-    }
-
-    pub fn purge_validator_block_committed(&mut self, rt: &impl Runtime) -> Result<(), ActorError> {
-        let all_validators = self.validator_activities(rt)?;
-        let mut validators = ValidatorMap::load(
-            rt.store(),
-            &self.consensus,
-            DEFAULT_HAMT_CONFIG,
-            "verifiers",
-        )?;
-
-        for v in all_validators {
-            validators.delete(&v.validator)?;
-        }
-
-        self.consensus = validators.flush()?;
-
-        Ok(())
-    }
-
-    pub fn incr_validator_block_committed(
-        &mut self,
-        rt: &impl Runtime,
-        validator: &Address,
-    ) -> Result<(), ActorError> {
-        let mut validators = ValidatorMap::load(
-            rt.store(),
-            &self.consensus,
-            DEFAULT_HAMT_CONFIG,
-            "verifiers",
-        )?;
-
-        let mut v = validators.get(validator)?.cloned().unwrap_or_default();
-        v.blocks_committed += 1;
-
-        validators.set(validator, v)?;
-
-        self.consensus = validators.flush()?;
-
-        Ok(())
-    }
-
-    pub fn validator_activities(
+    /// Returns the pending activity rollup.
+    pub fn pending_activity_rollup(
         &self,
         rt: &impl Runtime,
-    ) -> Result<Vec<ValidatorData>, ActorError> {
-        let validators = ValidatorMap::load(
-            rt.store(),
-            &self.consensus,
-            DEFAULT_HAMT_CONFIG,
-            "verifiers",
-        )?;
+    ) -> Result<ipc_actors_abis::checkpointing_facet::FullActivityRollup, ActorError> {
+        let consensus = {
+            let cid = &rt.state::<State>()?.consensus;
+            ConsensusData::load(rt.store(), cid, DEFAULT_HAMT_CONFIG, "consensus")
+        }?;
 
-        let mut result = vec![];
+        // Populate the rollup struct.
+        let mut rollup = ipc_actors_abis::checkpointing_facet::FullActivityRollup::default();
+        consensus.for_each(|validator_addr, validator_stats| {
+            rollup.consensus.stats.total_active_validators += 1;
+            rollup.consensus.stats.total_num_blocks_committed += validator_stats.blocks_committed;
 
-        validators.for_each(|k, v| {
-            let detail = ValidatorData {
-                validator: k,
-                stats: v.clone(),
+            // All addresses in state are f410 addresses, so we can safely cast to ethers addresses.
+            let addr = {
+                let Payload::Delegated(delegated) = validator_addr.payload() else {
+                    return Err(actor_error!(illegal_state; "illegal address in state"));
+                };
+                let slice = delegated.subaddress();
+                ethers::types::Address::from_slice(&slice[0..20])
             };
-            result.push(detail);
+
+            let item = ipc_actors_abis::checkpointing_facet::ValidatorData {
+                validator: addr,
+                blocks_committed: validator_stats.blocks_committed,
+            };
+
+            rollup.consensus.data.push(item);
             Ok(())
         })?;
 
-        Ok(result)
+        Ok(rollup)
     }
 }

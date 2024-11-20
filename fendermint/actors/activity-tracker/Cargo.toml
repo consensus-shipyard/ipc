@@ -1,6 +1,6 @@
 [package]
 name = "fendermint_actor_activity_tracker"
-description = "Tracks fendermint block mining activities"
+description = "Tracks subnet activity and generates rollups to submit to the parent in checkpoints"
 license.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -14,6 +14,9 @@ crate-type = ["cdylib", "lib"]
 [dependencies]
 anyhow = { workspace = true }
 cid = { workspace = true }
+ethers = { workspace = true }
+ipc_api = { workspace = true }
+ipc_actors_abis = { workspace = true }
 fil_actor_eam = { workspace = true }
 fil_actors_runtime = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }
