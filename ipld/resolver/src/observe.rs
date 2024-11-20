@@ -87,12 +87,28 @@ register_metrics! {
 impl_traceables!(TraceLevel::Info, "IPLD_Resolver/Ping", PingEvent);
 impl_traceables!(TraceLevel::Warn, "IPLD_Resolver/Ping", PingFailureEvent);
 impl_traceables!(TraceLevel::Info, "IPLD_Resolver/Identify", IdentifyEvent);
-impl_traceables!(TraceLevel::Warn, "IPLD_Resolver/Identify", IdentifyFailureEvent);
+impl_traceables!(
+    TraceLevel::Warn,
+    "IPLD_Resolver/Identify",
+    IdentifyFailureEvent
+);
 impl_traceables!(TraceLevel::Info, "IPLD_Resolver/Discovery", DiscoveryEvent);
-impl_traceables!(TraceLevel::Info, "IPLD_Resolver/Membership", MembershipEvent);
-impl_traceables!(TraceLevel::Warn, "IPLD_Resolver/Membership", MembershipFailureEvent);
+impl_traceables!(
+    TraceLevel::Info,
+    "IPLD_Resolver/Membership",
+    MembershipEvent
+);
+impl_traceables!(
+    TraceLevel::Warn,
+    "IPLD_Resolver/Membership",
+    MembershipFailureEvent
+);
 impl_traceables!(TraceLevel::Info, "IPLD_Resolver/Content", ResolveEvent);
-impl_traceables!(TraceLevel::Warn, "IPLD_Resolver/Content", ResolveFailureEvent);
+impl_traceables!(
+    TraceLevel::Warn,
+    "IPLD_Resolver/Content",
+    ResolveFailureEvent
+);
 
 #[derive(Debug)]
 #[allow(dead_code)]
