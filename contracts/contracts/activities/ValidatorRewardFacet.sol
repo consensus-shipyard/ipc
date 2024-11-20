@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import "./Activity.sol";
+import {Consensus} from "./Activity.sol";
 
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
@@ -18,16 +18,15 @@ import {SubnetID} from "../structs/Subnet.sol";
 /// to claim their reward in the parent subnet, which should be the current subnet this facet
 /// is deployed.
 contract ValidatorRewardFacet is ReentrancyGuard, Pausable {
-    function batchSubnetClaim(SubnetID calldata subnet, uint64[] calldata checkpointHeights, Consensus.ValidatorClaim[] calldata claims) external nonReentrant whenNotPaused {
+    function batchSubnetClaim(
+        SubnetID calldata subnet,
+        uint64[] calldata checkpointHeights,
+        Consensus.ValidatorClaim[] calldata claims
+    ) external nonReentrant whenNotPaused {
         require(checkpointHeights.length == claims.length, "length mismatch");
         uint256 len = claims.length;
-        for (uint256 i = 0; i < len;) {
-            _claim(
-                subnet,
-                checkpointHeights[i],
-                claims[i].data,
-                claims[i].proof
-            );
+        for (uint256 i = 0; i < len; ) {
+            _claim(subnet, checkpointHeights[i], claims[i].data, claims[i].proof);
             unchecked {
                 i++;
             }
@@ -142,7 +141,7 @@ library LibValidatorReward {
         uint256 size = ds.commitments[subnetKey].length();
         listDetails = new ListCommitmentDetail[](size);
 
-        for (uint256 i = 0; i < size;) {
+        for (uint256 i = 0; i < size; ) {
             (bytes32 heightBytes32, bytes32 commitment) = ds.commitments[subnetKey].at(i);
 
             listDetails[i] = ListCommitmentDetail({

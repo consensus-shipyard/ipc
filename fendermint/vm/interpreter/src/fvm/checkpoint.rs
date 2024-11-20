@@ -281,10 +281,7 @@ where
                 activities: checkpoint::CompressedSummary {
                     stats: checkpoint::AggregatedStats {
                         total_active_validators: cp.activities.stats.total_active_validators,
-                        total_num_blocks_committed: cp
-                            .activities
-                            .stats
-                            .total_num_blocks_committed,
+                        total_num_blocks_committed: cp.activities.stats.total_num_blocks_committed,
                     },
                     data_root_commitment: cp.activities.data_root_commitment,
                 },

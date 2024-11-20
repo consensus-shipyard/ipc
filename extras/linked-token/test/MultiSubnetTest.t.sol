@@ -384,12 +384,12 @@ contract MultiSubnetTest is IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: batch.msgs,
-            activities: Consensus.Compressed({
-                aggregated: Consensus.Aggregated({
+            activities: Consensus.CompressedSummary({
+                stats: Consensus.AggregatedStats({
                     totalActiveValidators: 1,
                     totalNumBlocksCommitted: 1
                 }),
-                commitment: bytes32(0)
+                dataRootCommitment: Consensus.MerkleHash.wrap(bytes32(0))
             })
         });
 

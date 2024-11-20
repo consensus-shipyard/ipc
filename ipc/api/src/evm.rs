@@ -4,8 +4,8 @@
 //! Type conversion for IPC Agent struct with solidity contract struct
 
 use crate::address::IPCAddress;
-use crate::checkpoint::{consensus, BatchClaimPayload, BottomUpCheckpoint};
-use crate::checkpoint::{BottomUpMsgBatch, ValidatorClaimPayload};
+use crate::checkpoint::BottomUpMsgBatch;
+use crate::checkpoint::{consensus, BottomUpCheckpoint};
 use crate::cross::{IpcEnvelope, IpcMsgKind};
 use crate::staking::StakingChange;
 use crate::staking::StakingChangeRequest;
@@ -125,25 +125,25 @@ macro_rules! bottom_up_checkpoint_conversion {
         impl TryFrom<consensus::AggregatedStats> for $module::AggregatedStats {
             type Error = anyhow::Error;
 
-            fn try_from(c: consensus::Aggregated) -> Result<Self, Self::Error> {
-                Ok($module::Aggregated {
+            fn try_from(c: consensus::AggregatedStats) -> Result<Self, Self::Error> {
+                Ok($module::AggregatedStats {
                     total_active_validators: c.total_active_validators,
                     total_num_blocks_committed: c.total_num_blocks_committed,
                 })
             }
         }
 
-        impl TryFrom<consensus::CompressedSummary> for $module::Compressed {
+        impl TryFrom<consensus::CompressedSummary> for $module::CompressedSummary {
             type Error = anyhow::Error;
 
             fn try_from(c: consensus::CompressedSummary) -> Result<Self, Self::Error> {
-                Ok($module::Compressed {
-                    aggregated: c
-                        .aggregated
+                Ok($module::CompressedSummary {
+                    stats: c
+                        .stats
                         .try_into()
                         .map_err(|_| anyhow!("cannot convert aggregated stats"))?,
-                    commitment: c
-                        .commitment
+                    data_root_commitment: c
+                        .data_root_commitment
                         .try_into()
                         .map_err(|_| anyhow!("cannot convert bytes32"))?,
                 })
@@ -184,17 +184,14 @@ macro_rules! bottom_up_checkpoint_conversion {
                         .map(IpcEnvelope::try_from)
                         .collect::<Result<Vec<_>, _>>()?,
                     activity_bundle: consensus::CompressedSummary {
-                        aggregated: consensus::Aggregated {
-                            total_active_validators: value
-                                .activities
-                                .aggregated
-                                .total_active_validators,
+                        stats: consensus::AggregatedStats {
+                            total_active_validators: value.activities.stats.total_active_validators,
                             total_num_blocks_committed: value
                                 .activities
-                                .aggregated
+                                .stats
                                 .total_num_blocks_committed,
                         },
-                        commitment: value.activities.commitment.to_vec(),
+                        data_root_commitment: value.activities.data_root_commitment.to_vec(),
                     },
                 })
             }

@@ -40,6 +40,7 @@ use ethers::providers::{Authorization, Http, Provider};
 use ethers::signers::{LocalWallet, Wallet};
 use ethers::types::{BlockId, Eip1559TransactionRequest, ValueOrArray, I256, U256};
 
+use ethers::middleware::Middleware;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_actors_abis::validator_reward_facet::ValidatorClaim;
@@ -1336,7 +1337,7 @@ impl ValidatorRewarder for EthSubnetManager {
             };
 
             // Utilty function to pack validator data into a vector of strings for proof generation.
-            let pack_validator_data = |v: &ValidatorData| {
+            let pack_validator_data = |v: &checkpointing_facet::ValidatorData| {
                 vec![format!("{:?}", v.validator), v.blocks_committed.to_string()]
             };
 
@@ -1348,7 +1349,7 @@ impl ValidatorRewarder for EthSubnetManager {
                     .data
                     .iter()
                     .map(pack_validator_data)
-                    .collect();
+                    .collect::<Vec<_>>();
                 StandardMerkleTree::<Raw>::of(&leaves, &VALIDATOR_SUMMARY_FIELDS)
                     .context("failed to construct Merkle tree")?
             };
@@ -1361,7 +1362,12 @@ impl ValidatorRewarder for EthSubnetManager {
 
             // Construct the claim and add it to the list.
             let claim = ValidatorClaim {
-                data: data.clone(),
+                // Even though it's the same struct but still need to do a mapping due to
+                // different crate from ethers-rs
+                data: validator_reward_facet::ValidatorData {
+                    validator: data.validator,
+                    blocks_committed: data.blocks_committed,
+                },
                 proof: proof.into_iter().map(|v| v.into()).collect(),
             };
             claims.push((event.checkpoint_height, claim));
@@ -1410,7 +1416,7 @@ impl ValidatorRewarder for EthSubnetManager {
                     validator: *validator_addr,
                     blocks_committed: data.blocks_committed,
                 };
-                rewards.push((meta.block_number.into(), data));
+                rewards.push((meta.block_number.as_u64(), data));
             }
         }
 
@@ -1432,11 +1438,11 @@ impl ValidatorRewarder for EthSubnetManager {
         );
 
         // separate the Vec of tuples claims into two Vecs of Height and Claim
-        let (heights, claims): (Vec<u64>, Vec<ValidatorClaim>) =
-            claims.into_iter().unzip();
+        let (heights, claims): (Vec<u64>, Vec<ValidatorClaim>) = claims.into_iter().unzip();
 
         let call = {
-            let call = contract.batch_subnet_claim(reward_origin_subnet.into(), heights, claims);
+            let call =
+                contract.batch_subnet_claim(reward_origin_subnet.try_into()?, heights, claims);
             call_with_premium_and_pending_block(signer, call).await?
         };
 

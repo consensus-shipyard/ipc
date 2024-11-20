@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 //! Cross network messages related struct and utility functions.
 
-use crate::checkpoint::consensus::ValidatorData;
 use crate::cross::IpcEnvelope;
 use crate::subnet_id::SubnetID;
 use crate::HumanReadable;
@@ -104,17 +103,17 @@ pub mod consensus {
     // The full activity summary for consensus-level activity.
     #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
     pub struct FullSummary {
-        pub aggregated: AggregatedStats,
+        pub stats: AggregatedStats,
         /// The breakdown of activity per validator.
-        pub validator_details: Vec<ValidatorData>,
+        pub data: Vec<ValidatorData>,
     }
 
     /// The compresed representation of the activity summary for consensus-level activity suitable for embedding in a checkpoint.
     #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
     pub struct CompressedSummary {
-        pub aggregated: AggregatedStats,
+        pub stats: AggregatedStats,
         /// The commitment for the validator details, so that we don't have to transmit them in full.
-        pub commitment: Vec<u8>,
+        pub data_root_commitment: Vec<u8>,
     }
 }
 

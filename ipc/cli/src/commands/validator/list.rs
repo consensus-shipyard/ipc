@@ -40,7 +40,8 @@ impl CommandLineHandler for ListActivities {
             .await?;
 
         println!("found total {} entries", r.len());
-        for v in r {
+        for (checkpoint_height, v) in r {
+            println!("  checkpoint height: {}", checkpoint_height);
             println!("  addr: {}", v.validator);
             println!("  locks_committed: {}", v.blocks_committed);
         }

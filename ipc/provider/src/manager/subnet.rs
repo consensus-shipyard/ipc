@@ -9,8 +9,8 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_actors_abis::validator_reward_facet::ValidatorClaim;
 use ipc_api::checkpoint::{
-    consensus::ValidatorData, BatchClaimPayload, BottomUpCheckpoint, BottomUpCheckpointBundle,
-    QuorumReachedEvent, Signature, ValidatorClaimPayload,
+    consensus::ValidatorData, BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent,
+    Signature,
 };
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::{StakingChangeRequest, ValidatorInfo};
@@ -210,7 +210,7 @@ pub struct SubnetGenesisInfo {
     pub active_validators_limit: u16,
     pub min_collateral: TokenAmount,
     pub genesis_epoch: ChainEpoch,
-    pub validators: Vec<ValidatorData>,
+    pub validators: Vec<Validator>,
     pub genesis_balances: BTreeMap<Address, TokenAmount>,
     pub permission_mode: PermissionMode,
     pub supply_source: Asset,
@@ -302,7 +302,7 @@ pub trait ValidatorRewarder: Send + Sync {
         validator: &Address,
         from_checkpoint: ChainEpoch,
         to_checkpoint: ChainEpoch,
-    ) -> Result<Vec<ValidatorData>>;
+    ) -> Result<Vec<(u64, ValidatorData)>>;
 
     /// Claim validator rewards in a batch for the specified subnet.
     async fn batch_subnet_claim(

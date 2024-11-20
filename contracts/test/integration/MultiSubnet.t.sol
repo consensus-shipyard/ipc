@@ -46,6 +46,7 @@ import {SubnetActorFacetsHelper} from "../helpers/SubnetActorFacetsHelper.sol";
 import "forge-std/console.sol";
 
 import {FullActivityBundle, Consensus} from "../../contracts/activities/Activity.sol";
+import {ActivityHelper} from "../helpers/ActivityHelper.sol";
 
 contract MultiSubnetTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
@@ -1351,10 +1352,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: batch.msgs,
-            activities: Consensus.CompressedSummary({
-                aggregated: Consensus.AggregatedStats({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
-                commitment: bytes32(uint256(0))
-            })
+            activities: ActivityHelper.newCompressedSummary(1, 3, bytes32(uint256(0)))
         });
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
@@ -1384,10 +1382,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: Consensus.CompressedSummary({
-                aggregated: Consensus.AggregatedStats({totalActiveValidators: 1, totalNumBlocksCommitted: 3}),
-                commitment: bytes32(uint256(0))
-            })
+            activities: ActivityHelper.newCompressedSummary(1, 3, bytes32(uint256(0)))
         });
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
