@@ -194,9 +194,9 @@ openssl = { version = "0.10", features = ["vendored"] }
 # pull in crates as transitive dependencies that do not support Wasm architector. If this
 # happens, try removing "crypto" feature from fvm_shared dependency in contracts/binding/Cargo.toml
 # and run `cargo build`. Then add the "crypto" feature back and run `cargo build` again.
-fvm = { version = "4.3.0", default-features = false } # no opencl feature or it fails on CI
-fvm_shared = { version = "4.3.0" }
-fvm_sdk = { version = "4.3.0" }
+fvm = { version = "4.4.0", default-features = false } # no opencl feature or it fails on CI
+fvm_shared = { version = "4.4.0" }
+fvm_sdk = { version = "4.4.0" }
 
 
 fvm_ipld_blockstore = "0.2.0"
@@ -228,7 +228,7 @@ cid = { version = "0.10.1", default-features = false, features = [
   "std",
 ] }
 
-frc42_dispatch = "7.0.0"
+frc42_dispatch = { git = "https://github.com/filecoin-project/actors-utils", rev = "0f8365151f44785f7bead4e5500258fd5c8944e6" }
 
 # Using the same tendermint-rs dependency as tower-abci. From both we are interested in v037 modules.
 tower-abci = { version = "0.7" }
