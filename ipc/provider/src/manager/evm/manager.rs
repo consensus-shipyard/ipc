@@ -39,7 +39,7 @@ use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::{Signer, SignerMiddleware};
 use ethers::providers::{Authorization, Http, Middleware, Provider};
 use ethers::signers::{LocalWallet, Wallet};
-use ethers::types::{BlockId, Eip1559TransactionRequest, ValueOrArray, U256};
+use ethers::types::{Eip1559TransactionRequest, ValueOrArray, U256};
 
 use super::gas_estimator_middleware::Eip1559GasEstimatorMiddleware;
 use fvm_shared::clock::ChainEpoch;
