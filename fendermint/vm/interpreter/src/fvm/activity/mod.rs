@@ -13,10 +13,6 @@ use fendermint_crypto::PublicKey;
 use fvm_shared::clock::ChainEpoch;
 use std::fmt::Debug;
 
-pub struct BlockMined {
-    pub(crate) validator: PublicKey,
-}
-
 #[derive(Debug, Clone)]
 pub struct ActivityDetails<T> {
     details: Vec<T>,
@@ -28,10 +24,10 @@ pub trait ValidatorActivityTracker {
     type ValidatorSummaryDetail: Clone + Debug;
 
     /// Mark the validator has mined the target block.
-    fn track_block_mined(&mut self, block: BlockMined) -> anyhow::Result<()>;
+    fn record_block_committed(&mut self, validator: PublicKey) -> anyhow::Result<()>;
 
     /// Get the validators activities summary since the checkpoint height
-    fn get_activities_summary(
+    fn commit_activity(
         &mut self,
     ) -> anyhow::Result<ActivityDetails<Self::ValidatorSummaryDetail>>;
 
