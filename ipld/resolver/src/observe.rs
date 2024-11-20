@@ -84,15 +84,15 @@ register_metrics! {
         register_int_counter!("ipld_resolver_content_rate_limited", "Number of rate limited requests");
 }
 
-impl_traceables!(TraceLevel::Info, "Ping", PingEvent);
-impl_traceables!(TraceLevel::Warn, "Ping", PingFailureEvent);
-impl_traceables!(TraceLevel::Info, "Identify", IdentifyEvent);
-impl_traceables!(TraceLevel::Warn, "Identify", IdentifyFailureEvent);
-impl_traceables!(TraceLevel::Info, "Discovery", DiscoveryEvent);
-impl_traceables!(TraceLevel::Info, "Membership", MembershipEvent);
-impl_traceables!(TraceLevel::Warn, "Membership", MembershipFailureEvent);
-impl_traceables!(TraceLevel::Info, "Content", ResolveEvent);
-impl_traceables!(TraceLevel::Warn, "Content", ResolveFailureEvent);
+impl_traceables!(TraceLevel::Info, "IPLD_Resolver/Ping", PingEvent);
+impl_traceables!(TraceLevel::Warn, "IPLD_Resolver/Ping", PingFailureEvent);
+impl_traceables!(TraceLevel::Info, "IPLD_Resolver/Identify", IdentifyEvent);
+impl_traceables!(TraceLevel::Warn, "IPLD_Resolver/Identify", IdentifyFailureEvent);
+impl_traceables!(TraceLevel::Info, "IPLD_Resolver/Discovery", DiscoveryEvent);
+impl_traceables!(TraceLevel::Info, "IPLD_Resolver/Membership", MembershipEvent);
+impl_traceables!(TraceLevel::Warn, "IPLD_Resolver/Membership", MembershipFailureEvent);
+impl_traceables!(TraceLevel::Info, "IPLD_Resolver/Content", ResolveEvent);
+impl_traceables!(TraceLevel::Warn, "IPLD_Resolver/Content", ResolveFailureEvent);
 
 #[derive(Debug)]
 #[allow(dead_code)]
