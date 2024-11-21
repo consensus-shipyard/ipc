@@ -35,7 +35,10 @@ impl<'a, DB: Blockstore + Clone + 'static> ValidatorActivityTracker
             gas_limit: i64::MAX as u64, // exclude this from gas restriction
             method_num: fendermint_actor_activity_tracker::Method::RecordBlockCommitted as u64,
             params: fvm_ipld_encoding::RawBytes::serialize(address)?,
-            ..Default::default()
+            value: Default::default(),
+            version: Default::default(),
+            gas_fee_cap: Default::default(),
+            gas_premium: Default::default(),
         };
 
         self.apply_implicit_message(msg)?;
@@ -51,7 +54,11 @@ impl<'a, DB: Blockstore + Clone + 'static> ValidatorActivityTracker
             sequence: 0, // irrelevant
             gas_limit: i64::MAX as u64, // exclude this from gas restriction
             method_num: fendermint_actor_activity_tracker::Method::CommitActivity as u64,
-            ..Default::default()
+            params: fvm_ipld_encoding::RawBytes::default(),
+            value: Default::default(),
+            version: Default::default(),
+            gas_fee_cap: Default::default(),
+            gas_premium: Default::default(),
         };
 
         let (apply_ret, _) = self.executor.execute_implicit(msg)?;
