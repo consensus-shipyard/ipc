@@ -2781,6 +2781,7 @@ dependencies = [
  "fvm_ipld_encoding",
  "fvm_shared",
  "hex-literal 0.4.1",
+ "ipc-api",
  "ipc_actors_abis",
  "log",
  "multihash 0.18.1",

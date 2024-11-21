@@ -15,7 +15,7 @@ crate-type = ["cdylib", "lib"]
 anyhow = { workspace = true }
 cid = { workspace = true }
 ethers = { workspace = true }
-ipc_api = { workspace = true }
+ipc-api = { workspace = true }
 ipc_actors_abis = { workspace = true }
 fil_actor_eam = { workspace = true }
 fil_actors_runtime = { workspace = true }
