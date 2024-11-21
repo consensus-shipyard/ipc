@@ -191,7 +191,7 @@ macro_rules! bottom_up_checkpoint_conversion {
                         .into_iter()
                         .map($module::IpcEnvelope::try_from)
                         .collect::<Result<Vec<_>, _>>()?,
-                    activities: checkpoint.activities.try_into()?,
+                    activities: checkpoint.activity_rollup.try_into()?,
                 })
             }
         }
@@ -210,7 +210,7 @@ macro_rules! bottom_up_checkpoint_conversion {
                         .into_iter()
                         .map(IpcEnvelope::try_from)
                         .collect::<Result<Vec<_>, _>>()?,
-                    activities: value.activities.into(),
+                    activity_rollup: value.activities.into(),
                 })
             }
         }
