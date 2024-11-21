@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::Context;
-use fendermint_actor_activity_tracker::ValidatorData;
+use ipc_api::checkpoint::consensus::ValidatorData;
 use ipc_api::evm::payload_to_evm_address;
 use ipc_observability::lazy_static;
 use merkle_tree_rs::format::Raw;

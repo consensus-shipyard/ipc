@@ -2772,6 +2772,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid",
+ "ethers",
  "fil_actor_eam",
  "fil_actors_evm_shared",
  "fil_actors_runtime",
@@ -2780,6 +2781,7 @@ dependencies = [
  "fvm_ipld_encoding",
  "fvm_shared",
  "hex-literal 0.4.1",
+ "ipc_actors_abis",
  "log",
  "multihash 0.18.1",
  "num-derive 0.3.3",

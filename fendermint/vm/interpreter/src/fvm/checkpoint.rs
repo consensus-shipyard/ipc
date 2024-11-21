@@ -37,7 +37,7 @@ use super::{
     state::{ipc::GatewayCaller, FvmExecState},
     ValidatorContext,
 };
-use crate::fvm::activities::ValidatorActivityTracker;
+use crate::fvm::activity::ValidatorActivityTracker;
 use crate::fvm::exec::BlockEndEvents;
 use fendermint_actor_activity_tracker::ValidatorData;
 
@@ -104,7 +104,7 @@ where
 
     let num_msgs = msgs.len();
 
-    let activities = state.activities_tracker().get_activities_summary()?;
+    let activities = state.activities_tracker().commit_activity()?;
 
     let (consensus_full, consensus_compressed) =
         gen_consensus_reports(state.block_height(), &activities)?;
@@ -126,8 +126,9 @@ where
     let report = checkpoint::FullActivityRollup {
         consensus: consensus_full,
     };
+
     let ret = gateway
-        .create_bu_ckpt_with_activities(state, checkpoint.clone(), &curr_power_table.0, report)
+        .create_bottom_up_checkpoint(state, checkpoint.clone(), &curr_power_table.0, report)
         .context("failed to store checkpoint")?;
     event_tracker.push((ret.apply_ret.events, ret.emitters));
 

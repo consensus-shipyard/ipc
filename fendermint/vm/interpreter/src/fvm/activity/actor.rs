@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::fvm::activities::{ActivityDetails, ValidatorActivityTracker};
+use crate::fvm::activity::{ActivityDetails, ValidatorActivityTracker};
 use crate::fvm::state::FvmExecState;
 use crate::fvm::FvmMessage;
 use anyhow::Context;
@@ -11,6 +11,7 @@ use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::system;
 use fvm::executor::ApplyRet;
 use fvm_ipld_blockstore::Blockstore;
+use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use fendermint_crypto::PublicKey;
 
@@ -25,9 +26,7 @@ impl<'a, DB: Blockstore + Clone + 'static> ValidatorActivityTracker
     type ValidatorSummaryDetail = ValidatorData;
 
     fn record_block_committed(&mut self, validator: PublicKey) -> anyhow::Result<()> {
-        let params = fendermint_actor_activity_tracker::BlockedMinedParams {
-            validator: EthAddress::from(validator).into(),
-        };
+        let address: Address = EthAddress::from(validator).into();
 
         let msg = FvmMessage {
             from: system::SYSTEM_ACTOR_ADDR,
@@ -35,7 +34,7 @@ impl<'a, DB: Blockstore + Clone + 'static> ValidatorActivityTracker
             sequence: 0, // irrelevant
             gas_limit: i64::MAX as u64, // exclude this from gas restriction
             method_num: fendermint_actor_activity_tracker::Method::RecordBlockCommitted as u64,
-            params: fvm_ipld_encoding::RawBytes::serialize(params)?,
+            params: fvm_ipld_encoding::RawBytes::serialize(address)?,
             ..Default::default()
         };
 
@@ -51,7 +50,7 @@ impl<'a, DB: Blockstore + Clone + 'static> ValidatorActivityTracker
             to: ACTIVITY_TRACKER_ACTOR_ADDR,
             sequence: 0, // irrelevant
             gas_limit: i64::MAX as u64, // exclude this from gas restriction
-            method_num: fendermint_actor_activity_tracker::Method::GetActivities as u64,
+            method_num: fendermint_actor_activity_tracker::Method::CommitActivity as u64,
             ..Default::default()
         };
 

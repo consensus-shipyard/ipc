@@ -83,6 +83,7 @@ pub struct CompressedActivityRollup {
 }
 
 /// Namespace for consensus-level activity summaries.
+/// XYZ(raulk) move to activity module
 pub mod consensus {
     use fvm_shared::address::Address;
     use serde::{Deserialize, Serialize};

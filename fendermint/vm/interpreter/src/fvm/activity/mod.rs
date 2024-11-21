@@ -7,7 +7,7 @@
 pub mod actor;
 mod merkle;
 
-use crate::fvm::activities::merkle::MerkleProofGen;
+use crate::fvm::activity::merkle::MerkleProofGen;
 use fendermint_actor_activity_tracker::ValidatorData;
 use fendermint_crypto::PublicKey;
 use fvm_shared::clock::ChainEpoch;
