@@ -1442,7 +1442,7 @@ fn gen_merkle_proof(
     let tree = gen_merkle_tree(validator_data, pack_validator_data)?;
 
     let leaf = pack_validator_data(validator);
-    Ok(tree.get_proof(LeafType::LeafBytes(leaf))?)
+    tree.get_proof(LeafType::LeafBytes(leaf))
 }
 
 fn gen_merkle_tree<F: Fn(&checkpointing_facet::ValidatorData) -> Vec<String>>(
@@ -1453,10 +1453,8 @@ fn gen_merkle_tree<F: Fn(&checkpointing_facet::ValidatorData) -> Vec<String>>(
         .iter()
         .map(pack_validator_data)
         .collect::<Vec<_>>();
-    Ok(
-        StandardMerkleTree::<Raw>::of(&leaves, &VALIDATOR_SUMMARY_FIELDS)
-            .context("failed to construct Merkle tree")?,
-    )
+    StandardMerkleTree::<Raw>::of(&leaves, &VALIDATOR_SUMMARY_FIELDS)
+        .context("failed to construct Merkle tree")
 }
 
 fn order_validator_data(
@@ -1478,15 +1476,15 @@ fn order_validator_data(
     });
 
     let back_to_eth = |(fvm_addr, blocks): (Address, u64)| {
-        payload_to_evm_address(&fvm_addr.payload()).map(|v| checkpointing_facet::ValidatorData {
+        payload_to_evm_address(fvm_addr.payload()).map(|v| checkpointing_facet::ValidatorData {
             validator: v,
             blocks_committed: blocks,
         })
     };
-    Ok(mapped
+    mapped
         .into_iter()
         .map(back_to_eth)
-        .collect::<Result<Vec<_>, _>>()?)
+        .collect::<Result<Vec<_>, _>>()
 }
 
 /// Takes a `FunctionCall` input and returns a new instance with an estimated optimal `gas_premium`.
