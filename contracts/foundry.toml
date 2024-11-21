@@ -16,6 +16,7 @@ remappings = [
     "murky/=lib/murky/src/",
 ]
 allow_paths = ["../node_modules"]
+evm_version = "paris"
 
 [fuzz]
 runs = 512
