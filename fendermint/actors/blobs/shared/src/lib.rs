@@ -2,6 +2,8 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::collections::HashSet;
+
 use fil_actors_runtime::runtime::Runtime;
 use fil_actors_runtime::{deserialize_block, extract_send_result, ActorError};
 use fvm_ipld_encoding::ipld_block::IpldBlock;
@@ -43,11 +45,11 @@ pub enum Method {
     DeleteBlob = frc42_dispatch::method_hash!("DeleteBlob"),
 }
 
-pub fn buy_credit(rt: &impl Runtime, recipient: Address) -> Result<Account, ActorError> {
+pub fn buy_credit(rt: &impl Runtime, to: Address) -> Result<Account, ActorError> {
     deserialize_block(extract_send_result(rt.send_simple(
         &BLOBS_ACTOR_ADDR,
         Method::BuyCredit as MethodNum,
-        IpldBlock::serialize_cbor(&params::BuyCreditParams(recipient))?,
+        IpldBlock::serialize_cbor(&params::BuyCreditParams(to))?,
         rt.message().value_received(),
     ))?)
 }
@@ -55,8 +57,8 @@ pub fn buy_credit(rt: &impl Runtime, recipient: Address) -> Result<Account, Acto
 pub fn approve_credit(
     rt: &impl Runtime,
     from: Address,
-    receiver: Address,
-    required_caller: Option<Address>,
+    to: Address,
+    caller_allowlist: Option<HashSet<Address>>,
     limit: Option<BigUint>,
     ttl: Option<ChainEpoch>,
 ) -> Result<CreditApproval, ActorError> {
@@ -65,8 +67,8 @@ pub fn approve_credit(
         Method::ApproveCredit as MethodNum,
         IpldBlock::serialize_cbor(&params::ApproveCreditParams {
             from,
-            receiver,
-            required_caller,
+            to,
+            caller_allowlist,
             limit,
             ttl,
         })?,
@@ -77,16 +79,16 @@ pub fn approve_credit(
 pub fn revoke_credit(
     rt: &impl Runtime,
     from: Address,
-    receiver: Address,
-    required_caller: Option<Address>,
+    to: Address,
+    for_caller: Option<Address>,
 ) -> Result<(), ActorError> {
     extract_send_result(rt.send_simple(
         &BLOBS_ACTOR_ADDR,
         Method::RevokeCredit as MethodNum,
         IpldBlock::serialize_cbor(&params::RevokeCreditParams {
             from,
-            receiver,
-            required_caller,
+            to,
+            for_caller,
         })?,
         rt.message().value_received(),
     ))?;

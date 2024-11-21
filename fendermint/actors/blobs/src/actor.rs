@@ -11,8 +11,7 @@ use fendermint_actor_blobs_shared::params::{
     UpdateCreditParams,
 };
 use fendermint_actor_blobs_shared::state::{
-    Account, Blob, BlobStatus, CreditAllowance, CreditApproval, Hash, PublicKey, Subscription,
-    SubscriptionId,
+    Account, Blob, BlobStatus, CreditApproval, Hash, PublicKey, Subscription, SubscriptionId,
 };
 use fendermint_actor_blobs_shared::Method;
 use fil_actors_runtime::runtime::builtins::Type;
@@ -23,6 +22,7 @@ use fil_actors_runtime::{
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::address::Address;
+use fvm_shared::econ::TokenAmount;
 use fvm_shared::sys::SendFlags;
 use fvm_shared::{error::ExitCode, MethodNum};
 use num_traits::Zero;
@@ -51,30 +51,30 @@ impl BlobsActor {
 
     fn buy_credit(rt: &impl Runtime, params: BuyCreditParams) -> Result<Account, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let (recipient, actor_type) = resolve_external(rt, params.0)?;
+        let (to, actor_type) = resolve_external(rt, params.0)?;
         // Recipient cannot be a machine
         if matches!(actor_type, ActorType::Machine) {
             return Err(ActorError::illegal_argument(format!(
-                "recipient {} cannot be a machine",
-                recipient
+                "to {} cannot be a machine",
+                to
             )));
         }
         rt.transaction(|st: &mut State, rt| {
-            st.buy_credit(recipient, rt.message().value_received(), rt.curr_epoch())
+            st.buy_credit(to, rt.message().value_received(), rt.curr_epoch())
         })
     }
 
     fn update_credit(rt: &impl Runtime, params: UpdateCreditParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        let (from, actor_type) = resolve_external(rt, params.from)?;
+        let (to, actor_type) = resolve_external(rt, params.to)?;
         // Credit owner cannot be a machine
         if matches!(actor_type, ActorType::Machine) {
             return Err(ActorError::illegal_argument(format!(
-                "from {} cannot be a machine",
-                from
+                "to {} cannot be a machine",
+                to
             )));
         }
-        let sponsor = if let Some(sponsor) = rt.message().sponsor() {
+        let sponsor = if let Some(sponsor) = params.sponsor {
             let (sponsor, actor_type) = resolve_external(rt, sponsor)?;
             // Sponsor cannot be a machine
             if matches!(actor_type, ActorType::Machine) {
@@ -88,13 +88,7 @@ impl BlobsActor {
             None
         };
         rt.transaction(|st: &mut State, rt| {
-            st.update_credit(
-                from,
-                from,
-                sponsor.unwrap_or(from),
-                params.add_amount,
-                rt.curr_epoch(),
-            )
+            st.update_credit(to, sponsor, params.add_amount, rt.curr_epoch())
         })
     }
 
@@ -126,25 +120,31 @@ impl BlobsActor {
                 from
             )));
         }
-        let (receiver, actor_type) = resolve_external(rt, params.receiver)?;
+        let (to, actor_type) = resolve_external(rt, params.to)?;
         // Receiver cannot be a machine
         if matches!(actor_type, ActorType::Machine) {
             return Err(ActorError::illegal_argument(format!(
-                "receiver {} cannot be a machine",
-                receiver
+                "to {} cannot be a machine",
+                to
             )));
         }
-        let required_caller = if let Some(required_caller) = params.required_caller {
-            let (required_caller, _) = resolve_external(rt, required_caller)?;
-            Some(required_caller)
+        let caller_allowlist = if let Some(allowlist) = params.caller_allowlist {
+            let resolved: HashSet<_> = allowlist
+                .into_iter()
+                .map(|caller| {
+                    let (caller, _) = resolve_external(rt, caller)?;
+                    Ok::<Address, ActorError>(caller)
+                })
+                .collect::<Result<_, _>>()?;
+            Some(resolved)
         } else {
             None
         };
         rt.transaction(|st: &mut State, rt| {
             st.approve_credit(
                 from,
-                receiver,
-                required_caller,
+                to,
+                caller_allowlist,
                 rt.curr_epoch(),
                 params.limit,
                 params.ttl,
@@ -177,21 +177,21 @@ impl BlobsActor {
                 from
             )));
         }
-        let (receiver, actor_type) = resolve_external(rt, params.receiver)?;
+        let (to, actor_type) = resolve_external(rt, params.to)?;
         // Receiver cannot be a machine
         if matches!(actor_type, ActorType::Machine) {
             return Err(ActorError::illegal_argument(format!(
-                "receiver {} cannot be a machine",
-                receiver
+                "to {} cannot be a machine",
+                to
             )));
         }
-        let required_caller = if let Some(required_caller) = params.required_caller {
-            let (required_caller, _) = resolve_external(rt, required_caller)?;
-            Some(required_caller)
+        let for_caller = if let Some(caller) = params.for_caller {
+            let (resolved, _) = resolve_external(rt, caller)?;
+            Some(resolved)
         } else {
             None
         };
-        rt.transaction(|st: &mut State, _| st.revoke_credit(from, receiver, required_caller))
+        rt.transaction(|st: &mut State, _| st.revoke_credit(from, to, for_caller))
     }
 
     fn get_account(
@@ -216,32 +216,32 @@ impl BlobsActor {
                 from
             )));
         }
-        let (receiver, actor_type) = resolve_external(rt, params.receiver)?;
+        let (to, actor_type) = resolve_external(rt, params.to)?;
         // Receiver cannot be a machine
         if matches!(actor_type, ActorType::Machine) {
             return Err(ActorError::illegal_argument(format!(
-                "receiver address {} cannot be a machine",
-                receiver
+                "to address {} cannot be a machine",
+                to
             )));
         }
-        let approval = rt.state::<State>()?.get_credit_approval(from, receiver);
+        let approval = rt.state::<State>()?.get_credit_approval(from, to);
         Ok(approval)
     }
 
     fn get_credit_allowance(
         rt: &impl Runtime,
         params: GetCreditAllowanceParams,
-    ) -> Result<CreditAllowance, ActorError> {
+    ) -> Result<TokenAmount, ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        let (from, actor_type) = resolve_external(rt, params.0)?;
+        let (to, actor_type) = resolve_external(rt, params.to)?;
         // Credit owner cannot be a machine
         if matches!(actor_type, ActorType::Machine) {
             return Err(ActorError::illegal_argument(format!(
-                "from address {} cannot be a machine",
-                from
+                "to address {} cannot be a machine",
+                to
             )));
         }
-        let sponsor = if let Some(sponsor) = rt.message().sponsor() {
+        let sponsor = if let Some(sponsor) = params.sponsor {
             let (sponsor, actor_type) = resolve_external(rt, sponsor)?;
             // Sponsor cannot be a machine
             if matches!(actor_type, ActorType::Machine) {
@@ -254,12 +254,8 @@ impl BlobsActor {
         } else {
             None
         };
-        rt.state::<State>()?.get_credit_allowance(
-            from,
-            from,
-            sponsor.unwrap_or(from),
-            rt.curr_epoch(),
-        )
+        rt.state::<State>()?
+            .get_credit_allowance(to, sponsor, rt.curr_epoch())
     }
 
     fn debit_accounts(rt: &impl Runtime) -> Result<(), ActorError> {
@@ -345,11 +341,10 @@ impl BlobsActor {
 
     fn finalize_blob(rt: &impl Runtime, params: FinalizeBlobParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        // We control this method call and can guarantee subscriber is an external address,
-        // i.e., no need to resolve its external address.
+        let (subscriber, _) = resolve_external(rt, params.subscriber)?;
         rt.transaction(|st: &mut State, _| {
             st.finalize_blob(
-                params.subscriber,
+                subscriber,
                 rt.curr_epoch(),
                 params.hash,
                 params.id,
@@ -690,13 +685,13 @@ mod tests {
         rt.set_delegated_address(owner_id_addr.id().unwrap(), owner_f4_eth_addr);
 
         // Credit receiver
-        let receiver_id_addr = Address::new_id(111);
+        let to_id_addr = Address::new_id(111);
         let receiver_eth_addr = EthAddress(hex_literal::hex!(
             "CAFEB0BA00000000000000000000000000000001"
         ));
         let receiver_f4_eth_addr = Address::new_delegated(10, &receiver_eth_addr.0).unwrap();
-        rt.set_delegated_address(receiver_id_addr.id().unwrap(), receiver_f4_eth_addr);
-        rt.set_address_actor_type(receiver_id_addr, *ETHACCOUNT_ACTOR_CODE_ID);
+        rt.set_delegated_address(to_id_addr.id().unwrap(), receiver_f4_eth_addr);
+        rt.set_address_actor_type(to_id_addr, *ETHACCOUNT_ACTOR_CODE_ID);
 
         // Proxy EVM contract on behalf of the credit owner
         let proxy_id_addr = Address::new_id(112);
@@ -713,8 +708,8 @@ mod tests {
         rt.expect_validate_caller_any();
         let approve_params = ApproveCreditParams {
             from: owner_id_addr,
-            receiver: receiver_id_addr,
-            required_caller: None,
+            to: to_id_addr,
+            caller_allowlist: None,
             limit: None,
             ttl: None,
         };
@@ -731,8 +726,8 @@ mod tests {
         rt.expect_validate_caller_any();
         let approve_params = ApproveCreditParams {
             from: owner_id_addr,
-            receiver: receiver_id_addr,
-            required_caller: None,
+            to: to_id_addr,
+            caller_allowlist: None,
             limit: None,
             ttl: None,
         };
@@ -748,9 +743,9 @@ mod tests {
         rt.set_origin(owner_id_addr);
         rt.expect_validate_caller_any();
         let approve_params = ApproveCreditParams {
-            from: receiver_id_addr, // mismatch
-            receiver: receiver_id_addr,
-            required_caller: None,
+            from: to_id_addr, // mismatch
+            to: to_id_addr,
+            caller_allowlist: None,
             limit: None,
             ttl: None,
         };
@@ -779,13 +774,13 @@ mod tests {
         rt.set_delegated_address(owner_id_addr.id().unwrap(), owner_f4_eth_addr);
 
         // Credit receiver
-        let receiver_id_addr = Address::new_id(111);
+        let to_id_addr = Address::new_id(111);
         let receiver_eth_addr = EthAddress(hex_literal::hex!(
             "CAFEB0BA00000000000000000000000000000001"
         ));
         let receiver_f4_eth_addr = Address::new_delegated(10, &receiver_eth_addr.0).unwrap();
-        rt.set_delegated_address(receiver_id_addr.id().unwrap(), receiver_f4_eth_addr);
-        rt.set_address_actor_type(receiver_id_addr, *ETHACCOUNT_ACTOR_CODE_ID);
+        rt.set_delegated_address(to_id_addr.id().unwrap(), receiver_f4_eth_addr);
+        rt.set_address_actor_type(to_id_addr, *ETHACCOUNT_ACTOR_CODE_ID);
 
         // Proxy EVM contract on behalf of the credit owner
         let proxy_id_addr = Address::new_id(112);
@@ -802,8 +797,8 @@ mod tests {
         rt.expect_validate_caller_any();
         let approve_params = ApproveCreditParams {
             from: owner_id_addr,
-            receiver: receiver_id_addr,
-            required_caller: None,
+            to: to_id_addr,
+            caller_allowlist: None,
             limit: None,
             ttl: None,
         };
@@ -820,8 +815,8 @@ mod tests {
         rt.expect_validate_caller_any();
         let revoke_params = RevokeCreditParams {
             from: owner_id_addr,
-            receiver: receiver_id_addr,
-            required_caller: None,
+            to: to_id_addr,
+            for_caller: None,
         };
         let result = rt.call::<BlobsActor>(
             Method::RevokeCredit as u64,
@@ -836,14 +831,16 @@ mod tests {
         rt.expect_validate_caller_any();
         let revoke_params = RevokeCreditParams {
             from: owner_id_addr,
-            receiver: receiver_id_addr,
-            required_caller: None,
+            to: to_id_addr,
+            for_caller: None,
         };
         let result = rt.call::<BlobsActor>(
             Method::RevokeCredit as u64,
             IpldBlock::serialize_cbor(&revoke_params).unwrap(),
         );
-        assert!(result.is_ok());
+        // This should be a state error, not from the actor API
+        assert!(result.is_err());
+        assert!(result.err().unwrap().msg().contains("not found"),);
         rt.verify();
 
         // Caller/origin mismatch with from
@@ -851,9 +848,9 @@ mod tests {
         rt.set_origin(owner_id_addr);
         rt.expect_validate_caller_any();
         let revoke_params = RevokeCreditParams {
-            from: receiver_id_addr, // mismatch
-            receiver: receiver_id_addr,
-            required_caller: None,
+            from: to_id_addr, // mismatch
+            to: to_id_addr,
+            for_caller: None,
         };
         let result = rt.call::<BlobsActor>(
             Method::RevokeCredit as u64,

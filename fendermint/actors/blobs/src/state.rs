@@ -7,8 +7,8 @@ use std::ops::Bound::{Included, Unbounded};
 
 use fendermint_actor_blobs_shared::params::GetStatsReturn;
 use fendermint_actor_blobs_shared::state::{
-    Account, Blob, BlobStatus, CreditAllowance, CreditApproval, Hash, PublicKey, Subscription,
-    SubscriptionGroup, SubscriptionId,
+    Account, Blob, BlobStatus, CreditApproval, Hash, PublicKey, Subscription, SubscriptionGroup,
+    SubscriptionId,
 };
 use fil_actors_runtime::ActorError;
 use fvm_ipld_encoding::tuple::*;
@@ -159,36 +159,25 @@ impl State {
 
     pub fn update_credit(
         &mut self,
-        origin: Address,
-        caller: Address,
-        subscriber: Address,
+        to: Address,
+        sponsor: Option<Address>,
         add_amount: TokenAmount,
         current_epoch: ChainEpoch,
     ) -> anyhow::Result<(), ActorError> {
+        let addr = sponsor.unwrap_or(to);
         let account = self
             .accounts
-            .get_mut(&subscriber)
-            .ok_or(ActorError::not_found(format!(
-                "account {} not found",
-                subscriber
-            )))?;
-        let delegation = if origin != subscriber {
-            // Look for an approval for origin from subscriber and validate the caller is allowed.
-            let approval = if let Some(approval) = account.approvals.get_mut(&origin) {
-                if approval.allowed_callers.is_empty() || approval.allowed_callers.contains(&caller)
-                {
-                    Some(approval)
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-            let approval = approval.ok_or(ActorError::forbidden(format!(
-                "approval from {} to {} via caller {} not found",
-                subscriber, origin, caller
-            )))?;
-            Some(CreditDelegation::new(origin, caller, approval))
+            .get_mut(&addr)
+            .ok_or(ActorError::not_found(format!("account {} not found", addr)))?;
+        let delegation = if let Some(sponsor) = sponsor {
+            let approval = account
+                .approvals
+                .get_mut(&to)
+                .ok_or(ActorError::forbidden(format!(
+                    "approval from {} to {} not found",
+                    sponsor, to
+                )))?;
+            Some(CreditDelegation::new(to, to, approval))
         } else {
             None
         };
@@ -197,7 +186,7 @@ impl State {
         if add_credit.is_negative() {
             let credit_required = -add_credit.clone();
             ensure_credit(
-                subscriber,
+                addr,
                 current_epoch,
                 &account.credit_free,
                 &credit_required,
@@ -211,98 +200,18 @@ impl State {
             delegation.approval.used -= &add_credit;
         }
         if add_credit.is_positive() {
-            debug!("refunded {} credits to {}", add_credit, subscriber);
+            debug!("refunded {} credits to {}", add_credit, addr);
         } else {
-            debug!(
-                "debited {} credits from {}",
-                add_credit.magnitude(),
-                subscriber
-            );
+            debug!("debited {} credits from {}", add_credit.magnitude(), addr);
         }
         Ok(())
     }
 
-    /*
-    pub fn debit_credit(
-        &mut self,
-        from: Address,
-        from_amount: TokenAmount,
-        sponsor: Option<Address>,
-        sponsor_amount: TokenAmount,
-        current_epoch: ChainEpoch,
-    ) -> anyhow::Result<(), ActorError> {
-        if from_amount.is_negative() || sponsor_amount.is_negative() {
-            return Err(ActorError::illegal_argument(
-                "token amount must be positive".into(),
-            ));
-        }
-
-        let account = self
-            .accounts
-            .get_mut(&from)
-            .ok_or(ActorError::not_found(format!("account {} not found", from)))?;
-        let from_credits = self.credit_debit_rate * from_amount.atto();
-        ensure_credit(
-            from,
-            current_epoch,
-            &account.credit_free,
-            &from_credits,
-            &None,
-        )?;
-
-        if let Some(sponsor) = sponsor {
-            let sponsor_account = self
-                .accounts
-                .get_mut(&sponsor)
-                .ok_or(ActorError::not_found(format!(
-                    "account {} not found",
-                    sponsor
-                )))?;
-            // Look for an approval for origin from subscriber and validate the caller is allowed.
-            let approval = if let Some(approval) = sponsor_account.approvals.get_mut(&from) {
-                // TODO: How to handle allowed caller here? Maybe not usable for gas.
-                if approval.allowed_callers.is_empty() {
-                    Some(approval)
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-            let approval = approval.ok_or(ActorError::forbidden(format!(
-                "approval from {} to {} not found",
-                sponsor, from,
-            )))?;
-            let delegation = CreditDelegation::new(from, from, approval);
-            let sponsor_credits = self.credit_debit_rate * sponsor_amount.atto();
-            ensure_credit(
-                sponsor,
-                current_epoch,
-                &sponsor_account.credit_free,
-                &sponsor_credits,
-                &Some(delegation),
-            )?;
-            // Debit from "sponsor" account
-            self.credit_debited += &sponsor_credits;
-            sponsor_account.credit_free -= &sponsor_credits;
-            approval.used += &sponsor_credits;
-            debug!("debited {} credits from {}", sponsor_credits, sponsor);
-        }
-
-        // Debit from "from" account
-        self.credit_debited += &from_credits;
-        account.credit_free -= &from_credits;
-        debug!("debited {} credits from {}", from_credits, from);
-        Ok(())
-    }
-     */
-
-    // TODO: Handle multiple allowed callers
     pub fn approve_credit(
         &mut self,
         from: Address,
         to: Address,
-        require_caller: Option<Address>,
+        caller_allowlist: Option<HashSet<Address>>,
         current_epoch: ChainEpoch,
         limit: Option<BigUint>,
         ttl: Option<ChainEpoch>,
@@ -322,15 +231,11 @@ impl State {
             .entry(from)
             .or_insert(Account::new(BigInt::zero(), current_epoch));
         // Get or add a new approval
-        let mut allowed_callers = HashSet::new();
-        if let Some(require_caller) = require_caller {
-            allowed_callers.insert(require_caller);
-        }
         let approval = account.approvals.entry(to).or_insert(CreditApproval {
             limit: limit.clone(),
             expiry,
             used: BigInt::zero(),
-            allowed_callers: allowed_callers.clone(),
+            caller_allowlist: caller_allowlist.clone(),
         });
         // Validate approval changes
         if let Some(limit) = limit.clone() {
@@ -343,51 +248,56 @@ impl State {
         }
         approval.limit = limit;
         approval.expiry = expiry;
-        approval.allowed_callers = allowed_callers;
+        approval.caller_allowlist = caller_allowlist.clone();
         debug!(
-            "approved credits from {} to {} (limit: {:?}; expiry: {:?}, required_caller: {:?})",
-            from, to, approval.limit, approval.expiry, require_caller
+            "approved credits from {} to {} (limit: {:?}; expiry: {:?}, caller_allowlist: {:?})",
+            from, to, approval.limit, approval.expiry, caller_allowlist
         );
         Ok(approval.clone())
     }
 
+    /// Revokes credit from one account to another.
+    /// If a caller is specified, this will remove it from the caller allowlist.
+    /// It is not possible to use this method to transform an approval with a caller allowlist
+    /// into one without a caller allowlist.
     pub fn revoke_credit(
         &mut self,
         from: Address,
         to: Address,
-        require_caller: Option<Address>,
+        for_caller: Option<Address>,
     ) -> anyhow::Result<(), ActorError> {
         let account = self
             .accounts
             .get_mut(&from)
             .ok_or(ActorError::not_found(format!("account {} not found", from)))?;
-        if let Some(caller) = require_caller {
+        if let Some(caller) = for_caller {
             let approval = account
                 .approvals
                 .get_mut(&to)
                 .ok_or(ActorError::not_found(format!(
-                    "approval from {} to {} via caller {} not found",
-                    from, to, caller
+                    "approval from {} to {} not found",
+                    from, to,
                 )))?;
-            if !approval.allowed_callers.remove(&caller) {
+            if !approval.remove_caller(&caller) {
                 return Err(ActorError::not_found(format!(
                     "approval from {} to {} via caller {} not found",
                     from, to, caller
                 )));
-            } else if approval.allowed_callers.is_empty() {
+            } else if !approval.has_allowlist() {
+                // Remove the entire approval.
+                // Otherwise, removing this caller would make the approval valid for any caller,
+                // which is likely not the intention.
                 account.approvals.remove(&to);
             }
-        } else {
-            if account.approvals.remove(&to).is_none() {
-                return Err(ActorError::not_found(format!(
-                    "approval from {} to {} not found",
-                    from, to
-                )));
-            }
+        } else if account.approvals.remove(&to).is_none() {
+            return Err(ActorError::not_found(format!(
+                "approval from {} to {} not found",
+                from, to
+            )));
         }
         debug!(
             "revoked credits from {} to {} (required_caller: {:?})",
-            from, to, require_caller
+            from, to, for_caller
         );
         Ok(())
     }
@@ -406,50 +316,42 @@ impl State {
         account.approvals.get(&to).cloned()
     }
 
-    // TODO: Should this return a single balance for "from" or "to"?
+    /// Returns the free credit for the given address, or from an approval from a sponsor.
+    /// Note: An error returned from this method would be fatal, as it's called from the FVM executor.
     pub fn get_credit_allowance(
         &self,
-        origin: Address,
-        caller: Address,
-        subscriber: Address,
+        to: Address,
+        sponsor: Option<Address>,
         current_epoch: ChainEpoch,
-    ) -> anyhow::Result<CreditAllowance, ActorError> {
-        let account = match self.accounts.get(&origin) {
-            None => return Ok(CreditAllowance::default()),
+    ) -> anyhow::Result<TokenAmount, ActorError> {
+        let addr = sponsor.unwrap_or(to);
+        let account = match self.accounts.get(&addr) {
+            None => return Ok(TokenAmount::zero()),
             Some(account) => account,
         };
-        let origin_amount = TokenAmount::from_atto(account.credit_free.clone());
-        let sponsored_amount = (origin != subscriber)
-            .then(|| self.accounts.get(&subscriber))
-            .flatten()
-            .and_then(|account| {
-                account
-                    .approvals
-                    .get(&origin)
-                    .filter(|approval| {
-                        approval.allowed_callers.is_empty()
-                            || approval.allowed_callers.contains(&caller)
-                    })
-                    .and_then(|approval| {
-                        let expiry_valid = approval
-                            .expiry
-                            .map_or(true, |expiry| expiry > current_epoch);
-                        if !expiry_valid {
-                            return None;
-                        }
-                        let credit_free = account.credit_free.clone();
-                        let used = approval.used.clone();
-                        let amount = approval
-                            .limit
-                            .clone()
-                            .map_or(credit_free.clone(), |limit| (limit - used).min(credit_free));
-                        Some(TokenAmount::from_atto(amount))
-                    })
-            });
-        Ok(CreditAllowance {
-            origin: origin_amount,
-            sponsored: sponsored_amount,
-        })
+        if sponsor.is_none() {
+            return Ok(TokenAmount::from_atto(account.credit_free.clone()));
+        }
+        let allowance = account
+            .approvals
+            .get(&to)
+            .and_then(|approval| {
+                let expiry_valid = approval
+                    .expiry
+                    .map_or(true, |expiry| expiry > current_epoch);
+                if !expiry_valid {
+                    return None;
+                }
+                let credit_free = account.credit_free.clone();
+                let used = approval.used.clone();
+                let amount = approval
+                    .limit
+                    .clone()
+                    .map_or(credit_free.clone(), |limit| (limit - used).min(credit_free));
+                Some(TokenAmount::from_atto(amount))
+            })
+            .unwrap_or(TokenAmount::zero());
+        Ok(allowance)
     }
 
     #[allow(clippy::type_complexity)]
@@ -568,20 +470,14 @@ impl State {
             .or_insert(Account::new(BigInt::zero(), current_epoch));
         let delegation = if origin != subscriber {
             // Look for an approval for origin from subscriber and validate the caller is allowed.
-            let approval = if let Some(approval) = account.approvals.get_mut(&origin) {
-                if approval.allowed_callers.is_empty() || approval.allowed_callers.contains(&caller)
-                {
-                    Some(approval)
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-            let approval = approval.ok_or(ActorError::forbidden(format!(
-                "approval from {} to {} via caller {} not found",
-                subscriber, origin, caller
-            )))?;
+            let approval = account
+                .approvals
+                .get_mut(&origin)
+                .and_then(|approval| approval.is_caller_allowed(&caller).then_some(approval))
+                .ok_or(ActorError::forbidden(format!(
+                    "approval from {} to {} via caller {} not found",
+                    subscriber, origin, caller
+                )))?;
             Some(CreditDelegation::new(origin, caller, approval))
         } else {
             None
@@ -871,20 +767,14 @@ impl State {
             )))?;
         let delegation = if let Some((origin, caller)) = sub.delegate {
             // Look for an approval for origin from subscriber and validate the caller is allowed.
-            let approval = if let Some(approval) = account.approvals.get_mut(&origin) {
-                if approval.allowed_callers.is_empty() || approval.allowed_callers.contains(&caller)
-                {
-                    Some(approval)
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-            let approval = approval.ok_or(ActorError::forbidden(format!(
-                "approval from {} to {} via caller {} not found",
-                subscriber, origin, caller
-            )))?;
+            let approval = account
+                .approvals
+                .get_mut(&origin)
+                .and_then(|approval| approval.is_caller_allowed(&caller).then_some(approval))
+                .ok_or(ActorError::forbidden(format!(
+                    "approval from {} to {} via caller {} not found",
+                    subscriber, origin, caller
+                )))?;
             Some(CreditDelegation::new(origin, caller, approval))
         } else {
             None
@@ -1061,17 +951,11 @@ impl State {
         // Do not error if the approval was removed while this blob was pending
         let delegation = if let Some((origin, caller)) = sub.delegate {
             // Look for an approval for origin from subscriber and validate the caller is allowed.
-            let approval = if let Some(approval) = account.approvals.get_mut(&origin) {
-                if approval.allowed_callers.is_empty() || approval.allowed_callers.contains(&caller)
-                {
-                    Some(approval)
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-            approval.map(|approval| CreditDelegation::new(origin, caller, approval))
+            account
+                .approvals
+                .get_mut(&origin)
+                .and_then(|approval| approval.is_caller_allowed(&caller).then_some(approval))
+                .map(|approval| CreditDelegation::new(origin, caller, approval))
         } else {
             None
         };
@@ -1177,16 +1061,10 @@ impl State {
             )))?;
         let delegation = if let Some((origin, caller)) = sub.delegate {
             // Look for an approval for origin from subscriber and validate the caller is allowed.
-            let approval = if let Some(approval) = account.approvals.get_mut(&origin) {
-                if approval.allowed_callers.is_empty() || approval.allowed_callers.contains(&caller)
-                {
-                    Some(approval)
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
+            let approval = account
+                .approvals
+                .get_mut(&origin)
+                .and_then(|approval| approval.is_caller_allowed(&caller).then_some(approval));
             if let Some(approval) = approval {
                 Some(CreditDelegation::new(origin, caller, approval))
             } else {
@@ -1469,7 +1347,7 @@ mod tests {
         if !account.approvals.is_empty() {
             let approval = account.approvals.get(&origin).unwrap();
             if origin != caller {
-                assert!(approval.allowed_callers.contains(&caller));
+                assert!(approval.has_allowlist() && approval.is_caller_allowed(&caller));
             }
             assert_eq!(approval.used, expect_used);
         }
@@ -1570,15 +1448,21 @@ mod tests {
 
         // Require caller
         let require_caller = new_address();
-        let res = state.approve_credit(from, to, Some(require_caller), current_epoch, None, None);
+        let res = state.approve_credit(
+            from,
+            to,
+            Some(HashSet::from([require_caller])),
+            current_epoch,
+            None,
+            None,
+        );
         assert!(res.is_ok());
 
         // Check the account approvals
         let account = state.get_account(from).unwrap();
         assert_eq!(account.approvals.len(), 1);
-        let approvals = account.approvals.get(&to).unwrap();
-        assert!(approvals.contains_key(&to));
-        assert!(approvals.contains_key(&require_caller));
+        let approval = account.approvals.get(&to).unwrap();
+        assert!(approval.has_allowlist() && approval.is_caller_allowed(&require_caller));
     }
 
     #[test]
@@ -1650,7 +1534,7 @@ mod tests {
         assert_eq!(
             res.err().unwrap().msg(),
             format!(
-                "limit cannot be less than amount of already spent credits ({})",
+                "limit cannot be less than amount of already used credits ({})",
                 approval.used
             )
         );
@@ -1668,29 +1552,32 @@ mod tests {
         let res = state.approve_credit(from, to, None, current_epoch, None, None);
         assert!(res.is_ok());
 
-        // Add another and require caller
+        // Check the account approval
+        let account = state.get_account(from).unwrap();
+        assert_eq!(account.approvals.len(), 1);
+        let approval = account.approvals.get(&to).unwrap();
+        assert!(!approval.has_allowlist());
+
+        // Update the approval with a required caller
         let require_caller = new_address();
-        let res = state.approve_credit(from, to, Some(require_caller), current_epoch, None, None);
+        let res = state.approve_credit(
+            from,
+            to,
+            Some(HashSet::from([require_caller])),
+            current_epoch,
+            None,
+            None,
+        );
         assert!(res.is_ok());
 
-        // Check the account approvals
+        // Check the account approval
         let account = state.get_account(from).unwrap();
         assert_eq!(account.approvals.len(), 1);
-        let approvals = account.approvals.get(&to).unwrap();
-        assert!(approvals.contains_key(&to));
-        assert!(approvals.contains_key(&require_caller));
+        let approval = account.approvals.get(&to).unwrap();
+        assert!(approval.has_allowlist() && approval.is_caller_allowed(&require_caller));
 
-        // Remove first
+        // Remove the approval
         let res = state.revoke_credit(from, to, None);
-        assert!(res.is_ok());
-        let account = state.get_account(from).unwrap();
-        assert_eq!(account.approvals.len(), 1);
-        let approvals = account.approvals.get(&to).unwrap();
-        assert!(!approvals.contains_key(&to));
-        assert!(approvals.contains_key(&require_caller));
-
-        // Remove second
-        let res = state.revoke_credit(from, to, Some(require_caller));
         assert!(res.is_ok());
         let account = state.get_account(from).unwrap();
         assert_eq!(account.approvals.len(), 0);
@@ -2121,7 +2008,14 @@ mod tests {
             .buy_credit(subscriber, token_amount.clone(), current_epoch)
             .unwrap();
         state
-            .approve_credit(subscriber, origin, Some(caller), current_epoch, None, None)
+            .approve_credit(
+                subscriber,
+                origin,
+                Some(HashSet::from([caller])),
+                current_epoch,
+                None,
+                None,
+            )
             .unwrap();
         add_blob_same_hash_same_account(
             state,

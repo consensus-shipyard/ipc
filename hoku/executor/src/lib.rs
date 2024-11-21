@@ -7,10 +7,7 @@ use std::result::Result as StdResult;
 
 use anyhow::{anyhow, bail, Context, Result};
 use cid::Cid;
-use fendermint_actor_blobs_shared::{
-    params::{GetCreditAllowanceParams, UpdateCreditParams},
-    state::CreditAllowance,
-};
+use fendermint_actor_blobs_shared::params::{GetCreditAllowanceParams, UpdateCreditParams};
 use fendermint_vm_actor_interface::{
     blobs::{BLOBS_ACTOR_ADDR, BLOBS_ACTOR_ID},
     eam::EAM_ACTOR_ID,
@@ -468,21 +465,22 @@ where
         sender_state.sequence += 1;
 
         // Ensure from actor has enough balance to cover the gas cost of the message.
-        let allowance = self.get_vgas_allowance(msg.from, msg.sponsor)?;
-        let total_allowance = allowance.total();
+        let (credit_allowance, sponsored_credit_allowance) =
+            self.get_total_credit_allowance(msg.from, msg.sponsor)?;
+        let total_credit_allowance = &credit_allowance + &sponsored_credit_allowance;
         let total_gas_cost: TokenAmount = msg.gas_fee_cap.clone() * msg.gas_limit;
         let sender_balance = sender_state.balance.clone();
-        if &total_allowance + &sender_balance < total_gas_cost {
+        if &total_credit_allowance + &sender_balance < total_gas_cost {
             return Ok(Err(ApplyRet::prevalidation_fail(
                 ExitCode::SYS_SENDER_STATE_INVALID,
                 format!(
                     "Actor allowance plus balance less than needed: {} + {} < {}",
-                    total_allowance, sender_state.balance, total_gas_cost
+                    total_credit_allowance, sender_state.balance, total_gas_cost
                 ),
                 miner_penalty_amount,
             )));
         }
-        let gas_costs = if total_allowance.is_zero() {
+        let gas_costs = if total_credit_allowance.is_zero() {
             // The sender is responsible for the entire gas cost
             sender_state.deduct_funds(&total_gas_cost)?;
             GasAmounts::new(total_gas_cost, TokenAmount::zero(), TokenAmount::zero())
@@ -509,53 +507,51 @@ where
                 };
 
             // Check the source balance
-            if source_state.balance < total_allowance {
+            if source_state.balance < total_credit_allowance {
                 // This should not happen
                 return Ok(Err(ApplyRet::prevalidation_fail(
                     ExitCode::SYS_SENDER_STATE_INVALID,
                     format!(
                         "Gas allowance source actor balance less than needed: {} < {}",
-                        source_state.balance, total_allowance
+                        source_state.balance, total_credit_allowance
                     ),
                     miner_penalty_amount,
                 )));
             }
 
-            let gas_costs = if total_allowance < total_gas_cost {
+            let gas_costs = if total_credit_allowance < total_gas_cost {
                 // Deduct the entire allowance
-                source_state.deduct_funds(&total_allowance)?;
+                source_state.deduct_funds(&total_credit_allowance)?;
                 // Deduct the remainder from sender
-                let sender_gas_cost = &total_gas_cost - &total_allowance;
+                let sender_gas_cost = &total_gas_cost - &total_credit_allowance;
                 sender_state.deduct_funds(&sender_gas_cost)?;
                 // Consume entire allowance
                 GasAmounts::new(
                     sender_gas_cost,
-                    allowance.origin,
-                    allowance.sponsored.unwrap_or_default(),
+                    credit_allowance,
+                    sponsored_credit_allowance,
                 )
             } else {
                 // Deduct entire gas cost from source
                 source_state.deduct_funds(&total_gas_cost)?;
                 // Consume allowances
-                let (gas_credit_cost, sponsored_gas_credit_cost) =
-                    if let Some(sponsored_allowance) = allowance.sponsored {
-                        // Prioritize sponsor allowance when consuming
-                        if sponsored_allowance > total_gas_cost {
-                            // Consume from sponsored allowance
-                            (TokenAmount::zero(), total_gas_cost)
-                        } else {
-                            // Consume entire sponsored allowance
-                            (&total_gas_cost - &sponsored_allowance, sponsored_allowance)
-                        }
+                let (credit_cost, sponsored_credit_cost) = if sponsored_credit_allowance.is_zero() {
+                    // Consume from own allowance
+                    (total_gas_cost, TokenAmount::zero())
+                } else {
+                    // Prioritize sponsor allowance when consuming
+                    if sponsored_credit_allowance > total_gas_cost {
+                        // Consume from sponsored allowance
+                        (TokenAmount::zero(), total_gas_cost)
                     } else {
-                        // Consume from own allowance
-                        (total_gas_cost, TokenAmount::zero())
-                    };
-                GasAmounts::new(
-                    TokenAmount::zero(),
-                    gas_credit_cost,
-                    sponsored_gas_credit_cost,
-                )
+                        // Consume entire sponsored allowance
+                        (
+                            &total_gas_cost - &sponsored_credit_allowance,
+                            sponsored_credit_allowance,
+                        )
+                    }
+                };
+                GasAmounts::new(TokenAmount::zero(), credit_cost, sponsored_credit_cost)
             };
 
             // Update the source actor in the state tree
@@ -568,8 +564,8 @@ where
         self.state_tree_mut().set_actor(sender_id, sender_state);
 
         // Debit credit costs (the unused amount will get refunded)
-        self.update_vgas_allowance(msg.from, None, -gas_costs.from_credit.clone())?;
-        self.update_vgas_allowance(
+        self.update_credit_allowance(msg.from, None, -gas_costs.from_credit.clone())?;
+        self.update_credit_allowance(
             msg.from,
             msg.sponsor,
             -gas_costs.from_sponsor_credit.clone(),
@@ -664,8 +660,8 @@ where
         }
 
         // Refund gas credit difference
-        self.update_vgas_allowance(msg.from, None, gas_refunds.from_credit)?;
-        self.update_vgas_allowance(msg.from, msg.sponsor, gas_refunds.from_sponsor_credit)?;
+        self.update_credit_allowance(msg.from, None, gas_refunds.from_credit)?;
+        self.update_credit_allowance(msg.from, msg.sponsor, gas_refunds.from_sponsor_credit)?;
 
         Ok(ApplyRet {
             msg_receipt: receipt,
@@ -698,19 +694,34 @@ where
         )
     }
 
-    /// Returns the virtual gas allowance for the sender.
-    fn get_vgas_allowance(
+    /// Returns the total credit allowance for the sender with a message sponsor.
+    fn get_total_credit_allowance(
         &mut self,
-        from: Address,
+        to: Address,
         sponsor: Option<Address>,
-    ) -> Result<CreditAllowance> {
-        let params = RawBytes::serialize(GetCreditAllowanceParams(from))?;
+    ) -> Result<(TokenAmount, TokenAmount)> {
+        let allowance = self.get_credit_allowance(to, None)?;
+        let sponsored_allowance = if let Some(sponsor) = sponsor {
+            self.get_credit_allowance(to, Some(sponsor))?
+        } else {
+            TokenAmount::zero()
+        };
+        Ok((allowance, sponsored_allowance))
+    }
+
+    /// Returns the credit allowance for the sender.
+    fn get_credit_allowance(
+        &mut self,
+        to: Address,
+        sponsor: Option<Address>,
+    ) -> Result<TokenAmount> {
+        let params = RawBytes::serialize(GetCreditAllowanceParams { to, sponsor })?;
 
         let msg = Message {
             from: SYSTEM_ACTOR_ADDR,
             to: BLOBS_ACTOR_ADDR,
-            sponsor,
-            sequence: 0, // irrelevant for implicit executions.
+            sponsor: None, // gas sponsor is none in this context
+            sequence: 0,   // irrelevant for implicit executions
             gas_limit: i64::MAX as u64,
             method_num: fendermint_actor_blobs_shared::Method::GetCreditAllowance as u64,
             params,
@@ -723,20 +734,21 @@ where
         let apply_ret = self.execute_message(msg, ApplyKind::Implicit, 0)?;
         if let Some(err) = apply_ret.failure_info {
             bail!(
-                "failed to acquire virtual gas allowance for {}: {}",
-                from,
+                "failed to get credit allowance for {} (sponsor: {:?}): {}",
+                to,
+                sponsor,
                 err
             );
         }
 
-        fvm_ipld_encoding::from_slice::<CreditAllowance>(&apply_ret.msg_receipt.return_data)
-            .context("failed to parse gas credit allowance")
+        fvm_ipld_encoding::from_slice::<TokenAmount>(&apply_ret.msg_receipt.return_data)
+            .context("failed to parse credit allowance")
     }
 
-    /// Updates virtual gas from the sender.
-    fn update_vgas_allowance(
+    /// Updates credit allowance from the sender.
+    fn update_credit_allowance(
         &mut self,
-        from: Address,
+        to: Address,
         sponsor: Option<Address>,
         add_amount: TokenAmount,
     ) -> Result<()> {
@@ -745,15 +757,16 @@ where
         }
 
         let params = RawBytes::serialize(UpdateCreditParams {
-            from,
+            to,
+            sponsor,
             add_amount: add_amount.clone(),
         })?;
 
         let msg = Message {
             from: SYSTEM_ACTOR_ADDR,
             to: BLOBS_ACTOR_ADDR,
-            sponsor,
-            sequence: 0, // irrelevant for implicit executions.
+            sponsor: None, // gas sponsor is none in this context
+            sequence: 0,   // irrelevant for implicit executions
             gas_limit: i64::MAX as u64,
             method_num: fendermint_actor_blobs_shared::Method::UpdateCredit as u64,
             params,
@@ -766,8 +779,8 @@ where
         let apply_ret = self.execute_message(msg, ApplyKind::Implicit, 0)?;
         if let Some(err) = apply_ret.failure_info {
             bail!(
-                "failed to update gas credit for {} (amount: {}; sponsor: {:?}): {}",
-                from,
+                "failed to update credit allowance for {} (amount: {}; sponsor: {:?}): {}",
+                to,
                 add_amount,
                 sponsor,
                 err
@@ -775,8 +788,8 @@ where
         }
 
         debug!(
-            "updated gas credit allowance for {} (amount: {}; sponsor: {:?})",
-            from, add_amount, sponsor
+            "updated credit allowance for {} (amount: {}; sponsor: {:?})",
+            to, add_amount, sponsor
         );
 
         Ok(())

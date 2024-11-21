@@ -10,7 +10,6 @@ use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
-use fvm_shared::econ::TokenAmount;
 use serde::{Deserialize, Serialize};
 
 /// The stored representation of a credit account.
@@ -55,24 +54,34 @@ pub struct CreditApproval {
     pub expiry: Option<ChainEpoch>,
     /// Counter for how much credit has been used via this approval.
     pub used: BigInt,
-    /// A set of allowed callers.
-    /// An empty set indicates any caller is allowed.
-    pub allowed_callers: HashSet<Address>,
+    /// Optional caller allowlist.
+    /// If not present, any caller is allowed.
+    pub caller_allowlist: Option<HashSet<Address>>,
 }
 
-/// Credit allowance for an account and from an approval.
-#[derive(Debug, Clone, Default, Serialize_tuple, Deserialize_tuple)]
-pub struct CreditAllowance {
-    /// Allowance from self.
-    pub origin: TokenAmount,
-    /// Allowance from an approval.
-    pub sponsored: Option<TokenAmount>,
-}
+impl CreditApproval {
+    pub fn remove_caller(&mut self, caller: &Address) -> bool {
+        if let Some(allowlist) = self.caller_allowlist.as_mut() {
+            allowlist.remove(caller)
+        } else {
+            false
+        }
+    }
 
-impl CreditAllowance {
-    /// Returns the total allowance.
-    pub fn total(&self) -> TokenAmount {
-        self.origin.clone() + self.sponsored.clone().unwrap_or_default()
+    pub fn has_allowlist(&self) -> bool {
+        if let Some(allowlist) = self.caller_allowlist.as_ref() {
+            !allowlist.is_empty()
+        } else {
+            false
+        }
+    }
+
+    pub fn is_caller_allowed(&self, caller: &Address) -> bool {
+        if let Some(allowlist) = self.caller_allowlist.as_ref() {
+            allowlist.contains(caller)
+        } else {
+            true
+        }
     }
 }
 

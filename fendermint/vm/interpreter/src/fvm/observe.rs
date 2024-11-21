@@ -156,6 +156,7 @@ mod tests {
             version: 1,
             from: Address::new_id(1),
             to: Address::new_id(2),
+            sponsor: None,
             sequence: 1,
             value: TokenAmount::from_atto(1),
             method_num: 1,

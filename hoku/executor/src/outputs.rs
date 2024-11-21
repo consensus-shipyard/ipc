@@ -1,7 +1,6 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use fendermint_vm_actor_interface::blobs::BLOBS_ACTOR_ID;
 use fvm_shared::econ::TokenAmount;
 use num_traits::Zero;
 
