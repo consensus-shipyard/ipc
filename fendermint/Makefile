@@ -53,8 +53,11 @@ e2e-only:
 	cd testing/smoke-test    && cargo make --profile $(PROFILE)
 	cd testing/snapshot-test && cargo make --profile $(PROFILE)
 	cd testing/graph-test    && cargo make --profile $(PROFILE)
-	cargo clean
-	PROFILE=$(PROFILE) cargo test --locked --package fendermint_materializer
+ifeq ($(PROFILE), release)
+	cargo test --release --locked --package fendermint_materializer
+else
+	cargo test --locked --package fendermint_materializer
+endif
 
 clean:
 	cargo clean
