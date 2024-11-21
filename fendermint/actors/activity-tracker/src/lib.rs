@@ -24,6 +24,10 @@ mod state;
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(ActivityTrackerActor);
 
+pub fn always_fail(_: &mut [u8]) -> Result<(), getrandom::Error> { unimplemented!() }
+
+getrandom::register_custom_getrandom!(always_fail);
+
 pub const IPC_ACTIVITY_TRACKER_ACTOR_NAME: &str = "activity_tracker";
 
 pub struct ActivityTrackerActor;

@@ -2780,6 +2780,7 @@ dependencies = [
  "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
  "fvm_shared",
+ "getrandom",
  "hex-literal 0.4.1",
  "ipc-api",
  "ipc_actors_abis",
