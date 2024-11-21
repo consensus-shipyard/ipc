@@ -9,14 +9,14 @@ use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Default)]
 pub struct ValidatorStats {
     pub blocks_committed: u64,
 }
 
 pub type ValidatorMap<BS> = Map2<BS, Address, ValidatorStats>;
 
-#[derive(Deserialize, Serialize, Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
 pub struct ValidatorData {
     pub validator: Address,
     pub stats: ValidatorStats,

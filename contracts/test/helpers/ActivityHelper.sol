@@ -9,7 +9,11 @@ library ActivityHelper {
         uint64 totalNumBlocksCommitted,
         bytes32 detailsRootCommitment
     ) internal pure returns (CompressedActivityRollup memory compressed) {
-        Consensus.CompressedSummary memory summary = newCompressedSummary(totalActiveValidators, totalNumBlocksCommitted, detailsRootCommitment);
+        Consensus.CompressedSummary memory summary = newCompressedSummary(
+            totalActiveValidators,
+            totalNumBlocksCommitted,
+            detailsRootCommitment
+        );
         compressed.consensus = summary;
         return compressed;
     }

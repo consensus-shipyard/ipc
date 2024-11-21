@@ -13,7 +13,7 @@ use num_derive::FromPrimitive;
 use serde::{Deserialize, Serialize};
 
 pub use crate::state::State;
-pub use crate::state::ValidatorData;
+pub use crate::state::{ValidatorData, ValidatorStats};
 
 mod state;
 

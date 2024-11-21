@@ -83,6 +83,7 @@ fendermint_testing = { path = "../../testing", features = ["golden"] }
 fvm = { workspace = true, features = ["arb", "testing"] }
 fendermint_vm_genesis = { path = "../genesis", features = ["arb"] }
 multihash = { workspace = true }
+hex = { workspace = true }
 
 [features]
 default = []

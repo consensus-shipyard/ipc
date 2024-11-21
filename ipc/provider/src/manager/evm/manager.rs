@@ -38,7 +38,7 @@ use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::{Signer, SignerMiddleware};
 use ethers::providers::{Authorization, Http, Provider};
 use ethers::signers::{LocalWallet, Wallet};
-use ethers::types::{BlockId, Eip1559TransactionRequest, ValueOrArray, I256, U256};
+use ethers::types::{BlockId, Eip1559TransactionRequest, ValueOrArray, H256, I256, U256};
 
 use ethers::middleware::Middleware;
 use fvm_shared::clock::ChainEpoch;
@@ -1336,29 +1336,7 @@ impl ValidatorRewarder for EthSubnetManager {
                 continue;
             };
 
-            // Utilty function to pack validator data into a vector of strings for proof generation.
-            let pack_validator_data = |v: &checkpointing_facet::ValidatorData| {
-                vec![format!("{:?}", v.validator), v.blocks_committed.to_string()]
-            };
-
-            // Form the entire tree from the leaves.
-            let tree = {
-                let leaves = event
-                    .rollup
-                    .consensus
-                    .data
-                    .iter()
-                    .map(pack_validator_data)
-                    .collect::<Vec<_>>();
-                StandardMerkleTree::<Raw>::of(&leaves, &VALIDATOR_SUMMARY_FIELDS)
-                    .context("failed to construct Merkle tree")?
-            };
-
-            // Get the proof for the leaf.
-            let proof = {
-                let leaf = pack_validator_data(data);
-                tree.get_proof(LeafType::LeafBytes(leaf))?
-            };
+            let proof = gen_merkle_proof(&event.rollup.consensus.data, data)?;
 
             // Construct the claim and add it to the list.
             let claim = ValidatorClaim {
@@ -1450,6 +1428,65 @@ impl ValidatorRewarder for EthSubnetManager {
 
         Ok(())
     }
+}
+
+fn gen_merkle_proof(
+    validator_data: &[checkpointing_facet::ValidatorData],
+    validator: &checkpointing_facet::ValidatorData,
+) -> anyhow::Result<Vec<H256>> {
+    // Utilty function to pack validator data into a vector of strings for proof generation.
+    let pack_validator_data = |v: &checkpointing_facet::ValidatorData| {
+        vec![format!("{:?}", v.validator), v.blocks_committed.to_string()]
+    };
+
+    let tree = gen_merkle_tree(validator_data, pack_validator_data)?;
+
+    let leaf = pack_validator_data(validator);
+    Ok(tree.get_proof(LeafType::LeafBytes(leaf))?)
+}
+
+fn gen_merkle_tree<F: Fn(&checkpointing_facet::ValidatorData) -> Vec<String>>(
+    validator_data: &[checkpointing_facet::ValidatorData],
+    pack_validator_data: F,
+) -> anyhow::Result<StandardMerkleTree<Raw>> {
+    let leaves = order_validator_data(validator_data)?
+        .iter()
+        .map(pack_validator_data)
+        .collect::<Vec<_>>();
+    Ok(
+        StandardMerkleTree::<Raw>::of(&leaves, &VALIDATOR_SUMMARY_FIELDS)
+            .context("failed to construct Merkle tree")?,
+    )
+}
+
+fn order_validator_data(
+    validator_data: &[checkpointing_facet::ValidatorData],
+) -> anyhow::Result<Vec<checkpointing_facet::ValidatorData>> {
+    let mut mapped = validator_data
+        .iter()
+        .map(|a| ethers_address_to_fil_address(&a.validator).map(|v| (v, a.blocks_committed)))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    mapped.sort_by(|a, b| {
+        let cmp = a.0.cmp(&b.0);
+        if cmp.is_eq() {
+            // Address will be unique, do this just in case equal
+            a.1.cmp(&b.1)
+        } else {
+            cmp
+        }
+    });
+
+    let back_to_eth = |(fvm_addr, blocks): (Address, u64)| {
+        payload_to_evm_address(&fvm_addr.payload()).map(|v| checkpointing_facet::ValidatorData {
+            validator: v,
+            blocks_committed: blocks,
+        })
+    };
+    Ok(mapped
+        .into_iter()
+        .map(back_to_eth)
+        .collect::<Result<Vec<_>, _>>()?)
 }
 
 /// Takes a `FunctionCall` input and returns a new instance with an estimated optimal `gas_premium`.
@@ -1678,8 +1715,11 @@ impl TryFrom<gateway_getter_facet::Subnet> for SubnetInfo {
 
 #[cfg(test)]
 mod tests {
-    use crate::manager::evm::manager::contract_address_from_subnet;
+    use crate::manager::evm::manager::{contract_address_from_subnet, gen_merkle_tree};
+    use ethers::core::rand::prelude::SliceRandom;
+    use ethers::core::rand::{random, thread_rng};
     use fvm_shared::address::Address;
+    use ipc_actors_abis::checkpointing_facet::{checkpointing_facet, ValidatorData};
     use ipc_api::subnet_id::SubnetID;
     use std::str::FromStr;
 
@@ -1693,5 +1733,92 @@ mod tests {
             format!("{eth:?}"),
             "0x2e714a3c385ea88a09998ed74db265dae9853667"
         );
+    }
+
+    /// test case that makes sure the commitment created for various addresses and blocks committed
+    /// are consistent
+    #[test]
+    fn test_validator_rewarder_claim_commitment() {
+        let pack_validator_data = |v: &checkpointing_facet::ValidatorData| {
+            vec![format!("{:?}", v.validator), v.blocks_committed.to_string()]
+        };
+
+        let mut random_validator_data = vec![
+            ValidatorData {
+                validator: ethers::types::Address::from_str(
+                    "0xB29C00299756135ec5d6A140CA54Ec77790a99d6",
+                )
+                .unwrap(),
+                blocks_committed: 1,
+            },
+            ValidatorData {
+                validator: ethers::types::Address::from_str(
+                    "0x1A79385eAd0e873FE0C441C034636D3Edf7014cC",
+                )
+                .unwrap(),
+                blocks_committed: 10,
+            },
+            ValidatorData {
+                validator: ethers::types::Address::from_str(
+                    "0x28345a43c2fBae4412f0AbadFa06Bd8BA3f58867",
+                )
+                .unwrap(),
+                blocks_committed: 2,
+            },
+            ValidatorData {
+                validator: ethers::types::Address::from_str(
+                    "0x3c5cc76b07cb02a372e647887bD6780513659527",
+                )
+                .unwrap(),
+                blocks_committed: 3,
+            },
+            ValidatorData {
+                validator: ethers::types::Address::from_str(
+                    "0x76B9d5a35C46B1fFEb37aadf929f1CA63a26A829",
+                )
+                .unwrap(),
+                blocks_committed: 4,
+            },
+        ];
+        random_validator_data.shuffle(&mut thread_rng());
+
+        let root = gen_merkle_tree(&random_validator_data, pack_validator_data)
+            .unwrap()
+            .root();
+        assert_eq!(
+            hex::encode(root.0),
+            "5519955f33109df3338490473cb14458640efdccd4df05998c4c439738280ab0"
+        );
+    }
+
+    #[test]
+    fn test_validator_rewarder_claim_commitment_ii() {
+        let pack_validator_data = |v: &checkpointing_facet::ValidatorData| {
+            vec![format!("{:?}", v.validator), v.blocks_committed.to_string()]
+        };
+
+        let mut random_validator_data = (0..100)
+            .map(|_| ValidatorData {
+                validator: ethers::types::Address::random(),
+                blocks_committed: random::<u64>(),
+            })
+            .collect::<Vec<_>>();
+
+        random_validator_data.shuffle(&mut thread_rng());
+        let root = gen_merkle_tree(&random_validator_data, pack_validator_data)
+            .unwrap()
+            .root();
+
+        random_validator_data.shuffle(&mut thread_rng());
+        let new_root = gen_merkle_tree(&random_validator_data, pack_validator_data)
+            .unwrap()
+            .root();
+        assert_eq!(new_root, root);
+
+        random_validator_data.shuffle(&mut thread_rng());
+        let new_root = gen_merkle_tree(&random_validator_data, pack_validator_data)
+            .unwrap()
+            .root();
+        assert_eq!(new_root, root);
     }
 }
