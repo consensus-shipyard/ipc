@@ -3,18 +3,14 @@
 
 use crate::state::ConsensusData;
 pub use crate::state::State;
-use anyhow::anyhow;
-use ethers::abi::AbiEncode;
 use fil_actors_runtime::builtin::singletons::SYSTEM_ACTOR_ADDR;
 use fil_actors_runtime::runtime::{ActorCode, Runtime};
 use fil_actors_runtime::{actor_dispatch, ActorError, EAM_ACTOR_ID};
 use fil_actors_runtime::{actor_error, WithCodec, DEFAULT_HAMT_CONFIG};
-use fvm_ipld_encoding::tuple::*;
-use fvm_ipld_encoding::{RawBytes, IPLD_RAW};
+use fvm_ipld_encoding::{IPLD_RAW};
 use fvm_shared::address::{Address, Payload};
-use fvm_shared::clock::ChainEpoch;
 use fvm_shared::METHOD_CONSTRUCTOR;
-use ipc_actors_abis::checkpointing_facet::{AggregatedStats, FullActivityRollup, FullSummary};
+use ipc_actors_abis::checkpointing_facet::{FullActivityRollup};
 use num_derive::FromPrimitive;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
@@ -102,7 +98,7 @@ impl ActivityTracker for ActivityTrackerActor {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
         // Reject non-f410 addresses.
-        if !matches!(validator, Payload::Delegated(d) if d.namespace() == EAM_ACTOR_ID && d.subaddress().len() == 20)
+        if !matches!(validator.payload(), Payload::Delegated(d) if d.namespace() == EAM_ACTOR_ID && d.subaddress().len() == 20)
         {
             return Err(
                 actor_error!(illegal_argument; "validator address must be a valid f410 address"),
