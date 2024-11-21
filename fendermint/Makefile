@@ -50,15 +50,12 @@ e2e: docker-build | cargo-make
 	${MAKE} e2e-only
 
 e2e-only:
-	df -h
 	cd testing/smoke-test    && cargo make --profile $(PROFILE)
-	df -h
 	cd testing/snapshot-test && cargo make --profile $(PROFILE)
-	df -h
 	cd testing/graph-test    && cargo make --profile $(PROFILE)
-	df -h
+	cargo clean
 	PROFILE=$(PROFILE) cargo test --locked --package fendermint_materializer
-	df -h
+
 clean:
 	cargo clean
 	rm $(BUILTIN_ACTORS_BUNDLE)
