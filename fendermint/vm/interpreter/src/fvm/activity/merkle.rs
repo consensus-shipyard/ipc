@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::Context;
-use ipc_api::checkpoint::consensus::ValidatorData;
-use ipc_api::evm::payload_to_evm_address;
+use ipc_actors_abis::checkpointing_facet::ValidatorData;
 use ipc_observability::lazy_static;
 use merkle_tree_rs::format::Raw;
 use merkle_tree_rs::standard::StandardMerkleTree;
@@ -21,20 +20,16 @@ pub(crate) struct MerkleProofGen {
 }
 
 impl MerkleProofGen {
+    pub fn pack_validator(v: &ValidatorData) -> Vec<String> {
+        vec![format!("{:?}", v.validator), v.blocks_committed.to_string()]
+    }
+
     pub fn root(&self) -> Hash {
         self.tree.root()
     }
-}
 
-impl MerkleProofGen {
     pub fn new(values: &[ValidatorData]) -> anyhow::Result<Self> {
-        let values = values
-            .iter()
-            .map(|t| {
-                payload_to_evm_address(t.validator.payload())
-                    .map(|addr| vec![format!("{addr:?}"), t.stats.blocks_committed.to_string()])
-            })
-            .collect::<anyhow::Result<Vec<_>>>()?;
+        let values = values.iter().map(Self::pack_validator).collect::<Vec<_>>();
 
         let tree = StandardMerkleTree::of(&values, &VALIDATOR_SUMMARY_FIELDS)
             .context("failed to construct Merkle tree")?;

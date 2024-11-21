@@ -1,33 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::HashMap;
-use std::time::Duration;
-
-use anyhow::{anyhow, Context};
-use ethers::abi::Tokenizable;
-use tendermint::block::Height;
-use tendermint_rpc::endpoint::commit;
-use tendermint_rpc::{endpoint::validators, Client, Paging};
-
-use fvm_ipld_blockstore::Blockstore;
-use fvm_shared::clock::ChainEpoch;
-use fvm_shared::{address::Address, chainid::ChainID};
-
-use fendermint_crypto::PublicKey;
-use fendermint_crypto::SecretKey;
-use fendermint_vm_actor_interface::eam::EthAddress;
-use fendermint_vm_actor_interface::ipc::BottomUpCheckpoint;
-use fendermint_vm_genesis::{Power, Validator, ValidatorKey};
-
-use ipc_api::evm::payload_to_evm_address;
-
-use crate::fvm::activities::ActivityDetails;
-use ipc_actors_abis::checkpointing_facet as checkpoint;
-use ipc_actors_abis::gateway_getter_facet as getter;
-use ipc_api::staking::ConfigurationNumber;
-use ipc_observability::{emit, serde::HexEncodableBlockHash};
-
 use super::observe::{
     CheckpointCreated, CheckpointFinalized, CheckpointSigned, CheckpointSignedRole,
 };
@@ -39,7 +12,24 @@ use super::{
 };
 use crate::fvm::activity::ValidatorActivityTracker;
 use crate::fvm::exec::BlockEndEvents;
-use fendermint_actor_activity_tracker::ValidatorData;
+use anyhow::{anyhow, Context};
+use ethers::abi::Tokenizable;
+use fendermint_crypto::PublicKey;
+use fendermint_crypto::SecretKey;
+use fendermint_vm_actor_interface::eam::EthAddress;
+use fendermint_vm_actor_interface::ipc::BottomUpCheckpoint;
+use fendermint_vm_genesis::{Power, Validator, ValidatorKey};
+use fvm_ipld_blockstore::Blockstore;
+use fvm_shared::{address::Address, chainid::ChainID};
+use ipc_actors_abis::checkpointing_facet as checkpoint;
+use ipc_actors_abis::gateway_getter_facet as getter;
+use ipc_api::staking::ConfigurationNumber;
+use ipc_observability::{emit, serde::HexEncodableBlockHash};
+use std::collections::HashMap;
+use std::time::Duration;
+use tendermint::block::Height;
+use tendermint_rpc::endpoint::commit;
+use tendermint_rpc::{endpoint::validators, Client, Paging};
 
 /// Validator voting power snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -104,10 +94,7 @@ where
 
     let num_msgs = msgs.len();
 
-    let activities = state.activities_tracker().commit_activity()?;
-
-    let (consensus_full, consensus_compressed) =
-        gen_consensus_reports(state.block_height(), &activities)?;
+    let full_activity_rollup = state.activities_tracker().commit_activity()?;
 
     // Construct checkpoint.
     let checkpoint = BottomUpCheckpoint {
@@ -116,23 +103,20 @@ where
         block_hash,
         next_configuration_number,
         msgs,
-        activities: checkpoint::CompressedActivityRollup {
-            consensus: consensus_compressed,
-        },
+        activities: full_activity_rollup.compressed()?,
     };
 
     // Save the checkpoint in the ledger.
     // Pass in the current power table, because these are the validators who can sign this checkpoint.
-    let report = checkpoint::FullActivityRollup {
-        consensus: consensus_full,
-    };
-
     let ret = gateway
-        .create_bottom_up_checkpoint(state, checkpoint.clone(), &curr_power_table.0, report)
+        .create_bottom_up_checkpoint(
+            state,
+            checkpoint.clone(),
+            &curr_power_table.0,
+            full_activity_rollup.into_inner(),
+        )
         .context("failed to store checkpoint")?;
     event_tracker.push((ret.apply_ret.events, ret.emitters));
-
-    state.activities_tracker().purge_activities()?;
 
     // Figure out the power updates if there was some change in the configuration.
     let power_updates = if next_configuration_number == 0 {
@@ -154,40 +138,6 @@ where
     });
 
     Ok(Some((checkpoint, power_updates)))
-}
-
-fn gen_consensus_reports(
-    block_height: ChainEpoch,
-    activities: &ActivityDetails<ValidatorData>,
-) -> anyhow::Result<(checkpoint::FullSummary, checkpoint::CompressedSummary)> {
-    let agg = checkpoint::AggregatedStats {
-        total_active_validators: activities.active_validators() as u64,
-        total_num_blocks_committed: activities.elapsed(block_height) as u64,
-    };
-
-    let compressed = checkpoint::CompressedSummary {
-        stats: agg.clone(),
-        data_root_commitment: activities
-            .commitment()?
-            .try_into()
-            .map_err(|_| anyhow!("cannot convert commitment"))?,
-    };
-
-    let full = checkpoint::FullSummary {
-        stats: agg,
-        data: activities
-            .details()
-            .iter()
-            .map(|v| {
-                Ok(checkpoint::ValidatorData {
-                    validator: payload_to_evm_address(v.validator.payload())?,
-                    blocks_committed: v.stats.blocks_committed,
-                })
-            })
-            .collect::<anyhow::Result<Vec<_>>>()?,
-    };
-
-    Ok((full, compressed))
 }
 
 /// Wait until CometBFT has reached a specific block height.

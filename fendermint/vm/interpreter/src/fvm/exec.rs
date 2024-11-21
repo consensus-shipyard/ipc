@@ -7,7 +7,7 @@ use super::{
     state::FvmExecState,
     BlockGasLimit, FvmMessage, FvmMessageInterpreter,
 };
-use crate::fvm::activity::{BlockMined, ValidatorActivityTracker};
+use crate::fvm::activity::ValidatorActivityTracker;
 use crate::ExecInterpreter;
 use anyhow::Context;
 use async_trait::async_trait;
@@ -204,9 +204,7 @@ where
         let mut block_end_events = BlockEndEvents::default();
 
         if let Some(pubkey) = state.block_producer() {
-            state
-                .activities_tracker()
-                .record_block_committed(BlockMined { validator: pubkey })?;
+            state.activities_tracker().record_block_committed(pubkey)?;
         }
 
         let next_gas_market = state.finalize_gas_market()?;

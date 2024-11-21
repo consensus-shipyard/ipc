@@ -293,10 +293,7 @@ where
     }
 
     pub fn activities_tracker(&mut self) -> ActorActivityTracker<DB> {
-        ActorActivityTracker {
-            epoch: self.block_height(),
-            executor: self,
-        }
+        ActorActivityTracker { executor: self }
     }
 
     /// Collect all the event emitters' delegated addresses, for those who have any.

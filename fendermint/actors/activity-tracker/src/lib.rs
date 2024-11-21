@@ -7,10 +7,10 @@ use fil_actors_runtime::builtin::singletons::SYSTEM_ACTOR_ADDR;
 use fil_actors_runtime::runtime::{ActorCode, Runtime};
 use fil_actors_runtime::{actor_dispatch, ActorError, EAM_ACTOR_ID};
 use fil_actors_runtime::{actor_error, WithCodec, DEFAULT_HAMT_CONFIG};
-use fvm_ipld_encoding::{IPLD_RAW};
+use fvm_ipld_encoding::IPLD_RAW;
 use fvm_shared::address::{Address, Payload};
 use fvm_shared::METHOD_CONSTRUCTOR;
-use ipc_actors_abis::checkpointing_facet::{FullActivityRollup};
+use ipc_actors_abis::checkpointing_facet::FullActivityRollup;
 use num_derive::FromPrimitive;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
@@ -20,7 +20,9 @@ mod state;
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(ActivityTrackerActor);
 
-pub fn always_fail(_: &mut [u8]) -> Result<(), getrandom::Error> { unimplemented!() }
+pub fn always_fail(_: &mut [u8]) -> Result<(), getrandom::Error> {
+    unimplemented!()
+}
 
 getrandom::register_custom_getrandom!(always_fail);
 
@@ -71,18 +73,12 @@ trait ActivityTracker {
     /// Returns the activity rollup as a Solidity ABI-encoded type, in raw byte form.
     fn commit_activity(
         rt: &impl Runtime,
-    ) -> Result<
-        WithCodec<AbiEncodedBytes<FullActivityRollup>, IPLD_RAW>,
-        ActorError,
-    >;
+    ) -> Result<WithCodec<AbiEncodedBytes<FullActivityRollup>, IPLD_RAW>, ActorError>;
 
     /// Queries the activity that has been accumulated since the last commit, and is pending a flush.
     fn pending_activity(
         rt: &impl Runtime,
-    ) -> Result<
-        WithCodec<AbiEncodedBytes<FullActivityRollup>, IPLD_RAW>,
-        ActorError,
-    >;
+    ) -> Result<WithCodec<AbiEncodedBytes<FullActivityRollup>, IPLD_RAW>, ActorError>;
 }
 
 impl ActivityTrackerActor {
