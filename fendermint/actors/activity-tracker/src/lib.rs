@@ -76,7 +76,7 @@ trait ActivityTracker {
     fn commit_activity(
         rt: &impl Runtime,
     ) -> Result<
-        WithCodec<AbiEncodedBytes<FullActivityRollup>, fvm_ipld_encoding::IPLD_RAW>,
+        WithCodec<AbiEncodedBytes<FullActivityRollup>, IPLD_RAW>,
         ActorError,
     >;
 
@@ -84,7 +84,7 @@ trait ActivityTracker {
     fn pending_activity(
         rt: &impl Runtime,
     ) -> Result<
-        WithCodec<AbiEncodedBytes<FullActivityRollup>, fvm_ipld_encoding::IPLD_RAW>,
+        WithCodec<AbiEncodedBytes<FullActivityRollup>, IPLD_RAW>,
         ActorError,
     >;
 }
