@@ -9,12 +9,18 @@ scrape_configs:
     static_configs:
       - targets: [
         # note the ports are the container internal values since we are using the network domain resolution
-        "relayer:9184",
         "validator-0-fendermint:9184",
         "validator-1-fendermint:9184",
         "validator-2-fendermint:9184",
+        "validator-0-ethapi:9185",
+        "validator-1-ethapi:9185",
+        "validator-2-ethapi:9185",
+        "validator-0-objects:9186",
+        "validator-1-objects:9186",
+        "validator-2-objects:9186",
         "validator-0-iroh:9090",
         "validator-1-iroh:9090",
         "validator-2-iroh:9090",
-        "prometheus:9090"
+        "prometheus:9090",
+        "relayer:9184"
       ]
