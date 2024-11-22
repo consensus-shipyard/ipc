@@ -14,7 +14,9 @@ use fendermint_actor_blobs_shared::state::{
     Account, Blob, BlobStatus, CreditApproval, Hash, PublicKey, Subscription, SubscriptionId,
 };
 
-use fendermint_actor_blobs_shared::{resolve_external, resolve_external_non_machine, Method};
+use crate::{ConstructorParams, State, BLOBS_ACTOR_NAME};
+use fendermint_actor_blobs_shared::Method;
+use fendermint_actor_machine::{resolve_external, resolve_external_non_machine};
 use fil_actors_runtime::{
     actor_dispatch, actor_error, extract_send_result,
     runtime::{ActorCode, Runtime},
@@ -23,8 +25,6 @@ use fil_actors_runtime::{
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::address::Address;
 use fvm_shared::{MethodNum, METHOD_SEND};
-
-use crate::{ConstructorParams, State, BLOBS_ACTOR_NAME};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(BlobsActor);

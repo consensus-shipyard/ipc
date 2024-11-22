@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use cid::Cid;
-use fendermint_actor_blobs_shared::{get_credit_approval, resolve_external};
-use fendermint_actor_machine::MachineActor;
+use fendermint_actor_blobs_shared::get_credit_approval;
+use fendermint_actor_machine::{resolve_external, MachineActor};
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
     runtime::{ActorCode, Runtime},

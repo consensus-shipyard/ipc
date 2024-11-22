@@ -3253,6 +3253,7 @@ dependencies = [
  "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
  "fvm_shared",
+ "num-traits",
  "serde",
  "serde_tuple",
 ]
