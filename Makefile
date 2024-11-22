@@ -46,7 +46,7 @@ run-devnet-fendermint:
 	FM_VALIDATOR_KEY__PATH=keys/validator.sk \
 	FM_VALIDATOR_KEY__KIND=regular \
 	FM_RESOLVER__CONNECTION__LISTEN_ADDR=/ip4/127.0.0.1/tcp/3001 \
-	./target/release/fendermint run
+	./target/release/fendermint run --iroh-addr 127.0.0.1:4919
 
 run-devnet-cometbft:
 	cometbft unsafe-reset-all
