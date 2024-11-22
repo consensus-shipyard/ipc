@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use cid::Cid;
+use ethers_core::types;
 use fil_actors_runtime::runtime::Runtime;
 use fil_actors_runtime::{actor_error, ActorError, Map2, DEFAULT_HAMT_CONFIG};
 use fvm_ipld_blockstore::Blockstore;
@@ -53,7 +54,7 @@ impl State {
                     return Err(actor_error!(illegal_state; "illegal address in state"));
                 };
                 let slice = delegated.subaddress();
-                ethers::types::Address::from_slice(&slice[0..20])
+                types::Address::from_slice(&slice[0..20])
             };
 
             let item = ipc_actors_abis::checkpointing_facet::ValidatorData {

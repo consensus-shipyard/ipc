@@ -2772,7 +2772,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid",
- "ethers",
+ "ethers-core",
  "fil_actor_eam",
  "fil_actors_evm_shared",
  "fil_actors_runtime",

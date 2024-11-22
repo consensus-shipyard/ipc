@@ -14,7 +14,7 @@ crate-type = ["cdylib", "lib"]
 [dependencies]
 anyhow = { workspace = true }
 cid = { workspace = true }
-ethers = { workspace = true }
+ethers-core = { workspace = true }
 ipc-api = { workspace = true }
 ipc_actors_abis = { workspace = true }
 fil_actor_eam = { workspace = true }
@@ -36,7 +36,7 @@ frc42_dispatch = { workspace = true }
 ## We don't want to enable the "js" feature of getrandom, since we don't run on the browser anyway.
 ## So we apply the workaround suggested here: https://github.com/gakonst/ethers-rs/issues/2457
 ## Which requires us to register a custom handler for getrandom for unknown targets which fails unconditionally. It won't be invoked anyway.
-getrandom = { version = "0.2.10", features = ["custom"] }
+getrandom = { version = "0.2.10", default-features = false, features = ["custom"] }
 
 [dev-dependencies]
 fil_actors_evm_shared = { workspace = true }
