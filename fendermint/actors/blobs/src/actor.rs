@@ -8,11 +8,12 @@ use fendermint_actor_blobs_shared::params::{
     AddBlobParams, ApproveCreditParams, BuyCreditParams, DeleteBlobParams, FinalizeBlobParams,
     GetAccountParams, GetAddedBlobsParams, GetBlobParams, GetBlobStatusParams,
     GetCreditApprovalParams, GetPendingBlobsParams, GetStatsReturn, RevokeCreditParams,
-    SetPendingParams,
+    SetBlobPendingParams,
 };
 use fendermint_actor_blobs_shared::state::{
-    Account, Blob, BlobStatus, CreditApproval, Hash, PublicKey, Subscription,
+    Account, Blob, BlobStatus, CreditApproval, Hash, PublicKey, Subscription, SubscriptionId,
 };
+
 use fendermint_actor_blobs_shared::{resolve_external, resolve_external_non_machine, Method};
 use fil_actors_runtime::{
     actor_dispatch, actor_error, extract_send_result,
@@ -30,7 +31,7 @@ fil_actors_runtime::wasm_trampoline!(BlobsActor);
 
 pub struct BlobsActor;
 
-type BlobTuple = (Hash, HashSet<(Address, PublicKey)>);
+type BlobTuple = (Hash, HashSet<(Address, SubscriptionId, PublicKey)>);
 
 impl BlobsActor {
     fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
@@ -59,7 +60,6 @@ impl BlobsActor {
     ) -> Result<CreditApproval, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let from = resolve_external_non_machine(rt, params.from)?;
-
         let (origin, caller) = if rt.message().origin() == rt.message().caller() {
             let (origin, _) = resolve_external(rt, rt.message().origin())?;
             (origin, origin)
@@ -99,11 +99,9 @@ impl BlobsActor {
         params: GetCreditApprovalParams,
     ) -> Result<Option<CreditApproval>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-
         let from = resolve_external_non_machine(rt, params.from)?;
         let receiver = resolve_external_non_machine(rt, params.receiver)?;
         let (caller, _) = resolve_external(rt, params.caller)?;
-
         let approval = rt
             .state::<State>()?
             .get_credit_approval(from, receiver, caller);
@@ -175,6 +173,7 @@ impl BlobsActor {
                 rt.curr_epoch(),
                 params.hash,
                 params.metadata_hash,
+                params.id,
                 params.size,
                 params.ttl,
                 params.source,
@@ -199,9 +198,9 @@ impl BlobsActor {
         params: GetBlobStatusParams,
     ) -> Result<Option<BlobStatus>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let status = rt
-            .state::<State>()?
-            .get_blob_status(params.hash, params.subscriber);
+        let status =
+            rt.state::<State>()?
+                .get_blob_status(params.subscriber, params.hash, params.id);
         Ok(status)
     }
 
@@ -223,11 +222,12 @@ impl BlobsActor {
         Ok(pending)
     }
 
-    fn set_pending(rt: &impl Runtime, params: SetPendingParams) -> Result<(), ActorError> {
+    fn set_blob_pending(rt: &impl Runtime, params: SetBlobPendingParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
+        // We control this method call and can guarantee subscriber is an external address,
+        // i.e., no need to resolve its external address.
         rt.transaction(|st: &mut State, _| {
-            st.set_pending(params.subscriber, params.hash, params.source);
-            Ok(())
+            st.set_blob_pending(params.subscriber, params.hash, params.id, params.source)
         })
     }
 
@@ -240,6 +240,7 @@ impl BlobsActor {
                 params.subscriber,
                 rt.curr_epoch(),
                 params.hash,
+                params.id,
                 params.status,
             )
         })
@@ -256,7 +257,14 @@ impl BlobsActor {
             origin
         };
         let delete = rt.transaction(|st: &mut State, _| {
-            st.delete_blob(origin, caller, subscriber, rt.curr_epoch(), params.hash)
+            st.delete_blob(
+                origin,
+                caller,
+                subscriber,
+                rt.curr_epoch(),
+                params.hash,
+                params.id,
+            )
         })?;
         if delete {
             delete_from_disc(params.hash)?;
@@ -316,7 +324,7 @@ impl ActorCode for BlobsActor {
         GetBlobStatus => get_blob_status,
         GetAddedBlobs => get_added_blobs,
         GetPendingBlobs => get_pending_blobs,
-        SetPending => set_pending,
+        SetBlobPending => set_blob_pending,
         FinalizeBlob => finalize_blob,
         DeleteBlob => delete_blob,
         _ => fallback,
@@ -383,7 +391,7 @@ mod tests {
     }
 
     #[test]
-    fn test_fund_account() {
+    fn test_buy_credit() {
         let rt = construct_and_verify(1024 * 1024, 1);
 
         let id_addr = Address::new_id(110);
@@ -466,7 +474,7 @@ mod tests {
         rt.set_delegated_address(receiver_id_addr.id().unwrap(), receiver_f4_eth_addr);
         rt.set_address_actor_type(receiver_id_addr, *ETHACCOUNT_ACTOR_CODE_ID);
 
-        // Proxy EVM contract on behalf of credit owner
+        // Proxy EVM contract on behalf of the credit owner
         let proxy_id_addr = Address::new_id(112);
         let proxy_eth_addr = EthAddress(hex_literal::hex!(
             "CAFEB0BA00000000000000000000000000000002"
@@ -555,7 +563,7 @@ mod tests {
         rt.set_delegated_address(receiver_id_addr.id().unwrap(), receiver_f4_eth_addr);
         rt.set_address_actor_type(receiver_id_addr, *ETHACCOUNT_ACTOR_CODE_ID);
 
-        // Proxy EVM contract on behalf of credit owner
+        // Proxy EVM contract on behalf of the credit owner
         let proxy_id_addr = Address::new_id(112);
         let proxy_eth_addr = EthAddress(hex_literal::hex!(
             "CAFEB0BA00000000000000000000000000000002"
@@ -657,8 +665,9 @@ mod tests {
             sponsor: None,
             source: new_pk(),
             hash: hash.0,
-            size: hash.1,
             metadata_hash: new_hash(1024).0,
+            id: SubscriptionId::Default,
+            size: hash.1,
             ttl: Some(3600),
         };
         let result = rt.call::<BlobsActor>(
@@ -718,10 +727,11 @@ mod tests {
         let hash = new_hash(1024);
         let add_params = AddBlobParams {
             sponsor: None,
-            source: new_pk(),
             hash: hash.0,
-            size: hash.1,
             metadata_hash: new_hash(1024).0,
+            source: new_pk(),
+            id: SubscriptionId::Default,
+            size: hash.1,
             ttl: Some(3600),
         };
         let tokens_sent = TokenAmount::from_whole(1);
@@ -750,10 +760,11 @@ mod tests {
         let hash = new_hash(1024);
         let add_params = AddBlobParams {
             sponsor: None,
-            source: new_pk(),
             hash: hash.0,
-            size: hash.1,
             metadata_hash: new_hash(1024).0,
+            source: new_pk(),
+            id: SubscriptionId::Default,
+            size: hash.1,
             ttl: Some(3600),
         };
         let response = rt.call::<BlobsActor>(
@@ -771,10 +782,11 @@ mod tests {
         let hash = new_hash(1024);
         let add_params = AddBlobParams {
             sponsor: None,
-            source: new_pk(),
             hash: hash.0,
-            size: hash.1,
             metadata_hash: new_hash(1024).0,
+            source: new_pk(),
+            id: SubscriptionId::Default,
+            size: hash.1,
             ttl: Some(3600),
         };
         let result = rt.call::<BlobsActor>(
@@ -786,7 +798,7 @@ mod tests {
     }
 
     #[test]
-    fn test_add_blob_sponsor() {
+    fn test_add_blob_with_sponsor() {
         let rt = construct_and_verify(1024 * 1024, 1);
 
         // Credit sponsor
@@ -806,7 +818,7 @@ mod tests {
         rt.set_delegated_address(spender_id_addr.id().unwrap(), spender_f4_eth_addr);
         rt.set_address_actor_type(spender_id_addr, *ETHACCOUNT_ACTOR_CODE_ID);
 
-        // Proxy EVM contract on behalf of credit owner
+        // Proxy EVM contract on behalf of the credit owner
         let proxy_id_addr = Address::new_id(112);
         let proxy_eth_addr = EthAddress(hex_literal::hex!(
             "CAFEB0BA00000000000000000000000000000002"
@@ -870,10 +882,11 @@ mod tests {
         let hash = new_hash(1024);
         let add_params = AddBlobParams {
             sponsor: Some(sponsor_id_addr),
-            source: new_pk(),
             hash: hash.0,
-            size: hash.1,
             metadata_hash: new_hash(1024).0,
+            source: new_pk(),
+            id: SubscriptionId::Default,
+            size: hash.1,
             ttl: Some(3600),
         };
         let response = rt.call::<BlobsActor>(
@@ -883,7 +896,7 @@ mod tests {
         assert!(response.is_ok());
         rt.verify();
 
-        // Try sending non-zero -> can not buy for a sponsor
+        // Try sending non-zero -> cannot buy for a sponsor
         rt.set_origin(spender_id_addr);
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, spender_id_addr);
         rt.expect_validate_caller_any();
@@ -891,10 +904,11 @@ mod tests {
         let hash = new_hash(1024);
         let add_params = AddBlobParams {
             sponsor: Some(sponsor_id_addr),
-            source: new_pk(),
             hash: hash.0,
-            size: hash.1,
             metadata_hash: new_hash(1024).0,
+            source: new_pk(),
+            id: SubscriptionId::Default,
+            size: hash.1,
             ttl: Some(3600),
         };
         let response = rt.call::<BlobsActor>(

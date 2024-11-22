@@ -3118,6 +3118,7 @@ dependencies = [
  "blobs_actor_sdk",
  "fendermint_actor_blobs_shared",
  "fendermint_actor_machine",
+ "fendermint_testing",
  "fil_actors_evm_shared",
  "fil_actors_runtime",
  "fvm_ipld_blockstore",
@@ -3127,9 +3128,12 @@ dependencies = [
  "iroh-base",
  "log",
  "num-traits",
+ "quickcheck",
+ "quickcheck_macros",
  "rand",
  "serde",
  "serde_tuple",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -3137,6 +3141,7 @@ name = "fendermint_actor_blobs_shared"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "blake3",
  "data-encoding",
  "fendermint_actor_machine",
  "fil_actors_runtime",
@@ -3901,6 +3906,7 @@ dependencies = [
  "cid",
  "ethers",
  "ethers-core",
+ "fendermint_actor_blobs_shared",
  "fendermint_crypto",
  "fendermint_testing",
  "fendermint_vm_actor_interface",

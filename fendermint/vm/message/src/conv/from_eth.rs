@@ -156,7 +156,7 @@ mod tests {
         }
 
         let tx1 = tx0.as_eip1559_ref().expect("tx as eip1559");
-        let msg = to_fvm_signed_message(&tx1, &sig).expect("to_fvm_signed_message");
+        let msg = to_fvm_signed_message(tx1, &sig).expect("to_fvm_signed_message");
         assert_eq!(
             msg.message.from,
             Address::from(EthAddress(tx0.from().unwrap().0))

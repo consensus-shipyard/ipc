@@ -81,6 +81,9 @@ jobs:
           ## Append the runner build phase to the Dockerfile.
           cat fendermint/docker/runner.Dockerfile >> /tmp/Dockerfile-${{ github.sha }}
           
+          ## Update Dockerfile permissions
+          chmod 777 /tmp/Dockerfile-${{ github.sha }}
+          
           ## Print the Dockerfile for debugging.
           echo "Dockerfile-${{ github.sha }}:"
           cat /tmp/Dockerfile-${{ github.sha }}
@@ -93,6 +96,9 @@ jobs:
           contracts/cache
           contracts/node-modules
           EOF
+          
+          ## Update .dockerignore file permissions
+          chmod 777 /tmp/Dockerfile-${{ github.sha }}.dockerignore
           
           ## Print the .dockerignore file for debugging.
           echo "Dockerfile-${{ github.sha }}.dockerignore:"

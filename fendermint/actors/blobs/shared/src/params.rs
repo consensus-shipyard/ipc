@@ -9,7 +9,7 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use serde::{Deserialize, Serialize};
 
-use crate::state::{BlobStatus, Hash, PublicKey};
+use crate::state::{BlobStatus, Hash, PublicKey, SubscriptionId};
 
 /// Params for buying credits.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -78,6 +78,8 @@ pub struct AddBlobParams {
     pub hash: Hash,
     /// Blake3 hash of the metadata to use for blob recovery.
     pub metadata_hash: Hash,
+    /// Identifier used to differentiate blob additions for the same subscriber.
+    pub id: SubscriptionId,
     /// Blob size.
     pub size: u64,
     /// Blob time-to-live epochs.
@@ -99,17 +101,32 @@ pub struct GetBlobStatusParams {
     pub subscriber: Address,
     /// Blob blake3 hash.
     pub hash: Hash,
+    /// Identifier used to differentiate blob additions for the same subscriber.
+    pub id: SubscriptionId,
 }
+
+/// Params for getting added blobs.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct GetAddedBlobsParams(pub u32);
 
 /// Params for getting pending blobs.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct GetPendingBlobsParams(pub u32);
 
-/// Params for getting added blobs.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct GetAddedBlobsParams(pub u32);
+/// Params for setting a blob to pending.
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct SetBlobPendingParams {
+    /// Source Iroh node ID used for ingestion.
+    pub source: PublicKey,
+    /// The address that requested the blob.
+    pub subscriber: Address,
+    /// Blob blake3 hash.
+    pub hash: Hash,
+    /// Identifier used to differentiate blob additions for the same subscriber.
+    pub id: SubscriptionId,
+}
 
 /// Params for finalizing a blob.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
@@ -119,19 +136,10 @@ pub struct FinalizeBlobParams {
     pub subscriber: Address,
     /// Blob blake3 hash.
     pub hash: Hash,
+    /// Identifier used to differentiate blob additions for the same subscriber.
+    pub id: SubscriptionId,
     /// The status to set as final.
     pub status: BlobStatus,
-}
-
-/// Params for setting pending blobs.
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct SetPendingParams {
-    /// The address that requested the blob.    
-    pub subscriber: Address,
-    /// Blob blake3 hash.
-    pub hash: Hash,
-    /// The source of the blob.
-    pub source: PublicKey,
 }
 
 /// Params for deleting a blob.
@@ -143,6 +151,8 @@ pub struct DeleteBlobParams {
     pub sponsor: Option<Address>,
     /// Blob blake3 hash.
     pub hash: Hash,
+    /// Identifier used to differentiate blob additions for the same subscriber.
+    pub id: SubscriptionId,
 }
 
 /// The stats of the blob actor.

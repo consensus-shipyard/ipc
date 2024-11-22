@@ -221,7 +221,7 @@ mod tests {
     use rand::RngCore;
     use std::str::FromStr;
 
-    pub fn new_hash(size: usize) -> (Hash, u64) {
+    fn new_hash(size: usize) -> (Hash, u64) {
         let mut rng = rand::thread_rng();
         let mut data = vec![0u8; size];
         rng.fill_bytes(&mut data);
@@ -280,7 +280,7 @@ mod tests {
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn list<BS: Blockstore>(
+    fn list<BS: Blockstore>(
         state: State,
         store: &BS,
         prefix: Vec<u8>,

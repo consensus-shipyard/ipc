@@ -532,7 +532,7 @@ where
         }
     }
 
-    /// Start a CID resolution using iorh.
+    /// Start a CID resolution using iroh.
     fn start_iroh_query(
         &mut self,
         hash: Hash,
@@ -650,7 +650,29 @@ pub fn build_transport(local_key: Keypair) -> Boxed<(PeerId, StreamMuxerBox)> {
 }
 
 async fn download_blob(iroh: Iroh, hash: Hash, node_addr: NodeAddr) -> anyhow::Result<()> {
-    let res = iroh.blobs().download(hash, node_addr).await?.await?;
+    // Use an explicit tag so we can keep track of it
+    // TODO: this needs to be tagged with a "user id"
+    let tag = iroh::blobs::Tag(format!("stored-{hash}").into());
+    let res = iroh
+        .blobs()
+        .download_with_opts(
+            hash,
+            iroh::client::blobs::DownloadOptions {
+                format: iroh::blobs::BlobFormat::Raw,
+                nodes: vec![node_addr],
+                tag: iroh::blobs::util::SetTagOption::Named(tag),
+                mode: iroh::client::blobs::DownloadMode::Queued,
+            },
+        )
+        .await?
+        .await?;
+
     debug!("downloaded blob {}: {:?}", hash, res);
+
+    // Delete the temporary tag (this might fail as not all nodes will have one).
+    // TODO: this needs to be tagged with a "user id"
+    let tag = iroh::blobs::Tag(format!("temp-{hash}").into());
+    iroh.tags().delete(tag).await.ok();
+
     Ok(())
 }

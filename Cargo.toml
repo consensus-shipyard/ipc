@@ -66,6 +66,7 @@ axum = { version = "0.6", features = ["ws"] }
 base64 = "0.21"
 bollard = "0.15"
 blake2b_simd = "1.0"
+blake3 = "1.5.4"
 bloom = "0.3"
 byteorder = "1.5.0"
 bytes = "1.4"
@@ -79,6 +80,8 @@ data-encoding = { version = "2.3.3" }
 dirs = "5.0"
 dircpy = "0.3.19"
 either = "1.10"
+entangler = { git = "ssh://git@github.com/hokunet/entanglement.git", rev = "8113eed819e4a2eac4988b842a8806174ed486b0" }
+entangler_storage = { package = "storage", git = "ssh://git@github.com/hokunet/entanglement.git", rev = "8113eed819e4a2eac4988b842a8806174ed486b0" }
 env_logger = "0.10"
 erased-serde = "0.3"
 ethers = { version = "2.0.13", features = ["abigen", "ws"] }
@@ -188,10 +191,6 @@ url = { version = "2.4.1", features = ["serde"] }
 warp = "0.3.7"
 zeroize = "1.6"
 
-entangler = { git = "ssh://git@github.com/hokunet/entanglement.git", rev = "8113eed819e4a2eac4988b842a8806174ed486b0" }
-entangler_storage = { package = "storage", git = "ssh://git@github.com/hokunet/entanglement.git", rev = "8113eed819e4a2eac4988b842a8806174ed486b0" }
-
-
 # Workspace deps
 ipc-api = { path = "ipc/api" }
 ipc-provider = { path = "ipc/provider" }
@@ -245,12 +244,6 @@ tendermint-rpc = { version = "0.31", features = [
 ] }
 tendermint-proto = { version = "0.31" }
 
-# Use below when working locally on entanglement and this repo simultaneously.
-# Assumes the entanglement checkout is in a sibling directory with the same name.
-#[patch."ssh://git@github.com/hokunet/entanglement.git"]
-#entangler = { path = "../entanglement/entangler" }
-#entangler_storage = { package = "storage", path = "../entanglement/storage" }
-
 [patch.crates-io]
 # Use stable-only features.
 gcra = { git = "https://github.com/consensus-shipyard/gcra-rs.git", branch = "main" }
@@ -265,6 +258,12 @@ gcra = { git = "https://github.com/consensus-shipyard/gcra-rs.git", branch = "ma
 # fvm_ipld_encoding = { path = "../ref-fvm/ipld/encoding" }
 # fvm_ipld_hamt = { path = "../ref-fvm/ipld/hamt" }
 # fvm_ipld_amt = { path = "../ref-fvm/ipld/amt" }
+
+# Use below when working locally on entanglement and this repo simultaneously.
+# Assumes the entanglement checkout is in a sibling directory with the same name.
+#[patch."ssh://git@github.com/hokunet/entanglement.git"]
+#entangler = { path = "../entanglement/entangler" }
+#entangler_storage = { package = "storage", path = "../entanglement/storage" }
 
 [profile.wasm]
 inherits = "release"

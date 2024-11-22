@@ -358,7 +358,8 @@ where
         Ok(())
     }
 
-    // when a blob is finalized in the parent we can remove it from the blob votes tally, note: ensure this is called with `atomically`
+    /// When a blob is finalized in the parent, we can remove it from the blob votes tally.
+    /// Note: Ensure this is called with `atomically`.
     pub fn clear_blob(&self, blob: O) -> Stm<()> {
         self.blob_votes.update_mut(|votes| {
             votes.remove(&blob);

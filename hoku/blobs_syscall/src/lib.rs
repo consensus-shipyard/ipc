@@ -26,9 +26,8 @@ const ENV_IROH_ADDR: &str = "IROH_RPC_ADDR";
 const HASHRM_SYSCALL_ERROR_CODE: u32 = 101; // TODO(sander): Is the okay?
 
 static IROH_INSTANCE: Lazy<Arc<Mutex<MaybeIroh>>> = Lazy::new(|| {
-    let iroh_addr =
-        std::env::var(ENV_IROH_ADDR).expect("IROH_RPC_ADDR environment variable not set");
-    Arc::new(Mutex::new(MaybeIroh::from_addr(iroh_addr)))
+    let iroh_addr = std::env::var(ENV_IROH_ADDR).ok();
+    Arc::new(Mutex::new(MaybeIroh::maybe_addr(iroh_addr)))
 });
 
 fn syscall_error<D: Display>(error_number: u32) -> impl FnOnce(D) -> ExecutionError {
@@ -60,11 +59,13 @@ pub fn hash_rm(context: Context<'_, impl HokuOps>, hash_offset: u32) -> Result<(
                 return;
             }
         };
-
-        match iroh_client.blobs().delete_blob(hash).await {
-            Ok(_) => tracing::debug!(hash = ?hash, "removed content from Iroh"),
+        // Deleting the tag will trigger deletion of the blob if it was the last reference.
+        // TODO: this needs to be tagged with a "user id"
+        let tag = iroh::blobs::Tag(format!("stored-{hash}").into());
+        match iroh_client.tags().delete(tag.clone()).await {
+            Ok(_) => tracing::debug!(tag = ?tag, hash = ?hash, "removed content from Iroh"),
             Err(e) => {
-                tracing::error!(hash = ?hash, error = e.to_string(), "removing content from Iroh failed");
+                tracing::warn!(tag = ?tag, hash = ?hash, error = e.to_string(), "deleting tag from Iroh failed");
             }
         }
     });

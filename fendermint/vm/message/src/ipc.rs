@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use cid::Cid;
+use fendermint_actor_blobs_shared::state::SubscriptionId;
 use fvm_shared::{
     address::Address, clock::ChainEpoch, crypto::signature::Signature, econ::TokenAmount,
 };
@@ -31,14 +32,14 @@ pub enum IpcMessage {
     /// state that to be checked and voted by validators.
     TopDownExec(ParentFinality),
 
+    /// Proposed by validators when a blob is moved into the pending resolve queue.
+    BlobPending(PendingBlob),
+
     /// Proposed by validators when a blob has been finalized and is ready to be executed.
     BlobFinalized(FinalizedBlob),
 
     /// Proposed by validators at the credit debit interval set at genesis.
     DebitCreditAccounts,
-
-    /// List of blobs that needs to be enqueued for resolution.
-    BlobPending(PendingBlob),
 }
 
 /// A message relayed by a user on the current subnet.
@@ -121,6 +122,8 @@ pub struct FinalizedBlob {
     pub subscriber: Address,
     /// The blake3 hash of the blob.
     pub hash: Hash,
+    /// Identifier used to differentiate blob additions for the same subscriber.
+    pub id: SubscriptionId,
     /// The node ID of the source node serving validators the blob.
     pub source: NodeId,
     /// Whether the blob was resolved or failed.
@@ -134,6 +137,8 @@ pub struct PendingBlob {
     pub subscriber: Address,
     /// The blake3 hash of the blob.
     pub hash: Hash,
+    /// Identifier used to differentiate blob additions for the same subscriber.
+    pub id: SubscriptionId,
     /// The node ID of the source node serving validators the blob.
     pub source: NodeId,
 }

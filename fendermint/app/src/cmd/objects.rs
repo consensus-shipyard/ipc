@@ -223,7 +223,7 @@ impl ObjectParser {
                         let tx = tx.as_eip1559_ref().ok_or_else(|| {
                             anyhow!("failed to process signed transaction as eip1559")
                         })?;
-                        let fvm_msg = from_eth::to_fvm_signed_message(&tx, &sig)
+                        let fvm_msg = from_eth::to_fvm_signed_message(tx, &sig)
                             .map_err(|e| anyhow!("failed to deserialize signed message: {}", e))?;
                         Ok(fvm_msg)
                     }
@@ -369,7 +369,7 @@ async fn handle_object_upload<F: QueryClient>(
         })
     })?;
 
-    // Ensure the sender has enough credits, and fetch the data through iroh
+    // Ensure the bucket exists and fetch the data through iroh
     let SignedMessage { message, .. } = signed_msg;
     ensure_bucket_exists(client, message.to)
         .await
@@ -404,12 +404,28 @@ async fn handle_object_upload<F: QueryClient>(
         }
     };
 
-    // TODO: What to do with downloaded data if there's a failure below?
-    let progress = iroh.blobs().download(hash, source).await.map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("failed to fetch blob {}: {}", hash, e),
-        })
-    })?;
+    // On failure, GC will cleanup things
+    // We tag with a "temp" tag to make clear that it is not confirmed yet that we want to keep this around.
+    // TODO: we need to schedule a task that deletes the temp tag after a certain amount of time.
+    // TODO: this needs to be tagged with a "user id"
+    let tag = iroh::blobs::Tag(format!("temp-{hash}").into());
+    let progress = iroh
+        .blobs()
+        .download_with_opts(
+            hash,
+            iroh::client::blobs::DownloadOptions {
+                format: iroh::blobs::BlobFormat::Raw,
+                nodes: vec![source],
+                tag: iroh::blobs::util::SetTagOption::Named(tag),
+                mode: iroh::client::blobs::DownloadMode::Queued,
+            },
+        )
+        .await
+        .map_err(|e| {
+            Rejection::from(BadRequest {
+                message: format!("failed to fetch blob {}: {}", hash, e),
+            })
+        })?;
     let outcome = progress.finish().await.map_err(|e| {
         Rejection::from(BadRequest {
             message: format!("failed to fetch blob {}: {}", hash, e),
@@ -427,7 +443,7 @@ async fn handle_object_upload<F: QueryClient>(
         })
     })?;
 
-    tracing::info!(
+    info!(
         "downloaded blob {} in {:?} (size: {}; local_size: {}; downloaded_size: {}; metadata: {})",
         hash,
         outcome.stats.elapsed,
@@ -613,7 +629,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
             if method == "HEAD" {
                 let mut response = warp::reply::Response::new(Body::empty());
                 let mut header_map = HeaderMap::new();
-                header_map.insert("Content-Length", HeaderValue::from(object_range.size));
+                header_map.insert("Content-Length", HeaderValue::from(object_range.len));
                 let headers = response.headers_mut();
                 headers.extend(header_map);
                 return Ok(response);
@@ -627,7 +643,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
                     "Content-Range",
                     HeaderValue::from_str(&format!(
                         "bytes {}-{}/{}",
-                        object_range.start, object_range.end, object_range.len
+                        object_range.start, object_range.end, object_range.size
                     ))
                     .unwrap(),
                 );
@@ -881,7 +897,7 @@ mod tests {
         let ent = Entangler::new(iroh_storage, Config::new(3, 5, 5)).unwrap();
         let metadata_hash = ent.entangle_uploaded(hash.to_string()).await.unwrap();
 
-        let iroh_metadata_hash = Hash::from_str(&metadata_hash.as_str()).unwrap();
+        let iroh_metadata_hash = Hash::from_str(metadata_hash.as_str()).unwrap();
 
         let store = Address::new_id(90);
         let key = b"key";
@@ -957,7 +973,7 @@ mod tests {
         let ent = Entangler::new(iroh_storage, Config::new(3, 5, 5)).unwrap();
         let metadata_hash = ent.entangle_uploaded(hash.to_string()).await.unwrap();
 
-        let iroh_metadata_hash = Hash::from_str(&metadata_hash.as_str()).unwrap();
+        let iroh_metadata_hash = Hash::from_str(metadata_hash.as_str()).unwrap();
 
         let store = Address::new_id(90);
         let key = b"key";
@@ -1050,7 +1066,7 @@ mod tests {
         let ent = Entangler::new(iroh_storage, Config::new(3, 5, 5)).unwrap();
         let metadata_hash = ent.entangle_uploaded(hash.to_string()).await.unwrap();
 
-        let iroh_metadata_hash = Hash::from_str(&metadata_hash.as_str()).unwrap();
+        let iroh_metadata_hash = Hash::from_str(metadata_hash.as_str()).unwrap();
 
         let store = Address::new_id(90);
         let key = b"key";
