@@ -32,8 +32,11 @@ pub enum IpcMessage {
     /// state that to be checked and voted by validators.
     TopDownExec(ParentFinality),
 
+    /// Proposed by validators when a blob is moved into the pending resolve queue.
+    BlobPending(PendingBlob),
+
     /// Proposed by validators when a blob has been finalized and is ready to be executed.
-    BlobFinalized(Blob),
+    BlobFinalized(FinalizedBlob),
 
     /// Proposed by validators at the credit debit interval set at genesis.
     DebitCreditAccounts,
@@ -114,7 +117,7 @@ pub struct ParentFinality {
 
 /// A blob resolution target that the validators will be voting on.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub struct Blob {
+pub struct FinalizedBlob {
     /// The address that requested the blob.
     pub subscriber: Address,
     /// The blake3 hash of the blob.
@@ -125,6 +128,19 @@ pub struct Blob {
     pub source: NodeId,
     /// Whether the blob was resolved or failed.
     pub succeeded: bool,
+}
+
+/// A blob that has been added but not yet queued for resolution.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct PendingBlob {
+    /// The address that requested the blob.
+    pub subscriber: Address,
+    /// The blake3 hash of the blob.
+    pub hash: Hash,
+    /// Identifier used to differentiate blob additions for the same subscriber.
+    pub id: SubscriptionId,
+    /// The node ID of the source node serving validators the blob.
+    pub source: NodeId,
 }
 
 #[cfg(feature = "arb")]

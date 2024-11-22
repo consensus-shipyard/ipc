@@ -234,8 +234,10 @@ impl SubscriptionGroup {
 /// The status of a blob.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub enum BlobStatus {
-    /// Blob is pending resolve.
+    /// Blob is added but not resolving.
     #[default]
+    Added,
+    /// Blob is pending resolve.
     Pending,
     /// Blob was successfully resolved.
     Resolved,
@@ -246,6 +248,7 @@ pub enum BlobStatus {
 impl fmt::Display for BlobStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            BlobStatus::Added => write!(f, "added"),
             BlobStatus::Pending => write!(f, "pending"),
             BlobStatus::Resolved => write!(f, "resolved"),
             BlobStatus::Failed => write!(f, "failed"),

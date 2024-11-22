@@ -177,7 +177,7 @@ fn build_object(
                 )))
             }
         }
-        BlobStatus::Pending | BlobStatus::Failed => Ok(None),
+        BlobStatus::Added | BlobStatus::Pending | BlobStatus::Failed => Ok(None),
     }
 }
 
