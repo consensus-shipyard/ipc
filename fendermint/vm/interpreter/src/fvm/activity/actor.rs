@@ -5,7 +5,7 @@ use crate::fvm::activity::{FullActivity, ValidatorActivityTracker};
 use crate::fvm::state::FvmExecState;
 use crate::fvm::FvmMessage;
 use anyhow::Context;
-use ethers::abi::AbiDecode;
+use fendermint_actor_activity_tracker::types::FullActivityRollup;
 use fendermint_crypto::PublicKey;
 use fendermint_vm_actor_interface::activity::ACTIVITY_TRACKER_ACTOR_ADDR;
 use fendermint_vm_actor_interface::eam::EthAddress;
@@ -13,7 +13,6 @@ use fendermint_vm_actor_interface::system;
 use fvm::executor::ApplyRet;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::address::Address;
-use ipc_actors_abis::checkpointing_facet::FullActivityRollup;
 
 pub struct ActorActivityTracker<'a, DB: Blockstore + Clone + 'static> {
     pub(crate) executor: &'a mut FvmExecState<DB>,
@@ -57,9 +56,10 @@ impl<'a, DB: Blockstore + Clone + 'static> ValidatorActivityTracker
         };
 
         let (apply_ret, _) = self.executor.execute_implicit(msg)?;
-        let r = fvm_ipld_encoding::from_slice::<Vec<u8>>(&apply_ret.msg_receipt.return_data)
-            .context("failed to parse validator activities")?;
-        Ok(FullActivity::new(FullActivityRollup::decode(r)?))
+        let r =
+            fvm_ipld_encoding::from_slice::<FullActivityRollup>(&apply_ret.msg_receipt.return_data)
+                .context("failed to parse validator activities")?;
+        r.try_into()
     }
 }
 
