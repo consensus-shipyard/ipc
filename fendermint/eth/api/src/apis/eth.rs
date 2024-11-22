@@ -1016,6 +1016,7 @@ where
 
                 // Filter by address.
                 if !addrs.is_empty() && addrs.intersection(&emitters).next().is_none() {
+                    height = height.increment();
                     continue;
                 }
 
