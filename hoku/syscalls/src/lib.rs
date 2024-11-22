@@ -19,9 +19,8 @@ pub const HASHRM_SYSCALL_FUNCTION_NAME: &str = "hash_rm";
 
 const ENV_IROH_ADDR: &str = "IROH_RPC_ADDR";
 static IROH_INSTANCE: Lazy<Arc<Mutex<IrohManager>>> = Lazy::new(|| {
-    let iroh_addr =
-        std::env::var(ENV_IROH_ADDR).expect("IROH_RPC_ADDR environment variable not set");
-    Arc::new(Mutex::new(IrohManager::from_addr(Some(iroh_addr))))
+    let iroh_addr = std::env::var(ENV_IROH_ADDR).ok();
+    Arc::new(Mutex::new(IrohManager::from_addr(iroh_addr)))
 });
 
 fn hash_source(bytes: &[u8]) -> Result<[u8; 32]> {
