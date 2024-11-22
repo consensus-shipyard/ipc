@@ -292,8 +292,9 @@ impl SubnetManager for EthSubnetManager {
             signer.clone(),
         );
 
-        let call = call_with_premium_and_pending_block(signer, registry_contract.new_subnet_actor(params))
-            .await?;
+        let call =
+            call_with_premium_and_pending_block(signer, registry_contract.new_subnet_actor(params))
+                .await?;
 
         let pending_tx = call.send().await?;
         // We need the retry to parse the deployment event. At the time of this writing, it's a bug
@@ -455,7 +456,8 @@ impl SubnetManager for EthSubnetManager {
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
-        let txn = call_with_premium_and_pending_block(signer, contract.unstake(collateral.into())).await?;
+        let txn = call_with_premium_and_pending_block(signer, contract.unstake(collateral.into()))
+            .await?;
         txn.send().await?.await?;
 
         Ok(())

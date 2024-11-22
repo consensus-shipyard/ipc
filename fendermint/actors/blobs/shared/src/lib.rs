@@ -36,7 +36,7 @@ pub enum Method {
     GetBlobStatus = frc42_dispatch::method_hash!("GetBlobStatus"),
     GetAddedBlobs = frc42_dispatch::method_hash!("GetAddedBlobs"),
     GetPendingBlobs = frc42_dispatch::method_hash!("GetPendingBlobs"),
-    SetPending = frc42_dispatch::method_hash!("SetPending"),
+    SetBlobPending = frc42_dispatch::method_hash!("SetBlobPending"),
     FinalizeBlob = frc42_dispatch::method_hash!("FinalizeBlob"),
     DeleteBlob = frc42_dispatch::method_hash!("DeleteBlob"),
 }
@@ -91,12 +91,14 @@ pub fn revoke_credit(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn add_blob(
     rt: &impl Runtime,
     sponsor: Option<Address>,
     source: state::PublicKey,
     hash: state::Hash,
     metadata_hash: state::Hash,
+    id: state::SubscriptionId,
     size: u64,
     ttl: Option<ChainEpoch>,
 ) -> Result<Subscription, ActorError> {
@@ -105,6 +107,7 @@ pub fn add_blob(
         source,
         hash,
         metadata_hash,
+        id,
         size,
         ttl,
     })?;
@@ -131,11 +134,12 @@ pub fn delete_blob(
     rt: &impl Runtime,
     sponsor: Option<Address>,
     hash: state::Hash,
+    id: state::SubscriptionId,
 ) -> Result<(), ActorError> {
     extract_send_result(rt.send_simple(
         &BLOBS_ACTOR_ADDR,
         Method::DeleteBlob as MethodNum,
-        IpldBlock::serialize_cbor(&params::DeleteBlobParams { sponsor, hash })?,
+        IpldBlock::serialize_cbor(&params::DeleteBlobParams { sponsor, hash, id })?,
         rt.message().value_received(),
     ))?;
     Ok(())

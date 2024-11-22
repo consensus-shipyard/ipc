@@ -223,7 +223,7 @@ impl ObjectParser {
                         let tx = tx.as_eip1559_ref().ok_or_else(|| {
                             anyhow!("failed to process signed transaction as eip1559")
                         })?;
-                        let fvm_msg = from_eth::to_fvm_signed_message(&tx, &sig)
+                        let fvm_msg = from_eth::to_fvm_signed_message(tx, &sig)
                             .map_err(|e| anyhow!("failed to deserialize signed message: {}", e))?;
                         Ok(fvm_msg)
                     }
@@ -427,7 +427,7 @@ async fn handle_object_upload<F: QueryClient>(
         })
     })?;
 
-    tracing::info!(
+    info!(
         "downloaded blob {} in {:?} (size: {}; local_size: {}; downloaded_size: {}; metadata: {})",
         hash,
         outcome.stats.elapsed,
@@ -881,7 +881,7 @@ mod tests {
         let ent = Entangler::new(iroh_storage, Config::new(3, 5, 5)).unwrap();
         let metadata_hash = ent.entangle_uploaded(hash.to_string()).await.unwrap();
 
-        let iroh_metadata_hash = Hash::from_str(&metadata_hash.as_str()).unwrap();
+        let iroh_metadata_hash = Hash::from_str(metadata_hash.as_str()).unwrap();
 
         let store = Address::new_id(90);
         let key = b"key";
@@ -957,7 +957,7 @@ mod tests {
         let ent = Entangler::new(iroh_storage, Config::new(3, 5, 5)).unwrap();
         let metadata_hash = ent.entangle_uploaded(hash.to_string()).await.unwrap();
 
-        let iroh_metadata_hash = Hash::from_str(&metadata_hash.as_str()).unwrap();
+        let iroh_metadata_hash = Hash::from_str(metadata_hash.as_str()).unwrap();
 
         let store = Address::new_id(90);
         let key = b"key";
@@ -1050,7 +1050,7 @@ mod tests {
         let ent = Entangler::new(iroh_storage, Config::new(3, 5, 5)).unwrap();
         let metadata_hash = ent.entangle_uploaded(hash.to_string()).await.unwrap();
 
-        let iroh_metadata_hash = Hash::from_str(&metadata_hash.as_str()).unwrap();
+        let iroh_metadata_hash = Hash::from_str(metadata_hash.as_str()).unwrap();
 
         let store = Address::new_id(90);
         let key = b"key";
