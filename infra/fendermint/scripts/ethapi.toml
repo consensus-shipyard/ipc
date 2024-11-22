@@ -12,6 +12,7 @@ docker run \
   --env LOG_LEVEL=${ETHAPI_LOG_LEVEL} \
   --env RUST_BACKTRACE=1 \
   ${FM_DOCKER_IMAGE} \
+  --network=${FM_NETWORK} \
   ${CMD}
 """
 dependencies = ["docker-network-create"]
