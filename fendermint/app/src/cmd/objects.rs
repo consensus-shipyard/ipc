@@ -369,7 +369,7 @@ async fn handle_object_upload<F: QueryClient>(
         })
     })?;
 
-    // Ensure the sender has enough credits, and fetch the data through iroh
+    // Ensure the bucket exists and fetch the data through iroh
     let SignedMessage { message, .. } = signed_msg;
     ensure_bucket_exists(client, message.to)
         .await
@@ -404,12 +404,28 @@ async fn handle_object_upload<F: QueryClient>(
         }
     };
 
-    // TODO: What to do with downloaded data if there's a failure below?
-    let progress = iroh.blobs().download(hash, source).await.map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("failed to fetch blob {}: {}", hash, e),
-        })
-    })?;
+    // On failure, GC will cleanup things
+    // We tag with a "temp" tag to make clear that it is not confirmed yet that we want to keep this around.
+    // TODO: we need to schedule a task that deletes the temp tag after a certain amount of time.
+    // TODO: this needs to be tagged with a "user id"
+    let tag = iroh::blobs::Tag(format!("temp-{hash}").into());
+    let progress = iroh
+        .blobs()
+        .download_with_opts(
+            hash,
+            iroh::client::blobs::DownloadOptions {
+                format: iroh::blobs::BlobFormat::Raw,
+                nodes: vec![source],
+                tag: iroh::blobs::util::SetTagOption::Named(tag),
+                mode: iroh::client::blobs::DownloadMode::Queued,
+            },
+        )
+        .await
+        .map_err(|e| {
+            Rejection::from(BadRequest {
+                message: format!("failed to fetch blob {}: {}", hash, e),
+            })
+        })?;
     let outcome = progress.finish().await.map_err(|e| {
         Rejection::from(BadRequest {
             message: format!("failed to fetch blob {}: {}", hash, e),
