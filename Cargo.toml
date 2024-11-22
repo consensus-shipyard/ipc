@@ -195,9 +195,10 @@ openssl = { version = "0.10", features = ["vendored"] }
 # pull in crates as transitive dependencies that do not support Wasm architector. If this
 # happens, try removing "crypto" feature from fvm_shared dependency in contracts/binding/Cargo.toml
 # and run `cargo build`. Then add the "crypto" feature back and run `cargo build` again.
-fvm = { version = "4.1.0", default-features = false } # no opencl feature or it fails on CI
-fvm_shared = { version = "4.1.0" }
-fvm_sdk = { version = "4.1.0" }
+fvm = { version = "4.4.0", features = ["verify-signature"], default-features = false } # no opencl feature or it fails on CI
+fvm_shared = { version = "4.4.0" }
+fvm_sdk = { version = "4.4.0" }
+
 
 fvm_ipld_blockstore = "0.2.0"
 fvm_ipld_car = "0.7.1"
@@ -217,9 +218,9 @@ fvm_ipld_amt = "0.6.2"
 # to cut down the time it takes to compile everything. However, some projects have a "shared" part,
 # and this copy-paste is clunky, so at least for those that have it, we should use it.
 # Keep the version here in sync with the Makefile!
-fil_actors_evm_shared = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v12.0.0" }
-fil_actor_eam = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v12.0.0" }
-fil_actors_runtime = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v12.0.0" }
+fil_actors_evm_shared = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v15.0.0" }
+fil_actor_eam = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v15.0.0" }
+fil_actors_runtime = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v15.0.0" }
 
 fendermint_actor_eam = { path = "./fendermint/actors/eam" }
 fendermint_actor_activity_tracker= { path = "./fendermint/actors/activity-tracker" }
@@ -229,7 +230,7 @@ cid = { version = "0.10.1", default-features = false, features = [
   "std",
 ] }
 
-frc42_dispatch = "6.0.0"
+frc42_dispatch = { git = "https://github.com/filecoin-project/actors-utils", rev = "0f8365151f44785f7bead4e5500258fd5c8944e6" }
 
 # Using the same tendermint-rs dependency as tower-abci. From both we are interested in v037 modules.
 tower-abci = { version = "0.7" }
@@ -256,3 +257,4 @@ opt-level = "z"
 strip = true
 codegen-units = 1
 incremental = false
+
