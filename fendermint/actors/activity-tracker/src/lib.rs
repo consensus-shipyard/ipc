@@ -6,14 +6,11 @@ pub use crate::state::State;
 use fil_actors_runtime::builtin::singletons::SYSTEM_ACTOR_ADDR;
 use fil_actors_runtime::runtime::{ActorCode, Runtime};
 use fil_actors_runtime::{actor_dispatch, ActorError, EAM_ACTOR_ID};
-use fil_actors_runtime::{actor_error, WithCodec, DEFAULT_HAMT_CONFIG};
-use fvm_ipld_encoding::IPLD_RAW;
+use fil_actors_runtime::{actor_error, DEFAULT_HAMT_CONFIG};
 use fvm_shared::address::{Address, Payload};
 use fvm_shared::METHOD_CONSTRUCTOR;
 use ipc_actors_abis::checkpointing_facet::FullActivityRollup;
 use num_derive::FromPrimitive;
-use serde::{Deserialize, Serialize};
-use std::marker::PhantomData;
 
 mod state;
 
@@ -39,30 +36,6 @@ pub enum Method {
     PendingActivity = frc42_dispatch::method_hash!("PendingActivity"),
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(transparent)]
-pub struct AbiEncodedBytes<T>
-where
-    T: ethers::abi::AbiEncode,
-{
-    pub bytes: Vec<u8>,
-    #[serde(skip)]
-    pub _marker: PhantomData<T>,
-}
-
-impl<T> From<T> for AbiEncodedBytes<T>
-where
-    T: ethers::abi::AbiEncode,
-{
-    fn from(value: T) -> Self {
-        let encoded = value.encode();
-        Self {
-            bytes: encoded,
-            _marker: PhantomData,
-        }
-    }
-}
-
 trait ActivityTracker {
     /// Hook for the consensus layer to report that the validator committed a new block.
     fn record_block_committed(rt: &impl Runtime, validator: Address) -> Result<(), ActorError>;
@@ -71,14 +44,10 @@ trait ActivityTracker {
     /// Currently, this constructs an activity rollup from the internal state, and then resets the internal state.
     /// In the future, this might actually write the activity rollup to the gateway directly, instead of relying on the client to move it around.
     /// Returns the activity rollup as a Solidity ABI-encoded type, in raw byte form.
-    fn commit_activity(
-        rt: &impl Runtime,
-    ) -> Result<WithCodec<AbiEncodedBytes<FullActivityRollup>, IPLD_RAW>, ActorError>;
+    fn commit_activity(rt: &impl Runtime) -> Result<FullActivityRollup, ActorError>;
 
     /// Queries the activity that has been accumulated since the last commit, and is pending a flush.
-    fn pending_activity(
-        rt: &impl Runtime,
-    ) -> Result<WithCodec<AbiEncodedBytes<FullActivityRollup>, IPLD_RAW>, ActorError>;
+    fn pending_activity(rt: &impl Runtime) -> Result<FullActivityRollup, ActorError>;
 }
 
 impl ActivityTrackerActor {
@@ -115,9 +84,7 @@ impl ActivityTracker for ActivityTrackerActor {
         })
     }
 
-    fn commit_activity(
-        rt: &impl Runtime,
-    ) -> Result<WithCodec<AbiEncodedBytes<FullActivityRollup>, IPLD_RAW>, ActorError> {
+    fn commit_activity(rt: &impl Runtime) -> Result<FullActivityRollup, ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
         // Obtain the pending rollup from state.
@@ -129,18 +96,13 @@ impl ActivityTracker for ActivityTrackerActor {
             Ok(())
         })?;
 
-        Ok(WithCodec(AbiEncodedBytes::from(rollup)))
+        Ok(rollup)
     }
 
-    fn pending_activity(
-        rt: &impl Runtime,
-    ) -> Result<WithCodec<AbiEncodedBytes<FullActivityRollup>, IPLD_RAW>, ActorError> {
+    fn pending_activity(rt: &impl Runtime) -> Result<FullActivityRollup, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
-        rt.state::<State>()?
-            .pending_activity_rollup(rt)
-            .map(AbiEncodedBytes::from)
-            .map(WithCodec)
+        rt.state::<State>()?.pending_activity_rollup(rt)
     }
 }
 

@@ -67,8 +67,15 @@ fn main() {
             format!("{ipc_actors_dir}/{output_dir}/{contract_name}.sol/{contract_name}.json");
         let output_path = format!("{ipc_actors_dir}/binding/src/{}.rs", module_name);
 
-        ethers::prelude::Abigen::new(contract_name, &input_path)
-            .expect("failed to create Abigen")
+        let mut abi_gen = ethers::prelude::Abigen::new(contract_name, &input_path)
+            .expect("failed to create Abigen");
+        abi_gen = abi_gen
+            .add_derive("::serde::Serialize")
+            .expect("invalid derive");
+        abi_gen = abi_gen
+            .add_derive("::serde::Deserialize")
+            .expect("invalid derive");
+        abi_gen
             .generate()
             .expect("failed to generate Rust bindings")
             .write_to_file(output_path)

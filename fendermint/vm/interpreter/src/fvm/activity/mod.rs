@@ -56,9 +56,7 @@ impl FullActivity {
 
 #[cfg(test)]
 mod tests {
-    use crate::fvm::activity::ActivityDetails;
-    use fendermint_vm_actor_interface::eam::EthAddress;
-    use fvm_shared::address::Address;
+    use crate::fvm::activity::FullActivity;
     use ipc_actors_abis::checkpointing_facet::{
         AggregatedStats, FullActivityRollup, FullSummary, ValidatorData,
     };
@@ -117,7 +115,7 @@ mod tests {
                     data: v.clone(),
                 },
             };
-            let details = ActivityDetails::new(full);
+            let details = FullActivity::new(full);
             assert_eq!(
                 hex::encode(details.compressed().unwrap().consensus.data_root_commitment),
                 "5519955f33109df3338490473cb14458640efdccd4df05998c4c439738280ab0"
