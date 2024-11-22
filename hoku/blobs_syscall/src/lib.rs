@@ -26,9 +26,8 @@ const ENV_IROH_ADDR: &str = "IROH_RPC_ADDR";
 const HASHRM_SYSCALL_ERROR_CODE: u32 = 101; // TODO(sander): Is the okay?
 
 static IROH_INSTANCE: Lazy<Arc<Mutex<MaybeIroh>>> = Lazy::new(|| {
-    let iroh_addr =
-        std::env::var(ENV_IROH_ADDR).expect("IROH_RPC_ADDR environment variable not set");
-    Arc::new(Mutex::new(MaybeIroh::from_addr(iroh_addr)))
+    let iroh_addr = std::env::var(ENV_IROH_ADDR).ok();
+    Arc::new(Mutex::new(MaybeIroh::maybe_addr(iroh_addr)))
 });
 
 fn syscall_error<D: Display>(error_number: u32) -> impl FnOnce(D) -> ExecutionError {
