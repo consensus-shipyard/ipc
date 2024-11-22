@@ -6,25 +6,24 @@ use std::collections::HashSet;
 
 use fendermint_actor_blobs_shared::params::{
     AddBlobParams, ApproveCreditParams, BuyCreditParams, DeleteBlobParams, FinalizeBlobParams,
-    GetAccountParams, GetBlobParams, GetBlobStatusParams, GetCreditAllowanceParams,
-    GetCreditApprovalParams, GetPendingBlobsParams, GetStatsReturn, RevokeCreditParams,
-    UpdateCreditParams,
+    GetAccountParams, GetAddedBlobsParams, GetBlobParams, GetBlobStatusParams,
+    GetCreditAllowanceParams, GetCreditApprovalParams, GetPendingBlobsParams, GetStatsReturn,
+    RevokeCreditParams, SetBlobPendingParams, UpdateCreditParams,
 };
 use fendermint_actor_blobs_shared::state::{
     Account, Blob, BlobStatus, CreditApproval, Hash, PublicKey, Subscription, SubscriptionId,
 };
 use fendermint_actor_blobs_shared::Method;
-use fil_actors_runtime::runtime::builtins::Type;
 use fil_actors_runtime::{
-    actor_dispatch, actor_error, deserialize_block,
-    runtime::{ActorCode, Runtime},
+    actor_dispatch, actor_error, deserialize_block, extract_send_result,
+    runtime::{builtins::Type, ActorCode, Runtime},
     ActorError, AsActorError, FIRST_EXPORTED_METHOD_NUMBER, SYSTEM_ACTOR_ADDR,
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::sys::SendFlags;
-use fvm_shared::{error::ExitCode, MethodNum};
+use fvm_shared::{error::ExitCode, MethodNum, METHOD_SEND};
 use num_traits::Zero;
 
 use crate::{ext, ConstructorParams, State, BLOBS_ACTOR_NAME};
@@ -51,14 +50,7 @@ impl BlobsActor {
 
     fn buy_credit(rt: &impl Runtime, params: BuyCreditParams) -> Result<Account, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let (to, actor_type) = resolve_external(rt, params.0)?;
-        // Recipient cannot be a machine
-        if matches!(actor_type, ActorType::Machine) {
-            return Err(ActorError::illegal_argument(format!(
-                "to {} cannot be a machine",
-                to
-            )));
-        }
+        let to = resolve_external_non_machine(rt, params.0)?;
         rt.transaction(|st: &mut State, rt| {
             st.buy_credit(to, rt.message().value_received(), rt.curr_epoch())
         })
@@ -66,24 +58,9 @@ impl BlobsActor {
 
     fn update_credit(rt: &impl Runtime, params: UpdateCreditParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        let (to, actor_type) = resolve_external(rt, params.to)?;
-        // Credit owner cannot be a machine
-        if matches!(actor_type, ActorType::Machine) {
-            return Err(ActorError::illegal_argument(format!(
-                "to {} cannot be a machine",
-                to
-            )));
-        }
+        let to = resolve_external_non_machine(rt, params.to)?;
         let sponsor = if let Some(sponsor) = params.sponsor {
-            let (sponsor, actor_type) = resolve_external(rt, sponsor)?;
-            // Sponsor cannot be a machine
-            if matches!(actor_type, ActorType::Machine) {
-                return Err(ActorError::illegal_argument(format!(
-                    "sponsor {} cannot be a machine",
-                    sponsor
-                )));
-            }
-            Some(sponsor)
+            Some(resolve_external_non_machine(rt, sponsor)?)
         } else {
             None
         };
@@ -97,14 +74,7 @@ impl BlobsActor {
         params: ApproveCreditParams,
     ) -> Result<CreditApproval, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let (from, actor_type) = resolve_external(rt, params.from)?;
-        // Credit owner cannot be a machine
-        if matches!(actor_type, ActorType::Machine) {
-            return Err(ActorError::illegal_argument(format!(
-                "from {} cannot be a machine",
-                from
-            )));
-        }
+        let from = resolve_external_non_machine(rt, params.from)?;
         let (origin, caller) = if rt.message().origin() == rt.message().caller() {
             let (origin, _) = resolve_external(rt, rt.message().origin())?;
             (origin, origin)
@@ -120,14 +90,7 @@ impl BlobsActor {
                 from
             )));
         }
-        let (to, actor_type) = resolve_external(rt, params.to)?;
-        // Receiver cannot be a machine
-        if matches!(actor_type, ActorType::Machine) {
-            return Err(ActorError::illegal_argument(format!(
-                "to {} cannot be a machine",
-                to
-            )));
-        }
+        let to = resolve_external_non_machine(rt, params.to)?;
         let caller_allowlist = if let Some(allowlist) = params.caller_allowlist {
             let resolved: HashSet<_> = allowlist
                 .into_iter()
@@ -154,7 +117,7 @@ impl BlobsActor {
 
     fn revoke_credit(rt: &impl Runtime, params: RevokeCreditParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let (from, actor_type) = resolve_external(rt, params.from)?;
+        let from = resolve_external_non_machine(rt, params.from)?;
         let (origin, caller) = if rt.message().origin() == rt.message().caller() {
             let (origin, _) = resolve_external(rt, rt.message().origin())?;
             (origin, origin)
@@ -170,21 +133,7 @@ impl BlobsActor {
                 from
             )));
         }
-        // Credit owner cannot be a machine
-        if matches!(actor_type, ActorType::Machine) {
-            return Err(ActorError::illegal_argument(format!(
-                "from {} cannot be a machine",
-                from
-            )));
-        }
-        let (to, actor_type) = resolve_external(rt, params.to)?;
-        // Receiver cannot be a machine
-        if matches!(actor_type, ActorType::Machine) {
-            return Err(ActorError::illegal_argument(format!(
-                "to {} cannot be a machine",
-                to
-            )));
-        }
+        let to = resolve_external_non_machine(rt, params.to)?;
         let for_caller = if let Some(caller) = params.for_caller {
             let (resolved, _) = resolve_external(rt, caller)?;
             Some(resolved)
@@ -208,22 +157,8 @@ impl BlobsActor {
         params: GetCreditApprovalParams,
     ) -> Result<Option<CreditApproval>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let (from, actor_type) = resolve_external(rt, params.from)?;
-        // Credit owner cannot be a machine
-        if matches!(actor_type, ActorType::Machine) {
-            return Err(ActorError::illegal_argument(format!(
-                "from address {} cannot be a machine",
-                from
-            )));
-        }
-        let (to, actor_type) = resolve_external(rt, params.to)?;
-        // Receiver cannot be a machine
-        if matches!(actor_type, ActorType::Machine) {
-            return Err(ActorError::illegal_argument(format!(
-                "to address {} cannot be a machine",
-                to
-            )));
-        }
+        let from = resolve_external_non_machine(rt, params.from)?;
+        let to = resolve_external_non_machine(rt, params.to)?;
         let approval = rt.state::<State>()?.get_credit_approval(from, to);
         Ok(approval)
     }
@@ -233,24 +168,9 @@ impl BlobsActor {
         params: GetCreditAllowanceParams,
     ) -> Result<TokenAmount, ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        let (to, actor_type) = resolve_external(rt, params.to)?;
-        // Credit owner cannot be a machine
-        if matches!(actor_type, ActorType::Machine) {
-            return Err(ActorError::illegal_argument(format!(
-                "to address {} cannot be a machine",
-                to
-            )));
-        }
+        let to = resolve_external_non_machine(rt, params.to)?;
         let sponsor = if let Some(sponsor) = params.sponsor {
-            let (sponsor, actor_type) = resolve_external(rt, sponsor)?;
-            // Sponsor cannot be a machine
-            if matches!(actor_type, ActorType::Machine) {
-                return Err(ActorError::illegal_argument(format!(
-                    "sponsor {} cannot be a machine",
-                    sponsor
-                )));
-            }
-            Some(sponsor)
+            Some(resolve_external_non_machine(rt, sponsor)?)
         } else {
             None
         };
@@ -273,19 +193,12 @@ impl BlobsActor {
         let (caller, _) = resolve_external(rt, rt.message().caller())?;
         // The blob subscriber will be the sponsor if specified and approved
         let subscriber = if let Some(sponsor) = params.sponsor {
-            let (sponsor, actor_type) = resolve_external(rt, sponsor)?;
-            // Sponsor cannot be a machine
-            if matches!(actor_type, ActorType::Machine) {
-                return Err(ActorError::illegal_argument(format!(
-                    "sponsor {} cannot be a machine",
-                    sponsor
-                )));
-            }
-            sponsor
+            resolve_external_non_machine(rt, sponsor)?
         } else {
             origin
         };
-        rt.transaction(|st: &mut State, rt| {
+        let tokens_received = rt.message().value_received();
+        let (subscription, unspent_tokens) = rt.transaction(|st: &mut State, rt| {
             st.add_blob(
                 origin,
                 caller,
@@ -297,8 +210,14 @@ impl BlobsActor {
                 params.size,
                 params.ttl,
                 params.source,
+                tokens_received,
             )
-        })
+        })?;
+        // Send the tokens not required for the buying back
+        if !unspent_tokens.is_zero() {
+            extract_send_result(rt.send_simple(&origin, METHOD_SEND, None, unspent_tokens))?;
+        }
+        Ok(subscription)
     }
 
     fn get_blob(rt: &impl Runtime, params: GetBlobParams) -> Result<Option<Blob>, ActorError> {
@@ -318,6 +237,15 @@ impl BlobsActor {
         Ok(status)
     }
 
+    fn get_added_blobs(
+        rt: &impl Runtime,
+        params: GetAddedBlobsParams,
+    ) -> Result<Vec<BlobTuple>, ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+        let added = rt.state::<State>()?.get_added_blobs(params.0);
+        Ok(added)
+    }
+
     fn get_pending_blobs(
         rt: &impl Runtime,
         params: GetPendingBlobsParams,
@@ -327,16 +255,13 @@ impl BlobsActor {
         Ok(pending)
     }
 
-    fn get_pending_blobs_count(rt: &impl Runtime) -> Result<u64, ActorError> {
-        rt.validate_immediate_caller_accept_any()?;
-        let count = rt.state::<State>()?.get_pending_blobs_count();
-        Ok(count)
-    }
-
-    fn get_pending_bytes_count(rt: &impl Runtime) -> Result<u64, ActorError> {
-        rt.validate_immediate_caller_accept_any()?;
-        let count = rt.state::<State>()?.get_pending_bytes_count();
-        Ok(count)
+    fn set_blob_pending(rt: &impl Runtime, params: SetBlobPendingParams) -> Result<(), ActorError> {
+        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
+        // We control this method call and can guarantee subscriber is an external address,
+        // i.e., no need to resolve its external address.
+        rt.transaction(|st: &mut State, _| {
+            st.set_blob_pending(params.subscriber, params.hash, params.id, params.source)
+        })
     }
 
     fn finalize_blob(rt: &impl Runtime, params: FinalizeBlobParams) -> Result<(), ActorError> {
@@ -359,15 +284,7 @@ impl BlobsActor {
         let (caller, _) = resolve_external(rt, rt.message().caller())?;
         // The blob subscriber will be the sponsor if specified and approved
         let subscriber = if let Some(sponsor) = params.sponsor {
-            let (sponsor, actor_type) = resolve_external(rt, sponsor)?;
-            // Sponsor cannot be a machine
-            if matches!(actor_type, ActorType::Machine) {
-                return Err(ActorError::illegal_argument(format!(
-                    "sponsor {} cannot be a machine",
-                    sponsor
-                )));
-            }
-            sponsor
+            resolve_external_non_machine(rt, sponsor)?
         } else {
             origin
         };
@@ -439,9 +356,9 @@ impl ActorCode for BlobsActor {
         AddBlob => add_blob,
         GetBlob => get_blob,
         GetBlobStatus => get_blob_status,
+        GetAddedBlobs => get_added_blobs,
         GetPendingBlobs => get_pending_blobs,
-        GetPendingBlobsCount => get_pending_blobs_count,
-        GetPendingBytesCount => get_pending_bytes_count,
+        SetBlobPending => set_blob_pending,
         FinalizeBlob => finalize_blob,
         DeleteBlob => delete_blob,
         _ => fallback,
@@ -471,7 +388,24 @@ impl ActorType {
     }
 }
 
-// Resolves robust address of an actor.
+/// Resolve robust address and ensure it is not a Machine actor type.
+/// See `resolve_external`.
+fn resolve_external_non_machine(
+    rt: &impl Runtime,
+    address: Address,
+) -> Result<Address, ActorError> {
+    let (address, actor_type) = resolve_external(rt, address)?;
+    if matches!(actor_type, ActorType::Machine) {
+        Err(ActorError::illegal_argument(format!(
+            "address {} cannot be a machine",
+            address
+        )))
+    } else {
+        Ok(address)
+    }
+}
+
+/// Resolves robust address of an actor.
 fn resolve_external(
     rt: &impl Runtime,
     address: Address,
@@ -610,7 +544,7 @@ mod tests {
     }
 
     #[test]
-    fn test_fund_account() {
+    fn test_buy_credit() {
         let rt = construct_and_verify(1024 * 1024, 1);
 
         let id_addr = Address::new_id(110);
@@ -929,10 +863,9 @@ mod tests {
     }
 
     #[test]
-    fn test_pending_blob_counts() {
+    fn test_add_blob_inline_buy() {
         let rt = construct_and_verify(1024 * 1024, 1);
 
-        // Set up test address
         let id_addr = Address::new_id(110);
         let eth_addr = EthAddress(hex_literal::hex!(
             "CAFEB0BA00000000000000000000000000000000"
@@ -944,134 +877,200 @@ mod tests {
         rt.set_origin(id_addr);
         rt.set_epoch(ChainEpoch::from(0));
 
-        // Initially there should be no pending blobs
+        // Try sending a lot
         rt.expect_validate_caller_any();
-        let count = rt
-            .call::<BlobsActor>(Method::GetPendingBlobsCount as u64, None)
-            .unwrap()
-            .unwrap()
-            .deserialize::<u64>()
-            .unwrap();
-        assert_eq!(count, 0);
+        let hash = new_hash(1024);
+        let add_params = AddBlobParams {
+            sponsor: None,
+            hash: hash.0,
+            metadata_hash: new_hash(1024).0,
+            source: new_pk(),
+            id: SubscriptionId::Default,
+            size: hash.1,
+            ttl: Some(3600),
+        };
+        let tokens_sent = TokenAmount::from_whole(1);
+        rt.set_received(tokens_sent.clone());
+        rt.set_balance(tokens_sent.clone());
+        let tokens_required_atto = add_params.size * add_params.ttl.unwrap() as u64;
+        let expected_tokens_unspent = tokens_sent.atto() - tokens_required_atto;
+        rt.expect_send_simple(
+            f4_eth_addr,
+            METHOD_SEND,
+            None,
+            TokenAmount::from_atto(expected_tokens_unspent),
+            None,
+            ExitCode::OK,
+        );
+        let result = rt.call::<BlobsActor>(
+            Method::AddBlob as u64,
+            IpldBlock::serialize_cbor(&add_params).unwrap(),
+        );
+        assert!(result.is_ok());
         rt.verify();
 
+        // Try sending zero
         rt.expect_validate_caller_any();
-        let bytes = rt
-            .call::<BlobsActor>(Method::GetPendingBytesCount as u64, None)
-            .unwrap()
-            .unwrap()
-            .deserialize::<u64>()
-            .unwrap();
-        assert_eq!(bytes, 0);
+        rt.set_received(TokenAmount::zero());
+        let hash = new_hash(1024);
+        let add_params = AddBlobParams {
+            sponsor: None,
+            hash: hash.0,
+            metadata_hash: new_hash(1024).0,
+            source: new_pk(),
+            id: SubscriptionId::Default,
+            size: hash.1,
+            ttl: Some(3600),
+        };
+        let response = rt.call::<BlobsActor>(
+            Method::AddBlob as u64,
+            IpldBlock::serialize_cbor(&add_params).unwrap(),
+        );
+        assert!(response.is_err());
         rt.verify();
 
-        // Fund the account
+        // Try sending exact amount
+        let tokens_required_atto = add_params.size * add_params.ttl.unwrap() as u64;
+        let tokens_sent = TokenAmount::from_atto(tokens_required_atto);
+        rt.set_received(tokens_sent.clone());
+        rt.expect_validate_caller_any();
+        let hash = new_hash(1024);
+        let add_params = AddBlobParams {
+            sponsor: None,
+            hash: hash.0,
+            metadata_hash: new_hash(1024).0,
+            source: new_pk(),
+            id: SubscriptionId::Default,
+            size: hash.1,
+            ttl: Some(3600),
+        };
+        let result = rt.call::<BlobsActor>(
+            Method::AddBlob as u64,
+            IpldBlock::serialize_cbor(&add_params).unwrap(),
+        );
+        assert!(result.is_ok());
+        rt.verify();
+    }
+
+    #[test]
+    fn test_add_blob_with_sponsor() {
+        let rt = construct_and_verify(1024 * 1024, 1);
+
+        // Credit sponsor
+        let sponsor_id_addr = Address::new_id(110);
+        let sponsor_eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000000"
+        ));
+        let sponsor_f4_eth_addr = Address::new_delegated(10, &sponsor_eth_addr.0).unwrap();
+        rt.set_delegated_address(sponsor_id_addr.id().unwrap(), sponsor_f4_eth_addr);
+
+        // Credit spender
+        let spender_id_addr = Address::new_id(111);
+        let spender_eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000001"
+        ));
+        let spender_f4_eth_addr = Address::new_delegated(10, &spender_eth_addr.0).unwrap();
+        rt.set_delegated_address(spender_id_addr.id().unwrap(), spender_f4_eth_addr);
+        rt.set_address_actor_type(spender_id_addr, *ETHACCOUNT_ACTOR_CODE_ID);
+
+        // Proxy EVM contract on behalf of the credit owner
+        let proxy_id_addr = Address::new_id(112);
+        let proxy_eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000002"
+        ));
+        let proxy_f4_eth_addr = Address::new_delegated(10, &proxy_eth_addr.0).unwrap();
+        rt.set_delegated_address(proxy_id_addr.id().unwrap(), proxy_f4_eth_addr);
+        rt.set_address_actor_type(proxy_id_addr, *EVM_ACTOR_CODE_ID);
+
+        // Sponsor buys credit
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, sponsor_id_addr);
         rt.set_received(TokenAmount::from_whole(1));
         rt.expect_validate_caller_any();
-        let fund_params = BuyCreditParams(f4_eth_addr);
-        let result = rt.call::<BlobsActor>(
+        let fund_params = BuyCreditParams(sponsor_id_addr);
+        let buy_credit_result = rt.call::<BlobsActor>(
             Method::BuyCredit as u64,
             IpldBlock::serialize_cbor(&fund_params).unwrap(),
         );
+        assert!(buy_credit_result.is_ok());
+        rt.verify();
+
+        // Sponsors approves credit
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, sponsor_id_addr);
+        rt.set_origin(sponsor_id_addr);
+        rt.expect_validate_caller_any();
+        let approve_params = ApproveCreditParams {
+            from: sponsor_id_addr,
+            to: spender_id_addr,
+            caller_allowlist: None,
+            limit: None,
+            ttl: None,
+        };
+        let result = rt.call::<BlobsActor>(
+            Method::ApproveCredit as u64,
+            IpldBlock::serialize_cbor(&approve_params).unwrap(),
+        );
         assert!(result.is_ok());
         rt.verify();
 
-        // Add two blobs of different sizes
-        rt.set_epoch(ChainEpoch::from(5));
+        rt.set_origin(sponsor_id_addr);
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, sponsor_id_addr);
         rt.expect_validate_caller_any();
+        let approve_params = ApproveCreditParams {
+            from: sponsor_id_addr,
+            to: spender_id_addr,
+            caller_allowlist: None,
+            limit: None,
+            ttl: None,
+        };
+        let approve_result = rt.call::<BlobsActor>(
+            Method::ApproveCredit as u64,
+            IpldBlock::serialize_cbor(&approve_params).unwrap(),
+        );
+        assert!(approve_result.is_ok());
+        rt.verify();
 
-        let hash1 = new_hash(1024);
-        let add_params1 = AddBlobParams {
-            sponsor: None,
-            source: new_pk(),
-            hash: hash1.0,
+        // Try sending zero
+        rt.set_origin(spender_id_addr);
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, spender_id_addr);
+        rt.expect_validate_caller_any();
+        rt.set_received(TokenAmount::zero());
+        let hash = new_hash(1024);
+        let add_params = AddBlobParams {
+            sponsor: Some(sponsor_id_addr),
+            hash: hash.0,
             metadata_hash: new_hash(1024).0,
+            source: new_pk(),
             id: SubscriptionId::Default,
-            size: hash1.1,
+            size: hash.1,
             ttl: Some(3600),
         };
-        let result = rt.call::<BlobsActor>(
+        let response = rt.call::<BlobsActor>(
             Method::AddBlob as u64,
-            IpldBlock::serialize_cbor(&add_params1).unwrap(),
+            IpldBlock::serialize_cbor(&add_params).unwrap(),
         );
-        assert!(result.is_ok());
+        assert!(response.is_ok());
         rt.verify();
 
-        let hash2 = new_hash(2048);
+        // Try sending non-zero -> cannot buy for a sponsor
+        rt.set_origin(spender_id_addr);
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, spender_id_addr);
         rt.expect_validate_caller_any();
-        let add_params2 = AddBlobParams {
-            sponsor: None,
-            source: new_pk(),
-            hash: hash2.0,
+        rt.set_received(TokenAmount::from_whole(1));
+        let hash = new_hash(1024);
+        let add_params = AddBlobParams {
+            sponsor: Some(sponsor_id_addr),
+            hash: hash.0,
             metadata_hash: new_hash(1024).0,
+            source: new_pk(),
             id: SubscriptionId::Default,
-            size: hash2.1,
+            size: hash.1,
             ttl: Some(3600),
         };
-        let result = rt.call::<BlobsActor>(
+        let response = rt.call::<BlobsActor>(
             Method::AddBlob as u64,
-            IpldBlock::serialize_cbor(&add_params2).unwrap(),
+            IpldBlock::serialize_cbor(&add_params).unwrap(),
         );
-        assert!(result.is_ok());
-        rt.verify();
-
-        // Check pending blob count is now 2
-        rt.expect_validate_caller_any();
-        let count = rt
-            .call::<BlobsActor>(Method::GetPendingBlobsCount as u64, None)
-            .unwrap()
-            .unwrap()
-            .deserialize::<u64>()
-            .unwrap();
-        assert_eq!(count, 2);
-        rt.verify();
-
-        // Check pending bytes count is the sum of both blob sizes
-        rt.expect_validate_caller_any();
-        let bytes = rt
-            .call::<BlobsActor>(Method::GetPendingBytesCount as u64, None)
-            .unwrap()
-            .unwrap()
-            .deserialize::<u64>()
-            .unwrap();
-        assert_eq!(bytes, 1024 + 2048);
-        rt.verify();
-
-        // Finalize one blob as resolved
-        rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
-        rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
-        let finalize_params = FinalizeBlobParams {
-            subscriber: f4_eth_addr,
-            hash: hash1.0,
-            id: SubscriptionId::Default,
-            status: BlobStatus::Resolved,
-        };
-        let result = rt.call::<BlobsActor>(
-            Method::FinalizeBlob as u64,
-            IpldBlock::serialize_cbor(&finalize_params).unwrap(),
-        );
-        assert!(result.is_ok());
-        rt.verify();
-
-        // Check counts are updated
-        rt.expect_validate_caller_any();
-        let count = rt
-            .call::<BlobsActor>(Method::GetPendingBlobsCount as u64, None)
-            .unwrap()
-            .unwrap()
-            .deserialize::<u64>()
-            .unwrap();
-        assert_eq!(count, 1);
-        rt.verify();
-
-        rt.expect_validate_caller_any();
-        let bytes = rt
-            .call::<BlobsActor>(Method::GetPendingBytesCount as u64, None)
-            .unwrap()
-            .unwrap()
-            .deserialize::<u64>()
-            .unwrap();
-        assert_eq!(bytes, 2048);
+        assert!(response.is_err());
         rt.verify();
     }
 }

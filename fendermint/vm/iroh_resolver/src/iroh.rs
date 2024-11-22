@@ -165,19 +165,19 @@ async fn add_own_vote<V>(
             })
             .await;
 
-            if resolved {
-                emit(BlobsFinalityVotingSuccess {
-                    blob_hash: Some(task.hash().into()),
-                });
-            } else {
-                emit(BlobsFinalityVotingFailure {
-                    blob_hash: Some(task.hash().into()),
-                });
-            }
-
             match res {
                 Ok(added) => {
                     if added {
+                        // Emit the vote event locally
+                        if resolved {
+                            emit(BlobsFinalityVotingSuccess {
+                                blob_hash: Some(task.hash().into()),
+                            });
+                        } else {
+                            emit(BlobsFinalityVotingFailure {
+                                blob_hash: Some(task.hash().into()),
+                            });
+                        }
                         // Send our own vote to peers
                         if let Err(e) = client.publish_vote(vote) {
                             tracing::error!(error = e.to_string(), "failed to publish vote");

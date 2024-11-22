@@ -122,10 +122,28 @@ pub struct GetBlobStatusParams {
     pub id: SubscriptionId,
 }
 
+/// Params for getting added blobs.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct GetAddedBlobsParams(pub u32);
+
 /// Params for getting pending blobs.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct GetPendingBlobsParams(pub u32);
+
+/// Params for setting a blob to pending.
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct SetBlobPendingParams {
+    /// Source Iroh node ID used for ingestion.
+    pub source: PublicKey,
+    /// The address that requested the blob.
+    pub subscriber: Address,
+    /// Blob blake3 hash.
+    pub hash: Hash,
+    /// Identifier used to differentiate blob additions for the same subscriber.
+    pub id: SubscriptionId,
+}
 
 /// Params for finalizing a blob.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
@@ -177,4 +195,10 @@ pub struct GetStatsReturn {
     pub num_blobs: u64,
     /// Total number of currently resolving blobs.
     pub num_resolving: u64,
+    /// Total bytes of all currently resolving blobs.
+    pub bytes_resolving: u64,
+    /// Total number of blobs that are not yet added to the validator's resolve pool.
+    pub num_added: u64,
+    /// Total bytes of all blobs that are not yet added to the validator's resolve pool.
+    pub bytes_added: u64,
 }

@@ -45,6 +45,8 @@ pub struct State {
     pub blobs: HashMap<Hash, Blob>,
     /// Map of expiries to blob hashes.
     pub expiries: BTreeMap<ChainEpoch, HashMap<Address, HashMap<ExpiryKey, bool>>>,
+    /// Map of currently added blob hashes to account and source Iroh node IDs.
+    pub added: BTreeMap<Hash, HashSet<(Address, SubscriptionId, PublicKey)>>,
     /// Map of currently pending blob hashes to account and source Iroh node IDs.
     pub pending: BTreeMap<Hash, HashSet<(Address, SubscriptionId, PublicKey)>>,
 }
@@ -110,10 +112,12 @@ impl State {
             accounts: HashMap::new(),
             blobs: HashMap::new(),
             expiries: BTreeMap::new(),
+            added: BTreeMap::new(),
             pending: BTreeMap::new(),
         }
     }
 
+    // TODO: Don't calculate stats on the fly, use running counters.
     pub fn get_stats(&self, balance: TokenAmount) -> GetStatsReturn {
         GetStatsReturn {
             balance,
@@ -126,6 +130,9 @@ impl State {
             num_accounts: self.accounts.len() as u64,
             num_blobs: self.blobs.len() as u64,
             num_resolving: self.pending.len() as u64,
+            bytes_resolving: self.pending.keys().map(|hash| self.blobs[hash].size).sum(),
+            num_added: self.added.len() as u64,
+            bytes_added: self.added.keys().map(|hash| self.blobs[hash].size).sum(),
         }
     }
 
@@ -186,7 +193,7 @@ impl State {
         if add_credit.is_negative() {
             let credit_required = -add_credit.clone();
             ensure_credit(
-                addr,
+                &addr,
                 current_epoch,
                 &account.credit_free,
                 &credit_required,
@@ -452,18 +459,9 @@ impl State {
         size: u64,
         ttl: Option<ChainEpoch>,
         source: PublicKey,
-    ) -> anyhow::Result<Subscription, ActorError> {
-        let (ttl, auto_renew) = if let Some(ttl) = ttl {
-            (ttl, false)
-        } else {
-            (AUTO_TTL, true)
-        };
-        if ttl < MIN_TTL {
-            return Err(ActorError::illegal_argument(format!(
-                "minimum blob TTL is {}",
-                MIN_TTL
-            )));
-        }
+        tokens_received: TokenAmount,
+    ) -> anyhow::Result<(Subscription, TokenAmount), ActorError> {
+        let (ttl, auto_renew) = accept_ttl(ttl)?;
         let account = self
             .accounts
             .entry(subscriber)
@@ -489,6 +487,8 @@ impl State {
         let mut new_capacity = BigInt::zero();
         let mut new_account_capacity = BigInt::zero();
         let credit_required: BigInt;
+        // Like cashback but for sending unspent tokens back
+        let tokens_unspent: TokenAmount;
         let sub = if let Some(blob) = self.blobs.get_mut(&hash) {
             let sub = if let Some(group) = blob.subscribers.get_mut(&subscriber) {
                 let (group_expiry, new_group_expiry) = group.max_expiries(&id, Some(expiry));
@@ -520,11 +520,14 @@ impl State {
                 } else {
                     (new_group_expiry - current_epoch) as u64 * &size
                 };
-                ensure_credit(
-                    subscriber,
-                    current_epoch,
-                    &account.credit_free,
+                tokens_unspent = ensure_credit_or_buy(
+                    &mut account.credit_free,
+                    &mut self.credit_sold,
                     &credit_required,
+                    &tokens_received,
+                    self.credit_debit_rate,
+                    &subscriber,
+                    current_epoch,
                     &delegation,
                 )?;
                 if let Some(sub) = group.subscriptions.get_mut(&id) {
@@ -582,11 +585,14 @@ impl State {
                 // However, we still need to reserve the full required credit from the new
                 // subscriber, as the existing account(s) may decide to change the expiry or cancel.
                 credit_required = ttl as u64 * &size;
-                ensure_credit(
-                    subscriber,
-                    current_epoch,
-                    &account.credit_free,
+                tokens_unspent = ensure_credit_or_buy(
+                    &mut account.credit_free,
+                    &mut self.credit_sold,
                     &credit_required,
+                    &tokens_received,
+                    self.credit_debit_rate,
+                    &subscriber,
+                    current_epoch,
                     &delegation,
                 )?;
                 // Add new subscription
@@ -620,10 +626,10 @@ impl State {
                 sub
             };
             if !matches!(blob.status, BlobStatus::Resolved) {
-                // It's pending or failed, reset to pending
-                blob.status = BlobStatus::Pending;
-                // Add/update pending with hash and its source
-                self.pending
+                // It's pending or failed, reset to added status
+                blob.status = BlobStatus::Added;
+                // Add/update added with hash and its source
+                self.added
                     .entry(hash)
                     .and_modify(|sources| {
                         sources.insert((subscriber, id.clone(), source));
@@ -644,11 +650,14 @@ impl State {
             }
             new_capacity = size.clone();
             credit_required = ttl as u64 * &size;
-            ensure_credit(
-                subscriber,
-                current_epoch,
-                &account.credit_free,
+            tokens_unspent = ensure_credit_or_buy(
+                &mut account.credit_free,
+                &mut self.credit_sold,
                 &credit_required,
+                &tokens_received,
+                self.credit_debit_rate,
+                &subscriber,
+                current_epoch,
                 &delegation,
             )?;
             // Create new blob
@@ -669,7 +678,7 @@ impl State {
                         subscriptions: HashMap::from([(id.clone(), sub.clone())]),
                     },
                 )]),
-                status: BlobStatus::Pending,
+                status: BlobStatus::Added,
             };
             self.blobs.insert(hash, blob);
             debug!("created new blob {}", hash);
@@ -686,8 +695,8 @@ impl State {
                 Some((expiry, auto_renew)),
                 None,
             );
-            // Add to pending
-            self.pending
+            // Add to added
+            self.added
                 .insert(hash, HashSet::from([(subscriber, id, source)]));
             sub
         };
@@ -720,7 +729,7 @@ impl State {
                 subscriber
             );
         }
-        Ok(sub)
+        Ok((sub, tokens_unspent))
     }
 
     fn renew_blob(
@@ -806,7 +815,7 @@ impl State {
         let credit_required =
             (new_group_expiry - group_expiry.max(account.last_debit_epoch)) as u64 * &size;
         ensure_credit(
-            subscriber,
+            &subscriber,
             current_epoch,
             &account.credit_free,
             &credit_required,
@@ -853,12 +862,13 @@ impl State {
         let blob = self.blobs.get(&hash)?;
         if blob.subscribers.contains_key(&subscriber) {
             match blob.status {
+                BlobStatus::Added => Some(BlobStatus::Added),
                 BlobStatus::Pending => Some(BlobStatus::Pending),
                 BlobStatus::Resolved => Some(BlobStatus::Resolved),
                 BlobStatus::Failed => {
                     // The blob state's status may have been finalized as failed by another
                     // subscription.
-                    // We need to if this specific subscription failed.
+                    // We need to see if this specific subscription failed.
                     if let Some(sub) = blob
                         .subscribers
                         .get(&subscriber)
@@ -882,6 +892,18 @@ impl State {
     }
 
     #[allow(clippy::type_complexity)]
+    pub fn get_added_blobs(
+        &self,
+        size: u32,
+    ) -> Vec<(Hash, HashSet<(Address, SubscriptionId, PublicKey)>)> {
+        self.added
+            .iter()
+            .take(size as usize)
+            .map(|element| (*element.0, element.1.clone()))
+            .collect::<Vec<_>>()
+    }
+
+    #[allow(clippy::type_complexity)]
     pub fn get_pending_blobs(
         &self,
         size: u32,
@@ -893,12 +915,26 @@ impl State {
             .collect::<Vec<_>>()
     }
 
-    pub fn get_pending_blobs_count(&self) -> u64 {
-        self.pending.len() as u64
-    }
-
-    pub fn get_pending_bytes_count(&self) -> u64 {
-        self.pending.keys().map(|hash| self.blobs[hash].size).sum()
+    pub fn set_blob_pending(
+        &mut self,
+        subscriber: Address,
+        hash: Hash,
+        id: SubscriptionId,
+        source: PublicKey,
+    ) -> anyhow::Result<(), ActorError> {
+        let blob = if let Some(blob) = self.blobs.get_mut(&hash) {
+            blob
+        } else {
+            // The blob may have been deleted before it was set to pending
+            return Ok(());
+        };
+        blob.status = BlobStatus::Pending;
+        // Add to pending
+        self.pending
+            .insert(hash, HashSet::from([(subscriber, id, source)]));
+        // Remove from added
+        self.added.remove(&hash);
+        Ok(())
     }
 
     pub fn finalize_blob(
@@ -909,9 +945,9 @@ impl State {
         id: SubscriptionId,
         status: BlobStatus,
     ) -> anyhow::Result<(), ActorError> {
-        if matches!(status, BlobStatus::Pending) {
+        if matches!(status, BlobStatus::Added | BlobStatus::Pending) {
             return Err(ActorError::illegal_state(format!(
-                "cannot finalize blob {} as pending",
+                "cannot finalize blob {} as added or pending",
                 hash
             )));
         }
@@ -925,7 +961,12 @@ impl State {
             // The blob may have been deleted before it was finalized
             return Ok(());
         };
-        if matches!(blob.status, BlobStatus::Resolved) {
+        if matches!(blob.status, BlobStatus::Added) {
+            return Err(ActorError::illegal_state(format!(
+                "blob {} cannot be finalized from status added",
+                hash
+            )));
+        } else if matches!(blob.status, BlobStatus::Resolved) {
             // Blob is already finalized as resolved.
             // We can ignore later finalizations, even if they are failed.
             return Ok(());
@@ -1179,6 +1220,13 @@ impl State {
             None,
             Some(sub.expiry),
         );
+        // Remove entry from added
+        if let Some(entry) = self.added.get_mut(&hash) {
+            entry.remove(&(subscriber, id.clone(), sub.source));
+            if entry.is_empty() {
+                self.added.remove(&hash);
+            }
+        }
         // Remove entry from pending
         if let Some(entry) = self.pending.get_mut(&hash) {
             entry.remove(&(subscriber, id.clone(), sub.source));
@@ -1215,19 +1263,103 @@ impl State {
     }
 }
 
+/// Check if `subscriber` has enough credits, including delegated credits.
 fn ensure_credit(
-    subscriber: Address,
+    subscriber: &Address,
     current_epoch: ChainEpoch,
     credit_free: &BigInt,
     credit_required: &BigInt,
     delegation: &Option<CreditDelegation>,
 ) -> anyhow::Result<(), ActorError> {
-    if credit_free < credit_required {
-        return Err(ActorError::insufficient_funds(format!(
+    ensure_enough_credits(subscriber, credit_free, credit_required)?;
+    ensure_delegated_credit(subscriber, current_epoch, credit_required, delegation)
+}
+
+/// Check if `subscriber` owns enough free credits.
+fn ensure_enough_credits(
+    subscriber: &Address,
+    credit_free: &BigInt,
+    credit_required: &BigInt,
+) -> anyhow::Result<(), ActorError> {
+    if credit_free >= credit_required {
+        Ok(())
+    } else {
+        Err(ActorError::insufficient_funds(format!(
             "account {} has insufficient credit (available: {}; required: {})",
             subscriber, credit_free, credit_required
-        )));
+        )))
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn ensure_credit_or_buy(
+    account_credit_free: &mut BigInt,
+    state_credit_sold: &mut BigInt,
+    credit_required: &BigInt,
+    tokens_received: &TokenAmount,
+    debit_credit_rate: u64,
+    subscriber: &Address,
+    current_epoch: ChainEpoch,
+    delegate: &Option<CreditDelegation>,
+) -> anyhow::Result<TokenAmount, ActorError> {
+    let tokens_received_non_zero = !tokens_received.is_zero();
+    let has_delegation = delegate.is_some();
+    match (tokens_received_non_zero, has_delegation) {
+        (true, true) => Err(ActorError::illegal_argument(format!(
+            "can not buy credits inline for {}",
+            subscriber,
+        ))),
+        (true, false) => {
+            // Try buying credits for self
+            let not_enough_credits = *account_credit_free < *credit_required;
+            if not_enough_credits {
+                let credits_needed = credit_required - &*account_credit_free;
+                let tokens_needed_atto = &credits_needed / debit_credit_rate;
+                let tokens_needed = TokenAmount::from_atto(tokens_needed_atto);
+                if tokens_needed <= *tokens_received {
+                    let tokens_to_rebate = tokens_received - tokens_needed;
+                    *state_credit_sold += &credits_needed;
+                    *account_credit_free += &credits_needed;
+                    Ok(tokens_to_rebate)
+                } else {
+                    Err(ActorError::insufficient_funds(format!(
+                        "account {} sent insufficient tokens (received: {}; required: {})",
+                        subscriber, tokens_received, tokens_needed
+                    )))
+                }
+            } else {
+                Ok(TokenAmount::zero())
+            }
+        }
+        (false, true) => {
+            ensure_credit(
+                subscriber,
+                current_epoch,
+                account_credit_free,
+                credit_required,
+                delegate,
+            )?;
+            Ok(TokenAmount::zero())
+        }
+        (false, false) => {
+            ensure_credit(
+                subscriber,
+                current_epoch,
+                account_credit_free,
+                credit_required,
+                delegate,
+            )?;
+            Ok(TokenAmount::zero())
+        }
+    }
+}
+
+fn ensure_delegated_credit(
+    subscriber: &Address,
+    current_epoch: ChainEpoch,
+    credit_required: &BigInt,
+    delegation: &Option<CreditDelegation>,
+) -> anyhow::Result<(), ActorError> {
     if let Some(delegation) = delegation {
         if let Some(limit) = &delegation.approval.limit {
             let unused = &(limit - &delegation.approval.used);
@@ -1286,6 +1418,18 @@ fn update_expiry_index(
                 expiries.remove(&remove);
             }
         }
+    }
+}
+
+fn accept_ttl(ttl: Option<ChainEpoch>) -> anyhow::Result<(ChainEpoch, bool), ActorError> {
+    let (ttl, auto_renew) = ttl.map(|ttl| (ttl, false)).unwrap_or((AUTO_TTL, true));
+    if ttl < MIN_TTL {
+        Err(ActorError::illegal_argument(format!(
+            "minimum blob TTL is {}",
+            MIN_TTL
+        )))
+    } else {
+        Ok((ttl, auto_renew))
     }
 }
 
@@ -1512,6 +1656,7 @@ mod tests {
             size,
             None,
             new_pk(),
+            TokenAmount::zero(),
         );
         assert!(res.is_ok());
 
@@ -1665,7 +1810,12 @@ mod tests {
             size,
             Some(ttl1),
             source,
+            TokenAmount::zero(),
         );
+        assert!(res.is_ok());
+
+        // Set to status pending
+        let res = state.set_blob_pending(subscriber, hash, id1.clone(), source);
         assert!(res.is_ok());
 
         // Finalize as resolved
@@ -1703,6 +1853,7 @@ mod tests {
             size,
             Some(ttl2),
             source,
+            TokenAmount::zero(),
         );
         assert!(res.is_ok());
 
@@ -1767,6 +1918,7 @@ mod tests {
 
         // Check indexes
         assert_eq!(state.expiries.len(), 0);
+        assert_eq!(state.added.len(), 0);
         assert_eq!(state.pending.len(), 0);
 
         // Check approval
@@ -1844,6 +1996,7 @@ mod tests {
             size1,
             Some(MIN_TTL),
             source,
+            TokenAmount::zero(),
         );
         assert!(res.is_ok());
 
@@ -1874,6 +2027,7 @@ mod tests {
             size2,
             None,
             source,
+            TokenAmount::zero(),
         );
         assert!(res.is_ok());
 
@@ -1900,7 +2054,8 @@ mod tests {
 
         // Check indexes
         assert_eq!(state.expiries.len(), 2);
-        assert_eq!(state.pending.len(), 2);
+        assert_eq!(state.added.len(), 2);
+        assert_eq!(state.pending.len(), 0);
 
         // Add the first (now expired) blob again
         let add3_epoch = ChainEpoch::from(MIN_TTL + 21);
@@ -1917,6 +2072,7 @@ mod tests {
             size1,
             None,
             source,
+            TokenAmount::zero(),
         );
         assert!(res.is_ok());
 
@@ -1943,7 +2099,8 @@ mod tests {
 
         // Check indexes
         assert_eq!(state.expiries.len(), 2);
-        assert_eq!(state.pending.len(), 2);
+        assert_eq!(state.added.len(), 2);
+        assert_eq!(state.pending.len(), 0);
 
         // Check approval
         let account_committed = account.credit_committed.clone();
@@ -2053,9 +2210,10 @@ mod tests {
             size,
             None,
             source,
+            TokenAmount::zero(),
         );
         assert!(res.is_ok());
-        let sub = res.unwrap();
+        let (sub, _) = res.unwrap();
         assert_eq!(sub.added, add1_epoch);
         assert_eq!(sub.expiry, add1_epoch + AUTO_TTL);
         assert!(sub.auto_renew);
@@ -2068,13 +2226,13 @@ mod tests {
         // Check the blob status
         assert_eq!(
             state.get_blob_status(subscriber, hash, id1.clone()),
-            Some(BlobStatus::Pending)
+            Some(BlobStatus::Added)
         );
 
         // Check the blob
         let blob = state.get_blob(hash).unwrap();
         assert_eq!(blob.subscribers.len(), 1);
-        assert_eq!(blob.status, BlobStatus::Pending);
+        assert_eq!(blob.status, BlobStatus::Added);
         assert_eq!(blob.size, size);
 
         // Check the subscription group
@@ -2093,6 +2251,10 @@ mod tests {
         credit_amount -= &account.credit_committed;
         assert_eq!(account.credit_free, credit_amount);
         assert_eq!(account.capacity_used, BigInt::from(size));
+
+        // Set to status pending
+        let res = state.set_blob_pending(subscriber, hash, id1.clone(), source);
+        assert!(res.is_ok());
 
         // Finalize as resolved
         let finalize_epoch = ChainEpoch::from(11);
@@ -2123,9 +2285,10 @@ mod tests {
             size,
             None,
             source,
+            TokenAmount::zero(),
         );
         assert!(res.is_ok());
-        let sub = res.unwrap();
+        let (sub, _) = res.unwrap();
         assert_eq!(sub.added, add1_epoch); // added should not change
         assert_eq!(sub.expiry, add2_epoch + AUTO_TTL);
         assert!(sub.auto_renew);
@@ -2180,9 +2343,10 @@ mod tests {
             size,
             None,
             source,
+            TokenAmount::zero(),
         );
         assert!(res.is_ok());
-        let sub = res.unwrap();
+        let (sub, _) = res.unwrap();
         assert_eq!(sub.added, add3_epoch);
         assert_eq!(sub.expiry, add3_epoch + AUTO_TTL);
         assert!(sub.auto_renew);
@@ -2239,6 +2403,7 @@ mod tests {
 
         // Check indexes
         assert_eq!(state.expiries.len(), 2);
+        assert_eq!(state.added.len(), 0);
         assert_eq!(state.pending.len(), 0);
 
         // Delete the default subscription ID
@@ -2281,6 +2446,7 @@ mod tests {
 
         // Check indexes
         assert_eq!(state.expiries.len(), 1);
+        assert_eq!(state.added.len(), 0);
         assert_eq!(state.pending.len(), 0);
 
         // Check approval
@@ -2321,6 +2487,7 @@ mod tests {
             size,
             None,
             source,
+            TokenAmount::zero(),
         );
         assert!(res.is_ok());
 
@@ -2334,6 +2501,10 @@ mod tests {
         credit_amount -= &account.credit_committed;
         assert_eq!(account.credit_free, credit_amount);
         assert_eq!(account.capacity_used, BigInt::from(size));
+
+        // Set to status pending
+        let res = state.set_blob_pending(subscriber, hash, SubscriptionId::Default, source);
+        assert!(res.is_ok());
 
         // Finalize as resolved
         let finalize_epoch = ChainEpoch::from(11);
@@ -2372,6 +2543,7 @@ mod tests {
 
         // Check indexes
         assert_eq!(state.expiries.len(), 1);
+        assert_eq!(state.added.len(), 0);
         assert_eq!(state.pending.len(), 0);
     }
 
@@ -2404,6 +2576,7 @@ mod tests {
             size1,
             None,
             source,
+            TokenAmount::zero(),
         );
         assert!(res.is_ok());
 
@@ -2434,6 +2607,7 @@ mod tests {
             size2,
             None,
             source,
+            TokenAmount::zero(),
         );
         assert!(res.is_ok());
 
@@ -2460,7 +2634,8 @@ mod tests {
 
         // Check indexes
         assert_eq!(state.expiries.len(), 2);
-        assert_eq!(state.pending.len(), 2);
+        assert_eq!(state.added.len(), 2);
+        assert_eq!(state.pending.len(), 0);
 
         // Renew the first blob
         let renew_epoch = ChainEpoch::from(AUTO_TTL + 31);
@@ -2493,11 +2668,12 @@ mod tests {
 
         // Check indexes
         assert_eq!(state.expiries.len(), 2);
-        assert_eq!(state.pending.len(), 2);
+        assert_eq!(state.added.len(), 2);
+        assert_eq!(state.pending.len(), 0);
     }
 
     #[test]
-    fn test_finalize_blob_pending() {
+    fn test_finalize_blob_from_bad_state() {
         setup_logs();
         let capacity = 1024 * 1024;
         let mut state = State::new(capacity, 1);
@@ -2521,6 +2697,7 @@ mod tests {
             size,
             None,
             new_pk(),
+            TokenAmount::zero(),
         );
         assert!(res.is_ok());
 
@@ -2536,7 +2713,7 @@ mod tests {
         assert!(res.is_err());
         assert_eq!(
             res.err().unwrap().msg(),
-            format!("cannot finalize blob {} as pending", hash)
+            format!("cannot finalize blob {} as added or pending", hash)
         );
     }
 
@@ -2554,6 +2731,7 @@ mod tests {
 
         // Add a blob
         let (hash, size) = new_hash(1024);
+        let source = new_pk();
         let res = state.add_blob(
             subscriber,
             subscriber,
@@ -2564,8 +2742,13 @@ mod tests {
             SubscriptionId::Default,
             size,
             None,
-            new_pk(),
+            source,
+            TokenAmount::zero(),
         );
+        assert!(res.is_ok());
+
+        // Set to status pending
+        let res = state.set_blob_pending(subscriber, hash, SubscriptionId::Default, source);
         assert!(res.is_ok());
 
         // Finalize as resolved
@@ -2587,6 +2770,7 @@ mod tests {
 
         // Check indexes
         assert_eq!(state.expiries.len(), 1);
+        assert_eq!(state.added.len(), 0);
         assert_eq!(state.pending.len(), 0);
     }
 
@@ -2606,6 +2790,7 @@ mod tests {
         // Add a blob
         let add_epoch = current_epoch;
         let (hash, size) = new_hash(1024);
+        let source = new_pk();
         let res = state.add_blob(
             subscriber,
             subscriber,
@@ -2616,8 +2801,13 @@ mod tests {
             SubscriptionId::Default,
             size,
             None,
-            new_pk(),
+            source,
+            TokenAmount::zero(),
         );
+        assert!(res.is_ok());
+
+        // Set to status pending
+        let res = state.set_blob_pending(subscriber, hash, SubscriptionId::Default, source);
         assert!(res.is_ok());
 
         // Finalize as failed
@@ -2651,6 +2841,7 @@ mod tests {
 
         // Check indexes
         assert_eq!(state.expiries.len(), 1); // remains until the blob is explicitly deleted
+        assert_eq!(state.added.len(), 0);
         assert_eq!(state.pending.len(), 0);
     }
 
@@ -2670,6 +2861,7 @@ mod tests {
         // Add a blob
         let add_epoch = current_epoch;
         let (hash, size) = new_hash(1024);
+        let source = new_pk();
         let res = state.add_blob(
             subscriber,
             subscriber,
@@ -2680,7 +2872,8 @@ mod tests {
             SubscriptionId::Default,
             size,
             None,
-            new_pk(),
+            source,
+            TokenAmount::zero(),
         );
         assert!(res.is_ok());
 
@@ -2723,6 +2916,10 @@ mod tests {
         );
         assert_eq!(state.capacity_used, account.capacity_used);
 
+        // Set to status pending
+        let res = state.set_blob_pending(subscriber, hash, SubscriptionId::Default, source);
+        assert!(res.is_ok());
+
         // Finalize as failed
         let finalize_epoch = ChainEpoch::from(21);
         let res = state.finalize_blob(
@@ -2754,6 +2951,7 @@ mod tests {
 
         // Check indexes
         assert_eq!(state.expiries.len(), 1); // remains until the blob is explicitly deleted
+        assert_eq!(state.added.len(), 0);
         assert_eq!(state.pending.len(), 0);
     }
 
@@ -2820,6 +3018,7 @@ mod tests {
             size1,
             Some(MIN_TTL),
             new_pk(),
+            TokenAmount::zero(),
         );
         assert!(res.is_ok());
 
@@ -2849,6 +3048,7 @@ mod tests {
             size2,
             Some(MIN_TTL),
             new_pk(),
+            TokenAmount::zero(),
         );
         assert!(res.is_ok());
 
@@ -2896,7 +3096,8 @@ mod tests {
 
         // Check indexes
         assert_eq!(state.expiries.len(), 1);
-        assert_eq!(state.pending.len(), 1);
+        assert_eq!(state.added.len(), 1);
+        assert_eq!(state.pending.len(), 0);
 
         // Check approval
         let account_committed = account.credit_committed.clone();

@@ -28,6 +28,12 @@ register_metrics! {
         );
     BLOBS_FINALITY_PENDING_BYTES: IntGauge
         = register_int_gauge!("blobs_finality_pending_bytes", "Blobs finality: current count of pending bytes");
+
+    BLOBS_FINALITY_ADDED_BLOBS: IntGauge
+        = register_int_gauge!("blobs_finality_added_blobs", "Blobs finality: current count of added blobs");
+
+    BLOBS_FINALITY_ADDED_BYTES: IntGauge
+        = register_int_gauge!("blobs_finality_added_bytes", "Blobs finality: current count of added bytes");
 }
 
 impl_traceables!(
@@ -36,7 +42,9 @@ impl_traceables!(
     BlobsFinalityVotingFailure,
     BlobsFinalityVotingSuccess,
     BlobsFinalityPendingBlobs,
-    BlobsFinalityPendingBytes
+    BlobsFinalityPendingBytes,
+    BlobsFinalityAddedBlobs,
+    BlobsFinalityAddedBytes
 );
 
 #[derive(Debug)]
@@ -83,6 +91,24 @@ impl Recordable for BlobsFinalityPendingBytes {
     }
 }
 
+#[derive(Debug)]
+pub struct BlobsFinalityAddedBlobs(pub u64);
+
+impl Recordable for BlobsFinalityAddedBlobs {
+    fn record_metrics(&self) {
+        BLOBS_FINALITY_ADDED_BLOBS.set(self.0 as i64);
+    }
+}
+
+#[derive(Debug)]
+pub struct BlobsFinalityAddedBytes(pub u64);
+
+impl Recordable for BlobsFinalityAddedBytes {
+    fn record_metrics(&self) {
+        BLOBS_FINALITY_ADDED_BYTES.set(self.0 as i64);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -108,13 +134,12 @@ mod tests {
         emit(BlobsFinalityVotingSuccess {
             blob_hash: Some([0u8; 32]),
         });
-
         emit(BlobsFinalityVotingFailure {
             blob_hash: Some([0u8; 32]),
         });
-
         emit(BlobsFinalityPendingBlobs(1));
-
         emit(BlobsFinalityPendingBytes(1));
+        emit(BlobsFinalityAddedBlobs(1));
+        emit(BlobsFinalityAddedBytes(1));
     }
 }

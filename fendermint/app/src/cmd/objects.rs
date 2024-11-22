@@ -9,16 +9,17 @@ use anyhow::anyhow;
 use anyhow::Context;
 use base64::{engine::general_purpose, Engine};
 use bytes::Buf;
-use entangler::{ChunkRange, Entangler};
+use entangler::{ChunkRange, Config, Entangler};
 use entangler_storage::iroh::IrohStorage as EntanglerIrohStorage;
 use fendermint_actor_bucket::{GetParams, Object};
 use fendermint_app_settings::objects::ObjectsSettings;
 use fendermint_rpc::client::FendermintClient;
 use fendermint_rpc::message::GasParams;
 use fendermint_rpc::QueryClient;
+use fendermint_vm_message::conv::from_eth;
 use fendermint_vm_message::query::FvmQueryHeight;
 use fendermint_vm_message::signed::SignedMessage;
-use futures_util::StreamExt;
+use futures_util::{StreamExt, TryStreamExt};
 use fvm_shared::chainid::ChainID;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use iroh::blobs::Hash;
@@ -202,8 +203,31 @@ impl ObjectParser {
             .decode(value)
             .map_err(|e| anyhow!("Failed to decode b64 encoded message: {}", e))
             .and_then(|b64_decoded| {
-                fvm_ipld_encoding::from_slice::<SignedMessage>(&b64_decoded)
-                    .map_err(|e| anyhow!("Failed to deserialize signed message: {}", e))
+                // Allow both FVM signed messages and EVM EIP-1559 signed transactions. Note: this
+                // presumes the `to` address can be converted to a non-masked Ethereum address.
+                // That is, signed EVM transactions cannot directly interface with a bucket actor,
+                // so they must proxy calls through something like EVM Solidity wrapper contracts.
+                match fvm_ipld_encoding::from_slice::<SignedMessage>(&b64_decoded) {
+                    Ok(signed_msg) => Ok(signed_msg),
+                    Err(e) => {
+                        tracing::debug!(
+                            "failed to deserialize FVM signed message, trying EVM tx format: {}",
+                            e
+                        );
+                        let tx = ethers::types::Bytes::from(b64_decoded);
+                        let rlp = ethers::core::utils::rlp::Rlp::new(&tx);
+                        let (tx, sig) =
+                            ethers::types::transaction::eip2718::TypedTransaction::decode_signed(
+                                &rlp,
+                            )?;
+                        let tx = tx.as_eip1559_ref().ok_or_else(|| {
+                            anyhow!("failed to process signed transaction as eip1559")
+                        })?;
+                        let fvm_msg = from_eth::to_fvm_signed_message(tx, &sig)
+                            .map_err(|e| anyhow!("failed to deserialize signed message: {}", e))?;
+                        Ok(fvm_msg)
+                    }
+                }
             })?;
         self.signed_msg = Some(signed_msg);
         Ok(())
@@ -345,7 +369,7 @@ async fn handle_object_upload<F: QueryClient>(
         })
     })?;
 
-    // Ensure the sender has enough credits, and fetch the data through iroh
+    // Ensure the bucket exists and fetch the data through iroh
     let SignedMessage { message, .. } = signed_msg;
     ensure_bucket_exists(client, message.to)
         .await
@@ -380,12 +404,28 @@ async fn handle_object_upload<F: QueryClient>(
         }
     };
 
-    // TODO: What to do with downloaded data if there's a failure below?
-    let progress = iroh.blobs().download(hash, source).await.map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("failed to fetch blob {}: {}", hash, e),
-        })
-    })?;
+    // On failure, GC will cleanup things
+    // We tag with a "temp" tag to make clear that it is not confirmed yet that we want to keep this around.
+    // TODO: we need to schedule a task that deletes the temp tag after a certain amount of time.
+    // TODO: this needs to be tagged with a "user id"
+    let tag = iroh::blobs::Tag(format!("temp-{hash}").into());
+    let progress = iroh
+        .blobs()
+        .download_with_opts(
+            hash,
+            iroh::client::blobs::DownloadOptions {
+                format: iroh::blobs::BlobFormat::Raw,
+                nodes: vec![source],
+                tag: iroh::blobs::util::SetTagOption::Named(tag),
+                mode: iroh::client::blobs::DownloadMode::Queued,
+            },
+        )
+        .await
+        .map_err(|e| {
+            Rejection::from(BadRequest {
+                message: format!("failed to fetch blob {}: {}", hash, e),
+            })
+        })?;
     let outcome = progress.finish().await.map_err(|e| {
         Rejection::from(BadRequest {
             message: format!("failed to fetch blob {}: {}", hash, e),
@@ -428,9 +468,7 @@ fn new_entangler(
 ) -> Result<Entangler<EntanglerIrohStorage>, entangler::Error> {
     Entangler::new(
         EntanglerIrohStorage::from_client(iroh),
-        ENTANGLER_ALPHA,
-        ENTANGLER_S,
-        ENTANGLER_P,
+        Config::new(ENTANGLER_ALPHA, ENTANGLER_S, ENTANGLER_P),
     )
 }
 
@@ -526,14 +564,14 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
                     let (first_byte, last_byte) = get_range_params(range, size).unwrap();
                     let len = (last_byte - first_byte) + 1;
 
-                    let fist_chunk = first_byte / CHUNK_SIZE;
+                    let first_chunk = first_byte / CHUNK_SIZE;
                     let last_chunk = last_byte / CHUNK_SIZE;
 
-                    let bytes = ent
+                    let bytes_stream = ent
                         .download_range(
                             &hash.to_string(),
-                            ChunkRange::Between(fist_chunk, last_chunk),
-                            Some(&recovery_hash.to_string()),
+                            ChunkRange::Between(first_chunk, last_chunk),
+                            Some(recovery_hash.to_string()),
                         )
                         .await
                         .map_err(|e| {
@@ -541,8 +579,23 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
                                 message: format!("failed to download object: {} {}", hash, e),
                             })
                         })?;
-                    let offset = (first_byte - fist_chunk * CHUNK_SIZE) as usize;
-                    let body = Body::from(bytes.slice(offset..offset + len as usize));
+
+                    let offset = (first_byte % CHUNK_SIZE) as usize;
+                    let end_offset = (last_byte % CHUNK_SIZE + 1) as usize;
+
+                    let bytes_stream = bytes_stream.enumerate().map(move |(i, chunk)| {
+                        let chunk = chunk?;
+                        let result = if i == 0 {
+                            chunk.slice(offset..)
+                        } else if i == (last_chunk - first_chunk) as usize {
+                            chunk.slice(..end_offset)
+                        } else {
+                            chunk
+                        };
+                        Ok::<_, anyhow::Error>(result)
+                    });
+
+                    let body = Body::wrap_stream(bytes_stream);
                     ObjectRange {
                         start: first_byte,
                         end: last_byte,
@@ -552,7 +605,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
                     }
                 }
                 None => {
-                    let bytes = ent
+                    let bytes_stream = ent
                         .download(&hash.to_string(), Some(&recovery_hash.to_string()))
                         .await
                         .map_err(|e| {
@@ -560,7 +613,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
                                 message: format!("failed to download object: {} {}", hash, e),
                             })
                         })?;
-                    let body = Body::from(bytes);
+                    let body = Body::wrap_stream(bytes_stream.map_err(|e| anyhow::anyhow!(e)));
                     ObjectRange {
                         start: 0,
                         end: size - 1,
@@ -576,7 +629,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
             if method == "HEAD" {
                 let mut response = warp::reply::Response::new(Body::empty());
                 let mut header_map = HeaderMap::new();
-                header_map.insert("Content-Length", HeaderValue::from(object_range.size));
+                header_map.insert("Content-Length", HeaderValue::from(object_range.len));
                 let headers = response.headers_mut();
                 headers.extend(header_map);
                 return Ok(response);
@@ -590,7 +643,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
                     "Content-Range",
                     HeaderValue::from_str(&format!(
                         "bytes {}-{}/{}",
-                        object_range.start, object_range.end, object_range.len
+                        object_range.start, object_range.end, object_range.size
                     ))
                     .unwrap(),
                 );
@@ -693,8 +746,11 @@ mod tests {
     use std::str::FromStr;
 
     use super::*;
+    use ethers::core::abi;
     use ethers::core::k256::ecdsa::SigningKey;
     use ethers::core::rand::{rngs::StdRng, SeedableRng};
+    use ethers::signers::{LocalWallet, Signer};
+    use ethers::types as et;
     use fendermint_actor_bucket::AddParams;
     use fendermint_rpc::FendermintClient;
     use fendermint_vm_message::conv::from_eth::to_fvm_address;
@@ -838,7 +894,7 @@ mod tests {
         let client_node_addr = client_iroh.net().node_addr().await.unwrap();
 
         let iroh_storage = EntanglerIrohStorage::from_client(client_iroh.client().clone());
-        let ent = Entangler::new(iroh_storage, 3, 5, 5).unwrap();
+        let ent = Entangler::new(iroh_storage, Config::new(3, 5, 5)).unwrap();
         let metadata_hash = ent.entangle_uploaded(hash.to_string()).await.unwrap();
 
         let iroh_metadata_hash = Hash::from_str(metadata_hash.as_str()).unwrap();
@@ -891,6 +947,200 @@ mod tests {
             .unwrap();
         let response = reply.into_response();
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_handle_object_upload_from_eth_tx() {
+        setup_logs();
+
+        let matcher = MockRequestMethodMatcher::default().map(
+            Method::AbciQuery,
+            Ok(ABCI_QUERY_RESPONSE_UPLOAD.to_string()),
+        );
+        let client = FendermintClient::new(MockClient::new(matcher).0);
+        let iroh = iroh::node::Node::memory().spawn().await.unwrap();
+
+        // client iroh node
+        let client_iroh = iroh::node::Node::memory().spawn().await.unwrap();
+        let hash = client_iroh
+            .blobs()
+            .add_bytes(&b"hello world"[..])
+            .await
+            .unwrap()
+            .hash;
+        let client_node_addr = client_iroh.net().node_addr().await.unwrap();
+
+        let iroh_storage = EntanglerIrohStorage::from_client(client_iroh.client().clone());
+        let ent = Entangler::new(iroh_storage, Config::new(3, 5, 5)).unwrap();
+        let metadata_hash = ent.entangle_uploaded(hash.to_string()).await.unwrap();
+
+        let iroh_metadata_hash = Hash::from_str(metadata_hash.as_str()).unwrap();
+
+        let store = Address::new_id(90);
+        let key = b"key";
+        let size = 11;
+        let params = AddParams {
+            source: fendermint_actor_blobs_shared::state::PublicKey(*iroh.node_id().as_bytes()),
+            key: key.to_vec(),
+            hash: fendermint_actor_blobs_shared::state::Hash(*hash.as_bytes()),
+            size,
+            recovery_hash: fendermint_actor_blobs_shared::state::Hash(
+                *iroh_metadata_hash.as_bytes(),
+            ),
+            ttl: None,
+            metadata: HashMap::new(),
+            overwrite: true,
+        };
+        let params = RawBytes::serialize(params).unwrap();
+
+        // This mimics how Solidity wrappers send transactions to a bucket actor (needs to be `to` EVM address)
+        const CALL_ACTOR_ID: &str = "0xfe00000000000000000000000000000000000005";
+        let calldata = abi::encode(&[
+            abi::Token::Uint(et::U256::from(
+                fendermint_actor_bucket::Method::AddObject as u64, // method_num
+            )),
+            abi::Token::Uint(0.into()),                       // value
+            abi::Token::Uint(0x00000000.into()),              // static call
+            abi::Token::Uint(fvm_ipld_encoding::CBOR.into()), // cbor codec
+            abi::Token::Bytes(params.to_vec()),               // params
+            abi::Token::Uint(store.id().unwrap().into()),     // target contract ID address
+        ]);
+
+        // Set up EVM wallet
+        let sk = fendermint_crypto::SecretKey::random(&mut StdRng::from_entropy());
+        let signing_key = SigningKey::from_slice(sk.serialize().as_ref()).unwrap();
+        let chain_id = 314159u64;
+        let wallet = LocalWallet::from_bytes(signing_key.to_bytes().as_ref())
+            .unwrap()
+            .with_chain_id(chain_id);
+
+        // Create and sign an EVM transaction
+        let tx = et::Eip1559TransactionRequest::new()
+            .from(wallet.address())
+            .to(CALL_ACTOR_ID.parse::<et::Address>().unwrap())
+            .nonce(0)
+            .gas(3000000)
+            .max_fee_per_gas(et::U256::zero())
+            .max_priority_fee_per_gas(et::U256::zero())
+            .data(et::Bytes::from(calldata))
+            .chain_id(chain_id);
+        let tx = et::transaction::eip2718::TypedTransaction::Eip1559(tx);
+        let sig = wallet.sign_transaction_sync(&tx).expect("failed to sign");
+
+        // Encode the signed bytes as base64
+        let bz = tx.rlp_signed(&sig);
+        let serialized_eth_tx_b64 = general_purpose::URL_SAFE.encode(bz.as_ref());
+
+        // Send the signed EVM tx as a multipart form in the `msg` field
+        let multipart_form =
+            multipart_form(&serialized_eth_tx_b64, hash, client_node_addr, size).await;
+
+        let reply = handle_object_upload(client, iroh.client().clone(), multipart_form)
+            .await
+            .unwrap();
+        let response = reply.into_response();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_handle_invalid_object_upload_from_eth_tx() {
+        setup_logs();
+
+        let matcher = MockRequestMethodMatcher::default().map(
+            Method::AbciQuery,
+            Ok(ABCI_QUERY_RESPONSE_UPLOAD.to_string()),
+        );
+        let client = FendermintClient::new(MockClient::new(matcher).0);
+        let iroh = iroh::node::Node::memory().spawn().await.unwrap();
+
+        // client iroh node
+        let client_iroh = iroh::node::Node::memory().spawn().await.unwrap();
+        let hash = client_iroh
+            .blobs()
+            .add_bytes(&b"hello world"[..])
+            .await
+            .unwrap()
+            .hash;
+        let client_node_addr = client_iroh.net().node_addr().await.unwrap();
+
+        let iroh_storage = EntanglerIrohStorage::from_client(client_iroh.client().clone());
+        let ent = Entangler::new(iroh_storage, Config::new(3, 5, 5)).unwrap();
+        let metadata_hash = ent.entangle_uploaded(hash.to_string()).await.unwrap();
+
+        let iroh_metadata_hash = Hash::from_str(metadata_hash.as_str()).unwrap();
+
+        let store = Address::new_id(90);
+        let key = b"key";
+        let size = 11;
+        let params = AddParams {
+            source: fendermint_actor_blobs_shared::state::PublicKey(*iroh.node_id().as_bytes()),
+            key: key.to_vec(),
+            hash: fendermint_actor_blobs_shared::state::Hash(*hash.as_bytes()),
+            size,
+            recovery_hash: fendermint_actor_blobs_shared::state::Hash(
+                *iroh_metadata_hash.as_bytes(),
+            ),
+            ttl: None,
+            metadata: HashMap::new(),
+            overwrite: true,
+        };
+        let params = RawBytes::serialize(params).unwrap();
+
+        // This mimics how Solidity wrappers send transactions to a bucket actor (needs to be `to` EVM address)
+        const CALL_ACTOR_ID: &str = "0xfe00000000000000000000000000000000000005";
+        let calldata = abi::encode(&[
+            abi::Token::Uint(et::U256::from(
+                fendermint_actor_bucket::Method::AddObject as u64, // method_num
+            )),
+            abi::Token::Uint(0.into()),                       // value
+            abi::Token::Uint(0x00000000.into()),              // static call
+            abi::Token::Uint(fvm_ipld_encoding::CBOR.into()), // cbor codec
+            abi::Token::Bytes(params.to_vec()),               // params
+            abi::Token::Uint(store.id().unwrap().into()),     // target contract ID address
+        ]);
+
+        // Set up EVM wallet
+        let sk = fendermint_crypto::SecretKey::random(&mut StdRng::from_entropy());
+        let signing_key = SigningKey::from_slice(sk.serialize().as_ref()).unwrap();
+        let chain_id = 314159u64;
+        let wallet = LocalWallet::from_bytes(signing_key.to_bytes().as_ref())
+            .unwrap()
+            .with_chain_id(chain_id);
+
+        // Try with an invalid (legacy) EVM tx
+        let tx = et::TransactionRequest::new()
+            .from(wallet.address())
+            .to(CALL_ACTOR_ID.parse::<et::Address>().unwrap())
+            .nonce(0)
+            .gas(3000000)
+            .gas_price(et::U256::zero())
+            .data(et::Bytes::from(calldata))
+            .chain_id(chain_id);
+        let tx = et::transaction::eip2718::TypedTransaction::Legacy(tx);
+        let sig = wallet.sign_transaction_sync(&tx).expect("failed to sign");
+        let bz = tx.rlp_signed(&sig);
+        let serialized_eth_tx_b64 = general_purpose::URL_SAFE.encode(bz.as_ref());
+
+        let multipart_form =
+            multipart_form(&serialized_eth_tx_b64, hash, client_node_addr, size).await;
+
+        let result = handle_object_upload(client, iroh.client().clone(), multipart_form).await;
+        match result {
+            Ok(_) => panic!("expected an error for legacy transaction"),
+            Err(rejection) => {
+                if let Some(bad_request) = rejection.find::<BadRequest>() {
+                    assert!(
+                        bad_request
+                            .message
+                            .contains("failed to process signed transaction as eip1559"),
+                        "unexpected error message: {}",
+                        bad_request.message
+                    );
+                } else {
+                    panic!("expected BadRequest rejection");
+                }
+            }
+        }
     }
 
     #[tokio::test]

@@ -69,7 +69,7 @@ RUN if [ "${TARGETARCH}" = "arm64" ]; then \
 COPY --from=stripper /app /app
 
 COPY root-config /root/
-RUN sed 's|/home/ghrunner|/root|g' -i.bak /root/.ssh/config
+RUN sed -E 's|/home/ghrunner[0-9]?|/root|g' -i.bak /root/.ssh/config
 ENV CARGO_NET_GIT_FETCH_WITH_CLI=true
 
 # Build the dependencies.
