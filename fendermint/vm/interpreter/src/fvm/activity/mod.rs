@@ -10,8 +10,10 @@ mod merkle;
 use crate::fvm::activity::merkle::MerkleProofGen;
 use fendermint_crypto::PublicKey;
 use ipc_actors_abis::checkpointing_facet::{
-    CompressedActivityRollup, CompressedSummary, FullActivityRollup,
+    AggregatedStats, CompressedActivityRollup, CompressedSummary, FullActivityRollup, FullSummary,
+    ValidatorData,
 };
+use ipc_api::evm::payload_to_evm_address;
 
 /// Wrapper for FullActivityRollup with some utility functions
 pub struct FullActivity(FullActivityRollup);
@@ -23,6 +25,35 @@ pub trait ValidatorActivityTracker {
 
     /// Get the validators activities summary since the checkpoint height
     fn commit_activity(&mut self) -> anyhow::Result<FullActivity>;
+}
+
+impl TryFrom<fendermint_actor_activity_tracker::types::FullActivityRollup> for FullActivity {
+    type Error = anyhow::Error;
+
+    fn try_from(
+        value: fendermint_actor_activity_tracker::types::FullActivityRollup,
+    ) -> Result<Self, Self::Error> {
+        let f = FullActivityRollup {
+            consensus: FullSummary {
+                stats: AggregatedStats {
+                    total_active_validators: value.consensus.stats.total_active_validators,
+                    total_num_blocks_committed: value.consensus.stats.total_num_blocks_committed,
+                },
+                data: value
+                    .consensus
+                    .data
+                    .into_iter()
+                    .map(|(addr, data)| {
+                        Ok(ValidatorData {
+                            validator: payload_to_evm_address(addr.payload())?,
+                            blocks_committed: data.blocks_committed,
+                        })
+                    })
+                    .collect::<anyhow::Result<Vec<_>>>()?,
+            },
+        };
+        Ok(Self::new(f))
+    }
 }
 
 impl FullActivity {
