@@ -296,6 +296,7 @@ impl SubnetManager for EthSubnetManager {
             call_with_premium_and_pending_block(signer, registry_contract.new_subnet_actor(params))
                 .await?;
 
+        // TODO: Edit call to get estimate premium
         let pending_tx = call.send().await?;
         // We need the retry to parse the deployment event. At the time of this writing, it's a bug
         // in current FEVM that without the retries, events are not picked up.

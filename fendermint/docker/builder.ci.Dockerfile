@@ -81,7 +81,9 @@ RUN \
   set -eux; \
   case "${TARGETARCH}" in \
   amd64) ARCH='x86_64'  ;; \
-  arm64) ARCH='aarch64' ;; \
+  arm64) ARCH='aarch64'; \
+      rustup target add aarch64-unknown-linux-gnu; \
+      rustup toolchain install stable-aarch64-unknown-linux-gnu ;; \
   *) echo >&2 "unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
   esac; \
   rustup show ; \
@@ -104,7 +106,9 @@ RUN \
   set -eux; \
   case "${TARGETARCH}" in \
   amd64) ARCH='x86_64'  ;; \
-  arm64) ARCH='aarch64' ;; \
+  arm64) ARCH='aarch64'; \
+    rustup target add aarch64-unknown-linux-gnu; \
+    rustup toolchain install stable-aarch64-unknown-linux-gnu ;; \
   esac; \
   rustup show ; \
   cargo install --locked --root output --path fendermint/app --target ${ARCH}-unknown-linux-gnu ; \

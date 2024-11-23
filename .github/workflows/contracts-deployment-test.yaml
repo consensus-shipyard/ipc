@@ -1,4 +1,4 @@
-name: 'Contracts: Smoke test deployment'
+name: "Contracts: Smoke test deployment"
 
 # This workflow is triggered from the main CI workflow.
 on:
@@ -19,7 +19,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
+<<<<<<< HEAD
       - uses: pnpm/action-setup@v2
+=======
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: "18.x"
+        cache: "pnpm"
+>>>>>>> parent
 
       - name: Setup Node
         uses: actions/setup-node@v4
