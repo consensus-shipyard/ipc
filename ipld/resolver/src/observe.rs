@@ -11,6 +11,7 @@ use prometheus::{
     register_histogram, register_int_counter, register_int_gauge, Histogram, IntCounter, IntGauge,
     Registry,
 };
+use std::fmt;
 use std::time::Duration;
 
 register_metrics! {
@@ -84,33 +85,18 @@ register_metrics! {
         register_int_counter!("ipld_resolver_content_rate_limited", "Number of rate limited requests");
 }
 
-impl_traceables!(TraceLevel::Info, "IPLD_Resolver/Ping", PingEvent);
-impl_traceables!(TraceLevel::Warn, "IPLD_Resolver/Ping", PingFailureEvent);
-impl_traceables!(TraceLevel::Info, "IPLD_Resolver/Identify", IdentifyEvent);
-impl_traceables!(
-    TraceLevel::Warn,
-    "IPLD_Resolver/Identify",
-    IdentifyFailureEvent
-);
-impl_traceables!(TraceLevel::Info, "IPLD_Resolver/Discovery", DiscoveryEvent);
-impl_traceables!(
-    TraceLevel::Info,
-    "IPLD_Resolver/Membership",
-    MembershipEvent
-);
-impl_traceables!(
-    TraceLevel::Warn,
-    "IPLD_Resolver/Membership",
-    MembershipFailureEvent
-);
-impl_traceables!(TraceLevel::Info, "IPLD_Resolver/Content", ResolveEvent);
-impl_traceables!(
-    TraceLevel::Warn,
-    "IPLD_Resolver/Content",
-    ResolveFailureEvent
-);
+const DOMAIN: &str = "IPLD";
 
-#[derive(Debug)]
+impl_traceables!(TraceLevel::Info, DOMAIN, PingEvent);
+impl_traceables!(TraceLevel::Warn, DOMAIN, PingFailureEvent);
+impl_traceables!(TraceLevel::Info, DOMAIN, IdentifyEvent);
+impl_traceables!(TraceLevel::Warn, DOMAIN, IdentifyFailureEvent);
+impl_traceables!(TraceLevel::Info, DOMAIN, DiscoveryEvent);
+impl_traceables!(TraceLevel::Info, DOMAIN, MembershipEvent);
+impl_traceables!(TraceLevel::Warn, DOMAIN, MembershipFailureEvent);
+impl_traceables!(TraceLevel::Info, DOMAIN, ResolveEvent);
+impl_traceables!(TraceLevel::Warn, DOMAIN, ResolveFailureEvent);
+
 #[allow(dead_code)]
 pub enum PingEvent {
     Success(PeerId, Duration),
@@ -126,8 +112,16 @@ impl Recordable for PingEvent {
         }
     }
 }
+impl fmt::Debug for PingEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PingEvent::Success(peer_id, duration) => {
+                write!(f, "Ping::Success({:?}, {:?})", peer_id, duration)
+            }
+        }
+    }
+}
 
-#[derive(Debug)]
 #[allow(dead_code)]
 pub enum PingFailureEvent {
     Timeout(PeerId),
@@ -143,7 +137,19 @@ impl Recordable for PingFailureEvent {
     }
 }
 
-#[derive(Debug)]
+impl fmt::Debug for PingFailureEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PingFailureEvent::Timeout(peer_id) => {
+                write!(f, "Ping::Timeout({:?})", peer_id)
+            }
+            PingFailureEvent::Failure(peer_id, reason) => {
+                write!(f, "Ping::Failure({:?}, {:?})", peer_id, reason)
+            }
+        }
+    }
+}
+
 #[allow(dead_code)]
 pub enum IdentifyEvent {
     Received(PeerId),
@@ -157,7 +163,16 @@ impl Recordable for IdentifyEvent {
     }
 }
 
-#[derive(Debug)]
+impl fmt::Debug for IdentifyEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            IdentifyEvent::Received(peer_id) => {
+                write!(f, "Identify::Received({:?})", peer_id)
+            }
+        }
+    }
+}
+
 #[allow(dead_code)]
 pub enum IdentifyFailureEvent {
     Failure(PeerId, String),
@@ -171,7 +186,16 @@ impl Recordable for IdentifyFailureEvent {
     }
 }
 
-#[derive(Debug)]
+impl fmt::Debug for IdentifyFailureEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            IdentifyFailureEvent::Failure(peer_id, reason) => {
+                write!(f, "Identify::Failure({:?}, {:?})", peer_id, reason)
+            }
+        }
+    }
+}
+
 #[allow(dead_code)]
 pub enum DiscoveryEvent {
     BackgroundLookup(PeerId),
@@ -189,7 +213,22 @@ impl Recordable for DiscoveryEvent {
     }
 }
 
-#[derive(Debug)]
+impl fmt::Debug for DiscoveryEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DiscoveryEvent::BackgroundLookup(peer_id) => {
+                write!(f, "Discovery::BackgroundLookup({:?})", peer_id)
+            }
+            DiscoveryEvent::ConnectionEstablished(peer_id) => {
+                write!(f, "Discovery::ConnectionEstablished({:?})", peer_id)
+            }
+            DiscoveryEvent::ConnectionClosed(peer_id) => {
+                write!(f, "Discovery::ConnectionClosed({:?})", peer_id)
+            }
+        }
+    }
+}
+
 #[allow(dead_code)]
 pub enum MembershipEvent {
     Added(PeerId),
@@ -213,7 +252,28 @@ impl Recordable for MembershipEvent {
     }
 }
 
-#[derive(Debug)]
+impl fmt::Debug for MembershipEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MembershipEvent::Added(peer_id) => {
+                write!(f, "Membership::Added({:?})", peer_id)
+            }
+            MembershipEvent::Removed(peer_id) => {
+                write!(f, "Membership::Removed({:?})", peer_id)
+            }
+            MembershipEvent::Skipped(peer_id) => {
+                write!(f, "Membership::Skipped({:?})", peer_id)
+            }
+            MembershipEvent::PublishSuccess => {
+                write!(f, "Membership::PublishSuccess")
+            }
+            MembershipEvent::RoutablePeers(count) => {
+                write!(f, "Membership::RoutablePeers({:?})", count)
+            }
+        }
+    }
+}
+
 #[allow(dead_code)]
 pub enum MembershipFailureEvent {
     PublishFailure(String),
@@ -235,7 +295,37 @@ impl Recordable for MembershipFailureEvent {
     }
 }
 
-#[derive(Debug)]
+impl fmt::Debug for MembershipFailureEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MembershipFailureEvent::PublishFailure(reason) => {
+                write!(f, "Membership::PublishFailure({:?})", reason)
+            }
+            MembershipFailureEvent::GossipInvalidProviderRecord(peer_id, record) => {
+                write!(
+                    f,
+                    "Membership::GossipInvalidProviderRecord({:?}, {:?})",
+                    peer_id, record
+                )
+            }
+            MembershipFailureEvent::GossipInvalidVoteRecord(peer_id, record) => {
+                write!(
+                    f,
+                    "Membership::GossipInvalidVoteRecord({:?}, {:?})",
+                    peer_id, record
+                )
+            }
+            MembershipFailureEvent::GossipUnknownTopic(peer_id, topic) => {
+                write!(
+                    f,
+                    "Membership::GossipUnknownTopic({:?}, {:?})",
+                    peer_id, topic
+                )
+            }
+        }
+    }
+}
+
 #[allow(dead_code)]
 pub enum ResolveEvent {
     Started(Cid),
@@ -259,7 +349,31 @@ impl Recordable for ResolveEvent {
     }
 }
 
-#[derive(Debug)]
+impl fmt::Debug for ResolveEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ResolveEvent::Started(cid) => {
+                write!(f, "Resolve::Started({:?})", cid)
+            }
+            ResolveEvent::Success(cid) => {
+                write!(f, "Resolve::Success({:?})", cid)
+            }
+            ResolveEvent::Completed => {
+                write!(f, "Resolve::Completed")
+            }
+            ResolveEvent::Peers(count) => {
+                write!(f, "Resolve::Peers({:?})", count)
+            }
+            ResolveEvent::NoPeers => {
+                write!(f, "Resolve::NoPeers")
+            }
+            ResolveEvent::ConnectedPeers(count) => {
+                write!(f, "Resolve::ConnectedPeers({:?})", count)
+            }
+        }
+    }
+}
+
 #[allow(dead_code)]
 pub enum ResolveFailureEvent {
     Failure(Cid),
@@ -271,6 +385,19 @@ impl Recordable for ResolveFailureEvent {
         match self {
             Self::Failure(_) => IPLD_RESOLVER_CONTENT_RESOLVE_FAILURE.inc(),
             Self::Fallback(_) => IPLD_RESOLVER_CONTENT_RESOLVE_FALLBACK.inc(),
+        }
+    }
+}
+
+impl fmt::Debug for ResolveFailureEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ResolveFailureEvent::Failure(cid) => {
+                write!(f, "Resolve::Failure({:?})", cid)
+            }
+            ResolveFailureEvent::Fallback(cid) => {
+                write!(f, "Resolve::Fallback({:?})", cid)
+            }
         }
     }
 }
