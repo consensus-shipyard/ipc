@@ -24,6 +24,7 @@ pub use exec::FvmApplyRet;
 use fendermint_crypto::{PublicKey, SecretKey};
 pub use fendermint_vm_message::query::FvmQuery;
 use fvm_ipld_blockstore::Blockstore;
+use fvm_shared::address::Address;
 pub use query::FvmQueryRet;
 use tendermint_rpc::Client;
 
@@ -40,18 +41,21 @@ pub struct ValidatorContext<C> {
     secret_key: SecretKey,
     /// The public key identifying the validator (corresponds to the secret key.)
     public_key: PublicKey,
+    /// The address associated with the public key.
+    addr: Address,
     /// Used to broadcast transactions. It might use a different secret key for
     /// signing transactions than the validator's block producing key.
     broadcaster: Broadcaster<C>,
 }
 
 impl<C> ValidatorContext<C> {
-    pub fn new(secret_key: SecretKey, broadcaster: Broadcaster<C>) -> Self {
+    pub fn new(secret_key: SecretKey, addr: Address, broadcaster: Broadcaster<C>) -> Self {
         // Derive the public keys so it's available to check whether this node is a validator at any point in time.
         let public_key = secret_key.public_key();
         Self {
             secret_key,
             public_key,
+            addr,
             broadcaster,
         }
     }

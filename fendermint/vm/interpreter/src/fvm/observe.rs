@@ -1,6 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use fvm_shared::address::Address;
 use ipc_observability::{
     impl_traceable, impl_traceables, lazy_static, register_metrics, serde::HexEncodableBlockHash,
     Recordable, TraceLevel, Traceable,
@@ -11,7 +12,6 @@ use prometheus::{
     Histogram, IntCounter, IntGauge, IntGaugeVec, Registry,
 };
 
-use fendermint_crypto::PublicKey;
 use fvm_shared::message::Message;
 
 register_metrics! {
@@ -110,13 +110,13 @@ pub struct CheckpointSigned {
     pub role: CheckpointSignedRole,
     pub height: u64,
     pub hash: HexEncodableBlockHash,
-    pub validator: PublicKey,
+    pub validator: Address,
 }
 
 impl Recordable for CheckpointSigned {
     fn record_metrics(&self) {
         BOTTOMUP_CHECKPOINT_SIGNED_HEIGHT
-            .with_label_values(&[format!("{:?}", self.validator).as_str()])
+            .with_label_values(&[format!("{}", self.validator).as_str()])
             .set(self.height as i64);
     }
 }
@@ -146,11 +146,9 @@ mod tests {
 
     #[test]
     fn test_emit() {
-        use fendermint_crypto::SecretKey;
         use fvm_ipld_encoding::RawBytes;
         use fvm_shared::address::Address;
         use fvm_shared::econ::TokenAmount;
-        use rand::thread_rng;
 
         let message = Message {
             version: 1,
@@ -182,14 +180,11 @@ mod tests {
             config_number: 3,
         });
 
-        let mut r = thread_rng();
-        let secret_key = SecretKey::random(&mut r);
-
         emit(CheckpointSigned {
             role: CheckpointSignedRole::Own,
             height: 1,
             hash: HexEncodableBlockHash(hash.clone()),
-            validator: secret_key.public_key(),
+            validator: Address::new_id(1),
         });
     }
 }

@@ -14,7 +14,8 @@ jobs:
     runs-on: self-hosted
     env:
       RUST_BACKTRACE: full
-      RUSTFLAGS: -Dwarnings
+      # Needed to avoid erroring on warnings from builtin-actors until they're fixed.
+      RUSTFLAGS: --cap-lints=warn
 
     steps:
       - uses: webfactory/ssh-agent@v0.9.0

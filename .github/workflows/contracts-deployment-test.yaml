@@ -1,4 +1,4 @@
-name: 'Contracts: Smoke test deployment'
+name: "Contracts: Smoke test deployment"
 
 # This workflow is triggered from the main CI workflow.
 on:
@@ -24,8 +24,8 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '18.x'
-          cache: 'pnpm'
+          node-version: "18.x"
+          cache: "pnpm"
 
       - name: Install dependencies
         run: cd contracts && make deps
