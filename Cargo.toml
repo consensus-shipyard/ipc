@@ -91,7 +91,7 @@ ethers = { version = "2.0.13", features = ["abigen", "ws"] }
 ethers-core = { version = "2.0.13" }
 ethers-contract = "2.0.13"
 fnv = "1.0"
-frc42_dispatch = { git = "https://github.com/filecoin-project/actors-utils", rev = "0f8365151f44785f7bead4e5500258fd5c8944e6" }
+frc42_dispatch = { git = "https://github.com/hokunet/actors-utils", rev = "958654cc5e49b192f6ab61d1cbf9b1ba857ffd7b" }
 futures = "0.3"
 futures-core = "0.3"
 futures-util = "0.3"
@@ -215,14 +215,14 @@ openssl = { version = "0.10", features = ["vendored"] }
 # pull in crates as transitive dependencies that do not support Wasm architector. If this
 # happens, try removing "crypto" feature from fvm_shared dependency in contracts/binding/Cargo.toml
 # and run `cargo build`. Then add the "crypto" feature back and run `cargo build` again.
-fvm = { version = "4.4.0", features = ["verify-signature"], default-features = false } # no opencl feature or it fails on CI
-fvm_shared = { version = "4.4.0" }
-fvm_sdk = { version = "4.4.0" }
-fvm_ipld_blockstore = "0.2.0"
-fvm_ipld_car = "0.7.1"
-fvm_ipld_encoding = "0.4.0"
-fvm_ipld_hamt = "0.9.0"
-fvm_ipld_amt = "0.6.2"
+fvm = { git = "https://github.com/hokunet/ref-fvm.git", rev = "aaaccbad8b12533a098d89ff9a07503162a2a644", features = ["verify-signature"], default-features = false } # no opencl feature or it fails on CI
+fvm_shared = { git = "https://github.com/hokunet/ref-fvm.git", rev = "aaaccbad8b12533a098d89ff9a07503162a2a644" }
+fvm_sdk = { git = "https://github.com/hokunet/ref-fvm.git", rev = "aaaccbad8b12533a098d89ff9a07503162a2a644" }
+fvm_ipld_blockstore = { git = "https://github.com/hokunet/ref-fvm.git", rev = "aaaccbad8b12533a098d89ff9a07503162a2a644" }
+fvm_ipld_car = { git = "https://github.com/hokunet/ref-fvm.git", rev = "aaaccbad8b12533a098d89ff9a07503162a2a644" }
+fvm_ipld_encoding = { git = "https://github.com/hokunet/ref-fvm.git", rev = "aaaccbad8b12533a098d89ff9a07503162a2a644" }
+fvm_ipld_hamt = { git = "https://github.com/hokunet/ref-fvm.git", rev = "aaaccbad8b12533a098d89ff9a07503162a2a644" }
+fvm_ipld_amt = { git = "https://github.com/hokunet/ref-fvm.git", rev = "aaaccbad8b12533a098d89ff9a07503162a2a644" }
 
 # We are using the bundle for the builtin-actors dependency, and repeating DTO classes on our side,
 # to cut down the time it takes to compile everything. However, some projects have a "shared" part,
@@ -254,21 +254,20 @@ gcra = { git = "https://github.com/consensus-shipyard/gcra-rs.git", branch = "ma
 
 # Uncomment entries below when working locally on ref-fvm and this repo simultaneously.
 # Assumes the ref-fvm checkout is in a sibling directory with the same name.
-#fvm = { path = "../ref-fvm/fvm" }
-#fvm_shared = { path = "../ref-fvm/shared" }
-#fvm_sdk = { path = "../ref-fvm/sdk" }
-#fvm_ipld_blockstore = { path = "../ref-fvm/ipld/blockstore" }
-#fvm_ipld_car = { path = "../ref-fvm/ipld/car" }
-#fvm_ipld_encoding = { path = "../ref-fvm/ipld/encoding" }
-#fvm_ipld_hamt = { path = "../ref-fvm/ipld/hamt" }
-#fvm_ipld_amt = { path = "../ref-fvm/ipld/amt" }
-#frc42_dispatch = { path = "../actors-utils/frc42_dispatch" }
+# fvm = { path = "../ref-fvm/fvm", default-features = false }
+# fvm_shared = { path = "../ref-fvm/shared" }
+# fvm_sdk = { path = "../ref-fvm/sdk" }
+# fvm_ipld_blockstore = { path = "../ref-fvm/ipld/blockstore" }
+# fvm_ipld_car = { path = "../ref-fvm/ipld/car" }
+# fvm_ipld_encoding = { path = "../ref-fvm/ipld/encoding" }
+# fvm_ipld_hamt = { path = "../ref-fvm/ipld/hamt" }
+# fvm_ipld_amt = { path = "../ref-fvm/ipld/amt" }
 
 # Use below when working locally on entanglement and this repo simultaneously.
 # Assumes the entanglement checkout is in a sibling directory with the same name.
-#[patch."ssh://git@github.com/hokunet/entanglement.git"]
-#entangler = { path = "../entanglement/entangler" }
-#entangler_storage = { package = "storage", path = "../entanglement/storage" }
+# [patch."ssh://git@github.com/hokunet/entanglement.git"]
+# entangler = { path = "../entanglement/entangler" }
+# entangler_storage = { package = "storage", path = "../entanglement/storage" }
 
 [profile.wasm]
 inherits = "release"
