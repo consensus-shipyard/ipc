@@ -157,7 +157,7 @@ library LibValidatorReward {
         return listDetails;
     }
 
-    function updateRewarder(address rewarder) internal {
+    function setRewarder(address rewarder) internal {
         ValidatorRewardStorage storage ds = facetStorage();
         ds.validatorRewarder = rewarder;
     }

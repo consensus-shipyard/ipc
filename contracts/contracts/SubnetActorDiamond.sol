@@ -107,7 +107,7 @@ contract SubnetActorDiamond {
         }
 
         if (params.validatorRewarder != address(0)) {
-            LibValidatorReward.updateRewarder(params.validatorRewarder);
+            LibValidatorReward.setRewarder(params.validatorRewarder);
         }
     }
 
