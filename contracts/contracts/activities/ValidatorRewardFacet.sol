@@ -8,7 +8,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {IValidatorRewarder, IValidatorRewardSetup} from "./IValidatorRewarder.sol";
 import {LibActivityMerkleVerifier} from "./LibActivityMerkleVerifier.sol";
 import {LibDiamond} from "../lib/LibDiamond.sol";
-import {NotValidator, SubnetNoTargetCommitment, CommitmentAlreadyInitialized, ValidatorAlreadyClaimed, NotGateway, NotOwner} from "../errors/IPCErrors.sol";
+import {NotAuthorized, SubnetNoTargetCommitment, CommitmentAlreadyInitialized, ValidatorAlreadyClaimed, NotGateway, NotOwner} from "../errors/IPCErrors.sol";
 import {Pausable} from "../lib/LibPausable.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
@@ -18,6 +18,8 @@ import {SubnetID} from "../structs/Subnet.sol";
 /// to claim their reward in the parent subnet, which should be the current subnet this facet
 /// is deployed.
 contract ValidatorRewardFacet is ReentrancyGuard, Pausable {
+    // Entrypoint for validators to batch claim rewards in the parent subnet, for a given subnet,
+    // against multiple checkpoints at once. Atomically succeeds or reverts.
     function batchSubnetClaim(
         SubnetID calldata subnet,
         uint64[] calldata checkpointHeights,
@@ -33,7 +35,7 @@ contract ValidatorRewardFacet is ReentrancyGuard, Pausable {
         }
     }
 
-    /// Validators claim their reward for doing work in the child subnet
+    /// Entrypoint for validators to claim their reward for doing work in the child subnet.
     function claim(
         SubnetID calldata subnet,
         uint64 checkpointHeight,
@@ -45,11 +47,6 @@ contract ValidatorRewardFacet is ReentrancyGuard, Pausable {
 
     // ======== Internal functions ===========
 
-    function handleRelay() internal pure {
-        // no-op for now
-        return;
-    }
-
     function _claim(
         SubnetID calldata subnetId,
         uint64 checkpointHeight,
@@ -58,15 +55,10 @@ contract ValidatorRewardFacet is ReentrancyGuard, Pausable {
     ) internal {
         ValidatorRewardStorage storage s = LibValidatorReward.facetStorage();
 
-        // note: No need to check if the subnet is active. If the subnet is not active, the checkpointHeight
-        // note: will never exist.
-
+        // Note: No need to check if the subnet is active. If the subnet is not active, the checkpointHeight
+        // will never exist.
         if (msg.sender != detail.validator) {
-            revert NotValidator(msg.sender);
-        }
-
-        if (s.validatorRewarder == address(0)) {
-            return handleRelay();
+            revert NotAuthorized(msg.sender);
         }
 
         LibValidatorReward.handleDistribution(subnetId, checkpointHeight, detail, proof);
@@ -83,7 +75,7 @@ struct RewardDistribution {
 
 /// Used by the SubnetActor to track the rewards for each validator
 struct ValidatorRewardStorage {
-    /// @notice The contract address for validator rewarder
+    /// @notice The contract address for the validator rewarder.
     address validatorRewarder;
     /// @notice Summaries look up pending to be processed.
     /// If the validator rewarder is non-zero, these denote summaries presentable at this level.
