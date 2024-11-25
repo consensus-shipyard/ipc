@@ -22,7 +22,7 @@ IPC is a scaling solution intentionally designed to achieve considerable perform
 
 It achieves scaling through the permission-less spawning of new blockchain sub-systems, which are composed of subnets.&#x20;
 
-[Subnets](broken-reference) are organized in a hierarchy, with one parent subnet being able to spawn infinite child subnets. Within a hierarchical subsystem, subnets can seamlessly communicate with each other, reducing the need for cross-chain bridges.
+[Subnets](concepts/subnets/README.md) are organized in a hierarchy, with one parent subnet being able to spawn infinite child subnets. Within a hierarchical subsystem, subnets can seamlessly communicate with each other, reducing the need for cross-chain bridges.
 
 Subnets also have their own specific consensus algorithms, whilst leveraging security features from parent subnets. This allows dApps to use subnets for hosting sets of applications or to [shard](https://en.wikipedia.org/wiki/Shard\_\(database\_architecture\)) a single application, according to its various cost or performance needs. \
 \

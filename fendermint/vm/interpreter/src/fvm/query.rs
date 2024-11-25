@@ -28,7 +28,7 @@ pub enum FvmQueryRet {
     /// The full state of an actor, if found.
     ActorState(Option<Box<(ActorID, ActorState)>>),
     /// The results of a read-only message application.
-    Call(FvmApplyRet),
+    Call(Box<FvmApplyRet>),
     /// The estimated gas limit.
     EstimateGas(GasEstimate),
     /// Current state parameters.
@@ -106,7 +106,7 @@ where
                     emitters,
                 };
 
-                let out = FvmQueryRet::Call(ret);
+                let out = FvmQueryRet::Call(Box::new(ret));
                 Ok((state, out))
             }
             FvmQuery::EstimateGas(mut msg) => {

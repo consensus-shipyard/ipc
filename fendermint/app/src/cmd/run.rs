@@ -78,8 +78,11 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
 
     // Prometheus metrics
     let metrics_registry = if settings.metrics.enabled {
-        let registry = prometheus::Registry::new_custom(Some("ipc".to_string()), None)
-            .context("failed to create Prometheus registry")?;
+        let registry = prometheus::Registry::new_custom(
+            Some("ipc".to_string()),
+            Some([("subnet_id".to_string(), settings.ipc.subnet_id.to_string())].into()),
+        )
+        .context("failed to create Prometheus registry")?;
 
         register_default_metrics(&registry).context("failed to register default metrics")?;
         register_topdown_metrics(&registry).context("failed to register topdown metrics")?;
@@ -133,7 +136,7 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
         .with_max_retries(settings.broadcast.max_retries)
         .with_retry_delay(settings.broadcast.retry_delay);
 
-        ValidatorContext::new(sk, broadcaster)
+        ValidatorContext::new(sk, addr, broadcaster)
     });
 
     let testing_settings = match settings.testing.as_ref() {

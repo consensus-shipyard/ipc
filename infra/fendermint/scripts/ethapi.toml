@@ -15,6 +15,7 @@ docker run \
   --env TENDERMINT_WS_URL=ws://${CMT_CONTAINER_NAME}:26657/websocket \
   --env RUST_BACKTRACE=1 \
   ${FM_DOCKER_IMAGE} \
+  --network=${FM_NETWORK} \
   ${CMD}
 """
 dependencies = ["docker-network-create"]
