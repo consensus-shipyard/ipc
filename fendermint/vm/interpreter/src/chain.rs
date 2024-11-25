@@ -443,7 +443,7 @@ where
                             id: item.id,
                             blob_hash: item.blob_hash,
                             offset: item.offset,
-                            len: item.len as u32,
+                            len: item.len,
                             callback: item.callback,
                             response: read_response,
                         },
