@@ -81,6 +81,12 @@ impl ReadReqActor {
         rt.transaction(|st: &mut State, _| st.set_read_request_pending(params.0))
     }
 
+    fn receive_read_request(rt: &impl Runtime, params: Vec<u8>) -> Result<(), ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+        log::info!("====>>>> received read request: {:?}", params.len());
+        Ok(())
+    }
+
     /// Fallback method for unimplemented method numbers.
     pub fn fallback(
         rt: &impl Runtime,
@@ -110,6 +116,8 @@ impl ActorCode for ReadReqActor {
         GetReadRequestStatus => get_read_request_status,
         CloseReadRequest => close_read_request,
         SetReadRequestPending => set_read_request_pending,
+
+        ReceiveReadRequest => receive_read_request,
         _ => fallback,
     }
 }
