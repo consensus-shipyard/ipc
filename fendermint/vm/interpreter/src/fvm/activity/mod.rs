@@ -33,24 +33,28 @@ impl TryFrom<fendermint_actor_activity_tracker::types::FullActivityRollup> for F
     fn try_from(
         value: fendermint_actor_activity_tracker::types::FullActivityRollup,
     ) -> Result<Self, Self::Error> {
+        let stats = AggregatedStats {
+            total_active_validators: value.consensus.stats.total_active_validators,
+            total_num_blocks_committed: value.consensus.stats.total_num_blocks_committed,
+        };
+        let data = value
+            .consensus
+            .data
+            .into_iter()
+            .map(|(addr, data)| {
+                let data = ValidatorData {
+                    validator: payload_to_evm_address(addr.payload())?,
+                    blocks_committed: data.blocks_committed,
+                };
+                Ok(data)
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        let consensus = FullSummary {
+            stats,
+            data,
+        };
         let f = FullActivityRollup {
-            consensus: FullSummary {
-                stats: AggregatedStats {
-                    total_active_validators: value.consensus.stats.total_active_validators,
-                    total_num_blocks_committed: value.consensus.stats.total_num_blocks_committed,
-                },
-                data: value
-                    .consensus
-                    .data
-                    .into_iter()
-                    .map(|(addr, data)| {
-                        Ok(ValidatorData {
-                            validator: payload_to_evm_address(addr.payload())?,
-                            blocks_committed: data.blocks_committed,
-                        })
-                    })
-                    .collect::<anyhow::Result<Vec<_>>>()?,
-            },
+            consensus,
         };
         Ok(Self::new(f))
     }
