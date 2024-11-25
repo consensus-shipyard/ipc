@@ -604,10 +604,17 @@ where
                         return Ok(false);
                     }
 
-                    let (is_globally_finalized, succeeded) = atomically(|| {
+                    let read_response = read_request.response.clone();
+                    // Extend request id with response data to use as the vote hash.
+                    // This ensures that the all validators are voting
+                    // on the same response from IROH.
+                    let mut request_id = read_request.id.as_bytes().to_vec();
+                    request_id.extend(read_response.clone());
+                    let vote_hash = Hash::new(request_id);
+                    let (is_globally_finalized, _) = atomically(|| {
                         chain_env
                             .parent_finality_votes
-                            .find_blob_quorum(&read_request.id.as_bytes().to_vec())
+                            .find_blob_quorum(&vote_hash.as_bytes().to_vec())
                     })
                     .await;
                     if !is_globally_finalized {
