@@ -11,8 +11,8 @@ struct SubnetRegistryActorStorage {
     address SUBNET_ACTOR_GETTER_FACET;
     // solhint-disable-next-line var-name-mixedcase
     address SUBNET_ACTOR_MANAGER_FACET;
-    // solhint-disable-next-line var-name-mixedcase
     /// TODO: this should be removed as it's for collateral withdraw only, not rewarder
+    // solhint-disable-next-line var-name-mixedcase
     address SUBNET_ACTOR_REWARD_FACET;
     // solhint-disable-next-line var-name-mixedcase
     address SUBNET_ACTOR_CHECKPOINTING_FACET;

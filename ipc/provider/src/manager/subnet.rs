@@ -7,9 +7,10 @@ use anyhow::Result;
 use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
+use ipc_actors_abis::validator_reward_facet::ValidatorClaim;
 use ipc_api::checkpoint::{
-    BatchClaimProofs, BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent, Signature,
-    ValidatorClaimProof, ValidatorSummary,
+    consensus::ValidatorData, BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent,
+    Signature,
 };
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::{StakingChangeRequest, ValidatorInfo};
@@ -287,25 +288,28 @@ pub trait BottomUpCheckpointRelayer: Send + Sync {
 /// in the child subnet
 #[async_trait]
 pub trait ValidatorRewarder: Send + Sync {
-    /// Obtain the proofs needed for the validator to batch claim the rewards
-    async fn get_validator_claim_proofs(
+    /// Query validator claims, indexed by checkpoint height, to batch claim rewards.
+    async fn query_reward_claims(
         &self,
         validator_addr: &Address,
         from_checkpoint: ChainEpoch,
         to_checkpoint: ChainEpoch,
-    ) -> Result<Vec<ValidatorClaimProof>>;
-    /// Get the reward for specific validator in the current subnet gateway
-    async fn get_validator_activities(
+    ) -> Result<Vec<(u64, ValidatorClaim)>>;
+
+    /// Query validator rewards in the current subnet, without obtaining proofs.
+    async fn query_validator_rewards(
         &self,
         validator: &Address,
         from_checkpoint: ChainEpoch,
         to_checkpoint: ChainEpoch,
-    ) -> Result<Vec<ValidatorSummary>>;
-    /// Claim the reward in batches
-    async fn batch_claim(
+    ) -> Result<Vec<(u64, ValidatorData)>>;
+
+    /// Claim validator rewards in a batch for the specified subnet.
+    async fn batch_subnet_claim(
         &self,
         submitter: &Address,
         reward_claim_subnet: &SubnetID,
-        payloads: Vec<BatchClaimProofs>,
+        reward_origin_subnet: &SubnetID,
+        claims: Vec<(u64, ValidatorClaim)>,
     ) -> Result<()>;
 }

@@ -17,7 +17,7 @@ import {CrossMsgHelper} from "../../lib/CrossMsgHelper.sol";
 import {IpcEnvelope, SubnetID} from "../../structs/CrossNet.sol";
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
 
-import {ActivityReportCreated, ActivityReport} from "../../activities/Activity.sol";
+import {ActivityRollupRecorded, FullActivityRollup} from "../../activities/Activity.sol";
 
 contract CheckpointingFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
@@ -49,12 +49,12 @@ contract CheckpointingFacet is GatewayActorModifiers {
     /// @param checkpoint - a bottom-up checkpoint
     /// @param membershipRootHash - a root hash of the Merkle tree built from the validator public keys and their weight
     /// @param membershipWeight - the total weight of the membership
-    /// @param activityReport - the validator validator report
+    /// @param fullSummary - the full validators' activities summary
     function createBUChptWithActivities(
         BottomUpCheckpoint calldata checkpoint,
         bytes32 membershipRootHash,
         uint256 membershipWeight,
-        ActivityReport calldata activityReport
+        FullActivityRollup calldata fullSummary
     ) external systemActorOnly {
         if (LibGateway.bottomUpCheckpointExists(checkpoint.blockHeight)) {
             revert CheckpointAlreadyExists();
@@ -71,7 +71,7 @@ contract CheckpointingFacet is GatewayActorModifiers {
 
         LibGateway.storeBottomUpCheckpoint(checkpoint);
 
-        emit ActivityReportCreated(uint64(checkpoint.blockHeight), activityReport);
+        emit ActivityRollupRecorded(uint64(checkpoint.blockHeight), fullSummary);
     }
 
     /// @notice creates a new bottom-up checkpoint

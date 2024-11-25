@@ -1,31 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::HashMap;
-use std::time::Duration;
-
-use anyhow::{anyhow, Context};
-use ethers::abi::Tokenizable;
-use tendermint::block::Height;
-use tendermint_rpc::endpoint::commit;
-use tendermint_rpc::{endpoint::validators, Client, Paging};
-
-use fvm_ipld_blockstore::Blockstore;
-use fvm_shared::{address::Address, chainid::ChainID};
-
-use fendermint_crypto::PublicKey;
-use fendermint_crypto::SecretKey;
-use fendermint_vm_actor_interface::eam::EthAddress;
-use fendermint_vm_actor_interface::ipc::BottomUpCheckpoint;
-use fendermint_vm_genesis::{Power, Validator, ValidatorKey};
-
-use ipc_api::evm::payload_to_evm_address;
-
-use ipc_actors_abis::checkpointing_facet as checkpoint;
-use ipc_actors_abis::gateway_getter_facet as getter;
-use ipc_api::staking::ConfigurationNumber;
-use ipc_observability::{emit, serde::HexEncodableBlockHash};
-
 use super::observe::{
     CheckpointCreated, CheckpointFinalized, CheckpointSigned, CheckpointSignedRole,
 };
@@ -35,8 +10,26 @@ use super::{
     state::{ipc::GatewayCaller, FvmExecState},
     ValidatorContext,
 };
-use crate::fvm::activities::ValidatorActivityTracker;
+use crate::fvm::activity::ValidatorActivityTracker;
 use crate::fvm::exec::BlockEndEvents;
+use anyhow::{anyhow, Context};
+use ethers::abi::Tokenizable;
+use fendermint_crypto::PublicKey;
+use fendermint_crypto::SecretKey;
+use fendermint_vm_actor_interface::eam::EthAddress;
+use fendermint_vm_actor_interface::ipc::BottomUpCheckpoint;
+use fendermint_vm_genesis::{Power, Validator, ValidatorKey};
+use fvm_ipld_blockstore::Blockstore;
+use fvm_shared::{address::Address, chainid::ChainID};
+use ipc_actors_abis::checkpointing_facet as checkpoint;
+use ipc_actors_abis::gateway_getter_facet as getter;
+use ipc_api::staking::ConfigurationNumber;
+use ipc_observability::{emit, serde::HexEncodableBlockHash};
+use std::collections::HashMap;
+use std::time::Duration;
+use tendermint::block::Height;
+use tendermint_rpc::endpoint::commit;
+use tendermint_rpc::{endpoint::validators, Client, Paging};
 
 /// Validator voting power snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -101,7 +94,7 @@ where
 
     let num_msgs = msgs.len();
 
-    let activities = state.activities_tracker().get_activities_summary()?;
+    let full_activity_rollup = state.activities_tracker().commit_activity()?;
 
     // Construct checkpoint.
     let checkpoint = BottomUpCheckpoint {
@@ -110,30 +103,20 @@ where
         block_hash,
         next_configuration_number,
         msgs,
-        activities: activities.commitment()?.try_into()?,
+        activities: full_activity_rollup.compressed()?,
     };
 
     // Save the checkpoint in the ledger.
     // Pass in the current power table, because these are the validators who can sign this checkpoint.
-    let report = checkpoint::ActivityReport {
-        validators: activities
-            .details
-            .into_iter()
-            .map(|v| {
-                Ok(checkpoint::ValidatorActivityReport {
-                    validator: payload_to_evm_address(v.validator.payload())?,
-                    blocks_committed: v.block_committed,
-                    metadata: ethers::types::Bytes::from(v.metadata),
-                })
-            })
-            .collect::<anyhow::Result<Vec<_>>>()?,
-    };
     let ret = gateway
-        .create_bu_ckpt_with_activities(state, checkpoint.clone(), &curr_power_table.0, report)
+        .create_bottom_up_checkpoint(
+            state,
+            checkpoint.clone(),
+            &curr_power_table.0,
+            full_activity_rollup.into_inner(),
+        )
         .context("failed to store checkpoint")?;
     event_tracker.push((ret.apply_ret.events, ret.emitters));
-
-    state.activities_tracker().purge_activities()?;
 
     // Figure out the power updates if there was some change in the configuration.
     let power_updates = if next_configuration_number == 0 {
@@ -266,9 +249,22 @@ where
                 block_hash: cp.block_hash,
                 next_configuration_number: cp.next_configuration_number,
                 msgs: convert_tokenizables(cp.msgs)?,
-                activities: checkpoint::ActivitySummary {
-                    total_active_validators: cp.activities.total_active_validators,
-                    commitment: cp.activities.commitment,
+                activities: checkpoint::CompressedActivityRollup {
+                    consensus: checkpoint::CompressedSummary {
+                        stats: checkpoint::AggregatedStats {
+                            total_active_validators: cp
+                                .activities
+                                .consensus
+                                .stats
+                                .total_active_validators,
+                            total_num_blocks_committed: cp
+                                .activities
+                                .consensus
+                                .stats
+                                .total_num_blocks_committed,
+                        },
+                        data_root_commitment: cp.activities.consensus.data_root_commitment,
+                    },
                 },
             };
 

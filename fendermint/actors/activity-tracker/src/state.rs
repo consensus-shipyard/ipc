@@ -1,6 +1,7 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::types::{FullActivityRollup, ValidatorStats};
 use cid::Cid;
 use fil_actors_runtime::runtime::Runtime;
 use fil_actors_runtime::{ActorError, Map2, DEFAULT_HAMT_CONFIG};
@@ -9,100 +10,45 @@ use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use serde::{Deserialize, Serialize};
 
-pub type BlockCommittedMap<BS> = Map2<BS, Address, BlockCommitted>;
-pub type BlockCommitted = u64;
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct ValidatorSummary {
-    pub validator: Address,
-    pub block_committed: BlockCommitted,
-    pub metadata: Vec<u8>,
-}
-
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct State {
-    pub start_height: ChainEpoch,
-    pub blocks_committed: Cid, // BlockCommittedMap
+    pub tracking_since: ChainEpoch,
+    pub consensus: Cid, // ConsensusData
 }
+
+pub type ConsensusData<BS> = Map2<BS, Address, ValidatorStats>;
 
 impl State {
     pub fn new<BS: Blockstore>(store: &BS) -> Result<State, ActorError> {
-        let mut deployers_map = BlockCommittedMap::empty(store, DEFAULT_HAMT_CONFIG, "empty");
-        Ok(State {
-            start_height: 0,
-            blocks_committed: deployers_map.flush()?,
-        })
-    }
-
-    pub fn reset_start_height(&mut self, rt: &impl Runtime) -> Result<(), ActorError> {
-        self.start_height = rt.curr_epoch();
-        Ok(())
-    }
-
-    pub fn purge_validator_block_committed(&mut self, rt: &impl Runtime) -> Result<(), ActorError> {
-        let all_validators = self.validator_activities(rt)?;
-        let mut validators = BlockCommittedMap::load(
-            rt.store(),
-            &self.blocks_committed,
-            DEFAULT_HAMT_CONFIG,
-            "verifiers",
-        )?;
-
-        for v in all_validators {
-            validators.delete(&v.validator)?;
-        }
-
-        self.blocks_committed = validators.flush()?;
-
-        Ok(())
-    }
-
-    pub fn incr_validator_block_committed(
-        &mut self,
-        rt: &impl Runtime,
-        validator: &Address,
-    ) -> Result<(), ActorError> {
-        let mut validators = BlockCommittedMap::load(
-            rt.store(),
-            &self.blocks_committed,
-            DEFAULT_HAMT_CONFIG,
-            "verifiers",
-        )?;
-
-        let v = if let Some(v) = validators.get(validator)? {
-            *v + 1
-        } else {
-            1
+        let state = State {
+            tracking_since: 0,
+            consensus: ConsensusData::flush_empty(store, DEFAULT_HAMT_CONFIG)?,
         };
-
-        validators.set(validator, v)?;
-
-        self.blocks_committed = validators.flush()?;
-
-        Ok(())
+        Ok(state)
     }
 
-    pub fn validator_activities(
+    /// Returns the pending activity rollup.
+    pub fn pending_activity_rollup(
         &self,
         rt: &impl Runtime,
-    ) -> Result<Vec<ValidatorSummary>, ActorError> {
-        let mut result = vec![];
+    ) -> Result<FullActivityRollup, ActorError> {
+        let consensus = {
+            let cid = &rt.state::<State>()?.consensus;
+            ConsensusData::load(rt.store(), cid, DEFAULT_HAMT_CONFIG, "consensus")
+        }?;
 
-        let validators = BlockCommittedMap::load(
-            rt.store(),
-            &self.blocks_committed,
-            DEFAULT_HAMT_CONFIG,
-            "verifiers",
-        )?;
-        validators.for_each(|k, v| {
-            result.push(ValidatorSummary {
-                validator: k,
-                block_committed: *v,
-                metadata: vec![],
-            });
+        // Populate the rollup struct.
+        let mut rollup = FullActivityRollup::default();
+        consensus.for_each(|validator_addr, validator_stats| {
+            rollup.consensus.stats.total_active_validators += 1;
+            rollup.consensus.stats.total_num_blocks_committed += validator_stats.blocks_committed;
+            rollup
+                .consensus
+                .data
+                .insert(validator_addr, validator_stats.clone());
             Ok(())
         })?;
 
-        Ok(result)
+        Ok(rollup)
     }
 }

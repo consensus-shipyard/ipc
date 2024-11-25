@@ -1,27 +1,32 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
+import {Consensus} from "./Activity.sol";
 
-import {Pausable} from "../lib/LibPausable.sol";
-import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
-import {NotValidator, SubnetNoTargetCommitment, CommitmentAlreadyInitialized, ValidatorAlreadyClaimed, NotGateway, NotOwner} from "../errors/IPCErrors.sol";
-import {ValidatorSummary, BatchClaimProofs} from "./Activity.sol";
+import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {IValidatorRewarder, IValidatorRewardSetup} from "./IValidatorRewarder.sol";
-import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
-import {SubnetID} from "../structs/Subnet.sol";
 import {LibActivityMerkleVerifier} from "./LibActivityMerkleVerifier.sol";
 import {LibDiamond} from "../lib/LibDiamond.sol";
+import {NotValidator, SubnetNoTargetCommitment, CommitmentAlreadyInitialized, ValidatorAlreadyClaimed, NotGateway, NotOwner} from "../errors/IPCErrors.sol";
+import {Pausable} from "../lib/LibPausable.sol";
+import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
+import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
+import {SubnetID} from "../structs/Subnet.sol";
 
 /// The validator reward facet for the parent subnet, i.e. for validators in the child subnet
 /// to claim their reward in the parent subnet, which should be the current subnet this facet
 /// is deployed.
 contract ValidatorRewardFacet is ReentrancyGuard, Pausable {
-    function batchClaim(BatchClaimProofs[] calldata payload) external nonReentrant whenNotPaused {
-        uint256 len = payload.length;
+    function batchSubnetClaim(
+        SubnetID calldata subnet,
+        uint64[] calldata checkpointHeights,
+        Consensus.ValidatorClaim[] calldata claims
+    ) external nonReentrant whenNotPaused {
+        require(checkpointHeights.length == claims.length, "length mismatch");
+        uint256 len = claims.length;
         for (uint256 i = 0; i < len; ) {
-            _batchClaimInSubnet(payload[i]);
+            _claim(subnet, checkpointHeights[i], claims[i].data, claims[i].proof);
             unchecked {
                 i++;
             }
@@ -30,43 +35,33 @@ contract ValidatorRewardFacet is ReentrancyGuard, Pausable {
 
     /// Validators claim their reward for doing work in the child subnet
     function claim(
-        SubnetID calldata subnetId,
-        ValidatorSummary calldata summary,
-        bytes32[] calldata proof
+        SubnetID calldata subnet,
+        uint64 checkpointHeight,
+        Consensus.ValidatorData calldata data,
+        Consensus.MerkleHash[] calldata proof
     ) external nonReentrant whenNotPaused {
-        ValidatorRewardStorage storage s = LibValidatorReward.facetStorage();
-        _claim(s, subnetId, summary, proof);
+        _claim(subnet, checkpointHeight, data, proof);
     }
 
     // ======== Internal functions ===========
 
     function handleRelay() internal pure {
-        // no opt for now
+        // no-op for now
         return;
     }
 
-    function _batchClaimInSubnet(BatchClaimProofs calldata payload) internal {
-        uint256 len = payload.proofs.length;
+    function _claim(
+        SubnetID calldata subnetId,
+        uint64 checkpointHeight,
+        Consensus.ValidatorData calldata detail,
+        Consensus.MerkleHash[] calldata proof
+    ) internal {
         ValidatorRewardStorage storage s = LibValidatorReward.facetStorage();
 
-        for (uint256 i = 0; i < len; ) {
-            _claim(s, payload.subnetId, payload.proofs[i].summary, payload.proofs[i].proof);
-            unchecked {
-                i++;
-            }
-        }
-    }
-
-    function _claim(
-        ValidatorRewardStorage storage s, 
-        SubnetID calldata subnetId,
-        ValidatorSummary calldata summary,
-        bytes32[] calldata proof
-    ) internal {
         // note: No need to check if the subnet is active. If the subnet is not active, the checkpointHeight
         // note: will never exist.
 
-        if (msg.sender != summary.validator) {
+        if (msg.sender != detail.validator) {
             revert NotValidator(msg.sender);
         }
 
@@ -74,7 +69,7 @@ contract ValidatorRewardFacet is ReentrancyGuard, Pausable {
             return handleRelay();
         }
 
-        LibValidatorReward.handleDistribution(s, subnetId, summary, proof);
+        LibValidatorReward.handleDistribution(subnetId, checkpointHeight, detail, proof);
     }
 }
 
@@ -102,7 +97,7 @@ struct ValidatorRewardStorage {
 }
 
 /// The payload for list commitments query
-struct ListCommimentDetail {
+struct ListCommitmentDetail {
     /// The child subnet checkpoint height
     uint64 checkpointHeight;
     /// The actual commiment of the activities
@@ -121,7 +116,7 @@ library LibValidatorReward {
     function initNewDistribution(
         SubnetID calldata subnetId,
         uint64 checkpointHeight,
-        bytes32 commitment,
+        Consensus.MerkleHash commitment,
         uint64 totalActiveValidators
     ) internal {
         ValidatorRewardStorage storage ds = facetStorage();
@@ -132,24 +127,24 @@ library LibValidatorReward {
             revert CommitmentAlreadyInitialized();
         }
 
-        ds.commitments[subnetKey].set(bytes32(uint256(checkpointHeight)), commitment);
+        ds.commitments[subnetKey].set(bytes32(uint256(checkpointHeight)), Consensus.MerkleHash.unwrap(commitment));
         ds.distributions[subnetKey][checkpointHeight].totalValidators = totalActiveValidators;
     }
 
     function listCommitments(
         SubnetID calldata subnetId
-    ) internal view returns (ListCommimentDetail[] memory listDetails) {
+    ) internal view returns (ListCommitmentDetail[] memory listDetails) {
         ValidatorRewardStorage storage ds = facetStorage();
 
         bytes32 subnetKey = subnetId.toHash();
 
         uint256 size = ds.commitments[subnetKey].length();
-        listDetails = new ListCommimentDetail[](size);
+        listDetails = new ListCommitmentDetail[](size);
 
         for (uint256 i = 0; i < size; ) {
             (bytes32 heightBytes32, bytes32 commitment) = ds.commitments[subnetKey].at(i);
 
-            listDetails[i] = ListCommimentDetail({
+            listDetails[i] = ListCommitmentDetail({
                 checkpointHeight: uint64(uint256(heightBytes32)),
                 commitment: commitment
             });
@@ -178,18 +173,20 @@ library LibValidatorReward {
     }
 
     function handleDistribution(
-        ValidatorRewardStorage storage s,
         SubnetID calldata subnetId,
-        ValidatorSummary calldata summary,
-        bytes32[] calldata proof
+        uint64 checkpointHeight,
+        Consensus.ValidatorData calldata detail,
+        Consensus.MerkleHash[] calldata proof
     ) internal {
+        ValidatorRewardStorage storage s = LibValidatorReward.facetStorage();
+
         bytes32 subnetKey = subnetId.toHash();
 
-        bytes32 commitment = ensureValidCommitment(s, subnetKey, summary.checkpointHeight);
-        LibActivityMerkleVerifier.ensureValidProof(commitment, summary, proof);
+        bytes32 commitment = ensureValidCommitment(s, subnetKey, checkpointHeight);
+        LibActivityMerkleVerifier.ensureValidProof(commitment, detail, proof);
 
-        validatorTryClaim(s, subnetKey, summary.checkpointHeight, summary.validator);
-        IValidatorRewarder(s.validatorRewarder).disburseRewards(subnetId, summary);
+        validatorTryClaim(s, subnetKey, checkpointHeight, detail.validator);
+        IValidatorRewarder(s.validatorRewarder).disburseRewards(subnetId, detail);
     }
 
     function ensureValidCommitment(

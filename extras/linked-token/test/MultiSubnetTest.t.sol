@@ -28,6 +28,7 @@ import {GatewayGetterFacet} from "@ipc/contracts/gateway/GatewayGetterFacet.sol"
 import {SubnetActorCheckpointingFacet} from "@ipc/contracts/subnet/SubnetActorCheckpointingFacet.sol";
 import {CheckpointingFacet} from "@ipc/contracts/gateway/router/CheckpointingFacet.sol";
 import {FvmAddressHelper} from "@ipc/contracts/lib/FvmAddressHelper.sol";
+import {Consensus, CompressedActivityRollup} from "@ipc/contracts/activities/Activity.sol";
 import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMsgKind, ResultMsg, CallMsg} from "@ipc/contracts/structs/CrossNet.sol";
 import {SubnetIDHelper} from "@ipc/contracts/lib/SubnetIDHelper.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -383,7 +384,16 @@ contract MultiSubnetTest is IntegrationTestBase {
             blockHeight: batch.blockHeight,
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
-            msgs: batch.msgs
+            msgs: batch.msgs,
+            activities: CompressedActivityRollup({
+                consensus: Consensus.CompressedSummary({
+                stats: Consensus.AggregatedStats({
+                    totalActiveValidators: 1,
+                    totalNumBlocksCommitted: 1
+                }),
+                dataRootCommitment: Consensus.MerkleHash.wrap(bytes32(0))
+            })
+            })
         });
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);

@@ -43,9 +43,10 @@ import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 import {ERC20PresetFixedSupply} from "../helpers/ERC20PresetFixedSupply.sol";
 import {SubnetValidatorGater} from "../../contracts/examples/SubnetValidatorGater.sol";
 
-import {ActivitySummary, ValidatorSummary, BatchClaimProofs, ValidatorClaimProof} from "../../contracts/activities/Activity.sol";
+import {FullActivityRollup, Consensus} from "../../contracts/activities/Activity.sol";
 import {ValidatorRewarderMap} from "../../contracts/examples/ValidatorRewarderMap.sol";
 import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
+import {ActivityHelper} from "../helpers/ActivityHelper.sol";
 
 contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
@@ -694,7 +695,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(0)})
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
         BottomUpCheckpoint memory checkpointWithIncorrectHeight = BottomUpCheckpoint({
@@ -703,7 +704,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(0)})
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
         vm.deal(address(saDiamond), 100 ether);
@@ -804,7 +805,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(0)})
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
         BottomUpCheckpoint memory checkpointWithIncorrectHeight = BottomUpCheckpoint({
@@ -813,7 +814,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: new IpcEnvelope[](0),
-            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(uint256(1))})
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
         vm.deal(address(saDiamond), 100 ether);
@@ -842,7 +843,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         // submit another again
         checkpoint.blockHeight = 2;
-        checkpoint.activities = ActivitySummary({totalActiveValidators: 1, commitment: bytes32(uint256(2))});
+        checkpoint.activities = ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)));
         hash = keccak256(abi.encode(checkpoint));
 
         for (uint256 i = 0; i < 3; i++) {
@@ -899,7 +900,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(uint256(1))})
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
         require(saDiamond.getter().lastBottomUpCheckpointHeight() == 1, " checkpoint height incorrect");
@@ -912,7 +913,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(uint256(2))})
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
         require(saDiamond.getter().lastBottomUpCheckpointHeight() == 3, " checkpoint height incorrect");
@@ -924,7 +925,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(uint256(3))})
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
         vm.expectRevert(BottomUpCheckpointAlreadySubmitted.selector);
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
@@ -936,7 +937,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(uint256(4))})
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
         vm.expectRevert(CannotSubmitFutureCheckpoint.selector);
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
@@ -947,7 +948,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: new IpcEnvelope[](0),
-            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(uint256(5))})
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
         require(
@@ -961,7 +962,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(uint256(6))})
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
         require(
@@ -975,7 +976,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(uint256(7))})
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
         require(
@@ -989,7 +990,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: new IpcEnvelope[](0),
-            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(uint256(8))})
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
         vm.expectRevert(InvalidCheckpointEpoch.selector);
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
@@ -1000,7 +1001,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: new IpcEnvelope[](0),
-            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(uint256(9))})
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
         require(
@@ -1014,7 +1015,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: new IpcEnvelope[](0),
-            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(uint256(10))})
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
         require(
@@ -1056,7 +1057,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(0)})
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
         vm.deal(address(saDiamond), 100 ether);
@@ -1100,7 +1101,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivitySummary({totalActiveValidators: 1, commitment: bytes32(uint256(1))})
+            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
         hash = keccak256(abi.encode(checkpoint));
@@ -2364,7 +2365,6 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         powers[3] = 10000;
         saDiamond.manager().setFederatedPower(addrs, pubkeys, powers);
 
-        bytes[] memory metadata = new bytes[](addrs.length);
         uint64[] memory blocksMined = new uint64[](addrs.length);
 
         blocksMined[0] = 1;
@@ -2372,62 +2372,45 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         (bytes32 activityRoot, bytes32[][] memory proofs) = MerkleTreeHelper.createMerkleProofsForActivities(
             addrs,
-            blocksMined,
-            metadata
+            blocksMined
         );
 
-        confirmChange(addrs, privKeys, ActivitySummary({totalActiveValidators: 2, commitment: activityRoot}));
+        confirmChange(addrs, privKeys, ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot));
 
         vm.startPrank(addrs[0]);
         vm.deal(addrs[0], 1 ether);
         saDiamond.validatorReward().claim(
             subnetId,
-            ValidatorSummary({
-                checkpointHeight: uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
-                validator: addrs[0],
-                blocksCommitted: blocksMined[0],
-                metadata: metadata[0]
-            }),
-            proofs[0]
+            uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
+            Consensus.ValidatorData({validator: addrs[0], blocksCommitted: blocksMined[0]}),
+            ActivityHelper.wrapBytes32Array(proofs[0])
         );
 
         vm.startPrank(addrs[1]);
         vm.deal(addrs[1], 1 ether);
         saDiamond.validatorReward().claim(
             subnetId,
-            ValidatorSummary({
-                checkpointHeight: uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
-                validator: addrs[1],
-                blocksCommitted: blocksMined[1],
-                metadata: metadata[1]
-            }),
-            proofs[1]
+            uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
+            Consensus.ValidatorData({validator: addrs[1], blocksCommitted: blocksMined[1]}),
+            ActivityHelper.wrapBytes32Array(proofs[1])
         );
 
         vm.startPrank(addrs[2]);
         vm.deal(addrs[2], 1 ether);
         saDiamond.validatorReward().claim(
             subnetId,
-            ValidatorSummary({
-                checkpointHeight: uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
-                validator: addrs[2],
-                blocksCommitted: blocksMined[2],
-                metadata: metadata[2]
-            }),
-            proofs[2]
+            uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
+            Consensus.ValidatorData({validator: addrs[2], blocksCommitted: blocksMined[2]}),
+            ActivityHelper.wrapBytes32Array(proofs[2])
         );
 
         vm.startPrank(addrs[3]);
         vm.deal(addrs[3], 1 ether);
         saDiamond.validatorReward().claim(
             subnetId,
-            ValidatorSummary({
-                checkpointHeight: uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
-                validator: addrs[3],
-                blocksCommitted: blocksMined[3],
-                metadata: metadata[3]
-            }),
-            proofs[3]
+            uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
+            Consensus.ValidatorData({validator: addrs[3], blocksCommitted: blocksMined[3]}),
+            ActivityHelper.wrapBytes32Array(proofs[3])
         );
 
         // check
@@ -2472,7 +2455,6 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             saDiamond.manager().setFederatedPower(addrs, pubkeys, powers);
         }
 
-        bytes[] memory metadata = new bytes[](addrs.length);
         uint64[] memory blocksMined = new uint64[](addrs.length);
 
         blocksMined[0] = 1;
@@ -2480,54 +2462,40 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         (bytes32 activityRoot1, bytes32[][] memory proofs1) = MerkleTreeHelper.createMerkleProofsForActivities(
             addrs,
-            blocksMined,
-            metadata
+            blocksMined
         );
 
         (bytes32 activityRoot2, bytes32[][] memory proofs2) = MerkleTreeHelper.createMerkleProofsForActivities(
             addrs,
-            blocksMined,
-            metadata
+            blocksMined
         );
 
-        confirmChange(addrs, privKeys, ActivitySummary({totalActiveValidators: 2, commitment: activityRoot1}));
-        confirmChange(addrs, privKeys, ActivitySummary({totalActiveValidators: 2, commitment: activityRoot2}));
+        confirmChange(addrs, privKeys, ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot1));
+        confirmChange(addrs, privKeys, ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot2));
 
         vm.startPrank(addrs[0]);
         vm.deal(addrs[0], 1 ether);
 
-        BatchClaimProofs[] memory batchProofs = new BatchClaimProofs[](1);
-        ValidatorClaimProof[] memory claimProofs = new ValidatorClaimProof[](2);
-        claimProofs[0] = ValidatorClaimProof({
-            summary: ValidatorSummary({
-                checkpointHeight: uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
-                validator: addrs[0],
-                blocksCommitted: blocksMined[0],
-                metadata: metadata[0]
-            }),
-            proof: proofs1[0]
+        Consensus.ValidatorClaim[] memory claimProofs = new Consensus.ValidatorClaim[](2);
+        uint64[] memory checkpointHeights = new uint64[](2);
+
+        checkpointHeights[0] = uint64(gatewayDiamond.getter().bottomUpCheckPeriod());
+        checkpointHeights[1] = uint64(gatewayDiamond.getter().bottomUpCheckPeriod()) * 2;
+
+        claimProofs[0] = Consensus.ValidatorClaim({
+            data: Consensus.ValidatorData({validator: addrs[0], blocksCommitted: blocksMined[0]}),
+            proof: ActivityHelper.wrapBytes32Array(proofs1[0])
         });
-        claimProofs[1] = ValidatorClaimProof({
-            summary: ValidatorSummary({
-                checkpointHeight: uint64(gatewayDiamond.getter().bottomUpCheckPeriod()) * 2,
-                validator: addrs[0],
-                blocksCommitted: blocksMined[0],
-                metadata: metadata[0]
-            }),
-            proof: proofs2[0]
+        claimProofs[1] = Consensus.ValidatorClaim({
+            data: Consensus.ValidatorData({validator: addrs[0], blocksCommitted: blocksMined[0]}),
+            proof: ActivityHelper.wrapBytes32Array(proofs2[0])
         });
 
-        batchProofs[0] = BatchClaimProofs({
-            subnetId: subnetId,
-            proofs: claimProofs
-        });
-
-        saDiamond.validatorReward().batchClaim(batchProofs);
+        saDiamond.validatorReward().batchSubnetClaim(subnetId, checkpointHeights, claimProofs);
 
         // check
         assert(m.blocksCommitted(addrs[0]) == 2);
     }
-
 
     function testGatewayDiamond_ValidatorBatchClaimMiningReward_NoDoubleClaim() public {
         ValidatorRewarderMap m = new ValidatorRewarderMap();
@@ -2564,7 +2532,6 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             saDiamond.manager().setFederatedPower(addrs, pubkeys, powers);
         }
 
-        bytes[] memory metadata = new bytes[](addrs.length);
         uint64[] memory blocksMined = new uint64[](addrs.length);
 
         blocksMined[0] = 1;
@@ -2572,50 +2539,36 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         (bytes32 activityRoot1, bytes32[][] memory proofs1) = MerkleTreeHelper.createMerkleProofsForActivities(
             addrs,
-            blocksMined,
-            metadata
+            blocksMined
         );
-
         (bytes32 activityRoot2, bytes32[][] memory proofs2) = MerkleTreeHelper.createMerkleProofsForActivities(
             addrs,
-            blocksMined,
-            metadata
+            blocksMined
         );
 
-        confirmChange(addrs, privKeys, ActivitySummary({totalActiveValidators: 2, commitment: activityRoot1}));
-        confirmChange(addrs, privKeys, ActivitySummary({totalActiveValidators: 2, commitment: activityRoot2}));
+        confirmChange(addrs, privKeys, ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot1));
+        confirmChange(addrs, privKeys, ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot2));
 
         vm.startPrank(addrs[0]);
         vm.deal(addrs[0], 1 ether);
 
-        BatchClaimProofs[] memory batchProofs = new BatchClaimProofs[](1);
-        ValidatorClaimProof[] memory claimProofs = new ValidatorClaimProof[](2);
-        claimProofs[0] = ValidatorClaimProof({
-            summary: ValidatorSummary({
-                checkpointHeight: uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
-                validator: addrs[0],
-                blocksCommitted: blocksMined[0],
-                metadata: metadata[0]
-            }),
-            proof: proofs1[0]
-        });
-        claimProofs[1] = ValidatorClaimProof({
-            summary: ValidatorSummary({
-                checkpointHeight: uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
-                validator: addrs[0],
-                blocksCommitted: blocksMined[0],
-                metadata: metadata[0]
-            }),
-            proof: proofs1[0]
-        });
+        Consensus.ValidatorClaim[] memory claimProofs = new Consensus.ValidatorClaim[](2);
+        uint64[] memory heights = new uint64[](2);
 
-        batchProofs[0] = BatchClaimProofs({
-            subnetId: subnetId,
-            proofs: claimProofs
+        heights[0] = uint64(gatewayDiamond.getter().bottomUpCheckPeriod());
+        heights[1] = uint64(gatewayDiamond.getter().bottomUpCheckPeriod());
+
+        claimProofs[0] = Consensus.ValidatorClaim({
+            data: Consensus.ValidatorData({validator: addrs[0], blocksCommitted: blocksMined[0]}),
+            proof: ActivityHelper.wrapBytes32Array(proofs1[0])
+        });
+        claimProofs[1] = Consensus.ValidatorClaim({
+            data: Consensus.ValidatorData({validator: addrs[0], blocksCommitted: blocksMined[0]}),
+            proof: ActivityHelper.wrapBytes32Array(proofs2[0])
         });
 
         vm.expectRevert(ValidatorAlreadyClaimed.selector);
-        saDiamond.validatorReward().batchClaim(batchProofs);
+        saDiamond.validatorReward().batchSubnetClaim(subnetId, heights, claimProofs);
     }
 
     // -----------------------------------------------------------------------------------------------------------------

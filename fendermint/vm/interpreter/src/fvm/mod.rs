@@ -15,7 +15,7 @@ pub mod upgrades;
 #[cfg(any(test, feature = "bundle"))]
 pub mod bundle;
 
-pub mod activities;
+pub mod activity;
 pub(crate) mod gas;
 pub(crate) mod topdown;
 

@@ -37,17 +37,17 @@ task('deploy-registry')
             },
             { name: 'SubnetActorPauseFacet' },
             { name: 'SubnetActorRewardFacet' },
-            { 
+            {
                 name: 'SubnetActorCheckpointingFacet',
                 libraries: ['SubnetIDHelper'],
             },
             { name: 'DiamondCutFacet' },
             { name: 'DiamondLoupeFacet' },
             { name: 'OwnershipFacet' },
-            { 
+            {
                 name: 'ValidatorRewardFacet',
                 libraries: ['SubnetIDHelper'],
-             },
+            },
         )
 
         const registryFacets = await Deployments.deploy(
