@@ -3133,6 +3133,7 @@ dependencies = [
  "anyhow",
  "blake3",
  "data-encoding",
+ "fendermint_actor_machine",
  "fil_actors_runtime",
  "frc42_dispatch",
  "fvm_ipld_encoding",
@@ -3242,6 +3243,7 @@ dependencies = [
  "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
  "fvm_shared",
+ "num-traits",
  "serde",
  "serde_tuple",
 ]
@@ -3252,6 +3254,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid",
+ "fendermint_actor_blobs_shared",
  "fendermint_actor_machine",
  "fil_actors_runtime",
  "frc42_dispatch",
