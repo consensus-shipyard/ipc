@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {SubnetID} from "../structs/Subnet.sol";
-import {InvalidProof} from "../errors/IPCErrors.sol";
+import {InvalidActivityProof} from "../errors/IPCErrors.sol";
 import {Consensus} from "./Activity.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
@@ -22,7 +22,7 @@ library LibActivityMerkleVerifier {
         }
         bool valid = MerkleProof.verify({proof: proofBytes, root: commitment, leaf: leaf});
         if (!valid) {
-            revert InvalidProof();
+            revert InvalidActivityProof();
         }
     }
 }
