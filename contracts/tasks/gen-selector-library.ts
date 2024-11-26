@@ -9,13 +9,13 @@ task('gen-selector-library', 'Generates a Solidity library with contract selecto
         // ridiculously, this appears to be the only way to get hardhat to compile a specific subtree
         // we are only updating the in-memory representation of the config, so it won't write this value out to disk
         // be careful if you compose this task with other tasks in larger scripts!
-        console.log("compiling mocks...")
+        console.log('compiling mocks...')
         const oldSources = hre.config.paths.sources
         hre.config.paths.sources = './test/mocks'
         await hre.run('compile')
 
         hre.config.paths.sources = oldSources
-        console.log("compiling contracts...")
+        console.log('compiling contracts...')
         await hre.run('compile')
 
         const contracts: string[] = [
