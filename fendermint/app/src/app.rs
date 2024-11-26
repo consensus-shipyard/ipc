@@ -41,13 +41,11 @@ use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 use tendermint::abci::request::CheckTxKind;
 use tendermint::abci::{request, response};
-use tendermint::account::Id as TendermintAccountId;
 use tendermint::block::Size as TendermintBlockSize;
 use tendermint::consensus::params::{
     Params as TendermintConsensusParams, ValidatorParams as TendermintValidatorParams,
 };
 use tendermint::evidence::{Duration as TendermintDuration, Params as TendermintEvidenceParams};
-use tendermint::PublicKey as TendermintPublicKey;
 
 use tracing::instrument;
 
