@@ -3049,6 +3049,7 @@ dependencies = [
  "base64 0.21.7",
  "libsecp256k1",
  "rand",
+ "tendermint 0.31.1",
  "zeroize",
 ]
 

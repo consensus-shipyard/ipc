@@ -42,12 +42,15 @@ use serde::{Deserialize, Serialize};
 use tendermint::abci::request::CheckTxKind;
 use tendermint::abci::{request, response};
 use tendermint::account::Id as TendermintAccountId;
-use tendermint::consensus::Params as TendermintConsensusParams;
+use tendermint::block::Size as TendermintBlockSize;
+use tendermint::consensus::params::{
+    Params as TendermintConsensusParams, ValidatorParams as TendermintValidatorParams,
+};
+use tendermint::evidence::{Duration as TendermintDuration, Params as TendermintEvidenceParams};
 use tendermint::PublicKey as TendermintPublicKey;
 
 use tracing::instrument;
 
-use crate::consensus_params::ConsensusParamsTracker;
 use crate::observe::{
     BlockCommitted, BlockProposalEvaluated, BlockProposalReceived, BlockProposalSent, Message,
     MpoolReceived,
@@ -56,7 +59,6 @@ use crate::validators::ValidatorTracker;
 use crate::AppExitCode;
 use crate::BlockHeight;
 use crate::{tmconv::*, VERSION};
-
 #[derive(Serialize)]
 #[repr(u8)]
 pub enum AppStoreKey {
@@ -86,6 +88,8 @@ pub struct AppState {
     oldest_state_height: BlockHeight,
     /// Last committed version of the evolving state of the FVM.
     state_params: FvmStateParams,
+    /// Tendermint consensus params.
+    consensus_params: TendermintConsensusParams,
 }
 
 impl AppState {
@@ -105,6 +109,25 @@ impl AppState {
     /// so the height of the state itself as a "post-state" is one higher than the block which we executed to create it.
     pub fn state_height(&self) -> BlockHeight {
         self.block_height + 1
+    }
+}
+
+fn default_consensus_params() -> TendermintConsensusParams {
+    TendermintConsensusParams {
+        block: TendermintBlockSize {
+            max_bytes: 0,
+            max_gas: 0,
+            time_iota_ms: 0,
+        },
+        evidence: TendermintEvidenceParams {
+            max_age_num_blocks: 0,
+            max_age_duration: TendermintDuration(core::time::Duration::ZERO),
+            max_bytes: 0,
+        },
+        validator: TendermintValidatorParams {
+            pub_key_types: vec![],
+        },
+        version: None,
     }
 }
 
@@ -167,8 +190,6 @@ where
     state_hist_size: u64,
     /// Tracks the validator
     validators: ValidatorTracker,
-    /// Tracks the consensus params
-    consensus_params: ConsensusParamsTracker,
 }
 
 impl<DB, SS, S, I> App<DB, SS, S, I>
@@ -203,7 +224,6 @@ where
             exec_state: Arc::new(tokio::sync::Mutex::new(None)),
             check_state: Arc::new(tokio::sync::Mutex::new(None)),
             validators: ValidatorTracker::new(),
-            consensus_params: ConsensusParamsTracker::new(),
         };
         app.init_committed_state()?;
         Ok(app)
@@ -245,6 +265,7 @@ where
                     power_scale: 0,
                     app_version: 0,
                 },
+                consensus_params: default_consensus_params(),
             };
             self.set_committed_state(state)?;
         }
@@ -292,6 +313,23 @@ where
                 Ok(())
             })
             .context("commit failed")
+    }
+
+    /// Update the consensus params block gas limit. Return the updated params if changed.
+    fn update_block_gas_limit(
+        &self,
+        new_block_gas_limit: i64,
+    ) -> Result<Option<TendermintConsensusParams>> {
+        let mut state = self.committed_state()?;
+        if state.consensus_params.block.max_gas != new_block_gas_limit {
+            state.consensus_params.block.max_gas = new_block_gas_limit;
+            let updated_params = state.consensus_params.clone();
+
+            self.set_committed_state(state)?;
+            Ok(Some(updated_params))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Put the execution state during block execution. Has to be empty.
@@ -464,19 +502,13 @@ where
 
         let (validators, state_params) = read_genesis_car(genesis_bytes, &self.state_store).await?;
 
-        self.consensus_params
-            .set_consensus_params(request.consensus_params);
+        let validators_keys = validators.iter().map(|v| v.public_key.clone()).collect();
+
+        // Set the initial validator set to validators cache.
+        self.validators.set_validators(validators_keys)?;
 
         let validators =
             to_validator_updates(validators).context("failed to convert validators")?;
-
-        // Set the initial validator set to validators cache.
-        let validators_ids_with_keys: Vec<(TendermintAccountId, TendermintPublicKey)> = validators
-            .iter()
-            .map(|v| (TendermintAccountId::from(v.pub_key), v.pub_key))
-            .collect();
-
-        self.validators.set_validators(validators_ids_with_keys);
 
         tracing::info!(state_params = serde_json::to_string(&state_params)?);
 
@@ -496,6 +528,7 @@ where
             block_height: height,
             oldest_state_height: height,
             state_params,
+            consensus_params: request.consensus_params,
         };
 
         let response = response::InitChain {
@@ -744,7 +777,7 @@ where
 
         let validator = self
             .validators
-            .get_validator(&request.header.proposer_address)?;
+            .get_public_key(&request.header.proposer_address)?;
 
         let state = FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
             .context("error creating new state")?
@@ -817,31 +850,11 @@ where
         let validator_updates =
             to_validator_updates(power_updates.0).context("failed to convert validator updates")?;
 
-        // Updates the validator cache with the new validator set.
-        let validators_ids_with_keys: Vec<(TendermintAccountId, TendermintPublicKey)> =
-            validator_updates
-                .iter()
-                .map(|v| (TendermintAccountId::from(v.pub_key), v.pub_key))
-                .collect();
+        self.validators.set_validators(current_validators)?;
 
-        self.validators.set_validators(validators_ids_with_keys);
-
-        let new_block_gas_limit = new_block_gas_limit as i64;
-
-        let consensus_param_updates =
-            if self.consensus_params.get_current_block_gas_limit() != new_block_gas_limit {
-                self.consensus_params
-                    .set_current_block_gas_limit(new_block_gas_limit);
-
-                let mut updated_params = self
-                    .consensus_params
-                    .get_genesis_consensus_params()
-                    .ok_or_else(|| anyhow!("missing genesis consensus params"))?;
-                updated_params.block.max_gas = new_block_gas_limit;
-                Some(updated_params)
-            } else {
-                None
-            };
+        let consensus_param_updates = self
+            .update_block_gas_limit(new_block_gas_limit as i64)
+            .context("failed to update block gas limit")?;
 
         let ret = response::EndBlock {
             validator_updates,
