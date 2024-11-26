@@ -5,7 +5,9 @@ use anyhow::Context;
 use async_trait::async_trait;
 use std::collections::HashMap;
 
+use fendermint_crypto::PublicKey;
 use fendermint_vm_actor_interface::{chainmetadata, cron, system};
+use fendermint_vm_genesis::ValidatorKey;
 use fvm::executor::ApplyRet;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::{address::Address, ActorID, MethodNum, BLOCK_GAS_LIMIT};
@@ -18,7 +20,7 @@ use super::{
     checkpoint::{self, PowerUpdates},
     observe::{CheckpointFinalized, MsgExec, MsgExecPurpose},
     state::FvmExecState,
-    BlockGasLimit, FvmMessage, FvmMessageInterpreter,
+    BlockGasLimit, CurrentValidators, FvmMessage, FvmMessageInterpreter,
 };
 
 /// The return value extended with some things from the message that
@@ -48,7 +50,7 @@ where
     /// Return validator power updates and the next base fee.
     /// Currently ignoring events as there aren't any emitted by the smart contract,
     /// but keep in mind that if there were, those would have to be propagated.
-    type EndOutput = (PowerUpdates, BlockGasLimit);
+    type EndOutput = (PowerUpdates, BlockGasLimit, CurrentValidators);
 
     async fn begin(
         &self,
@@ -252,7 +254,17 @@ where
             PowerUpdates::default()
         };
 
-        let ret = (updates, next_gas_market.block_gas_limit);
+        let current_validators = self
+            .gateway
+            .current_membership(&mut state)
+            .context("failed to update membership")?
+            .validators
+            .iter()
+            .filter_map(|v| PublicKey::parse_slice(&v.metadata, None).ok())
+            .map(ValidatorKey)
+            .collect();
+
+        let ret = (updates, next_gas_market.block_gas_limit, current_validators);
         Ok((state, ret))
     }
 }
