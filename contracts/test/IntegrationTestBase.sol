@@ -934,7 +934,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             blockHash: keccak256(abi.encode(h)),
             nextConfigurationNumber: nextConfigNum - 1,
             msgs: new IpcEnvelope[](0),
-            activities: CompressedActivityRollup({
+            activity: CompressedActivityRollup({
                 consensus: Consensus.CompressedSummary({
                     stats: Consensus.AggregatedStats({
                         totalActiveValidators: uint64(validators.length),
@@ -977,7 +977,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             blockHash: keccak256(abi.encode(h)),
             nextConfigurationNumber: nextConfigNum - 1,
             msgs: new IpcEnvelope[](0),
-            activities: activities
+            activity: activities
         });
 
         vm.deal(address(saDiamond), 100 ether);

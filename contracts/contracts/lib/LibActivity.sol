@@ -4,10 +4,10 @@ pragma solidity ^0.8.23;
 import "../activities/IValidatorRewarder.sol";
 import {Consensus, CompressedActivityRollup} from "../activities/Activity.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {InvalidActivityProof} from "../../errors/IPCErrors.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {SubnetID} from "../structs/Subnet.sol";
-import {MissingActivityCommitment, ValidatorAlreadyClaimed} from "../errors/IPCErrors.sol";
+import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
+import {InvalidActivityProof, MissingActivityCommitment, ValidatorAlreadyClaimed} from "../errors/IPCErrors.sol";
 
 /// Library to handle activity rollups.
 library LibActivity {
@@ -55,7 +55,7 @@ library LibActivity {
     }
 
     function ensureValidProof(
-        bytes32 commitment,
+        Consensus.MerkleHash commitment,
         Consensus.ValidatorData calldata detail,
         Consensus.MerkleHash[] calldata proof
     ) internal pure {
@@ -66,7 +66,7 @@ library LibActivity {
         for (uint256 i = 0; i < proof.length; i++) {
             proofBytes[i] = Consensus.MerkleHash.unwrap(proof[i]);
         }
-        bool valid = MerkleProof.verify({proof: proofBytes, root: commitment, leaf: leaf});
+        bool valid = MerkleProof.verify({proof: proofBytes, root: Consensus.MerkleHash.unwrap(commitment), leaf: leaf});
         if (!valid) {
             revert InvalidActivityProof();
         }
@@ -108,10 +108,10 @@ library LibActivity {
             bytes32[] memory heights = tracker.pendingHeights.values();
 
             for (uint256 j = 0; j < heights.length; j++) {
-                uint64 height = uint64(heights[j]);
+                uint64 height = uint64(uint256(heights[j]) << 192 >> 192);
                 ConsensusPendingAtHeight storage pending = tracker.pending[height];
                 result[i] = ListPendingReturnEntry({
-                    checkpointHeight: height,
+                    height: height,
                     summary: pending.summary,
                     claimed: pending.claimed.values()
                 });
@@ -133,8 +133,8 @@ library LibActivity {
 
         // Check the validity of the proof.
         ConsensusPendingAtHeight storage pending = s.tracker[subnetKey].pending[checkpointHeight];
-        Consensus.MerkleHash memory commitment = pending.summary.dataRootCommitment;
-        if (commitment == bytes32(0)) {
+        Consensus.MerkleHash commitment = pending.summary.dataRootCommitment;
+        if (Consensus.MerkleHash.unwrap(commitment) == bytes32(0)) {
             revert MissingActivityCommitment();
         }
         ensureValidProof(commitment, data, proof);
@@ -150,8 +150,9 @@ library LibActivity {
 
         // Prune state for this height if all validators have claimed.
         if (pending.claimed.length() == pending.summary.stats.totalActiveValidators) {
-            s.tracker[subnetKey].pendingHeights.remove(bytes32(uint256(checkpointHeight)));
-            delete s.tracker[subnetKey][checkpointHeight];
+            ConsensusTracker storage tracker = s.tracker[subnetKey];
+            tracker.pendingHeights.remove(bytes32(uint256(checkpointHeight)));
+            delete tracker.pending[checkpointHeight];
         }
     }
 
