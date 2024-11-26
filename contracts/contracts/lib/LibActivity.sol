@@ -3,53 +3,55 @@ pragma solidity ^0.8.23;
 
 import "../activities/IValidatorRewarder.sol";
 import {Consensus, CompressedActivityRollup} from "../activities/Activity.sol";
-import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {InvalidActivityProof} from "../../errors/IPCErrors.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {SubnetID} from "../structs/Subnet.sol";
-import {MissingActivityCommitment, DuplicateCommitment, ValidatorAlreadyClaimed} from "../errors/IPCErrors.sol";
+import {MissingActivityCommitment, ValidatorAlreadyClaimed} from "../errors/IPCErrors.sol";
 
 /// Library to handle activity rollups.
 library LibActivity {
-    bytes32 private constant NAMESPACE = keccak256("activity.consensus");
+    bytes32 private constant CONSENSUS_NAMESPACE = keccak256("activity.consensus");
 
     using SubnetIDHelper for SubnetID;
-    using EnumerableMap for EnumerableMap.Bytes32ToBytes32Map;
     using EnumerableSet for EnumerableSet.AddressSet;
+    using EnumerableSet for EnumerableSet.Bytes32Set;
 
     // Newtype for extra safety.
     type SubnetKey is bytes32;
 
-    /// The activity summary commiment that is currently under reward distribution
-    struct ConsensusProcessed {
-        /// Total number of valdators to claim the distribution
-        uint64 totalValidators;
-        /// The list of validators that have claimed the reward
+    /// An object to track consensus-related activity submissions from subnets.
+    struct ConsensusTracker {
+        /// An enumeration of checkpoint heights that are pending.
+        EnumerableSet.Bytes32Set pendingHeights;
+        /// The pending summaries for each checkpoint height, including information about the validators that have already claimed rewards.
+        mapping(uint64 => ConsensusPendingAtHeight) pending;
+    }
+
+    struct ConsensusPendingAtHeight {
+        /// The original compressed summary submitted for this height.
+        /// We store the summary in full, or we relay it upwards if there is no validator rewarder configured.
+        Consensus.CompressedSummary summary;
+        /// Tracks validators have already claimed rewards for this height.
         EnumerableSet.AddressSet claimed;
     }
 
     /// Used by the SubnetActor to track the rewards for each validator
-    struct ActivityConsensusStorage {
+    struct ConsensusStorage {
         /// @notice The contract address for the validator rewarder.
         address validatorRewarder;
-        /// @notice Summaries pending to be processed.
+        /// @notice Tracks pending summaries to be processed.
         /// If the validator rewarder is non-zero, these denote summaries presentable at this level.
         /// If the validator rewarder is zero, these summaries must be relayed upwards in the next bottom-up checkpoint.
         /// Partitioned by subnet ID (hash) then by checkpoint block height in the child subnet to the commitment
-        mapping(SubnetKey => EnumerableMap.Bytes32ToBytes32Map) pending;
-        /// @notice Index over presentable summaries back to the subnet ID, so we can locate them quickly when they're presented.
-        /// Only used if the validator rewarder is non-zero.
-        /// Partitioned by subnet ID (hash) then by checkpoint block height in the child subnet to the commitment
-        mapping(SubnetKey => mapping(uint64 => ConsensusProcessed)) processed;
+        mapping(SubnetKey => ConsensusTracker) tracker;
     }
 
-    /// The payload for list commitments query
-    struct ListPendingResult {
-        /// The child subnet checkpoint height
-        uint64 checkpointHeight;
-        /// The actual commiment of the activities
-        bytes32 commitment;
+    /// Return type for the list commitments view method.
+    struct ListPendingReturnEntry {
+        uint64 height;
+        Consensus.CompressedSummary summary;
+        address[] claimed;
     }
 
     function ensureValidProof(
@@ -77,57 +79,46 @@ library LibActivity {
         uint64 checkpointHeight,
         CompressedActivityRollup calldata activity
     ) internal {
-        ActivityConsensusStorage storage ds = consensusStorage();
+        ConsensusStorage storage s = consensusStorage();
 
         SubnetKey subnetKey = SubnetKey.wrap(subnet.toHash());
 
-        if (ds.processed[subnetKey][checkpointHeight].totalValidators != 0) {
-            revert DuplicateCommitment();
-        }
+        ConsensusTracker storage tracker = s.tracker[subnetKey];
+        bool added = tracker.pendingHeights.add(bytes32(uint256(checkpointHeight)));
+        require(added, "duplicate checkpoint height");
 
-        ds.pending[subnetKey].set(bytes32(uint256(checkpointHeight)), Consensus.MerkleHash.unwrap(activity.consensus.dataRootCommitment));
-        ds.processed[subnetKey][checkpointHeight].totalValidators = activity.consensus.stats.totalActiveValidators;
+        ConsensusPendingAtHeight storage pending = tracker.pending[checkpointHeight];
+        pending.summary = activity.consensus;
     }
 
-    function listPending(
+    /// A view accessor to query the pending consensus summaries for a given subnet.
+    function listPendingConsensus(
         SubnetID calldata subnet
-    ) internal view returns (ListPendingResult[] memory result) {
-        ActivityConsensusStorage storage ds = consensusStorage();
+    ) internal view returns (ListPendingReturnEntry[] memory result) {
+        ConsensusStorage storage s = consensusStorage();
 
         SubnetKey subnetKey = SubnetKey.wrap(subnet.toHash());
 
-        uint256 size = ds.pending[subnetKey].length();
-        result = new ListPendingResult[](size);
+        uint256 size = s.tracker[subnetKey].pendingHeights.length();
+        result = new ListPendingReturnEntry[](size);
 
-        for (uint256 i = 0; i < size; ) {
-            (bytes32 heightBytes32, bytes32 commitment) = ds.pending[subnetKey].at(i);
+        // Ok to not optimize with unchecked increments, since we expect this to be used off-chain only, for introspection.
+        for (uint256 i = 0; i < size; i++) {
+            ConsensusTracker storage tracker = s.tracker[subnetKey];
+            bytes32[] memory heights = tracker.pendingHeights.values();
 
-            result[i] = ListPendingResult({
-                checkpointHeight: uint64(uint256(heightBytes32)),
-                commitment: commitment
-            });
-
-            unchecked {
-                i++;
+            for (uint256 j = 0; j < heights.length; j++) {
+                uint64 height = uint64(heights[j]);
+                ConsensusPendingAtHeight storage pending = tracker.pending[height];
+                result[i] = ListPendingReturnEntry({
+                    checkpointHeight: height,
+                    summary: pending.summary,
+                    claimed: pending.claimed.values()
+                });
             }
         }
 
         return result;
-    }
-
-    function setRewarder(address rewarder) internal {
-        ActivityConsensusStorage storage ds = consensusStorage();
-        ds.validatorRewarder = rewarder;
-    }
-
-    // ============ Internal library functions ============
-
-    function consensusStorage() internal pure returns (ActivityConsensusStorage storage ds) {
-        bytes32 position = NAMESPACE;
-        assembly {
-            ds.slot := position
-        }
-        return ds;
     }
 
     function processConsensusClaim(
@@ -136,28 +127,46 @@ library LibActivity {
         Consensus.ValidatorData calldata data,
         Consensus.MerkleHash[] calldata proof
     ) internal {
-        ActivityConsensusStorage storage s = consensusStorage();
+        ConsensusStorage storage s = consensusStorage();
 
-        bytes32 subnetKey = subnet.toHash();
+        SubnetKey subnetKey = SubnetKey.wrap(subnet.toHash());
 
-        (bool exists, bytes32 commitment) = s.pending[subnetKey].tryGet(bytes32(uint256(checkpointHeight)));
-        if (!exists) {
+        // Check the validity of the proof.
+        ConsensusPendingAtHeight storage pending = s.tracker[subnetKey].pending[checkpointHeight];
+        Consensus.MerkleHash memory commitment = pending.summary.dataRootCommitment;
+        if (commitment == bytes32(0)) {
             revert MissingActivityCommitment();
         }
         ensureValidProof(commitment, data, proof);
 
-        EnumerableSet.AddressSet storage claimed = s.processed[subnetKey][checkpointHeight].claimed;
-        if (claimed.contains(data.validator)) {
+        // Mark the validator as claimed.
+        bool added = pending.claimed.add(data.validator);
+        if (!added) {
             revert ValidatorAlreadyClaimed();
         }
-        claimed.add(data.validator);
+
+        // Notify the validator rewarder of a valid claim.
         IValidatorRewarder(s.validatorRewarder).disburseRewards(subnet, data);
 
-        // Prune state if all validators have claimed.
-        if (claimed.length() == s.processed[subnetKey][checkpointHeight].totalValidators) {
-            delete s.pending[subnetKey];
-            delete s.processed[subnetKey][checkpointHeight];
+        // Prune state for this height if all validators have claimed.
+        if (pending.claimed.length() == pending.summary.stats.totalActiveValidators) {
+            s.tracker[subnetKey].pendingHeights.remove(bytes32(uint256(checkpointHeight)));
+            delete s.tracker[subnetKey][checkpointHeight];
         }
     }
 
+    function setRewarder(address rewarder) internal {
+        ConsensusStorage storage ds = consensusStorage();
+        ds.validatorRewarder = rewarder;
+    }
+
+    // ============ Internal library functions ============
+
+    function consensusStorage() internal pure returns (ConsensusStorage storage ds) {
+        bytes32 position = CONSENSUS_NAMESPACE;
+        assembly {
+            ds.slot := position
+        }
+        return ds;
+    }
 }

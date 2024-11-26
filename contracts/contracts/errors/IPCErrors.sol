@@ -80,7 +80,6 @@ error InvalidFederationPayload();
 error DuplicatedGenesisValidator();
 error NotEnoughGenesisValidators();
 error ValidatorPowerChangeDenied();
-error DuplicateCommitment();
 error MissingActivityCommitment();
 error ValidatorAlreadyClaimed();
 error InvalidActivityProof();
