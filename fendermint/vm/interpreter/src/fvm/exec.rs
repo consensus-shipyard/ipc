@@ -5,7 +5,7 @@ use super::{
     checkpoint::{self, PowerUpdates},
     observe::{CheckpointFinalized, MsgExec, MsgExecPurpose},
     state::FvmExecState,
-    BlockGasLimit, FvmMessage, FvmMessageInterpreter,
+    BlockGasLimit, CurrentValidators, FvmMessage, FvmMessageInterpreter,
 };
 use crate::fvm::activity::ValidatorActivityTracker;
 use crate::ExecInterpreter;

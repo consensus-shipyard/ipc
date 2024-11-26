@@ -23,6 +23,7 @@ pub use check::FvmCheckRet;
 pub use checkpoint::PowerUpdates;
 pub use exec::{EndBlockOutput, FvmApplyRet};
 use fendermint_crypto::{PublicKey, SecretKey};
+use fendermint_vm_genesis::ValidatorKey;
 pub use fendermint_vm_message::query::FvmQuery;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::address::Address;
@@ -35,6 +36,7 @@ use self::{state::ipc::GatewayCaller, upgrades::UpgradeScheduler};
 pub type FvmMessage = fvm_shared::message::Message;
 pub type BaseFee = fvm_shared::econ::TokenAmount;
 pub type BlockGasLimit = u64;
+pub type CurrentValidators = Vec<ValidatorKey>;
 
 #[derive(Clone)]
 pub struct ValidatorContext<C> {

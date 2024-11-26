@@ -1,55 +1,55 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-//! Tracks the validator id from tendermint to their corresponding public key.
+//! Tracks the validator ID from Tendermint to their corresponding public key.
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Result};
 use fendermint_crypto::PublicKey;
+use fendermint_vm_genesis::ValidatorKey;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 #[derive(Clone)]
 pub(crate) struct ValidatorTracker {
-    public_keys: Arc<RwLock<HashMap<tendermint::account::Id, PublicKey>>>,
+    validator_mapping: Arc<RwLock<HashMap<tendermint::account::Id, PublicKey>>>,
 }
 
 impl ValidatorTracker {
     pub fn new() -> Self {
         Self {
-            public_keys: Arc::new(RwLock::new(HashMap::new())),
+            validator_mapping: Arc::new(RwLock::new(HashMap::new())),
         }
     }
-}
 
-impl ValidatorTracker {
-    /// Get the public key of the validator by id. Note that the id is expected to be a validator.
-    pub fn get_validator(&self, id: &tendermint::account::Id) -> anyhow::Result<PublicKey> {
-        let keys = self.public_keys.read().unwrap();
+    /// Get the public key of the validator by ID.
+    /// Note that the ID is expected to be a validator.
+    pub fn get_public_key(&self, id: &tendermint::account::Id) -> Result<PublicKey> {
+        let keys = self
+            .validator_mapping
+            .read()
+            .map_err(|_| anyhow!("Failed to acquire read lock"))?;
+
         keys.get(id)
             .copied()
-            .ok_or_else(|| anyhow!("validator not found: {:?}", id))
+            .ok_or_else(|| anyhow!("Validator not found: {:?}", id))
     }
 
-    pub fn set_validators(
-        &self,
-        public_keys: Vec<(tendermint::account::Id, tendermint::public_key::PublicKey)>,
-    ) {
-        let mut cache = self.public_keys.write().unwrap();
+    /// Sets the validator keys mapping.
+    pub fn set_validators(&self, validators: Vec<ValidatorKey>) -> Result<()> {
+        let mut cache = self
+            .validator_mapping
+            .write()
+            .map_err(|_| anyhow!("Failed to acquire write lock to update validators"))?;
 
-        for (id, key) in public_keys {
-            if let Ok(fendermint_key) = fendermint_pub_key_from_tendermint_pub_key(&key) {
-                cache.insert(id, fendermint_key);
-            }
-        }
+        cache.clear();
+
+        validators.into_iter().try_for_each(|validator_key| {
+            let tendermint_pub_key = tendermint::PublicKey::try_from(validator_key.clone())
+                .map_err(|_| anyhow!("Failed to convert ValidatorKey to Tendermint public key"))?;
+
+            let tendermint_id = tendermint::account::Id::from(tendermint_pub_key);
+            cache.insert(tendermint_id, validator_key.public_key().clone());
+            Ok(())
+        })
     }
-}
-
-fn fendermint_pub_key_from_tendermint_pub_key(
-    key: &tendermint::public_key::PublicKey,
-) -> anyhow::Result<PublicKey> {
-    let p = key.secp256k1().unwrap();
-    let compressed = p.to_encoded_point(true);
-    let b = compressed.as_bytes();
-    let key = PublicKey::parse_slice(b, None)?;
-    Ok(key)
 }
