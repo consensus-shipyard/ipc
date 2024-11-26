@@ -30,8 +30,8 @@ struct BottomUpCheckpoint {
     uint64 nextConfigurationNumber;
     /// @dev Batch of messages to execute.
     IpcEnvelope[] msgs;
-    /// @dev The activity summary from child subnet to parent subnet
-    CompressedActivityRollup activities;
+    /// @dev The activity rollup from child subnet to parent subnet.
+    CompressedActivityRollup activity;
 }
 
 /// @notice A batch of bottom-up messages for execution.

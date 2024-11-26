@@ -843,7 +843,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         // submit another again
         checkpoint.blockHeight = 2;
-        checkpoint.activities = ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)));
+        checkpoint.activity = ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)));
         hash = keccak256(abi.encode(checkpoint));
 
         for (uint256 i = 0; i < 3; i++) {

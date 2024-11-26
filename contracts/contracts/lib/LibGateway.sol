@@ -82,7 +82,7 @@ library LibGateway {
         b.subnetID = checkpoint.subnetID;
         b.nextConfigurationNumber = checkpoint.nextConfigurationNumber;
         b.blockHeight = checkpoint.blockHeight;
-        b.activities = checkpoint.activities;
+        b.activity = checkpoint.activity;
 
         uint256 msgLength = checkpoint.msgs.length;
         for (uint256 i; i < msgLength; ) {
