@@ -32,7 +32,7 @@ library MerkleTreeHelper {
         return (root, proofs);
     }
 
-    function createMerkleProofsForActivities(
+    function createMerkleProofsForConsensusActivity(
         address[] memory addrs,
         uint64[] memory blocksMined
     ) internal returns (bytes32, bytes32[][] memory) {

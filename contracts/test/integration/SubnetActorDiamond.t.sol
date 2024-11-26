@@ -2334,7 +2334,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     }
 
     // ============== Test Activities ===============
-    function testGatewayDiamond_ValidatorClaimMiningReward_Works() public {
+    function testSubnetActor_ValidatorClaimMiningReward_Works() public {
         gatewayAddress = address(gatewayDiamond);
 
         Asset memory source = Asset({kind: AssetKind.Native, tokenAddress: address(0)});
@@ -2370,18 +2370,20 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         blocksMined[0] = 1;
         blocksMined[1] = 2;
 
-        (bytes32 activityRoot, bytes32[][] memory proofs) = MerkleTreeHelper.createMerkleProofsForActivities(
+        (bytes32 activityRoot, bytes32[][] memory proofs) = MerkleTreeHelper.createMerkleProofsForConsensusActivity(
             addrs,
             blocksMined
         );
 
         confirmChange(addrs, privKeys, ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot));
 
+        uint64 bottomUpCheckPeriod = uint64(gatewayDiamond.getter().bottomUpCheckPeriod());
+
         vm.startPrank(addrs[0]);
         vm.deal(addrs[0], 1 ether);
         saDiamond.validatorReward().claim(
             subnetId,
-            uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
+            bottomUpCheckPeriod,
             Consensus.ValidatorData({validator: addrs[0], blocksCommitted: blocksMined[0]}),
             ActivityHelper.wrapBytes32Array(proofs[0])
         );
@@ -2390,25 +2392,30 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.deal(addrs[1], 1 ether);
         saDiamond.validatorReward().claim(
             subnetId,
-            uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
+            bottomUpCheckPeriod,
             Consensus.ValidatorData({validator: addrs[1], blocksCommitted: blocksMined[1]}),
             ActivityHelper.wrapBytes32Array(proofs[1])
         );
 
+        // These validators have no claims; they were inactive, so the pending activity should've been removed
+        // and as a result, the claim should fail.
+
         vm.startPrank(addrs[2]);
         vm.deal(addrs[2], 1 ether);
+        vm.expectRevert(MissingActivityCommitment.selector);
         saDiamond.validatorReward().claim(
             subnetId,
-            uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
+            bottomUpCheckPeriod,
             Consensus.ValidatorData({validator: addrs[2], blocksCommitted: blocksMined[2]}),
             ActivityHelper.wrapBytes32Array(proofs[2])
         );
 
         vm.startPrank(addrs[3]);
         vm.deal(addrs[3], 1 ether);
+        vm.expectRevert(MissingActivityCommitment.selector);
         saDiamond.validatorReward().claim(
             subnetId,
-            uint64(gatewayDiamond.getter().bottomUpCheckPeriod()),
+            bottomUpCheckPeriod,
             Consensus.ValidatorData({validator: addrs[3], blocksCommitted: blocksMined[3]}),
             ActivityHelper.wrapBytes32Array(proofs[3])
         );
@@ -2420,7 +2427,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         assert(m.blocksCommitted(addrs[3]) == 0);
     }
 
-    function testGatewayDiamond_ValidatorBatchClaimMiningReward_Works() public {
+    function testSubnetActor_ValidatorBatchClaimMiningReward_Works() public {
         ValidatorRewarderMap m = new ValidatorRewarderMap();
         {
             gatewayAddress = address(gatewayDiamond);
@@ -2460,12 +2467,12 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         blocksMined[0] = 1;
         blocksMined[1] = 2;
 
-        (bytes32 activityRoot1, bytes32[][] memory proofs1) = MerkleTreeHelper.createMerkleProofsForActivities(
+        (bytes32 activityRoot1, bytes32[][] memory proofs1) = MerkleTreeHelper.createMerkleProofsForConsensusActivity(
             addrs,
             blocksMined
         );
 
-        (bytes32 activityRoot2, bytes32[][] memory proofs2) = MerkleTreeHelper.createMerkleProofsForActivities(
+        (bytes32 activityRoot2, bytes32[][] memory proofs2) = MerkleTreeHelper.createMerkleProofsForConsensusActivity(
             addrs,
             blocksMined
         );
@@ -2497,7 +2504,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         assert(m.blocksCommitted(addrs[0]) == 2);
     }
 
-    function testGatewayDiamond_ValidatorBatchClaimMiningReward_NoDoubleClaim() public {
+    function testSubnetActor_ValidatorBatchClaimMiningReward_NoDoubleClaim() public {
         ValidatorRewarderMap m = new ValidatorRewarderMap();
         {
             gatewayAddress = address(gatewayDiamond);
@@ -2537,11 +2544,11 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         blocksMined[0] = 1;
         blocksMined[1] = 2;
 
-        (bytes32 activityRoot1, bytes32[][] memory proofs1) = MerkleTreeHelper.createMerkleProofsForActivities(
+        (bytes32 activityRoot1, bytes32[][] memory proofs1) = MerkleTreeHelper.createMerkleProofsForConsensusActivity(
             addrs,
             blocksMined
         );
-        (bytes32 activityRoot2, bytes32[][] memory proofs2) = MerkleTreeHelper.createMerkleProofsForActivities(
+        (bytes32 activityRoot2, bytes32[][] memory proofs2) = MerkleTreeHelper.createMerkleProofsForConsensusActivity(
             addrs,
             blocksMined
         );
