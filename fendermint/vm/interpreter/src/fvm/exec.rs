@@ -204,7 +204,7 @@ where
         let mut block_end_events = BlockEndEvents::default();
 
         if let Some(pubkey) = state.block_producer() {
-            state.activities_tracker().record_block_committed(pubkey)?;
+            state.activity_tracker().record_block_committed(pubkey)?;
         }
 
         let next_gas_market = state.finalize_gas_market()?;

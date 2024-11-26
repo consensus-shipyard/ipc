@@ -1342,7 +1342,7 @@ impl ValidatorRewarder for EthSubnetManager {
             let claim = ValidatorClaim {
                 // Even though it's the same struct but still need to do a mapping due to
                 // different crate from ethers-rs
-                data: validator_reward_facet::ValidatorData {
+                data: subnet_actor_activity_facet::ValidatorData {
                     validator: data.validator,
                     blocks_committed: data.blocks_committed,
                 },

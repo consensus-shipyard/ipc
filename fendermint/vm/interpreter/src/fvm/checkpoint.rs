@@ -94,7 +94,7 @@ where
 
     let num_msgs = msgs.len();
 
-    let full_activity_rollup = state.activities_tracker().commit_activity()?;
+    let full_activity_rollup = state.activity_tracker().commit_activity()?;
 
     // Construct checkpoint.
     let checkpoint = BottomUpCheckpoint {
@@ -103,7 +103,7 @@ where
         block_hash,
         next_configuration_number,
         msgs,
-        activities: full_activity_rollup.compressed()?,
+        activity: full_activity_rollup.compressed()?,
     };
 
     // Save the checkpoint in the ledger.
@@ -249,21 +249,21 @@ where
                 block_hash: cp.block_hash,
                 next_configuration_number: cp.next_configuration_number,
                 msgs: convert_tokenizables(cp.msgs)?,
-                activities: checkpoint::CompressedActivityRollup {
+                activity: checkpoint::CompressedActivityRollup {
                     consensus: checkpoint::CompressedSummary {
                         stats: checkpoint::AggregatedStats {
                             total_active_validators: cp
-                                .activities
+                                .activity
                                 .consensus
                                 .stats
                                 .total_active_validators,
                             total_num_blocks_committed: cp
-                                .activities
+                                .activity
                                 .consensus
                                 .stats
                                 .total_num_blocks_committed,
                         },
-                        data_root_commitment: cp.activities.consensus.data_root_commitment,
+                        data_root_commitment: cp.activity.consensus.data_root_commitment,
                     },
                 },
             };

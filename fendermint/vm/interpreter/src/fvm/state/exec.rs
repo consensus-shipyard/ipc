@@ -292,7 +292,7 @@ where
         self.executor.context().network.chain_id
     }
 
-    pub fn activities_tracker(&mut self) -> ActorActivityTracker<DB> {
+    pub fn activity_tracker(&mut self) -> ActorActivityTracker<DB> {
         ActorActivityTracker { executor: self }
     }
 

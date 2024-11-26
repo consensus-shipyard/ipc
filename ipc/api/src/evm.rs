@@ -20,7 +20,7 @@ use fvm_shared::econ::TokenAmount;
 use ipc_actors_abis::{
     checkpointing_facet, gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet,
     lib_gateway, register_subnet_facet, subnet_actor_checkpointing_facet, subnet_actor_diamond,
-    subnet_actor_getter_facet, top_down_finality_facet, validator_reward_facet,
+    subnet_actor_getter_facet, top_down_finality_facet, subnet_actor_activity_facet,
     xnet_messaging_facet,
 };
 
@@ -191,7 +191,7 @@ macro_rules! bottom_up_checkpoint_conversion {
                         .into_iter()
                         .map($module::IpcEnvelope::try_from)
                         .collect::<Result<Vec<_>, _>>()?,
-                    activities: checkpoint.activity_rollup.try_into()?,
+                    activity: checkpoint.activity_rollup.try_into()?,
                 })
             }
         }
@@ -210,7 +210,7 @@ macro_rules! bottom_up_checkpoint_conversion {
                         .into_iter()
                         .map(IpcEnvelope::try_from)
                         .collect::<Result<Vec<_>, _>>()?,
-                    activity_rollup: value.activities.into(),
+                    activity_rollup: value.activity.into(),
                 })
             }
         }
@@ -284,7 +284,7 @@ base_type_conversion!(subnet_actor_checkpointing_facet);
 base_type_conversion!(gateway_getter_facet);
 base_type_conversion!(gateway_messenger_facet);
 base_type_conversion!(lib_gateway);
-base_type_conversion!(validator_reward_facet);
+base_type_conversion!(subnet_actor_activity_facet);
 base_type_conversion!(checkpointing_facet);
 
 cross_msg_types!(gateway_getter_facet);
