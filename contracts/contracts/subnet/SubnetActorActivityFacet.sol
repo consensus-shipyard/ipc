@@ -13,7 +13,7 @@ import {SubnetID} from "../structs/Subnet.sol";
 /// The validator reward facet for the parent subnet, i.e. for validators in the child subnet
 /// to claim their reward in the parent subnet, which should be the current subnet this facet
 /// is deployed.
-contract ValidatorRewardFacet is ReentrancyGuard, Pausable {
+contract SubnetActorActivityFacet is ReentrancyGuard, Pausable {
     // Entrypoint for validators to batch claim rewards in the parent subnet, for a given subnet,
     // against multiple checkpoints at once. Atomically succeeds or reverts.
     function batchSubnetClaim(

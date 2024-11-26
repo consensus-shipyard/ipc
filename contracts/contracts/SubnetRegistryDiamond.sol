@@ -25,7 +25,7 @@ contract SubnetRegistryDiamond {
         address diamondCutFacet;
         address diamondLoupeFacet;
         address ownershipFacet;
-        address validatorRewardFacet;
+        address activityFacet;
         bytes4[] subnetActorGetterSelectors;
         bytes4[] subnetActorManagerSelectors;
         bytes4[] subnetActorRewarderSelectors;
@@ -34,7 +34,7 @@ contract SubnetRegistryDiamond {
         bytes4[] subnetActorDiamondCutSelectors;
         bytes4[] subnetActorDiamondLoupeSelectors;
         bytes4[] subnetActorOwnershipSelectors;
-        bytes4[] validatorRewardSelectors;
+        bytes4[] subnetActorActivitySelectors;
         SubnetCreationPrivileges creationPrivileges;
     }
 
@@ -66,7 +66,7 @@ contract SubnetRegistryDiamond {
         if (params.ownershipFacet == address(0)) {
             revert FacetCannotBeZero();
         }
-        if (params.validatorRewardFacet == address(0)) {
+        if (params.activityFacet == address(0)) {
             revert FacetCannotBeZero();
         }
 
@@ -88,7 +88,7 @@ contract SubnetRegistryDiamond {
         s.SUBNET_ACTOR_DIAMOND_CUT_FACET = params.diamondCutFacet;
         s.SUBNET_ACTOR_LOUPE_FACET = params.diamondLoupeFacet;
         s.SUBNET_ACTOR_OWNERSHIP_FACET = params.ownershipFacet;
-        s.VALIDATOR_REWARD_FACET = params.validatorRewardFacet;
+        s.VALIDATOR_REWARD_FACET = params.activityFacet;
 
         s.subnetActorGetterSelectors = params.subnetActorGetterSelectors;
         s.subnetActorManagerSelectors = params.subnetActorManagerSelectors;
@@ -98,7 +98,7 @@ contract SubnetRegistryDiamond {
         s.subnetActorDiamondCutSelectors = params.subnetActorDiamondCutSelectors;
         s.subnetActorDiamondLoupeSelectors = params.subnetActorDiamondLoupeSelectors;
         s.subnetActorOwnershipSelectors = params.subnetActorOwnershipSelectors;
-        s.validatorRewardSelectors = params.validatorRewardSelectors;
+        s.subnetActorActivitySelectors = params.subnetActorActivitySelectors;
 
         s.creationPrivileges = params.creationPrivileges;
     }

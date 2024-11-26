@@ -43,7 +43,7 @@ import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 import {ERC20PresetFixedSupply} from "../helpers/ERC20PresetFixedSupply.sol";
 import {SubnetValidatorGater} from "../../contracts/examples/SubnetValidatorGater.sol";
 
-import {FullActivityRollup, Consensus} from "../../contracts/activities/Activity.sol";
+import {FullActivityRollup, Consensus} from "../../contracts/structs/Activity.sol";
 import {ValidatorRewarderMap} from "../../contracts/examples/ValidatorRewarderMap.sol";
 import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
 import {ActivityHelper} from "../helpers/ActivityHelper.sol";
@@ -2381,7 +2381,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         vm.startPrank(addrs[0]);
         vm.deal(addrs[0], 1 ether);
-        saDiamond.validatorReward().claim(
+        saDiamond.activity().claim(
             subnetId,
             bottomUpCheckPeriod,
             Consensus.ValidatorData({validator: addrs[0], blocksCommitted: blocksMined[0]}),
@@ -2390,7 +2390,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         vm.startPrank(addrs[1]);
         vm.deal(addrs[1], 1 ether);
-        saDiamond.validatorReward().claim(
+        saDiamond.activity().claim(
             subnetId,
             bottomUpCheckPeriod,
             Consensus.ValidatorData({validator: addrs[1], blocksCommitted: blocksMined[1]}),
@@ -2403,7 +2403,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.startPrank(addrs[2]);
         vm.deal(addrs[2], 1 ether);
         vm.expectRevert(MissingActivityCommitment.selector);
-        saDiamond.validatorReward().claim(
+        saDiamond.activity().claim(
             subnetId,
             bottomUpCheckPeriod,
             Consensus.ValidatorData({validator: addrs[2], blocksCommitted: blocksMined[2]}),
@@ -2413,7 +2413,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.startPrank(addrs[3]);
         vm.deal(addrs[3], 1 ether);
         vm.expectRevert(MissingActivityCommitment.selector);
-        saDiamond.validatorReward().claim(
+        saDiamond.activity().claim(
             subnetId,
             bottomUpCheckPeriod,
             Consensus.ValidatorData({validator: addrs[3], blocksCommitted: blocksMined[3]}),
@@ -2498,7 +2498,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             proof: ActivityHelper.wrapBytes32Array(proofs2[0])
         });
 
-        saDiamond.validatorReward().batchSubnetClaim(subnetId, checkpointHeights, claimProofs);
+        saDiamond.activity().batchSubnetClaim(subnetId, checkpointHeights, claimProofs);
 
         // check
         assert(m.blocksCommitted(addrs[0]) == 2);
@@ -2575,7 +2575,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         });
 
         vm.expectRevert(ValidatorAlreadyClaimed.selector);
-        saDiamond.validatorReward().batchSubnetClaim(subnetId, heights, claimProofs);
+        saDiamond.activity().batchSubnetClaim(subnetId, heights, claimProofs);
     }
 
     // -----------------------------------------------------------------------------------------------------------------

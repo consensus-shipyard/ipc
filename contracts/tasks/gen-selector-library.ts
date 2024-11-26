@@ -36,7 +36,7 @@ task('gen-selector-library', 'Generates a Solidity library with contract selecto
             'RegisterSubnetFacet',
             'SubnetGetterFacet',
             'SubnetActorMock',
-            'ValidatorRewardFacet',
+            'SubnetActorActivityFacet',
         ]
 
         const resolveSelectors = async (contractName: string) => {

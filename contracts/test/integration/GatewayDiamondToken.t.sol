@@ -33,7 +33,7 @@ import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.so
 
 import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 
-import {FullActivityRollup, Consensus} from "../../contracts/activities/Activity.sol";
+import {FullActivityRollup, Consensus} from "../../contracts/structs/Activity.sol";
 import {ActivityHelper} from "../helpers/ActivityHelper.sol";
 
 contract GatewayDiamondTokenTest is Test, IntegrationTestBase {

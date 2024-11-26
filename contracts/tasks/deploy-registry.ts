@@ -45,7 +45,7 @@ task('deploy-registry')
             { name: 'DiamondLoupeFacet' },
             { name: 'OwnershipFacet' },
             {
-                name: 'ValidatorRewardFacet',
+                name: 'SubnetActorActivityFacet',
                 libraries: ['SubnetIDHelper'],
             },
         )
@@ -92,7 +92,7 @@ task('deploy-registry')
             diamondCutFacet: subnetActorFacets.addresses['DiamondCutFacet'],
             diamondLoupeFacet: subnetActorFacets.addresses['DiamondLoupeFacet'],
             ownershipFacet: subnetActorFacets.addresses['OwnershipFacet'],
-            validatorRewardFacet: subnetActorFacets.addresses['ValidatorRewardFacet'],
+            activityFacet: subnetActorFacets.addresses['SubnetActorActivityFacet'],
 
             subnetActorGetterSelectors: selectors(subnetActorFacets.contracts['SubnetActorGetterFacet']),
             subnetActorManagerSelectors: selectors(subnetActorFacets.contracts['SubnetActorManagerFacet']),
@@ -102,7 +102,7 @@ task('deploy-registry')
             subnetActorDiamondCutSelectors: selectors(subnetActorFacets.contracts['DiamondCutFacet']),
             subnetActorDiamondLoupeSelectors: selectors(subnetActorFacets.contracts['DiamondLoupeFacet']),
             subnetActorOwnershipSelectors: selectors(subnetActorFacets.contracts['OwnershipFacet']),
-            validatorRewardSelectors: selectors(subnetActorFacets.contracts['ValidatorRewardFacet']),
+            activityFacetSelectors: selectors(subnetActorFacets.contracts['SubnetActorActivityFacet']),
 
             creationPrivileges: Number(mode),
         }

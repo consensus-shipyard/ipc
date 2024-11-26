@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {Consensus, CompressedActivityRollup} from "../../contracts/activities/Activity.sol";
+import {Consensus, CompressedActivityRollup, FullActivityRollup} from "../../contracts/structs/Activity.sol";
 
 library ActivityHelper {
     function newCompressedActivityRollup(
@@ -44,5 +44,19 @@ library ActivityHelper {
         }
 
         return wrapped;
+    }
+
+    function dummyActivityRollup() internal pure returns (FullActivityRollup memory rollup) {
+        Consensus.ValidatorData[] memory data = new Consensus.ValidatorData[](0);
+        rollup = FullActivityRollup({
+            consensus: Consensus.FullSummary({
+                stats: Consensus.AggregatedStats({
+                    totalActiveValidators: 0,
+                    totalNumBlocksCommitted: 0
+                }),
+                data: data
+            })
+        });
+        return rollup;
     }
 }

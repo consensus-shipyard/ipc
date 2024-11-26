@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {SubnetID} from "../structs/Subnet.sol";
-import {Consensus} from "./Activity.sol";
+import {Consensus} from "../structs/Activity.sol";
 
 /// @title ValidatorRewarder interface.
 ///
@@ -11,7 +11,7 @@ import {Consensus} from "./Activity.sol";
 /// activities inside the subnet.
 ///
 /// This interface will be called by the subnet actor when a validator presents a _valid_ proof of consensus activity,
-/// via the ValidatorRewardFacet#claim method.
+/// via the SubnetActivityActivityFacet#claim method.
 interface IValidatorRewarder {
     /// @notice Called by the subnet manager contract to instruct the rewarder to process the subnet summary and
     /// disburse any relevant rewards.

@@ -45,53 +45,20 @@ contract CheckpointingFacet is GatewayActorModifiers {
         execBottomUpMsgs(checkpoint.msgs, subnet);
     }
 
-    /// @notice creates a new bottom-up checkpoint with activity report
-    /// @param checkpoint - a bottom-up checkpoint
-    /// @param membershipRootHash - a root hash of the Merkle tree built from the validator public keys and their weight
-    /// @param membershipWeight - the total weight of the membership
-    /// @param fullSummary - the full validators' activities summary
-    function createBUChptWithActivities(
-        BottomUpCheckpoint calldata checkpoint,
-        bytes32 membershipRootHash,
-        uint256 membershipWeight,
-        FullActivityRollup calldata fullSummary
-    ) external systemActorOnly {
-        if (LibGateway.bottomUpCheckpointExists(checkpoint.blockHeight)) {
-            revert CheckpointAlreadyExists();
-        }
-
-        LibQuorum.createQuorumInfo({
-            self: s.checkpointQuorumMap,
-            objHeight: checkpoint.blockHeight,
-            objHash: keccak256(abi.encode(checkpoint)),
-            membershipRootHash: membershipRootHash,
-            membershipWeight: membershipWeight,
-            majorityPercentage: s.majorityPercentage
-        });
-
-        LibGateway.storeBottomUpCheckpoint(checkpoint);
-
-        emit ActivityRollupRecorded(uint64(checkpoint.blockHeight), fullSummary);
-    }
-
     /// @notice creates a new bottom-up checkpoint
     /// @param checkpoint - a bottom-up checkpoint
     /// @param membershipRootHash - a root hash of the Merkle tree built from the validator public keys and their weight
     /// @param membershipWeight - the total weight of the membership
+    /// @param activity - the full activity rollup
     function createBottomUpCheckpoint(
         BottomUpCheckpoint calldata checkpoint,
         bytes32 membershipRootHash,
-        uint256 membershipWeight
+        uint256 membershipWeight,
+        FullActivityRollup calldata activity
     ) external systemActorOnly {
         if (LibGateway.bottomUpCheckpointExists(checkpoint.blockHeight)) {
             revert CheckpointAlreadyExists();
         }
-
-        // TODO(rewarder): step 1. call fvm ActivityTrackerActor::get_summary to generate the summary
-        // TODO(rewarder): step 2. update checkpoint.activities with that in step 1
-        // TODO: (if there is more time, should wrap param checkpoint with another data structure)
-        // TODO(rewarder): step 3. call fvm ActivityTrackerActor::purge_activities to purge the activities
-        // TODO(rewarder): step 4. emit validator details as event
 
         LibQuorum.createQuorumInfo({
             self: s.checkpointQuorumMap,
@@ -103,6 +70,8 @@ contract CheckpointingFacet is GatewayActorModifiers {
         });
 
         LibGateway.storeBottomUpCheckpoint(checkpoint);
+
+        emit ActivityRollupRecorded(uint64(checkpoint.blockHeight), activity);
     }
 
     /// @notice Set a new checkpoint retention height and garbage collect all checkpoints in range [`retentionHeight`, `newRetentionHeight`)
