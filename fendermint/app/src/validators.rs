@@ -48,7 +48,7 @@ impl ValidatorTracker {
                 .map_err(|_| anyhow!("Failed to convert ValidatorKey to Tendermint public key"))?;
 
             let tendermint_id = tendermint::account::Id::from(tendermint_pub_key);
-            cache.insert(tendermint_id, validator_key.public_key().clone());
+            cache.insert(tendermint_id, *validator_key.public_key());
             Ok(())
         })
     }
