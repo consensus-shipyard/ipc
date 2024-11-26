@@ -2507,7 +2507,7 @@ dependencies = [
 [[package]]
 name = "entangler"
 version = "0.1.0"
-source = "git+ssh://git@github.com/hokunet/entanglement.git?rev=dc93353e97a438a800a4a22ed46fe75e77eca200#dc93353e97a438a800a4a22ed46fe75e77eca200"
+source = "git+ssh://git@github.com/hokunet/entanglement.git?rev=7119617e0778472c5f490b5ee5763203fe356633#7119617e0778472c5f490b5ee5763203fe356633"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -11018,7 +11018,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 [[package]]
 name = "storage"
 version = "0.1.0"
-source = "git+ssh://git@github.com/hokunet/entanglement.git?rev=dc93353e97a438a800a4a22ed46fe75e77eca200#dc93353e97a438a800a4a22ed46fe75e77eca200"
+source = "git+ssh://git@github.com/hokunet/entanglement.git?rev=7119617e0778472c5f490b5ee5763203fe356633#7119617e0778472c5f490b5ee5763203fe356633"
 dependencies = [
  "anyhow",
  "async-trait",

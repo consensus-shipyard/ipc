@@ -80,8 +80,8 @@ data-encoding = { version = "2.3.3" }
 dirs = "5.0"
 dircpy = "0.3.19"
 either = "1.10"
-entangler = { git = "ssh://git@github.com/hokunet/entanglement.git", rev = "dc93353e97a438a800a4a22ed46fe75e77eca200" }
-entangler_storage = { package = "storage", git = "ssh://git@github.com/hokunet/entanglement.git", rev = "dc93353e97a438a800a4a22ed46fe75e77eca200" }
+entangler = { git = "ssh://git@github.com/hokunet/entanglement.git", rev = "7119617e0778472c5f490b5ee5763203fe356633" }
+entangler_storage = { package = "storage", git = "ssh://git@github.com/hokunet/entanglement.git", rev = "7119617e0778472c5f490b5ee5763203fe356633" }
 env_logger = "0.10"
 erased-serde = "0.3"
 ethers = { version = "2.0.13", features = ["abigen", "ws"] }
@@ -211,7 +211,9 @@ openssl = { version = "0.10", features = ["vendored"] }
 # pull in crates as transitive dependencies that do not support Wasm architector. If this
 # happens, try removing "crypto" feature from fvm_shared dependency in contracts/binding/Cargo.toml
 # and run `cargo build`. Then add the "crypto" feature back and run `cargo build` again.
-fvm = { version = "4.4.0", features = ["verify-signature"], default-features = false } # no opencl feature or it fails on CI
+fvm = { version = "4.4.0", features = [
+    "verify-signature",
+], default-features = false } # no opencl feature or it fails on CI
 fvm_shared = { version = "4.4.0" }
 fvm_sdk = { version = "4.4.0" }
 fvm_ipld_blockstore = "0.2.0"
