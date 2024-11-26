@@ -24,5 +24,7 @@ num-traits = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_tuple = { workspace = true }
 
+fendermint_actor_machine = { path = "../../machine" }
+
 [features]
 fil-actor = ["fil_actors_runtime/fil-actor"]

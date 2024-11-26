@@ -76,6 +76,23 @@ pub fn approve_credit(
     ))?)
 }
 
+pub fn get_credit_approval(
+    rt: &impl Runtime,
+    from: Address,
+    to: Address,
+) -> Result<Option<CreditApproval>, ActorError> {
+    let params = params::GetCreditApprovalParams { from, to };
+
+    deserialize_block(extract_send_result(rt.send(
+        &BLOBS_ACTOR_ADDR,
+        Method::GetCreditApproval as MethodNum,
+        IpldBlock::serialize_cbor(&params)?,
+        rt.message().value_received(),
+        None,
+        SendFlags::READ_ONLY,
+    ))?)
+}
+
 pub fn revoke_credit(
     rt: &impl Runtime,
     from: Address,
