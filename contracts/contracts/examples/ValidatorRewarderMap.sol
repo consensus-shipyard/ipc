@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {IValidatorRewarder} from "../activities/IValidatorRewarder.sol";
+import {IValidatorRewarder} from "../interfaces/IValidatorRewarder.sol";
 import {Consensus} from "../activities/Activity.sol";
 import {SubnetID} from "../structs/Subnet.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
