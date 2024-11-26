@@ -1086,7 +1086,12 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         // failed to create a checkpoint with zero membership weight
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
         vm.expectRevert(ZeroMembershipWeight.selector);
-        gatewayDiamond.checkpointer().createBottomUpCheckpoint(checkpoint, membershipRoot, 0, ActivityHelper.dummyActivityRollup());
+        gatewayDiamond.checkpointer().createBottomUpCheckpoint(
+            checkpoint,
+            membershipRoot,
+            0,
+            ActivityHelper.dummyActivityRollup()
+        );
         vm.stopPrank();
 
         // failed create a processed checkpoint
@@ -1468,7 +1473,12 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
 
         // create a checkpoint
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        gatewayDiamond.checkpointer().createBottomUpCheckpoint(checkpoint, membershipRoot, 10, ActivityHelper.dummyActivityRollup());
+        gatewayDiamond.checkpointer().createBottomUpCheckpoint(
+            checkpoint,
+            membershipRoot,
+            10,
+            ActivityHelper.dummyActivityRollup()
+        );
         vm.stopPrank();
 
         uint8 v;
@@ -1503,7 +1513,12 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
 
         // create a checkpoint
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        gatewayDiamond.checkpointer().createBottomUpCheckpoint(checkpoint, membershipRoot, 10, ActivityHelper.dummyActivityRollup());
+        gatewayDiamond.checkpointer().createBottomUpCheckpoint(
+            checkpoint,
+            membershipRoot,
+            10,
+            ActivityHelper.dummyActivityRollup()
+        );
         vm.stopPrank();
 
         uint8 v;
@@ -1548,7 +1563,12 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
 
         // create a checkpoint
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        gatewayDiamond.checkpointer().createBottomUpCheckpoint(checkpoint, membershipRoot, 10, ActivityHelper.dummyActivityRollup());
+        gatewayDiamond.checkpointer().createBottomUpCheckpoint(
+            checkpoint,
+            membershipRoot,
+            10,
+            ActivityHelper.dummyActivityRollup()
+        );
         vm.stopPrank();
 
         uint8 v;
@@ -1595,7 +1615,12 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
                 activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
             });
 
-            gatewayDiamond.checkpointer().createBottomUpCheckpoint(checkpoint, membershipRoot, 10, ActivityHelper.dummyActivityRollup());
+            gatewayDiamond.checkpointer().createBottomUpCheckpoint(
+                checkpoint,
+                membershipRoot,
+                10,
+                ActivityHelper.dummyActivityRollup()
+            );
         }
         vm.stopPrank();
 

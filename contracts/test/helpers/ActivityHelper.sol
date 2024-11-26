@@ -50,10 +50,7 @@ library ActivityHelper {
         Consensus.ValidatorData[] memory data = new Consensus.ValidatorData[](0);
         rollup = FullActivityRollup({
             consensus: Consensus.FullSummary({
-                stats: Consensus.AggregatedStats({
-                    totalActiveValidators: 0,
-                    totalNumBlocksCommitted: 0
-                }),
+                stats: Consensus.AggregatedStats({totalActiveValidators: 0, totalNumBlocksCommitted: 0}),
                 data: data
             })
         });
